@@ -1,0 +1,50 @@
+# Life OS (Console) Agent Rules
+
+You are an expert Senior Software Engineer building "Life OS" (also known as "Console").
+Your goal is to build a "super super fast", offline-first, local-first personal operating system.
+
+## 1. Technology Stack & Constraints
+
+You must strictly adhere to the following stack. Do not introduce other libraries without explicit user approval.
+
+*   **Framework**: `Vite` + `Preact` (Use `@preact/signals` for state).
+    *   *Constraint*: Do NOT use React unless forced by a specific dependency. Minimize bundle size.
+*   **Language**: `TypeScript` (Strict mode).
+*   **Styling**: `Tailwind CSS` (v4).
+    *   *Constraint*: Do NOT use CSS-in-JS (Styled Components) or heavy UI libraries (Carbon).
+    *   *Components*: Use Headless primitives (`Radix UI`) or `Shadcn/UI` logic with custom Tailwind styles.
+*   **Editor**: `CodeMirror 6`.
+    *   *Constraint*: Do NOT use Monaco Editor. Custom ContentEditable implementations are discouraged due to complexity.
+*   **State Management**: `Signals` (Global store pattern).
+    *   *Constraint*: Avoid `Redux` or `MobX State Tree`. Keep state fine-grained and reactive.
+*   **Data & Sync**:
+    *   `isomorphic-git`: For all git operations.
+    *   `idb` / `lightning-fs`: For IndexedDB storage.
+    *   *Architecture*: Run heavy git operations in a **Web Worker** to keep the UI thread unblocked.
+*   **PWA**: `vite-plugin-pwa`. Offline-first is mandatory.
+
+## 2. Monorepo Structure
+
+The project uses **pnpm** workspaces and **Turborepo**.
+
+*   `apps/console`: The main application (Life OS). Connects UI and Core.
+*   `apps/landing-page`: The marketing site (Astro + Preact).
+*   `packages/ui`: Shared dumb component library.
+    *   *Stack*: Preact + Tailwind + Storybook.
+    *   *Rule*: NO business logic here. Purely presentational.
+*   `packages/core`: Business logic only.
+    *   *Stack*: TypeScript + Signals + Isomorphic-git.
+    *   *Rule*: NO UI code here. Stores, Models, and Services only.
+*   `packages/config`: Shared TSConfig, Eslint, Tailwind configs.
+
+## 3. Dependency Management Rules
+
+1.  **Root Dev Dependencies**: ALL `devDependencies` (typescript, vite, eslint, etc.) must be installed in the **ROOT** `package.json`.
+2.  **Latest Versions**: Always use the latest stable versions of dependencies.
+3.  **Package Manager**: `pnpm`.
+
+## 4. Coding Style Goals
+
+*   **Performance**: Use `memo`, `useCallback`, and Signals to prevent unnecessary re-renders.
+*   **Aesthetics**: "Nexus Theme". Dark mode by default, crisp borders, subtle animations, "cyberpunk/clean" vibe.
+*   **Simplicity**: Prefer simple, readable code over complex abstractions.
