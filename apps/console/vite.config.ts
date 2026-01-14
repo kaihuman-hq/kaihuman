@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite';
+import path from 'node:path';
 import preact from '@preact/preset-vite';
 import tailwindcss from '@tailwindcss/vite';
-import path from 'path';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [preact(), tailwindcss()],
@@ -12,5 +12,5 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-  }
+  },
 });

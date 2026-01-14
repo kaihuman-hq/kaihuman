@@ -1,4 +1,4 @@
-import { signal, computed, effect } from '@preact/signals';
+import { computed, effect, signal } from '@preact/signals';
 import { z } from 'zod';
 
 const GithubProfileSchema = z.object({

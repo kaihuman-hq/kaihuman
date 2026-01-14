@@ -1,7 +1,6 @@
+import { authStore } from '@lifosy/core';
 import { render } from 'preact';
-import { Router, Route } from 'preact-router';
-import { createHashHistory } from 'history';
-import { authStore } from '@lifosy/core/src/stores/auth.store';
+import { Route, Router } from 'preact-router';
 import { Login } from './pages/login';
 import './index.css';
 
@@ -28,6 +27,7 @@ const App = () => {
       <ProtectedRoute path="/" component={() => <div>Dashboard (Authenticated)</div>} />
     </Router>
   );
-}
+};
 
+// biome-ignore lint/style/noNonNullAssertion: Root element is guaranteed to exist
 render(<App />, document.getElementById('app')!);

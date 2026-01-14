@@ -9,22 +9,22 @@ Goal: Re-implement Life OS as "Console" using a high-performance, offline-first 
 **Goal**: Establish the monorepo structure, build system, and shared configurations.
 
 ### Phase 1.1: Monorepo Bootstrap
-*   [ ] **Initialize Repository**: Run `pnpm init` and `npx create-turbo@latest`.
-*   [ ] **Configure Workspace**: Setup `pnpm-workspace.yaml` defining `apps/*` and `packages/*`.
-*   [ ] **Agent Setup**: Copy `.cursorrules` and `.agent/*` from the bootstrap kit.
+*   [x] **Initialize Repository**: Run `pnpm init` and `npx create-turbo@latest`.
+*   [x] **Configure Workspace**: Setup `pnpm-workspace.yaml` defining `apps/*` and `packages/*`.
+*   [x] **Agent Setup**: Copy `.cursorrules` and `.agent/*` from the bootstrap kit.
 
 ### Phase 1.2: Shared Configuration (`packages/config`)
-*   [ ] **TypeScript**: Create composable `tsconfig.base.json` (Strict Mode).
-*   [ ] **Linting/Formatting**: Setup `Biome` configuration.
-*   [ ] **Tailwind**: Create a shared Tailwind preset with the "Nexus Theme" tokens (colors, spacing).
+*   [x] **TypeScript**: Create composable `tsconfig.base.json` (Strict Mode).
+*   [x] **Linting/Formatting**: Setup `Biome` configuration.
+*   [x] **Tailwind**: Create a shared Tailwind preset with the "Nexus Theme" tokens (colors, spacing).
 
 ### Phase 1.3: Authentication & GitHub Integration
 **Goal**: Re-implement the OAuth flow found in `apps/life-os/src/models/app-boot.ts`.
-*   [ ] **AuthStore**: Create a Signal-based store to hold `token` and `user` profile. Persist to `localStorage`.
-*   [ ] **Env Config**: Define `VITE_GH_LOGIN` (OAuth Gatekeeper URL) in `.env`.
-*   [ ] **Boot Logic**: Implement logic to parse `?access_token=...` from URL on app startup.
+*   [x] **AuthStore**: Create a Signal-based store to hold `token` and `user` profile. Persist to `localStorage`.
+*   [x] **Env Config**: Define `VITE_GH_LOGIN` (OAuth Gatekeeper URL) in `.env`.
+*   [x] **Boot Logic**: Implement logic to parse `?access_token=...` from URL on app startup.
     *   *Ref*: See `ApplicationBoot.preLoggedInBoot` in legacy app.
-*   [ ] **Login UI**: Create a simple Login page with a "Login with GitHub" button redirecting to `VITE_GH_LOGIN`.
+*   [x] **Login UI**: Create a simple Login page with a "Login with GitHub" button redirecting to `VITE_GH_LOGIN`.
 
 ---
 
