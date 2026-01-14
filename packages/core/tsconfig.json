@@ -1,0 +1,9 @@
+{
+  "extends": "@lifosy/config/tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["vite/client"]
+  },
+  "include": ["src/**/*"]
+}

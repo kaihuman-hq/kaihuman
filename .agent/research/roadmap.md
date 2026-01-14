@@ -9,22 +9,22 @@ Goal: Re-implement Life OS as "Console" using a high-performance, offline-first 
 **Goal**: Establish the monorepo structure, build system, and shared configurations.
 
 ### Phase 1.1: Monorepo Bootstrap
-*   [ ] **Initialize Repository**: Run `pnpm init` and `npx create-turbo@latest`.
-*   [ ] **Configure Workspace**: Setup `pnpm-workspace.yaml` defining `apps/*` and `packages/*`.
-*   [ ] **Agent Setup**: Copy `.cursorrules` and `.agent/*` from the bootstrap kit.
+*   [x] **Initialize Repository**: Run `pnpm init` and `npx create-turbo@latest`.
+*   [x] **Configure Workspace**: Setup `pnpm-workspace.yaml` defining `apps/*` and `packages/*`.
+*   [x] **Agent Setup**: Copy `.cursorrules` and `.agent/*` from the bootstrap kit.
 
 ### Phase 1.2: Shared Configuration (`packages/config`)
-*   [ ] **TypeScript**: Create composable `tsconfig.base.json` (Strict Mode).
-*   [ ] **Linting/Formatting**: Setup `Biome` configuration.
-*   [ ] **Tailwind**: Create a shared Tailwind preset with the "Nexus Theme" tokens (colors, spacing).
+*   [x] **TypeScript**: Create composable `tsconfig.base.json` (Strict Mode).
+*   [x] **Linting/Formatting**: Setup `Biome` configuration.
+*   [x] **Tailwind**: Create a shared Tailwind preset with the "Nexus Theme" tokens (colors, spacing).
 
 ### Phase 1.3: Authentication & GitHub Integration
 **Goal**: Re-implement the OAuth flow found in `apps/life-os/src/models/app-boot.ts`.
-*   [ ] **AuthStore**: Create a Signal-based store to hold `token` and `user` profile. Persist to `localStorage`.
-*   [ ] **Env Config**: Define `VITE_GH_LOGIN` (OAuth Gatekeeper URL) in `.env`.
-*   [ ] **Boot Logic**: Implement logic to parse `?access_token=...` from URL on app startup.
+*   [x] **AuthStore**: Create a Signal-based store to hold `token` and `user` profile. Persist to `localStorage`.
+*   [x] **Env Config**: Define `VITE_GH_LOGIN` (OAuth Gatekeeper URL) in `.env`.
+*   [x] **Boot Logic**: Implement logic to parse `?access_token=...` from URL on app startup.
     *   *Ref*: See `ApplicationBoot.preLoggedInBoot` in legacy app.
-*   [ ] **Login UI**: Create a simple Login page with a "Login with GitHub" button redirecting to `VITE_GH_LOGIN`.
+*   [x] **Login UI**: Create a simple Login page with a "Login with GitHub" button redirecting to `VITE_GH_LOGIN`.
 
 ---
 
@@ -32,15 +32,14 @@ Goal: Re-implement Life OS as "Console" using a high-performance, offline-first 
 **Goal**: Implement the "Brain" of the OS without any UI. Pure TypeScript logic.
 **Target**: `packages/core`
 
-### Phase 2.1: Domain Modeling
-*   [ ] **File Types**: Define Zod schemas for `Todo`, `Habit`, `Timetracking`, and `Config`.
-*   [ ] **Store Architecture**: Define the Signal-based `RootStore` interface.
+### Phase 2.1: Domain Modeling (Completed)
+*   [x] **File Types**: Define Zod schemas for `Todo`, `Habit`, `Timetracking`, and `Config`.
+*   [x] **Store Architecture**: Define the Signal-based `RootStore` interface.
 
-### Phase 2.2: Git & Storage Layer (The Hard Part)
-*   [ ] **Web Worker Setup**: Scaffold a Web Worker to host `isomorphic-git`.
-*   [ ] **Git Service**: Implement `clone`, `pull`, `push`, `commit`, `log` inside the Worker.
-*   [ ] **Storage Service**: Implement `lightning-fs` / `idb` integration for offline persistence.
-*   [ ] **Sync Logic**: Implement the conflict resolution and "sync loop" logic.
+### Phase 2.2: GitHub API Layer (Completed)
+*   [x] **GitHub Client**: Integrate `@octokit/rest` (or `fetch` wrapper) for API interactions.
+*   [x] **File Operations**: Implement `fetchTree`, `getFile`, `saveFile` (create/update), `deleteFile`.
+*   [x] **Repo Operations**: Implement `listRepos`, `getBranch` logic.
 
 ### Phase 2.3: State Management
 *   [ ] **GithubProfileStore**: Implement authentication and repository selection logic.

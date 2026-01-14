@@ -1,0 +1,2 @@
+@import "tailwindcss";
+@config "../../../packages/config/tailwind-preset.js";

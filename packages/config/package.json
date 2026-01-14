@@ -1,0 +1,20 @@
+{
+  "name": "@lifosy/config",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "tsconfig.base.json",
+    "biome.json",
+    "tailwind-preset.js"
+  ],
+  "scripts": {
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "check-types": "echo 'No types to check in config'"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.11",
+    "tailwindcss": "^4.1.18",
+    "typescript": "5.9.2"
+  }
+}

@@ -1,0 +1,35 @@
+import { z } from 'zod';
+
+export const TodoSchema = z.object({
+  id: z.string().uuid(),
+  text: z.string().min(1),
+  completed: z.boolean().default(false),
+  tags: z.array(z.string()).default([]),
+  due: z.string().datetime().optional(),
+  created_at: z.string().datetime(),
+});
+
+export const HabitSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  frequency: z.enum(['daily', 'weekly']),
+  streaks: z.number().default(0),
+  history: z.record(z.string(), z.boolean()).default({}), // ISO date -> completed
+});
+
+export const TimetrackingSchema = z.object({
+  id: z.string().uuid(),
+  project: z.string().min(1),
+  duration: z.number().min(0), // in seconds
+  timestamp: z.string().datetime(),
+});
+
+export const ConfigSchema = z.object({
+  theme: z.enum(['nexus', 'light', 'dark']).default('nexus'),
+  username: z.string().optional(),
+});
+
+export type Todo = z.infer<typeof TodoSchema>;
+export type Habit = z.infer<typeof HabitSchema>;
+export type Timetracking = z.infer<typeof TimetrackingSchema>;
+export type Config = z.infer<typeof ConfigSchema>;
