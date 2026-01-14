@@ -32,9 +32,9 @@ Goal: Re-implement Life OS as "Console" using a high-performance, offline-first 
 **Goal**: Implement the "Brain" of the OS without any UI. Pure TypeScript logic.
 **Target**: `packages/core`
 
-### Phase 2.1: Domain Modeling
-*   [ ] **File Types**: Define Zod schemas for `Todo`, `Habit`, `Timetracking`, and `Config`.
-*   [ ] **Store Architecture**: Define the Signal-based `RootStore` interface.
+### Phase 2.1: Domain Modeling (Completed)
+*   [x] **File Types**: Define Zod schemas for `Todo`, `Habit`, `Timetracking`, and `Config`.
+*   [x] **Store Architecture**: Define the Signal-based `RootStore` interface.
 
 ### Phase 2.2: Git & Storage Layer (The Hard Part)
 *   [ ] **Web Worker Setup**: Scaffold a Web Worker to host `isomorphic-git`.

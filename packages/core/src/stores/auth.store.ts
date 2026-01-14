@@ -12,7 +12,7 @@ export type GithubProfile = z.infer<typeof GithubProfileSchema>;
 
 const STORAGE_KEY_TOKEN = 'lifeos_gh_token';
 
-class AuthStore {
+export class AuthStore {
   // Signals
   token = signal<string | null>(localStorage.getItem(STORAGE_KEY_TOKEN));
   user = signal<GithubProfile | null>(null);
