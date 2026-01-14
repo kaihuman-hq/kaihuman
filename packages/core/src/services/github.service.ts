@@ -32,6 +32,18 @@ export class GithubService {
     return data;
   }
 
+  async listRepos() {
+    const client = this.getClient();
+    // Fetch authenticated user's repos
+    // per_page: 100 to get most recent
+    const { data } = await client.repos.listForAuthenticatedUser({
+      sort: 'updated',
+      per_page: 100,
+      type: 'all',
+    });
+    return data;
+  }
+
   async fetchRepoTree(owner: string, repo: string, branch = 'main') {
     const client = this.getClient();
     // Get the reference for the branch to find the commit SHA
