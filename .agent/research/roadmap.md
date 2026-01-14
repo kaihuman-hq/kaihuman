@@ -36,11 +36,10 @@ Goal: Re-implement Life OS as "Console" using a high-performance, offline-first 
 *   [x] **File Types**: Define Zod schemas for `Todo`, `Habit`, `Timetracking`, and `Config`.
 *   [x] **Store Architecture**: Define the Signal-based `RootStore` interface.
 
-### Phase 2.2: Git & Storage Layer (The Hard Part)
-*   [ ] **Web Worker Setup**: Scaffold a Web Worker to host `isomorphic-git`.
-*   [ ] **Git Service**: Implement `clone`, `pull`, `push`, `commit`, `log` inside the Worker.
-*   [ ] **Storage Service**: Implement `lightning-fs` / `idb` integration for offline persistence.
-*   [ ] **Sync Logic**: Implement the conflict resolution and "sync loop" logic.
+### Phase 2.2: GitHub API Layer (Completed)
+*   [x] **GitHub Client**: Integrate `@octokit/rest` (or `fetch` wrapper) for API interactions.
+*   [x] **File Operations**: Implement `fetchTree`, `getFile`, `saveFile` (create/update), `deleteFile`.
+*   [x] **Repo Operations**: Implement `listRepos`, `getBranch` logic.
 
 ### Phase 2.3: State Management
 *   [ ] **GithubProfileStore**: Implement authentication and repository selection logic.
