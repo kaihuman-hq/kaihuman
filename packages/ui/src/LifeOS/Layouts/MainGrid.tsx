@@ -17,36 +17,53 @@ export const MainGrid = ({
   className
 }: MainGridProps) => {
   const kids = toChildArray(children) as VNode<any>[];
+
+  // Identify children by column prop
+  const leftChild = kids.find(k => k.props?.column === 'left');
+  const rightChild = kids.find(k => k.props?.column === 'right');
+  // Center is either explicitly marked, or it's the remaining one if not left/right
+  const centerChild = kids.find(k => k.props?.column === 'center')
+    || kids.find(k => k.props?.column !== 'left' && k.props?.column !== 'right');
+
   console.log('[MainGrid] Rendering. viewState:', viewState);
-  console.log('[MainGrid] Children count:', kids.length);
-  kids.forEach((k, i) => console.log(`[MainGrid] Child ${i}:`, k));
+  console.log('[MainGrid] Has Left:', !!leftChild, 'Has Right:', !!rightChild);
+
+  // Helper to determine grid cols
+  const leftWidth = leftChild ? "minmax(250px,1fr)" : "0px";
+  const rightWidth = rightChild ? "minmax(250px,1fr)" : "0px";
+
+  const dynamicVars = viewState === 'DASHBOARD' ? {
+    '--col-left': leftWidth,
+    '--col-right': rightWidth
+  } : {};
 
   return (
-    <div className={cn(
-      "life-os-root h-screen w-screen bg-[var(--los-bg)] overflow-hidden",
-      "grid transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)]", // Spring-ish CSS
-      // Desktop grid definition
-      "grid-cols-1", // Mobile default (Stack)
-      // Desktop (md+)
-      // State A: DASHBOARD - 1fr 2fr 1fr
-      viewState === 'DASHBOARD' && "md:grid-cols-[minmax(250px,1fr)_minmax(400px,2fr)_minmax(250px,1fr)]",
-      // State B: FOCUS - Wide Center, Squares on sides (if screen large enough)
-      // "Reasonable Width" for center (~800px-1200px?) and "Squared" for sides.
-      // Let's rely on flex/grid sizing. 1fr for center, and min-content or specific aspect ratio for sides?
-      // Grid cols can't enforce aspect ratio directly on the column width relative to row height easily without JS or subgrid.
-      // But we can just set them to a fixed reasonable width like 300px or 400px for "Squared-ish" look or use a ratio.
-      // Let's try 350px - 1fr - 350px for now to give space for "Square-ish" content.
-      viewState === 'FOCUS' && "md:grid-cols-[0px_1fr_0px] xl:grid-cols-[300px_1fr_300px]",
-      // State C: ZEN - 0px 1fr 0px
-      viewState === 'ZEN' && "md:grid-cols-[0px_1fr_0px]",
+    <div
+      className={cn(
+        "life-os-root h-screen w-screen bg-[var(--los-bg)] overflow-hidden",
+        "grid transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)]",
+        "grid-cols-1", // Mobile default
 
-      className
-    )}>
-      {kids.map((child, index) => {
-        // Assume strictly 3 children for desktop logic: [Left, Center, Right]
+        // Desktop (md+)
+        viewState === 'DASHBOARD' && "md:grid-cols-[var(--col-left)_minmax(400px,2fr)_var(--col-right)]",
+        viewState === 'ZEN' && "md:grid-cols-[0px_1fr_0px]",
+        viewState === 'FOCUS' && "md:grid-cols-[0px_1fr_0px] xl:grid-cols-[300px_1fr_300px]",
+
+        className
+      )}
+      // Use CSS vars to allow media query class overrides work
+      style={dynamicVars as any}
+    >
+      {[leftChild, centerChild, rightChild].map((child, index) => {
+        if (!child) return null; // Skip empty slots
+
         const column = index === 0 ? 'left' : index === 1 ? 'center' : 'right';
         const isCollapsed = viewState !== 'DASHBOARD' && column !== 'center';
-        const isHidden = viewState === 'ZEN' && column !== 'center';
+
+        // Dynamic visibility logic
+        let isHidden = false;
+        if (viewState === 'ZEN' && column !== 'center') isHidden = true;
+        // In DASHBOARD, if child exists, it's shown.
 
         return cloneElement(child, {
           column,
@@ -54,7 +71,11 @@ export const MainGrid = ({
           className: cn(
             child.props.className,
             "h-full w-full",
-            isHidden && "hidden"
+            isHidden && "hidden",
+            // Explicit grid placement
+            column === 'left' && "md:col-start-1",
+            column === 'center' && "md:col-start-2",
+            column === 'right' && "md:col-start-3"
           )
         });
       })}
