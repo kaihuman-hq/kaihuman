@@ -14,7 +14,8 @@
       "require": "./dist/index.mjs",
       "types": "./dist/index.d.ts"
     },
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./LifeOS/styles.css": "./src/LifeOS/styles.css"
   },
   "scripts": {
     "lint": "biome check .",

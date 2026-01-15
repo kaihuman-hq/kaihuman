@@ -8,3 +8,6 @@ export * from './components/SplitView';
 export * from './components/editor/Editor';
 export * from './components/files/FileTree';
 export * from './utils';
+
+// LifeOS Exports
+export * from './LifeOS/Layouts/MainApp';
