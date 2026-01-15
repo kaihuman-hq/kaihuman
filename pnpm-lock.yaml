@@ -78,6 +78,9 @@ importers:
       '@preact/signals':
         specifier: ^2.0.1
         version: 2.5.1(preact@10.28.2)
+      idb:
+        specifier: ^8.0.3
+        version: 8.0.3
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -1991,6 +1994,9 @@ packages:
   he@1.2.0:
     resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
     hasBin: true
+
+  idb@8.0.3:
+    resolution: {integrity: sha512-LtwtVyVYO5BqRvcsKuB2iUMnHwPVByPCXFXOpuU96IZPPoPN6xjOGxZQ74pgSVVLQWtUOYgyeL4GE98BY5D3wg==}
 
   import-lazy@4.0.0:
     resolution: {integrity: sha512-rKtvo6a868b5Hu3heneU+L4yEQ4jYKLtjpnPeUdK7h0yzXGmyBTypknlkCvHFBqfX9YlorEiMM6Dnq/5atfHkw==}
@@ -4596,6 +4602,8 @@ snapshots:
       function-bind: 1.1.2
 
   he@1.2.0: {}
+
+  idb@8.0.3: {}
 
   import-lazy@4.0.0: {}
 
