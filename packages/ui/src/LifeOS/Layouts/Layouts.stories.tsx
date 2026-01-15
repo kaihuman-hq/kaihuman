@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/preact';
 import { MainGrid } from './MainGrid';
 import { Tile } from '../Molecules/Tile';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
+import { StatusBar } from '../Organisms/StatusBar';
 import { useState } from 'preact/hooks';
 import { cn } from '../../utils';
 
