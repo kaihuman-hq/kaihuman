@@ -1,5 +1,6 @@
 import type { Preview } from "@storybook/preact";
 import "../src/styles.css";
+import "../src/LifeOS/styles.css";
 
 const preview: Preview = {
   parameters: {
