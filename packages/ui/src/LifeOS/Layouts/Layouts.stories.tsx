@@ -17,120 +17,101 @@ const meta = {
 
 export default meta;
 
-export const BentoLayout: StoryObj = {
-  render: () => {
-    const [state, setState] = useState<'DASHBOARD' | 'FOCUS' | 'ZEN'>('DASHBOARD');
-
-    return (
-      <div className="h-screen w-full relative">
-        <MainGrid viewState={state}>
-          <Tile title="Sidebar">
-            <div className="p-4">
-              <MonoHeader>NAV</MonoHeader>
-              <MonoText>Projects</MonoText>
-            </div>
-          </Tile>
-
-          <Tile title="Main Stage" onClick={() => {
-            if (state === 'DASHBOARD') setState('FOCUS');
-            else if (state === 'FOCUS') setState('ZEN');
-            else setState('DASHBOARD');
-          }}>
-            <div className="p-4 cursor-pointer">
-              <MonoHeader>WORK AREA</MonoHeader>
-              <MonoText className="mt-4">
-                Current State: <span className="text-[var(--los-accent)]">{state}</span>
-              </MonoText>
-              <MonoText className="mt-2 text-xs">Click me to cycle view modes.</MonoText>
-            </div>
-          </Tile>
-
-          <Tile title="Widgets">
-            <div className="p-4">
-              <MonoHeader>INFO</MonoHeader>
-              <MonoText>CPU: 12%</MonoText>
-            </div>
-          </Tile>
-        </MainGrid>
-
-        {/* Controls Overlay for Storybook */}
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-2 z-50">
-          {['DASHBOARD', 'FOCUS', 'ZEN'].map((s) => (
-            <button
-              key={s}
-              onClick={() => setState(s as any)}
-              className={cn(
-                "px-3 py-1 text-xs border border-[var(--los-border)] bg-black text-[var(--los-fg)] hover:border-[var(--los-accent)] transition-colors",
-                state === s && "bg-[var(--los-accent)] text-black font-bold"
-              )}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-}
+// export const BentoLayout: StoryObj = { ... }
 
 export const TileMatrix: StoryObj = {
   render: () => {
-    const tiles = Array.from({ length: 20 }, (_, i) => ({
-      id: i,
-      title: `Tile 0${i + 1}`
-    }));
+    // Local State for the Story
+    const [activeTileId, setActiveTileId] = useState<number | null>(null);
+    const tiles = Array.from({ length: 24 }, (_, i) => ({ id: i, title: `Tile ${i}` }));
 
     return (
-      <div className="min-h-screen bg-[var(--los-bg)] start-0">
-        {/* 
-                   Gapless Grid Trick:
-                   - Set grid gap to 1px.
-                   - Set grid background to border color.
-                   - Set tiles to have NO border.
-                   - Result: The gap becomes the border.
-                */}
-        <div className={cn(
-          "grid gap-[1px] bg-[var(--los-border)] border border-[var(--los-border)]",
-          // Mobile: 1 column
-          "grid-cols-1",
-          // Tablet: 2 columns
-          "sm:grid-cols-2",
-          // Regular Desktop: 4 columns
-          "lg:grid-cols-4",
-          // Large Screens: 8 columns
-          "2xl:grid-cols-8"
-        )}>
-          {tiles.map((tile) => (
-            <Tile
-              key={tile.id}
-              title={tile.title}
-              // Remove default Tile borders to let the grid gap handle it
-              className="border-none aspect-square hover:bg-white/5 transition-colors"
-            >
-              <div className="p-4 flex flex-col justify-between h-full">
-                <MonoText className="text-xs opacity-50">Content Block</MonoText>
-                <div className="text-right">
-                  <MonoText className="text-[10px]">{`ID: ${tile.id}`}</MonoText>
-                </div>
-              </div>
-            </Tile>
-          ))}
-        </div>
+      <div className="h-screen w-screen bg-[var(--los-bg)] overflow-hidden relative">
+        <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'ZEN'}>
 
-        {/* Sticky Status Bar */}
+          {/* LEFT SIDE */}
+          <Tile title="LEFT" column="left" className="bg-red-900/20">
+            <div className="h-full w-full flex items-center justify-center">
+              <MonoText className="rotate-[-90deg]">SIDE_A</MonoText>
+            </div>
+          </Tile>
+
+          {/* CENTER */}
+          <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : "MATRIX"} column="center" className="bg-blue-900/20">
+            <div className="h-full w-full relative border border-green-500">
+              <div className="absolute top-0 right-0 z-50 bg-black text-white p-2">
+                DEBUG: ID={activeTileId === null ? 'NULL' : activeTileId}
+              </div>
+              {/* MATRIX VIEW */}
+              <div className={cn(
+                "absolute inset-0 grid gap-[1px] bg-[var(--los-border)] border-b border-[var(--los-border)] overflow-y-auto content-start transition-opacity duration-300",
+                "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8",
+                activeTileId !== null ? "opacity-0 pointer-events-none" : "opacity-100"
+              )}>
+                {tiles.map((tile) => (
+                  <div
+                    key={tile.id}
+                    onClick={() => setActiveTileId(tile.id)}
+                    className="bg-[var(--los-bg)] aspect-square hover:bg-white/5 transition-colors cursor-pointer relative group"
+                  >
+                    <div className="p-4">
+                      <MonoText className="text-xs opacity-50">{tile.title}</MonoText>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* FOCUSED VIEW */}
+              <div className={cn(
+                "absolute inset-0 pointer-events-none transition-opacity duration-300",
+                activeTileId !== null ? "opacity-100 pointer-events-auto" : "opacity-0"
+              )}>
+                {activeTileId !== null && (
+                  <FocusedTileDemo
+                    id={activeTileId}
+                    onClose={() => setActiveTileId(null)}
+                  />
+                )}
+              </div>
+            </div>
+          </Tile>
+
+          {/* RIGHT SIDE: Placeholder for "Squared Tile" */}
+          <Tile title="RIGHT" column="right">
+            <div className="h-full w-full flex items-center justify-center bg-white/5">
+              <MonoText className="rotate-90">SIDE_B</MonoText>
+            </div>
+          </Tile>
+
+        </MainGrid>
+
         <StatusBar
-          mode="NORMAL"
-          breadcrumbs={["~", "personal", "journal", "2024"]}
-          stats={[
-            { label: "W/C", value: "1,204" },
-            { label: "SYNC", value: "OK" }
-          ]}
+          mode={activeTileId !== null ? "FOCUS" : "MATRIX"}
+          breadcrumbs={activeTileId !== null ? ["root", "tile", `#${activeTileId}`] : ["root", "matrix"]}
+          stats={[{ label: "TILES", value: tiles.length.toString() }]}
         />
       </div>
     );
   }
 }
 
-export const ApplicationShell: StoryObj = {
-  render: () => <MainApp />
+// Local Demo Component for Focused Tile
+const FocusedTileDemo = ({ id, onClose }: { id: number; onClose: () => void }) => {
+  return (
+    <div className="absolute inset-0 bg-[var(--los-bg)] z-10 p-8 flex flex-col">
+      <div className="flex-1 border border-[var(--los-border)] flex flex-col relative bg-[var(--los-bg)] animate-in fade-in slide-in-from-bottom-4 duration-300">
+        {/* Header */}
+        <div className="h-12 border-b border-[var(--los-border)] flex items-center justify-between px-4">
+          <MonoHeader className="text-[var(--los-accent)]">FOCUSED_TILE_{id}</MonoHeader>
+          <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="text-xs hover:text-red-500">[CLOSE]</button>
+        </div>
+        {/* Content */}
+        <div className="flex-1 p-8">
+          <MonoText>Here is the focused content with full height and reasonable width.</MonoText>
+        </div>
+      </div>
+    </div>
+  );
 }
+
+// export const ApplicationShell: StoryObj = { ... }

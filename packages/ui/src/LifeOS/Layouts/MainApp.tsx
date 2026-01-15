@@ -6,7 +6,7 @@ import { StatusBar } from '../Organisms/StatusBar';
 import { Editor } from '../Organisms/Editor';
 import { MonoText, MonoHeader } from '../Atoms/Typography';
 import { MainGrid } from './MainGrid';
-import { AnimatePresence, motion } from 'framer-motion';
+// framer-motion removed
 
 export const MainApp = () => {
   // State
@@ -21,7 +21,7 @@ export const MainApp = () => {
 
   return (
     <div className="h-screen w-screen bg-[var(--los-bg)] overflow-hidden relative">
-      <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
+      <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'ZEN'}>
 
         {/* LEFT SIDEBAR: Navigation / File Tree */}
         <Tile title="NAV" column="left">
@@ -37,54 +37,46 @@ export const MainApp = () => {
 
         {/* CENTER STAGE: The Matrix OR The Active Tile */}
         <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : "MATRIX_ROOT"} column="center">
-          <div className="h-full w-full relative">
-            <AnimatePresence mode="popLayout" initial={false}>
-              {activeTileId === null ? (
-                // STATE A: THE MATRIX
-                <motion.div
-                  className={cn(
-                    "absolute inset-0 grid gap-[1px] bg-[var(--los-border)] border-b border-[var(--los-border)] overflow-y-auto",
-                    "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8",
-                    "content-start" // Pack to top
-                  )}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                  key="matrix"
-                >
-                  {tiles.map((tile) => (
-                    <motion.div
-                      key={tile.id}
-                      layoutId={`tile-${tile.id}`}
-                      onClick={() => setActiveTileId(tile.id)}
-                      className="bg-[var(--los-bg)] aspect-square hover:bg-white/5 transition-colors group relative cursor-pointer"
-                    >
-                      <div className="p-4 flex flex-col justify-between h-full">
-                        <div className="flex justify-between items-start">
-                          <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity">
-                            {tile.id === 0 ? "HOME_ROOT" : "NODE"}
-                          </MonoText>
-                          <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors" />
-                        </div>
-                        <div className="text-right">
-                          <MonoText className="text-[10px] text-[var(--los-muted)]">
-                            {`ID: ${tile.id.toString(16).toUpperCase().padStart(4, '0')}`}
-                          </MonoText>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              ) : (
-                // STATE B: FOCUSED TILE
-                <FocusedTile
-                  id={activeTileId}
-                  onClose={() => setActiveTileId(null)}
-                />
+          {activeTileId === null ? (
+            // STATE A: THE MATRIX
+            <div
+              className={cn(
+                "absolute inset-0 grid gap-[1px] bg-[var(--los-border)] border-b border-[var(--los-border)] overflow-y-auto",
+                "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8",
+                "content-start", // Pack to top
+                "animate-in fade-in duration-300"
               )}
-            </AnimatePresence>
-          </div>
+              key="matrix"
+            >
+              {tiles.map((tile) => (
+                <div
+                  key={tile.id}
+                  onClick={() => setActiveTileId(tile.id)}
+                  className="bg-[var(--los-bg)] aspect-square hover:bg-white/5 transition-colors group relative cursor-pointer"
+                >
+                  <div className="p-4 flex flex-col justify-between h-full">
+                    <div className="flex justify-between items-start">
+                      <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity">
+                        {tile.id === 0 ? "HOME_ROOT" : "NODE"}
+                      </MonoText>
+                      <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors" />
+                    </div>
+                    <div className="text-right">
+                      <MonoText className="text-[10px] text-[var(--los-muted)]">
+                        {`ID: ${tile.id.toString(16).toUpperCase().padStart(4, '0')}`}
+                      </MonoText>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // STATE B: FOCUSED TILE
+            <FocusedTile
+              id={activeTileId}
+              onClose={() => setActiveTileId(null)}
+            />
+          )}
         </Tile>
 
         {/* RIGHT SIDEBAR: Widgets */}
@@ -123,17 +115,12 @@ const FocusedTile = ({ id, onClose }: { id: number; onClose: () => void }) => {
   const [view, setView] = useState<'INFO' | 'EDITOR'>('INFO');
 
   return (
-    <motion.div
+    <div
       className="absolute inset-0 bg-[var(--los-bg)] z-10 p-8 flex flex-col"
-      layoutId={`tile-${id}`}
       key={`focused-${id}`}
-    // REMOVED onClick to close - explicit close only
     >
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="flex-1 border border-[var(--los-border)] flex flex-col relative bg-[var(--los-bg)]"
+      <div
+        className="flex-1 border border-[var(--los-border)] flex flex-col relative bg-[var(--los-bg)] animate-in fade-in slide-in-from-bottom-4 duration-300"
       >
         {/* Header / Controls */}
         <div className="h-12 border-b border-[var(--los-border)] flex items-center justify-between px-4 shrink-0">
@@ -175,46 +162,36 @@ const FocusedTile = ({ id, onClose }: { id: number; onClose: () => void }) => {
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-8 relative">
-          <AnimatePresence mode="wait">
-            {view === 'INFO' ? (
-              <motion.div
-                key="info"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                transition={{ duration: 0.2 }}
-                className="max-w-3xl"
-              >
-                <MonoText className="text-xl opacity-80 leading-relaxed mb-6">
-                  You are viewing the info panel. This is the default view.
-                </MonoText>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="aspect-video border border-[var(--los-border)] bg-white/5 p-4 flex items-end">
-                    <MonoText className="text-[10px]">PREVIEW_A</MonoText>
-                  </div>
-                  <div className="aspect-video border border-[var(--los-border)] bg-white/5 p-4 flex items-end">
-                    <MonoText className="text-[10px]">PREVIEW_B</MonoText>
-                  </div>
-                  <div className="aspect-video border border-[var(--los-border)] bg-white/5 p-4 flex items-end">
-                    <MonoText className="text-[10px]">METRICS</MonoText>
-                  </div>
+          {view === 'INFO' ? (
+            <div
+              key="info"
+              className="max-w-3xl animate-in fade-in slide-in-from-left-4 duration-200"
+            >
+              <MonoText className="text-xl opacity-80 leading-relaxed mb-6">
+                You are viewing the info panel. This is the default view.
+              </MonoText>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="aspect-video border border-[var(--los-border)] bg-white/5 p-4 flex items-end">
+                  <MonoText className="text-[10px]">PREVIEW_A</MonoText>
                 </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="editor"
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                transition={{ duration: 0.2 }}
-                className="h-full w-full border border-[var(--los-border)]"
-              >
-                <Editor />
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <div className="aspect-video border border-[var(--los-border)] bg-white/5 p-4 flex items-end">
+                  <MonoText className="text-[10px]">PREVIEW_B</MonoText>
+                </div>
+                <div className="aspect-video border border-[var(--los-border)] bg-white/5 p-4 flex items-end">
+                  <MonoText className="text-[10px]">METRICS</MonoText>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div
+              key="editor"
+              className="h-full w-full border border-[var(--los-border)] animate-in fade-in slide-in-from-right-4 duration-200"
+            >
+              <Editor />
+            </div>
+          )}
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }

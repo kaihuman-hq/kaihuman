@@ -17,6 +17,9 @@ export const MainGrid = ({
   className
 }: MainGridProps) => {
   const kids = toChildArray(children) as VNode<any>[];
+  console.log('[MainGrid] Rendering. viewState:', viewState);
+  console.log('[MainGrid] Children count:', kids.length);
+  kids.forEach((k, i) => console.log(`[MainGrid] Child ${i}:`, k));
 
   return (
     <div className={cn(
@@ -27,8 +30,13 @@ export const MainGrid = ({
       // Desktop (md+)
       // State A: DASHBOARD - 1fr 2fr 1fr
       viewState === 'DASHBOARD' && "md:grid-cols-[minmax(250px,1fr)_minmax(400px,2fr)_minmax(250px,1fr)]",
-      // State B: FOCUS - 60px 1fr 60px
-      viewState === 'FOCUS' && "md:grid-cols-[60px_1fr_60px]",
+      // State B: FOCUS - Wide Center, Squares on sides (if screen large enough)
+      // "Reasonable Width" for center (~800px-1200px?) and "Squared" for sides.
+      // Let's rely on flex/grid sizing. 1fr for center, and min-content or specific aspect ratio for sides?
+      // Grid cols can't enforce aspect ratio directly on the column width relative to row height easily without JS or subgrid.
+      // But we can just set them to a fixed reasonable width like 300px or 400px for "Squared-ish" look or use a ratio.
+      // Let's try 350px - 1fr - 350px for now to give space for "Square-ish" content.
+      viewState === 'FOCUS' && "md:grid-cols-[0px_1fr_0px] xl:grid-cols-[300px_1fr_300px]",
       // State C: ZEN - 0px 1fr 0px
       viewState === 'ZEN' && "md:grid-cols-[0px_1fr_0px]",
 
@@ -38,6 +46,7 @@ export const MainGrid = ({
         // Assume strictly 3 children for desktop logic: [Left, Center, Right]
         const column = index === 0 ? 'left' : index === 1 ? 'center' : 'right';
         const isCollapsed = viewState !== 'DASHBOARD' && column !== 'center';
+        const isHidden = viewState === 'ZEN' && column !== 'center';
 
         return cloneElement(child, {
           column,
@@ -45,10 +54,7 @@ export const MainGrid = ({
           className: cn(
             child.props.className,
             "h-full w-full",
-            // Mobile Logic: Show only Center unless on Dashboard? Or just stack?
-            // User said "Stack or Carousel". For now, let's just stack them vertically on mobile via grid-cols-1
-            // But MainGrid has h-screen, so they might overflow.
-            // Let's enforce h-full.
+            isHidden && "hidden"
           )
         });
       })}

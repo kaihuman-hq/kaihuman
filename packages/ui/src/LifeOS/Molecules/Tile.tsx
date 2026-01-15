@@ -1,7 +1,6 @@
 import { ComponentChildren, h } from 'preact';
 import { cn } from '../../utils';
 import { MonoText } from '../Atoms/Typography';
-import { motion } from 'framer-motion';
 
 export interface TileProps {
   title: string;
@@ -10,7 +9,7 @@ export interface TileProps {
   isCollapsed?: boolean;
   className?: string;
   onClick?: () => void;
-  layoutId?: string; // For Shared Layout Animations
+  // layoutId removed
 }
 
 export const Tile = ({
@@ -20,25 +19,17 @@ export const Tile = ({
   isCollapsed = false,
   className,
   onClick,
-  layoutId
 }: TileProps) => {
   return (
-    <motion.div
-      layoutId={layoutId}
+    <div
       onClick={onClick}
       className={cn(
-        "relative flex flex-col h-full bg-[var(--los-bg)] transition-colors duration-300 overflow-hidden",
-        // Gapless Border Logic via CSS classes is preserved, 
-        // BUT framer-motion might override transforms.
-        "border border-[var(--los-border)]", // Base border
+        "relative flex flex-col h-full bg-[var(--los-bg)] transition-all duration-300 overflow-hidden",
+        "border border-[var(--los-border)]",
         column === 'center' && "border-l-0",
         column === 'right' && "border-l-0",
         className
       )}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
     >
       {/* Micro Header */}
       <div className={cn(
@@ -68,6 +59,6 @@ export const Tile = ({
       )}>
         {children}
       </div>
-    </motion.div>
+    </div>
   )
 }
