@@ -1,0 +1,37 @@
+/* LifeOS Design Tokens */
+/* Scoped to .life-os-root or specific components to avoid bleeding */
+
+:root {
+  /* Colors */
+  --los-bg: #000000;
+  --los-fg: #e2e8f0;
+  /* slate-200 */
+  --los-border: #333333;
+  --los-accent: #00FF00;
+  /* Neon Green / Terminal Green */
+  --los-accent-dim: rgba(0, 255, 0, 0.2);
+  --los-muted: #64748b;
+  /* slate-500 */
+
+  /* Typography */
+  --los-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Spacing */
+  --los-gap: 0px;
+  /* The gapless philosophy */
+
+  /* Components */
+  --los-status-height: 32px;
+}
+
+.life-os-root {
+  background-color: var(--los-bg);
+  color: var(--los-fg);
+  font-family: var(--los-font-mono);
+  box-sizing: border-box;
+}
+
+/* Global Reset for LifeOS components */
+.life-os-root * {
+  box-sizing: border-box;
+}

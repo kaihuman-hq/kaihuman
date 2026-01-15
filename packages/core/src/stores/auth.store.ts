@@ -1,5 +1,6 @@
 import { computed, effect, signal } from '@preact/signals';
 import { z } from 'zod';
+import { dbPromise } from '../db.js';
 
 const GithubProfileSchema = z.object({
   id: z.number(),
@@ -19,13 +20,36 @@ export class AuthStore {
   isAuthenticated = computed(() => !!this.token.value);
 
   constructor() {
-    // Persist token
+    this.init();
+  }
+
+  private async init() {
+    const db = await dbPromise;
+    const token = await db.get('auth', 'token');
+    const user = await db.get('auth', 'user');
+
+    if (token) this.token.value = token;
+    if (user) this.user.value = user;
+
+    // Fallback to localStorage if DB empty (migration path)
+    if (!token && localStorage.getItem(STORAGE_KEY_TOKEN)) {
+      this.token.value = localStorage.getItem(STORAGE_KEY_TOKEN);
+    }
+
+    // Persist token to DB on change
     effect(() => {
-      if (this.token.value) {
-        localStorage.setItem(STORAGE_KEY_TOKEN, this.token.value);
-      } else {
-        localStorage.removeItem(STORAGE_KEY_TOKEN);
-      }
+      const saveToken = async () => {
+        const db = await dbPromise;
+        if (this.token.value) {
+          // Keep localStorage as backup/sync for now, but primary source is DB for local-first
+          localStorage.setItem(STORAGE_KEY_TOKEN, this.token.value);
+          await db.put('auth', this.token.value, 'token');
+        } else {
+          localStorage.removeItem(STORAGE_KEY_TOKEN);
+          await db.delete('auth', 'token');
+        }
+      };
+      saveToken();
     });
 
     // Fetch user if token exists but user is missing (restore session)
@@ -33,6 +57,19 @@ export class AuthStore {
       if (this.token.value && !this.user.value) {
         this.fetchUser();
       }
+    });
+
+    // Persist user profile
+    effect(() => {
+      const saveUser = async () => {
+        const db = await dbPromise;
+        if (this.user.value) {
+          await db.put('auth', this.user.value, 'user');
+        } else {
+          await db.delete('auth', 'user');
+        }
+      };
+      saveUser();
     });
   }
 

@@ -1,33 +1,72 @@
-import { githubProfileStore } from '@lifosy/core';
+import { h } from 'preact';
+import { useEffect } from 'preact/hooks';
+import { useSignal } from '@preact/signals';
+import { githubFileStore, githubProfileStore } from '@lifosy/core';
+import { MainApp, TileDef } from '@lifosy/ui';
+import { FileViewer } from '../components/FileViewer';
 
 export const Dashboard = () => {
   const repo = githubProfileStore.currentRepo.value;
-  return (
-    <div class="space-y-4">
-      <h2 class="text-3xl font-bold bg-gradient-to-r from-teal-400 to-blue-500 bg-clip-text text-transparent">
-        Dashboard
-      </h2>
-      <p class="text-slate-400">
-        {repo
-          ? `Connected to ${repo.full_name}`
-          : 'Please select a repository from the sidebar to get started.'}
-      </p>
 
-      {/* Metrics placeholders */}
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-        <div class="p-6 bg-slate-800 rounded-lg border border-slate-700">
-          <h3 class="text-xs uppercase font-bold text-slate-500 mb-2">Total Files</h3>
-          <p class="text-2xl font-mono text-white">--</p>
-        </div>
-        <div class="p-6 bg-slate-800 rounded-lg border border-slate-700">
-          <h3 class="text-xs uppercase font-bold text-slate-500 mb-2">Habit Streak</h3>
-          <p class="text-2xl font-mono text-green-400">--</p>
-        </div>
-        <div class="p-6 bg-slate-800 rounded-lg border border-slate-700">
-          <h3 class="text-xs uppercase font-bold text-slate-500 mb-2">Open Tasks</h3>
-          <p class="text-2xl font-mono text-blue-400">--</p>
-        </div>
+  // Use local signal for formatted tiles to avoid re-calc on every render
+  // unless tree changes
+  const tiles = useSignal<TileDef[]>([]);
+
+  useEffect(() => {
+    if (repo) {
+      console.log('[Dashboard] Loading tree for', repo.full_name);
+      githubFileStore.loadTree();
+    }
+  }, [repo?.full_name]);
+
+  // Reactively map tree to tiles
+  const tree = githubFileStore.tree.value;
+  useEffect(() => {
+    if (tree.length === 0) return;
+
+    // Filter for root files/folders (no '/' in path)
+    // Or maybe show top level folders as 'Folder' tiles?
+    // For now, let's just show root items.
+    const rootItems = tree.filter(item => !item.path.includes('/'));
+
+    // Sort: Folders first, then files
+    rootItems.sort((a, b) => {
+      if (a.type === 'tree' && b.type !== 'tree') return -1;
+      if (a.type !== 'tree' && b.type === 'tree') return 1;
+      return a.path.localeCompare(b.path);
+    });
+
+    const mappedTiles: TileDef[] = rootItems.map((item, index) => ({
+      id: item.sha, // or item.path? item.path is more readable for ID if unique
+      title: item.path,
+      content: item.type === 'blob'
+        ? <FileViewer path={item.path} />
+        : <div className="p-8 text-nexus-muted">Folder View Not Implemented</div>
+    }));
+
+    console.log('[Dashboard] Mapped tiles:', mappedTiles.length);
+    tiles.value = mappedTiles;
+
+  }, [tree]);
+
+  if (!repo) {
+    return (
+      <div className="h-screen flex items-center justify-center text-nexus-muted">
+        Please select a repository.
       </div>
+    );
+  }
+
+  return (
+    <div className="h-full w-full">
+      {tiles.value.length > 0 ? (
+        <MainApp tiles={tiles.value} />
+      ) : (
+        <div className="flex h-screen items-center justify-center text-nexus-muted">
+          {githubFileStore.isLoading.value ? "Loading files..." : "No files in root directory."}
+        </div>
+      )}
     </div>
   );
 };
+

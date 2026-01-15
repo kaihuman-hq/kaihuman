@@ -1,6 +1,7 @@
-import { signal } from '@preact/signals';
+import { effect, signal } from '@preact/signals';
 import { githubService } from '../services/github.service.js';
 import { authStore } from './auth.store.js';
+import { dbPromise } from '../db.js';
 
 // Basic Repo interface based on what we need
 export interface GithubRepo {
@@ -21,6 +22,32 @@ export class GithubProfileStore {
   currentRepo = signal<GithubRepo | null>(null);
   isLoading = signal<boolean>(false);
   error = signal<string | null>(null);
+
+  constructor() {
+    this.init();
+  }
+
+  private init() {
+    // 1. Try localStorage first (sync, fast)
+    const saved = localStorage.getItem('lifeos_current_repo');
+    if (saved) {
+      try {
+        const repo = JSON.parse(saved);
+        this.currentRepo.value = repo;
+      } catch (e) {
+        console.error('Failed to parse saved repo', e);
+      }
+    }
+
+    // 2. Persist to localStorage on change
+    effect(() => {
+      if (this.currentRepo.value) {
+        localStorage.setItem('lifeos_current_repo', JSON.stringify(this.currentRepo.value));
+      } else {
+        localStorage.removeItem('lifeos_current_repo');
+      }
+    });
+  }
 
   async fetchRepos() {
     if (!authStore.isAuthenticated.value) return;

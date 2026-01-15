@@ -1,4 +1,5 @@
 import { authStore } from '@lifosy/core';
+import { Button } from '@lifosy/ui';
 
 export function Login() {
   return (
@@ -10,13 +11,11 @@ export function Login() {
         </div>
 
         <div class="mt-8 space-y-6">
-          <button
+          <Button
             onClick={() => authStore.login()}
-            type="button"
-            class="group relative flex w-full justify-center rounded-md border border-transparent bg-nexus-primary px-4 py-2 text-sm font-medium text-black hover:bg-cyan-400 focus:outline-none focus:ring-2 focus:ring-nexus-primary focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-200"
-          >
-            Sign in with GitHub
-          </button>
+            label="Sign in with GitHub"
+            className="w-full"
+          />
         </div>
       </div>
     </div>
