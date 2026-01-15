@@ -1,6 +1,7 @@
 import { ComponentChildren, h } from 'preact';
 import { cn } from '../../utils';
 import { MonoText } from '../Atoms/Typography';
+import { motion } from 'framer-motion';
 
 export interface TileProps {
   title: string;
@@ -9,6 +10,7 @@ export interface TileProps {
   isCollapsed?: boolean;
   className?: string;
   onClick?: () => void;
+  layoutId?: string; // For Shared Layout Animations
 }
 
 export const Tile = ({
@@ -17,23 +19,26 @@ export const Tile = ({
   column = 'center',
   isCollapsed = false,
   className,
-  onClick
+  onClick,
+  layoutId
 }: TileProps) => {
   return (
-    <div className={cn(
-      "relative flex flex-col h-full bg-[var(--los-bg)] transition-all duration-300 overflow-hidden",
-      // Gapless Border Logic
-      "border border-[var(--los-border)]", // Base border
-      // Prevent double borders by removing specific sides based on column
-      // Left: Keep all (or maybe remove right?)
-      // Center: Remove Left (shares with Left's right)
-      column === 'center' && "border-l-0",
-      // Right: Remove Left (shares with Center's right)
-      column === 'right' && "border-l-0",
-
-      className
-    )}
+    <motion.div
+      layoutId={layoutId}
       onClick={onClick}
+      className={cn(
+        "relative flex flex-col h-full bg-[var(--los-bg)] transition-colors duration-300 overflow-hidden",
+        // Gapless Border Logic via CSS classes is preserved, 
+        // BUT framer-motion might override transforms.
+        "border border-[var(--los-border)]", // Base border
+        column === 'center' && "border-l-0",
+        column === 'right' && "border-l-0",
+        className
+      )}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
     >
       {/* Micro Header */}
       <div className={cn(
@@ -48,7 +53,7 @@ export const Tile = ({
           {title}
         </MonoText>
 
-        {/* Collapsed Indicator (Vertical Text or Dot) */}
+        {/* Collapsed Indicator */}
         {isCollapsed && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-1 h-1 bg-[var(--los-accent)] rounded-full animate-pulse" />
@@ -63,6 +68,6 @@ export const Tile = ({
       )}>
         {children}
       </div>
-    </div>
+    </motion.div>
   )
 }
