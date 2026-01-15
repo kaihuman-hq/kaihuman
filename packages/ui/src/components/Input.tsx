@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { cn } from './Button'; // Re-use utility, eventually move to utils
+import { cn } from '../utils';
 import { forwardRef } from 'preact/compat';
 
 export interface InputProps extends h.JSX.HTMLAttributes<HTMLInputElement> {

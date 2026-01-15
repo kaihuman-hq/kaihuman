@@ -1,6 +1,7 @@
 import { FileText, Home, Settings } from 'lucide-preact';
 import { Link } from 'preact-router/match';
 import { RepoSelector } from '../repo/RepoSelector';
+import { FileTree } from '../files/FileTree';
 import { Sidebar as NexusSidebar, SidebarHeader, SidebarContent, SidebarFooter } from '@lifosy/ui';
 
 export const Sidebar = () => {
@@ -45,11 +46,16 @@ export const Sidebar = () => {
             </Link>
           </div>
         </nav>
+
+        <div class="mt-4 pt-4 border-t border-nexus-border flex-1 overflow-hidden flex flex-col">
+          <h3 class="px-2 text-xs font-semibold text-nexus-muted mb-2 flex-shrink-0">FILES</h3>
+          <FileTree />
+        </div>
       </SidebarContent>
 
       <SidebarFooter>
         <div class="text-xs text-nexus-muted">v0.1.0-alpha</div>
       </SidebarFooter>
-    </NexusSidebar>
+    </NexusSidebar >
   );
 };
