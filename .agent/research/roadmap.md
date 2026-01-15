@@ -42,8 +42,8 @@ Goal: Re-implement Life OS as "Console" using a high-performance, offline-first 
 *   [x] **Repo Operations**: Implement `listRepos`, `getBranch` logic.
 
 ### Phase 2.3: State Management
-*   [ ] **GithubProfileStore**: Implement authentication and repository selection logic.
-*   [ ] **GithubFileStore**: Implement file loading, saving, and caching logic using Signals.
+*   [x] **GithubProfileStore**: Implement authentication and repository selection logic.
+*   [x] **GithubFileStore**: Implement file loading, saving, and caching logic using Signals.
 
 ---
 
@@ -52,13 +52,13 @@ Goal: Re-implement Life OS as "Console" using a high-performance, offline-first 
 **Target**: `packages/ui`
 
 ### Phase 3.1: Environment
-*   [ ] **Storybook**: Initialize Storybook for Preact.
-*   [ ] **Tailwind integration**: Ensure Tailwind works in Storybook.
+*   [x] **Storybook**: Initialize Storybook for Preact.
+*   [x] **Tailwind integration**: Ensure Tailwind works in Storybook.
 
 ### Phase 3.2: Nexus Design System
-*   [ ] **Primitives**: Build atomic components using Radix UI / Headless patterns (Button, Input, Dropdown, Modal).
-*   [ ] **Layouts**: create `Sidebar`, `Panel`, `SplitView` shells.
-*   [ ] **Visuals**: Implement the "Cyberpunk/Clean" aesthetic (Glassmorphism, thin borders).
+*   [x] **Primitives**: Build atomic components using Radix UI / Headless patterns (Button, Input, Dropdown, Modal).
+*   [x] **Layouts**: create `Sidebar`, `Panel`, `SplitView` shells.
+*   [x] **Visuals**: Implement the "Cyberpunk/Clean" aesthetic (Glassmorphism, thin borders).
 
 ---
 

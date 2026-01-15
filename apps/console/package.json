@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@lifosy/core": "workspace:*",
+    "@lifosy/ui": "workspace:*",
     "@preact/signals": "^2.0.1",
     "lucide-preact": "^0.562.0",
     "preact": "^10.25.4",

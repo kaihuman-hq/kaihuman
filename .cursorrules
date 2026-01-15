@@ -32,6 +32,8 @@ The project uses **pnpm** workspaces and **Turborepo**.
 *   `packages/ui`: Shared dumb component library.
     *   *Stack*: Preact + Tailwind + Storybook.
     *   *Rule*: NO business logic here. Purely presentational.
+    *   *Rule*: Console App (`apps/console`) MUST NOT define its own UI primitives (Button, Input, etc). It MUST import them from `@lifosy/ui`. If a component is missing, add it to `packages/ui` first.
+    *   *Rule*: Console App (`apps/console`) MUST NOT define its own UI primitives (Button, Input, etc). It MUST import them from `@lifosy/ui`. If a component is missing, add it to `packages/ui` first.
 *   `packages/core`: Business logic only.
     *   *Stack*: TypeScript + Signals + Isomorphic-git.
     *   *Rule*: NO UI code here. Stores, Models, and Services only.
