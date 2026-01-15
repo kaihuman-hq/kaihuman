@@ -1,4 +1,6 @@
+import type { Meta, StoryObj } from '@storybook/preact';
 import { MainGrid } from './MainGrid';
+import { MainApp } from './MainApp';
 import { Tile } from '../Molecules/Tile';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
 import { StatusBar } from '../Organisms/StatusBar';
@@ -114,7 +116,21 @@ export const TileMatrix: StoryObj = {
             </Tile>
           ))}
         </div>
+
+        {/* Sticky Status Bar */}
+        <StatusBar
+          mode="NORMAL"
+          breadcrumbs={["~", "personal", "journal", "2024"]}
+          stats={[
+            { label: "W/C", value: "1,204" },
+            { label: "SYNC", value: "OK" }
+          ]}
+        />
       </div>
     );
   }
+}
+
+export const ApplicationShell: StoryObj = {
+  render: () => <MainApp />
 }
