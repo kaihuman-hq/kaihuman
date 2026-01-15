@@ -1,5 +1,5 @@
 import { authStore } from '@lifosy/core';
-import { authStore } from '@lifosy/core';
+
 import { Route, Router } from 'preact-router';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/login';
