@@ -213,3 +213,69 @@ export const isRunning = (data: TimeTrackingData): boolean => {
   const last = entry.intervals[entry.intervals.length - 1];
   return !!(last && !last.end);
 };
+
+export interface ChartData {
+  daily: { date: string; workHours: number; breakHours: number }[];
+  weekly: { week: string; hours: number }[];
+  monthly: { month: string; hours: number }[];
+}
+
+export const getChartData = (data: TimeTrackingData): ChartData => {
+  const daily: ChartData['daily'] = [];
+  const weeklyMap = new Map<string, number>();
+  const monthlyMap = new Map<string, number>();
+
+  // 12 weeks lookback ~ 84 days
+  const lookback = new Date();
+  lookback.setDate(lookback.getDate() - 84);
+  const lookbackDateStr = lookback.toISOString().split('T')[0]!;
+
+  // Sort ascending for chart
+  const sorted = [...data.entries].sort((a, b) => a.date.localeCompare(b.date));
+
+  for (const entry of sorted) {
+    if (entry.date < lookbackDateStr) continue;
+
+    // Work Hours
+    const mins = calculateDurationMinutes(entry);
+    const workHours = parseFloat((mins / 60).toFixed(2));
+
+    // Break Hours
+    let breakMins = 0;
+    for (let i = 0; i < entry.intervals.length - 1; i++) {
+      const current = entry.intervals[i];
+      const next = entry.intervals[i + 1];
+      if (current && current.end && next) {
+        const endParts = current.end.split(':').map(Number);
+        const nextStartParts = next.start.split(':').map(Number);
+
+        const endM = (endParts[0] || 0) * 60 + (endParts[1] || 0);
+        const startM = (nextStartParts[0] || 0) * 60 + (nextStartParts[1] || 0);
+
+        if (startM > endM) {
+          breakMins += (startM - endM);
+        }
+      }
+    }
+    const breakHours = parseFloat((breakMins / 60).toFixed(2));
+
+    daily.push({ date: entry.date, workHours, breakHours });
+
+    // Weekly (ISO Week)
+    const d = new Date(entry.date);
+    const onejan = new Date(d.getFullYear(), 0, 1);
+    const weekNum = Math.ceil((((d.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
+    const weekKey = `${d.getFullYear()}-W${weekNum}`;
+    weeklyMap.set(weekKey, (weeklyMap.get(weekKey) || 0) + workHours);
+
+    // Monthly
+    const monthKey = entry.date.substring(0, 7); // YYYY-MM
+    monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + workHours);
+  }
+
+  return {
+    daily,
+    weekly: Array.from(weeklyMap.entries()).map(([week, hours]) => ({ week, hours: parseFloat(hours.toFixed(2)) })),
+    monthly: Array.from(monthlyMap.entries()).map(([month, hours]) => ({ month, hours: parseFloat(hours.toFixed(2)) }))
+  };
+};

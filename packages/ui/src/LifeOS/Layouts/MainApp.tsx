@@ -8,6 +8,7 @@ import { MonoText, MonoHeader } from '../Atoms/Typography';
 import { MainGrid } from './MainGrid';
 import { MillerColumn } from '../Molecules/MillerColumn';
 import { TimeTrackingWidget } from '../Organisms/Widgets/TimeTrackingWidget';
+import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
 // framer-motion removed
 
 export interface TileDef {
@@ -201,7 +202,7 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
 
 const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) => {
   const hasWidget = !!tile.extension && !!tile.rawContent;
-  const [viewMode, setViewMode] = useState<'WIDGET' | 'CODE'>(hasWidget ? 'WIDGET' : 'CODE');
+  const [viewMode, setViewMode] = useState<'WIDGET' | 'CHARTS' | 'CODE'>(hasWidget ? 'WIDGET' : 'CODE');
 
   return (
     <div
@@ -226,6 +227,15 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
                   )}
                 >
                   WIDGET
+                </button>
+                <button
+                  onClick={() => setViewMode('CHARTS')}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                    viewMode === 'CHARTS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                  )}
+                >
+                  CHARTS
                 </button>
                 <button
                   onClick={() => setViewMode('CODE')}
@@ -257,6 +267,12 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
                 content={tile.rawContent!}
                 onChange={(newContent) => tile.onContentChange?.(newContent)}
                 mode="FOCUS"
+              />
+            </div>
+          ) : viewMode === 'CHARTS' && hasWidget ? (
+            <div className="h-full w-full p-8">
+              <TimeTrackingCharts
+                data={tile.rawContent!}
               />
             </div>
           ) : (
