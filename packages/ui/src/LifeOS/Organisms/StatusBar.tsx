@@ -146,13 +146,32 @@ export const StatusBar = ({
                 <MonoText className="text-xs font-bold">{currentRepository.name}</MonoText>
               </div>
             )}
+
+            {/* Breadcrumbs (Shifted to Left on Hover/Expand) */}
+            <div className={cn(
+              "flex items-center gap-2 transition-all duration-500 transform origin-left whitespace-nowrap overflow-hidden hidden lg:flex",
+              (isHovered || expanded) ? "opacity-100 translate-x-0 max-w-[500px]" : "opacity-0 -translate-x-4 max-w-0"
+            )}>
+              <span className="text-[var(--los-muted)]">/</span>
+              {breadcrumbs.map((crumb, i) => (
+                <span key={i} className="flex items-center gap-1">
+                  <MonoText className={cn("text-xs", i === breadcrumbs.length - 1 ? "text-[var(--los-fg)]" : "text-[var(--los-muted)]")}>
+                    {crumb}
+                  </MonoText>
+                  {i < breadcrumbs.length - 1 && <span className="text-[var(--los-muted)] text-[10px]">/</span>}
+                </span>
+              ))}
+            </div>
           </div>
 
 
           {/* CENTER COLUMN */}
-          <div className="flex-[2] flex items-center justify-center relative h-full gap-4">
-            {/* Always visible Breadcrumbs */}
-            <div className="flex items-center gap-2 transition-all duration-300">
+          <div className="flex-[2] flex items-center justify-center relative h-full">
+            {/* Breadcrumbs (Center - Visible when NOT hovered/expanded) */}
+            <div className={cn(
+              "absolute transition-all duration-300 flex items-center gap-2",
+              (isHovered || expanded) ? "opacity-0 translate-y-4 scale-90 pointer-events-none" : "opacity-100 translate-y-0 scale-100"
+            )}>
               {breadcrumbs.map((crumb, i) => (
                 <span key={i} className="flex items-center gap-1">
                   <MonoText className={cn("text-xs", i === breadcrumbs.length - 1 ? "text-[var(--los-fg)]" : "text-[var(--los-muted)]")}>
@@ -163,17 +182,18 @@ export const StatusBar = ({
               ))}
             </div>
 
-            {/* Magic Button - Now inline/adjacent, or icon only */}
+            {/* Magic Button - Bigger and centered on Hover/Expand */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handleToggleExpand('MENU');
               }}
               className={cn(
-                "transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black",
-                isHovered ? "visible opacity-100 scale-100" : "invisible opacity-0 scale-50 w-0 px-0 border-0"
+                "absolute transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-3 px-6 py-2 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black shadow-[0_0_15px_rgba(var(--los-accent-rgb),0.3)]",
+                (isHovered || expanded) ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-4 scale-50 pointer-events-none"
               )}>
-              <Sparkles size={12} />
+              <Sparkles size={18} fill="currentColor" className="animate-pulse" />
+              <span className="text-sm font-bold uppercase tracking-widest">Life OS</span>
             </button>
           </div>
 

@@ -64,6 +64,12 @@ export const TileMatrix: StoryObj = {
     return <MainApp
       fileSystem={{ columns }}
       onItemClick={handleNavigate}
+      onNavigate={(path) => {
+        if (path.length === 0) {
+          setColumns([{ items: matrixItems, activeId: null }]);
+          setCurrentRepo(mockRepos[0]); // Optional: reset repo too if needed
+        }
+      }}
       currentRepository={currentRepo}
       repositories={mockRepos}
       onSelectRepository={(repo: any) => setCurrentRepo(repo)}
