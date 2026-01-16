@@ -109,7 +109,7 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
               <div
                 className={cn(
                   "absolute top-0 left-0 right-0 bottom-8 grid gap-px bg-[var(--los-bg)] overflow-y-auto overflow-x-hidden",
-                  "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8",
+                  "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8",
                   "content-start", // Pack to top
                   "animate-in fade-in duration-300"
                 )}
@@ -119,21 +119,25 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
                   <div
                     key={tile.id}
                     onClick={() => setActiveTileId(tile.id)}
-                    className="bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] aspect-square hover:bg-white/5 transition-colors group relative cursor-pointer w-full"
+                    className="bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]"
                   >
-                    <div className="p-4 flex flex-col justify-between h-full">
-                      <div className="flex justify-between items-start">
-                        <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute inset-0 overflow-hidden p-4 flex flex-col">
+                      <div className="flex justify-between items-start shrink-0 mb-2">
+                        <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity flex-1 mr-2 truncate">
                           {tile.title}
                         </MonoText>
                         {tile.type === 'FOLDER' ? (
-                          // Folder indicator if we were using types in legacy mode (optional upgrade)
-                          <div className="w-2 h-2 border border-[var(--los-muted)] rotate-45" />
+                          <div className="w-2 h-2 border border-[var(--los-muted)] rotate-45 shrink-0" />
                         ) : (
-                          <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors" />
+                          <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors shrink-0" />
                         )}
                       </div>
-                      <div className="text-right">
+
+                      <div className="flex-1 overflow-y-auto min-h-0 w-full mb-2">
+                        {tile.content}
+                      </div>
+
+                      <div className="text-right shrink-0 mt-auto">
                         <MonoText className="text-[10px] text-[var(--los-muted)]">
                           {`ID: ${tile.id.toString().toUpperCase().slice(0, 4)}`}
                         </MonoText>
