@@ -1,14 +1,19 @@
 import type { StorybookConfig } from "@storybook/preact-vite";
+import { dirname, join } from "path";
+
+function getAbsolutePath(value: string): any {
+  return dirname(require.resolve(join(value, "package.json")));
+}
 
 const config: StorybookConfig = {
   stories: ["../src/**/*.mdx", "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
   addons: [
-    "@storybook/addon-links",
-    "@storybook/addon-essentials",
-    "@storybook/addon-interactions",
+    getAbsolutePath("@storybook/addon-links"),
+    getAbsolutePath("@storybook/addon-essentials"),
+    getAbsolutePath("@storybook/addon-interactions"),
   ],
   framework: {
-    name: "@storybook/preact-vite",
+    name: getAbsolutePath("@storybook/preact-vite"),
     options: {},
   },
   docs: {

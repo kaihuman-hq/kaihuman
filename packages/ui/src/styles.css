@@ -1,3 +1,32 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom Scrollbar Styles to match LifeOS Theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--los-bg);
+  border-left: 1px solid var(--los-border);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--los-muted);
+  /* Darker thumb */
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--los-accent);
+  /* Accent color on hover */
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--los-muted) var(--los-bg);
+}
