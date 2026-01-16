@@ -9,6 +9,7 @@ export const Dashboard = () => {
   const repo = githubProfileStore.currentRepo.value;
   const repos = githubProfileStore.repos.value;
   const tree = githubFileStore.tree.value;
+  const openFiles = githubFileStore.openFiles.value; // Subscribe to file content updates
 
   // Miller Columns State
   // We store the FULL definition of columns here
@@ -58,24 +59,96 @@ export const Dashboard = () => {
       return a.path.localeCompare(b.path);
     });
 
-    return items.map(item => ({
-      id: item.path, // Use path as ID for simplicity
-      title: item.path.split('/').pop() || item.path,
-      type: item.type === 'tree' ? 'FOLDER' : 'FILE',
-      content: item.type === 'blob'
-        ? <FileViewer path={item.path} />
-        : <div className="p-8 text-nexus-muted">Select a file from this folder.</div>
-    }));
+    return items.map(item => {
+      const isTimeTracking = item.path.endsWith('.timetracking.csv');
+
+      const tile: TileDef = {
+        id: item.path, // Use path as ID for simplicity
+        title: item.path.split('/').pop() || item.path,
+        type: item.type === 'tree' ? 'FOLDER' : 'FILE',
+        content: item.type === 'blob'
+          ? <FileViewer path={item.path} />
+          : <div className="p-8 text-nexus-muted">Select a file from this folder.</div>
+      };
+
+      if (isTimeTracking) {
+        tile.extension = '.timetracking.csv';
+        // Inject content if loaded
+        if (openFiles[item.path]) {
+          tile.rawContent = openFiles[item.path].content;
+        }
+
+        tile.onContentChange = (newContent: string) => {
+          githubFileStore.updateFileContent(item.path, newContent);
+          // Save immediately for widget interactions (Start/Stop)
+          // Debouncing might be better but for button clicks immediate is native
+          githubFileStore.saveFile(item.path);
+        };
+      }
+
+      return tile;
+    });
   };
 
-  // 4. Update ROOT column when tree changes
+  // 4. Update ROOT column when tree OR openFiles changes (to re-render widgets)
   useEffect(() => {
     if (tree.length > 0) {
-      setColumns([{ items: getChildren(""), activeId: null }]);
+      setColumns(prev => {
+        // Re-calculate the items for the existing columns to update content
+        // But wait, setColumns replaces state.
+        // If we just want to update content of *visible* columns...
+        // Actually simpler to just rebuild the current view structure if we can.
+        // But we store 'activeId' in state.
+
+        // If this is the FIRST load:
+        if (prev.length === 0) {
+          return [{ items: getChildren(""), activeId: null }];
+        }
+
+        // If we have previous columns, we want to Refresh the items in them
+        // preserving the navigation path.
+        return prev.map((col, idx) => {
+          // Re-fetch children for this column based on the activeId of the PREVIOUS column?
+          // Or we rely on the fact that `col.items` came from a parent.
+          // We need to know the 'path' of this column. 
+          // Root is ""
+          // Next is `col[i-1].activeId`
+
+          let prefix = "";
+          if (idx > 0) {
+            const parentCol = prev[idx - 1];
+            if (parentCol.activeId) prefix = `${parentCol.activeId}/`;
+            else return col; // Should not happen for deeper cols
+          }
+
+          return {
+            ...col,
+            items: getChildren(prefix)
+          };
+        });
+      });
     } else {
       setColumns([]);
     }
-  }, [tree]);
+  }, [tree, openFiles]); // Re-run when content updates
+
+  // 5. Auto-load TimeTracking files when they appear in the tree
+  useEffect(() => {
+    tree.forEach(item => {
+      if (item.path.endsWith('.timetracking.csv')) {
+        // If not loaded, load it.
+        if (!openFiles[item.path]) {
+          // Request load (background)
+          // Avoid infinite loop if load fails? openFile handles cache/dedupe?
+          // openFile checks "if (this.openFiles.value[path])" but we are reacting to that value.
+          // It should be safe as long as openFile is idempotent-ish.
+          // Call wrapped in timeout to avoid flicker or react loop issues?
+          // console.log('Auto-loading widget:', item.path);
+          githubFileStore.openFile(item.path);
+        }
+      }
+    });
+  }, [tree]); // Running on tree change is enough. If we run on openFiles we strictly loop.
 
 
   // 5. Navigation Handler
