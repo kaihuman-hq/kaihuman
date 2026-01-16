@@ -3,14 +3,13 @@ import { cn } from '../../utils';
 import { MonoText } from '../Atoms/Typography';
 
 export interface TileProps {
-  title: string;
+  title?: string;
   children: ComponentChildren;
   column?: 'left' | 'center' | 'right';
   isCollapsed?: boolean;
   className?: string;
   onClick?: () => void;
   type?: 'FILE' | 'FOLDER';
-  // layoutId removed
 }
 
 export const Tile = ({
@@ -33,29 +32,31 @@ export const Tile = ({
         className
       )}
     >
-      {/* Micro Header */}
-      <div className={cn(
-        "h-[24px] shrink-0 flex items-center px-2 bg-[var(--los-bg)] select-none transition-all duration-300",
-        "border-b border-[var(--los-border)]",
-        isCollapsed && "justify-center px-0 bg-[var(--los-bg)]"
-      )}>
-        <MonoText className={cn(
-          "text-[10px] uppercase tracking-widest truncate transition-opacity duration-200",
-          isCollapsed ? "opacity-0 w-0 hidden" : "opacity-100"
+      {/* Micro Header - Only render if title is provided */}
+      {title && (
+        <div className={cn(
+          "h-[24px] shrink-0 flex items-center px-2 bg-[var(--los-bg)] select-none transition-all duration-300",
+          "border-b border-[var(--los-border)]",
+          isCollapsed && "justify-center px-0 bg-[var(--los-bg)]"
         )}>
-          {title}
-        </MonoText>
+          <MonoText className={cn(
+            "text-[10px] uppercase tracking-widest truncate transition-opacity duration-200",
+            isCollapsed ? "opacity-0 w-0 hidden" : "opacity-100"
+          )}>
+            {title}
+          </MonoText>
 
-        {/* Collapsed Indicator */}
-        {isCollapsed && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-1 h-1 bg-[var(--los-accent)] rounded-full animate-pulse" />
-          </div>
-        )}
-        {type === 'FOLDER' && !isCollapsed && (
-          <div className="ml-auto w-2 h-2 border border-[var(--los-muted)] rotate-45" />
-        )}
-      </div>
+          {/* Collapsed Indicator */}
+          {isCollapsed && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-1 h-1 bg-[var(--los-accent)] rounded-full animate-pulse" />
+            </div>
+          )}
+          {type === 'FOLDER' && !isCollapsed && (
+            <div className="ml-auto w-2 h-2 border border-[var(--los-muted)] rotate-45" />
+          )}
+        </div>
+      )}
 
       {/* Content */}
       <div className={cn(
