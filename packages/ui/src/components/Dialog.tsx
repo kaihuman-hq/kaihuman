@@ -10,7 +10,7 @@ const DialogPortal: any = DialogPrimitive.Portal;
 const DialogClose: any = DialogPrimitive.Close;
 
 const DialogOverlay = forwardRef<
-  h.JSX.Element,
+  HTMLDivElement,
   DialogPrimitive.DialogOverlayProps
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
@@ -25,7 +25,7 @@ const DialogOverlay = forwardRef<
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = forwardRef<
-  h.JSX.Element,
+  HTMLDivElement,
   DialogPrimitive.DialogContentProps
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
@@ -39,10 +39,10 @@ const DialogContent = forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-nexus-bg transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-nexus-primary focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-nexus-accent data-[state=open]:text-nexus-text">
-        <X className="h-4 w-4 text-nexus-text" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
+      {<DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-nexus-bg transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-nexus-primary focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-nexus-accent data-[state=open]:text-nexus-text">
+        {<X className="h-4 w-4 text-nexus-text" /> as any}
+        {<span className="sr-only">Close</span> as any}
+      </DialogPrimitive.Close> as any}
     </DialogPrimitive.Content>
   </DialogPortal>
 ));
@@ -77,7 +77,7 @@ const DialogFooter = ({
 DialogFooter.displayName = 'DialogFooter';
 
 const DialogTitle = forwardRef<
-  h.JSX.Element,
+  HTMLHeadingElement,
   DialogPrimitive.DialogTitleProps
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
@@ -92,7 +92,7 @@ const DialogTitle = forwardRef<
 DialogTitle.displayName = DialogPrimitive.Title.displayName;
 
 const DialogDescription = forwardRef<
-  h.JSX.Element,
+  HTMLParagraphElement,
   DialogPrimitive.DialogDescriptionProps
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description

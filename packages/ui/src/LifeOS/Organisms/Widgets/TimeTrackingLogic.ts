@@ -124,7 +124,7 @@ export const formatDuration = (minutes: number): string => {
  * Toggles Start/Stop for Today.
  */
 export const toggleStartStop = (data: TimeTrackingData): TimeTrackingData => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0]!;
   const now = new Date();
   const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 

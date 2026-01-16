@@ -12,7 +12,7 @@ const DropdownMenuSub: any = DropdownMenuPrimitive.Sub;
 const DropdownMenuRadioGroup: any = DropdownMenuPrimitive.RadioGroup;
 
 const DropdownMenuSubTrigger = forwardRef<
-  h.JSX.Element,
+  HTMLDivElement,
   DropdownMenuPrimitive.DropdownMenuSubTriggerProps & { inset?: boolean }
 >(({ className, inset, children, ...props }, ref) => (
   <DropdownMenuPrimitive.SubTrigger
@@ -25,13 +25,13 @@ const DropdownMenuSubTrigger = forwardRef<
     {...props}
   >
     {children}
-    <ChevronRight className="ml-auto h-4 w-4" />
+    {<ChevronRight className="ml-auto h-4 w-4" /> as any}
   </DropdownMenuPrimitive.SubTrigger>
 ));
 DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName;
 
 const DropdownMenuSubContent = forwardRef<
-  h.JSX.Element,
+  HTMLDivElement,
   DropdownMenuPrimitive.DropdownMenuSubContentProps
 >(({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.SubContent
@@ -46,11 +46,11 @@ const DropdownMenuSubContent = forwardRef<
 DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName;
 
 const DropdownMenuContent = forwardRef<
-  h.JSX.Element,
+  HTMLDivElement,
   DropdownMenuPrimitive.DropdownMenuContentProps
 >(({ className, sideOffset = 4, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
-    <DropdownMenuPrimitive.Content
+    {<DropdownMenuPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
@@ -58,13 +58,13 @@ const DropdownMenuContent = forwardRef<
         className
       )}
       {...props}
-    />
+    /> as any}
   </DropdownMenuPrimitive.Portal>
 ));
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
 
 const DropdownMenuItem = forwardRef<
-  h.JSX.Element,
+  HTMLDivElement,
   DropdownMenuPrimitive.DropdownMenuItemProps & { inset?: boolean }
 >(({ className, inset, ...props }, ref) => (
   <DropdownMenuPrimitive.Item
@@ -80,7 +80,7 @@ const DropdownMenuItem = forwardRef<
 DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName;
 
 const DropdownMenuLabel = forwardRef<
-  h.JSX.Element,
+  HTMLDivElement,
   DropdownMenuPrimitive.DropdownMenuLabelProps & { inset?: boolean }
 >(({ className, inset, ...props }, ref) => (
   <DropdownMenuPrimitive.Label
@@ -96,7 +96,7 @@ const DropdownMenuLabel = forwardRef<
 DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName;
 
 const DropdownMenuSeparator = forwardRef<
-  h.JSX.Element,
+  HTMLDivElement,
   DropdownMenuPrimitive.DropdownMenuSeparatorProps
 >(({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.Separator
