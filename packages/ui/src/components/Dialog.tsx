@@ -4,10 +4,10 @@ import { X } from 'lucide-preact';
 import { cn } from '../utils';
 import { forwardRef } from 'preact/compat';
 
-const Dialog = DialogPrimitive.Root;
-const DialogTrigger = DialogPrimitive.Trigger;
-const DialogPortal = DialogPrimitive.Portal;
-const DialogClose = DialogPrimitive.Close;
+const Dialog: any = DialogPrimitive.Root;
+const DialogTrigger: any = DialogPrimitive.Trigger;
+const DialogPortal: any = DialogPrimitive.Portal;
+const DialogClose: any = DialogPrimitive.Close;
 
 const DialogOverlay = forwardRef<
   h.JSX.Element,

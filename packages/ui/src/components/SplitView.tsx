@@ -38,7 +38,7 @@ export const ResizableHandle = ({ className, withHandle, ...props }: SeparatorPr
           <circle cx="9" cy="12" r="1"></circle>
           <circle cx="15" cy="12" r="1"></circle>
         </svg>
-      </div>
+      </div> as any
     )}
   </Separator>
 );

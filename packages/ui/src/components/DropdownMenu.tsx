@@ -4,12 +4,12 @@ import { cn } from '../utils';
 import { forwardRef } from 'preact/compat';
 import { Check, ChevronRight, Circle } from 'lucide-preact';
 
-const DropdownMenu = DropdownMenuPrimitive.Root;
-const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
-const DropdownMenuGroup = DropdownMenuPrimitive.Group;
-const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
-const DropdownMenuSub = DropdownMenuPrimitive.Sub;
-const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
+const DropdownMenu: any = DropdownMenuPrimitive.Root;
+const DropdownMenuTrigger: any = DropdownMenuPrimitive.Trigger;
+const DropdownMenuGroup: any = DropdownMenuPrimitive.Group;
+const DropdownMenuPortal: any = DropdownMenuPrimitive.Portal;
+const DropdownMenuSub: any = DropdownMenuPrimitive.Sub;
+const DropdownMenuRadioGroup: any = DropdownMenuPrimitive.RadioGroup;
 
 const DropdownMenuSubTrigger = forwardRef<
   h.JSX.Element,

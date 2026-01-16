@@ -79,7 +79,7 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
   };
 
   return (
-    <div className="h-screen w-screen bg-[var(--los-bg)] overflow-hidden relative">
+    <div className="h-screen w-full max-w-[100vw] bg-[var(--los-bg)] overflow-hidden relative">
       <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
 
         {/* CENTER STAGE: The Matrix OR The Active Tile */}

@@ -40,7 +40,7 @@ export const MainGrid = ({
   return (
     <div
       className={cn(
-        "life-os-root h-screen w-screen bg-[var(--los-bg)] overflow-hidden",
+        "life-os-root h-screen w-full max-w-[100vw] bg-[var(--los-bg)] overflow-hidden",
         "grid transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)]",
         "grid-cols-1", // Mobile default
 

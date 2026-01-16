@@ -3,6 +3,7 @@ import { cn } from '../utils';
 import { forwardRef } from 'preact/compat';
 
 export interface InputProps extends h.JSX.HTMLAttributes<HTMLInputElement> {
+  type?: string;
   error?: boolean;
 }
 
