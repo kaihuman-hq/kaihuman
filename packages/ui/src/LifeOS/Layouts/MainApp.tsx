@@ -79,7 +79,7 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
   };
 
   return (
-    <div className="h-[calc(100vh-32px)] w-screen bg-[var(--los-bg)] overflow-hidden relative">
+    <div className="h-screen w-screen bg-[var(--los-bg)] overflow-hidden relative">
       <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
 
         {/* CENTER STAGE: The Matrix OR The Active Tile */}
@@ -87,7 +87,7 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
           {activeTileId === null ? (
             isMillerMode ? (
               // MILLER COLUMNS LAYOUT
-              <div className="absolute inset-0 flex flex-row overflow-x-auto">
+              <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto">
                 {fileSystem!.columns.map((col, index) => {
                   const isLast = index === fileSystem!.columns.length - 1;
                   return (
@@ -108,7 +108,7 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
               // LEGACY SINGLE GRID LAYOUT
               <div
                 className={cn(
-                  "absolute inset-0 grid gap-[1px] bg-[var(--los-border)] border-b border-[var(--los-border)] overflow-y-auto",
+                  "absolute top-0 left-0 right-0 bottom-8 grid gap-[1px] bg-[var(--los-border)] border-b border-[var(--los-border)] overflow-y-auto",
                   "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8",
                   "content-start", // Pack to top
                   "animate-in fade-in duration-300"
@@ -173,7 +173,7 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
 const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) => {
   return (
     <div
-      className="absolute inset-0 bg-[var(--los-bg)] z-10 p-8 flex flex-col"
+      className="absolute top-0 left-0 right-0 bottom-8 bg-[var(--los-bg)] z-10 p-8 flex flex-col"
       key={`focused-${tile.id}`}
     >
       <div
