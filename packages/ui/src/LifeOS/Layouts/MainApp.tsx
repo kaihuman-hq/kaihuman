@@ -6,6 +6,7 @@ import { StatusBar } from '../Organisms/StatusBar';
 import { Editor } from '../Organisms/Editor';
 import { MonoText, MonoHeader } from '../Atoms/Typography';
 import { MainGrid } from './MainGrid';
+import { MillerColumn } from '../Molecules/MillerColumn';
 // framer-motion removed
 
 export interface TileDef {
@@ -13,20 +14,44 @@ export interface TileDef {
   title: string;
   /** Component or element to render when this tile is focused */
   content?: ComponentChildren;
+  type?: 'FILE' | 'FOLDER';
+}
+
+export interface FileSystemState {
+  columns: { items: TileDef[]; activeId: string | null }[];
 }
 
 export interface MainAppProps {
-  tiles?: TileDef[];
+  tiles?: TileDef[]; // Legacy/Single-level prop
+  fileSystem?: FileSystemState;
+  onNavigate?: (path: string[]) => void; // Path is list of IDs
+  onItemClick?: (item: TileDef) => void;
+
   currentRepository?: import('../Organisms/StatusBar').Repository;
   repositories?: import('../Organisms/StatusBar').Repository[];
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
 }
 
-export const MainApp = ({ tiles = defaultTiles, ...props }: MainAppProps) => {
-  // State
+export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, ...props }: MainAppProps) => {
+  // State for legacy/single-level mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
 
-  const activeTile = activeTileId !== null ? tiles.find(t => t.id === activeTileId) : null;
+  // If fileSystem is provided, we use the Miller Column Layout
+  const isMillerMode = !!fileSystem;
+
+  // For Miller Mode, "Focus" is when the last column has a selected "FILE" item, 
+  // OR we can rely on `activeTileId` if we want to "zoom in" on a specific file.
+  // The requirements say: "right content of the selected folder is shown".
+  // "User can always click on one of the smaller tiles in the left columns".
+  // "There should be a way to select the current folder, so all folder content becomes the full matrix".
+
+  // Let's assume `activeTileId` is used for "Focusing a File" (fullscreen editor).
+
+  const activeTile = activeTileId !== null ? (
+    isMillerMode
+      ? fileSystem?.columns.flatMap(c => c.items).find(t => t.id === activeTileId)
+      : tiles.find(t => t.id === activeTileId)
+  ) : null;
 
   return (
     <div className="h-screen w-screen bg-[var(--los-bg)] overflow-hidden relative">
@@ -35,38 +60,64 @@ export const MainApp = ({ tiles = defaultTiles, ...props }: MainAppProps) => {
         {/* CENTER STAGE: The Matrix OR The Active Tile */}
         <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : "MATRIX_ROOT"} column="center">
           {activeTileId === null ? (
-            // STATE A: THE MATRIX
-            <div
-              className={cn(
-                "absolute inset-0 grid gap-[1px] bg-[var(--los-border)] border-b border-[var(--los-border)] overflow-y-auto",
-                "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8",
-                "content-start", // Pack to top
-                "animate-in fade-in duration-300"
-              )}
-              key="matrix"
-            >
-              {tiles.map((tile) => (
-                <div
-                  key={tile.id}
-                  onClick={() => setActiveTileId(tile.id)}
-                  className="bg-[var(--los-bg)] aspect-square hover:bg-white/5 transition-colors group relative cursor-pointer"
-                >
-                  <div className="p-4 flex flex-col justify-between h-full">
-                    <div className="flex justify-between items-start">
-                      <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity">
-                        {tile.title}
-                      </MonoText>
-                      <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors" />
-                    </div>
-                    <div className="text-right">
-                      <MonoText className="text-[10px] text-[var(--los-muted)]">
-                        {`ID: ${tile.id.toString().toUpperCase().padStart(4, '0')}`}
-                      </MonoText>
+            isMillerMode ? (
+              // MILLER COLUMNS LAYOUT
+              <div className="absolute inset-0 flex flex-row overflow-x-auto">
+                {fileSystem!.columns.map((col, index) => {
+                  const isLast = index === fileSystem!.columns.length - 1;
+                  return (
+                    <MillerColumn
+                      key={index}
+                      items={col.items}
+                      activeId={col.activeId}
+                      variant={isLast ? 'GRID' : 'LIST'}
+                      onItemClick={(item) => {
+                        if (onItemClick) onItemClick(item);
+                        if (item.type === 'FILE') setActiveTileId(item.id);
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            ) : (
+              // LEGACY SINGLE GRID LAYOUT
+              <div
+                className={cn(
+                  "absolute inset-0 grid gap-[1px] bg-[var(--los-border)] border-b border-[var(--los-border)] overflow-y-auto",
+                  "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8",
+                  "content-start", // Pack to top
+                  "animate-in fade-in duration-300"
+                )}
+                key="matrix"
+              >
+                {tiles.map((tile) => (
+                  <div
+                    key={tile.id}
+                    onClick={() => setActiveTileId(tile.id)}
+                    className="bg-[var(--los-bg)] aspect-square hover:bg-white/5 transition-colors group relative cursor-pointer"
+                  >
+                    <div className="p-4 flex flex-col justify-between h-full">
+                      <div className="flex justify-between items-start">
+                        <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity">
+                          {tile.title}
+                        </MonoText>
+                        {tile.type === 'FOLDER' ? (
+                          // Folder indicator if we were using types in legacy mode (optional upgrade)
+                          <div className="w-2 h-2 border border-[var(--los-muted)] rotate-45" />
+                        ) : (
+                          <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors" />
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <MonoText className="text-[10px] text-[var(--los-muted)]">
+                          {`ID: ${tile.id.toString().toUpperCase().slice(0, 4)}`}
+                        </MonoText>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
           ) : (
             // STATE B: FOCUSED TILE
             <FocusedTile

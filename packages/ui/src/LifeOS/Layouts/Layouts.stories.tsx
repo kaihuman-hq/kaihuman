@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/preact';
+import { useState } from 'preact/hooks';
 import { MainApp } from './MainApp';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
 
@@ -14,36 +15,66 @@ export default meta;
 
 export const TileMatrix: StoryObj = {
   render: () => {
-    const [currentRepo, setCurrentRepo] = (globalThis as any).React ? (globalThis as any).React.useState(mockRepos[0]) : [mockRepos[0], () => { }]; // Basic mock hook usage if possible, or just pass static for now. 
-    // Since this is preact storybook, we might need preact hooks. But for simplicity in a story render function without component wrapper it might be tricky.
-    // Let's just render the MainApp with static data or a wrapper.
+    const [currentRepo, setCurrentRepo] = useState(mockRepos[0]);
+
+    // Generate a larger mock file system for the Matrix
+    const matrixItems: any[] = Array.from({ length: 48 }, (_, i) => {
+      const isFolder = i % 5 === 0;
+      return {
+        id: `item_${i}`,
+        title: isFolder ? `Folder ${i}` : `File ${i}`,
+        type: isFolder ? 'FOLDER' : 'FILE',
+        content: <div className="p-8"><MonoText>Content for {i}</MonoText></div>,
+        children: isFolder ? Array.from({ length: 10 }, (_, j) => ({
+          id: `child_${i}_${j}`,
+          title: `Child File ${i}-${j}`,
+          type: 'FILE',
+          content: <div className="p-8"><MonoText>Child Content {i}-{j}</MonoText></div>
+        })) : undefined
+      };
+    });
+
+    interface StoryColumn {
+      items: any[];
+      activeId: string | null;
+    }
+
+    const [columns, setColumns] = useState<StoryColumn[]>([
+      { items: matrixItems, activeId: null }
+    ]);
+
+    const handleNavigate = (item: any) => {
+      if (item.type === 'FOLDER') {
+        const colIndex = columns.findIndex((col: any) => col.items.some((i: any) => i.id === item.id));
+        const newColumns = [...columns].slice(0, colIndex + 1);
+        newColumns[colIndex] = { ...newColumns[colIndex], activeId: item.id } as any;
+
+        const children: any[] = item.children || [];
+        newColumns.push({ items: children, activeId: null });
+
+        setColumns(newColumns);
+      } else {
+        const colIndex = columns.findIndex((col: any) => col.items.some((i: any) => i.id === item.id));
+        const newColumns = [...columns].slice(0, colIndex + 1);
+        newColumns[colIndex] = { ...newColumns[colIndex], activeId: item.id } as any;
+        setColumns(newColumns);
+      }
+    };
 
     return <MainApp
-      tiles={[
-        ...Array.from({ length: 24 }, (_, i) => ({
-          id: i,
-          title: `Story Tile ${i}`,
-          content: (
-            <div className="p-8 h-full flex flex-col">
-              <MonoHeader className="mb-4">Custom Content for Tile {i}</MonoHeader>
-              <div className="flex-1 border border-[var(--los-border)] p-4 bg-black/20">
-                <MonoText>This content is defined in the Storybook story.</MonoText>
-              </div>
-            </div>
-          )
-        }))
-      ]}
-      currentRepository={mockRepos[0]}
+      fileSystem={{ columns }}
+      onItemClick={handleNavigate}
+      currentRepository={currentRepo}
       repositories={mockRepos}
-      onSelectRepository={(repo) => console.log('Selected repo:', repo)}
+      onSelectRepository={(repo: any) => setCurrentRepo(repo)}
     />;
   }
 };
+
+
 
 const mockRepos = [
   { id: '1', name: 'Lifosy/monorepo', branch: 'main' },
   { id: '2', name: 'Lifosy/ui', branch: 'develop' },
   { id: '3', name: 'Lifosy/core', branch: 'feature/repo-selection' },
 ];
-
-// export const ApplicationShell: StoryObj = { ... }

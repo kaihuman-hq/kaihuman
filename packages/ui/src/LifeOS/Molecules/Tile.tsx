@@ -9,6 +9,7 @@ export interface TileProps {
   isCollapsed?: boolean;
   className?: string;
   onClick?: () => void;
+  type?: 'FILE' | 'FOLDER';
   // layoutId removed
 }
 
@@ -19,6 +20,7 @@ export const Tile = ({
   isCollapsed = false,
   className,
   onClick,
+  type = 'FILE',
 }: TileProps) => {
   return (
     <div
@@ -49,6 +51,9 @@ export const Tile = ({
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-1 h-1 bg-[var(--los-accent)] rounded-full animate-pulse" />
           </div>
+        )}
+        {type === 'FOLDER' && !isCollapsed && (
+          <div className="ml-auto w-2 h-2 border border-[var(--los-muted)] rotate-45" />
         )}
       </div>
 
