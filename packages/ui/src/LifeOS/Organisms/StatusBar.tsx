@@ -18,6 +18,7 @@ export interface StatusBarProps {
   currentRepository?: Repository;
   repositories?: Repository[];
   onSelectRepository?: (repo: Repository) => void;
+  onDashboardClick?: () => void;
 }
 
 export const StatusBar = ({
@@ -26,11 +27,12 @@ export const StatusBar = ({
   stats = [],
   currentRepository,
   repositories = [],
-  onSelectRepository
+  onSelectRepository,
+  onDashboardClick
 }: StatusBarProps) => {
   const [expanded, setExpanded] = useState(false);
   const [expandedMode, setExpandedMode] = useState<'MENU' | 'REPOS'>('MENU');
-  const [isHovered, setIsHovered] = useState(false); // Track hover state for desktop (and touch for mobile simulation)
+  const [isHovered, setIsHovered] = useState(false);
 
   const handleToggleExpand = (mode: 'MENU' | 'REPOS') => {
     if (expanded && expandedMode === mode) {
@@ -56,7 +58,6 @@ export const StatusBar = ({
       <div
         className={cn(
           "fixed bottom-0 left-0 right-0 z-[100] bg-[var(--los-bg)] border-t border-[var(--los-border)] transition-all duration-300 ease-spring",
-          // Height logic
           expanded ? "h-[40vh]" : (isHovered ? "h-16" : "h-8"),
           "shadow-2xl overflow-hidden"
         )}
@@ -64,13 +65,19 @@ export const StatusBar = ({
         onMouseLeave={() => setIsHovered(false)}
       >
 
-        {/* Expanded Drawer Content (Only visible when fully expanded) */}
+        {/* Expanded Drawer Content */}
         <div className={cn(
           "absolute inset-0 top-16 p-6 transition-opacity duration-200 overflow-y-auto",
           expanded ? "opacity-100 delay-100" : "opacity-0 pointer-events-none"
         )}>
           {expandedMode === 'MENU' && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div
+                onClick={() => { onDashboardClick?.(); setExpanded(false); }}
+                className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2"
+              >
+                <MonoLabel className="group-hover:text-[var(--los-accent)]">DASHBOARD</MonoLabel>
+              </div>
               {['New File', 'Search', 'Settings', 'Git', 'Terminal', 'Zen Mode'].map((action, i) => (
                 <div key={i} className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2">
                   <MonoLabel className="group-hover:text-[var(--los-accent)]">{action}</MonoLabel>
@@ -119,7 +126,6 @@ export const StatusBar = ({
 
           {/* LEFT COLUMN */}
           <div className="flex-1 flex items-center gap-4 min-w-0">
-            {/* Mode Indicator */}
             <div className={cn(
               "bg-[var(--los-accent)] text-black font-bold text-[10px] px-2 py-0.5 rounded-sm shrink-0 uppercase transition-all",
               isHovered ? "scale-110" : "scale-100"
@@ -127,7 +133,6 @@ export const StatusBar = ({
               {mode}
             </div>
 
-            {/* Repository Indicator (New Feature) */}
             {currentRepository && (
               <div
                 className={cn(
@@ -141,35 +146,16 @@ export const StatusBar = ({
                 <MonoText className="text-xs font-bold">{currentRepository.name}</MonoText>
               </div>
             )}
-
-            {/* Context (Shifted Version) - Visible only on Hover */}
-            <div className={cn(
-              "flex items-center gap-2 transition-all duration-300 transform origin-left whitespace-nowrap overflow-hidden hidden lg:flex", // Hidden on smaller screens to make room for Repo
-              isHovered ? "opacity-100 translate-x-0 w-auto" : "opacity-0 -translate-x-4 w-0"
-            )}>
-              {breadcrumbs.map((crumb, i) => (
-                <span key={i} className="flex items-center gap-1">
-                  <MonoText className={cn("text-xs", i === breadcrumbs.length - 1 ? "text-[var(--los-fg)]" : "")}>
-                    {crumb}
-                  </MonoText>
-                  {i < breadcrumbs.length - 1 && <span className="text-[var(--los-muted)] text-[10px]">/</span>}
-                </span>
-              ))}
-            </div>
           </div>
 
 
           {/* CENTER COLUMN */}
-          <div className="flex-[2] flex items-center justify-center relative h-full">
-
-            {/* Context (Centered Version) - Visible only when NOT Hovered */}
-            <div className={cn(
-              "absolute transition-all duration-300 flex items-center gap-2",
-              isHovered ? "opacity-0 translate-y-4 scale-90 pointer-events-none" : "opacity-100 translate-y-0 scale-100"
-            )}>
+          <div className="flex-[2] flex items-center justify-center relative h-full gap-4">
+            {/* Always visible Breadcrumbs */}
+            <div className="flex items-center gap-2 transition-all duration-300">
               {breadcrumbs.map((crumb, i) => (
                 <span key={i} className="flex items-center gap-1">
-                  <MonoText className={cn("text-xs", i === breadcrumbs.length - 1 ? "text-[var(--los-fg)]" : "")}>
+                  <MonoText className={cn("text-xs", i === breadcrumbs.length - 1 ? "text-[var(--los-fg)]" : "text-[var(--los-muted)]")}>
                     {crumb}
                   </MonoText>
                   {i < breadcrumbs.length - 1 && <span className="text-[var(--los-muted)] text-[10px]">/</span>}
@@ -177,18 +163,17 @@ export const StatusBar = ({
               ))}
             </div>
 
-            {/* Magic Button - Visible only ON Hover */}
+            {/* Magic Button - Now inline/adjacent, or icon only */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handleToggleExpand('MENU');
               }}
               className={cn(
-                "absolute transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-2 px-6 py-2 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black",
-                isHovered ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-4 scale-50 pointer-events-none"
+                "transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black",
+                isHovered ? "visible opacity-100 scale-100" : "invisible opacity-0 scale-50 w-0 px-0 border-0"
               )}>
-              <Sparkles size={14} />
-              <span className="text-xs font-bold uppercase tracking-widest">Life OS</span>
+              <Sparkles size={12} />
             </button>
           </div>
 
@@ -201,8 +186,6 @@ export const StatusBar = ({
                 <MonoText className="text-[10px]">{stat.value}</MonoText>
               </div>
             ))}
-
-            {/* Always visible Clock or Indicator */}
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
               <MonoText className="text-[10px]">ONLINE</MonoText>

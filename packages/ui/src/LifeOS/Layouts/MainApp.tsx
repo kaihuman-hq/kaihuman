@@ -32,7 +32,7 @@ export interface MainAppProps {
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
 }
 
-export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, ...props }: MainAppProps) => {
+export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavigate, ...props }: MainAppProps) => {
   // State for legacy/single-level mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
 
@@ -53,12 +53,37 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, ...prop
       : tiles.find(t => t.id === activeTileId)
   ) : null;
 
+  // Calculate Breadcrumbs Logic
+  const getBreadcrumbs = () => {
+    if (activeTileId !== null && !isMillerMode) return ["root", "focus", `tile_${activeTileId}`];
+
+    if (isMillerMode && fileSystem) {
+      // Traverse simple path
+      const path: string[] = ['~'];
+      fileSystem.columns.forEach(col => {
+        if (col.activeId) {
+          const activeItem = col.items.find(i => i.id === col.activeId);
+          if (activeItem) path.push(String(activeItem.title));
+        }
+      });
+      return path;
+    }
+    return ["~"];
+  };
+
+  const handleDashboardClick = () => {
+    setActiveTileId(null);
+    if (onNavigate) {
+      onNavigate([]); // Signal root navigation to parent
+    }
+  };
+
   return (
     <div className="h-screen w-screen bg-[var(--los-bg)] overflow-hidden relative">
       <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
 
         {/* CENTER STAGE: The Matrix OR The Active Tile */}
-        <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : "MATRIX_ROOT"} column="center">
+        <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : undefined} column="center">
           {activeTileId === null ? (
             isMillerMode ? (
               // MILLER COLUMNS LAYOUT
@@ -131,7 +156,7 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, ...prop
       {/* Sticky Status Bar */}
       <StatusBar
         mode={activeTileId !== null ? "FOCUS" : "NORMAL"}
-        breadcrumbs={activeTileId !== null ? ["root", "focus", `tile_${activeTileId}`] : ["root", "dashboard"]}
+        breadcrumbs={getBreadcrumbs()}
         stats={[
           { label: "TILES", value: tiles.length.toString() },
           { label: "GRID", value: activeTileId ? "OFF" : "AUTO" },
@@ -139,6 +164,7 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, ...prop
         currentRepository={props.currentRepository}
         repositories={props.repositories}
         onSelectRepository={props.onSelectRepository}
+        onDashboardClick={handleDashboardClick}
       />
     </div>
   );
