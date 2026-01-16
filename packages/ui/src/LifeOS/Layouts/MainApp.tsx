@@ -17,9 +17,12 @@ export interface TileDef {
 
 export interface MainAppProps {
   tiles?: TileDef[];
+  currentRepository?: import('../Organisms/StatusBar').Repository;
+  repositories?: import('../Organisms/StatusBar').Repository[];
+  onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
 }
 
-export const MainApp = ({ tiles = defaultTiles }: MainAppProps) => {
+export const MainApp = ({ tiles = defaultTiles, ...props }: MainAppProps) => {
   // State
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
 
@@ -82,6 +85,9 @@ export const MainApp = ({ tiles = defaultTiles }: MainAppProps) => {
           { label: "TILES", value: tiles.length.toString() },
           { label: "GRID", value: activeTileId ? "OFF" : "AUTO" },
         ]}
+        currentRepository={props.currentRepository}
+        repositories={props.repositories}
+        onSelectRepository={props.onSelectRepository}
       />
     </div>
   );
