@@ -108,7 +108,7 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
               // LEGACY SINGLE GRID LAYOUT
               <div
                 className={cn(
-                  "absolute top-0 left-0 right-0 bottom-8 grid gap-[1px] bg-[var(--los-border)] border-b border-[var(--los-border)] overflow-y-auto overflow-x-hidden",
+                  "absolute top-0 left-0 right-0 bottom-8 grid border-t border-l border-[var(--los-border)] bg-[var(--los-bg)] overflow-y-auto overflow-x-hidden",
                   "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8",
                   "content-start", // Pack to top
                   "animate-in fade-in duration-300"
@@ -119,7 +119,7 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
                   <div
                     key={tile.id}
                     onClick={() => setActiveTileId(tile.id)}
-                    className="bg-[var(--los-bg)] aspect-square hover:bg-white/5 transition-colors group relative cursor-pointer"
+                    className="bg-[var(--los-bg)] border-r border-b border-[var(--los-border)] aspect-square hover:bg-white/5 transition-colors group relative cursor-pointer"
                   >
                     <div className="p-4 flex flex-col justify-between h-full">
                       <div className="flex justify-between items-start">
