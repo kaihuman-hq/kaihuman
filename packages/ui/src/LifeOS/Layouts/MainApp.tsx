@@ -7,13 +7,21 @@ import { Editor } from '../Organisms/Editor';
 import { MonoText, MonoHeader } from '../Atoms/Typography';
 import { MainGrid } from './MainGrid';
 import { MillerColumn } from '../Molecules/MillerColumn';
+import { TimeTrackingWidget } from '../Organisms/Widgets/TimeTrackingWidget';
 // framer-motion removed
 
 export interface TileDef {
   id: string | number;
   title: string;
   /** Component or element to render when this tile is focused */
+  /** Component or element to render when this tile is focused */
   content?: ComponentChildren;
+  /** Raw text content for file-based widgets */
+  rawContent?: string;
+  /** File extension to determine widget type */
+  extension?: string;
+  /** Callback to update raw content */
+  onContentChange?: (newContent: string) => void;
   type?: 'FILE' | 'FOLDER';
 }
 
@@ -35,6 +43,20 @@ export interface MainAppProps {
 export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavigate, ...props }: MainAppProps) => {
   // State for legacy/single-level mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
+
+  // Helper to render tile content (Widget vs Default)
+  const renderTileContent = (tile: TileDef, mode: 'SMALL' | 'FOCUS') => {
+    if (tile.extension === '.timetracking.csv' && tile.rawContent) {
+      return (
+        <TimeTrackingWidget
+          content={tile.rawContent}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+          mode={mode}
+        />
+      );
+    }
+    return tile.content;
+  };
 
   // If fileSystem is provided, we use the Miller Column Layout
   const isMillerMode = !!fileSystem;
@@ -93,7 +115,10 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
                   return (
                     <MillerColumn
                       key={index}
-                      items={col.items}
+                      items={col.items.map(t => ({
+                        ...t,
+                        content: renderTileContent(t, 'SMALL')
+                      }))}
                       activeId={col.activeId}
                       variant={isLast ? 'GRID' : 'LIST'}
                       onItemClick={(item) => {
@@ -134,7 +159,7 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
                       </div>
 
                       <div className="flex-1 overflow-y-auto min-h-0 w-full mb-2">
-                        {tile.content}
+                        {renderTileContent(tile, 'SMALL')}
                       </div>
 
                       <div className="text-right shrink-0 mt-auto">
@@ -175,6 +200,9 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
 };
 
 const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) => {
+  const hasWidget = !!tile.extension && !!tile.rawContent;
+  const [viewMode, setViewMode] = useState<'WIDGET' | 'CODE'>(hasWidget ? 'WIDGET' : 'CODE');
+
   return (
     <div
       className="absolute top-0 left-0 right-0 bottom-8 bg-[var(--los-bg)] z-10 p-8 flex flex-col"
@@ -187,7 +215,29 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
         <div className="h-12 border-b border-[var(--los-border)] flex items-center justify-between px-4 shrink-0">
           <div className="flex items-center gap-4">
             <MonoHeader className="text-[var(--los-accent)]">{`TILE: ${tile.id.toString().toUpperCase().padStart(4, '0')}`}</MonoHeader>
-            {/* Note: View Switcher removed as content determines the view now */}
+
+            {hasWidget && (
+              <div className="flex bg-[var(--los-border)] rounded-sm p-0.5 ml-4">
+                <button
+                  onClick={() => setViewMode('WIDGET')}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                    viewMode === 'WIDGET' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                  )}
+                >
+                  WIDGET
+                </button>
+                <button
+                  onClick={() => setViewMode('CODE')}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                    viewMode === 'CODE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                  )}
+                >
+                  CODE
+                </button>
+              </div>
+            )}
           </div>
 
           <button
@@ -201,10 +251,20 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-0 relative">
-          {tile.content ? tile.content : (
-            <div className="p-8 flex items-center justify-center text-[var(--los-muted)]">
-              <MonoText>No content defined for this tile.</MonoText>
+          {viewMode === 'WIDGET' && hasWidget ? (
+            <div className="h-full w-full p-8">
+              <TimeTrackingWidget
+                content={tile.rawContent!}
+                onChange={(newContent) => tile.onContentChange?.(newContent)}
+                mode="FOCUS"
+              />
             </div>
+          ) : (
+            tile.content ? tile.content : (
+              <div className="p-8 flex items-center justify-center text-[var(--los-muted)]">
+                <MonoText>No content defined for this tile.</MonoText>
+              </div>
+            )
           )}
         </div>
       </div>

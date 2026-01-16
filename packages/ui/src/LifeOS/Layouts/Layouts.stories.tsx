@@ -79,6 +79,43 @@ export const TileMatrix: StoryObj = {
 
 
 
+// ... (existing code)
+
+export const TimeTracking: StoryObj = {
+  render: () => {
+    const [csvContent, setCsvContent] = useState(`iso date;time
+2023-10-27;08:00,12:00,13:00,17:00
+${new Date().toISOString().split('T')[0]};09:00,11:30`);
+
+    const timeTrackingTile = {
+      id: 'tt_1',
+      title: 'Work Hours.timetracking.csv',
+      type: 'FILE',
+      extension: '.timetracking.csv',
+      rawContent: csvContent,
+      onContentChange: (newVal: string) => {
+        setCsvContent(newVal);
+        console.log('CSV Updated:', newVal);
+      },
+      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+    };
+
+    const [columns, setColumns] = useState<any[]>([
+      { items: [timeTrackingTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    ]);
+
+    return <MainApp
+      fileSystem={{ columns }}
+      onItemClick={(item) => {
+        // partial nav logic
+        if (item.type === 'FOLDER') {
+          // ... folder logic ...
+        }
+      }}
+    />;
+  }
+};
+
 const mockRepos = [
   { id: '1', name: 'Lifosy/monorepo', branch: 'main' },
   { id: '2', name: 'Lifosy/ui', branch: 'develop' },
