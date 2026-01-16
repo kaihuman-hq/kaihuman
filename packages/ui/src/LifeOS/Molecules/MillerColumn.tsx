@@ -17,7 +17,7 @@ export const MillerColumn = ({ items, activeId, variant, onItemClick }: MillerCo
     return (
       <div
         className={cn(
-          "grid gap-[1px] bg-[var(--los-border)] border-b border-[var(--los-border)] overflow-y-auto flex-1 h-full min-w-[50vw]",
+          "grid gap-[1px] bg-[var(--los-border)] border-b border-[var(--los-border)] overflow-y-auto overflow-x-hidden flex-1 h-full min-w-0 w-full",
           "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8",
           "content-start",
           "animate-in fade-in slide-in-from-right-4 duration-300"
@@ -27,11 +27,11 @@ export const MillerColumn = ({ items, activeId, variant, onItemClick }: MillerCo
           <div
             key={tile.id}
             onClick={() => onItemClick(tile)}
-            className="bg-[var(--los-bg)] aspect-square hover:bg-white/5 transition-colors group relative cursor-pointer"
+            className="bg-[var(--los-bg)] aspect-square hover:bg-white/5 transition-colors group relative cursor-pointer overflow-hidden"
           >
             <div className="p-4 flex flex-col justify-between h-full">
-              <div className="flex justify-between items-start">
-                <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity">
+              <div className="flex justify-between items-start overflow-hidden">
+                <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity truncate w-full">
                   {tile.title}
                 </MonoText>
                 {tile.type === 'FOLDER' ? (
