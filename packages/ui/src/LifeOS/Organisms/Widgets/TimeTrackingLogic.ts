@@ -20,7 +20,7 @@ export interface TimeTrackingData {
  */
 export const parseTimeTracking = (csv: string): TimeTrackingData => {
   if (!csv) return { entries: [] };
-  const lines = csv.trim().split('\n');
+  const lines = csv.trim().split(/\r?\n/);
   const entries: DayEntry[] = [];
 
   // Skip header if present
@@ -225,9 +225,9 @@ export const getChartData = (data: TimeTrackingData): ChartData => {
   const weeklyMap = new Map<string, number>();
   const monthlyMap = new Map<string, number>();
 
-  // 12 weeks lookback ~ 84 days
+  // 12 months lookback ~ 365 days
   const lookback = new Date();
-  lookback.setDate(lookback.getDate() - 84);
+  lookback.setDate(lookback.getDate() - 365);
   const lookbackDateStr = lookback.toISOString().split('T')[0]!;
 
   // Sort ascending for chart
