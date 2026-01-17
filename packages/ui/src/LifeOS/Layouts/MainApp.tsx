@@ -11,6 +11,7 @@ import { TimeTrackingWidget } from '../Organisms/Widgets/TimeTrackingWidget';
 import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
 import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
 import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
+import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 // framer-motion removed
 
 export interface TileDef {
@@ -225,13 +226,14 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
 
     // We will parse -> push -> serialize.
     // See top of file for imports.
-    const currentData = import('../Organisms/Widgets/EventsLogic').then(m => {
-      const data = m.parseEvents(tile.rawContent || '');
-      data.entries.push(entry);
-      const newContent = m.serializeEvents(data);
-      tile.onContentChange?.(newContent);
-      setViewMode('WIDGET'); // Switch back to list
-    });
+    // We will parse -> push -> serialize.
+    // See top of file for imports.
+    // Refactored to static import to avoid duplicate chunk warning.
+    const data = EventsLogic.parseEvents(tile.rawContent || '');
+    data.entries.push(entry);
+    const newContent = EventsLogic.serializeEvents(data);
+    tile.onContentChange?.(newContent);
+    setViewMode('WIDGET'); // Switch back to list
   };
 
   return (
@@ -335,13 +337,12 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
                 onCancel={() => setViewMode('WIDGET')}
                 onAdd={(entry) => {
                   // Logic to update content
-                  import('../Organisms/Widgets/EventsLogic').then(m => {
-                    const data = m.parseEvents(tile.rawContent || '');
-                    data.entries.push(entry);
-                    const newContent = m.serializeEvents(data);
-                    tile.onContentChange?.(newContent);
-                    setViewMode('WIDGET');
-                  });
+                  // Logic to update content
+                  const data = EventsLogic.parseEvents(tile.rawContent || '');
+                  data.entries.push(entry);
+                  const newContent = EventsLogic.serializeEvents(data);
+                  tile.onContentChange?.(newContent);
+                  setViewMode('WIDGET');
                 }}
               />
             </div>
