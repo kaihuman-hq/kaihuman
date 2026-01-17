@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/preact';
+import type { Meta, StoryObj } from '@storybook/preact-vite';
 import { StatusBar } from './StatusBar';
 import { Editor } from './Editor';
 import { FileBrowser } from './FileBrowser';

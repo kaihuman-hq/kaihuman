@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/preact';
+import type { Meta, StoryObj } from '@storybook/preact-vite';
 import { useState } from 'preact/hooks';
 import { MainApp } from './MainApp';
 import { MonoHeader, MonoText } from '../Atoms/Typography';

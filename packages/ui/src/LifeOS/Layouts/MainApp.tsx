@@ -9,6 +9,9 @@ import { MainGrid } from './MainGrid';
 import { MillerColumn } from '../Molecules/MillerColumn';
 import { TimeTrackingWidget } from '../Organisms/Widgets/TimeTrackingWidget';
 import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
+import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
+import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
+import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 // framer-motion removed
 
 export interface TileDef {
@@ -52,6 +55,14 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
         <TimeTrackingWidget
           content={tile.rawContent}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
+          mode={mode}
+        />
+      );
+    }
+    if (tile.extension === '.events.csv' && tile.rawContent) {
+      return (
+        <EventsWidget
+          content={tile.rawContent}
           mode={mode}
         />
       );
@@ -201,8 +212,37 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
 };
 
 const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) => {
-  const hasWidget = !!tile.extension && !!tile.rawContent;
-  const [viewMode, setViewMode] = useState<'WIDGET' | 'CHARTS' | 'CODE'>(hasWidget ? 'WIDGET' : 'CODE');
+  const isTimeTracking = tile.extension === '.timetracking.csv';
+  const isEvents = tile.extension === '.events.csv';
+  const hasWidget = (isTimeTracking || isEvents) && !!tile.rawContent;
+
+  // Initial view mode: If widget available, default to WIDGET.
+  // Note: For events, we might have 'WIDGET' (List), 'ADD', 'CODE'.
+  const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
+
+  // Helper for Events Adding
+  const handleAddEvent = (entry: any) => {
+    // We need to import parseEvents/serializeEvents helper logic ideally, 
+    // or just assume we append to string since it's CSV?
+    // Better to use the logic functions to ensure safety.
+    // However, MainApp imports are growing. 
+    // Let's implement a simple append for now or use the proper logic if imports allow.
+    // Since we are inside MainApp, we can import * from EventsLogic.
+
+    // Using simplistic append for basic requirement fulfillment to avoid heavy refactor of MainApp imports in this single block if possible,
+    // BUT user asked for callback handling.
+
+    // We will parse -> push -> serialize.
+    // See top of file for imports.
+    // We will parse -> push -> serialize.
+    // See top of file for imports.
+    // Refactored to static import to avoid duplicate chunk warning.
+    const data = EventsLogic.parseEvents(tile.rawContent || '');
+    data.entries.push(entry);
+    const newContent = EventsLogic.serializeEvents(data);
+    tile.onContentChange?.(newContent);
+    setViewMode('WIDGET'); // Switch back to list
+  };
 
   return (
     <div
@@ -228,15 +268,31 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
                 >
                   WIDGET
                 </button>
-                <button
-                  onClick={() => setViewMode('CHARTS')}
-                  className={cn(
-                    "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
-                    viewMode === 'CHARTS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
-                  )}
-                >
-                  CHARTS
-                </button>
+
+                {isTimeTracking && (
+                  <button
+                    onClick={() => setViewMode('CHARTS')}
+                    className={cn(
+                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                      viewMode === 'CHARTS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                    )}
+                  >
+                    CHARTS
+                  </button>
+                )}
+
+                {isEvents && (
+                  <button
+                    onClick={() => setViewMode('ADD')}
+                    className={cn(
+                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                      viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                    )}
+                  >
+                    ADD EVENT
+                  </button>
+                )}
+
                 <button
                   onClick={() => setViewMode('CODE')}
                   className={cn(
@@ -263,16 +319,39 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
         <div className="flex-1 overflow-auto p-0 relative">
           {viewMode === 'WIDGET' && hasWidget ? (
             <div className="h-full w-full p-8">
-              <TimeTrackingWidget
-                content={tile.rawContent!}
-                onChange={(newContent) => tile.onContentChange?.(newContent)}
-                mode="FOCUS"
-              />
+              {isTimeTracking && (
+                <TimeTrackingWidget
+                  content={tile.rawContent!}
+                  onChange={(newContent) => tile.onContentChange?.(newContent)}
+                  mode="FOCUS"
+                />
+              )}
+              {isEvents && (
+                <EventsWidget
+                  content={tile.rawContent!}
+                  mode="FOCUS"
+                />
+              )}
             </div>
-          ) : viewMode === 'CHARTS' && hasWidget ? (
+          ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="h-full w-full p-8">
               <TimeTrackingCharts
                 data={tile.rawContent!}
+              />
+            </div>
+          ) : viewMode === 'ADD' && isEvents ? (
+            <div className="h-full w-full p-8 flex justify-center items-start">
+              <EventAddForm
+                onCancel={() => setViewMode('WIDGET')}
+                onAdd={(entry) => {
+                  // Logic to update content
+                  // Logic to update content
+                  const data = EventsLogic.parseEvents(tile.rawContent || '');
+                  data.entries.push(entry);
+                  const newContent = EventsLogic.serializeEvents(data);
+                  tile.onContentChange?.(newContent);
+                  setViewMode('WIDGET');
+                }}
               />
             </div>
           ) : (
