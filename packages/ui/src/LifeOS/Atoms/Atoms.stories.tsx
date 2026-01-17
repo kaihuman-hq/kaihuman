@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/preact';
+import type { Meta, StoryObj } from '@storybook/preact-vite';
 import { TileFrame } from './TileFrame';
 import { MonoHeader, MonoText, MonoLabel } from './Typography';
 

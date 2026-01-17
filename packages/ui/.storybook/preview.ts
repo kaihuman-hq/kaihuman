@@ -1,4 +1,4 @@
-import type { Preview } from "@storybook/preact";
+import type { Preview } from "@storybook/preact-vite";
 import "../src/styles.css";
 import "../src/LifeOS/styles.css";
 
@@ -11,19 +11,25 @@ const preview: Preview = {
       },
     },
     backgrounds: {
-      default: 'nexus-bg',
-      values: [
-        {
+      options: {
+        "nexus-bg": {
           name: 'nexus-bg',
           value: '#0a0a0f',
         },
-        {
+
+        light: {
           name: 'light',
           value: '#ffffff',
-        },
-      ],
+        }
+      }
     }
   },
+
+  initialGlobals: {
+    backgrounds: {
+      value: 'nexus-bg'
+    }
+  }
 };
 
 export default preview;

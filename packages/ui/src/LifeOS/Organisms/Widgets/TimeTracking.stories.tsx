@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/preact';
+import type { Meta, StoryObj } from '@storybook/preact-vite';
 import { TimeTrackingWidget } from './TimeTrackingWidget';
 import { TimeTrackingCharts } from './TimeTrackingCharts';
 
