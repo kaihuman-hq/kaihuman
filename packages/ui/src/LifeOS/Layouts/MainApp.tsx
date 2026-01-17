@@ -59,6 +59,14 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
         />
       );
     }
+    if (tile.extension === '.events.csv' && tile.rawContent) {
+      return (
+        <EventsWidget
+          content={tile.rawContent}
+          mode={mode}
+        />
+      );
+    }
     return tile.content;
   };
 

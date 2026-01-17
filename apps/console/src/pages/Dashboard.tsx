@@ -61,6 +61,7 @@ export const Dashboard = () => {
 
     return items.map(item => {
       const isTimeTracking = item.path.endsWith('.timetracking.csv');
+      const isEvents = item.path.endsWith('.events.csv');
 
       const tile: TileDef = {
         id: item.path, // Use path as ID for simplicity
@@ -82,6 +83,18 @@ export const Dashboard = () => {
           githubFileStore.updateFileContent(item.path, newContent);
           // Save immediately for widget interactions (Start/Stop)
           // Debouncing might be better but for button clicks immediate is native
+          githubFileStore.saveFile(item.path);
+        };
+      }
+
+      if (isEvents) {
+        tile.extension = '.events.csv';
+        if (openFiles[item.path]) {
+          tile.rawContent = openFiles[item.path].content;
+        }
+
+        tile.onContentChange = (newContent: string) => {
+          githubFileStore.updateFileContent(item.path, newContent);
           githubFileStore.saveFile(item.path);
         };
       }
@@ -144,6 +157,11 @@ export const Dashboard = () => {
           // It should be safe as long as openFile is idempotent-ish.
           // Call wrapped in timeout to avoid flicker or react loop issues?
           // console.log('Auto-loading widget:', item.path);
+          githubFileStore.openFile(item.path);
+        }
+      }
+      if (item.path.endsWith('.events.csv')) {
+        if (!openFiles[item.path]) {
           githubFileStore.openFile(item.path);
         }
       }

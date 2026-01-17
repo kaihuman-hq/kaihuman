@@ -20,7 +20,12 @@ export interface UpcomingEvent {
   durationLabel: string; // e.g., "in 5 days", "Tomorrow", "Today"
 }
 
+
+
 export const parseEvents = (csv: string): EventsData => {
+  // Debug Logging
+  console.log('[EventsLogic] Parsing CSV length:', csv ? csv.length : 0);
+
   if (!csv) return { entries: [] };
   const lines = csv.trim().split(/\r?\n/);
   const entries: EventEntry[] = [];
@@ -48,7 +53,7 @@ export const parseEvents = (csv: string): EventsData => {
       endDate: (end || start).trim() // Fallback to start if end missing
     });
   }
-
+  console.log('[EventsLogic] Parsed entries:', entries.length);
   return { entries };
 };
 
@@ -60,6 +65,7 @@ export const serializeEvents = (data: EventsData): string => {
   return csv;
 };
 
+
 export const getUpcomingEvents = (data: EventsData, limit = 8): UpcomingEvent[] => {
   const now = new Date();
   now.setHours(0, 0, 0, 0); // Normalize to start of day
@@ -69,11 +75,18 @@ export const getUpcomingEvents = (data: EventsData, limit = 8): UpcomingEvent[] 
 
   for (const entry of data.entries) {
     let nextDate: Date;
-    let targetLabel = '';
+
 
     if (entry.type === 'birthday') {
       // Parse original birthday
-      const bday = new Date(entry.startDate);
+      // Use local parts to avoid timezone shift
+      const parts = entry.startDate.split('-').map(Number);
+      if (parts.length < 3) continue; // Invalid date
+      const y = parts[0] as number;
+      const m = parts[1] as number;
+      const d = parts[2] as number;
+      const bday = new Date(y, m - 1, d); // Local
+
       // Construct current year birthday
       nextDate = new Date(year, bday.getMonth(), bday.getDate());
       nextDate.setHours(0, 0, 0, 0);
@@ -83,16 +96,32 @@ export const getUpcomingEvents = (data: EventsData, limit = 8): UpcomingEvent[] 
         nextDate.setFullYear(year + 1);
       }
     } else {
-      // General event - uses Start Date for "upcoming" sorting usually? 
-      // User said "shows upcoming events that are in the future".
-      // Usually means Start Date >= Today OR (Start <= Today <= End for ongoing).
-      // Let's stick to Start Date for "upcoming" list sorting primarily.
-      nextDate = new Date(entry.startDate);
+      // General event
+      const parts = entry.startDate.split('-').map(Number);
+      if (parts.length < 3) continue; // Invalid date
+      const y = parts[0] as number;
+      const m = parts[1] as number;
+      const d = parts[2] as number;
+
+      nextDate = new Date(y, m - 1, d); // Local
       nextDate.setHours(0, 0, 0, 0);
 
       // Filter out past events (End Date < Now)
-      // If End Date is missing, assume single day event (End = Start)
-      const endDate = entry.endDate ? new Date(entry.endDate) : new Date(entry.startDate);
+      // Parse endDate locally too
+      let endDate: Date;
+      if (entry.endDate) {
+        const endParts = entry.endDate.split('-').map(Number);
+        if (endParts.length >= 3) {
+          const ey = endParts[0] as number;
+          const em = endParts[1] as number;
+          const ed = endParts[2] as number;
+          endDate = new Date(ey, em - 1, ed); // Local
+        } else {
+          endDate = new Date(nextDate);
+        }
+      } else {
+        endDate = new Date(nextDate);
+      }
       endDate.setHours(0, 0, 0, 0);
 
       if (endDate < now) continue;
