@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite';
-import { FocusedTile } from '../Layouts/MainApp'; // We need access to this or we mock MainApp. 
+
 // FocusedTile is not exported. Let's export it or just test Widgets directly.
 // User requested: "add/adjust Stories for it".
 // Let's test EventsWidget directly first.
