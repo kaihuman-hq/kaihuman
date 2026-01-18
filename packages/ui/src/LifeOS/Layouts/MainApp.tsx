@@ -292,6 +292,17 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     setActiveDashboardId(config.dashboards[prevIndex].id);
   };
 
+  const getResponsiveGridClass = (count: number) => {
+    if (count <= 1) return "grid-cols-1";
+    if (count === 2) return "grid-cols-1 sm:grid-cols-2";
+    if (count === 3) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3";
+    if (count === 4) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
+    if (count === 5) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
+    if (count === 6) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
+    if (count === 7) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7";
+    return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8";
+  };
+
   return (
     <div
       className="h-screen w-full max-w-[100vw] bg-[var(--los-bg)] overflow-hidden relative"
@@ -331,7 +342,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
               <div
                 className={cn(
                   "absolute top-0 left-0 right-0 bottom-8 overflow-y-auto overflow-x-hidden",
-                  !localConfig ? "grid gap-px bg-[var(--los-bg)] content-start grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8" : "block"
+                  !localConfig ? getResponsiveGridClass(displayTiles.length) : "block"
                 )}
                 key="matrix"
               >
@@ -349,7 +360,10 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
                           strategy={rectSortingStrategy}
                         >
                           {(
-                            <div className="grid gap-px bg-[var(--los-bg)] content-start grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8 w-full p-4 md:p-0">
+                            <div className={cn(
+                              "grid gap-px bg-[var(--los-bg)] content-start w-full p-4 md:p-0",
+                              getResponsiveGridClass(displayTiles.length)
+                            )}>
                               {displayTiles.map((tile) => (
                                 <SortableTileItem
                                   key={tile.id}
