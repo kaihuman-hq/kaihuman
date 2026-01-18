@@ -207,9 +207,9 @@ export const StatusBar = ({
                 onClick={() => handleToggleExpand('REPOS')}
                 title={`Change Repository`}
               >
-                <GitCommit size={12} className="group-hover:animate-pulse" />
-                <div className="flex items-center">
-                  <MonoText className="text-xs font-bold">{currentRepository.name}</MonoText>
+                <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
+                <div className="flex items-center max-w-0 opacity-0 overflow-hidden group-hover:max-w-[200px] group-hover:opacity-100 transition-all duration-300 ease-in-out whitespace-nowrap">
+                  <MonoText className="text-xs font-bold ml-2">{currentRepository.name}</MonoText>
                   <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
                 </div>
               </div>
@@ -243,9 +243,9 @@ export const StatusBar = ({
                   </div>
                 )}
 
-                <LayoutGrid size={12} className="group-hover:animate-pulse" />
-                <div className="flex items-center">
-                  <MonoText className="text-xs font-bold">{currentWorkspace.name}</MonoText>
+                <LayoutGrid size={12} className="group-hover:animate-pulse shrink-0" />
+                <div className="flex items-center max-w-0 opacity-0 overflow-hidden group-hover:max-w-[200px] group-hover:opacity-100 transition-all duration-300 ease-in-out whitespace-nowrap">
+                  <MonoText className="text-xs font-bold ml-2">{currentWorkspace.name}</MonoText>
                   <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
                 </div>
               </div>
