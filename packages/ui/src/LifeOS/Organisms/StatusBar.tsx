@@ -2,7 +2,7 @@ import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoLabel, MonoText } from '../Atoms/Typography';
-import { Sparkles, Archive, Search, Settings, GitBranch, GitCommit } from 'lucide-preact';
+import { Sparkles, Archive, Search, Settings, GitBranch, GitCommit, LayoutGrid, ChevronUp, ArrowRight } from 'lucide-preact';
 
 export interface Repository {
   id: string;
@@ -24,6 +24,7 @@ export interface StatusBarProps {
   currentRepository?: Repository;
   repositories?: Repository[];
   onSelectRepository?: (repo: Repository) => void;
+  onNextRepository?: () => void;
   repositoryLabel?: string;
   onDashboardClick?: () => void;
   menuItems?: MenuItem[];
@@ -36,6 +37,7 @@ export const StatusBar = ({
   currentRepository,
   repositories = [],
   onSelectRepository,
+  onNextRepository,
   repositoryLabel = "SELECT REPOSITORY",
   onDashboardClick,
   menuItems
@@ -153,14 +155,35 @@ export const StatusBar = ({
             {currentRepository && (
               <div
                 className={cn(
-                  "hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300",
+                  "flex items-center gap-2 cursor-pointer group transtion-all duration-300",
                   expanded && expandedMode === 'REPOS' ? "text-[var(--los-accent)]" : "text-[var(--los-fg)] hover:text-[var(--los-accent)]"
                 )}
                 onClick={() => handleToggleExpand('REPOS')}
-                title="Change Repository"
+                title={`Change ${repositoryLabel}`}
               >
-                <GitCommit size={12} className="group-hover:animate-pulse" />
-                <MonoText className="text-xs font-bold">{currentRepository.name}</MonoText>
+                {repositoryLabel === 'WORKSPACES' ? (
+                  <LayoutGrid size={12} className="group-hover:animate-pulse" />
+                ) : (
+                  <GitCommit size={12} className="group-hover:animate-pulse" />
+                )}
+
+                {onNextRepository && (
+                  <div
+                    className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNextRepository();
+                    }}
+                    title="Next Workspace"
+                  >
+                    <ArrowRight size={14} />
+                  </div>
+                )}
+
+                <div className="flex items-center">
+                  <MonoText className="text-xs font-bold">{currentRepository.name}</MonoText>
+                  <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
+                </div>
               </div>
             )}
 

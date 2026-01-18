@@ -1,5 +1,5 @@
 import { ComponentChildren, h } from 'preact';
-import { useState, useEffect, useMemo } from 'preact/hooks';
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { cn } from '../../utils';
 import { Tile } from '../Molecules/Tile';
 import { StatusBar } from '../Organisms/StatusBar';
@@ -108,6 +108,15 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
   };
 
   const currentDashboardId = activeDashboardId || localConfig?.dashboards[0]?.id;
+
+  const handleNextDashboard = () => {
+    const config = localConfig;
+    if (!config || !config.dashboards.length) return;
+    const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
+    // Find next index, wrap around
+    const nextIndex = (currentIndex + 1) % config.dashboards.length;
+    setActiveDashboardId(config.dashboards[nextIndex].id);
+  };
 
   // Filter entries for current dashboard
   const userEntries = useMemo(() => {
@@ -245,11 +254,54 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     }),
   };
 
-  return (
-    <div className="h-screen w-full max-w-[100vw] bg-[var(--los-bg)] overflow-hidden relative">
-      <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
+  // Swipe Logic
+  const touchStart = useRef<number | null>(null);
+  const touchEnd = useRef<number | null>(null);
 
-        {/* CENTER STAGE: The Matrix OR The Active Tile */}
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: any) => {
+    touchEnd.current = null;
+    touchStart.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchMove = (e: any) => {
+    touchEnd.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart.current || !touchEnd.current) return;
+    const distance = touchStart.current - touchEnd.current;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      handleNextDashboard();
+    }
+    if (isRightSwipe) {
+      handlePrevDashboard();
+    }
+  };
+
+  const handlePrevDashboard = () => {
+    const config = localConfig;
+    if (!config || !config.dashboards.length) return;
+    const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
+    // Find prev index, wrap around
+    const prevIndex = (currentIndex - 1 + config.dashboards.length) % config.dashboards.length;
+    setActiveDashboardId(config.dashboards[prevIndex].id);
+  };
+
+  return (
+    <div
+      className="h-screen w-full max-w-[100vw] bg-[var(--los-bg)] overflow-hidden relative"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+
+      {/* CENTER STAGE: The Matrix OR The Active Tile */}
+      <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
         <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : undefined} column="center">
           {activeTileId === null ? (
             isMillerMode ? (
@@ -368,7 +420,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         // Dashboard Integration
         repositoryLabel={localConfig ? "WORKSPACES" : "SELECT REPOSITORY"}
         repositories={localConfig ? localConfig.dashboards.map(d => ({ id: d.id, name: d.name })) : props.repositories}
-        currentRepository={localConfig ? { id: currentDashboardId || '', name: localConfig.dashboards.find(d => d.id === currentDashboardId)?.name || 'Unknown' } : props.currentRepository}
+        currentRepository={localConfig ? { id: currentDashboardId || '', name: localConfig.dashboards?.find(d => d.id === currentDashboardId)?.name || 'Unknown' } : props.currentRepository}
         onSelectRepository={(repo) => {
           if (!dragEnabled) {
             if (localConfig) {
@@ -378,18 +430,22 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
             }
           }
         }}
+        onNextRepository={!dragEnabled && localConfig ? handleNextDashboard : undefined}
         menuItems={dragEnabled ? [
           { label: "Save Order", onClick: handleDragSave },
           { label: "Cancel Reorder", onClick: handleDragCancel }
-        ] : (localConfig ? (localConfig.files.recentlyOpened || []).map(path => ({
+        ] : (localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
           label: path,
           onClick: () => {
-            const entry = localConfig.entries.find(e => e.path === path);
-            if (entry) {
-              setActiveDashboardId(entry.dashboard);
-              setActiveTileId(entry.path);
-            } else {
-              console.warn("File not found in dashboard entries:", path);
+            const conf = localConfig;
+            if (conf) {
+              const entry = conf.entries.find(e => e.path === path);
+              if (entry) {
+                setActiveDashboardId(entry.dashboard);
+                setActiveTileId(entry.path);
+              } else {
+                console.warn("File not found in dashboard entries:", path);
+              }
             }
           }
         })) : undefined)}

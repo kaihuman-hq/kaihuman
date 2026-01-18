@@ -131,19 +131,27 @@ export const ConfiguredDashboard: StoryObj = {
       "dashboards": [
         {
           "id": "d0",
-          "name": "work8test-new"
+          "name": "Personal"
         },
         {
           "id": "d1",
-          "name": "new-dashboard"
+          "name": "Work Proj A"
         },
         {
           "id": "d2",
-          "name": "default"
+          "name": "Learning"
         },
         {
           "id": "d3",
-          "name": "my new shiny dashboard"
+          "name": "Finance"
+        },
+        {
+          "id": "d4",
+          "name": "Health & Fitness"
+        },
+        {
+          "id": "d5",
+          "name": "Archive 2023"
         }
       ],
       "entries": [
