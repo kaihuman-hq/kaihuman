@@ -115,7 +115,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
     // Find next index, wrap around
     const nextIndex = (currentIndex + 1) % config.dashboards.length;
-    setActiveDashboardId(config.dashboards[nextIndex].id);
+    setActiveDashboardId(config.dashboards[nextIndex]?.id || null);
   };
 
   // Filter entries for current dashboard
@@ -289,7 +289,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
     // Find prev index, wrap around
     const prevIndex = (currentIndex - 1 + config.dashboards.length) % config.dashboards.length;
-    setActiveDashboardId(config.dashboards[prevIndex].id);
+    setActiveDashboardId(config.dashboards[prevIndex]?.id || null);
   };
 
   const getResponsiveGridClass = (count: number) => {
