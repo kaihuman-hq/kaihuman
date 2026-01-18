@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite';
 import { useState } from 'preact/hooks';
-import { MainApp } from './MainApp';
+import { MainApp, TileDef } from './MainApp';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
+import { DashboardConfig } from '../types';
 
 const meta = {
   title: 'LifeOS/Layouts',
@@ -121,3 +122,98 @@ const mockRepos = [
   { id: '2', name: 'Lifosy/ui', branch: 'develop' },
   { id: '3', name: 'Lifosy/core', branch: 'feature/repo-selection' },
 ];
+
+export const ConfiguredDashboard: StoryObj = {
+  render: () => {
+    // Sample Config from user
+    const sampleConfig: DashboardConfig = {
+      "version": 1,
+      "dashboards": [
+        {
+          "id": "d0",
+          "name": "work8test-new"
+        },
+        {
+          "id": "d1",
+          "name": "new-dashboard"
+        },
+        {
+          "id": "d2",
+          "name": "default"
+        },
+        {
+          "id": "d3",
+          "name": "my new shiny dashboard"
+        }
+      ],
+      "entries": [
+        {
+          "path": "test2.habit.csv",
+          "dashboard": "d0",
+          "skipOnMobile": false
+        },
+        {
+          "path": "my2.achievements.md",
+          "dashboard": "d1",
+          "skipOnMobile": false
+        },
+        {
+          "path": "generic-test/generic-other.csv.md",
+          "dashboard": "d3",
+          "skipOnMobile": false
+        },
+        {
+          "path": "test-todos.todos.md",
+          "dashboard": "d2",
+          "skipOnMobile": false
+        },
+        {
+          "path": "reditlater.readitlater.json",
+          "dashboard": "d2",
+          "skipOnMobile": false
+        },
+        {
+          "path": ".lifeos/.readitlater.json",
+          "dashboard": "d0",
+          "skipOnMobile": false
+        },
+        {
+          "path": "my-date-time.timezones.json",
+          "dashboard": "d0",
+          "skipOnMobile": false
+        }
+      ],
+      "files": {
+        "selected": "0_event.events.csv",
+        "opened": [
+          "0_event.events.csv"
+        ],
+        "recentlyOpened": [
+          "0_event.events.csv",
+          "my-lifosy-event.lifosy-event.json",
+          "testidea .tldraw.json",
+          ".lifeos/.readitlater.json"
+        ]
+      }
+    };
+
+    // Mock file contents
+    const mockFileContents: Record<string, string> = {
+      "test2.habit.csv": "date,habit1\n2023-10-01,true",
+      "my2.achievements.md": "# Achievements\n- Built a dashboard",
+      ".lifeos/.readitlater.json": "[]",
+      "my-date-time.timezones.json": "{}",
+      // ... others empty
+    };
+
+    const [config, setConfig] = useState<DashboardConfig>(sampleConfig);
+
+    return (
+      <MainApp
+        config={config}
+        onConfigChange={setConfig}
+        fileContents={mockFileContents}
+      />
+    );
+  }
+};

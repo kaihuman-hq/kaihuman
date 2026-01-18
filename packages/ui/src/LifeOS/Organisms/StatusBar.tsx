@@ -11,6 +11,12 @@ export interface Repository {
   branch?: string;
 }
 
+export interface MenuItem {
+  label: string;
+  onClick?: () => void;
+  icon?: any;
+}
+
 export interface StatusBarProps {
   mode?: string;
   breadcrumbs?: string[];
@@ -18,7 +24,9 @@ export interface StatusBarProps {
   currentRepository?: Repository;
   repositories?: Repository[];
   onSelectRepository?: (repo: Repository) => void;
+  repositoryLabel?: string;
   onDashboardClick?: () => void;
+  menuItems?: MenuItem[];
 }
 
 export const StatusBar = ({
@@ -28,7 +36,9 @@ export const StatusBar = ({
   currentRepository,
   repositories = [],
   onSelectRepository,
-  onDashboardClick
+  repositoryLabel = "SELECT REPOSITORY",
+  onDashboardClick,
+  menuItems
 }: StatusBarProps) => {
   const [expanded, setExpanded] = useState(false);
   const [expandedMode, setExpandedMode] = useState<'MENU' | 'REPOS'>('MENU');
@@ -78,7 +88,14 @@ export const StatusBar = ({
               >
                 <MonoLabel className="group-hover:text-[var(--los-accent)]">DASHBOARD</MonoLabel>
               </div>
-              {['New File', 'Search', 'Settings', 'Git', 'Terminal', 'Zen Mode'].map((action, i) => (
+              {menuItems ? menuItems.map((item, i) => (
+                <div key={i}
+                  onClick={() => { item.onClick?.(); setExpanded(false); }}
+                  className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2"
+                >
+                  <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase">{item.label}</MonoLabel>
+                </div>
+              )) : ['New File', 'Search', 'Settings', 'Git', 'Terminal', 'Zen Mode'].map((action, i) => (
                 <div key={i} className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2">
                   <MonoLabel className="group-hover:text-[var(--los-accent)]">{action}</MonoLabel>
                 </div>
@@ -88,7 +105,7 @@ export const StatusBar = ({
 
           {expandedMode === 'REPOS' && (
             <div className="flex flex-col gap-2">
-              <MonoLabel className="mb-4 text-[var(--los-accent)]">SELECT REPOSITORY</MonoLabel>
+              <MonoLabel className="mb-4 text-[var(--los-accent)] uppercase">{repositoryLabel}</MonoLabel>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {repositories.map((repo) => (
                   <div
