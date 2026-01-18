@@ -21,11 +21,19 @@ export interface StatusBarProps {
   mode?: string;
   breadcrumbs?: string[];
   stats?: { label: string; value: string }[];
+
+  // Repository (Global Context)
   currentRepository?: Repository;
   repositories?: Repository[];
   onSelectRepository?: (repo: Repository) => void;
-  onNextRepository?: () => void;
   repositoryLabel?: string;
+
+  // Workspace (Local Context)
+  currentWorkspace?: Repository; // Reusing Repository interface for Name/ID
+  workspaces?: Repository[];
+  onSelectWorkspace?: (ws: Repository) => void;
+  onNextWorkspace?: () => void; // Replaces onNextRepository usage for workspaces
+
   onDashboardClick?: () => void;
   menuItems?: MenuItem[];
 }
@@ -37,16 +45,21 @@ export const StatusBar = ({
   currentRepository,
   repositories = [],
   onSelectRepository,
-  onNextRepository,
-  repositoryLabel = "SELECT REPOSITORY",
+  repositoryLabel = "REPOSITORY",
+
+  currentWorkspace,
+  workspaces = [],
+  onSelectWorkspace,
+  onNextWorkspace,
+
   onDashboardClick,
   menuItems
 }: StatusBarProps) => {
   const [expanded, setExpanded] = useState(false);
-  const [expandedMode, setExpandedMode] = useState<'MENU' | 'REPOS'>('MENU');
+  const [expandedMode, setExpandedMode] = useState<'MENU' | 'REPOS' | 'WORKSPACES'>('MENU');
   const [isHovered, setIsHovered] = useState(false);
 
-  const handleToggleExpand = (mode: 'MENU' | 'REPOS') => {
+  const handleToggleExpand = (mode: 'MENU' | 'REPOS' | 'WORKSPACES') => {
     if (expanded && expandedMode === mode) {
       setExpanded(false);
     } else {
@@ -107,7 +120,7 @@ export const StatusBar = ({
 
           {expandedMode === 'REPOS' && (
             <div className="flex flex-col gap-2">
-              <MonoLabel className="mb-4 text-[var(--los-accent)] uppercase">{repositoryLabel}</MonoLabel>
+              <MonoLabel className="mb-4 text-[var(--los-accent)] uppercase">REPOSITORIES</MonoLabel>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {repositories.map((repo) => (
                   <div
@@ -138,6 +151,39 @@ export const StatusBar = ({
               </div>
             </div>
           )}
+
+          {expandedMode === 'WORKSPACES' && (
+            <div className="flex flex-col gap-2">
+              <MonoLabel className="mb-4 text-[var(--los-accent)] uppercase">WORKSPACES</MonoLabel>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {workspaces.map((ws) => (
+                  <div
+                    key={ws.id}
+                    onClick={() => {
+                      onSelectWorkspace?.(ws);
+                      setExpanded(false);
+                    }}
+                    className={cn(
+                      "border p-4 cursor-pointer transition-colors flex items-center justify-between group",
+                      currentWorkspace?.id === ws.id
+                        ? "border-[var(--los-accent)] bg-[var(--los-accent-dim)]"
+                        : "border-[var(--los-border)] hover:border-[var(--los-fg)] hover:bg-white/5"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <LayoutGrid size={16} className={currentWorkspace?.id === ws.id ? "text-[var(--los-accent)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]"} />
+                      <div className="flex flex-col">
+                        <MonoText className={currentWorkspace?.id === ws.id ? "text-[var(--los-accent)]" : "text-[var(--los-fg)]"}>
+                          {ws.name}
+                        </MonoText>
+                      </div>
+                    </div>
+                    {currentWorkspace?.id === ws.id && <div className="w-2 h-2 rounded-full bg-[var(--los-accent)]" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* The Bar Itself */}
@@ -159,20 +205,37 @@ export const StatusBar = ({
                   expanded && expandedMode === 'REPOS' ? "text-[var(--los-accent)]" : "text-[var(--los-fg)] hover:text-[var(--los-accent)]"
                 )}
                 onClick={() => handleToggleExpand('REPOS')}
-                title={`Change ${repositoryLabel}`}
+                title={`Change Repository`}
               >
-                {repositoryLabel === 'WORKSPACES' ? (
-                  <LayoutGrid size={12} className="group-hover:animate-pulse" />
-                ) : (
-                  <GitCommit size={12} className="group-hover:animate-pulse" />
-                )}
+                <GitCommit size={12} className="group-hover:animate-pulse" />
+                <div className="flex items-center">
+                  <MonoText className="text-xs font-bold">{currentRepository.name}</MonoText>
+                  <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
+                </div>
+              </div>
+            )}
 
-                {onNextRepository && (
+            {currentRepository && currentWorkspace && (
+              <div className="h-4 w-px bg-[var(--los-border)] mx-1" />
+            )}
+
+            {currentWorkspace && (
+              <div
+                className={cn(
+                  "flex items-center gap-2 cursor-pointer group transtion-all duration-300",
+                  "text-[var(--los-fg)] hover:text-[var(--los-accent)]"
+                )}
+                // We'll reuse the REPOS expander but maybe we need a separate mode or just list workspaces in the same menu?
+                // For simplicity let's use a new mode 'WORKSPACES'
+                onClick={() => handleToggleExpand('WORKSPACES' as any)}
+                title={`Change Workspace`}
+              >
+                {onNextWorkspace && (
                   <div
                     className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onNextRepository();
+                      onNextWorkspace();
                     }}
                     title="Next Workspace"
                   >
@@ -180,8 +243,9 @@ export const StatusBar = ({
                   </div>
                 )}
 
+                <LayoutGrid size={12} className="group-hover:animate-pulse" />
                 <div className="flex items-center">
-                  <MonoText className="text-xs font-bold">{currentRepository.name}</MonoText>
+                  <MonoText className="text-xs font-bold">{currentWorkspace.name}</MonoText>
                   <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
                 </div>
               </div>

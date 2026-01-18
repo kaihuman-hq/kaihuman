@@ -75,6 +75,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
   const [activeDashboardId, setActiveDashboardId] = useState<string | null>(null);
   const [dragEnabled, setDragEnabled] = useState(false);
   const [localConfig, setLocalConfig] = useState<DashboardConfig | undefined>(config);
+  const [showFiles, setShowFiles] = useState(false); // Toggle for "Files" view
 
   // Store original config when entering Drag Mode for cancellation
   const [originalConfig, setOriginalConfig] = useState<DashboardConfig | undefined>(undefined);
@@ -83,7 +84,10 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
   const [activeId, setActiveId] = useState<string | number | null>(null);
 
   useEffect(() => {
-    if (config) setLocalConfig(config);
+    if (config) {
+      setLocalConfig(config);
+      setShowFiles(false); // Reset to dashboard when config loads? Or keep user pref?
+    }
   }, [config]);
 
   const handleDragStartLogic = () => {
@@ -173,7 +177,10 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
   };
 
   // If fileSystem is provided, we use the Miller Column Layout
-  const isMillerMode = !!fileSystem;
+  // Override: If showFiles is true, we force Miller Mode if fileSystem exists
+  // If localConfig exists AND !showFiles, we use Grid Mode (isMillerMode = false)
+  // If localConfig missing, we default to Miller Mode if fileSystem exists
+  const isMillerMode = !!fileSystem && (showFiles || !localConfig);
 
   // Constants
   const activeTile = activeTileId !== null ? (
@@ -342,11 +349,11 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
               <div
                 className={cn(
                   "absolute top-0 left-0 right-0 bottom-8 overflow-y-auto overflow-x-hidden",
-                  !localConfig ? getResponsiveGridClass(displayTiles.length) : "block"
+                  !localConfig || showFiles ? "block" : getResponsiveGridClass(displayTiles.length)
                 )}
                 key="matrix"
               >
-                {localConfig ? (
+                {localConfig && !showFiles ? (
                   <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -417,7 +424,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
 
       {/* Sticky Status Bar */}
       <StatusBar
-        mode={activeTileId !== null ? "FOCUS" : (dragEnabled ? "DND" : "NORMAL")}
+        mode={activeTileId !== null ? "FOCUS" : (showFiles ? "FILES" : (dragEnabled ? "DND" : "NORMAL"))}
         breadcrumbs={getBreadcrumbs()}
         stats={[
           { label: "TILES", value: displayTiles.length.toString() },
@@ -431,38 +438,46 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
             handleDashboardClick();
           }
         }}
-        // Dashboard Integration
-        repositoryLabel={localConfig ? "WORKSPACES" : "SELECT REPOSITORY"}
-        repositories={localConfig ? localConfig.dashboards.map(d => ({ id: d.id, name: d.name })) : props.repositories}
-        currentRepository={localConfig ? { id: currentDashboardId || '', name: localConfig.dashboards?.find(d => d.id === currentDashboardId)?.name || 'Unknown' } : props.currentRepository}
-        onSelectRepository={(repo) => {
-          if (!dragEnabled) {
-            if (localConfig) {
-              setActiveDashboardId(repo.id);
-            } else {
-              props.onSelectRepository?.(repo);
-            }
+
+        // Repository Switcher (Always available if props provided)
+        currentRepository={props.currentRepository}
+        repositories={props.repositories}
+        onSelectRepository={props.onSelectRepository}
+
+        // Workspace Switcher (Only if config exists)
+        currentWorkspace={localConfig ? { id: currentDashboardId || '', name: localConfig.dashboards?.find(d => d.id === currentDashboardId)?.name || 'Unknown' } : undefined}
+        workspaces={localConfig ? localConfig.dashboards.map(d => ({ id: d.id, name: d.name })) : undefined}
+        onSelectWorkspace={(ws) => {
+          if (!dragEnabled && localConfig) {
+            setActiveDashboardId(ws.id);
+            setShowFiles(false); // Switch back to dashboard view
           }
         }}
-        onNextRepository={!dragEnabled && localConfig ? handleNextDashboard : undefined}
+        onNextWorkspace={!dragEnabled && localConfig ? handleNextDashboard : undefined}
+
         menuItems={dragEnabled ? [
           { label: "Save Order", onClick: handleDragSave },
           { label: "Cancel Reorder", onClick: handleDragCancel }
-        ] : (localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
-          label: path,
-          onClick: () => {
-            const conf = localConfig;
-            if (conf) {
-              const entry = conf.entries.find(e => e.path === path);
-              if (entry) {
-                setActiveDashboardId(entry.dashboard);
-                setActiveTileId(entry.path);
-              } else {
-                console.warn("File not found in dashboard entries:", path);
+        ] : [
+          { label: "Files", onClick: () => setShowFiles(true) },
+          ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
+          ...(localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
+            label: path,
+            onClick: () => {
+              const conf = localConfig;
+              if (conf) {
+                const entry = conf.entries.find(e => e.path === path);
+                if (entry) {
+                  setShowFiles(false); // Switch to dashboard
+                  setActiveDashboardId(entry.dashboard);
+                  setActiveTileId(entry.path);
+                } else {
+                  console.warn("File not found in dashboard entries:", path);
+                }
               }
             }
-          }
-        })) : undefined)}
+          })) : [])
+        ]}
       />
     </div>
   );
