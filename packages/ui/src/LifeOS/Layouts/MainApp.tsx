@@ -1,5 +1,5 @@
 import { ComponentChildren, h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { cn } from '../../utils';
 import { Tile } from '../Molecules/Tile';
 import { StatusBar } from '../Organisms/StatusBar';
@@ -12,7 +12,27 @@ import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
 import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
 import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
-// framer-motion removed
+import { DashboardConfig, DashboardEntry } from '../types';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  defaultDropAnimationSideEffects,
+  DragStartEvent,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 export interface TileDef {
   id: string | number;
@@ -35,6 +55,9 @@ export interface FileSystemState {
 
 export interface MainAppProps {
   tiles?: TileDef[]; // Legacy/Single-level prop
+  config?: DashboardConfig;
+  fileContents?: Record<string, string>; // Map path -> content
+  onConfigChange?: (newConfig: DashboardConfig) => void;
   fileSystem?: FileSystemState;
   onNavigate?: (path: string[]) => void; // Path is list of IDs
   onItemClick?: (item: TileDef) => void;
@@ -44,9 +67,92 @@ export interface MainAppProps {
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
 }
 
-export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavigate, ...props }: MainAppProps) => {
-  // State for legacy/single-level mode
+export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, ...props }: MainAppProps) => {
+  // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
+
+  // Dashboard State
+  const [activeDashboardId, setActiveDashboardId] = useState<string | null>(null);
+  const [dragEnabled, setDragEnabled] = useState(false);
+  const [localConfig, setLocalConfig] = useState<DashboardConfig | undefined>(config);
+  const [showFiles, setShowFiles] = useState(false); // Toggle for "Files" view
+
+  // Store original config when entering Drag Mode for cancellation
+  const [originalConfig, setOriginalConfig] = useState<DashboardConfig | undefined>(undefined);
+
+  // Store current drag id for drag overlay
+  const [activeId, setActiveId] = useState<string | number | null>(null);
+
+  useEffect(() => {
+    if (config) {
+      setLocalConfig(config);
+      setShowFiles(false); // Reset to dashboard when config loads? Or keep user pref?
+    }
+  }, [config]);
+
+  const handleDragStartLogic = () => {
+    setOriginalConfig(JSON.parse(JSON.stringify(localConfig))); // Deep copy
+    setDragEnabled(true);
+  };
+
+  const handleDragSave = () => {
+    setDragEnabled(false);
+    setOriginalConfig(undefined);
+    // Persist changes - user callback already called during reorder
+    if (localConfig) onConfigChange?.(localConfig);
+  };
+
+  const handleDragCancel = () => {
+    if (originalConfig) {
+      setLocalConfig(originalConfig);
+      onConfigChange?.(originalConfig);
+    }
+    setDragEnabled(false);
+    setOriginalConfig(undefined);
+  };
+
+  const currentDashboardId = activeDashboardId || localConfig?.dashboards[0]?.id;
+
+  const handleNextDashboard = () => {
+    const config = localConfig;
+    if (!config || !config.dashboards.length) return;
+    const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
+    // Find next index, wrap around
+    const nextIndex = (currentIndex + 1) % config.dashboards.length;
+    setActiveDashboardId(config.dashboards[nextIndex]?.id || null);
+  };
+
+  // Filter entries for current dashboard
+  const userEntries = useMemo(() => {
+    if (!localConfig || !currentDashboardId) return [];
+    return localConfig.entries.filter(e => e.dashboard === currentDashboardId);
+  }, [localConfig, currentDashboardId]);
+
+  // Convert config entries to tiles
+  const dashboardTiles = useMemo(() => {
+    if (!localConfig) return tiles; // Fallback to legacy tiles
+
+    return userEntries.map((entry, index) => {
+      const extension = entry.path.split('.').slice(1).join('.'); // .events.csv etc. leads to events.csv
+      // Better extension extraction:
+      const parts = entry.path.split('.');
+      const ext = parts.length > 1 ? '.' + parts.slice(1).join('.') : '';
+
+      return {
+        id: entry.path, // Use path as ID
+        title: entry.path,
+        type: 'FILE',
+        extension: ext,
+        rawContent: fileContents[entry.path],
+        onContentChange: (newContent: string) => {
+          // How to handle save? Ideally pass callback up.
+          // For now, we update local state if needed?
+        }
+      } as TileDef;
+    });
+  }, [localConfig, userEntries, fileContents, tiles]);
+
+  const displayTiles = dashboardTiles;
 
   // Helper to render tile content (Widget vs Default)
   const renderTileContent = (tile: TileDef, mode: 'SMALL' | 'FOCUS') => {
@@ -71,20 +177,16 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
   };
 
   // If fileSystem is provided, we use the Miller Column Layout
-  const isMillerMode = !!fileSystem;
+  // Override: If showFiles is true, we force Miller Mode if fileSystem exists
+  // If localConfig exists AND !showFiles, we use Grid Mode (isMillerMode = false)
+  // If localConfig missing, we default to Miller Mode if fileSystem exists
+  const isMillerMode = !!fileSystem && (showFiles || !localConfig);
 
-  // For Miller Mode, "Focus" is when the last column has a selected "FILE" item, 
-  // OR we can rely on `activeTileId` if we want to "zoom in" on a specific file.
-  // The requirements say: "right content of the selected folder is shown".
-  // "User can always click on one of the smaller tiles in the left columns".
-  // "There should be a way to select the current folder, so all folder content becomes the full matrix".
-
-  // Let's assume `activeTileId` is used for "Focusing a File" (fullscreen editor).
-
+  // Constants
   const activeTile = activeTileId !== null ? (
     isMillerMode
       ? fileSystem?.columns.flatMap(c => c.items).find(t => t.id === activeTileId)
-      : tiles.find(t => t.id === activeTileId)
+      : displayTiles.find(t => t.id === activeTileId)
   ) : null;
 
   // Calculate Breadcrumbs Logic
@@ -112,11 +214,112 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
     }
   };
 
-  return (
-    <div className="h-screen w-full max-w-[100vw] bg-[var(--los-bg)] overflow-hidden relative">
-      <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
+  // DnD Sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require movement before drag starts to allow clicks
+      }
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
-        {/* CENTER STAGE: The Matrix OR The Active Tile */}
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (active.id !== over?.id) {
+      if (!localConfig || !currentDashboardId) return;
+      // Find indices
+      const oldIndex = userEntries.findIndex(e => e.path === active.id);
+      const newIndex = userEntries.findIndex(e => e.path === over?.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(userEntries, oldIndex, newIndex);
+        const otherEntries = localConfig.entries.filter(e => e.dashboard !== currentDashboardId);
+        const newConfig = { ...localConfig, entries: [...otherEntries, ...newOrder] };
+        setLocalConfig(newConfig);
+        onConfigChange?.(newConfig);
+      }
+    }
+  };
+
+  // To allow cross-column drag, use rectSortingStrategy which supports grids
+  const dropAnimation = {
+    sideEffects: defaultDropAnimationSideEffects({
+      styles: {
+        active: {
+          opacity: '0.5',
+        },
+      },
+    }),
+  };
+
+  // Swipe Logic
+  const touchStart = useRef<number | null>(null);
+  const touchEnd = useRef<number | null>(null);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: any) => {
+    touchEnd.current = null;
+    touchStart.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchMove = (e: any) => {
+    touchEnd.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart.current || !touchEnd.current) return;
+    const distance = touchStart.current - touchEnd.current;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      handleNextDashboard();
+    }
+    if (isRightSwipe) {
+      handlePrevDashboard();
+    }
+  };
+
+  const handlePrevDashboard = () => {
+    const config = localConfig;
+    if (!config || !config.dashboards.length) return;
+    const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
+    // Find prev index, wrap around
+    const prevIndex = (currentIndex - 1 + config.dashboards.length) % config.dashboards.length;
+    setActiveDashboardId(config.dashboards[prevIndex]?.id || null);
+  };
+
+  const getResponsiveGridClass = (count: number) => {
+    if (count <= 1) return "grid-cols-1";
+    if (count === 2) return "grid-cols-1 sm:grid-cols-2";
+    if (count === 3) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3";
+    if (count === 4) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
+    if (count === 5) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
+    if (count === 6) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
+    if (count === 7) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7";
+    return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8";
+  };
+
+  return (
+    <div
+      className="h-screen w-full max-w-[100vw] bg-[var(--los-bg)] overflow-hidden relative"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+
+      {/* CENTER STAGE: The Matrix OR The Active Tile */}
+      <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
         <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : undefined} column="center">
           {activeTileId === null ? (
             isMillerMode ? (
@@ -142,46 +345,71 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
                 })}
               </div>
             ) : (
-              // LEGACY SINGLE GRID LAYOUT
+              // LEGACY SINGLE GRID LAYOUT OR DASHBOARD
               <div
                 className={cn(
-                  "absolute top-0 left-0 right-0 bottom-8 grid gap-px bg-[var(--los-bg)] overflow-y-auto overflow-x-hidden",
-                  "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8",
-                  "content-start", // Pack to top
-                  "animate-in fade-in duration-300"
+                  "absolute top-0 left-0 right-0 bottom-8 overflow-y-auto overflow-x-hidden",
+                  !localConfig || showFiles ? "block" : getResponsiveGridClass(displayTiles.length)
                 )}
                 key="matrix"
               >
-                {tiles.map((tile) => (
-                  <div
-                    key={tile.id}
-                    onClick={() => setActiveTileId(tile.id)}
-                    className="bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]"
+                {localConfig && !showFiles ? (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
                   >
-                    <div className="absolute inset-0 overflow-hidden p-4 flex flex-col">
-                      <div className="flex justify-between items-start shrink-0 mb-2">
-                        <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity flex-1 mr-2 truncate">
-                          {tile.title}
-                        </MonoText>
-                        {tile.type === 'FOLDER' ? (
-                          <div className="w-2 h-2 border border-[var(--los-muted)] rotate-45 shrink-0" />
-                        ) : (
-                          <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors shrink-0" />
-                        )}
-                      </div>
+                    {(
+                      <>
+                        <SortableContext
+                          items={userEntries.map(e => e.path)}
+                          strategy={rectSortingStrategy}
+                        >
+                          {(
+                            <div className={cn(
+                              "grid gap-px bg-[var(--los-bg)] content-start w-full p-4 md:p-0",
+                              getResponsiveGridClass(displayTiles.length)
+                            )}>
+                              {displayTiles.map((tile) => (
+                                <SortableTileItem
+                                  key={tile.id}
+                                  tile={tile}
+                                  renderTileContent={renderTileContent}
+                                  setActiveTileId={setActiveTileId}
+                                  handleDragStart={handleDragStartLogic}
+                                  handleDragSave={handleDragSave}
+                                  dragEnabled={dragEnabled}
+                                />
+                              ))}
+                            </div>
+                          ) as any}
+                        </SortableContext>
 
-                      <div className="flex-1 overflow-y-auto min-h-0 w-full mb-2">
-                        {renderTileContent(tile, 'SMALL')}
-                      </div>
-
-                      <div className="text-right shrink-0 mt-auto">
-                        <MonoText className="text-[10px] text-[var(--los-muted)]">
-                          {`ID: ${tile.id.toString().toUpperCase().slice(0, 4)}`}
-                        </MonoText>
-                      </div>
+                        <DragOverlay dropAnimation={dropAnimation}>
+                          {(activeId ? (
+                            <div className="bg-[var(--los-bg)] ring-2 ring-[var(--los-accent)] opacity-90 scale-95 w-full h-full pb-[100%]">
+                              <TileContentStructure
+                                tile={displayTiles.find(t => t.id === activeId)!}
+                                renderTileContent={renderTileContent}
+                              />
+                            </div>
+                          ) : null) as any}
+                        </DragOverlay>
+                      </>
+                    ) as any}
+                  </DndContext>
+                ) : (
+                  displayTiles.map((tile) => (
+                    <div
+                      key={tile.id}
+                      onClick={() => setActiveTileId(tile.id)}
+                      className="bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]"
+                    >
+                      <TileContentStructure tile={tile} renderTileContent={renderTileContent} />
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             )
           ) : (
@@ -196,16 +424,60 @@ export const MainApp = ({ tiles = defaultTiles, fileSystem, onItemClick, onNavig
 
       {/* Sticky Status Bar */}
       <StatusBar
-        mode={activeTileId !== null ? "FOCUS" : "NORMAL"}
+        mode={activeTileId !== null ? "FOCUS" : (showFiles ? "FILES" : (dragEnabled ? "DND" : "NORMAL"))}
         breadcrumbs={getBreadcrumbs()}
         stats={[
-          { label: "TILES", value: tiles.length.toString() },
+          { label: "TILES", value: displayTiles.length.toString() },
           { label: "GRID", value: activeTileId ? "OFF" : "AUTO" },
+          ...(localConfig ? [{ label: "WORKSPACE", value: localConfig.dashboards.find(d => d.id === currentDashboardId)?.name || "UNKNOWN" }] : [])
         ]}
+        onDashboardClick={() => {
+          if (dragEnabled) {
+            // Show cancellation menu or just cancel?
+          } else {
+            handleDashboardClick();
+          }
+        }}
+
+        // Repository Switcher (Always available if props provided)
         currentRepository={props.currentRepository}
         repositories={props.repositories}
         onSelectRepository={props.onSelectRepository}
-        onDashboardClick={handleDashboardClick}
+
+        // Workspace Switcher (Only if config exists)
+        currentWorkspace={localConfig ? { id: currentDashboardId || '', name: localConfig.dashboards?.find(d => d.id === currentDashboardId)?.name || 'Unknown' } : undefined}
+        workspaces={localConfig ? localConfig.dashboards.map(d => ({ id: d.id, name: d.name })) : undefined}
+        onSelectWorkspace={(ws) => {
+          if (!dragEnabled && localConfig) {
+            setActiveDashboardId(ws.id);
+            setShowFiles(false); // Switch back to dashboard view
+          }
+        }}
+        onNextWorkspace={!dragEnabled && localConfig ? handleNextDashboard : undefined}
+
+        menuItems={dragEnabled ? [
+          { label: "Save Order", onClick: handleDragSave },
+          { label: "Cancel Reorder", onClick: handleDragCancel }
+        ] : [
+          { label: "Files", onClick: () => setShowFiles(true) },
+          ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
+          ...(localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
+            label: path,
+            onClick: () => {
+              const conf = localConfig;
+              if (conf) {
+                const entry = conf.entries.find(e => e.path === path);
+                if (entry) {
+                  setShowFiles(false); // Switch to dashboard
+                  setActiveDashboardId(entry.dashboard);
+                  setActiveTileId(entry.path);
+                } else {
+                  console.warn("File not found in dashboard entries:", path);
+                }
+              }
+            }
+          })) : [])
+        ]}
       />
     </div>
   );
@@ -216,33 +488,7 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
   const isEvents = tile.extension === '.events.csv';
   const hasWidget = (isTimeTracking || isEvents) && !!tile.rawContent;
 
-  // Initial view mode: If widget available, default to WIDGET.
-  // Note: For events, we might have 'WIDGET' (List), 'ADD', 'CODE'.
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
-
-  // Helper for Events Adding
-  const handleAddEvent = (entry: any) => {
-    // We need to import parseEvents/serializeEvents helper logic ideally, 
-    // or just assume we append to string since it's CSV?
-    // Better to use the logic functions to ensure safety.
-    // However, MainApp imports are growing. 
-    // Let's implement a simple append for now or use the proper logic if imports allow.
-    // Since we are inside MainApp, we can import * from EventsLogic.
-
-    // Using simplistic append for basic requirement fulfillment to avoid heavy refactor of MainApp imports in this single block if possible,
-    // BUT user asked for callback handling.
-
-    // We will parse -> push -> serialize.
-    // See top of file for imports.
-    // We will parse -> push -> serialize.
-    // See top of file for imports.
-    // Refactored to static import to avoid duplicate chunk warning.
-    const data = EventsLogic.parseEvents(tile.rawContent || '');
-    data.entries.push(entry);
-    const newContent = EventsLogic.serializeEvents(data);
-    tile.onContentChange?.(newContent);
-    setViewMode('WIDGET'); // Switch back to list
-  };
 
   return (
     <div
@@ -344,8 +590,6 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
               <EventAddForm
                 onCancel={() => setViewMode('WIDGET')}
                 onAdd={(entry) => {
-                  // Logic to update content
-                  // Logic to update content
                   const data = EventsLogic.parseEvents(tile.rawContent || '');
                   data.entries.push(entry);
                   const newContent = EventsLogic.serializeEvents(data);
@@ -366,6 +610,88 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
     </div>
   );
 }
+
+const TileContentStructure = ({ tile, renderTileContent }: { tile: TileDef, renderTileContent: any }) => (
+  <div className="absolute inset-0 overflow-hidden p-4 flex flex-col pointer-events-none">
+    <div className="flex justify-between items-start shrink-0 mb-2 pointer-events-auto">
+      <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity flex-1 mr-2 truncate">
+        {tile.title}
+      </MonoText>
+      {tile.type === 'FOLDER' ? (
+        <div className="w-2 h-2 border border-[var(--los-muted)] rotate-45 shrink-0" />
+      ) : (
+        <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors shrink-0" />
+      )}
+    </div>
+
+    <div className="flex-1 overflow-y-auto min-h-0 w-full mb-2 pointer-events-auto">
+      {renderTileContent(tile, 'SMALL')}
+    </div>
+
+    <div className="text-right shrink-0 mt-auto">
+      <MonoText className="text-[10px] text-[var(--los-muted)]">
+        {`ID: ${tile.id.toString().toUpperCase().slice(0, 4)}`}
+      </MonoText>
+    </div>
+  </div>
+);
+
+const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDragStart, handleDragSave, dragEnabled }: any) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: tile.id, disabled: !dragEnabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0 : 1, // Hide orig element while dragging overlay
+    zIndex: isDragging ? 999 : 'auto'
+  };
+
+  const [pressing, setPressing] = useState(false);
+
+  useEffect(() => {
+    let timer: any;
+    if (pressing) {
+      timer = setTimeout(() => {
+        if (dragEnabled) {
+          handleDragSave();
+        } else {
+          handleDragStart();
+        }
+      }, 500);
+    }
+    return () => clearTimeout(timer);
+  }, [pressing, handleDragStart, handleDragSave, dragEnabled]);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...(attributes as any)}
+      {...(listeners as any)}
+      onMouseDown={() => setPressing(true)}
+      onMouseUp={() => setPressing(false)}
+      onMouseLeave={() => setPressing(false)}
+      onTouchStart={() => setPressing(true)}
+      onTouchEnd={() => setPressing(false)}
+      onClick={() => {
+        if (!dragEnabled) setActiveTileId(tile.id);
+      }}
+      className={cn(
+        "bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]",
+        dragEnabled && "touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95"
+      )}
+    >
+      <TileContentStructure tile={tile} renderTileContent={renderTileContent} />
+    </div>
+  );
+};
 
 // Default dummy data if none provided
 const defaultTiles: TileDef[] = Array.from({ length: 24 }, (_, i) => ({

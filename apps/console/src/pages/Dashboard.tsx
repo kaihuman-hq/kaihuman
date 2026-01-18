@@ -19,6 +19,9 @@ export const Dashboard = () => {
   }
   const [columns, setColumns] = useState<Column[]>([]);
 
+  // Remote Dashboard Config State
+  const [remoteConfig, setRemoteConfig] = useState<any | null>(null);
+
   // 1. Fetch Repos on Mount
   useEffect(() => {
     githubProfileStore.fetchRepos();
@@ -29,6 +32,7 @@ export const Dashboard = () => {
     if (repo) {
       console.log('[Dashboard] Loading tree for', repo.full_name);
       githubFileStore.loadTree();
+      setRemoteConfig(null); // Reset config on repo change
     }
   }, [repo?.full_name]);
 
@@ -75,7 +79,7 @@ export const Dashboard = () => {
       if (isTimeTracking) {
         tile.extension = '.timetracking.csv';
         // Inject content if loaded
-        if (openFiles[item.path]) {
+        if (openFiles && openFiles[item.path]) {
           tile.rawContent = openFiles[item.path].content;
         }
 
@@ -89,7 +93,7 @@ export const Dashboard = () => {
 
       if (isEvents) {
         tile.extension = '.events.csv';
-        if (openFiles[item.path]) {
+        if (openFiles && openFiles[item.path]) {
           tile.rawContent = openFiles[item.path].content;
         }
 
@@ -107,12 +111,6 @@ export const Dashboard = () => {
   useEffect(() => {
     if (tree.length > 0) {
       setColumns(prev => {
-        // Re-calculate the items for the existing columns to update content
-        // But wait, setColumns replaces state.
-        // If we just want to update content of *visible* columns...
-        // Actually simpler to just rebuild the current view structure if we can.
-        // But we store 'activeId' in state.
-
         // If this is the FIRST load:
         if (prev.length === 0) {
           return [{ items: getChildren(""), activeId: null }];
@@ -121,16 +119,10 @@ export const Dashboard = () => {
         // If we have previous columns, we want to Refresh the items in them
         // preserving the navigation path.
         return prev.map((col, idx) => {
-          // Re-fetch children for this column based on the activeId of the PREVIOUS column?
-          // Or we rely on the fact that `col.items` came from a parent.
-          // We need to know the 'path' of this column. 
-          // Root is ""
-          // Next is `col[i-1].activeId`
-
           let prefix = "";
           if (idx > 0) {
             const parentCol = prev[idx - 1];
-            if (parentCol.activeId) prefix = `${parentCol.activeId}/`;
+            if (parentCol?.activeId) prefix = `${parentCol.activeId}/`;
             else return col; // Should not happen for deeper cols
           }
 
@@ -145,31 +137,47 @@ export const Dashboard = () => {
     }
   }, [tree, openFiles]); // Re-run when content updates
 
-  // 5. Auto-load TimeTracking files when they appear in the tree
+  // 5. DETECT AND MONITOR DASHBOARD CONFIG
+  const CONFIG_PATH = '.lifeos/.dashboard.config.json';
+
   useEffect(() => {
-    tree.forEach(item => {
-      if (item.path.endsWith('.timetracking.csv')) {
-        // If not loaded, load it.
-        if (!openFiles[item.path]) {
-          // Request load (background)
-          // Avoid infinite loop if load fails? openFile handles cache/dedupe?
-          // openFile checks "if (this.openFiles.value[path])" but we are reacting to that value.
-          // It should be safe as long as openFile is idempotent-ish.
-          // Call wrapped in timeout to avoid flicker or react loop issues?
-          // console.log('Auto-loading widget:', item.path);
-          githubFileStore.openFile(item.path);
+    // Check if config exists in tree
+    const configItem = tree.find(item => item.path === CONFIG_PATH);
+    if (configItem) {
+      console.log('[Dashboard] Found config:', CONFIG_PATH);
+      if (!openFiles || !openFiles[CONFIG_PATH]) {
+        if (openFiles) // ensure openFiles loaded
+          githubFileStore.openFile(CONFIG_PATH);
+      } else {
+        // Parse it
+        try {
+          const content = openFiles[CONFIG_PATH].content;
+          if (content) { // Ensure content is loaded
+            const parsed = JSON.parse(content);
+            setRemoteConfig(parsed);
+          }
+        } catch (e) {
+          console.error('[Dashboard] Failed to parse config:', e);
         }
       }
-      if (item.path.endsWith('.events.csv')) {
-        if (!openFiles[item.path]) {
-          githubFileStore.openFile(item.path);
+    } else {
+      setRemoteConfig(null);
+    }
+  }, [tree, openFiles && openFiles[CONFIG_PATH]?.content]); // React to tree finding it, or content loading
+
+  // 6. Pre-load files referenced in Config
+  useEffect(() => {
+    if (remoteConfig && remoteConfig.entries) {
+      remoteConfig.entries.forEach((entry: any) => {
+        if (openFiles && !openFiles[entry.path]) {
+          // Preload
+          githubFileStore.openFile(entry.path);
         }
-      }
-    });
-  }, [tree]); // Running on tree change is enough. If we run on openFiles we strictly loop.
+      });
+    }
+  }, [remoteConfig, openFiles]);
 
-
-  // 5. Navigation Handler
+  // 7. Navigation Handler (Miller Mode)
   const handleNavigate = (item: TileDef) => {
     if (item.type === 'FOLDER') {
       // Find which column this item belongs to
@@ -194,8 +202,7 @@ export const Dashboard = () => {
       const colIndex = columns.findIndex(col => col.items.some(i => i.id === item.id));
       if (colIndex === -1) return;
 
-      // Just focus it (MainApp handles the activeTileId change via onItemClick wrapper if needed, 
-      // but here we just update our column state to show it's selected in the list)
+      // Just focus it
       const newColumns = [...columns].slice(0, colIndex + 1);
       newColumns[colIndex] = { ...newColumns[colIndex], activeId: String(item.id) };
       setColumns(newColumns);
@@ -213,13 +220,30 @@ export const Dashboard = () => {
     return <div className="h-screen flex items-center justify-center text-nexus-muted">Loading LifeOS...</div>;
   }
 
+  // Preapare File Contents Map for Grid Mode
+  const gridFileContents: Record<string, string> = {};
+  if (remoteConfig && openFiles) {
+    Object.keys(openFiles).forEach(path => {
+      gridFileContents[path] = openFiles[path].content;
+    });
+  }
+
   return (
     <div className="h-full w-full">
       <MainApp
-        // File System Props
+        // File System Props (Always pass so we can switch to "Files" view)
         fileSystem={{ columns }}
         onItemClick={handleNavigate}
         onNavigate={(path) => { if (path.length === 0) handleDashboardClick(); }}
+
+        // Remote Config Props
+        config={remoteConfig || undefined}
+        fileContents={gridFileContents}
+        onConfigChange={(newConfig) => {
+          const content = JSON.stringify(newConfig, null, 2);
+          githubFileStore.updateFileContent(CONFIG_PATH, content);
+          githubFileStore.saveFile(CONFIG_PATH);
+        }}
 
         // Repo Props
         currentRepository={repo ? { id: String(repo.id), name: repo.full_name, branch: repo.default_branch } : undefined}
