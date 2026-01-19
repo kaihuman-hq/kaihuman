@@ -20,7 +20,7 @@ export const FileViewer = ({ path }: FileViewerProps) => {
   return (
     <div className="h-full w-full relative">
       {/* Ensure the editor takes full height */}
-      <CodeMirrorEditor />
+      <CodeMirrorEditor path={path} />
     </div>
   );
 };
