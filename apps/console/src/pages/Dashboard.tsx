@@ -9,7 +9,8 @@ export const Dashboard = () => {
   const repo = githubProfileStore.currentRepo.value;
   const repos = githubProfileStore.repos.value;
   const tree = githubFileStore.tree.value;
-  const openFiles = githubFileStore.openFiles.value; // Subscribe to file content updates
+  const openFiles = githubFileStore.openFiles.value;
+  console.log('[Dashboard] Render. openFiles keys:', openFiles ? Object.keys(openFiles).length : 'null');
 
   // Miller Columns State
   // We store the FULL definition of columns here
@@ -36,7 +37,15 @@ export const Dashboard = () => {
     }
   }, [repo?.full_name]);
 
-  // 3. Helper to get children for a given path prefix
+  // 3. Helper to update local columns state immediately
+  const updateLocalTileContent = (path: string, content: string) => {
+    setColumns(prev => prev.map(col => ({
+      ...col,
+      items: col.items.map(item => item.id === path ? { ...item, rawContent: content } : item)
+    })));
+  };
+
+  // 4. Helper to get children for a given path prefix
   // If prefix is empty, returns root items.
   const getChildren = (prefix: string): TileDef[] => {
     if (!tree) return [];
@@ -66,13 +75,14 @@ export const Dashboard = () => {
     return items.map(item => {
       const isTimeTracking = item.path.endsWith('.timetracking.csv');
       const isEvents = item.path.endsWith('.events.csv');
+      const isHabit = item.path.endsWith('.habit.csv');
 
       const tile: TileDef = {
         id: item.path, // Use path as ID for simplicity
         title: item.path.split('/').pop() || item.path,
         type: item.type === 'tree' ? 'FOLDER' : 'FILE',
         content: item.type === 'blob'
-          ? <FileViewer path={item.path} />
+          ? <FileViewer key={item.path} path={item.path} />
           : <div className="p-8 text-nexus-muted">Select a file from this folder.</div>
       };
 
@@ -80,7 +90,7 @@ export const Dashboard = () => {
         tile.extension = '.timetracking.csv';
         // Inject content if loaded
         if (openFiles && openFiles[item.path]) {
-          tile.rawContent = openFiles[item.path].content;
+          tile.rawContent = openFiles[item.path]?.content;
         }
 
         tile.onContentChange = (newContent: string) => {
@@ -88,18 +98,33 @@ export const Dashboard = () => {
           // Save immediately for widget interactions (Start/Stop)
           // Debouncing might be better but for button clicks immediate is native
           githubFileStore.saveFile(item.path);
+          updateLocalTileContent(item.path, newContent);
         };
       }
 
       if (isEvents) {
         tile.extension = '.events.csv';
         if (openFiles && openFiles[item.path]) {
-          tile.rawContent = openFiles[item.path].content;
+          tile.rawContent = openFiles[item.path]?.content;
         }
 
         tile.onContentChange = (newContent: string) => {
           githubFileStore.updateFileContent(item.path, newContent);
           githubFileStore.saveFile(item.path);
+          updateLocalTileContent(item.path, newContent);
+        };
+      }
+
+      if (isHabit) {
+        tile.extension = '.habit.csv';
+        if (openFiles && openFiles[item.path]) {
+          tile.rawContent = openFiles[item.path]?.content;
+        }
+
+        tile.onContentChange = (newContent: string) => {
+          githubFileStore.updateFileContent(item.path, newContent);
+          githubFileStore.saveFile(item.path);
+          updateLocalTileContent(item.path, newContent);
         };
       }
 
@@ -109,6 +134,7 @@ export const Dashboard = () => {
 
   // 4. Update ROOT column when tree OR openFiles changes (to re-render widgets)
   useEffect(() => {
+    console.log('[Dashboard] Effect: tree/openFiles changed. OpenFiles count:', openFiles ? Object.keys(openFiles).length : 0);
     if (tree.length > 0) {
       setColumns(prev => {
         // If this is the FIRST load:
@@ -188,7 +214,10 @@ export const Dashboard = () => {
       const newColumns = [...columns].slice(0, colIndex + 1);
 
       // Update active state of current column
-      newColumns[colIndex] = { ...newColumns[colIndex], activeId: String(item.id) };
+      const activeCol = newColumns[colIndex];
+      if (activeCol) {
+        newColumns[colIndex] = { ...activeCol, items: activeCol.items, activeId: String(item.id) };
+      }
 
       // Find and push children
       const children = getChildren(`${item.id}/`);
@@ -204,7 +233,10 @@ export const Dashboard = () => {
 
       // Just focus it
       const newColumns = [...columns].slice(0, colIndex + 1);
-      newColumns[colIndex] = { ...newColumns[colIndex], activeId: String(item.id) };
+      const activeCol = newColumns[colIndex];
+      if (activeCol) {
+        newColumns[colIndex] = { ...activeCol, items: activeCol.items, activeId: String(item.id) };
+      }
       setColumns(newColumns);
     }
   };
@@ -224,7 +256,7 @@ export const Dashboard = () => {
   const gridFileContents: Record<string, string> = {};
   if (remoteConfig && openFiles) {
     Object.keys(openFiles).forEach(path => {
-      gridFileContents[path] = openFiles[path].content;
+      gridFileContents[path] = openFiles[path]?.content || "";
     });
   }
 

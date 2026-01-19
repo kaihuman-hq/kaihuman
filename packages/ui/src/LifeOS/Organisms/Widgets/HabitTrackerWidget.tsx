@@ -30,6 +30,13 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
   // We want the last column to include today. 
   // We generate weeks back from today's week.
 
+  const toLocDate = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const matrix = useMemo(() => {
     const params: { date: Date; status: boolean; isToday: boolean }[][] = [];
 
@@ -49,7 +56,7 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
         const dayDate = new Date(weekStart);
         dayDate.setDate(dayDate.getDate() + d);
 
-        const iso = dayDate.toISOString().split('T')[0];
+        const iso = toLocDate(dayDate);
         const status = data.entries.some(e => e.date === iso && e.reached);
         const isToday = dayDate.getTime() === today.getTime();
 
@@ -60,19 +67,30 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
     return params;
   }, [data, today]);
 
+
+
   // Interaction Handlers
   const handleCheckIn = (targetDate: Date) => {
-    if (!onChange) return;
-    const iso = targetDate.toISOString().split('T')[0] || '';
+    if (!onChange) {
+      console.warn("HabitTrackerWidget: No onChange handler provided");
+      return;
+    }
+    const iso = toLocDate(targetDate);
+    console.log("HabitTrackerWidget: Checking in", iso);
     const newContent = checkIn(content, iso);
+    if (newContent === content) {
+      console.warn("HabitTrackerWidget: Content unchanged after checkIn");
+    } else {
+      console.log("HabitTrackerWidget: New content generated, calling onChange");
+    }
     onChange(newContent);
   };
 
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  const isCheckedToday = isCheckedIn(content, today.toISOString().split('T')[0] || '');
-  const isCheckedYesterday = isCheckedIn(content, yesterday.toISOString().split('T')[0] || '');
+  const isCheckedToday = isCheckedIn(content, toLocDate(today));
+  const isCheckedYesterday = isCheckedIn(content, toLocDate(yesterday));
 
   // Render Month Labels
   // We need to check where months change in the columns.

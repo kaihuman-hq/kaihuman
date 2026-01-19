@@ -10,7 +10,8 @@ interface FileViewerProps {
 export const FileViewer = ({ path }: FileViewerProps) => {
   // When this component mounts (tile focused), load the file
   useEffect(() => {
-    console.log('[FileViewer] Mounting for', path);
+    console.error('[FileViewer] Mounting for', path);
+    if (!path) console.error('[FileViewer] Path is empty!');
     githubFileStore.openFile(path);
   }, [path]);
 

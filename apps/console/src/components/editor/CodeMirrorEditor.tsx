@@ -42,6 +42,7 @@ export const CodeMirrorEditor = () => {
 
   // Initial setup
   useEffect(() => {
+    console.error('[CodeMirrorEditor] Mounting. Active:', githubFileStore.activeFile.value, 'Ref:', parentRef.current);
     if (!parentRef.current) return;
 
     const startState = EditorState.create({
