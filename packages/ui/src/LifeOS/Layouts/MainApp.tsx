@@ -62,13 +62,15 @@ export interface MainAppProps {
   fileSystem?: FileSystemState;
   onNavigate?: (path: string[]) => void; // Path is list of IDs
   onItemClick?: (item: TileDef) => void;
+  renderFile?: (path: string) => ComponentChildren;
+  onFileChange?: (path: string, newContent: string) => void;
 
   currentRepository?: import('../Organisms/StatusBar').Repository;
   repositories?: import('../Organisms/StatusBar').Repository[];
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
 }
 
-export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, ...props }: MainAppProps) => {
+export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, ...props }: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
 
@@ -146,9 +148,9 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         extension: ext,
         rawContent: fileContents[entry.path],
         onContentChange: (newContent: string) => {
-          // How to handle save? Ideally pass callback up.
-          // For now, we update local state if needed?
-        }
+          onFileChange?.(entry.path, newContent);
+        },
+        content: renderFile ? renderFile(entry.path) : undefined
       } as TileDef;
     });
   }, [localConfig, userEntries, fileContents, tiles]);

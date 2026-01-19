@@ -284,6 +284,14 @@ export const Dashboard = () => {
           const found = repos.find(x => String(x.id) === r.id);
           if (found) githubProfileStore.selectRepo(found);
         }}
+
+        // Grid Mode Editors / Content
+        renderFile={(path: string) => <FileViewer key={path} path={path} />}
+        onFileChange={(path: string, newContent: string) => {
+          console.log('[Dashboard] Global onFileChange:', path);
+          githubFileStore.updateFileContent(path, newContent);
+          githubFileStore.saveFile(path);
+        }}
       />
     </div>
   );
