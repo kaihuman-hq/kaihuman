@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useState, useCallback } from 'preact/hooks';
 import { useSignal } from '@preact/signals';
 import { githubFileStore, githubProfileStore } from '@lifosy/core';
 import { MainApp, TileDef } from '@lifosy/ui';
@@ -284,11 +284,11 @@ export const Dashboard = () => {
         }}
 
         // Grid Mode Editors / Content
-        renderFile={(path: string) => <FileViewer key={path} path={path} />}
-        onFileChange={(path: string, newContent: string) => {
+        renderFile={useCallback((path: string) => <FileViewer key={path} path={path} />, [])}
+        onFileChange={useCallback((path: string, newContent: string) => {
           githubFileStore.updateFileContent(path, newContent);
           githubFileStore.saveFile(path);
-        }}
+        }, [])}
       />
     </div>
   );
