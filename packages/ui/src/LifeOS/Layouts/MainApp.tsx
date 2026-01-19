@@ -10,6 +10,7 @@ import { MillerColumn } from '../Molecules/MillerColumn';
 import { TimeTrackingWidget } from '../Organisms/Widgets/TimeTrackingWidget';
 import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
 import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
+import { HabitTrackerWidget } from '../Organisms/Widgets/HabitTrackerWidget';
 import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import { DashboardConfig, DashboardEntry } from '../types';
@@ -61,13 +62,15 @@ export interface MainAppProps {
   fileSystem?: FileSystemState;
   onNavigate?: (path: string[]) => void; // Path is list of IDs
   onItemClick?: (item: TileDef) => void;
+  renderFile?: (path: string) => ComponentChildren;
+  onFileChange?: (path: string, newContent: string) => void;
 
   currentRepository?: import('../Organisms/StatusBar').Repository;
   repositories?: import('../Organisms/StatusBar').Repository[];
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
 }
 
-export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, ...props }: MainAppProps) => {
+export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, ...props }: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
 
@@ -145,9 +148,9 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         extension: ext,
         rawContent: fileContents[entry.path],
         onContentChange: (newContent: string) => {
-          // How to handle save? Ideally pass callback up.
-          // For now, we update local state if needed?
-        }
+          onFileChange?.(entry.path, newContent);
+        },
+        content: renderFile ? renderFile(entry.path) : undefined
       } as TileDef;
     });
   }, [localConfig, userEntries, fileContents, tiles]);
@@ -170,6 +173,15 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         <EventsWidget
           content={tile.rawContent}
           mode={mode}
+        />
+      );
+    }
+    if (tile.extension === '.habit.csv' && tile.rawContent) {
+      return (
+        <HabitTrackerWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
     }
@@ -486,7 +498,9 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
 const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) => {
   const isTimeTracking = tile.extension === '.timetracking.csv';
   const isEvents = tile.extension === '.events.csv';
-  const hasWidget = (isTimeTracking || isEvents) && !!tile.rawContent;
+
+  const isHabit = tile.extension === '.habit.csv';
+  const hasWidget = (isTimeTracking || isEvents || isHabit) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
 
@@ -539,6 +553,8 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
                   </button>
                 )}
 
+
+
                 <button
                   onClick={() => setViewMode('CODE')}
                   className={cn(
@@ -576,6 +592,13 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
                 <EventsWidget
                   content={tile.rawContent!}
                   mode="FOCUS"
+                />
+              )}
+              {isHabit && (
+                <HabitTrackerWidget
+                  content={tile.rawContent!}
+                  mode="FOCUS"
+                  onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
             </div>

@@ -69,6 +69,8 @@ export class GithubFileStore {
     }
   }
 
+  pendingFiles = new Set<string>(); // Track in-flight requests
+
   async openFile(path: string) {
     // If already open, just set active
     if (this.openFiles.value[path]) {
@@ -76,8 +78,16 @@ export class GithubFileStore {
       return;
     }
 
+    // If pending, just wait (or ignore, assuming previous call handles it)
+    if (this.pendingFiles.has(path)) {
+      console.warn(`[GithubFileStore] File ${path} is already loading. Ignoring duplicate request.`);
+      return;
+    }
+
     const repo = githubProfileStore.currentRepo.value;
     if (!repo) return;
+
+    this.pendingFiles.add(path);
 
     try {
       // Find in tree to make sure it's a file
@@ -119,6 +129,8 @@ export class GithubFileStore {
     } catch (err: any) {
       console.error('Failed to open file', err);
       this.error.value = err.message;
+    } finally {
+      this.pendingFiles.delete(path);
     }
   }
 

@@ -33,7 +33,7 @@ const nexusTheme = EditorView.theme({
   }
 }, { dark: true });
 
-export const CodeMirrorEditor = () => {
+export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -42,6 +42,10 @@ export const CodeMirrorEditor = () => {
 
   // Initial setup
   useEffect(() => {
+    // Determine effective path (prop takes precedence, though usually one or other is used)
+    const initialPath = propsPath || githubFileStore.activeFile.value;
+
+    console.error('[CodeMirrorEditor] Mounting. Path:', initialPath, 'Ref:', parentRef.current);
     if (!parentRef.current) return;
 
     const startState = EditorState.create({
@@ -60,9 +64,10 @@ export const CodeMirrorEditor = () => {
           {
             key: "Mod-s",
             run: (view) => {
-              const path = githubFileStore.activeFile.value;
-              if (path) {
-                githubFileStore.saveFile(path);
+              // Re-read path at time of save
+              const currentPath = propsPath || githubFileStore.activeFile.value;
+              if (currentPath) {
+                githubFileStore.saveFile(currentPath);
               }
               return true;
             }
@@ -74,9 +79,10 @@ export const CodeMirrorEditor = () => {
         nexusTheme, // Overrides
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
-            const path = githubFileStore.activeFile.value;
-            if (path) {
-              githubFileStore.updateFileContent(path, update.state.doc.toString());
+            // Update store for the CORRECT path
+            const currentPath = propsPath || githubFileStore.activeFile.value;
+            if (currentPath) {
+              githubFileStore.updateFileContent(currentPath, update.state.doc.toString());
             }
           }
         })
@@ -93,15 +99,18 @@ export const CodeMirrorEditor = () => {
     return () => {
       view.destroy();
     };
-  }, []);
+  }, [propsPath]); // Re-mount if props.path changes? Usually it won't change for same component instance.
 
   // Sync content with store
   useSignalEffect(() => {
-    const path = githubFileStore.activeFile.value;
-    const content = githubFileStore.currentContent.value;
+    const effectivePath = propsPath || githubFileStore.activeFile.value;
+
+    // Get content from OPEN files map directly
+    const content = effectivePath ? (githubFileStore.openFiles.value[effectivePath]?.content || '') : '';
+
     const view = viewRef.current;
 
-    if (!view || !path) return;
+    if (!view || !effectivePath) return;
 
     // If path changed or content changed externally (and we are not the ones who changed it? Store updates on local edit too)
     // Store `updateFileContent` sets value.
@@ -111,8 +120,8 @@ export const CodeMirrorEditor = () => {
     // If we type, store updates. If we update view from store, we reset cursor.
     // Solution: Track path changes.
 
-    if (path !== currentPathRef.current) {
-      currentPathRef.current = path;
+    if (effectivePath !== currentPathRef.current) {
+      currentPathRef.current = effectivePath;
       const currentDoc = view.state.doc.toString();
       if (content !== currentDoc) {
         view.dispatch({
@@ -144,7 +153,7 @@ export const CodeMirrorEditor = () => {
     }
   });
 
-  if (!githubFileStore.activeFile.value) {
+  if (!propsPath && !githubFileStore.activeFile.value) {
     return (
       <div class="h-full flex items-center justify-center text-nexus-muted">
         Select a file to edit
