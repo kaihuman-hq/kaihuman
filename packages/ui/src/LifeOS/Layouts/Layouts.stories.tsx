@@ -117,6 +117,51 @@ ${new Date().toISOString().split('T')[0]};09:00,11:30`);
   }
 };
 
+
+
+export const HabitTracking: StoryObj = {
+  render: () => {
+    // Generate some random habit data for the last 6 months
+    const generateHabitData = () => {
+      const today = new Date();
+      let csv = 'iso date;goal reached\n';
+      for (let i = 0; i < 180; i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        if (Math.random() > 0.5) {
+          csv += `${d.toISOString().split('T')[0]};x\n`;
+        }
+      }
+      return csv;
+    };
+
+    const [csvContent, setCsvContent] = useState(generateHabitData());
+
+    const habitTile = {
+      id: 'habit_1',
+      title: 'Workout.habit.csv',
+      type: 'FILE',
+      extension: '.habit.csv',
+      rawContent: csvContent,
+      onContentChange: (newVal: string) => {
+        setCsvContent(newVal);
+      },
+      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+    };
+
+    const [columns, setColumns] = useState<any[]>([
+      { items: [habitTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    ]);
+
+    return <MainApp
+      fileSystem={{ columns }}
+      onItemClick={(item) => {
+        // partial nav logic
+      }}
+    />;
+  }
+};
+
 const mockRepos = [
   { id: '1', name: 'Lifosy/monorepo', branch: 'main' },
   { id: '2', name: 'Lifosy/ui', branch: 'develop' },
@@ -207,7 +252,7 @@ export const ConfiguredDashboard: StoryObj = {
 
     // Mock file contents
     const mockFileContents: Record<string, string> = {
-      "test2.habit.csv": "date,habit1\n2023-10-01,true",
+      "test2.habit.csv": "iso date;goal reached\n2023-10-01;x",
       "my2.achievements.md": "# Achievements\n- Built a dashboard",
       ".lifeos/.readitlater.json": "[]",
       "my-date-time.timezones.json": "{}",
