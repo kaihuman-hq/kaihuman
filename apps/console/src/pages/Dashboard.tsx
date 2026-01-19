@@ -10,7 +10,6 @@ export const Dashboard = () => {
   const repos = githubProfileStore.repos.value;
   const tree = githubFileStore.tree.value;
   const openFiles = githubFileStore.openFiles.value;
-  console.log('[Dashboard] Render. openFiles keys:', openFiles ? Object.keys(openFiles).length : 'null');
 
   // Miller Columns State
   // We store the FULL definition of columns here
@@ -134,7 +133,6 @@ export const Dashboard = () => {
 
   // 4. Update ROOT column when tree OR openFiles changes (to re-render widgets)
   useEffect(() => {
-    console.log('[Dashboard] Effect: tree/openFiles changed. OpenFiles count:', openFiles ? Object.keys(openFiles).length : 0);
     if (tree.length > 0) {
       setColumns(prev => {
         // If this is the FIRST load:
@@ -288,7 +286,6 @@ export const Dashboard = () => {
         // Grid Mode Editors / Content
         renderFile={(path: string) => <FileViewer key={path} path={path} />}
         onFileChange={(path: string, newContent: string) => {
-          console.log('[Dashboard] Global onFileChange:', path);
           githubFileStore.updateFileContent(path, newContent);
           githubFileStore.saveFile(path);
         }}

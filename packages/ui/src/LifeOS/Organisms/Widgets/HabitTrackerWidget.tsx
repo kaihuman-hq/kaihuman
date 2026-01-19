@@ -76,13 +76,8 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
       return;
     }
     const iso = toLocDate(targetDate);
-    console.log("HabitTrackerWidget: Checking in", iso);
     const newContent = checkIn(content, iso);
-    if (newContent === content) {
-      console.warn("HabitTrackerWidget: Content unchanged after checkIn");
-    } else {
-      console.log("HabitTrackerWidget: New content generated, calling onChange");
-    }
+
     onChange(newContent);
   };
 

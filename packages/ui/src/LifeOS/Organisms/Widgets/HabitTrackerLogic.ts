@@ -71,13 +71,20 @@ export const calculateStats = (data: HabitData) => {
   let currentStreak = 0;
 
   if (sortedEntries.length > 0) {
+    const toLocDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayIso = today.toISOString().split('T')[0];
+    const todayIso = toLocDate(today);
 
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
-    const yesterdayIso = yesterday.toISOString().split('T')[0];
+    const yesterdayIso = toLocDate(yesterday);
 
     // Check if streak is active (today or yesterday must be checked)
     // If multiple entries per day (shouldn't happen with set logic but good to handle), unique days matter.
