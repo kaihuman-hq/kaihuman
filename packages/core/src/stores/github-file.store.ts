@@ -118,7 +118,7 @@ export class GithubFileStore {
         const fileData = await githubService.getFileContent(repo.owner.login, repo.name, path);
 
         // Only update if content changed or if we didn't have cache
-        if (!cachedData || fileData.sha !== cachedData.sha) {
+        if (!cachedData || fileData.sha !== cachedData.sha || fileData.content !== cachedData.content) {
           this.openFiles.value = {
             ...this.openFiles.value,
             [path]: { content: fileData.content, sha: fileData.sha },
