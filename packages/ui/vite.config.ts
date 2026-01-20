@@ -30,6 +30,13 @@ export default defineConfig({
         'react',
         'react-dom',
         'tailwindcss',
+        // Externalize heavy deps to let consumer bundle/tree-shake them
+        'lucide-preact',
+        'framer-motion',
+        /^@codemirror\/.*/,
+        /^@dnd-kit\/.*/,
+        'clsx',
+        'tailwind-merge',
       ],
       output: {
         globals: {
@@ -40,6 +47,6 @@ export default defineConfig({
     // Generate sourcemaps for better debugging
     sourcemap: true,
     // Reduce bloat
-    minify: false,
+    minify: true,
   },
 });

@@ -11,8 +11,11 @@ import { TimeTrackingWidget } from '../Organisms/Widgets/TimeTrackingWidget';
 import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
 import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
 import { HabitTrackerWidget } from '../Organisms/Widgets/HabitTrackerWidget';
+import { TodoWidget } from '../Organisms/Widgets/TodoWidget';
 import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
+import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
+import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import { DashboardConfig, DashboardEntry } from '../types';
 import {
   DndContext,
@@ -68,9 +71,11 @@ export interface MainAppProps {
   currentRepository?: import('../Organisms/StatusBar').Repository;
   repositories?: import('../Organisms/StatusBar').Repository[];
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
+
+  renderEditor?: (path: string) => ComponentChildren;
 }
 
-export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, ...props }: MainAppProps) => {
+export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, renderEditor, ...props }: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
 
@@ -184,6 +189,24 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
+    }
+    if (tile.extension === '.habit.csv' && tile.rawContent) {
+      return (
+        <HabitTrackerWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+    if (tile.extension === '.todos.md' && tile.rawContent) {
+      return (
+        <TodoWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      )
     }
     return tile.content;
   };
@@ -429,6 +452,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
             <FocusedTile
               tile={activeTile!}
               onClose={() => setActiveTileId(null)}
+              renderEditor={renderEditor}
             />
           )}
         </Tile>
@@ -473,6 +497,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         ] : [
           { label: "Files", onClick: () => setShowFiles(true) },
           ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
+          ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
           ...(localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
             label: path,
             onClick: () => {
@@ -495,12 +520,13 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
   );
 };
 
-const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) => {
+const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string) => ComponentChildren }) => {
   const isTimeTracking = tile.extension === '.timetracking.csv';
   const isEvents = tile.extension === '.events.csv';
-
   const isHabit = tile.extension === '.habit.csv';
-  const hasWidget = (isTimeTracking || isEvents || isHabit) && !!tile.rawContent;
+  const isTodos = tile.extension === '.todos.md';
+
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
 
@@ -541,7 +567,7 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
                   </button>
                 )}
 
-                {isEvents && (
+                {(isEvents || isTodos) && (
                   <button
                     onClick={() => setViewMode('ADD')}
                     className={cn(
@@ -549,7 +575,7 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
                       viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
-                    ADD EVENT
+                    {isEvents ? 'ADD EVENT' : 'ADD TASK'}
                   </button>
                 )}
 
@@ -601,6 +627,13 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
+              {isTodos && (
+                <TodoWidget
+                  content={tile.rawContent!}
+                  mode="FOCUS"
+                  onChange={(newContent) => tile.onContentChange?.(newContent)}
+                />
+              )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="h-full w-full p-8">
@@ -608,18 +641,42 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
                 data={tile.rawContent!}
               />
             </div>
-          ) : viewMode === 'ADD' && isEvents ? (
+          ) : viewMode === 'ADD' && (isEvents || isTodos) ? (
             <div className="h-full w-full p-8 flex justify-center items-start">
-              <EventAddForm
-                onCancel={() => setViewMode('WIDGET')}
-                onAdd={(entry) => {
-                  const data = EventsLogic.parseEvents(tile.rawContent || '');
-                  data.entries.push(entry);
-                  const newContent = EventsLogic.serializeEvents(data);
-                  tile.onContentChange?.(newContent);
-                  setViewMode('WIDGET');
-                }}
-              />
+              {isEvents && (
+                <EventAddForm
+                  onCancel={() => setViewMode('WIDGET')}
+                  onAdd={(entry) => {
+                    const data = EventsLogic.parseEvents(tile.rawContent || '');
+                    data.entries.push(entry);
+                    const newContent = EventsLogic.serializeEvents(data);
+                    tile.onContentChange?.(newContent);
+                    setViewMode('WIDGET');
+                  }}
+                />
+              )}
+              {isTodos && (
+                <TodoAddForm
+                  groups={useMemo(() => TodoLogic.parseTodos(tile.rawContent || '').groups.map(g => g.name), [tile.rawContent])}
+                  onCancel={() => setViewMode('WIDGET')}
+                  onAdd={(group, text) => {
+                    const data = TodoLogic.parseTodos(tile.rawContent || '');
+                    const newData = TodoLogic.addTodo(data, group, text);
+                    const newContent = TodoLogic.serializeTodos(newData);
+                    tile.onContentChange?.(newContent);
+                    setViewMode('WIDGET');
+                  }}
+                />
+              )}
+            </div>
+
+          ) : viewMode === 'CODE' ? (
+            <div className="h-full w-full">
+              {renderEditor ? renderEditor(String(tile.id)) : (
+                <div className="h-full w-full flex items-center justify-center text-[var(--los-muted)]">
+                  <MonoText>No Editor Available</MonoText>
+                </div>
+              )}
             </div>
           ) : (
             tile.content ? tile.content : (
@@ -678,6 +735,8 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
 
   const [pressing, setPressing] = useState(false);
 
+  const lastUpTime = useRef(0);
+
   useEffect(() => {
     let timer: any;
     if (pressing) {
@@ -698,11 +757,27 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
       style={style}
       {...(attributes as any)}
       {...(listeners as any)}
-      onMouseDown={() => setPressing(true)}
-      onMouseUp={() => setPressing(false)}
+      onMouseDown={() => {
+        // Disable completely on mobile (width check)
+        if (window.innerWidth < 768) return;
+
+        if (dragEnabled) {
+          // Already enabled, allow simple hold to save
+          setPressing(true);
+        } else {
+          // Not enabled: Require double-click-hold
+          const now = Date.now();
+          if (now - lastUpTime.current < 400) {
+            setPressing(true);
+          }
+        }
+      }}
+      onMouseUp={() => {
+        setPressing(false);
+        lastUpTime.current = Date.now();
+      }}
       onMouseLeave={() => setPressing(false)}
-      onTouchStart={() => setPressing(true)}
-      onTouchEnd={() => setPressing(false)}
+      // Touch handlers removed to disable on mobile touch interactions
       onClick={() => {
         if (!dragEnabled) setActiveTileId(tile.id);
       }}

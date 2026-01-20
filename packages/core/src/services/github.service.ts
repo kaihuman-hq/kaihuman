@@ -86,8 +86,10 @@ export class GithubService {
       throw new Error(`Path is not a file: ${data.type}`);
     }
 
-    // decode base64
-    const content = atob(data.content.replace(/\n/g, ''));
+    // decode base64 -> binary string -> bytes -> utf-8 string
+    const binaryString = atob(data.content.replace(/\n/g, ''));
+    const bytes = Uint8Array.from(binaryString, (c) => c.charCodeAt(0));
+    const content = new TextDecoder().decode(bytes);
     return { content, sha: data.sha };
   }
 
@@ -101,8 +103,10 @@ export class GithubService {
   ) {
     const client = this.getClient();
 
-    // We need base64 content
-    const base64Content = btoa(content);
+    // We need base64 content, preserving UTF-8
+    const bytes = new TextEncoder().encode(content);
+    const binaryString = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
+    const base64Content = btoa(binaryString);
 
     const { data } = await client.repos.createOrUpdateFileContents({
       owner,

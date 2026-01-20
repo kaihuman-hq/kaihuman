@@ -97,12 +97,6 @@ export const StatusBar = ({
         )}>
           {expandedMode === 'MENU' && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div
-                onClick={() => { onDashboardClick?.(); setExpanded(false); }}
-                className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2"
-              >
-                <MonoLabel className="group-hover:text-[var(--los-accent)]">DASHBOARD</MonoLabel>
-              </div>
               {menuItems ? menuItems.map((item, i) => (
                 <div key={i}
                   onClick={() => { item.onClick?.(); setExpanded(false); }}

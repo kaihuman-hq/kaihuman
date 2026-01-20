@@ -31,6 +31,7 @@ export const Dashboard = () => {
   useEffect(() => {
     if (repo) {
       console.log('[Dashboard] Loading tree for', repo.full_name);
+      setColumns([]); // Clear columns immediately on repo switch to prevent stale content
       githubFileStore.loadTree();
       setRemoteConfig(null); // Reset config on repo change
     }
@@ -80,10 +81,24 @@ export const Dashboard = () => {
         id: item.path, // Use path as ID for simplicity
         title: item.path.split('/').pop() || item.path,
         type: item.type === 'tree' ? 'FOLDER' : 'FILE',
-        content: item.type === 'blob'
-          ? <FileViewer key={item.path} path={item.path} />
-          : <div className="p-8 text-nexus-muted">Select a file from this folder.</div>
+        content: null // Will be set below
       };
+
+      // Widget Handling Logic
+      const isWidget = isTimeTracking || isEvents || isHabit;
+
+      if (item.type === 'tree') {
+        tile.content = <div className="p-8 text-nexus-muted">Select a file from this folder.</div>;
+      } else if (isWidget) {
+        // For widgets, we render FileViewer to ensure content is loaded.
+        // MainApp will switch to the actual widget once content is available.
+        tile.content = <FileViewer key={item.path} path={item.path} />;
+      } else {
+        // For non-widgets, show the fallback message
+        tile.content = <div className="p-8 text-nexus-muted flex items-center justify-center h-full text-center">
+          No widget available for this file extension
+        </div>;
+      }
 
       if (isTimeTracking) {
         tile.extension = '.timetracking.csv';
@@ -284,11 +299,21 @@ export const Dashboard = () => {
         }}
 
         // Grid Mode Editors / Content
-        renderFile={useCallback((path: string) => <FileViewer key={path} path={path} />, [])}
+        renderFile={useCallback((path: string) => {
+          const isWidget = path.endsWith('.timetracking.csv') || path.endsWith('.events.csv') || path.endsWith('.habit.csv') || path.endsWith('.todos.md');
+          if (isWidget) return <FileViewer key={path} path={path} />;
+
+          return (
+            <div className="p-8 text-nexus-muted flex items-center justify-center h-full text-center">
+              No widget available for this file extension
+            </div>
+          );
+        }, [])}
         onFileChange={useCallback((path: string, newContent: string) => {
           githubFileStore.updateFileContent(path, newContent);
           githubFileStore.saveFile(path);
         }, [])}
+        renderEditor={useCallback((path: string) => <FileViewer key={path} path={path} />, [])}
       />
     </div>
   );
