@@ -111,22 +111,38 @@ export class GithubFileStore {
           [path]: { content: cachedData.content, sha: cachedData.sha },
         };
         this.activeFile.value = path;
-      } else {
+      }
+
+      // Always revalidate from network
+      try {
         const fileData = await githubService.getFileContent(repo.owner.login, repo.name, path);
 
-        this.openFiles.value = {
-          ...this.openFiles.value,
-          [path]: { content: fileData.content, sha: fileData.sha },
-        };
-        this.activeFile.value = path;
+        // Only update if content changed or if we didn't have cache
+        if (!cachedData || fileData.sha !== cachedData.sha) {
+          this.openFiles.value = {
+            ...this.openFiles.value,
+            [path]: { content: fileData.content, sha: fileData.sha },
+          };
 
-        // Cache it - NO extra key arg since keyPath is 'path'
-        await db.put('files', {
-          path: cacheKey,
-          content: fileData.content,
-          sha: fileData.sha,
-          timestamp: Date.now()
-        });
+          // If we didn't have cache, we need to set active file (in case we didn't enter the if block above)
+          if (!cachedData) {
+            this.activeFile.value = path;
+          }
+
+          // Update Cache
+          await db.put('files', {
+            path: cacheKey,
+            content: fileData.content,
+            sha: fileData.sha,
+            timestamp: Date.now()
+          });
+        }
+      } catch (netErr: any) {
+        console.warn('Background fetch failed', netErr);
+        // If we didn't have cached data, this is a real error for the user
+        if (!cachedData) {
+          throw netErr;
+        }
       }
 
     } catch (err: any) {
