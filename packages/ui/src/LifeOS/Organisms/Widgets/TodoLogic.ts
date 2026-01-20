@@ -61,11 +61,12 @@ export const parseTodos = (md: string): TodoData => {
     }
 
     // Detect Todo
-    const todoMatch = line.match(/^(\s*)-\s+\[([ xX])\]\s+(.*)/);
+    const todoMatch = line.match(/^(\s*)([-*])\s+\[([ xX])\]\s+(.*)/);
     if (todoMatch && currentGroup) {
-      const indent = todoMatch[1];
-      const state = todoMatch[2].toLowerCase();
-      const text = todoMatch[3];
+      const indent = todoMatch[1] || '';
+      // todoMatch[2] is the bullet char, ignored for logic but good to know
+      const state = (todoMatch[3] || '').toLowerCase();
+      const text = todoMatch[4] || '';
       const isChecked = state === 'x';
 
       // Look ahead for ::updated::
@@ -187,7 +188,7 @@ export const addTodo = (data: TodoData, groupName: string, text: string): TodoDa
       id: `new-${Date.now()}`,
       text,
       checked: false,
-      updatedAt: undefined,
+      updatedAt: Date.now(),
       rawLine: `* [ ] ${text}`
     }
   ];

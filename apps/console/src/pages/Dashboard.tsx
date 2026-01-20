@@ -300,7 +300,7 @@ export const Dashboard = () => {
 
         // Grid Mode Editors / Content
         renderFile={useCallback((path: string) => {
-          const isWidget = path.endsWith('.timetracking.csv') || path.endsWith('.events.csv') || path.endsWith('.habit.csv');
+          const isWidget = path.endsWith('.timetracking.csv') || path.endsWith('.events.csv') || path.endsWith('.habit.csv') || path.endsWith('.todos.md');
           if (isWidget) return <FileViewer key={path} path={path} />;
 
           return (
