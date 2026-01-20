@@ -313,6 +313,7 @@ export const Dashboard = () => {
           githubFileStore.updateFileContent(path, newContent);
           githubFileStore.saveFile(path);
         }, [])}
+        renderEditor={useCallback((path: string) => <FileViewer key={path} path={path} />, [])}
       />
     </div>
   );
