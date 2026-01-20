@@ -68,9 +68,11 @@ export interface MainAppProps {
   currentRepository?: import('../Organisms/StatusBar').Repository;
   repositories?: import('../Organisms/StatusBar').Repository[];
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
+
+  renderEditor?: (path: string) => ComponentChildren;
 }
 
-export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, ...props }: MainAppProps) => {
+export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, renderEditor, ...props }: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
 
@@ -429,6 +431,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
             <FocusedTile
               tile={activeTile!}
               onClose={() => setActiveTileId(null)}
+              renderEditor={renderEditor}
             />
           )}
         </Tile>
@@ -495,7 +498,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
   );
 };
 
-const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) => {
+const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string) => ComponentChildren }) => {
   const isTimeTracking = tile.extension === '.timetracking.csv';
   const isEvents = tile.extension === '.events.csv';
 
@@ -620,6 +623,15 @@ const FocusedTile = ({ tile, onClose }: { tile: TileDef; onClose: () => void }) 
                   setViewMode('WIDGET');
                 }}
               />
+            </div>
+
+          ) : viewMode === 'CODE' ? (
+            <div className="h-full w-full">
+              {renderEditor ? renderEditor(String(tile.id)) : (
+                <div className="h-full w-full flex items-center justify-center text-[var(--los-muted)]">
+                  <MonoText>No Editor Available</MonoText>
+                </div>
+              )}
             </div>
           ) : (
             tile.content ? tile.content : (

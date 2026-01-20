@@ -39,6 +39,9 @@ export class GithubFileStore {
 
     this.isLoading.value = true;
     this.error.value = null;
+    this.tree.value = []; // Clear tree to trigger UI refresh and prevent stale data
+    this.openFiles.value = {}; // Clear open files to prevent stale content
+    this.activeFile.value = null;
 
     try {
       // 1. Try to load from DB first
