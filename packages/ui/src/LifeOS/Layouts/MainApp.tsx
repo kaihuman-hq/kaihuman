@@ -497,6 +497,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         ] : [
           { label: "Files", onClick: () => setShowFiles(true) },
           ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
+          ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
           ...(localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
             label: path,
             onClick: () => {
@@ -734,6 +735,8 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
 
   const [pressing, setPressing] = useState(false);
 
+  const lastUpTime = useRef(0);
+
   useEffect(() => {
     let timer: any;
     if (pressing) {
@@ -754,11 +757,27 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
       style={style}
       {...(attributes as any)}
       {...(listeners as any)}
-      onMouseDown={() => setPressing(true)}
-      onMouseUp={() => setPressing(false)}
+      onMouseDown={() => {
+        // Disable completely on mobile (width check)
+        if (window.innerWidth < 768) return;
+
+        if (dragEnabled) {
+          // Already enabled, allow simple hold to save
+          setPressing(true);
+        } else {
+          // Not enabled: Require double-click-hold
+          const now = Date.now();
+          if (now - lastUpTime.current < 400) {
+            setPressing(true);
+          }
+        }
+      }}
+      onMouseUp={() => {
+        setPressing(false);
+        lastUpTime.current = Date.now();
+      }}
       onMouseLeave={() => setPressing(false)}
-      onTouchStart={() => setPressing(true)}
-      onTouchEnd={() => setPressing(false)}
+      // Touch handlers removed to disable on mobile touch interactions
       onClick={() => {
         if (!dragEnabled) setActiveTileId(tile.id);
       }}
