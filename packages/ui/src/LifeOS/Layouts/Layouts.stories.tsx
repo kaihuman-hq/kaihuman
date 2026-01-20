@@ -270,3 +270,40 @@ export const ConfiguredDashboard: StoryObj = {
     );
   }
 };
+
+export const TodoList: StoryObj = {
+  render: () => {
+    const [mdContent, setMdContent] = useState(`# Work
+- [ ] Finish report
+- [x] Email client
+::updated:: 1700000000000
+
+# Home
+- [ ] Buy milk
+- [ ] Call mom`);
+
+    const todoTile = {
+      id: 'todo_1',
+      title: 'Tasks.todos.md',
+      type: 'FILE',
+      extension: '.todos.md',
+      rawContent: mdContent,
+      onContentChange: (newVal: string) => {
+        setMdContent(newVal);
+        console.log('Todos Updated:', newVal);
+      },
+      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+    };
+
+    const [columns, setColumns] = useState<any[]>([
+      { items: [todoTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    ]);
+
+    return <MainApp
+      fileSystem={{ columns }}
+      onItemClick={(item) => {
+        // partial nav
+      }}
+    />;
+  }
+};

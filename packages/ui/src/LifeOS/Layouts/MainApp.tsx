@@ -11,8 +11,11 @@ import { TimeTrackingWidget } from '../Organisms/Widgets/TimeTrackingWidget';
 import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
 import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
 import { HabitTrackerWidget } from '../Organisms/Widgets/HabitTrackerWidget';
+import { TodoWidget } from '../Organisms/Widgets/TodoWidget';
 import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
+import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
+import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import { DashboardConfig, DashboardEntry } from '../types';
 import {
   DndContext,
@@ -186,6 +189,24 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
+    }
+    if (tile.extension === '.habit.csv' && tile.rawContent) {
+      return (
+        <HabitTrackerWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+    if (tile.extension === '.todos.md' && tile.rawContent) {
+      return (
+        <TodoWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      )
     }
     return tile.content;
   };
@@ -501,9 +522,10 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
 const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string) => ComponentChildren }) => {
   const isTimeTracking = tile.extension === '.timetracking.csv';
   const isEvents = tile.extension === '.events.csv';
-
   const isHabit = tile.extension === '.habit.csv';
-  const hasWidget = (isTimeTracking || isEvents || isHabit) && !!tile.rawContent;
+  const isTodos = tile.extension === '.todos.md';
+
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
 
@@ -544,7 +566,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   </button>
                 )}
 
-                {isEvents && (
+                {(isEvents || isTodos) && (
                   <button
                     onClick={() => setViewMode('ADD')}
                     className={cn(
@@ -552,7 +574,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                       viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
-                    ADD EVENT
+                    {isEvents ? 'ADD EVENT' : 'ADD TASK'}
                   </button>
                 )}
 
@@ -604,6 +626,13 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
+              {isTodos && (
+                <TodoWidget
+                  content={tile.rawContent!}
+                  mode="FOCUS"
+                  onChange={(newContent) => tile.onContentChange?.(newContent)}
+                />
+              )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="h-full w-full p-8">
@@ -611,18 +640,33 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                 data={tile.rawContent!}
               />
             </div>
-          ) : viewMode === 'ADD' && isEvents ? (
+          ) : viewMode === 'ADD' && (isEvents || isTodos) ? (
             <div className="h-full w-full p-8 flex justify-center items-start">
-              <EventAddForm
-                onCancel={() => setViewMode('WIDGET')}
-                onAdd={(entry) => {
-                  const data = EventsLogic.parseEvents(tile.rawContent || '');
-                  data.entries.push(entry);
-                  const newContent = EventsLogic.serializeEvents(data);
-                  tile.onContentChange?.(newContent);
-                  setViewMode('WIDGET');
-                }}
-              />
+              {isEvents && (
+                <EventAddForm
+                  onCancel={() => setViewMode('WIDGET')}
+                  onAdd={(entry) => {
+                    const data = EventsLogic.parseEvents(tile.rawContent || '');
+                    data.entries.push(entry);
+                    const newContent = EventsLogic.serializeEvents(data);
+                    tile.onContentChange?.(newContent);
+                    setViewMode('WIDGET');
+                  }}
+                />
+              )}
+              {isTodos && (
+                <TodoAddForm
+                  groups={useMemo(() => TodoLogic.parseTodos(tile.rawContent || '').groups.map(g => g.name), [tile.rawContent])}
+                  onCancel={() => setViewMode('WIDGET')}
+                  onAdd={(group, text) => {
+                    const data = TodoLogic.parseTodos(tile.rawContent || '');
+                    const newData = TodoLogic.addTodo(data, group, text);
+                    const newContent = TodoLogic.serializeTodos(newData);
+                    tile.onContentChange?.(newContent);
+                    setViewMode('WIDGET');
+                  }}
+                />
+              )}
             </div>
 
           ) : viewMode === 'CODE' ? (
