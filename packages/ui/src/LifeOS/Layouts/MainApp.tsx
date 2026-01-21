@@ -16,6 +16,7 @@ import { TimezoneWidget } from '../Organisms/Widgets/TimezoneWidget';
 import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
 import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
 import { TimezoneAddForm } from '../Organisms/Widgets/TimezoneAddForm';
+import { RssWidget, RssFeedManager } from '../Organisms/Widgets/RssWidget';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
@@ -219,6 +220,15 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       )
+    }
+    if (tile.extension === '.rss.json' && tile.rawContent) {
+      return (
+        <RssWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
     }
     return tile.content || (renderFile && tile.type === 'FILE' ? renderFile(String(tile.id)) : undefined);
   };
@@ -538,8 +548,9 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
   const isHabit = tile.extension === '.habit.csv';
   const isTodos = tile.extension === '.todos.md';
   const isTimezones = tile.extension === '.timezones.json';
+  const isRss = tile.extension === '.rss.json';
 
-  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones) && !!tile.rawContent;
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
 
@@ -589,6 +600,18 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                     )}
                   >
                     {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : 'ADD TIMEZONE'}
+                  </button>
+                )}
+
+                {isRss && (
+                  <button
+                    onClick={() => setViewMode('FEEDS')}
+                    className={cn(
+                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                      viewMode === 'FEEDS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                    )}
+                  >
+                    MANAGE FEEDS
                   </button>
                 )}
 
@@ -654,6 +677,13 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
+              {isRss && (
+                <RssWidget
+                  content={tile.rawContent!}
+                  mode="FOCUS"
+                  onChange={(newContent) => tile.onContentChange?.(newContent)}
+                />
+              )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="h-full w-full p-8">
@@ -702,6 +732,15 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
               )}
             </div>
 
+          ) : viewMode === 'FEEDS' && isRss ? (
+            <div className="h-full w-full">
+              <RssFeedManager
+                content={tile.rawContent || ''}
+                onChange={(newContent) => {
+                  tile.onContentChange?.(newContent);
+                }}
+              />
+            </div>
           ) : viewMode === 'CODE' ? (
             <div className="h-full w-full">
               {renderEditor ? renderEditor(String(tile.id)) : (
