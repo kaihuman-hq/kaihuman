@@ -77,6 +77,7 @@ export const Dashboard = () => {
       const isEvents = item.path.endsWith('.events.csv');
       const isHabit = item.path.endsWith('.habit.csv');
       const isTimezones = item.path.endsWith('.timezones.json');
+      const isRss = item.path.endsWith('.rss.json');
 
       const tile: TileDef = {
         id: item.path, // Use path as ID for simplicity
@@ -86,7 +87,7 @@ export const Dashboard = () => {
       };
 
       // Widget Handling Logic
-      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones;
+      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss;
 
       if (item.type === 'tree') {
         tile.content = <div className="p-8 text-nexus-muted">Select a file from this folder.</div>;
@@ -145,6 +146,19 @@ export const Dashboard = () => {
 
       if (isTimezones) {
         tile.extension = '.timezones.json';
+        if (openFiles && openFiles[item.path]) {
+          tile.rawContent = openFiles[item.path]?.content;
+        }
+
+        tile.onContentChange = (newContent: string) => {
+          githubFileStore.updateFileContent(item.path, newContent);
+          githubFileStore.saveFile(item.path);
+          updateLocalTileContent(item.path, newContent);
+        };
+      }
+
+      if (isRss) {
+        tile.extension = '.rss.json';
         if (openFiles && openFiles[item.path]) {
           tile.rawContent = openFiles[item.path]?.content;
         }
@@ -328,7 +342,7 @@ export const Dashboard = () => {
 
         // Grid Mode Editors / Content
         renderFile={useCallback((path: string) => {
-          const isWidget = path.endsWith('.timetracking.csv') || path.endsWith('.events.csv') || path.endsWith('.habit.csv') || path.endsWith('.todos.md') || path.endsWith('.timezones.json');
+          const isWidget = path.endsWith('.timetracking.csv') || path.endsWith('.events.csv') || path.endsWith('.habit.csv') || path.endsWith('.todos.md') || path.endsWith('.timezones.json') || path.endsWith('.rss.json');
           if (isWidget) return <FileViewer key={path} path={path} />;
 
           return (
