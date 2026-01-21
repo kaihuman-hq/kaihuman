@@ -356,3 +356,43 @@ export const TimezoneClock: StoryObj = {
     />;
   }
 };
+
+export const RssReader: StoryObj = {
+  render: () => {
+    const [jsonContent, setJsonContent] = useState(`{
+  "feedOptions": [
+    {
+      "url": "https://news.ycombinator.com/rss",
+      "id": "f48475ae-a9d5-4f1e-9b37-f6399eb3424d",
+      "xml": "",
+      "read": []
+    }
+  ],
+  "readLater": []
+}`);
+
+    const rssTile = {
+      id: 'rss_1',
+      title: 'HackerNews.rss.json',
+      type: 'FILE',
+      extension: '.rss.json',
+      rawContent: jsonContent,
+      onContentChange: (newVal: string) => {
+        setJsonContent(newVal);
+        console.log('RSS Updated:', newVal);
+      },
+      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+    };
+
+    const [columns, setColumns] = useState<any[]>([
+      { items: [rssTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    ]);
+
+    return <MainApp
+      fileSystem={{ columns }}
+      onItemClick={(item) => {
+        // partial nav
+      }}
+    />;
+  }
+};

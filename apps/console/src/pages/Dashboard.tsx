@@ -2,7 +2,7 @@ import { h } from 'preact';
 import { useEffect, useState, useCallback } from 'preact/hooks';
 import { useSignal } from '@preact/signals';
 import { githubFileStore, githubProfileStore } from '@lifosy/core';
-import { MainApp, TileDef } from '@lifosy/ui';
+import { MainApp, TileDef, RepositorySelector } from '@lifosy/ui';
 import { FileViewer } from '../components/FileViewer';
 
 export const Dashboard = () => {
@@ -77,6 +77,7 @@ export const Dashboard = () => {
       const isEvents = item.path.endsWith('.events.csv');
       const isHabit = item.path.endsWith('.habit.csv');
       const isTimezones = item.path.endsWith('.timezones.json');
+      const isRss = item.path.endsWith('.rss.json');
 
       const tile: TileDef = {
         id: item.path, // Use path as ID for simplicity
@@ -86,14 +87,14 @@ export const Dashboard = () => {
       };
 
       // Widget Handling Logic
-      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones;
+      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss;
 
       if (item.type === 'tree') {
         tile.content = <div className="p-8 text-nexus-muted">Select a file from this folder.</div>;
       } else if (isWidget) {
-        // For widgets, we render FileViewer to ensure content is loaded.
-        // MainApp will switch to the actual widget once content is available.
-        tile.content = <FileViewer key={item.path} path={item.path} />;
+        // For widgets, we rely on MainApp to call renderFile() which returns FileViewer
+        // setting tile.content explicitly here causes infinite re-renders/loading loops
+        tile.content = undefined;
       } else {
         // For non-widgets, show the fallback message
         tile.content = <div className="p-8 text-nexus-muted flex items-center justify-center h-full text-center">
@@ -145,6 +146,19 @@ export const Dashboard = () => {
 
       if (isTimezones) {
         tile.extension = '.timezones.json';
+        if (openFiles && openFiles[item.path]) {
+          tile.rawContent = openFiles[item.path]?.content;
+        }
+
+        tile.onContentChange = (newContent: string) => {
+          githubFileStore.updateFileContent(item.path, newContent);
+          githubFileStore.saveFile(item.path);
+          updateLocalTileContent(item.path, newContent);
+        };
+      }
+
+      if (isRss) {
+        tile.extension = '.rss.json';
         if (openFiles && openFiles[item.path]) {
           tile.rawContent = openFiles[item.path]?.content;
         }
@@ -281,35 +295,15 @@ export const Dashboard = () => {
 
   // 0. Welcome Screen / Initial Repo Selection
   if (!repo && repos.length > 0) {
-    // Import lucide icons locally if not imported or use what's available
-    // Assuming standard layout
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#0d0d0d] text-[#e0e0e0] p-4 font-mono">
-        <div className="max-w-4xl w-full flex flex-col items-center">
-          <div className="border border-[#333] rounded-full px-6 py-2 mb-8 bg-[#111]">
-            <span className="text-sm tracking-[0.2em] font-bold text-[var(--los-accent)]">WELCOME TO LIFE OS</span>
-          </div>
-
-          <h1 className="text-4xl mb-2 font-bold uppercase tracking-tight">Select Repository</h1>
-          <p className="text-[#666] mb-12 text-center text-sm max-w-lg">
-            Choose a GitHub repository to mount as your file system. This will act as the root of your Life OS instance.
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-            {repos.map(r => (
-              <button
-                key={r.id}
-                onClick={() => githubProfileStore.selectRepo(r)}
-                className="flex flex-col items-start p-6 border border-[#333] bg-[#111] hover:bg-[#1a1a1a] hover:border-[#666] transition-all cursor-pointer group text-left w-full rounded-sm"
-              >
-                <span className="text-xs text-[#666] group-hover:text-[var(--los-accent)] mb-2 uppercase tracking-wider">Repository</span>
-                <span className="text-lg font-bold mb-1 group-hover:translate-x-1 transition-transform">{r.name}</span>
-                <span className="text-xs text-[#444] font-mono">{r.full_name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      <RepositorySelector
+        repositories={repos.map(r => ({ ...r, id: String(r.id) }))}
+        onSelect={(r) => {
+          const found = repos.find(x => String(x.id) === r.id);
+          if (found) githubProfileStore.selectRepo(found);
+        }}
+        isLoading={false}
+      />
     );
   }
 
@@ -348,7 +342,7 @@ export const Dashboard = () => {
 
         // Grid Mode Editors / Content
         renderFile={useCallback((path: string) => {
-          const isWidget = path.endsWith('.timetracking.csv') || path.endsWith('.events.csv') || path.endsWith('.habit.csv') || path.endsWith('.todos.md') || path.endsWith('.timezones.json');
+          const isWidget = path.endsWith('.timetracking.csv') || path.endsWith('.events.csv') || path.endsWith('.habit.csv') || path.endsWith('.todos.md') || path.endsWith('.timezones.json') || path.endsWith('.rss.json');
           if (isWidget) return <FileViewer key={path} path={path} />;
 
           return (
