@@ -307,3 +307,52 @@ export const TodoList: StoryObj = {
     />;
   }
 };
+
+export const TimezoneClock: StoryObj = {
+  render: () => {
+    const [jsonContent, setJsonContent] = useState(`{
+  "timezones": [
+    {
+      "id": "1",
+      "name": "Europe/London",
+      "offset": "+00:00",
+      "cities": ["London"],
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000000000
+    },
+    {
+      "id": "2",
+      "name": "America/New_York",
+      "offset": "-05:00",
+      "cities": ["New York"],
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000000000
+    }
+  ]
+}`);
+
+    const tzTile = {
+      id: 'tz_1',
+      title: 'World Clock.timezones.json',
+      type: 'FILE',
+      extension: '.timezones.json',
+      rawContent: jsonContent,
+      onContentChange: (newVal: string) => {
+        setJsonContent(newVal);
+        console.log('Timezones Updated:', newVal);
+      },
+      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+    };
+
+    const [columns, setColumns] = useState<any[]>([
+      { items: [tzTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    ]);
+
+    return <MainApp
+      fileSystem={{ columns }}
+      onItemClick={(item) => {
+        // partial nav
+      }}
+    />;
+  }
+};
