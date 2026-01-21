@@ -220,7 +220,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         />
       )
     }
-    return tile.content;
+    return tile.content || (renderFile && tile.type === 'FILE' ? renderFile(String(tile.id)) : undefined);
   };
 
   // If fileSystem is provided, we use the Miller Column Layout

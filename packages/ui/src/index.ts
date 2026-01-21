@@ -11,4 +11,5 @@ export * from './utils';
 
 // LifeOS Exports
 export * from './LifeOS/Layouts/MainApp';
+export * from './LifeOS/Organisms/RepositorySelector';
 export * from './LifeOS/types';
