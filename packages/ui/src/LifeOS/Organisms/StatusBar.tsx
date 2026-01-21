@@ -192,7 +192,7 @@ export const StatusBar = ({
               {mode}
             </div>
 
-            {currentRepository && (
+            {(currentRepository || repositories.length > 0) && (
               <div
                 className={cn(
                   "flex items-center gap-2 cursor-pointer group transtion-all duration-300",
@@ -203,7 +203,7 @@ export const StatusBar = ({
               >
                 <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
                 <div className="flex items-center max-w-0 opacity-0 overflow-hidden group-hover:max-w-[200px] group-hover:opacity-100 transition-all duration-300 ease-in-out whitespace-nowrap">
-                  <MonoText className="text-xs font-bold ml-2">{currentRepository.name}</MonoText>
+                  <MonoText className="text-xs font-bold ml-2">{currentRepository ? currentRepository.name : "SELECT REPO"}</MonoText>
                   <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
                 </div>
               </div>
