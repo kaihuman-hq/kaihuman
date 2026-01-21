@@ -12,10 +12,13 @@ import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
 import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
 import { HabitTrackerWidget } from '../Organisms/Widgets/HabitTrackerWidget';
 import { TodoWidget } from '../Organisms/Widgets/TodoWidget';
+import { TimezoneWidget } from '../Organisms/Widgets/TimezoneWidget';
 import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
 import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
+import { TimezoneAddForm } from '../Organisms/Widgets/TimezoneAddForm';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
+import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
 import { DashboardConfig, DashboardEntry } from '../types';
 import {
   DndContext,
@@ -202,6 +205,15 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     if (tile.extension === '.todos.md' && tile.rawContent) {
       return (
         <TodoWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      )
+    }
+    if (tile.extension === '.timezones.json' && tile.rawContent) {
+      return (
+        <TimezoneWidget
           content={tile.rawContent}
           mode={mode}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
@@ -525,8 +537,9 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
   const isEvents = tile.extension === '.events.csv';
   const isHabit = tile.extension === '.habit.csv';
   const isTodos = tile.extension === '.todos.md';
+  const isTimezones = tile.extension === '.timezones.json';
 
-  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos) && !!tile.rawContent;
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
 
@@ -567,7 +580,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   </button>
                 )}
 
-                {(isEvents || isTodos) && (
+                {(isEvents || isTodos || isTimezones) && (
                   <button
                     onClick={() => setViewMode('ADD')}
                     className={cn(
@@ -575,7 +588,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                       viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
-                    {isEvents ? 'ADD EVENT' : 'ADD TASK'}
+                    {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : 'ADD TIMEZONE'}
                   </button>
                 )}
 
@@ -634,6 +647,13 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
+              {isTimezones && (
+                <TimezoneWidget
+                  content={tile.rawContent!}
+                  mode="FOCUS"
+                  onChange={(newContent) => tile.onContentChange?.(newContent)}
+                />
+              )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="h-full w-full p-8">
@@ -641,7 +661,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                 data={tile.rawContent!}
               />
             </div>
-          ) : viewMode === 'ADD' && (isEvents || isTodos) ? (
+          ) : viewMode === 'ADD' && (isEvents || isTodos || isTimezones) ? (
             <div className="h-full w-full p-8 flex justify-center items-start">
               {isEvents && (
                 <EventAddForm
@@ -668,14 +688,35 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   }}
                 />
               )}
+              {isTimezones && (
+                <TimezoneAddForm
+                  onCancel={() => setViewMode('WIDGET')}
+                  onAdd={(entry) => {
+                    const data = TimezoneLogic.parseTimezones(tile.rawContent || '');
+                    data.timezones.push(entry);
+                    const newContent = TimezoneLogic.serializeTimezones(data);
+                    tile.onContentChange?.(newContent);
+                    setViewMode('WIDGET');
+                  }}
+                />
+              )}
             </div>
 
           ) : viewMode === 'CODE' ? (
             <div className="h-full w-full">
               {renderEditor ? renderEditor(String(tile.id)) : (
-                <div className="h-full w-full flex items-center justify-center text-[var(--los-muted)]">
-                  <MonoText>No Editor Available</MonoText>
-                </div>
+                tile.rawContent !== undefined ? (
+                  <textarea
+                    className="w-full h-full bg-[var(--los-bg)] text-[var(--los-fg)] font-mono text-xs p-4 resize-none focus:outline-none border-none"
+                    value={tile.rawContent}
+                    onInput={(e) => tile.onContentChange?.(e.currentTarget.value)}
+                    spellcheck={false}
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-[var(--los-muted)]">
+                    <MonoText>No Editor Available</MonoText>
+                  </div>
+                )
               )}
             </div>
           ) : (

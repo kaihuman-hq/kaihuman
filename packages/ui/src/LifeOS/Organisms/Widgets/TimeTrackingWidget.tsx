@@ -33,12 +33,24 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
   // Real week logic requires date math, but "Duration of time tracking for current week" requested.
   // We'll just sum all parsed entries for now as "Total Tracked" if date math is overkill, 
   // but let's try to filter correctly.
+  // Calculate Current Week Stats (Current ISO Week - Start Monday)
   const weekMinutes = useMemo(() => {
-    // Simple "last 7 days" window
     const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const day = now.getDay() || 7; // Sunday is 7
+    const monday = new Date(now);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(now.getDate() - day + 1);
+
+    // Normalize to YYYY-MM-DD string to match data format
+    // Note: toISOString() uses UTC. We need local YYYY-MM-DD.
+    // Use the utility/offset trick or simple getters.
+    const year = monday.getFullYear();
+    const month = String(monday.getMonth() + 1).padStart(2, '0');
+    const d = String(monday.getDate()).padStart(2, '0');
+    const mondayStr = `${year}-${month}-${d}`;
+
     return data.entries
-      .filter(e => new Date(e.date) >= oneWeekAgo)
+      .filter(e => e.date >= mondayStr)
       .reduce((acc, curr) => acc + calculateDurationMinutes(curr), 0);
   }, [data]);
 
