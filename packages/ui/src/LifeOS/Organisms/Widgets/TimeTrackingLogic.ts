@@ -1,7 +1,12 @@
+import { toLocalISOString } from '../../../utils/date';
+
 export interface Interval {
   start: string; // HH:MM
   end?: string; // HH:MM
 }
+// ... (imports are top of file usually, but I can add it) 
+// Actually I need to check where imports are.
+// I'll add the import at the top and replace the usages.
 
 export interface DayEntry {
   date: string; // YYYY-MM-DD
@@ -53,6 +58,9 @@ export const parseTimeTracking = (csv: string): TimeTrackingData => {
     entries.push({ date, intervals });
   }
 
+  // Sort by date descending (newest first)
+  entries.sort((a, b) => b.date.localeCompare(a.date));
+
   return { entries };
 };
 
@@ -87,18 +95,18 @@ export const calculateDurationMinutes = (entry: DayEntry): number => {
 
   for (const interval of entry.intervals) {
     const startParts = interval.start.split(':').map(Number);
-    if (startParts.length !== 2) continue;
+    if (startParts.length < 2) continue;
 
     const startMin = (startParts[0] || 0) * 60 + (startParts[1] || 0);
 
     let endMin;
     if (interval.end) {
       const endParts = interval.end.split(':').map(Number);
-      if (endParts.length === 2) {
+      if (endParts.length >= 2) {
         endMin = (endParts[0] || 0) * 60 + (endParts[1] || 0);
       }
     } else {
-      const today = new Date().toISOString().split('T')[0];
+      const today = toLocalISOString(new Date());
       if (entry.date === today) {
         const nowParts = currentHm.split(':').map(Number);
         endMin = (nowParts[0] || 0) * 60 + (nowParts[1] || 0);
@@ -124,7 +132,7 @@ export const formatDuration = (minutes: number): string => {
  * Toggles Start/Stop for Today.
  */
 export const toggleStartStop = (data: TimeTrackingData): TimeTrackingData => {
-  const today = new Date().toISOString().split('T')[0]!;
+  const today = toLocalISOString(new Date());
   const now = new Date();
   const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
@@ -162,7 +170,7 @@ export const toggleStartStop = (data: TimeTrackingData): TimeTrackingData => {
 };
 
 export const addPause = (data: TimeTrackingData, pauseMinutes: number): TimeTrackingData => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalISOString(new Date());
   const newData = { ...data, entries: [...data.entries] };
   const dayEntryIndex = newData.entries.findIndex(e => e.date === today);
 
@@ -207,7 +215,7 @@ export const addPause = (data: TimeTrackingData, pauseMinutes: number): TimeTrac
 };
 
 export const isRunning = (data: TimeTrackingData): boolean => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalISOString(new Date());
   const entry = data.entries.find(e => e.date === today);
   if (!entry) return false;
   const last = entry.intervals[entry.intervals.length - 1];
@@ -228,7 +236,7 @@ export const getChartData = (data: TimeTrackingData): ChartData => {
   // 12 months lookback ~ 365 days
   const lookback = new Date();
   lookback.setDate(lookback.getDate() - 365);
-  const lookbackDateStr = lookback.toISOString().split('T')[0]!;
+  const lookbackDateStr = toLocalISOString(lookback);
 
   // Sort ascending for chart
   const sorted = [...data.entries].sort((a, b) => a.date.localeCompare(b.date));
