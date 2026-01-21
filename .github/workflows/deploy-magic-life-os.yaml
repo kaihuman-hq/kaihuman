@@ -1,0 +1,28 @@
+name: "[PROD] Deploy Life OS"
+
+# on:
+#   push:
+#     branches:
+#       - main
+
+# on: workflow_dispatch
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/console/**"
+
+jobs:
+  publish-lifosy:
+    uses: ./.github/workflows/template-deploy-to-cloudflare.yaml
+    with:
+      buildTarget: console:build
+      rootDir: ./apps/console
+      distDir: ./dist
+      cfPagesName: lifosy-console
+      branchName: main
+    secrets:
+      cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+      cf_api_token: ${{ secrets.CF_API_TOKEN }}
