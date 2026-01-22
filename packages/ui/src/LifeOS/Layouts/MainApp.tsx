@@ -374,6 +374,44 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
+      {/* Desktop Navigation Overlays */}
+      {!activeTileId && localConfig && localConfig.dashboards.length > 1 && (
+        <>
+          {/* Left Overlay - Previous */}
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrevDashboard();
+            }}
+            className="hidden md:flex absolute top-0 left-0 bottom-8 w-16 z-20 items-center justify-start pl-2 
+                       hover:bg-gradient-to-r from-black/40 to-transparent 
+                       opacity-0 hover:opacity-100 transition-all duration-300 cursor-pointer group"
+          >
+            <div className="text-white/50 group-hover:text-white group-hover:-translate-x-1 transition-transform duration-300 transform translate-x-1">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Right Overlay - Next */}
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNextDashboard();
+            }}
+            className="hidden md:flex absolute top-0 right-0 bottom-8 w-16 z-20 items-center justify-end pr-2 
+                       hover:bg-gradient-to-l from-black/40 to-transparent 
+                       opacity-0 hover:opacity-100 transition-all duration-300 cursor-pointer group"
+          >
+            <div className="text-white/50 group-hover:text-white group-hover:translate-x-1 transition-transform duration-300 transform -translate-x-1">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* CENTER STAGE: The Matrix OR The Active Tile */}
       <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
