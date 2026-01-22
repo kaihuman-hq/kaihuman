@@ -18,6 +18,7 @@ import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
 import { TimezoneAddForm } from '../Organisms/Widgets/TimezoneAddForm';
 import { RssWidget, RssFeedManager } from '../Organisms/Widgets/RssWidget';
 import { ReadItLaterWidget } from '../Organisms/Widgets/ReadItLaterWidget';
+import { ReadItLaterItem } from '../Organisms/Widgets/ReadItLaterLogic';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
@@ -78,9 +79,10 @@ export interface MainAppProps {
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
 
   renderEditor?: (path: string) => ComponentChildren;
+  onAddToReadItLater?: (item: ReadItLaterItem) => void;
 }
 
-export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, renderEditor, ...props }: MainAppProps) => {
+export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, renderEditor, onAddToReadItLater, ...props }: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
 
@@ -239,6 +241,18 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
           content={tile.rawContent}
           mode={mode}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
+          onReadItLater={(item) => {
+            const newItem: ReadItLaterItem = {
+              id: crypto.randomUUID(),
+              url: item.link,
+              status: 'new',
+              name: item.title,
+              tags: [],
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            };
+            onAddToReadItLater?.(newItem);
+          }}
         />
       );
     }

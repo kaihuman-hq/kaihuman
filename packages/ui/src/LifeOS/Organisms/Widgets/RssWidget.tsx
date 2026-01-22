@@ -10,9 +10,10 @@ interface RssWidgetProps {
   content: string;
   mode?: 'SMALL' | 'FOCUS';
   onChange?: (newContent: string) => void;
+  onReadItLater?: (item: RssItem) => void;
 }
 
-export const RssWidget = ({ content, mode = 'SMALL', onChange }: RssWidgetProps) => {
+export const RssWidget = ({ content, mode = 'SMALL', onChange, onReadItLater }: RssWidgetProps) => {
   const config = useMemo(() => parseRssConfig(content), [content]);
   const [items, setItems] = useState<(RssItem & { feedId: string })[]>([]);
   const [loading, setLoading] = useState(false);
@@ -107,6 +108,7 @@ export const RssWidget = ({ content, mode = 'SMALL', onChange }: RssWidgetProps)
             key={`${item.feedId}-${item.guid || item.link}-${idx}`}
             item={item}
             onRead={() => handleRead(item)}
+            onReadItLater={() => onReadItLater?.(item)}
             mode={mode}
           />
         ))}
@@ -116,7 +118,7 @@ export const RssWidget = ({ content, mode = 'SMALL', onChange }: RssWidgetProps)
 };
 
 // Wrapper for Item Row
-const RssItemRow = ({ item, onRead, mode }: { item: RssItem, onRead: () => void, mode: string }) => {
+const RssItemRow = ({ item, onRead, onReadItLater, mode }: { item: RssItem, onRead: () => void, onReadItLater: () => void, mode: string }) => {
   return (
     <div className="py-3 px-1 group hover:bg-white/5 transition-colors">
       <div className="flex gap-2 items-start">
@@ -143,6 +145,9 @@ const RssItemRow = ({ item, onRead, mode }: { item: RssItem, onRead: () => void,
         <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button title="Mark as Read" onClick={onRead} className="p-1 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
             <Check className="w-4 h-4" />
+          </button>
+          <button title="Read Later" onClick={onReadItLater} className="p-1 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
           </button>
           <a href={item.link} target="_blank" rel="noopener noreferrer" title="Open" className="p-1 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
             <ExternalLink className="w-4 h-4" />

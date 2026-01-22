@@ -2,7 +2,14 @@ import { h } from 'preact';
 import { useEffect, useState, useCallback } from 'preact/hooks';
 import { useSignal } from '@preact/signals';
 import { githubFileStore, githubProfileStore } from '@lifosy/core';
-import { MainApp, TileDef, RepositorySelector } from '@lifosy/ui';
+import {
+  MainApp,
+  TileDef,
+  RepositorySelector,
+  parseReadItLater,
+  serializeReadItLater,
+  DEFAULT_CONFIG as DEFAULT_RIL_CONFIG
+} from '@lifosy/ui';
 import { FileViewer } from '../components/FileViewer';
 
 export const Dashboard = () => {
@@ -371,6 +378,39 @@ export const Dashboard = () => {
           githubFileStore.saveFile(path);
         }, [])}
         renderEditor={useCallback((path: string) => <FileViewer key={path} path={path} />, [])}
+        onAddToReadItLater={async (item) => {
+          const rilPath = '.lifeos/.readitlater.json';
+          try {
+            // Ensure loaded
+            if (!githubFileStore.openFiles.value[rilPath]) {
+              await githubFileStore.openFile(rilPath);
+            }
+
+            const file = githubFileStore.openFiles.value[rilPath];
+            const content = file?.content || '';
+
+            let config;
+            try {
+              config = content ? parseReadItLater(content) : DEFAULT_RIL_CONFIG;
+            } catch (e) {
+              config = DEFAULT_RIL_CONFIG;
+            }
+
+            // Check duplicates
+            if (config.items.some(i => i.url === item.url)) return;
+
+            const newConfig = { ...config, items: [item, ...config.items] };
+            const newContent = serializeReadItLater(newConfig);
+
+            // Update and Save - calling updateFileContent handles DB update/state update
+            githubFileStore.updateFileContent(rilPath, newContent);
+            await githubFileStore.saveFile(rilPath);
+
+          } catch (error) {
+            console.error('Failed to add to ReadItLater:', error);
+          }
+        }}
+
       />
     </div>
   );
