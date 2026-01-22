@@ -83,9 +83,14 @@ export class AuthStore {
   }
 
   logout() {
+    // 1. Immediate sync cleanup to prevent loop if a reload happens
+    localStorage.removeItem(STORAGE_KEY_TOKEN);
+
+    // 2. Update state - this triggers the effect to clean DB, and updates UI
     this.token.value = null;
     this.user.value = null;
-    window.location.href = '/login';
+
+    // 3. Do NOT force reload. ProtectedRoute checks isAuthenticated and will show Login.
   }
 
   handleCallback() {
