@@ -17,6 +17,7 @@ import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
 import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
 import { TimezoneAddForm } from '../Organisms/Widgets/TimezoneAddForm';
 import { RssWidget, RssFeedManager } from '../Organisms/Widgets/RssWidget';
+import { ReadItLaterWidget } from '../Organisms/Widgets/ReadItLaterWidget';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
@@ -224,6 +225,15 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     if (tile.extension === '.rss.json' && tile.rawContent) {
       return (
         <RssWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+    if (tile.extension === '.readitlater.json' && tile.rawContent) {
+      return (
+        <ReadItLaterWidget
           content={tile.rawContent}
           mode={mode}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
@@ -587,8 +597,9 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
   const isTodos = tile.extension === '.todos.md';
   const isTimezones = tile.extension === '.timezones.json';
   const isRss = tile.extension === '.rss.json';
+  const isReadItLater = tile.extension === '.readitlater.json';
 
-  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss) && !!tile.rawContent;
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
 
@@ -650,6 +661,18 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                     )}
                   >
                     MANAGE FEEDS
+                  </button>
+                )}
+
+                {isReadItLater && (
+                  <button
+                    onClick={() => setViewMode('ARCHIVE')}
+                    className={cn(
+                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                      viewMode === 'ARCHIVE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                    )}
+                  >
+                    ARCHIVE
                   </button>
                 )}
 
@@ -722,6 +745,14 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
+              {isReadItLater && (
+                <ReadItLaterWidget
+                  content={tile.rawContent!}
+                  mode="FOCUS"
+                  focusMode="WIDGET"
+                  onChange={(newContent) => tile.onContentChange?.(newContent)}
+                />
+              )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="h-full w-full p-8">
@@ -777,6 +808,15 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                 onChange={(newContent) => {
                   tile.onContentChange?.(newContent);
                 }}
+              />
+            </div>
+          ) : viewMode === 'ARCHIVE' && isReadItLater ? (
+            <div className="h-full w-full">
+              <ReadItLaterWidget
+                content={tile.rawContent!}
+                mode="FOCUS"
+                focusMode="ARCHIVE"
+                onChange={(newContent) => tile.onContentChange?.(newContent)}
               />
             </div>
           ) : viewMode === 'CODE' ? (

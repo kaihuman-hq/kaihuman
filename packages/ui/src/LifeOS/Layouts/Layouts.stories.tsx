@@ -396,3 +396,54 @@ export const RssReader: StoryObj = {
     />;
   }
 };
+
+export const ReadItLater: StoryObj = {
+  render: () => {
+    const [jsonContent, setJsonContent] = useState(`{
+  "items": [
+    {
+      "id": "1",
+      "url": "https://example.com/article1",
+      "status": "new",
+      "name": "Interesting Article 1",
+      "tags": ["tech", "ai"],
+      "createdAt": 1700000000000,
+      "updatedAt": 1700000000000
+    },
+    {
+      "id": "2",
+      "url": "https://example.com/article2",
+      "status": "read",
+      "name": "Read Article 2",
+      "tags": ["news"],
+      "createdAt": 1690000000000,
+      "updatedAt": 1700000000000
+    }
+  ]
+}`);
+
+    const rilTile = {
+      id: 'ril_1',
+      title: 'ReadingList.readitlater.json',
+      type: 'FILE',
+      extension: '.readitlater.json',
+      rawContent: jsonContent,
+      onContentChange: (newVal: string) => {
+        setJsonContent(newVal);
+        console.log('ReadItLater Updated:', newVal);
+      },
+      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+    };
+
+    const [columns, setColumns] = useState<any[]>([
+      { items: [rilTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    ]);
+
+    return <MainApp
+      fileSystem={{ columns }}
+      onItemClick={(item) => {
+        // partial nav
+      }}
+    />;
+  }
+};
