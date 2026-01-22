@@ -25,15 +25,30 @@ export class AuthStore {
 
   private async init() {
     const db = await dbPromise;
-    const token = await db.get('auth', 'token');
-    const user = await db.get('auth', 'user');
 
-    if (token) this.token.value = token;
-    if (user) this.user.value = user;
+    // Check for explicit logout flag
+    const loggedOut = localStorage.getItem('lifeos_logged_out');
 
-    // Fallback to localStorage if DB empty (migration path)
-    if (!token && localStorage.getItem(STORAGE_KEY_TOKEN)) {
-      this.token.value = localStorage.getItem(STORAGE_KEY_TOKEN);
+    if (loggedOut) {
+      // We were explicitly logged out, so ignore any token in DB to prevent zombie sessions
+      await db.delete('auth', 'token');
+      await db.delete('auth', 'user');
+      // We can clear the flag now, or keep it. Clearing it is safe as we've nuked the DB token.
+      localStorage.removeItem('lifeos_logged_out');
+
+      // Clear legacy
+      localStorage.removeItem(STORAGE_KEY_TOKEN);
+    } else {
+      const token = await db.get('auth', 'token');
+      const user = await db.get('auth', 'user');
+
+      if (token) this.token.value = token;
+      if (user) this.user.value = user;
+
+      // Fallback to localStorage if DB empty (migration path)
+      if (!token && localStorage.getItem(STORAGE_KEY_TOKEN)) {
+        this.token.value = localStorage.getItem(STORAGE_KEY_TOKEN);
+      }
     }
 
     // Persist token to DB on change
@@ -83,14 +98,17 @@ export class AuthStore {
   }
 
   logout() {
-    // 1. Immediate sync cleanup to prevent loop if a reload happens
+    // 1. Set explicit logout flag immediately
+    localStorage.setItem('lifeos_logged_out', 'true');
+
+    // 2. Immediate sync cleanup to prevent loop if a reload happens
     localStorage.removeItem(STORAGE_KEY_TOKEN);
 
-    // 2. Update state - this triggers the effect to clean DB, and updates UI
+    // 3. Update state - this triggers the effect to clean DB, and updates UI
     this.token.value = null;
     this.user.value = null;
 
-    // 3. Do NOT force reload. ProtectedRoute checks isAuthenticated and will show Login.
+    // 4. Do NOT force reload. ProtectedRoute checks isAuthenticated and will show Login.
   }
 
   handleCallback() {
@@ -98,6 +116,9 @@ export class AuthStore {
     const accessToken = params.get('access_token');
 
     if (accessToken) {
+      // Clear logout flag on successful login
+      localStorage.removeItem('lifeos_logged_out');
+
       this.token.value = accessToken;
       // Clear query param
       window.history.replaceState({}, document.title, window.location.pathname);

@@ -17,6 +17,8 @@ import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
 import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
 import { TimezoneAddForm } from '../Organisms/Widgets/TimezoneAddForm';
 import { RssWidget, RssFeedManager } from '../Organisms/Widgets/RssWidget';
+import { ReadItLaterWidget } from '../Organisms/Widgets/ReadItLaterWidget';
+import { ReadItLaterItem } from '../Organisms/Widgets/ReadItLaterLogic';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
@@ -77,9 +79,10 @@ export interface MainAppProps {
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
 
   renderEditor?: (path: string) => ComponentChildren;
+  onAddToReadItLater?: (item: ReadItLaterItem) => void;
 }
 
-export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, renderEditor, ...props }: MainAppProps) => {
+export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, renderEditor, onAddToReadItLater, ...props }: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
 
@@ -147,8 +150,19 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     return userEntries.map((entry, index) => {
       const extension = entry.path.split('.').slice(1).join('.'); // .events.csv etc. leads to events.csv
       // Better extension extraction:
-      const parts = entry.path.split('.');
-      const ext = parts.length > 1 ? '.' + parts.slice(1).join('.') : '';
+      let ext = '';
+      const lowerPath = entry.path.toLowerCase();
+      if (lowerPath.endsWith('.readitlater.json')) ext = '.readitlater.json';
+      else if (lowerPath.endsWith('.timetracking.csv')) ext = '.timetracking.csv';
+      else if (lowerPath.endsWith('.events.csv')) ext = '.events.csv';
+      else if (lowerPath.endsWith('.habit.csv')) ext = '.habit.csv';
+      else if (lowerPath.endsWith('.todos.md')) ext = '.todos.md';
+      else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
+      else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
+      else {
+        const parts = entry.path.split('.');
+        ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
+      }
 
       return {
         id: entry.path, // Use path as ID
@@ -221,9 +235,30 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         />
       )
     }
-    if (tile.extension === '.rss.json' && tile.rawContent) {
+    if (tile.extension?.toLowerCase() === '.rss.json' && tile.rawContent) {
       return (
         <RssWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+          onReadItLater={(item) => {
+            const newItem: ReadItLaterItem = {
+              id: crypto.randomUUID(),
+              url: item.link,
+              status: 'new',
+              name: item.title,
+              tags: [],
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            };
+            onAddToReadItLater?.(newItem);
+          }}
+        />
+      );
+    }
+    if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
+      return (
+        <ReadItLaterWidget
           content={tile.rawContent}
           mode={mode}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
@@ -374,6 +409,44 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
+      {/* Desktop Navigation Overlays */}
+      {!activeTileId && localConfig && localConfig.dashboards.length > 1 && (
+        <>
+          {/* Left Overlay - Previous */}
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrevDashboard();
+            }}
+            className="hidden md:flex absolute top-0 left-0 bottom-8 w-16 z-20 items-center justify-start pl-2 
+                       hover:bg-gradient-to-r from-black/40 to-transparent 
+                       opacity-0 hover:opacity-100 transition-all duration-300 cursor-pointer group"
+          >
+            <div className="text-white/50 group-hover:text-white group-hover:-translate-x-1 transition-transform duration-300 transform translate-x-1">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Right Overlay - Next */}
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNextDashboard();
+            }}
+            className="hidden md:flex absolute top-0 right-0 bottom-8 w-16 z-20 items-center justify-end pr-2 
+                       hover:bg-gradient-to-l from-black/40 to-transparent 
+                       opacity-0 hover:opacity-100 transition-all duration-300 cursor-pointer group"
+          >
+            <div className="text-white/50 group-hover:text-white group-hover:translate-x-1 transition-transform duration-300 transform -translate-x-1">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* CENTER STAGE: The Matrix OR The Active Tile */}
       <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
@@ -543,14 +616,15 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
 };
 
 const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string) => ComponentChildren }) => {
-  const isTimeTracking = tile.extension === '.timetracking.csv';
-  const isEvents = tile.extension === '.events.csv';
-  const isHabit = tile.extension === '.habit.csv';
-  const isTodos = tile.extension === '.todos.md';
-  const isTimezones = tile.extension === '.timezones.json';
-  const isRss = tile.extension === '.rss.json';
+  const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
+  const isEvents = tile.extension?.toLowerCase() === '.events.csv';
+  const isHabit = tile.extension?.toLowerCase() === '.habit.csv';
+  const isTodos = tile.extension?.toLowerCase() === '.todos.md';
+  const isTimezones = tile.extension?.toLowerCase() === '.timezones.json';
+  const isRss = tile.extension?.toLowerCase() === '.rss.json';
+  const isReadItLater = tile.extension?.toLowerCase() === '.readitlater.json';
 
-  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss) && !!tile.rawContent;
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
 
@@ -612,6 +686,18 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                     )}
                   >
                     MANAGE FEEDS
+                  </button>
+                )}
+
+                {isReadItLater && (
+                  <button
+                    onClick={() => setViewMode('ARCHIVE')}
+                    className={cn(
+                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                      viewMode === 'ARCHIVE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                    )}
+                  >
+                    ARCHIVE
                   </button>
                 )}
 
@@ -684,6 +770,14 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
+              {isReadItLater && (
+                <ReadItLaterWidget
+                  content={tile.rawContent!}
+                  mode="FOCUS"
+                  focusMode="WIDGET"
+                  onChange={(newContent) => tile.onContentChange?.(newContent)}
+                />
+              )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="h-full w-full p-8">
@@ -739,6 +833,15 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                 onChange={(newContent) => {
                   tile.onContentChange?.(newContent);
                 }}
+              />
+            </div>
+          ) : viewMode === 'ARCHIVE' && isReadItLater ? (
+            <div className="h-full w-full">
+              <ReadItLaterWidget
+                content={tile.rawContent!}
+                mode="FOCUS"
+                focusMode="ARCHIVE"
+                onChange={(newContent) => tile.onContentChange?.(newContent)}
               />
             </div>
           ) : viewMode === 'CODE' ? (

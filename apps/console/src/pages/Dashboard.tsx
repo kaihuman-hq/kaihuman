@@ -2,7 +2,14 @@ import { h } from 'preact';
 import { useEffect, useState, useCallback } from 'preact/hooks';
 import { useSignal } from '@preact/signals';
 import { githubFileStore, githubProfileStore } from '@lifosy/core';
-import { MainApp, TileDef, RepositorySelector } from '@lifosy/ui';
+import {
+  MainApp,
+  TileDef,
+  RepositorySelector,
+  parseReadItLater,
+  serializeReadItLater,
+  DEFAULT_CONFIG as DEFAULT_RIL_CONFIG
+} from '@lifosy/ui';
 import { FileViewer } from '../components/FileViewer';
 
 export const Dashboard = () => {
@@ -73,11 +80,12 @@ export const Dashboard = () => {
     });
 
     return items.map(item => {
-      const isTimeTracking = item.path.endsWith('.timetracking.csv');
-      const isEvents = item.path.endsWith('.events.csv');
-      const isHabit = item.path.endsWith('.habit.csv');
-      const isTimezones = item.path.endsWith('.timezones.json');
-      const isRss = item.path.endsWith('.rss.json');
+      const isTimeTracking = item.path.toLowerCase().endsWith('.timetracking.csv');
+      const isEvents = item.path.toLowerCase().endsWith('.events.csv');
+      const isHabit = item.path.toLowerCase().endsWith('.habit.csv');
+      const isTimezones = item.path.toLowerCase().endsWith('.timezones.json');
+      const isRss = item.path.toLowerCase().endsWith('.rss.json');
+      const isReadItLater = item.path.toLowerCase().endsWith('.readitlater.json');
 
       const tile: TileDef = {
         id: item.path, // Use path as ID for simplicity
@@ -87,7 +95,7 @@ export const Dashboard = () => {
       };
 
       // Widget Handling Logic
-      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss;
+      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss || isReadItLater;
 
       if (item.type === 'tree') {
         tile.content = <div className="p-8 text-nexus-muted">Select a file from this folder.</div>;
@@ -159,6 +167,19 @@ export const Dashboard = () => {
 
       if (isRss) {
         tile.extension = '.rss.json';
+        if (openFiles && openFiles[item.path]) {
+          tile.rawContent = openFiles[item.path]?.content;
+        }
+
+        tile.onContentChange = (newContent: string) => {
+          githubFileStore.updateFileContent(item.path, newContent);
+          githubFileStore.saveFile(item.path);
+          updateLocalTileContent(item.path, newContent);
+        };
+      }
+
+      if (isReadItLater) {
+        tile.extension = '.readitlater.json';
         if (openFiles && openFiles[item.path]) {
           tile.rawContent = openFiles[item.path]?.content;
         }
@@ -342,7 +363,8 @@ export const Dashboard = () => {
 
         // Grid Mode Editors / Content
         renderFile={useCallback((path: string) => {
-          const isWidget = path.endsWith('.timetracking.csv') || path.endsWith('.events.csv') || path.endsWith('.habit.csv') || path.endsWith('.todos.md') || path.endsWith('.timezones.json') || path.endsWith('.rss.json');
+          const lowerPath = path.toLowerCase();
+          const isWidget = lowerPath.endsWith('.timetracking.csv') || lowerPath.endsWith('.events.csv') || lowerPath.endsWith('.habit.csv') || lowerPath.endsWith('.todos.md') || lowerPath.endsWith('.timezones.json') || lowerPath.endsWith('.rss.json') || lowerPath.endsWith('.readitlater.json');
           if (isWidget) return <FileViewer key={path} path={path} />;
 
           return (
@@ -356,6 +378,39 @@ export const Dashboard = () => {
           githubFileStore.saveFile(path);
         }, [])}
         renderEditor={useCallback((path: string) => <FileViewer key={path} path={path} />, [])}
+        onAddToReadItLater={async (item) => {
+          const rilPath = '.lifeos/.readitlater.json';
+          try {
+            // Ensure loaded
+            if (!githubFileStore.openFiles.value[rilPath]) {
+              await githubFileStore.openFile(rilPath);
+            }
+
+            const file = githubFileStore.openFiles.value[rilPath];
+            const content = file?.content || '';
+
+            let config;
+            try {
+              config = content ? parseReadItLater(content) : DEFAULT_RIL_CONFIG;
+            } catch (e) {
+              config = DEFAULT_RIL_CONFIG;
+            }
+
+            // Check duplicates
+            if (config.items.some(i => i.url === item.url)) return;
+
+            const newConfig = { ...config, items: [item, ...config.items] };
+            const newContent = serializeReadItLater(newConfig);
+
+            // Update and Save - calling updateFileContent handles DB update/state update
+            githubFileStore.updateFileContent(rilPath, newContent);
+            await githubFileStore.saveFile(rilPath);
+
+          } catch (error) {
+            console.error('Failed to add to ReadItLater:', error);
+          }
+        }}
+
       />
     </div>
   );
