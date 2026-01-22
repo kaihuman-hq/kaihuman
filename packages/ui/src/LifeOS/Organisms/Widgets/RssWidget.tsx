@@ -142,15 +142,15 @@ const RssItemRow = ({ item, onRead, onReadItLater, mode }: { item: RssItem, onRe
           </div>
         </div>
 
-        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button title="Mark as Read" onClick={(e) => { e.stopPropagation(); onRead(); }} className="p-1 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
-            <Check className="w-4 h-4" />
+        <div className="flex flex-col gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-[var(--los-bg)] pl-2">
+          <button title="Mark as Read" onClick={(e) => { e.stopPropagation(); onRead(); }} className="p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
+            <Check className="w-5 h-5" />
           </button>
-          <button title="Read Later" onClick={(e) => { e.stopPropagation(); onReadItLater(); }} className="p-1 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
+          <button title="Read Later" onClick={(e) => { e.stopPropagation(); onReadItLater(); }} className="p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
           </button>
-          <a href={item.link} target="_blank" rel="noopener noreferrer" title="Open" className="p-1 hover:text-[var(--los-accent)] text-[var(--los-muted)]" onClick={(e) => e.stopPropagation()}>
-            <ExternalLink className="w-4 h-4" />
+          <a href={item.link} target="_blank" rel="noopener noreferrer" title="Open" className="p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)]" onClick={(e) => e.stopPropagation()}>
+            <ExternalLink className="w-5 h-5" />
           </a>
         </div>
       </div>

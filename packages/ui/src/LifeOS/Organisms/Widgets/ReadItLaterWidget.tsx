@@ -179,11 +179,11 @@ const ItemRow = ({
         </div>
       </div>
 
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-[var(--los-bg)] pl-2">
         <button
           onClick={(e) => { e.stopPropagation(); onPrimary(); }}
           title={primaryLabel}
-          className="p-1.5 hover:bg-[var(--los-accent)] hover:text-[var(--los-bg)] text-[var(--los-muted)] rounded transition-colors"
+          className="p-2 hover:bg-[var(--los-accent)] hover:text-[var(--los-bg)] text-[var(--los-muted)] rounded transition-colors"
         >
           {primaryIcon}
         </button>
@@ -193,19 +193,19 @@ const ItemRow = ({
           target="_blank"
           rel="noopener noreferrer"
           title="Open"
-          className="p-1.5 hover:text-[var(--los-fg)] text-[var(--los-muted)] rounded transition-colors"
+          className="p-2 hover:text-[var(--los-fg)] text-[var(--los-muted)] rounded transition-colors"
           onClick={(e) => e.stopPropagation()}
         >
-          <ExternalLink className="w-4 h-4" />
+          <ExternalLink className="w-5 h-5" />
         </a>
 
         {onDelete && (
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             title="Delete"
-            className="p-1.5 hover:text-red-500 text-[var(--los-muted)] rounded transition-colors"
+            className="p-2 hover:text-red-500 text-[var(--los-muted)] rounded transition-colors"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-5 h-5" />
           </button>
         )}
       </div>
