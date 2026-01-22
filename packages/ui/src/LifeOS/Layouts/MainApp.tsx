@@ -148,8 +148,19 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     return userEntries.map((entry, index) => {
       const extension = entry.path.split('.').slice(1).join('.'); // .events.csv etc. leads to events.csv
       // Better extension extraction:
-      const parts = entry.path.split('.');
-      const ext = parts.length > 1 ? '.' + parts.slice(1).join('.') : '';
+      let ext = '';
+      const lowerPath = entry.path.toLowerCase();
+      if (lowerPath.endsWith('.readitlater.json')) ext = '.readitlater.json';
+      else if (lowerPath.endsWith('.timetracking.csv')) ext = '.timetracking.csv';
+      else if (lowerPath.endsWith('.events.csv')) ext = '.events.csv';
+      else if (lowerPath.endsWith('.habit.csv')) ext = '.habit.csv';
+      else if (lowerPath.endsWith('.todos.md')) ext = '.todos.md';
+      else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
+      else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
+      else {
+        const parts = entry.path.split('.');
+        ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
+      }
 
       return {
         id: entry.path, // Use path as ID
@@ -222,7 +233,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         />
       )
     }
-    if (tile.extension === '.rss.json' && tile.rawContent) {
+    if (tile.extension?.toLowerCase() === '.rss.json' && tile.rawContent) {
       return (
         <RssWidget
           content={tile.rawContent}
@@ -231,7 +242,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         />
       );
     }
-    if (tile.extension === '.readitlater.json' && tile.rawContent) {
+    if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
       return (
         <ReadItLaterWidget
           content={tile.rawContent}
@@ -591,13 +602,13 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
 };
 
 const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string) => ComponentChildren }) => {
-  const isTimeTracking = tile.extension === '.timetracking.csv';
-  const isEvents = tile.extension === '.events.csv';
-  const isHabit = tile.extension === '.habit.csv';
-  const isTodos = tile.extension === '.todos.md';
-  const isTimezones = tile.extension === '.timezones.json';
-  const isRss = tile.extension === '.rss.json';
-  const isReadItLater = tile.extension === '.readitlater.json';
+  const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
+  const isEvents = tile.extension?.toLowerCase() === '.events.csv';
+  const isHabit = tile.extension?.toLowerCase() === '.habit.csv';
+  const isTodos = tile.extension?.toLowerCase() === '.todos.md';
+  const isTimezones = tile.extension?.toLowerCase() === '.timezones.json';
+  const isRss = tile.extension?.toLowerCase() === '.rss.json';
+  const isReadItLater = tile.extension?.toLowerCase() === '.readitlater.json';
 
   const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater) && !!tile.rawContent;
 
