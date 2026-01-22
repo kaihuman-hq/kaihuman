@@ -159,7 +159,7 @@ const ItemRow = ({
   return (
     <div className="py-3 px-2 group hover:bg-white/5 transition-colors flex gap-3 items-start">
       <div className="flex-1 min-w-0">
-        <a href={item.url} target="_blank" rel="noopener noreferrer" className="block">
+        <a href={item.url} target="_blank" rel="noopener noreferrer" className="block" onClick={(e) => e.stopPropagation()}>
           <MonoText className="font-bold text-[var(--los-fg)] hover:text-[var(--los-accent)] truncate block mb-1">
             {item.name || item.url}
           </MonoText>
@@ -181,7 +181,7 @@ const ItemRow = ({
 
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
-          onClick={onPrimary}
+          onClick={(e) => { e.stopPropagation(); onPrimary(); }}
           title={primaryLabel}
           className="p-1.5 hover:bg-[var(--los-accent)] hover:text-[var(--los-bg)] text-[var(--los-muted)] rounded transition-colors"
         >
@@ -194,13 +194,14 @@ const ItemRow = ({
           rel="noopener noreferrer"
           title="Open"
           className="p-1.5 hover:text-[var(--los-fg)] text-[var(--los-muted)] rounded transition-colors"
+          onClick={(e) => e.stopPropagation()}
         >
           <ExternalLink className="w-4 h-4" />
         </a>
 
         {onDelete && (
           <button
-            onClick={onDelete}
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
             title="Delete"
             className="p-1.5 hover:text-red-500 text-[var(--los-muted)] rounded transition-colors"
           >

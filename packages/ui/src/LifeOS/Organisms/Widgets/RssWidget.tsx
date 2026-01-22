@@ -123,7 +123,7 @@ const RssItemRow = ({ item, onRead, onReadItLater, mode }: { item: RssItem, onRe
     <div className="py-3 px-1 group hover:bg-white/5 transition-colors">
       <div className="flex gap-2 items-start">
         <div className="flex-1 min-w-0">
-          <a href={item.link} target="_blank" rel="noopener noreferrer" className="block">
+          <a href={item.link} target="_blank" rel="noopener noreferrer" className="block" onClick={(e) => e.stopPropagation()}>
             <MonoText className="font-bold text-[var(--los-fg)] hover:text-[var(--los-accent)] truncate block">
               {item.title}
             </MonoText>
@@ -133,7 +133,7 @@ const RssItemRow = ({ item, onRead, onReadItLater, mode }: { item: RssItem, onRe
           )}
           <div className="flex gap-4 mt-2">
             {item.comments && (
-              <a href={item.comments} target="_blank" rel="noopener noreferrer" className="flex items-center text-[10px] text-[var(--los-muted)] hover:text-[var(--los-fg)]">
+              <a href={item.comments} target="_blank" rel="noopener noreferrer" className="flex items-center text-[10px] text-[var(--los-muted)] hover:text-[var(--los-fg)]" onClick={(e) => e.stopPropagation()}>
                 <MessageSquare className="w-3 h-3 mr-1" />
                 Comments
               </a>
@@ -143,13 +143,13 @@ const RssItemRow = ({ item, onRead, onReadItLater, mode }: { item: RssItem, onRe
         </div>
 
         <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button title="Mark as Read" onClick={onRead} className="p-1 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
+          <button title="Mark as Read" onClick={(e) => { e.stopPropagation(); onRead(); }} className="p-1 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
             <Check className="w-4 h-4" />
           </button>
-          <button title="Read Later" onClick={onReadItLater} className="p-1 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
+          <button title="Read Later" onClick={(e) => { e.stopPropagation(); onReadItLater(); }} className="p-1 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
           </button>
-          <a href={item.link} target="_blank" rel="noopener noreferrer" title="Open" className="p-1 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
+          <a href={item.link} target="_blank" rel="noopener noreferrer" title="Open" className="p-1 hover:text-[var(--los-accent)] text-[var(--los-muted)]" onClick={(e) => e.stopPropagation()}>
             <ExternalLink className="w-4 h-4" />
           </a>
         </div>
