@@ -593,23 +593,24 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
           { label: "Files", onClick: () => setShowFiles(true) },
           ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
           ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
-          ...(localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
-            label: path,
-            onClick: () => {
-              const conf = localConfig;
-              if (conf) {
-                const entry = conf.entries.find(e => e.path === path);
-                if (entry) {
-                  setShowFiles(false); // Switch to dashboard
-                  setActiveDashboardId(entry.dashboard);
-                  setActiveTileId(entry.path);
-                } else {
-                  console.warn("File not found in dashboard entries:", path);
-                }
+        ]}
+        recentFiles={!dragEnabled && localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
+          label: path,
+          onClick: () => {
+            const conf = localConfig;
+            if (conf) {
+              const entry = conf.entries.find(e => e.path === path);
+              if (entry) {
+                setShowFiles(false); // Switch to dashboard
+                setActiveDashboardId(entry.dashboard);
+                setActiveTileId(entry.path);
+              } else {
+                console.warn("File not found in dashboard entries:", path);
               }
             }
-          })) : [])
-        ]}
+          }
+        })) : []
+        }
       />
     </div>
   );

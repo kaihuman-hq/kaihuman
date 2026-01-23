@@ -36,6 +36,7 @@ export interface StatusBarProps {
 
   onDashboardClick?: () => void;
   menuItems?: MenuItem[];
+  recentFiles?: MenuItem[];
 }
 
 export const StatusBar = ({
@@ -53,7 +54,8 @@ export const StatusBar = ({
   onNextWorkspace,
 
   onDashboardClick,
-  menuItems
+  menuItems,
+  recentFiles
 }: StatusBarProps) => {
   const [expanded, setExpanded] = useState(false);
   const [expandedMode, setExpandedMode] = useState<'MENU' | 'REPOS' | 'WORKSPACES'>('MENU');
@@ -111,39 +113,65 @@ export const StatusBar = ({
           expanded ? "opacity-100 delay-100" : "opacity-0 pointer-events-none"
         )}>
           {expandedMode === 'MENU' && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Manual "Repositories" and "Workspaces" buttons for Mobile/Menu access */}
-              {repositories.length > 0 && (
-                <div
-                  onClick={(e) => { e.stopPropagation(); setExpandedMode('REPOS'); }}
-                  className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2"
-                >
-                  <GitBranch size={20} className="group-hover:text-[var(--los-accent)]" />
-                  <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center">Repositories</MonoLabel>
-                </div>
-              )}
-              {workspaces.length > 0 && (
-                <div
-                  onClick={(e) => { e.stopPropagation(); setExpandedMode('WORKSPACES'); }}
-                  className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2"
-                >
-                  <LayoutGrid size={20} className="group-hover:text-[var(--los-accent)]" />
-                  <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center">Workspaces</MonoLabel>
-                </div>
-              )}
+            <div className="flex flex-col gap-6">
+              {/* Main Actions Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Manual "Repositories" and "Workspaces" buttons for Mobile/Menu access */}
+                {repositories.length > 0 && (
+                  <div
+                    onClick={(e) => { e.stopPropagation(); setExpandedMode('REPOS'); }}
+                    className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                  >
+                    <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full">Repositories</MonoLabel>
+                  </div>
+                )}
+                {workspaces.length > 0 && (
+                  <div
+                    onClick={(e) => { e.stopPropagation(); setExpandedMode('WORKSPACES'); }}
+                    className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                  >
+                    <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full">Workspaces</MonoLabel>
+                  </div>
+                )}
 
-              {menuItems ? menuItems.map((item, i) => (
-                <div key={i}
-                  onClick={(e) => { e.stopPropagation(); item.onClick?.(); setExpanded(false); }}
-                  className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2"
-                >
-                  <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center">{item.label}</MonoLabel>
+                {menuItems ? menuItems.map((item, i) => (
+                  <div key={i}
+                    onClick={(e) => { e.stopPropagation(); item.onClick?.(); setExpanded(false); }}
+                    className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                  >
+                    <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full" title={item.label}>{item.label}</MonoLabel>
+                  </div>
+                )) : ['New File', 'Search', 'Settings', 'Git', 'Terminal', 'Zen Mode'].map((action, i) => (
+                  <div key={i} className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden">
+                    <MonoLabel className="group-hover:text-[var(--los-accent)] truncate w-full text-center" title={action}>{action}</MonoLabel>
+                  </div>
+                ))}
+              </div>
+
+              {/* Recent Files Section */}
+              {recentFiles && recentFiles.length > 0 && (
+                <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300 delay-100">
+                  <div className="flex items-center gap-4">
+                    <div className="h-px bg-[var(--los-border)] flex-1" />
+                    <MonoLabel className="text-[var(--los-muted)]">RECENT FILES</MonoLabel>
+                    <div className="h-px bg-[var(--los-border)] flex-1" />
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {recentFiles.map((item, i) => (
+                      <div key={`recent-${i}`}
+                        onClick={(e) => { e.stopPropagation(); item.onClick?.(); setExpanded(false); }}
+                        className="border border-[var(--los-border)] p-3 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                      >
+                        <div className="flex items-center justify-center w-full">
+                          <MonoLabel className="group-hover:text-[var(--los-accent)] text-xs truncate w-full text-center" title={item.label}>
+                            {item.label.split('/').pop()}
+                          </MonoLabel>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              )) : ['New File', 'Search', 'Settings', 'Git', 'Terminal', 'Zen Mode'].map((action, i) => (
-                <div key={i} className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2">
-                  <MonoLabel className="group-hover:text-[var(--los-accent)]">{action}</MonoLabel>
-                </div>
-              ))}
+              )}
             </div>
           )}
 
