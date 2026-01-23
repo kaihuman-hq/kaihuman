@@ -643,11 +643,11 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
             <MonoHeader className="text-[var(--los-accent)]">{`TILE: ${tile.id.toString().toUpperCase().padStart(4, '0')}`}</MonoHeader>
 
             {hasWidget && (
-              <div className="flex bg-[var(--los-border)] rounded-sm p-0.5 ml-4">
+              <div className="flex bg-[var(--los-border)] rounded-sm p-0.5 ml-4 overflow-x-auto max-w-[40vw] md:max-w-none scrollbar-hide shrink-0">
                 <button
                   onClick={() => setViewMode('WIDGET')}
                   className={cn(
-                    "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                    "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap",
                     viewMode === 'WIDGET' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                   )}
                 >
@@ -658,7 +658,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   <button
                     onClick={() => setViewMode('CHARTS')}
                     className={cn(
-                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap",
                       viewMode === 'CHARTS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
@@ -670,7 +670,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   <button
                     onClick={() => setViewMode('ADD')}
                     className={cn(
-                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap",
                       viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
@@ -682,7 +682,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   <button
                     onClick={() => setViewMode('FEEDS')}
                     className={cn(
-                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap",
                       viewMode === 'FEEDS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
@@ -694,7 +694,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   <button
                     onClick={() => setViewMode('ARCHIVE')}
                     className={cn(
-                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap",
                       viewMode === 'ARCHIVE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
@@ -707,7 +707,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                 <button
                   onClick={() => setViewMode('CODE')}
                   className={cn(
-                    "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
+                    "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap",
                     viewMode === 'CODE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                   )}
                 >
