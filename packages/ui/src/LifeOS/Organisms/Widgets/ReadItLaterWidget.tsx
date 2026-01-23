@@ -157,8 +157,8 @@ const ItemRow = ({
   onDelete?: () => void
 }) => {
   return (
-    <div className="py-3 px-2 group hover:bg-white/5 transition-colors flex flex-wrap md:flex-nowrap gap-3 items-start">
-      <div className="flex-1 min-w-[200px] md:min-w-0">
+    <div className="py-3 px-2 group hover:bg-white/5 transition-colors flex flex-col md:flex-row gap-3 items-start">
+      <div className="w-full md:flex-1 md:min-w-0">
         <a href={item.url} target="_blank" rel="noopener noreferrer" className="block" onClick={(e) => e.stopPropagation()}>
           <MonoText className="font-bold text-[var(--los-fg)] hover:text-[var(--los-accent)] whitespace-normal break-words block mb-1">
             {item.name || item.url}
@@ -179,7 +179,7 @@ const ItemRow = ({
         </div>
       </div>
 
-      {/* Actions - Horizontal on Mobile, Vertical on Desktop */}
+      {/* Actions - Horizontal on Mobile (below), Vertical on Desktop (right) */}
       <div className="flex flex-row md:flex-col gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-[var(--los-bg)] mt-1 md:mt-0 md:pl-2 md:w-auto border-t md:border-t-0 border-[var(--los-border)] md:border-none pt-2 md:pt-0 shrink-0 w-auto md:w-auto justify-end md:justify-start">
         <button
           onClick={(e) => { e.stopPropagation(); onPrimary(); }}
