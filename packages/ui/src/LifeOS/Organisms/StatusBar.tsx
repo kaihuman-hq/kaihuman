@@ -36,6 +36,7 @@ export interface StatusBarProps {
 
   onDashboardClick?: () => void;
   menuItems?: MenuItem[];
+  recentFiles?: MenuItem[];
 }
 
 export const StatusBar = ({
@@ -53,17 +54,30 @@ export const StatusBar = ({
   onNextWorkspace,
 
   onDashboardClick,
-  menuItems
+  menuItems,
+  recentFiles
 }: StatusBarProps) => {
   const [expanded, setExpanded] = useState(false);
   const [expandedMode, setExpandedMode] = useState<'MENU' | 'REPOS' | 'WORKSPACES'>('MENU');
   const [isHovered, setIsHovered] = useState(false);
 
+  // Helper to handle expansion, toggling if already in that mode
   const handleToggleExpand = (mode: 'MENU' | 'REPOS' | 'WORKSPACES') => {
     if (expanded && expandedMode === mode) {
       setExpanded(false);
     } else {
       setExpandedMode(mode);
+      setExpanded(true);
+    }
+  };
+
+  // On Mobile, tapping the bar generally should wake it up / expand it
+  const handleBarClick = (e: MouseEvent) => {
+    // If not expanded and not clicking a specific interactive element (handled by stoppropagation below)
+    // we expand to menu by default on mobile/touch logic
+    if (!expanded) {
+      // Logic: If on mobile (or just generally), clicking the empty space expands the menu
+      setExpandedMode('MENU');
       setExpanded(true);
     }
   };
@@ -83,11 +97,14 @@ export const StatusBar = ({
       <div
         className={cn(
           "fixed bottom-0 left-0 right-0 z-[100] bg-[var(--los-bg)] border-t border-[var(--los-border)] transition-all duration-300 ease-spring",
-          expanded ? "h-[40vh]" : (isHovered ? "h-16" : "h-8"),
+          // On mobile, if not expanded, it might need to be slightly taller or just standard.
+          // We keep h-8 (32px) standard, h-16 (64px) on hover/touch-intent
+          expanded ? "h-[40vh]" : (isHovered ? "h-16" : "h-12 md:h-8"), // Increased base height for mobile touch targets
           "shadow-2xl overflow-hidden"
         )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onClick={handleBarClick as any}
       >
 
         {/* Expanded Drawer Content */}
@@ -96,30 +113,83 @@ export const StatusBar = ({
           expanded ? "opacity-100 delay-100" : "opacity-0 pointer-events-none"
         )}>
           {expandedMode === 'MENU' && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {menuItems ? menuItems.map((item, i) => (
-                <div key={i}
-                  onClick={() => { item.onClick?.(); setExpanded(false); }}
-                  className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2"
-                >
-                  <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase">{item.label}</MonoLabel>
+            <div className="flex flex-col gap-6">
+              {/* Main Actions Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Manual "Repositories" and "Workspaces" buttons for Mobile/Menu access */}
+                {repositories.length > 0 && (
+                  <div
+                    onClick={(e) => { e.stopPropagation(); setExpandedMode('REPOS'); }}
+                    className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                  >
+                    <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full">Repositories</MonoLabel>
+                  </div>
+                )}
+                {workspaces.length > 0 && (
+                  <div
+                    onClick={(e) => { e.stopPropagation(); setExpandedMode('WORKSPACES'); }}
+                    className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                  >
+                    <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full">Workspaces</MonoLabel>
+                  </div>
+                )}
+
+                {menuItems ? menuItems.map((item, i) => (
+                  <div key={i}
+                    onClick={(e) => { e.stopPropagation(); item.onClick?.(); setExpanded(false); }}
+                    className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                  >
+                    <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full" title={item.label}>{item.label}</MonoLabel>
+                  </div>
+                )) : ['New File', 'Search', 'Settings', 'Git', 'Terminal', 'Zen Mode'].map((action, i) => (
+                  <div key={i} className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden">
+                    <MonoLabel className="group-hover:text-[var(--los-accent)] truncate w-full text-center" title={action}>{action}</MonoLabel>
+                  </div>
+                ))}
+              </div>
+
+              {/* Recent Files Section */}
+              {recentFiles && recentFiles.length > 0 && (
+                <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300 delay-100">
+                  <div className="flex items-center gap-4">
+                    <div className="h-px bg-[var(--los-border)] flex-1" />
+                    <MonoLabel className="text-[var(--los-muted)]">RECENT FILES</MonoLabel>
+                    <div className="h-px bg-[var(--los-border)] flex-1" />
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {recentFiles.map((item, i) => (
+                      <div key={`recent-${i}`}
+                        onClick={(e) => { e.stopPropagation(); item.onClick?.(); setExpanded(false); }}
+                        className="border border-[var(--los-border)] p-3 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                      >
+                        <div className="flex items-center justify-center w-full">
+                          <MonoLabel className="group-hover:text-[var(--los-accent)] text-xs truncate w-full text-center" title={item.label}>
+                            {item.label.split('/').pop()}
+                          </MonoLabel>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              )) : ['New File', 'Search', 'Settings', 'Git', 'Terminal', 'Zen Mode'].map((action, i) => (
-                <div key={i} className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2">
-                  <MonoLabel className="group-hover:text-[var(--los-accent)]">{action}</MonoLabel>
-                </div>
-              ))}
+              )}
             </div>
           )}
 
           {expandedMode === 'REPOS' && (
             <div className="flex flex-col gap-2">
-              <MonoLabel className="mb-4 text-[var(--los-accent)] uppercase">REPOSITORIES</MonoLabel>
+              <div className="flex items-center gap-2 mb-4">
+                <div onClick={() => setExpandedMode('MENU')} className="cursor-pointer hover:text-[var(--los-accent)] flex items-center gap-1">
+                  <ChevronUp className="rotate-[-90deg]" size={16} />
+                  <MonoLabel>BACK</MonoLabel>
+                </div>
+                <MonoLabel className="text-[var(--los-accent)] uppercase ml-auto">REPOSITORIES</MonoLabel>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {repositories.map((repo) => (
                   <div
                     key={repo.id}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onSelectRepository?.(repo);
                       setExpanded(false);
                     }}
@@ -148,12 +218,19 @@ export const StatusBar = ({
 
           {expandedMode === 'WORKSPACES' && (
             <div className="flex flex-col gap-2">
-              <MonoLabel className="mb-4 text-[var(--los-accent)] uppercase">WORKSPACES</MonoLabel>
+              <div className="flex items-center gap-2 mb-4">
+                <div onClick={() => setExpandedMode('MENU')} className="cursor-pointer hover:text-[var(--los-accent)] flex items-center gap-1">
+                  <ChevronUp className="rotate-[-90deg]" size={16} />
+                  <MonoLabel>BACK</MonoLabel>
+                </div>
+                <MonoLabel className="text-[var(--los-accent)] uppercase ml-auto">WORKSPACES</MonoLabel>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {workspaces.map((ws) => (
                   <div
                     key={ws.id}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onSelectWorkspace?.(ws);
                       setExpanded(false);
                     }}
@@ -195,14 +272,14 @@ export const StatusBar = ({
             {(currentRepository || repositories.length > 0) && (
               <div
                 className={cn(
-                  "flex items-center gap-2 cursor-pointer group transtion-all duration-300",
+                  "hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300",
                   expanded && expandedMode === 'REPOS' ? "text-[var(--los-accent)]" : "text-[var(--los-fg)] hover:text-[var(--los-accent)]"
                 )}
-                onClick={() => handleToggleExpand('REPOS')}
+                onClick={(e) => { e.stopPropagation(); handleToggleExpand('REPOS'); }}
                 title={`Change Repository`}
               >
                 <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
-                <div className="flex items-center max-w-0 opacity-0 overflow-hidden group-hover:max-w-[200px] group-hover:opacity-100 transition-all duration-300 ease-in-out whitespace-nowrap">
+                <div className="flex items-center max-w-0 opacity-0 overflow-hidden group-hover:max-w-[200px] group-hover:opacity-100 transition-all duration-300 ease-in-out whitespace-nowrap hidden md:flex">
                   <MonoText className="text-xs font-bold ml-2">{currentRepository ? currentRepository.name : "SELECT REPO"}</MonoText>
                   <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
                 </div>
@@ -210,23 +287,21 @@ export const StatusBar = ({
             )}
 
             {currentRepository && currentWorkspace && (
-              <div className="h-4 w-px bg-[var(--los-border)] mx-1" />
+              <div className="hidden md:block h-4 w-px bg-[var(--los-border)] mx-1" />
             )}
 
             {currentWorkspace && (
               <div
                 className={cn(
-                  "flex items-center gap-2 cursor-pointer group transtion-all duration-300",
+                  "hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300",
                   "text-[var(--los-fg)] hover:text-[var(--los-accent)]"
                 )}
-                // We'll reuse the REPOS expander but maybe we need a separate mode or just list workspaces in the same menu?
-                // For simplicity let's use a new mode 'WORKSPACES'
-                onClick={() => handleToggleExpand('WORKSPACES' as any)}
+                onClick={(e) => { e.stopPropagation(); handleToggleExpand('WORKSPACES' as any); }}
                 title={`Change Workspace`}
               >
                 {onNextWorkspace && (
                   <div
-                    className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100"
+                    className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100 hidden md:block" // Hidden on mobile to avoid misclicks
                     onClick={(e) => {
                       e.stopPropagation();
                       onNextWorkspace();
@@ -238,16 +313,16 @@ export const StatusBar = ({
                 )}
 
                 <LayoutGrid size={12} className="group-hover:animate-pulse shrink-0" />
-                <div className="flex items-center max-w-0 opacity-0 overflow-hidden group-hover:max-w-[200px] group-hover:opacity-100 transition-all duration-300 ease-in-out whitespace-nowrap">
+                <div className="flex items-center max-w-0 opacity-0 overflow-hidden group-hover:max-w-[200px] group-hover:opacity-100 transition-all duration-300 ease-in-out whitespace-nowrap hidden md:flex">
                   <MonoText className="text-xs font-bold ml-2">{currentWorkspace.name}</MonoText>
                   <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
                 </div>
               </div>
             )}
 
-            {/* Breadcrumbs (Shifted to Left on Hover/Expand) */}
+            {/* Breadcrumbs (Shifted to Left on Hover/Expand) - Hidden entirely on mobile when NOT expanded */}
             <div className={cn(
-              "flex items-center gap-2 transition-all duration-500 transform origin-left whitespace-nowrap overflow-hidden hidden lg:flex",
+              "hidden lg:flex items-center gap-2 transition-all duration-500 transform origin-left whitespace-nowrap overflow-hidden",
               (isHovered || expanded) ? "opacity-100 translate-x-0 max-w-[500px]" : "opacity-0 -translate-x-4 max-w-0"
             )}>
               <span className="text-[var(--los-muted)]">/</span>
@@ -265,9 +340,9 @@ export const StatusBar = ({
 
           {/* CENTER COLUMN */}
           <div className="flex-[2] flex items-center justify-center relative h-full">
-            {/* Breadcrumbs (Center - Visible when NOT hovered/expanded) */}
+            {/* Breadcrumbs (Center - Visible when NOT hovered/expanded) - Hidden on small mobile to save space for Magic Button */}
             <div className={cn(
-              "absolute transition-all duration-300 flex items-center gap-2",
+              "absolute transition-all duration-300 items-center gap-2 hidden sm:flex",
               (isHovered || expanded) ? "opacity-0 translate-y-4 scale-90 pointer-events-none" : "opacity-100 translate-y-0 scale-100"
             )}>
               {breadcrumbs.map((crumb, i) => (
@@ -280,33 +355,36 @@ export const StatusBar = ({
               ))}
             </div>
 
-            {/* Magic Button - Bigger and centered on Hover/Expand */}
+            {/* Magic Button - Always interactable on mobile (opacity-100) or if hovered/expanded */}
+            {/* On mobile, we make it smaller but visible? Or just the icon? */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handleToggleExpand('MENU');
               }}
               className={cn(
-                "absolute transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-3 px-6 py-2 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black shadow-[0_0_15px_rgba(var(--los-accent-rgb),0.3)]",
-                (isHovered || expanded) ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-4 scale-50 pointer-events-none"
+                "absolute transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-3 px-4 md:px-6 py-2 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black shadow-[0_0_15px_rgba(var(--los-accent-rgb),0.3)]",
+                // Show on mobile by default (opacity-100), show on desktop only when hovered/expanded
+                (isHovered || expanded) ? "opacity-100 translate-y-0 scale-100" : "opacity-100 md:opacity-0 translate-y-0 md:-translate-y-4 scale-90 md:scale-50 pointer-events-auto md:pointer-events-none"
               )}>
               <Sparkles size={18} fill="currentColor" className="animate-pulse" />
-              <span className="text-sm font-bold uppercase tracking-widest">Life OS</span>
+              <span className="text-sm font-bold uppercase tracking-widest hidden sm:inline">Life OS</span>
             </button>
           </div>
 
 
           {/* RIGHT COLUMN */}
           <div className="flex-1 flex items-center justify-end gap-6 min-w-0">
+            {/* Stats hidden on small screens */}
             {stats.map((stat, i) => (
-              <div key={i} className="flex items-center gap-2 whitespace-nowrap hidden sm:flex">
+              <div key={i} className="hidden md:flex items-center gap-2 whitespace-nowrap">
                 <MonoLabel className="text-[9px]">{stat.label}</MonoLabel>
                 <MonoText className="text-[10px]">{stat.value}</MonoText>
               </div>
             ))}
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              <MonoText className="text-[10px]">ONLINE</MonoText>
+              <MonoText className="text-[10px] hidden sm:block">ONLINE</MonoText>
             </div>
           </div>
 

@@ -183,49 +183,96 @@ export class GithubFileStore {
     }
   }
 
+  savingFiles = signal<Set<string>>(new Set());
+
   async saveFile(path: string) {
     const repo = githubProfileStore.currentRepo.value;
-    const file = this.openFiles.value[path];
+    // We get file from latest state
+    let file = this.openFiles.value[path];
     if (!repo || !file) return;
 
     if (!this.dirtyFiles.value.has(path)) return; // Nothing to save
 
+    // CONCURRENCY HANDLING:
+    // If already saving this file, we don't need to spawn another saver.
+    // The existing saver will loop around and pick up the new changes because we left it 'dirty'.
+    if (this.savingFiles.value.has(path)) {
+      console.log(`[GithubFileStore] Save already in progress for ${path}, queuing update.`);
+      return;
+    }
+
+    // Mark as saving
+    const newSaving = new Set(this.savingFiles.value);
+    newSaving.add(path);
+    this.savingFiles.value = newSaving;
+
     try {
-      const res = await githubService.saveFile(
-        repo.owner.login,
-        repo.name,
-        path,
-        file.content,
-        `Update ${path} via Console`,
-        file.sha,
-      );
+      // LOOP: Keep saving as long as it's dirty (changes happened while saving)
+      while (this.dirtyFiles.value.has(path)) {
+        // 1. Capture content at start of iteration
+        // Refresh file ref to get latest content
+        file = this.openFiles.value[path];
+        const contentToSave = file.content;
 
-      // Update SHA from response
-      const serverSha = res.content?.sha;
-      if (serverSha) {
-        this.openFiles.value = {
-          ...this.openFiles.value,
-          [path]: { ...file, sha: serverSha },
-        };
+        console.log(`[GithubFileStore] Saving ${path}...`);
 
-        // Update DB with new SHA - NO extra key arg
-        const cacheKey = `${repo.full_name}:${path}`;
-        const db = await dbPromise;
-        await db.put('files', {
-          path: cacheKey,
-          content: file.content,
-          sha: serverSha,
-          timestamp: Date.now()
-        });
+        const res = await githubService.saveFile(
+          repo.owner.login,
+          repo.name,
+          path,
+          contentToSave,
+          `Update ${path} via Console`,
+          file.sha,
+        );
+
+        // 2. Update SHA from response
+        const serverSha = res.content?.sha;
+        if (serverSha) {
+          // Update local state with new SHA
+          // Note: We must read 'this.openFiles' again to ensure we don't overwrite concurrent content updates 
+          // (though content updates shouldn't change SHA, but good practice)
+          const currentFileState = this.openFiles.value[path];
+          this.openFiles.value = {
+            ...this.openFiles.value,
+            [path]: { ...currentFileState, sha: serverSha },
+          };
+
+          // Update DB with new SHA
+          const cacheKey = `${repo.full_name}:${path}`;
+          dbPromise.then(db => {
+            db.put('files', {
+              path: cacheKey,
+              content: contentToSave, // Use the content we actually saved
+              sha: serverSha,
+              timestamp: Date.now()
+            });
+          });
+        }
+
+        // 3. Status Check
+        // If content hasn't changed since we started this save, we are clean.
+        // If content changed (currentFileState.content !== contentToSave), 
+        // then dirty property remains true (we never cleared it), so loop continues.
+        const freshFileState = this.openFiles.value[path];
+        if (freshFileState.content === contentToSave) {
+          const dirty = new Set(this.dirtyFiles.value);
+          dirty.delete(path);
+          this.dirtyFiles.value = dirty;
+          console.log(`[GithubFileStore] Saved ${path} successfully. Clean.`);
+        } else {
+          console.log(`[GithubFileStore] Saved ${path}, but content changed during save. Retrying...`);
+        }
       }
-
-      // Clear dirty
-      const dirty = new Set(this.dirtyFiles.value);
-      dirty.delete(path);
-      this.dirtyFiles.value = dirty;
     } catch (err: any) {
       console.error('Failed to save', err);
       this.error.value = err.message;
+      // Note: We leave it in 'dirty' state so user can try again or auto-retry later?
+      // Or should we throw to alert caller?
+      // For now, silent fail in store, UI shows error via 'error' signal.
+    } finally {
+      const doneSaving = new Set(this.savingFiles.value);
+      doneSaving.delete(path);
+      this.savingFiles.value = doneSaving;
     }
   }
 }
