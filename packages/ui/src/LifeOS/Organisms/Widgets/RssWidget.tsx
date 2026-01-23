@@ -121,8 +121,8 @@ export const RssWidget = ({ content, mode = 'SMALL', onChange, onReadItLater }: 
 const RssItemRow = ({ item, onRead, onReadItLater, mode }: { item: RssItem, onRead: () => void, onReadItLater: () => void, mode: string }) => {
   return (
     <div className="py-3 px-1 group hover:bg-white/5 transition-colors">
-      <div className="flex flex-col md:flex-row gap-2 items-start">
-        <div className="flex-1 min-w-0 w-full">
+      <div className="flex flex-wrap md:flex-nowrap gap-2 items-start">
+        <div className="flex-1 min-w-[200px] md:min-w-0">
           <a href={item.link} target="_blank" rel="noopener noreferrer" className="block" onClick={(e) => e.stopPropagation()}>
             <MonoText className="font-bold text-[var(--los-fg)] hover:text-[var(--los-accent)] whitespace-normal break-words block">
               {item.title}
@@ -142,15 +142,15 @@ const RssItemRow = ({ item, onRead, onReadItLater, mode }: { item: RssItem, onRe
           </div>
         </div>
 
-        {/* Actions - Horizontal on Mobile, Vertical on Desktop */}
-        <div className="flex flex-row md:flex-col gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-[var(--los-bg)] mt-2 md:mt-0 md:pl-2 w-full md:w-auto border-t md:border-t-0 border-[var(--los-border)] md:border-none pt-2 md:pt-0">
-          <button title="Mark as Read" onClick={(e) => { e.stopPropagation(); onRead(); }} className="flex-1 md:flex-none flex justify-center p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
+        {/* Actions - Horizontal on Mobile (wrapped), Vertical on Desktop */}
+        <div className="flex flex-row md:flex-col gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-[var(--los-bg)] mt-1 md:mt-0 md:pl-2 md:w-auto border-t md:border-t-0 border-[var(--los-border)] md:border-none pt-2 md:pt-0 shrink-0 w-auto md:w-auto justify-end md:justify-start">
+          <button title="Mark as Read" onClick={(e) => { e.stopPropagation(); onRead(); }} className="flex-none flex justify-center p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
             <Check className="w-5 h-5" />
           </button>
-          <button title="Read Later" onClick={(e) => { e.stopPropagation(); onReadItLater(); }} className="flex-1 md:flex-none flex justify-center p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
+          <button title="Read Later" onClick={(e) => { e.stopPropagation(); onReadItLater(); }} className="flex-none flex justify-center p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
           </button>
-          <a href={item.link} target="_blank" rel="noopener noreferrer" title="Open" className="flex-1 md:flex-none flex justify-center p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)]" onClick={(e) => e.stopPropagation()}>
+          <a href={item.link} target="_blank" rel="noopener noreferrer" title="Open" className="flex-none flex justify-center p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)]" onClick={(e) => e.stopPropagation()}>
             <ExternalLink className="w-5 h-5" />
           </a>
         </div>
