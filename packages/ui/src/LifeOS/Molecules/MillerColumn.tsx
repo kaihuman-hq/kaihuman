@@ -18,7 +18,7 @@ export const MillerColumn = ({ items, activeId, variant, onItemClick }: MillerCo
       <div
         className={cn(
           "grid gap-px bg-[var(--los-bg)] overflow-y-auto overflow-x-hidden flex-1 h-full min-w-0 w-full",
-          "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8",
+          "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-8",
           "content-start",
           "animate-in fade-in slide-in-from-right-4 duration-300"
         )}
@@ -31,10 +31,13 @@ export const MillerColumn = ({ items, activeId, variant, onItemClick }: MillerCo
             <div
               key={tile.id}
               onClick={() => onItemClick(tile)}
-              className="bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]"
+              className={cn(
+                "ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[50%]",
+                tile.type === 'FOLDER' ? "bg-[var(--los-accent)]/5" : "bg-[var(--los-bg)]"
+              )}
             >
-              <div className="absolute inset-0 overflow-hidden p-4 flex flex-col">
-                <div className="flex justify-between items-start shrink-0 mb-2">
+              <div className="absolute inset-0 overflow-hidden p-3 flex flex-col">
+                <div className="flex justify-between items-center shrink-0 mb-1">
                   <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity truncate flex-1 mr-2">
                     {tile.title}
                   </MonoText>
@@ -45,7 +48,7 @@ export const MillerColumn = ({ items, activeId, variant, onItemClick }: MillerCo
                   )}
                 </div>
 
-                <div className="flex-1 overflow-y-auto min-h-0 w-full mb-2">
+                <div className="flex-1 overflow-y-auto min-h-0 w-full mb-1">
                   {tile.content}
                 </div>
 
