@@ -275,6 +275,23 @@ export class GithubFileStore {
       this.savingFiles.value = doneSaving;
     }
   }
+
+  async createFile(path: string, content: string) {
+    if (this.openFiles.value[path]) {
+      throw new Error(`File already exists: ${path}`);
+    }
+
+    this.openFiles.value = {
+      ...this.openFiles.value,
+      [path]: { content, sha: '' },
+    };
+
+    const dirty = new Set(this.dirtyFiles.value);
+    dirty.add(path);
+    this.dirtyFiles.value = dirty;
+
+    await this.saveFile(path);
+  }
 }
 
 export const githubFileStore = new GithubFileStore();

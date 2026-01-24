@@ -410,6 +410,22 @@ export const Dashboard = () => {
             console.error('Failed to add to ReadItLater:', error);
           }
         }}
+        onCreateFile={useCallback(async (path: string, content: string) => {
+          try {
+            await githubFileStore.createFile(path, content);
+            // After create, maybe refresh tree or just optimistically update?
+            // githubFileStore.createFile already adds it to openFiles.
+            // But we might want it to show up in the File Tree immediately.
+            // loadTree clears tree, so it fetches fresh.
+            // Let's do a loadTree to be safe and ensure SHA/Tree alignment if backend is fast.
+            await githubFileStore.loadTree();
+            // Also open it?
+            await githubFileStore.openFile(path);
+          } catch (e) {
+            console.error('Failed to create file:', e);
+            // TODO: Toast error
+          }
+        }, [])}
 
       />
     </div>

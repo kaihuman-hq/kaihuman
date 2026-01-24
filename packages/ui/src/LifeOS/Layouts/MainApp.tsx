@@ -43,6 +43,7 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { NewFileWizard } from '../Organisms/NewFileWizard';
 
 export interface TileDef {
   id: string | number;
@@ -80,9 +81,10 @@ export interface MainAppProps {
 
   renderEditor?: (path: string) => ComponentChildren;
   onAddToReadItLater?: (item: ReadItLaterItem) => void;
+  onCreateFile?: (path: string, content: string) => void;
 }
 
-export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, renderEditor, onAddToReadItLater, ...props }: MainAppProps) => {
+export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, renderEditor, onAddToReadItLater, onCreateFile, ...props }: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
 
@@ -91,6 +93,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
   const [dragEnabled, setDragEnabled] = useState(false);
   const [localConfig, setLocalConfig] = useState<DashboardConfig | undefined>(config);
   const [showFiles, setShowFiles] = useState(false); // Toggle for "Files" view
+  const [showNewFileWizard, setShowNewFileWizard] = useState(false);
 
   // Store original config when entering Drag Mode for cancellation
   const [originalConfig, setOriginalConfig] = useState<DashboardConfig | undefined>(undefined);
@@ -553,6 +556,19 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         </Tile>
       </MainGrid>
 
+      {/* New File Wizard Overlay */}
+      {showNewFileWizard && (
+        <NewFileWizard
+          onClose={() => setShowNewFileWizard(false)}
+          onCreate={(path, content) => {
+            onCreateFile?.(path, content);
+            // Optionally auto-open the new file or switch to files view?
+            // For now, let consumer decide or just close wizard.
+          }}
+          fileSystem={fileSystem as any}
+        />
+      )}
+
       {/* Sticky Status Bar */}
       <StatusBar
         mode={activeTileId !== null ? "FOCUS" : (showFiles ? "FILES" : (dragEnabled ? "DND" : "NORMAL"))}
@@ -590,6 +606,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
           { label: "Save Order", onClick: handleDragSave },
           { label: "Cancel Reorder", onClick: handleDragCancel }
         ] : [
+          { label: "New File", onClick: () => setShowNewFileWizard(true) },
           { label: "Files", onClick: () => setShowFiles(true) },
           ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
           ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
