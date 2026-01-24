@@ -89,13 +89,15 @@ export interface NewFileWizardProps {
   onClose: () => void;
   onCreate: (path: string, content: string) => void;
   fileSystem?: { columns: { items: TileDef[] }[] }; // Simplified file system view
+  availableFolders?: string[]; // List of available folders (paths relative to root)
 }
 
-export const NewFileWizard = ({ onClose, onCreate, fileSystem }: NewFileWizardProps) => {
+export const NewFileWizard = ({ onClose, onCreate, fileSystem, availableFolders = [] }: NewFileWizardProps) => {
   const [step, setStep] = useState<'TEMPLATE' | 'LOCATION'>('TEMPLATE');
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [filename, setFilename] = useState('');
+  const [selectedFolder, setSelectedFolder] = useState<string>(''); // Empty string means root
 
   // Helper to drill down into file system based on currentPath
   // This logic is currently placeholder as full tree traversal requires more context or utils
@@ -110,7 +112,9 @@ export const NewFileWizard = ({ onClose, onCreate, fileSystem }: NewFileWizardPr
     const name = filename.trim();
     if (!name) return;
 
-    const fullPath = `${name}${selectedTemplate.extension}`;
+    // Construct full path
+    const folderPrefix = selectedFolder ? (selectedFolder.endsWith('/') ? selectedFolder : `${selectedFolder}/`) : '';
+    const fullPath = `${folderPrefix}${name}${selectedTemplate.extension}`;
 
     onCreate(fullPath, selectedTemplate.defaultContent);
     onClose();
@@ -192,13 +196,27 @@ export const NewFileWizard = ({ onClose, onCreate, fileSystem }: NewFileWizardPr
               <div className="space-y-4">
                 <div className="space-y-2">
                   <MonoLabel>FILE LOCATION</MonoLabel>
-                  {/* TODO: Implement Folder Selector. For now just text input or Root. */}
-                  <div className="flex items-center gap-2 p-3 border border-[var(--los-border)] bg-[var(--los-bg)] opacity-50 cursor-not-allowed">
-                    <Folder size={16} className="text-[var(--los-muted)]" />
-                    <MonoText className="text-sm">root/</MonoText>
+
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Folder size={16} className="text-[var(--los-muted)]" />
+                    </div>
+                    <select
+                      value={selectedFolder}
+                      onChange={(e) => setSelectedFolder(e.currentTarget.value)}
+                      className="w-full pl-10 pr-10 py-3 bg-[var(--los-bg)] border border-[var(--los-border)] text-[var(--los-fg)] appearance-none focus:outline-none focus:border-[var(--los-accent)] rounded-none cursor-pointer"
+                    >
+                      <option value="">root /</option>
+                      {availableFolders.map(folder => (
+                        <option key={folder} value={folder}>{folder}</option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--los-muted)]">
+                      <ChevronRight size={14} className="rotate-90" />
+                    </div>
                   </div>
                   <p className="text-[10px] text-[var(--los-muted)]">
-                    * Folder selection coming soon. Currently creates in root.
+                    Select a folder to create the file in.
                   </p>
                 </div>
 
@@ -211,7 +229,7 @@ export const NewFileWizard = ({ onClose, onCreate, fileSystem }: NewFileWizardPr
                       onInput={(e) => setFilename(e.currentTarget.value)}
                       placeholder="my-new-file"
                       autoFocus
-                      className="flex-1 bg-transparent border-b border-[var(--los-border)] py-2 text-xl font-mono focus:outline-none focus:border-[var(--los-accent)] placeholder:text-[var(--los-muted)]/20"
+                      className="flex-1 bg-transparent border-b border-[var(--los-border)] py-2 text-xl font-mono text-[var(--los-fg)] focus:outline-none focus:border-[var(--los-accent)] placeholder:text-[var(--los-muted)]/20"
                     />
                     <span className="text-[var(--los-muted)] font-mono ml-2">{selectedTemplate!.extension}</span>
                   </div>

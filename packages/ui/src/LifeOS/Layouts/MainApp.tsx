@@ -566,6 +566,24 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
             // For now, let consumer decide or just close wizard.
           }}
           fileSystem={fileSystem as any}
+          availableFolders={useMemo(() => {
+            if (!localConfig) return [];
+            const folders = new Set<string>();
+            localConfig.entries.forEach(entry => {
+              const parts = entry.path.split('/');
+              if (parts.length > 1) {
+                // Has parent folder
+                // Add each valid parent path logic
+                // e.g. "a/b/c.txt" -> "a", "a/b"
+                let currentPath = '';
+                for (let i = 0; i < parts.length - 1; i++) {
+                  currentPath += (i > 0 ? '/' : '') + parts[i];
+                  folders.add(currentPath);
+                }
+              }
+            });
+            return Array.from(folders).sort();
+          }, [localConfig])}
         />
       )}
 
