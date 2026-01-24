@@ -5,14 +5,13 @@ name: "[PROD] Deploy Life OS"
 #     branches:
 #       - main
 
-# on: workflow_dispatch
-
 on:
   push:
     branches:
       - main
     paths:
       - "apps/console/**"
+  workflow_dispatch:
 
 jobs:
   publish-lifosy:
