@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useMemo } from 'preact/hooks';
+import { useState, useMemo, useEffect } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoHeader, MonoText, MonoLabel } from '../Atoms/Typography';
 import {
@@ -13,9 +13,11 @@ import {
   Folder,
   ChevronRight,
   ArrowRight,
-  X
+  X,
+  AlertTriangle
 } from 'lucide-preact';
 import { TileDef } from '../Layouts/MainApp';
+import { FolderSelector, FolderItem } from './FolderSelector';
 
 interface Template {
   id: string;
@@ -88,34 +90,84 @@ const TEMPLATES: Template[] = [
 export interface NewFileWizardProps {
   onClose: () => void;
   onCreate: (path: string, content: string) => void;
-  fileSystem?: { columns: { items: TileDef[] }[] }; // Simplified file system view
-  availableFolders?: string[]; // List of available folders (paths relative to root)
+  fileSystem?: { columns: { items: TileDef[] }[] }; // We use this to derive initial folder state
+  availableFolders?: string[]; // Legacy, unused now in favor of recursive load
+  // We need a way to check file existence. Ideally passed in.
+  existingFiles?: string[];
+  // Callback to load children for folder selector
+  onLoadFolder?: (path: string) => Promise<TileDef[]>;
 }
 
-export const NewFileWizard = ({ onClose, onCreate, fileSystem, availableFolders = [] }: NewFileWizardProps) => {
+export const NewFileWizard = ({ onClose, onCreate, fileSystem, availableFolders = [], existingFiles = [], onLoadFolder }: NewFileWizardProps) => {
   const [step, setStep] = useState<'TEMPLATE' | 'LOCATION'>('TEMPLATE');
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [filename, setFilename] = useState('');
   const [selectedFolder, setSelectedFolder] = useState<string>(''); // Empty string means root
 
-  // Helper to drill down into file system based on currentPath
-  // This logic is currently placeholder as full tree traversal requires more context or utils
-  const currentFolderItems = useMemo(() => {
+  // Validation State
+  const [error, setError] = useState<string | null>(null);
+
+  // Derive root folders from fileSystem or availableFolders if not provided
+  const rootItems = useMemo<FolderItem[]>(() => {
+    // If we have a fileSystem prop (from MainApp), use its first column
+    if (fileSystem && fileSystem.columns.length > 0 && fileSystem.columns[0]) {
+      return fileSystem.columns[0].items
+        .filter(item => item.type === 'FOLDER')
+        .map(item => ({
+          id: String(item.id), // full path
+          name: item.title,
+          hasChildren: true // Assume true for simplicity or check if we can know
+        }));
+    }
+    // Fallback? Or empty.
     return [];
-  }, [fileSystem, currentPath]);
+  }, [fileSystem]);
+
+  // Adapter for FolderSelector to load children
+  const handleLoadFolder = async (path: string): Promise<FolderItem[]> => {
+    if (onLoadFolder) {
+      const items = await onLoadFolder(path);
+      return items
+        .filter(item => item.type === 'FOLDER')
+        .map(item => ({
+          id: String(item.id),
+          name: item.title,
+          hasChildren: true
+        }));
+    }
+    return [];
+  };
+
+  const fullPath = useMemo(() => {
+    if (!selectedTemplate || !filename) return '';
+    const folderPrefix = selectedFolder ? (selectedFolder.endsWith('/') ? selectedFolder : `${selectedFolder}/`) : '';
+    return `${folderPrefix}${filename.trim()}${selectedTemplate.extension}`;
+  }, [selectedFolder, filename, selectedTemplate]);
+
+  // Validate on change
+  useEffect(() => {
+    if (!filename) {
+      setError(null);
+      return;
+    }
+    // Check duplication
+    // We need to know if fullPath exists in existingFiles
+    // But existingFiles might be just a list of paths.
+    // If existingFiles prop is passed (we'll need to update MainApp to pass it), we check against it.
+
+    // For now, if existingFiles is empty, we might skip or try to look at fileSystem.
+    // Ideally MainApp passes all known file paths.
+    if (existingFiles.includes(fullPath)) {
+      setError('File already exists at this location.');
+    } else {
+      setError(null);
+    }
+
+  }, [fullPath, existingFiles]);
+
 
   const handleCreate = () => {
-    if (!selectedTemplate || !filename) return;
-
-    // Sanitize filename
-    const name = filename.trim();
-    if (!name) return;
-
-    // Construct full path
-    const folderPrefix = selectedFolder ? (selectedFolder.endsWith('/') ? selectedFolder : `${selectedFolder}/`) : '';
-    const fullPath = `${folderPrefix}${name}${selectedTemplate.extension}`;
-
+    if (!selectedTemplate || !filename || error) return;
     onCreate(fullPath, selectedTemplate.defaultContent);
     onClose();
   };
@@ -127,7 +179,7 @@ export const NewFileWizard = ({ onClose, onCreate, fileSystem, availableFolders 
         onClick={onClose}
       />
 
-      <div className="relative bg-[var(--los-bg)] border border-[var(--los-border)] w-full max-w-2xl h-[80vh] md:h-[600px] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative bg-[var(--los-bg)] border border-[var(--los-border)] w-full max-w-3xl h-[80vh] md:h-[650px] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
 
         {/* Header */}
         <div className="h-14 border-b border-[var(--los-border)] flex items-center justify-between px-6 shrink-0">
@@ -174,10 +226,9 @@ export const NewFileWizard = ({ onClose, onCreate, fileSystem, availableFolders 
               ))}
             </div>
           ) : (
-            <div className="flex flex-col gap-8 max-w-md mx-auto mt-8">
+            <div className="flex flex-col gap-8 w-full max-w-2xl mx-auto mt-4 px-4 pb-12">
               <div className="flex items-center gap-4 p-4 border border-[var(--los-border)] bg-[var(--los-accent)]/5">
                 {(() => {
-                  // Fix for JSX syntax error: Extract icon to variable
                   const Icon = selectedTemplate?.icon;
                   return Icon ? <Icon size={32} className="text-[var(--los-accent)]" /> : null;
                 })()}
@@ -195,51 +246,54 @@ export const NewFileWizard = ({ onClose, onCreate, fileSystem, availableFolders 
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <MonoLabel>FILE LOCATION</MonoLabel>
-
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <Folder size={16} className="text-[var(--los-muted)]" />
-                    </div>
-                    <select
-                      value={selectedFolder}
-                      onChange={(e) => setSelectedFolder(e.currentTarget.value)}
-                      className="w-full pl-10 pr-10 py-3 bg-[var(--los-bg)] border border-[var(--los-border)] text-[var(--los-fg)] appearance-none focus:outline-none focus:border-[var(--los-accent)] rounded-none cursor-pointer"
-                    >
-                      <option value="">root /</option>
-                      {availableFolders.map(folder => (
-                        <option key={folder} value={folder}>{folder}</option>
-                      ))}
-                    </select>
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--los-muted)]">
-                      <ChevronRight size={14} className="rotate-90" />
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-[var(--los-muted)]">
-                    Select a folder to create the file in.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
                   <MonoLabel>FILENAME</MonoLabel>
-                  <div className="flex items-center">
+                  <div className="flex items-center relative">
                     <input
                       type="text"
                       value={filename}
                       onInput={(e) => setFilename(e.currentTarget.value)}
                       placeholder="my-new-file"
                       autoFocus
-                      className="flex-1 bg-transparent border-b border-[var(--los-border)] py-2 text-xl font-mono text-[var(--los-fg)] focus:outline-none focus:border-[var(--los-accent)] placeholder:text-[var(--los-muted)]/20"
+                      className={cn(
+                        "flex-1 bg-transparent border-b py-2 text-xl font-mono text-[var(--los-fg)] focus:outline-none placeholder:text-[var(--los-muted)]/20",
+                        error ? "border-red-500" : "border-[var(--los-border)] focus:border-[var(--los-accent)]"
+                      )}
                     />
-                    <span className="text-[var(--los-muted)] font-mono ml-2">{selectedTemplate!.extension}</span>
+                    <span className="text-[var(--los-muted)] font-mono ml-2 whitespace-nowrap">{selectedTemplate!.extension}</span>
                   </div>
+                  {error && (
+                    <div className="text-red-500 text-xs flex items-center gap-1 mt-1 animate-in slide-in-from-top-1">
+                      <AlertTriangle size={12} />
+                      <span>{error}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-end">
+                    <MonoLabel>LOCATION</MonoLabel>
+                    <MonoText className="text-xs text-[var(--los-muted)]">
+                      Selected: <span className="text-[var(--los-fg)]">{selectedFolder || '/ (root)'}</span>
+                    </MonoText>
+                  </div>
+
+                  <FolderSelector
+                    rootItems={rootItems}
+                    onLoadFolder={handleLoadFolder}
+                    onSelect={setSelectedFolder}
+                    selectedPath={selectedFolder}
+                    className="w-full"
+                  />
+                  <p className="text-[10px] text-[var(--los-muted)]">
+                    Navigate through folders to select a destination. Initial view shows root folders.
+                  </p>
                 </div>
               </div>
 
               <button
                 onClick={handleCreate}
-                disabled={!filename}
-                className="mt-8 bg-[var(--los-accent)] text-black font-bold py-3 px-6 flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                disabled={!filename || !!error}
+                className="mt-4 bg-[var(--los-accent)] text-black font-bold py-3 px-6 flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity self-end w-full sm:w-auto"
               >
                 <span>CREATE FILE</span>
                 <ArrowRight size={16} />

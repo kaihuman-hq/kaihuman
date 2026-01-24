@@ -82,6 +82,8 @@ export interface MainAppProps {
   renderEditor?: (path: string) => ComponentChildren;
   onAddToReadItLater?: (item: ReadItLaterItem) => void;
   onCreateFile?: (path: string, content: string) => void;
+  existingFiles?: string[];
+  onLoadFolder?: (path: string) => Promise<TileDef[]>;
 }
 
 export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, renderEditor, onAddToReadItLater, onCreateFile, ...props }: MainAppProps) => {
@@ -584,6 +586,8 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
             });
             return Array.from(folders).sort();
           }, [localConfig])}
+          existingFiles={props.existingFiles}
+          onLoadFolder={props.onLoadFolder}
         />
       )}
 

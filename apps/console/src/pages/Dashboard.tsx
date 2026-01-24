@@ -426,7 +426,17 @@ export const Dashboard = () => {
             // TODO: Toast error
           }
         }, [])}
-
+        existingFiles={tree ? tree.map(t => t.path) : []}
+        onLoadFolder={async (path: string) => {
+          // Emulate async load from existing tree
+          // Using getChildren logic which is available in scope? No, getChildren is inside component.
+          // We can allow this inline or move getChildren out?
+          // getChildren uses `tree` from closure, so it's fine.
+          // But getChildren expects "prefix", and FolderSelector calls with "path" (e.g. "folder").
+          // getChildren expects "folder/".
+          const prefix = path ? (path.endsWith('/') ? path : `${path}/`) : '';
+          return getChildren(prefix);
+        }}
       />
     </div>
   );
