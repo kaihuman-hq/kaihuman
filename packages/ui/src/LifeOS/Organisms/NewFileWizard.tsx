@@ -14,7 +14,8 @@ import {
   ChevronRight,
   ArrowRight,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Database
 } from 'lucide-preact';
 import { TileDef } from '../Layouts/MainApp';
 import { FolderSelector, FolderItem } from './FolderSelector';
@@ -29,6 +30,14 @@ interface Template {
 }
 
 const TEMPLATES: Template[] = [
+  {
+    id: 'data-collection',
+    name: 'Data Collection',
+    description: 'Track custom metrics and data',
+    icon: Database,
+    extension: '.data-collection.csv',
+    defaultContent: 'name::created,type::auto:date;name::Value,type::number,unit::#\n'
+  },
   {
     id: 'rss',
     name: 'RSS Reader',

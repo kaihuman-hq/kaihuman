@@ -22,6 +22,9 @@ import { ReadItLaterItem } from '../Organisms/Widgets/ReadItLaterLogic';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
+import { DataCollectionWidget } from '../Organisms/Widgets/DataCollectionWidget';
+import { DataCollectionAddForm } from '../Organisms/Widgets/DataCollectionAddForm';
+import { DataCollectionData, parseDataCollection, serializeDataCollection, calculateAutoValues } from '../Organisms/Widgets/DataCollectionLogic';
 import { DashboardConfig, DashboardEntry } from '../types';
 import {
   DndContext,
@@ -164,6 +167,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
       else if (lowerPath.endsWith('.todos.md')) ext = '.todos.md';
       else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
       else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
+      else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
       else {
         const parts = entry.path.split('.');
         ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
@@ -264,6 +268,15 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
       return (
         <ReadItLaterWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+    if (tile.extension === '.data-collection.csv' && tile.rawContent) {
+      return (
+        <DataCollectionWidget
           content={tile.rawContent}
           mode={mode}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
@@ -663,8 +676,9 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
   const isTimezones = tile.extension?.toLowerCase() === '.timezones.json';
   const isRss = tile.extension?.toLowerCase() === '.rss.json';
   const isReadItLater = tile.extension?.toLowerCase() === '.readitlater.json';
+  const isDataCollection = tile.extension === '.data-collection.csv';
 
-  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater) && !!tile.rawContent;
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
 
@@ -677,16 +691,32 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
         className="flex-1 border border-[var(--los-border)] flex flex-col relative bg-[var(--los-bg)] animate-in fade-in slide-in-from-bottom-4 duration-300"
       >
         {/* Header / Controls */}
-        <div className="h-12 border-b border-[var(--los-border)] flex items-center justify-between px-4 shrink-0">
-          <div className="flex items-center gap-4">
-            <MonoHeader className="text-[var(--los-accent)]">{`TILE: ${tile.id.toString().toUpperCase().padStart(4, '0')}`}</MonoHeader>
+        <div className="min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2">
+          <div className="flex items-center justify-between w-full gap-4">
+            <MonoHeader className="text-[var(--los-accent)] text-lg">
+              {tile.id.toString().split('/').pop()}
+            </MonoHeader>
 
+            {/* Close Button (Desktop & Mobile) */}
+            <div>
+              <button
+                onClick={(e) => { e.stopPropagation(); onClose(); }}
+                className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
+                title="Close Tile"
+              >
+                <span className="text-[10px] text-[var(--los-muted)] group-hover:text-red-500 hidden md:inline">[CLOSE]</span>
+                <div className="w-2 h-2 rounded-full border border-[var(--los-muted)] group-hover:border-red-500 group-hover:bg-red-500 transition-colors" />
+              </button>
+            </div>
+          </div>
+
+          <div className="w-full overflow-x-auto scrollbar-hide pb-1">
             {hasWidget && (
-              <div className="flex bg-[var(--los-border)] rounded-sm p-0.5 ml-4 overflow-x-auto max-w-[40vw] md:max-w-none scrollbar-hide shrink-0">
+              <div className="flex bg-[var(--los-border)] rounded-sm p-0.5 overflow-x-auto w-full md:w-auto md:max-w-none scrollbar-hide shrink-0">
                 <button
                   onClick={() => setViewMode('WIDGET')}
                   className={cn(
-                    "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap",
+                    "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
                     viewMode === 'WIDGET' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                   )}
                 >
@@ -697,7 +727,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   <button
                     onClick={() => setViewMode('CHARTS')}
                     className={cn(
-                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap",
+                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
                       viewMode === 'CHARTS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
@@ -705,15 +735,15 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   </button>
                 )}
 
-                {(isEvents || isTodos || isTimezones) && (
+                {(isEvents || isTodos || isTimezones || isDataCollection) && (
                   <button
                     onClick={() => setViewMode('ADD')}
                     className={cn(
-                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap",
+                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
                       viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
-                    {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : 'ADD TIMEZONE'}
+                    {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : isTimezones ? 'ADD TIMEZONE' : 'ADD ENTRY'}
                   </button>
                 )}
 
@@ -721,7 +751,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   <button
                     onClick={() => setViewMode('FEEDS')}
                     className={cn(
-                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap",
+                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
                       viewMode === 'FEEDS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
@@ -733,7 +763,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   <button
                     onClick={() => setViewMode('ARCHIVE')}
                     className={cn(
-                      "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap",
+                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
                       viewMode === 'ARCHIVE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
@@ -741,12 +771,10 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   </button>
                 )}
 
-
-
                 <button
                   onClick={() => setViewMode('CODE')}
                   className={cn(
-                    "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap",
+                    "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
                     viewMode === 'CODE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                   )}
                 >
@@ -755,14 +783,6 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
               </div>
             )}
           </div>
-
-          <button
-            onClick={(e) => { e.stopPropagation(); onClose(); }}
-            className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
-          >
-            <span className="text-[10px] text-[var(--los-muted)] group-hover:text-red-500">[CLOSE]</span>
-            <div className="w-2 h-2 rounded-full border border-[var(--los-muted)] group-hover:border-red-500 group-hover:bg-red-500 transition-colors" />
-          </button>
         </div>
 
         {/* Content Area */}
@@ -818,6 +838,13 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
+              {isDataCollection && (
+                <DataCollectionWidget
+                  content={tile.rawContent!}
+                  mode="FOCUS"
+                  onChange={(newContent) => tile.onContentChange?.(newContent)}
+                />
+              )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="h-full w-full p-8">
@@ -825,7 +852,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                 data={tile.rawContent!}
               />
             </div>
-          ) : viewMode === 'ADD' && (isEvents || isTodos || isTimezones) ? (
+          ) : viewMode === 'ADD' && (isEvents || isTodos || isTimezones || isDataCollection) ? (
             <div className="h-full w-full p-8 flex justify-center items-start">
               {isEvents && (
                 <EventAddForm
@@ -859,6 +886,18 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                     const data = TimezoneLogic.parseTimezones(tile.rawContent || '');
                     data.timezones.push(entry);
                     const newContent = TimezoneLogic.serializeTimezones(data);
+                    tile.onContentChange?.(newContent);
+                    setViewMode('WIDGET');
+                  }}
+                />
+              )}
+              {isDataCollection && (
+                <DataCollectionAddForm
+                  data={parseDataCollection(tile.rawContent || '')}
+                  onAdd={(entry) => {
+                    const data = parseDataCollection(tile.rawContent || '');
+                    data.rows.push(entry);
+                    const newContent = serializeDataCollection(data);
                     tile.onContentChange?.(newContent);
                     setViewMode('WIDGET');
                   }}
