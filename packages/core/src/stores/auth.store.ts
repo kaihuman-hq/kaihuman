@@ -131,15 +131,20 @@ export class AuthStore {
     if (!this.token.value) return;
 
     try {
+      console.log('[Auth] Fetching user with token:', this.token.value?.substring(0, 10) + '...');
       const res = await fetch('https://api.github.com/user', {
         headers: {
-          Authorization: `token ${this.token.value}`,
+          Authorization: `Bearer ${this.token.value}`,
           Accept: 'application/vnd.github.v3+json',
         },
       });
 
       if (!res.ok) {
-        if (res.status === 401) this.logout();
+        console.error('[Auth] Failed to fetch user:', res.status, res.statusText);
+        if (res.status === 401) {
+          console.warn('[Auth] Token invalid, logging out.');
+          this.logout();
+        }
         throw new Error('Failed to fetch user');
       }
 
