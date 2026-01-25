@@ -22,6 +22,9 @@ import { ReadItLaterItem } from '../Organisms/Widgets/ReadItLaterLogic';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
+import { DataCollectionWidget } from '../Organisms/Widgets/DataCollectionWidget';
+import { DataCollectionAddForm } from '../Organisms/Widgets/DataCollectionAddForm';
+import { DataCollectionData, parseDataCollection, serializeDataCollection, calculateAutoValues } from '../Organisms/Widgets/DataCollectionLogic';
 import { DashboardConfig, DashboardEntry } from '../types';
 import {
   DndContext,
@@ -164,6 +167,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
       else if (lowerPath.endsWith('.todos.md')) ext = '.todos.md';
       else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
       else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
+      else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
       else {
         const parts = entry.path.split('.');
         ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
@@ -264,6 +268,15 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
       return (
         <ReadItLaterWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+    if (tile.extension === '.data-collection.csv' && tile.rawContent) {
+      return (
+        <DataCollectionWidget
           content={tile.rawContent}
           mode={mode}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
@@ -663,8 +676,9 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
   const isTimezones = tile.extension?.toLowerCase() === '.timezones.json';
   const isRss = tile.extension?.toLowerCase() === '.rss.json';
   const isReadItLater = tile.extension?.toLowerCase() === '.readitlater.json';
+  const isDataCollection = tile.extension === '.data-collection.csv';
 
-  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater) && !!tile.rawContent;
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
 
@@ -726,7 +740,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   </button>
                 )}
 
-                {(isEvents || isTodos || isTimezones) && (
+                {(isEvents || isTodos || isTimezones || isDataCollection) && (
                   <button
                     onClick={() => setViewMode('ADD')}
                     className={cn(
@@ -734,7 +748,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                       viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
-                    {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : 'ADD TIMEZONE'}
+                    {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : isTimezones ? 'ADD TIMEZONE' : 'ADD ENTRY'}
                   </button>
                 )}
 
