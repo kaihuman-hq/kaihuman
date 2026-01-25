@@ -26,8 +26,9 @@ const parseDate = (val: any) => {
   return isNaN(d.getTime()) ? new Date() : d;
 };
 
-export const DataCollectionChart = ({ data, width: propWidth, height: propHeight }: DataCollectionChartProps) => {
+export const DataCollectionChart = ({ data, width: propWidth, height: propHeight, hideLegend }: DataCollectionChartProps & { hideLegend?: boolean }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -35,13 +36,13 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
       setDimensions({ width: propWidth, height: propHeight });
       return;
     }
-    if (!containerRef.current) return;
+    if (!chartRef.current) return;
     const observer = new ResizeObserver((entries) => {
       if (!entries[0]) return;
       const { width, height } = entries[0].contentRect;
       setDimensions({ width, height });
     });
-    observer.observe(containerRef.current);
+    observer.observe(chartRef.current);
     return () => observer.disconnect();
   }, [propWidth, propHeight]);
 
@@ -141,7 +142,7 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
 
   return (
     <div className="flex flex-col h-full w-full" ref={containerRef}>
-      <div className="flex-1 relative w-full h-full min-h-0" onMouseLeave={() => setHoveredIndex(null)}>
+      <div className="flex-1 relative w-full h-full min-h-0" ref={chartRef} onMouseLeave={() => setHoveredIndex(null)}>
         <svg width={width} height={height} onMouseMove={handleMouseMove}>
           {/* Grid Lines */}
           {Array.from({ length: 5 }).map((_, i) => {
@@ -242,19 +243,21 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
       </div>
 
       {/* Legend */}
-      <div className="h-8 border-t border-[var(--los-border)] flex items-center justify-end px-2 gap-3 shrink-0 overflow-x-auto scrollbar-hide">
-        {numericColumns.map((col, i) => (
-          <button
-            key={col.name}
-            onClick={() => toggleLine(col.name)}
-            className="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity whitespace-nowrap"
-            style={{ opacity: activeLines.includes(col.name) ? 1 : 0.4 }}
-          >
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-            <span className="text-[9px] font-mono text-[var(--los-muted)]">{col.name}</span>
-          </button>
-        ))}
-      </div>
+      {!hideLegend && (
+        <div className="h-8 border-t border-[var(--los-border)] flex items-center justify-end px-2 gap-3 shrink-0 overflow-x-auto scrollbar-hide">
+          {numericColumns.map((col, i) => (
+            <button
+              key={col.name}
+              onClick={() => toggleLine(col.name)}
+              className="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity whitespace-nowrap"
+              style={{ opacity: activeLines.includes(col.name) ? 1 : 0.4 }}
+            >
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+              <span className="text-[9px] font-mono text-[var(--los-muted)]">{col.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
