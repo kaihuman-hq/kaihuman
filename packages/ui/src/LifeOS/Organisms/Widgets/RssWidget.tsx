@@ -119,6 +119,26 @@ export const RssWidget = ({ content, mode = 'SMALL', onChange, onReadItLater }: 
 
 // Wrapper for Item Row
 const RssItemRow = ({ item, onRead, onReadItLater, mode }: { item: RssItem, onRead: () => void, onReadItLater: () => void, mode: string }) => {
+  const [readState, setReadState] = useState<'IDLE' | 'LOADING'>('IDLE');
+  const [rilState, setRilState] = useState<'IDLE' | 'LOADING' | 'SUCCESS'>('IDLE');
+
+  const handleRead = async () => {
+    setReadState('LOADING');
+    // Small delay to show spinner if onRead is instant
+    // But onRead usually removes the item, so spinner might just be brief until unmount
+    await new Promise(r => setTimeout(r, 300));
+    onRead();
+  };
+
+  const handleRil = async () => {
+    setRilState('LOADING');
+    onReadItLater();
+    // Simulate some logic or just wait a bit
+    await new Promise(r => setTimeout(r, 600));
+    setRilState('SUCCESS');
+    setTimeout(() => setRilState('IDLE'), 2000);
+  };
+
   return (
     <div className="py-3 px-1 group hover:bg-white/5 transition-colors">
       <div className="flex flex-col md:flex-row gap-2 items-start">
@@ -144,12 +164,33 @@ const RssItemRow = ({ item, onRead, onReadItLater, mode }: { item: RssItem, onRe
 
         {/* Actions - Horizontal on Mobile (below), Vertical on Desktop (right) */}
         <div className="flex flex-row md:flex-col gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-[var(--los-bg)] mt-1 md:mt-0 md:pl-2 md:w-auto border-t md:border-t-0 border-[var(--los-border)] md:border-none pt-2 md:pt-0 shrink-0 w-auto md:w-auto justify-end md:justify-start self-end md:self-auto">
-          <button title="Mark as Read" onClick={(e) => { e.stopPropagation(); onRead(); }} className="flex-none flex justify-center p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
-            <Check className="w-5 h-5" />
+          <button
+            title="Mark as Read"
+            disabled={readState === 'LOADING'}
+            onClick={(e) => { e.stopPropagation(); handleRead(); }}
+            className="flex-none flex justify-center p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)] disabled:opacity-50"
+          >
+            {readState === 'LOADING' ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
           </button>
-          <button title="Read Later" onClick={(e) => { e.stopPropagation(); onReadItLater(); }} className="flex-none flex justify-center p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)]">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
+
+          <button
+            title="Read Later"
+            disabled={rilState === 'LOADING' || rilState === 'SUCCESS'}
+            onClick={(e) => { e.stopPropagation(); handleRil(); }}
+            className={cn(
+              "flex-none flex justify-center p-2 transition-colors disabled:opacity-100",
+              rilState === 'SUCCESS' ? "text-green-500" : "hover:text-[var(--los-accent)] text-[var(--los-muted)]"
+            )}
+          >
+            {rilState === 'LOADING' ? (
+              <RefreshCw className="w-5 h-5 animate-spin" />
+            ) : rilState === 'SUCCESS' ? (
+              <Check className="w-5 h-5" />
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" /></svg>
+            )}
           </button>
+
           <a href={item.link} target="_blank" rel="noopener noreferrer" title="Open" className="flex-none flex justify-center p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)]" onClick={(e) => e.stopPropagation()}>
             <ExternalLink className="w-5 h-5" />
           </a>
