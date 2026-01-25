@@ -677,12 +677,33 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
         className="flex-1 border border-[var(--los-border)] flex flex-col relative bg-[var(--los-bg)] animate-in fade-in slide-in-from-bottom-4 duration-300"
       >
         {/* Header / Controls */}
-        <div className="h-12 border-b border-[var(--los-border)] flex items-center justify-between px-4 shrink-0">
-          <div className="flex items-center gap-4">
-            <MonoHeader className="text-[var(--los-accent)]">{`TILE: ${tile.id.toString().toUpperCase().padStart(4, '0')}`}</MonoHeader>
+        <div className="min-h-12 border-b border-[var(--los-border)] flex flex-col md:flex-row md:items-center justify-between px-4 py-2 md:py-0 shrink-0 gap-2 md:gap-0">
+          <div className="flex items-center justify-between w-full md:w-auto gap-4">
+            <MonoHeader className="text-[var(--los-accent)]">
+              {/* Mobile: Basename only */}
+              <span className="md:hidden">
+                {tile.id.toString().split('/').pop()}
+              </span>
+              {/* Desktop: Full ID */}
+              <span className="hidden md:inline">
+                {`TILE: ${tile.id.toString().toUpperCase().padStart(4, '0')}`}
+              </span>
+            </MonoHeader>
 
+            {/* Mobile Close Button */}
+            <div className="md:hidden">
+              <button
+                onClick={(e) => { e.stopPropagation(); onClose(); }}
+                className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
+              >
+                <div className="w-2 h-2 rounded-full border border-[var(--los-muted)] group-hover:border-red-500 group-hover:bg-red-500 transition-colors" />
+              </button>
+            </div>
+          </div>
+
+          <div className="w-full md:w-auto overflow-x-auto scrollbar-hide">
             {hasWidget && (
-              <div className="flex bg-[var(--los-border)] rounded-sm p-0.5 ml-4 overflow-x-auto max-w-[40vw] md:max-w-none scrollbar-hide shrink-0">
+              <div className="flex bg-[var(--los-border)] rounded-sm p-0.5 md:ml-4 overflow-x-auto w-full md:w-auto md:max-w-none scrollbar-hide shrink-0">
                 <button
                   onClick={() => setViewMode('WIDGET')}
                   className={cn(
@@ -756,13 +777,16 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
             )}
           </div>
 
-          <button
-            onClick={(e) => { e.stopPropagation(); onClose(); }}
-            className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
-          >
-            <span className="text-[10px] text-[var(--los-muted)] group-hover:text-red-500">[CLOSE]</span>
-            <div className="w-2 h-2 rounded-full border border-[var(--los-muted)] group-hover:border-red-500 group-hover:bg-red-500 transition-colors" />
-          </button>
+          {/* Desktop Close Button */}
+          <div className="hidden md:block">
+            <button
+              onClick={(e) => { e.stopPropagation(); onClose(); }}
+              className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
+            >
+              <span className="text-[10px] text-[var(--los-muted)] group-hover:text-red-500">[CLOSE]</span>
+              <div className="w-2 h-2 rounded-full border border-[var(--los-muted)] group-hover:border-red-500 group-hover:bg-red-500 transition-colors" />
+            </button>
+          </div>
         </div>
 
         {/* Content Area */}
