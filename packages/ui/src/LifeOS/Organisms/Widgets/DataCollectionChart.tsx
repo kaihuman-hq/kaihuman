@@ -160,13 +160,13 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
             <>
               <text x={padding.left} y={height - 5} className="text-[9px] fill-[var(--los-muted)] font-mono">
                 {xColumn.type.includes('date')
-                  ? parseDate(sortedRows[0][xColumn.name]).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })
-                  : sortedRows[0][xColumn.name]}
+                  ? parseDate(sortedRows[0]?.[xColumn.name]).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })
+                  : sortedRows[0]?.[xColumn.name]}
               </text>
               <text x={width - padding.right} y={height - 5} textAnchor="end" className="text-[9px] fill-[var(--los-muted)] font-mono">
                 {xColumn.type.includes('date')
-                  ? parseDate(sortedRows[sortedRows.length - 1][xColumn.name]).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })
-                  : sortedRows[sortedRows.length - 1][xColumn.name]}
+                  ? parseDate(sortedRows[sortedRows.length - 1]?.[xColumn.name]).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })
+                  : sortedRows[sortedRows.length - 1]?.[xColumn.name]}
               </text>
             </>
           )}
@@ -197,7 +197,7 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
           {/* Dots on Hover */}
           {hoveredIndex !== null && numericColumns.map((col, i) => {
             if (!activeLines.includes(col.name)) return null;
-            const val = Number(sortedRows[hoveredIndex][col.name]) || 0;
+            const val = Number(sortedRows[hoveredIndex]?.[col.name]) || 0;
             return (
               <circle
                 key={col.name}
@@ -223,12 +223,12 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
           >
             <div className="text-[10px] text-[var(--los-muted)] font-mono mb-1">
               {xColumn.type.includes('date')
-                ? parseDate(sortedRows[hoveredIndex][xColumn.name]).toLocaleDateString()
-                : sortedRows[hoveredIndex][xColumn.name]}
+                ? parseDate(sortedRows[hoveredIndex]?.[xColumn.name]).toLocaleDateString()
+                : sortedRows[hoveredIndex]?.[xColumn.name]}
             </div>
             {numericColumns.map((col, i) => {
               if (!activeLines.includes(col.name)) return null;
-              const val = Number(sortedRows[hoveredIndex][col.name]);
+              const val = Number(sortedRows[hoveredIndex]?.[col.name]);
               return (
                 <div key={col.name} className="flex items-center gap-2 text-[10px] font-mono">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />

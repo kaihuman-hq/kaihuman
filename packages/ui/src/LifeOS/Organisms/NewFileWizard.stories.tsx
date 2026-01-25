@@ -23,11 +23,11 @@ const meta = {
   },
   args: {
     onClose: () => console.log('onClose triggered'),
-    onCreate: (path, content) => console.log('onCreate triggered', path, content),
+    onCreate: (path: string, content: string) => console.log('onCreate triggered', path, content),
     fileSystem: mockFileSystem,
     availableFolders: ['/home/user/docs', '/home/user/work'], // Legacy prop, kept for compatibility if needed
     existingFiles: ['/home/user/existing.md'],
-    onLoadFolder: async (path) => {
+    onLoadFolder: async (path: string) => {
       console.log('Loading folder:', path);
       return [
         { id: `${path}/subfolder`, title: 'Subfolder', type: 'FOLDER' },

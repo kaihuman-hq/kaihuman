@@ -64,7 +64,7 @@ export const parseDataCollection = (csv: string): DataCollectionData => {
   // Parse Rows
   const rows: DataRow[] = [];
   for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
+    const line = lines[i]?.trim();
     if (!line) continue;
 
     const values = line.split(';');
@@ -74,16 +74,16 @@ export const parseDataCollection = (csv: string): DataCollectionData => {
       const rawVal = values[index];
 
       if (col.type === 'number' || col.type === 'auto:number:sum' || col.type === 'auto:number:avg') {
-        const num = parseFloat(rawVal);
+        const num = parseFloat(rawVal || '0');
         row[col.name] = isNaN(num) ? 0 : num;
       } else if (col.type === 'date' || col.type === 'auto:date' || col.type === 'auto:date:yesterday') {
         // Try parsing ISO date
         // If rawVal is empty/invalid, we keep it as null or handle it?
         // For auto fields, they should be regenerated on save, but on read we trust the file?
         // Let's trust the file content for read.
-        row[col.name] = rawVal;
+        row[col.name] = rawVal || null;
       } else {
-        row[col.name] = rawVal;
+        row[col.name] = rawVal || null;
       }
     });
     rows.push(row);
