@@ -279,7 +279,7 @@ export const StatusBar = ({
                 title={`Change Repository`}
               >
                 <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
-                <div className="flex items-center max-w-0 opacity-0 overflow-hidden group-hover:max-w-[200px] group-hover:opacity-100 transition-all duration-300 ease-in-out whitespace-nowrap hidden md:flex">
+                <div className="flex items-center whitespace-nowrap hidden md:flex">
                   <MonoText className="text-xs font-bold ml-2">{currentRepository ? currentRepository.name : "SELECT REPO"}</MonoText>
                   <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
                 </div>
@@ -313,7 +313,7 @@ export const StatusBar = ({
                 )}
 
                 <LayoutGrid size={12} className="group-hover:animate-pulse shrink-0" />
-                <div className="flex items-center max-w-0 opacity-0 overflow-hidden group-hover:max-w-[200px] group-hover:opacity-100 transition-all duration-300 ease-in-out whitespace-nowrap hidden md:flex">
+                <div className="flex items-center whitespace-nowrap hidden md:flex">
                   <MonoText className="text-xs font-bold ml-2">{currentWorkspace.name}</MonoText>
                   <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
                 </div>
@@ -322,8 +322,8 @@ export const StatusBar = ({
 
             {/* Breadcrumbs (Shifted to Left on Hover/Expand) - Hidden entirely on mobile when NOT expanded */}
             <div className={cn(
-              "hidden lg:flex items-center gap-2 transition-all duration-500 transform origin-left whitespace-nowrap overflow-hidden",
-              (isHovered || expanded) ? "opacity-100 translate-x-0 max-w-[500px]" : "opacity-0 -translate-x-4 max-w-0"
+              "hidden lg:flex items-center gap-2 transition-all duration-500 transform origin-left whitespace-nowrap overflow-hidden ml-2",
+              "opacity-100 translate-x-0 max-w-[500px]"
             )}>
               <span className="text-[var(--los-muted)]">/</span>
               {breadcrumbs.map((crumb, i) => (
@@ -340,21 +340,6 @@ export const StatusBar = ({
 
           {/* CENTER COLUMN */}
           <div className="flex-[2] flex items-center justify-center relative h-full">
-            {/* Breadcrumbs (Center - Visible when NOT hovered/expanded) - Hidden on small mobile to save space for Magic Button */}
-            <div className={cn(
-              "absolute transition-all duration-300 items-center gap-2 hidden sm:flex",
-              (isHovered || expanded) ? "opacity-0 translate-y-4 scale-90 pointer-events-none" : "opacity-100 translate-y-0 scale-100"
-            )}>
-              {breadcrumbs.map((crumb, i) => (
-                <span key={i} className="flex items-center gap-1">
-                  <MonoText className={cn("text-xs", i === breadcrumbs.length - 1 ? "text-[var(--los-fg)]" : "text-[var(--los-muted)]")}>
-                    {crumb}
-                  </MonoText>
-                  {i < breadcrumbs.length - 1 && <span className="text-[var(--los-muted)] text-[10px]">/</span>}
-                </span>
-              ))}
-            </div>
-
             {/* Magic Button - Always interactable on mobile (opacity-100) or if hovered/expanded */}
             {/* On mobile, we make it smaller but visible? Or just the icon? */}
             <button
@@ -363,12 +348,17 @@ export const StatusBar = ({
                 handleToggleExpand('MENU');
               }}
               className={cn(
-                "absolute transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-3 px-4 md:px-6 py-2 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black shadow-[0_0_15px_rgba(var(--los-accent-rgb),0.3)]",
+                "absolute transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-2 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black shadow-[0_0_15px_rgba(var(--los-accent-rgb),0.3)]",
                 // Show on mobile by default (opacity-100), show on desktop only when hovered/expanded
-                (isHovered || expanded) ? "opacity-100 translate-y-0 scale-100" : "opacity-100 md:opacity-0 translate-y-0 md:-translate-y-4 scale-90 md:scale-50 pointer-events-auto md:pointer-events-none"
+                (isHovered || expanded)
+                  ? "px-6 py-2 scale-100 translate-y-0"
+                  : "px-2 py-0.5 scale-90 translate-y-0 opacity-80 hover:opacity-100"
               )}>
-              <Sparkles size={18} fill="currentColor" className="animate-pulse" />
-              <span className="text-sm font-bold uppercase tracking-widest hidden sm:inline">Life OS</span>
+              <Sparkles size={(isHovered || expanded) ? 18 : 14} fill="currentColor" className="animate-pulse transition-all" />
+              <span className={cn(
+                "font-bold uppercase tracking-widest hidden sm:inline transition-all",
+                (isHovered || expanded) ? "text-sm" : "text-[10px]"
+              )}>Life OS</span>
             </button>
           </div>
 

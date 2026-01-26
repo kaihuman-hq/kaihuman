@@ -654,11 +654,25 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
             if (conf) {
               const entry = conf.entries.find(e => e.path === path);
               if (entry) {
-                setShowFiles(false); // Switch to dashboard
+                // Scenario 1: File is pinned to a Dashboard
+                setShowFiles(false); // Switch to dashboard view
                 setActiveDashboardId(entry.dashboard);
                 setActiveTileId(entry.path);
               } else {
-                console.warn("File not found in dashboard entries:", path);
+                // Scenario 2: File is NOT on any dashboard (accessed via File Tree)
+                // We switch to "Files" mode (Miller Columns) and try to navigate to it.
+                console.log("File not found in dashboard, switching to File View:", path);
+                setShowFiles(true);
+                // Trigger navigation in parent (Dashboard.tsx) to update columns
+                if (onItemClick) {
+                  onItemClick({
+                    id: path,
+                    title: path.split('/').pop() || path,
+                    type: 'FILE'
+                  });
+                }
+                // Also set active tile locally so it focuses if rendered
+                setActiveTileId(path);
               }
             }
           }

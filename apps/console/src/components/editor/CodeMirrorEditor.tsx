@@ -1,6 +1,6 @@
 import { githubFileStore, githubProfileStore } from '@lifosy/core';
 import { useSignalEffect } from '@preact/signals';
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
@@ -40,6 +40,60 @@ export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
   // Track active file to handle switching content
   const currentPathRef = useRef<string | null>(null);
 
+  // Local state for tracking dirty status
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Helper to save
+  const handleSave = async () => {
+    const currentPath = propsPath || githubFileStore.activeFile.value;
+    if (currentPath) {
+      console.log('[CodeMirrorEditor] Saving file:', currentPath);
+      setIsSaving(true);
+      try {
+        await githubFileStore.saveFile(currentPath);
+        setHasUnsavedChanges(false);
+      } catch (e) {
+        console.error('Failed to save:', e);
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  // Auto-save interval (2 minutes)
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (hasUnsavedChanges && !isSaving) {
+        console.log('[CodeMirrorEditor] Auto-saving...');
+        handleSave();
+      }
+    }, 2 * 60 * 1000); // 2 minutes
+
+    return () => clearInterval(intervalId);
+  }, [hasUnsavedChanges, isSaving]); // Re-create interval if status changes? No, closure captures state? 
+  // Actually, intervals with closures can be tricky.
+  // Better to use ref for state or functional update, or just depend on [hasUnsavedChanges] (which resets timer on change - acceptable or not?)
+  // Resetting timer on every keystroke (hasUnsavedChanges true->true) is not ideal if we want strict "every 2 min".
+  // But if we toggle false->true (first change), timer starts.
+  // If we toggle true->false (save), timer stops.
+  // This essentially means "Auto-save 2 mins after the FIRST change". 
+  // If I want "Check every 2 mins", I should start interval on mount and use Ref for checking state.
+
+  const stateRef = useRef({ hasUnsavedChanges, isSaving });
+  stateRef.current = { hasUnsavedChanges, isSaving };
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (stateRef.current.hasUnsavedChanges && !stateRef.current.isSaving) {
+        console.log('[CodeMirrorEditor] Auto-saving...');
+        handleSave();
+      }
+    }, 2 * 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, []); // Run once on mount
+
   // Initial setup
   useEffect(() => {
     // Determine effective path (prop takes precedence, though usually one or other is used)
@@ -60,15 +114,11 @@ export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
           ...defaultKeymap,
           ...historyKeymap,
           ...searchKeymap,
-          // Save command?
+          // Save command
           {
             key: "Mod-s",
             run: (view) => {
-              // Re-read path at time of save
-              const currentPath = propsPath || githubFileStore.activeFile.value;
-              if (currentPath) {
-                githubFileStore.saveFile(currentPath);
-              }
+              handleSave();
               return true;
             }
           }
@@ -83,6 +133,8 @@ export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
             const currentPath = propsPath || githubFileStore.activeFile.value;
             if (currentPath) {
               githubFileStore.updateFileContent(currentPath, update.state.doc.toString());
+              // Mark as dirty
+              setHasUnsavedChanges(true); // This might cause re-renders? That's fine for the button.
             }
           }
         })
@@ -95,6 +147,10 @@ export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
     });
 
     viewRef.current = view;
+
+    // Reset unsaved changes on load?
+    // If we load a file, it's clean initially.
+    setHasUnsavedChanges(false);
 
     return () => {
       view.destroy();
@@ -112,14 +168,7 @@ export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
 
     if (!view || !effectivePath) return;
 
-    // If path changed or content changed externally (and we are not the ones who changed it? Store updates on local edit too)
-    // Store `updateFileContent` sets value.
-    // We need to distinguish between "store updated because WE typed" vs "store updated because FILE switched or FETCHED".
-
-    // Simplest: only update doc if path changes or if content is significantly different (like hard reload).
-    // If we type, store updates. If we update view from store, we reset cursor.
-    // Solution: Track path changes.
-
+    // Logic to update view if content changed EXTERNALLY
     if (effectivePath !== currentPathRef.current) {
       currentPathRef.current = effectivePath;
       const currentDoc = view.state.doc.toString();
@@ -127,28 +176,22 @@ export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
         view.dispatch({
           changes: { from: 0, to: currentDoc.length, insert: content || '' }
         });
+        // New file loaded -> clean state
+        setHasUnsavedChanges(false);
       }
     } else {
-      // Path is same. Did content change from OUTSIDE?
-      // E.g. fetch finished.
-      // If the store content is different from editor content, sync it.
-      // But if we just typed it, it should be same.
-      // Note: Signals update synchronously? 
-      // If we type -> `updateListener` -> `updateFileContent` -> `currentContent` signal updates -> this effect runs.
-      // content == view.state.doc.toString(). So harmless.
-
-      // Check if we are "dirty" effectively?
-      // Actually, if we use `updateFileContent`, the store matches the editor.
-      // If we load a file, store changes, effect runs, path check handles it.
-      // What if we SAVE and SHA changes? Content doesn't change.
-      // What if we Revert? 
-
-      // Re-check content just in case
+      // Path is same. 
+      // If content matches doc, we are good.
+      // If content differs, it means external update (e.g. pull).
       const doc = view.state.doc.toString();
       if (content !== doc && content !== null) {
         view.dispatch({
           changes: { from: 0, to: doc.length, insert: content }
         });
+        // External update -> Reset dirty? Or keep dirty if we had changes?
+        // Usually external update overwrites, so we are now "in sync" with that version (but maybe that version is unsaved?)
+        // Let's assume external update means we accept it.
+        setHasUnsavedChanges(false);
       }
     }
   });
@@ -161,5 +204,27 @@ export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
     );
   }
 
-  return <div ref={parentRef} class="h-full w-full overflow-hidden" />;
+  return (
+    <div className="h-full w-full relative group">
+      <div ref={parentRef} class="h-full w-full overflow-hidden" />
+
+      {/* Save Button Overlay */}
+      <div className={`absolute top-4 right-8 transition-opacity duration-300 ${hasUnsavedChanges ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="bg-[var(--los-accent)] text-black px-4 py-1.5 rounded-sm shadow-lg text-xs font-bold font-mono tracking-wider hover:opacity-90 active:scale-95 transition-all flex items-center gap-2"
+        >
+          {isSaving ? (
+            <>
+              <div className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+              SAVING...
+            </>
+          ) : (
+            "SAVE CHANGES"
+          )}
+        </button>
+      </div>
+    </div>
+  );
 };
