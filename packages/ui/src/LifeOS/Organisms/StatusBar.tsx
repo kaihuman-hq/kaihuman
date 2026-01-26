@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoLabel, MonoText } from '../Atoms/Typography';
 import { Sparkles, Archive, Search, Settings, GitBranch, GitCommit, LayoutGrid, ChevronUp, ArrowRight } from 'lucide-preact';
@@ -60,6 +60,11 @@ export const StatusBar = ({
   const [expanded, setExpanded] = useState(false);
   const [expandedMode, setExpandedMode] = useState<'MENU' | 'REPOS' | 'WORKSPACES'>('MENU');
   const [isHovered, setIsHovered] = useState(false);
+
+  // Auto-collapse when mode changes (e.g. opening a file switches to FOCUS)
+  useEffect(() => {
+    setExpanded(false);
+  }, [mode]);
 
   // Helper to handle expansion, toggling if already in that mode
   const handleToggleExpand = (mode: 'MENU' | 'REPOS' | 'WORKSPACES') => {
