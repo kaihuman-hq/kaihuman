@@ -24,6 +24,7 @@ import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
 import { DataCollectionWidget } from '../Organisms/Widgets/DataCollectionWidget';
 import { DataCollectionAddForm } from '../Organisms/Widgets/DataCollectionAddForm';
+import { DataCollectionColumnManager } from '../Organisms/Widgets/DataCollectionColumnManager';
 import { DataCollectionData, parseDataCollection, serializeDataCollection, calculateAutoValues } from '../Organisms/Widgets/DataCollectionLogic';
 import { DashboardConfig, DashboardEntry } from '../types';
 import {
@@ -168,6 +169,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
       else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
       else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
+      else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
       else {
         const parts = entry.path.split('.');
         ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
@@ -268,6 +270,15 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
       return (
         <ReadItLaterWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+    if (tile.extension === '.data-collection.csv' && tile.rawContent) {
+      return (
+        <DataCollectionWidget
           content={tile.rawContent}
           mode={mode}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
@@ -653,11 +664,25 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
             if (conf) {
               const entry = conf.entries.find(e => e.path === path);
               if (entry) {
-                setShowFiles(false); // Switch to dashboard
+                // Scenario 1: File is pinned to a Dashboard
+                setShowFiles(false); // Switch to dashboard view
                 setActiveDashboardId(entry.dashboard);
                 setActiveTileId(entry.path);
               } else {
-                console.warn("File not found in dashboard entries:", path);
+                // Scenario 2: File is NOT on any dashboard (accessed via File Tree)
+                // We switch to "Files" mode (Miller Columns) and try to navigate to it.
+                console.log("File not found in dashboard, switching to File View:", path);
+                setShowFiles(true);
+                // Trigger navigation in parent (Dashboard.tsx) to update columns
+                if (onItemClick) {
+                  onItemClick({
+                    id: path,
+                    title: path.split('/').pop() || path,
+                    type: 'FILE'
+                  });
+                }
+                // Also set active tile locally so it focuses if rendered
+                setActiveTileId(path);
               }
             }
           }
@@ -744,6 +769,18 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                     )}
                   >
                     {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : isTimezones ? 'ADD TIMEZONE' : 'ADD ENTRY'}
+                  </button>
+                )}
+
+                {isDataCollection && (
+                  <button
+                    onClick={() => setViewMode('COLUMNS')}
+                    className={cn(
+                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                      viewMode === 'COLUMNS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                    )}
+                  >
+                    COLUMNS
                   </button>
                 )}
 
@@ -905,6 +942,14 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
               )}
             </div>
 
+          ) : viewMode === 'COLUMNS' && isDataCollection ? (
+            <DataCollectionColumnManager
+              content={tile.rawContent || ''}
+              onChange={(newContent) => {
+                tile.onContentChange?.(newContent);
+                // Don't switch view, let them continue managing
+              }}
+            />
           ) : viewMode === 'FEEDS' && isRss ? (
             <div className="h-full w-full">
               <RssFeedManager

@@ -156,3 +156,64 @@ export const calculateAutoValues = (row: DataRow, columns: ColumnDefinition[]): 
 
   return newRow;
 };
+
+export const recalculateAllRows = (rows: DataRow[], columns: ColumnDefinition[]): DataRow[] => {
+  return rows.map(row => calculateAutoValues(row, columns));
+};
+
+export const addColumn = (data: DataCollectionData, newCol: ColumnDefinition): DataCollectionData => {
+  if (data.columns.some(c => c.name === newCol.name)) {
+    throw new Error(`Column "${newCol.name}" already exists.`);
+  }
+  const newColumns = [...data.columns, newCol];
+  // Backfill rows
+  const newRows = data.rows.map(row => ({
+    ...row,
+    [newCol.name]: null
+  } as DataRow));
+
+  return {
+    columns: newColumns,
+    rows: recalculateAllRows(newRows, newColumns)
+  };
+};
+
+export const updateColumn = (data: DataCollectionData, oldName: string, newCol: ColumnDefinition): DataCollectionData => {
+  const colIndex = data.columns.findIndex(c => c.name === oldName);
+  if (colIndex === -1) throw new Error(`Column "${oldName}" not found.`);
+
+  // Check name collision if renaming
+  if (oldName !== newCol.name && data.columns.some(c => c.name === newCol.name)) {
+    throw new Error(`Column "${newCol.name}" already exists.`);
+  }
+
+  const newColumns = [...data.columns];
+  newColumns[colIndex] = newCol;
+
+  let newRows = data.rows;
+  if (oldName !== newCol.name) {
+    // Rename key in rows
+    newRows = data.rows.map(row => {
+      const { [oldName]: val, ...rest } = row;
+      return { ...rest, [newCol.name]: val } as DataRow;
+    });
+  }
+
+  return {
+    columns: newColumns,
+    rows: recalculateAllRows(newRows, newColumns)
+  };
+};
+
+export const deleteColumn = (data: DataCollectionData, colName: string): DataCollectionData => {
+  const newColumns = data.columns.filter(c => c.name !== colName);
+  const newRows = data.rows.map(row => {
+    const { [colName]: _, ...rest } = row;
+    return rest;
+  });
+
+  return {
+    columns: newColumns,
+    rows: recalculateAllRows(newRows, newColumns)
+  };
+};
