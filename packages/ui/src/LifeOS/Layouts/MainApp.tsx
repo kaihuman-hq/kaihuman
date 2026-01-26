@@ -24,6 +24,7 @@ import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
 import { DataCollectionWidget } from '../Organisms/Widgets/DataCollectionWidget';
 import { DataCollectionAddForm } from '../Organisms/Widgets/DataCollectionAddForm';
+import { DataCollectionColumnManager } from '../Organisms/Widgets/DataCollectionColumnManager';
 import { DataCollectionData, parseDataCollection, serializeDataCollection, calculateAutoValues } from '../Organisms/Widgets/DataCollectionLogic';
 import { DashboardConfig, DashboardEntry } from '../types';
 import {
@@ -747,6 +748,18 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   </button>
                 )}
 
+                {isDataCollection && (
+                  <button
+                    onClick={() => setViewMode('COLUMNS')}
+                    className={cn(
+                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                      viewMode === 'COLUMNS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                    )}
+                  >
+                    COLUMNS
+                  </button>
+                )}
+
                 {isRss && (
                   <button
                     onClick={() => setViewMode('FEEDS')}
@@ -905,6 +918,14 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
               )}
             </div>
 
+          ) : viewMode === 'COLUMNS' && isDataCollection ? (
+            <DataCollectionColumnManager
+              content={tile.rawContent || ''}
+              onChange={(newContent) => {
+                tile.onContentChange?.(newContent);
+                // Don't switch view, let them continue managing
+              }}
+            />
           ) : viewMode === 'FEEDS' && isRss ? (
             <div className="h-full w-full">
               <RssFeedManager
