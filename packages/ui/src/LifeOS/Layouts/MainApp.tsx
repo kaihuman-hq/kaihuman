@@ -169,6 +169,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
       else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
       else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
+      else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
       else {
         const parts = entry.path.split('.');
         ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
@@ -269,6 +270,15 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
       return (
         <ReadItLaterWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+    if (tile.extension === '.data-collection.csv' && tile.rawContent) {
+      return (
+        <DataCollectionWidget
           content={tile.rawContent}
           mode={mode}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
@@ -692,7 +702,9 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
   const isRss = tile.extension?.toLowerCase() === '.rss.json';
   const isReadItLater = tile.extension?.toLowerCase() === '.readitlater.json';
   const isDataCollection = tile.extension === '.data-collection.csv';
+  const isDataCollection = tile.extension === '.data-collection.csv';
 
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection) && !!tile.rawContent;
   const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
@@ -726,371 +738,419 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
           </div>
 
           <div className="w-full overflow-x-auto scrollbar-hide pb-1">
-            {hasWidget && (
-              <div className="flex bg-[var(--los-border)] rounded-sm p-0.5 overflow-x-auto w-full md:w-auto md:max-w-none scrollbar-hide shrink-0">
-                <button
-                  onClick={() => setViewMode('WIDGET')}
-                  className={cn(
-                    "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                    viewMode === 'WIDGET' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
-                  )}
-                >
-                  WIDGET
-                </button>
+            <div className="min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2">
+              <div className="flex items-center justify-between w-full gap-4">
+                <MonoHeader className="text-[var(--los-accent)] text-lg">
+                  {tile.id.toString().split('/').pop()}
+                </MonoHeader>
 
-                {isTimeTracking && (
+                {/* Close Button (Desktop & Mobile) */}
+                <div>
                   <button
-                    onClick={() => setViewMode('CHARTS')}
-                    className={cn(
-                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                      viewMode === 'CHARTS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
-                    )}
+                    onClick={(e) => { e.stopPropagation(); onClose(); }}
+                    className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
+                    title="Close Tile"
                   >
-                    CHARTS
+                    <span className="text-[10px] text-[var(--los-muted)] group-hover:text-red-500 hidden md:inline">[CLOSE]</span>
+                    <div className="w-2 h-2 rounded-full border border-[var(--los-muted)] group-hover:border-red-500 group-hover:bg-red-500 transition-colors" />
                   </button>
-                )}
-
-                {(isEvents || isTodos || isTimezones || isDataCollection) && (
-                  <button
-                    onClick={() => setViewMode('ADD')}
-                    className={cn(
-                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                      viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
-                    )}
-                  >
-                    {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : isTimezones ? 'ADD TIMEZONE' : 'ADD ENTRY'}
-                  </button>
-                )}
-
-                {isDataCollection && (
-                  <button
-                    onClick={() => setViewMode('COLUMNS')}
-                    className={cn(
-                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                      viewMode === 'COLUMNS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
-                    )}
-                  >
-                    COLUMNS
-                  </button>
-                )}
-
-                {isRss && (
-                  <button
-                    onClick={() => setViewMode('FEEDS')}
-                    className={cn(
-                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                      viewMode === 'FEEDS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
-                    )}
-                  >
-                    MANAGE FEEDS
-                  </button>
-                )}
-
-                {isReadItLater && (
-                  <button
-                    onClick={() => setViewMode('ARCHIVE')}
-                    className={cn(
-                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                      viewMode === 'ARCHIVE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
-                    )}
-                  >
-                    ARCHIVE
-                  </button>
-                )}
-
-                <button
-                  onClick={() => setViewMode('CODE')}
-                  className={cn(
-                    "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                    viewMode === 'CODE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
-                  )}
-                >
-                  CODE
-                </button>
+                </div>
               </div>
+
+              <div className="w-full overflow-x-auto scrollbar-hide pb-1">
+                {hasWidget && (
+                  <div className="flex bg-[var(--los-border)] rounded-sm p-0.5 overflow-x-auto w-full md:w-auto md:max-w-none scrollbar-hide shrink-0">
+                    <div className="flex bg-[var(--los-border)] rounded-sm p-0.5 overflow-x-auto w-full md:w-auto md:max-w-none scrollbar-hide shrink-0">
+                      <button
+                        onClick={() => setViewMode('WIDGET')}
+                        className={cn(
+                          "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                          "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                          viewMode === 'WIDGET' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                        )}
+                      >
+                        WIDGET
+                      </button>
+
+                      {isTimeTracking && (
+                        <button
+                          onClick={() => setViewMode('CHARTS')}
+                          className={cn(
+                            "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                            "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                            viewMode === 'CHARTS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                          )}
+                        >
+                          CHARTS
+                        </button>
+                      )}
+
+                      {(isEvents || isTodos || isTimezones || isDataCollection) && (
+                        {(isEvents || isTodos || isTimezones || isDataCollection) && (
+                          <button
+                            onClick={() => setViewMode('ADD')}
+                            className={cn(
+                              "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                              "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                              viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                            )}
+                          >
+                            {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : isTimezones ? 'ADD TIMEZONE' : 'ADD ENTRY'}
+                          </button>
+                        )}
+
+                      {isDataCollection && (
+                        <button
+                          onClick={() => setViewMode('COLUMNS')}
+                          className={cn(
+                            "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                            viewMode === 'COLUMNS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                          )}
+                        >
+                          COLUMNS
+                        </button>
+                      )}
+
+                      {isRss && (
+                        <button
+                          onClick={() => setViewMode('FEEDS')}
+                          className={cn(
+                            "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                            "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                            viewMode === 'FEEDS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                          )}
+                        >
+                          MANAGE FEEDS
+                        </button>
+                      )}
+
+                      {isReadItLater && (
+                        <button
+                          onClick={() => setViewMode('ARCHIVE')}
+                          className={cn(
+                            "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                            "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                            viewMode === 'ARCHIVE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                          )}
+                        >
+                          ARCHIVE
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => setViewMode('CODE')}
+                        className={cn(
+                          "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                          "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                          viewMode === 'CODE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                        )}
+                      >
+                        CODE
+                      </button>
+                    </div>
             )}
-          </div>
-        </div>
-
-        {/* Content Area */}
-        <div className="flex-1 overflow-auto p-0 relative">
-          {viewMode === 'WIDGET' && hasWidget ? (
-            <div className="h-full w-full p-8">
-              {isTimeTracking && (
-                <TimeTrackingWidget
-                  content={tile.rawContent!}
-                  onChange={(newContent) => tile.onContentChange?.(newContent)}
-                  mode="FOCUS"
-                />
-              )}
-              {isEvents && (
-                <EventsWidget
-                  content={tile.rawContent!}
-                  mode="FOCUS"
-                />
-              )}
-              {isHabit && (
-                <HabitTrackerWidget
-                  content={tile.rawContent!}
-                  mode="FOCUS"
-                  onChange={(newContent) => tile.onContentChange?.(newContent)}
-                />
-              )}
-              {isTodos && (
-                <TodoWidget
-                  content={tile.rawContent!}
-                  mode="FOCUS"
-                  onChange={(newContent) => tile.onContentChange?.(newContent)}
-                />
-              )}
-              {isTimezones && (
-                <TimezoneWidget
-                  content={tile.rawContent!}
-                  mode="FOCUS"
-                  onChange={(newContent) => tile.onContentChange?.(newContent)}
-                />
-              )}
-              {isRss && (
-                <RssWidget
-                  content={tile.rawContent!}
-                  mode="FOCUS"
-                  onChange={(newContent) => tile.onContentChange?.(newContent)}
-                />
-              )}
-              {isReadItLater && (
-                <ReadItLaterWidget
-                  content={tile.rawContent!}
-                  mode="FOCUS"
-                  focusMode="WIDGET"
-                  onChange={(newContent) => tile.onContentChange?.(newContent)}
-                />
-              )}
-              {isDataCollection && (
-                <DataCollectionWidget
-                  content={tile.rawContent!}
-                  mode="FOCUS"
-                  onChange={(newContent) => tile.onContentChange?.(newContent)}
-                />
-              )}
-            </div>
-          ) : viewMode === 'CHARTS' && isTimeTracking ? (
-            <div className="h-full w-full p-8">
-              <TimeTrackingCharts
-                data={tile.rawContent!}
-              />
-            </div>
-          ) : viewMode === 'ADD' && (isEvents || isTodos || isTimezones || isDataCollection) ? (
-            <div className="h-full w-full p-8 flex justify-center items-start">
-              {isEvents && (
-                <EventAddForm
-                  onCancel={() => setViewMode('WIDGET')}
-                  onAdd={(entry) => {
-                    const data = EventsLogic.parseEvents(tile.rawContent || '');
-                    data.entries.push(entry);
-                    const newContent = EventsLogic.serializeEvents(data);
-                    tile.onContentChange?.(newContent);
-                    setViewMode('WIDGET');
-                  }}
-                />
-              )}
-              {isTodos && (
-                <TodoAddForm
-                  groups={useMemo(() => TodoLogic.parseTodos(tile.rawContent || '').groups.map(g => g.name), [tile.rawContent])}
-                  onCancel={() => setViewMode('WIDGET')}
-                  onAdd={(group, text) => {
-                    const data = TodoLogic.parseTodos(tile.rawContent || '');
-                    const newData = TodoLogic.addTodo(data, group, text);
-                    const newContent = TodoLogic.serializeTodos(newData);
-                    tile.onContentChange?.(newContent);
-                    setViewMode('WIDGET');
-                  }}
-                />
-              )}
-              {isTimezones && (
-                <TimezoneAddForm
-                  onCancel={() => setViewMode('WIDGET')}
-                  onAdd={(entry) => {
-                    const data = TimezoneLogic.parseTimezones(tile.rawContent || '');
-                    data.timezones.push(entry);
-                    const newContent = TimezoneLogic.serializeTimezones(data);
-                    tile.onContentChange?.(newContent);
-                    setViewMode('WIDGET');
-                  }}
-                />
-              )}
-              {isDataCollection && (
-                <DataCollectionAddForm
-                  data={parseDataCollection(tile.rawContent || '')}
-                  onAdd={(entry) => {
-                    const data = parseDataCollection(tile.rawContent || '');
-                    data.rows.push(entry);
-                    const newContent = serializeDataCollection(data);
-                    tile.onContentChange?.(newContent);
-                    setViewMode('WIDGET');
-                  }}
-                />
-              )}
-            </div>
-
-          ) : viewMode === 'COLUMNS' && isDataCollection ? (
-            <DataCollectionColumnManager
-              content={tile.rawContent || ''}
-              onChange={(newContent) => {
-                tile.onContentChange?.(newContent);
-                // Don't switch view, let them continue managing
-              }}
-            />
-          ) : viewMode === 'FEEDS' && isRss ? (
-            <div className="h-full w-full">
-              <RssFeedManager
-                content={tile.rawContent || ''}
-                onChange={(newContent) => {
-                  tile.onContentChange?.(newContent);
-                }}
-              />
-            </div>
-          ) : viewMode === 'ARCHIVE' && isReadItLater ? (
-            <div className="h-full w-full">
-              <ReadItLaterWidget
-                content={tile.rawContent!}
-                mode="FOCUS"
-                focusMode="ARCHIVE"
-                onChange={(newContent) => tile.onContentChange?.(newContent)}
-              />
-            </div>
-          ) : viewMode === 'CODE' ? (
-            <div className="h-full w-full">
-              {renderEditor ? renderEditor(String(tile.id)) : (
-                tile.rawContent !== undefined ? (
-                  <textarea
-                    className="w-full h-full bg-[var(--los-bg)] text-[var(--los-fg)] font-mono text-xs p-4 resize-none focus:outline-none border-none"
-                    value={tile.rawContent}
-                    onInput={(e) => tile.onContentChange?.(e.currentTarget.value)}
-                    spellcheck={false}
-                  />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center text-[var(--los-muted)]">
-                    <MonoText>No Editor Available</MonoText>
                   </div>
-                )
-              )}
-            </div>
-          ) : (
-            tile.content ? tile.content : (
-              <div className="p-8 flex items-center justify-center text-[var(--los-muted)]">
-                <MonoText>No content defined for this tile.</MonoText>
-              </div>
-            )
-          )}
         </div>
-      </div>
-    </div>
-  );
+
+              {/* Content Area */}
+              <div className="flex-1 overflow-auto p-0 relative">
+                {viewMode === 'WIDGET' && hasWidget ? (
+                  <div className="h-full w-full p-8">
+                    {isTimeTracking && (
+                      <TimeTrackingWidget
+                        content={tile.rawContent!}
+                        onChange={(newContent) => tile.onContentChange?.(newContent)}
+                        mode="FOCUS"
+                      />
+                    )}
+                    {isEvents && (
+                      <EventsWidget
+                        content={tile.rawContent!}
+                        mode="FOCUS"
+                      />
+                    )}
+                    {isHabit && (
+                      <HabitTrackerWidget
+                        content={tile.rawContent!}
+                        mode="FOCUS"
+                        onChange={(newContent) => tile.onContentChange?.(newContent)}
+                      />
+                    )}
+                    {isTodos && (
+                      <TodoWidget
+                        content={tile.rawContent!}
+                        mode="FOCUS"
+                        onChange={(newContent) => tile.onContentChange?.(newContent)}
+                      />
+                    )}
+                    {isTimezones && (
+                      <TimezoneWidget
+                        content={tile.rawContent!}
+                        mode="FOCUS"
+                        onChange={(newContent) => tile.onContentChange?.(newContent)}
+                      />
+                    )}
+                    {isRss && (
+                      <RssWidget
+                        content={tile.rawContent!}
+                        mode="FOCUS"
+                        onChange={(newContent) => tile.onContentChange?.(newContent)}
+                      />
+                    )}
+                    {isReadItLater && (
+                      <ReadItLaterWidget
+                        content={tile.rawContent!}
+                        mode="FOCUS"
+                        focusMode="WIDGET"
+                        onChange={(newContent) => tile.onContentChange?.(newContent)}
+                      />
+                    )}
+                    {isDataCollection && (
+                      <DataCollectionWidget
+                        content={tile.rawContent!}
+                        mode="FOCUS"
+                        onChange={(newContent) => tile.onContentChange?.(newContent)}
+                      />
+                    )}
+                    {isDataCollection && (
+                      <DataCollectionWidget
+                        content={tile.rawContent!}
+                        mode="FOCUS"
+                        onChange={(newContent) => tile.onContentChange?.(newContent)}
+                      />
+                    )}
+                  </div>
+                ) : viewMode === 'CHARTS' && isTimeTracking ? (
+                  <div className="h-full w-full p-8">
+                    <TimeTrackingCharts
+                      data={tile.rawContent!}
+                    />
+                  </div>
+                ) : viewMode === 'ADD' && (isEvents || isTodos || isTimezones || isDataCollection) ? (
+                ): viewMode === 'ADD' && (isEvents || isTodos || isTimezones || isDataCollection) ? (
+                <div className="h-full w-full p-8 flex justify-center items-start">
+                  {isEvents && (
+                    <EventAddForm
+                      onCancel={() => setViewMode('WIDGET')}
+                      onAdd={(entry) => {
+                        const data = EventsLogic.parseEvents(tile.rawContent || '');
+                        data.entries.push(entry);
+                        const newContent = EventsLogic.serializeEvents(data);
+                        tile.onContentChange?.(newContent);
+                        setViewMode('WIDGET');
+                      }}
+                    />
+                  )}
+                  {isTodos && (
+                    <TodoAddForm
+                      groups={useMemo(() => TodoLogic.parseTodos(tile.rawContent || '').groups.map(g => g.name), [tile.rawContent])}
+                      onCancel={() => setViewMode('WIDGET')}
+                      onAdd={(group, text) => {
+                        const data = TodoLogic.parseTodos(tile.rawContent || '');
+                        const newData = TodoLogic.addTodo(data, group, text);
+                        const newContent = TodoLogic.serializeTodos(newData);
+                        tile.onContentChange?.(newContent);
+                        setViewMode('WIDGET');
+                      }}
+                    />
+                  )}
+                  {isTimezones && (
+                    <TimezoneAddForm
+                      onCancel={() => setViewMode('WIDGET')}
+                      onAdd={(entry) => {
+                        const data = TimezoneLogic.parseTimezones(tile.rawContent || '');
+                        data.timezones.push(entry);
+                        const newContent = TimezoneLogic.serializeTimezones(data);
+                        tile.onContentChange?.(newContent);
+                        setViewMode('WIDGET');
+                      }}
+                    />
+                  )}
+                  {isDataCollection && (
+                    <DataCollectionAddForm
+                      data={parseDataCollection(tile.rawContent || '')}
+                      onAdd={(entry) => {
+                        const data = parseDataCollection(tile.rawContent || '');
+                        data.rows.push(entry);
+                        const newContent = serializeDataCollection(data);
+                        tile.onContentChange?.(newContent);
+                        setViewMode('WIDGET');
+                      }}
+                    />
+                  )}
+                  {isDataCollection && (
+                    <DataCollectionAddForm
+                      data={parseDataCollection(tile.rawContent || '')}
+                      onAdd={(entry) => {
+                        const data = parseDataCollection(tile.rawContent || '');
+                        data.rows.push(entry);
+                        const newContent = serializeDataCollection(data);
+                        tile.onContentChange?.(newContent);
+                        setViewMode('WIDGET');
+                      }}
+                    />
+                  )}
+                </div>
+
+                ) : viewMode === 'COLUMNS' && isDataCollection ? (
+                <DataCollectionColumnManager
+                  content={tile.rawContent || ''}
+                  onChange={(newContent) => {
+                    tile.onContentChange?.(newContent);
+                    // Don't switch view, let them continue managing
+                  }}
+                />
+                ) : viewMode === 'FEEDS' && isRss ? (
+                <div className="h-full w-full">
+                  <RssFeedManager
+                    content={tile.rawContent || ''}
+                    onChange={(newContent) => {
+                      tile.onContentChange?.(newContent);
+                    }}
+                  />
+                </div>
+                ) : viewMode === 'ARCHIVE' && isReadItLater ? (
+                <div className="h-full w-full">
+                  <ReadItLaterWidget
+                    content={tile.rawContent!}
+                    mode="FOCUS"
+                    focusMode="ARCHIVE"
+                    onChange={(newContent) => tile.onContentChange?.(newContent)}
+                  />
+                </div>
+                ) : viewMode === 'CODE' ? (
+                <div className="h-full w-full">
+                  {renderEditor ? renderEditor(String(tile.id)) : (
+                    tile.rawContent !== undefined ? (
+                      <textarea
+                        className="w-full h-full bg-[var(--los-bg)] text-[var(--los-fg)] font-mono text-xs p-4 resize-none focus:outline-none border-none"
+                        value={tile.rawContent}
+                        onInput={(e) => tile.onContentChange?.(e.currentTarget.value)}
+                        spellcheck={false}
+                      />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center text-[var(--los-muted)]">
+                        <MonoText>No Editor Available</MonoText>
+                      </div>
+                    )
+                  )}
+                </div>
+                ) : (
+                tile.content ? tile.content : (
+                <div className="p-8 flex items-center justify-center text-[var(--los-muted)]">
+                  <MonoText>No content defined for this tile.</MonoText>
+                </div>
+                )
+          )}
+              </div>
+            </div>
+          </div>
+          );
 }
 
-const TileContentStructure = ({ tile, renderTileContent }: { tile: TileDef, renderTileContent: any }) => (
-  <div className="absolute inset-0 overflow-hidden p-4 flex flex-col pointer-events-none">
-    <div className="flex justify-between items-start shrink-0 mb-2 pointer-events-auto">
-      <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity flex-1 mr-2 truncate">
-        {tile.title}
-      </MonoText>
-      {tile.type === 'FOLDER' ? (
-        <div className="w-2 h-2 border border-[var(--los-muted)] rotate-45 shrink-0" />
-      ) : (
-        <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors shrink-0" />
-      )}
-    </div>
+          const TileContentStructure = ({tile, renderTileContent}: {tile: TileDef, renderTileContent: any }) => (
+          <div className="absolute inset-0 overflow-hidden p-4 flex flex-col pointer-events-none">
+            <div className="flex justify-between items-start shrink-0 mb-2 pointer-events-auto">
+              <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity flex-1 mr-2 truncate">
+                {tile.title}
+              </MonoText>
+              {tile.type === 'FOLDER' ? (
+                <div className="w-2 h-2 border border-[var(--los-muted)] rotate-45 shrink-0" />
+              ) : (
+                <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors shrink-0" />
+              )}
+            </div>
 
-    <div className="flex-1 overflow-y-auto min-h-0 w-full mb-2 pointer-events-auto">
-      {renderTileContent(tile, 'SMALL')}
-    </div>
+            <div className="flex-1 overflow-y-auto min-h-0 w-full mb-2 pointer-events-auto">
+              {renderTileContent(tile, 'SMALL')}
+            </div>
 
-    <div className="text-right shrink-0 mt-auto">
-      <MonoText className="text-[10px] text-[var(--los-muted)]">
-        {`ID: ${tile.id.toString().toUpperCase().slice(0, 4)}`}
-      </MonoText>
-    </div>
-  </div>
-);
+            <div className="text-right shrink-0 mt-auto">
+              <MonoText className="text-[10px] text-[var(--los-muted)]">
+                {`ID: ${tile.id.toString().toUpperCase().slice(0, 4)}`}
+              </MonoText>
+            </div>
+          </div>
+          );
 
-const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDragStart, handleDragSave, dragEnabled }: any) => {
+          const SortableTileItem = ({tile, setActiveTileId, renderTileContent, handleDragStart, handleDragSave, dragEnabled}: any) => {
   const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({ id: tile.id, disabled: !dragEnabled });
+            attributes,
+            listeners,
+            setNodeRef,
+            transform,
+            transition,
+            isDragging
+          } = useSortable({id: tile.id, disabled: !dragEnabled });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0 : 1, // Hide orig element while dragging overlay
-    zIndex: isDragging ? 999 : 'auto'
+          const style = {
+            transform: CSS.Transform.toString(transform),
+          transition,
+          opacity: isDragging ? 0 : 1, // Hide orig element while dragging overlay
+          zIndex: isDragging ? 999 : 'auto'
   };
 
-  const [pressing, setPressing] = useState(false);
+          const [pressing, setPressing] = useState(false);
 
-  const lastUpTime = useRef(0);
+          const lastUpTime = useRef(0);
 
   useEffect(() => {
-    let timer: any;
-    if (pressing) {
-      timer = setTimeout(() => {
-        if (dragEnabled) {
-          handleDragSave();
-        } else {
-          handleDragStart();
-        }
-      }, 500);
+            let timer: any;
+          if (pressing) {
+            timer = setTimeout(() => {
+              if (dragEnabled) {
+                handleDragSave();
+              } else {
+                handleDragStart();
+              }
+            }, 500);
     }
     return () => clearTimeout(timer);
   }, [pressing, handleDragStart, handleDragSave, dragEnabled]);
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...(attributes as any)}
-      {...(listeners as any)}
-      onMouseDown={() => {
-        // Disable completely on mobile (width check)
-        if (window.innerWidth < 768) return;
+          return (
+          <div
+            ref={setNodeRef}
+            style={style}
+            {...(attributes as any)}
+            {...(listeners as any)}
+            onMouseDown={() => {
+              // Disable completely on mobile (width check)
+              if (window.innerWidth < 768) return;
 
-        if (dragEnabled) {
-          // Already enabled, allow simple hold to save
-          setPressing(true);
-        } else {
-          // Not enabled: Require double-click-hold
-          const now = Date.now();
-          if (now - lastUpTime.current < 400) {
-            setPressing(true);
-          }
-        }
-      }}
-      onMouseUp={() => {
-        setPressing(false);
-        lastUpTime.current = Date.now();
-      }}
-      onMouseLeave={() => setPressing(false)}
-      // Touch handlers removed to disable on mobile touch interactions
-      onClick={() => {
-        if (!dragEnabled) setActiveTileId(tile.id);
-      }}
-      className={cn(
-        "bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]",
-        dragEnabled && "touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95"
-      )}
-    >
-      <TileContentStructure tile={tile} renderTileContent={renderTileContent} />
-    </div>
-  );
+              if (dragEnabled) {
+                // Already enabled, allow simple hold to save
+                setPressing(true);
+              } else {
+                // Not enabled: Require double-click-hold
+                const now = Date.now();
+                if (now - lastUpTime.current < 400) {
+                  setPressing(true);
+                }
+              }
+            }}
+            onMouseUp={() => {
+              setPressing(false);
+              lastUpTime.current = Date.now();
+            }}
+            onMouseLeave={() => setPressing(false)}
+            // Touch handlers removed to disable on mobile touch interactions
+            onClick={() => {
+              if (!dragEnabled) setActiveTileId(tile.id);
+            }}
+            className={cn(
+              "bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]",
+              dragEnabled && "touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95"
+            )}
+          >
+            <TileContentStructure tile={tile} renderTileContent={renderTileContent} />
+          </div>
+          );
 };
 
-// Default dummy data if none provided
-const defaultTiles: TileDef[] = Array.from({ length: 24 }, (_, i) => ({
-  id: i,
-  title: `Tile 0${i + 1}`,
-  content: <div className="p-8"><Editor /></div>
+          // Default dummy data if none provided
+          const defaultTiles: TileDef[] = Array.from({length: 24 }, (_, i) => ({
+            id: i,
+          title: `Tile 0${i + 1}`,
+          content: <div className="p-8"><Editor /></div>
 }));
