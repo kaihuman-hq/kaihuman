@@ -586,8 +586,8 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
       {showNewFileWizard && (
         <NewFileWizard
           onClose={() => setShowNewFileWizard(false)}
-          onCreate={(path, content) => {
-            onCreateFile?.(path, content);
+          onCreate={async (path, content) => {
+            if (onCreateFile) await onCreateFile(path, content);
             // Auto-open: switch to file view and focus the tile
             setShowFiles(true);
             setActiveTileId(path);
