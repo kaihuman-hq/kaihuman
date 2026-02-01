@@ -137,7 +137,9 @@ export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
               setHasUnsavedChanges(true); // This might cause re-renders? That's fine for the button.
             }
           }
-        })
+        }),
+        // Conditional line wrapping for markdown
+        (initialPath?.endsWith('.md') ? EditorView.lineWrapping : [])
       ]
     });
 

@@ -281,14 +281,42 @@ export class GithubFileStore {
       throw new Error(`File already exists: ${path}`);
     }
 
+    // 1. Update Open Files (Optimistic)
     this.openFiles.value = {
       ...this.openFiles.value,
       [path]: { content, sha: '' },
     };
 
+    // 2. Update Tree (Optimistic) - CRITICAL for File Explorer to show it immediately
+    const newItem: TreeItem = {
+      path,
+      mode: '100644',
+      type: 'blob',
+      sha: '', // No SHA yet
+      url: '',
+      size: content.length
+    };
+
+    // Create new tree array with optimistic item
+    const newTree = [...this.tree.value, newItem].sort((a, b) => {
+      if (a.type === 'tree' && b.type !== 'tree') return -1;
+      if (a.type !== 'tree' && b.type === 'tree') return 1;
+      return a.path.localeCompare(b.path);
+    });
+    this.tree.value = newTree;
+
+    // 3. Mark dirty and Save
     const dirty = new Set(this.dirtyFiles.value);
     dirty.add(path);
     this.dirtyFiles.value = dirty;
+
+    // 4. Persist Tree to DB immediately (so reload works)
+    const repo = githubProfileStore.currentRepo.value;
+    if (repo) {
+      dbPromise.then(db => {
+        db.put('trees', newTree, `tree:${repo.full_name}`);
+      });
+    }
 
     await this.saveFile(path);
   }

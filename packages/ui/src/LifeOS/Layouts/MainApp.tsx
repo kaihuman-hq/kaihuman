@@ -588,8 +588,9 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
           onClose={() => setShowNewFileWizard(false)}
           onCreate={(path, content) => {
             onCreateFile?.(path, content);
-            // Optionally auto-open the new file or switch to files view?
-            // For now, let consumer decide or just close wizard.
+            // Auto-open: switch to file view and focus the tile
+            setShowFiles(true);
+            setActiveTileId(path);
           }}
           fileSystem={fileSystem as any}
           availableFolders={useMemo(() => {
@@ -694,6 +695,8 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
 };
 
 const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string) => ComponentChildren }) => {
+  if (!tile) return null; // Guard against undefined tile
+
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
   const isEvents = tile.extension?.toLowerCase() === '.events.csv';
   const isHabit = tile.extension?.toLowerCase() === '.habit.csv';

@@ -413,27 +413,66 @@ export const Dashboard = () => {
         onCreateFile={useCallback(async (path: string, content: string) => {
           try {
             await githubFileStore.createFile(path, content);
-            // After create, maybe refresh tree or just optimistically update?
-            // githubFileStore.createFile already adds it to openFiles.
-            // But we might want it to show up in the File Tree immediately.
-            // loadTree clears tree, so it fetches fresh.
-            // Let's do a loadTree to be safe and ensure SHA/Tree alignment if backend is fast.
+
+            // Optimistic Update: Manually add to columns
+            const parts = path.split('/');
+            const fileName = parts.pop() || path;
+            const parentPath = parts.join('/'); // "folder" or ""
+
+            setColumns(prev => {
+              return prev.map(col => {
+                // Determine if this column matches the parent path
+                // Simplified check:
+                // If parentPath is empty, look for root column
+                if (parentPath === "") {
+                  const isRoot = col.items.some(i => !String(i.id).includes('/'));
+                  if (isRoot || col.items.length === 0) {
+                    if (col.items.some(i => i.id === path)) return col;
+                    return {
+                      ...col,
+                      items: [...col.items, {
+                        id: path,
+                        title: fileName,
+                        type: 'FILE' as const,
+                        content: <div className="p-8 text-nexus-muted flex items-center justify-center h-full text-center">Loading...</div>
+                      }].sort((a, b) => {
+                        if (a.type === 'FOLDER' && b.type !== 'FOLDER') return -1;
+                        if (a.type !== 'FOLDER' && b.type === 'FOLDER') return 1;
+                        return String(a.id).localeCompare(String(b.id));
+                      })
+                    };
+                  }
+                } else {
+                  // Subfolder
+                  const sample = col.items[0];
+                  if (sample) {
+                    const sampleParent = String(sample.id).split('/').slice(0, -1).join('/');
+                    if (sampleParent === parentPath) {
+                      if (col.items.some(i => i.id === path)) return col;
+                      return {
+                        ...col,
+                        items: [...col.items, {
+                          id: path,
+                          title: fileName,
+                          type: 'FILE' as const,
+                          content: <div className="p-8 text-nexus-muted flex items-center justify-center h-full text-center">Loading...</div>
+                        }].sort((a, b) => a.title.localeCompare(b.title))
+                      };
+                    }
+                  }
+                }
+                return col;
+              });
+            });
+
             await githubFileStore.loadTree();
-            // Also open it?
             await githubFileStore.openFile(path);
           } catch (e) {
             console.error('Failed to create file:', e);
-            // TODO: Toast error
           }
         }, [])}
         existingFiles={tree ? tree.map(t => t.path) : []}
         onLoadFolder={async (path: string) => {
-          // Emulate async load from existing tree
-          // Using getChildren logic which is available in scope? No, getChildren is inside component.
-          // We can allow this inline or move getChildren out?
-          // getChildren uses `tree` from closure, so it's fine.
-          // But getChildren expects "prefix", and FolderSelector calls with "path" (e.g. "folder").
-          // getChildren expects "folder/".
           const prefix = path ? (path.endsWith('/') ? path : `${path}/`) : '';
           return getChildren(prefix);
         }}
