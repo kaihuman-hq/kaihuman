@@ -55,13 +55,15 @@ export const Dashboard = () => {
   // 4. Helper to get children for a given path prefix
   // If prefix is empty, returns root items.
   const getChildren = (prefix: string): TileDef[] => {
-    if (!tree) return [];
+    // ALWAYS read fresh value from store to avoid stale closures in callbacks
+    const currentTree = githubFileStore.tree.value;
+    if (!currentTree) return [];
 
     // Normalize prefix to match GitHub paths (no leading slash, optional trailing slash handling)
     // Root = ""
     // Sub = "folder/"
 
-    const items = tree.filter(item => {
+    const items = currentTree.filter(item => {
       if (!prefix) {
         // Root items: no slashes in path
         return !item.path.includes('/');
@@ -413,27 +415,53 @@ export const Dashboard = () => {
         onCreateFile={useCallback(async (path: string, content: string) => {
           try {
             await githubFileStore.createFile(path, content);
-            // After create, maybe refresh tree or just optimistically update?
-            // githubFileStore.createFile already adds it to openFiles.
-            // But we might want it to show up in the File Tree immediately.
-            // loadTree clears tree, so it fetches fresh.
-            // Let's do a loadTree to be safe and ensure SHA/Tree alignment if backend is fast.
-            await githubFileStore.loadTree();
-            // Also open it?
             await githubFileStore.openFile(path);
+
+            // Reconstruct Columns to Force Navigation to the new file
+            const newColumns: Column[] = [];
+            const parts = path.split('/'); // e.g. ["folder", "sub", "file.txt"]
+
+            // 1. Root Column
+            const rootChildren = getChildren("");
+
+            // Determine active ID for root
+            // If path is just "file.txt", activeId is "file.txt"
+            // If path is "folder/file.txt", activeId is "folder"
+            const rootActiveId = parts.length > 1 ? parts[0] : path;
+
+            newColumns.push({ items: rootChildren, activeId: rootActiveId });
+
+            // 2. Intermediate Columns
+            let currentPath = parts[0];
+            for (let i = 1; i < parts.length; i++) {
+              // Get children of the container (currentPath)
+              // Ensure slash
+              const children = getChildren(currentPath + "/");
+
+              // Determine active ID for this column
+              // If we are at the last segment (the file), the active ID is the file path itself
+              // path = "folder/file.txt". i=1. activeId = "folder/file.txt"
+              // path = "a/b/c". i=1 (b). activeId = "a/b"
+
+              let activeId = "";
+              if (i === parts.length - 1) {
+                activeId = path;
+              } else {
+                activeId = currentPath + "/" + parts[i];
+              }
+
+              newColumns.push({ items: children, activeId });
+              currentPath += "/" + parts[i];
+            }
+
+            setColumns(newColumns);
+
           } catch (e) {
             console.error('Failed to create file:', e);
-            // TODO: Toast error
           }
         }, [])}
         existingFiles={tree ? tree.map(t => t.path) : []}
         onLoadFolder={async (path: string) => {
-          // Emulate async load from existing tree
-          // Using getChildren logic which is available in scope? No, getChildren is inside component.
-          // We can allow this inline or move getChildren out?
-          // getChildren uses `tree` from closure, so it's fine.
-          // But getChildren expects "prefix", and FolderSelector calls with "path" (e.g. "folder").
-          // getChildren expects "folder/".
           const prefix = path ? (path.endsWith('/') ? path : `${path}/`) : '';
           return getChildren(prefix);
         }}
