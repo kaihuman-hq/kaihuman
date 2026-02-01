@@ -415,79 +415,47 @@ export const Dashboard = () => {
         onCreateFile={useCallback(async (path: string, content: string) => {
           try {
             await githubFileStore.createFile(path, content);
-
-            // Optimistic Update: Manually add to columns
-            const parts = path.split('/');
-            const fileName = parts.pop() || path;
-            const parentPath = parts.join('/'); // "folder" or ""
-
-            setColumns(prev => {
-              return prev.map(col => {
-                // Determine if this column matches the parent path
-                // Simplified check:
-                // If parentPath is empty, look for root column
-                if (parentPath === "") {
-                  const isRoot = col.items.some(i => !String(i.id).includes('/'));
-                  if (isRoot || col.items.length === 0) {
-                    if (col.items.some(i => i.id === path)) return col;
-                    return {
-                      ...col,
-                      items: [...col.items, {
-                        id: path,
-                        title: fileName,
-                        type: 'FILE' as const,
-                        // Derive extension for widgets
-                        extension: path.endsWith('.timetracking.csv') ? '.timetracking.csv' :
-                          path.endsWith('.events.csv') ? '.events.csv' :
-                            path.endsWith('.habit.csv') ? '.habit.csv' :
-                              path.endsWith('.todos.md') ? '.todos.md' :
-                                path.endsWith('.timezones.json') ? '.timezones.json' :
-                                  path.endsWith('.rss.json') ? '.rss.json' :
-                                    path.endsWith('.readitlater.json') ? '.readitlater.json' :
-                                      path.endsWith('.data-collection.csv') ? '.data-collection.csv' : undefined,
-                        content: undefined
-                      }].sort((a, b) => {
-                        if (a.type === 'FOLDER' && b.type !== 'FOLDER') return -1;
-                        if (a.type !== 'FOLDER' && b.type === 'FOLDER') return 1;
-                        return String(a.id).localeCompare(String(b.id));
-                      })
-                    };
-                  }
-                } else {
-                  // Subfolder
-                  const sample = col.items[0];
-                  if (sample) {
-                    const sampleParent = String(sample.id).split('/').slice(0, -1).join('/');
-                    if (sampleParent === parentPath) {
-                      if (col.items.some(i => i.id === path)) return col;
-                      return {
-                        ...col,
-                        items: [...col.items, {
-                          id: path,
-                          title: fileName,
-                          type: 'FILE' as const,
-                          extension: path.endsWith('.timetracking.csv') ? '.timetracking.csv' :
-                            path.endsWith('.events.csv') ? '.events.csv' :
-                              path.endsWith('.habit.csv') ? '.habit.csv' :
-                                path.endsWith('.todos.md') ? '.todos.md' :
-                                  path.endsWith('.timezones.json') ? '.timezones.json' :
-                                    path.endsWith('.rss.json') ? '.rss.json' :
-                                      path.endsWith('.readitlater.json') ? '.readitlater.json' :
-                                        path.endsWith('.data-collection.csv') ? '.data-collection.csv' : undefined,
-                          content: undefined
-                        }].sort((a, b) => a.title.localeCompare(b.title))
-                      };
-                    }
-                  }
-                }
-                return col;
-              });
-            });
-
-            // Do not call loadTree here. createFile handles local tree update and persistence.
-            // Calling loadTree immediately causes race conditions with GitHub eventual consistency.
-            // await githubFileStore.loadTree();
             await githubFileStore.openFile(path);
+
+            // Reconstruct Columns to Force Navigation to the new file
+            const newColumns: Column[] = [];
+            const parts = path.split('/'); // e.g. ["folder", "sub", "file.txt"]
+
+            // 1. Root Column
+            const rootChildren = getChildren("");
+
+            // Determine active ID for root
+            // If path is just "file.txt", activeId is "file.txt"
+            // If path is "folder/file.txt", activeId is "folder"
+            const rootActiveId = parts.length > 1 ? parts[0] : path;
+
+            newColumns.push({ items: rootChildren, activeId: rootActiveId });
+
+            // 2. Intermediate Columns
+            let currentPath = parts[0];
+            for (let i = 1; i < parts.length; i++) {
+              // Get children of the container (currentPath)
+              // Ensure slash
+              const children = getChildren(currentPath + "/");
+
+              // Determine active ID for this column
+              // If we are at the last segment (the file), the active ID is the file path itself
+              // path = "folder/file.txt". i=1. activeId = "folder/file.txt"
+              // path = "a/b/c". i=1 (b). activeId = "a/b"
+
+              let activeId = "";
+              if (i === parts.length - 1) {
+                activeId = path;
+              } else {
+                activeId = currentPath + "/" + parts[i];
+              }
+
+              newColumns.push({ items: children, activeId });
+              currentPath += "/" + parts[i];
+            }
+
+            setColumns(newColumns);
+
           } catch (e) {
             console.error('Failed to create file:', e);
           }
