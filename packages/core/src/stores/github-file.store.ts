@@ -37,33 +37,76 @@ export class GithubFileStore {
     const repo = githubProfileStore.currentRepo.value;
     if (!repo) return;
 
+    // Use current value to allow "refresh" without clearing everything if same repo
+    // If we are switching repos, we should clear.
+    // But implementation simple: assume if we are calling this, we want to refresh.
+    // If we clear `tree`, the UI flashes. Let's NOT clear tree if it has values? 
+    // Ideally we want optimistic UI: show old, replace with new.
+
+    // this.tree.value = []; // Don't clear tree to prevent flash
     this.isLoading.value = true;
     this.error.value = null;
-    this.tree.value = []; // Clear tree to trigger UI refresh and prevent stale data
-    this.openFiles.value = {}; // Clear open files to prevent stale content
+
+    // Only clear openFiles if we are changing context? 
+    // For now, let's keep openFiles as is. Clearing it forces everything to re-fetch/re-read from cache.
+    // this.openFiles.value = {}; 
     this.activeFile.value = null;
 
     try {
-      // 1. Try to load from DB first
       const db = await dbPromise;
-      const cachedTree = await db.get('trees', `tree:${repo.full_name}`);
-      if (cachedTree) {
-        this.tree.value = cachedTree;
-        this.isLoading.value = false; // Show content immediately
+      let cachedTree: TreeItem[] = [];
+
+      // 1. Try to load from DB first
+      const dbTree = await db.get('trees', `tree:${repo.full_name}`);
+      if (dbTree) {
+        cachedTree = dbTree;
+        // If we have no in-memory tree, use cache immediately
+        if (this.tree.value.length === 0) {
+          this.tree.value = cachedTree;
+        }
       }
 
-      // 2. Fetch fresh from network in background/foreground (revalidate)
-      const tree = await githubService.fetchRepoTree(repo.owner.login, repo.name);
+      // 2. Fetch fresh from network
+      const remoteTree = await githubService.fetchRepoTree(repo.owner.login, repo.name) as TreeItem[];
 
-      this.tree.value = tree as TreeItem[];
+      // 3. Smart Merge: Keep items from Cache that are NOT in Remote but have Local Content
+      // This handles the "Eventual Consistency" of GitHub API after creation
+      const mergedTree = [...remoteTree];
+      const remotePaths = new Set(remoteTree.map(t => t.path));
 
-      // 3. Update DB
-      await db.put('trees', tree, `tree:${repo.full_name}`);
+      // Check for missing items
+      for (const item of cachedTree) {
+        if (!remotePaths.has(item.path)) {
+          // This item is in Cache but not Remote.
+          // Check if we have content for it in 'files' store.
+          // Logic: If we have content, it's likely a local file we care about (newly created or working on).
+          // If we don't, it might be a deleted file we should drop.
+
+          const cacheKey = `${repo.full_name}:${item.path}`;
+          const hasFile = await db.getKey('files', cacheKey);
+
+          if (hasFile) {
+            console.log(`[GithubFileStore] Preserving local file not (yet) in remote: ${item.path}`);
+            mergedTree.push(item);
+          }
+        }
+      }
+
+      // Sort
+      mergedTree.sort((a, b) => {
+        if (a.type === 'tree' && b.type !== 'tree') return -1;
+        if (a.type !== 'tree' && b.type === 'tree') return 1;
+        return a.path.localeCompare(b.path);
+      });
+
+      this.tree.value = mergedTree;
+
+      // 4. Update DB
+      await db.put('trees', mergedTree, `tree:${repo.full_name}`);
 
     } catch (err: any) {
       console.error('Failed to load tree', err);
-      // Only set error if we don't have cached data? Or maybe toast it?
-      // For now, if cache existed, we just keep showing it but log error.
+      // Fallback to cache if request fails
       if (this.tree.value.length === 0) {
         this.error.value = err.message;
       }

@@ -465,7 +465,9 @@ export const Dashboard = () => {
               });
             });
 
-            await githubFileStore.loadTree();
+            // Do not call loadTree here. createFile handles local tree update and persistence.
+            // Calling loadTree immediately causes race conditions with GitHub eventual consistency.
+            // await githubFileStore.loadTree();
             await githubFileStore.openFile(path);
           } catch (e) {
             console.error('Failed to create file:', e);
