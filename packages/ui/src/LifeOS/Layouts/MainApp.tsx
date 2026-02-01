@@ -591,8 +591,8 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
             setShowNewFileWizard(false); // Close wizard first
             // Auto-open: switch to file view (navigate to folder)
             setShowFiles(true);
-            // Do NOT focus the tile immediately. Just show it in the list.
-            // setActiveTileId(path); 
+            // Focus the tile immediately (simulate click)
+            setActiveTileId(path);
           }}
           fileSystem={fileSystem as any}
           availableFolders={useMemo(() => {
