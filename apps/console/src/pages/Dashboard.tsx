@@ -55,13 +55,15 @@ export const Dashboard = () => {
   // 4. Helper to get children for a given path prefix
   // If prefix is empty, returns root items.
   const getChildren = (prefix: string): TileDef[] => {
-    if (!tree) return [];
+    // ALWAYS read fresh value from store to avoid stale closures in callbacks
+    const currentTree = githubFileStore.tree.value;
+    if (!currentTree) return [];
 
     // Normalize prefix to match GitHub paths (no leading slash, optional trailing slash handling)
     // Root = ""
     // Sub = "folder/"
 
-    const items = tree.filter(item => {
+    const items = currentTree.filter(item => {
       if (!prefix) {
         // Root items: no slashes in path
         return !item.path.includes('/');
@@ -434,7 +436,16 @@ export const Dashboard = () => {
                         id: path,
                         title: fileName,
                         type: 'FILE' as const,
-                        content: <div className="p-8 text-nexus-muted flex items-center justify-center h-full text-center">Loading...</div>
+                        // Derive extension for widgets
+                        extension: path.endsWith('.timetracking.csv') ? '.timetracking.csv' :
+                          path.endsWith('.events.csv') ? '.events.csv' :
+                            path.endsWith('.habit.csv') ? '.habit.csv' :
+                              path.endsWith('.todos.md') ? '.todos.md' :
+                                path.endsWith('.timezones.json') ? '.timezones.json' :
+                                  path.endsWith('.rss.json') ? '.rss.json' :
+                                    path.endsWith('.readitlater.json') ? '.readitlater.json' :
+                                      path.endsWith('.data-collection.csv') ? '.data-collection.csv' : undefined,
+                        content: undefined
                       }].sort((a, b) => {
                         if (a.type === 'FOLDER' && b.type !== 'FOLDER') return -1;
                         if (a.type !== 'FOLDER' && b.type === 'FOLDER') return 1;
@@ -455,7 +466,15 @@ export const Dashboard = () => {
                           id: path,
                           title: fileName,
                           type: 'FILE' as const,
-                          content: <div className="p-8 text-nexus-muted flex items-center justify-center h-full text-center">Loading...</div>
+                          extension: path.endsWith('.timetracking.csv') ? '.timetracking.csv' :
+                            path.endsWith('.events.csv') ? '.events.csv' :
+                              path.endsWith('.habit.csv') ? '.habit.csv' :
+                                path.endsWith('.todos.md') ? '.todos.md' :
+                                  path.endsWith('.timezones.json') ? '.timezones.json' :
+                                    path.endsWith('.rss.json') ? '.rss.json' :
+                                      path.endsWith('.readitlater.json') ? '.readitlater.json' :
+                                        path.endsWith('.data-collection.csv') ? '.data-collection.csv' : undefined,
+                          content: undefined
                         }].sort((a, b) => a.title.localeCompare(b.title))
                       };
                     }

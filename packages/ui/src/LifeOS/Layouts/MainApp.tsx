@@ -588,9 +588,11 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
           onClose={() => setShowNewFileWizard(false)}
           onCreate={async (path, content) => {
             if (onCreateFile) await onCreateFile(path, content);
-            // Auto-open: switch to file view and focus the tile
+            setShowNewFileWizard(false); // Close wizard first
+            // Auto-open: switch to file view (navigate to folder)
             setShowFiles(true);
-            setActiveTileId(path);
+            // Do NOT focus the tile immediately. Just show it in the list.
+            // setActiveTileId(path); 
           }}
           fileSystem={fileSystem as any}
           availableFolders={useMemo(() => {
