@@ -22,6 +22,7 @@ import { ReadItLaterItem } from '../Organisms/Widgets/ReadItLaterLogic';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
+import { ActionLogWidget } from '../Organisms/Widgets/ActionLogWidget';
 import { DataCollectionWidget } from '../Organisms/Widgets/DataCollectionWidget';
 import { DataCollectionAddForm } from '../Organisms/Widgets/DataCollectionAddForm';
 import { DataCollectionColumnManager } from '../Organisms/Widgets/DataCollectionColumnManager';
@@ -173,6 +174,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
       else if (lowerPath.endsWith('.budget.csv')) ext = '.budget.csv';
+      else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
       else {
         const parts = entry.path.split('.');
         ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
@@ -300,6 +302,15 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     if (tile.extension === '.budget.csv' && tile.rawContent) {
       return (
         <BudgetWidget
+          content={tile.rawContent}
+          mode={mode === 'FOCUS' ? 'FOCUS' : 'SMALL'}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+    if (tile.extension === '.actionlog.md' && tile.rawContent) {
+      return (
+        <ActionLogWidget
           content={tile.rawContent}
           mode={mode === 'FOCUS' ? 'FOCUS' : 'SMALL'}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
@@ -720,8 +731,9 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
   const isReadItLater = tile.extension?.toLowerCase() === '.readitlater.json';
   const isDataCollection = tile.extension === '.data-collection.csv';
   const isBudget = tile.extension === '.budget.csv';
+  const isActionLog = tile.extension === '.actionlog.md';
 
-  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget) && !!tile.rawContent;
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
 
@@ -786,7 +798,19 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                       viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
                     )}
                   >
-                    {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : isTimezones ? 'ADD TIMEZONE' : 'ADD ENTRY'}
+                    {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : isTimezones ? 'ADD TIMEZONE' : isActionLog ? 'ADD ACTION' : 'ADD ENTRY'}
+                  </button>
+                )}
+
+                {isActionLog && (
+                  <button
+                    onClick={() => setViewMode('ADD')}
+                    className={cn(
+                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                      viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                    )}
+                  >
+                    ADD ACTION
                   </button>
                 )}
 
@@ -868,6 +892,17 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
           {isBudget && (viewMode === 'WIDGET' || viewMode === 'ACCOUNTS' || viewMode === 'ADD') ? (
             <div className="h-full w-full p-8">
               <BudgetWidget
+                content={tile.rawContent || ''}
+                mode={viewMode as any}
+                onChange={(c) => {
+                  tile.onContentChange?.(c);
+                  if (viewMode === 'ADD') setViewMode('WIDGET');
+                }}
+              />
+            </div>
+          ) : isActionLog && (viewMode === 'WIDGET' || viewMode === 'ADD') ? (
+            <div className="h-full w-full p-8">
+              <ActionLogWidget
                 content={tile.rawContent || ''}
                 mode={viewMode as any}
                 onChange={(c) => {

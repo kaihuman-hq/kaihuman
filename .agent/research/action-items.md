@@ -164,7 +164,7 @@ Semantics:
   - Last year (only data from last year is rendered)
   - All years (data from all years is rendered) - this is also the default view
 
-### 2.3 Action log (new)
+### [x] 2.3 Action log (new)
 
 Context: packages/ui
 Goal: Build the following feature into the package and add/adjust Stories for it.
