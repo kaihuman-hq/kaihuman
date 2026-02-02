@@ -54,8 +54,11 @@ export const parseActionLog = (content: string): ActionLogFile => {
     }
 
     // List Items
-    if (line.startsWith('- ')) {
-      const entryText = line.substring(2).trim();
+    // Match lines starting with optional whitespace, then - or *, then space
+    const listMatch = line.match(/^\s*([-*])\s+(.+)/);
+
+    if (listMatch) {
+      const entryText = (listMatch[2] || "").trim();
       // Regex to find timestamp at start: YYYY-MM-DD HH:mm:ss
       // and tags at the end or anywhere #tag
 
