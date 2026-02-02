@@ -1,6 +1,6 @@
 import { h } from 'preact';
 import { useEffect, useState, useCallback } from 'preact/hooks';
-import { useSignal } from '@preact/signals';
+import { useSignal, effect } from '@preact/signals';
 import { githubFileStore, githubProfileStore } from '@lifosy/core';
 import {
   MainApp,
@@ -295,6 +295,55 @@ export const Dashboard = () => {
       });
     }
   }, [remoteConfig, openFiles]);
+
+  // 9. Watch for Saved Files to update Config
+  useEffect(() => {
+    // Watch for successful saves to update recent files
+    const dispose = effect(() => {
+      const lastSaved = githubFileStore.lastSavedFile.value;
+
+      // Ignore updates to the config file itself to prevent loops
+      if (lastSaved && lastSaved !== CONFIG_PATH) {
+        // Read current config directly from store to ensure freshness
+        const configContent = githubFileStore.openFiles.value[CONFIG_PATH]?.content;
+
+        let newConfig: any = { files: { recentlyOpened: [] } };
+
+        if (configContent) {
+          try {
+            newConfig = JSON.parse(configContent);
+          } catch (e) {
+            console.error('[Dashboard] Failed to parse config for recent files update:', e);
+            if (configContent.trim().length > 0) return; // Abort if invalid JSON
+          }
+        }
+
+        const currentRecent = newConfig.files?.recentlyOpened || [];
+        // Remove existing occurrence
+        const filtered = currentRecent.filter((p: string) => p !== lastSaved);
+        // Add to top and limit to 10
+        const updatedRecent = [lastSaved, ...filtered].slice(0, 10);
+
+        const updatedConfig = {
+          ...newConfig,
+          files: {
+            ...newConfig.files,
+            recentlyOpened: updatedRecent
+          }
+        };
+
+        const newContent = JSON.stringify(updatedConfig, null, 2);
+
+        if (newContent !== configContent) {
+          console.log('[Dashboard] Updating recent files with:', lastSaved);
+          githubFileStore.updateFileContent(CONFIG_PATH, newContent);
+          githubFileStore.saveFile(CONFIG_PATH);
+        }
+      }
+    });
+
+    return () => dispose();
+  }, []);
 
   // 7. Navigation Helper: Jump to any path
   const navigateToPath = (path: string) => {

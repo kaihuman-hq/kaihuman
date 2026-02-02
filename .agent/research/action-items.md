@@ -4,6 +4,7 @@
 
 [x] 1.1 From the status bar, clicking on one recent file, currently does not open the file properly. Implement the following: open the files view and navigate to the folder where file is located and open the file.
 [ ] 1.2 Fix repo selection to open the newly selected repo instead of the default one.
+[ ] 1.3 Files that have been saved must also be considered in the recently opened files list in .lifosy directory. Fix it. Make sure there is a limit of 10 files.
 
 ## 2. Widgets
 

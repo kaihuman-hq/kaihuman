@@ -25,6 +25,7 @@ export class GithubFileStore {
   dirtyFiles = signal<Set<string>>(new Set());
   isLoading = signal<boolean>(false);
   error = signal<string | null>(null);
+  lastSavedFile = signal<string | null>(null);
 
   // Computed: currently open file content
   currentContent = computed(() => {
@@ -255,6 +256,12 @@ export class GithubFileStore {
         // 1. Capture content at start of iteration
         // Refresh file ref to get latest content
         file = this.openFiles.value[path];
+
+        if (!file) {
+          console.error('[GithubFileStore] File closed during save:', path);
+          break;
+        }
+
         const contentToSave = file.content;
 
         console.log(`[GithubFileStore] Saving ${path}...`);
@@ -275,10 +282,12 @@ export class GithubFileStore {
           // Note: We must read 'this.openFiles' again to ensure we don't overwrite concurrent content updates 
           // (though content updates shouldn't change SHA, but good practice)
           const currentFileState = this.openFiles.value[path];
-          this.openFiles.value = {
-            ...this.openFiles.value,
-            [path]: { ...currentFileState, sha: serverSha },
-          };
+          if (currentFileState) {
+            this.openFiles.value = {
+              ...this.openFiles.value,
+              [path]: { ...currentFileState, sha: serverSha },
+            };
+          }
 
           // Update DB with new SHA
           const cacheKey = `${repo.full_name}:${path}`;
@@ -297,11 +306,12 @@ export class GithubFileStore {
         // If content changed (currentFileState.content !== contentToSave), 
         // then dirty property remains true (we never cleared it), so loop continues.
         const freshFileState = this.openFiles.value[path];
-        if (freshFileState.content === contentToSave) {
+        if (freshFileState && freshFileState.content === contentToSave) {
           const dirty = new Set(this.dirtyFiles.value);
           dirty.delete(path);
           this.dirtyFiles.value = dirty;
           console.log(`[GithubFileStore] Saved ${path} successfully. Clean.`);
+          this.lastSavedFile.value = path;
         } else {
           console.log(`[GithubFileStore] Saved ${path}, but content changed during save. Retrying...`);
         }
