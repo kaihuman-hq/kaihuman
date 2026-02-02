@@ -37,18 +37,10 @@ export const parseBudget = (content: string): BudgetTransaction[] => {
   if (!content) return [];
   const lines = content.split('\n');
   const transactions: BudgetTransaction[] = [];
-  let isStarted = false;
 
   for (const line of lines) {
-    if (line.trim() === 'START OF FILE') {
-      isStarted = true;
-      continue;
-    }
-    if (line.trim() === 'END OF FILE') {
-      break;
-    }
-    if (!isStarted) continue;
-    if (line.trim() === '' || line.startsWith('name;')) continue; // Skip header and empty lines
+    const trimmed = line.trim();
+    if (trimmed === '' || trimmed.startsWith('name;')) continue; // Skip header and empty lines
 
     const parts = line.split(';');
     if (parts.length >= 5) {
@@ -67,7 +59,6 @@ export const parseBudget = (content: string): BudgetTransaction[] => {
 
 export const serializeBudget = (transactions: BudgetTransaction[]): string => {
   const lines = [
-    'START OF FILE',
     'name;account;category;date;value'
   ];
 
@@ -75,7 +66,6 @@ export const serializeBudget = (transactions: BudgetTransaction[]): string => {
     lines.push(`${t.name};${t.account};${t.category};${t.date};${t.value}`);
   }
 
-  lines.push('END OF FILE');
   return lines.join('\n');
 };
 

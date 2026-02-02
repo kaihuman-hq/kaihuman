@@ -865,7 +865,18 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-0 relative">
-          {viewMode === 'WIDGET' && hasWidget ? (
+          {isBudget && (viewMode === 'WIDGET' || viewMode === 'ACCOUNTS' || viewMode === 'ADD') ? (
+            <div className="h-full w-full p-8">
+              <BudgetWidget
+                content={tile.rawContent || ''}
+                mode={viewMode as any}
+                onChange={(c) => {
+                  tile.onContentChange?.(c);
+                  if (viewMode === 'ADD') setViewMode('WIDGET');
+                }}
+              />
+            </div>
+          ) : viewMode === 'WIDGET' && hasWidget ? (
             <div className="h-full w-full p-8">
               {isTimeTracking && (
                 <TimeTrackingWidget
@@ -981,19 +992,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   }}
                 />
               )}
-              {isBudget && (
-                <BudgetWidget
-                  content={tile.rawContent || ''}
-                  mode={viewMode as any}
-                  onChange={(c) => {
-                    tile.onContentChange?.(c);
-                    // If added via ADD mode, maybe switch back?
-                    // The widget handles rendering the form if mode is ADD.
-                    // But if we want to auto-switch after add:
-                    if (viewMode === 'ADD') setViewMode('WIDGET');
-                  }}
-                />
-              )}
+
             </div>
 
           ) : viewMode === 'COLUMNS' && isDataCollection ? (
