@@ -26,6 +26,7 @@ export class GithubFileStore {
   isLoading = signal<boolean>(false);
   error = signal<string | null>(null);
   lastSavedFile = signal<string | null>(null);
+  loadedRepo = signal<string | null>(null);
 
   // Computed: currently open file content
   currentContent = computed(() => {
@@ -39,18 +40,18 @@ export class GithubFileStore {
     if (!repo) return;
 
     // Use current value to allow "refresh" without clearing everything if same repo
-    // If we are switching repos, we should clear.
-    // But implementation simple: assume if we are calling this, we want to refresh.
-    // If we clear `tree`, the UI flashes. Let's NOT clear tree if it has values? 
-    // Ideally we want optimistic UI: show old, replace with new.
+    // But if we are switching repos, we MUST clear to prevent showing wrong files.
 
-    // this.tree.value = []; // Don't clear tree to prevent flash
+    if (this.loadedRepo.value !== repo.full_name) {
+      console.log(`[GithubFileStore] Switching repo from ${this.loadedRepo.value} to ${repo.full_name}. Clearing tree.`);
+      this.tree.value = [];
+      this.activeFile.value = null;
+      this.openFiles.value = {}; // Clear open files too? Yes, safer.
+      this.loadedRepo.value = repo.full_name;
+    }
+
     this.isLoading.value = true;
     this.error.value = null;
-
-    // Only clear openFiles if we are changing context? 
-    // For now, let's keep openFiles as is. Clearing it forces everything to re-fetch/re-read from cache.
-    // this.openFiles.value = {}; 
     this.activeFile.value = null;
 
     try {
