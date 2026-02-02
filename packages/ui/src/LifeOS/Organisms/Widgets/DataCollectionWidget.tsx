@@ -31,8 +31,24 @@ export interface DataCollectionWidgetProps {
   // I'll export `DataCollectionAddForm` from its file and use it in `MainApp`.
 }
 
+import { filterDataByTime } from './DataCollectionLogic';
+
 export const DataCollectionWidget = ({ content, mode, onChange, className }: DataCollectionWidgetProps) => {
   const data = useMemo(() => parseDataCollection(content), [content]);
+  const [filterMode, setFilterMode] = useState<'ALL' | 'YEAR' | 'LAST_YEAR'>('ALL');
+
+  const filteredRows = useMemo(() => {
+    if (mode === 'SMALL') return data.rows; // Always show all or default stats in small view?
+    // Requirement says: "It should be able to switch between... in focus mode"
+    // Small view: "This is also the default view" referring to 'All years' being default?
+    // Let's assume Small view shows All.
+    return filterDataByTime(data, filterMode);
+  }, [data, filterMode, mode]);
+
+  const filteredData = useMemo(() => ({
+    ...data,
+    rows: filteredRows
+  }), [data, filteredRows]);
 
   // If invalid or empty
   if (!data.columns.length) {
@@ -46,7 +62,16 @@ export const DataCollectionWidget = ({ content, mode, onChange, className }: Dat
 
   return (
     <div className={cn("flex flex-col h-full w-full", className)}>
-      {/* Internal Header only for Small mode, Focus mode has tile header */}
+      {/* FILTER SWITCHER (FOCUS MODE ONLY) */}
+      {mode === 'FOCUS' && (
+        <div className="flex items-center justify-end px-4 py-2 gap-2 border-b border-[var(--los-border)]">
+          <FilterButton label="ALL YEARS" active={filterMode === 'ALL'} onClick={() => setFilterMode('ALL')} />
+          <FilterButton label="THIS YEAR" active={filterMode === 'YEAR'} onClick={() => setFilterMode('YEAR')} />
+          <FilterButton label="LAST YEAR" active={filterMode === 'LAST_YEAR'} onClick={() => setFilterMode('LAST_YEAR')} />
+        </div>
+      )}
+
+      {/* Internal Header only for Small mode */}
       {mode === 'SMALL' && (
         <div className="flex justify-between items-center mb-2 px-1 pt-1 shrink-0">
           <MonoHeader className="text-sm">DATA</MonoHeader>
@@ -57,20 +82,31 @@ export const DataCollectionWidget = ({ content, mode, onChange, className }: Dat
       )}
 
       <div className="flex-1 min-h-0 relative">
-        <DataCollectionChart data={data} hideLegend={mode === 'SMALL'} />
+        <DataCollectionChart data={filteredData} hideLegend={mode === 'SMALL'} />
       </div>
 
       {/* Footer Stats for Focus Mode? */}
       {mode === 'FOCUS' && (
         <div className="h-12 border-t border-[var(--los-border)] flex items-center justify-between px-4 shrink-0">
           <MonoText className="text-xs text-[var(--los-muted)]">
-            Total Entries: <span className="text-[var(--los-fg)]">{data.rows.length}</span>
+            Entries: <span className="text-[var(--los-fg)]">{filteredRows.length}</span> / <span className="text-[var(--los-muted)]">{data.rows.length}</span>
           </MonoText>
-          <div className="flex gap-4">
-            {/* Aggregations could go here */}
-          </div>
         </div>
       )}
     </div>
   );
 };
+
+const FilterButton = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
+  <button
+    onClick={onClick}
+    className={cn(
+      "px-2 py-1 text-[10px] font-mono rounded-sm transition-colors border",
+      active
+        ? "bg-[var(--los-fg)] text-[var(--los-bg)] border-[var(--los-fg)]"
+        : "bg-transparent text-[var(--los-muted)] border-transparent hover:text-[var(--los-fg)] hover:border-[var(--los-border)]"
+    )}
+  >
+    {label}
+  </button>
+);

@@ -217,3 +217,30 @@ export const deleteColumn = (data: DataCollectionData, colName: string): DataCol
     rows: recalculateAllRows(newRows, newColumns)
   };
 };
+
+/**
+ * Filter rows by time.
+ * Logic: Find the FIRST column that is basically a date (date, auto:date, auto:date:yesterday).
+ * Return rows that match the year criteria.
+ */
+export const filterDataByTime = (data: DataCollectionData, mode: 'ALL' | 'YEAR' | 'LAST_YEAR'): DataRow[] => {
+  if (mode === 'ALL') return data.rows;
+
+  const dateCol = data.columns.find(c => ['date', 'auto:date', 'auto:date:yesterday'].includes(c.type));
+  if (!dateCol) return data.rows; // No date column found, return all
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const lastYear = currentYear - 1;
+  const targetYear = mode === 'YEAR' ? currentYear : lastYear;
+
+  return data.rows.filter(row => {
+    const val = row[dateCol.name];
+    if (!val) return false;
+
+    const d = new Date(String(val));
+    if (isNaN(d.getTime())) return false;
+
+    return d.getFullYear() === targetYear;
+  });
+};

@@ -156,7 +156,7 @@ Semantics:
   - input for "value" as a number input
 - one view with the regular editor
 
-### 2.2 Data Collection Widget (existing)
+### [x] 2.2 Data Collection Widget (existing)
 
 - Add switcher for the widget in focus mode
 - It should be able to switch between:
