@@ -26,6 +26,7 @@ import { DataCollectionWidget } from '../Organisms/Widgets/DataCollectionWidget'
 import { DataCollectionAddForm } from '../Organisms/Widgets/DataCollectionAddForm';
 import { DataCollectionColumnManager } from '../Organisms/Widgets/DataCollectionColumnManager';
 import { DataCollectionData, parseDataCollection, serializeDataCollection, calculateAutoValues } from '../Organisms/Widgets/DataCollectionLogic';
+import { BudgetWidget } from '../Organisms/Widgets/BudgetWidget';
 import { DashboardConfig, DashboardEntry } from '../types';
 import {
   DndContext,
@@ -170,6 +171,8 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
       else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
+      else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
+      else if (lowerPath.endsWith('.budget.csv')) ext = '.budget.csv';
       else {
         const parts = entry.path.split('.');
         ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
@@ -290,6 +293,15 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         <DataCollectionWidget
           content={tile.rawContent}
           mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+    if (tile.extension === '.budget.csv' && tile.rawContent) {
+      return (
+        <BudgetWidget
+          content={tile.rawContent}
+          mode={mode === 'FOCUS' ? 'FOCUS' : 'SMALL'}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
@@ -707,8 +719,9 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
   const isRss = tile.extension?.toLowerCase() === '.rss.json';
   const isReadItLater = tile.extension?.toLowerCase() === '.readitlater.json';
   const isDataCollection = tile.extension === '.data-collection.csv';
+  const isBudget = tile.extension === '.budget.csv';
 
-  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection) && !!tile.rawContent;
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
 
@@ -775,6 +788,29 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                   >
                     {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : isTimezones ? 'ADD TIMEZONE' : 'ADD ENTRY'}
                   </button>
+                )}
+
+                {isBudget && (
+                  <>
+                    <button
+                      onClick={() => setViewMode('ACCOUNTS')}
+                      className={cn(
+                        "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                        viewMode === 'ACCOUNTS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                      )}
+                    >
+                      ACCOUNTS
+                    </button>
+                    <button
+                      onClick={() => setViewMode('ADD')}
+                      className={cn(
+                        "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                        viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                      )}
+                    >
+                      ADD TRANSACTION
+                    </button>
+                  </>
                 )}
 
                 {isDataCollection && (
@@ -942,6 +978,19 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
                     const newContent = serializeDataCollection(data);
                     tile.onContentChange?.(newContent);
                     setViewMode('WIDGET');
+                  }}
+                />
+              )}
+              {isBudget && (
+                <BudgetWidget
+                  content={tile.rawContent || ''}
+                  mode={viewMode as any}
+                  onChange={(c) => {
+                    tile.onContentChange?.(c);
+                    // If added via ADD mode, maybe switch back?
+                    // The widget handles rendering the form if mode is ADD.
+                    // But if we want to auto-switch after add:
+                    if (viewMode === 'ADD') setViewMode('WIDGET');
                   }}
                 />
               )}

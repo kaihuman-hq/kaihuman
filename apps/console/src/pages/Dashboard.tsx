@@ -88,6 +88,7 @@ export const Dashboard = () => {
       const isTimezones = item.path.toLowerCase().endsWith('.timezones.json');
       const isRss = item.path.toLowerCase().endsWith('.rss.json');
       const isReadItLater = item.path.toLowerCase().endsWith('.readitlater.json');
+      const isBudget = item.path.toLowerCase().endsWith('.budget.csv');
 
       const tile: TileDef = {
         id: item.path, // Use path as ID for simplicity
@@ -97,7 +98,7 @@ export const Dashboard = () => {
       };
 
       // Widget Handling Logic
-      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss || isReadItLater;
+      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss || isReadItLater || isBudget;
 
       if (item.type === 'tree') {
         tile.content = <div className="p-8 text-nexus-muted">Select a file from this folder.</div>;
@@ -182,6 +183,19 @@ export const Dashboard = () => {
 
       if (isReadItLater) {
         tile.extension = '.readitlater.json';
+        if (openFiles && openFiles[item.path]) {
+          tile.rawContent = openFiles[item.path]?.content;
+        }
+
+        tile.onContentChange = (newContent: string) => {
+          githubFileStore.updateFileContent(item.path, newContent);
+          githubFileStore.saveFile(item.path);
+          updateLocalTileContent(item.path, newContent);
+        };
+      }
+
+      if (isBudget) {
+        tile.extension = '.budget.csv';
         if (openFiles && openFiles[item.path]) {
           tile.rawContent = openFiles[item.path]?.content;
         }
@@ -411,7 +425,7 @@ export const Dashboard = () => {
         // Grid Mode Editors / Content
         renderFile={useCallback((path: string) => {
           const lowerPath = path.toLowerCase();
-          const isWidget = lowerPath.endsWith('.timetracking.csv') || lowerPath.endsWith('.events.csv') || lowerPath.endsWith('.habit.csv') || lowerPath.endsWith('.todos.md') || lowerPath.endsWith('.timezones.json') || lowerPath.endsWith('.rss.json') || lowerPath.endsWith('.readitlater.json');
+          const isWidget = lowerPath.endsWith('.timetracking.csv') || lowerPath.endsWith('.events.csv') || lowerPath.endsWith('.habit.csv') || lowerPath.endsWith('.todos.md') || lowerPath.endsWith('.timezones.json') || lowerPath.endsWith('.rss.json') || lowerPath.endsWith('.readitlater.json') || lowerPath.endsWith('.budget.csv');
           if (isWidget) return <FileViewer key={path} path={path} />;
 
           return (

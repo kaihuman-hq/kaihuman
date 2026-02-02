@@ -3,11 +3,11 @@
 ## 1. Bugs
 
 [x] 1.1 From the status bar, clicking on one recent file, currently does not open the file properly. Implement the following: open the files view and navigate to the folder where file is located and open the file.
-
+[ ] 1.2 Fix repo selection to open the newly selected repo instead of the default one.
 
 ## 2. Widgets
 
-### 2.1 Budget Widget (new)
+### [x] 2.1 Budget Widget (new)
 
 Context: packages/ui
 Goal: Build the following feature into the package and add/adjust Stories for it.
