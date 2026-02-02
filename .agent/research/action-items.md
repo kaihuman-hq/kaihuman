@@ -2,7 +2,7 @@
 
 ## 1. Bugs
 
-[ ] 1.1 From the status bar, clicking on one recent file, currently does not open the file properly. Implement the following: open the files view and navigate to the folder where file is located and open the file.
+[x] 1.1 From the status bar, clicking on one recent file, currently does not open the file properly. Implement the following: open the files view and navigate to the folder where file is located and open the file.
 
 
 ## 2. Widgets

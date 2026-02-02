@@ -267,13 +267,62 @@ export const Dashboard = () => {
     }
   }, [remoteConfig, openFiles]);
 
-  // 7. Navigation Handler (Miller Mode)
-  const handleNavigate = (item: TileDef) => {
-    if (item.type === 'FOLDER') {
-      // Find which column this item belongs to
-      const colIndex = columns.findIndex(col => col.items.some(i => i.id === item.id));
-      if (colIndex === -1) return;
+  // 7. Navigation Helper: Jump to any path
+  const navigateToPath = (path: string) => {
+    // Reconstruct Columns to Force Navigation to the new file
+    const newColumns: Column[] = [];
+    const parts = path.split('/'); // e.g. ["folder", "sub", "file.txt"] or ["file.txt"]
 
+    // 1. Root Column
+    const rootChildren = getChildren("");
+
+    // Determine active ID for root
+    const rootActiveId = (parts.length > 1 ? parts[0] : path) || "";
+    const rootHasItem = rootChildren.some(i => i.id === rootActiveId);
+
+    // If root item doesn't exist (e.g. invalid path), fallback to just root
+    if (!rootHasItem) {
+      setColumns([{ items: rootChildren, activeId: null }]);
+      return;
+    }
+
+    newColumns.push({ items: rootChildren, activeId: rootActiveId });
+
+    // 2. Intermediate Columns
+    let currentPath = parts[0];
+    for (let i = 1; i < parts.length; i++) {
+      // Get children of the container (currentPath)
+      const children = getChildren(currentPath + "/");
+
+      // Determine active ID for this column
+      let activeId = "";
+      if (i === parts.length - 1) {
+        activeId = path;
+      } else {
+        activeId = currentPath + "/" + parts[i];
+      }
+
+      // Verify existence logic could be added here, but assuming path is valid for now
+      newColumns.push({ items: children, activeId });
+      currentPath += "/" + parts[i];
+    }
+
+    setColumns(newColumns);
+  };
+
+  // 8. Navigation Handler (Miller Mode)
+  const handleNavigate = (item: TileDef) => {
+    // Check if item is already in columns
+    const colIndex = columns.findIndex(col => col.items.some(i => i.id === item.id));
+
+    if (colIndex === -1) {
+      // Item NOT found in current view (e.g. from Recent Files deep link)
+      // We attempt to reconstruct the path
+      navigateToPath(String(item.id));
+      return;
+    }
+
+    if (item.type === 'FOLDER') {
       // Slice columns up to this point
       const newColumns = [...columns].slice(0, colIndex + 1);
 
@@ -291,11 +340,7 @@ export const Dashboard = () => {
 
       setColumns(newColumns);
     } else {
-      // It's a file
-      const colIndex = columns.findIndex(col => col.items.some(i => i.id === item.id));
-      if (colIndex === -1) return;
-
-      // Just focus it
+      // It's a file, just focus it
       const newColumns = [...columns].slice(0, colIndex + 1);
       const activeCol = newColumns[colIndex];
       if (activeCol) {
@@ -417,44 +462,7 @@ export const Dashboard = () => {
             await githubFileStore.createFile(path, content);
             await githubFileStore.openFile(path);
 
-            // Reconstruct Columns to Force Navigation to the new file
-            const newColumns: Column[] = [];
-            const parts = path.split('/'); // e.g. ["folder", "sub", "file.txt"]
-
-            // 1. Root Column
-            const rootChildren = getChildren("");
-
-            // Determine active ID for root
-            // If path is just "file.txt", activeId is "file.txt"
-            // If path is "folder/file.txt", activeId is "folder"
-            const rootActiveId = parts.length > 1 ? parts[0] : path;
-
-            newColumns.push({ items: rootChildren, activeId: rootActiveId });
-
-            // 2. Intermediate Columns
-            let currentPath = parts[0];
-            for (let i = 1; i < parts.length; i++) {
-              // Get children of the container (currentPath)
-              // Ensure slash
-              const children = getChildren(currentPath + "/");
-
-              // Determine active ID for this column
-              // If we are at the last segment (the file), the active ID is the file path itself
-              // path = "folder/file.txt". i=1. activeId = "folder/file.txt"
-              // path = "a/b/c". i=1 (b). activeId = "a/b"
-
-              let activeId = "";
-              if (i === parts.length - 1) {
-                activeId = path;
-              } else {
-                activeId = currentPath + "/" + parts[i];
-              }
-
-              newColumns.push({ items: children, activeId });
-              currentPath += "/" + parts[i];
-            }
-
-            setColumns(newColumns);
+            navigateToPath(path);
 
           } catch (e) {
             console.error('Failed to create file:', e);
