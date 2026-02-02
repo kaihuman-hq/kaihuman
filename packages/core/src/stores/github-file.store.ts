@@ -25,6 +25,8 @@ export class GithubFileStore {
   dirtyFiles = signal<Set<string>>(new Set());
   isLoading = signal<boolean>(false);
   error = signal<string | null>(null);
+  lastSavedFile = signal<string | null>(null);
+  loadedRepo = signal<string | null>(null);
 
   // Computed: currently open file content
   currentContent = computed(() => {
@@ -38,18 +40,18 @@ export class GithubFileStore {
     if (!repo) return;
 
     // Use current value to allow "refresh" without clearing everything if same repo
-    // If we are switching repos, we should clear.
-    // But implementation simple: assume if we are calling this, we want to refresh.
-    // If we clear `tree`, the UI flashes. Let's NOT clear tree if it has values? 
-    // Ideally we want optimistic UI: show old, replace with new.
+    // But if we are switching repos, we MUST clear to prevent showing wrong files.
 
-    // this.tree.value = []; // Don't clear tree to prevent flash
+    if (this.loadedRepo.value !== repo.full_name) {
+      console.log(`[GithubFileStore] Switching repo from ${this.loadedRepo.value} to ${repo.full_name}. Clearing tree.`);
+      this.tree.value = [];
+      this.activeFile.value = null;
+      this.openFiles.value = {}; // Clear open files too? Yes, safer.
+      this.loadedRepo.value = repo.full_name;
+    }
+
     this.isLoading.value = true;
     this.error.value = null;
-
-    // Only clear openFiles if we are changing context? 
-    // For now, let's keep openFiles as is. Clearing it forces everything to re-fetch/re-read from cache.
-    // this.openFiles.value = {}; 
     this.activeFile.value = null;
 
     try {
@@ -255,6 +257,12 @@ export class GithubFileStore {
         // 1. Capture content at start of iteration
         // Refresh file ref to get latest content
         file = this.openFiles.value[path];
+
+        if (!file) {
+          console.error('[GithubFileStore] File closed during save:', path);
+          break;
+        }
+
         const contentToSave = file.content;
 
         console.log(`[GithubFileStore] Saving ${path}...`);
@@ -275,10 +283,12 @@ export class GithubFileStore {
           // Note: We must read 'this.openFiles' again to ensure we don't overwrite concurrent content updates 
           // (though content updates shouldn't change SHA, but good practice)
           const currentFileState = this.openFiles.value[path];
-          this.openFiles.value = {
-            ...this.openFiles.value,
-            [path]: { ...currentFileState, sha: serverSha },
-          };
+          if (currentFileState) {
+            this.openFiles.value = {
+              ...this.openFiles.value,
+              [path]: { ...currentFileState, sha: serverSha },
+            };
+          }
 
           // Update DB with new SHA
           const cacheKey = `${repo.full_name}:${path}`;
@@ -297,11 +307,12 @@ export class GithubFileStore {
         // If content changed (currentFileState.content !== contentToSave), 
         // then dirty property remains true (we never cleared it), so loop continues.
         const freshFileState = this.openFiles.value[path];
-        if (freshFileState.content === contentToSave) {
+        if (freshFileState && freshFileState.content === contentToSave) {
           const dirty = new Set(this.dirtyFiles.value);
           dirty.delete(path);
           this.dirtyFiles.value = dirty;
           console.log(`[GithubFileStore] Saved ${path} successfully. Clean.`);
+          this.lastSavedFile.value = path;
         } else {
           console.log(`[GithubFileStore] Saved ${path}, but content changed during save. Retrying...`);
         }

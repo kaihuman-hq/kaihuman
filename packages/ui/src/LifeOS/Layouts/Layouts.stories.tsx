@@ -447,3 +447,78 @@ export const ReadItLater: StoryObj = {
     />;
   }
 };
+
+export const BudgetWidgetStory: StoryObj = {
+  render: () => {
+    const [csvContent, setCsvContent] = useState(`name;account;category;date;value
+Gehalt Adam;bwbank:adam;earnings;2024-08-05;4000
+Miete;bwbank:adam;running-costs;2024-08-01;1200
+Lebensmittel;bwbank:adam;food;2024-08-03;150
+Tanken;bwbank:adam;transport;2024-08-04;80
+Kino;bwbank:adam;entertainment;2024-08-06;30`);
+
+    const budgetTile = {
+      id: 'budget_1',
+      title: 'Monthly.budget.csv',
+      type: 'FILE',
+      extension: '.budget.csv',
+      rawContent: csvContent,
+      onContentChange: (newVal: string) => {
+        setCsvContent(newVal);
+      },
+      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+    };
+
+    const [columns, setColumns] = useState<any[]>([
+      { items: [budgetTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    ]);
+
+    return <MainApp
+      fileSystem={{ columns }}
+      onItemClick={(item) => {
+        // partial nav
+      }}
+    />;
+  }
+};
+
+export const ActionLogWidgetStory: StoryObj = {
+  render: () => {
+    const [mdContent, setMdContent] = useState(`---
+type: actionlog
+created: 2025-03-19T18:19:59.792Z
+description: Write down in simple words what happened. Use tags to categorize your actions.
+abbreviations: -
+---
+
+# Action Log
+
+- 2025-03-19 19:20:03 Flexible Spam Detection in Accounts by using Redis Cache. #accounts
+- 2025-03-20 09:15:00 Started implementation of new widget. #feature
+- 2025-03-20 10:30:00 Debugging build issues. #bugfix #urgent`);
+
+    const logTile = {
+      id: 'log_1',
+      title: 'Work.actionlog.md',
+      type: 'FILE',
+      extension: '.actionlog.md',
+      rawContent: mdContent,
+      onContentChange: (newVal: string) => {
+        setMdContent(newVal);
+        console.log('Action Log Updated:', newVal);
+      },
+      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+    };
+
+    const [columns, setColumns] = useState<any[]>([
+      { items: [logTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    ]);
+
+    return <MainApp
+      fileSystem={{ columns }}
+      onItemClick={(item) => {
+        // partial nav
+      }}
+    />;
+  }
+};

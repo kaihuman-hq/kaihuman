@@ -1,6 +1,6 @@
 import { h } from 'preact';
 import { useEffect, useState, useCallback } from 'preact/hooks';
-import { useSignal } from '@preact/signals';
+import { useSignal, effect } from '@preact/signals';
 import { githubFileStore, githubProfileStore } from '@lifosy/core';
 import {
   MainApp,
@@ -89,6 +89,9 @@ export const Dashboard = () => {
       const isRss = item.path.toLowerCase().endsWith('.rss.json');
       const isReadItLater = item.path.toLowerCase().endsWith('.readitlater.json');
 
+      const isBudget = item.path.toLowerCase().endsWith('.budget.csv');
+      const isActionLog = item.path.toLowerCase().endsWith('.actionlog.md');
+
       const tile: TileDef = {
         id: item.path, // Use path as ID for simplicity
         title: item.path.split('/').pop() || item.path,
@@ -97,7 +100,7 @@ export const Dashboard = () => {
       };
 
       // Widget Handling Logic
-      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss || isReadItLater;
+      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss || isReadItLater || isBudget || isActionLog;
 
       if (item.type === 'tree') {
         tile.content = <div className="p-8 text-nexus-muted">Select a file from this folder.</div>;
@@ -193,6 +196,32 @@ export const Dashboard = () => {
         };
       }
 
+      if (isBudget) {
+        tile.extension = '.budget.csv';
+        if (openFiles && openFiles[item.path]) {
+          tile.rawContent = openFiles[item.path]?.content;
+        }
+
+        tile.onContentChange = (newContent: string) => {
+          githubFileStore.updateFileContent(item.path, newContent);
+          githubFileStore.saveFile(item.path);
+          updateLocalTileContent(item.path, newContent);
+        };
+      }
+
+      if (isActionLog) {
+        tile.extension = '.actionlog.md';
+        if (openFiles && openFiles[item.path]) {
+          tile.rawContent = openFiles[item.path]?.content;
+        }
+
+        tile.onContentChange = (newContent: string) => {
+          githubFileStore.updateFileContent(item.path, newContent);
+          githubFileStore.saveFile(item.path);
+          updateLocalTileContent(item.path, newContent);
+        };
+      }
+
       return tile;
     });
   };
@@ -267,13 +296,111 @@ export const Dashboard = () => {
     }
   }, [remoteConfig, openFiles]);
 
-  // 7. Navigation Handler (Miller Mode)
-  const handleNavigate = (item: TileDef) => {
-    if (item.type === 'FOLDER') {
-      // Find which column this item belongs to
-      const colIndex = columns.findIndex(col => col.items.some(i => i.id === item.id));
-      if (colIndex === -1) return;
+  // 9. Watch for Saved Files to update Config
+  useEffect(() => {
+    // Watch for successful saves to update recent files
+    const dispose = effect(() => {
+      const lastSaved = githubFileStore.lastSavedFile.value;
 
+      // Ignore updates to the config file itself to prevent loops
+      if (lastSaved && lastSaved !== CONFIG_PATH) {
+        // Read current config directly from store to ensure freshness
+        const configContent = githubFileStore.openFiles.value[CONFIG_PATH]?.content;
+
+        let newConfig: any = { files: { recentlyOpened: [] } };
+
+        if (configContent) {
+          try {
+            newConfig = JSON.parse(configContent);
+          } catch (e) {
+            console.error('[Dashboard] Failed to parse config for recent files update:', e);
+            if (configContent.trim().length > 0) return; // Abort if invalid JSON
+          }
+        }
+
+        const currentRecent = newConfig.files?.recentlyOpened || [];
+        // Remove existing occurrence
+        const filtered = currentRecent.filter((p: string) => p !== lastSaved);
+        // Add to top and limit to 10
+        const updatedRecent = [lastSaved, ...filtered].slice(0, 10);
+
+        const updatedConfig = {
+          ...newConfig,
+          files: {
+            ...newConfig.files,
+            recentlyOpened: updatedRecent
+          }
+        };
+
+        const newContent = JSON.stringify(updatedConfig, null, 2);
+
+        if (newContent !== configContent) {
+          console.log('[Dashboard] Updating recent files with:', lastSaved);
+          githubFileStore.updateFileContent(CONFIG_PATH, newContent);
+          githubFileStore.saveFile(CONFIG_PATH);
+        }
+      }
+    });
+
+    return () => dispose();
+  }, []);
+
+  // 7. Navigation Helper: Jump to any path
+  const navigateToPath = (path: string) => {
+    // Reconstruct Columns to Force Navigation to the new file
+    const newColumns: Column[] = [];
+    const parts = path.split('/'); // e.g. ["folder", "sub", "file.txt"] or ["file.txt"]
+
+    // 1. Root Column
+    const rootChildren = getChildren("");
+
+    // Determine active ID for root
+    const rootActiveId = (parts.length > 1 ? parts[0] : path) || "";
+    const rootHasItem = rootChildren.some(i => i.id === rootActiveId);
+
+    // If root item doesn't exist (e.g. invalid path), fallback to just root
+    if (!rootHasItem) {
+      setColumns([{ items: rootChildren, activeId: null }]);
+      return;
+    }
+
+    newColumns.push({ items: rootChildren, activeId: rootActiveId });
+
+    // 2. Intermediate Columns
+    let currentPath = parts[0];
+    for (let i = 1; i < parts.length; i++) {
+      // Get children of the container (currentPath)
+      const children = getChildren(currentPath + "/");
+
+      // Determine active ID for this column
+      let activeId = "";
+      if (i === parts.length - 1) {
+        activeId = path;
+      } else {
+        activeId = currentPath + "/" + parts[i];
+      }
+
+      // Verify existence logic could be added here, but assuming path is valid for now
+      newColumns.push({ items: children, activeId });
+      currentPath += "/" + parts[i];
+    }
+
+    setColumns(newColumns);
+  };
+
+  // 8. Navigation Handler (Miller Mode)
+  const handleNavigate = (item: TileDef) => {
+    // Check if item is already in columns
+    const colIndex = columns.findIndex(col => col.items.some(i => i.id === item.id));
+
+    if (colIndex === -1) {
+      // Item NOT found in current view (e.g. from Recent Files deep link)
+      // We attempt to reconstruct the path
+      navigateToPath(String(item.id));
+      return;
+    }
+
+    if (item.type === 'FOLDER') {
       // Slice columns up to this point
       const newColumns = [...columns].slice(0, colIndex + 1);
 
@@ -291,11 +418,7 @@ export const Dashboard = () => {
 
       setColumns(newColumns);
     } else {
-      // It's a file
-      const colIndex = columns.findIndex(col => col.items.some(i => i.id === item.id));
-      if (colIndex === -1) return;
-
-      // Just focus it
+      // It's a file, just focus it
       const newColumns = [...columns].slice(0, colIndex + 1);
       const activeCol = newColumns[colIndex];
       if (activeCol) {
@@ -366,7 +489,7 @@ export const Dashboard = () => {
         // Grid Mode Editors / Content
         renderFile={useCallback((path: string) => {
           const lowerPath = path.toLowerCase();
-          const isWidget = lowerPath.endsWith('.timetracking.csv') || lowerPath.endsWith('.events.csv') || lowerPath.endsWith('.habit.csv') || lowerPath.endsWith('.todos.md') || lowerPath.endsWith('.timezones.json') || lowerPath.endsWith('.rss.json') || lowerPath.endsWith('.readitlater.json');
+          const isWidget = lowerPath.endsWith('.timetracking.csv') || lowerPath.endsWith('.events.csv') || lowerPath.endsWith('.habit.csv') || lowerPath.endsWith('.todos.md') || lowerPath.endsWith('.timezones.json') || lowerPath.endsWith('.rss.json') || lowerPath.endsWith('.readitlater.json') || lowerPath.endsWith('.budget.csv') || lowerPath.endsWith('.actionlog.md');
           if (isWidget) return <FileViewer key={path} path={path} />;
 
           return (
@@ -417,44 +540,7 @@ export const Dashboard = () => {
             await githubFileStore.createFile(path, content);
             await githubFileStore.openFile(path);
 
-            // Reconstruct Columns to Force Navigation to the new file
-            const newColumns: Column[] = [];
-            const parts = path.split('/'); // e.g. ["folder", "sub", "file.txt"]
-
-            // 1. Root Column
-            const rootChildren = getChildren("");
-
-            // Determine active ID for root
-            // If path is just "file.txt", activeId is "file.txt"
-            // If path is "folder/file.txt", activeId is "folder"
-            const rootActiveId = parts.length > 1 ? parts[0] : path;
-
-            newColumns.push({ items: rootChildren, activeId: rootActiveId });
-
-            // 2. Intermediate Columns
-            let currentPath = parts[0];
-            for (let i = 1; i < parts.length; i++) {
-              // Get children of the container (currentPath)
-              // Ensure slash
-              const children = getChildren(currentPath + "/");
-
-              // Determine active ID for this column
-              // If we are at the last segment (the file), the active ID is the file path itself
-              // path = "folder/file.txt". i=1. activeId = "folder/file.txt"
-              // path = "a/b/c". i=1 (b). activeId = "a/b"
-
-              let activeId = "";
-              if (i === parts.length - 1) {
-                activeId = path;
-              } else {
-                activeId = currentPath + "/" + parts[i];
-              }
-
-              newColumns.push({ items: children, activeId });
-              currentPath += "/" + parts[i];
-            }
-
-            setColumns(newColumns);
+            navigateToPath(path);
 
           } catch (e) {
             console.error('Failed to create file:', e);
