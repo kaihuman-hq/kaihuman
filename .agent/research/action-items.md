@@ -3,8 +3,8 @@
 ## 1. Bugs
 
 [x] 1.1 From the status bar, clicking on one recent file, currently does not open the file properly. Implement the following: open the files view and navigate to the folder where file is located and open the file.
-[ ] 1.2 Fix repo selection to open the newly selected repo instead of the default one.
-[ ] 1.3 Files that have been saved must also be considered in the recently opened files list in .lifosy directory. Fix it. Make sure there is a limit of 10 files.
+[x] 1.2 Fix repo selection to open the newly selected repo instead of the default one.
+[x] 1.3 Files that have been saved must also be considered in the recently opened files list in .lifosy directory. Fix it. Make sure there is a limit of 10 files.
 
 ## 2. Widgets
 
@@ -227,12 +227,16 @@ Semantics:
 ### 3.1 PWA
 
 [ ] 3.1.1 Make sure the app can be installed as PWA. Configure everything accordigly. Use a plugin for vite.
-[ ] 3.1.2 TIn mobile safari (iOS) the top bar color must be adjusted to the theme color
+[ ] 3.1.2 In mobile safari (iOS) the top bar color must be adjusted to the theme color
 
 ### 3.2 Grid
 
-[ ] 3.2.1 Improve the grid view on Desktop mode
+[ ] 3.2.1 Improve the grid view on Desktop mode. Currently if there are only 4 items, and the screen is big, all items are rendered in one row (4 columns). I'd like to have it the following way: try to make the Tiles always fit the whole view port on Desktop. 4 items result in a 2x2 grid, and the Tiles should be big enough to fill the whole screen. 3 items result in a 1x3 grid, and the Tiles should be big enough to fill the whole screen. 2 items result in a 1x2 grid, and the Tiles should be big enough to fill the whole screen. 1 item results in a 1x1 grid, and the Tile should be big enough to fill the whole screen.
 
 ### 3.3 Search
 
 [ ] 3.3.1 Implement search functionality to search files and actions. The command ctrl+k opens the menu. Users can search for all files. Use the github search api to search for files.
+
+### 3.4 Status Bar
+
+[ ] 3.4.1 There are useless information in the status bar at the right bottom corner. Remove "Tiles" and "Workspace". Make the entry "Grid" a dropdown to switch between "Auto" and "4 Columns" / "3 Columns" / "2 Columns" / "1 Column" view - but only on desktop mode. On mobile mode it should always be "Auto".
