@@ -50,6 +50,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { NewFileWizard } from '../Organisms/NewFileWizard';
+import { MoveFileModal } from '../Organisms/MoveFileModal';
+import { SearchModal } from '../Organisms/SearchModal';
 
 export interface TileDef {
   id: string | number;
@@ -76,7 +78,7 @@ export interface MainAppProps {
   fileContents?: Record<string, string>; // Map path -> content
   onConfigChange?: (newConfig: DashboardConfig) => void;
   fileSystem?: FileSystemState;
-  onNavigate?: (path: string[]) => void; // Path is list of IDs
+  onNavigate?: (path: string[]) => void;
   onItemClick?: (item: TileDef) => void;
   renderFile?: (path: string) => ComponentChildren;
   onFileChange?: (path: string, newContent: string) => void;
@@ -85,14 +87,38 @@ export interface MainAppProps {
   repositories?: import('../Organisms/StatusBar').Repository[];
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
 
-  renderEditor?: (path: string) => ComponentChildren;
+  renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren;
   onAddToReadItLater?: (item: ReadItLaterItem) => void;
   onCreateFile?: (path: string, content: string) => void;
+  onDeleteFile?: (path: string) => void;
+  onRenameFile?: (path: string, newPath: string) => void;
+  onMoveFile?: (path: string, newPath: string) => void;
   existingFiles?: string[];
   onLoadFolder?: (path: string) => Promise<TileDef[]>;
+  githubToken?: string;
 }
 
-export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, renderEditor, onAddToReadItLater, onCreateFile, ...props }: MainAppProps) => {
+export const MainApp = ({
+  tiles = [],
+  config,
+  fileContents = {},
+  onConfigChange,
+  fileSystem,
+  onItemClick,
+  onNavigate,
+  renderFile,
+  onFileChange,
+  renderEditor,
+  onAddToReadItLater,
+  onCreateFile,
+  onDeleteFile,
+  onRenameFile,
+  onMoveFile,
+  existingFiles,
+  onLoadFolder,
+  githubToken,
+  ...props
+}: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
 
@@ -102,6 +128,8 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
   const [localConfig, setLocalConfig] = useState<DashboardConfig | undefined>(config);
   const [showFiles, setShowFiles] = useState(false); // Toggle for "Files" view
   const [showNewFileWizard, setShowNewFileWizard] = useState(false);
+  const [fileToMove, setFileToMove] = useState<string | null>(null);
+  const [zenMode, setZenMode] = useState(false); // Zen Mode state
 
   // Store original config when entering Drag Mode for cancellation
   const [originalConfig, setOriginalConfig] = useState<DashboardConfig | undefined>(undefined);
@@ -109,10 +137,13 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
   // Store current drag id for drag overlay
   const [activeId, setActiveId] = useState<string | number | null>(null);
 
+  // Nav Overlay Hover State
+  const [hoverNav, setHoverNav] = useState<'prev' | 'next' | null>(null);
+
   useEffect(() => {
     if (config) {
       setLocalConfig(config);
-      setShowFiles(false); // Reset to dashboard when config loads? Or keep user pref?
+      // setShowFiles(false); // Removed to prevent view reset on config update (e.g. rename/move)
     }
   }, [config]);
 
@@ -444,15 +475,30 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
   };
 
   const getResponsiveGridClass = (count: number) => {
-    if (count <= 1) return "grid-cols-1";
-    if (count === 2) return "grid-cols-1 sm:grid-cols-2";
-    if (count === 3) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3";
-    if (count === 4) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
-    if (count === 5) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
-    if (count === 6) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
-    if (count === 7) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7";
-    return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8";
+    return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
   };
+
+  // Search State
+  const [showSearch, setShowSearch] = useState(false);
+
+  // Keyboard Shortcuts (Global)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle Search (Ctrl+K or Cmd+K)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSearch(prev => !prev);
+      }
+      // Toggle Zen Mode (Ctrl+Shift+Z or Cmd+Shift+Z)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        setZenMode(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <div
@@ -461,52 +507,53 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      {/* Desktop Navigation Overlays */}
-      {!activeTileId && localConfig && localConfig.dashboards.length > 1 && (
-        <>
-          {/* Left Overlay - Previous */}
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              handlePrevDashboard();
-            }}
-            className="hidden md:flex absolute top-0 left-0 bottom-8 w-16 z-20 items-center justify-start pl-2 
-                       hover:bg-gradient-to-r from-black/40 to-transparent 
-                       opacity-0 hover:opacity-100 transition-all duration-300 cursor-pointer group"
-          >
-            <div className="text-white/50 group-hover:text-white group-hover:-translate-x-1 transition-transform duration-300 transform translate-x-1">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </div>
-          </div>
+      {/* Search Modal */}
+      <SearchModal
+        isOpen={showSearch}
+        onClose={() => setShowSearch(false)}
+        currentRepository={props.currentRepository?.name || "Lifosy/monorepo"}
+        githubToken={githubToken}
+        onSelect={(item) => {
+          // If item is in current dashboard, focus it
+          const tile = displayTiles.find(t => t.id === item.path);
+          if (tile) {
+            setActiveTileId(tile.id);
+          } else {
+            // If not in dashboard, switch to File View and try to navigate
+            // Or at least open it if we have a way to open arbitrary files
+            console.log("Opening file from search:", item.path);
 
-          {/* Right Overlay - Next */}
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              handleNextDashboard();
-            }}
-            className="hidden md:flex absolute top-0 right-0 bottom-8 w-16 z-20 items-center justify-end pr-2 
-                       hover:bg-gradient-to-l from-black/40 to-transparent 
-                       opacity-0 hover:opacity-100 transition-all duration-300 cursor-pointer group"
-          >
-            <div className="text-white/50 group-hover:text-white group-hover:translate-x-1 transition-transform duration-300 transform -translate-x-1">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            </div>
-          </div>
-        </>
-      )}
-
+            // Check if it's in userEntries to switch dashboard?
+            const entry = localConfig?.entries.find(e => e.path === item.path);
+            if (entry) {
+              // Switch dashboard
+              setActiveDashboardId(entry.dashboard);
+              setActiveTileId(entry.path);
+              setShowFiles(false);
+            } else {
+              // Open in Files View
+              setShowFiles(true);
+              if (onItemClick) {
+                onItemClick({
+                  id: item.path,
+                  title: item.name,
+                  type: 'FILE',
+                  // content... we might not have it yet
+                });
+              }
+              setActiveTileId(item.path);
+            }
+          }
+          setShowSearch(false);
+        }}
+      />
       {/* CENTER STAGE: The Matrix OR The Active Tile */}
-      <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
+      <MainGrid viewState={zenMode ? 'ZEN' : (activeTileId !== null ? 'FOCUS' : 'DASHBOARD')}>
         <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : undefined} column="center">
           {activeTileId === null ? (
             isMillerMode ? (
-              // MILLER COLUMNS LAYOUT
-              <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto">
+              // MILLER COLUMNS LAYOUT (Centered & Max-Width)
+              <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto mx-auto w-full max-w-screen-2xl">
                 {fileSystem!.columns.map((col, index) => {
                   const isLast = index === fileSystem!.columns.length - 1;
                   return (
@@ -522,6 +569,12 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
                         if (onItemClick) onItemClick(item);
                         if (item.type === 'FILE') setActiveTileId(item.id);
                       }}
+                      onDeleteFile={onDeleteFile}
+                      onRenameFile={async (path, newPath) => {
+                        if (onRenameFile) await onRenameFile(path, newPath);
+                        if (activeTileId === path) setActiveTileId(newPath); // Keep active
+                      }}
+                      onRequestMove={(path) => setFileToMove(path)}
                     />
                   )
                 })}
@@ -551,6 +604,7 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
                           {(
                             <div className={cn(
                               "grid gap-px bg-[var(--los-bg)] content-start w-full p-4 md:p-0",
+                              "max-w-screen-2xl mx-auto", // Center content
                               getResponsiveGridClass(displayTiles.length)
                             )}>
                               {displayTiles.map((tile) => (
@@ -600,10 +654,77 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
               tile={activeTile!}
               onClose={() => setActiveTileId(null)}
               renderEditor={renderEditor}
+              zenMode={zenMode}
+              onToggleZenMode={() => setZenMode(prev => !prev)}
             />
           )}
         </Tile>
       </MainGrid>
+
+      {/* Desktop Navigation Overlays (Fix: JS-based hover state for guaranteed visibility) */}
+      {(() => {
+        const shouldRender = !activeTileId && localConfig && localConfig.dashboards.length > 1;
+        if (localConfig) {
+          console.log('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: localConfig.dashboards.length, shouldRender, hoverNav });
+        }
+        return shouldRender;
+      })() && (
+          <>
+            {/* Left Overlay - Previous */}
+            <div
+              onMouseEnter={() => setHoverNav('prev')}
+              onMouseLeave={() => setHoverNav(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrevDashboard();
+              }}
+              title="Previous Workspace"
+              className="flex absolute top-0 left-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-start pl-4 cursor-pointer select-none"
+            >
+              {/* Visual Container (Gradient & Icon) */}
+              <div className={cn(
+                "absolute inset-0 bg-gradient-to-r from-black/60 to-transparent transition-opacity duration-300",
+                hoverNav === 'prev' ? "opacity-100" : "opacity-0"
+              )} />
+
+              <div className={cn(
+                "relative z-10 text-white transition-all duration-300 transform",
+                hoverNav === 'prev' ? "opacity-100 translate-x-4" : "opacity-0 translate-x-0"
+              )}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Right Overlay - Next */}
+            <div
+              onMouseEnter={() => setHoverNav('next')}
+              onMouseLeave={() => setHoverNav(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNextDashboard();
+              }}
+              title="Next Workspace"
+              className="flex absolute top-0 right-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-end pr-4 cursor-pointer select-none"
+            >
+              {/* Visual Container (Gradient & Icon) */}
+              <div className={cn(
+                "absolute inset-0 bg-gradient-to-l from-black/60 to-transparent transition-opacity duration-300",
+                hoverNav === 'next' ? "opacity-100" : "opacity-0"
+              )} />
+
+              <div className={cn(
+                "relative z-10 text-white transition-all duration-300 transform",
+                hoverNav === 'next' ? "opacity-100 -translate-x-4" : "opacity-0 translate-x-0"
+              )}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </div>
+            </div>
+          </>
+        )}
 
       {/* New File Wizard Overlay */}
       {showNewFileWizard && (
@@ -636,90 +757,133 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
             });
             return Array.from(folders).sort();
           }, [localConfig])}
-          existingFiles={props.existingFiles}
-          onLoadFolder={props.onLoadFolder}
+          existingFiles={existingFiles}
+          onLoadFolder={onLoadFolder}
+        />
+      )}
+
+      {/* Move File Modal */}
+      {fileToMove && (
+        <MoveFileModal
+          fileToMove={fileToMove}
+          onClose={() => setFileToMove(null)}
+          onMove={async (oldPath, newPath) => {
+            if (onMoveFile) await onMoveFile(oldPath, newPath);
+            if (activeTileId === oldPath) setActiveTileId(newPath);
+            setFileToMove(null);
+          }}
+          fileSystem={fileSystem as any}
+          onLoadFolder={onLoadFolder}
         />
       )}
 
       {/* Sticky Status Bar */}
-      <StatusBar
-        mode={activeTileId !== null ? "FOCUS" : (showFiles ? "FILES" : (dragEnabled ? "DND" : "NORMAL"))}
-        breadcrumbs={getBreadcrumbs()}
-        stats={[
-          { label: "TILES", value: displayTiles.length.toString() },
-          { label: "GRID", value: activeTileId ? "OFF" : "AUTO" },
-          ...(localConfig ? [{ label: "WORKSPACE", value: localConfig.dashboards.find(d => d.id === currentDashboardId)?.name || "UNKNOWN" }] : [])
-        ]}
-        onDashboardClick={() => {
-          if (dragEnabled) {
-            // Show cancellation menu or just cancel?
-          } else {
-            handleDashboardClick();
-          }
-        }}
+      {!zenMode && (
+        <StatusBar
+          mode={activeTileId !== null ? "FOCUS" : (showFiles ? "FILES" : (dragEnabled ? "DND" : "NORMAL"))}
+          breadcrumbs={getBreadcrumbs()}
+          stats={[
+            { label: "TILES", value: displayTiles.length.toString() },
+            ...(localConfig ? [{ label: "WORKSPACE", value: localConfig.dashboards.find(d => d.id === currentDashboardId)?.name || "UNKNOWN" }] : [])
+          ]}
+          onDashboardClick={() => {
+            if (dragEnabled) {
+              // Show cancellation menu or just cancel?
+            } else {
+              handleDashboardClick();
+            }
+          }}
 
-        // Repository Switcher (Always available if props provided)
-        currentRepository={props.currentRepository}
-        repositories={props.repositories}
-        onSelectRepository={props.onSelectRepository}
+          // Repository Switcher (Always available if props provided)
+          currentRepository={props.currentRepository}
+          repositories={props.repositories}
+          onSelectRepository={props.onSelectRepository}
 
-        // Workspace Switcher (Only if config exists)
-        currentWorkspace={localConfig ? { id: currentDashboardId || '', name: localConfig.dashboards?.find(d => d.id === currentDashboardId)?.name || 'Unknown' } : undefined}
-        workspaces={localConfig ? localConfig.dashboards.map(d => ({ id: d.id, name: d.name })) : undefined}
-        onSelectWorkspace={(ws) => {
-          if (!dragEnabled && localConfig) {
-            setActiveDashboardId(ws.id);
-            setShowFiles(false); // Switch back to dashboard view
-          }
-        }}
-        onNextWorkspace={!dragEnabled && localConfig ? handleNextDashboard : undefined}
+          // Workspace Switcher (Only if config exists)
+          currentWorkspace={localConfig ? { id: currentDashboardId || '', name: localConfig.dashboards?.find(d => d.id === currentDashboardId)?.name || 'Unknown' } : undefined}
+          workspaces={localConfig ? localConfig.dashboards.map(d => ({ id: d.id, name: d.name })) : undefined}
+          onSelectWorkspace={(ws) => {
+            if (!dragEnabled && localConfig) {
+              setActiveDashboardId(ws.id);
+              setShowFiles(false); // Switch back to dashboard view
+            }
+          }}
+          onNextWorkspace={!dragEnabled && localConfig ? handleNextDashboard : undefined}
 
-        menuItems={dragEnabled ? [
-          { label: "Save Order", onClick: handleDragSave },
-          { label: "Cancel Reorder", onClick: handleDragCancel }
-        ] : [
-          { label: "New File", onClick: () => setShowNewFileWizard(true) },
-          { label: "Files", onClick: () => setShowFiles(true) },
-          ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
-          ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
-        ]}
-        recentFiles={!dragEnabled && localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
-          label: path,
-          onClick: () => {
-            const conf = localConfig;
-            if (conf) {
-              const entry = conf.entries.find(e => e.path === path);
-              if (entry) {
-                // Scenario 1: File is pinned to a Dashboard
-                setShowFiles(false); // Switch to dashboard view
-                setActiveDashboardId(entry.dashboard);
-                setActiveTileId(entry.path);
-              } else {
-                // Scenario 2: File is NOT on any dashboard (accessed via File Tree)
-                // We switch to "Files" mode (Miller Columns) and try to navigate to it.
-                console.log("File not found in dashboard, switching to File View:", path);
-                setShowFiles(true);
-                // Trigger navigation in parent (Dashboard.tsx) to update columns
-                if (onItemClick) {
-                  onItemClick({
-                    id: path,
-                    title: path.split('/').pop() || path,
-                    type: 'FILE'
-                  });
+          menuItems={dragEnabled ? [
+            { label: "Save Order", onClick: handleDragSave },
+            { label: "Cancel Reorder", onClick: handleDragCancel }
+          ] : [
+            { label: "New File", onClick: () => setShowNewFileWizard(true) },
+            {
+              label: "Quick Note",
+              onClick: async () => {
+                const now = new Date();
+                const pad = (n: number) => n.toString().padStart(2, '0');
+                // Format: quicknote-YYYY-MM-DD-HH:mm:ss.md
+                const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+                const filename = `quicknote-${timestamp}.md`;
+                const path = `.lifeos/quicknotes/${filename}`;
+
+                const content = `---
+type: generic
+created: ${now.toISOString()}
+description: A generic markdown document template for general note-taking and documentation.
+abbreviations: undefined
+---
+
+`;
+                if (onCreateFile) {
+                  await onCreateFile(path, content);
                 }
-                // Also set active tile locally so it focuses if rendered
+                // Open file view
+                setShowFiles(true);
+                // Navigate to it
                 setActiveTileId(path);
               }
+            },
+            { label: "Files", onClick: () => setShowFiles(true) },
+            ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
+            ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
+          ]}
+          recentFiles={!dragEnabled && localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
+            label: path,
+            onClick: () => {
+              const conf = localConfig;
+              if (conf) {
+                const entry = conf.entries.find(e => e.path === path);
+                if (entry) {
+                  // Scenario 1: File is pinned to a Dashboard
+                  setShowFiles(false); // Switch to dashboard view
+                  setActiveDashboardId(entry.dashboard);
+                  setActiveTileId(entry.path);
+                } else {
+                  // Scenario 2: File is NOT on any dashboard (accessed via File Tree)
+                  // We switch to "Files" mode (Miller Columns) and try to navigate to it.
+                  console.log("File not found in dashboard, switching to File View:", path);
+                  setShowFiles(true);
+                  // Trigger navigation in parent (Dashboard.tsx) to update columns
+                  if (onItemClick) {
+                    onItemClick({
+                      id: path,
+                      title: path.split('/').pop() || path,
+                      type: 'FILE'
+                    });
+                  }
+                  // Also set active tile locally so it focuses if rendered
+                  setActiveTileId(path);
+                }
+              }
             }
+          })) : []
           }
-        })) : []
-        }
-      />
+        />
+      )}
     </div>
   );
 };
 
-const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string) => ComponentChildren }) => {
+const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void }) => {
   if (!tile) return null; // Guard against undefined tile
 
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
@@ -739,21 +903,43 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
 
   return (
     <div
-      className="absolute top-0 left-0 right-0 bottom-8 bg-[var(--los-bg)] z-10 p-8 flex flex-col"
+      className={cn(
+        "absolute top-0 bottom-8 z-10 p-8 flex flex-col",
+        zenMode ? "bg-stone-950" : "bg-[var(--los-bg)]", // Darker background in Zen Mode
+        "left-0 right-0 mx-auto w-full max-w-screen-2xl" // Center & Constrain
+      )}
       key={`focused-${tile.id}`}
     >
       <div
-        className="flex-1 border border-[var(--los-border)] flex flex-col relative bg-[var(--los-bg)] animate-in fade-in slide-in-from-bottom-4 duration-300"
+        className={cn(
+          "flex-1 border border-[var(--los-border)] flex flex-col relative animate-in fade-in slide-in-from-bottom-4 duration-300",
+          zenMode ? "bg-transparent" : "bg-[var(--los-bg)]"
+        )}
       >
-        {/* Header / Controls */}
-        <div className="min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2">
+        {/* Header / Controls - Dim in Zen Mode */}
+        <div className={cn(
+          "min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2 transition-opacity duration-500",
+          zenMode ? "opacity-10 hover:opacity-100" : "opacity-100"
+        )}>
           <div className="flex items-center justify-between w-full gap-4">
             <MonoHeader className="text-[var(--los-accent)] text-lg">
               {tile.id.toString().split('/').pop()}
             </MonoHeader>
 
             {/* Close Button (Desktop & Mobile) */}
-            <div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleZenMode?.(); }}
+                className={cn(
+                  "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                  zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                )}
+                title="Toggle Zen Mode (Ctrl+Shift+Z)"
+              >
+                {zenMode ? <span className="text-[10px] hidden md:inline">EXIT ZEN</span> : <span className="text-[10px] hidden md:inline">ZEN MODE</span>}
+                <div className={cn("w-2 h-2 border transition-colors", zenMode ? "bg-[var(--los-accent)] border-[var(--los-accent)]" : "border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+              </button>
+
               <button
                 onClick={(e) => { e.stopPropagation(); onClose(); }}
                 className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
@@ -1058,7 +1244,7 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
             </div>
           ) : viewMode === 'CODE' ? (
             <div className="h-full w-full">
-              {renderEditor ? renderEditor(String(tile.id)) : (
+              {renderEditor ? renderEditor(String(tile.id), zenMode) : (
                 tile.rawContent !== undefined ? (
                   <textarea
                     className="w-full h-full bg-[var(--los-bg)] text-[var(--los-fg)] font-mono text-xs p-4 resize-none focus:outline-none border-none"

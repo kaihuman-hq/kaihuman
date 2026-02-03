@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import { useEffect, useState, useCallback } from 'preact/hooks';
 import { useSignal, effect } from '@preact/signals';
-import { githubFileStore, githubProfileStore } from '@lifosy/core';
+import { githubFileStore, githubProfileStore, authStore } from '@lifosy/core';
 import {
   MainApp,
   TileDef,
@@ -502,7 +502,7 @@ export const Dashboard = () => {
           githubFileStore.updateFileContent(path, newContent);
           githubFileStore.saveFile(path);
         }, [])}
-        renderEditor={useCallback((path: string) => <FileViewer key={path} path={path} />, [])}
+        renderEditor={useCallback((path: string, zenMode?: boolean) => <FileViewer key={path} path={path} zenMode={zenMode} />, [])}
         onAddToReadItLater={async (item) => {
           const rilPath = '.lifeos/.readitlater.json';
           try {
@@ -546,11 +546,23 @@ export const Dashboard = () => {
             console.error('Failed to create file:', e);
           }
         }, [])}
+        onDeleteFile={useCallback(async (path: string) => {
+          if (confirm(`Are you sure you want to delete ${path}?`)) {
+            await githubFileStore.deleteFile(path);
+          }
+        }, [])}
+        onRenameFile={useCallback(async (path: string, newPath: string) => {
+          await githubFileStore.renameFile(path, newPath);
+        }, [])}
+        onMoveFile={useCallback(async (path: string, newPath: string) => {
+          await githubFileStore.renameFile(path, newPath);
+        }, [])}
         existingFiles={tree ? tree.map(t => t.path) : []}
         onLoadFolder={async (path: string) => {
           const prefix = path ? (path.endsWith('/') ? path : `${path}/`) : '';
           return getChildren(prefix);
         }}
+        githubToken={authStore.token.value || undefined}
       />
     </div>
   );

@@ -3,8 +3,8 @@
 ## 1. Bugs
 
 [x] 1.1 From the status bar, clicking on one recent file, currently does not open the file properly. Implement the following: open the files view and navigate to the folder where file is located and open the file.
-[ ] 1.2 Fix repo selection to open the newly selected repo instead of the default one.
-[ ] 1.3 Files that have been saved must also be considered in the recently opened files list in .lifosy directory. Fix it. Make sure there is a limit of 10 files.
+[x] 1.2 Fix repo selection to open the newly selected repo instead of the default one.
+[x] 1.3 Files that have been saved must also be considered in the recently opened files list in .lifosy directory. Fix it. Make sure there is a limit of 10 files.
 
 ## 2. Widgets
 
@@ -226,13 +226,44 @@ Semantics:
 
 ### 3.1 PWA
 
-[ ] 3.1.1 Make sure the app can be installed as PWA. Configure everything accordigly. Use a plugin for vite.
-[ ] 3.1.2 TIn mobile safari (iOS) the top bar color must be adjusted to the theme color
+[x] 3.1.1 Make sure the app can be installed as PWA. Configure everything accordigly. Use a plugin for vite.
+[x] 3.1.2 In mobile safari (iOS) the top bar color must be adjusted to the theme color
 
 ### 3.2 Grid
 
-[ ] 3.2.1 Improve the grid view on Desktop mode
+[x] 3.2.1 Improve the grid view on Desktop mode. Currently if there are only 4 items, and the screen is big, all items are rendered in one row (4 columns). I'd like to have it the following way: try to make the Tiles always fit the whole view port on Desktop. 4 items result in a 2x2 grid, and the Tiles should be big enough to fill the whole screen. 3 items result in a 1x3 grid, and the Tiles should be big enough to fill the whole screen. 2 items result in a 1x2 grid, and the Tiles should be big enough to fill the whole screen. 1 item results in a 1x1 grid, and the Tile should be big enough to fill the whole screen.
 
 ### 3.3 Search
 
-[ ] 3.3.1 Implement search functionality to search files and actions. The command ctrl+k opens the menu. Users can search for all files. Use the github search api to search for files.
+[x] 3.3.1 Implement search functionality to search files and actions. The command ctrl+k opens the menu. Users can search for all files. Use the github search api to search for files.
+
+### 3.4 Status Bar
+
+[x] 3.4.1 There are useless information in the status bar at the right bottom corner. Remove "Tiles" and "Workspace". Make the entry "Grid" a dropdown to switch between "Auto" and "4 Columns" / "3 Columns" / "2 Columns" / "1 Column" view - but only on desktop mode. On mobile mode it should always be "Auto".
+
+### 3.5 Quick Notes
+
+[x] 3.5.1 Implement a quick notes feature. It should be a new file type called "quick-note". It should be a simple markdown file with a frontmatter (see example below). The new quick note gets an auto-generated file name that includes the current date and time. Example: "quicknote-2025-11-13-16:35:31.md". Frontmatter example:
+
+---
+type: generic
+created: 2025-11-13T15:35:31.883Z
+description: A generic markdown document template for general note-taking and documentation.
+abbreviations: undefined
+---
+
+Add a new menu item to the magic menu to create a new quick note. The quick notes will be automatically stored in folder ".lifeos/quicknotes". After creating a new quick note, it should be opened in the editor (flow: oipen file view, navigate to the folder where it's stored, open file)
+
+### 3.6 File management
+
+[x] 3.6.1 It must be possible to delete files. The file tile in the file view should have a menu with a delete option. 
+[x] 3.6.2 It must be possible to move files. The file tile in the file view should have a menu with a move option. For this the user should be able to select a target folder like in the new file creation modal.
+[x] 3.6.3 It must be possible to rename files. The file tile in the file view should have a menu with a rename option. 
+
+### 3.7 Design
+
+[x] 3.7.1 Favicon: Add a matching favicon to the app.
+
+### 3.8 Editor
+
+Implement a Zen Mode for the editor. It should be possible to toggle it with a button and a keyboard shortcut. In Zen Mode the editor should be in full screen mode and most of the other UI elements are hidden. New user should be able to fully focus on writing the text.
