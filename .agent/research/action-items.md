@@ -240,3 +240,22 @@ Semantics:
 ### 3.4 Status Bar
 
 [x] 3.4.1 There are useless information in the status bar at the right bottom corner. Remove "Tiles" and "Workspace". Make the entry "Grid" a dropdown to switch between "Auto" and "4 Columns" / "3 Columns" / "2 Columns" / "1 Column" view - but only on desktop mode. On mobile mode it should always be "Auto".
+
+### 3.5 Quick Notes
+
+[ ] 3.5.1 Implement a quick notes feature. It should be a new file type called "quick-note". It should be a simple markdown file with a frontmatter (see example below). The new quick note gets an auto-generated file name that includes the current date and time. Example: "quicknote-2025-11-13-16:35:31.md". Frontmatter example:
+
+---
+type: generic
+created: 2025-11-13T15:35:31.883Z
+description: A generic markdown document template for general note-taking and documentation.
+abbreviations: undefined
+---
+
+Add a new menu item to the magic menu to create a new quick note. The quick notes will be automatically stored in folder ".lifeos/quicknotes". After creating a new quick note, it should be opened in the editor (flow: oipen file view, navigate to the folder where it's stored, open file)
+
+### 3.6 File management
+
+[ ] 3.6.1 It must be possible to delete files. The file tile in the file view should have a menu with a delete option. 
+[ ] 3.6.2 It must be possible to move files. The file tile in the file view should have a menu with a move option. For this the user should be able to select a target folder like in the new file creation modal.
+[ ] 3.6.3 It must be possible to rename files. The file tile in the file view should have a menu with a rename option. 
