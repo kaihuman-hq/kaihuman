@@ -87,7 +87,7 @@ export interface MainAppProps {
   repositories?: import('../Organisms/StatusBar').Repository[];
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
 
-  renderEditor?: (path: string) => ComponentChildren;
+  renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren;
   onAddToReadItLater?: (item: ReadItLaterItem) => void;
   onCreateFile?: (path: string, content: string) => void;
   onDeleteFile?: (path: string) => void;
@@ -883,7 +883,7 @@ abbreviations: undefined
   );
 };
 
-const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void }) => {
+const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void }) => {
   if (!tile) return null; // Guard against undefined tile
 
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
@@ -904,13 +904,17 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: 
   return (
     <div
       className={cn(
-        "absolute top-0 bottom-8 bg-[var(--los-bg)] z-10 p-8 flex flex-col",
+        "absolute top-0 bottom-8 z-10 p-8 flex flex-col",
+        zenMode ? "bg-stone-950" : "bg-[var(--los-bg)]", // Darker background in Zen Mode
         "left-0 right-0 mx-auto w-full max-w-screen-2xl" // Center & Constrain
       )}
       key={`focused-${tile.id}`}
     >
       <div
-        className="flex-1 border border-[var(--los-border)] flex flex-col relative bg-[var(--los-bg)] animate-in fade-in slide-in-from-bottom-4 duration-300"
+        className={cn(
+          "flex-1 border border-[var(--los-border)] flex flex-col relative animate-in fade-in slide-in-from-bottom-4 duration-300",
+          zenMode ? "bg-transparent" : "bg-[var(--los-bg)]"
+        )}
       >
         {/* Header / Controls - Dim in Zen Mode */}
         <div className={cn(
@@ -1240,7 +1244,7 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: 
             </div>
           ) : viewMode === 'CODE' ? (
             <div className="h-full w-full">
-              {renderEditor ? renderEditor(String(tile.id)) : (
+              {renderEditor ? renderEditor(String(tile.id), zenMode) : (
                 tile.rawContent !== undefined ? (
                   <textarea
                     className="w-full h-full bg-[var(--los-bg)] text-[var(--los-fg)] font-mono text-xs p-4 resize-none focus:outline-none border-none"

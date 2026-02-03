@@ -33,7 +33,7 @@ const nexusTheme = EditorView.theme({
   }
 }, { dark: true });
 
-export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
+export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, zenMode?: boolean }) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -94,6 +94,9 @@ export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
     return () => clearInterval(intervalId);
   }, []); // Run once on mount
 
+  // Compartment for dynamic theme switching
+  const themeCompartment = useRef(new Compartment());
+
   // Initial setup
   useEffect(() => {
     // Determine effective path (prop takes precedence, though usually one or other is used)
@@ -124,9 +127,9 @@ export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
           }
         ]),
         markdown(),
-        syntaxHighlighting(defaultHighlightStyle), // Or oneDark highlight style?
+        syntaxHighlighting(defaultHighlightStyle),
         oneDark, // Base theme
-        nexusTheme, // Overrides
+        themeCompartment.current.of(nexusTheme), // Dynamic Helper
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             // Update store for the CORRECT path
@@ -134,7 +137,7 @@ export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
             if (currentPath) {
               githubFileStore.updateFileContent(currentPath, update.state.doc.toString());
               // Mark as dirty
-              setHasUnsavedChanges(true); // This might cause re-renders? That's fine for the button.
+              setHasUnsavedChanges(true);
             }
           }
         }),
@@ -151,13 +154,46 @@ export const CodeMirrorEditor = ({ path: propsPath }: { path?: string }) => {
     viewRef.current = view;
 
     // Reset unsaved changes on load?
-    // If we load a file, it's clean initially.
     setHasUnsavedChanges(false);
 
     return () => {
       view.destroy();
     };
-  }, [propsPath]); // Re-mount if props.path changes? Usually it won't change for same component instance.
+  }, [propsPath]);
+
+  // Dynamic Theme Update
+  useEffect(() => {
+    if (viewRef.current) {
+      // Define Zen Theme override
+      const zenTheme = EditorView.theme({
+        "&": {
+          backgroundColor: "#0c0a09 !important", // Force overrides
+          color: "#a8a29e",
+        },
+        ".cm-scroller": {
+          backgroundColor: "inherit !important"
+        },
+        ".cm-gutters": {
+          backgroundColor: "#0c0a09 !important", // Match gutter specifically
+          color: "#44403c" // Dimmed gutter text
+        },
+        ".cm-activeLine": {
+          backgroundColor: "rgba(56, 189, 248, 0.08) !important",
+          backdropFilter: "brightness(1.5)"
+        },
+        ".cm-content": {
+          fontFamily: "JetBrains Mono, monospace"
+        },
+        ".cm-cursor": {
+          borderLeftColor: "#38bdf8"
+        }
+      }, { dark: true });
+
+      viewRef.current.dispatch({
+        effects: themeCompartment.current.reconfigure(zenMode ? [nexusTheme, zenTheme] : nexusTheme)
+      });
+    }
+  }, [zenMode]);
 
   // Sync content with store
   useSignalEffect(() => {

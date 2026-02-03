@@ -5,9 +5,10 @@ import { CodeMirrorEditor } from './editor/CodeMirrorEditor';
 
 interface FileViewerProps {
   path: string;
+  zenMode?: boolean;
 }
 
-export const FileViewer = ({ path }: FileViewerProps) => {
+export const FileViewer = ({ path, zenMode }: FileViewerProps) => {
   // When this component mounts (tile focused), load the file
   useEffect(() => {
     console.error('[FileViewer] Mounting for', path);
@@ -20,7 +21,7 @@ export const FileViewer = ({ path }: FileViewerProps) => {
   return (
     <div className="h-full w-full relative">
       {/* Ensure the editor takes full height */}
-      <CodeMirrorEditor path={path} />
+      <CodeMirrorEditor path={path} zenMode={zenMode} />
     </div>
   );
 };
