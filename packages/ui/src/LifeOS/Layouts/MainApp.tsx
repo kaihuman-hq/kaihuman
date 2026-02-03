@@ -136,6 +136,9 @@ export const MainApp = ({
   // Store current drag id for drag overlay
   const [activeId, setActiveId] = useState<string | number | null>(null);
 
+  // Nav Overlay Hover State
+  const [hoverNav, setHoverNav] = useState<'prev' | 'next' | null>(null);
+
   useEffect(() => {
     if (config) {
       setLocalConfig(config);
@@ -539,45 +542,7 @@ export const MainApp = ({
         }}
       />
       {/* Desktop Navigation Overlays */}
-      {!activeTileId && localConfig && localConfig.dashboards.length > 1 && (
-        <>
-          {/* Left Overlay - Previous */}
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              handlePrevDashboard();
-            }}
-            className="hidden md:flex absolute top-0 left-0 bottom-8 w-16 z-20 items-center justify-start pl-2
-                       hover:bg-gradient-to-r from-black/40 to-transparent
-                       opacity-0 hover:opacity-100 transition-all duration-300 cursor-pointer group"
-          >
-            <div className="text-white/50 group-hover:text-white group-hover:-translate-x-1 transition-transform duration-300 transform translate-x-1">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </div>
-          </div>
 
-          {/* Right Overlay - Next */}
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              handleNextDashboard();
-            }}
-            className="hidden md:flex absolute top-0 right-0 bottom-8 w-16 z-20 items-center justify-end pr-2
-                       hover:bg-gradient-to-l from-black/40 to-transparent
-                       opacity-0 hover:opacity-100 transition-all duration-300 cursor-pointer group"
-          >
-            <div className="text-white/50 group-hover:text-white group-hover:translate-x-1 transition-transform duration-300 transform -translate-x-1">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* CENTER STAGE: The Matrix OR The Active Tile */}
       <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
         <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : undefined} column="center">
           {activeTileId === null ? (
@@ -688,6 +653,71 @@ export const MainApp = ({
           )}
         </Tile>
       </MainGrid>
+
+      {/* Desktop Navigation Overlays (Fix: JS-based hover state for guaranteed visibility) */}
+      {(() => {
+        const shouldRender = !activeTileId && localConfig && localConfig.dashboards.length > 1;
+        if (localConfig) {
+          console.log('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: localConfig.dashboards.length, shouldRender, hoverNav });
+        }
+        return shouldRender;
+      })() && (
+          <>
+            {/* Left Overlay - Previous */}
+            <div
+              onMouseEnter={() => setHoverNav('prev')}
+              onMouseLeave={() => setHoverNav(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrevDashboard();
+              }}
+              title="Previous Workspace"
+              className="flex absolute top-0 left-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-start pl-4 cursor-pointer select-none"
+            >
+              {/* Visual Container (Gradient & Icon) */}
+              <div className={cn(
+                "absolute inset-0 bg-gradient-to-r from-black/60 to-transparent transition-opacity duration-300",
+                hoverNav === 'prev' ? "opacity-100" : "opacity-0"
+              )} />
+
+              <div className={cn(
+                "relative z-10 text-white transition-all duration-300 transform",
+                hoverNav === 'prev' ? "opacity-100 translate-x-4" : "opacity-0 translate-x-0"
+              )}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Right Overlay - Next */}
+            <div
+              onMouseEnter={() => setHoverNav('next')}
+              onMouseLeave={() => setHoverNav(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNextDashboard();
+              }}
+              title="Next Workspace"
+              className="flex absolute top-0 right-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-end pr-4 cursor-pointer select-none"
+            >
+              {/* Visual Container (Gradient & Icon) */}
+              <div className={cn(
+                "absolute inset-0 bg-gradient-to-l from-black/60 to-transparent transition-opacity duration-300",
+                hoverNav === 'next' ? "opacity-100" : "opacity-0"
+              )} />
+
+              <div className={cn(
+                "relative z-10 text-white transition-all duration-300 transform",
+                hoverNav === 'next' ? "opacity-100 -translate-x-4" : "opacity-0 translate-x-0"
+              )}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </div>
+            </div>
+          </>
+        )}
 
       {/* New File Wizard Overlay */}
       {showNewFileWizard && (

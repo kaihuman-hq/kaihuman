@@ -263,3 +263,7 @@ Add a new menu item to the magic menu to create a new quick note. The quick note
 ### 3.7 Design
 
 [x] 3.7.1 Favicon: Add a matching favicon to the app.
+
+### 3.8 Editor
+
+Implement a Zen Mode for the editor. It should be possible to toggle it with a button and a keyboard shortcut. In Zen Mode the editor should be in full screen mode and most of the other UI elements are hidden. New user should be able to fully focus on writing the text.
