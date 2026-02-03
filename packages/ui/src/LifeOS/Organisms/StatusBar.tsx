@@ -20,7 +20,12 @@ export interface MenuItem {
 export interface StatusBarProps {
   mode?: string;
   breadcrumbs?: string[];
-  stats?: { label: string; value: string }[];
+  stats?: {
+    label: string;
+    value: string;
+    options?: string[];
+    onOptionSelect?: (option: string) => void;
+  }[];
 
   // Repository (Global Context)
   currentRepository?: Repository;
@@ -372,9 +377,37 @@ export const StatusBar = ({
           <div className="flex-1 flex items-center justify-end gap-6 min-w-0">
             {/* Stats hidden on small screens */}
             {stats.map((stat, i) => (
-              <div key={i} className="hidden md:flex items-center gap-2 whitespace-nowrap">
+              <div key={i} className="hidden md:flex items-center gap-2 whitespace-nowrap relative group/stat">
                 <MonoLabel className="text-[9px]">{stat.label}</MonoLabel>
-                <MonoText className="text-[10px]">{stat.value}</MonoText>
+
+                {stat.options ? (
+                  <div className="relative">
+                    <MonoText className="text-[10px] cursor-pointer hover:text-[var(--los-accent)] transition-colors">
+                      {stat.value}
+                    </MonoText>
+
+                    {/* Dropdown Menu */}
+                    <div className="absolute bottom-full right-0 mb-2 w-32 bg-[var(--los-bg)] border border-[var(--los-border)] shadow-xl rounded-sm opacity-0 invisible group-hover/stat:opacity-100 group-hover/stat:visible transition-all duration-200 flex flex-col z-[150]">
+                      {stat.options.map(opt => (
+                        <div
+                          key={opt}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            stat.onOptionSelect?.(opt);
+                          }}
+                          className={cn(
+                            "px-3 py-2 text-[10px] cursor-pointer hover:bg-[var(--los-accent)] hover:text-black transition-colors font-mono uppercase",
+                            stat.value === opt ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                          )}
+                        >
+                          {opt}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <MonoText className="text-[10px]">{stat.value}</MonoText>
+                )}
               </div>
             ))}
             <div className="flex items-center gap-2">

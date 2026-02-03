@@ -226,17 +226,17 @@ Semantics:
 
 ### 3.1 PWA
 
-[ ] 3.1.1 Make sure the app can be installed as PWA. Configure everything accordigly. Use a plugin for vite.
-[ ] 3.1.2 In mobile safari (iOS) the top bar color must be adjusted to the theme color
+[x] 3.1.1 Make sure the app can be installed as PWA. Configure everything accordigly. Use a plugin for vite.
+[x] 3.1.2 In mobile safari (iOS) the top bar color must be adjusted to the theme color
 
 ### 3.2 Grid
 
-[ ] 3.2.1 Improve the grid view on Desktop mode. Currently if there are only 4 items, and the screen is big, all items are rendered in one row (4 columns). I'd like to have it the following way: try to make the Tiles always fit the whole view port on Desktop. 4 items result in a 2x2 grid, and the Tiles should be big enough to fill the whole screen. 3 items result in a 1x3 grid, and the Tiles should be big enough to fill the whole screen. 2 items result in a 1x2 grid, and the Tiles should be big enough to fill the whole screen. 1 item results in a 1x1 grid, and the Tile should be big enough to fill the whole screen.
+[x] 3.2.1 Improve the grid view on Desktop mode. Currently if there are only 4 items, and the screen is big, all items are rendered in one row (4 columns). I'd like to have it the following way: try to make the Tiles always fit the whole view port on Desktop. 4 items result in a 2x2 grid, and the Tiles should be big enough to fill the whole screen. 3 items result in a 1x3 grid, and the Tiles should be big enough to fill the whole screen. 2 items result in a 1x2 grid, and the Tiles should be big enough to fill the whole screen. 1 item results in a 1x1 grid, and the Tile should be big enough to fill the whole screen.
 
 ### 3.3 Search
 
-[ ] 3.3.1 Implement search functionality to search files and actions. The command ctrl+k opens the menu. Users can search for all files. Use the github search api to search for files.
+[x] 3.3.1 Implement search functionality to search files and actions. The command ctrl+k opens the menu. Users can search for all files. Use the github search api to search for files.
 
 ### 3.4 Status Bar
 
-[ ] 3.4.1 There are useless information in the status bar at the right bottom corner. Remove "Tiles" and "Workspace". Make the entry "Grid" a dropdown to switch between "Auto" and "4 Columns" / "3 Columns" / "2 Columns" / "1 Column" view - but only on desktop mode. On mobile mode it should always be "Auto".
+[x] 3.4.1 There are useless information in the status bar at the right bottom corner. Remove "Tiles" and "Workspace". Make the entry "Grid" a dropdown to switch between "Auto" and "4 Columns" / "3 Columns" / "2 Columns" / "1 Column" view - but only on desktop mode. On mobile mode it should always be "Auto".

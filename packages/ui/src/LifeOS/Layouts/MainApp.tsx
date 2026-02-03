@@ -50,6 +50,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { NewFileWizard } from '../Organisms/NewFileWizard';
+import { SearchModal } from '../Organisms/SearchModal';
 
 export interface TileDef {
   id: string | number;
@@ -443,16 +444,43 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     setActiveDashboardId(config.dashboards[prevIndex]?.id || null);
   };
 
+  // Grid Mode State
+  const [gridMode, setGridMode] = useState<'AUTO' | '1' | '2' | '3' | '4'>('AUTO');
+
   const getResponsiveGridClass = (count: number) => {
+    // Manual Overrides
+    if (gridMode === '1') return "grid-cols-1";
+    if (gridMode === '2') return "grid-cols-1 sm:grid-cols-2";
+    if (gridMode === '3') return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3";
+    if (gridMode === '4') return "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2"; // 2x2 preference as requested
+
+    // AUTO Mode Logic
     if (count <= 1) return "grid-cols-1";
     if (count === 2) return "grid-cols-1 sm:grid-cols-2";
     if (count === 3) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3";
-    if (count === 4) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
+    if (count === 4) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-2"; // 4 items -> 2x2
     if (count === 5) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
     if (count === 6) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
     if (count === 7) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7";
     return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8";
   };
+
+  // Search State
+  const [showSearch, setShowSearch] = useState(false);
+
+  // Keyboard Shortcuts (Global)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle Search (Ctrl+K or Cmd+K)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSearch(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <div
@@ -461,6 +489,45 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
+      {/* Search Modal */}
+      <SearchModal
+        isOpen={showSearch}
+        onClose={() => setShowSearch(false)}
+        currentRepository={props.currentRepository?.id || (localConfig?.dashboards[0]?.name ? undefined : "lifosy/monorepo")} // Fallback or use context
+        onSelect={(item) => {
+          // If item is in current dashboard, focus it
+          const tile = displayTiles.find(t => t.id === item.path);
+          if (tile) {
+            setActiveTileId(tile.id);
+          } else {
+            // If not in dashboard, switch to File View and try to navigate
+            // Or at least open it if we have a way to open arbitrary files
+            console.log("Opening file from search:", item.path);
+
+            // Check if it's in userEntries to switch dashboard?
+            const entry = localConfig?.entries.find(e => e.path === item.path);
+            if (entry) {
+              // Switch dashboard
+              setActiveDashboardId(entry.dashboard);
+              setActiveTileId(entry.path);
+              setShowFiles(false);
+            } else {
+              // Open in Files View
+              setShowFiles(true);
+              if (onItemClick) {
+                onItemClick({
+                  id: item.path,
+                  title: item.name,
+                  type: 'FILE',
+                  // content... we might not have it yet
+                });
+              }
+              setActiveTileId(item.path);
+            }
+          }
+          setShowSearch(false);
+        }}
+      />
       {/* Desktop Navigation Overlays */}
       {!activeTileId && localConfig && localConfig.dashboards.length > 1 && (
         <>
@@ -646,9 +713,12 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         mode={activeTileId !== null ? "FOCUS" : (showFiles ? "FILES" : (dragEnabled ? "DND" : "NORMAL"))}
         breadcrumbs={getBreadcrumbs()}
         stats={[
-          { label: "TILES", value: displayTiles.length.toString() },
-          { label: "GRID", value: activeTileId ? "OFF" : "AUTO" },
-          ...(localConfig ? [{ label: "WORKSPACE", value: localConfig.dashboards.find(d => d.id === currentDashboardId)?.name || "UNKNOWN" }] : [])
+          {
+            label: "GRID",
+            value: gridMode,
+            options: ['AUTO', '1', '2', '3', '4'],
+            onOptionSelect: (opt: any) => setGridMode(opt)
+          }
         ]}
         onDashboardClick={() => {
           if (dragEnabled) {
