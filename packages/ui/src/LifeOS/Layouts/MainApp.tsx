@@ -618,6 +618,7 @@ export const MainApp = ({
                           {(
                             <div className={cn(
                               "grid gap-px bg-[var(--los-bg)] content-start w-full p-4 md:p-0",
+                              "max-w-screen-2xl mx-auto", // Center content
                               getResponsiveGridClass(displayTiles.length)
                             )}>
                               {displayTiles.map((tile) => (
