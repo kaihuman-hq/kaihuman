@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useRef, useEffect } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { cn } from '../../utils';
 import { TileDef } from '../Layouts/MainApp';
 import { MonoText } from '../Atoms/Typography';
@@ -12,7 +12,7 @@ export interface MillerColumnProps {
   onItemClick: (item: TileDef) => void;
   onDeleteFile?: (path: string) => void;
   onRenameFile?: (path: string, newPath: string) => void;
-  onMoveFile?: (path: string, newPath: string) => void; // Distinction for UI, same backend
+  onRequestMove?: (path: string) => void;
 }
 
 export const MillerColumn = ({
@@ -22,7 +22,7 @@ export const MillerColumn = ({
   onItemClick,
   onDeleteFile,
   onRenameFile,
-  onMoveFile
+  onRequestMove
 }: MillerColumnProps) => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
@@ -34,6 +34,52 @@ export const MillerColumn = ({
     }
     return () => window.removeEventListener('click', handleClick);
   }, [activeMenu]);
+
+  // Shared context menu renderer
+  const renderContextMenu = (tile: TileDef) => (
+    <div
+      className="absolute top-8 right-2 z-50 bg-[#1a1a1f] border border-[var(--los-border)] shadow-xl rounded flex flex-col min-w-[120px] py-1"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
+        onClick={(e) => {
+          e.stopPropagation();
+          setActiveMenu(null);
+          const newName = prompt("Rename to:", tile.title);
+          if (newName && newName !== tile.title) {
+            // Keep dir, change name
+            const parts = tile.id.toString().split('/');
+            parts.pop();
+            const newPath = [...parts, newName].join('/');
+            onRenameFile?.(tile.id.toString(), newPath);
+          }
+        }}
+      >
+        <Edit size={12} /> Rename
+      </div>
+      <div
+        className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
+        onClick={(e) => {
+          e.stopPropagation();
+          setActiveMenu(null);
+          onRequestMove?.(tile.id.toString());
+        }}
+      >
+        <Move size={12} /> Move
+      </div>
+      <div
+        className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs text-red-400 hover:text-red-300"
+        onClick={(e) => {
+          e.stopPropagation();
+          setActiveMenu(null);
+          onDeleteFile?.(tile.id.toString());
+        }}
+      >
+        <Trash size={12} /> Delete
+      </div>
+    </div>
+  );
 
   if (variant === 'GRID') {
     // Current Active View - The Grid
@@ -73,58 +119,11 @@ export const MillerColumn = ({
                             e.stopPropagation();
                             setActiveMenu(activeMenu === tile.id ? null : tile.id.toString());
                           }}
-                          className="p-1 hover:bg-white/10 rounded cursor-pointer text-[var(--los-muted)] hover:text-white"
+                          className="p-1 hover:bg-white/10 rounded cursor-pointer text-[var(--los-muted)] hover:text-white relative"
                         >
                           <MoreVertical size={12} />
                         </div>
-                        {/* Context Menu */}
-                        {activeMenu === tile.id && (
-                          <div
-                            className="absolute top-8 right-2 z-50 bg-[#1a1a1f] border border-[var(--los-border)] shadow-xl rounded flex flex-col min-w-[120px] py-1"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div
-                              className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveMenu(null);
-                                const newName = prompt("Rename to:", tile.title);
-                                if (newName && newName !== tile.title) {
-                                  // Keep dir, change name
-                                  const parts = tile.id.toString().split('/');
-                                  parts.pop();
-                                  const newPath = [...parts, newName].join('/');
-                                  onRenameFile?.(tile.id.toString(), newPath);
-                                }
-                              }}
-                            >
-                              <Edit size={12} /> Rename
-                            </div>
-                            <div
-                              className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveMenu(null);
-                                const newPath = prompt("Move to path:", tile.id.toString());
-                                if (newPath && newPath !== tile.id.toString()) {
-                                  onMoveFile?.(tile.id.toString(), newPath);
-                                }
-                              }}
-                            >
-                              <Move size={12} /> Move
-                            </div>
-                            <div
-                              className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs text-red-400 hover:text-red-300"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveMenu(null);
-                                onDeleteFile?.(tile.id.toString());
-                              }}
-                            >
-                              <Trash size={12} /> Delete
-                            </div>
-                          </div>
-                        )}
+                        {activeMenu === tile.id && renderContextMenu(tile)}
                       </>
                     )}
                   </div>
@@ -147,7 +146,7 @@ export const MillerColumn = ({
     );
   }
 
-  // History/Previous View - The List/Column
+  // LIST view
   return (
     <div className="w-16 md:w-48 lg:w-64 border-r border-[var(--los-border)] h-full overflow-y-auto shrink-0 flex flex-col bg-[var(--los-bg)] animate-in fade-in slide-in-from-left-4 duration-300">
       {items.map((tile) => (
@@ -155,24 +154,45 @@ export const MillerColumn = ({
           key={tile.id}
           onClick={() => onItemClick(tile)}
           className={cn(
-            "p-3 border-b border-[var(--los-border)] cursor-pointer transition-all group flex items-center gap-2",
+            "p-3 border-b border-[var(--los-border)] cursor-pointer transition-all group flex items-center justify-between gap-2 relative",
             activeId === tile.id
               ? "bg-[var(--los-accent-dim)] border-l-2 border-l-[var(--los-accent)]"
               : "hover:bg-white/5 border-l-2 border-l-transparent"
           )}
         >
-          {tile.type === 'FOLDER' ? (
-            <Folder size={14} className={cn(activeId === tile.id ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")} />
-          ) : (
-            <FileText size={14} className="text-[var(--los-muted)]" />
-          )}
+          <div className="flex items-center gap-2 overflow-hidden flex-1">
+            {tile.type === 'FOLDER' ? (
+              <Folder size={14} className={cn(activeId === tile.id ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")} />
+            ) : (
+              <FileText size={14} className="text-[var(--los-muted)]" />
+            )}
 
-          <MonoText className={cn(
-            "text-xs truncate hidden md:block",
-            activeId === tile.id ? "text-[var(--los-fg)] font-bold" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]"
-          )}>
-            {tile.title}
-          </MonoText>
+            <MonoText className={cn(
+              "text-xs truncate hidden md:block",
+              activeId === tile.id ? "text-[var(--los-fg)] font-bold" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]"
+            )}>
+              {tile.title}
+            </MonoText>
+          </div>
+
+          {/* Context Menu for List Items */}
+          {tile.type === 'FILE' && (
+            <div className="relative shrink-0">
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveMenu(activeMenu === tile.id ? null : tile.id.toString());
+                }}
+                className={cn(
+                  "p-1 rounded cursor-pointer hover:bg-white/10",
+                  activeId === tile.id ? "text-[var(--los-fg)]" : "text-[var(--los-muted)] opacity-0 group-hover:opacity-100 transition-opacity"
+                )}
+              >
+                <MoreVertical size={12} />
+              </div>
+              {activeMenu === tile.id && renderContextMenu(tile)}
+            </div>
+          )}
         </div>
       ))}
     </div>

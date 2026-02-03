@@ -50,6 +50,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { NewFileWizard } from '../Organisms/NewFileWizard';
+import { MoveFileModal } from '../Organisms/MoveFileModal';
 import { SearchModal } from '../Organisms/SearchModal';
 
 export interface TileDef {
@@ -127,6 +128,7 @@ export const MainApp = ({
   const [localConfig, setLocalConfig] = useState<DashboardConfig | undefined>(config);
   const [showFiles, setShowFiles] = useState(false); // Toggle for "Files" view
   const [showNewFileWizard, setShowNewFileWizard] = useState(false);
+  const [fileToMove, setFileToMove] = useState<string | null>(null);
 
   // Store original config when entering Drag Mode for cancellation
   const [originalConfig, setOriginalConfig] = useState<DashboardConfig | undefined>(undefined);
@@ -137,7 +139,7 @@ export const MainApp = ({
   useEffect(() => {
     if (config) {
       setLocalConfig(config);
-      setShowFiles(false); // Reset to dashboard when config loads? Or keep user pref?
+      // setShowFiles(false); // Removed to prevent view reset on config update (e.g. rename/move)
     }
   }, [config]);
 
@@ -598,8 +600,11 @@ export const MainApp = ({
                         if (item.type === 'FILE') setActiveTileId(item.id);
                       }}
                       onDeleteFile={onDeleteFile}
-                      onRenameFile={onRenameFile}
-                      onMoveFile={onMoveFile}
+                      onRenameFile={async (path, newPath) => {
+                        if (onRenameFile) await onRenameFile(path, newPath);
+                        if (activeTileId === path) setActiveTileId(newPath); // Keep active
+                      }}
+                      onRequestMove={(path) => setFileToMove(path)}
                     />
                   )
                 })}
@@ -716,6 +721,21 @@ export const MainApp = ({
             return Array.from(folders).sort();
           }, [localConfig])}
           existingFiles={existingFiles}
+          onLoadFolder={onLoadFolder}
+        />
+      )}
+
+      {/* Move File Modal */}
+      {fileToMove && (
+        <MoveFileModal
+          fileToMove={fileToMove}
+          onClose={() => setFileToMove(null)}
+          onMove={async (oldPath, newPath) => {
+            if (onMoveFile) await onMoveFile(oldPath, newPath);
+            if (activeTileId === oldPath) setActiveTileId(newPath);
+            setFileToMove(null);
+          }}
+          fileSystem={fileSystem as any}
           onLoadFolder={onLoadFolder}
         />
       )}
