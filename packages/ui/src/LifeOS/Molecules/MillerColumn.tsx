@@ -1,17 +1,40 @@
 import { h } from 'preact';
+import { useState, useRef, useEffect } from 'preact/hooks';
 import { cn } from '../../utils';
 import { TileDef } from '../Layouts/MainApp';
 import { MonoText } from '../Atoms/Typography';
-import { Folder, FileText } from 'lucide-preact';
+import { Folder, FileText, MoreVertical, Trash, Edit, Move } from 'lucide-preact';
 
 export interface MillerColumnProps {
   items: TileDef[];
   activeId?: string | null;
   variant: 'GRID' | 'LIST';
   onItemClick: (item: TileDef) => void;
+  onDeleteFile?: (path: string) => void;
+  onRenameFile?: (path: string, newPath: string) => void;
+  onMoveFile?: (path: string, newPath: string) => void; // Distinction for UI, same backend
 }
 
-export const MillerColumn = ({ items, activeId, variant, onItemClick }: MillerColumnProps) => {
+export const MillerColumn = ({
+  items,
+  activeId,
+  variant,
+  onItemClick,
+  onDeleteFile,
+  onRenameFile,
+  onMoveFile
+}: MillerColumnProps) => {
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+
+  // Close menu on click outside
+  useEffect(() => {
+    const handleClick = () => setActiveMenu(null);
+    if (activeMenu) {
+      window.addEventListener('click', handleClick);
+    }
+    return () => window.removeEventListener('click', handleClick);
+  }, [activeMenu]);
+
   if (variant === 'GRID') {
     // Current Active View - The Grid
     return (
@@ -24,9 +47,6 @@ export const MillerColumn = ({ items, activeId, variant, onItemClick }: MillerCo
         )}
       >
         {items.map((tile) => {
-          // DEBUG: Log dimensions
-          h('script', {}, `console.log('Rendering Tile ${tile.id}', { title: '${tile.title}' })`);
-
           return (
             <div
               key={tile.id}
@@ -41,14 +61,76 @@ export const MillerColumn = ({ items, activeId, variant, onItemClick }: MillerCo
                   <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity truncate flex-1 mr-2">
                     {tile.title}
                   </MonoText>
-                  {tile.type === 'FOLDER' ? (
-                    <Folder size={12} className="text-[var(--los-muted)] group-hover:text-[var(--los-accent)] shrink-0" />
-                  ) : (
-                    <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors shrink-0" />
-                  )}
+
+                  <div className="flex items-center gap-1">
+                    {tile.type === 'FOLDER' ? (
+                      <Folder size={12} className="text-[var(--los-muted)] group-hover:text-[var(--los-accent)] shrink-0" />
+                    ) : (
+                      <>
+                        {/* Context Menu Trigger */}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenu(activeMenu === tile.id ? null : tile.id.toString());
+                          }}
+                          className="p-1 hover:bg-white/10 rounded cursor-pointer text-[var(--los-muted)] hover:text-white"
+                        >
+                          <MoreVertical size={12} />
+                        </div>
+                        {/* Context Menu */}
+                        {activeMenu === tile.id && (
+                          <div
+                            className="absolute top-8 right-2 z-50 bg-[#1a1a1f] border border-[var(--los-border)] shadow-xl rounded flex flex-col min-w-[120px] py-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div
+                              className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenu(null);
+                                const newName = prompt("Rename to:", tile.title);
+                                if (newName && newName !== tile.title) {
+                                  // Keep dir, change name
+                                  const parts = tile.id.toString().split('/');
+                                  parts.pop();
+                                  const newPath = [...parts, newName].join('/');
+                                  onRenameFile?.(tile.id.toString(), newPath);
+                                }
+                              }}
+                            >
+                              <Edit size={12} /> Rename
+                            </div>
+                            <div
+                              className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenu(null);
+                                const newPath = prompt("Move to path:", tile.id.toString());
+                                if (newPath && newPath !== tile.id.toString()) {
+                                  onMoveFile?.(tile.id.toString(), newPath);
+                                }
+                              }}
+                            >
+                              <Move size={12} /> Move
+                            </div>
+                            <div
+                              className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs text-red-400 hover:text-red-300"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenu(null);
+                                onDeleteFile?.(tile.id.toString());
+                              }}
+                            >
+                              <Trash size={12} /> Delete
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto min-h-0 w-full mb-1">
+                <div className="flex-1 overflow-y-auto min-h-0 w-full mb-1 pointer-events-none opacity-50">
                   {tile.content}
                 </div>
 

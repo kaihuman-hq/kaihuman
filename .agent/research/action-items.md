@@ -256,6 +256,6 @@ Add a new menu item to the magic menu to create a new quick note. The quick note
 
 ### 3.6 File management
 
-[ ] 3.6.1 It must be possible to delete files. The file tile in the file view should have a menu with a delete option. 
-[ ] 3.6.2 It must be possible to move files. The file tile in the file view should have a menu with a move option. For this the user should be able to select a target folder like in the new file creation modal.
-[ ] 3.6.3 It must be possible to rename files. The file tile in the file view should have a menu with a rename option. 
+[x] 3.6.1 It must be possible to delete files. The file tile in the file view should have a menu with a delete option. 
+[x] 3.6.2 It must be possible to move files. The file tile in the file view should have a menu with a move option. For this the user should be able to select a target folder like in the new file creation modal.
+[x] 3.6.3 It must be possible to rename files. The file tile in the file view should have a menu with a rename option. 

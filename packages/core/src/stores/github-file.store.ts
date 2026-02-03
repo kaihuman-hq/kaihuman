@@ -374,6 +374,145 @@ export class GithubFileStore {
 
     await this.saveFile(path);
   }
+
+  async deleteFile(path: string) {
+    const repo = githubProfileStore.currentRepo.value;
+    if (!repo) return;
+
+    // 1. Get SHA (from open files or tree)
+    let sha = this.openFiles.value[path]?.sha;
+    if (!sha) {
+      const item = this.tree.value.find(t => t.path === path);
+      sha = item?.sha || '';
+    }
+
+    // If still no SHA, we might need to fetch it, or it's a new unsaved file
+    if (!sha) {
+      console.warn(`[GithubFileStore] No SHA found for ${path}, attempting to fetch...`);
+      try {
+        const { sha: serverSha } = await githubService.getFileContent(repo.owner.login, repo.name, path);
+        sha = serverSha;
+      } catch (e) {
+        console.error(`[GithubFileStore] Could not find SHA for ${path}, cannot delete.`);
+        // If it doesn't exist on server, just clean up local state
+      }
+    }
+
+    // 2. Delete from Server
+    if (sha) {
+      this.isLoading.value = true;
+      try {
+        await githubService.deleteFile(repo.owner.login, repo.name, path, `Delete ${path}`, sha);
+      } catch (e) {
+        console.error(`[GithubFileStore] Failed to delete ${path}`, e);
+        throw e;
+      } finally {
+        this.isLoading.value = false;
+      }
+    }
+
+    // 3. Update Local State (Tree, OpenFiles, DB)
+
+    // Remove from Tree
+    this.tree.value = this.tree.value.filter(t => t.path !== path);
+    // Remove from OpenFiles
+    const newOpenFiles = { ...this.openFiles.value };
+    delete newOpenFiles[path];
+    this.openFiles.value = newOpenFiles;
+
+    // Clear Active if it was this one
+    if (this.activeFile.value === path) {
+      this.activeFile.value = null;
+    }
+
+    // Update DB
+    const cacheKey = `${repo.full_name}:${path}`;
+    dbPromise.then(async db => {
+      await db.delete('files', cacheKey);
+      await db.put('trees', this.tree.value, `tree:${repo.full_name}`);
+    });
+  }
+
+  async renameFile(oldPath: string, newPath: string) {
+    const repo = githubProfileStore.currentRepo.value;
+    if (!repo) return;
+
+    if (this.openFiles.value[newPath] || this.tree.value.find(t => t.path === newPath)) {
+      throw new Error(`Destination ${newPath} already exists`);
+    }
+
+    this.isLoading.value = true;
+
+    try {
+      // 1. Get Content
+      // Try open files first
+      let content = this.openFiles.value[oldPath]?.content;
+
+      // If not open, try to load it
+      if (content === undefined) {
+        await this.openFile(oldPath);
+        content = this.openFiles.value[oldPath]?.content;
+      }
+
+      if (content === undefined) {
+        throw new Error(`Could not load content for ${oldPath}`);
+      }
+
+      // 2. Create new file
+      // 2. Create new file
+
+      // Actually we can use our existing methods but we need to be careful with atomicity manually
+      // Use direct service calls to avoid UI flicker or state updates mid-flight?
+      // No, strictly: Create New -> Delete Old.
+
+      await this.saveFileDirectly(newPath, content); // We need a direct save that accepts content, not just from state
+
+      // 3. Delete old file
+      await this.deleteFile(oldPath);
+
+      // 4. Update Open Files to point to new path if it was open
+      // deleteFile handled removal. 
+      // We should open the new file.
+      await this.openFile(newPath);
+
+    } catch (e) {
+      console.error(`[GithubFileStore] Rename failed`, e);
+      throw e;
+    } finally {
+      this.isLoading.value = false;
+    }
+  }
+
+  // Helper for rename to avoid complex state juggling
+  async saveFileDirectly(path: string, content: string) {
+    const repo = githubProfileStore.currentRepo.value;
+    if (!repo) return;
+
+    const res = await githubService.saveFile(
+      repo.owner.login,
+      repo.name,
+      path,
+      content,
+      `Create ${path} (Rename)`,
+      undefined // No SHA = Create
+    );
+
+    // Optimistically update our tree
+    const newItem: TreeItem = {
+      path,
+      mode: '100644',
+      type: 'blob',
+      sha: res.content?.sha || '',
+      url: '',
+      size: content.length
+    };
+    this.tree.value = [...this.tree.value, newItem].sort((a, b) => a.path.localeCompare(b.path));
+
+    // Update DB tree
+    dbPromise.then(db => {
+      db.put('trees', this.tree.value, `tree:${repo.full_name}`);
+    });
+  }
 }
 
 export const githubFileStore = new GithubFileStore();

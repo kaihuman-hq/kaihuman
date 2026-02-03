@@ -89,6 +89,9 @@ export interface MainAppProps {
   renderEditor?: (path: string) => ComponentChildren;
   onAddToReadItLater?: (item: ReadItLaterItem) => void;
   onCreateFile?: (path: string, content: string) => void;
+  onDeleteFile?: (path: string) => void;
+  onRenameFile?: (path: string, newPath: string) => void;
+  onMoveFile?: (path: string, newPath: string) => void;
   existingFiles?: string[];
   onLoadFolder?: (path: string) => Promise<TileDef[]>;
   githubToken?: string;
@@ -107,6 +110,11 @@ export const MainApp = ({
   renderEditor,
   onAddToReadItLater,
   onCreateFile,
+  onDeleteFile,
+  onRenameFile,
+  onMoveFile,
+  existingFiles,
+  onLoadFolder,
   githubToken,
   ...props
 }: MainAppProps) => {
@@ -589,6 +597,9 @@ export const MainApp = ({
                         if (onItemClick) onItemClick(item);
                         if (item.type === 'FILE') setActiveTileId(item.id);
                       }}
+                      onDeleteFile={onDeleteFile}
+                      onRenameFile={onRenameFile}
+                      onMoveFile={onMoveFile}
                     />
                   )
                 })}
@@ -704,8 +715,8 @@ export const MainApp = ({
             });
             return Array.from(folders).sort();
           }, [localConfig])}
-          existingFiles={props.existingFiles}
-          onLoadFolder={props.onLoadFolder}
+          existingFiles={existingFiles}
+          onLoadFolder={onLoadFolder}
         />
       )}
 

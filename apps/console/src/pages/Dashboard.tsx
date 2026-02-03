@@ -546,6 +546,17 @@ export const Dashboard = () => {
             console.error('Failed to create file:', e);
           }
         }, [])}
+        onDeleteFile={useCallback(async (path: string) => {
+          if (confirm(`Are you sure you want to delete ${path}?`)) {
+            await githubFileStore.deleteFile(path);
+          }
+        }, [])}
+        onRenameFile={useCallback(async (path: string, newPath: string) => {
+          await githubFileStore.renameFile(path, newPath);
+        }, [])}
+        onMoveFile={useCallback(async (path: string, newPath: string) => {
+          await githubFileStore.renameFile(path, newPath);
+        }, [])}
         existingFiles={tree ? tree.map(t => t.path) : []}
         onLoadFolder={async (path: string) => {
           const prefix = path ? (path.endsWith('/') ? path : `${path}/`) : '';
