@@ -129,6 +129,7 @@ export const MainApp = ({
   const [showFiles, setShowFiles] = useState(false); // Toggle for "Files" view
   const [showNewFileWizard, setShowNewFileWizard] = useState(false);
   const [fileToMove, setFileToMove] = useState<string | null>(null);
+  const [zenMode, setZenMode] = useState(false); // Zen Mode state
 
   // Store original config when entering Drag Mode for cancellation
   const [originalConfig, setOriginalConfig] = useState<DashboardConfig | undefined>(undefined);
@@ -488,6 +489,11 @@ export const MainApp = ({
         e.preventDefault();
         setShowSearch(prev => !prev);
       }
+      // Toggle Zen Mode (Ctrl+Shift+Z or Cmd+Shift+Z)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        setZenMode(prev => !prev);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -541,14 +547,13 @@ export const MainApp = ({
           setShowSearch(false);
         }}
       />
-      {/* Desktop Navigation Overlays */}
-
-      <MainGrid viewState={activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
+      {/* CENTER STAGE: The Matrix OR The Active Tile */}
+      <MainGrid viewState={zenMode ? 'ZEN' : (activeTileId !== null ? 'FOCUS' : 'DASHBOARD')}>
         <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : undefined} column="center">
           {activeTileId === null ? (
             isMillerMode ? (
-              // MILLER COLUMNS LAYOUT
-              <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto">
+              // MILLER COLUMNS LAYOUT (Centered & Max-Width)
+              <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto mx-auto w-full max-w-screen-2xl">
                 {fileSystem!.columns.map((col, index) => {
                   const isLast = index === fileSystem!.columns.length - 1;
                   return (
@@ -649,6 +654,8 @@ export const MainApp = ({
               tile={activeTile!}
               onClose={() => setActiveTileId(null)}
               renderEditor={renderEditor}
+              zenMode={zenMode}
+              onToggleZenMode={() => setZenMode(prev => !prev)}
             />
           )}
         </Tile>
@@ -771,53 +778,54 @@ export const MainApp = ({
       )}
 
       {/* Sticky Status Bar */}
-      <StatusBar
-        mode={activeTileId !== null ? "FOCUS" : (showFiles ? "FILES" : (dragEnabled ? "DND" : "NORMAL"))}
-        breadcrumbs={getBreadcrumbs()}
-        stats={[
-          { label: "TILES", value: displayTiles.length.toString() },
-          ...(localConfig ? [{ label: "WORKSPACE", value: localConfig.dashboards.find(d => d.id === currentDashboardId)?.name || "UNKNOWN" }] : [])
-        ]}
-        onDashboardClick={() => {
-          if (dragEnabled) {
-            // Show cancellation menu or just cancel?
-          } else {
-            handleDashboardClick();
-          }
-        }}
+      {!zenMode && (
+        <StatusBar
+          mode={activeTileId !== null ? "FOCUS" : (showFiles ? "FILES" : (dragEnabled ? "DND" : "NORMAL"))}
+          breadcrumbs={getBreadcrumbs()}
+          stats={[
+            { label: "TILES", value: displayTiles.length.toString() },
+            ...(localConfig ? [{ label: "WORKSPACE", value: localConfig.dashboards.find(d => d.id === currentDashboardId)?.name || "UNKNOWN" }] : [])
+          ]}
+          onDashboardClick={() => {
+            if (dragEnabled) {
+              // Show cancellation menu or just cancel?
+            } else {
+              handleDashboardClick();
+            }
+          }}
 
-        // Repository Switcher (Always available if props provided)
-        currentRepository={props.currentRepository}
-        repositories={props.repositories}
-        onSelectRepository={props.onSelectRepository}
+          // Repository Switcher (Always available if props provided)
+          currentRepository={props.currentRepository}
+          repositories={props.repositories}
+          onSelectRepository={props.onSelectRepository}
 
-        // Workspace Switcher (Only if config exists)
-        currentWorkspace={localConfig ? { id: currentDashboardId || '', name: localConfig.dashboards?.find(d => d.id === currentDashboardId)?.name || 'Unknown' } : undefined}
-        workspaces={localConfig ? localConfig.dashboards.map(d => ({ id: d.id, name: d.name })) : undefined}
-        onSelectWorkspace={(ws) => {
-          if (!dragEnabled && localConfig) {
-            setActiveDashboardId(ws.id);
-            setShowFiles(false); // Switch back to dashboard view
-          }
-        }}
-        onNextWorkspace={!dragEnabled && localConfig ? handleNextDashboard : undefined}
+          // Workspace Switcher (Only if config exists)
+          currentWorkspace={localConfig ? { id: currentDashboardId || '', name: localConfig.dashboards?.find(d => d.id === currentDashboardId)?.name || 'Unknown' } : undefined}
+          workspaces={localConfig ? localConfig.dashboards.map(d => ({ id: d.id, name: d.name })) : undefined}
+          onSelectWorkspace={(ws) => {
+            if (!dragEnabled && localConfig) {
+              setActiveDashboardId(ws.id);
+              setShowFiles(false); // Switch back to dashboard view
+            }
+          }}
+          onNextWorkspace={!dragEnabled && localConfig ? handleNextDashboard : undefined}
 
-        menuItems={dragEnabled ? [
-          { label: "Save Order", onClick: handleDragSave },
-          { label: "Cancel Reorder", onClick: handleDragCancel }
-        ] : [
-          { label: "New File", onClick: () => setShowNewFileWizard(true) },
-          {
-            label: "Quick Note",
-            onClick: async () => {
-              const now = new Date();
-              const pad = (n: number) => n.toString().padStart(2, '0');
-              // Format: quicknote-YYYY-MM-DD-HH:mm:ss.md
-              const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-              const filename = `quicknote-${timestamp}.md`;
-              const path = `.lifeos/quicknotes/${filename}`;
+          menuItems={dragEnabled ? [
+            { label: "Save Order", onClick: handleDragSave },
+            { label: "Cancel Reorder", onClick: handleDragCancel }
+          ] : [
+            { label: "New File", onClick: () => setShowNewFileWizard(true) },
+            {
+              label: "Quick Note",
+              onClick: async () => {
+                const now = new Date();
+                const pad = (n: number) => n.toString().padStart(2, '0');
+                // Format: quicknote-YYYY-MM-DD-HH:mm:ss.md
+                const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+                const filename = `quicknote-${timestamp}.md`;
+                const path = `.lifeos/quicknotes/${filename}`;
 
-              const content = `---
+                const content = `---
 type: generic
 created: ${now.toISOString()}
 description: A generic markdown document template for general note-taking and documentation.
@@ -825,56 +833,57 @@ abbreviations: undefined
 ---
 
 `;
-              if (onCreateFile) {
-                await onCreateFile(path, content);
-              }
-              // Open file view
-              setShowFiles(true);
-              // Navigate to it
-              setActiveTileId(path);
-            }
-          },
-          { label: "Files", onClick: () => setShowFiles(true) },
-          ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
-          ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
-        ]}
-        recentFiles={!dragEnabled && localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
-          label: path,
-          onClick: () => {
-            const conf = localConfig;
-            if (conf) {
-              const entry = conf.entries.find(e => e.path === path);
-              if (entry) {
-                // Scenario 1: File is pinned to a Dashboard
-                setShowFiles(false); // Switch to dashboard view
-                setActiveDashboardId(entry.dashboard);
-                setActiveTileId(entry.path);
-              } else {
-                // Scenario 2: File is NOT on any dashboard (accessed via File Tree)
-                // We switch to "Files" mode (Miller Columns) and try to navigate to it.
-                console.log("File not found in dashboard, switching to File View:", path);
-                setShowFiles(true);
-                // Trigger navigation in parent (Dashboard.tsx) to update columns
-                if (onItemClick) {
-                  onItemClick({
-                    id: path,
-                    title: path.split('/').pop() || path,
-                    type: 'FILE'
-                  });
+                if (onCreateFile) {
+                  await onCreateFile(path, content);
                 }
-                // Also set active tile locally so it focuses if rendered
+                // Open file view
+                setShowFiles(true);
+                // Navigate to it
                 setActiveTileId(path);
               }
+            },
+            { label: "Files", onClick: () => setShowFiles(true) },
+            ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
+            ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
+          ]}
+          recentFiles={!dragEnabled && localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
+            label: path,
+            onClick: () => {
+              const conf = localConfig;
+              if (conf) {
+                const entry = conf.entries.find(e => e.path === path);
+                if (entry) {
+                  // Scenario 1: File is pinned to a Dashboard
+                  setShowFiles(false); // Switch to dashboard view
+                  setActiveDashboardId(entry.dashboard);
+                  setActiveTileId(entry.path);
+                } else {
+                  // Scenario 2: File is NOT on any dashboard (accessed via File Tree)
+                  // We switch to "Files" mode (Miller Columns) and try to navigate to it.
+                  console.log("File not found in dashboard, switching to File View:", path);
+                  setShowFiles(true);
+                  // Trigger navigation in parent (Dashboard.tsx) to update columns
+                  if (onItemClick) {
+                    onItemClick({
+                      id: path,
+                      title: path.split('/').pop() || path,
+                      type: 'FILE'
+                    });
+                  }
+                  // Also set active tile locally so it focuses if rendered
+                  setActiveTileId(path);
+                }
+              }
             }
+          })) : []
           }
-        })) : []
-        }
-      />
+        />
+      )}
     </div>
   );
 };
 
-const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string) => ComponentChildren }) => {
+const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void }) => {
   if (!tile) return null; // Guard against undefined tile
 
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
@@ -894,21 +903,39 @@ const FocusedTile = ({ tile, onClose, renderEditor }: { tile: TileDef; onClose: 
 
   return (
     <div
-      className="absolute top-0 left-0 right-0 bottom-8 bg-[var(--los-bg)] z-10 p-8 flex flex-col"
+      className={cn(
+        "absolute top-0 bottom-8 bg-[var(--los-bg)] z-10 p-8 flex flex-col",
+        "left-0 right-0 mx-auto w-full max-w-screen-2xl" // Center & Constrain
+      )}
       key={`focused-${tile.id}`}
     >
       <div
         className="flex-1 border border-[var(--los-border)] flex flex-col relative bg-[var(--los-bg)] animate-in fade-in slide-in-from-bottom-4 duration-300"
       >
-        {/* Header / Controls */}
-        <div className="min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2">
+        {/* Header / Controls - Dim in Zen Mode */}
+        <div className={cn(
+          "min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2 transition-opacity duration-500",
+          zenMode ? "opacity-10 hover:opacity-100" : "opacity-100"
+        )}>
           <div className="flex items-center justify-between w-full gap-4">
             <MonoHeader className="text-[var(--los-accent)] text-lg">
               {tile.id.toString().split('/').pop()}
             </MonoHeader>
 
             {/* Close Button (Desktop & Mobile) */}
-            <div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleZenMode?.(); }}
+                className={cn(
+                  "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                  zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                )}
+                title="Toggle Zen Mode (Ctrl+Shift+Z)"
+              >
+                {zenMode ? <span className="text-[10px] hidden md:inline">EXIT ZEN</span> : <span className="text-[10px] hidden md:inline">ZEN MODE</span>}
+                <div className={cn("w-2 h-2 border transition-colors", zenMode ? "bg-[var(--los-accent)] border-[var(--los-accent)]" : "border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+              </button>
+
               <button
                 onClick={(e) => { e.stopPropagation(); onClose(); }}
                 className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
