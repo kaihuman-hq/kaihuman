@@ -281,9 +281,17 @@ export const NewFileWizard = ({ onClose, onCreate, fileSystem, availableFolders 
                 <div className="space-y-2">
                   <div className="flex justify-between items-end">
                     <MonoLabel>LOCATION</MonoLabel>
-                    <MonoText className="text-xs text-[var(--los-muted)]">
-                      Selected: <span className="text-[var(--los-fg)]">{selectedFolder || '/ (root)'}</span>
-                    </MonoText>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedFolder('')}
+                        className="text-[10px] text-[var(--los-muted)] hover:text-[var(--los-accent)] uppercase border border-[var(--los-border)] px-1.5 py-0.5 rounded hover:bg-white/5 transition-colors"
+                      >
+                        Select Root
+                      </button>
+                      <MonoText className="text-xs text-[var(--los-muted)]">
+                        Selected: <span className="text-[var(--los-fg)]">{selectedFolder || '/ (root)'}</span>
+                      </MonoText>
+                    </div>
                   </div>
 
                   <FolderSelector

@@ -805,7 +805,6 @@ abbreviations: undefined
             }
           },
           { label: "Files", onClick: () => setShowFiles(true) },
-          { label: "Files", onClick: () => setShowFiles(true) },
           ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
           ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
         ]}
