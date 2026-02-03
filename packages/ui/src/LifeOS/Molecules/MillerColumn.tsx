@@ -1,10 +1,10 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
 import { cn } from '../../utils';
 import { TileDef } from '../Layouts/MainApp';
-import { MonoText } from '../Atoms/Typography';
-import { Folder, FileText, MoreVertical, Trash, Edit, Move } from 'lucide-preact';
+import { MonoText, MonoLabel } from '../Atoms/Typography';
+import { Folder, FileText, MoreVertical, Trash, Edit, Move, Search as SearchIcon, X } from 'lucide-preact';
 
 export interface MillerColumnProps {
   items: TileDef[];
@@ -27,6 +27,16 @@ export const MillerColumn = ({
 }: MillerColumnProps) => {
   const [activeMenu, setActiveMenu] = useState<{ id: string, x: number, y: number } | null>(null);
 
+  // Search State
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Filter items based on search
+  const filteredItems = items.filter(item =>
+    item.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   // Close menu on click outside
   useEffect(() => {
     const handleClick = () => setActiveMenu(null);
@@ -36,15 +46,32 @@ export const MillerColumn = ({
     return () => window.removeEventListener('click', handleClick);
   }, [activeMenu]);
 
+  // Ctrl+F Handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        if (variant === 'GRID') { // Only valid for current view if focused? Or globally if this component is mounted?
+          // Since this component is mounted when visualizing files, this should be fine.
+          e.preventDefault();
+          setShowSearch(true);
+          setTimeout(() => searchInputRef.current?.focus(), 50);
+        }
+      }
+      if (e.key === 'Escape' && showSearch) {
+        setShowSearch(false);
+        setSearchQuery('');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [variant, showSearch]);
+
+
   // Shared context menu renderer (using Portal)
   const renderContextMenu = () => {
     if (!activeMenu) return null;
     const tile = items.find(i => i.id.toString() === activeMenu.id);
     if (!tile) return null;
-
-    // Calculate position to prevent overflow? 
-    // Simple fixed for now: right/top aligned to trigger or mouse.
-    // Using simple logic: slightly offset from click/trigger
 
     return createPortal(
       <div
@@ -93,86 +120,141 @@ export const MillerColumn = ({
     );
   };
 
-  const handleMenuTrigger = (e: any, id: string) => { // Using simple event type
+  const handleMenuTrigger = (e: any, id: string) => {
     e.stopPropagation();
     if (activeMenu?.id === id) {
       setActiveMenu(null);
       return;
     }
     const rect = e.currentTarget.getBoundingClientRect();
-    // Position menu: Bottom Left of the trigger button? Or Right?
-    // Let's explicitly place it nearby.
-    // Position: Right aligned to button?
-    // Let's place it slightly below and left-aligned to button
     setActiveMenu({ id, x: rect.left, y: rect.bottom + 5 });
   };
 
   if (variant === 'GRID') {
     return (
-      <>
+      <div className="flex flex-col flex-1 h-full min-w-0 w-full relative">
+        {/* Search Bar - conditionally shown */}
+        {showSearch && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4 animate-in slide-in-from-top-2 fade-in duration-200">
+            <div className="bg-[var(--los-bg)] border border-[var(--los-accent)] shadow-[0_0_15px_rgba(var(--los-accent-rgb),0.2)] rounded-full flex items-center px-4 py-2 gap-2">
+              <SearchIcon size={16} className="text-[var(--los-accent)]" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onInput={(e) => setSearchQuery(e.currentTarget.value)}
+                placeholder="Filter..."
+                className="bg-transparent border-none outline-none text-sm text-[var(--los-fg)] flex-1 placeholder:text-[var(--los-muted)]"
+              />
+              <button onClick={() => { setSearchQuery(''); setShowSearch(false); }} className="hover:text-[var(--los-accent)]">
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div
           className={cn(
-            "grid gap-px bg-[var(--los-bg)] overflow-y-auto overflow-x-hidden flex-1 h-full min-w-0 w-full",
+            "grid gap-px bg-[var(--los-bg)] overflow-y-auto overflow-x-hidden flex-1",
             "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-8",
             "content-start",
             "animate-in fade-in slide-in-from-right-4 duration-300"
           )}
         >
-          {items.map((tile) => (
+          {filteredItems.map((tile) => (
             <div
               key={tile.id}
               onClick={() => onItemClick(tile)}
               className={cn(
-                "ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[50%]",
+                "ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%] aspect-square flex items-center justify-center",
                 tile.type === 'FOLDER' ? "bg-[var(--los-accent)]/5" : "bg-[var(--los-bg)]"
               )}
             >
-              <div className="absolute inset-0 overflow-hidden p-3 flex flex-col">
-                <div className="flex justify-between items-center shrink-0 mb-1">
-                  <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity truncate flex-1 mr-2">
-                    {tile.title}
-                  </MonoText>
+              <div className="absolute inset-0 overflow-hidden p-6 flex flex-col items-center justify-center text-center">
 
-                  <div className="flex items-center gap-1">
-                    {tile.type === 'FOLDER' ? (
-                      <Folder size={12} className="text-[var(--los-muted)] group-hover:text-[var(--los-accent)] shrink-0" />
-                    ) : (
-                      <div
-                        onClick={(e) => handleMenuTrigger(e, tile.id.toString())}
-                        className={cn(
-                          "p-1 hover:bg-white/10 rounded cursor-pointer transition-colors relative",
-                          activeMenu?.id === tile.id ? "text-white bg-white/10" : "text-[var(--los-muted)] hover:text-white"
-                        )}
-                      >
-                        <MoreVertical size={12} />
-                      </div>
-                    )}
+                {/* Icon (Large) */}
+                <div className="mb-4 text-[var(--los-muted)] group-hover:text-[var(--los-accent)] transition-colors">
+                  {tile.type === 'FOLDER' ? <Folder size={32} /> : <FileText size={32} />}
+                </div>
+
+                {/* Title (Big & Focused) */}
+                <MonoText
+                  className={cn(
+                    "text-sm sm:text-base font-bold truncate w-full px-2",
+                    "text-[var(--los-fg)] group-hover:text-[var(--los-accent)] transition-colors"
+                  )}
+                  title={tile.title}
+                >
+                  {tile.title}
+                </MonoText>
+
+                {/* Menu Trigger (Top Right) */}
+                {tile.type === 'FILE' && (
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div
+                      onClick={(e) => handleMenuTrigger(e, tile.id.toString())}
+                      className={cn(
+                        "p-1 hover:bg-white/10 rounded cursor-pointer transition-colors relative",
+                        activeMenu?.id === tile.id ? "text-white bg-white/10 opacity-100" : "text-[var(--los-muted)] hover:text-white"
+                      )}
+                    >
+                      <MoreVertical size={16} />
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="flex-1 overflow-y-auto min-h-0 w-full mb-1 pointer-events-none opacity-50">
-                  {tile.content}
-                </div>
-
-                <div className="text-right shrink-0 mt-auto">
-                  <MonoText className="text-[10px] text-[var(--los-muted)]">
-                    {`ID: ${tile.id.toString().toUpperCase().slice(0, 4)}`}
+                {/* ID Label (Subtle, Bottom) */}
+                <div className="absolute bottom-2 text-center w-full opacity-0 group-hover:opacity-100 transition-opacity">
+                  <MonoText className="text-[9px] text-[var(--los-muted)] tracking-wider">
+                    {tile.id.toString().toUpperCase().slice(0, 4)}
                   </MonoText>
                 </div>
+
               </div>
             </div>
           ))}
+          {filteredItems.length === 0 && (
+            <div className="col-span-full h-32 flex flex-col items-center justify-center text-[var(--los-muted)] gap-2">
+              <MonoText>No items found.</MonoText>
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="text-xs underline hover:text-[var(--los-fg)]">Clear Search</button>
+              )}
+            </div>
+          )}
         </div>
         {renderContextMenu()}
-      </>
+      </div>
     );
   }
 
-  // LIST view
+  // LIST view - unchanged logic but uses filteredItems? 
+  // User req was: "This view the shortcut ctrl+f must open a search input... within the current folder".
+  // Assuming list view also benefits from filtering? "Make sure this is only affecting the files view!"
+  // This layout IS the files view.
   return (
     <>
-      <div className="w-16 md:w-48 lg:w-64 border-r border-[var(--los-border)] h-full overflow-y-auto shrink-0 flex flex-col bg-[var(--los-bg)] animate-in fade-in slide-in-from-left-4 duration-300">
-        {items.map((tile) => (
+      {/* Search Bar for List View too? */}
+      {showSearch && (
+        <div className="absolute top-4 left-16 z-50 w-64 px-4 animate-in slide-in-from-left-2 fade-in duration-200">
+          <div className="bg-[var(--los-bg)] border border-[var(--los-accent)] shadow-xl rounded-full flex items-center px-4 py-2 gap-2">
+            <SearchIcon size={14} className="text-[var(--los-accent)]" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onInput={(e) => setSearchQuery(e.currentTarget.value)}
+              placeholder="Filter..."
+              className="bg-transparent border-none outline-none text-xs text-[var(--los-fg)] flex-1 placeholder:text-[var(--los-muted)] min-w-0"
+            />
+            <button onClick={() => { setSearchQuery(''); setShowSearch(false); }} className="hover:text-[var(--los-accent)]">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="w-16 md:w-48 lg:w-64 border-r border-[var(--los-border)] h-full overflow-y-auto shrink-0 flex flex-col bg-[var(--los-bg)] animate-in fade-in slide-in-from-left-4 duration-300 relative">
+        {filteredItems.map((tile) => (
           <div
             key={tile.id}
             onClick={() => onItemClick(tile)}
