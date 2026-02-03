@@ -77,7 +77,7 @@ export interface MainAppProps {
   fileContents?: Record<string, string>; // Map path -> content
   onConfigChange?: (newConfig: DashboardConfig) => void;
   fileSystem?: FileSystemState;
-  onNavigate?: (path: string[]) => void; // Path is list of IDs
+  onNavigate?: (path: string[]) => void;
   onItemClick?: (item: TileDef) => void;
   renderFile?: (path: string) => ComponentChildren;
   onFileChange?: (path: string, newContent: string) => void;
@@ -91,9 +91,25 @@ export interface MainAppProps {
   onCreateFile?: (path: string, content: string) => void;
   existingFiles?: string[];
   onLoadFolder?: (path: string) => Promise<TileDef[]>;
+  githubToken?: string;
 }
 
-export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onConfigChange, fileSystem, onItemClick, onNavigate, renderFile, onFileChange, renderEditor, onAddToReadItLater, onCreateFile, ...props }: MainAppProps) => {
+export const MainApp = ({
+  tiles = [],
+  config,
+  fileContents = {},
+  onConfigChange,
+  fileSystem,
+  onItemClick,
+  onNavigate,
+  renderFile,
+  onFileChange,
+  renderEditor,
+  onAddToReadItLater,
+  onCreateFile,
+  githubToken,
+  ...props
+}: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
 
@@ -444,25 +460,8 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
     setActiveDashboardId(config.dashboards[prevIndex]?.id || null);
   };
 
-  // Grid Mode State
-  const [gridMode, setGridMode] = useState<'AUTO' | '1' | '2' | '3' | '4'>('AUTO');
-
   const getResponsiveGridClass = (count: number) => {
-    // Manual Overrides
-    if (gridMode === '1') return "grid-cols-1";
-    if (gridMode === '2') return "grid-cols-1 sm:grid-cols-2";
-    if (gridMode === '3') return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3";
-    if (gridMode === '4') return "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2"; // 2x2 preference as requested
-
-    // AUTO Mode Logic
-    if (count <= 1) return "grid-cols-1";
-    if (count === 2) return "grid-cols-1 sm:grid-cols-2";
-    if (count === 3) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3";
-    if (count === 4) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-2"; // 4 items -> 2x2
-    if (count === 5) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
-    if (count === 6) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
-    if (count === 7) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-7";
-    return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8";
+    return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
   };
 
   // Search State
@@ -493,7 +492,8 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
       <SearchModal
         isOpen={showSearch}
         onClose={() => setShowSearch(false)}
-        currentRepository={props.currentRepository?.id || (localConfig?.dashboards[0]?.name ? undefined : "lifosy/monorepo")} // Fallback or use context
+        currentRepository={props.currentRepository?.name || "Lifosy/monorepo"}
+        githubToken={githubToken}
         onSelect={(item) => {
           // If item is in current dashboard, focus it
           const tile = displayTiles.find(t => t.id === item.path);
@@ -537,8 +537,8 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
               e.stopPropagation();
               handlePrevDashboard();
             }}
-            className="hidden md:flex absolute top-0 left-0 bottom-8 w-16 z-20 items-center justify-start pl-2 
-                       hover:bg-gradient-to-r from-black/40 to-transparent 
+            className="hidden md:flex absolute top-0 left-0 bottom-8 w-16 z-20 items-center justify-start pl-2
+                       hover:bg-gradient-to-r from-black/40 to-transparent
                        opacity-0 hover:opacity-100 transition-all duration-300 cursor-pointer group"
           >
             <div className="text-white/50 group-hover:text-white group-hover:-translate-x-1 transition-transform duration-300 transform translate-x-1">
@@ -554,8 +554,8 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
               e.stopPropagation();
               handleNextDashboard();
             }}
-            className="hidden md:flex absolute top-0 right-0 bottom-8 w-16 z-20 items-center justify-end pr-2 
-                       hover:bg-gradient-to-l from-black/40 to-transparent 
+            className="hidden md:flex absolute top-0 right-0 bottom-8 w-16 z-20 items-center justify-end pr-2
+                       hover:bg-gradient-to-l from-black/40 to-transparent
                        opacity-0 hover:opacity-100 transition-all duration-300 cursor-pointer group"
           >
             <div className="text-white/50 group-hover:text-white group-hover:translate-x-1 transition-transform duration-300 transform -translate-x-1">
@@ -713,12 +713,8 @@ export const MainApp = ({ tiles = defaultTiles, config, fileContents = {}, onCon
         mode={activeTileId !== null ? "FOCUS" : (showFiles ? "FILES" : (dragEnabled ? "DND" : "NORMAL"))}
         breadcrumbs={getBreadcrumbs()}
         stats={[
-          {
-            label: "GRID",
-            value: gridMode,
-            options: ['AUTO', '1', '2', '3', '4'],
-            onOptionSelect: (opt: any) => setGridMode(opt)
-          }
+          { label: "TILES", value: displayTiles.length.toString() },
+          ...(localConfig ? [{ label: "WORKSPACE", value: localConfig.dashboards.find(d => d.id === currentDashboardId)?.name || "UNKNOWN" }] : [])
         ]}
         onDashboardClick={() => {
           if (dragEnabled) {

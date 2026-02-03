@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import { useEffect, useState, useCallback } from 'preact/hooks';
 import { useSignal, effect } from '@preact/signals';
-import { githubFileStore, githubProfileStore } from '@lifosy/core';
+import { githubFileStore, githubProfileStore, authStore } from '@lifosy/core';
 import {
   MainApp,
   TileDef,
@@ -551,6 +551,7 @@ export const Dashboard = () => {
           const prefix = path ? (path.endsWith('/') ? path : `${path}/`) : '';
           return getChildren(prefix);
         }}
+        githubToken={authStore.token.value || undefined}
       />
     </div>
   );

@@ -19,9 +19,10 @@ export interface SearchModalProps {
   onClose: () => void;
   onSelect: (item: SearchResult) => void;
   currentRepository?: string; // e.g. "owner/repo"
+  githubToken?: string;
 }
 
-export const SearchModal = ({ isOpen, onClose, onSelect, currentRepository = "lifosy/monorepo" }: SearchModalProps) => {
+export const SearchModal = ({ isOpen, onClose, onSelect, currentRepository = "lifosy/monorepo", githubToken }: SearchModalProps) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,10 +49,17 @@ export const SearchModal = ({ isOpen, onClose, onSelect, currentRepository = "li
       try {
         // Search in the specific repository
         const q = encodeURIComponent(`${query} repo:${currentRepository}`);
+
+        const headers: Record<string, string> = {
+          'Accept': 'application/vnd.github.v3+json'
+        };
+
+        if (githubToken) {
+          headers['Authorization'] = `Bearer ${githubToken}`;
+        }
+
         const res = await fetch(`https://api.github.com/search/code?q=${q}&per_page=10`, {
-          headers: {
-            'Accept': 'application/vnd.github.v3+json'
-          }
+          headers
         });
 
         if (res.ok) {
@@ -59,7 +67,7 @@ export const SearchModal = ({ isOpen, onClose, onSelect, currentRepository = "li
           setResults(data.items || []);
           setSelectedIndex(0);
         } else {
-          console.error('Search failed', res.statusText);
+          console.error('Search failed', res.status, res.statusText);
         }
       } catch (e) {
         console.error('Search error', e);
@@ -69,7 +77,7 @@ export const SearchModal = ({ isOpen, onClose, onSelect, currentRepository = "li
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [query, currentRepository]);
+  }, [query, currentRepository, githubToken]);
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
