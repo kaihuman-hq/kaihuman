@@ -243,7 +243,7 @@ Semantics:
 
 ### 3.5 Quick Notes
 
-[ ] 3.5.1 Implement a quick notes feature. It should be a new file type called "quick-note". It should be a simple markdown file with a frontmatter (see example below). The new quick note gets an auto-generated file name that includes the current date and time. Example: "quicknote-2025-11-13-16:35:31.md". Frontmatter example:
+[x] 3.5.1 Implement a quick notes feature. It should be a new file type called "quick-note". It should be a simple markdown file with a frontmatter (see example below). The new quick note gets an auto-generated file name that includes the current date and time. Example: "quicknote-2025-11-13-16:35:31.md". Frontmatter example:
 
 ---
 type: generic
@@ -262,4 +262,4 @@ Add a new menu item to the magic menu to create a new quick note. The quick note
 
 ### 3.7 Design
 
-[ ] 3.7.1 Favicon: Add a matching favicon to the app.
+[x] 3.7.1 Favicon: Add a matching favicon to the app.

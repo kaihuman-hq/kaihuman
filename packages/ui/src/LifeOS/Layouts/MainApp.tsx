@@ -777,6 +777,34 @@ export const MainApp = ({
           { label: "Cancel Reorder", onClick: handleDragCancel }
         ] : [
           { label: "New File", onClick: () => setShowNewFileWizard(true) },
+          {
+            label: "Quick Note",
+            onClick: async () => {
+              const now = new Date();
+              const pad = (n: number) => n.toString().padStart(2, '0');
+              // Format: quicknote-YYYY-MM-DD-HH:mm:ss.md
+              const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+              const filename = `quicknote-${timestamp}.md`;
+              const path = `.lifeos/quicknotes/${filename}`;
+
+              const content = `---
+type: generic
+created: ${now.toISOString()}
+description: A generic markdown document template for general note-taking and documentation.
+abbreviations: undefined
+---
+
+`;
+              if (onCreateFile) {
+                await onCreateFile(path, content);
+              }
+              // Open file view
+              setShowFiles(true);
+              // Navigate to it
+              setActiveTileId(path);
+            }
+          },
+          { label: "Files", onClick: () => setShowFiles(true) },
           { label: "Files", onClick: () => setShowFiles(true) },
           ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
           ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
