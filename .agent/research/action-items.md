@@ -380,3 +380,15 @@ The version field is for backward compatibility. So make sure that there is a mi
 ### 3.10 Routing
 
 [x] 3.10.1 For all main views add dedicated routes so it's easier to navigate to them. Root is always the Dashboard View. "/files" navigates to the Files View. "/files/new" opens the new file modal. "/files/[path in repo]" opens the files view or the file in the editor with the path from the parameter - if the path is not valid, or the file is not found, navigate to the files view.
+
+### 3.11 Graph
+
+[ ] 3.11.1 Implement a view that represents how files are connected to each other. Consider only Markdown files where files can be referenced with a link. The graph should be interactive and allow to navigate to the referenced files. For details read the Obsidian docs, the graph should do the same as the Obsidian graph view: https://help.obsidian.md/plugins/graph. Add this as a new entry to the magic menu. Show connections between files in the graph view.
+
+### 3.12 Commits
+
+[ ] 3.12.1 Implement a view that shows the commit history for the current repo. It can be very just a table showing the commits with the commit message, the author, the date and the commit hash. Add this as a new entry to the magic menu.
+
+### 3.13 File history
+
+[ ] 3.13.1 Implement a view that shows the history of a specific file. For each Focused Modal show a new toggle "History" that opens this view. In this view the user can see the history of the file and what changes were made in each commit.
