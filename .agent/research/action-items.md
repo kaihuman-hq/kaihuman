@@ -283,9 +283,9 @@ Add a new menu item to the magic menu to create a new quick note. The quick note
 
 ### 3.9 Dashboard
 
-[ ] 3.9.1 It must be possible to add a file to the Dashboard, so the widget can be rendered. Since it is possible to have multiple workspaces, the user should be able to select a workspace where to put it. 
+[x] 3.9.1 It must be possible to add a file to the Dashboard, so the widget can be rendered. Since it is possible to have multiple workspaces, the user should be able to select a workspace where to put it. 
 
-[ ] 3.9.2 Add a new menu entry to the magic menu called "Settings". This will open a new view where the user can configure settings for the app. All settings are stored in the .lifeos/.dashboard.config.json file. The structure of the file is as follows:
+[x] 3.9.2 Add a new menu entry to the magic menu called "Settings". This will open a new view where the user can configure settings for the app. All settings are stored in the .lifeos/.dashboard.config.json file. The structure of the file is as follows:
 
 - version: the version of the file
 - dashboards: a list of dashboards - these are the workspaces

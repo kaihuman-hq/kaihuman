@@ -1,5 +1,8 @@
 import { ComponentChildren, h } from 'preact';
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
+import { SettingsView } from '../Organisms/SettingsView';
+import { AddToDashboardModal } from '../Organisms/AddToDashboardModal';
+
 import { cn } from '../../utils';
 import { Tile } from '../Molecules/Tile';
 import { StatusBar } from '../Organisms/StatusBar';
@@ -121,6 +124,35 @@ export const MainApp = ({
 }: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAddToDashboard, setShowAddToDashboard] = useState(false);
+  const [fileToAddToDashboard, setFileToAddToDashboard] = useState<string | null>(null);
+
+  const handleAddToDashboard = (dashboardId: string) => {
+    if (!fileToAddToDashboard || !config || !onConfigChange) return;
+
+    // Check if already exists in that dashboard
+    const exists = config.entries.some(e => e.path === fileToAddToDashboard && e.dashboard === dashboardId);
+    if (exists) {
+      alert("File is already in this dashboard.");
+      return;
+    }
+
+    const newEntry: DashboardEntry = {
+      path: fileToAddToDashboard,
+      dashboard: dashboardId,
+      skipOnMobile: false
+    };
+
+    onConfigChange({
+      ...config,
+      entries: [...config.entries, newEntry]
+    });
+
+    setShowAddToDashboard(false);
+    setFileToAddToDashboard(null);
+  };
 
   // Dashboard State
   const [activeDashboardId, setActiveDashboardId] = useState<string | null>(null);
@@ -536,6 +568,27 @@ export const MainApp = ({
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
+      {showSettings && config && onConfigChange && (
+        <SettingsView
+          config={config}
+          onConfigChange={onConfigChange}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {showAddToDashboard && config && (
+        <AddToDashboardModal
+          isOpen={showAddToDashboard}
+          onClose={() => {
+            setShowAddToDashboard(false);
+            setFileToAddToDashboard(null);
+          }}
+          dashboards={config.dashboards}
+          fileName={fileToAddToDashboard || ''}
+          onAddToDashboard={handleAddToDashboard}
+        />
+      )}
+
       {/* Search Modal */}
       <SearchModal
         isOpen={showSearch}
@@ -705,6 +758,10 @@ export const MainApp = ({
               zenMode={zenMode}
               onToggleZenMode={() => setZenMode(prev => !prev)}
               onAddToReadItLater={onAddToReadItLater}
+              onAddToDashboard={config ? (path) => {
+                setFileToAddToDashboard(path);
+                setShowAddToDashboard(true);
+              } : undefined}
             />
           )}
         </Tile>
@@ -892,6 +949,7 @@ abbreviations: undefined
               }
             },
             { label: "Files", onClick: () => { setShowFiles(true); setActiveTileId(null); } },
+            { label: "Settings", onClick: () => setShowSettings(true) },
             ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
             ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
           ]}
@@ -932,7 +990,7 @@ abbreviations: undefined
   );
 };
 
-const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void }) => {
+const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater, onAddToDashboard }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void, onAddToDashboard?: (path: string) => void }) => {
   if (!tile) return null; // Guard against undefined tile
 
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
@@ -977,6 +1035,19 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
 
             {/* Close Button (Desktop & Mobile) */}
             <div className="flex items-center gap-2">
+              {onAddToDashboard && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onAddToDashboard(String(tile.id)); }}
+                  className={cn(
+                    "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                    zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                  )}
+                  title="Add to Dashboard"
+                >
+                  <span className="text-[10px] hidden md:inline">[+ DASHBOARD]</span>
+                  <div className={cn("w-2 h-2 border transition-colors border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+                </button>
+              )}
               <button
                 onClick={(e) => { e.stopPropagation(); onToggleZenMode?.(); }}
                 className={cn(
