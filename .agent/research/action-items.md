@@ -376,3 +376,7 @@ The version field is for backward compatibility. So make sure that there is a mi
     ]
   }
 }
+
+### 3.10 Routing
+
+[ ] 3.10.1 For all main views add dedicated routes so it's easier to navigate to them. Root is always the Dashboard View. "/files" navigates to the Files View. "/files/new" opens the new file modal. "/files/[path in repo]" opens the files view or the file in the editor with the path from the parameter - if the path is not valid, or the file is not found, navigate to the files view.
