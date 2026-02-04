@@ -999,9 +999,9 @@ export const MainApp = ({
 
       {/* Desktop Navigation Overlays (Fix: JS-based hover state for guaranteed visibility) */}
       {(() => {
-        const shouldRender = !activeTileId && localConfig && localConfig.dashboards.length > 1;
+        const shouldRender = !activeTileId && !showFiles && !showGraph && !showCommits && !zenMode && localConfig && localConfig.dashboards.length > 1;
         if (localConfig) {
-          console.log('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: localConfig.dashboards.length, shouldRender, hoverNav });
+          // console.log('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: localConfig.dashboards.length, shouldRender, hoverNav });
         }
         return shouldRender;
       })() && (
@@ -1178,7 +1178,15 @@ abbreviations: undefined
                 setActiveTileId(path);
               }
             },
-            { label: "Files", onClick: () => { setShowFiles(true); setActiveTileId(null); } },
+            {
+              label: "Files", onClick: () => {
+                setShowFiles(true);
+                setActiveTileId(null);
+                setShowGraph(false);
+                setShowCommits(false);
+                setNotFound(false);
+              }
+            },
             { label: "Graph", onClick: () => setShowGraph(true) },
             { label: "Commits", onClick: () => setShowCommits(true) },
             { label: "Settings", onClick: () => setShowSettings(true) },

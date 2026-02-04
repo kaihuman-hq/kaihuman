@@ -181,10 +181,7 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
           graphData={graphData}
           backgroundColor="rgba(0,0,0,0)" // Transparent, let parent bg show
           nodeLabel="name"
-          nodeColor={() => 'var(--los-accent)'} // CSS var doesn't work directly in canvas usually? 
-          // Colors need to be hex strings usually for canvas.
-          // Let's hardcode a nice color or compute it.
-          // Fallback to a concrete color if vars fail. 
+          nodeColor={() => '#d4b769'} // Use explicit Gold RGB for now to ensure visibility
           nodeRelSize={6}
           linkColor={() => '#3f3f46'} // zinc-700
           onNodeClick={(node: any) => onNavigate(node.id)}

@@ -21,7 +21,7 @@ export const AddToDashboardModal = ({ isOpen, onClose, dashboards, onAddToDashbo
       {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} />
 
-      <div className="relative w-full max-w-md bg-[var(--los-bg)] border border-[var(--los-accent)] shadow-2xl rounded-md overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-md bg-[var(--los-bg)] text-[var(--los-fg)] border border-[var(--los-accent)] shadow-2xl rounded-md overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--los-border)]">
           <MonoHeader className="text-sm">ADD TO DASHBOARD</MonoHeader>
           <button onClick={onClose} className="text-[var(--los-muted)] hover:text-[var(--los-fg)]">
