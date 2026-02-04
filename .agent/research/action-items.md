@@ -12,6 +12,10 @@
 [x] 1.8 When a file is opened in Focus Mode, and then the user clicks on "Files" in the magic menu, it stays with the Focused Modal of the opened file. It must always open the root folder by clicking on "Files" in the magic menu, and if any focused modal is opened it must be closed.
 [x] 1.9 Opening a file from the Files View must also show all available widgets in the Focus Mode. Currently I only see the regular editor for "Data Collection" for example. Fix it.
 [x] 1.10 Using the search must also search file names not only the content of files. Currently it looks like file names are not searched. Investigate and fix it.
+[ ] 1.11 In Desktop mode the clickable area and the arrow left/right icons should only appear on the Desktop view, not in any other view.
+[ ] 1.12 Knowledge Graph is not rendering properly, nothing is shown. Investigate and fix it.
+[ ] 1.13 Clicking on the "Add to Dashboard"" button in focus mode does not render the of each item properly. the text is not visible. by hovering it becomes visible. Make each item text visible (check text color)
+[ ] 1.14 If the knowledge graph is opened, clicking on the "Files" entry in the magic menu does not change the view. Investigate and fix it.
 
 ## 2. Widgets
 
