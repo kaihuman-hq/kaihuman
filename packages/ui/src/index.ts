@@ -14,3 +14,4 @@ export * from './LifeOS/Layouts/MainApp';
 export * from './LifeOS/Organisms/RepositorySelector';
 export * from './LifeOS/types';
 export * from './LifeOS/Organisms/Widgets/ReadItLaterLogic';
+export * from './LifeOS/Organisms/NotFound';

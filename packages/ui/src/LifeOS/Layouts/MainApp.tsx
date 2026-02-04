@@ -55,6 +55,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { NewFileWizard } from '../Organisms/NewFileWizard';
 import { MoveFileModal } from '../Organisms/MoveFileModal';
 import { SearchModal } from '../Organisms/SearchModal';
+import { NotFound } from '../Organisms/NotFound';
 
 export interface TileDef {
   id: string | number;
@@ -140,8 +141,8 @@ export const MainApp = ({
   ...props
 }: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
-  // Initial state derived from URL
   const [activeTileId, setActiveTileId] = useState<string | number | null>(() => parseUrlState().activeTileId);
+  const [notFound, setNotFound] = useState(false);
 
   const [showSettings, setShowSettings] = useState(false);
   const [showAddToDashboard, setShowAddToDashboard] = useState(false);
@@ -197,7 +198,9 @@ export const MainApp = ({
     if (showNewFileWizard) {
       url = '/files/new';
     } else if (activeTileId && typeof activeTileId === 'string') {
-      url = `/files/${encodeURIComponent(activeTileId)}`;
+      // Split by slash and encode each segment to preserve structure
+      const cleanPath = activeTileId.split('/').map(segment => encodeURIComponent(segment)).join('/');
+      url = `/files/${cleanPath}`;
     } else if (showFiles) {
       url = '/files';
     } else {
@@ -209,18 +212,78 @@ export const MainApp = ({
     }
   }, [activeTileId, showFiles, showNewFileWizard]);
 
-  // Sync URL -> State (Popstate)
+  // Sync URL -> State (Popstate) & Resolve Path (Deep Liking)
+  // We need to resolve against fileSystem to know if it's a folder or file
   useEffect(() => {
-    const handlePopState = () => {
+    const resolvePath = () => {
       const state = parseUrlState();
-      // Batch updates if possible or preact handles it
-      setActiveTileId(state.activeTileId);
-      setShowFiles(state.showFiles);
-      setShowNewFileWizard(state.showNewFileWizard);
+
+      if (state.activeTileId && typeof state.activeTileId === 'string') {
+        // Resolution Logic
+        // If we have fileSystem, check if it's a folder
+        // If we DON'T have fileSystem yet (initial load), we might wait or assume file first?
+        // Actually, MainApp might be mounted before fileSystem is ready.
+        // Let's assume if it ends in slash or has no extension and matches a known folder, it's a folder.
+        // But we rely on fileSystem to tell us valid paths.
+
+        if (fileSystem) {
+          const path = state.activeTileId;
+          // Check if it is a folder in any column items? 
+          // Or check if it exists at all?
+
+          // Simplistic check: If path exists as a Tile of type FOLDER -> navigate there
+          // Flatten all items to find it
+          const allItems = fileSystem.columns.flatMap(c => c.items);
+          const item = allItems.find(i => i.id === path);
+
+          if (item) {
+            if (item.type === 'FOLDER') {
+              // It is a folder!
+              setShowFiles(true);
+              setActiveTileId(null);
+              setNotFound(false);
+              // Trigger Navigation if needed to rebuild columns?
+              // Verify if current columns already show it?
+              // If deep linking, columns might be default.
+              // We should call onNavigate to the path parts
+              const parts = path.split('/');
+              onNavigate?.(parts);
+            } else {
+              // It is a file
+              setActiveTileId(path);
+              setShowFiles(true); // Files view with focus
+              setNotFound(false);
+            }
+            return;
+          }
+
+          // If not found in fileSystem items, BUT it might be a valid subpath not yet loaded?
+          // Or maybe it's in dashboard tiles?
+          const dashEntry = localConfig?.entries.find(e => e.path === path);
+          if (dashEntry) {
+            setActiveTileId(path);
+            setShowFiles(false); // Dashboard view
+            setNotFound(false);
+            return;
+          }
+
+          // If completely unknown
+          console.warn("Path not found in FS or Dashboard:", path);
+          setNotFound(true);
+        }
+      } else {
+        setNotFound(false);
+        setActiveTileId(state.activeTileId);
+        setShowFiles(state.showFiles);
+        setShowNewFileWizard(state.showNewFileWizard);
+      }
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+
+    resolvePath();
+    window.addEventListener('popstate', resolvePath);
+    return () => window.removeEventListener('popstate', resolvePath);
+  }, [fileSystem, localConfig]); // Re-run when FS loads
+
 
   useEffect(() => {
     if (config) {
@@ -700,121 +763,134 @@ export const MainApp = ({
       />
       {/* CENTER STAGE: The Matrix OR The Active Tile */}
       <MainGrid viewState={zenMode ? 'ZEN' : (activeTileId !== null ? 'FOCUS' : 'DASHBOARD')}>
-        <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : undefined} column="center">
-          {activeTileId === null ? (
-            isMillerMode ? (
-              // MILLER COLUMNS LAYOUT (Centered & Max-Width)
-              <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto mx-auto w-full max-w-screen-2xl">
-                {fileSystem!.columns.map((col, index) => {
-                  const isLast = index === fileSystem!.columns.length - 1;
-                  return (
-                    <MillerColumn
-                      key={index}
-                      items={col.items.map(t => ({
-                        ...t,
-                        content: renderTileContent(t, 'SMALL')
-                      }))}
-                      activeId={col.activeId}
-                      variant={isLast ? 'GRID' : 'LIST'}
-                      onItemClick={(item) => {
-                        if (onItemClick) onItemClick(item);
-                        if (item.type === 'FILE') setActiveTileId(item.id);
-                      }}
-                      onDeleteFile={onDeleteFile}
-                      onRenameFile={async (path, newPath) => {
-                        if (onRenameFile) await onRenameFile(path, newPath);
-                        if (activeTileId === path) setActiveTileId(newPath); // Keep active
-                      }}
-                      onRequestMove={(path) => setFileToMove(path)}
-                    />
-                  )
-                })}
-              </div>
-            ) : (
-              // LEGACY SINGLE GRID LAYOUT OR DASHBOARD
-              <div
-                className={cn(
-                  "absolute top-0 left-0 right-0 bottom-8 overflow-y-auto overflow-x-hidden",
-                  !localConfig || showFiles ? "block" : getResponsiveGridClass(displayTiles.length)
-                )}
-                key="matrix"
-              >
-                {localConfig && !showFiles ? (
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                  >
-                    {(
-                      <>
-                        <SortableContext
-                          items={userEntries.map(e => e.path)}
-                          strategy={rectSortingStrategy}
-                        >
-                          {(
-                            <div className={cn(
-                              "grid gap-px bg-[var(--los-bg)] content-start w-full p-4 md:p-0",
-                              "max-w-screen-2xl mx-auto", // Center content
-                              getResponsiveGridClass(displayTiles.length)
-                            )}>
-                              {displayTiles.map((tile) => (
-                                <SortableTileItem
-                                  key={tile.id}
-                                  tile={tile}
-                                  renderTileContent={renderTileContent}
-                                  setActiveTileId={setActiveTileId}
-                                  handleDragStart={handleDragStartLogic}
-                                  handleDragSave={handleDragSave}
-                                  dragEnabled={dragEnabled}
-                                />
-                              ))}
-                            </div>
-                          ) as any}
-                        </SortableContext>
 
-                        <DragOverlay dropAnimation={dropAnimation}>
-                          {(activeId ? (
-                            <div className="bg-[var(--los-bg)] ring-2 ring-[var(--los-accent)] opacity-90 scale-95 w-full h-full pb-[100%]">
-                              <TileContentStructure
-                                tile={displayTiles.find(t => t.id === activeId)!}
-                                renderTileContent={renderTileContent}
-                              />
-                            </div>
-                          ) : null) as any}
-                        </DragOverlay>
-                      </>
-                    ) as any}
-                  </DndContext>
-                ) : (
-                  displayTiles.map((tile) => (
-                    <div
-                      key={tile.id}
-                      onClick={() => setActiveTileId(tile.id)}
-                      className="bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]"
+        {/* Not Found State */}
+        {notFound ? (
+          <Tile column="center" title="404">
+            <NotFound onGoHome={() => {
+              window.history.pushState({}, '', '/');
+              setNotFound(false);
+              setActiveTileId(null);
+              setShowFiles(false);
+            }} />
+          </Tile>
+        ) : (
+          <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : undefined} column="center">
+            {activeTileId === null ? (
+              isMillerMode ? (
+                // MILLER COLUMNS LAYOUT (Centered & Max-Width)
+                <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto mx-auto w-full max-w-screen-2xl">
+                  {fileSystem!.columns.map((col, index) => {
+                    const isLast = index === fileSystem!.columns.length - 1;
+                    return (
+                      <MillerColumn
+                        key={index}
+                        items={col.items.map(t => ({
+                          ...t,
+                          content: renderTileContent(t, 'SMALL')
+                        }))}
+                        activeId={col.activeId}
+                        variant={isLast ? 'GRID' : 'LIST'}
+                        onItemClick={(item) => {
+                          if (onItemClick) onItemClick(item);
+                          if (item.type === 'FILE') setActiveTileId(item.id);
+                        }}
+                        onDeleteFile={onDeleteFile}
+                        onRenameFile={async (path, newPath) => {
+                          if (onRenameFile) await onRenameFile(path, newPath);
+                          if (activeTileId === path) setActiveTileId(newPath); // Keep active
+                        }}
+                        onRequestMove={(path) => setFileToMove(path)}
+                      />
+                    )
+                  })}
+                </div>
+              ) : (
+                // LEGACY SINGLE GRID LAYOUT OR DASHBOARD
+                <div
+                  className={cn(
+                    "absolute top-0 left-0 right-0 bottom-8 overflow-y-auto overflow-x-hidden",
+                    !localConfig || showFiles ? "block" : getResponsiveGridClass(displayTiles.length)
+                  )}
+                  key="matrix"
+                >
+                  {localConfig && !showFiles ? (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
                     >
-                      <TileContentStructure tile={tile} renderTileContent={renderTileContent} />
-                    </div>
-                  ))
-                )}
-              </div>
-            )
-          ) : (
-            // STATE B: FOCUSED TILE
-            <FocusedTile
-              tile={activeTile!}
-              onClose={() => setActiveTileId(null)}
-              renderEditor={renderEditor}
-              zenMode={zenMode}
-              onToggleZenMode={() => setZenMode(prev => !prev)}
-              onAddToReadItLater={onAddToReadItLater}
-              onAddToDashboard={config ? (path) => {
-                setFileToAddToDashboard(path);
-                setShowAddToDashboard(true);
-              } : undefined}
-            />
-          )}
-        </Tile>
+                      {(
+                        <>
+                          <SortableContext
+                            items={userEntries.map(e => e.path)}
+                            strategy={rectSortingStrategy}
+                          >
+                            {(
+                              <div className={cn(
+                                "grid gap-px bg-[var(--los-bg)] content-start w-full p-4 md:p-0",
+                                "max-w-screen-2xl mx-auto", // Center content
+                                getResponsiveGridClass(displayTiles.length)
+                              )}>
+                                {displayTiles.map((tile) => (
+                                  <SortableTileItem
+                                    key={tile.id}
+                                    tile={tile}
+                                    renderTileContent={renderTileContent}
+                                    setActiveTileId={setActiveTileId}
+                                    handleDragStart={handleDragStartLogic}
+                                    handleDragSave={handleDragSave}
+                                    dragEnabled={dragEnabled}
+                                  />
+                                ))}
+                              </div>
+                            ) as any}
+                          </SortableContext>
+
+                          <DragOverlay dropAnimation={dropAnimation}>
+                            {(activeId ? (
+                              <div className="bg-[var(--los-bg)] ring-2 ring-[var(--los-accent)] opacity-90 scale-95 w-full h-full pb-[100%]">
+                                <TileContentStructure
+                                  tile={displayTiles.find(t => t.id === activeId)!}
+                                  renderTileContent={renderTileContent}
+                                />
+                              </div>
+                            ) : null) as any}
+                          </DragOverlay>
+                        </>
+                      ) as any}
+                    </DndContext>
+                  ) : (
+                    displayTiles.map((tile) => (
+                      <div
+                        key={tile.id}
+                        onClick={() => setActiveTileId(tile.id)}
+                        className="bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]"
+                      >
+                        <TileContentStructure tile={tile} renderTileContent={renderTileContent} />
+                      </div>
+                    ))
+                  )}
+                </div>
+              )
+            ) : (
+              // STATE B: FOCUSED TILE
+              <FocusedTile
+                tile={activeTile!}
+                onClose={() => setActiveTileId(null)}
+                renderEditor={renderEditor}
+                zenMode={zenMode}
+                onToggleZenMode={() => setZenMode(prev => !prev)}
+                onAddToReadItLater={onAddToReadItLater}
+                onAddToDashboard={config ? (path) => {
+                  setFileToAddToDashboard(path);
+                  setShowAddToDashboard(true);
+                } : undefined}
+              />
+            )}
+          </Tile>
+        )}
       </MainGrid>
 
       {/* Desktop Navigation Overlays (Fix: JS-based hover state for guaranteed visibility) */}

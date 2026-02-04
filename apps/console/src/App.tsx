@@ -1,4 +1,5 @@
 import { authStore } from '@lifosy/core';
+import { NotFound } from '@lifosy/ui';
 
 import { Route, Router } from 'preact-router';
 import { Dashboard } from './pages/Dashboard';
@@ -26,6 +27,9 @@ export const App = () => {
     <Router>
       <Route path="/login" component={Login} />
       <ProtectedRoute path="/" component={Dashboard} />
+      <ProtectedRoute path="/files" component={Dashboard} />
+      <ProtectedRoute path="/files/:rest*" component={Dashboard} />
+      <Route default component={NotFound} />
       {/* Editor and Settings are now tiles within Dashboard/MainApp if needed, or we can keep them accessbile via URL if desired, but User said "MainApp should use whole view port" */}
     </Router>
   );
