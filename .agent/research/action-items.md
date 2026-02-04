@@ -241,6 +241,12 @@ Semantics:
 ### 3.3 Search
 
 [x] 3.3.1 Implement search functionality to search files and actions. The command ctrl+k opens the menu. Users can search for all files. Use the github search api to search for files.
+[ ] 3.3.2 Add regular commands to the search menu as well. Currently it only searches for files and their contents. Add commands for all entries in the magic manu, and also to switch the repo and workspaces. Also consider all the names of available repos and workspaces. Examples:
+- "Navigate to Files" opens the Files view
+- "Create new File" opens the modal to create a new file
+- "Change Repo" opens the modal to change the repo
+- "Change Workspace" opens the modal to change the workspace
+- "Switch to Repo ABC" switches to the repo ABC
 
 ### 3.4 Status Bar
 
@@ -271,7 +277,7 @@ Add a new menu item to the magic menu to create a new quick note. The quick note
 
 ### 3.8 Editor
 
-Implement a Zen Mode for the editor. It should be possible to toggle it with a button and a keyboard shortcut. In Zen Mode the editor should be in full screen mode and most of the other UI elements are hidden. New user should be able to fully focus on writing the text.
+[x] 3.8.1 Implement a Zen Mode for the editor. It should be possible to toggle it with a button and a keyboard shortcut. In Zen Mode the editor should be in full screen mode and most of the other UI elements are hidden. New user should be able to fully focus on writing the text.
 
 ### 3.9 Dashboard
 
