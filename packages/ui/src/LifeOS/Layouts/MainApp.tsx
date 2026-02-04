@@ -542,6 +542,25 @@ export const MainApp = ({
         onClose={() => setShowSearch(false)}
         currentRepository={props.currentRepository?.name || "Lifosy/monorepo"}
         githubToken={githubToken}
+        repositories={props.repositories || []}
+        workspaces={config ? config.dashboards.map(d => ({ id: d.id, name: d.name })) : []}
+        onSelectRepository={(repoId) => {
+          const repo = props.repositories?.find(r => r.id === repoId);
+          if (repo && props.onSelectRepository) {
+            props.onSelectRepository(repo);
+          }
+        }}
+        onSelectWorkspace={(wsId) => {
+          setActiveDashboardId(wsId);
+          setShowFiles(false);
+        }}
+        onNavigateToFiles={() => {
+          setShowFiles(true);
+          setActiveTileId(null);
+        }}
+        onCreateNewFile={() => {
+          setShowNewFileWizard(true);
+        }}
         onSelect={(item) => {
           // If item is in current dashboard, focus it
           const tile = displayTiles.find(t => t.id === item.path);

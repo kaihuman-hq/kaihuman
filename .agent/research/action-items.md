@@ -243,7 +243,7 @@ Semantics:
 ### 3.3 Search
 
 [x] 3.3.1 Implement search functionality to search files and actions. The command ctrl+k opens the menu. Users can search for all files. Use the github search api to search for files.
-[ ] 3.3.2 Add regular commands to the search menu as well. Currently it only searches for files and their contents. Add commands for all entries in the magic manu, and also to switch the repo and workspaces. Also consider all the names of available repos and workspaces. Examples:
+[x] 3.3.2 Add regular commands to the search menu as well. Currently it only searches for files and their contents. Add commands for all entries in the magic manu, and also to switch the repo and workspaces. Also consider all the names of available repos and workspaces. Examples:
 - "Navigate to Files" opens the Files view
 - "Create new File" opens the modal to create a new file
 - "Change Repo" opens the modal to change the repo
