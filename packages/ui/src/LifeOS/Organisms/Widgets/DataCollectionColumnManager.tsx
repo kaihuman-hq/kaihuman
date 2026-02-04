@@ -1,6 +1,6 @@
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
-import { DataCollectionData, ColumnDefinition, addColumn, updateColumn, deleteColumn, serializeDataCollection } from './DataCollectionLogic';
+import { DataCollectionData, ColumnDefinition, addColumn, updateColumn, deleteColumn, serializeDataCollection, parseDataCollection } from './DataCollectionLogic';
 import { MonoText, MonoHeader } from '../../Atoms/Typography';
 import { cn } from '../../../utils';
 
@@ -24,7 +24,7 @@ export const DataCollectionColumnManager = ({ content, onChange }: DataCollectio
   // We should derive but we need logic functions that take Data object
   // So we parse on render? Or assume parent passes raw content?
   // Let's parse.
-  const { parseDataCollection } = require('./DataCollectionLogic'); // Dynamic import to avoid circular dep if any? No, static is fine.
+
   // Actually we need to import it properly.
   // Ideally this component assumes valid data.
 

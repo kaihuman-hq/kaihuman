@@ -91,6 +91,7 @@ export const Dashboard = () => {
 
       const isBudget = item.path.toLowerCase().endsWith('.budget.csv');
       const isActionLog = item.path.toLowerCase().endsWith('.actionlog.md');
+      const isDataCollection = item.path.toLowerCase().endsWith('.data-collection.csv');
 
       const tile: TileDef = {
         id: item.path, // Use path as ID for simplicity
@@ -100,7 +101,7 @@ export const Dashboard = () => {
       };
 
       // Widget Handling Logic
-      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss || isReadItLater || isBudget || isActionLog;
+      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss || isReadItLater || isBudget || isActionLog || isDataCollection;
 
       if (item.type === 'tree') {
         tile.content = <div className="p-8 text-nexus-muted">Select a file from this folder.</div>;
@@ -211,6 +212,19 @@ export const Dashboard = () => {
 
       if (isActionLog) {
         tile.extension = '.actionlog.md';
+        if (openFiles && openFiles[item.path]) {
+          tile.rawContent = openFiles[item.path]?.content;
+        }
+
+        tile.onContentChange = (newContent: string) => {
+          githubFileStore.updateFileContent(item.path, newContent);
+          githubFileStore.saveFile(item.path);
+          updateLocalTileContent(item.path, newContent);
+        };
+      }
+
+      if (isDataCollection) {
+        tile.extension = '.data-collection.csv';
         if (openFiles && openFiles[item.path]) {
           tile.rawContent = openFiles[item.path]?.content;
         }
@@ -489,7 +503,7 @@ export const Dashboard = () => {
         // Grid Mode Editors / Content
         renderFile={useCallback((path: string) => {
           const lowerPath = path.toLowerCase();
-          const isWidget = lowerPath.endsWith('.timetracking.csv') || lowerPath.endsWith('.events.csv') || lowerPath.endsWith('.habit.csv') || lowerPath.endsWith('.todos.md') || lowerPath.endsWith('.timezones.json') || lowerPath.endsWith('.rss.json') || lowerPath.endsWith('.readitlater.json') || lowerPath.endsWith('.budget.csv') || lowerPath.endsWith('.actionlog.md');
+          const isWidget = lowerPath.endsWith('.timetracking.csv') || lowerPath.endsWith('.events.csv') || lowerPath.endsWith('.habit.csv') || lowerPath.endsWith('.todos.md') || lowerPath.endsWith('.timezones.json') || lowerPath.endsWith('.rss.json') || lowerPath.endsWith('.readitlater.json') || lowerPath.endsWith('.budget.csv') || lowerPath.endsWith('.actionlog.md') || lowerPath.endsWith('.data-collection.csv');
           if (isWidget) return <FileViewer key={path} path={path} />;
 
           return (
@@ -505,34 +519,95 @@ export const Dashboard = () => {
         renderEditor={useCallback((path: string, zenMode?: boolean) => <FileViewer key={path} path={path} zenMode={zenMode} />, [])}
         onAddToReadItLater={async (item) => {
           const rilPath = '.lifeos/.readitlater.json';
+          console.log('[ReadItLater] Handler triggered for:', item);
           try {
-            // Ensure loaded
-            if (!githubFileStore.openFiles.value[rilPath]) {
-              await githubFileStore.openFile(rilPath);
+            // 1. Check existence in Tree (Source of Truth)
+            let fileExists = githubFileStore.tree.value.some(t => t.path === rilPath);
+            console.log('[ReadItLater] File exists in tree?', fileExists);
+
+            // 2. Load Content if it exists
+            if (fileExists) {
+              if (!githubFileStore.openFiles.value[rilPath]) {
+                console.log('[ReadItLater] File not open, attempting to open...');
+                try {
+                  await githubFileStore.openFile(rilPath);
+                  console.log('[ReadItLater] File opened successfully');
+                } catch (e) {
+                  console.error("[ReadItLater] Failed to open existing file", e);
+                  fileExists = false; // Fallback to create?
+                }
+              } else {
+                console.log('[ReadItLater] File already open');
+              }
             }
 
             const file = githubFileStore.openFiles.value[rilPath];
             const content = file?.content || '';
+            console.log('[ReadItLater] Current content length:', content.length);
 
+            // 3. Parse Config
             let config;
             try {
               config = content ? parseReadItLater(content) : DEFAULT_RIL_CONFIG;
+              if (!config || !config.items) config = DEFAULT_RIL_CONFIG;
             } catch (e) {
+              console.error('[ReadItLater] Parse error:', e);
               config = DEFAULT_RIL_CONFIG;
             }
 
-            // Check duplicates
-            if (config.items.some(i => i.url === item.url)) return;
+            // 4. Update Data
+            const isDuplicate = config.items && config.items.some(i => i.url === item.url);
+            if (isDuplicate) {
+              console.log("[ReadItLater] Item already exists (Duplicate):", item.url);
+              // Force UI update anyway just to be sure visual state matches
+              // updateLocalTileContent(rilPath, serializeReadItLater(config));
+              return;
+            }
 
-            const newConfig = { ...config, items: [item, ...config.items] };
+            const newItems = [item, ...(config.items || [])];
+            const newConfig = { ...config, items: newItems };
             const newContent = serializeReadItLater(newConfig);
+            console.log('[ReadItLater] New config items count:', newItems.length);
 
-            // Update and Save - calling updateFileContent handles DB update/state update
-            githubFileStore.updateFileContent(rilPath, newContent);
-            await githubFileStore.saveFile(rilPath);
+            // 5. Persist
+            if (fileExists && file) {
+              console.log("[ReadItLater] Updating existing file via updateFileContent");
+              githubFileStore.updateFileContent(rilPath, newContent);
+              await githubFileStore.saveFile(rilPath);
+            } else {
+              console.log("[ReadItLater] Creating new file via createFile");
+              try {
+                await githubFileStore.createFile(rilPath, newContent);
+                console.log("[ReadItLater] createFile success");
+              } catch (e: any) {
+                console.warn("[ReadItLater] createFile failed:", e);
+                if (e.message && e.message.includes('already exists')) {
+                  console.log("[ReadItLater] File actually exists, attempting fallback update.");
+
+                  // Fallback: Ensure it is "open" locally so updateFileContent doesn't bail
+                  if (!githubFileStore.openFiles.value[rilPath]) {
+                    console.log("[ReadItLater] Fallback: Injecting into openFiles before update");
+                    // Manually inject so updateFileContent doesn't bail
+                    githubFileStore.openFiles.value = {
+                      ...githubFileStore.openFiles.value,
+                      [rilPath]: { content: newContent, sha: '' } // Optimistic
+                    };
+                  }
+
+                  githubFileStore.updateFileContent(rilPath, newContent);
+                  await githubFileStore.saveFile(rilPath);
+                } else {
+                  throw e;
+                }
+              }
+            }
+
+            // 6. Force UI Update
+            console.log("[ReadItLater] Triggering updateLocalTileContent");
+            updateLocalTileContent(rilPath, newContent);
 
           } catch (error) {
-            console.error('Failed to add to ReadItLater:', error);
+            console.error('[ReadItLater] CRITICAL failure:', error);
           }
         }}
         onCreateFile={useCallback(async (path: string, content: string) => {
@@ -563,6 +638,20 @@ export const Dashboard = () => {
           return getChildren(prefix);
         }}
         githubToken={authStore.token.value || undefined}
+        onCheckPath={async (path: string) => {
+          // Check against the full tree
+          const currentTree = githubFileStore.tree.value;
+          if (!currentTree) return null;
+
+          const found = currentTree.find(item => item.path === path);
+          if (found) {
+            return found.type === 'tree' ? 'FOLDER' : 'FILE';
+          }
+
+          // Also check if prefix is a folder (for potential folder paths that don't match exactly without slash)
+          // Actually tree usually has folders without trailing slash.
+          return null;
+        }}
       />
     </div>
   );

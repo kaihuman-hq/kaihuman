@@ -132,6 +132,7 @@ const RssItemRow = ({ item, onRead, onReadItLater, mode }: { item: RssItem, onRe
 
   const handleRil = async () => {
     setRilState('LOADING');
+    console.log('[RssWidget] handleRil called');
     onReadItLater();
     // Simulate some logic or just wait a bit
     await new Promise(r => setTimeout(r, 600));

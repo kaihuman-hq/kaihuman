@@ -5,6 +5,17 @@
 [x] 1.1 From the status bar, clicking on one recent file, currently does not open the file properly. Implement the following: open the files view and navigate to the folder where file is located and open the file.
 [x] 1.2 Fix repo selection to open the newly selected repo instead of the default one.
 [x] 1.3 Files that have been saved must also be considered in the recently opened files list in .lifosy directory. Fix it. Make sure there is a limit of 10 files.
+[x] 1.4 Clicking on Bookmark/Read it later, does not add the entry to the .lifosy/readitlater.json file anymore. This was already working. Investigate and fix it.
+[x] 1.5 In mobile safari the top bar is not adjusted to the theme color. It is white instead of dark. Implement it.
+[x] 1.6 In Mobile Safari: Switching to Zen Mode in the Editor in Focus Mode, switches the colors of the top bar and bottom bar to white. But it should be dark. Implement it.
+[x] 1.7 In Mobile Mode the Icons for Arrow Left and Right AND the clickable area is available to switch the workspace. This may not be available on mobile mode, only in Desktop Mode.
+[x] 1.8 When a file is opened in Focus Mode, and then the user clicks on "Files" in the magic menu, it stays with the Focused Modal of the opened file. It must always open the root folder by clicking on "Files" in the magic menu, and if any focused modal is opened it must be closed.
+[x] 1.9 Opening a file from the Files View must also show all available widgets in the Focus Mode. Currently I only see the regular editor for "Data Collection" for example. Fix it.
+[x] 1.10 Using the search must also search file names not only the content of files. Currently it looks like file names are not searched. Investigate and fix it.
+[x] 1.11 In Desktop mode the clickable area and the arrow left/right icons should only appear on the Desktop view, not in any other view.
+[x] 1.12 Knowledge Graph is not rendering properly, nothing is shown. Investigate and fix it.
+[x] 1.13 Clicking on the "Add to Dashboard"" button in focus mode does not render the of each item properly. the text is not visible. by hovering it becomes visible. Make each item text visible (check text color)
+[x] 1.14 If the knowledge graph is opened, clicking on the "Files" entry in the magic menu does not change the view. Investigate and fix it.
 
 ## 2. Widgets
 
@@ -236,6 +247,12 @@ Semantics:
 ### 3.3 Search
 
 [x] 3.3.1 Implement search functionality to search files and actions. The command ctrl+k opens the menu. Users can search for all files. Use the github search api to search for files.
+[x] 3.3.2 Add regular commands to the search menu as well. Currently it only searches for files and their contents. Add commands for all entries in the magic manu, and also to switch the repo and workspaces. Also consider all the names of available repos and workspaces. Examples:
+- "Navigate to Files" opens the Files view
+- "Create new File" opens the modal to create a new file
+- "Change Repo" opens the modal to change the repo
+- "Change Workspace" opens the modal to change the workspace
+- "Switch to Repo ABC" switches to the repo ABC
 
 ### 3.4 Status Bar
 
@@ -266,4 +283,116 @@ Add a new menu item to the magic menu to create a new quick note. The quick note
 
 ### 3.8 Editor
 
-Implement a Zen Mode for the editor. It should be possible to toggle it with a button and a keyboard shortcut. In Zen Mode the editor should be in full screen mode and most of the other UI elements are hidden. New user should be able to fully focus on writing the text.
+[x] 3.8.1 Implement a Zen Mode for the editor. It should be possible to toggle it with a button and a keyboard shortcut. In Zen Mode the editor should be in full screen mode and most of the other UI elements are hidden. New user should be able to fully focus on writing the text.
+
+### 3.9 Dashboard
+
+[x] 3.9.1 It must be possible to add a file to the Dashboard, so the widget can be rendered. Since it is possible to have multiple workspaces, the user should be able to select a workspace where to put it. 
+
+[x] 3.9.2 Add a new menu entry to the magic menu called "Settings". This will open a new view where the user can configure settings for the app. All settings are stored in the .lifeos/.dashboard.config.json file. The structure of the file is as follows:
+
+- version: the version of the file
+- dashboards: a list of dashboards - these are the workspaces
+- entries: a list of entries
+- files: a list of files
+
+On the settings page the user should be able to:
+- add a new dashboard (workspace)
+- delete a dashboard (workspace)
+- rename a dashboard (workspace)
+- change the order of the dashboards
+
+The version field is for backward compatibility. So make sure that there is a migration path to the next version.
+
+{
+  "version": 1,
+  "dashboards": [
+    {
+      "id": "d0",
+      "name": "work8test-new"
+    },
+    {
+      "id": "d1",
+      "name": "new-dashboard"
+    },
+    {
+      "id": "d2",
+      "name": "default"
+    },
+    {
+      "id": "d3",
+      "name": "my new shiny dashboard"
+    }
+  ],
+  "entries": [
+    {
+      "path": "my2.achievements.md",
+      "dashboard": "d1",
+      "skipOnMobile": false
+    },
+    {
+      "path": "generic-test/generic-other.csv.md",
+      "dashboard": "d3",
+      "skipOnMobile": false
+    },
+    {
+      "path": "test-todos.todos.md",
+      "dashboard": "d2",
+      "skipOnMobile": false
+    },
+    {
+      "path": "reditlater.readitlater.json",
+      "dashboard": "d2",
+      "skipOnMobile": false
+    },
+    {
+      "path": ".lifeos/.readitlater.json",
+      "dashboard": "d0",
+      "skipOnMobile": false
+    },
+    {
+      "path": "test2.habit.csv",
+      "dashboard": "d0",
+      "skipOnMobile": false
+    },
+    {
+      "path": "my-date-time.timezones.json",
+      "dashboard": "d0",
+      "skipOnMobile": false
+    }
+  ],
+  "files": {
+    "selected": "0_event.events.csv",
+    "opened": [
+      "0_event.events.csv"
+    ],
+    "recentlyOpened": [
+      "hackernews.rss.json",
+      "asd.md",
+      ".lifeos/quicknotes/quicknote-2026-02-03-10:38:15.md",
+      "0_event.events.csv",
+      "my-lifosy-event.lifosy-event.json",
+      "testidea .tldraw.json",
+      ".lifeos/.readitlater.json",
+      ".lifeos/quicknotes/quicknote-2025-11-07-12:59.md",
+      "hello-quicknote.md",
+      ".lifeos/quicknotes/quicknote-2025-11-07-12:57.md"
+    ]
+  }
+}
+
+### 3.10 Routing
+
+[x] 3.10.1 For all main views add dedicated routes so it's easier to navigate to them. Root is always the Dashboard View. "/files" navigates to the Files View. "/files/new" opens the new file modal. "/files/[path in repo]" opens the files view or the file in the editor with the path from the parameter - if the path is not valid, or the file is not found, navigate to the files view.
+
+### 3.11 Graph
+
+[ ] 3.11.1 Implement a view that represents how files are connected to each other. Consider only Markdown files where files can be referenced with a link. The graph should be interactive and allow to navigate to the referenced files. For details read the Obsidian docs, the graph should do the same as the Obsidian graph view: https://help.obsidian.md/plugins/graph. Add this as a new entry to the magic menu. Show connections between files in the graph view.
+
+### 3.12 Commits
+
+[ ] 3.12.1 Implement a view that shows the commit history for the current repo. It can be very just a table showing the commits with the commit message, the author, the date and the commit hash. Add this as a new entry to the magic menu.
+
+### 3.13 File history
+
+[ ] 3.13.1 Implement a view that shows the history of a specific file. For each Focused Modal show a new toggle "History" that opens this view. In this view the user can see the history of the file and what changes were made in each commit.

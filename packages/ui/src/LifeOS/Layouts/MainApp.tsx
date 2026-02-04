@@ -1,5 +1,8 @@
 import { ComponentChildren, h } from 'preact';
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
+import { SettingsView } from '../Organisms/SettingsView';
+import { AddToDashboardModal } from '../Organisms/AddToDashboardModal';
+
 import { cn } from '../../utils';
 import { Tile } from '../Molecules/Tile';
 import { StatusBar } from '../Organisms/StatusBar';
@@ -29,6 +32,25 @@ import { DataCollectionColumnManager } from '../Organisms/Widgets/DataCollection
 import { DataCollectionData, parseDataCollection, serializeDataCollection, calculateAutoValues } from '../Organisms/Widgets/DataCollectionLogic';
 import { BudgetWidget } from '../Organisms/Widgets/BudgetWidget';
 import { DashboardConfig, DashboardEntry } from '../types';
+// 3.12, 3.11 Views
+import { CommitsView } from '../Organisms/CommitsView';
+import { GraphView } from '../Organisms/GraphView';
+import { FileHistoryView } from '../Organisms/FileHistoryView';
+import {
+  FileText,
+  Layout,
+  Maximize2,
+  Minimize2,
+  Grid,
+  List,
+  Plus,
+  ArrowLeft,
+  Settings,
+  X,
+  History,
+  GitCommit,
+  Share2
+} from 'lucide-preact';
 import {
   DndContext,
   closestCenter,
@@ -52,6 +74,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { NewFileWizard } from '../Organisms/NewFileWizard';
 import { MoveFileModal } from '../Organisms/MoveFileModal';
 import { SearchModal } from '../Organisms/SearchModal';
+import { NotFound } from '../Organisms/NotFound';
 
 export interface TileDef {
   id: string | number;
@@ -96,7 +119,25 @@ export interface MainAppProps {
   existingFiles?: string[];
   onLoadFolder?: (path: string) => Promise<TileDef[]>;
   githubToken?: string;
+  onCheckPath?: (path: string) => Promise<'FILE' | 'FOLDER' | null> | 'FILE' | 'FOLDER' | null;
 }
+
+// Helper to parse URL into state
+const parseUrlState = () => {
+  if (typeof window === 'undefined') return { showFiles: false, activeTileId: null, showNewFileWizard: false };
+  const path = window.location.pathname;
+  if (path === '/files/new') {
+    return { showFiles: true, activeTileId: null, showNewFileWizard: true };
+  }
+  if (path.startsWith('/files/') && path.length > 7) {
+    const filePath = decodeURIComponent(path.replace('/files/', ''));
+    return { showFiles: true, activeTileId: filePath, showNewFileWizard: false };
+  }
+  if (path === '/files') {
+    return { showFiles: true, activeTileId: null, showNewFileWizard: false };
+  }
+  return { showFiles: false, activeTileId: null, showNewFileWizard: false };
+};
 
 export const MainApp = ({
   tiles = [],
@@ -117,17 +158,53 @@ export const MainApp = ({
   existingFiles,
   onLoadFolder,
   githubToken,
+  onCheckPath,
   ...props
 }: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
-  const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
+  const [activeTileId, setActiveTileId] = useState<string | number | null>(() => parseUrlState().activeTileId);
+  const [notFound, setNotFound] = useState(false);
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAddToDashboard, setShowAddToDashboard] = useState(false);
+  const [fileToAddToDashboard, setFileToAddToDashboard] = useState<string | null>(null);
+
+  // 3.12, 3.11 State
+  const [showCommits, setShowCommits] = useState(false);
+  const [showGraph, setShowGraph] = useState(false);
+
+
+  const handleAddToDashboard = (dashboardId: string) => {
+    if (!fileToAddToDashboard || !config || !onConfigChange) return;
+
+    // Check if already exists in that dashboard
+    const exists = config.entries.some(e => e.path === fileToAddToDashboard && e.dashboard === dashboardId);
+    if (exists) {
+      alert("File is already in this dashboard.");
+      return;
+    }
+
+    const newEntry: DashboardEntry = {
+      path: fileToAddToDashboard,
+      dashboard: dashboardId,
+      skipOnMobile: false
+    };
+
+    onConfigChange({
+      ...config,
+      entries: [...config.entries, newEntry]
+    });
+
+    setShowAddToDashboard(false);
+    setFileToAddToDashboard(null);
+  };
 
   // Dashboard State
   const [activeDashboardId, setActiveDashboardId] = useState<string | null>(null);
   const [dragEnabled, setDragEnabled] = useState(false);
   const [localConfig, setLocalConfig] = useState<DashboardConfig | undefined>(config);
-  const [showFiles, setShowFiles] = useState(false); // Toggle for "Files" view
-  const [showNewFileWizard, setShowNewFileWizard] = useState(false);
+  const [showFiles, setShowFiles] = useState(() => parseUrlState().showFiles); // Toggle for "Files" view
+  const [showNewFileWizard, setShowNewFileWizard] = useState(() => parseUrlState().showNewFileWizard);
   const [fileToMove, setFileToMove] = useState<string | null>(null);
   const [zenMode, setZenMode] = useState(false); // Zen Mode state
 
@@ -139,6 +216,135 @@ export const MainApp = ({
 
   // Nav Overlay Hover State
   const [hoverNav, setHoverNav] = useState<'prev' | 'next' | null>(null);
+
+  // ROUTING LOGIC (Feature 3.10.1)
+  // Sync State -> URL
+  useEffect(() => {
+    let url = '/';
+    if (showNewFileWizard) {
+      url = '/files/new';
+    } else if (activeTileId && typeof activeTileId === 'string') {
+      // Split by slash and encode each segment to preserve structure
+      const cleanPath = activeTileId.split('/').map(segment => encodeURIComponent(segment)).join('/');
+      url = `/files/${cleanPath}`;
+    } else if (showFiles) {
+      url = '/files';
+    } else {
+      url = '/';
+    }
+
+    if (window.location.pathname !== url) {
+      window.history.pushState({}, '', url);
+    }
+  }, [activeTileId, showFiles, showNewFileWizard]);
+
+  // Sync URL -> State (Popstate) & Resolve Path (Deep Liking)
+  // We need to resolve against fileSystem to know if it's a folder or file
+  useEffect(() => {
+    const resolvePath = () => {
+      const state = parseUrlState();
+
+      if (state.activeTileId && typeof state.activeTileId === 'string') {
+        // Resolution Logic
+        // If we have fileSystem, check if it's a folder
+        // If we DON'T have fileSystem yet (initial load), we might wait or assume file first?
+        // Actually, MainApp might be mounted before fileSystem is ready.
+        // Let's assume if it ends in slash or has no extension and matches a known folder, it's a folder.
+        const path = state.activeTileId;
+
+        // NEW LOGIC: Use onCheckPath if available (Source of Truth)
+        if (onCheckPath) {
+          Promise.resolve(onCheckPath(path)).then(type => {
+            if (type === 'FOLDER') {
+              setShowFiles(true);
+              setActiveTileId(null);
+              setNotFound(false);
+              const parts = path.split('/');
+              onNavigate?.(parts);
+            } else if (type === 'FILE') {
+              setShowFiles(true);
+              setActiveTileId(path);
+              setNotFound(false);
+              // Ensure navigation happens so columns are built?
+              // MainApp/MillerColumn usually rebuilds based on activeTileId if it's passed down?
+              // Actually onNavigate is safer to reconstruction
+              const parts = path.split('/');
+              onNavigate?.(parts);
+            } else {
+              // Check dashboard entries as fallback
+              const dashEntry = localConfig?.entries.find(e => e.path === path);
+              if (dashEntry) {
+                setActiveTileId(path);
+                setShowFiles(false);
+                setNotFound(false);
+                return;
+              }
+              console.warn("Path not found (via onCheckPath):", path);
+              setNotFound(true);
+            }
+          });
+          return;
+        }
+
+        // Fallback to existing logic if no onCheckPath logic
+        if (fileSystem) {
+          // path already defined above from state.activeTileId
+          // Check if it is a folder in any column items? 
+          // Or check if it exists at all?
+
+          // Simplistic check: If path exists as a Tile of type FOLDER -> navigate there
+          // Flatten all items to find it
+          const allItems = fileSystem.columns.flatMap(c => c.items);
+          const item = allItems.find(i => i.id === path);
+
+          if (item) {
+            if (item.type === 'FOLDER') {
+              // It is a folder!
+              setShowFiles(true);
+              setActiveTileId(null);
+              setNotFound(false);
+              // Trigger Navigation if needed to rebuild columns?
+              // Verify if current columns already show it?
+              // If deep linking, columns might be default.
+              // We should call onNavigate to the path parts
+              const parts = path.split('/');
+              onNavigate?.(parts);
+            } else {
+              // It is a file
+              setActiveTileId(path);
+              setShowFiles(true); // Files view with focus
+              setNotFound(false);
+            }
+            return;
+          }
+
+          // If not found in fileSystem items, BUT it might be a valid subpath not yet loaded?
+          // Or maybe it's in dashboard tiles?
+          const dashEntry = localConfig?.entries.find(e => e.path === path);
+          if (dashEntry) {
+            setActiveTileId(path);
+            setShowFiles(false); // Dashboard view
+            setNotFound(false);
+            return;
+          }
+
+          // If completely unknown
+          console.warn("Path not found in FS or Dashboard:", path);
+          setNotFound(true);
+        }
+      } else {
+        setNotFound(false);
+        setActiveTileId(state.activeTileId);
+        setShowFiles(state.showFiles);
+        setShowNewFileWizard(state.showNewFileWizard);
+      }
+    };
+
+    resolvePath();
+    window.addEventListener('popstate', resolvePath);
+    return () => window.removeEventListener('popstate', resolvePath);
+  }, [fileSystem, localConfig]); // Re-run when FS loads
+
 
   useEffect(() => {
     if (config) {
@@ -298,12 +504,23 @@ export const MainApp = ({
               createdAt: Date.now(),
               updatedAt: Date.now()
             };
+            console.log('[MainApp] RssWidget onReadItLater triggered. Calling onAddToReadItLater prop...', newItem);
+            if (!onAddToReadItLater) {
+              console.error('[MainApp] onAddToReadItLater prop is UNDEFINED');
+            }
             onAddToReadItLater?.(newItem);
-          }}
+          }
+          }
         />
       );
     }
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
+      // setRilState('LOADING'); // This state is not defined in MainApp
+      console.log('[MainApp] Read Later clicked for item:', tile.title); // Log the item title from the tile
+      if (!onAddToReadItLater) { // Check the correct prop for adding to read later
+        console.warn('[MainApp] onAddToReadItLater prop is missing!');
+      }
+      // onAddToReadItLater(); // This call needs an item, not a direct call
       return (
         <ReadItLaterWidget
           content={tile.rawContent}
@@ -500,6 +717,24 @@ export const MainApp = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Fix 1.5 & 1.6: Dynamic Theme Color for Mobile Safari and Zen Mode
+  useEffect(() => {
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      if (zenMode) {
+        metaThemeColor.setAttribute('content', '#0a0a0f'); // Dark background
+      } else {
+        metaThemeColor.setAttribute('content', '#0a0a0f'); // Ensure it stays dark even if something else changes it or default
+      }
+    } else {
+      // Create if missing?
+      const meta = document.createElement('meta');
+      meta.name = "theme-color";
+      meta.content = "#0a0a0f";
+      document.head.appendChild(meta);
+    }
+  }, [zenMode]);
+
   return (
     <div
       className="h-screen w-full max-w-[100vw] bg-[var(--los-bg)] overflow-hidden relative"
@@ -507,12 +742,95 @@ export const MainApp = ({
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
+      {showCommits && (
+        <div className="fixed inset-0 z-50 bg-[var(--los-bg)] animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-[var(--los-border)]">
+            <div className="flex items-center gap-2">
+              <GitCommit className="text-[var(--los-accent)]" size={20} />
+              <MonoHeader>REPOSITORY HISTORY</MonoHeader>
+            </div>
+            <button
+              onClick={() => setShowCommits(false)}
+              className="p-2 hover:bg-white/10 rounded-sm"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <CommitsView />
+          </div>
+        </div>
+      )}
+
+      {showGraph && (
+        <div className="fixed inset-0 z-50 bg-[var(--los-bg)] animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+          <div className="absolute top-4 right-4 z-50">
+            <button
+              onClick={() => setShowGraph(false)}
+              className="p-2 bg-[var(--los-bg)] border border-[var(--los-border)] hover:bg-[var(--los-accent)] hover://text-[var(--los-bg)] rounded-sm transition-colors shadow-lg"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <GraphView onNavigate={(path) => {
+              setShowGraph(false);
+              setShowFiles(true);
+              setActiveTileId(path);
+            }} />
+          </div>
+        </div>
+      )}
+
+      {/* Settings Overlay */}
+      {showSettings && localConfig && onConfigChange && (
+        <div className="fixed inset-0 z-50 bg-[var(--los-bg)] animate-in fade-in zoom-in-95 duration-200">
+          <SettingsView
+            config={localConfig}
+            onConfigChange={onConfigChange}
+            onClose={() => setShowSettings(false)}
+          />
+        </div>
+      )}
+
+      {showAddToDashboard && config && (
+        <AddToDashboardModal
+          isOpen={showAddToDashboard}
+          onClose={() => {
+            setShowAddToDashboard(false);
+            setFileToAddToDashboard(null);
+          }}
+          dashboards={config.dashboards}
+          fileName={fileToAddToDashboard || ''}
+          onAddToDashboard={handleAddToDashboard}
+        />
+      )}
+
       {/* Search Modal */}
       <SearchModal
         isOpen={showSearch}
         onClose={() => setShowSearch(false)}
         currentRepository={props.currentRepository?.name || "Lifosy/monorepo"}
         githubToken={githubToken}
+        repositories={props.repositories || []}
+        workspaces={config ? config.dashboards.map(d => ({ id: d.id, name: d.name })) : []}
+        onSelectRepository={(repoId) => {
+          const repo = props.repositories?.find(r => r.id === repoId);
+          if (repo && props.onSelectRepository) {
+            props.onSelectRepository(repo);
+          }
+        }}
+        onSelectWorkspace={(wsId) => {
+          setActiveDashboardId(wsId);
+          setShowFiles(false);
+        }}
+        onNavigateToFiles={() => {
+          setShowFiles(true);
+          setActiveTileId(null);
+        }}
+        onCreateNewFile={() => {
+          setShowNewFileWizard(true);
+        }}
         onSelect={(item) => {
           // If item is in current dashboard, focus it
           const tile = displayTiles.find(t => t.id === item.path);
@@ -549,123 +867,141 @@ export const MainApp = ({
       />
       {/* CENTER STAGE: The Matrix OR The Active Tile */}
       <MainGrid viewState={zenMode ? 'ZEN' : (activeTileId !== null ? 'FOCUS' : 'DASHBOARD')}>
-        <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : undefined} column="center">
-          {activeTileId === null ? (
-            isMillerMode ? (
-              // MILLER COLUMNS LAYOUT (Centered & Max-Width)
-              <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto mx-auto w-full max-w-screen-2xl">
-                {fileSystem!.columns.map((col, index) => {
-                  const isLast = index === fileSystem!.columns.length - 1;
-                  return (
-                    <MillerColumn
-                      key={index}
-                      items={col.items.map(t => ({
-                        ...t,
-                        content: renderTileContent(t, 'SMALL')
-                      }))}
-                      activeId={col.activeId}
-                      variant={isLast ? 'GRID' : 'LIST'}
-                      onItemClick={(item) => {
-                        if (onItemClick) onItemClick(item);
-                        if (item.type === 'FILE') setActiveTileId(item.id);
-                      }}
-                      onDeleteFile={onDeleteFile}
-                      onRenameFile={async (path, newPath) => {
-                        if (onRenameFile) await onRenameFile(path, newPath);
-                        if (activeTileId === path) setActiveTileId(newPath); // Keep active
-                      }}
-                      onRequestMove={(path) => setFileToMove(path)}
-                    />
-                  )
-                })}
-              </div>
-            ) : (
-              // LEGACY SINGLE GRID LAYOUT OR DASHBOARD
-              <div
-                className={cn(
-                  "absolute top-0 left-0 right-0 bottom-8 overflow-y-auto overflow-x-hidden",
-                  !localConfig || showFiles ? "block" : getResponsiveGridClass(displayTiles.length)
-                )}
-                key="matrix"
-              >
-                {localConfig && !showFiles ? (
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                  >
-                    {(
-                      <>
-                        <SortableContext
-                          items={userEntries.map(e => e.path)}
-                          strategy={rectSortingStrategy}
-                        >
-                          {(
-                            <div className={cn(
-                              "grid gap-px bg-[var(--los-bg)] content-start w-full p-4 md:p-0",
-                              "max-w-screen-2xl mx-auto", // Center content
-                              getResponsiveGridClass(displayTiles.length)
-                            )}>
-                              {displayTiles.map((tile) => (
-                                <SortableTileItem
-                                  key={tile.id}
-                                  tile={tile}
-                                  renderTileContent={renderTileContent}
-                                  setActiveTileId={setActiveTileId}
-                                  handleDragStart={handleDragStartLogic}
-                                  handleDragSave={handleDragSave}
-                                  dragEnabled={dragEnabled}
-                                />
-                              ))}
-                            </div>
-                          ) as any}
-                        </SortableContext>
 
-                        <DragOverlay dropAnimation={dropAnimation}>
-                          {(activeId ? (
-                            <div className="bg-[var(--los-bg)] ring-2 ring-[var(--los-accent)] opacity-90 scale-95 w-full h-full pb-[100%]">
-                              <TileContentStructure
-                                tile={displayTiles.find(t => t.id === activeId)!}
-                                renderTileContent={renderTileContent}
-                              />
-                            </div>
-                          ) : null) as any}
-                        </DragOverlay>
-                      </>
-                    ) as any}
-                  </DndContext>
-                ) : (
-                  displayTiles.map((tile) => (
-                    <div
-                      key={tile.id}
-                      onClick={() => setActiveTileId(tile.id)}
-                      className="bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]"
+        {/* Not Found State */}
+        {notFound ? (
+          <Tile column="center" title="404">
+            <NotFound onGoHome={() => {
+              window.history.pushState({}, '', '/');
+              setNotFound(false);
+              setActiveTileId(null);
+              setShowFiles(false);
+            }} />
+          </Tile>
+        ) : (
+          <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : undefined} column="center">
+            {activeTileId === null ? (
+              isMillerMode ? (
+                // MILLER COLUMNS LAYOUT (Centered & Max-Width)
+                <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto mx-auto w-full max-w-screen-2xl">
+                  {fileSystem!.columns.map((col, index) => {
+                    const isLast = index === fileSystem!.columns.length - 1;
+                    return (
+                      <MillerColumn
+                        key={index}
+                        items={col.items.map(t => ({
+                          ...t,
+                          content: renderTileContent(t, 'SMALL')
+                        }))}
+                        activeId={col.activeId}
+                        variant={isLast ? 'GRID' : 'LIST'}
+                        onItemClick={(item) => {
+                          if (onItemClick) onItemClick(item);
+                          if (item.type === 'FILE') setActiveTileId(item.id);
+                        }}
+                        onDeleteFile={onDeleteFile}
+                        onRenameFile={async (path, newPath) => {
+                          if (onRenameFile) await onRenameFile(path, newPath);
+                          if (activeTileId === path) setActiveTileId(newPath); // Keep active
+                        }}
+                        onRequestMove={(path) => setFileToMove(path)}
+                      />
+                    )
+                  })}
+                </div>
+              ) : (
+                // LEGACY SINGLE GRID LAYOUT OR DASHBOARD
+                <div
+                  className={cn(
+                    "absolute top-0 left-0 right-0 bottom-8 overflow-y-auto overflow-x-hidden",
+                    !localConfig || showFiles ? "block" : getResponsiveGridClass(displayTiles.length)
+                  )}
+                  key="matrix"
+                >
+                  {localConfig && !showFiles ? (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
                     >
-                      <TileContentStructure tile={tile} renderTileContent={renderTileContent} />
-                    </div>
-                  ))
-                )}
-              </div>
-            )
-          ) : (
-            // STATE B: FOCUSED TILE
-            <FocusedTile
-              tile={activeTile!}
-              onClose={() => setActiveTileId(null)}
-              renderEditor={renderEditor}
-              zenMode={zenMode}
-              onToggleZenMode={() => setZenMode(prev => !prev)}
-            />
-          )}
-        </Tile>
+                      {(
+                        <>
+                          <SortableContext
+                            items={userEntries.map(e => e.path)}
+                            strategy={rectSortingStrategy}
+                          >
+                            {(
+                              <div className={cn(
+                                "grid gap-px bg-[var(--los-bg)] content-start w-full p-4 md:p-0",
+                                "max-w-screen-2xl mx-auto", // Center content
+                                getResponsiveGridClass(displayTiles.length)
+                              )}>
+                                {displayTiles.map((tile) => (
+                                  <SortableTileItem
+                                    key={tile.id}
+                                    tile={tile}
+                                    renderTileContent={renderTileContent}
+                                    setActiveTileId={setActiveTileId}
+                                    handleDragStart={handleDragStartLogic}
+                                    handleDragSave={handleDragSave}
+                                    dragEnabled={dragEnabled}
+                                  />
+                                ))}
+                              </div>
+                            ) as any}
+                          </SortableContext>
+
+                          <DragOverlay dropAnimation={dropAnimation}>
+                            {(activeId ? (
+                              <div className="bg-[var(--los-bg)] ring-2 ring-[var(--los-accent)] opacity-90 scale-95 w-full h-full pb-[100%]">
+                                <TileContentStructure
+                                  tile={displayTiles.find(t => t.id === activeId)!}
+                                  renderTileContent={renderTileContent}
+                                />
+                              </div>
+                            ) : null) as any}
+                          </DragOverlay>
+                        </>
+                      ) as any}
+                    </DndContext>
+                  ) : (
+                    displayTiles.map((tile) => (
+                      <div
+                        key={tile.id}
+                        onClick={() => setActiveTileId(tile.id)}
+                        className="bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]"
+                      >
+                        <TileContentStructure tile={tile} renderTileContent={renderTileContent} />
+                      </div>
+                    ))
+                  )}
+                </div>
+              )
+            ) : (
+              // STATE B: FOCUSED TILE
+              <FocusedTile
+                tile={activeTile!}
+                onClose={() => setActiveTileId(null)}
+                renderEditor={renderEditor}
+                zenMode={zenMode}
+                onToggleZenMode={() => setZenMode(prev => !prev)}
+                onAddToReadItLater={onAddToReadItLater}
+                onAddToDashboard={config ? (path) => {
+                  setFileToAddToDashboard(path);
+                  setShowAddToDashboard(true);
+                } : undefined}
+              />
+            )}
+          </Tile>
+        )}
       </MainGrid>
 
       {/* Desktop Navigation Overlays (Fix: JS-based hover state for guaranteed visibility) */}
       {(() => {
-        const shouldRender = !activeTileId && localConfig && localConfig.dashboards.length > 1;
+        const shouldRender = !activeTileId && !showFiles && !showGraph && !showCommits && !zenMode && localConfig && localConfig.dashboards.length > 1;
         if (localConfig) {
-          console.log('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: localConfig.dashboards.length, shouldRender, hoverNav });
+          // console.log('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: localConfig.dashboards.length, shouldRender, hoverNav });
         }
         return shouldRender;
       })() && (
@@ -679,7 +1015,7 @@ export const MainApp = ({
                 handlePrevDashboard();
               }}
               title="Previous Workspace"
-              className="flex absolute top-0 left-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-start pl-4 cursor-pointer select-none"
+              className="hidden md:flex absolute top-0 left-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-start pl-4 cursor-pointer select-none"
             >
               {/* Visual Container (Gradient & Icon) */}
               <div className={cn(
@@ -706,7 +1042,7 @@ export const MainApp = ({
                 handleNextDashboard();
               }}
               title="Next Workspace"
-              className="flex absolute top-0 right-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-end pr-4 cursor-pointer select-none"
+              className="hidden md:flex absolute top-0 right-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-end pr-4 cursor-pointer select-none"
             >
               {/* Visual Container (Gradient & Icon) */}
               <div className={cn(
@@ -842,7 +1178,18 @@ abbreviations: undefined
                 setActiveTileId(path);
               }
             },
-            { label: "Files", onClick: () => setShowFiles(true) },
+            {
+              label: "Files", onClick: () => {
+                setShowFiles(true);
+                setActiveTileId(null);
+                setShowGraph(false);
+                setShowCommits(false);
+                setNotFound(false);
+              }
+            },
+            { label: "Graph", onClick: () => setShowGraph(true) },
+            { label: "Commits", onClick: () => setShowCommits(true) },
+            { label: "Settings", onClick: () => setShowSettings(true) },
             ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
             ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
           ]}
@@ -883,7 +1230,7 @@ abbreviations: undefined
   );
 };
 
-const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void }) => {
+const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater, onAddToDashboard }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void, onAddToDashboard?: (path: string) => void }) => {
   if (!tile) return null; // Guard against undefined tile
 
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
@@ -900,6 +1247,7 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: 
   const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
+  const [showHistory, setShowHistory] = useState(false);
 
   return (
     <div
@@ -928,6 +1276,31 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: 
 
             {/* Close Button (Desktop & Mobile) */}
             <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
+                className={cn(
+                  "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                  showHistory ? "text-[var(--los-accent)]" : (zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")
+                )}
+                title="Toggle History"
+              >
+                <span className="text-[10px] hidden md:inline">{showHistory ? "HISTORY ON" : "HISTORY"}</span>
+                <History size={14} className={cn("transition-colors", showHistory && "text-[var(--los-accent)]")} />
+              </button>
+
+              {onAddToDashboard && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onAddToDashboard(String(tile.id)); }}
+                  className={cn(
+                    "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                    zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                  )}
+                  title="Add to Dashboard"
+                >
+                  <span className="text-[10px] hidden md:inline">[+ DASHBOARD]</span>
+                  <div className={cn("w-2 h-2 border transition-colors border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+                </button>
+              )}
               <button
                 onClick={(e) => { e.stopPropagation(); onToggleZenMode?.(); }}
                 className={cn(
@@ -1073,8 +1446,16 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: 
           </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-auto p-0 relative">
+        {/* Content Body */}
+        <div className="flex-1 min-h-0 relative overflow-hidden">
+          {showHistory && (
+            <FileHistoryView
+              path={String(tile.id)}
+              onClose={() => setShowHistory(false)}
+            />
+          )}
+
+          {/* Content Area */}
           {isBudget && (viewMode === 'WIDGET' || viewMode === 'ACCOUNTS' || viewMode === 'ADD') ? (
             <div className="h-full w-full p-8">
               <BudgetWidget
@@ -1138,6 +1519,22 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: 
                   content={tile.rawContent!}
                   mode="FOCUS"
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
+                  onReadItLater={(item) => {
+                    const newItem: ReadItLaterItem = {
+                      id: crypto.randomUUID(),
+                      url: item.link,
+                      status: 'new',
+                      name: item.title,
+                      tags: [],
+                      createdAt: Date.now(),
+                      updatedAt: Date.now()
+                    };
+                    console.log('[MainApp] (Focused) RssWidget onReadItLater triggered.', newItem);
+                    if (!onAddToReadItLater) {
+                      console.error('[MainApp] onAddToReadItLater prop is UNDEFINED in FocusedTile');
+                    }
+                    onAddToReadItLater?.(newItem);
+                  }}
                 />
               )}
               {isReadItLater && (
@@ -1267,8 +1664,8 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: 
             )
           )}
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }
 

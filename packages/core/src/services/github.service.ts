@@ -131,6 +131,18 @@ export class GithubService {
     });
     return data;
   }
+
+  async listCommits(owner: string, repo: string, path?: string, page = 1, perPage = 30) {
+    const client = this.getClient();
+    const { data } = await client.repos.listCommits({
+      owner,
+      repo,
+      path,
+      page,
+      per_page: perPage,
+    });
+    return data;
+  }
 }
 
 export const githubService = new GithubService();
