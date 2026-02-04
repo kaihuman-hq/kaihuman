@@ -872,7 +872,7 @@ abbreviations: undefined
                 setActiveTileId(path);
               }
             },
-            { label: "Files", onClick: () => setShowFiles(true) },
+            { label: "Files", onClick: () => { setShowFiles(true); setActiveTileId(null); } },
             ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
             ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
           ]}

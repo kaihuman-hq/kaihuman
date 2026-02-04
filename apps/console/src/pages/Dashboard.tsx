@@ -91,6 +91,7 @@ export const Dashboard = () => {
 
       const isBudget = item.path.toLowerCase().endsWith('.budget.csv');
       const isActionLog = item.path.toLowerCase().endsWith('.actionlog.md');
+      const isDataCollection = item.path.toLowerCase().endsWith('.data-collection.csv');
 
       const tile: TileDef = {
         id: item.path, // Use path as ID for simplicity
@@ -100,7 +101,7 @@ export const Dashboard = () => {
       };
 
       // Widget Handling Logic
-      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss || isReadItLater || isBudget || isActionLog;
+      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss || isReadItLater || isBudget || isActionLog || isDataCollection;
 
       if (item.type === 'tree') {
         tile.content = <div className="p-8 text-nexus-muted">Select a file from this folder.</div>;
@@ -211,6 +212,19 @@ export const Dashboard = () => {
 
       if (isActionLog) {
         tile.extension = '.actionlog.md';
+        if (openFiles && openFiles[item.path]) {
+          tile.rawContent = openFiles[item.path]?.content;
+        }
+
+        tile.onContentChange = (newContent: string) => {
+          githubFileStore.updateFileContent(item.path, newContent);
+          githubFileStore.saveFile(item.path);
+          updateLocalTileContent(item.path, newContent);
+        };
+      }
+
+      if (isDataCollection) {
+        tile.extension = '.data-collection.csv';
         if (openFiles && openFiles[item.path]) {
           tile.rawContent = openFiles[item.path]?.content;
         }
@@ -489,7 +503,7 @@ export const Dashboard = () => {
         // Grid Mode Editors / Content
         renderFile={useCallback((path: string) => {
           const lowerPath = path.toLowerCase();
-          const isWidget = lowerPath.endsWith('.timetracking.csv') || lowerPath.endsWith('.events.csv') || lowerPath.endsWith('.habit.csv') || lowerPath.endsWith('.todos.md') || lowerPath.endsWith('.timezones.json') || lowerPath.endsWith('.rss.json') || lowerPath.endsWith('.readitlater.json') || lowerPath.endsWith('.budget.csv') || lowerPath.endsWith('.actionlog.md');
+          const isWidget = lowerPath.endsWith('.timetracking.csv') || lowerPath.endsWith('.events.csv') || lowerPath.endsWith('.habit.csv') || lowerPath.endsWith('.todos.md') || lowerPath.endsWith('.timezones.json') || lowerPath.endsWith('.rss.json') || lowerPath.endsWith('.readitlater.json') || lowerPath.endsWith('.budget.csv') || lowerPath.endsWith('.actionlog.md') || lowerPath.endsWith('.data-collection.csv');
           if (isWidget) return <FileViewer key={path} path={path} />;
 
           return (
