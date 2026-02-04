@@ -298,12 +298,23 @@ export const MainApp = ({
               createdAt: Date.now(),
               updatedAt: Date.now()
             };
+            console.log('[MainApp] RssWidget onReadItLater triggered. Calling onAddToReadItLater prop...', newItem);
+            if (!onAddToReadItLater) {
+              console.error('[MainApp] onAddToReadItLater prop is UNDEFINED');
+            }
             onAddToReadItLater?.(newItem);
-          }}
+          }
+          }
         />
       );
     }
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
+      // setRilState('LOADING'); // This state is not defined in MainApp
+      console.log('[MainApp] Read Later clicked for item:', tile.title); // Log the item title from the tile
+      if (!onAddToReadItLater) { // Check the correct prop for adding to read later
+        console.warn('[MainApp] onAddToReadItLater prop is missing!');
+      }
+      // onAddToReadItLater(); // This call needs an item, not a direct call
       return (
         <ReadItLaterWidget
           content={tile.rawContent}
@@ -674,6 +685,7 @@ export const MainApp = ({
               renderEditor={renderEditor}
               zenMode={zenMode}
               onToggleZenMode={() => setZenMode(prev => !prev)}
+              onAddToReadItLater={onAddToReadItLater}
             />
           )}
         </Tile>
@@ -901,7 +913,7 @@ abbreviations: undefined
   );
 };
 
-const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void }) => {
+const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void }) => {
   if (!tile) return null; // Guard against undefined tile
 
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
@@ -1156,6 +1168,22 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode }: 
                   content={tile.rawContent!}
                   mode="FOCUS"
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
+                  onReadItLater={(item) => {
+                    const newItem: ReadItLaterItem = {
+                      id: crypto.randomUUID(),
+                      url: item.link,
+                      status: 'new',
+                      name: item.title,
+                      tags: [],
+                      createdAt: Date.now(),
+                      updatedAt: Date.now()
+                    };
+                    console.log('[MainApp] (Focused) RssWidget onReadItLater triggered.', newItem);
+                    if (!onAddToReadItLater) {
+                      console.error('[MainApp] onAddToReadItLater prop is UNDEFINED in FocusedTile');
+                    }
+                    onAddToReadItLater?.(newItem);
+                  }}
                 />
               )}
               {isReadItLater && (

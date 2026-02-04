@@ -9,6 +9,7 @@
 [x] 1.5 In mobile safari the top bar is not adjusted to the theme color. It is white instead of dark. Implement it.
 [x] 1.6 In Mobile Safari: Switching to Zen Mode in the Editor in Focus Mode, switches the colors of the top bar and bottom bar to white. But it should be dark. Implement it.
 [x] 1.7 In Mobile Mode the Icons for Arrow Left and Right AND the clickable area is available to switch the workspace. This may not be available on mobile mode, only in Desktop Mode.
+[ ] 1.8 When a file is opened in Focus Mode, and then the user clicks on "Files" in the magic menu, it stays with the Focused Modal of the opened file. It must always open the root folder by clicking on "Files" in the magic menu, and if any focused modal is opened it must be closed.
 
 ## 2. Widgets
 

@@ -505,48 +505,95 @@ export const Dashboard = () => {
         renderEditor={useCallback((path: string, zenMode?: boolean) => <FileViewer key={path} path={path} zenMode={zenMode} />, [])}
         onAddToReadItLater={async (item) => {
           const rilPath = '.lifeos/.readitlater.json';
+          console.log('[ReadItLater] Handler triggered for:', item);
           try {
-            // Try to open first
-            if (!githubFileStore.openFiles.value[rilPath]) {
-              try {
-                await githubFileStore.openFile(rilPath);
-              } catch (e) {
-                // Ignore open error, assuming file doesn't exist
+            // 1. Check existence in Tree (Source of Truth)
+            let fileExists = githubFileStore.tree.value.some(t => t.path === rilPath);
+            console.log('[ReadItLater] File exists in tree?', fileExists);
+
+            // 2. Load Content if it exists
+            if (fileExists) {
+              if (!githubFileStore.openFiles.value[rilPath]) {
+                console.log('[ReadItLater] File not open, attempting to open...');
+                try {
+                  await githubFileStore.openFile(rilPath);
+                  console.log('[ReadItLater] File opened successfully');
+                } catch (e) {
+                  console.error("[ReadItLater] Failed to open existing file", e);
+                  fileExists = false; // Fallback to create?
+                }
+              } else {
+                console.log('[ReadItLater] File already open');
               }
             }
 
             const file = githubFileStore.openFiles.value[rilPath];
             const content = file?.content || '';
+            console.log('[ReadItLater] Current content length:', content.length);
 
+            // 3. Parse Config
             let config;
             try {
               config = content ? parseReadItLater(content) : DEFAULT_RIL_CONFIG;
               if (!config || !config.items) config = DEFAULT_RIL_CONFIG;
             } catch (e) {
+              console.error('[ReadItLater] Parse error:', e);
               config = DEFAULT_RIL_CONFIG;
             }
 
-            // Check duplicates
-            if (config.items && config.items.some(i => i.url === item.url)) return;
+            // 4. Update Data
+            const isDuplicate = config.items && config.items.some(i => i.url === item.url);
+            if (isDuplicate) {
+              console.log("[ReadItLater] Item already exists (Duplicate):", item.url);
+              // Force UI update anyway just to be sure visual state matches
+              // updateLocalTileContent(rilPath, serializeReadItLater(config));
+              return;
+            }
 
-            const newConfig = { ...config, items: [item, ...(config.items || [])] };
+            const newItems = [item, ...(config.items || [])];
+            const newConfig = { ...config, items: newItems };
             const newContent = serializeReadItLater(newConfig);
+            console.log('[ReadItLater] New config items count:', newItems.length);
 
-            if (file) {
-              // Update and Save - calling updateFileContent handles DB update/state update
+            // 5. Persist
+            if (fileExists && file) {
+              console.log("[ReadItLater] Updating existing file via updateFileContent");
               githubFileStore.updateFileContent(rilPath, newContent);
               await githubFileStore.saveFile(rilPath);
             } else {
-              // File doesn't exist (openFile failed or returned nothing), so we CREATE it
-              await githubFileStore.createFile(rilPath, newContent);
+              console.log("[ReadItLater] Creating new file via createFile");
+              try {
+                await githubFileStore.createFile(rilPath, newContent);
+                console.log("[ReadItLater] createFile success");
+              } catch (e: any) {
+                console.warn("[ReadItLater] createFile failed:", e);
+                if (e.message && e.message.includes('already exists')) {
+                  console.log("[ReadItLater] File actually exists, attempting fallback update.");
+
+                  // Fallback: Ensure it is "open" locally so updateFileContent doesn't bail
+                  if (!githubFileStore.openFiles.value[rilPath]) {
+                    console.log("[ReadItLater] Fallback: Injecting into openFiles before update");
+                    // Manually inject so updateFileContent doesn't bail
+                    githubFileStore.openFiles.value = {
+                      ...githubFileStore.openFiles.value,
+                      [rilPath]: { content: newContent, sha: '' } // Optimistic
+                    };
+                  }
+
+                  githubFileStore.updateFileContent(rilPath, newContent);
+                  await githubFileStore.saveFile(rilPath);
+                } else {
+                  throw e;
+                }
+              }
             }
 
-            // CRITICAL: Force UI update by triggering local state change
-            // This ensures Dashboard re-renders and picks up the new content from the store
+            // 6. Force UI Update
+            console.log("[ReadItLater] Triggering updateLocalTileContent");
             updateLocalTileContent(rilPath, newContent);
 
           } catch (error) {
-            console.error('Failed to add to ReadItLater:', error);
+            console.error('[ReadItLater] CRITICAL failure:', error);
           }
         }}
         onCreateFile={useCallback(async (path: string, content: string) => {
