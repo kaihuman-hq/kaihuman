@@ -101,6 +101,23 @@ export interface MainAppProps {
   githubToken?: string;
 }
 
+// Helper to parse URL into state
+const parseUrlState = () => {
+  if (typeof window === 'undefined') return { showFiles: false, activeTileId: null, showNewFileWizard: false };
+  const path = window.location.pathname;
+  if (path === '/files/new') {
+    return { showFiles: true, activeTileId: null, showNewFileWizard: true };
+  }
+  if (path.startsWith('/files/') && path.length > 7) {
+    const filePath = decodeURIComponent(path.replace('/files/', ''));
+    return { showFiles: true, activeTileId: filePath, showNewFileWizard: false };
+  }
+  if (path === '/files') {
+    return { showFiles: true, activeTileId: null, showNewFileWizard: false };
+  }
+  return { showFiles: false, activeTileId: null, showNewFileWizard: false };
+};
+
 export const MainApp = ({
   tiles = [],
   config,
@@ -123,7 +140,8 @@ export const MainApp = ({
   ...props
 }: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
-  const [activeTileId, setActiveTileId] = useState<string | number | null>(null);
+  // Initial state derived from URL
+  const [activeTileId, setActiveTileId] = useState<string | number | null>(() => parseUrlState().activeTileId);
 
   const [showSettings, setShowSettings] = useState(false);
   const [showAddToDashboard, setShowAddToDashboard] = useState(false);
@@ -158,8 +176,8 @@ export const MainApp = ({
   const [activeDashboardId, setActiveDashboardId] = useState<string | null>(null);
   const [dragEnabled, setDragEnabled] = useState(false);
   const [localConfig, setLocalConfig] = useState<DashboardConfig | undefined>(config);
-  const [showFiles, setShowFiles] = useState(false); // Toggle for "Files" view
-  const [showNewFileWizard, setShowNewFileWizard] = useState(false);
+  const [showFiles, setShowFiles] = useState(() => parseUrlState().showFiles); // Toggle for "Files" view
+  const [showNewFileWizard, setShowNewFileWizard] = useState(() => parseUrlState().showNewFileWizard);
   const [fileToMove, setFileToMove] = useState<string | null>(null);
   const [zenMode, setZenMode] = useState(false); // Zen Mode state
 
@@ -171,6 +189,38 @@ export const MainApp = ({
 
   // Nav Overlay Hover State
   const [hoverNav, setHoverNav] = useState<'prev' | 'next' | null>(null);
+
+  // ROUTING LOGIC (Feature 3.10.1)
+  // Sync State -> URL
+  useEffect(() => {
+    let url = '/';
+    if (showNewFileWizard) {
+      url = '/files/new';
+    } else if (activeTileId && typeof activeTileId === 'string') {
+      url = `/files/${encodeURIComponent(activeTileId)}`;
+    } else if (showFiles) {
+      url = '/files';
+    } else {
+      url = '/';
+    }
+
+    if (window.location.pathname !== url) {
+      window.history.pushState({}, '', url);
+    }
+  }, [activeTileId, showFiles, showNewFileWizard]);
+
+  // Sync URL -> State (Popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      const state = parseUrlState();
+      // Batch updates if possible or preact handles it
+      setActiveTileId(state.activeTileId);
+      setShowFiles(state.showFiles);
+      setShowNewFileWizard(state.showNewFileWizard);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     if (config) {
