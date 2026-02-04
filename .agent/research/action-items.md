@@ -10,6 +10,7 @@
 [x] 1.6 In Mobile Safari: Switching to Zen Mode in the Editor in Focus Mode, switches the colors of the top bar and bottom bar to white. But it should be dark. Implement it.
 [x] 1.7 In Mobile Mode the Icons for Arrow Left and Right AND the clickable area is available to switch the workspace. This may not be available on mobile mode, only in Desktop Mode.
 [ ] 1.8 When a file is opened in Focus Mode, and then the user clicks on "Files" in the magic menu, it stays with the Focused Modal of the opened file. It must always open the root folder by clicking on "Files" in the magic menu, and if any focused modal is opened it must be closed.
+[ ] 1.9 Opening a file from the Files View must also show all available widgets in the Focus Mode. Currently I only see the regular editor for "Data Collection" for example. Fix it.
 
 ## 2. Widgets
 
