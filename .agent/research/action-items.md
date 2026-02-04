@@ -271,3 +271,99 @@ Add a new menu item to the magic menu to create a new quick note. The quick note
 ### 3.8 Editor
 
 Implement a Zen Mode for the editor. It should be possible to toggle it with a button and a keyboard shortcut. In Zen Mode the editor should be in full screen mode and most of the other UI elements are hidden. New user should be able to fully focus on writing the text.
+
+### 3.9 Dashboard
+
+[ ] 3.9.1 It must be possible to add a file to the Dashboard, so the widget can be rendered. Since it is possible to have multiple workspaces, the user should be able to select a workspace where to put it. 
+
+[ ] 3.9.2 Add a new menu entry to the magic menu called "Settings". This will open a new view where the user can configure settings for the app. All settings are stored in the .lifeos/.dashboard.config.json file. The structure of the file is as follows:
+
+- version: the version of the file
+- dashboards: a list of dashboards - these are the workspaces
+- entries: a list of entries
+- files: a list of files
+
+On the settings page the user should be able to:
+- add a new dashboard (workspace)
+- delete a dashboard (workspace)
+- rename a dashboard (workspace)
+- change the order of the dashboards
+
+The version field is for backward compatibility. So make sure that there is a migration path to the next version.
+
+{
+  "version": 1,
+  "dashboards": [
+    {
+      "id": "d0",
+      "name": "work8test-new"
+    },
+    {
+      "id": "d1",
+      "name": "new-dashboard"
+    },
+    {
+      "id": "d2",
+      "name": "default"
+    },
+    {
+      "id": "d3",
+      "name": "my new shiny dashboard"
+    }
+  ],
+  "entries": [
+    {
+      "path": "my2.achievements.md",
+      "dashboard": "d1",
+      "skipOnMobile": false
+    },
+    {
+      "path": "generic-test/generic-other.csv.md",
+      "dashboard": "d3",
+      "skipOnMobile": false
+    },
+    {
+      "path": "test-todos.todos.md",
+      "dashboard": "d2",
+      "skipOnMobile": false
+    },
+    {
+      "path": "reditlater.readitlater.json",
+      "dashboard": "d2",
+      "skipOnMobile": false
+    },
+    {
+      "path": ".lifeos/.readitlater.json",
+      "dashboard": "d0",
+      "skipOnMobile": false
+    },
+    {
+      "path": "test2.habit.csv",
+      "dashboard": "d0",
+      "skipOnMobile": false
+    },
+    {
+      "path": "my-date-time.timezones.json",
+      "dashboard": "d0",
+      "skipOnMobile": false
+    }
+  ],
+  "files": {
+    "selected": "0_event.events.csv",
+    "opened": [
+      "0_event.events.csv"
+    ],
+    "recentlyOpened": [
+      "hackernews.rss.json",
+      "asd.md",
+      ".lifeos/quicknotes/quicknote-2026-02-03-10:38:15.md",
+      "0_event.events.csv",
+      "my-lifosy-event.lifosy-event.json",
+      "testidea .tldraw.json",
+      ".lifeos/.readitlater.json",
+      ".lifeos/quicknotes/quicknote-2025-11-07-12:59.md",
+      "hello-quicknote.md",
+      ".lifeos/quicknotes/quicknote-2025-11-07-12:57.md"
+    ]
+  }
+}

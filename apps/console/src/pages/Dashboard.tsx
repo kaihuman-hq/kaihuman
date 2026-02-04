@@ -508,7 +508,11 @@ export const Dashboard = () => {
           try {
             // Try to open first
             if (!githubFileStore.openFiles.value[rilPath]) {
-              await githubFileStore.openFile(rilPath);
+              try {
+                await githubFileStore.openFile(rilPath);
+              } catch (e) {
+                // Ignore open error, assuming file doesn't exist
+              }
             }
 
             const file = githubFileStore.openFiles.value[rilPath];
@@ -517,14 +521,15 @@ export const Dashboard = () => {
             let config;
             try {
               config = content ? parseReadItLater(content) : DEFAULT_RIL_CONFIG;
+              if (!config || !config.items) config = DEFAULT_RIL_CONFIG;
             } catch (e) {
               config = DEFAULT_RIL_CONFIG;
             }
 
             // Check duplicates
-            if (config.items.some(i => i.url === item.url)) return;
+            if (config.items && config.items.some(i => i.url === item.url)) return;
 
-            const newConfig = { ...config, items: [item, ...config.items] };
+            const newConfig = { ...config, items: [item, ...(config.items || [])] };
             const newContent = serializeReadItLater(newConfig);
 
             if (file) {
@@ -535,6 +540,10 @@ export const Dashboard = () => {
               // File doesn't exist (openFile failed or returned nothing), so we CREATE it
               await githubFileStore.createFile(rilPath, newContent);
             }
+
+            // CRITICAL: Force UI update by triggering local state change
+            // This ensures Dashboard re-renders and picks up the new content from the store
+            updateLocalTileContent(rilPath, newContent);
 
           } catch (error) {
             console.error('Failed to add to ReadItLater:', error);
