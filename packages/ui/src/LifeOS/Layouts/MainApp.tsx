@@ -100,6 +100,7 @@ export interface MainAppProps {
   existingFiles?: string[];
   onLoadFolder?: (path: string) => Promise<TileDef[]>;
   githubToken?: string;
+  onCheckPath?: (path: string) => Promise<'FILE' | 'FOLDER' | null> | 'FILE' | 'FOLDER' | null;
 }
 
 // Helper to parse URL into state
@@ -138,6 +139,7 @@ export const MainApp = ({
   existingFiles,
   onLoadFolder,
   githubToken,
+  onCheckPath,
   ...props
 }: MainAppProps) => {
   // State for legacy/single-level mode or Dashboard mode
@@ -224,10 +226,45 @@ export const MainApp = ({
         // If we DON'T have fileSystem yet (initial load), we might wait or assume file first?
         // Actually, MainApp might be mounted before fileSystem is ready.
         // Let's assume if it ends in slash or has no extension and matches a known folder, it's a folder.
-        // But we rely on fileSystem to tell us valid paths.
+        const path = state.activeTileId;
 
+        // NEW LOGIC: Use onCheckPath if available (Source of Truth)
+        if (onCheckPath) {
+          Promise.resolve(onCheckPath(path)).then(type => {
+            if (type === 'FOLDER') {
+              setShowFiles(true);
+              setActiveTileId(null);
+              setNotFound(false);
+              const parts = path.split('/');
+              onNavigate?.(parts);
+            } else if (type === 'FILE') {
+              setShowFiles(true);
+              setActiveTileId(path);
+              setNotFound(false);
+              // Ensure navigation happens so columns are built?
+              // MainApp/MillerColumn usually rebuilds based on activeTileId if it's passed down?
+              // Actually onNavigate is safer to reconstruction
+              const parts = path.split('/');
+              onNavigate?.(parts);
+            } else {
+              // Check dashboard entries as fallback
+              const dashEntry = localConfig?.entries.find(e => e.path === path);
+              if (dashEntry) {
+                setActiveTileId(path);
+                setShowFiles(false);
+                setNotFound(false);
+                return;
+              }
+              console.warn("Path not found (via onCheckPath):", path);
+              setNotFound(true);
+            }
+          });
+          return;
+        }
+
+        // Fallback to existing logic if no onCheckPath logic
         if (fileSystem) {
-          const path = state.activeTileId;
+          // path already defined above from state.activeTileId
           // Check if it is a folder in any column items? 
           // Or check if it exists at all?
 

@@ -638,6 +638,20 @@ export const Dashboard = () => {
           return getChildren(prefix);
         }}
         githubToken={authStore.token.value || undefined}
+        onCheckPath={async (path: string) => {
+          // Check against the full tree
+          const currentTree = githubFileStore.tree.value;
+          if (!currentTree) return null;
+
+          const found = currentTree.find(item => item.path === path);
+          if (found) {
+            return found.type === 'tree' ? 'FOLDER' : 'FILE';
+          }
+
+          // Also check if prefix is a folder (for potential folder paths that don't match exactly without slash)
+          // Actually tree usually has folders without trailing slash.
+          return null;
+        }}
       />
     </div>
   );
