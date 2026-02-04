@@ -500,6 +500,24 @@ export const MainApp = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Fix 1.5 & 1.6: Dynamic Theme Color for Mobile Safari and Zen Mode
+  useEffect(() => {
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      if (zenMode) {
+        metaThemeColor.setAttribute('content', '#0a0a0f'); // Dark background
+      } else {
+        metaThemeColor.setAttribute('content', '#0a0a0f'); // Ensure it stays dark even if something else changes it or default
+      }
+    } else {
+      // Create if missing?
+      const meta = document.createElement('meta');
+      meta.name = "theme-color";
+      meta.content = "#0a0a0f";
+      document.head.appendChild(meta);
+    }
+  }, [zenMode]);
+
   return (
     <div
       className="h-screen w-full max-w-[100vw] bg-[var(--los-bg)] overflow-hidden relative"
@@ -679,7 +697,7 @@ export const MainApp = ({
                 handlePrevDashboard();
               }}
               title="Previous Workspace"
-              className="flex absolute top-0 left-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-start pl-4 cursor-pointer select-none"
+              className="hidden md:flex absolute top-0 left-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-start pl-4 cursor-pointer select-none"
             >
               {/* Visual Container (Gradient & Icon) */}
               <div className={cn(
@@ -706,7 +724,7 @@ export const MainApp = ({
                 handleNextDashboard();
               }}
               title="Next Workspace"
-              className="flex absolute top-0 right-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-end pr-4 cursor-pointer select-none"
+              className="hidden md:flex absolute top-0 right-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-end pr-4 cursor-pointer select-none"
             >
               {/* Visual Container (Gradient & Icon) */}
               <div className={cn(

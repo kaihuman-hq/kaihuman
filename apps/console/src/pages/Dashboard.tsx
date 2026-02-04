@@ -506,7 +506,7 @@ export const Dashboard = () => {
         onAddToReadItLater={async (item) => {
           const rilPath = '.lifeos/.readitlater.json';
           try {
-            // Ensure loaded
+            // Try to open first
             if (!githubFileStore.openFiles.value[rilPath]) {
               await githubFileStore.openFile(rilPath);
             }
@@ -527,9 +527,14 @@ export const Dashboard = () => {
             const newConfig = { ...config, items: [item, ...config.items] };
             const newContent = serializeReadItLater(newConfig);
 
-            // Update and Save - calling updateFileContent handles DB update/state update
-            githubFileStore.updateFileContent(rilPath, newContent);
-            await githubFileStore.saveFile(rilPath);
+            if (file) {
+              // Update and Save - calling updateFileContent handles DB update/state update
+              githubFileStore.updateFileContent(rilPath, newContent);
+              await githubFileStore.saveFile(rilPath);
+            } else {
+              // File doesn't exist (openFile failed or returned nothing), so we CREATE it
+              await githubFileStore.createFile(rilPath, newContent);
+            }
 
           } catch (error) {
             console.error('Failed to add to ReadItLater:', error);

@@ -5,10 +5,10 @@
 [x] 1.1 From the status bar, clicking on one recent file, currently does not open the file properly. Implement the following: open the files view and navigate to the folder where file is located and open the file.
 [x] 1.2 Fix repo selection to open the newly selected repo instead of the default one.
 [x] 1.3 Files that have been saved must also be considered in the recently opened files list in .lifosy directory. Fix it. Make sure there is a limit of 10 files.
-[ ] 1.4 Clicking on Bookmark/Read it later, does not add the entry to the .lifosy/readitlater.json file anymore. This was already working. Investigate and fix it.
-[ ] 1.5 In mobile safari the top bar is not adjusted to the theme color. It is white instead of dark. Implement it.
-[ ] 1.6 In Mobile Safari: Switching to Zen Mode in the Editor in Focus Mode, switches the colors of the top bar and bottom bar to white. But it should be dark. Implement it.
-[ ] 1.7 In Mobile Mode the Icons for Arrow Left and Right AND the clickable area is available to switch the workspace. This may not be available on mobile mode, only in Desktop Mode.
+[x] 1.4 Clicking on Bookmark/Read it later, does not add the entry to the .lifosy/readitlater.json file anymore. This was already working. Investigate and fix it.
+[x] 1.5 In mobile safari the top bar is not adjusted to the theme color. It is white instead of dark. Implement it.
+[x] 1.6 In Mobile Safari: Switching to Zen Mode in the Editor in Focus Mode, switches the colors of the top bar and bottom bar to white. But it should be dark. Implement it.
+[x] 1.7 In Mobile Mode the Icons for Arrow Left and Right AND the clickable area is available to switch the workspace. This may not be available on mobile mode, only in Desktop Mode.
 
 ## 2. Widgets
 
