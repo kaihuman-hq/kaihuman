@@ -11,7 +11,7 @@
 [x] 1.7 In Mobile Mode the Icons for Arrow Left and Right AND the clickable area is available to switch the workspace. This may not be available on mobile mode, only in Desktop Mode.
 [x] 1.8 When a file is opened in Focus Mode, and then the user clicks on "Files" in the magic menu, it stays with the Focused Modal of the opened file. It must always open the root folder by clicking on "Files" in the magic menu, and if any focused modal is opened it must be closed.
 [x] 1.9 Opening a file from the Files View must also show all available widgets in the Focus Mode. Currently I only see the regular editor for "Data Collection" for example. Fix it.
-[ ] 1.10 Using the search must also search file names not only the content of files. Currently it looks like file names are not searched. Investigate and fix it.
+[x] 1.10 Using the search must also search file names not only the content of files. Currently it looks like file names are not searched. Investigate and fix it.
 
 ## 2. Widgets
 

@@ -48,7 +48,9 @@ export const SearchModal = ({ isOpen, onClose, onSelect, currentRepository = "li
       setLoading(true);
       try {
         // Search in the specific repository
-        const q = encodeURIComponent(`${query} repo:${currentRepository}`);
+        // GitHub Code Search doesn't support OR, so we run two queries in parallel
+        const qContent = encodeURIComponent(`${query} repo:${currentRepository}`);
+        const qFile = encodeURIComponent(`filename:${query} repo:${currentRepository}`);
 
         const headers: Record<string, string> = {
           'Accept': 'application/vnd.github.v3+json'
@@ -58,17 +60,40 @@ export const SearchModal = ({ isOpen, onClose, onSelect, currentRepository = "li
           headers['Authorization'] = `Bearer ${githubToken}`;
         }
 
-        const res = await fetch(`https://api.github.com/search/code?q=${q}&per_page=10`, {
-          headers
+        const [resContent, resFile] = await Promise.all([
+          fetch(`https://api.github.com/search/code?q=${qContent}&per_page=10`, { headers }),
+          fetch(`https://api.github.com/search/code?q=${qFile}&per_page=10`, { headers })
+        ]);
+
+        let combinedResults: SearchResult[] = [];
+
+        if (resContent.ok) {
+          const data = await resContent.json();
+          combinedResults = [...combinedResults, ...(data.items || [])];
+        } else {
+          console.error('Content Search failed', resContent.status);
+        }
+
+        if (resFile.ok) {
+          const data = await resFile.json();
+          // Prioritize filename matches by putting them first (or we can just merge)
+          // Let's prepend them so they appear at the top
+          combinedResults = [...(data.items || []), ...combinedResults];
+        } else {
+          console.error('Filename Search failed', resFile.status);
+        }
+
+        // Deduplicate by path
+        const seen = new Set<string>();
+        const uniqueResults = combinedResults.filter(item => {
+          if (seen.has(item.path)) return false;
+          seen.add(item.path);
+          return true;
         });
 
-        if (res.ok) {
-          const data = await res.json();
-          setResults(data.items || []);
-          setSelectedIndex(0);
-        } else {
-          console.error('Search failed', res.status, res.statusText);
-        }
+        setResults(uniqueResults.slice(0, 20)); // Cap at 20 combined
+        setSelectedIndex(0);
+
       } catch (e) {
         console.error('Search error', e);
       } finally {
