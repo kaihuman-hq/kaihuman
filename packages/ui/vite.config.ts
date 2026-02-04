@@ -37,6 +37,7 @@ export default defineConfig({
         /^@dnd-kit\/.*/,
         'clsx',
         'tailwind-merge',
+        '@lifosy/core',
       ],
       output: {
         globals: {

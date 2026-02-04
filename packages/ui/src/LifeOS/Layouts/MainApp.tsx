@@ -32,6 +32,25 @@ import { DataCollectionColumnManager } from '../Organisms/Widgets/DataCollection
 import { DataCollectionData, parseDataCollection, serializeDataCollection, calculateAutoValues } from '../Organisms/Widgets/DataCollectionLogic';
 import { BudgetWidget } from '../Organisms/Widgets/BudgetWidget';
 import { DashboardConfig, DashboardEntry } from '../types';
+// 3.12, 3.11 Views
+import { CommitsView } from '../Organisms/CommitsView';
+import { GraphView } from '../Organisms/GraphView';
+import { FileHistoryView } from '../Organisms/FileHistoryView';
+import {
+  FileText,
+  Layout,
+  Maximize2,
+  Minimize2,
+  Grid,
+  List,
+  Plus,
+  ArrowLeft,
+  Settings,
+  X,
+  History,
+  GitCommit,
+  Share2
+} from 'lucide-preact';
 import {
   DndContext,
   closestCenter,
@@ -149,6 +168,11 @@ export const MainApp = ({
   const [showSettings, setShowSettings] = useState(false);
   const [showAddToDashboard, setShowAddToDashboard] = useState(false);
   const [fileToAddToDashboard, setFileToAddToDashboard] = useState<string | null>(null);
+
+  // 3.12, 3.11 State
+  const [showCommits, setShowCommits] = useState(false);
+  const [showGraph, setShowGraph] = useState(false);
+
 
   const handleAddToDashboard = (dashboardId: string) => {
     if (!fileToAddToDashboard || !config || !onConfigChange) return;
@@ -718,12 +742,55 @@ export const MainApp = ({
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      {showSettings && config && onConfigChange && (
-        <SettingsView
-          config={config}
-          onConfigChange={onConfigChange}
-          onClose={() => setShowSettings(false)}
-        />
+      {showCommits && (
+        <div className="fixed inset-0 z-50 bg-[var(--los-bg)] animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-[var(--los-border)]">
+            <div className="flex items-center gap-2">
+              <GitCommit className="text-[var(--los-accent)]" size={20} />
+              <MonoHeader>REPOSITORY HISTORY</MonoHeader>
+            </div>
+            <button
+              onClick={() => setShowCommits(false)}
+              className="p-2 hover:bg-white/10 rounded-sm"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <CommitsView />
+          </div>
+        </div>
+      )}
+
+      {showGraph && (
+        <div className="fixed inset-0 z-50 bg-[var(--los-bg)] animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+          <div className="absolute top-4 right-4 z-50">
+            <button
+              onClick={() => setShowGraph(false)}
+              className="p-2 bg-[var(--los-bg)] border border-[var(--los-border)] hover:bg-[var(--los-accent)] hover://text-[var(--los-bg)] rounded-sm transition-colors shadow-lg"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <GraphView onNavigate={(path) => {
+              setShowGraph(false);
+              setShowFiles(true);
+              setActiveTileId(path);
+            }} />
+          </div>
+        </div>
+      )}
+
+      {/* Settings Overlay */}
+      {showSettings && localConfig && onConfigChange && (
+        <div className="fixed inset-0 z-50 bg-[var(--los-bg)] animate-in fade-in zoom-in-95 duration-200">
+          <SettingsView
+            config={localConfig}
+            onConfigChange={onConfigChange}
+            onClose={() => setShowSettings(false)}
+          />
+        </div>
       )}
 
       {showAddToDashboard && config && (
@@ -1112,6 +1179,8 @@ abbreviations: undefined
               }
             },
             { label: "Files", onClick: () => { setShowFiles(true); setActiveTileId(null); } },
+            { label: "Graph", onClick: () => setShowGraph(true) },
+            { label: "Commits", onClick: () => setShowCommits(true) },
             { label: "Settings", onClick: () => setShowSettings(true) },
             ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
             ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
@@ -1170,6 +1239,7 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
   const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
+  const [showHistory, setShowHistory] = useState(false);
 
   return (
     <div
@@ -1198,6 +1268,18 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
 
             {/* Close Button (Desktop & Mobile) */}
             <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
+                className={cn(
+                  "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                  showHistory ? "text-[var(--los-accent)]" : (zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")
+                )}
+                title="Toggle History"
+              >
+                <span className="text-[10px] hidden md:inline">{showHistory ? "HISTORY ON" : "HISTORY"}</span>
+                <History size={14} className={cn("transition-colors", showHistory && "text-[var(--los-accent)]")} />
+              </button>
+
               {onAddToDashboard && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onAddToDashboard(String(tile.id)); }}
@@ -1356,8 +1438,16 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
           </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-auto p-0 relative">
+        {/* Content Body */}
+        <div className="flex-1 min-h-0 relative overflow-hidden">
+          {showHistory && (
+            <FileHistoryView
+              path={String(tile.id)}
+              onClose={() => setShowHistory(false)}
+            />
+          )}
+
+          {/* Content Area */}
           {isBudget && (viewMode === 'WIDGET' || viewMode === 'ACCOUNTS' || viewMode === 'ADD') ? (
             <div className="h-full w-full p-8">
               <BudgetWidget
@@ -1566,8 +1656,8 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
             )
           )}
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }
 

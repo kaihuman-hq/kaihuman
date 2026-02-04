@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { computed, effect, signal } from '@preact/signals';
 import { z } from 'zod';
 import { dbPromise } from '../db.js';
