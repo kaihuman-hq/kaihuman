@@ -171,6 +171,7 @@ export const MainApp = ({
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(() => parseUrlState().activeTileId);
   const [notFound, setNotFound] = useState(false);
+  const [checkingPath, setCheckingPath] = useState(false);
 
   const [showSettings, setShowSettings] = useState(false);
   const [showAddToDashboard, setShowAddToDashboard] = useState(false);
@@ -261,7 +262,9 @@ export const MainApp = ({
 
         // NEW LOGIC: Use onCheckPath if available (Source of Truth)
         if (onCheckPath) {
+          setCheckingPath(true);
           Promise.resolve(onCheckPath(path)).then(type => {
+            setCheckingPath(false);
             if (type === 'FOLDER') {
               setShowFiles(true);
               setActiveTileId(null);
@@ -350,7 +353,7 @@ export const MainApp = ({
     resolvePath();
     window.addEventListener('popstate', resolvePath);
     return () => window.removeEventListener('popstate', resolvePath);
-  }, [fileSystem, localConfig]); // Re-run when FS loads
+  }, [fileSystem, localConfig, onCheckPath, onNavigate]); // Re-run when FS loads or props change
 
 
   useEffect(() => {
@@ -883,8 +886,14 @@ export const MainApp = ({
       {/* CENTER STAGE: The Matrix OR The Active Tile */}
       <MainGrid viewState={zenMode ? 'ZEN' : (activeTileId !== null ? 'FOCUS' : 'DASHBOARD')}>
 
-        {/* Not Found State */}
-        {notFound ? (
+        {/* Not Found State or Loading State */}
+        {checkingPath ? (
+          <Tile column="center" title="Loading...">
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--los-accent)]"></div>
+            </div>
+          </Tile>
+        ) : notFound ? (
           <Tile column="center" title="404">
             <NotFound onGoHome={() => {
               window.history.pushState({}, '', '/');
