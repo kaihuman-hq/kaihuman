@@ -1,10 +1,11 @@
-import { computed, effect, signal } from '@preact/signals';
+import { signal, effect, computed } from '@preact/signals';
 import { githubService } from '../services/github.service.js';
 import { githubProfileStore } from './github-profile.store.js';
-import { dbPromise } from '../db.js';
+import { openDB } from 'idb';
 import { Logger } from '../logger.js';
 
 const logger = new Logger('GithubFileStore');
+const dbPromise = openDB('life-os-db', 1);
 
 export interface TreeItem {
   path: string;
@@ -62,7 +63,7 @@ export class GithubFileStore {
       let cachedTree: TreeItem[] = [];
 
       // 1. Try to load from DB first
-      const dbTree = await db.get('trees', `tree:${repo.full_name}`);
+      const dbTree = await db.get('trees', `tree:${repo.full_name} `);
       if (dbTree) {
         cachedTree = dbTree;
         // If we have no in-memory tree, use cache immediately
@@ -87,11 +88,11 @@ export class GithubFileStore {
           // Logic: If we have content, it's likely a local file we care about (newly created or working on).
           // If we don't, it might be a deleted file we should drop.
 
-          const cacheKey = `${repo.full_name}:${item.path}`;
+          const cacheKey = `${repo.full_name}:${item.path} `;
           const hasFile = await db.getKey('files', cacheKey);
 
           if (hasFile) {
-            logger.debug(`Preserving local file not (yet) in remote: ${item.path}`);
+            logger.debug(`Preserving local file not(yet) in remote: ${item.path} `);
             mergedTree.push(item);
           }
         }
@@ -107,7 +108,7 @@ export class GithubFileStore {
       this.tree.value = mergedTree;
 
       // 4. Update DB
-      await db.put('trees', mergedTree, `tree:${repo.full_name}`);
+      await db.put('trees', mergedTree, `tree:${repo.full_name} `);
 
     } catch (err: any) {
       logger.error('Failed to load tree', err);
@@ -131,7 +132,7 @@ export class GithubFileStore {
 
     // If pending, just wait (or ignore, assuming previous call handles it)
     if (this.pendingFiles.has(path)) {
-      logger.warn(`File ${path} is already loading. Ignoring duplicate request.`);
+      logger.warn(`File ${path} is already loading.Ignoring duplicate request.`);
       return;
     }
 
@@ -150,7 +151,7 @@ export class GithubFileStore {
       // 1. Try Cache
       const db = await dbPromise;
       // Use composite key
-      const cacheKey = `${repo.full_name}:${path}`;
+      const cacheKey = `${repo.full_name}:${path} `;
       const cachedData = await db.get('files', cacheKey);
 
       if (cachedData) {
@@ -217,7 +218,7 @@ export class GithubFileStore {
       // Update DB immediately
       const repo = githubProfileStore.currentRepo.value;
       if (repo) {
-        const cacheKey = `${repo.full_name}:${path}`;
+        const cacheKey = `${repo.full_name}:${path} `;
         dbPromise.then(db => {
           // NO extra key arg
           db.put('files', {
@@ -255,8 +256,13 @@ export class GithubFileStore {
     this.savingFiles.value = newSaving;
 
     try {
+      let attempts = 0;
+      const MAX_ATTEMPTS = 3;
+
       // LOOP: Keep saving as long as it's dirty (changes happened while saving)
-      while (this.dirtyFiles.value.has(path)) {
+      while (this.dirtyFiles.value.has(path) && attempts < MAX_ATTEMPTS) {
+        attempts++;
+
         // 1. Capture content at start of iteration
         // Refresh file ref to get latest content
         file = this.openFiles.value[path];
@@ -268,56 +274,83 @@ export class GithubFileStore {
 
         const contentToSave = file.content;
 
-        logger.debug(`Saving ${path}...`);
+        logger.debug(`Saving ${path} (Attempt ${attempts})...`);
 
-        const res = await githubService.saveFile(
-          repo.owner.login,
-          repo.name,
-          path,
-          contentToSave,
-          `Update ${path} via Console`,
-          file.sha,
-        );
+        try {
+          const res = await githubService.saveFile(
+            repo.owner.login,
+            repo.name,
+            path,
+            contentToSave,
+            `Update ${path} via Console`,
+            file.sha,
+          );
 
-        // 2. Update SHA from response
-        const serverSha = res.content?.sha;
-        if (serverSha) {
-          // Update local state with new SHA
-          // Note: We must read 'this.openFiles' again to ensure we don't overwrite concurrent content updates 
-          // (though content updates shouldn't change SHA, but good practice)
-          const currentFileState = this.openFiles.value[path];
-          if (currentFileState) {
-            this.openFiles.value = {
-              ...this.openFiles.value,
-              [path]: { ...currentFileState, sha: serverSha },
-            };
+          // 2. Update SHA from response
+          const serverSha = res.content?.sha;
+          if (serverSha) {
+            // Update local state with new SHA
+            const currentFileState = this.openFiles.value[path];
+            if (currentFileState) {
+              this.openFiles.value = {
+                ...this.openFiles.value,
+                [path]: { ...currentFileState, sha: serverSha },
+              };
+            }
+
+            // Update DB with new SHA
+            const cacheKey = `${repo.full_name}:${path} `;
+            dbPromise.then(db => {
+              db.put('files', {
+                path: cacheKey,
+                content: contentToSave,
+                sha: serverSha,
+                timestamp: Date.now()
+              });
+            });
           }
 
-          // Update DB with new SHA
-          const cacheKey = `${repo.full_name}:${path}`;
-          dbPromise.then(db => {
-            db.put('files', {
-              path: cacheKey,
-              content: contentToSave, // Use the content we actually saved
-              sha: serverSha,
-              timestamp: Date.now()
-            });
-          });
-        }
+          // 3. Mark as NOT dirty (for THIS content version)
+          // We only remove dirty flag if content matches what we just saved.
+          const currentFile = this.openFiles.value[path];
+          if (currentFile && currentFile.content === contentToSave) {
+            const dirty = new Set(this.dirtyFiles.value);
+            dirty.delete(path);
+            this.dirtyFiles.value = dirty;
+            logger.debug(`Saved ${path} successfully.Clean.`);
+            this.lastSavedFile.value = path;
+          } else {
+            logger.warn(`Saved ${path}, but content changed during save.Retrying...`);
+          }
 
-        // 3. Status Check
-        // If content hasn't changed since we started this save, we are clean.
-        // If content changed (currentFileState.content !== contentToSave), 
-        // then dirty property remains true (we never cleared it), so loop continues.
-        const freshFileState = this.openFiles.value[path];
-        if (freshFileState && freshFileState.content === contentToSave) {
-          const dirty = new Set(this.dirtyFiles.value);
-          dirty.delete(path);
-          this.dirtyFiles.value = dirty;
-          logger.debug(`Saved ${path} successfully. Clean.`);
-          this.lastSavedFile.value = path;
-        } else {
-          logger.warn(`Saved ${path}, but content changed during save. Retrying...`);
+        } catch (e: any) {
+          // HANDLE 409 CONFLICT
+          if (e.status === 409) {
+            logger.warn(`Conflict(409) detected for ${path}.Fetching latest SHA and retrying...`);
+
+            // Fetch latest file metadata to get fresh SHA
+            try {
+              const latest = await githubService.getFileContent(repo.owner.login, repo.name, path);
+
+              // Update our local SHA but KEEP our content (User Wins)
+              const current = this.openFiles.value[path];
+              if (current) {
+                this.openFiles.value = {
+                  ...this.openFiles.value,
+                  [path]: { ...current, sha: latest.sha }
+                };
+                // Loop will continue and try saving again with new SHA
+              } else {
+                break; // File closed
+              }
+              continue; // Force next iteration immediately
+            } catch (fetchErr) {
+              logger.error(`Failed to resolve conflict for ${path}`, fetchErr);
+              throw e; // Abort if we can't even fetch
+            }
+          }
+
+          throw e; // Re-throw other errors to exit
         }
       }
     } catch (err: any) {
@@ -335,7 +368,7 @@ export class GithubFileStore {
 
   async createFile(path: string, content: string) {
     if (this.openFiles.value[path]) {
-      throw new Error(`File already exists: ${path}`);
+      throw new Error(`File already exists: ${path} `);
     }
 
     // 1. Update Open Files (Optimistic)
@@ -371,7 +404,7 @@ export class GithubFileStore {
     const repo = githubProfileStore.currentRepo.value;
     if (repo) {
       dbPromise.then(db => {
-        db.put('trees', newTree, `tree:${repo.full_name}`);
+        db.put('trees', newTree, `tree:${repo.full_name} `);
       });
     }
 
@@ -405,9 +438,9 @@ export class GithubFileStore {
     if (sha) {
       this.isLoading.value = true;
       try {
-        await githubService.deleteFile(repo.owner.login, repo.name, path, `Delete ${path}`, sha);
+        await githubService.deleteFile(repo.owner.login, repo.name, path, `Delete ${path} `, sha);
       } catch (e) {
-        logger.error(`Failed to delete ${path}`, e);
+        logger.error(`Failed to delete ${path} `, e);
         throw e;
       } finally {
         this.isLoading.value = false;
@@ -429,10 +462,10 @@ export class GithubFileStore {
     }
 
     // Update DB
-    const cacheKey = `${repo.full_name}:${path}`;
+    const cacheKey = `${repo.full_name}:${path} `;
     dbPromise.then(async db => {
       await db.delete('files', cacheKey);
-      await db.put('trees', this.tree.value, `tree:${repo.full_name}`);
+      await db.put('trees', this.tree.value, `tree:${repo.full_name} `);
     });
   }
 
@@ -513,7 +546,7 @@ export class GithubFileStore {
 
     // Update DB tree
     dbPromise.then(db => {
-      db.put('trees', this.tree.value, `tree:${repo.full_name}`);
+      db.put('trees', this.tree.value, `tree:${repo.full_name} `);
     });
   }
 }
