@@ -754,13 +754,9 @@ export const MainApp = ({
     const darkThemeColor = '#0a0a0f';
 
     if (metaThemeColors.length > 0) {
-      // Update all existing theme-color meta tags
+      // Update all existing theme-color meta tags to dark theme
       metaThemeColors.forEach((meta) => {
-        if (zenMode) {
-          meta.setAttribute('content', darkThemeColor); // Dark background
-        } else {
-          meta.setAttribute('content', darkThemeColor); // Ensure it stays dark
-        }
+        meta.setAttribute('content', darkThemeColor);
       });
     } else {
       // Create if missing
