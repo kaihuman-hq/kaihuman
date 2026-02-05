@@ -71,6 +71,9 @@ import {
   rectSortingStrategy,
   useSortable
 } from '@dnd-kit/sortable';
+import { Logger } from '@lifosy/core';
+
+const logger = new Logger('MainApp');
 import { CSS } from '@dnd-kit/utilities';
 import { NewFileWizard } from '../Organisms/NewFileWizard';
 import { MoveFileModal } from '../Organisms/MoveFileModal';
@@ -289,7 +292,7 @@ export const MainApp = ({
                 setNotFound(false);
                 return;
               }
-              console.warn("Path not found (via onCheckPath):", path);
+              logger.warn(`Path not found (via onCheckPath): ${path}`);
               setNotFound(true);
             }
           });
@@ -299,7 +302,7 @@ export const MainApp = ({
         // Fallback to existing logic if no onCheckPath logic
         if (fileSystem) {
           // path already defined above from state.activeTileId
-          // Check if it is a folder in any column items? 
+          // Check if it is a folder in any column items?
           // Or check if it exists at all?
 
           // Simplistic check: If path exists as a Tile of type FOLDER -> navigate there
@@ -339,7 +342,7 @@ export const MainApp = ({
           }
 
           // If completely unknown
-          console.warn("Path not found in FS or Dashboard:", path);
+          logger.warn(`Path not found in FS or Dashboard: ${path}`);
           setNotFound(true);
         }
       } else {
@@ -514,11 +517,12 @@ export const MainApp = ({
               createdAt: Date.now(),
               updatedAt: Date.now()
             };
-            console.log('[MainApp] RssWidget onReadItLater triggered. Calling onAddToReadItLater prop...', newItem);
-            if (!onAddToReadItLater) {
-              console.error('[MainApp] onAddToReadItLater prop is UNDEFINED');
+            if (onAddToReadItLater && newItem) {
+              logger.debug(`RssWidget onReadItLater triggered. Calling onAddToReadItLater prop... ${newItem.name}`);
+              onAddToReadItLater(newItem);
+            } else {
+              logger.error('onAddToReadItLater prop is UNDEFINED');
             }
-            onAddToReadItLater?.(newItem);
           }
           }
         />
@@ -526,9 +530,9 @@ export const MainApp = ({
     }
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
       // setRilState('LOADING'); // This state is not defined in MainApp
-      console.log('[MainApp] Read Later clicked for item:', tile.title); // Log the item title from the tile
+      logger.debug(`Read Later clicked for item: ${tile.title}`); // Log the item title from the tile
       if (!onAddToReadItLater) { // Check the correct prop for adding to read later
-        console.warn('[MainApp] onAddToReadItLater prop is missing!');
+        logger.warn('[MainApp] onAddToReadItLater prop is missing!');
       }
       // onAddToReadItLater(); // This call needs an item, not a direct call
       return (
@@ -850,15 +854,8 @@ export const MainApp = ({
           setShowNewFileWizard(true);
         }}
         onSelect={(item) => {
-          // If item is in current dashboard, focus it
-          const tile = displayTiles.find(t => t.id === item.path);
-          if (tile) {
-            setActiveTileId(tile.id);
-          } else {
-            // If not in dashboard, switch to File View and try to navigate
-            // Or at least open it if we have a way to open arbitrary files
-            console.log("Opening file from search:", item.path);
-
+          if (item.type === 'FILE') {
+            logger.debug(`Opening file from search: ${item.path}`);
             // Check if it's in userEntries to switch dashboard?
             const entry = localConfig?.entries.find(e => e.path === item.path);
             if (entry) {
@@ -1025,7 +1022,7 @@ export const MainApp = ({
       {(() => {
         const shouldRender = !activeTileId && !showFiles && !showGraph && !showCommits && !zenMode && localConfig && localConfig.dashboards.length > 1;
         if (localConfig) {
-          // console.log('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: localConfig.dashboards.length, shouldRender, hoverNav });
+          // logger.debug('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: localConfig.dashboards.length, shouldRender, hoverNav });
         }
         return shouldRender;
       })() && (
@@ -1228,15 +1225,17 @@ abbreviations: undefined
               const conf = localConfig;
               if (conf) {
                 const entry = conf.entries.find(e => e.path === path);
-                if (entry) {
+                const isFoundInDashboard = !!entry;
+
+                if (isFoundInDashboard) {
                   // Scenario 1: File is pinned to a Dashboard
                   setShowFiles(false); // Switch to dashboard view
-                  setActiveDashboardId(entry.dashboard);
-                  setActiveTileId(entry.path);
+                  setActiveDashboardId(entry!.dashboard);
+                  setActiveTileId(entry!.path);
                 } else {
                   // Scenario 2: File is NOT on any dashboard (accessed via File Tree)
                   // We switch to "Files" mode (Miller Columns) and try to navigate to it.
-                  console.log("File not found in dashboard, switching to File View:", path);
+                  logger.debug(`File not found in dashboard, switching to File View: ${path}`);
                   setShowFiles(true);
                   // Trigger navigation in parent (Dashboard.tsx) to update columns
                   if (onItemClick) {
@@ -1650,11 +1649,12 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
                       createdAt: Date.now(),
                       updatedAt: Date.now()
                     };
-                    console.log('[MainApp] (Focused) RssWidget onReadItLater triggered.', newItem);
-                    if (!onAddToReadItLater) {
-                      console.error('[MainApp] onAddToReadItLater prop is UNDEFINED in FocusedTile');
+                    if (onAddToReadItLater) {
+                      logger.debug(`(Focused) RssWidget onReadItLater triggered. ${newItem.name}`);
+                      onAddToReadItLater(newItem);
+                    } else {
+                      logger.error('(Focused) onAddToReadItLater prop is UNDEFINED in FocusedTile');
                     }
-                    onAddToReadItLater?.(newItem);
                   }}
                 />
               )}

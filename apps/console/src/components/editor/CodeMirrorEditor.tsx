@@ -1,4 +1,4 @@
-import { githubFileStore, githubProfileStore } from '@lifosy/core';
+import { githubFileStore, githubProfileStore, Logger } from '@lifosy/core';
 import { useSignalEffect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { EditorState, Compartment } from '@codemirror/state';
@@ -8,6 +8,8 @@ import { markdown } from '@codemirror/lang-markdown';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
 import { oneDark } from '@codemirror/theme-one-dark';
+
+const logger = new Logger('CodeMirrorEditor');
 
 // Theme customization to match Nexus
 const nexusTheme = EditorView.theme({
@@ -48,13 +50,13 @@ export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, 
   const handleSave = async () => {
     const currentPath = propsPath || githubFileStore.activeFile.value;
     if (currentPath) {
-      console.log('[CodeMirrorEditor] Saving file:', currentPath);
+      logger.debug(`Saving file: ${currentPath}`);
       setIsSaving(true);
       try {
         await githubFileStore.saveFile(currentPath);
         setHasUnsavedChanges(false);
       } catch (e) {
-        console.error('Failed to save:', e);
+        logger.error('Failed to save:', e);
       } finally {
         setIsSaving(false);
       }
@@ -65,7 +67,7 @@ export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, 
   useEffect(() => {
     const intervalId = setInterval(() => {
       if (hasUnsavedChanges && !isSaving) {
-        console.log('[CodeMirrorEditor] Auto-saving...');
+        logger.debug('Auto-saving...');
         handleSave();
       }
     }, 2 * 60 * 1000); // 2 minutes
@@ -86,7 +88,7 @@ export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, 
   useEffect(() => {
     const intervalId = setInterval(() => {
       if (stateRef.current.hasUnsavedChanges && !stateRef.current.isSaving) {
-        console.log('[CodeMirrorEditor] Auto-saving...');
+        logger.debug('Auto-saving...');
         handleSave();
       }
     }, 2 * 60 * 1000);
@@ -102,7 +104,7 @@ export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, 
     // Determine effective path (prop takes precedence, though usually one or other is used)
     const initialPath = propsPath || githubFileStore.activeFile.value;
 
-    console.error('[CodeMirrorEditor] Mounting. Path:', initialPath, 'Ref:', parentRef.current);
+    logger.debug(`Mounting. Path: ${initialPath} Ref: ${!!parentRef.current}`);
     if (!parentRef.current) return;
 
     const startState = EditorState.create({

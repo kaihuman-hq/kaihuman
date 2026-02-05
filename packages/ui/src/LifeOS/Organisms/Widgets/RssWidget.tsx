@@ -1,10 +1,13 @@
-
 import { h, Fragment } from 'preact';
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { RssConfig, RssItem, parseRssConfig, serializeRssConfig, fetchFeedXml, parseFeedItems, markItemAsRead, addFeed, removeFeed } from './RssLogic';
+import { ReadItLaterItem } from './ReadItLaterLogic';
+import { Logger } from '@lifosy/core';
 import { MonoText, MonoHeader } from '../../Atoms/Typography';
 import { cn } from '../../../utils';
 import { ExternalLink, MessageSquare, Check, RefreshCw, Trash2, Plus, Rss } from 'lucide-preact';
+
+const logger = new Logger('RssWidget');
 
 interface RssWidgetProps {
   content: string;
@@ -151,13 +154,15 @@ const RssItemRow = ({ item, onRead, onReadItLater, mode }: { item: RssItem, onRe
   };
 
   const handleRil = async () => {
-    setRilState('LOADING');
-    console.log('[RssWidget] handleRil called');
-    onReadItLater();
-    // Simulate some logic or just wait a bit
-    await new Promise(r => setTimeout(r, 600));
-    setRilState('SUCCESS');
-    setTimeout(() => setRilState('IDLE'), 2000);
+    logger.debug('handleRil called');
+    if (onReadItLater) {
+      setRilState('LOADING');
+      onReadItLater();
+      // Simulate some logic or just wait a bit
+      await new Promise(r => setTimeout(r, 600));
+      setRilState('SUCCESS');
+      setTimeout(() => setRilState('IDLE'), 2000);
+    }
   };
 
   return (

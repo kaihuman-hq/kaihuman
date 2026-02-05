@@ -1,5 +1,8 @@
 import { h } from 'preact';
-import { useEffect } from 'preact/hooks';
+import { useRef, useEffect } from 'preact/hooks';
+import { Logger } from '@lifosy/core';
+
+const logger = new Logger('FileViewer');
 import { githubFileStore } from '@lifosy/core';
 import { CodeMirrorEditor } from './editor/CodeMirrorEditor';
 
@@ -11,8 +14,8 @@ interface FileViewerProps {
 export const FileViewer = ({ path, zenMode }: FileViewerProps) => {
   // When this component mounts (tile focused), load the file
   useEffect(() => {
-    console.error('[FileViewer] Mounting for', path);
-    if (!path) console.error('[FileViewer] Path is empty!');
+    logger.debug(`Mounting for ${path}`);
+    if (!path) logger.error('Path is empty!');
     githubFileStore.openFile(path);
   }, [path]);
 

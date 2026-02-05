@@ -1,8 +1,12 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { cn } from '../../utils';
+import { Dialog, DialogContent, DialogOverlay } from '../../components/Dialog';
 import { Search, File, Loader2, X, CornerDownLeft, Command, Hash, GitBranch, LayoutGrid } from 'lucide-preact';
 import { MonoLabel, MonoText } from '../Atoms/Typography';
+import { Logger } from '@lifosy/core';
+
+const logger = new Logger('SearchModal');
 
 export type SearchResultType = 'FILE' | 'COMMAND' | 'REPO' | 'WORKSPACE';
 
@@ -83,11 +87,11 @@ export const SearchModal = ({
 
     // Repositories (Switch to Repo ABC)
     repositories.forEach(repo => {
-      const label = `Switch to Repo ${repo.name}`;
+      const label = `Switch to Repo ${repo.name} `;
       if (label.toLowerCase().includes(lowerQ) || repo.name.toLowerCase().includes(lowerQ)) {
         cmds.push({
           name: label,
-          path: `repo:${repo.id}`,
+          path: `repo:${repo.id} `,
           type: 'REPO',
           description: repo.name,
           onSelect: () => onSelectRepository?.(repo.id)
@@ -97,11 +101,11 @@ export const SearchModal = ({
 
     // Workspaces (Change Workspace / Switch to Workspace ABC)
     workspaces.forEach(ws => {
-      const label = `Switch to Workspace ${ws.name}`;
+      const label = `Switch to Workspace ${ws.name} `;
       if (label.toLowerCase().includes(lowerQ) || ws.name.toLowerCase().includes(lowerQ)) {
         cmds.push({
           name: label,
-          path: `ws:${ws.id}`,
+          path: `ws:${ws.id} `,
           type: 'WORKSPACE',
           description: ws.name,
           onSelect: () => onSelectWorkspace?.(ws.id)
@@ -137,15 +141,15 @@ export const SearchModal = ({
       setLoading(true);
       try {
         // GitHub Search (Content + Filename)
-        const qContent = encodeURIComponent(`${query} repo:${currentRepository}`);
-        const qFile = encodeURIComponent(`filename:${query} repo:${currentRepository}`);
+        const qContent = encodeURIComponent(`${query} repo:${currentRepository} `);
+        const qFile = encodeURIComponent(`filename:${query} repo:${currentRepository} `);
 
         const headers: Record<string, string> = {
           'Accept': 'application/vnd.github.v3+json'
         };
 
         if (githubToken) {
-          headers['Authorization'] = `Bearer ${githubToken}`;
+          headers['Authorization'] = `Bearer ${githubToken} `;
         }
 
         const [resContent, resFile] = await Promise.all([
@@ -179,7 +183,7 @@ export const SearchModal = ({
         setSelectedIndex(0);
 
       } catch (e) {
-        console.error('Search error', e);
+        logger.error('Search error', e);
       } finally {
         setLoading(false);
       }

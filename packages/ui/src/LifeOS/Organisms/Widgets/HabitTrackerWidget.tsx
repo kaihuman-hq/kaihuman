@@ -3,6 +3,9 @@ import { useMemo } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoText, MonoHeader } from '../../Atoms/Typography';
 import { parseHabitData, isCheckedIn, checkIn, calculateStats, HabitData } from './HabitTrackerLogic';
+import { Logger } from '@lifosy/core';
+
+const logger = new Logger('HabitTrackerWidget');
 
 interface HabitTrackerWidgetProps {
   content: string;
@@ -72,7 +75,7 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
   // Interaction Handlers
   const handleCheckIn = (targetDate: Date) => {
     if (!onChange) {
-      console.warn("HabitTrackerWidget: No onChange handler provided");
+      logger.warn("No onChange handler provided");
       return;
     }
     const iso = toLocDate(targetDate);

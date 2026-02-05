@@ -2,6 +2,9 @@ import { effect, signal } from '@preact/signals';
 import { githubService } from '../services/github.service.js';
 import { authStore } from './auth.store.js';
 import { dbPromise } from '../db.js';
+import { Logger } from '../logger.js';
+
+const logger = new Logger('GithubProfileStore');
 
 // Basic Repo interface based on what we need
 export interface GithubRepo {
@@ -35,7 +38,7 @@ export class GithubProfileStore {
         const repo = JSON.parse(saved);
         this.currentRepo.value = repo;
       } catch (e) {
-        console.error('Failed to parse saved repo', e);
+        logger.error('Failed to parse saved repo', e);
       }
     }
 
@@ -59,7 +62,7 @@ export class GithubProfileStore {
       const repos = await githubService.listRepos();
       this.repos.value = repos as any;
     } catch (err: any) {
-      console.error('Failed to fetch repos:', err);
+      logger.error('Failed to fetch repos:', err);
       this.error.value = err.message;
     } finally {
       this.isLoading.value = false;

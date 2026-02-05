@@ -1,6 +1,9 @@
 import { signal } from '@preact/signals';
 import { githubService } from '../services/github.service.js';
 import { githubProfileStore } from './github-profile.store.js';
+import { Logger } from '../logger.js';
+
+const logger = new Logger('GithubCommitStore');
 
 export interface CommitData {
   sha: string;
@@ -46,7 +49,7 @@ export class GithubCommitStore {
         html_url: item.html_url
       }));
     } catch (err: any) {
-      console.error('[GithubCommitStore] Failed to load repo commits', err);
+      logger.error('Failed to load repo commits', err);
       this.error.value = err.message;
     } finally {
       this.isLoading.value = false;
@@ -86,7 +89,7 @@ export class GithubCommitStore {
       };
 
     } catch (err: any) {
-      console.error(`[GithubCommitStore] Failed to load commits for ${path}`, err);
+      logger.error(`Failed to load commits for ${path}`, err);
       this.error.value = err.message;
     } finally {
       this.isLoading.value = false;

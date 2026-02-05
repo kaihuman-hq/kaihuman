@@ -2,6 +2,9 @@ import { computed, effect, signal } from '@preact/signals';
 import { githubService } from '../services/github.service.js';
 import { githubProfileStore } from './github-profile.store.js';
 import { dbPromise } from '../db.js';
+import { Logger } from '../logger.js';
+
+const logger = new Logger('GithubFileStore');
 
 export interface TreeItem {
   path: string;
@@ -43,7 +46,7 @@ export class GithubFileStore {
     // But if we are switching repos, we MUST clear to prevent showing wrong files.
 
     if (this.loadedRepo.value !== repo.full_name) {
-      console.log(`[GithubFileStore] Switching repo from ${this.loadedRepo.value} to ${repo.full_name}. Clearing tree.`);
+      logger.info(`Switching repo from ${this.loadedRepo.value} to ${repo.full_name}. Clearing tree.`);
       this.tree.value = [];
       this.activeFile.value = null;
       this.openFiles.value = {}; // Clear open files too? Yes, safer.
@@ -88,7 +91,7 @@ export class GithubFileStore {
           const hasFile = await db.getKey('files', cacheKey);
 
           if (hasFile) {
-            console.log(`[GithubFileStore] Preserving local file not (yet) in remote: ${item.path}`);
+            logger.debug(`Preserving local file not (yet) in remote: ${item.path}`);
             mergedTree.push(item);
           }
         }
@@ -107,7 +110,7 @@ export class GithubFileStore {
       await db.put('trees', mergedTree, `tree:${repo.full_name}`);
 
     } catch (err: any) {
-      console.error('Failed to load tree', err);
+      logger.error('Failed to load tree', err);
       // Fallback to cache if request fails
       if (this.tree.value.length === 0) {
         this.error.value = err.message;
@@ -128,7 +131,7 @@ export class GithubFileStore {
 
     // If pending, just wait (or ignore, assuming previous call handles it)
     if (this.pendingFiles.has(path)) {
-      console.warn(`[GithubFileStore] File ${path} is already loading. Ignoring duplicate request.`);
+      logger.warn(`File ${path} is already loading. Ignoring duplicate request.`);
       return;
     }
 
@@ -141,7 +144,7 @@ export class GithubFileStore {
       // Find in tree to make sure it's a file
       const treeItem = this.tree.value.find((t) => t.path === path);
       if (!treeItem) {
-        console.warn(`File ${path} not found in tree, attempting to fetch anyway.`);
+        logger.warn(`File ${path} not found in tree, attempting to fetch anyway.`);
       }
 
       // 1. Try Cache
@@ -183,7 +186,7 @@ export class GithubFileStore {
           });
         }
       } catch (netErr: any) {
-        console.warn('Background fetch failed', netErr);
+        logger.warn('Background fetch failed', netErr);
         // If we didn't have cached data, this is a real error for the user
         if (!cachedData) {
           throw netErr;
@@ -191,7 +194,7 @@ export class GithubFileStore {
       }
 
     } catch (err: any) {
-      console.error('Failed to open file', err);
+      logger.error('Failed to open file', err);
       this.error.value = err.message;
     } finally {
       this.pendingFiles.delete(path);
@@ -242,7 +245,7 @@ export class GithubFileStore {
     // If already saving this file, we don't need to spawn another saver.
     // The existing saver will loop around and pick up the new changes because we left it 'dirty'.
     if (this.savingFiles.value.has(path)) {
-      console.log(`[GithubFileStore] Save already in progress for ${path}, queuing update.`);
+      logger.debug(`Save already in progress for ${path}, queuing update.`);
       return;
     }
 
@@ -259,13 +262,13 @@ export class GithubFileStore {
         file = this.openFiles.value[path];
 
         if (!file) {
-          console.error('[GithubFileStore] File closed during save:', path);
+          logger.error('File closed during save:', path);
           break;
         }
 
         const contentToSave = file.content;
 
-        console.log(`[GithubFileStore] Saving ${path}...`);
+        logger.debug(`Saving ${path}...`);
 
         const res = await githubService.saveFile(
           repo.owner.login,
@@ -311,14 +314,14 @@ export class GithubFileStore {
           const dirty = new Set(this.dirtyFiles.value);
           dirty.delete(path);
           this.dirtyFiles.value = dirty;
-          console.log(`[GithubFileStore] Saved ${path} successfully. Clean.`);
+          logger.debug(`Saved ${path} successfully. Clean.`);
           this.lastSavedFile.value = path;
         } else {
-          console.log(`[GithubFileStore] Saved ${path}, but content changed during save. Retrying...`);
+          logger.warn(`Saved ${path}, but content changed during save. Retrying...`);
         }
       }
     } catch (err: any) {
-      console.error('Failed to save', err);
+      logger.error('Failed to save', err);
       this.error.value = err.message;
       // Note: We leave it in 'dirty' state so user can try again or auto-retry later?
       // Or should we throw to alert caller?
@@ -388,12 +391,12 @@ export class GithubFileStore {
 
     // If still no SHA, we might need to fetch it, or it's a new unsaved file
     if (!sha) {
-      console.warn(`[GithubFileStore] No SHA found for ${path}, attempting to fetch...`);
+      logger.warn(`No SHA found for ${path}, attempting to fetch...`);
       try {
         const { sha: serverSha } = await githubService.getFileContent(repo.owner.login, repo.name, path);
         sha = serverSha;
       } catch (e) {
-        console.error(`[GithubFileStore] Could not find SHA for ${path}, cannot delete.`);
+        logger.error(`Could not find SHA for ${path}, cannot delete.`);
         // If it doesn't exist on server, just clean up local state
       }
     }
@@ -404,7 +407,7 @@ export class GithubFileStore {
       try {
         await githubService.deleteFile(repo.owner.login, repo.name, path, `Delete ${path}`, sha);
       } catch (e) {
-        console.error(`[GithubFileStore] Failed to delete ${path}`, e);
+        logger.error(`Failed to delete ${path}`, e);
         throw e;
       } finally {
         this.isLoading.value = false;
@@ -471,12 +474,12 @@ export class GithubFileStore {
       await this.deleteFile(oldPath);
 
       // 4. Update Open Files to point to new path if it was open
-      // deleteFile handled removal. 
+      // deleteFile handled removal.
       // We should open the new file.
       await this.openFile(newPath);
 
     } catch (e) {
-      console.error(`[GithubFileStore] Rename failed`, e);
+      logger.error(`Rename failed`, e);
       throw e;
     } finally {
       this.isLoading.value = false;

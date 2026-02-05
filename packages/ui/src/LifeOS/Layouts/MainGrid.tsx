@@ -1,5 +1,8 @@
 import { ComponentChildren, h, cloneElement, toChildArray, VNode } from 'preact';
 import { cn } from '../../utils';
+import { Logger } from '@lifosy/core';
+
+const logger = new Logger('MainGrid');
 
 export type GridState = 'DASHBOARD' | 'FOCUS' | 'ZEN';
 
@@ -25,8 +28,9 @@ export const MainGrid = ({
   const centerChild = kids.find(k => k.props?.column === 'center')
     || kids.find(k => k.props?.column !== 'left' && k.props?.column !== 'right');
 
-  console.log('[MainGrid] Rendering. viewState:', viewState);
-  console.log('[MainGrid] Has Left:', !!leftChild, 'Has Right:', !!rightChild);
+  // Debug
+  // logger.debug(`Rendering. viewState: ${JSON.stringify(viewState)}`);
+  // logger.debug(`Has Left: ${!!leftChild}, Has Right: ${!!rightChild}`);
 
   // Helper to determine grid cols
   const leftWidth = leftChild ? "minmax(250px,1fr)" : "0px";

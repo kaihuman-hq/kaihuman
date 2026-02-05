@@ -2,6 +2,9 @@
 import { computed, effect, signal } from '@preact/signals';
 import { z } from 'zod';
 import { dbPromise } from '../db.js';
+import { Logger } from '../logger.js';
+
+const logger = new Logger('AuthStore');
 
 const GithubProfileSchema = z.object({
   id: z.number(),
@@ -92,7 +95,7 @@ export class AuthStore {
   login() {
     const gatewayUrl = import.meta.env.VITE_GH_LOGIN;
     if (!gatewayUrl) {
-      console.error('VITE_GH_LOGIN is not defined');
+      logger.error('VITE_GH_LOGIN is not defined');
       return;
     }
     window.location.href = gatewayUrl;
@@ -132,7 +135,7 @@ export class AuthStore {
     if (!this.token.value) return;
 
     try {
-      console.log('[Auth] Fetching user with token:', this.token.value?.substring(0, 10) + '...');
+      logger.debug('Fetching user with token:', this.token.value?.substring(0, 10) + '...');
       const res = await fetch('https://api.github.com/user', {
         headers: {
           Authorization: `Bearer ${this.token.value}`,
@@ -141,9 +144,9 @@ export class AuthStore {
       });
 
       if (!res.ok) {
-        console.error('[Auth] Failed to fetch user:', res.status, res.statusText);
+        logger.error('Failed to fetch user:', res.status, res.statusText);
         if (res.status === 401) {
-          console.warn('[Auth] Token invalid, logging out.');
+          logger.warn('Token invalid, logging out.');
           this.logout();
         }
         throw new Error('Failed to fetch user');
@@ -152,7 +155,7 @@ export class AuthStore {
       const data = await res.json();
       this.user.value = GithubProfileSchema.parse(data);
     } catch (err) {
-      console.error('Auth error:', err);
+      logger.error('Auth error:', err);
     }
   }
 }
