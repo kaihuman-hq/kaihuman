@@ -42,7 +42,7 @@ export const VERSION = {
   version: '${versionString}',
   buildTime: '${buildTime}',
   gitHash: '${gitHash}',
-  full: 'v${versionString}+${gitHash}'
+  full: 'v${versionString}-${gitHash}'
 } as const;
 `;
 

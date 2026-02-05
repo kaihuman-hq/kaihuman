@@ -48,10 +48,10 @@ Each bump command:
 
 ### Build Process
 
-The version is automatically generated during every build:
+The version is automatically generated during every build and development session:
 
 ```bash
-# Development build (doesn't generate version by default)
+# Development build (generates version automatically)
 pnpm run dev
 
 # Production build (generates version automatically)
@@ -59,7 +59,7 @@ pnpm run build
 pnpm run build:prod
 ```
 
-The `generate-version.js` script runs before each build and creates a fresh `src/version.ts` file with:
+The `generate-version.js` script runs before each build and dev server start, creating a fresh `src/version.ts` file with:
 - Current version from `version.json`
 - Current timestamp in ISO format
 - Git commit hash (if available)

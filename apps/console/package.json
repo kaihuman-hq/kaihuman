@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "vite",
-    "prod": "vite --mode prod",
+    "dev": "node scripts/generate-version.js && vite",
+    "prod": "node scripts/generate-version.js && vite --mode prod",
     "build": "node scripts/generate-version.js && vite build",
     "build:prod": "node scripts/generate-version.js && vite build --mode prod",
     "preview": "vite preview",
