@@ -406,3 +406,7 @@ The version field is for backward compatibility. So make sure that there is a mi
 ### 3.13 File history
 
 [ ] 3.13.1 Implement a view that shows the history of a specific file. For each Focused Modal show a new toggle "History" that opens this view. In this view the user can see the history of the file and what changes were made in each commit.
+
+### 3.14 Table view for csv files
+
+[ ] 3.14.1 Implement a table view for csv files. For each Focused Modal show a new toggle "Table" that opens this view. In this view the user can see the table of the csv file. It should be possible to sort the columns by clicking on the column headers. It should also be possible to filter the rows by clicking on the filter icon in the column header.
