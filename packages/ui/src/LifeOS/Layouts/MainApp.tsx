@@ -162,6 +162,12 @@ export const MainApp = ({
   onCheckPath,
   ...props
 }: MainAppProps) => {
+  // Fix 1.25: Reset view when switching repositories
+  useEffect(() => {
+    setActiveTileId(null);
+    setShowFiles(false);
+  }, [props.currentRepository?.name]);
+
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(() => parseUrlState().activeTileId);
   const [notFound, setNotFound] = useState(false);
@@ -1266,6 +1272,28 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
   const [showHistory, setShowHistory] = useState(false);
 
+  // Fix 1.24: Deep Linking - Switch to WIDGET view when content loads if currently in CODE/empty state
+  useEffect(() => {
+    // Re-evaluate hasWidget logic here because props update
+    const _isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
+    const _isEvents = tile.extension?.toLowerCase() === '.events.csv';
+    const _isHabit = tile.extension?.toLowerCase() === '.habit.csv';
+    const _isTodos = tile.extension?.toLowerCase() === '.todos.md';
+    const _isTimezones = tile.extension?.toLowerCase() === '.timezones.json';
+    const _isRss = tile.extension?.toLowerCase() === '.rss.json';
+    const _isReadItLater = tile.extension?.toLowerCase() === '.readitlater.json';
+    const _isDataCollection = tile.extension === '.data-collection.csv';
+    const _isBudget = tile.extension === '.budget.csv';
+    const _isActionLog = tile.extension === '.actionlog.md';
+    const _isAnyCsv = tile.extension?.toLowerCase().endsWith('.csv');
+
+    const _hasWidget = (_isTimeTracking || _isEvents || _isHabit || _isTodos || _isTimezones || _isRss || _isReadItLater || _isDataCollection || _isBudget || _isActionLog || _isAnyCsv) && !!tile.rawContent;
+
+    if (_hasWidget && viewMode === 'CODE') {
+      setViewMode('WIDGET');
+    }
+  }, [tile.rawContent]);
+
   return (
     <div
       className={cn(
@@ -1309,7 +1337,8 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
                   )}
                   title="Add to Dashboard"
                 >
-                  <div className={cn("w-2 h-2 border transition-colors border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+                  {/* Fix 1.23: "Add to Dashboard" icon ambiguity */}
+                  <Plus size={14} className={cn("transition-colors", zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]")} />
                 </button>
               )}
               <button
@@ -1363,7 +1392,8 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
                   title="Add to Dashboard"
                 >
                   <span className="text-[10px] hidden md:inline">[+ DASHBOARD]</span>
-                  <div className={cn("w-2 h-2 border transition-colors border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+                  {/* Fix 1.23: "Add to Dashboard" icon ambiguity */}
+                  <Plus size={14} className={cn("transition-colors", zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]")} />
                 </button>
               )}
               <button
