@@ -16,6 +16,13 @@
 [x] 1.12 Knowledge Graph is not rendering properly, nothing is shown. Investigate and fix it.
 [x] 1.13 Clicking on the "Add to Dashboard"" button in focus mode does not render the of each item properly. the text is not visible. by hovering it becomes visible. Make each item text visible (check text color)
 [x] 1.14 If the knowledge graph is opened, clicking on the "Files" entry in the magic menu does not change the view. Investigate and fix it.
+[ ] 1.15 Mobile iOS Safari: theme color is not applied to the top bar - and on some views not to the bottom bar. Investigate deeply and fix it. Make sure it uses the current theme color. Check if there is any conflicting style or something else. It's a really bad ux currently because the app is dark, but the top and bottom bars are light.
+[ ] 1.16 Mobile Focus Modal: if the title is too long, it increases the width of the Modal. But the Modal must stay in the view port. Add text ellipsis to the title.
+[ ] 1.17 Mobile Focus Modal: The action buttons (zen mode, add to dashboard, ...) are shifted to the right, outside of the modal, not in the view port anymore. A different approach is needed for mobile views: put the actions below the title. So there will be three rows for the top bar of the focus modal: actions, title, content toggles. The actions in the first row should be aligned to the right. Make sure this is only applied to Mobile view!
+[ ] 1.18 Mobile: Swipe left/right may only work on the dashboard view! If a Focus Modal is opened, the swipe left/right should not work. Also not on all other views. Only on the dashboard view. Investigate and fix it.
+[ ] 1.19 RSS widget in focus mode: clicking on "Read Later" and "Read" breaks the view somehow, the view becomes empty. I observed this on mobile view. Investigate and fix it.
+[ ] 1.20 Budget widget: there is a special handling that needs to be applied - if there are multiple rows with the same name, account and category, only consider the latest one (use the date column for that). Fix it.
+[ ] 1.21 The search is currently only available with a shortcut which does not work on Mobile. Add a new entry to the Magic Menu for Search. Make sure it works on Mobile too.
 
 ## 2. Widgets
 
