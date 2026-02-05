@@ -36,6 +36,7 @@ import { DashboardConfig, DashboardEntry } from '../types';
 import { CommitsView } from '../Organisms/CommitsView';
 import { GraphView } from '../Organisms/GraphView';
 import { FileHistoryView } from '../Organisms/FileHistoryView';
+import { CsvTableView } from '../Organisms/Widgets/CsvTableView';
 import {
   FileText,
   Layout,
@@ -1257,7 +1258,10 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
   const isBudget = tile.extension === '.budget.csv';
   const isActionLog = tile.extension === '.actionlog.md';
 
-  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog) && !!tile.rawContent;
+  const isGenericCsv = tile.extension === '.csv' && !isTimeTracking && !isEvents && !isHabit && !isDataCollection && !isBudget;
+  const isAnyCsv = tile.extension?.toLowerCase().endsWith('.csv'); // For enabling TABLE view on all CSVs
+
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog || isAnyCsv) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
   const [showHistory, setShowHistory] = useState(false);
@@ -1457,6 +1461,18 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
                   </>
                 )}
 
+                {isAnyCsv && (
+                  <button
+                    onClick={() => setViewMode('TABLE')}
+                    className={cn(
+                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                      viewMode === 'TABLE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                    )}
+                  >
+                    TABLE
+                  </button>
+                )}
+
                 {isDataCollection && (
                   <button
                     onClick={() => setViewMode('COLUMNS')}
@@ -1517,7 +1533,12 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
           )}
 
           {/* Content Area */}
-          {isBudget && (viewMode === 'WIDGET' || viewMode === 'ACCOUNTS' || viewMode === 'ADD') ? (
+          {/* Content Area */}
+          {isAnyCsv && viewMode === 'TABLE' ? (
+            <div className="h-full w-full p-8">
+              <CsvTableView content={tile.rawContent || ''} />
+            </div>
+          ) : isBudget && (viewMode === 'WIDGET' || viewMode === 'ACCOUNTS' || viewMode === 'ADD') ? (
             <div className="h-full w-full p-8">
               <BudgetWidget
                 content={tile.rawContent || ''}
@@ -1612,6 +1633,9 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
                   mode="FOCUS"
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
+              )}
+              {isGenericCsv && (
+                <CsvTableView content={tile.rawContent!} />
               )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
