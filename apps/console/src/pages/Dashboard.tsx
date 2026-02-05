@@ -1,7 +1,9 @@
 import { h } from 'preact';
 import { useEffect, useState, useCallback } from 'preact/hooks';
 import { useSignal, effect } from '@preact/signals';
-import { githubFileStore, githubProfileStore, authStore } from '@lifosy/core';
+import { githubFileStore, githubProfileStore, authStore, Logger } from '@lifosy/core';
+
+const logger = new Logger('Dashboard');
 import {
   MainApp,
   TileDef,
@@ -37,7 +39,7 @@ export const Dashboard = () => {
   // 2. Refresh Tree when Repo changes
   useEffect(() => {
     if (repo) {
-      console.log('[Dashboard] Loading tree for', repo.full_name);
+      logger.info(`Loading tree for ${repo.full_name}`);
       setColumns([]); // Clear columns immediately on repo switch to prevent stale content
       githubFileStore.loadTree();
       setRemoteConfig(null); // Reset config on repo change
@@ -277,7 +279,7 @@ export const Dashboard = () => {
     // Check if config exists in tree
     const configItem = tree.find(item => item.path === CONFIG_PATH);
     if (configItem) {
-      console.log('[Dashboard] Found config:', CONFIG_PATH);
+      logger.debug(`Found config: ${CONFIG_PATH}`);
       if (!openFiles || !openFiles[CONFIG_PATH]) {
         if (openFiles) // ensure openFiles loaded
           githubFileStore.openFile(CONFIG_PATH);
@@ -290,7 +292,7 @@ export const Dashboard = () => {
             setRemoteConfig(parsed);
           }
         } catch (e) {
-          console.error('[Dashboard] Failed to parse config:', e);
+          logger.error('Failed to parse config:', e);
         }
       }
     } else {
@@ -327,7 +329,7 @@ export const Dashboard = () => {
           try {
             newConfig = JSON.parse(configContent);
           } catch (e) {
-            console.error('[Dashboard] Failed to parse config for recent files update:', e);
+            logger.error('Failed to parse config for recent files update:', e);
             if (configContent.trim().length > 0) return; // Abort if invalid JSON
           }
         }
@@ -349,7 +351,7 @@ export const Dashboard = () => {
         const newContent = JSON.stringify(updatedConfig, null, 2);
 
         if (newContent !== configContent) {
-          console.log('[Dashboard] Updating recent files with:', lastSaved);
+          logger.debug(`Updating recent files with: ${lastSaved}`);
           githubFileStore.updateFileContent(CONFIG_PATH, newContent);
           githubFileStore.saveFile(CONFIG_PATH);
         }
@@ -519,31 +521,31 @@ export const Dashboard = () => {
         renderEditor={useCallback((path: string, zenMode?: boolean) => <FileViewer key={path} path={path} zenMode={zenMode} />, [])}
         onAddToReadItLater={async (item) => {
           const rilPath = '.lifeos/.readitlater.json';
-          console.log('[ReadItLater] Handler triggered for:', item);
+          logger.debug('ReadItLater Handler triggered for:', item);
           try {
             // 1. Check existence in Tree (Source of Truth)
             let fileExists = githubFileStore.tree.value.some(t => t.path === rilPath);
-            console.log('[ReadItLater] File exists in tree?', fileExists);
+            logger.debug(`File exists in tree? ${fileExists}`);
 
             // 2. Load Content if it exists
             if (fileExists) {
               if (!githubFileStore.openFiles.value[rilPath]) {
-                console.log('[ReadItLater] File not open, attempting to open...');
+                logger.debug('File not open, attempting to open...');
                 try {
                   await githubFileStore.openFile(rilPath);
-                  console.log('[ReadItLater] File opened successfully');
+                  logger.debug('File opened successfully');
                 } catch (e) {
-                  console.error("[ReadItLater] Failed to open existing file", e);
+                  logger.error("Failed to open existing file", e);
                   fileExists = false; // Fallback to create?
                 }
               } else {
-                console.log('[ReadItLater] File already open');
+                logger.debug('File already open');
               }
             }
 
             const file = githubFileStore.openFiles.value[rilPath];
             const content = file?.content || '';
-            console.log('[ReadItLater] Current content length:', content.length);
+            logger.debug(`Current content length: ${content.length}`);
 
             // 3. Parse Config
             let config;
@@ -551,14 +553,14 @@ export const Dashboard = () => {
               config = content ? parseReadItLater(content) : DEFAULT_RIL_CONFIG;
               if (!config || !config.items) config = DEFAULT_RIL_CONFIG;
             } catch (e) {
-              console.error('[ReadItLater] Parse error:', e);
+              logger.error('Parse error:', e);
               config = DEFAULT_RIL_CONFIG;
             }
 
             // 4. Update Data
             const isDuplicate = config.items && config.items.some(i => i.url === item.url);
             if (isDuplicate) {
-              console.log("[ReadItLater] Item already exists (Duplicate):", item.url);
+              logger.info(`Item already exists (Duplicate): ${item.url}`);
               // Force UI update anyway just to be sure visual state matches
               // updateLocalTileContent(rilPath, serializeReadItLater(config));
               return;
@@ -567,26 +569,26 @@ export const Dashboard = () => {
             const newItems = [item, ...(config.items || [])];
             const newConfig = { ...config, items: newItems };
             const newContent = serializeReadItLater(newConfig);
-            console.log('[ReadItLater] New config items count:', newItems.length);
+            logger.debug(`New config items count: ${newItems.length}`);
 
             // 5. Persist
             if (fileExists && file) {
-              console.log("[ReadItLater] Updating existing file via updateFileContent");
+              logger.debug("Updating existing file via updateFileContent");
               githubFileStore.updateFileContent(rilPath, newContent);
               await githubFileStore.saveFile(rilPath);
             } else {
-              console.log("[ReadItLater] Creating new file via createFile");
+              logger.info("Creating new file via createFile");
               try {
                 await githubFileStore.createFile(rilPath, newContent);
-                console.log("[ReadItLater] createFile success");
+                logger.info("createFile success");
               } catch (e: any) {
-                console.warn("[ReadItLater] createFile failed:", e);
+                logger.warn("createFile failed:", e);
                 if (e.message && e.message.includes('already exists')) {
-                  console.log("[ReadItLater] File actually exists, attempting fallback update.");
+                  logger.warn("File actually exists, attempting fallback update.");
 
                   // Fallback: Ensure it is "open" locally so updateFileContent doesn't bail
                   if (!githubFileStore.openFiles.value[rilPath]) {
-                    console.log("[ReadItLater] Fallback: Injecting into openFiles before update");
+                    logger.debug("Fallback: Injecting into openFiles before update");
                     // Manually inject so updateFileContent doesn't bail
                     githubFileStore.openFiles.value = {
                       ...githubFileStore.openFiles.value,
@@ -603,11 +605,11 @@ export const Dashboard = () => {
             }
 
             // 6. Force UI Update
-            console.log("[ReadItLater] Triggering updateLocalTileContent");
+            logger.debug("Triggering updateLocalTileContent");
             updateLocalTileContent(rilPath, newContent);
 
           } catch (error) {
-            console.error('[ReadItLater] CRITICAL failure:', error);
+            logger.error('CRITICAL failure:', error);
           }
         }}
         onCreateFile={useCallback(async (path: string, content: string) => {
@@ -618,7 +620,7 @@ export const Dashboard = () => {
             navigateToPath(path);
 
           } catch (e) {
-            console.error('Failed to create file:', e);
+            logger.error('Failed to create file:', e);
           }
         }, [])}
         onDeleteFile={useCallback(async (path: string) => {

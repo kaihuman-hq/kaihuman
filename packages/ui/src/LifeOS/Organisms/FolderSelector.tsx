@@ -1,8 +1,11 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { cn } from '../../utils';
+import { Logger } from '@lifosy/core';
 import { MonoText } from '../Atoms/Typography';
 import { Folder, ChevronRight, Check } from 'lucide-preact';
+
+const logger = new Logger('FolderSelector');
 
 export interface FolderItem {
   id: string; // The full path or unique ID
@@ -76,7 +79,7 @@ export const FolderSelector = ({ rootItems, onLoadFolder, onSelect, selectedPath
           }, 10);
         }
       } catch (e) {
-        console.error("Failed to load folder", e);
+        logger.error("Failed to load folder", e);
         setLoadingIds(prev => {
           const next = new Set(prev);
           next.delete(item.id);

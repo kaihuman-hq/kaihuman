@@ -36,6 +36,7 @@ import { DashboardConfig, DashboardEntry } from '../types';
 import { CommitsView } from '../Organisms/CommitsView';
 import { GraphView } from '../Organisms/GraphView';
 import { FileHistoryView } from '../Organisms/FileHistoryView';
+import { CsvTableView } from '../Organisms/Widgets/CsvTableView';
 import {
   FileText,
   Layout,
@@ -70,6 +71,9 @@ import {
   rectSortingStrategy,
   useSortable
 } from '@dnd-kit/sortable';
+import { Logger } from '@lifosy/core';
+
+const logger = new Logger('MainApp');
 import { CSS } from '@dnd-kit/utilities';
 import { NewFileWizard } from '../Organisms/NewFileWizard';
 import { MoveFileModal } from '../Organisms/MoveFileModal';
@@ -161,9 +165,16 @@ export const MainApp = ({
   onCheckPath,
   ...props
 }: MainAppProps) => {
+  // Fix 1.25: Reset view when switching repositories
+  useEffect(() => {
+    setActiveTileId(null);
+    setShowFiles(false);
+  }, [props.currentRepository?.name]);
+
   // State for legacy/single-level mode or Dashboard mode
   const [activeTileId, setActiveTileId] = useState<string | number | null>(() => parseUrlState().activeTileId);
   const [notFound, setNotFound] = useState(false);
+  const [checkingPath, setCheckingPath] = useState(false);
 
   const [showSettings, setShowSettings] = useState(false);
   const [showAddToDashboard, setShowAddToDashboard] = useState(false);
@@ -254,7 +265,9 @@ export const MainApp = ({
 
         // NEW LOGIC: Use onCheckPath if available (Source of Truth)
         if (onCheckPath) {
+          setCheckingPath(true);
           Promise.resolve(onCheckPath(path)).then(type => {
+            setCheckingPath(false);
             if (type === 'FOLDER') {
               setShowFiles(true);
               setActiveTileId(null);
@@ -279,7 +292,7 @@ export const MainApp = ({
                 setNotFound(false);
                 return;
               }
-              console.warn("Path not found (via onCheckPath):", path);
+              logger.warn(`Path not found (via onCheckPath): ${path}`);
               setNotFound(true);
             }
           });
@@ -289,7 +302,7 @@ export const MainApp = ({
         // Fallback to existing logic if no onCheckPath logic
         if (fileSystem) {
           // path already defined above from state.activeTileId
-          // Check if it is a folder in any column items? 
+          // Check if it is a folder in any column items?
           // Or check if it exists at all?
 
           // Simplistic check: If path exists as a Tile of type FOLDER -> navigate there
@@ -329,7 +342,7 @@ export const MainApp = ({
           }
 
           // If completely unknown
-          console.warn("Path not found in FS or Dashboard:", path);
+          logger.warn(`Path not found in FS or Dashboard: ${path}`);
           setNotFound(true);
         }
       } else {
@@ -343,7 +356,7 @@ export const MainApp = ({
     resolvePath();
     window.addEventListener('popstate', resolvePath);
     return () => window.removeEventListener('popstate', resolvePath);
-  }, [fileSystem, localConfig]); // Re-run when FS loads
+  }, [fileSystem, localConfig, onCheckPath, onNavigate]); // Re-run when FS loads or props change
 
 
   useEffect(() => {
@@ -504,11 +517,12 @@ export const MainApp = ({
               createdAt: Date.now(),
               updatedAt: Date.now()
             };
-            console.log('[MainApp] RssWidget onReadItLater triggered. Calling onAddToReadItLater prop...', newItem);
-            if (!onAddToReadItLater) {
-              console.error('[MainApp] onAddToReadItLater prop is UNDEFINED');
+            if (onAddToReadItLater && newItem) {
+              logger.debug(`RssWidget onReadItLater triggered. Calling onAddToReadItLater prop... ${newItem.name}`);
+              onAddToReadItLater(newItem);
+            } else {
+              logger.error('onAddToReadItLater prop is UNDEFINED');
             }
-            onAddToReadItLater?.(newItem);
           }
           }
         />
@@ -516,9 +530,9 @@ export const MainApp = ({
     }
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
       // setRilState('LOADING'); // This state is not defined in MainApp
-      console.log('[MainApp] Read Later clicked for item:', tile.title); // Log the item title from the tile
+      logger.debug(`Read Later clicked for item: ${tile.title}`); // Log the item title from the tile
       if (!onAddToReadItLater) { // Check the correct prop for adding to read later
-        console.warn('[MainApp] onAddToReadItLater prop is missing!');
+        logger.warn('[MainApp] onAddToReadItLater prop is missing!');
       }
       // onAddToReadItLater(); // This call needs an item, not a direct call
       return (
@@ -670,6 +684,10 @@ export const MainApp = ({
 
   const onTouchEnd = () => {
     if (!touchStart.current || !touchEnd.current) return;
+
+    // Fix 1.18: Disable swipe if a tile is focused (activeTileId is not null)
+    if (activeTileId !== null) return;
+
     const distance = touchStart.current - touchEnd.current;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
@@ -720,17 +738,21 @@ export const MainApp = ({
   // Fix 1.5 & 1.6: Dynamic Theme Color for Mobile Safari and Zen Mode
   useEffect(() => {
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    // Using --los-bg variable value would require getComputedStyle, but we know it maps to #0a0a0f usually.
+    // However, to be precise, let's hardcode the dark theme color which seems to be intended.
+    const darkThemeColor = '#0a0a0f';
+
     if (metaThemeColor) {
       if (zenMode) {
-        metaThemeColor.setAttribute('content', '#0a0a0f'); // Dark background
+        metaThemeColor.setAttribute('content', darkThemeColor); // Dark background
       } else {
-        metaThemeColor.setAttribute('content', '#0a0a0f'); // Ensure it stays dark even if something else changes it or default
+        metaThemeColor.setAttribute('content', darkThemeColor); // Ensure it stays dark
       }
     } else {
-      // Create if missing?
+      // Create if missing
       const meta = document.createElement('meta');
       meta.name = "theme-color";
-      meta.content = "#0a0a0f";
+      meta.content = darkThemeColor;
       document.head.appendChild(meta);
     }
   }, [zenMode]);
@@ -832,15 +854,8 @@ export const MainApp = ({
           setShowNewFileWizard(true);
         }}
         onSelect={(item) => {
-          // If item is in current dashboard, focus it
-          const tile = displayTiles.find(t => t.id === item.path);
-          if (tile) {
-            setActiveTileId(tile.id);
-          } else {
-            // If not in dashboard, switch to File View and try to navigate
-            // Or at least open it if we have a way to open arbitrary files
-            console.log("Opening file from search:", item.path);
-
+          if (item.type === 'FILE') {
+            logger.debug(`Opening file from search: ${item.path}`);
             // Check if it's in userEntries to switch dashboard?
             const entry = localConfig?.entries.find(e => e.path === item.path);
             if (entry) {
@@ -868,8 +883,14 @@ export const MainApp = ({
       {/* CENTER STAGE: The Matrix OR The Active Tile */}
       <MainGrid viewState={zenMode ? 'ZEN' : (activeTileId !== null ? 'FOCUS' : 'DASHBOARD')}>
 
-        {/* Not Found State */}
-        {notFound ? (
+        {/* Not Found State or Loading State */}
+        {checkingPath ? (
+          <Tile column="center" title="Loading...">
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--los-accent)]"></div>
+            </div>
+          </Tile>
+        ) : notFound ? (
           <Tile column="center" title="404">
             <NotFound onGoHome={() => {
               window.history.pushState({}, '', '/');
@@ -1001,7 +1022,7 @@ export const MainApp = ({
       {(() => {
         const shouldRender = !activeTileId && !showFiles && !showGraph && !showCommits && !zenMode && localConfig && localConfig.dashboards.length > 1;
         if (localConfig) {
-          // console.log('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: localConfig.dashboards.length, shouldRender, hoverNav });
+          // logger.debug('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: localConfig.dashboards.length, shouldRender, hoverNav });
         }
         return shouldRender;
       })() && (
@@ -1187,6 +1208,11 @@ abbreviations: undefined
                 setNotFound(false);
               }
             },
+            {
+              label: "Search",
+              // Fix 1.21: Add Search to Magic Menu (works on mobile)
+              onClick: () => setShowSearch(true)
+            },
             { label: "Graph", onClick: () => setShowGraph(true) },
             { label: "Commits", onClick: () => setShowCommits(true) },
             { label: "Settings", onClick: () => setShowSettings(true) },
@@ -1199,15 +1225,17 @@ abbreviations: undefined
               const conf = localConfig;
               if (conf) {
                 const entry = conf.entries.find(e => e.path === path);
-                if (entry) {
+                const isFoundInDashboard = !!entry;
+
+                if (isFoundInDashboard) {
                   // Scenario 1: File is pinned to a Dashboard
                   setShowFiles(false); // Switch to dashboard view
-                  setActiveDashboardId(entry.dashboard);
-                  setActiveTileId(entry.path);
+                  setActiveDashboardId(entry!.dashboard);
+                  setActiveTileId(entry!.path);
                 } else {
                   // Scenario 2: File is NOT on any dashboard (accessed via File Tree)
                   // We switch to "Files" mode (Miller Columns) and try to navigate to it.
-                  console.log("File not found in dashboard, switching to File View:", path);
+                  logger.debug(`File not found in dashboard, switching to File View: ${path}`);
                   setShowFiles(true);
                   // Trigger navigation in parent (Dashboard.tsx) to update columns
                   if (onItemClick) {
@@ -1244,10 +1272,35 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
   const isBudget = tile.extension === '.budget.csv';
   const isActionLog = tile.extension === '.actionlog.md';
 
-  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog) && !!tile.rawContent;
+  const isGenericCsv = tile.extension === '.csv' && !isTimeTracking && !isEvents && !isHabit && !isDataCollection && !isBudget;
+  const isAnyCsv = tile.extension?.toLowerCase().endsWith('.csv'); // For enabling TABLE view on all CSVs
+
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog || isAnyCsv) && !!tile.rawContent;
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
   const [showHistory, setShowHistory] = useState(false);
+
+  // Fix 1.24: Deep Linking - Switch to WIDGET view when content loads if currently in CODE/empty state
+  useEffect(() => {
+    // Re-evaluate hasWidget logic here because props update
+    const _isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
+    const _isEvents = tile.extension?.toLowerCase() === '.events.csv';
+    const _isHabit = tile.extension?.toLowerCase() === '.habit.csv';
+    const _isTodos = tile.extension?.toLowerCase() === '.todos.md';
+    const _isTimezones = tile.extension?.toLowerCase() === '.timezones.json';
+    const _isRss = tile.extension?.toLowerCase() === '.rss.json';
+    const _isReadItLater = tile.extension?.toLowerCase() === '.readitlater.json';
+    const _isDataCollection = tile.extension === '.data-collection.csv';
+    const _isBudget = tile.extension === '.budget.csv';
+    const _isActionLog = tile.extension === '.actionlog.md';
+    const _isAnyCsv = tile.extension?.toLowerCase().endsWith('.csv');
+
+    const _hasWidget = (_isTimeTracking || _isEvents || _isHabit || _isTodos || _isTimezones || _isRss || _isReadItLater || _isDataCollection || _isBudget || _isActionLog || _isAnyCsv) && !!tile.rawContent;
+
+    if (_hasWidget && viewMode === 'CODE') {
+      setViewMode('WIDGET');
+    }
+  }, [tile.rawContent]);
 
   return (
     <div
@@ -1264,18 +1317,67 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
           zenMode ? "bg-transparent" : "bg-[var(--los-bg)]"
         )}
       >
-        {/* Header / Controls - Dim in Zen Mode */}
+        {/* Fix 1.17: Responsive Layout for Mobile - 3 rows: Actions, Title, Content Toggles */}
         <div className={cn(
           "min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2 transition-opacity duration-500",
           zenMode ? "opacity-10 hover:opacity-100" : "opacity-100"
         )}>
+          {/* Mobile: Row 1 - Actions (Right Aligned) - Strictly hidden on Desktop */}
+          <div className="md:hidden">
+            <div className="flex w-full justify-end gap-2 mb-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
+                className={cn(
+                  "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                  showHistory ? "text-[var(--los-accent)]" : (zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")
+                )}
+                title="Toggle History"
+              >
+                <History size={14} className={cn("transition-colors", showHistory && "text-[var(--los-accent)]")} />
+              </button>
+
+              {onAddToDashboard && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onAddToDashboard(String(tile.id)); }}
+                  className={cn(
+                    "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                    zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                  )}
+                  title="Add to Dashboard"
+                >
+                  {/* Fix 1.23: "Add to Dashboard" icon ambiguity */}
+                  <Plus size={14} className={cn("transition-colors", zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]")} />
+                </button>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleZenMode?.(); }}
+                className={cn(
+                  "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                  zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                )}
+                title="Toggle Zen Mode (Ctrl+Shift+Z)"
+              >
+                <div className={cn("w-2 h-2 border transition-colors", zenMode ? "bg-[var(--los-accent)] border-[var(--los-accent)]" : "border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+              </button>
+
+              <button
+                onClick={(e) => { e.stopPropagation(); onClose(); }}
+                className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
+                title="Close Tile"
+              >
+                <div className="w-2 h-2 rounded-full border border-[var(--los-muted)] group-hover:border-red-500 group-hover:bg-red-500 transition-colors" />
+              </button>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between w-full gap-4">
-            <MonoHeader className="text-[var(--los-accent)] text-lg">
+            {/* Fix 1.16: Truncate Title */}
+            <MonoHeader className="text-[var(--los-accent)] text-lg truncate flex-1 md:flex-none">
               {tile.id.toString().split('/').pop()}
             </MonoHeader>
 
-            {/* Close Button (Desktop & Mobile) */}
-            <div className="flex items-center gap-2">
+            {/* Desktop: Actions (Normal Layout) */}
+            <div className="hidden md:flex items-center gap-2">
               <button
                 onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
                 className={cn(
@@ -1298,7 +1400,8 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
                   title="Add to Dashboard"
                 >
                   <span className="text-[10px] hidden md:inline">[+ DASHBOARD]</span>
-                  <div className={cn("w-2 h-2 border transition-colors border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+                  {/* Fix 1.23: "Add to Dashboard" icon ambiguity */}
+                  <Plus size={14} className={cn("transition-colors", zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]")} />
                 </button>
               )}
               <button
@@ -1396,6 +1499,18 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
                   </>
                 )}
 
+                {isAnyCsv && (
+                  <button
+                    onClick={() => setViewMode('TABLE')}
+                    className={cn(
+                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
+                      viewMode === 'TABLE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                    )}
+                  >
+                    TABLE
+                  </button>
+                )}
+
                 {isDataCollection && (
                   <button
                     onClick={() => setViewMode('COLUMNS')}
@@ -1456,7 +1571,12 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
           )}
 
           {/* Content Area */}
-          {isBudget && (viewMode === 'WIDGET' || viewMode === 'ACCOUNTS' || viewMode === 'ADD') ? (
+          {/* Content Area */}
+          {isAnyCsv && viewMode === 'TABLE' ? (
+            <div className="h-full w-full p-8">
+              <CsvTableView content={tile.rawContent || ''} />
+            </div>
+          ) : isBudget && (viewMode === 'WIDGET' || viewMode === 'ACCOUNTS' || viewMode === 'ADD') ? (
             <div className="h-full w-full p-8">
               <BudgetWidget
                 content={tile.rawContent || ''}
@@ -1529,11 +1649,12 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
                       createdAt: Date.now(),
                       updatedAt: Date.now()
                     };
-                    console.log('[MainApp] (Focused) RssWidget onReadItLater triggered.', newItem);
-                    if (!onAddToReadItLater) {
-                      console.error('[MainApp] onAddToReadItLater prop is UNDEFINED in FocusedTile');
+                    if (onAddToReadItLater) {
+                      logger.debug(`(Focused) RssWidget onReadItLater triggered. ${newItem.name}`);
+                      onAddToReadItLater(newItem);
+                    } else {
+                      logger.error('(Focused) onAddToReadItLater prop is UNDEFINED in FocusedTile');
                     }
-                    onAddToReadItLater?.(newItem);
                   }}
                 />
               )}
@@ -1551,6 +1672,9 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
                   mode="FOCUS"
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
+              )}
+              {isGenericCsv && (
+                <CsvTableView content={tile.rawContent!} />
               )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (

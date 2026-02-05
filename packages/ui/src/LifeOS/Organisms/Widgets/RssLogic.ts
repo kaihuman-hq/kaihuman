@@ -1,4 +1,4 @@
-
+import { Logger } from '@lifosy/core';
 export interface RssConfig {
   feedOptions: RssFeedConfig[];
   readLater: string[]; // List of URLs or IDs? Requirements say "skip this for now" but field exists.
@@ -26,6 +26,8 @@ export const DEFAULT_RSS_CONFIG: RssConfig = {
   readLater: []
 };
 
+const logger = new Logger('RssLogic');
+
 export const parseRssConfig = (content: string): RssConfig => {
   try {
     const parsed = JSON.parse(content);
@@ -35,7 +37,7 @@ export const parseRssConfig = (content: string): RssConfig => {
       readLater: Array.isArray(parsed.readLater) ? parsed.readLater : []
     };
   } catch (e) {
-    console.warn("Failed to parse RSS config, returning default", e);
+    logger.warn("Failed to parse RSS config, returning default", e);
     return DEFAULT_RSS_CONFIG;
   }
 };
@@ -83,7 +85,7 @@ export const fetchFeedXml = async (feedUrl: string): Promise<string | null> => {
     if (!response.ok) return null;
     return await response.text();
   } catch (e) {
-    console.error(`Failed to fetch feed: ${feedUrl}`, e);
+    logger.error(`Failed to fetch feed: ${feedUrl}`, e);
     return null;
   }
 };
@@ -113,7 +115,7 @@ export const parseFeedItems = (xmlString: string): RssItem[] => {
       };
     });
   } catch (e) {
-    console.error("Error parsing XML", e);
+    logger.error("Error parsing XML", e);
     return [];
   }
 };

@@ -1,11 +1,13 @@
 import { h } from 'preact';
 import { useEffect, useRef, useState, useMemo } from 'preact/hooks';
 import { useSignal } from '@preact/signals';
+import { Logger, githubFileStore, githubService, githubProfileStore } from '@lifosy/core';
 import ForceGraph2D from 'react-force-graph-2d';
-import { githubFileStore, githubService, githubProfileStore } from '@lifosy/core';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
 import { Loader2, Share2, RefreshCw } from 'lucide-preact';
 import { cn } from '../../utils';
+
+const logger = new Logger('GraphView');
 
 // Helper to find links in markdown
 const findLinks = (content: string): string[] => {
@@ -139,7 +141,7 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
             await githubFileStore.openFile(file.path);
           }
         } catch (e) {
-          console.warn("Failed to analyze", file.path);
+          logger.warn("Failed to analyze", file.path, e);
         }
         setAnalyzedCount(prev => prev + 1);
       }

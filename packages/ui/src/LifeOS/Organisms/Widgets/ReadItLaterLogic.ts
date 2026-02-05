@@ -1,4 +1,7 @@
 
+import { Logger } from '@lifosy/core';
+const logger = new Logger('ReadItLaterLogic');
+
 export interface ReadItLaterItem {
   id: string;
   url: string;
@@ -24,8 +27,8 @@ export const parseReadItLater = (content: string): ReadItLaterConfig => {
       items: Array.isArray(parsed.items) ? parsed.items : []
     };
   } catch (e) {
-    console.warn("Failed to parse read it later config", e);
-    return DEFAULT_CONFIG;
+    logger.warn("Failed to parse read it later config", e);
+    return { items: [] };
   }
 };
 
