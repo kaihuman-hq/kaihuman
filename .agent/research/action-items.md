@@ -23,7 +23,7 @@
 [x] 1.19 RSS widget in focus mode: clicking on "Read Later" and "Read" breaks the view somehow, the view becomes empty. I observed this on mobile view. Investigate and fix it.
 [x] 1.20 Budget widget: there is a special handling that needs to be applied - if there are multiple rows with the same name, account and category, only consider the latest one (use the date column for that). Fix it.
 [x] 1.21 The search is currently only available with a shortcut which does not work on Mobile. Add a new entry to the Magic Menu for Search. Make sure it works on Mobile too.
-[ ] 1.22 Budget Widget:
+[x] 1.22 Budget Widget:
 - Focus Mode, Accounts tab: negative values (outcome) is not rendered, but render it the same way as bars, but with a red bar instead of white, so it's clearly an outcome. Use the positive value for the width of the bar.
 - Calculate the whole balance (income - outcome (only latest values)) and render the balance on the main widget view (top right corner).
 
@@ -397,16 +397,20 @@ The version field is for backward compatibility. So make sure that there is a mi
 
 ### 3.11 Graph
 
-[ ] 3.11.1 Implement a view that represents how files are connected to each other. Consider only Markdown files where files can be referenced with a link. The graph should be interactive and allow to navigate to the referenced files. For details read the Obsidian docs, the graph should do the same as the Obsidian graph view: https://help.obsidian.md/plugins/graph. Add this as a new entry to the magic menu. Show connections between files in the graph view.
+[x] 3.11.1 Implement a view that represents how files are connected to each other. Consider only Markdown files where files can be referenced with a link. The graph should be interactive and allow to navigate to the referenced files. For details read the Obsidian docs, the graph should do the same as the Obsidian graph view: https://help.obsidian.md/plugins/graph. Add this as a new entry to the magic menu. Show connections between files in the graph view.
 
 ### 3.12 Commits
 
-[ ] 3.12.1 Implement a view that shows the commit history for the current repo. It can be very just a table showing the commits with the commit message, the author, the date and the commit hash. Add this as a new entry to the magic menu.
+[x] 3.12.1 Implement a view that shows the commit history for the current repo. It can be very just a table showing the commits with the commit message, the author, the date and the commit hash. Add this as a new entry to the magic menu.
 
 ### 3.13 File history
 
-[ ] 3.13.1 Implement a view that shows the history of a specific file. For each Focused Modal show a new toggle "History" that opens this view. In this view the user can see the history of the file and what changes were made in each commit.
+[x] 3.13.1 Implement a view that shows the history of a specific file. For each Focused Modal show a new toggle "History" that opens this view. In this view the user can see the history of the file and what changes were made in each commit.
 
 ### 3.14 Table view for csv files
 
-[ ] 3.14.1 Implement a table view for csv files. For each Focused Modal show a new toggle "Table" that opens this view. In this view the user can see the table of the csv file. It should be possible to sort the columns by clicking on the column headers. It should also be possible to filter the rows by clicking on the filter icon in the column header. This will be applied to all files with the extension .csv
+[x] 3.14.1 Implement a table view for csv files. For each Focused Modal show a new toggle "Table" that opens this view. In this view the user can see the table of the csv file. It should be possible to sort the columns by clicking on the column headers. It should also be possible to filter the rows by clicking on the filter icon in the column header. This will be applied to all files with the extension .csv
+
+### 3.15 Logging
+
+[ ] 3.15.1 Create a custom logger for the app. Eventually there may not be any console.log calls in the code. The logger should be able to log to the console. The logger should be able to log different levels of messages (debug, info, warn, error). The logger should be able to log different modules (ui, backend, etc.). Make sure that in production no warnings and errors are logged to the console.
