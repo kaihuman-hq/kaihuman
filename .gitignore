@@ -27,6 +27,8 @@ out/
 build
 dist
 
+# Generated files
+apps/console/src/version.ts
 
 # Debug
 npm-debug.log*

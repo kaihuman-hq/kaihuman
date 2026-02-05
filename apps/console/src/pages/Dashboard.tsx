@@ -13,6 +13,7 @@ import {
   DEFAULT_CONFIG as DEFAULT_RIL_CONFIG
 } from '@lifosy/ui';
 import { FileViewer } from '../components/FileViewer';
+import { VERSION } from '../version';
 
 export const Dashboard = () => {
   const repo = githubProfileStore.currentRepo.value;
@@ -654,6 +655,7 @@ export const Dashboard = () => {
           // Actually tree usually has folders without trailing slash.
           return null;
         }}
+        version={VERSION}
       />
     </div>
   );

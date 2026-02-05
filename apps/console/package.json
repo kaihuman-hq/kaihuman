@@ -5,12 +5,15 @@
   "scripts": {
     "dev": "vite",
     "prod": "vite --mode prod",
-    "build": "vite build",
-    "build:prod": "vite build --mode prod",
+    "build": "node scripts/generate-version.js && vite build",
+    "build:prod": "node scripts/generate-version.js && vite build --mode prod",
     "preview": "vite preview",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "version:bump": "node scripts/bump-version.js",
+    "version:bump:minor": "node scripts/bump-version.js minor",
+    "version:bump:major": "node scripts/bump-version.js major"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.1",
