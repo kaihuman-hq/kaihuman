@@ -2,18 +2,18 @@
 
 /**
  * Version Bumping Script
- * 
+ *
  * Usage:
  *   node scripts/bump-version.js [patch|minor|major]
- * 
+ *
  * Default: patch
- * 
+ *
  * This script updates the version.json file and runs generate-version.js
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const { execSync } = require('node:child_process');
 
 // Get bump type from command line argument
 const bumpType = process.argv[2] || 'patch';
@@ -47,7 +47,7 @@ switch (bumpType) {
 }
 
 // Write updated version
-fs.writeFileSync(versionPath, JSON.stringify(version, null, 2) + '\n', 'utf-8');
+fs.writeFileSync(versionPath, `${JSON.stringify(version, null, 2)}\n`, 'utf-8');
 
 const newVersion = `${version.major}.${version.minor}.${version.patch}`;
 console.log(`✓ Bumped version from ${oldVersion} to ${newVersion}`);

@@ -1,8 +1,9 @@
-import { h } from 'preact';
-import { useRef, useEffect } from 'preact/hooks';
 import { Logger } from '@lifosy/core';
+import { h } from 'preact';
+import { useEffect, useRef } from 'preact/hooks';
 
 const logger = new Logger('FileViewer');
+
 import { githubFileStore } from '@lifosy/core';
 import { CodeMirrorEditor } from './editor/CodeMirrorEditor';
 

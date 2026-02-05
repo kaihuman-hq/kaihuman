@@ -2,18 +2,18 @@
 
 /**
  * Version Generation Script
- * 
+ *
  * This script generates version information for the app including:
  * - Version number (from version.json)
  * - Build timestamp (ISO format)
  * - Git commit hash (if available)
- * 
+ *
  * Output is written to src/version.ts for importing in the app
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const { execSync } = require('node:child_process');
 
 // Read version from version.json
 const versionPath = path.join(__dirname, '..', 'version.json');
