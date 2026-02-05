@@ -1281,7 +1281,7 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
         {/* Header / Controls - Dim in Zen Mode */}
         {/* Fix 1.17: Responsive Layout for Mobile - 3 rows: Actions, Title, Content Toggles */}
         <div className={cn(
-          "min-h-12 border-b border-[var(--los-border)] flex flex-col md:flex-row px-4 py-2 shrink-0 gap-2 transition-opacity duration-500",
+          "min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2 transition-opacity duration-500",
           zenMode ? "opacity-10 hover:opacity-100" : "opacity-100"
         )}>
           {/* Mobile: Row 1 - Actions (Right Aligned) */}
