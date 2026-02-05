@@ -55,7 +55,7 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
       const dateB = b.pubDate ? new Date(b.pubDate).getTime() : 0;
       return dateB - dateA;
     });
-  }, [rawItems, config]); // optimisticReadIds is handled by rawItems shallow clone trigger
+  }, [rawItems, config]); // optimisticReadIds updates are reflected via rawItems state update (setRawItems shallow clone)
 
   // Fetch Logic - Only runs when URLs change
   // We track initiated URLs to dedupe requests if the component re-renders while fetching
@@ -96,7 +96,7 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
     }
 
     return () => { mounted = false; };
-  }, [config.feedOptions]); // Only depend on feed URLs, not entire content
+  }, [config.feedOptions]); // Depend on feedOptions array to avoid refetch on read status changes
 
   // Stable Callbacks Pattern associated with Refs for props/config
   const latestProps = useRef({ onChange, onReadItLater, config });
