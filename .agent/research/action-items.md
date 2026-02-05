@@ -413,4 +413,8 @@ The version field is for backward compatibility. So make sure that there is a mi
 
 ### 3.15 Logging
 
-[ ] 3.15.1 Create a custom logger for the app. Eventually there may not be any console.log calls in the code. The logger should be able to log to the console. The logger should be able to log different levels of messages (debug, info, warn, error). The logger should be able to log different modules (ui, backend, etc.). Make sure that in production no warnings and errors are logged to the console.
+[x] 3.15.1 Create a custom logger for the app. Eventually there may not be any console.log calls in the code. The logger should be able to log to the console. The logger should be able to log different levels of messages (debug, info, warn, error). The logger should be able to log different modules (ui, backend, etc.). Make sure that in production no warnings and errors are logged to the console.
+
+### 3.16 New route with new file
+
+[ ] 3.16.1 Add a new route "/files/dump" that opens the new file modal. This route should be added to the router. Nothing happens so far, but it can be used to quickly put data into it. If the user uses the shortcut ctrl+s or clicks on save, a save dialog opens and the user can select the name and the location of the file. 

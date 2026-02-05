@@ -306,6 +306,17 @@ export const MainApp = ({
           // Or check if it exists at all?
 
           // Simplistic check: If path exists as a Tile of type FOLDER -> navigate there
+          // Priority 1: Check Dashboard Tiles (localConfig)
+          // If found here, we prefer Dashboard View (showFiles = false)
+          const dashEntry = localConfig?.entries.find(e => e.path === path);
+          if (dashEntry) {
+            setActiveTileId(path);
+            setShowFiles(false); // Dashboard view
+            setNotFound(false);
+            return;
+          }
+
+          // Priority 2: Check FileSystem
           // Flatten all items to find it
           const allItems = fileSystem.columns.flatMap(c => c.items);
           const item = allItems.find(i => i.id === path);
@@ -317,9 +328,6 @@ export const MainApp = ({
               setActiveTileId(null);
               setNotFound(false);
               // Trigger Navigation if needed to rebuild columns?
-              // Verify if current columns already show it?
-              // If deep linking, columns might be default.
-              // We should call onNavigate to the path parts
               const parts = path.split('/');
               onNavigate?.(parts);
             } else {
@@ -331,17 +339,7 @@ export const MainApp = ({
             return;
           }
 
-          // If not found in fileSystem items, BUT it might be a valid subpath not yet loaded?
-          // Or maybe it's in dashboard tiles?
-          const dashEntry = localConfig?.entries.find(e => e.path === path);
-          if (dashEntry) {
-            setActiveTileId(path);
-            setShowFiles(false); // Dashboard view
-            setNotFound(false);
-            return;
-          }
-
-          // If completely unknown
+          // Priority 3: Not Found
           logger.warn(`Path not found in FS or Dashboard: ${path}`);
           setNotFound(true);
         }
@@ -589,11 +587,23 @@ export const MainApp = ({
   const isMillerMode = !!fileSystem && (showFiles || !localConfig);
 
   // Constants
-  const activeTile = activeTileId !== null ? (
+  const lastActiveTile = useRef<TileDef | null>(null);
+
+  let activeTile = activeTileId !== null ? (
     isMillerMode
       ? fileSystem?.columns.flatMap(c => c.items).find(t => t.id === activeTileId)
       : displayTiles.find(t => t.id === activeTileId)
   ) : null;
+
+  // Persist Active Tile: If we had a tile, but now it's gone, but ID persists -> use old one
+  if (!activeTile && activeTileId !== null && lastActiveTile.current && lastActiveTile.current.id === activeTileId) {
+    activeTile = lastActiveTile.current;
+  }
+
+  // Update persisted reference
+  if (activeTile) {
+    lastActiveTile.current = activeTile;
+  }
 
   // Calculate Breadcrumbs Logic
   const getBreadcrumbs = () => {
@@ -999,11 +1009,19 @@ export const MainApp = ({
                   )}
                 </div>
               )
-            ) : (
+            ) : activeTile ? (
               // STATE B: FOCUSED TILE
               <FocusedTile
-                tile={activeTile!}
-                onClose={() => setActiveTileId(null)}
+                tile={activeTile}
+                onClose={() => {
+                  // Fix 1.35: Navigation Return Flow - Check if tile is in Dashboard
+                  // If so, strictly enforce Dashboard View (setShowFiles(false))
+                  const isDashboardTile = localConfig?.entries.some(e => e.path === activeTile.id);
+                  if (isDashboardTile) {
+                    setShowFiles(false);
+                  }
+                  setActiveTileId(null);
+                }}
                 renderEditor={renderEditor}
                 zenMode={zenMode}
                 onToggleZenMode={() => setZenMode(prev => !prev)}
@@ -1013,6 +1031,12 @@ export const MainApp = ({
                   setShowAddToDashboard(true);
                 } : undefined}
               />
+            ) : (
+              // Should not happen, but safe fallback
+              <div className="flex items-center justify-center h-full text-red-500">
+                Error: Tile not found
+                {(() => { setActiveTileId(null); return null; })()}
+              </div>
             )}
           </Tile>
         )}
@@ -1275,7 +1299,8 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
   const isGenericCsv = tile.extension === '.csv' && !isTimeTracking && !isEvents && !isHabit && !isDataCollection && !isBudget;
   const isAnyCsv = tile.extension?.toLowerCase().endsWith('.csv'); // For enabling TABLE view on all CSVs
 
-  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog || isAnyCsv) && !!tile.rawContent;
+  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog || isAnyCsv); // && !!tile.rawContent;
+
 
   const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
   const [showHistory, setShowHistory] = useState(false);
@@ -1295,7 +1320,8 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
     const _isActionLog = tile.extension === '.actionlog.md';
     const _isAnyCsv = tile.extension?.toLowerCase().endsWith('.csv');
 
-    const _hasWidget = (_isTimeTracking || _isEvents || _isHabit || _isTodos || _isTimezones || _isRss || _isReadItLater || _isDataCollection || _isBudget || _isActionLog || _isAnyCsv) && !!tile.rawContent;
+    const _hasWidget = (_isTimeTracking || _isEvents || _isHabit || _isTodos || _isTimezones || _isRss || _isReadItLater || _isDataCollection || _isBudget || _isActionLog || _isAnyCsv); // && !!tile.rawContent; // Removed to prevent unmount on flicker
+
 
     if (_hasWidget && viewMode === 'CODE') {
       setViewMode('WIDGET');
@@ -1636,7 +1662,7 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
               )}
               {isRss && (
                 <RssWidget
-                  content={tile.rawContent!}
+                  content={tile.rawContent}
                   mode="FOCUS"
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                   onReadItLater={(item) => {
