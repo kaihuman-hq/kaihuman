@@ -54,7 +54,27 @@ export const parseBudget = (content: string): BudgetTransaction[] => {
     }
   }
 
-  return transactions;
+  // Deduplication Logic (Bug 1.20)
+  // Key: name-account-category
+  // Strategy: Keep the one with the LATEST date.
+  const latestMap = new Map<string, BudgetTransaction>();
+
+  transactions.forEach(t => {
+    const key = `${t.name}|${t.account}|${t.category}`;
+    const existing = latestMap.get(key);
+
+    if (!existing) {
+      latestMap.set(key, t);
+    } else {
+      // Compare dates
+      // ISO strings compare lexically correctly
+      if (t.date > existing.date) {
+        latestMap.set(key, t);
+      }
+    }
+  });
+
+  return Array.from(latestMap.values());
 };
 
 export const serializeBudget = (transactions: BudgetTransaction[]): string => {

@@ -670,6 +670,10 @@ export const MainApp = ({
 
   const onTouchEnd = () => {
     if (!touchStart.current || !touchEnd.current) return;
+
+    // Fix 1.18: Disable swipe if a tile is focused (activeTileId is not null)
+    if (activeTileId !== null) return;
+
     const distance = touchStart.current - touchEnd.current;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
@@ -720,17 +724,21 @@ export const MainApp = ({
   // Fix 1.5 & 1.6: Dynamic Theme Color for Mobile Safari and Zen Mode
   useEffect(() => {
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    // Using --los-bg variable value would require getComputedStyle, but we know it maps to #0a0a0f usually.
+    // However, to be precise, let's hardcode the dark theme color which seems to be intended.
+    const darkThemeColor = '#0a0a0f';
+
     if (metaThemeColor) {
       if (zenMode) {
-        metaThemeColor.setAttribute('content', '#0a0a0f'); // Dark background
+        metaThemeColor.setAttribute('content', darkThemeColor); // Dark background
       } else {
-        metaThemeColor.setAttribute('content', '#0a0a0f'); // Ensure it stays dark even if something else changes it or default
+        metaThemeColor.setAttribute('content', darkThemeColor); // Ensure it stays dark
       }
     } else {
-      // Create if missing?
+      // Create if missing
       const meta = document.createElement('meta');
       meta.name = "theme-color";
-      meta.content = "#0a0a0f";
+      meta.content = darkThemeColor;
       document.head.appendChild(meta);
     }
   }, [zenMode]);
@@ -1187,6 +1195,11 @@ abbreviations: undefined
                 setNotFound(false);
               }
             },
+            {
+              label: "Search",
+              // Fix 1.21: Add Search to Magic Menu (works on mobile)
+              onClick: () => setShowSearch(true)
+            },
             { label: "Graph", onClick: () => setShowGraph(true) },
             { label: "Commits", onClick: () => setShowCommits(true) },
             { label: "Settings", onClick: () => setShowSettings(true) },
@@ -1265,17 +1278,65 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
         )}
       >
         {/* Header / Controls - Dim in Zen Mode */}
+        {/* Header / Controls - Dim in Zen Mode */}
+        {/* Fix 1.17: Responsive Layout for Mobile - 3 rows: Actions, Title, Content Toggles */}
         <div className={cn(
-          "min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2 transition-opacity duration-500",
+          "min-h-12 border-b border-[var(--los-border)] flex flex-col md:flex-row px-4 py-2 shrink-0 gap-2 transition-opacity duration-500",
           zenMode ? "opacity-10 hover:opacity-100" : "opacity-100"
         )}>
+          {/* Mobile: Row 1 - Actions (Right Aligned) */}
+          <div className="flex md:hidden w-full justify-end gap-2 mb-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
+              className={cn(
+                "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                showHistory ? "text-[var(--los-accent)]" : (zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")
+              )}
+              title="Toggle History"
+            >
+              <History size={14} className={cn("transition-colors", showHistory && "text-[var(--los-accent)]")} />
+            </button>
+
+            {onAddToDashboard && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onAddToDashboard(String(tile.id)); }}
+                className={cn(
+                  "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                  zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                )}
+                title="Add to Dashboard"
+              >
+                <div className={cn("w-2 h-2 border transition-colors border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleZenMode?.(); }}
+              className={cn(
+                "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+              )}
+              title="Toggle Zen Mode (Ctrl+Shift+Z)"
+            >
+              <div className={cn("w-2 h-2 border transition-colors", zenMode ? "bg-[var(--los-accent)] border-[var(--los-accent)]" : "border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+            </button>
+
+            <button
+              onClick={(e) => { e.stopPropagation(); onClose(); }}
+              className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
+              title="Close Tile"
+            >
+              <div className="w-2 h-2 rounded-full border border-[var(--los-muted)] group-hover:border-red-500 group-hover:bg-red-500 transition-colors" />
+            </button>
+          </div>
+
           <div className="flex items-center justify-between w-full gap-4">
-            <MonoHeader className="text-[var(--los-accent)] text-lg">
+            {/* Fix 1.16: Truncate Title */}
+            <MonoHeader className="text-[var(--los-accent)] text-lg truncate flex-1 md:flex-none">
               {tile.id.toString().split('/').pop()}
             </MonoHeader>
 
-            {/* Close Button (Desktop & Mobile) */}
-            <div className="flex items-center gap-2">
+            {/* Desktop: Actions (Normal Layout) */}
+            <div className="hidden md:flex items-center gap-2">
               <button
                 onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
                 className={cn(

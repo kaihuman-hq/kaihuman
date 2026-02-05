@@ -1,6 +1,6 @@
 
 import { h, Fragment } from 'preact';
-import { useState, useEffect, useMemo } from 'preact/hooks';
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { RssConfig, RssItem, parseRssConfig, serializeRssConfig, fetchFeedXml, parseFeedItems, markItemAsRead, addFeed, removeFeed } from './RssLogic';
 import { MonoText, MonoHeader } from '../../Atoms/Typography';
 import { cn } from '../../../utils';
@@ -20,6 +20,8 @@ export const RssWidget = ({ content, mode = 'SMALL', onChange, onReadItLater }: 
   const [lastUpdated, setLastUpdated] = useState<number>(0);
 
   // Combine and de-duplicate fetches
+  const prevConfig = useRef<RssConfig | null>(null);
+
   useEffect(() => {
     let mounted = true;
 
@@ -58,11 +60,29 @@ export const RssWidget = ({ content, mode = 'SMALL', onChange, onReadItLater }: 
       setLastUpdated(Date.now());
     };
 
-    if (config.feedOptions.length > 0) {
-      loadFeeds();
+    // Fix 1.19: RSS widget in focus mode breaking on interaction
+    // Only re-fetch if feed URLs or count changed. If only read status changed, just filter locally.
+    const feedsChanged = !prevConfig.current ||
+      JSON.stringify(config.feedOptions.map(f => f.url)) !== JSON.stringify(prevConfig.current.feedOptions.map(f => f.url));
+
+    if (feedsChanged) {
+      if (config.feedOptions.length > 0) {
+        loadFeeds();
+      } else {
+        setItems([]);
+      }
     } else {
-      setItems([]);
+      // Just filter existing items based on new read list
+      setItems(prevItems => {
+        const allReadIds = new Set(config.feedOptions.flatMap(f => f.read));
+        return prevItems.filter(item => {
+          const id = item.guid || item.link;
+          return !allReadIds.has(id);
+        });
+      });
     }
+
+    prevConfig.current = config;
 
     return () => { mounted = false; };
   }, [content]); // rudimentary re-fetch on content change (e.g. adding feed), but we might want manual refresh too.
