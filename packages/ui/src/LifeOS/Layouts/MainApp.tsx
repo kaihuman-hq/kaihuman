@@ -1277,56 +1277,56 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
           zenMode ? "bg-transparent" : "bg-[var(--los-bg)]"
         )}
       >
-        {/* Header / Controls - Dim in Zen Mode */}
-        {/* Header / Controls - Dim in Zen Mode */}
         {/* Fix 1.17: Responsive Layout for Mobile - 3 rows: Actions, Title, Content Toggles */}
         <div className={cn(
           "min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2 transition-opacity duration-500",
           zenMode ? "opacity-10 hover:opacity-100" : "opacity-100"
         )}>
-          {/* Mobile: Row 1 - Actions (Right Aligned) */}
-          <div className="flex md:hidden w-full justify-end gap-2 mb-2">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
-              className={cn(
-                "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
-                showHistory ? "text-[var(--los-accent)]" : (zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")
-              )}
-              title="Toggle History"
-            >
-              <History size={14} className={cn("transition-colors", showHistory && "text-[var(--los-accent)]")} />
-            </button>
-
-            {onAddToDashboard && (
+          {/* Mobile: Row 1 - Actions (Right Aligned) - Strictly hidden on Desktop */}
+          <div className="md:hidden">
+            <div className="flex w-full justify-end gap-2 mb-2">
               <button
-                onClick={(e) => { e.stopPropagation(); onAddToDashboard(String(tile.id)); }}
+                onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
+                className={cn(
+                  "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                  showHistory ? "text-[var(--los-accent)]" : (zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")
+                )}
+                title="Toggle History"
+              >
+                <History size={14} className={cn("transition-colors", showHistory && "text-[var(--los-accent)]")} />
+              </button>
+
+              {onAddToDashboard && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onAddToDashboard(String(tile.id)); }}
+                  className={cn(
+                    "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
+                    zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                  )}
+                  title="Add to Dashboard"
+                >
+                  <div className={cn("w-2 h-2 border transition-colors border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+                </button>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleZenMode?.(); }}
                 className={cn(
                   "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
                   zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
                 )}
-                title="Add to Dashboard"
+                title="Toggle Zen Mode (Ctrl+Shift+Z)"
               >
-                <div className={cn("w-2 h-2 border transition-colors border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+                <div className={cn("w-2 h-2 border transition-colors", zenMode ? "bg-[var(--los-accent)] border-[var(--los-accent)]" : "border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
               </button>
-            )}
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggleZenMode?.(); }}
-              className={cn(
-                "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
-                zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
-              )}
-              title="Toggle Zen Mode (Ctrl+Shift+Z)"
-            >
-              <div className={cn("w-2 h-2 border transition-colors", zenMode ? "bg-[var(--los-accent)] border-[var(--los-accent)]" : "border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
-            </button>
 
-            <button
-              onClick={(e) => { e.stopPropagation(); onClose(); }}
-              className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
-              title="Close Tile"
-            >
-              <div className="w-2 h-2 rounded-full border border-[var(--los-muted)] group-hover:border-red-500 group-hover:bg-red-500 transition-colors" />
-            </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onClose(); }}
+                className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
+                title="Close Tile"
+              >
+                <div className="w-2 h-2 rounded-full border border-[var(--los-muted)] group-hover:border-red-500 group-hover:bg-red-500 transition-colors" />
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between w-full gap-4">
