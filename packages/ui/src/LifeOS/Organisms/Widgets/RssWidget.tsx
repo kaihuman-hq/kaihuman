@@ -31,6 +31,12 @@ interface RssWidgetProps {
 }
 
 const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }: RssWidgetProps) => {
+  // Debug Mount
+  useEffect(() => {
+    logger.info('[RssWidget] MOUNTED');
+    return () => logger.info('[RssWidget] UNMOUNTED');
+  }, []);
+
   // Persist last valid config to prevent reset on undefined content (loading state)
   const lastValidConfig = useRef<RssConfig>(parseRssConfig('')); // Initialize with default
 
@@ -42,22 +48,17 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
   }, [content]); // content dependency
 
 
-  // Optimistic tracking
-  const optimisticReadIds = useRef<Set<string>>(new Set());
-
   // Trigger fetches via Service
   useEffect(() => {
     config.feedOptions.forEach(feed => {
       rssService.ensureFeed(feed.url);
     });
-  }, [config.feedOptions]); // Re-check when options change
+  }, [config.feedOptions]);
 
-  // Manual Subscription to Signal to avoid Render-Cycle
+  // Manual Subscription to Signal to prevent Render-Cycle
   const [items, setItems] = useState<(RssItem & { feedId: string })[]>([]);
 
-  // Effect to sync items from Service
   useEffect(() => {
-    // Define computation function
     const computeItems = () => {
       const allReadIds = new Set(config.feedOptions.flatMap(f => f.read));
       const allItems: (RssItem & { feedId: string })[] = [];
@@ -73,7 +74,8 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
 
       return allItems.filter(item => {
         const id = item.guid || item.link;
-        return !allReadIds.has(id) && !optimisticReadIds.current.has(id);
+        // Use Service's helper which checks both Config AND Global Optimistic State
+        return !rssService.isRead(id, allReadIds);
       }).sort((a, b) => {
         const dateA = a.pubDate ? new Date(a.pubDate).getTime() : 0;
         const dateB = b.pubDate ? new Date(b.pubDate).getTime() : 0;
@@ -81,19 +83,21 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
       });
     };
 
-    // Initial computation
     setItems(computeItems());
 
-    // Subscribe to signal changes via subscribe
-    const dispose = rssService.feeds.subscribe((val) => {
-      setItems(computeItems());
-    });
+    // Subscribe to BOTH feeds and optimisticReads
+    // We create a wrapper effect to subscribe to multiple signals easily or just two subscriptions
+    const disposeFeeds = rssService.feeds.subscribe(() => setItems(computeItems()));
+    const disposeOptimistic = rssService.optimisticReads.subscribe(() => setItems(computeItems()));
 
-    return () => dispose();
-  }, [config]); // Re-run if config changes
+    return () => {
+      disposeFeeds();
+      disposeOptimistic();
+    };
+  }, [config]);
 
 
-  // Stable Callbacks Pattern associated with Refs for props/config
+  // Stable Callbacks Pattern
   const latestProps = useRef({ onChange, onReadItLater, config });
   latestProps.current = { onChange, onReadItLater, config };
 
@@ -102,12 +106,14 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
     if (!onChange) return;
 
     const idToMark = item.guid || item.link;
-    optimisticReadIds.current.add(idToMark);
+    logger.info(`[handleRead] Marking: ${idToMark}`);
 
-    // Update config which will trigger re-sync of items
+    // Global Optimistic Update (Persists across unmounts)
+    rssService.markOptimisticRead(idToMark);
+
     const newConfig = markItemAsRead(config, item.feedId, idToMark);
     onChange(serializeRssConfig(newConfig));
-  }, []); // Truly stable callback
+  }, []);
 
   const handleRil = useCallback((item: RssItem) => {
     latestProps.current.onReadItLater?.(item);

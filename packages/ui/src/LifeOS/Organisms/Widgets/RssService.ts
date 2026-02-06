@@ -96,6 +96,21 @@ export class RssService {
       };
     }
   }
+  // Optimistic Read IDs (persists across component unmounts)
+  optimisticReads = signal<Set<string>>(new Set());
+
+  markOptimisticRead(id: string) {
+    const current = this.optimisticReads.value;
+    if (!current.has(id)) {
+      const next = new Set(current);
+      next.add(id);
+      this.optimisticReads.value = next;
+    }
+  }
+
+  isRead(id: string, configReadIds: Set<string>) {
+    return configReadIds.has(id) || this.optimisticReads.value.has(id);
+  }
 }
 
 export const rssService = new RssService();
