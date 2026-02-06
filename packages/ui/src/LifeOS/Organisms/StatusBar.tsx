@@ -42,7 +42,7 @@ export interface StatusBarProps {
   onDashboardClick?: () => void;
   menuItems?: MenuItem[];
   recentFiles?: MenuItem[];
-  
+
   // Version info
   version?: {
     version: string;
@@ -106,7 +106,7 @@ export const StatusBar = ({
       {/* Expanded Magic Drawer Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] transition-opacity duration-300",
+          "fixed inset-0 bg-black/50 backdrop-blur-sm z-[990] transition-opacity duration-300",
           expanded ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         )}
         onClick={() => setExpanded(false)}
@@ -115,7 +115,7 @@ export const StatusBar = ({
       {/* The Status Bar Container */}
       <div
         className={cn(
-          "fixed bottom-0 left-0 right-0 z-[100] bg-[var(--los-bg)] border-t border-[var(--los-border)] transition-all duration-300 ease-spring",
+          "fixed bottom-0 left-0 right-0 z-[1000] bg-[var(--los-bg)] border-t border-[var(--los-border)] transition-all duration-300 ease-spring",
           // On mobile, if not expanded, it might need to be slightly taller or just standard.
           // We keep h-8 (32px) standard, h-16 (64px) on hover/touch-intent
           expanded ? "h-[40vh]" : (isHovered ? "h-16" : "h-12 md:h-8"), // Increased base height for mobile touch targets
@@ -339,7 +339,7 @@ export const StatusBar = ({
             {currentWorkspace && (
               <div
                 className={cn(
-                  "hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300",
+                  "hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300 relative z-20",
                   "text-[var(--los-fg)] hover:text-[var(--los-accent)]"
                 )}
                 onClick={(e) => { e.stopPropagation(); handleToggleExpand('WORKSPACES' as any); }}
@@ -413,7 +413,7 @@ export const StatusBar = ({
           <div className="flex-1 flex items-center justify-end gap-6 min-w-0">
             {/* Version Info - Always visible on desktop */}
             {version && (
-              <div 
+              <div
                 className={cn(
                   "hidden md:flex items-center gap-2 whitespace-nowrap relative group/version transition-all duration-300",
                   "opacity-100"
@@ -424,7 +424,7 @@ export const StatusBar = ({
                 <MonoText className="text-[10px] text-[var(--los-muted)]">{version.version}</MonoText>
               </div>
             )}
-            
+
             {/* Stats hidden on small screens */}
             {stats.map((stat, i) => (
               <div key={i} className="hidden md:flex items-center gap-2 whitespace-nowrap relative group/stat">

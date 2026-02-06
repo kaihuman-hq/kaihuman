@@ -39,6 +39,7 @@ export default defineConfig({
         'tailwind-merge',
         '@lifosy/core',
         '@preact/signals',
+        'react-force-graph-2d',
       ],
       output: {
         globals: {

@@ -105,13 +105,36 @@ export interface NewFileWizardProps {
   existingFiles?: string[];
   // Callback to load children for folder selector
   onLoadFolder?: (path: string) => Promise<TileDef[]>;
+  initialStep?: 'TEMPLATE' | 'LOCATION';
+  initialContent?: string;
+  initialFilename?: string;
+  initialFolder?: string;
 }
 
-export const NewFileWizard = ({ onClose, onCreate, fileSystem, availableFolders = [], existingFiles = [], onLoadFolder }: NewFileWizardProps) => {
-  const [step, setStep] = useState<'TEMPLATE' | 'LOCATION'>('TEMPLATE');
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [filename, setFilename] = useState('');
-  const [selectedFolder, setSelectedFolder] = useState<string>(''); // Empty string means root
+export const NewFileWizard = ({
+  onClose,
+  onCreate,
+  fileSystem,
+  availableFolders = [],
+  existingFiles = [],
+  onLoadFolder,
+  initialStep = 'TEMPLATE',
+  initialContent,
+  initialFilename = '',
+  initialFolder = ''
+}: NewFileWizardProps) => {
+  const [step, setStep] = useState<'TEMPLATE' | 'LOCATION'>(initialStep);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(() => {
+    if (initialContent) {
+      // Default to Note template for dumps, or find generic md
+      const noteTemplate = TEMPLATES.find(t => t.id === 'note');
+      // Ensure we return Template or null, never undefined
+      return noteTemplate || TEMPLATES[0] || null;
+    }
+    return null;
+  });
+  const [filename, setFilename] = useState(initialFilename);
+  const [selectedFolder, setSelectedFolder] = useState<string>(initialFolder); // Empty string means root
 
   // Validation State
   const [error, setError] = useState<string | null>(null);
@@ -177,7 +200,7 @@ export const NewFileWizard = ({ onClose, onCreate, fileSystem, availableFolders 
 
   const handleCreate = () => {
     if (!selectedTemplate || !filename || error) return;
-    onCreate(fullPath, selectedTemplate.defaultContent);
+    onCreate(fullPath, initialContent || selectedTemplate.defaultContent);
     onClose();
   };
 
