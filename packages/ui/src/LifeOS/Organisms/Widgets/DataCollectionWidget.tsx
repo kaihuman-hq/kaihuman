@@ -31,17 +31,14 @@ export interface DataCollectionWidgetProps {
   // I'll export `DataCollectionAddForm` from its file and use it in `MainApp`.
 }
 
-import { filterDataByTime } from './DataCollectionLogic';
+import { filterDataByTime, TimeFilterMode } from './DataCollectionLogic';
 
 export const DataCollectionWidget = ({ content, mode, onChange, className }: DataCollectionWidgetProps) => {
   const data = useMemo(() => parseDataCollection(content), [content]);
-  const [filterMode, setFilterMode] = useState<'ALL' | 'YEAR' | 'LAST_YEAR'>('ALL');
+  const [filterMode, setFilterMode] = useState<TimeFilterMode>('ALL');
 
   const filteredRows = useMemo(() => {
-    if (mode === 'SMALL') return data.rows; // Always show all or default stats in small view?
-    // Requirement says: "It should be able to switch between... in focus mode"
-    // Small view: "This is also the default view" referring to 'All years' being default?
-    // Let's assume Small view shows All.
+    if (mode === 'SMALL') return data.rows;
     return filterDataByTime(data, filterMode);
   }, [data, filterMode, mode]);
 
@@ -64,10 +61,12 @@ export const DataCollectionWidget = ({ content, mode, onChange, className }: Dat
     <div className={cn("flex flex-col h-full w-full", className)}>
       {/* FILTER SWITCHER (FOCUS MODE ONLY) */}
       {mode === 'FOCUS' && (
-        <div className="flex items-center justify-end px-4 py-2 gap-2 border-b border-[var(--los-border)]">
+        <div className="flex items-center justify-end px-4 py-2 gap-2 border-b border-[var(--los-border)] overflow-x-auto scrollbar-hide">
           <FilterButton label="ALL YEARS" active={filterMode === 'ALL'} onClick={() => setFilterMode('ALL')} />
-          <FilterButton label="THIS YEAR" active={filterMode === 'YEAR'} onClick={() => setFilterMode('YEAR')} />
+          <FilterButton label="YTD" active={filterMode === 'YTD'} onClick={() => setFilterMode('YTD')} />
           <FilterButton label="LAST YEAR" active={filterMode === 'LAST_YEAR'} onClick={() => setFilterMode('LAST_YEAR')} />
+          <FilterButton label="LAST 6M" active={filterMode === 'LAST_6_MONTHS'} onClick={() => setFilterMode('LAST_6_MONTHS')} />
+          <FilterButton label="LAST 12M" active={filterMode === 'LAST_12_MONTHS'} onClick={() => setFilterMode('LAST_12_MONTHS')} />
         </div>
       )}
 

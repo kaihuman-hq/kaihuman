@@ -223,7 +223,14 @@ export const deleteColumn = (data: DataCollectionData, colName: string): DataCol
  * Logic: Find the FIRST column that is basically a date (date, auto:date, auto:date:yesterday).
  * Return rows that match the year criteria.
  */
-export const filterDataByTime = (data: DataCollectionData, mode: 'ALL' | 'YEAR' | 'LAST_YEAR'): DataRow[] => {
+export type TimeFilterMode = 'ALL' | 'YTD' | 'LAST_YEAR' | 'LAST_6_MONTHS' | 'LAST_12_MONTHS';
+
+/**
+ * Filter rows by time.
+ * Logic: Find the FIRST column that is basically a date (date, auto:date, auto:date:yesterday).
+ * Return rows that match the criteria.
+ */
+export const filterDataByTime = (data: DataCollectionData, mode: TimeFilterMode): DataRow[] => {
   if (mode === 'ALL') return data.rows;
 
   const dateCol = data.columns.find(c => ['date', 'auto:date', 'auto:date:yesterday'].includes(c.type));
@@ -232,7 +239,14 @@ export const filterDataByTime = (data: DataCollectionData, mode: 'ALL' | 'YEAR' 
   const now = new Date();
   const currentYear = now.getFullYear();
   const lastYear = currentYear - 1;
-  const targetYear = mode === 'YEAR' ? currentYear : lastYear;
+
+  // Calculate cutoff dates for relative ranges
+  const getCutoffDate = (monthsAgo: number) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - monthsAgo);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
 
   return data.rows.filter(row => {
     const val = row[dateCol.name];
@@ -241,6 +255,19 @@ export const filterDataByTime = (data: DataCollectionData, mode: 'ALL' | 'YEAR' 
     const d = new Date(String(val));
     if (isNaN(d.getTime())) return false;
 
-    return d.getFullYear() === targetYear;
+    if (mode === 'YTD') {
+      return d.getFullYear() === currentYear;
+    }
+    if (mode === 'LAST_YEAR') {
+      return d.getFullYear() === lastYear;
+    }
+    if (mode === 'LAST_6_MONTHS') {
+      return d >= getCutoffDate(6);
+    }
+    if (mode === 'LAST_12_MONTHS') {
+      return d >= getCutoffDate(12);
+    }
+
+    return true;
   });
 };
