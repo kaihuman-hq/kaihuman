@@ -10,6 +10,17 @@ import { ExternalLink, MessageSquare, Check, RefreshCw, Trash2, Plus, Rss, Bookm
 
 const logger = new Logger('RssWidget');
 
+// Debug Logging
+const useRenderLog = (name: string, props: any) => {
+  useEffect(() => {
+    logger.info(`[${name}] MOUNTED`);
+    return () => logger.info(`[${name}] UNMOUNTED`);
+  }, []);
+  useEffect(() => {
+    logger.info(`[${name}] RENDER`);
+  });
+};
+
 interface RssWidgetProps {
   content?: string;
   mode?: 'SMALL' | 'FOCUS';

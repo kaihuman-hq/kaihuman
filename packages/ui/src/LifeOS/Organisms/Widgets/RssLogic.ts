@@ -29,6 +29,9 @@ export const DEFAULT_RSS_CONFIG: RssConfig = {
 const logger = new Logger('RssLogic');
 
 export const parseRssConfig = (content: string): RssConfig => {
+  if (!content || !content.trim()) {
+    return DEFAULT_RSS_CONFIG;
+  }
   try {
     const parsed = JSON.parse(content);
     // Basic validation could go here
