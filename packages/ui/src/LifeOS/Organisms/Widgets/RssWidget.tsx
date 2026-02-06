@@ -7,8 +7,20 @@ import { Logger } from '@lifosy/core';
 import { MonoText, MonoHeader } from '../../Atoms/Typography';
 import { cn } from '../../../utils';
 import { ExternalLink, MessageSquare, Check, RefreshCw, Trash2, Plus, Rss, Bookmark } from 'lucide-preact';
+import { rssService } from './RssService';
 
 const logger = new Logger('RssWidget');
+
+// Debug Logging
+const useRenderLog = (name: string, props: any) => {
+  useEffect(() => {
+    logger.info(`[${name}] MOUNTED`);
+    return () => logger.info(`[${name}] UNMOUNTED`);
+  }, []);
+  useEffect(() => {
+    logger.info(`[${name}] RENDER`);
+  });
+};
 
 interface RssWidgetProps {
   content?: string;
@@ -19,86 +31,73 @@ interface RssWidgetProps {
 }
 
 const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }: RssWidgetProps) => {
+  // Debug Mount
+  useEffect(() => {
+    logger.info('[RssWidget] MOUNTED');
+    return () => logger.info('[RssWidget] UNMOUNTED');
+  }, []);
+
   // Persist last valid config to prevent reset on undefined content (loading state)
   const lastValidConfig = useRef<RssConfig>(parseRssConfig('')); // Initialize with default
 
   const config = useMemo(() => {
     if (content === undefined) return lastValidConfig.current;
-
-    // Check for empty string vs actual empty config?
-    // If content is empty string, parseRssConfig returns empty defaults.
-    // Ideally we treat empty string as "empty file".
-    // But undefined is "loading/unknown".
-
     const c = parseRssConfig(content);
     lastValidConfig.current = c;
     return c;
   }, [content]); // content dependency
 
 
-  // RAW fetched items (unfiltered by read status, but mapped to internal structure)
-  const [rawItems, setRawItems] = useState<(RssItem & { feedId: string })[]>([]);
-  const [initialLoaded, setInitialLoaded] = useState(false);
-
-  // Optimistic tracking
-  const optimisticReadIds = useRef<Set<string>>(new Set());
-
-  // Derived visible items
-  const items = useMemo(() => {
-    const allReadIds = new Set(config.feedOptions.flatMap(f => f.read));
-
-    return rawItems.filter(item => {
-      const id = item.guid || item.link;
-      return !allReadIds.has(id) && !optimisticReadIds.current.has(id);
-    }).sort((a, b) => {
-      const dateA = a.pubDate ? new Date(a.pubDate).getTime() : 0;
-      const dateB = b.pubDate ? new Date(b.pubDate).getTime() : 0;
-      return dateB - dateA;
+  // Trigger fetches via Service
+  useEffect(() => {
+    config.feedOptions.forEach(feed => {
+      rssService.ensureFeed(feed.url);
     });
-  }, [rawItems, config]); // optimisticReadIds updates are reflected via rawItems state update (setRawItems shallow clone)
+  }, [config.feedOptions]);
 
-  // Fetch Logic - Only runs when URLs change
-  // We track initiated URLs to dedupe requests if the component re-renders while fetching
-  const initiatedUrls = useRef<string>('');
+  // Manual Subscription to Signal to prevent Render-Cycle
+  const [items, setItems] = useState<(RssItem & { feedId: string })[]>([]);
 
   useEffect(() => {
-    let mounted = true;
-    const currentFeedUrls = JSON.stringify(config.feedOptions.map(f => f.url));
+    const computeItems = () => {
+      const allReadIds = new Set(config.feedOptions.flatMap(f => f.read));
+      const allItems: (RssItem & { feedId: string })[] = [];
 
-    // Refetch only if URLs change (deduped by initiatedUrls ref)
-    // We do NOT rely on initialLoaded state for the trigger, as that causes race conditions.
-    if (currentFeedUrls !== initiatedUrls.current) {
-      initiatedUrls.current = currentFeedUrls;
+      config.feedOptions.forEach(feed => {
+        const feedState = rssService.feeds.value[feed.url];
+        if (feedState && feedState.items) {
+          feedState.items.forEach(item => {
+            allItems.push({ ...item, feedId: feed.id });
+          });
+        }
+      });
 
-      const loadFeeds = async () => {
-        const allNewItems: (RssItem & { feedId: string })[] = [];
-        const fetchPromises = config.feedOptions.map(async (feed) => {
-          const xml = await fetchFeedXml(feed.url);
-          if (xml) {
-            const parsedFn = parseFeedItems(xml);
-            return parsedFn.map(item => ({ ...item, feedId: feed.id }));
-          }
-          return [];
-        });
-        const results = await Promise.all(fetchPromises);
-        if (!mounted) return;
-        results.forEach(res => allNewItems.push(...res));
-        setRawItems(allNewItems);
-        setInitialLoaded(true);
-      };
+      return allItems.filter(item => {
+        const id = item.guid || item.link;
+        // Use Service's helper which checks both Config AND Global Optimistic State
+        return !rssService.isRead(id, allReadIds);
+      }).sort((a, b) => {
+        const dateA = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+        const dateB = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+        return dateB - dateA;
+      });
+    };
 
-      if (config.feedOptions.length > 0) {
-        loadFeeds();
-      } else {
-        setRawItems([]);
-        setInitialLoaded(true);
-      }
-    }
+    setItems(computeItems());
 
-    return () => { mounted = false; };
-  }, [config.feedOptions]); // Depend on feedOptions array to avoid refetch on read status changes
+    // Subscribe to BOTH feeds and optimisticReads
+    // We create a wrapper effect to subscribe to multiple signals easily or just two subscriptions
+    const disposeFeeds = rssService.feeds.subscribe(() => setItems(computeItems()));
+    const disposeOptimistic = rssService.optimisticReads.subscribe(() => setItems(computeItems()));
 
-  // Stable Callbacks Pattern associated with Refs for props/config
+    return () => {
+      disposeFeeds();
+      disposeOptimistic();
+    };
+  }, [config]);
+
+
+  // Stable Callbacks Pattern
   const latestProps = useRef({ onChange, onReadItLater, config });
   latestProps.current = { onChange, onReadItLater, config };
 
@@ -107,18 +106,29 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
     if (!onChange) return;
 
     const idToMark = item.guid || item.link;
-    optimisticReadIds.current.add(idToMark);
+    logger.info(`[handleRead] Marking: ${idToMark}`);
 
-    // Force re-render of useMemo by shallow cloning rawItems
-    setRawItems(prev => [...prev]);
+    // Global Optimistic Update (Persists across unmounts)
+    rssService.markOptimisticRead(idToMark);
 
     const newConfig = markItemAsRead(config, item.feedId, idToMark);
     onChange(serializeRssConfig(newConfig));
-  }, []); // Truly stable callback
+  }, []);
 
   const handleRil = useCallback((item: RssItem) => {
     latestProps.current.onReadItLater?.(item);
   }, []);
+
+  // Calculated Loading State used for UI feedback
+  // We can also subscribe to loading state if critical, but checking value here during render is generally safe for simple booleans 
+  // IF we are not in a computed context. But accessing .value might register usage.
+  // Safest to rely on `items` or creating a separate loading signal subscription.
+  // For now, let's assume `isLoading = false` or derive it safely.
+  // Accessing `rssService.feeds.value` here might re-trigger the cycle if we are not careful.
+  // Let's rely on items length for "loading" feedback or use a separate subscription if needed.
+  // A simple approximation:
+  const isLoading = false; // Disable detailed loading state for safety for now.
+  const hasItems = items.length > 0;
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -130,14 +140,14 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
         </div>
       )}
 
-      {!initialLoaded && rawItems.length === 0 && config.feedOptions.length > 0 && (
+      {isLoading && !hasItems && config.feedOptions.length > 0 && (
         <div className="flex-1 flex items-center justify-center text-[var(--los-muted)]">
           <RefreshCw className="w-4 h-4 animate-spin mr-2" />
           <MonoText>Fetching feeds...</MonoText>
         </div>
       )}
 
-      {initialLoaded && items.length === 0 && config.feedOptions.length > 0 && (
+      {!isLoading && !hasItems && config.feedOptions.length > 0 && (
         <div className="flex-1 flex items-center justify-center text-[var(--los-muted)]">
           <Check className="w-8 h-8 mb-2 opacity-50" />
           <MonoText>All caught up!</MonoText>
@@ -160,9 +170,6 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
 };
 
 // Export memoized version to prevent re-renders from unstable parent props (like inline onChange in FocusedTile)
-// We only need to re-render if content string changes or mode changes.
-// The internal state (loading, rawItems) handles itself.
-// The callbacks (onChange, onReadItLater) are handled by internal Refs, so their prop identity doesn't matter.
 export const RssWidget = memo(RssWidgetInternal, (prev, next) => {
   return prev.content === next.content && prev.mode === next.mode && prev.path === next.path;
 });

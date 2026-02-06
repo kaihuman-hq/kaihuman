@@ -1,5 +1,6 @@
 import { ComponentChildren, h } from 'preact';
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
+import { memo } from 'preact/compat';
 import { SettingsView } from '../Organisms/SettingsView';
 import { AddToDashboardModal } from '../Organisms/AddToDashboardModal';
 
@@ -124,7 +125,7 @@ export interface MainAppProps {
   onLoadFolder?: (path: string) => Promise<TileDef[]>;
   githubToken?: string;
   onCheckPath?: (path: string) => Promise<'FILE' | 'FOLDER' | null> | 'FILE' | 'FOLDER' | null;
-  
+
   // Version info
   version?: {
     version: string;
@@ -1019,12 +1020,12 @@ export const MainApp = ({
               )
             ) : activeTile ? (
               // STATE B: FOCUSED TILE
-              <FocusedTile
+              <FocusedTileMemo
                 tile={activeTile}
                 onClose={() => {
                   // Fix 1.35: Navigation Return Flow - Check if tile is in Dashboard
                   // If so, strictly enforce Dashboard View (setShowFiles(false))
-                  const isDashboardTile = localConfig?.entries.some(e => e.path === activeTile.id);
+                  const isDashboardTile = localConfig?.entries.some(e => e.path === activeTile!.id);
                   if (isDashboardTile) {
                     setShowFiles(false);
                   }
@@ -1291,7 +1292,7 @@ abbreviations: undefined
   );
 };
 
-const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater, onAddToDashboard }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void, onAddToDashboard?: (path: string) => void }) => {
+const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater, onAddToDashboard }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void, onAddToDashboard?: (path: string) => void }) => {
   if (!tile) return null; // Guard against undefined tile
 
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
@@ -1304,6 +1305,7 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
   const isDataCollection = tile.extension === '.data-collection.csv';
   const isBudget = tile.extension === '.budget.csv';
   const isActionLog = tile.extension === '.actionlog.md';
+
 
   const isGenericCsv = tile.extension === '.csv' && !isTimeTracking && !isEvents && !isHabit && !isDataCollection && !isBudget;
   const isAnyCsv = tile.extension?.toLowerCase().endsWith('.csv'); // For enabling TABLE view on all CSVs
@@ -1823,10 +1825,23 @@ const FocusedTile = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, on
             )
           )}
         </div>
-      </div >
-    </div >
+      </div>
+    </div>
   );
 }
+
+// Memoize FocusedTile to prevent re-renders when MainApp updates but Tile content hasn't changed
+const FocusedTileMemo = memo(FocusedTileInternal, (prev, next) => {
+  // We only re-render if:
+  // 1. ID changes (different tile)
+  // 2. Content changes (data update)
+  // 3. Zen Mode changes (layout update)
+  const idEqual = prev.tile.id === next.tile.id;
+  const contentEqual = prev.tile.rawContent === next.tile.rawContent;
+  const zenEqual = prev.zenMode === next.zenMode;
+
+  return idEqual && contentEqual && zenEqual;
+});
 
 const TileContentStructure = ({ tile, renderTileContent }: { tile: TileDef, renderTileContent: any }) => (
   <div className="absolute inset-0 overflow-hidden p-4 flex flex-col pointer-events-none">

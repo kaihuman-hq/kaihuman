@@ -38,6 +38,7 @@ export default defineConfig({
         'clsx',
         'tailwind-merge',
         '@lifosy/core',
+        '@preact/signals',
       ],
       output: {
         globals: {
