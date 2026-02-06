@@ -13,6 +13,10 @@ on:
       - "apps/console/**"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+
 jobs:
   publish-lifosy:
     uses: ./.github/workflows/template-deploy-to-cloudflare.yaml
