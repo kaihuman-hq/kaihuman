@@ -29,6 +29,7 @@ export const App = () => {
       <ProtectedRoute path="/" component={Dashboard} />
       <ProtectedRoute path="/files" component={Dashboard} />
       <ProtectedRoute path="/files/:rest*" component={Dashboard} />
+      <ProtectedRoute path="/new" component={Dashboard} />
       <Route default component={NotFound} />
       {/* Editor and Settings are now tiles within Dashboard/MainApp if needed, or we can keep them accessbile via URL if desired, but User said "MainApp should use whole view port" */}
     </Router>

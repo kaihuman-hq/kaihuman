@@ -8,6 +8,7 @@ import { cn } from '../../utils';
 import { Tile } from '../Molecules/Tile';
 import { StatusBar } from '../Organisms/StatusBar';
 import { Editor } from '../Organisms/Editor';
+import { Editor as RealEditor } from '../../components/editor/Editor';
 import { MonoText, MonoHeader } from '../Atoms/Typography';
 import { MainGrid } from './MainGrid';
 import { MillerColumn } from '../Molecules/MillerColumn';
@@ -147,9 +148,12 @@ const parseUrlState = () => {
     return { showFiles: true, activeTileId: filePath, showNewFileWizard: false };
   }
   if (path === '/files') {
-    return { showFiles: true, activeTileId: null, showNewFileWizard: false };
+    return { showFiles: true, activeTileId: null, showNewFileWizard: false, showDumpMode: false };
   }
-  return { showFiles: false, activeTileId: null, showNewFileWizard: false };
+  if (path === '/new' || path === '/new/') {
+    return { showFiles: false, activeTileId: null, showNewFileWizard: false, showDumpMode: true };
+  }
+  return { showFiles: false, activeTileId: null, showNewFileWizard: false, showDumpMode: false };
 };
 
 export const MainApp = ({
@@ -228,6 +232,41 @@ export const MainApp = ({
   const [fileToMove, setFileToMove] = useState<string | null>(null);
   const [zenMode, setZenMode] = useState(false); // Zen Mode state
 
+  // Dump Mode State
+  const [showDumpMode, setShowDumpMode] = useState(() => parseUrlState().showDumpMode);
+  const [dumpContent, setDumpContent] = useState('');
+  const [dumpSaveProps, setDumpSaveProps] = useState<{
+    initialContent: string;
+    initialFilename: string;
+    initialFolder: string;
+    initialStep: 'LOCATION';
+  } | null>(null);
+
+  const handleDumpSave = (content: string) => {
+    const now = new Date();
+    // specific format: quicknote-YYYY-MM-DD-HH:mm.md
+    // We'll let NewFileWizard append extension ideally, or we provide full name?
+    // NewFileWizard usually takes a name without extension in the input, and adds extension.
+    // The format requested: quicknote-2025-11-13-16:35:31.md (approx)
+    // Actually the request said: "quicknote-2025-11-13-16:35:31.md"
+    // Let's format it nicely:
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}`; // Removed seconds to be cleaner or keep them? Request said yes.
+    // Using simple format safe for filenames
+    const filename = `quicknote-${timestamp}`;
+
+    const targetFolder = '.lifeos/quicknotes';
+
+    setDumpSaveProps({
+      initialContent: content,
+      initialFilename: filename,
+      initialFolder: targetFolder,
+      initialStep: 'LOCATION'
+    });
+    // Trigger New File Wizard
+    setShowNewFileWizard(true);
+  };
+
   // Store original config when entering Drag Mode for cancellation
   const [originalConfig, setOriginalConfig] = useState<DashboardConfig | undefined>(undefined);
 
@@ -241,7 +280,9 @@ export const MainApp = ({
   // Sync State -> URL
   useEffect(() => {
     let url = '/';
-    if (showNewFileWizard) {
+    if (showDumpMode) {
+      url = '/new';
+    } else if (showNewFileWizard) {
       url = '/files/new';
     } else if (activeTileId && typeof activeTileId === 'string') {
       // Split by slash and encode each segment to preserve structure
@@ -256,7 +297,7 @@ export const MainApp = ({
     if (window.location.pathname !== url) {
       window.history.pushState({}, '', url);
     }
-  }, [activeTileId, showFiles, showNewFileWizard]);
+  }, [activeTileId, showFiles, showNewFileWizard, showDumpMode]);
 
   // Sync URL -> State (Popstate) & Resolve Path (Deep Liking)
   // We need to resolve against fileSystem to know if it's a folder or file
@@ -357,6 +398,7 @@ export const MainApp = ({
         setActiveTileId(state.activeTileId);
         setShowFiles(state.showFiles);
         setShowNewFileWizard(state.showNewFileWizard);
+        setShowDumpMode(state.showDumpMode);
       }
     };
 
@@ -1053,7 +1095,7 @@ export const MainApp = ({
 
       {/* Desktop Navigation Overlays (Fix: JS-based hover state for guaranteed visibility) */}
       {(() => {
-        const shouldRender = !activeTileId && !showFiles && !showGraph && !showCommits && !zenMode && localConfig && localConfig.dashboards.length > 1;
+        const shouldRender = !activeTileId && !showFiles && !showGraph && !showCommits && !zenMode && !showDumpMode && localConfig && localConfig.dashboards.length > 1;
         if (localConfig) {
           // logger.debug('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: localConfig.dashboards.length, shouldRender, hoverNav });
         }
@@ -1116,18 +1158,56 @@ export const MainApp = ({
           </>
         )}
 
+      {/* Dump Mode Overlay */}
+      {showDumpMode && (
+        <div className="fixed inset-0 z-50 bg-[var(--los-bg)] animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b border-[var(--los-border)]">
+            <div className="flex items-center gap-2">
+              <FileText className="text-[var(--los-accent)]" size={20} />
+              <MonoHeader>QUICK DUMP</MonoHeader>
+            </div>
+            <button
+              onClick={() => {
+                setShowDumpMode(false);
+                window.history.pushState({}, '', '/');
+              }}
+              className="p-2 hover:bg-white/10 rounded-sm"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden p-4">
+            <RealEditor
+              content={dumpContent}
+              onChange={setDumpContent}
+              onSave={handleDumpSave}
+              className="h-full w-full"
+            />
+          </div>
+        </div>
+      )}
+
       {/* New File Wizard Overlay */}
       {showNewFileWizard && (
         <NewFileWizard
-          onClose={() => setShowNewFileWizard(false)}
+          onClose={() => {
+            setShowNewFileWizard(false);
+            setDumpSaveProps(null); // Reset dump props
+          }}
           onCreate={async (path, content) => {
             if (onCreateFile) await onCreateFile(path, content);
             setShowNewFileWizard(false); // Close wizard first
+            setDumpSaveProps(null);
             // Auto-open: switch to file view (navigate to folder)
             setShowFiles(true);
             // Focus the tile immediately (simulate click)
             setActiveTileId(path);
+
+            if (showDumpMode) {
+              setShowDumpMode(false);
+            }
           }}
+          {...dumpSaveProps}
           fileSystem={fileSystem as any}
           availableFolders={useMemo(() => {
             if (!localConfig) return [];
@@ -1180,6 +1260,7 @@ export const MainApp = ({
             if (dragEnabled) {
               // Show cancellation menu or just cancel?
             } else {
+              if (showDumpMode) setShowDumpMode(false);
               handleDashboardClick();
             }
           }}
@@ -1196,6 +1277,7 @@ export const MainApp = ({
             if (!dragEnabled && localConfig) {
               setActiveDashboardId(ws.id);
               setShowFiles(false); // Switch back to dashboard view
+              if (showDumpMode) setShowDumpMode(false);
             }
           }}
           onNextWorkspace={!dragEnabled && localConfig ? handleNextDashboard : undefined}
@@ -1230,6 +1312,7 @@ abbreviations: undefined
                 setShowFiles(true);
                 // Navigate to it
                 setActiveTileId(path);
+                if (showDumpMode) setShowDumpMode(false);
               }
             },
             {
@@ -1239,6 +1322,7 @@ abbreviations: undefined
                 setShowGraph(false);
                 setShowCommits(false);
                 setNotFound(false);
+                if (showDumpMode) setShowDumpMode(false);
               }
             },
             {
@@ -1246,10 +1330,10 @@ abbreviations: undefined
               // Fix 1.21: Add Search to Magic Menu (works on mobile)
               onClick: () => setShowSearch(true)
             },
-            { label: "Graph", onClick: () => setShowGraph(true) },
-            { label: "Commits", onClick: () => setShowCommits(true) },
-            { label: "Settings", onClick: () => setShowSettings(true) },
-            ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); } }] : []),
+            { label: "Graph", onClick: () => { setShowGraph(true); if (showDumpMode) setShowDumpMode(false); } },
+            { label: "Commits", onClick: () => { setShowCommits(true); if (showDumpMode) setShowDumpMode(false); } },
+            { label: "Settings", onClick: () => { setShowSettings(true); if (showDumpMode) setShowDumpMode(false); } },
+            ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); if (showDumpMode) setShowDumpMode(false); } }] : []),
             ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
           ]}
           recentFiles={!dragEnabled && localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
@@ -1265,6 +1349,7 @@ abbreviations: undefined
                   setShowFiles(false); // Switch to dashboard view
                   setActiveDashboardId(entry!.dashboard);
                   setActiveTileId(entry!.path);
+                  if (showDumpMode) setShowDumpMode(false);
                 } else {
                   // Scenario 2: File is NOT on any dashboard (accessed via File Tree)
                   // We switch to "Files" mode (Miller Columns) and try to navigate to it.
@@ -1280,6 +1365,7 @@ abbreviations: undefined
                   }
                   // Also set active tile locally so it focuses if rendered
                   setActiveTileId(path);
+                  if (showDumpMode) setShowDumpMode(false);
                 }
               }
             }
