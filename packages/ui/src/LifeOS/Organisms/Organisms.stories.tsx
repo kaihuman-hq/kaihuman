@@ -26,6 +26,17 @@ export const StatusBarComponent: StoryObj = {
           { label: "CPU", value: "12%" },
           { label: "MEM", value: "1.2GB" }
         ]}
+        version={{
+          version: "0.1.1",
+          buildTime: "2026-02-06T09:41:30.219Z",
+          gitHash: "f6eaefc",
+          full: "v0.1.1-f6eaefc"
+        }}
+        menuItems={[
+          { label: "New File" },
+          { label: "Search" },
+          { label: "Settings" }
+        ]}
       />
     </div>
   )
