@@ -1,18 +1,20 @@
+import { authStore, githubFileStore, githubProfileStore, Logger } from '@lifosy/core';
+import { effect, useSignal } from '@preact/signals';
 import { h } from 'preact';
-import { useEffect, useState, useCallback } from 'preact/hooks';
-import { useSignal, effect } from '@preact/signals';
-import { githubFileStore, githubProfileStore, authStore, Logger } from '@lifosy/core';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 
 const logger = new Logger('Dashboard');
+
 import {
+  DEFAULT_CONFIG as DEFAULT_RIL_CONFIG,
   MainApp,
-  TileDef,
-  RepositorySelector,
   parseReadItLater,
+  RepositorySelector,
   serializeReadItLater,
-  DEFAULT_CONFIG as DEFAULT_RIL_CONFIG
+  type TileDef,
 } from '@lifosy/ui';
 import { FileViewer } from '../components/FileViewer';
+import { VERSION } from '../version';
 
 export const Dashboard = () => {
   const repo = githubProfileStore.currentRepo.value;
@@ -48,10 +50,14 @@ export const Dashboard = () => {
 
   // 3. Helper to update local columns state immediately
   const updateLocalTileContent = (path: string, content: string) => {
-    setColumns(prev => prev.map(col => ({
-      ...col,
-      items: col.items.map(item => item.id === path ? { ...item, rawContent: content } : item)
-    })));
+    setColumns((prev) =>
+      prev.map((col) => ({
+        ...col,
+        items: col.items.map((item) =>
+          item.id === path ? { ...item, rawContent: content } : item,
+        ),
+      })),
+    );
   };
 
   // 4. Helper to get children for a given path prefix
@@ -65,15 +71,17 @@ export const Dashboard = () => {
     // Root = ""
     // Sub = "folder/"
 
-    const items = currentTree.filter(item => {
+    const items = currentTree.filter((item) => {
       if (!prefix) {
         // Root items: no slashes in path
         return !item.path.includes('/');
       }
       // Children: must start with prefix, and have NO extra slashes after the prefix
-      return item.path.startsWith(prefix) &&
+      return (
+        item.path.startsWith(prefix) &&
         item.path.slice(prefix.length).split('/').length === 1 &&
-        item.path !== prefix; // Should not include self if listed
+        item.path !== prefix
+      ); // Should not include self if listed
     });
 
     // Sort: Folders first
@@ -83,7 +91,7 @@ export const Dashboard = () => {
       return a.path.localeCompare(b.path);
     });
 
-    return items.map(item => {
+    return items.map((item) => {
       const isTimeTracking = item.path.toLowerCase().endsWith('.timetracking.csv');
       const isEvents = item.path.toLowerCase().endsWith('.events.csv');
       const isHabit = item.path.toLowerCase().endsWith('.habit.csv');
@@ -99,11 +107,20 @@ export const Dashboard = () => {
         id: item.path, // Use path as ID for simplicity
         title: item.path.split('/').pop() || item.path,
         type: item.type === 'tree' ? 'FOLDER' : 'FILE',
-        content: null // Will be set below
+        content: null, // Will be set below
       };
 
       // Widget Handling Logic
-      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss || isReadItLater || isBudget || isActionLog || isDataCollection;
+      const isWidget =
+        isTimeTracking ||
+        isEvents ||
+        isHabit ||
+        isTimezones ||
+        isRss ||
+        isReadItLater ||
+        isBudget ||
+        isActionLog ||
+        isDataCollection;
 
       if (item.type === 'tree') {
         tile.content = <div className="p-8 text-nexus-muted">Select a file from this folder.</div>;
@@ -113,9 +130,11 @@ export const Dashboard = () => {
         tile.content = undefined;
       } else {
         // For non-widgets, show the fallback message
-        tile.content = <div className="p-8 text-nexus-muted flex items-center justify-center h-full text-center">
-          No widget available for this file extension
-        </div>;
+        tile.content = (
+          <div className="p-8 text-nexus-muted flex items-center justify-center h-full text-center">
+            No widget available for this file extension
+          </div>
+        );
       }
 
       if (isTimeTracking) {
@@ -245,16 +264,16 @@ export const Dashboard = () => {
   // 4. Update ROOT column when tree OR openFiles changes (to re-render widgets)
   useEffect(() => {
     if (tree.length > 0) {
-      setColumns(prev => {
+      setColumns((prev) => {
         // If this is the FIRST load:
         if (prev.length === 0) {
-          return [{ items: getChildren(""), activeId: null }];
+          return [{ items: getChildren(''), activeId: null }];
         }
 
         // If we have previous columns, we want to Refresh the items in them
         // preserving the navigation path.
         return prev.map((col, idx) => {
-          let prefix = "";
+          let prefix = '';
           if (idx > 0) {
             const parentCol = prev[idx - 1];
             if (parentCol?.activeId) prefix = `${parentCol.activeId}/`;
@@ -263,7 +282,7 @@ export const Dashboard = () => {
 
           return {
             ...col,
-            items: getChildren(prefix)
+            items: getChildren(prefix),
           };
         });
       });
@@ -277,17 +296,19 @@ export const Dashboard = () => {
 
   useEffect(() => {
     // Check if config exists in tree
-    const configItem = tree.find(item => item.path === CONFIG_PATH);
+    const configItem = tree.find((item) => item.path === CONFIG_PATH);
     if (configItem) {
       logger.debug(`Found config: ${CONFIG_PATH}`);
       if (!openFiles || !openFiles[CONFIG_PATH]) {
-        if (openFiles) // ensure openFiles loaded
+        if (openFiles)
+          // ensure openFiles loaded
           githubFileStore.openFile(CONFIG_PATH);
       } else {
         // Parse it
         try {
           const content = openFiles[CONFIG_PATH].content;
-          if (content) { // Ensure content is loaded
+          if (content) {
+            // Ensure content is loaded
             const parsed = JSON.parse(content);
             setRemoteConfig(parsed);
           }
@@ -344,8 +365,8 @@ export const Dashboard = () => {
           ...newConfig,
           files: {
             ...newConfig.files,
-            recentlyOpened: updatedRecent
-          }
+            recentlyOpened: updatedRecent,
+          },
         };
 
         const newContent = JSON.stringify(updatedConfig, null, 2);
@@ -368,11 +389,11 @@ export const Dashboard = () => {
     const parts = path.split('/'); // e.g. ["folder", "sub", "file.txt"] or ["file.txt"]
 
     // 1. Root Column
-    const rootChildren = getChildren("");
+    const rootChildren = getChildren('');
 
     // Determine active ID for root
-    const rootActiveId = (parts.length > 1 ? parts[0] : path) || "";
-    const rootHasItem = rootChildren.some(i => i.id === rootActiveId);
+    const rootActiveId = (parts.length > 1 ? parts[0] : path) || '';
+    const rootHasItem = rootChildren.some((i) => i.id === rootActiveId);
 
     // If root item doesn't exist (e.g. invalid path), fallback to just root
     if (!rootHasItem) {
@@ -386,19 +407,19 @@ export const Dashboard = () => {
     let currentPath = parts[0];
     for (let i = 1; i < parts.length; i++) {
       // Get children of the container (currentPath)
-      const children = getChildren(currentPath + "/");
+      const children = getChildren(currentPath + '/');
 
       // Determine active ID for this column
-      let activeId = "";
+      let activeId = '';
       if (i === parts.length - 1) {
         activeId = path;
       } else {
-        activeId = currentPath + "/" + parts[i];
+        activeId = currentPath + '/' + parts[i];
       }
 
       // Verify existence logic could be added here, but assuming path is valid for now
       newColumns.push({ items: children, activeId });
-      currentPath += "/" + parts[i];
+      currentPath += '/' + parts[i];
     }
 
     setColumns(newColumns);
@@ -407,7 +428,7 @@ export const Dashboard = () => {
   // 8. Navigation Handler (Miller Mode)
   const handleNavigate = (item: TileDef) => {
     // Check if item is already in columns
-    const colIndex = columns.findIndex(col => col.items.some(i => i.id === item.id));
+    const colIndex = columns.findIndex((col) => col.items.some((i) => i.id === item.id));
 
     if (colIndex === -1) {
       // Item NOT found in current view (e.g. from Recent Files deep link)
@@ -446,22 +467,25 @@ export const Dashboard = () => {
 
   const handleDashboardClick = () => {
     // Reset to root
-    setColumns([{ items: getChildren(""), activeId: null }]);
+    setColumns([{ items: getChildren(''), activeId: null }]);
   };
-
 
   if (!repo && repos.length === 0) {
     // Loading state or critical error if no repos
-    return <div className="h-screen flex items-center justify-center text-nexus-muted">Loading LifeOS...</div>;
+    return (
+      <div className="h-screen flex items-center justify-center text-nexus-muted">
+        Loading LifeOS...
+      </div>
+    );
   }
 
   // 0. Welcome Screen / Initial Repo Selection
   if (!repo && repos.length > 0) {
     return (
       <RepositorySelector
-        repositories={repos.map(r => ({ ...r, id: String(r.id) }))}
+        repositories={repos.map((r) => ({ ...r, id: String(r.id) }))}
         onSelect={(r) => {
-          const found = repos.find(x => String(x.id) === r.id);
+          const found = repos.find((x) => String(x.id) === r.id);
           if (found) githubProfileStore.selectRepo(found);
         }}
         isLoading={false}
@@ -472,8 +496,8 @@ export const Dashboard = () => {
   // Preapare File Contents Map for Grid Mode
   const gridFileContents: Record<string, string> = {};
   if (remoteConfig && openFiles) {
-    Object.keys(openFiles).forEach(path => {
-      gridFileContents[path] = openFiles[path]?.content || "";
+    Object.keys(openFiles).forEach((path) => {
+      gridFileContents[path] = openFiles[path]?.content || '';
     });
   }
 
@@ -483,8 +507,9 @@ export const Dashboard = () => {
         // File System Props (Always pass so we can switch to "Files" view)
         fileSystem={{ columns }}
         onItemClick={handleNavigate}
-        onNavigate={(path) => { if (path.length === 0) handleDashboardClick(); }}
-
+        onNavigate={(path) => {
+          if (path.length === 0) handleDashboardClick();
+        }}
         // Remote Config Props
         config={remoteConfig || undefined}
         fileContents={gridFileContents}
@@ -493,19 +518,35 @@ export const Dashboard = () => {
           githubFileStore.updateFileContent(CONFIG_PATH, content);
           githubFileStore.saveFile(CONFIG_PATH);
         }}
-
         // Repo Props
-        currentRepository={repo ? { id: String(repo.id), name: repo.full_name, branch: repo.default_branch } : undefined}
-        repositories={repos.map(r => ({ id: String(r.id), name: r.full_name, branch: r.default_branch }))}
+        currentRepository={
+          repo
+            ? { id: String(repo.id), name: repo.full_name, branch: repo.default_branch }
+            : undefined
+        }
+        repositories={repos.map((r) => ({
+          id: String(r.id),
+          name: r.full_name,
+          branch: r.default_branch,
+        }))}
         onSelectRepository={(r) => {
-          const found = repos.find(x => String(x.id) === r.id);
+          const found = repos.find((x) => String(x.id) === r.id);
           if (found) githubProfileStore.selectRepo(found);
         }}
-
         // Grid Mode Editors / Content
         renderFile={useCallback((path: string) => {
           const lowerPath = path.toLowerCase();
-          const isWidget = lowerPath.endsWith('.timetracking.csv') || lowerPath.endsWith('.events.csv') || lowerPath.endsWith('.habit.csv') || lowerPath.endsWith('.todos.md') || lowerPath.endsWith('.timezones.json') || lowerPath.endsWith('.rss.json') || lowerPath.endsWith('.readitlater.json') || lowerPath.endsWith('.budget.csv') || lowerPath.endsWith('.actionlog.md') || lowerPath.endsWith('.data-collection.csv');
+          const isWidget =
+            lowerPath.endsWith('.timetracking.csv') ||
+            lowerPath.endsWith('.events.csv') ||
+            lowerPath.endsWith('.habit.csv') ||
+            lowerPath.endsWith('.todos.md') ||
+            lowerPath.endsWith('.timezones.json') ||
+            lowerPath.endsWith('.rss.json') ||
+            lowerPath.endsWith('.readitlater.json') ||
+            lowerPath.endsWith('.budget.csv') ||
+            lowerPath.endsWith('.actionlog.md') ||
+            lowerPath.endsWith('.data-collection.csv');
           if (isWidget) return <FileViewer key={path} path={path} />;
 
           return (
@@ -518,13 +559,18 @@ export const Dashboard = () => {
           githubFileStore.updateFileContent(path, newContent);
           githubFileStore.saveFile(path);
         }, [])}
-        renderEditor={useCallback((path: string, zenMode?: boolean) => <FileViewer key={path} path={path} zenMode={zenMode} />, [])}
+        renderEditor={useCallback(
+          (path: string, zenMode?: boolean) => (
+            <FileViewer key={path} path={path} zenMode={zenMode} />
+          ),
+          [],
+        )}
         onAddToReadItLater={async (item) => {
           const rilPath = '.lifeos/.readitlater.json';
           logger.debug('ReadItLater Handler triggered for:', item);
           try {
             // 1. Check existence in Tree (Source of Truth)
-            let fileExists = githubFileStore.tree.value.some(t => t.path === rilPath);
+            let fileExists = githubFileStore.tree.value.some((t) => t.path === rilPath);
             logger.debug(`File exists in tree? ${fileExists}`);
 
             // 2. Load Content if it exists
@@ -535,7 +581,7 @@ export const Dashboard = () => {
                   await githubFileStore.openFile(rilPath);
                   logger.debug('File opened successfully');
                 } catch (e) {
-                  logger.error("Failed to open existing file", e);
+                  logger.error('Failed to open existing file', e);
                   fileExists = false; // Fallback to create?
                 }
               } else {
@@ -558,7 +604,7 @@ export const Dashboard = () => {
             }
 
             // 4. Update Data
-            const isDuplicate = config.items && config.items.some(i => i.url === item.url);
+            const isDuplicate = config.items && config.items.some((i) => i.url === item.url);
             if (isDuplicate) {
               logger.info(`Item already exists (Duplicate): ${item.url}`);
               // Force UI update anyway just to be sure visual state matches
@@ -573,26 +619,26 @@ export const Dashboard = () => {
 
             // 5. Persist
             if (fileExists && file) {
-              logger.debug("Updating existing file via updateFileContent");
+              logger.debug('Updating existing file via updateFileContent');
               githubFileStore.updateFileContent(rilPath, newContent);
               await githubFileStore.saveFile(rilPath);
             } else {
-              logger.info("Creating new file via createFile");
+              logger.info('Creating new file via createFile');
               try {
                 await githubFileStore.createFile(rilPath, newContent);
-                logger.info("createFile success");
+                logger.info('createFile success');
               } catch (e: any) {
-                logger.warn("createFile failed:", e);
+                logger.warn('createFile failed:', e);
                 if (e.message && e.message.includes('already exists')) {
-                  logger.warn("File actually exists, attempting fallback update.");
+                  logger.warn('File actually exists, attempting fallback update.');
 
                   // Fallback: Ensure it is "open" locally so updateFileContent doesn't bail
                   if (!githubFileStore.openFiles.value[rilPath]) {
-                    logger.debug("Fallback: Injecting into openFiles before update");
+                    logger.debug('Fallback: Injecting into openFiles before update');
                     // Manually inject so updateFileContent doesn't bail
                     githubFileStore.openFiles.value = {
                       ...githubFileStore.openFiles.value,
-                      [rilPath]: { content: newContent, sha: '' } // Optimistic
+                      [rilPath]: { content: newContent, sha: '' }, // Optimistic
                     };
                   }
 
@@ -605,9 +651,8 @@ export const Dashboard = () => {
             }
 
             // 6. Force UI Update
-            logger.debug("Triggering updateLocalTileContent");
+            logger.debug('Triggering updateLocalTileContent');
             updateLocalTileContent(rilPath, newContent);
-
           } catch (error) {
             logger.error('CRITICAL failure:', error);
           }
@@ -618,7 +663,6 @@ export const Dashboard = () => {
             await githubFileStore.openFile(path);
 
             navigateToPath(path);
-
           } catch (e) {
             logger.error('Failed to create file:', e);
           }
@@ -634,7 +678,7 @@ export const Dashboard = () => {
         onMoveFile={useCallback(async (path: string, newPath: string) => {
           await githubFileStore.renameFile(path, newPath);
         }, [])}
-        existingFiles={tree ? tree.map(t => t.path) : []}
+        existingFiles={tree ? tree.map((t) => t.path) : []}
         onLoadFolder={async (path: string) => {
           const prefix = path ? (path.endsWith('/') ? path : `${path}/`) : '';
           return getChildren(prefix);
@@ -645,7 +689,7 @@ export const Dashboard = () => {
           const currentTree = githubFileStore.tree.value;
           if (!currentTree) return null;
 
-          const found = currentTree.find(item => item.path === path);
+          const found = currentTree.find((item) => item.path === path);
           if (found) {
             return found.type === 'tree' ? 'FOLDER' : 'FILE';
           }
@@ -654,8 +698,8 @@ export const Dashboard = () => {
           // Actually tree usually has folders without trailing slash.
           return null;
         }}
+        version={VERSION}
       />
     </div>
   );
 };
-

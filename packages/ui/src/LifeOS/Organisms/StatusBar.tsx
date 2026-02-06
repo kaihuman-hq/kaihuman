@@ -42,6 +42,14 @@ export interface StatusBarProps {
   onDashboardClick?: () => void;
   menuItems?: MenuItem[];
   recentFiles?: MenuItem[];
+  
+  // Version info
+  version?: {
+    version: string;
+    buildTime: string;
+    gitHash?: string;
+    full?: string;
+  };
 }
 
 export const StatusBar = ({
@@ -60,7 +68,8 @@ export const StatusBar = ({
 
   onDashboardClick,
   menuItems,
-  recentFiles
+  recentFiles,
+  version
 }: StatusBarProps) => {
   const [expanded, setExpanded] = useState(false);
   const [expandedMode, setExpandedMode] = useState<'MENU' | 'REPOS' | 'WORKSPACES'>('MENU');
@@ -375,6 +384,20 @@ export const StatusBar = ({
 
           {/* RIGHT COLUMN */}
           <div className="flex-1 flex items-center justify-end gap-6 min-w-0">
+            {/* Version Info - Shows on hover/expand */}
+            {version && (
+              <div 
+                className={cn(
+                  "hidden md:flex items-center gap-2 whitespace-nowrap relative group/version transition-all duration-300",
+                  (isHovered || expanded) ? "opacity-100" : "opacity-0"
+                )}
+                title={`Build: ${version.buildTime}${version.gitHash ? `\nCommit: ${version.gitHash}` : ''}`}
+              >
+                <MonoLabel className="text-[9px]">VERSION</MonoLabel>
+                <MonoText className="text-[10px] text-[var(--los-muted)]">{version.version}</MonoText>
+              </div>
+            )}
+            
             {/* Stats hidden on small screens */}
             {stats.map((stat, i) => (
               <div key={i} className="hidden md:flex items-center gap-2 whitespace-nowrap relative group/stat">

@@ -1,41 +1,50 @@
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { markdown } from '@codemirror/lang-markdown';
+import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
+import { Compartment, EditorState } from '@codemirror/state';
+import { oneDark } from '@codemirror/theme-one-dark';
+import { EditorView, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view';
 import { githubFileStore, githubProfileStore, Logger } from '@lifosy/core';
 import { useSignalEffect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { EditorState, Compartment } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { markdown } from '@codemirror/lang-markdown';
-import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
-import { oneDark } from '@codemirror/theme-one-dark';
 
 const logger = new Logger('CodeMirrorEditor');
 
 // Theme customization to match Nexus
-const nexusTheme = EditorView.theme({
-  "&": {
-    height: "100%",
-    backgroundColor: "transparent",
-    color: "#e2e8f0" // text-nexus-text (slate-200 approx)
+const nexusTheme = EditorView.theme(
+  {
+    '&': {
+      height: '100%',
+      backgroundColor: 'transparent',
+      color: '#e2e8f0', // text-nexus-text (slate-200 approx)
+    },
+    '.cm-content': {
+      caretColor: '#38bdf8', // nexus-primary (sky-400)
+      fontFamily: 'JetBrains Mono, monospace', // Ensure mono font
+    },
+    '.cm-gutters': {
+      backgroundColor: 'transparent',
+      color: '#475569', // nexus-muted (slate-600)
+      border: 'none',
+    },
+    '.cm-activeLineGutter': {
+      backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    },
+    '.cm-activeLine': {
+      backgroundColor: 'rgba(56, 189, 248, 0.05)',
+    },
   },
-  ".cm-content": {
-    caretColor: "#38bdf8", // nexus-primary (sky-400)
-    fontFamily: "JetBrains Mono, monospace" // Ensure mono font
-  },
-  ".cm-gutters": {
-    backgroundColor: "transparent",
-    color: "#475569", // nexus-muted (slate-600)
-    border: "none"
-  },
-  ".cm-activeLineGutter": {
-    backgroundColor: "rgba(56, 189, 248, 0.1)"
-  },
-  ".cm-activeLine": {
-    backgroundColor: "rgba(56, 189, 248, 0.05)"
-  }
-}, { dark: true });
+  { dark: true },
+);
 
-export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, zenMode?: boolean }) => {
+export const CodeMirrorEditor = ({
+  path: propsPath,
+  zenMode,
+}: {
+  path?: string;
+  zenMode?: boolean;
+}) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -65,33 +74,39 @@ export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, 
 
   // Auto-save interval (2 minutes)
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      if (hasUnsavedChanges && !isSaving) {
-        logger.debug('Auto-saving...');
-        handleSave();
-      }
-    }, 2 * 60 * 1000); // 2 minutes
+    const intervalId = setInterval(
+      () => {
+        if (hasUnsavedChanges && !isSaving) {
+          logger.debug('Auto-saving...');
+          handleSave();
+        }
+      },
+      2 * 60 * 1000,
+    ); // 2 minutes
 
     return () => clearInterval(intervalId);
-  }, [hasUnsavedChanges, isSaving]); // Re-create interval if status changes? No, closure captures state? 
+  }, [hasUnsavedChanges, isSaving]); // Re-create interval if status changes? No, closure captures state?
   // Actually, intervals with closures can be tricky.
   // Better to use ref for state or functional update, or just depend on [hasUnsavedChanges] (which resets timer on change - acceptable or not?)
   // Resetting timer on every keystroke (hasUnsavedChanges true->true) is not ideal if we want strict "every 2 min".
   // But if we toggle false->true (first change), timer starts.
   // If we toggle true->false (save), timer stops.
-  // This essentially means "Auto-save 2 mins after the FIRST change". 
+  // This essentially means "Auto-save 2 mins after the FIRST change".
   // If I want "Check every 2 mins", I should start interval on mount and use Ref for checking state.
 
   const stateRef = useRef({ hasUnsavedChanges, isSaving });
   stateRef.current = { hasUnsavedChanges, isSaving };
 
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      if (stateRef.current.hasUnsavedChanges && !stateRef.current.isSaving) {
-        logger.debug('Auto-saving...');
-        handleSave();
-      }
-    }, 2 * 60 * 1000);
+    const intervalId = setInterval(
+      () => {
+        if (stateRef.current.hasUnsavedChanges && !stateRef.current.isSaving) {
+          logger.debug('Auto-saving...');
+          handleSave();
+        }
+      },
+      2 * 60 * 1000,
+    );
 
     return () => clearInterval(intervalId);
   }, []); // Run once on mount
@@ -121,12 +136,12 @@ export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, 
           ...searchKeymap,
           // Save command
           {
-            key: "Mod-s",
+            key: 'Mod-s',
             run: (view) => {
               handleSave();
               return true;
-            }
-          }
+            },
+          },
         ]),
         markdown(),
         syntaxHighlighting(defaultHighlightStyle),
@@ -144,13 +159,13 @@ export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, 
           }
         }),
         // Conditional line wrapping for markdown
-        (initialPath?.endsWith('.md') ? EditorView.lineWrapping : [])
-      ]
+        initialPath?.endsWith('.md') ? EditorView.lineWrapping : [],
+      ],
     });
 
     const view = new EditorView({
       state: startState,
-      parent: parentRef.current
+      parent: parentRef.current,
     });
 
     viewRef.current = view;
@@ -167,32 +182,37 @@ export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, 
   useEffect(() => {
     if (viewRef.current) {
       // Define Zen Theme override
-      const zenTheme = EditorView.theme({
-        "&": {
-          backgroundColor: "#0c0a09 !important", // Force overrides
-          color: "#a8a29e",
+      const zenTheme = EditorView.theme(
+        {
+          '&': {
+            backgroundColor: '#0c0a09 !important', // Force overrides
+            color: '#a8a29e',
+          },
+          '.cm-scroller': {
+            backgroundColor: 'inherit !important',
+          },
+          '.cm-gutters': {
+            backgroundColor: '#0c0a09 !important', // Match gutter specifically
+            color: '#44403c', // Dimmed gutter text
+          },
+          '.cm-activeLine': {
+            backgroundColor: 'rgba(56, 189, 248, 0.08) !important',
+            backdropFilter: 'brightness(1.5)',
+          },
+          '.cm-content': {
+            fontFamily: 'JetBrains Mono, monospace',
+          },
+          '.cm-cursor': {
+            borderLeftColor: '#38bdf8',
+          },
         },
-        ".cm-scroller": {
-          backgroundColor: "inherit !important"
-        },
-        ".cm-gutters": {
-          backgroundColor: "#0c0a09 !important", // Match gutter specifically
-          color: "#44403c" // Dimmed gutter text
-        },
-        ".cm-activeLine": {
-          backgroundColor: "rgba(56, 189, 248, 0.08) !important",
-          backdropFilter: "brightness(1.5)"
-        },
-        ".cm-content": {
-          fontFamily: "JetBrains Mono, monospace"
-        },
-        ".cm-cursor": {
-          borderLeftColor: "#38bdf8"
-        }
-      }, { dark: true });
+        { dark: true },
+      );
 
       viewRef.current.dispatch({
-        effects: themeCompartment.current.reconfigure(zenMode ? [nexusTheme, zenTheme] : nexusTheme)
+        effects: themeCompartment.current.reconfigure(
+          zenMode ? [nexusTheme, zenTheme] : nexusTheme,
+        ),
       });
     }
   }, [zenMode]);
@@ -202,7 +222,9 @@ export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, 
     const effectivePath = propsPath || githubFileStore.activeFile.value;
 
     // Get content from OPEN files map directly
-    const content = effectivePath ? (githubFileStore.openFiles.value[effectivePath]?.content || '') : '';
+    const content = effectivePath
+      ? githubFileStore.openFiles.value[effectivePath]?.content || ''
+      : '';
 
     const view = viewRef.current;
 
@@ -214,19 +236,19 @@ export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, 
       const currentDoc = view.state.doc.toString();
       if (content !== currentDoc) {
         view.dispatch({
-          changes: { from: 0, to: currentDoc.length, insert: content || '' }
+          changes: { from: 0, to: currentDoc.length, insert: content || '' },
         });
         // New file loaded -> clean state
         setHasUnsavedChanges(false);
       }
     } else {
-      // Path is same. 
+      // Path is same.
       // If content matches doc, we are good.
       // If content differs, it means external update (e.g. pull).
       const doc = view.state.doc.toString();
       if (content !== doc && content !== null) {
         view.dispatch({
-          changes: { from: 0, to: doc.length, insert: content }
+          changes: { from: 0, to: doc.length, insert: content },
         });
         // External update -> Reset dirty? Or keep dirty if we had changes?
         // Usually external update overwrites, so we are now "in sync" with that version (but maybe that version is unsaved?)
@@ -249,7 +271,9 @@ export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, 
       <div ref={parentRef} class="h-full w-full overflow-hidden" />
 
       {/* Save Button Overlay */}
-      <div className={`absolute top-4 right-8 transition-opacity duration-300 ${hasUnsavedChanges ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <div
+        className={`absolute top-4 right-8 transition-opacity duration-300 ${hasUnsavedChanges ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+      >
         <button
           onClick={handleSave}
           disabled={isSaving}
@@ -261,7 +285,7 @@ export const CodeMirrorEditor = ({ path: propsPath, zenMode }: { path?: string, 
               SAVING...
             </>
           ) : (
-            "SAVE CHANGES"
+            'SAVE CHANGES'
           )}
         </button>
       </div>

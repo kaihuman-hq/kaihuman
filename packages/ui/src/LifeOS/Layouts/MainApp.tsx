@@ -124,6 +124,14 @@ export interface MainAppProps {
   onLoadFolder?: (path: string) => Promise<TileDef[]>;
   githubToken?: string;
   onCheckPath?: (path: string) => Promise<'FILE' | 'FOLDER' | null> | 'FILE' | 'FOLDER' | null;
+  
+  // Version info
+  version?: {
+    version: string;
+    buildTime: string;
+    gitHash?: string;
+    full?: string;
+  };
 }
 
 // Helper to parse URL into state
@@ -1276,6 +1284,7 @@ abbreviations: undefined
             }
           })) : []
           }
+          version={props.version}
         />
       )}
     </div>
