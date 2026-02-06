@@ -1111,7 +1111,7 @@ export const MainApp = ({
                 handlePrevDashboard();
               }}
               title="Previous Workspace"
-              className="hidden md:flex absolute top-0 left-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-start pl-4 cursor-pointer select-none"
+              className="hidden md:flex absolute top-0 left-0 bottom-8 w-24 z-[50] pointer-events-auto items-center justify-start pl-4 cursor-pointer select-none"
             >
               {/* Visual Container (Gradient & Icon) */}
               <div className={cn(
@@ -1138,7 +1138,7 @@ export const MainApp = ({
                 handleNextDashboard();
               }}
               title="Next Workspace"
-              className="hidden md:flex absolute top-0 right-0 bottom-8 w-24 z-[999] pointer-events-auto items-center justify-end pr-4 cursor-pointer select-none"
+              className="hidden md:flex absolute top-0 right-0 bottom-8 w-24 z-[50] pointer-events-auto items-center justify-end pr-4 cursor-pointer select-none"
             >
               {/* Visual Container (Gradient & Icon) */}
               <div className={cn(
@@ -1280,7 +1280,10 @@ export const MainApp = ({
               if (showDumpMode) setShowDumpMode(false);
             }
           }}
-          onNextWorkspace={!dragEnabled && localConfig ? handleNextDashboard : undefined}
+          onNextWorkspace={!dragEnabled && localConfig ? () => {
+            if (showDumpMode) setShowDumpMode(false);
+            handleNextDashboard();
+          } : undefined}
 
           menuItems={dragEnabled ? [
             { label: "Save Order", onClick: handleDragSave },
