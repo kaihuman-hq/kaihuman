@@ -1,6 +1,6 @@
 
 import { h, Fragment } from 'preact';
-import { useState, useMemo } from 'preact/hooks';
+import { useState, useMemo, useEffect } from 'preact/hooks';
 import { parseReadItLater, serializeReadItLater, markAsRead, markAsNew, deleteItem, deleteAllRead, ReadItLaterItem } from './ReadItLaterLogic';
 import { MonoText, MonoHeader } from '../../Atoms/Typography';
 import { cn } from '../../../utils';
@@ -13,30 +13,66 @@ interface ReadItLaterWidgetProps {
   onChange?: (newContent: string) => void;
 }
 
+import { readItLaterService } from './ReadItLaterService';
+
 export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET', onChange }: ReadItLaterWidgetProps) => {
   const config = useMemo(() => parseReadItLater(content), [content]);
 
-  const sortedItems = useMemo(() => {
-    return [...config.items].sort((a, b) => b.createdAt - a.createdAt);
-  }, [config.items]);
+  // Manual subscription to optimistic changes
+  const [optimisticChanges, setOptimisticChanges] = useState(readItLaterService.optimisticChanges.value);
 
-  const newItems = sortedItems.filter(i => i.status === 'new');
-  const readItems = sortedItems.filter(i => i.status === 'read');
+  useEffect(() => {
+    setOptimisticChanges(readItLaterService.optimisticChanges.value);
+    return readItLaterService.optimisticChanges.subscribe(val => {
+      setOptimisticChanges(val);
+    });
+  }, []);
+
+  const mergedItems = useMemo(() => {
+    // Merge persistent config with optimistic changes
+    let items = [...config.items];
+
+    // Apply Optimistic Overrides
+    items = items.map(item => {
+      const change = optimisticChanges[item.id];
+      if (!change) return item;
+
+      // If deleted, filter out later
+      if (change.deleted) return { ...item, _deleted: true };
+
+      return {
+        ...item,
+        status: change.status || item.status
+      };
+    });
+
+    // Filter out deleted
+    // @ts-ignore
+    items = items.filter(i => !i._deleted);
+
+    return items.sort((a, b) => b.createdAt - a.createdAt);
+  }, [config.items, optimisticChanges]);
+
+  const newItems = mergedItems.filter(i => i.status === 'new');
+  const readItems = mergedItems.filter(i => i.status === 'read');
 
   const handleMarkAsRead = (id: string) => {
     if (!onChange) return;
+    readItLaterService.markAsRead(id); // Optimistic Global Update
     const newConfig = markAsRead(config, id);
     onChange(serializeReadItLater(newConfig));
   };
 
   const handleMarkAsNew = (id: string) => {
     if (!onChange) return;
+    readItLaterService.markAsNew(id); // Optimistic Global Update
     const newConfig = markAsNew(config, id);
     onChange(serializeReadItLater(newConfig));
   };
 
   const handleDelete = (id: string) => {
     if (!onChange) return;
+    readItLaterService.deleteItem(id); // Optimistic Global Update
     const newConfig = deleteItem(config, id);
     onChange(serializeReadItLater(newConfig));
   };
@@ -44,6 +80,9 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
   const handleDeleteAllRead = () => {
     if (!onChange) return;
     if (confirm('Are you sure you want to delete all read items?')) {
+      // Optimistic update for all read items
+      readItems.forEach(i => readItLaterService.deleteItem(i.id));
+
       const newConfig = deleteAllRead(config);
       onChange(serializeReadItLater(newConfig));
     }
