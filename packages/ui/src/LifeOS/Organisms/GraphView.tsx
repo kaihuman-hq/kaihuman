@@ -1,8 +1,9 @@
 import { h } from 'preact';
-import { useEffect, useRef, useState, useMemo } from 'preact/hooks';
+import { useEffect, useRef, useState, useMemo, lazy, Suspense } from 'preact/compat';
 import { useSignal } from '@preact/signals';
 import { Logger, githubFileStore, githubService, githubProfileStore } from '@lifosy/core';
-import ForceGraph2D from 'react-force-graph-2d';
+// import ForceGraph2D from 'react-force-graph-2d';
+const ForceGraph2D = lazy(() => import('react-force-graph-2d'));
 import { MonoHeader, MonoText } from '../Atoms/Typography';
 import { Loader2, Share2, RefreshCw } from 'lucide-preact';
 import { cn } from '../../utils';
@@ -177,20 +178,26 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
       </div>
 
       <div ref={containerRef} className="flex-1 relative cursor-move">
-        <ForceGraph2D
-          width={dimensions.width}
-          height={dimensions.height}
-          graphData={graphData}
-          backgroundColor="rgba(0,0,0,0)" // Transparent, let parent bg show
-          nodeLabel="name"
-          nodeColor={() => '#d4b769'} // Use explicit Gold RGB for now to ensure visibility
-          nodeRelSize={6}
-          linkColor={() => '#3f3f46'} // zinc-700
-          onNodeClick={(node: any) => onNavigate(node.id)}
-          cooldownTicks={100}
-          d3AlphaDecay={0.02}
-          d3VelocityDecay={0.3}
-        />
+        <Suspense fallback={
+          <div className="flex h-full w-full items-center justify-center">
+            <Loader2 className="animate-spin text-[var(--los-muted)]" size={32} />
+          </div>
+        }>
+          <ForceGraph2D
+            width={dimensions.width}
+            height={dimensions.height}
+            graphData={graphData}
+            backgroundColor="rgba(0,0,0,0)" // Transparent, let parent bg show
+            nodeLabel="name"
+            nodeColor={() => '#d4b769'} // Use explicit Gold RGB for now to ensure visibility
+            nodeRelSize={6}
+            linkColor={() => '#3f3f46'} // zinc-700
+            onNodeClick={(node: any) => onNavigate(node.id)}
+            cooldownTicks={100}
+            d3AlphaDecay={0.02}
+            d3VelocityDecay={0.3}
+          />
+        </Suspense>
 
         {graphData.nodes.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
