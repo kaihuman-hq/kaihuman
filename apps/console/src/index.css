@@ -10,6 +10,10 @@
     overflow-x: hidden;
     margin: 0;
     padding: 0;
+    /* Fix for iOS Safari: As of iOS 26, Safari no longer uses theme-color meta tag.
+       Instead, it derives the status bar color from the background-color of html/body.
+       This ensures the top bar matches our dark theme. */
+    background-color: #0a0a0f;
   }
 
   #app {
