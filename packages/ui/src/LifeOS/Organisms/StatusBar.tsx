@@ -191,6 +191,33 @@ export const StatusBar = ({
                   </div>
                 </div>
               )}
+
+              {/* Version Info for Mobile - Shows in Menu */}
+              {version && (
+                <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300 delay-100">
+                  <div className="flex items-center gap-4">
+                    <div className="h-px bg-[var(--los-border)] flex-1" />
+                    <MonoLabel className="text-[var(--los-muted)]">VERSION</MonoLabel>
+                    <div className="h-px bg-[var(--los-border)] flex-1" />
+                  </div>
+                  <div className="border border-[var(--los-border)] p-4 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <MonoLabel className="text-xs">Version:</MonoLabel>
+                      <MonoText className="text-sm text-[var(--los-fg)]">{version.version}</MonoText>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <MonoLabel className="text-xs">Build:</MonoLabel>
+                      <MonoText className="text-[10px] text-[var(--los-muted)]">{new Date(version.buildTime).toLocaleString()}</MonoText>
+                    </div>
+                    {version.gitHash && (
+                      <div className="flex items-center justify-between">
+                        <MonoLabel className="text-xs">Commit:</MonoLabel>
+                        <MonoText className="text-[10px] font-mono text-[var(--los-muted)]">{version.gitHash}</MonoText>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -384,12 +411,12 @@ export const StatusBar = ({
 
           {/* RIGHT COLUMN */}
           <div className="flex-1 flex items-center justify-end gap-6 min-w-0">
-            {/* Version Info - Shows on hover/expand */}
+            {/* Version Info - Always visible on desktop */}
             {version && (
               <div 
                 className={cn(
                   "hidden md:flex items-center gap-2 whitespace-nowrap relative group/version transition-all duration-300",
-                  (isHovered || expanded) ? "opacity-100" : "opacity-0"
+                  "opacity-100"
                 )}
                 title={`Build: ${version.buildTime}${version.gitHash ? `\nCommit: ${version.gitHash}` : ''}`}
               >
