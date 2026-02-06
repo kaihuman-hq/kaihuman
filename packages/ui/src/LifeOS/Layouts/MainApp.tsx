@@ -747,17 +747,17 @@ export const MainApp = ({
 
   // Fix 1.5 & 1.6: Dynamic Theme Color for Mobile Safari and Zen Mode
   useEffect(() => {
-    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    // Get all theme-color meta tags (including those with media queries)
+    const metaThemeColors = document.querySelectorAll('meta[name="theme-color"]');
     // Using --los-bg variable value would require getComputedStyle, but we know it maps to #0a0a0f usually.
     // However, to be precise, let's hardcode the dark theme color which seems to be intended.
     const darkThemeColor = '#0a0a0f';
 
-    if (metaThemeColor) {
-      if (zenMode) {
-        metaThemeColor.setAttribute('content', darkThemeColor); // Dark background
-      } else {
-        metaThemeColor.setAttribute('content', darkThemeColor); // Ensure it stays dark
-      }
+    if (metaThemeColors.length > 0) {
+      // Update all existing theme-color meta tags to dark theme
+      metaThemeColors.forEach((meta) => {
+        meta.setAttribute('content', darkThemeColor);
+      });
     } else {
       // Create if missing
       const meta = document.createElement('meta');
