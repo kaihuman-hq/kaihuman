@@ -242,6 +242,22 @@ export const MainApp = ({
     initialStep: 'LOCATION';
   } | null>(null);
 
+  // Resize State
+  const [expandedTiles, setExpandedTiles] = useState<Set<string>>(new Set());
+
+  const toggleTileSize = (id: string | number) => {
+    setExpandedTiles(prev => {
+      const next = new Set(prev);
+      const strId = String(id);
+      if (next.has(strId)) {
+        next.delete(strId);
+      } else {
+        next.add(strId);
+      }
+      return next;
+    });
+  };
+
   const handleDumpSave = (content: string) => {
     const now = new Date();
     // specific format: quicknote-YYYY-MM-DD-HH:mm.md
@@ -1028,6 +1044,8 @@ export const MainApp = ({
                                     handleDragStart={handleDragStartLogic}
                                     handleDragSave={handleDragSave}
                                     dragEnabled={dragEnabled}
+                                    isExpanded={expandedTiles.has(String(tile.id))}
+                                    onToggleSize={() => toggleTileSize(tile.id)}
                                   />
                                 ))}
                               </div>
@@ -1932,17 +1950,33 @@ const FocusedTileMemo = memo(FocusedTileInternal, (prev, next) => {
   return idEqual && contentEqual && zenEqual;
 });
 
-const TileContentStructure = ({ tile, renderTileContent }: { tile: TileDef, renderTileContent: any }) => (
+const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpanded }: { tile: TileDef, renderTileContent: any, onToggleSize?: () => void, isExpanded?: boolean }) => (
   <div className="absolute inset-0 overflow-hidden p-4 flex flex-col pointer-events-none">
     <div className="flex justify-between items-start shrink-0 mb-2 pointer-events-auto">
       <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity flex-1 mr-2 truncate">
         {tile.title}
       </MonoText>
-      {tile.type === 'FOLDER' ? (
-        <div className="w-2 h-2 border border-[var(--los-muted)] rotate-45 shrink-0" />
-      ) : (
-        <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors shrink-0" />
-      )}
+
+      <div className="flex items-center gap-2">
+        {onToggleSize && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSize();
+            }}
+            className="text-[var(--los-muted)] hover:text-[var(--los-accent)] transition-colors p-1"
+            title={isExpanded ? "Collapse" : "Expand"}
+          >
+            {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
+        )}
+
+        {tile.type === 'FOLDER' ? (
+          <div className="w-2 h-2 border border-[var(--los-muted)] rotate-45 shrink-0" />
+        ) : (
+          <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors shrink-0" />
+        )}
+      </div>
     </div>
 
     <div className="flex-1 overflow-y-auto min-h-0 w-full mb-2 pointer-events-auto">
@@ -1957,7 +1991,7 @@ const TileContentStructure = ({ tile, renderTileContent }: { tile: TileDef, rend
   </div>
 );
 
-const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDragStart, handleDragSave, dragEnabled }: any) => {
+const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDragStart, handleDragSave, dragEnabled, isExpanded, onToggleSize }: any) => {
   const {
     attributes,
     listeners,
@@ -2023,11 +2057,13 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
         if (!dragEnabled) setActiveTileId(tile.id);
       }}
       className={cn(
-        "bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]",
+        "bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full",
+        !isExpanded && "pb-[100%]", // Square if NOT expanded
+        isExpanded && "min-h-[60vh] md:min-h-auto md:row-span-2 md:col-span-2 pb-0", // Mobile: tall, Desktop: 2x2 grid
         dragEnabled && "touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95"
       )}
     >
-      <TileContentStructure tile={tile} renderTileContent={renderTileContent} />
+      <TileContentStructure tile={tile} renderTileContent={renderTileContent} isExpanded={isExpanded} onToggleSize={onToggleSize} />
     </div>
   );
 };
