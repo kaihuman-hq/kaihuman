@@ -35,3 +35,46 @@
 .life-os-root * {
   box-sizing: border-box;
 }
+
+/* Glassmorphism Utilities */
+:root {
+  --los-glass-bg: rgba(15, 15, 15, 0.6);
+  --los-glass-border: rgba(255, 255, 255, 0.08);
+  --los-glass-blur: 16px;
+  --los-glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+.glass-panel {
+  background: var(--los-glass-bg);
+  backdrop-filter: blur(var(--los-glass-blur));
+  -webkit-backdrop-filter: blur(var(--los-glass-blur));
+  border: 1px solid var(--los-glass-border);
+  box-shadow: var(--los-glass-shadow);
+}
+
+.glass-tile {
+  background: linear-gradient(135deg, rgba(20, 20, 20, 0.7) 0%, rgba(10, 10, 10, 0.6) 100%);
+  backdrop-filter: blur(var(--los-glass-blur));
+  -webkit-backdrop-filter: blur(var(--los-glass-blur));
+  border: 1px solid var(--los-glass-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.glass-tile:hover {
+  background: linear-gradient(135deg, rgba(30, 30, 30, 0.8) 0%, rgba(20, 20, 20, 0.7) 100%);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Background Pattern */
+.cyber-grid-bg {
+  background-color: #050505;
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(20, 40, 30, 0.2) 0%, transparent 50%),
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
+  background-position: center, center, center;
+}

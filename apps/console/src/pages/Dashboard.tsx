@@ -422,6 +422,19 @@ export const Dashboard = () => {
       currentPath += '/' + parts[i];
     }
 
+    // 3. If the final active item is a FOLDER, we need to show its contents
+    // Otherwise we just end at the column where the file is selected
+    const lastCol = newColumns[newColumns.length - 1];
+    if (lastCol && lastCol.activeId) {
+      // Find the item definition for the active ID
+      const activeItem = lastCol.items.find(i => i.id === lastCol.activeId);
+      if (activeItem && activeItem.type === 'FOLDER') {
+        const children = getChildren(activeItem.id + '/');
+        // Always push children column for a folder, even if empty, so we can see it's open
+        newColumns.push({ items: children, activeId: null });
+      }
+    }
+
     setColumns(newColumns);
   };
 
@@ -508,7 +521,11 @@ export const Dashboard = () => {
         fileSystem={{ columns }}
         onItemClick={handleNavigate}
         onNavigate={(path) => {
-          if (path.length === 0) handleDashboardClick();
+          if (path.length === 0) {
+            handleDashboardClick();
+          } else {
+            navigateToPath(path.join('/'));
+          }
         }}
         // Remote Config Props
         config={remoteConfig || undefined}
