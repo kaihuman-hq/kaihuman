@@ -156,6 +156,20 @@ const parseUrlState = () => {
   return { showFiles: false, activeTileId: null, showNewFileWizard: false, showDumpMode: false };
 };
 
+import { StackedNavigation } from '../Molecules/StackedNavigation';
+
+// Helper hook for mobile detection
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+};
+
 export const MainApp = ({
   tiles = [],
   config,
@@ -178,6 +192,8 @@ export const MainApp = ({
   onCheckPath,
   ...props
 }: MainAppProps) => {
+  const isMobile = useIsMobile();
+
   // Fix 1.25: Reset view when switching repositories
   useEffect(() => {
     setActiveTileId(null);
@@ -647,7 +663,7 @@ export const MainApp = ({
     return tile.content || (renderFile && tile.type === 'FILE' ? renderFile(String(tile.id)) : undefined);
   };
 
-  // If fileSystem is provided, we use the Miller Column Layout
+  // If fileSystem is provided, we use the Miller Column Layout (or Stack on Mobile)
   // Override: If showFiles is true, we force Miller Mode if fileSystem exists
   // If localConfig exists AND !showFiles, we use Grid Mode (isMillerMode = false)
   // If localConfig missing, we default to Miller Mode if fileSystem exists
@@ -981,32 +997,50 @@ export const MainApp = ({
             {activeTileId === null ? (
               isMillerMode ? (
                 // MILLER COLUMNS LAYOUT (Centered & Max-Width)
-                <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto mx-auto w-full max-w-screen-2xl">
-                  {fileSystem!.columns.map((col, index) => {
-                    const isLast = index === fileSystem!.columns.length - 1;
-                    return (
-                      <MillerColumn
-                        key={index}
-                        items={col.items.map(t => ({
-                          ...t,
-                          content: renderTileContent(t, 'SMALL')
-                        }))}
-                        activeId={col.activeId}
-                        variant={isLast ? 'GRID' : 'LIST'}
-                        onItemClick={(item) => {
-                          if (onItemClick) onItemClick(item);
-                          if (item.type === 'FILE') setActiveTileId(item.id);
-                        }}
-                        onDeleteFile={onDeleteFile}
-                        onRenameFile={async (path, newPath) => {
-                          if (onRenameFile) await onRenameFile(path, newPath);
-                          if (activeTileId === path) setActiveTileId(newPath); // Keep active
-                        }}
-                        onRequestMove={(path) => setFileToMove(path)}
-                      />
-                    )
-                  })}
-                </div>
+                isMobile ? (
+                  <StackedNavigation
+                    fileSystem={fileSystem!}
+                    onNavigate={(path) => onNavigate?.(path)}
+                    onItemClick={(item) => {
+                      if (onItemClick) onItemClick(item);
+                      if (item.type === 'FILE') setActiveTileId(item.id);
+                    }}
+                    renderTileContent={(tile, mode) => renderTileContent(tile, mode)}
+                    onDeleteFile={onDeleteFile}
+                    onRenameFile={async (path, newPath) => {
+                      if (onRenameFile) await onRenameFile(path, newPath);
+                      if (activeTileId === path) setActiveTileId(newPath);
+                    }}
+                    onRequestMove={(path) => setFileToMove(path)}
+                  />
+                ) : (
+                  <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto mx-auto w-full max-w-screen-2xl">
+                    {fileSystem!.columns.map((col, index) => {
+                      const isLast = index === fileSystem!.columns.length - 1;
+                      return (
+                        <MillerColumn
+                          key={index}
+                          items={col.items.map(t => ({
+                            ...t,
+                            content: renderTileContent(t, 'SMALL')
+                          }))}
+                          activeId={col.activeId}
+                          variant={isLast ? 'GRID' : 'LIST'}
+                          onItemClick={(item) => {
+                            if (onItemClick) onItemClick(item);
+                            if (item.type === 'FILE') setActiveTileId(item.id);
+                          }}
+                          onDeleteFile={onDeleteFile}
+                          onRenameFile={async (path, newPath) => {
+                            if (onRenameFile) await onRenameFile(path, newPath);
+                            if (activeTileId === path) setActiveTileId(newPath); // Keep active
+                          }}
+                          onRequestMove={(path) => setFileToMove(path)}
+                        />
+                      )
+                    })}
+                  </div>
+                )
               ) : (
                 // LEGACY SINGLE GRID LAYOUT OR DASHBOARD
                 <div

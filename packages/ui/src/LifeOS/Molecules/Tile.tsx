@@ -25,10 +25,10 @@ export const Tile = ({
     <div
       onClick={onClick}
       className={cn(
-        "relative flex flex-col h-full bg-[var(--los-bg)] transition-all duration-300 overflow-hidden",
-        "border border-[var(--los-border)]",
-        column === 'center' && "border-l-0",
-        column === 'right' && "border-l-0",
+        "relative flex flex-col h-full overflow-hidden glass-tile rounded-xl mx-1 my-1",
+        // "border border-[var(--los-border)]", // Removed in favor of glass-tile
+        // column === 'center' && "border-l-0", // Legacy
+        // column === 'right' && "border-l-0", // Legacy
         className
       )}
     >
