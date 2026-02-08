@@ -33,3 +33,44 @@ export type Todo = z.infer<typeof TodoSchema>;
 export type Habit = z.infer<typeof HabitSchema>;
 export type Timetracking = z.infer<typeof TimetrackingSchema>;
 export type Config = z.infer<typeof ConfigSchema>;
+
+// UI/Layout Data Types
+export interface TileDef {
+  id: string | number;
+  title: string;
+  rawContent?: string;
+  extension?: string;
+  type?: 'FILE' | 'FOLDER';
+  onContentChange?: (newContent: string) => void;
+  // UI specific props omitted in core, handled by UI extensions
+}
+
+export interface Column {
+  items: TileDef[];
+  activeId: string | null;
+}
+
+// Dashboard Configuration Types
+export interface DashboardWorkspace {
+  id: string;
+  name: string;
+}
+
+export interface DashboardEntry {
+  path: string;
+  dashboard: string;
+  skipOnMobile?: boolean; // Default false
+}
+
+export interface DashboardFilesConfig {
+  selected?: string; // Currently selected file path
+  opened?: string[]; // List of opened file paths
+  recentlyOpened?: string[]; // MRU list
+}
+
+export interface DashboardConfig {
+  version: number;
+  dashboards: DashboardWorkspace[];
+  entries: DashboardEntry[];
+  files: DashboardFilesConfig;
+}

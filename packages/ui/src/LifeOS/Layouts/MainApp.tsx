@@ -28,6 +28,7 @@ import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
 import { ActionLogWidget } from '../Organisms/Widgets/ActionLogWidget';
+import { layoutStore } from '@lifosy/core';
 import { DataCollectionWidget } from '../Organisms/Widgets/DataCollectionWidget';
 import { DataCollectionAddForm } from '../Organisms/Widgets/DataCollectionAddForm';
 import { DataCollectionColumnManager } from '../Organisms/Widgets/DataCollectionColumnManager';
@@ -81,20 +82,11 @@ import { NewFileWizard } from '../Organisms/NewFileWizard';
 import { MoveFileModal } from '../Organisms/MoveFileModal';
 import { SearchModal } from '../Organisms/SearchModal';
 import { NotFound } from '../Organisms/NotFound';
+import { TileDef as CoreTileDef } from '@lifosy/core';
 
-export interface TileDef {
-  id: string | number;
-  title: string;
-  /** Component or element to render when this tile is focused */
+export interface TileDef extends CoreTileDef {
   /** Component or element to render when this tile is focused */
   content?: ComponentChildren;
-  /** Raw text content for file-based widgets */
-  rawContent?: string;
-  /** File extension to determine widget type */
-  extension?: string;
-  /** Callback to update raw content */
-  onContentChange?: (newContent: string) => void;
-  type?: 'FILE' | 'FOLDER';
 }
 
 export interface FileSystemState {
@@ -194,25 +186,67 @@ export const MainApp = ({
 }: MainAppProps) => {
   const isMobile = useIsMobile();
 
-  // Fix 1.25: Reset view when switching repositories
+  // FIX: Reset view when switching repositories
   useEffect(() => {
-    setActiveTileId(null);
-    setShowFiles(false);
+    layoutStore.setFocus(null);
+    if (layoutStore.view.value === 'FILES') layoutStore.view.value = 'DASHBOARD';
   }, [props.currentRepository?.name]);
 
-  // State for legacy/single-level mode or Dashboard mode
-  const [activeTileId, setActiveTileId] = useState<string | number | null>(() => parseUrlState().activeTileId);
-  const [notFound, setNotFound] = useState(false);
+  // --- STORE ACCESSORS ---
+  const activeTileId = layoutStore.activeTileId.value;
+  const showFiles = layoutStore.view.value === 'FILES';
+  const showSettings = layoutStore.view.value === 'SETTINGS';
+  const showGraph = layoutStore.view.value === 'GRAPH';
+  const showCommits = layoutStore.view.value === 'COMMITS';
+  const activeDashboardId = layoutStore.activeDashboardId.value;
+  const zenMode = layoutStore.zenMode.value;
+  const showNewFileWizard = layoutStore.showNewFileWizard.value;
+  const showDumpMode = layoutStore.showDumpMode.value;
+  const fileToMove = layoutStore.fileToMove.value;
+  const showAddToDashboard = layoutStore.showAddToDashboard.value;
+  const fileToAddToDashboard = layoutStore.fileToAddToDashboard.value;
+  // const showSearch = layoutStore.showSearch.value; // Handled separately? No, let's use check
+
+  const dumpContent = layoutStore.dumpContent.value;
+  const dumpSaveProps = layoutStore.dumpSaveProps.value;
+  const expandedTiles = layoutStore.expandedTiles.value;
+
+  // --- LOCAL STATE (Transient/Component-Specific) ---
+  const notFound = layoutStore.notFound.value;
   const [checkingPath, setCheckingPath] = useState(false);
+  const dragEnabled = layoutStore.dragEnabled.value;
+  /* REMOVED COMPONENT_STATE: localConfig, moved to layoutStore.remoteConfig */
+  // Original config backup for cancel
+  const originalConfig = useRef<DashboardConfig | undefined>(undefined);
 
-  const [showSettings, setShowSettings] = useState(false);
-  const [showAddToDashboard, setShowAddToDashboard] = useState(false);
-  const [fileToAddToDashboard, setFileToAddToDashboard] = useState<string | null>(null);
 
-  // 3.12, 3.11 State
-  const [showCommits, setShowCommits] = useState(false);
-  const [showGraph, setShowGraph] = useState(false);
+  // Store current drag id for drag overlay
+  const activeId = layoutStore.activeDragId.value;
 
+
+  // --- SETTERS / ACTIONS ADAPTERS ---
+  const setActiveTileId = (id: string | number | null) => layoutStore.setFocus(id ? String(id) : null);
+  const setShowFiles = (show: boolean) => { layoutStore.view.value = show ? 'FILES' : 'DASHBOARD'; };
+  const setShowSettings = (show: boolean) => { layoutStore.view.value = show ? 'SETTINGS' : 'DASHBOARD'; };
+  const setShowGraph = (show: boolean) => { layoutStore.view.value = show ? 'GRAPH' : 'DASHBOARD'; };
+  const setShowCommits = (show: boolean) => { layoutStore.view.value = show ? 'COMMITS' : 'DASHBOARD'; };
+
+  const setShowNewFileWizard = (show: boolean) => { layoutStore.showNewFileWizard.value = show; };
+  const setShowDumpMode = (show: boolean) => { layoutStore.showDumpMode.value = show; };
+  const setZenMode = (val: boolean | ((prev: boolean) => boolean)) => {
+    if (typeof val === 'function') layoutStore.zenMode.value = !!val(layoutStore.zenMode.value);
+    else layoutStore.zenMode.value = !!val;
+  };
+  const setActiveDashboardId = (id: string | null) => { layoutStore.activeDashboardId.value = id; };
+  const setFileToMove = (path: string | null) => { layoutStore.fileToMove.value = path; };
+  const setDumpContent = (content: string) => { layoutStore.dumpContent.value = content; };
+  const setDumpSaveProps = (props: any) => { layoutStore.dumpSaveProps.value = props; };
+
+  const setShowAddToDashboard = (show: boolean) => { layoutStore.showAddToDashboard.value = show; };
+  const setFileToAddToDashboard = (path: string | null) => { layoutStore.fileToAddToDashboard.value = path; };
+  const setDragEnabled = (enabled: boolean) => { layoutStore.dragEnabled.value = enabled; };
+  const setActiveId = (id: string | number | null) => { layoutStore.activeDragId.value = id; };
+  const setNotFound = (val: boolean) => { layoutStore.notFound.value = val; };
 
   const handleAddToDashboard = (dashboardId: string) => {
     if (!fileToAddToDashboard || !config || !onConfigChange) return;
@@ -239,52 +273,14 @@ export const MainApp = ({
     setFileToAddToDashboard(null);
   };
 
-  // Dashboard State
-  const [activeDashboardId, setActiveDashboardId] = useState<string | null>(null);
-  const [dragEnabled, setDragEnabled] = useState(false);
-  const [localConfig, setLocalConfig] = useState<DashboardConfig | undefined>(config);
-  const [showFiles, setShowFiles] = useState(() => parseUrlState().showFiles); // Toggle for "Files" view
-  const [showNewFileWizard, setShowNewFileWizard] = useState(() => parseUrlState().showNewFileWizard);
-  const [fileToMove, setFileToMove] = useState<string | null>(null);
-  const [zenMode, setZenMode] = useState(false); // Zen Mode state
-
-  // Dump Mode State
-  const [showDumpMode, setShowDumpMode] = useState(() => parseUrlState().showDumpMode);
-  const [dumpContent, setDumpContent] = useState('');
-  const [dumpSaveProps, setDumpSaveProps] = useState<{
-    initialContent: string;
-    initialFilename: string;
-    initialFolder: string;
-    initialStep: 'LOCATION';
-  } | null>(null);
-
-  // Resize State
-  const [expandedTiles, setExpandedTiles] = useState<Set<string>>(new Set());
-
   const toggleTileSize = (id: string | number) => {
-    setExpandedTiles(prev => {
-      const next = new Set(prev);
-      const strId = String(id);
-      if (next.has(strId)) {
-        next.delete(strId);
-      } else {
-        next.add(strId);
-      }
-      return next;
-    });
+    layoutStore.toggleExpanded(String(id));
   };
 
   const handleDumpSave = (content: string) => {
     const now = new Date();
-    // specific format: quicknote-YYYY-MM-DD-HH:mm.md
-    // We'll let NewFileWizard append extension ideally, or we provide full name?
-    // NewFileWizard usually takes a name without extension in the input, and adds extension.
-    // The format requested: quicknote-2025-11-13-16:35:31.md (approx)
-    // Actually the request said: "quicknote-2025-11-13-16:35:31.md"
-    // Let's format it nicely:
     const pad = (n: number) => n.toString().padStart(2, '0');
-    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}`; // Removed seconds to be cleaner or keep them? Request said yes.
-    // Using simple format safe for filenames
+    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}`;
     const filename = `quicknote-${timestamp}`;
 
     const targetFolder = '.lifeos/quicknotes';
@@ -300,10 +296,10 @@ export const MainApp = ({
   };
 
   // Store original config when entering Drag Mode for cancellation
-  const [originalConfig, setOriginalConfig] = useState<DashboardConfig | undefined>(undefined);
+
 
   // Store current drag id for drag overlay
-  const [activeId, setActiveId] = useState<string | number | null>(null);
+
 
   // Nav Overlay Hover State
   const [hoverNav, setHoverNav] = useState<'prev' | 'next' | null>(null);
@@ -367,7 +363,7 @@ export const MainApp = ({
               onNavigate?.(parts);
             } else {
               // Check dashboard entries as fallback
-              const dashEntry = localConfig?.entries.find(e => e.path === path);
+              const dashEntry = layoutStore.remoteConfig.value?.entries.find(e => e.path === path);
               if (dashEntry) {
                 setActiveTileId(path);
                 setShowFiles(false);
@@ -390,7 +386,7 @@ export const MainApp = ({
           // Simplistic check: If path exists as a Tile of type FOLDER -> navigate there
           // Priority 1: Check Dashboard Tiles (localConfig)
           // If found here, we prefer Dashboard View (showFiles = false)
-          const dashEntry = localConfig?.entries.find(e => e.path === path);
+          const dashEntry = layoutStore.remoteConfig.value?.entries.find(e => e.path === path);
           if (dashEntry) {
             setActiveTileId(path);
             setShowFiles(false); // Dashboard view
@@ -429,49 +425,49 @@ export const MainApp = ({
         setNotFound(false);
         setActiveTileId(state.activeTileId);
         setShowFiles(state.showFiles);
-        setShowNewFileWizard(state.showNewFileWizard);
-        setShowDumpMode(state.showDumpMode);
+        setShowNewFileWizard(!!state.showNewFileWizard);
+        setShowDumpMode(!!state.showDumpMode);
       }
     };
 
     resolvePath();
     window.addEventListener('popstate', resolvePath);
     return () => window.removeEventListener('popstate', resolvePath);
-  }, [fileSystem, localConfig, onCheckPath, onNavigate]); // Re-run when FS loads or props change
+  }, [fileSystem, layoutStore.remoteConfig.value, onCheckPath, onNavigate]); // Re-run when FS loads or props change
 
 
-  useEffect(() => {
-    if (config) {
-      setLocalConfig(config);
-      // setShowFiles(false); // Removed to prevent view reset on config update (e.g. rename/move)
-    }
-  }, [config]);
+  /* REMOVED useEffect syncing config prop to localConfig as we use layoutStore directly */
+  // If config prop is provided (e.g. initial load from Dashboard), ensure store matches? 
+  // Dashboard already syncs store from file. MainApp should just observe store.
 
   const handleDragStartLogic = () => {
-    setOriginalConfig(JSON.parse(JSON.stringify(localConfig))); // Deep copy
+    // Deep copy current config to originalConfig ref for cancel
+    const current = layoutStore.remoteConfig.value;
+    if (current) originalConfig.current = JSON.parse(JSON.stringify(current));
     setDragEnabled(true);
   };
 
   const handleDragSave = () => {
     setDragEnabled(false);
-    setOriginalConfig(undefined);
+    originalConfig.current = undefined;
     // Persist changes - user callback already called during reorder
-    if (localConfig) onConfigChange?.(localConfig);
+    const current = layoutStore.remoteConfig.value;
+    if (current) onConfigChange?.(current);
   };
 
   const handleDragCancel = () => {
-    if (originalConfig) {
-      setLocalConfig(originalConfig);
-      onConfigChange?.(originalConfig);
+    if (originalConfig.current) {
+      layoutStore.remoteConfig.value = originalConfig.current;
+      onConfigChange?.(originalConfig.current);
     }
     setDragEnabled(false);
-    setOriginalConfig(undefined);
+    originalConfig.current = undefined;
   };
 
-  const currentDashboardId = activeDashboardId || localConfig?.dashboards[0]?.id;
+  const currentDashboardId = activeDashboardId || layoutStore.remoteConfig.value?.dashboards[0]?.id;
 
   const handleNextDashboard = () => {
-    const config = localConfig;
+    const config = layoutStore.remoteConfig.value;
     if (!config || !config.dashboards.length) return;
     const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
     // Find next index, wrap around
@@ -481,19 +477,21 @@ export const MainApp = ({
 
   // Filter entries for current dashboard
   const userEntries = useMemo(() => {
-    if (!localConfig || !currentDashboardId) return [];
-    return localConfig.entries.filter(e => e.dashboard === currentDashboardId);
-  }, [localConfig, currentDashboardId]);
+    const config = layoutStore.remoteConfig.value;
+    if (!config || !currentDashboardId) return [];
+    return config.entries.filter(e => e.dashboard === currentDashboardId);
+  }, [layoutStore.remoteConfig.value, currentDashboardId]);
 
   // Convert config entries to tiles
   const dashboardTiles = useMemo(() => {
-    if (!localConfig) return tiles; // Fallback to legacy tiles
+    const config = layoutStore.remoteConfig.value;
+    if (!config) return tiles; // Fallback to legacy tiles
 
     return userEntries.map((entry, index) => {
       const extension = entry.path.split('.').slice(1).join('.'); // .events.csv etc. leads to events.csv
       // Better extension extraction:
       let ext = '';
-      const lowerPath = entry.path.toLowerCase();
+      const lowerPath = entry.path?.toLowerCase() || '';
       if (lowerPath.endsWith('.readitlater.json')) ext = '.readitlater.json';
       else if (lowerPath.endsWith('.timetracking.csv')) ext = '.timetracking.csv';
       else if (lowerPath.endsWith('.events.csv')) ext = '.events.csv';
@@ -501,8 +499,6 @@ export const MainApp = ({
       else if (lowerPath.endsWith('.todos.md')) ext = '.todos.md';
       else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
       else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
-      else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
-      else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
       else if (lowerPath.endsWith('.budget.csv')) ext = '.budget.csv';
       else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
@@ -523,7 +519,7 @@ export const MainApp = ({
         content: renderFile ? renderFile(entry.path) : undefined
       } as TileDef;
     });
-  }, [localConfig, userEntries, fileContents, tiles]);
+  }, [layoutStore.remoteConfig.value, userEntries, fileContents, tiles]);
 
   const displayTiles = dashboardTiles;
 
@@ -667,7 +663,7 @@ export const MainApp = ({
   // Override: If showFiles is true, we force Miller Mode if fileSystem exists
   // If localConfig exists AND !showFiles, we use Grid Mode (isMillerMode = false)
   // If localConfig missing, we default to Miller Mode if fileSystem exists
-  const isMillerMode = !!fileSystem && (showFiles || !localConfig);
+  const isMillerMode = !!fileSystem && (showFiles || !layoutStore.remoteConfig.value);
 
   // Constants
   const lastActiveTile = useRef<TileDef | null>(null);
@@ -734,16 +730,17 @@ export const MainApp = ({
     setActiveId(null);
 
     if (active.id !== over?.id) {
-      if (!localConfig || !currentDashboardId) return;
+      const config = layoutStore.remoteConfig.value;
+      if (!config || !currentDashboardId) return;
       // Find indices
       const oldIndex = userEntries.findIndex(e => e.path === active.id);
       const newIndex = userEntries.findIndex(e => e.path === over?.id);
 
       if (oldIndex !== -1 && newIndex !== -1) {
         const newOrder = arrayMove(userEntries, oldIndex, newIndex);
-        const otherEntries = localConfig.entries.filter(e => e.dashboard !== currentDashboardId);
-        const newConfig = { ...localConfig, entries: [...otherEntries, ...newOrder] };
-        setLocalConfig(newConfig);
+        const otherEntries = config.entries.filter(e => e.dashboard !== currentDashboardId);
+        const newConfig = { ...config, entries: [...otherEntries, ...newOrder] };
+        layoutStore.remoteConfig.value = newConfig;
         onConfigChange?.(newConfig);
       }
     }
@@ -794,7 +791,7 @@ export const MainApp = ({
   };
 
   const handlePrevDashboard = () => {
-    const config = localConfig;
+    const config = layoutStore.remoteConfig.value;
     if (!config || !config.dashboards.length) return;
     const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
     // Find prev index, wrap around
@@ -815,7 +812,7 @@ export const MainApp = ({
       // Toggle Search (Ctrl+K or Cmd+K)
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        setShowSearch(prev => !prev);
+        layoutStore.showSearch.value = !layoutStore.showSearch.value;
       }
       // Toggle Zen Mode (Ctrl+Shift+Z or Cmd+Shift+Z)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
@@ -898,10 +895,10 @@ export const MainApp = ({
       )}
 
       {/* Settings Overlay */}
-      {showSettings && localConfig && onConfigChange && (
+      {showSettings && layoutStore.remoteConfig.value && onConfigChange && (
         <div className="fixed inset-0 z-50 bg-[var(--los-bg)] animate-in fade-in zoom-in-95 duration-200">
           <SettingsView
-            config={localConfig}
+            config={layoutStore.remoteConfig.value}
             onConfigChange={onConfigChange}
             onClose={() => setShowSettings(false)}
           />
@@ -950,7 +947,7 @@ export const MainApp = ({
           if (item.type === 'FILE') {
             logger.debug(`Opening file from search: ${item.path}`);
             // Check if it's in userEntries to switch dashboard?
-            const entry = localConfig?.entries.find(e => e.path === item.path);
+            const entry = layoutStore.remoteConfig.value?.entries.find(e => e.path === item.path);
             if (entry) {
               // Switch dashboard
               setActiveDashboardId(entry.dashboard);
@@ -1046,11 +1043,11 @@ export const MainApp = ({
                 <div
                   className={cn(
                     "absolute top-0 left-0 right-0 bottom-8 overflow-y-auto overflow-x-hidden",
-                    !localConfig || showFiles ? "block" : getResponsiveGridClass(displayTiles.length)
+                    !layoutStore.remoteConfig.value || showFiles ? "block" : getResponsiveGridClass(displayTiles.length)
                   )}
                   key="matrix"
                 >
-                  {localConfig && !showFiles ? (
+                  {layoutStore.remoteConfig.value && !showFiles ? (
                     <DndContext
                       sensors={sensors}
                       collisionDetection={closestCenter}
@@ -1119,7 +1116,7 @@ export const MainApp = ({
                 onClose={() => {
                   // Fix 1.35: Navigation Return Flow - Check if tile is in Dashboard
                   // If so, strictly enforce Dashboard View (setShowFiles(false))
-                  const isDashboardTile = localConfig?.entries.some(e => e.path === activeTile!.id);
+                  const isDashboardTile = layoutStore.remoteConfig.value?.entries.some(e => e.path === activeTile!.id);
                   if (isDashboardTile) {
                     setShowFiles(false);
                   }
@@ -1147,9 +1144,10 @@ export const MainApp = ({
 
       {/* Desktop Navigation Overlays (Fix: JS-based hover state for guaranteed visibility) */}
       {(() => {
-        const shouldRender = !activeTileId && !showFiles && !showGraph && !showCommits && !zenMode && !showDumpMode && localConfig && localConfig.dashboards.length > 1;
-        if (localConfig) {
-          // logger.debug('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: localConfig.dashboards.length, shouldRender, hoverNav });
+        const config = layoutStore.remoteConfig.value;
+        const shouldRender = !activeTileId && !showFiles && !showGraph && !showCommits && !zenMode && !showDumpMode && config && config.dashboards.length > 1;
+        if (config) {
+          // logger.debug('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: config.dashboards.length, shouldRender, hoverNav });
         }
         return shouldRender;
       })() && (
@@ -1259,12 +1257,13 @@ export const MainApp = ({
               setShowDumpMode(false);
             }
           }}
-          {...dumpSaveProps}
+          {...dumpSaveProps as any}
           fileSystem={fileSystem as any}
           availableFolders={useMemo(() => {
-            if (!localConfig) return [];
+            const config = layoutStore.remoteConfig.value;
+            if (!config) return [];
             const folders = new Set<string>();
-            localConfig.entries.forEach(entry => {
+            config.entries.forEach(entry => {
               const parts = entry.path.split('/');
               if (parts.length > 1) {
                 // Has parent folder
@@ -1278,7 +1277,7 @@ export const MainApp = ({
               }
             });
             return Array.from(folders).sort();
-          }, [localConfig])}
+          }, [layoutStore.remoteConfig.value])}
           existingFiles={existingFiles}
           onLoadFolder={onLoadFolder}
         />
@@ -1306,7 +1305,7 @@ export const MainApp = ({
           breadcrumbs={getBreadcrumbs()}
           stats={[
             { label: "TILES", value: displayTiles.length.toString() },
-            ...(localConfig ? [{ label: "WORKSPACE", value: localConfig.dashboards.find(d => d.id === currentDashboardId)?.name || "UNKNOWN" }] : [])
+            ...(layoutStore.remoteConfig.value ? [{ label: "WORKSPACE", value: layoutStore.remoteConfig.value.dashboards.find(d => d.id === currentDashboardId)?.name || "UNKNOWN" }] : [])
           ]}
           onDashboardClick={() => {
             if (dragEnabled) {
@@ -1323,16 +1322,16 @@ export const MainApp = ({
           onSelectRepository={props.onSelectRepository}
 
           // Workspace Switcher (Only if config exists)
-          currentWorkspace={localConfig ? { id: currentDashboardId || '', name: localConfig.dashboards?.find(d => d.id === currentDashboardId)?.name || 'Unknown' } : undefined}
-          workspaces={localConfig ? localConfig.dashboards.map(d => ({ id: d.id, name: d.name })) : undefined}
+          currentWorkspace={layoutStore.remoteConfig.value ? { id: currentDashboardId || '', name: layoutStore.remoteConfig.value.dashboards?.find(d => d.id === currentDashboardId)?.name || 'Unknown' } : undefined}
+          workspaces={layoutStore.remoteConfig.value ? layoutStore.remoteConfig.value.dashboards.map(d => ({ id: d.id, name: d.name })) : undefined}
           onSelectWorkspace={(ws) => {
-            if (!dragEnabled && localConfig) {
+            if (!dragEnabled && layoutStore.remoteConfig.value) {
               setActiveDashboardId(ws.id);
               setShowFiles(false); // Switch back to dashboard view
               if (showDumpMode) setShowDumpMode(false);
             }
           }}
-          onNextWorkspace={!dragEnabled && localConfig ? () => {
+          onNextWorkspace={!dragEnabled && layoutStore.remoteConfig.value ? () => {
             if (showDumpMode) setShowDumpMode(false);
             handleNextDashboard();
           } : undefined}
@@ -1388,13 +1387,13 @@ abbreviations: undefined
             { label: "Graph", onClick: () => { setShowGraph(true); if (showDumpMode) setShowDumpMode(false); } },
             { label: "Commits", onClick: () => { setShowCommits(true); if (showDumpMode) setShowDumpMode(false); } },
             { label: "Settings", onClick: () => { setShowSettings(true); if (showDumpMode) setShowDumpMode(false); } },
-            ...(localConfig ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); if (showDumpMode) setShowDumpMode(false); } }] : []),
-            ...((localConfig && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
+            ...(layoutStore.remoteConfig.value ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); if (showDumpMode) setShowDumpMode(false); } }] : []),
+            ...((layoutStore.remoteConfig.value && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
           ]}
-          recentFiles={!dragEnabled && localConfig ? (localConfig.files?.recentlyOpened || []).map(path => ({
+          recentFiles={!dragEnabled && layoutStore.remoteConfig.value ? (layoutStore.remoteConfig.value.files?.recentlyOpened || []).map((path: string) => ({
             label: path,
             onClick: () => {
-              const conf = localConfig;
+              const conf = layoutStore.remoteConfig.value;
               if (conf) {
                 const entry = conf.entries.find(e => e.path === path);
                 const isFoundInDashboard = !!entry;
@@ -1434,7 +1433,7 @@ abbreviations: undefined
 };
 
 const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater, onAddToDashboard }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void, onAddToDashboard?: (path: string) => void }) => {
-  if (!tile) return null; // Guard against undefined tile
+  if (!tile) return null;
 
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
   const isEvents = tile.extension?.toLowerCase() === '.events.csv';
@@ -1449,7 +1448,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
 
 
   const isGenericCsv = tile.extension === '.csv' && !isTimeTracking && !isEvents && !isHabit && !isDataCollection && !isBudget;
-  const isAnyCsv = tile.extension?.toLowerCase().endsWith('.csv'); // For enabling TABLE view on all CSVs
+  const isAnyCsv = tile.extension?.toLowerCase()?.endsWith('.csv'); // For enabling TABLE view on all CSVs
 
   const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog || isAnyCsv); // && !!tile.rawContent;
 
@@ -1470,10 +1469,10 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
     const _isDataCollection = tile.extension === '.data-collection.csv';
     const _isBudget = tile.extension === '.budget.csv';
     const _isActionLog = tile.extension === '.actionlog.md';
-    const _isAnyCsv = tile.extension?.toLowerCase().endsWith('.csv');
+    const _isAnyCsv = tile.extension?.toLowerCase()?.endsWith('.csv');
 
-    const _hasWidget = (_isTimeTracking || _isEvents || _isHabit || _isTodos || _isTimezones || _isRss || _isReadItLater || _isDataCollection || _isBudget || _isActionLog || _isAnyCsv); // && !!tile.rawContent; // Removed to prevent unmount on flicker
 
+    const _hasWidget = (_isTimeTracking || _isEvents || _isHabit || _isTodos || _isTimezones || _isRss || _isReadItLater || _isDataCollection || _isBudget || _isActionLog || _isAnyCsv);
 
     if (_hasWidget && viewMode === 'CODE') {
       setViewMode('WIDGET');
@@ -1852,7 +1851,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
                 />
               )}
               {isGenericCsv && (
-                <CsvTableView content={tile.rawContent!} />
+                <CsvTableView content={tile.rawContent || ''} />
               )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
