@@ -2093,7 +2093,7 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
       className={cn(
         "bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full",
         !isExpanded && "pb-[100%]", // Square if NOT expanded
-        isExpanded && "min-h-[60vh] md:min-h-auto md:row-span-2 md:col-span-2 pb-0", // Mobile: tall, Desktop: 2x2 grid
+        isExpanded && "min-h-[calc(100dvh-5rem)] md:min-h-auto md:row-span-2 md:col-span-2 pb-0", // Mobile: tall, Desktop: 2x2 grid
         dragEnabled && "touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95"
       )}
     >
