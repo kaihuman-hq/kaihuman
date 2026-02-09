@@ -44,12 +44,61 @@ export const Dashboard = () => {
   useEffect(() => {
     if (repo) {
       logger.info(`Loading tree for ${repo.full_name}`);
-      // layoutStore.columns.value = []; // Handled by store effect on tree change?
-      // Store effect sees empty tree first?
       githubFileStore.loadTree();
-      // remoteConfig handled by store? We need to migrate config logic to store too.
     }
   }, [repo?.full_name]);
+
+  // 3. Load Remote Config
+  useEffect(() => {
+    // Only run if we have a tree and no config (or repo changed)
+    if (!tree || tree.length === 0) return;
+
+    const CONFIG_PATH = '.lifeos/.dashboard.config.json';
+    const configItem = tree.find(t => t.path === CONFIG_PATH);
+
+    const loadConfig = async () => {
+      logger.info('Checking for remote config...');
+      if (configItem) {
+        try {
+          // Check if already open
+          let content = openFiles[CONFIG_PATH]?.content;
+          if (!content) {
+            const fileData = await githubFileStore.openFile(CONFIG_PATH);
+            // fileData in openFile doesn't return, it updates store.
+            // We wait for store update or grab from store now?
+            // openFile is async, so after await, it should be in openFiles
+            content = githubFileStore.openFiles.peek()[CONFIG_PATH]?.content;
+          }
+
+          if (content) {
+            const parsed = JSON.parse(content);
+            logger.info('Config loaded successfully');
+            layoutStore.remoteConfig.value = parsed;
+            return;
+          }
+        } catch (e) {
+          logger.error('Failed to load config', e);
+        }
+      }
+
+      // Fallback: Default Config
+      logger.info('No config found, using default.');
+      const DEFAULT_DASHBOARD_CONFIG = {
+        version: 1,
+        dashboards: [
+          { id: 'default', name: 'Main' }
+        ],
+        entries: [],
+        files: {
+          recentlyOpened: []
+        }
+      };
+
+      layoutStore.remoteConfig.value = DEFAULT_DASHBOARD_CONFIG;
+    };
+
+    loadConfig();
+  }, [tree.length, repo?.full_name]); // Re-run when tree loads or repo changes
 
   // Navigate Handler adapter
   const handleNavigate = (item: TileDef) => {
