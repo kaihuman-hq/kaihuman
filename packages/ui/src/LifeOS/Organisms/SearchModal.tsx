@@ -4,7 +4,7 @@ import { cn } from '../../utils';
 import { Dialog, DialogContent, DialogOverlay } from '../../components/Dialog';
 import { Search, File, Loader2, X, CornerDownLeft, Command, Hash, GitBranch, LayoutGrid } from 'lucide-preact';
 import { MonoLabel, MonoText } from '../Atoms/Typography';
-import { Logger } from '@lifosy/core';
+import { Logger, githubFileStore, layoutStore } from '@lifosy/core';
 
 const logger = new Logger('SearchModal');
 
@@ -29,6 +29,7 @@ export interface SearchModalProps {
   onSelect: (item: SearchResult) => void;
   currentRepository?: string; // e.g. "owner/repo"
   githubToken?: string;
+  files?: string[]; // Pass file list for local check
 
   // Command Context
   repositories?: { id: string; name: string }[];
@@ -75,6 +76,7 @@ export const SearchModal = ({
     const staticCommands = [
       { name: "Navigate to Files", path: "cmd:files", type: 'COMMAND', onSelect: onNavigateToFiles },
       { name: "Create new File", path: "cmd:new-file", type: 'COMMAND', onSelect: onCreateNewFile },
+      { name: "Open Wiki", path: "cmd:wiki", type: 'COMMAND', onSelect: () => handleOpenWiki() },
       { name: "Change Repo", path: "cmd:repo", type: 'COMMAND', onSelect: () => { } }, // Triggered by UI flow usually? Or needs specific handler
       { name: "Change Workspace", path: "cmd:workspace", type: 'COMMAND', onSelect: () => { } }
     ];
@@ -114,6 +116,34 @@ export const SearchModal = ({
     });
 
     return cmds;
+  };
+
+  const handleOpenWiki = () => {
+    const tree = githubFileStore.tree.value;
+    if (!tree) {
+      alert('File tree not loaded');
+      return;
+    }
+
+    // 1. Look for .wiki.md files
+    const wikiFiles = tree.filter(f => f.path.endsWith('.wiki.md'));
+
+    if (wikiFiles.length === 0) {
+      // Show notification? 
+      alert('No wiki found. Please create a file ending with .wiki.md (e.g. docs/index.wiki.md) to start a wiki.');
+      return;
+    }
+
+    // 2. Determine root
+    // If we have distinct wiki roots, we might need to pick one.
+    // For now, let's pick the first one's parent folder as root.
+    const firstWiki = wikiFiles[0];
+    if (!firstWiki) return;
+    const root = firstWiki.path.substring(0, firstWiki.path.lastIndexOf('/'));
+    // If root is empty string, it's root defined as ""
+
+    layoutStore.activeWikiRoot.value = root || '';
+    layoutStore.view.value = 'WIKI';
   };
 
   // Debounced Search

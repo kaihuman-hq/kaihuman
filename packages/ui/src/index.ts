@@ -15,3 +15,5 @@ export * from './LifeOS/Organisms/RepositorySelector';
 export * from './LifeOS/types';
 export * from './LifeOS/Organisms/Widgets/ReadItLaterLogic';
 export * from './LifeOS/Organisms/NotFound';
+export * from './LifeOS/Organisms/WikiView';
+export * from './LifeOS/Organisms/Widgets/ActionLogLogic';

@@ -82,6 +82,7 @@ import { NewFileWizard } from '../Organisms/NewFileWizard';
 import { MoveFileModal } from '../Organisms/MoveFileModal';
 import { SearchModal } from '../Organisms/SearchModal';
 import { NotFound } from '../Organisms/NotFound';
+import { WikiView } from '../Organisms/WikiView';
 import { TileDef as CoreTileDef } from '@lifosy/core';
 
 export interface TileDef extends CoreTileDef {
@@ -242,7 +243,8 @@ export const MainApp = ({
 
   const setShowFiles = (show: boolean) => {
     if (show) layoutStore.view.value = 'FILES';
-    else if (layoutStore.view.value === 'FILES') layoutStore.view.value = 'DASHBOARD';
+    // Fix: Ensure we switch back to DASHBOARD from ANY view (including WIKI) when hiding files
+    else layoutStore.view.value = 'DASHBOARD';
   };
   const setShowSettings = (show: boolean) => {
     if (show) layoutStore.view.value = 'SETTINGS';
@@ -822,14 +824,17 @@ export const MainApp = ({
   };
 
   // Search State
-  const [showSearch, setShowSearch] = useState(false);
+  // const [showSearch, setShowSearch] = useState(false); // REMOVED local state
+  const showSearch = layoutStore.showSearch.value;
+  const setShowSearch = (val: boolean) => { layoutStore.showSearch.value = val; };
 
   // Keyboard Shortcuts (Global)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Toggle Search (Ctrl+K or Cmd+K)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
+        e.stopPropagation(); // Stop propagation
         layoutStore.showSearch.value = !layoutStore.showSearch.value;
       }
       // Toggle Zen Mode (Ctrl+Shift+Z or Cmd+Shift+Z)
@@ -839,8 +844,9 @@ export const MainApp = ({
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    // Use capture phase to ensure we get the event before CodeMirror or other inputs
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, []);
 
   // Fix 1.5 & 1.6: Dynamic Theme Color for Mobile Safari and Zen Mode
@@ -864,6 +870,8 @@ export const MainApp = ({
       document.head.appendChild(meta);
     }
   }, [zenMode]);
+
+  const showWiki = layoutStore.view.value === 'WIKI';
 
   return (
     <div
@@ -908,6 +916,24 @@ export const MainApp = ({
               setShowFiles(true);
               setActiveTileId(path);
             }} />
+          </div>
+        </div>
+      )}
+
+      {/* Wiki View Overlay */}
+      {showWiki && (
+        <div className="fixed inset-0 z-50 bg-[var(--los-bg)] animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+          <WikiView rootPath={layoutStore.activeWikiRoot.value || ''} />
+          <div className="absolute top-3 right-4 z-50">
+            <button
+              className="p-2 bg-black/50 hover:bg-black/70 rounded text-white backdrop-blur-sm"
+              onClick={() => {
+                layoutStore.view.value = 'DASHBOARD';
+                layoutStore.activeWikiRoot.value = null;
+              }}
+            >
+              <X size={20} />
+            </button>
           </div>
         </div>
       )}
@@ -1163,7 +1189,7 @@ export const MainApp = ({
       {/* Desktop Navigation Overlays (Fix: JS-based hover state for guaranteed visibility) */}
       {(() => {
         const config = layoutStore.remoteConfig.value;
-        const shouldRender = !activeTileId && !showFiles && !showGraph && !showCommits && !zenMode && !showDumpMode && config && config.dashboards.length > 1;
+        const shouldRender = !activeTileId && !showFiles && !showWiki && !showGraph && !showCommits && !zenMode && !showDumpMode && config && config.dashboards.length > 1;
         if (config) {
           // logger.debug('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: config.dashboards.length, shouldRender, hoverNav });
         }
