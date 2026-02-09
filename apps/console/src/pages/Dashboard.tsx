@@ -130,6 +130,16 @@ export const Dashboard = () => {
     );
   }
 
+  // Blocking Load: Wait for Config
+  if (!remoteConfig) {
+    return (
+      <div className="h-screen flex items-center justify-center text-nexus-muted flex-col gap-4">
+        <div className="w-8 h-8 border-2 border-nexus-accent border-t-transparent rounded-full animate-spin"></div>
+        <div>Loading Dashboard Configuration...</div>
+      </div>
+    );
+  }
+
   // Preapare File Contents Map for Grid Mode
   const gridFileContents: Record<string, string> = {};
   if (remoteConfig && openFiles) {

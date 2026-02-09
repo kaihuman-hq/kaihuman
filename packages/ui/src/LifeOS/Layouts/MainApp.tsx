@@ -187,14 +187,27 @@ export const MainApp = ({
   const isMobile = useIsMobile();
 
   // FIX: Reset view when switching repositories
+  const prevRepoName = useRef(props.currentRepository?.name);
+
   useEffect(() => {
-    layoutStore.setFocus(null);
-    if (layoutStore.view.value === 'FILES') layoutStore.view.value = 'DASHBOARD';
+    logger.info('[MainApp] Repo Name Changed Check:', { prev: prevRepoName.current, curr: props.currentRepository?.name });
+    // Only reset if repo name ACTUALLY changed (skip on mount)
+    if (prevRepoName.current !== props.currentRepository?.name) {
+      if (prevRepoName.current) { // Only if we had a previous repo (not initial load)
+        logger.info('[MainApp] Switching Repo - Resetting View');
+        layoutStore.setFocus(null);
+        if (layoutStore.view.value === 'FILES') layoutStore.view.value = 'DASHBOARD';
+      }
+      prevRepoName.current = props.currentRepository?.name;
+    }
   }, [props.currentRepository?.name]);
 
   // --- STORE ACCESSORS ---
   const activeTileId = layoutStore.activeTileId.value;
   const showFiles = layoutStore.view.value === 'FILES';
+
+  // LOG RENDER
+  // logger.debug('[MainApp] Render', { showFiles, view: layoutStore.view.value, activeTileId, pathname: typeof window !== 'undefined' ? window.location.pathname : 'N/A' });
   const showSettings = layoutStore.view.value === 'SETTINGS';
   const showGraph = layoutStore.view.value === 'GRAPH';
   const showCommits = layoutStore.view.value === 'COMMITS';
@@ -226,10 +239,23 @@ export const MainApp = ({
 
   // --- SETTERS / ACTIONS ADAPTERS ---
   const setActiveTileId = (id: string | number | null) => layoutStore.setFocus(id ? String(id) : null);
-  const setShowFiles = (show: boolean) => { layoutStore.view.value = show ? 'FILES' : 'DASHBOARD'; };
-  const setShowSettings = (show: boolean) => { layoutStore.view.value = show ? 'SETTINGS' : 'DASHBOARD'; };
-  const setShowGraph = (show: boolean) => { layoutStore.view.value = show ? 'GRAPH' : 'DASHBOARD'; };
-  const setShowCommits = (show: boolean) => { layoutStore.view.value = show ? 'COMMITS' : 'DASHBOARD'; };
+
+  const setShowFiles = (show: boolean) => {
+    if (show) layoutStore.view.value = 'FILES';
+    else if (layoutStore.view.value === 'FILES') layoutStore.view.value = 'DASHBOARD';
+  };
+  const setShowSettings = (show: boolean) => {
+    if (show) layoutStore.view.value = 'SETTINGS';
+    else if (layoutStore.view.value === 'SETTINGS') layoutStore.view.value = 'DASHBOARD';
+  };
+  const setShowGraph = (show: boolean) => {
+    if (show) layoutStore.view.value = 'GRAPH';
+    else if (layoutStore.view.value === 'GRAPH') layoutStore.view.value = 'DASHBOARD';
+  };
+  const setShowCommits = (show: boolean) => {
+    if (show) layoutStore.view.value = 'COMMITS';
+    else if (layoutStore.view.value === 'COMMITS') layoutStore.view.value = 'DASHBOARD';
+  };
 
   const setShowNewFileWizard = (show: boolean) => { layoutStore.showNewFileWizard.value = show; };
   const setShowDumpMode = (show: boolean) => { layoutStore.showDumpMode.value = show; };
@@ -306,7 +332,14 @@ export const MainApp = ({
 
   // ROUTING LOGIC (Feature 3.10.1)
   // Sync State -> URL
+  const isInitialMount = useRef(true);
   useEffect(() => {
+    if (isInitialMount.current) {
+      logger.debug('[MainApp] Skipping initial State -> URL sync to allow URL -> State to win');
+      isInitialMount.current = false;
+      return;
+    }
+
     let url = '/';
     if (showDumpMode) {
       url = '/new';
@@ -323,6 +356,7 @@ export const MainApp = ({
     }
 
     if (window.location.pathname !== url) {
+      logger.info(`[MainApp] Syncing State -> URL: ${url}`, { from: window.location.pathname });
       window.history.pushState({}, '', url);
     }
   }, [activeTileId, showFiles, showNewFileWizard, showDumpMode]);
@@ -332,13 +366,9 @@ export const MainApp = ({
   useEffect(() => {
     const resolvePath = () => {
       const state = parseUrlState();
+      // logger.debug('[MainApp] resolvePath', { path: window.location.pathname, state });
 
       if (state.activeTileId && typeof state.activeTileId === 'string') {
-        // Resolution Logic
-        // If we have fileSystem, check if it's a folder
-        // If we DON'T have fileSystem yet (initial load), we might wait or assume file first?
-        // Actually, MainApp might be mounted before fileSystem is ready.
-        // Let's assume if it ends in slash or has no extension and matches a known folder, it's a folder.
         const path = state.activeTileId;
 
         // NEW LOGIC: Use onCheckPath if available (Source of Truth)
@@ -347,24 +377,24 @@ export const MainApp = ({
           Promise.resolve(onCheckPath(path)).then(type => {
             setCheckingPath(false);
             if (type === 'FOLDER') {
+              logger.info('[MainApp] Path is FOLDER -> Showing Files');
               setShowFiles(true);
               setActiveTileId(null);
               setNotFound(false);
               const parts = path.split('/');
               onNavigate?.(parts);
             } else if (type === 'FILE') {
+              logger.info('[MainApp] Path is FILE -> Showing Files & Focus');
               setShowFiles(true);
               setActiveTileId(path);
               setNotFound(false);
-              // Ensure navigation happens so columns are built?
-              // MainApp/MillerColumn usually rebuilds based on activeTileId if it's passed down?
-              // Actually onNavigate is safer to reconstruction
               const parts = path.split('/');
               onNavigate?.(parts);
             } else {
               // Check dashboard entries as fallback
               const dashEntry = layoutStore.remoteConfig.value?.entries.find(e => e.path === path);
               if (dashEntry) {
+                logger.info('[MainApp] Path is Dashboard Entry -> Switch Dashboard');
                 setActiveTileId(path);
                 setShowFiles(false);
                 setNotFound(false);
@@ -379,52 +409,46 @@ export const MainApp = ({
 
         // Fallback to existing logic if no onCheckPath logic
         if (fileSystem) {
-          // path already defined above from state.activeTileId
-          // Check if it is a folder in any column items?
-          // Or check if it exists at all?
-
+          // ... (existing fallback logic)
           // Simplistic check: If path exists as a Tile of type FOLDER -> navigate there
-          // Priority 1: Check Dashboard Tiles (localConfig)
-          // If found here, we prefer Dashboard View (showFiles = false)
           const dashEntry = layoutStore.remoteConfig.value?.entries.find(e => e.path === path);
           if (dashEntry) {
             setActiveTileId(path);
-            setShowFiles(false); // Dashboard view
+            setShowFiles(false);
             setNotFound(false);
             return;
           }
 
           // Priority 2: Check FileSystem
-          // Flatten all items to find it
           const allItems = fileSystem.columns.flatMap(c => c.items);
           const item = allItems.find(i => i.id === path);
 
           if (item) {
             if (item.type === 'FOLDER') {
-              // It is a folder!
               setShowFiles(true);
               setActiveTileId(null);
               setNotFound(false);
-              // Trigger Navigation if needed to rebuild columns?
               const parts = path.split('/');
               onNavigate?.(parts);
             } else {
-              // It is a file
               setActiveTileId(path);
-              setShowFiles(true); // Files view with focus
+              setShowFiles(true);
               setNotFound(false);
             }
             return;
           }
-
-          // Priority 3: Not Found
-          logger.warn(`Path not found in FS or Dashboard: ${path}`);
           setNotFound(true);
         }
       } else {
         setNotFound(false);
         setActiveTileId(state.activeTileId);
-        setShowFiles(state.showFiles);
+
+        // This is the critical part for /files
+        const currentIsFiles = layoutStore.view.value === 'FILES';
+        if (state.showFiles !== currentIsFiles) {
+          logger.info(`[MainApp] Resolving State: showFiles=${state.showFiles}`, { currentView: layoutStore.view.value });
+          setShowFiles(state.showFiles);
+        }
         setShowNewFileWizard(!!state.showNewFileWizard);
         setShowDumpMode(!!state.showDumpMode);
       }
@@ -606,12 +630,6 @@ export const MainApp = ({
       );
     }
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
-      // setRilState('LOADING'); // This state is not defined in MainApp
-      logger.debug(`Read Later clicked for item: ${tile.title}`); // Log the item title from the tile
-      if (!onAddToReadItLater) { // Check the correct prop for adding to read later
-        logger.warn('[MainApp] onAddToReadItLater prop is missing!');
-      }
-      // onAddToReadItLater(); // This call needs an item, not a direct call
       return (
         <ReadItLaterWidget
           content={tile.rawContent}
@@ -1373,8 +1391,6 @@ abbreviations: undefined
               label: "Files", onClick: () => {
                 setShowFiles(true);
                 setActiveTileId(null);
-                setShowGraph(false);
-                setShowCommits(false);
                 setNotFound(false);
                 if (showDumpMode) setShowDumpMode(false);
               }

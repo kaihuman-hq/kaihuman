@@ -1,4 +1,4 @@
-
+import { Logger } from '../logger.js';
 import { signal, computed, effect } from '@preact/signals';
 import { TileDef, Column, DashboardConfig } from '../models/types.js';
 import { githubFileStore } from './github-file.store.js';
@@ -13,10 +13,12 @@ export interface DumpSaveProps {
   initialStep: 'LOCATION' | string;
 }
 
-// We need to export a class to allow multiple instances (but we use singleton)
 export class LayoutStore {
+  private logger = new Logger('LayoutStore');
   // Main Navigation State
   view = signal<ViewMode>('DASHBOARD');
+  activeTileId = signal<string | null>(null); // Re-ordered for clarity
+
   activeDashboardId = signal<string | null>(null);
 
   // Miller Columns State
@@ -24,10 +26,7 @@ export class LayoutStore {
   remoteConfig = signal<DashboardConfig | null>(null);
 
   // Focus Mode State
-  activeTileMap = signal<Map<string, boolean>>(new Map()); // Just to track expanded? No, activeTileId is singular focus.
-
-  // Wait, let's stick to the singular activeTileId from previous logic which toggled "Focus Modal"
-  activeTileId = signal<string | null>(null);
+  activeTileMap = signal<Map<string, boolean>>(new Map());
   focusViewMode = signal<FocusViewMode>('CODE');
 
   // UI Preferences
@@ -51,10 +50,17 @@ export class LayoutStore {
   // Resize State
   expandedTiles = signal<Set<string>>(new Set());
 
-  // Computed Helpers
-  // isFocusMode = computed(() => this.activeTileId.value !== null); // Circular dependency? signals handles it.
-
   constructor() {
+    // Log View Changes
+    effect(() => {
+      this.logger.debug(`[StateChange] view changed to: ${this.view.value}`);
+    });
+
+    // Log Active Tile Changes
+    effect(() => {
+      this.logger.debug(`[StateChange] activeTileId changed to: ${this.activeTileId.value}`);
+    });
+
     // Sync Columns with Tree (Reactive)
     effect(() => {
       const tree = githubFileStore.tree.value;
