@@ -51,6 +51,9 @@ export const CodeMirrorEditor = ({
   // Track active file to handle switching content
   const currentPathRef = useRef<string | null>(null);
 
+  // Ref to prevent echo loop (Store -> View -> Store)
+  const isUpdatingFromStore = useRef(false);
+
   // Local state for tracking dirty status
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -148,7 +151,7 @@ export const CodeMirrorEditor = ({
         oneDark, // Base theme
         themeCompartment.current.of(nexusTheme), // Dynamic Helper
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
+          if (update.docChanged && !isUpdatingFromStore.current) {
             // Update store for the CORRECT path
             const currentPath = propsPath || githubFileStore.activeFile.value;
             if (currentPath) {
@@ -235,9 +238,14 @@ export const CodeMirrorEditor = ({
       currentPathRef.current = effectivePath;
       const currentDoc = view.state.doc.toString();
       if (content !== currentDoc) {
-        view.dispatch({
-          changes: { from: 0, to: currentDoc.length, insert: content || '' },
-        });
+        isUpdatingFromStore.current = true;
+        try {
+          view.dispatch({
+            changes: { from: 0, to: currentDoc.length, insert: content || '' },
+          });
+        } finally {
+          isUpdatingFromStore.current = false;
+        }
         // New file loaded -> clean state
         setHasUnsavedChanges(false);
       }
@@ -247,9 +255,14 @@ export const CodeMirrorEditor = ({
       // If content differs, it means external update (e.g. pull).
       const doc = view.state.doc.toString();
       if (content !== doc && content !== null) {
-        view.dispatch({
-          changes: { from: 0, to: doc.length, insert: content },
-        });
+        isUpdatingFromStore.current = true;
+        try {
+          view.dispatch({
+            changes: { from: 0, to: doc.length, insert: content },
+          });
+        } finally {
+          isUpdatingFromStore.current = false;
+        }
         // External update -> Reset dirty? Or keep dirty if we had changes?
         // Usually external update overwrites, so we are now "in sync" with that version (but maybe that version is unsaved?)
         // Let's assume external update means we accept it.
