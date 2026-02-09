@@ -3,7 +3,7 @@ import { signal, computed, effect } from '@preact/signals';
 import { TileDef, Column, DashboardConfig } from '../models/types.js';
 import { githubFileStore } from './github-file.store.js';
 
-export type ViewMode = 'DASHBOARD' | 'FILES' | 'GRAPH' | 'COMMITS' | 'SETTINGS';
+export type ViewMode = 'DASHBOARD' | 'FILES' | 'GRAPH' | 'COMMITS' | 'SETTINGS' | 'WIKI';
 export type FocusViewMode = 'CODE' | 'WIDGET' | 'PREVIEW' | 'CHARTS' | 'ADD' | 'ACCOUNTS' | 'TABLE' | 'COLUMNS' | 'FEEDS' | 'ARCHIVE';
 
 export interface DumpSaveProps {
@@ -28,6 +28,9 @@ export class LayoutStore {
   // Focus Mode State
   activeTileMap = signal<Map<string, boolean>>(new Map());
   focusViewMode = signal<FocusViewMode>('CODE');
+
+  // Wiki State
+  activeWikiRoot = signal<string | null>(null);
 
   // UI Preferences
   zenMode = signal<boolean>(false);

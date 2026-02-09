@@ -8,6 +8,7 @@ const logger = new Logger('Dashboard');
 import {
   DEFAULT_CONFIG as DEFAULT_RIL_CONFIG,
   MainApp,
+  WikiView, // Added import
   parseReadItLater,
   RepositorySelector,
   serializeReadItLater,
