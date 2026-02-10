@@ -1256,10 +1256,13 @@ export const MainApp = ({
                 onClose={() => {
                   // Fix 1.35: Navigation Return Flow - Check if tile is in Dashboard
                   // If so, strictly enforce Dashboard View (setShowFiles(false))
+                  /* REMOVED: This logic forces Dashboard view even if user came from Files.
+                     Preserving existing `showFiles` state (which persists in background) is correct.
                   const isDashboardTile = layoutStore.remoteConfig.value?.entries.some(e => e.path === activeTile!.id);
                   if (isDashboardTile) {
                     setShowFiles(false);
                   }
+                  */
                   setActiveTileId(null);
                 }}
                 renderEditor={renderEditor}
