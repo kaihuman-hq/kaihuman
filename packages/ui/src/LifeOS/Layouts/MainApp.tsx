@@ -710,9 +710,14 @@ export const MainApp = ({
   // Fix: Enhance activeTile from fileSystem with content props if missing
   // This ensures 'Files View' behaves exactly like 'Dashboard View' in Focus Mode
   // We use useMemo here to ensure STABLE object identity if content string hasn't changed
+  // Fix: Enhance activeTile from fileSystem with content props if missing
+  // This ensures 'Files View' behaves exactly like 'Dashboard View' in Focus Mode
+  // We use useMemo here to ensure STABLE object identity if content string hasn't changed
   const computedActiveTile = useMemo(() => {
-    if (baseActiveTile && isMillerMode && !baseActiveTile.rawContent) {
+    if (baseActiveTile && isMillerMode) {
       const entryPath = String(baseActiveTile.id);
+
+      // 1. Calculate the CORRECT extension based on the ID (filename)
       let ext = '';
       const lowerPath = entryPath.toLowerCase();
       if (lowerPath.endsWith('.readitlater.json')) ext = '.readitlater.json';
@@ -730,19 +735,24 @@ export const MainApp = ({
         ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
       }
 
-      // We must dependency on fileContents[entryPath]
-      const currentContent = fileContents[entryPath];
+      // 2. Determine if we need to update the tile
+      const currentContent = fileContents[entryPath] !== undefined ? fileContents[entryPath] : baseActiveTile.rawContent;
 
-      const newTile = {
-        ...baseActiveTile,
-        extension: ext,
-        rawContent: currentContent,
-        onContentChange: (newContent: string) => {
-          onFileChange?.(entryPath, newContent);
-        }
-      };
-      // console.log('[MainApp] Recreating activeTile for File View.', entryPath, 'Content Length:', currentContent?.length);
-      return newTile;
+      // Update if extension mismatch OR content missing OR content changed
+      const needsUpdate = (ext !== baseActiveTile.extension) ||
+        (!baseActiveTile.rawContent) ||
+        (fileContents[entryPath] !== undefined && fileContents[entryPath] !== baseActiveTile.rawContent);
+
+      if (needsUpdate) {
+        return {
+          ...baseActiveTile,
+          extension: ext,
+          rawContent: currentContent,
+          onContentChange: (newContent: string) => {
+            onFileChange?.(entryPath, newContent);
+          }
+        };
+      }
     }
     return baseActiveTile;
   }, [baseActiveTile, isMillerMode, fileContents, onFileChange]);
