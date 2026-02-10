@@ -820,6 +820,7 @@ export const MainApp = ({
 
   const handleDashboardClick = () => {
     setActiveTileId(null);
+    setShowFiles(false); // Fix: Explicitly exit files view
     if (onNavigate) {
       onNavigate([]); // Signal root navigation to parent
     }
@@ -1451,12 +1452,19 @@ export const MainApp = ({
             ...(layoutStore.remoteConfig.value ? [{ label: "WORKSPACE", value: layoutStore.remoteConfig.value.dashboards.find(d => d.id === currentDashboardId)?.name || "UNKNOWN" }] : [])
           ]}
           onDashboardClick={() => {
+            console.log('[MainApp] Status Bar: Dashboard Clicked');
             if (dragEnabled) {
               // Show cancellation menu or just cancel?
             } else {
               if (showDumpMode) setShowDumpMode(false);
               handleDashboardClick();
             }
+          }}
+          onFilesClick={() => {
+            console.log('[MainApp] Status Bar: Files Clicked');
+            if (showDumpMode) setShowDumpMode(false);
+            setActiveTileId(null);
+            setShowFiles(true);
           }}
 
           // Repository Switcher (Always available if props provided)

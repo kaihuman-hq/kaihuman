@@ -40,6 +40,7 @@ export interface StatusBarProps {
   onNextWorkspace?: () => void; // Replaces onNextRepository usage for workspaces
 
   onDashboardClick?: () => void;
+  onFilesClick?: () => void; // New prop for Quick Links
   menuItems?: MenuItem[];
   recentFiles?: MenuItem[];
 
@@ -67,6 +68,7 @@ export const StatusBar = ({
   onNextWorkspace,
 
   onDashboardClick,
+  onFilesClick,
   menuItems,
   recentFiles,
   version
@@ -74,6 +76,23 @@ export const StatusBar = ({
   const [expanded, setExpanded] = useState(false);
   const [expandedMode, setExpandedMode] = useState<'MENU' | 'REPOS' | 'WORKSPACES'>('MENU');
   const [isHovered, setIsHovered] = useState(false);
+
+  // Quick Links Toggle State
+  const [navMode, setNavMode] = useState<'QUICK' | 'CONTEXT'>(() => {
+    // Initialize from localStorage, default to 'CONTEXT'
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lifeos-statusbar-nav-mode');
+      return (saved === 'QUICK' || saved === 'CONTEXT') ? saved : 'CONTEXT';
+    }
+    return 'CONTEXT';
+  });
+
+  const handleToggleNavMode = (e: MouseEvent) => {
+    e.stopPropagation();
+    const newMode = navMode === 'CONTEXT' ? 'QUICK' : 'CONTEXT';
+    setNavMode(newMode);
+    localStorage.setItem('lifeos-statusbar-nav-mode', newMode);
+  };
 
   // Auto-collapse when mode changes (e.g. opening a file switches to FOCUS)
   useEffect(() => {
@@ -315,55 +334,105 @@ export const StatusBar = ({
               {mode}
             </div>
 
-            {(currentRepository || repositories.length > 0) && (
-              <div
-                className={cn(
-                  "hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300",
-                  expanded && expandedMode === 'REPOS' ? "text-[var(--los-accent)]" : "text-[var(--los-fg)] hover:text-[var(--los-accent)]"
-                )}
-                onClick={(e) => { e.stopPropagation(); handleToggleExpand('REPOS'); }}
-                title={`Change Repository`}
-              >
-                <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
-                <div className="flex items-center whitespace-nowrap hidden md:flex">
-                  <MonoText className="text-xs font-bold ml-2">{currentRepository ? currentRepository.name : "SELECT REPO"}</MonoText>
-                  <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
-                </div>
+            {/* Quick Links Toggle Button - Fix: Prevent Squeezing with shrink-0 */}
+            <div
+              onClick={handleToggleNavMode as any}
+              className="hidden md:flex flex items-center justify-center w-5 h-5 min-w-[1.25rem] shrink-0 border border-[var(--los-border)] hover:border-[var(--los-accent)] rounded-sm cursor-pointer transition-colors text-[10px] font-mono text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+              title={navMode === 'CONTEXT' ? "Switch to Quick Links" : "Switch to Context Selectors"}
+            >
+              {navMode === 'CONTEXT' ? '2' : '1'}
+            </div>
+
+            {/* QUICK LINKS MODE */}
+            {navMode === 'QUICK' && (
+              <div className="hidden md:flex items-center gap-4">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    console.log('[StatusBar] Dashboard button clicked'); // Debug log
+                    if (onDashboardClick) {
+                      onDashboardClick();
+                    } else {
+                      console.log('[StatusBar] onDashboardClick is undefined');
+                    }
+                  }}
+                  className="flex items-center gap-2 hover:text-[var(--los-accent)] transition-colors group cursor-pointer"
+                >
+                  <LayoutGrid size={12} className="group-hover:animate-pulse" />
+                  <MonoText className="text-xs font-bold uppercase">Dashboard</MonoText>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    console.log('[StatusBar] Files button clicked'); // Debug log
+                    if (onFilesClick) {
+                      onFilesClick();
+                    } else {
+                      console.log('[StatusBar] onFilesClick is undefined');
+                    }
+                  }}
+                  className="flex items-center gap-2 hover:text-[var(--los-accent)] transition-colors group cursor-pointer"
+                >
+                  <Archive size={12} className="group-hover:animate-pulse" />
+                  <MonoText className="text-xs font-bold uppercase">Files</MonoText>
+                </button>
               </div>
             )}
 
-            {currentRepository && currentWorkspace && (
-              <div className="hidden md:block h-4 w-px bg-[var(--los-border)] mx-1" />
-            )}
-
-            {currentWorkspace && (
-              <div
-                className={cn(
-                  "hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300 relative z-20",
-                  "text-[var(--los-fg)] hover:text-[var(--los-accent)]"
-                )}
-                onClick={(e) => { e.stopPropagation(); handleToggleExpand('WORKSPACES' as any); }}
-                title={`Change Workspace`}
-              >
-                {onNextWorkspace && (
+            {/* CONTEXT SELECTORS MODE */}
+            {navMode === 'CONTEXT' && (
+              <>
+                {(currentRepository || repositories.length > 0) && (
                   <div
-                    className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100 hidden md:block" // Hidden on mobile to avoid misclicks
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onNextWorkspace();
-                    }}
-                    title="Next Workspace"
+                    className={cn(
+                      "hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300",
+                      expanded && expandedMode === 'REPOS' ? "text-[var(--los-accent)]" : "text-[var(--los-fg)] hover:text-[var(--los-accent)]"
+                    )}
+                    onClick={(e) => { e.stopPropagation(); handleToggleExpand('REPOS'); }}
+                    title={`Change Repository`}
                   >
-                    <ArrowRight size={14} />
+                    <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
+                    <div className="flex items-center whitespace-nowrap hidden md:flex">
+                      <MonoText className="text-xs font-bold ml-2">{currentRepository ? currentRepository.name : "SELECT REPO"}</MonoText>
+                      <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
+                    </div>
                   </div>
                 )}
 
-                <LayoutGrid size={12} className="group-hover:animate-pulse shrink-0" />
-                <div className="flex items-center whitespace-nowrap hidden md:flex">
-                  <MonoText className="text-xs font-bold ml-2">{currentWorkspace.name}</MonoText>
-                  <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
-                </div>
-              </div>
+                {currentRepository && currentWorkspace && (
+                  <div className="hidden md:block h-4 w-px bg-[var(--los-border)] mx-1" />
+                )}
+
+                {currentWorkspace && (
+                  <div
+                    className={cn(
+                      "hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300 relative z-20",
+                      "text-[var(--los-fg)] hover:text-[var(--los-accent)]"
+                    )}
+                    onClick={(e) => { e.stopPropagation(); handleToggleExpand('WORKSPACES' as any); }}
+                    title={`Change Workspace`}
+                  >
+                    {onNextWorkspace && (
+                      <div
+                        className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100 hidden md:block" // Hidden on mobile to avoid misclicks
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNextWorkspace();
+                        }}
+                        title="Next Workspace"
+                      >
+                        <ArrowRight size={14} />
+                      </div>
+                    )}
+
+                    <LayoutGrid size={12} className="group-hover:animate-pulse shrink-0" />
+                    <div className="flex items-center whitespace-nowrap hidden md:flex">
+                      <MonoText className="text-xs font-bold ml-2">{currentWorkspace.name}</MonoText>
+                      <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Breadcrumbs (Shifted to Left on Hover/Expand) - Hidden entirely on mobile when NOT expanded */}
