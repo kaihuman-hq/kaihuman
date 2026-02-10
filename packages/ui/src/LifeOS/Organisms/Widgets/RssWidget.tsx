@@ -197,8 +197,8 @@ const RssItemRow = memo(({ item, onRead, onReadItLater, mode }: { item: RssItem 
 
   return (
     <div className="py-3 px-1 group hover:bg-white/5 transition-colors">
-      <div className="flex flex-col md:flex-row gap-2 items-start">
-        <div className="w-full md:flex-1 md:min-w-0">
+      <div className="flex flex-col gap-2 items-start">
+        <div className="w-full">
           <a href={item.link} target="_blank" rel="noopener noreferrer" className="block" onClick={(e) => e.stopPropagation()}>
             <MonoText className="font-bold text-[var(--los-fg)] hover:text-[var(--los-accent)] whitespace-normal break-words block">
               {item.title}
@@ -218,12 +218,12 @@ const RssItemRow = memo(({ item, onRead, onReadItLater, mode }: { item: RssItem 
           </div>
         </div>
 
-        <div className="flex flex-row md:flex-col gap-3 bg-[var(--los-bg)] mt-1 md:mt-0 md:pl-2 md:w-auto border-t md:border-t-0 border-[var(--los-border)] md:border-none pt-2 md:pt-0 shrink-0 w-auto md:w-auto justify-end md:justify-start self-end md:self-auto">
+        <div className="flex flex-row gap-3 mt-1 border-t border-[var(--los-border)] pt-2 shrink-0 w-full justify-end">
           <button
             title="Mark as Read"
             disabled={readState === 'LOADING'}
             onClick={(e) => { e.stopPropagation(); handleRead(); }}
-            className="flex-none flex justify-center p-2 hover:text-[var(--los-accent)] text-[var(--los-muted)] disabled:opacity-50"
+            className="flex-none flex justify-center p-2 hover:bg-[var(--los-accent)] hover:text-[var(--los-bg)] text-[var(--los-muted)] rounded transition-colors disabled:opacity-50"
           >
             {readState === 'LOADING' ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
           </button>
@@ -233,7 +233,7 @@ const RssItemRow = memo(({ item, onRead, onReadItLater, mode }: { item: RssItem 
             disabled={rilState === 'LOADING' || rilState === 'SUCCESS'}
             onClick={(e) => { e.stopPropagation(); handleRil(); }}
             className={cn(
-              "flex-none flex justify-center p-2 transition-colors disabled:opacity-50",
+              "flex-none flex justify-center p-2 rounded transition-colors disabled:opacity-50",
               rilState === 'SUCCESS' ? "text-green-500" : "hover:text-[var(--los-accent)] text-[var(--los-muted)]"
             )}
           >

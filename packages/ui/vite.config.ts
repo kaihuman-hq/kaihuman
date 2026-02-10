@@ -40,6 +40,11 @@ export default defineConfig({
         '@lifosy/core',
         '@preact/signals',
         'react-force-graph-2d',
+        'highlight.js',
+        'react-markdown',
+        'rehype-highlight',
+        'remark-gfm',
+        /^@radix-ui\/.*/,
       ],
       output: {
         globals: {
