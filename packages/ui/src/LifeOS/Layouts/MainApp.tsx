@@ -375,6 +375,13 @@ export const MainApp = ({
 
         // NEW LOGIC: Use onCheckPath if available (Source of Truth)
         if (onCheckPath) {
+          // Fix: Prevent redundant checks if we are already viewing this file/folder
+          // This prevents unmounting/remounting (and losing state) when fileSystem/props change during edits
+          if (activeTileId === path && !notFound) {
+            // logger.debug('[MainApp] Skipping onCheckPath - already focused', path);
+            return;
+          }
+
           setCheckingPath(true);
           Promise.resolve(onCheckPath(path)).then(type => {
             setCheckingPath(false);
@@ -436,6 +443,8 @@ export const MainApp = ({
               setActiveTileId(path);
               setShowFiles(true);
               setNotFound(false);
+              const parts = path.split('/');
+              onNavigate?.(parts);
             }
             return;
           }
@@ -688,21 +697,88 @@ export const MainApp = ({
   // Constants
   const lastActiveTile = useRef<TileDef | null>(null);
 
-  let activeTile = activeTileId !== null ? (
-    isMillerMode
-      ? fileSystem?.columns.flatMap(c => c.items).find(t => t.id === activeTileId)
-      : displayTiles.find(t => t.id === activeTileId)
-  ) : null;
+  // Memoize the base active tile from source to avoid unnecessary re-calculations
+  const baseActiveTile = useMemo(() => {
+    return activeTileId !== null ? (
+      isMillerMode
+        ? fileSystem?.columns.flatMap(c => c.items).find(t => t.id === activeTileId)
+        : displayTiles.find(t => t.id === activeTileId)
+    ) : null;
+  }, [activeTileId, isMillerMode, fileSystem, displayTiles]);
+
+
+  // Fix: Enhance activeTile from fileSystem with content props if missing
+  // This ensures 'Files View' behaves exactly like 'Dashboard View' in Focus Mode
+  // We use useMemo here to ensure STABLE object identity if content string hasn't changed
+  const computedActiveTile = useMemo(() => {
+    if (baseActiveTile && isMillerMode && !baseActiveTile.rawContent) {
+      const entryPath = String(baseActiveTile.id);
+      let ext = '';
+      const lowerPath = entryPath.toLowerCase();
+      if (lowerPath.endsWith('.readitlater.json')) ext = '.readitlater.json';
+      else if (lowerPath.endsWith('.timetracking.csv')) ext = '.timetracking.csv';
+      else if (lowerPath.endsWith('.events.csv')) ext = '.events.csv';
+      else if (lowerPath.endsWith('.habit.csv')) ext = '.habit.csv';
+      else if (lowerPath.endsWith('.todos.md')) ext = '.todos.md';
+      else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
+      else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
+      else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
+      else if (lowerPath.endsWith('.budget.csv')) ext = '.budget.csv';
+      else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
+      else {
+        const parts = entryPath.split('.');
+        ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
+      }
+
+      // We must dependency on fileContents[entryPath]
+      const currentContent = fileContents[entryPath];
+
+      const newTile = {
+        ...baseActiveTile,
+        extension: ext,
+        rawContent: currentContent,
+        onContentChange: (newContent: string) => {
+          onFileChange?.(entryPath, newContent);
+        }
+      };
+      // console.log('[MainApp] Recreating activeTile for File View.', entryPath, 'Content Length:', currentContent?.length);
+      return newTile;
+    }
+    return baseActiveTile;
+  }, [baseActiveTile, isMillerMode, fileContents, onFileChange]);
+
 
   // Persist Active Tile: If we had a tile, but now it's gone, but ID persists -> use old one
-  if (!activeTile && activeTileId !== null && lastActiveTile.current && lastActiveTile.current.id === activeTileId) {
-    activeTile = lastActiveTile.current;
-  }
+  // Check if activeTile is null but we have an ID and a cached tile
+  const finalActiveTile = computedActiveTile || (activeTileId !== null && lastActiveTile.current && lastActiveTile.current.id === activeTileId ? lastActiveTile.current : null);
+
+  useEffect(() => {
+    if (finalActiveTile) {
+      // console.log('[MainApp] finalActiveTile Updated:', finalActiveTile.id);
+    } else {
+      // console.log('[MainApp] finalActiveTile is NULL');
+    }
+  }, [finalActiveTile]);
+
 
   // Update persisted reference
-  if (activeTile) {
-    lastActiveTile.current = activeTile;
-  }
+  useEffect(() => {
+    if (finalActiveTile) {
+      lastActiveTile.current = finalActiveTile;
+    }
+  }, [finalActiveTile]);
+
+  // Use finalActiveTile for rendering
+  // We need to update the variable name usage below or assign it back to activeTile?
+  // Since 'activeTile' is const now, we can't reassign.
+  // Let's use 'finalActiveTile' in the render or rename 'activeTile' -> 'resolvedActiveTile' activeTile -> finalActiveTile.
+  // Actually, I can just rename the variable in the render section.
+  // BUT I need to be careful with the text replacement range.
+  // The downstream code uses `activeTile`.
+  // I should name my computed result `activeTile` to minimize changes, but I can't because of the `let` vs `const` and scope.
+  // Step 1: `let activeTile` was the original.
+  // I will output `const resolvedActiveTile = ...` then `const activeTile = resolvedActiveTile ...` logic?
+  // No, I'll just name the result `activeTile` and change the intermediate names.
 
   // Calculate Breadcrumbs Logic
   const getBreadcrumbs = () => {
@@ -721,6 +797,8 @@ export const MainApp = ({
     }
     return ["~"];
   };
+
+  const activeTile = finalActiveTile;
 
   const handleDashboardClick = () => {
     setActiveTileId(null);
@@ -1516,10 +1594,23 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
 
     const _hasWidget = (_isTimeTracking || _isEvents || _isHabit || _isTodos || _isTimezones || _isRss || _isReadItLater || _isDataCollection || _isBudget || _isActionLog || _isAnyCsv);
 
+    if (viewMode === 'CODE') {
+      // console.log('[FocusedTileInternal] ViewMode is CODE. HasWidget:', _hasWidget, 'RawContent length:', tile.rawContent?.length);
+    }
+
+
+    /* REMOVED: Auto-switch to WIDGET view on content change.
+       This was causing the editor to close when saving.
     if (_hasWidget && viewMode === 'CODE') {
       setViewMode('WIDGET');
     }
+    */
   }, [tile.rawContent]);
+
+  useEffect(() => {
+    // console.log('[FocusedTileInternal] Mounted/Updated. Tile ID:', tile.id, 'ViewMode:', viewMode);
+    // return () => console.log('[FocusedTileInternal] Unmounting. Tile ID:', tile.id);
+  }, [tile.id]);
 
   return (
     <div
@@ -1802,7 +1893,8 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
                 mode={viewMode as any}
                 onChange={(c) => {
                   tile.onContentChange?.(c);
-                  if (viewMode === 'ADD') setViewMode('WIDGET');
+                  // Fix: Keep in ADD mode to allow multiple additions
+                  // if (viewMode === 'ADD') setViewMode('WIDGET');
                 }}
               />
             </div>
