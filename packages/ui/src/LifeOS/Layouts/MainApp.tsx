@@ -685,6 +685,14 @@ export const MainApp = ({
         />
       );
     }
+
+    // Fix 1.25: If mode is FOCUS and we have no content for a file, prefer renderEditor over renderFile
+    // renderEditor typically triggers a data fetch, whereas renderFile might be a static preview or lightweight view.
+    // This ensures that deep-linked widgets (which start with no content) trigger a load.
+    if (mode === 'FOCUS' && renderEditor && tile.type === 'FILE' && !tile.content) {
+      return renderEditor(String(tile.id), false);
+    }
+
     return tile.content || (renderFile && tile.type === 'FILE' ? renderFile(String(tile.id)) : undefined);
   };
 
@@ -2107,6 +2115,14 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
                 <MonoText>No content defined for this tile.</MonoText>
               </div>
             )
+          )}
+
+          {/* Fix 1.25: Ensure data is fetched even if we are in WIDGET mode and content is missing */}
+          {/* We render the Editor hidden so it mounts and triggers the data fetch */}
+          {hasWidget && viewMode !== 'CODE' && !tile.rawContent && renderEditor && (
+            <div style={{ display: 'none' }}>
+              {renderEditor(String(tile.id), false)}
+            </div>
           )}
         </div>
       </div>
