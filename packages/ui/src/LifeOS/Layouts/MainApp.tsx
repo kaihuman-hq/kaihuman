@@ -1966,7 +1966,8 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
                 mode={viewMode as any}
                 onChange={(c) => {
                   tile.onContentChange?.(c);
-                  if (viewMode === 'ADD') setViewMode('WIDGET');
+                  // Fixed: Keep in ADD mode to allow multiple additions
+                  // if (viewMode === 'ADD') setViewMode('WIDGET');
                 }}
               />
             </div>
