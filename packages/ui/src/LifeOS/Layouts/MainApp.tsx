@@ -1491,6 +1491,15 @@ export const MainApp = ({
             { label: "Save Order", onClick: handleDragSave },
             { label: "Cancel Reorder", onClick: handleDragCancel }
           ] : [
+            ...(layoutStore.remoteConfig.value ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); if (showDumpMode) setShowDumpMode(false); } }] : []),
+            {
+              label: "Files", onClick: () => {
+                setShowFiles(true);
+                setActiveTileId(null);
+                setNotFound(false);
+                if (showDumpMode) setShowDumpMode(false);
+              }
+            },
             { label: "New File", onClick: () => setShowNewFileWizard(true) },
             {
               label: "Quick Note",
@@ -1521,22 +1530,16 @@ abbreviations: undefined
               }
             },
             {
-              label: "Files", onClick: () => {
-                setShowFiles(true);
-                setActiveTileId(null);
-                setNotFound(false);
-                if (showDumpMode) setShowDumpMode(false);
-              }
-            },
-            {
               label: "Search",
               // Fix 1.21: Add Search to Magic Menu (works on mobile)
               onClick: () => setShowSearch(true)
             },
             { label: "Graph", onClick: () => { setShowGraph(true); if (showDumpMode) setShowDumpMode(false); } },
             { label: "Commits", onClick: () => { setShowCommits(true); if (showDumpMode) setShowDumpMode(false); } },
+            // Expanded Menu Items (Repositories, Workspaces)
+            { label: "Repositories", type: 'REPOS' },
+            { label: "Workspaces", type: 'WORKSPACES' },
             { label: "Settings", onClick: () => { setShowSettings(true); if (showDumpMode) setShowDumpMode(false); } },
-            ...(layoutStore.remoteConfig.value ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); if (showDumpMode) setShowDumpMode(false); } }] : []),
             ...((layoutStore.remoteConfig.value && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
           ]}
           recentFiles={!dragEnabled && layoutStore.remoteConfig.value ? (layoutStore.remoteConfig.value.files?.recentlyOpened || []).map((path: string) => ({

@@ -15,6 +15,7 @@ export interface MenuItem {
   label: string;
   onClick?: () => void;
   icon?: any;
+  type?: 'REPOS' | 'WORKSPACES' | 'ACTION';
 }
 
 export interface StatusBarProps {
@@ -154,32 +155,39 @@ export const StatusBar = ({
             <div className="flex flex-col gap-6">
               {/* Main Actions Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {/* Manual "Repositories" and "Workspaces" buttons for Mobile/Menu access */}
-                {repositories.length > 0 && (
-                  <div
-                    onClick={(e) => { e.stopPropagation(); setExpandedMode('REPOS'); }}
-                    className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
-                  >
-                    <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full">Repositories</MonoLabel>
-                  </div>
-                )}
-                {workspaces.length > 0 && (
-                  <div
-                    onClick={(e) => { e.stopPropagation(); setExpandedMode('WORKSPACES'); }}
-                    className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
-                  >
-                    <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full">Workspaces</MonoLabel>
-                  </div>
-                )}
+                {menuItems ? menuItems.map((item, i) => {
+                  if (item.type === 'REPOS' && repositories.length > 0) {
+                    return (
+                      <div
+                        key={i}
+                        onClick={(e) => { e.stopPropagation(); setExpandedMode('REPOS'); }}
+                        className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                      >
+                        <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full">{item.label || 'Repositories'}</MonoLabel>
+                      </div>
+                    )
+                  }
+                  if (item.type === 'WORKSPACES' && workspaces.length > 0) {
+                    return (
+                      <div
+                        key={i}
+                        onClick={(e) => { e.stopPropagation(); setExpandedMode('WORKSPACES'); }}
+                        className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                      >
+                        <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full">{item.label || 'Workspaces'}</MonoLabel>
+                      </div>
+                    )
+                  }
 
-                {menuItems ? menuItems.map((item, i) => (
-                  <div key={i}
-                    onClick={(e) => { e.stopPropagation(); item.onClick?.(); setExpanded(false); }}
-                    className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
-                  >
-                    <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full" title={item.label}>{item.label}</MonoLabel>
-                  </div>
-                )) : ['New File', 'Search', 'Settings', 'Git', 'Terminal', 'Zen Mode'].map((action, i) => (
+                  return (
+                    <div key={i}
+                      onClick={(e) => { e.stopPropagation(); item.onClick?.(); setExpanded(false); }}
+                      className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                    >
+                      <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full" title={item.label}>{item.label}</MonoLabel>
+                    </div>
+                  )
+                }) : ['New File', 'Search', 'Settings', 'Git', 'Terminal', 'Zen Mode'].map((action, i) => (
                   <div key={i} className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden">
                     <MonoLabel className="group-hover:text-[var(--los-accent)] truncate w-full text-center" title={action}>{action}</MonoLabel>
                   </div>
