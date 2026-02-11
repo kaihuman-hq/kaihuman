@@ -119,7 +119,7 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
   }, [stats]);
 
   return (
-    <div className="flex flex-col h-full w-full gap-4">
+    <div className={cn("flex flex-col w-full gap-4", mode === 'SMALL' ? "h-full" : "min-h-full")}>
       {/* Activity Graph */}
       <div className="flex flex-col gap-1 overflow-x-auto pb-2 min-h-0 shrink-0">
         {/* Month Labels */}

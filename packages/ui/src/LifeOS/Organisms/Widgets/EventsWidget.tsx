@@ -24,7 +24,7 @@ export const EventsWidget = ({ content, mode, className }: EventsWidgetProps) =>
   }
 
   return (
-    <div className={cn("flex flex-col h-full w-full", className)}>
+    <div className={cn("flex flex-col w-full", mode === 'SMALL' ? "h-full" : "min-h-full", className)}>
       {/* HEADER */}
       <div className="flex justify-between items-center mb-4 shrink-0">
         <MonoHeader className="text-lg">UPCOMING</MonoHeader>
@@ -34,7 +34,7 @@ export const EventsWidget = ({ content, mode, className }: EventsWidgetProps) =>
       </div>
 
       {/* LIST */}
-      <div className="flex-1 overflow-y-auto min-h-0 border-t border-[var(--los-border)]">
+      <div className={cn("flex-1 min-h-0 border-t border-[var(--los-border)]", mode === 'SMALL' ? "overflow-y-auto" : "overflow-visible")}>
         {upcoming.map((item, i) => (
           <div
             key={i}

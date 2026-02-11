@@ -1640,8 +1640,26 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
   }, [tile.rawContent]);
 
   useEffect(() => {
-    // console.log('[FocusedTileInternal] Mounted/Updated. Tile ID:', tile.id, 'ViewMode:', viewMode);
-    // return () => console.log('[FocusedTileInternal] Unmounting. Tile ID:', tile.id);
+    const checkScroll = () => {
+      const ids = [
+        `focused-modal-container-${tile.id}`,
+        'focused-modal-inner',
+        'focused-modal-content-scroller'
+      ];
+
+      console.log('--- Scroll Debug ---');
+      ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          console.log(`${id}: scrollHeight=${el.scrollHeight}, clientHeight=${el.clientHeight}, scrollTop=${el.scrollTop}, overflow=${window.getComputedStyle(el).overflow}`);
+        } else {
+          console.log(`${id}: NOT FOUND`);
+        }
+      });
+    };
+
+    const interval = setInterval(checkScroll, 2000);
+    return () => clearInterval(interval);
   }, [tile.id]);
 
   return (
@@ -1652,10 +1670,12 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
         "left-0 right-0 mx-auto w-full max-w-screen-2xl" // Center & Constrain
       )}
       key={`focused-${tile.id}`}
+      id={`focused-modal-container-${tile.id}`}
     >
       <div
+        id="focused-modal-inner"
         className={cn(
-          "flex-1 border border-[var(--los-border)] flex flex-col relative animate-in fade-in slide-in-from-bottom-4 duration-300",
+          "flex-1 min-h-0 overflow-hidden border border-[var(--los-border)] flex flex-col relative animate-in fade-in slide-in-from-bottom-4 duration-300",
           zenMode ? "bg-transparent" : "bg-[var(--los-bg)]"
         )}
       >
@@ -1663,8 +1683,9 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
         <div className={cn(
           "min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2 transition-opacity duration-500",
           zenMode ? "opacity-10 hover:opacity-100" : "opacity-100"
-        )}>
-          {/* Mobile: Row 1 - Actions (Right Aligned) - Strictly hidden on Desktop */}
+        )}
+          id="focused-modal-header"
+        >    {/* Mobile: Row 1 - Actions (Right Aligned) - Strictly hidden on Desktop */}
           <div className="md:hidden">
             <div className="flex w-full justify-end gap-2 mb-2">
               <button
@@ -1771,7 +1792,10 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
 
           <div className="w-full overflow-x-auto scrollbar-hide pb-1">
             {hasWidget && (
-              <div className="flex bg-[var(--los-border)] rounded-sm p-0.5 overflow-x-auto w-full md:w-auto md:max-w-none scrollbar-hide shrink-0">
+              <div
+                id="focused-modal-tabs"
+                className="flex bg-[var(--los-border)] rounded-sm p-0.5 overflow-x-auto w-full md:w-auto md:max-w-none scrollbar-hide shrink-0"
+              >
                 <button
                   onClick={() => setViewMode('WIDGET')}
                   className={cn(
@@ -1904,7 +1928,12 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 min-h-0 relative overflow-hidden">
+        <div
+          id="focused-modal-content-scroller"
+          className={cn(
+            "flex-1 min-h-0 relative",
+            viewMode === 'CODE' ? "overflow-hidden" : "overflow-y-auto"
+          )}>
           {showHistory && (
             <FileHistoryView
               path={String(tile.id)}
@@ -1915,11 +1944,11 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
           {/* Content Area */}
           {/* Content Area */}
           {isAnyCsv && viewMode === 'TABLE' ? (
-            <div className="h-full w-full p-8">
+            <div className="min-h-full w-full p-8">
               <CsvTableView content={tile.rawContent || ''} />
             </div>
           ) : isBudget && (viewMode === 'WIDGET' || viewMode === 'ACCOUNTS' || viewMode === 'ADD') ? (
-            <div className="h-full w-full p-8">
+            <div className="min-h-full w-full p-8">
               <BudgetWidget
                 content={tile.rawContent || ''}
                 mode={viewMode as any}
@@ -1931,7 +1960,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
               />
             </div>
           ) : isActionLog && (viewMode === 'WIDGET' || viewMode === 'ADD') ? (
-            <div className="h-full w-full p-8">
+            <div className="min-h-full w-full p-8">
               <ActionLogWidget
                 content={tile.rawContent || ''}
                 mode={viewMode as any}
@@ -1942,7 +1971,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
               />
             </div>
           ) : viewMode === 'WIDGET' && hasWidget ? (
-            <div className="h-full w-full p-8">
+            <div className="min-h-full w-full p-8">
               {isTimeTracking && (
                 <TimeTrackingWidget
                   content={tile.rawContent!}
@@ -2021,13 +2050,13 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
               )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
-            <div className="h-full w-full p-8">
+            <div className="min-h-full w-full p-8">
               <TimeTrackingCharts
                 data={tile.rawContent!}
               />
             </div>
           ) : viewMode === 'ADD' && (isEvents || isTodos || isTimezones || isDataCollection) ? (
-            <div className="h-full w-full p-8 flex justify-center items-start">
+            <div className="min-h-full w-full p-8 flex justify-center items-start">
               {isEvents && (
                 <EventAddForm
                   onCancel={() => setViewMode('WIDGET')}
@@ -2081,15 +2110,17 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
             </div>
 
           ) : viewMode === 'COLUMNS' && isDataCollection ? (
-            <DataCollectionColumnManager
-              content={tile.rawContent || ''}
-              onChange={(newContent) => {
-                tile.onContentChange?.(newContent);
-                // Don't switch view, let them continue managing
-              }}
-            />
+            <div className="min-h-full w-full">
+              <DataCollectionColumnManager
+                content={tile.rawContent || ''}
+                onChange={(newContent) => {
+                  tile.onContentChange?.(newContent);
+                  // Don't switch view, let them continue managing
+                }}
+              />
+            </div>
           ) : viewMode === 'FEEDS' && isRss ? (
-            <div className="h-full w-full">
+            <div className="min-h-full w-full">
               <RssFeedManager
                 content={tile.rawContent || ''}
                 onChange={(newContent) => {
@@ -2098,7 +2129,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
               />
             </div>
           ) : viewMode === 'ARCHIVE' && isReadItLater ? (
-            <div className="h-full w-full">
+            <div className="min-h-full w-full">
               <ReadItLaterWidget
                 content={tile.rawContent!}
                 mode="FOCUS"
