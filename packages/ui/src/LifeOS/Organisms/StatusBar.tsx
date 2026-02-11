@@ -337,7 +337,7 @@ export const StatusBar = ({
             {/* Quick Links Toggle Button - Fix: Prevent Squeezing with shrink-0 */}
             <div
               onClick={handleToggleNavMode as any}
-              className="hidden md:flex flex items-center justify-center w-5 h-5 min-w-[1.25rem] shrink-0 border border-[var(--los-border)] hover:border-[var(--los-accent)] rounded-sm cursor-pointer transition-colors text-[10px] font-mono text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+              className="hidden md:flex items-center justify-center w-5 h-5 min-w-[1.25rem] shrink-0 border border-[var(--los-border)] hover:border-[var(--los-accent)] rounded-sm cursor-pointer transition-colors text-[10px] font-mono text-[var(--los-muted)] hover:text-[var(--los-fg)]"
               title={navMode === 'CONTEXT' ? "Switch to Quick Links" : "Switch to Context Selectors"}
             >
               {navMode === 'CONTEXT' ? '2' : '1'}
