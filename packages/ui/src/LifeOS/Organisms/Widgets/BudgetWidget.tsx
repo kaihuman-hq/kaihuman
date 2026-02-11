@@ -4,6 +4,7 @@ import { useMemo } from 'preact/hooks';
 import { parseBudget, serializeBudget, getCategoryStats, getAccountStats, BudgetTransaction, CATEGORIES } from './BudgetLogic';
 import { BudgetAddForm } from './BudgetAddForm';
 import { MonoLabel, MonoText } from '../../Atoms/Typography';
+import { cn } from '../../../utils';
 
 export interface BudgetWidgetProps {
   content: string;
@@ -37,7 +38,7 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
   }, [transactions]);
 
   const renderCategoryChart = () => (
-    <div className="flex flex-col gap-2 w-full h-full overflow-y-auto p-4 custom-scrollbar">
+    <div className={cn("flex flex-col gap-2 w-full p-4 custom-scrollbar", mode === 'SMALL' ? "h-full overflow-y-auto" : "min-h-full")}>
       <div className="flex justify-between items-center mb-4 border-b border-[var(--los-border)] pb-2">
         <MonoLabel>Total Balance</MonoLabel>
         <MonoText className={totalBalance >= 0 ? "text-green-500" : "text-red-500"}>
@@ -70,7 +71,7 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
   );
 
   const renderAccountChart = () => (
-    <div className="flex flex-col gap-2 w-full h-full overflow-y-auto p-4 custom-scrollbar">
+    <div className={cn("flex flex-col gap-2 w-full p-4 custom-scrollbar", mode === 'SMALL' ? "h-full overflow-y-auto" : "min-h-full")}>
       {accountStats.map(stat => (
         <div key={stat.id} className="flex flex-col gap-1 w-full">
           <div className="flex justify-between items-end">

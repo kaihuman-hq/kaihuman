@@ -135,13 +135,35 @@ export const appendAction = (data: ActionLogFile, description: string, tags: str
   const pad = (n: number) => n.toString().padStart(2, '0');
   const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 
-  const tagsStr = tags.map(t => `#${t}`).join(' ');
-  const fullDescription = tags.length > 0 ? `${description} ${tagsStr}` : description;
+  // Parse inline tags from description and merge with provided tags
+  const inlineTags: string[] = [];
+  const tagRegex = /#([\w-]+)/g;
+  let match;
+  while ((match = tagRegex.exec(description)) !== null) {
+    if (match[1]) inlineTags.push(match[1]);
+  }
+
+  // Combine and deduplicate tags
+  const allTags = Array.from(new Set([...tags, ...inlineTags]));
+
+  // Construct full description - if tags were provided explicitly, append them if not already inline
+  // Logic: 
+  // 1. If tag was inline, it's already in description.
+  // 2. If tag was in 'tags' array (input field), append it to description?
+  // The requirement says: "just add tags into the description by using the '#' character"
+  // It also implies we might still use the separate input. 
+  // Standard behavior: Append non-inline tags to the end of description string for storage consistency?
+  // Or just rely on 'tags' array for metadata and keep description as is?
+  // Existing logic appended tags to description. Let's keep that for non-inline tags.
+
+  const tagsToAppend = tags.filter(t => !description.includes(`#${t}`));
+  const tagsStr = tagsToAppend.map(t => `#${t}`).join(' ');
+  const fullDescription = tagsStr ? `${description} ${tagsStr}` : description;
 
   const newEntry: ActionLogEntry = {
     timestamp,
     description: fullDescription,
-    tags
+    tags: allTags
   };
 
   return {

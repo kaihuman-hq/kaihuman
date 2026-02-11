@@ -46,6 +46,12 @@ export const ActionLogAddForm = ({ onAdd, onCancel }: ActionLogAddFormProps) => 
             onInput={(e) => setDescription(e.currentTarget.value)}
             className="w-full bg-[var(--los-bg)] border border-[var(--los-border)] p-2 text-xs text-[var(--los-fg)] outline-none focus:border-[var(--los-accent)] transition-colors min-h-[80px]"
             placeholder="What happened?"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
+              }
+            }}
             autoFocus
           />
         </div>

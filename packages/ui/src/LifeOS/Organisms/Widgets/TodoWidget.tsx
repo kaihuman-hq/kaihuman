@@ -51,7 +51,7 @@ export const TodoWidget = ({ content, mode, className, onChange }: TodoWidgetPro
   }
 
   return (
-    <div className={cn("flex flex-col h-full w-full", className)}>
+    <div className={cn("flex flex-col w-full", mode === 'SMALL' ? "h-full" : "min-h-full", className)}>
       {/* HEADER */}
       <div className="flex justify-between items-center mb-4 shrink-0">
         <MonoHeader className="text-lg">TASKS</MonoHeader>
@@ -61,7 +61,7 @@ export const TodoWidget = ({ content, mode, className, onChange }: TodoWidgetPro
       </div>
 
       {/* LIST */}
-      <div className="flex-1 overflow-y-auto min-h-0 border-t border-[var(--los-border)]">
+      <div className={cn("flex-1 min-h-0 border-t border-[var(--los-border)]", mode === 'SMALL' ? "overflow-y-auto" : "overflow-visible")}>
         {displayData.groups.map((group, gIdx) => (
           <div key={group.name} className="mb-4 last:mb-0">
             <div className="sticky top-0 bg-[var(--los-bg)] py-2 border-b border-[var(--los-border)]/50 z-10 px-1">

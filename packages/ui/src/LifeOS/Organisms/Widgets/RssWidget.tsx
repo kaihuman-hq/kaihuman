@@ -131,7 +131,7 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
   const hasItems = items.length > 0;
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className={cn("flex flex-col w-full", mode === 'SMALL' ? "h-full" : "min-h-full")}>
       {config.feedOptions.length === 0 && (
         <div className="flex-1 flex flex-col items-center justify-center text-[var(--los-muted)] p-4 text-center">
           <Rss className="w-8 h-8 mb-2 opacity-50" />
@@ -154,7 +154,7 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
         </div>
       )}
 
-      <div className="divide-y divide-[var(--los-border)] overflow-y-auto">
+      <div className={cn("divide-y divide-[var(--los-border)]", mode === 'SMALL' ? "overflow-y-auto" : "overflow-visible")}>
         {items.map((item, idx) => (
           <RssItemRow
             key={`${item.feedId}-${item.guid || item.link}`}

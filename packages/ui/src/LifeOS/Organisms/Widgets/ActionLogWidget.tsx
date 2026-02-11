@@ -53,14 +53,14 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
 
   if (mode === 'ADD') {
     return (
-      <div className="h-full w-full p-4 overflow-y-auto">
+      <div className="w-full min-h-full p-4">
         <ActionLogAddForm onAdd={handleAdd} />
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full flex flex-col p-4 relative">
+    <div className={cn("w-full flex flex-col p-4 relative", mode === 'SMALL' ? "h-full" : "min-h-full")}>
       {/* Header */}
       {mode === 'SMALL' && (
         <div className="flex justify-between items-end mb-2 shrink-0">
@@ -93,7 +93,7 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
       )}
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
+      <div className={cn("flex-1 min-h-0 custom-scrollbar", mode === 'SMALL' ? "overflow-y-auto" : "overflow-visible")}>
         <div className="flex flex-col gap-3">
           {displayEntries.map((entry, idx) => (
             <div key={idx} className="flex flex-col gap-1 border-b border-[var(--los-border)] pb-2 last:border-0 last:pb-0">

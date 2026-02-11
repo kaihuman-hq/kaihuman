@@ -67,7 +67,7 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
   };
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className={cn("flex flex-col w-full", mode === 'SMALL' ? "h-full" : "min-h-full")}>
       {/* HEADER STATS */}
       <div className="flex justify-between items-end mb-4 shrink-0">
         <div>
@@ -127,7 +127,7 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
       </div>
 
       {/* HISTORY LIST (Visible in both, but expaned in FOCUS) */}
-      <div className="flex-1 overflow-y-auto min-h-0 border-t border-[var(--los-border)] pt-2 relative">
+      <div className={cn("flex-1 min-h-0 border-t border-[var(--los-border)] pt-2 relative", mode === 'SMALL' ? "overflow-y-auto" : "overflow-visible")}>
         <table className="w-full text-left border-collapse">
           <thead>
             <tr>
