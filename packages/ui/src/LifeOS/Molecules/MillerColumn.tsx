@@ -190,13 +190,16 @@ export const MillerColumn = ({
 
                 {/* Menu Trigger (Top Right) */}
                 {tile.type === 'FILE' && (
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute top-2 right-2 z-[100] animate-in fade-in duration-300">
                     <div
                       onClick={(e) => handleMenuTrigger(e, tile.id.toString())}
                       className={cn(
-                        "p-1 hover:bg-white/10 rounded cursor-pointer transition-colors relative",
-                        activeMenu?.id === tile.id ? "text-white bg-white/10 opacity-100" : "text-[var(--los-muted)] hover:text-white"
+                        "p-1.5 rounded-md cursor-pointer transition-all duration-200 relative",
+                        "bg-black/60 backdrop-blur-md shadow-sm border border-white/20",
+                        "text-white hover:bg-[var(--los-accent)] hover:border-[var(--los-accent)] hover:scale-110",
+                        activeMenu?.id === tile.id && "bg-[var(--los-accent)] border-[var(--los-accent)]"
                       )}
+                      title="File Options"
                     >
                       <MoreVertical size={16} />
                     </div>
