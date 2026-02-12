@@ -26,6 +26,7 @@ export const MillerColumn = ({
   onRequestMove
 }: MillerColumnProps) => {
   const [activeMenu, setActiveMenu] = useState<{ id: string, x: number, y: number } | null>(null);
+  const [hoveredTileId, setHoveredTileId] = useState<string | null>(null);
 
   // Search State
   const [showSearch, setShowSearch] = useState(false);
@@ -75,12 +76,12 @@ export const MillerColumn = ({
 
     return createPortal(
       <div
-        className="fixed z-[9999] bg-[#1a1a1f] border border-[var(--los-border)] shadow-xl rounded flex flex-col min-w-[120px] py-1 animate-in fade-in zoom-in-95 duration-100"
+        className="fixed z-[9999] bg-[#1a1a1f] border border-[var(--los-border)] shadow-xl rounded flex flex-col min-w-[120px] py-1 animate-in fade-in zoom-in-95 duration-100 text-white"
         style={{ top: activeMenu.y, left: activeMenu.x }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
+          className="px-3 py-2 hover:bg-white/10 flex items-center gap-2 cursor-pointer text-xs transition-colors"
           onClick={(e) => {
             e.stopPropagation();
             setActiveMenu(null);
@@ -96,7 +97,7 @@ export const MillerColumn = ({
           <Edit size={12} /> Rename
         </div>
         <div
-          className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
+          className="px-3 py-2 hover:bg-white/10 flex items-center gap-2 cursor-pointer text-xs transition-colors"
           onClick={(e) => {
             e.stopPropagation();
             setActiveMenu(null);
@@ -106,7 +107,7 @@ export const MillerColumn = ({
           <Move size={12} /> Move
         </div>
         <div
-          className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs text-red-400 hover:text-red-300"
+          className="px-3 py-2 hover:bg-red-500/20 flex items-center gap-2 cursor-pointer text-xs text-red-400 hover:text-red-300 transition-colors"
           onClick={(e) => {
             e.stopPropagation();
             setActiveMenu(null);
@@ -161,58 +162,70 @@ export const MillerColumn = ({
             "animate-in fade-in slide-in-from-right-4 duration-300"
           )}
         >
-          {filteredItems.map((tile) => (
-            <div
-              key={tile.id}
-              onClick={() => onItemClick(tile)}
-              className={cn(
-                "ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%] aspect-square flex items-center justify-center",
-                tile.type === 'FOLDER' ? "bg-[var(--los-accent)]/5" : "bg-[var(--los-bg)]"
-              )}
-            >
-              <div className="absolute inset-0 overflow-hidden p-6 flex flex-col items-center justify-center text-center">
+          {filteredItems.map((tile) => {
+            const isHovered = hoveredTileId === tile.id.toString();
+            const isMenuOpen = activeMenu?.id === tile.id.toString();
+            const showMenu = isHovered || isMenuOpen;
 
-                {/* Icon (Large) */}
-                <div className="mb-4 text-[var(--los-muted)] group-hover:text-[var(--los-accent)] transition-colors">
-                  {tile.type === 'FOLDER' ? <Folder size={32} /> : <FileText size={32} />}
-                </div>
-
-                {/* Title (Big & Focused) */}
-                <MonoText
-                  className={cn(
-                    "text-sm sm:text-base font-bold truncate w-full px-2",
-                    "text-[var(--los-fg)] group-hover:text-[var(--los-accent)] transition-colors"
-                  )}
-                  title={tile.title}
-                >
-                  {tile.title}
-                </MonoText>
-
-                {/* Menu Trigger (Top Right) */}
-                {tile.type === 'FILE' && (
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div
-                      onClick={(e) => handleMenuTrigger(e, tile.id.toString())}
-                      className={cn(
-                        "p-1 hover:bg-white/10 rounded cursor-pointer transition-colors relative",
-                        activeMenu?.id === tile.id ? "text-white bg-white/10 opacity-100" : "text-[var(--los-muted)] hover:text-white"
-                      )}
-                    >
-                      <MoreVertical size={16} />
-                    </div>
-                  </div>
+            return (
+              <div
+                key={tile.id}
+                onClick={() => onItemClick(tile)}
+                onMouseEnter={() => setHoveredTileId(tile.id.toString())}
+                onMouseLeave={() => setHoveredTileId(null)}
+                className={cn(
+                  "ring-1 ring-inset ring-[var(--los-border)] transition-colors group relative cursor-pointer w-full pb-[100%] aspect-square flex items-center justify-center",
+                  isHovered ? "bg-white/10" : (tile.type === 'FOLDER' ? "bg-[var(--los-accent)]/5" : "bg-[var(--los-bg)]")
                 )}
+              >
+                <div className="absolute inset-0 overflow-hidden p-6 flex flex-col items-center justify-center text-center">
 
-                {/* ID Label (Subtle, Bottom) */}
-                <div className="absolute bottom-2 text-center w-full opacity-0 group-hover:opacity-100 transition-opacity">
-                  <MonoText className="text-[9px] text-[var(--los-muted)] tracking-wider">
-                    {tile.id.toString().toUpperCase().slice(0, 4)}
+                  {/* Icon (Large) */}
+                  <div className="mb-4 text-[var(--los-muted)] group-hover:text-[var(--los-accent)] transition-colors">
+                    {tile.type === 'FOLDER' ? <Folder size={32} /> : <FileText size={32} />}
+                  </div>
+
+                  {/* Title (Big & Focused) */}
+                  <MonoText
+                    className={cn(
+                      "text-sm sm:text-base font-bold truncate w-full px-2",
+                      "text-[var(--los-fg)] group-hover:text-[var(--los-accent)] transition-colors"
+                    )}
+                    title={tile.title}
+                  >
+                    {tile.title}
                   </MonoText>
-                </div>
 
+                  {/* Menu Trigger (Top Right) */}
+                  {tile.type === 'FILE' && showMenu && (
+                    <div className="absolute top-2 right-2 z-[100] animate-in fade-in duration-200">
+                      <div
+                        onClick={(e) => handleMenuTrigger(e, tile.id.toString())}
+                        className={cn(
+                          "p-1.5 rounded-md cursor-pointer transition-all duration-200 relative",
+                          "bg-black/60 backdrop-blur-md shadow-sm border border-white/20",
+                          "text-white hover:bg-[var(--los-accent)] hover:border-[var(--los-accent)] hover:scale-110",
+                          isMenuOpen && "bg-[var(--los-accent)] border-[var(--los-accent)] opacity-100"
+                        )}
+                        title="File Options"
+                      >
+                        <MoreVertical size={16} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ID Label (Subtle, Bottom) */}
+                  {isHovered && (
+                    <div className="absolute bottom-2 text-center w-full animate-in fade-in duration-200">
+                      <MonoText className="text-[9px] text-[var(--los-muted)] tracking-wider">
+                        {tile.id.toString().toUpperCase().slice(0, 4)}
+                      </MonoText>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {filteredItems.length === 0 && (
             <div className="col-span-full h-32 flex flex-col items-center justify-center text-[var(--los-muted)] gap-2">
               <MonoText>No items found.</MonoText>

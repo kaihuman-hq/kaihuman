@@ -1,6 +1,6 @@
 import { ComponentChildren, h } from 'preact';
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
-import { memo } from 'preact/compat';
+import { memo, createPortal } from 'preact/compat';
 import { SettingsView } from '../Organisms/SettingsView';
 import { AddToDashboardModal } from '../Organisms/AddToDashboardModal';
 
@@ -53,7 +53,11 @@ import {
   X,
   History,
   GitCommit,
-  Share2
+  Share2,
+  MoreVertical,
+  Trash,
+  Edit,
+  Move
 } from 'lucide-preact';
 import {
   DndContext,
@@ -1218,6 +1222,9 @@ export const MainApp = ({
                                     dragEnabled={dragEnabled}
                                     isExpanded={expandedTiles.has(String(tile.id))}
                                     onToggleSize={() => toggleTileSize(tile.id)}
+                                    onDeleteFile={onDeleteFile}
+                                    onRenameFile={onRenameFile}
+                                    onRequestMove={(path: string) => setFileToMove(path)}
                                   />
                                 ))}
                               </div>
@@ -1244,7 +1251,13 @@ export const MainApp = ({
                         onClick={() => setActiveTileId(tile.id)}
                         className="bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full pb-[100%]"
                       >
-                        <TileContentStructure tile={tile} renderTileContent={renderTileContent} />
+                        <TileContentStructure
+                          tile={tile}
+                          renderTileContent={renderTileContent}
+                          onDeleteFile={onDeleteFile}
+                          onRenameFile={onRenameFile}
+                          onRequestMove={(path: string) => setFileToMove(path)}
+                        />
                       </div>
                     ))
                   )}
@@ -2189,48 +2202,134 @@ const FocusedTileMemo = memo(FocusedTileInternal, (prev, next) => {
   return idEqual && contentEqual && zenEqual;
 });
 
-const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpanded }: { tile: TileDef, renderTileContent: any, onToggleSize?: () => void, isExpanded?: boolean }) => (
-  <div className="absolute inset-0 overflow-hidden p-4 flex flex-col pointer-events-none">
-    <div className="flex justify-between items-start shrink-0 mb-2 pointer-events-auto">
-      <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity flex-1 mr-2 truncate">
-        {tile.title}
-      </MonoText>
+const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpanded, onDeleteFile, onRenameFile, onRequestMove }: { tile: TileDef, renderTileContent: any, onToggleSize?: () => void, isExpanded?: boolean, onDeleteFile?: (path: string) => void, onRenameFile?: (path: string, newPath: string) => void, onRequestMove?: (path: string) => void }) => {
+  const [activeMenu, setActiveMenu] = useState<{ id: string, x: number, y: number } | null>(null);
 
-      <div className="flex items-center gap-2">
-        {onToggleSize && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleSize();
-            }}
-            className="text-[var(--los-muted)] hover:text-[var(--los-accent)] transition-colors p-1"
-            title={isExpanded ? "Collapse" : "Expand"}
-          >
-            {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </button>
-        )}
+  useEffect(() => {
+    const handleClick = () => setActiveMenu(null);
+    if (activeMenu) {
+      window.addEventListener('click', handleClick);
+    }
+    return () => window.removeEventListener('click', handleClick);
+  }, [activeMenu]);
 
-        {tile.type === 'FOLDER' ? (
-          <div className="w-2 h-2 border border-[var(--los-muted)] rotate-45 shrink-0" />
-        ) : (
-          <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors shrink-0" />
-        )}
+  const handleMenuTrigger = (e: any) => {
+    e.stopPropagation();
+    if (activeMenu) {
+      setActiveMenu(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    // Position menu slightly to the left to avoid overflow
+    setActiveMenu({ id: String(tile.id), x: rect.right - 120, y: rect.bottom + 5 });
+  };
+
+  const renderContextMenu = () => {
+    if (!activeMenu) return null;
+
+    return createPortal(
+      <div
+        className="fixed z-[9999] bg-[#1a1a1f] border border-[var(--los-border)] shadow-xl rounded flex flex-col min-w-[120px] py-1 animate-in fade-in zoom-in-95 duration-100"
+        style={{ top: activeMenu.y, left: activeMenu.x }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveMenu(null);
+            const newName = prompt("Rename to:", tile.title);
+            if (newName && newName !== tile.title && onRenameFile) {
+              const parts = String(tile.id).split('/');
+              parts.pop();
+              const newPath = [...parts, newName].join('/');
+              onRenameFile(String(tile.id), newPath);
+            }
+          }}
+        >
+          <Edit size={12} /> Rename
+        </div>
+        <div
+          className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveMenu(null);
+            if (onRequestMove) onRequestMove(String(tile.id));
+          }}
+        >
+          <Move size={12} /> Move
+        </div>
+        <div
+          className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs text-red-400 hover:text-red-300"
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveMenu(null);
+            if (onDeleteFile) onDeleteFile(String(tile.id));
+          }}
+        >
+          <Trash size={12} /> Delete
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
+  return (
+    <div className="absolute inset-0 overflow-hidden p-4 flex flex-col pointer-events-none">
+      <div className="flex justify-between items-start shrink-0 mb-2 pointer-events-auto">
+        <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity flex-1 mr-2 truncate">
+          {tile.title}
+        </MonoText>
+
+        <div className="flex items-center gap-2">
+          {onToggleSize && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSize();
+              }}
+              className="text-[var(--los-muted)] hover:text-[var(--los-accent)] transition-colors p-1"
+              title={isExpanded ? "Collapse" : "Expand"}
+            >
+              {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+          )}
+
+          {tile.type === 'FILE' && onDeleteFile && (
+            <button
+              onClick={handleMenuTrigger}
+              className={cn(
+                "p-1 rounded cursor-pointer transition-colors",
+                activeMenu ? "text-white bg-white/10" : "text-[var(--los-muted)] hover:text-white"
+              )}
+            >
+              <MoreVertical size={14} />
+            </button>
+          )}
+
+          {tile.type === 'FOLDER' ? (
+            <div className="w-2 h-2 border border-[var(--los-muted)] rotate-45 shrink-0" />
+          ) : (
+            <div className="w-2 h-2 rounded-full border border-[var(--los-border)] group-hover:bg-[var(--los-accent)] transition-colors shrink-0" />
+          )}
+        </div>
       </div>
-    </div>
 
-    <div className="flex-1 overflow-y-auto min-h-0 w-full mb-2 pointer-events-auto">
-      {renderTileContent(tile, 'SMALL')}
-    </div>
+      <div className="flex-1 overflow-y-auto min-h-0 w-full mb-2 pointer-events-auto">
+        {renderTileContent(tile, 'SMALL')}
+      </div>
 
-    <div className="text-right shrink-0 mt-auto">
-      <MonoText className="text-[10px] text-[var(--los-muted)]">
-        {`ID: ${tile.id.toString().toUpperCase().slice(0, 4)}`}
-      </MonoText>
+      <div className="text-right shrink-0 mt-auto">
+        <MonoText className="text-[10px] text-[var(--los-muted)]">
+          {`ID: ${tile.id.toString().toUpperCase().slice(0, 4)}`}
+        </MonoText>
+      </div>
+      {renderContextMenu()}
     </div>
-  </div>
-);
+  );
+};
 
-const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDragStart, handleDragSave, dragEnabled, isExpanded, onToggleSize }: any) => {
+const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDragStart, handleDragSave, dragEnabled, isExpanded, onToggleSize, onDeleteFile, onRenameFile, onRequestMove }: any) => {
   const {
     attributes,
     listeners,
@@ -2302,7 +2401,15 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
         dragEnabled && "touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95"
       )}
     >
-      <TileContentStructure tile={tile} renderTileContent={renderTileContent} isExpanded={isExpanded} onToggleSize={onToggleSize} />
+      <TileContentStructure
+        tile={tile}
+        renderTileContent={renderTileContent}
+        isExpanded={isExpanded}
+        onToggleSize={onToggleSize}
+        onDeleteFile={onDeleteFile}
+        onRenameFile={onRenameFile}
+        onRequestMove={onRequestMove}
+      />
     </div>
   );
 };
