@@ -203,9 +203,50 @@ export const MainApp = ({
         layoutStore.setFocus(null);
         if (layoutStore.view.value === 'FILES') layoutStore.view.value = 'DASHBOARD';
       }
-      prevRepoName.current = props.currentRepository?.name;
     }
+    prevRepoName.current = props.currentRepository?.name;
   }, [props.currentRepository?.name]);
+
+  // THEME MANAGEMENT
+  useEffect(() => {
+    // 1. Determine effective theme
+    // Priority: Config Prop -> LocalStorage -> Default 'nexus'
+    // Actually, config prop IS the source of truth if available.
+    // Dashboard.tsx loads config. If config has theme, we use it.
+
+    let themeToUse: 'nexus' | 'light' | 'amethyst' = 'nexus';
+
+    if (config?.theme) {
+      themeToUse = config.theme;
+    } else {
+      // Fallback to localStorage if not in config (e.g. first load before config patch)
+      // or if config is not yet loaded? config is usually loaded by Dashboard before MainApp.
+      try {
+        const stored = localStorage.getItem('lifeos-theme');
+        if (stored === 'light' || stored === 'amethyst' || stored === 'nexus') {
+          themeToUse = stored;
+        }
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    // 2. Apply Theme
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', themeToUse);
+      // Also set on body for safety, or just root (html) as per styles.css [data-theme] selector which usually applies to children if on root.
+      // My styles.css uses [data-theme="..."] which matches any element with that attribute.
+      // If I put it on html, variables cascade.
+    }
+
+    // 3. Persist to LocalStorage (Cache)
+    try {
+      localStorage.setItem('lifeos-theme', themeToUse);
+    } catch (e) {
+      // Ignore
+    }
+
+  }, [config?.theme]);
 
   // --- STORE ACCESSORS ---
   const activeTileId = layoutStore.activeTileId.value;
@@ -1041,13 +1082,11 @@ export const MainApp = ({
 
       {/* Settings Overlay */}
       {showSettings && layoutStore.remoteConfig.value && onConfigChange && (
-        <div className="fixed inset-0 z-50 bg-[var(--los-bg)] animate-in fade-in zoom-in-95 duration-200">
-          <SettingsView
-            config={layoutStore.remoteConfig.value}
-            onConfigChange={onConfigChange}
-            onClose={() => setShowSettings(false)}
-          />
-        </div>
+        <SettingsView
+          config={layoutStore.remoteConfig.value}
+          onConfigChange={onConfigChange}
+          onClose={() => setShowSettings(false)}
+        />
       )}
 
       {showAddToDashboard && config && (

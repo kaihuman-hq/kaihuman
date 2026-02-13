@@ -168,6 +168,10 @@ export const Dashboard = () => {
           config={remoteConfig || undefined}
           fileContents={gridFileContents}
           onConfigChange={(newConfig) => {
+            // 1. Optimistic Update
+            layoutStore.remoteConfig.value = newConfig;
+
+            // 2. Persist
             const CONFIG_PATH = '.lifeos/.dashboard.config.json';
             const content = JSON.stringify(newConfig, null, 2);
             githubFileStore.updateFileContent(CONFIG_PATH, content);
