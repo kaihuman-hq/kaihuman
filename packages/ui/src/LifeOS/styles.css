@@ -2,13 +2,13 @@
 /* Scoped to .life-os-root or specific components to avoid bleeding */
 
 :root {
-  /* Colors */
+  /* Default to Nexus (Dark) */
   --los-bg: #000000;
   --los-fg: #e2e8f0;
   /* slate-200 */
   --los-border: #333333;
   --los-accent: #00FF00;
-  /* Neon Green / Terminal Green */
+  /* Neon Green */
   --los-accent-dim: rgba(0, 255, 0, 0.2);
   --los-muted: #64748b;
   /* slate-500 */
@@ -18,10 +18,81 @@
 
   /* Spacing */
   --los-gap: 0px;
-  /* The gapless philosophy */
 
   /* Components */
   --los-status-height: 32px;
+
+  /* Extended Theme Tokens */
+  --los-glass-bg: rgba(15, 15, 15, 0.6);
+  --los-glass-border: rgba(255, 255, 255, 0.08);
+  --los-glass-blur: 16px;
+  --los-glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+
+  --los-glass-tile-bg: linear-gradient(135deg, rgba(20, 20, 20, 0.7) 0%, rgba(10, 10, 10, 0.6) 100%);
+  --los-glass-tile-hover-bg: linear-gradient(135deg, rgba(30, 30, 30, 0.8) 0%, rgba(20, 20, 20, 0.7) 100%);
+  --los-glass-tile-hover-border: rgba(255, 255, 255, 0.15);
+
+  --los-cyber-grid-bg: #050505;
+  --los-cyber-grid-dot: rgba(255, 255, 255, 0.03);
+  --los-cyber-grid-glow: rgba(20, 40, 30, 0.2);
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  --los-bg: #f8fafc;
+  /* slate-50 */
+  --los-fg: #1e293b;
+  /* slate-800 */
+  --los-border: #cbd5e1;
+  /* slate-300 */
+  --los-accent: #2563eb;
+  /* Blue 600 */
+  --los-accent-dim: rgba(37, 99, 235, 0.1);
+  --los-muted: #64748b;
+  /* slate-500 */
+
+  /* Glass Overrides for Light */
+  --los-glass-bg: rgba(255, 255, 255, 0.6);
+  --los-glass-border: rgba(0, 0, 0, 0.05);
+  --los-glass-blur: 20px;
+  --los-glass-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+
+  --los-glass-tile-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(241, 245, 249, 0.7) 100%);
+  --los-glass-tile-hover-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.85) 100%);
+  --los-glass-tile-hover-border: rgba(37, 99, 235, 0.3);
+
+  --los-cyber-grid-bg: #f1f5f9;
+  /* slate-100 */
+  --los-cyber-grid-dot: rgba(0, 0, 0, 0.03);
+  --los-cyber-grid-glow: rgba(37, 99, 235, 0.05);
+}
+
+/* Amethyst Theme (Purple Dark) */
+[data-theme="amethyst"] {
+  --los-bg: #0f0518;
+  /* Deep Purple Black */
+  --los-fg: #e9d5ff;
+  /* purple-100 */
+  --los-border: #3b0764;
+  /* purple-950 */
+  --los-accent: #d946ef;
+  /* Fuchsia 500 */
+  --los-accent-dim: rgba(217, 70, 239, 0.15);
+  --los-muted: #a855f7;
+  /* purple-500 */
+
+  /* Glass Overrides for Amethyst */
+  --los-glass-bg: rgba(20, 5, 30, 0.6);
+  --los-glass-border: rgba(217, 70, 239, 0.2);
+  --los-glass-shadow: 0 4px 30px rgba(88, 28, 135, 0.15);
+
+  --los-glass-tile-bg: linear-gradient(135deg, rgba(30, 10, 40, 0.7) 0%, rgba(15, 5, 25, 0.6) 100%);
+  --los-glass-tile-hover-bg: linear-gradient(135deg, rgba(45, 15, 60, 0.8) 0%, rgba(30, 10, 40, 0.7) 100%);
+  --los-glass-tile-hover-border: rgba(217, 70, 239, 0.3);
+
+  --los-cyber-grid-bg: #0a0110;
+  --los-cyber-grid-dot: rgba(217, 70, 239, 0.05);
+  --los-cyber-grid-glow: rgba(88, 28, 135, 0.2);
 }
 
 .life-os-root {
@@ -37,12 +108,7 @@
 }
 
 /* Glassmorphism Utilities */
-:root {
-  --los-glass-bg: rgba(15, 15, 15, 0.6);
-  --los-glass-border: rgba(255, 255, 255, 0.08);
-  --los-glass-blur: 16px;
-  --los-glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-}
+/* Glassmorphism Utilities - Legacy :root block removed as it is now in main :root */
 
 .glass-panel {
   background: var(--los-glass-bg);
@@ -53,28 +119,29 @@
 }
 
 .glass-tile {
-  background: linear-gradient(135deg, rgba(20, 20, 20, 0.7) 0%, rgba(10, 10, 10, 0.6) 100%);
+  background: var(--los-glass-tile-bg);
   backdrop-filter: blur(var(--los-glass-blur));
   -webkit-backdrop-filter: blur(var(--los-glass-blur));
   border: 1px solid var(--los-glass-border);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+  /* Lighter shadow for broad compatibility */
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .glass-tile:hover {
-  background: linear-gradient(135deg, rgba(30, 30, 30, 0.8) 0%, rgba(20, 20, 20, 0.7) 100%);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--los-glass-tile-hover-bg);
+  border-color: var(--los-glass-tile-hover-border);
   transform: translateY(-2px);
-  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.1), 0 0 0 1px var(--los-glass-tile-hover-border);
 }
 
 /* Background Pattern */
 .cyber-grid-bg {
-  background-color: #050505;
+  background-color: var(--los-cyber-grid-bg);
   background-image:
-    radial-gradient(circle at 50% 50%, rgba(20, 40, 30, 0.2) 0%, transparent 50%),
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    radial-gradient(circle at 50% 50%, var(--los-cyber-grid-glow) 0%, transparent 50%),
+    linear-gradient(var(--los-cyber-grid-dot) 1px, transparent 1px),
+    linear-gradient(90deg, var(--los-cyber-grid-dot) 1px, transparent 1px);
   background-size: 100% 100%, 40px 40px, 40px 40px;
   background-position: center, center, center;
 }

@@ -84,7 +84,7 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
       <div className="w-full max-w-2xl bg-[var(--los-bg)] border border-[var(--los-accent)] shadow-2xl rounded-md overflow-hidden flex flex-col max-h-[80vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--los-border)]">
@@ -98,6 +98,33 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
           {/* Workspaces Section */}
           <section className="space-y-4">
             <div className="flex items-center justify-between border-b border-[var(--los-border)] pb-2">
+              <MonoText className="text-[var(--los-muted)] text-xs">APPEARANCE</MonoText>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {['nexus', 'light', 'amethyst'].map((theme) => (
+                <button
+                  key={theme}
+                  onClick={() => onConfigChange({ ...config, theme: theme as any })} // Cast because types might lag? No, types are updated.
+                  className={cn(
+                    "flex flex-col items-center gap-2 p-2 rounded border transition-all",
+                    config.theme === theme || (!config.theme && theme === 'nexus')
+                      ? "border-[var(--los-accent)] bg-[var(--los-accent-dim)]"
+                      : "border-[var(--los-border)] hover:border-[var(--los-fg)]"
+                  )}
+                >
+                  <div className={cn(
+                    "w-12 h-12 rounded-full border shadow-sm",
+                    theme === 'nexus' && "bg-[#000000] border-[#333333]",
+                    theme === 'light' && "bg-[#ffffff] border-[#e2e8f0]",
+                    theme === 'amethyst' && "bg-[#0f0518] border-[#3b0764]",
+                  )}></div>
+                  <MonoText className="text-[10px] uppercase">{theme}</MonoText>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between border-b border-[var(--los-border)] pb-2 pt-4">
               <MonoText className="text-[var(--los-muted)] text-xs">DASHBOARDS (WORKSPACES)</MonoText>
             </div>
 

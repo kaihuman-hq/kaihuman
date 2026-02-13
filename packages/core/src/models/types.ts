@@ -72,5 +72,6 @@ export interface DashboardConfig {
   version: number;
   dashboards: DashboardWorkspace[];
   entries: DashboardEntry[];
+  theme?: 'nexus' | 'light' | 'amethyst'; // Default 'nexus'
   files: DashboardFilesConfig;
 }
