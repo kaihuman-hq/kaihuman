@@ -123,37 +123,12 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
     const maxVal = Math.max(income, outcome, Math.abs(balance), 1);
 
     return (
-      <div className="flex flex-col justify-center h-full w-full p-4 gap-2">
-        {/* Income */}
-        <div className="flex flex-col gap-1">
-          <div className="flex justify-between text-[10px] uppercase text-[var(--los-muted)]">
-            <span>INCOME</span>
-            <span className="text-green-500">{income.toFixed(0)}</span>
-          </div>
-          <div className="h-1.5 w-full bg-[var(--los-border)] rounded-full overflow-hidden">
-            <div className="h-full bg-green-500 rounded-full" style={{ width: `${(income / maxVal) * 100}%` }} />
-          </div>
-        </div>
-        {/* Outcome */}
-        <div className="flex flex-col gap-1">
-          <div className="flex justify-between text-[10px] uppercase text-[var(--los-muted)]">
-            <span>OUTCOME</span>
-            <span className="text-red-500">{outcome.toFixed(0)}</span>
-          </div>
-          <div className="h-1.5 w-full bg-[var(--los-border)] rounded-full overflow-hidden">
-            <div className="h-full bg-red-500 rounded-full" style={{ width: `${(outcome / maxVal) * 100}%` }} />
-          </div>
-        </div>
-        {/* Balance */}
-        <div className="flex flex-col gap-1">
-          <div className="flex justify-between text-[10px] uppercase text-[var(--los-muted)]">
-            <span>BALANCE</span>
-            <span className={balance >= 0 ? "text-[var(--los-fg)]" : "text-red-500"}>{balance.toFixed(0)}</span>
-          </div>
-          <div className="h-1.5 w-full bg-[var(--los-border)] rounded-full overflow-hidden">
-            <div className={cn("h-full rounded-full", balance >= 0 ? "bg-[var(--los-fg)]" : "bg-red-500")} style={{ width: `${(Math.abs(balance) / maxVal) * 100}%` }} />
-          </div>
-        </div>
+
+      <div className="flex flex-col items-center justify-center h-full w-full p-2 gap-1 text-center">
+        <MonoHeader className={cn("text-2xl font-bold leading-none", balance >= 0 ? "text-[var(--los-fg)]" : "text-red-500")}>
+          {balance.toFixed(0)}
+        </MonoHeader>
+        <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-wider">BALANCE</MonoText>
       </div>
     );
   }

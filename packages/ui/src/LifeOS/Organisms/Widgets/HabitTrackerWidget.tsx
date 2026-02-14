@@ -122,12 +122,21 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
 
   if (mode === 'MOBILE_COLLAPSED') {
     return (
-      <div className="flex flex-col items-center justify-center h-full w-full p-4 text-center">
-        <div className="text-[var(--los-accent)] mb-2">
-          <Flame size={32} />
+      <div className="flex flex-col items-center justify-center h-full w-full p-2 text-center gap-1">
+        <div className="text-[var(--los-accent)]">
+          <Flame size={24} />
         </div>
-        <MonoHeader className="text-2xl font-bold">{stats.currentStreak}</MonoHeader>
-        <MonoText className="text-[10px] text-[var(--los-muted)] uppercase">DAY STREAK</MonoText>
+        <div className="flex gap-4 items-center">
+          <div className="flex flex-col items-center">
+            <MonoHeader className="text-xl font-bold leading-none">{stats.currentStreak}</MonoHeader>
+            <MonoText className="text-[8px] text-[var(--los-muted)] uppercase tracking-wider">DAYS</MonoText>
+          </div>
+          <div className="w-[1px] h-6 bg-[var(--los-border)]" />
+          <div className="flex flex-col items-center">
+            <MonoHeader className="text-xl font-bold leading-none">{stats.weekStreak}</MonoHeader>
+            <MonoText className="text-[8px] text-[var(--los-muted)] uppercase tracking-wider">WEEKS</MonoText>
+          </div>
+        </div>
       </div>
     );
   }
