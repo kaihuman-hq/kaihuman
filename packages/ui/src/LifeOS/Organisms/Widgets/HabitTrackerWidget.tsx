@@ -196,34 +196,36 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
   return (
     <div className={cn("flex flex-col w-full gap-4", mode === 'SMALL' ? "h-full" : "min-h-full")}>
       {/* Activity Graph */}
-      <div className="flex flex-col gap-1 overflow-x-auto pb-2 min-h-0 shrink-0">
-        {/* Month Labels */}
-        <div className="flex text-[10px] text-[var(--los-muted)] h-4 relative">
-          {monthLabels.map(l => (
-            <div key={l.index} className="absolute" style={{ left: `${l.index * 14}px` }}> {/* 12px box + 2px gap */}
-              {l.label}
-            </div>
-          ))}
-        </div>
+      <div className="flex flex-col overflow-x-auto pb-2 min-h-0 shrink-0 custom-scrollbar">
+        <div className="flex flex-col gap-1 mx-auto">
+          {/* Month Labels */}
+          <div className="flex text-[10px] text-[var(--los-muted)] h-4 relative">
+            {monthLabels.map(l => (
+              <div key={l.index} className="absolute" style={{ left: `${l.index * 14}px` }}> {/* 12px box + 2px gap */}
+                {l.label}
+              </div>
+            ))}
+          </div>
 
-        <div className="flex gap-[2px]">
-          {matrix.map((week, wIndex) => (
-            <div key={wIndex} className="flex flex-col gap-[2px]">
-              {week.map((day, dIndex) => (
-                <div
-                  key={dIndex}
-                  title={`${day.date.toDateString()}${day.status ? ' (Done)' : ''}`}
-                  className={cn(
-                    "w-3 h-3 rounded-[1px] transition-colors",
-                    day.status
-                      ? (day.isToday ? "bg-[var(--los-accent)] ring-1 ring-white" : "bg-[var(--los-accent)]")
-                      : "bg-white/10 hover:bg-white/20",
-                    day.isToday && !day.status && "ring-1 ring-[var(--los-muted)]"
-                  )}
-                />
-              ))}
-            </div>
-          ))}
+          <div className="flex gap-[2px]">
+            {matrix.map((week, wIndex) => (
+              <div key={wIndex} className="flex flex-col gap-[2px]">
+                {week.map((day, dIndex) => (
+                  <div
+                    key={dIndex}
+                    title={`${day.date.toDateString()}${day.status ? ' (Done)' : ''}`}
+                    className={cn(
+                      "w-3 h-3 rounded-[1px] transition-colors",
+                      day.status
+                        ? (day.isToday ? "bg-[var(--los-accent)] ring-1 ring-white" : "bg-[var(--los-accent)]")
+                        : "bg-white/10 hover:bg-white/20",
+                      day.isToday && !day.status && "ring-1 ring-[var(--los-muted)]"
+                    )}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
