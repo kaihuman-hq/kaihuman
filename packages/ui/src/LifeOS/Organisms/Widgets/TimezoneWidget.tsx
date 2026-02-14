@@ -69,6 +69,20 @@ export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneW
           </MonoText>
         </div>
 
+        {/* Extra Timezones */}
+        <div className="flex w-full gap-2 mt-2 mb-2">
+          {data.timezones.slice(0, 2).map(tz => {
+            const tzTime = getCurrentTimeInZone(tz.name);
+            const city = tz.cities[0] || tz.name.split('/')[1]?.replace(/_/g, ' ') || tz.name;
+            return (
+              <div key={tz.id} className="flex-1 flex flex-col items-center bg-white/5 rounded-md p-1 min-w-0">
+                <MonoHeader className="text-sm font-bold">{tzTime.time}</MonoHeader>
+                <MonoText className="text-[8px] text-[var(--los-muted)] truncate w-full text-center uppercase tracking-wider">{city}</MonoText>
+              </div>
+            );
+          })}
+        </div>
+
         {/* Bottom: Year Progress */}
         <div className="mt-auto pt-4 border-t border-[var(--los-border)]">
           <div className="flex justify-between items-end mb-1">
