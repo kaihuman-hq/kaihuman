@@ -69,6 +69,7 @@ export const calculateStats = (data: HabitData) => {
 
   const totalCount = sortedEntries.length;
   let currentStreak = 0;
+  let weekStreak = 0;
 
   if (sortedEntries.length > 0) {
     const toLocDate = (d: Date) => {
@@ -86,18 +87,10 @@ export const calculateStats = (data: HabitData) => {
     yesterday.setDate(today.getDate() - 1);
     const yesterdayIso = toLocDate(yesterday);
 
-    // Check if streak is active (today or yesterday must be checked)
-    // If multiple entries per day (shouldn't happen with set logic but good to handle), unique days matter.
-    // However, our checkIn logic allows multiple if dates are slightly different strings, but we normalize to iso date.
-
+    // DAILY STREAK
     const uniqueDates = Array.from(new Set(sortedEntries.map(e => e.date))).sort((a, b) => b.localeCompare(a));
 
     if (uniqueDates.length > 0) {
-      // If the newest entry is NOT today AND NOT yesterday, streak is broken -> 0
-      // Wait, if I checked in last week, streak is 0.
-      // If I checked in today, streak starts counting from today backwards.
-      // If I checked in yesterday, streak starts counting from yesterday backwards.
-
       const isToday = uniqueDates[0] === todayIso;
       const isYesterday = uniqueDates[0] === yesterdayIso;
 
@@ -122,7 +115,46 @@ export const calculateStats = (data: HabitData) => {
         }
       }
     }
+
+    // WEEKLY STREAK
+    // 1. Identify all unique weeks (represented by Sunday date string or timestamp)
+    const getSunday = (dateStr: string) => {
+      const d = new Date(dateStr);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - d.getDay()); // Go to Sunday
+      return d.getTime();
+    };
+
+    const uniqueWeeks = new Set(sortedEntries.map(e => getSunday(e.date)));
+
+    // 2. check streak from this week backwards
+    const thisWeekSunday = new Date(today);
+    thisWeekSunday.setDate(today.getDate() - today.getDay());
+    thisWeekSunday.setHours(0, 0, 0, 0);
+
+    let checkTime = thisWeekSunday.getTime();
+    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+
+    if (uniqueWeeks.has(checkTime)) {
+      weekStreak = 1;
+      checkTime -= oneWeekMs;
+      while (uniqueWeeks.has(checkTime)) {
+        weekStreak++;
+        checkTime -= oneWeekMs;
+      }
+    } else {
+      // Check last week
+      checkTime -= oneWeekMs;
+      if (uniqueWeeks.has(checkTime)) {
+        weekStreak = 1;
+        checkTime -= oneWeekMs;
+        while (uniqueWeeks.has(checkTime)) {
+          weekStreak++;
+          checkTime -= oneWeekMs;
+        }
+      }
+    }
   }
 
-  return { currentStreak, totalCount };
+  return { currentStreak, totalCount, weekStreak };
 }

@@ -9,7 +9,7 @@ import { CompactWidgetLayout, CompactList, CompactHero } from './CompactWidgetLa
 
 export interface TodoWidgetProps {
   content: string;
-  mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED';
+  mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED';
   className?: string;
   onChange?: (newContent: string) => void;
 }
@@ -30,7 +30,7 @@ export const TodoWidget = ({ content, mode, className, onChange }: TodoWidgetPro
 
   // In Small mode, hide old completed items.
   const displayData = useMemo(() => {
-    if (mode === 'SMALL' || mode === 'MOBILE_EXPANDED') return getVisibleTodos(data);
+    if (mode === 'SMALL' || mode === 'MOBILE_EXPANDED' || mode === 'MOBILE_COLLAPSED') return getVisibleTodos(data);
     return data;
   }, [data, mode]);
 
@@ -49,6 +49,18 @@ export const TodoWidget = ({ content, mode, className, onChange }: TodoWidgetPro
         <MonoText>No tasks.</MonoText>
       </div>
     );
+  }
+
+  if (mode === 'MOBILE_COLLAPSED') {
+    // Only show the number of open todos
+    const openTodosCount = displayData.groups.reduce((acc, g) => acc + g.todos.filter(t => !t.checked).length, 0);
+
+    return (
+      <div className={cn("flex flex-col items-center justify-center h-full w-full p-2 gap-1", className)}>
+        <MonoHeader className="text-4xl font-bold leading-none">{openTodosCount}</MonoHeader>
+        <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-wider">OPEN TASKS</MonoText>
+      </div>
+    )
   }
 
   if (mode === 'MOBILE_EXPANDED') {
