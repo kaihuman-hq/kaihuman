@@ -7,6 +7,7 @@ import { Logger } from '@lifosy/core';
 import { MonoText, MonoHeader } from '../../Atoms/Typography';
 import { cn } from '../../../utils';
 import { ExternalLink, MessageSquare, Check, RefreshCw, Trash2, Plus, Rss, Bookmark } from 'lucide-preact';
+import { CompactWidgetLayout, CompactList } from './CompactWidgetLayout';
 import { rssService } from './RssService';
 
 const logger = new Logger('RssWidget');
@@ -24,7 +25,7 @@ const useRenderLog = (name: string, props: any) => {
 
 interface RssWidgetProps {
   content?: string;
-  mode?: 'SMALL' | 'FOCUS';
+  mode?: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED';
   onChange?: (newContent: string) => void;
   onReadItLater?: (item: RssItem) => void;
   path?: string; // Kept for compatibility but ignored
@@ -140,31 +141,54 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
         </div>
       )}
 
-      {isLoading && !hasItems && config.feedOptions.length > 0 && (
-        <div className="flex-1 flex items-center justify-center text-[var(--los-muted)]">
-          <RefreshCw className="w-4 h-4 animate-spin mr-2" />
-          <MonoText>Fetching feeds...</MonoText>
-        </div>
-      )}
+      {mode === 'MOBILE_EXPANDED' ? (
+        <CompactWidgetLayout>
+          <div className="flex justify-between items-center shrink-0 border-b border-[var(--los-border)] pb-2">
+            <MonoHeader className="text-xs text-[var(--los-muted)]">FEEDS</MonoHeader>
+            <MonoText className="text-[10px] text-[var(--los-accent)]">{items.length} UNREAD</MonoText>
+          </div>
 
-      {!isLoading && !hasItems && config.feedOptions.length > 0 && (
-        <div className="flex-1 flex items-center justify-center text-[var(--los-muted)]">
-          <Check className="w-8 h-8 mb-2 opacity-50" />
-          <MonoText>All caught up!</MonoText>
-        </div>
-      )}
+          <CompactList>
+            {items.map((item, idx) => (
+              <RssItemRow
+                key={`${item.feedId}-${item.guid || item.link}`}
+                item={item}
+                onRead={handleRead}
+                onReadItLater={handleRil}
+                mode={mode}
+              />
+            ))}
+          </CompactList>
+        </CompactWidgetLayout>
+      ) : (
+        <>
+          {isLoading && !hasItems && config.feedOptions.length > 0 && (
+            <div className="flex-1 flex items-center justify-center text-[var(--los-muted)]">
+              <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+              <MonoText>Fetching feeds...</MonoText>
+            </div>
+          )}
 
-      <div className={cn("divide-y divide-[var(--los-border)]", mode === 'SMALL' ? "overflow-y-auto" : "overflow-visible")}>
-        {items.map((item, idx) => (
-          <RssItemRow
-            key={`${item.feedId}-${item.guid || item.link}`}
-            item={item}
-            onRead={handleRead}
-            onReadItLater={handleRil}
-            mode={mode}
-          />
-        ))}
-      </div>
+          {!isLoading && !hasItems && config.feedOptions.length > 0 && (
+            <div className="flex-1 flex items-center justify-center text-[var(--los-muted)]">
+              <Check className="w-8 h-8 mb-2 opacity-50" />
+              <MonoText>All caught up!</MonoText>
+            </div>
+          )}
+
+          <div className={cn("divide-y divide-[var(--los-border)]", mode === 'SMALL' ? "overflow-y-auto" : "overflow-visible")}>
+            {items.map((item, idx) => (
+              <RssItemRow
+                key={`${item.feedId}-${item.guid || item.link}`}
+                item={item}
+                onRead={handleRead}
+                onReadItLater={handleRil}
+                mode={mode}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -208,13 +232,15 @@ const RssItemRow = memo(({ item, onRead, onReadItLater, mode }: { item: RssItem 
             <div className="text-xs text-[var(--los-muted)] line-clamp-2 mt-1" dangerouslySetInnerHTML={{ __html: item.description }} />
           )}
           <div className="flex gap-4 mt-2">
-            {item.comments && (
+            {(mode !== 'MOBILE_EXPANDED' && item.comments) && (
               <a href={item.comments} target="_blank" rel="noopener noreferrer" className="flex items-center text-[10px] text-[var(--los-muted)] hover:text-[var(--los-fg)]" onClick={(e) => e.stopPropagation()}>
                 <MessageSquare className="w-3 h-3 mr-1" />
                 Comments
               </a>
             )}
-            <span className="text-[10px] text-[var(--los-muted)]">{item.pubDate ? new Date(item.pubDate).toLocaleDateString() : ''}</span>
+            {mode !== 'MOBILE_EXPANDED' && (
+              <span className="text-[10px] text-[var(--los-muted)]">{item.pubDate ? new Date(item.pubDate).toLocaleDateString() : ''}</span>
+            )}
           </div>
         </div>
 

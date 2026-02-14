@@ -7,7 +7,7 @@ import { Clock, Calendar, Globe, Trash2 } from 'lucide-preact';
 
 export interface TimezoneWidgetProps {
   content: string;
-  mode: 'SMALL' | 'FOCUS';
+  mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED';
   className?: string;
   onChange?: (newContent: string) => void;
 }
@@ -43,7 +43,7 @@ export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneW
   const localTzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const localTime = getCurrentTimeInZone(localTzName);
 
-  if (mode === 'SMALL') {
+  if (mode === 'SMALL' || mode === 'MOBILE_EXPANDED') {
     return (
       <div className={cn("flex flex-col h-full w-full p-2", className)}>
         {/* Top: Local Time Info */}

@@ -604,7 +604,7 @@ export const MainApp = ({
   const displayTiles = dashboardTiles;
 
   // Helper to render tile content (Widget vs Default)
-  const renderTileContent = (tile: TileDef, mode: 'SMALL' | 'FOCUS') => {
+  const renderTileContent = (tile: TileDef, mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED') => {
     if (tile.extension === '.timetracking.csv' && tile.rawContent) {
       return (
         <TimeTrackingWidget
@@ -716,7 +716,7 @@ export const MainApp = ({
       return (
         <BudgetWidget
           content={tile.rawContent}
-          mode={mode === 'FOCUS' ? 'FOCUS' : 'SMALL'}
+          mode={mode === 'FOCUS' ? 'FOCUS' : (mode === 'MOBILE_EXPANDED' ? 'MOBILE_EXPANDED' : 'SMALL')}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
@@ -725,7 +725,7 @@ export const MainApp = ({
       return (
         <ActionLogWidget
           content={tile.rawContent}
-          mode={mode === 'FOCUS' ? 'FOCUS' : 'SMALL'}
+          mode={mode === 'FOCUS' ? 'FOCUS' : (mode === 'MOBILE_EXPANDED' ? 'MOBILE_EXPANDED' : 'SMALL')}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
@@ -1264,6 +1264,7 @@ export const MainApp = ({
                                     onDeleteFile={onDeleteFile}
                                     onRenameFile={onRenameFile}
                                     onRequestMove={(path: string) => setFileToMove(path)}
+                                    isMobile={isMobile}
                                   />
                                 ))}
                               </div>
@@ -2368,7 +2369,7 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
   );
 };
 
-const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDragStart, handleDragSave, dragEnabled, isExpanded, onToggleSize, onDeleteFile, onRenameFile, onRequestMove }: any) => {
+const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDragStart, handleDragSave, dragEnabled, isExpanded, onToggleSize, onDeleteFile, onRenameFile, onRequestMove, isMobile }: any) => {
   const {
     attributes,
     listeners,
@@ -2406,7 +2407,7 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
   return (
     <div
       ref={setNodeRef}
-      style={style}
+
       {...(attributes as any)}
       {...(listeners as any)}
       onMouseDown={() => {
@@ -2433,23 +2434,32 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
       onClick={() => {
         if (!dragEnabled) setActiveTileId(tile.id);
       }}
-      className={cn(
         "bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full",
-        !isExpanded && "pb-[100%]", // Square if NOT expanded
-        isExpanded && "min-h-[calc(100dvh-5rem)] md:min-h-auto md:row-span-2 md:col-span-2 pb-0", // Mobile: tall, Desktop: 2x2 grid
-        dragEnabled && "touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95"
+    !isExpanded && (isMobile ? "h-40 pb-0" : "pb-[100%]"), // Mobile: Compact Fixed Height (h-40), Desktop: Square
+    isExpanded && "min-h-[60dvh] md:min-h-auto md:h-auto md:row-span-2 md:col-span-2 pb-0", // Mobile: Compact Expanded (60dvh > width), Desktop: 2x2 grid
+    dragEnabled && "touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95"
       )}
+style = {{
+        ...style,
+    paddingBottom: isExpanded || isMobile ? '0' : undefined // Force override pb-full if (expanded OR (mobile AND collapsed)) -> wait, logic above handles class. But style overrides class? No, class overrides if specific.
+  // Actually, pb-[100%] is a class. My inline style override was for `isExpanded`.
+  // Now I have `!isExpanded && isMobile` setting `pb-0` via class.
+  // But `style` prop might have `paddingBottom` from `...style` (sortable).
+  // Let's safe-guard:
+  paddingBottom: (isExpanded || isMobile) ? '0' : undefined
+}}
+      }}
     >
-      <TileContentStructure
-        tile={tile}
-        renderTileContent={renderTileContent}
-        isExpanded={isExpanded}
-        onToggleSize={onToggleSize}
-        onDeleteFile={onDeleteFile}
-        onRenameFile={onRenameFile}
-        onRequestMove={onRequestMove}
-      />
-    </div>
+  <TileContentStructure
+    tile={tile}
+    renderTileContent={(t: TileDef, m: any) => renderTileContent(t, isMobile && isExpanded ? 'MOBILE_EXPANDED' : 'SMALL')}
+    isExpanded={isExpanded}
+    onToggleSize={onToggleSize}
+    onDeleteFile={onDeleteFile}
+    onRenameFile={onRenameFile}
+    onRequestMove={onRequestMove}
+  />
+    </div >
   );
 };
 
