@@ -5,10 +5,11 @@ import { parseReadItLater, serializeReadItLater, markAsRead, markAsNew, deleteIt
 import { MonoText, MonoHeader } from '../../Atoms/Typography';
 import { cn } from '../../../utils';
 import { ExternalLink, Check, Trash2, Archive, RefreshCw, X, RotateCcw } from 'lucide-preact';
+import { CompactWidgetLayout, CompactList } from './CompactWidgetLayout';
 
 interface ReadItLaterWidgetProps {
   content: string;
-  mode?: 'SMALL' | 'FOCUS';
+  mode?: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED';
   focusMode?: 'WIDGET' | 'ARCHIVE' | 'CODE'; // Passed from parent
   onChange?: (newContent: string) => void;
 }
@@ -114,6 +115,52 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
     );
   }
 
+  if (mode === 'MOBILE_COLLAPSED') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full p-4 text-center">
+        <MonoHeader className="text-5xl font-bold text-[var(--los-fg)] mb-1">
+          {newItems.length}
+        </MonoHeader>
+        <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-widest">
+          SAVED ITEMS
+        </MonoText>
+      </div>
+    );
+  }
+
+  if (mode === 'MOBILE_EXPANDED') {
+    return (
+      <CompactWidgetLayout>
+        <div className="flex justify-between items-center shrink-0 border-b border-[var(--los-border)] pb-2">
+          <MonoHeader className="text-xs text-[var(--los-muted)]">READING LIST</MonoHeader>
+          <MonoText className="text-[10px] text-[var(--los-accent)]">{newItems.length} ITEMS</MonoText>
+        </div>
+
+        <CompactList>
+          {newItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-[var(--los-muted)] text-center">
+              <Check className="w-8 h-8 mb-2 opacity-50" />
+              <MonoText>All caught up!</MonoText>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {newItems.map(item => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  onPrimary={() => handleMarkAsRead(item.id)}
+                  primaryIcon={<Check className="w-4 h-4" />}
+                  primaryLabel="Mark Read"
+                  compact={true}
+                />
+              ))}
+            </div>
+          )}
+        </CompactList>
+      </CompactWidgetLayout>
+    )
+  }
+
   // Focus View
 
   if (focusMode === 'ARCHIVE') {
@@ -187,13 +234,15 @@ const ItemRow = ({
   onPrimary,
   primaryIcon,
   primaryLabel,
-  onDelete
+  onDelete,
+  compact = false
 }: {
   item: ReadItLaterItem,
   onPrimary: () => void,
   primaryIcon: any,
   primaryLabel: string,
-  onDelete?: () => void
+  onDelete?: () => void,
+  compact?: boolean
 }) => {
   const [primaryState, setPrimaryState] = useState<'IDLE' | 'LOADING'>('IDLE');
   const [deleteState, setDeleteState] = useState<'IDLE' | 'LOADING'>('IDLE');
@@ -234,8 +283,10 @@ const ItemRow = ({
         </div>
       </div>
 
+
+
       {/* Actions - Always Horizontal below */}
-      <div className="flex flex-row gap-3 mt-1 border-t border-[var(--los-border)] pt-2 shrink-0 w-full justify-end">
+      <div className={cn("flex flex-row gap-3 mt-1 border-t border-[var(--los-border)] pt-2 shrink-0 w-full justify-end", compact ? "py-1 mt-0" : "pt-2")}>
         <button
           onClick={(e) => { e.stopPropagation(); handlePrimary(); }}
           title={primaryLabel}
@@ -267,6 +318,6 @@ const ItemRow = ({
           </button>
         )}
       </div>
-    </div>
+    </div >
   )
 }

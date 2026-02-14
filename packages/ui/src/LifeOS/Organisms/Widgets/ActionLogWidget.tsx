@@ -1,13 +1,15 @@
 import { h } from 'preact';
 import { useMemo } from 'preact/hooks';
-import { ActionLogAddForm } from './ActionLogAddForm';
+
 import { parseActionLog, serializeActionLog, appendAction } from './ActionLogLogic';
 import { MonoText, MonoHeader } from '../../Atoms/Typography';
+import { ActionLogAddForm } from './ActionLogAddForm';
 import { cn } from '../../../utils';
+import { CompactWidgetLayout, CompactList } from './CompactWidgetLayout';
 
 export interface ActionLogWidgetProps {
   content: string;
-  mode: 'SMALL' | 'FOCUS' | 'ADD'; // Added ADD to align with MainApp prop spreading
+  mode: 'SMALL' | 'FOCUS' | 'ADD' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED'; // Added ADD to align with MainApp prop spreading
   onChange?: (newContent: string) => void;
 }
 
@@ -24,7 +26,7 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
   }, [data.entries]);
 
   // View limits: Small = 5, Focus = All
-  const displayEntries = mode === 'SMALL' ? sortedEntries.slice(0, 5) : sortedEntries;
+  const displayEntries = mode === 'SMALL' ? sortedEntries.slice(0, 10) : sortedEntries;
 
   const totalCount = data.entries.length;
 
@@ -57,6 +59,53 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
         <ActionLogAddForm onAdd={handleAdd} />
       </div>
     );
+  }
+
+  if (mode === 'MOBILE_COLLAPSED') {
+    // Count items from today
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayCount = data.entries.filter(e => e.timestamp && e.timestamp.startsWith(todayStr)).length;
+
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full p-4 text-center">
+        <MonoHeader className="text-5xl font-bold text-[var(--los-fg)] mb-1">
+          {todayCount}
+        </MonoHeader>
+        <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-widest">
+          ACTIONS TODAY
+        </MonoText>
+      </div>
+    );
+  }
+
+  if (mode === 'MOBILE_EXPANDED') {
+    const recentLogs = sortedEntries.slice(0, 3);
+    return (
+      <CompactWidgetLayout>
+        <div className="shrink-0 mb-4">
+          <MonoHeader className="text-xs text-[var(--los-muted)] mb-2">QUICK LOG</MonoHeader>
+          {/* Inline simplified add form or just re-use ActionLogAddForm but styled? 
+                       ActionLogAddForm currently takes full height. Let's wrap it in a container.
+                   */}
+          <div className="border border-[var(--los-border)] rounded-md overflow-hidden bg-[var(--los-bg)]">
+            <ActionLogAddForm onAdd={handleAdd} />
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[var(--los-bg)] pointer-events-none z-10 opactiy-50" />
+          <div className="flex flex-col gap-3 opacity-60">
+            <MonoHeader className="text-[10px] text-[var(--los-muted)]">RECENT</MonoHeader>
+            {recentLogs.map((entry, idx) => (
+              <div key={idx} className="flex gap-2 text-sm border-l-2 border-[var(--los-border)] pl-3">
+                <span className="text-[var(--los-muted)] text-xs whitespace-nowrap">{entry.timestamp.split(' ')[1]?.slice(0, 5)}</span>
+                <span className="truncate">{entry.description}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CompactWidgetLayout>
+    )
   }
 
   return (

@@ -8,7 +8,7 @@ import { MonoHeader, MonoText } from '../../Atoms/Typography';
 
 export interface DataCollectionWidgetProps {
   content: string;
-  mode: 'SMALL' | 'FOCUS';
+  mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED';
   onChange?: (newContent: string) => void;
   className?: string;
   // In Focus mode, we might receive a viewMode from parent via context or props if we lifted state up?
@@ -38,7 +38,7 @@ export const DataCollectionWidget = ({ content, mode, onChange, className }: Dat
   const [filterMode, setFilterMode] = useState<TimeFilterMode>('ALL');
 
   const filteredRows = useMemo(() => {
-    if (mode === 'SMALL') return data.rows;
+    if (mode === 'SMALL' || mode === 'MOBILE_EXPANDED') return data.rows;
     return filterDataByTime(data, filterMode);
   }, [data, filterMode, mode]);
 
@@ -71,7 +71,7 @@ export const DataCollectionWidget = ({ content, mode, onChange, className }: Dat
       )}
 
       {/* Internal Header only for Small mode */}
-      {mode === 'SMALL' && (
+      {(mode === 'SMALL' || mode === 'MOBILE_EXPANDED') && (
         <div className="flex justify-between items-center mb-2 px-1 pt-1 shrink-0">
           <MonoHeader className="text-sm">DATA</MonoHeader>
           <MonoText className="text-[10px] text-[var(--los-muted)]">
@@ -81,7 +81,7 @@ export const DataCollectionWidget = ({ content, mode, onChange, className }: Dat
       )}
 
       <div className="flex-1 min-h-0 relative">
-        <DataCollectionChart data={filteredData} hideLegend={mode === 'SMALL'} />
+        <DataCollectionChart data={filteredData} hideLegend={mode === 'SMALL' || mode === 'MOBILE_EXPANDED'} />
       </div>
 
       {/* Footer Stats for Focus Mode? */}

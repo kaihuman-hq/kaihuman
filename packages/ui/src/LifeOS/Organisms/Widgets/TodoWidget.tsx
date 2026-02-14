@@ -3,12 +3,13 @@ import { useMemo, useState } from 'preact/hooks';
 import { MonoText, MonoHeader } from '../../Atoms/Typography';
 import { parseTodos, getVisibleTodos, toggleTodo, serializeTodos, TodoData } from './TodoLogic';
 import { cn } from '../../../utils';
-import { Check, Circle } from 'lucide-preact';
+import { Check, Circle, Plus } from 'lucide-preact';
+import { CompactWidgetLayout, CompactList, CompactHero } from './CompactWidgetLayout';
 
 
 export interface TodoWidgetProps {
   content: string;
-  mode: 'SMALL' | 'FOCUS';
+  mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED';
   className?: string;
   onChange?: (newContent: string) => void;
 }
@@ -29,7 +30,7 @@ export const TodoWidget = ({ content, mode, className, onChange }: TodoWidgetPro
 
   // In Small mode, hide old completed items.
   const displayData = useMemo(() => {
-    if (mode === 'SMALL') return getVisibleTodos(data);
+    if (mode === 'SMALL' || mode === 'MOBILE_EXPANDED') return getVisibleTodos(data);
     return data;
   }, [data, mode]);
 
@@ -48,6 +49,53 @@ export const TodoWidget = ({ content, mode, className, onChange }: TodoWidgetPro
         <MonoText>No tasks.</MonoText>
       </div>
     );
+  }
+
+  if (mode === 'MOBILE_EXPANDED') {
+    const topTodos = displayData.groups.flatMap(g => g.todos).filter(t => !t.checked).slice(0, 5);
+    return (
+      <CompactWidgetLayout>
+        <div className="flex justify-between items-center shrink-0">
+          <MonoHeader className="text-xs text-[var(--los-muted)]">TOP PRIORITIES</MonoHeader>
+          <MonoText className="text-[10px] text-[var(--los-accent)]">{topTodos.length} DUE</MonoText>
+        </div>
+
+        <CompactList>
+          {topTodos.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-[var(--los-muted)]">No active tasks</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {topTodos.map((todo, idx) => (
+                <div
+                  key={todo.id}
+                  className="group flex items-start gap-3 py-3 border-b border-[var(--los-border)] last:border-0 hover:bg-white/5 transition-colors px-1 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Find group name for this todo
+                    const group = displayData.groups.find(g => g.todos.includes(todo));
+                    if (group) {
+                      // Find index within group
+                      const tIdx = group.todos.indexOf(todo);
+                      handleToggle(group.name, tIdx, todo.checked);
+                    }
+                  }}
+                >
+                  <div className="mt-0.5 shrink-0 text-[var(--los-muted)] group-hover:text-[var(--los-fg)]">
+                    <Circle size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <MonoText className="text-sm">{todo.text}</MonoText>
+                    <MonoText className="text-[10px] text-[var(--los-muted)] mt-0.5">
+                      {formatRelTime(todo.updatedAt)}
+                    </MonoText>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CompactList>
+      </CompactWidgetLayout>
+    )
   }
 
   return (

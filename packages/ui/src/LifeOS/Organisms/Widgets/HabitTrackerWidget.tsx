@@ -4,12 +4,14 @@ import { cn } from '../../../utils';
 import { MonoText, MonoHeader } from '../../Atoms/Typography';
 import { parseHabitData, isCheckedIn, checkIn, calculateStats, HabitData } from './HabitTrackerLogic';
 import { Logger } from '@lifosy/core';
+import { CompactWidgetLayout, CompactHero, CompactList } from './CompactWidgetLayout';
+import { Flame, CheckCircle, Calendar } from 'lucide-preact';
 
 const logger = new Logger('HabitTrackerWidget');
 
 interface HabitTrackerWidgetProps {
   content: string;
-  mode: 'SMALL' | 'FOCUS';
+  mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED';
   onChange?: (newContent: string) => void;
 }
 
@@ -117,6 +119,70 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
     }
     return `Start a streak today! Total completed: ${stats.totalCount}`;
   }, [stats]);
+
+  if (mode === 'MOBILE_COLLAPSED') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full p-4 text-center">
+        <div className="text-[var(--los-accent)] mb-2">
+          <Flame size={32} />
+        </div>
+        <MonoHeader className="text-2xl font-bold">{stats.currentStreak}</MonoHeader>
+        <MonoText className="text-[10px] text-[var(--los-muted)] uppercase">DAY STREAK</MonoText>
+      </div>
+    );
+  }
+
+  if (mode === 'MOBILE_EXPANDED') {
+    return (
+      <CompactWidgetLayout>
+        <CompactHero className="flex-1 justify-center">
+          <div className={cn("p-4 rounded-full mb-4 bg-white/5", isCheckedToday && "bg-[var(--los-accent)] text-black")}>
+            <Flame size={48} className={isCheckedToday ? "text-black" : "text-[var(--los-muted)]"} />
+          </div>
+
+          <MonoHeader className="text-3xl font-bold mb-1">{stats.currentStreak} DAY STREAK</MonoHeader>
+          <MonoText className="text-xs text-[var(--los-muted)] mb-6">
+            {isCheckedToday ? "You crushed it today!" : "Keep the flame alive!"}
+          </MonoText>
+
+          <button
+            disabled={isCheckedToday}
+            onClick={(e) => { e.stopPropagation(); handleCheckIn(today); }}
+            className={cn(
+              "flex items-center justify-center gap-2 px-6 py-3 border rounded-full transition-all active:scale-95 group w-full max-w-[200px]",
+              isCheckedToday
+                ? "border-[var(--los-accent)] bg-[var(--los-accent)] text-black cursor-default opacity-50"
+                : "border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black font-bold"
+            )}
+          >
+            <CheckCircle size={18} />
+            <span>{isCheckedToday ? "DONE" : "CHECK IN"}</span>
+          </button>
+        </CompactHero>
+
+        <div className="mt-auto border-t border-[var(--los-border)] pt-4 pb-2">
+          <MonoText className="text-[10px] text-[var(--los-muted)] mb-2 uppercase text-center">Last 20 Weeks</MonoText>
+          <div className="flex justify-center gap-[2px] opacity-70">
+            {matrix.map((week, wIndex) => (
+              <div key={wIndex} className="flex flex-col gap-[2px]">
+                {week.map((day, dIndex) => (
+                  <div
+                    key={dIndex}
+                    className={cn(
+                      "w-2.5 h-2.5 rounded-[1px]",
+                      day.status
+                        ? (day.isToday ? "bg-[var(--los-accent)] ring-1 ring-white" : "bg-[var(--los-accent)]")
+                        : "bg-white/10"
+                    )}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </CompactWidgetLayout>
+    )
+  }
 
   return (
     <div className={cn("flex flex-col w-full gap-4", mode === 'SMALL' ? "h-full" : "min-h-full")}>

@@ -3,17 +3,18 @@ import { useMemo } from 'preact/hooks';
 import { MonoText, MonoHeader } from '../../Atoms/Typography';
 import { parseEvents, getUpcomingEvents, EventsData } from './EventsLogic';
 import { cn } from '../../../utils';
-import { Calendar, Gift } from 'lucide-preact';
+import { Calendar, Gift, Clock } from 'lucide-preact';
+import { CompactWidgetLayout, CompactList } from './CompactWidgetLayout';
 
 export interface EventsWidgetProps {
   content: string;
-  mode: 'SMALL' | 'FOCUS';
+  mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED';
   className?: string; // For layout flexibility
 }
 
 export const EventsWidget = ({ content, mode, className }: EventsWidgetProps) => {
   const data: EventsData = useMemo(() => parseEvents(content), [content]);
-  const upcoming = useMemo(() => getUpcomingEvents(data, mode === 'SMALL' ? 8 : undefined), [data, mode]);
+  const upcoming = useMemo(() => getUpcomingEvents(data, mode === 'SMALL' ? 8 : (mode === 'MOBILE_EXPANDED' ? 12 : undefined)), [data, mode]);
 
   if (upcoming.length === 0) {
     return (
@@ -24,17 +25,27 @@ export const EventsWidget = ({ content, mode, className }: EventsWidgetProps) =>
   }
 
   return (
-    <div className={cn("flex flex-col w-full", mode === 'SMALL' ? "h-full" : "min-h-full", className)}>
+    <div className={cn("flex flex-col w-full", mode === 'SMALL' || mode === 'MOBILE_EXPANDED' ? "h-full" : "min-h-full", className)}>
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-4 shrink-0">
-        <MonoHeader className="text-lg">UPCOMING</MonoHeader>
-        <MonoText className="text-[10px] text-[var(--los-muted)]">
-          {upcoming.length} EVENT{upcoming.length !== 1 ? 'S' : ''}
-        </MonoText>
-      </div>
+      {/* Custom reduced header for Mobile Expanded */}
+      {mode === 'MOBILE_EXPANDED' ? (
+        <div className="flex justify-between items-center mb-2 shrink-0 px-1 pt-2">
+          <MonoHeader className="text-xs text-[var(--los-muted)]">UPCOMING EVENTS</MonoHeader>
+          <MonoText className="text-[10px] text-[var(--los-accent)]">
+            {upcoming.length}
+          </MonoText>
+        </div>
+      ) : (
+        <div className="flex justify-between items-center mb-4 shrink-0">
+          <MonoHeader className="text-lg">UPCOMING</MonoHeader>
+          <MonoText className="text-[10px] text-[var(--los-muted)]">
+            {upcoming.length} EVENT{upcoming.length !== 1 ? 'S' : ''}
+          </MonoText>
+        </div>
+      )}
 
       {/* LIST */}
-      <div className={cn("flex-1 min-h-0 border-t border-[var(--los-border)]", mode === 'SMALL' ? "overflow-y-auto" : "overflow-visible")}>
+      <div className={cn("flex-1 min-h-0 border-t border-[var(--los-border)]", mode === 'SMALL' || mode === 'MOBILE_EXPANDED' ? "overflow-y-auto" : "overflow-visible")}>
         {upcoming.map((item, i) => (
           <div
             key={i}
@@ -77,10 +88,10 @@ export const EventsWidget = ({ content, mode, className }: EventsWidgetProps) =>
       </div>
 
       {/* Footer hint if truncated */}
-      {mode === 'SMALL' && getUpcomingEvents(data, 100).length > 8 && ( // Check if more exist
+      {(mode === 'SMALL' || mode === 'MOBILE_EXPANDED') && getUpcomingEvents(data, 100).length > upcoming.length && ( // Check if more exist
         <div className="text-center pt-2 border-t border-[var(--los-border)]">
           <MonoText className="text-[10px] text-[var(--los-muted)]">
-            + {getUpcomingEvents(data, 100).length - 8} more in Focus Mode
+            + {getUpcomingEvents(data, 100).length - upcoming.length} more in Focus Mode
           </MonoText>
         </div>
       )}

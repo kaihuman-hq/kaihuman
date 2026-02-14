@@ -1,6 +1,7 @@
 import { h } from 'preact';
 import { useMemo } from 'preact/hooks';
-import { Play, Square, Pause } from 'lucide-preact';
+import { Play, Square, Pause, Clock } from 'lucide-preact';
+import { CompactWidgetLayout, CompactHero, CompactList } from './CompactWidgetLayout';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
 import {
   parseTimeTracking,
@@ -17,7 +18,7 @@ import { cn } from '../../../utils';
 export interface TimeTrackingWidgetProps {
   content: string;
   onChange: (newContent: string) => void;
-  mode: 'SMALL' | 'FOCUS';
+  mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED';
 }
 
 export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidgetProps) => {
@@ -65,6 +66,73 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
     const newData = addPause(data, minutes);
     onChange(serializeTimeTracking(newData));
   };
+
+  if (mode === 'MOBILE_COLLAPSED') {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+    return (
+      <div className="flex justify-between items-center h-full w-full p-4">
+        <div className="flex flex-col justify-center">
+          <MonoText className="text-[10px] text-[var(--los-muted)] uppercase mb-1">TRACKED TODAY</MonoText>
+          <MonoHeader className={cn(
+            "text-3xl font-bold",
+            active ? "text-[var(--los-accent)]" : "text-[var(--los-fg)]"
+          )}>
+            {formatDuration(todayMinutes)}
+          </MonoHeader>
+        </div>
+        <div className="flex flex-col items-end justify-center text-right border-l border-[var(--los-border)] pl-4 h-full">
+          <MonoHeader className="text-xl text-[var(--los-fg)]">{timeStr}</MonoHeader>
+          <MonoText className="text-xs text-[var(--los-muted)]">{dateStr}</MonoText>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'MOBILE_EXPANDED') {
+    return (
+      <CompactWidgetLayout>
+        <CompactHero className="flex-1 justify-center">
+          <MonoText className="text-xs text-[var(--los-muted)] uppercase tracking-wide mb-2">
+            Today
+          </MonoText>
+          <MonoHeader className={cn(
+            "text-6xl font-bold mb-4",
+            active ? "text-[var(--los-accent)]" : "text-[var(--los-fg)]"
+          )}>
+            {formatDuration(todayMinutes)}
+          </MonoHeader>
+          <button
+            onClick={handleStartStop}
+            className={cn(
+              "flex items-center justify-center gap-3 px-8 py-4 border rounded-full transition-all active:scale-95 group mb-6",
+              active
+                ? "border-[var(--los-accent)] bg-[var(--los-accent)] text-black"
+                : "border-[var(--los-border)] hover:bg-white/5 text-[var(--los-fg)]"
+            )}
+          >
+            {active ? <Square size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
+            <MonoText className="font-bold text-lg">{active ? "STOP" : "START"}</MonoText>
+          </button>
+        </CompactHero>
+
+        <div className="grid grid-cols-2 gap-4 border-t border-[var(--los-border)] pt-4">
+          <div className="text-center">
+            <MonoText className="text-[10px] text-[var(--los-muted)] uppercase">THIS WEEK</MonoText>
+            <MonoText className="text-xl">{formatDuration(weekMinutes)}</MonoText>
+          </div>
+          <div className="text-center">
+            <MonoText className="text-[10px] text-[var(--los-muted)] uppercase">STATUS</MonoText>
+            <MonoText className={cn("text-xl", active ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")}>
+              {active ? "RUNNING" : "PAUSED"}
+            </MonoText>
+          </div>
+        </div>
+      </CompactWidgetLayout>
+    );
+  }
 
   return (
     <div className={cn("flex flex-col w-full", mode === 'SMALL' ? "h-full" : "min-h-full")}>
