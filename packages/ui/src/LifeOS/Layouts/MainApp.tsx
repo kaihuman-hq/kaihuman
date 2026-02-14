@@ -2434,31 +2434,26 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
       onClick={() => {
         if (!dragEnabled) setActiveTileId(tile.id);
       }}
+      className={cn(
         "bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full",
-    !isExpanded && (isMobile ? "h-40 pb-0" : "pb-[100%]"), // Mobile: Compact Fixed Height (h-40), Desktop: Square
-    isExpanded && "min-h-[60dvh] md:min-h-auto md:h-auto md:row-span-2 md:col-span-2 pb-0", // Mobile: Compact Expanded (60dvh > width), Desktop: 2x2 grid
-    dragEnabled && "touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95"
+        !isExpanded && (isMobile ? "h-40 pb-0" : "pb-[100%]"), // Mobile: Compact Fixed Height (h-40), Desktop: Square
+        isExpanded && "min-h-[60dvh] md:min-h-auto md:h-auto md:row-span-2 md:col-span-2 pb-0", // Mobile: Compact Expanded (60dvh > width), Desktop: 2x2 grid
+        dragEnabled && "touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95"
       )}
-style = {{
+      style={{
         ...style,
-    paddingBottom: isExpanded || isMobile ? '0' : undefined // Force override pb-full if (expanded OR (mobile AND collapsed)) -> wait, logic above handles class. But style overrides class? No, class overrides if specific.
-  // Actually, pb-[100%] is a class. My inline style override was for `isExpanded`.
-  // Now I have `!isExpanded && isMobile` setting `pb-0` via class.
-  // But `style` prop might have `paddingBottom` from `...style` (sortable).
-  // Let's safe-guard:
-  paddingBottom: (isExpanded || isMobile) ? '0' : undefined
-}}
+        paddingBottom: (isExpanded || isMobile) ? '0' : undefined
       }}
     >
-  <TileContentStructure
-    tile={tile}
-    renderTileContent={(t: TileDef, m: any) => renderTileContent(t, isMobile && isExpanded ? 'MOBILE_EXPANDED' : 'SMALL')}
-    isExpanded={isExpanded}
-    onToggleSize={onToggleSize}
-    onDeleteFile={onDeleteFile}
-    onRenameFile={onRenameFile}
-    onRequestMove={onRequestMove}
-  />
+      <TileContentStructure
+        tile={tile}
+        renderTileContent={(t: TileDef, m: any) => renderTileContent(t, isMobile && isExpanded ? 'MOBILE_EXPANDED' : 'SMALL')}
+        isExpanded={isExpanded}
+        onToggleSize={onToggleSize}
+        onDeleteFile={onDeleteFile}
+        onRenameFile={onRenameFile}
+        onRequestMove={onRequestMove}
+      />
     </div >
   );
 };
