@@ -11,7 +11,7 @@ const logger = new Logger('HabitTrackerWidget');
 
 interface HabitTrackerWidgetProps {
   content: string;
-  mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED';
+  mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED';
   onChange?: (newContent: string) => void;
 }
 
@@ -119,6 +119,18 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
     }
     return `Start a streak today! Total completed: ${stats.totalCount}`;
   }, [stats]);
+
+  if (mode === 'MOBILE_COLLAPSED') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full p-4 text-center">
+        <div className="text-[var(--los-accent)] mb-2">
+          <Flame size={32} />
+        </div>
+        <MonoHeader className="text-2xl font-bold">{stats.currentStreak}</MonoHeader>
+        <MonoText className="text-[10px] text-[var(--los-muted)] uppercase">DAY STREAK</MonoText>
+      </div>
+    );
+  }
 
   if (mode === 'MOBILE_EXPANDED') {
     return (

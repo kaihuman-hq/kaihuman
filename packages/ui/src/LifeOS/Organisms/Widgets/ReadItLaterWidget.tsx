@@ -9,7 +9,7 @@ import { CompactWidgetLayout, CompactList } from './CompactWidgetLayout';
 
 interface ReadItLaterWidgetProps {
   content: string;
-  mode?: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED';
+  mode?: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED';
   focusMode?: 'WIDGET' | 'ARCHIVE' | 'CODE'; // Passed from parent
   onChange?: (newContent: string) => void;
 }
@@ -111,6 +111,19 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
             ))}
           </div>
         )}
+      </div>
+    );
+  }
+
+  if (mode === 'MOBILE_COLLAPSED') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full p-4 text-center">
+        <MonoHeader className="text-5xl font-bold text-[var(--los-fg)] mb-1">
+          {newItems.length}
+        </MonoHeader>
+        <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-widest">
+          SAVED ITEMS
+        </MonoText>
       </div>
     );
   }

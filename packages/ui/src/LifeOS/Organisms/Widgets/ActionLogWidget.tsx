@@ -9,7 +9,7 @@ import { CompactWidgetLayout, CompactList } from './CompactWidgetLayout';
 
 export interface ActionLogWidgetProps {
   content: string;
-  mode: 'SMALL' | 'FOCUS' | 'ADD' | 'MOBILE_EXPANDED'; // Added ADD to align with MainApp prop spreading
+  mode: 'SMALL' | 'FOCUS' | 'ADD' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED'; // Added ADD to align with MainApp prop spreading
   onChange?: (newContent: string) => void;
 }
 
@@ -57,6 +57,23 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
     return (
       <div className="w-full min-h-full p-4">
         <ActionLogAddForm onAdd={handleAdd} />
+      </div>
+    );
+  }
+
+  if (mode === 'MOBILE_COLLAPSED') {
+    // Count items from today
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayCount = data.entries.filter(e => e.timestamp && e.timestamp.startsWith(todayStr)).length;
+
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full p-4 text-center">
+        <MonoHeader className="text-5xl font-bold text-[var(--los-fg)] mb-1">
+          {todayCount}
+        </MonoHeader>
+        <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-widest">
+          ACTIONS TODAY
+        </MonoText>
       </div>
     );
   }

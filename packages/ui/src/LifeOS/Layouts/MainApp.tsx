@@ -604,7 +604,7 @@ export const MainApp = ({
   const displayTiles = dashboardTiles;
 
   // Helper to render tile content (Widget vs Default)
-  const renderTileContent = (tile: TileDef, mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED') => {
+  const renderTileContent = (tile: TileDef, mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED') => {
     if (tile.extension === '.timetracking.csv' && tile.rawContent) {
       return (
         <TimeTrackingWidget
@@ -716,7 +716,7 @@ export const MainApp = ({
       return (
         <BudgetWidget
           content={tile.rawContent}
-          mode={mode === 'FOCUS' ? 'FOCUS' : (mode === 'MOBILE_EXPANDED' ? 'MOBILE_EXPANDED' : 'SMALL')}
+          mode={mode === 'FOCUS' ? 'FOCUS' : (mode === 'MOBILE_EXPANDED' ? 'MOBILE_EXPANDED' : (mode === 'MOBILE_COLLAPSED' ? 'MOBILE_COLLAPSED' : 'SMALL'))}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
@@ -725,7 +725,7 @@ export const MainApp = ({
       return (
         <ActionLogWidget
           content={tile.rawContent}
-          mode={mode === 'FOCUS' ? 'FOCUS' : (mode === 'MOBILE_EXPANDED' ? 'MOBILE_EXPANDED' : 'SMALL')}
+          mode={mode === 'FOCUS' ? 'FOCUS' : (mode === 'MOBILE_EXPANDED' ? 'MOBILE_EXPANDED' : (mode === 'MOBILE_COLLAPSED' ? 'MOBILE_COLLAPSED' : 'SMALL'))}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
@@ -2436,7 +2436,7 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
       }}
       className={cn(
         "bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full",
-        !isExpanded && (isMobile ? "h-40 pb-0" : "pb-[100%]"), // Mobile: Compact Fixed Height (h-40), Desktop: Square
+        !isExpanded && (isMobile ? "h-44 pb-0" : "pb-[100%]"), // Mobile: Compact Fixed Height (h-44), Desktop: Square
         isExpanded && "min-h-[60dvh] md:min-h-auto md:h-auto md:row-span-2 md:col-span-2 pb-0", // Mobile: Compact Expanded (60dvh > width), Desktop: 2x2 grid
         dragEnabled && "touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95"
       )}
@@ -2447,7 +2447,7 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
     >
       <TileContentStructure
         tile={tile}
-        renderTileContent={(t: TileDef, m: any) => renderTileContent(t, isMobile && isExpanded ? 'MOBILE_EXPANDED' : 'SMALL')}
+        renderTileContent={(t: TileDef, m: any) => renderTileContent(t, isMobile ? (isExpanded ? 'MOBILE_EXPANDED' : 'MOBILE_COLLAPSED') : 'SMALL')}
         isExpanded={isExpanded}
         onToggleSize={onToggleSize}
         onDeleteFile={onDeleteFile}

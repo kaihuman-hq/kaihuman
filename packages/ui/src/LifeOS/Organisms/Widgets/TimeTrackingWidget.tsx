@@ -18,7 +18,7 @@ import { cn } from '../../../utils';
 export interface TimeTrackingWidgetProps {
   content: string;
   onChange: (newContent: string) => void;
-  mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED';
+  mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED';
 }
 
 export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidgetProps) => {
@@ -66,6 +66,30 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
     const newData = addPause(data, minutes);
     onChange(serializeTimeTracking(newData));
   };
+
+  if (mode === 'MOBILE_COLLAPSED') {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+    return (
+      <div className="flex justify-between items-center h-full w-full p-4">
+        <div className="flex flex-col justify-center">
+          <MonoText className="text-[10px] text-[var(--los-muted)] uppercase mb-1">TRACKED TODAY</MonoText>
+          <MonoHeader className={cn(
+            "text-3xl font-bold",
+            active ? "text-[var(--los-accent)]" : "text-[var(--los-fg)]"
+          )}>
+            {formatDuration(todayMinutes)}
+          </MonoHeader>
+        </div>
+        <div className="flex flex-col items-end justify-center text-right border-l border-[var(--los-border)] pl-4 h-full">
+          <MonoHeader className="text-xl text-[var(--los-fg)]">{timeStr}</MonoHeader>
+          <MonoText className="text-xs text-[var(--los-muted)]">{dateStr}</MonoText>
+        </div>
+      </div>
+    );
+  }
 
   if (mode === 'MOBILE_EXPANDED') {
     return (

@@ -25,7 +25,7 @@ const useRenderLog = (name: string, props: any) => {
 
 interface RssWidgetProps {
   content?: string;
-  mode?: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED';
+  mode?: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED';
   onChange?: (newContent: string) => void;
   onReadItLater?: (item: RssItem) => void;
   path?: string; // Kept for compatibility but ignored
@@ -141,7 +141,16 @@ const RssWidgetInternal = ({ content, mode = 'SMALL', onChange, onReadItLater }:
         </div>
       )}
 
-      {mode === 'MOBILE_EXPANDED' ? (
+      {mode === 'MOBILE_COLLAPSED' ? (
+        <div className="flex flex-col items-center justify-center h-full w-full p-4 text-center">
+          <MonoHeader className="text-5xl font-bold text-[var(--los-accent)] mb-1">
+            {items.length}
+          </MonoHeader>
+          <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-widest">
+            UNREAD ITEMS
+          </MonoText>
+        </div>
+      ) : mode === 'MOBILE_EXPANDED' ? (
         <CompactWidgetLayout>
           <div className="flex justify-between items-center shrink-0 border-b border-[var(--los-border)] pb-2">
             <MonoHeader className="text-xs text-[var(--los-muted)]">FEEDS</MonoHeader>
