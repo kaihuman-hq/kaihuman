@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+:root {
+  /* Default to Nexus (Dark) */
+  --los-bg: #000000;
+  --los-fg: #e2e8f0;
+  --los-border: #333333;
+  --los-accent: #00FF00;
+  --los-accent-dim: rgba(0, 255, 0, 0.2);
+  --los-muted: #64748b;
+
+  /* Typography */
+  --los-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Spacing */
+  --los-gap: 0px;
+
+  /* Components */
+  --los-status-height: 32px;
+
+  /* Extended Theme Tokens */
+  --los-glass-bg: rgba(15, 15, 15, 0.6);
+  --los-glass-border: rgba(255, 255, 255, 0.08);
+  --los-glass-blur: 16px;
+  --los-glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+
+  --los-glass-tile-bg: linear-gradient(135deg, rgba(20, 20, 20, 0.7) 0%, rgba(10, 10, 10, 0.6) 100%);
+  --los-glass-tile-hover-bg: linear-gradient(135deg, rgba(30, 30, 30, 0.8) 0%, rgba(20, 20, 20, 0.7) 100%);
+  --los-glass-tile-hover-border: rgba(255, 255, 255, 0.15);
+
+  --los-cyber-grid-bg: #050505;
+  --los-cyber-grid-dot: rgba(255, 255, 255, 0.03);
+  --los-cyber-grid-glow: rgba(20, 40, 30, 0.2);
+}
+
+body {
+  background-color: var(--los-bg);
+  color: var(--los-fg);
+  font-family: var(--los-font-mono);
+  overflow-x: hidden;
+}
+
+.glass-panel {
+  background: var(--los-glass-bg);
+  backdrop-filter: blur(var(--los-glass-blur));
+  -webkit-backdrop-filter: blur(var(--los-glass-blur));
+  border: 1px solid var(--los-glass-border);
+  box-shadow: var(--los-glass-shadow);
+}
+
+.glass-tile {
+  background: var(--los-glass-tile-bg);
+  backdrop-filter: blur(var(--los-glass-blur));
+  -webkit-backdrop-filter: blur(var(--los-glass-blur));
+  border: 1px solid var(--los-glass-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.glass-tile:hover {
+  background: var(--los-glass-tile-hover-bg);
+  border-color: var(--los-glass-tile-hover-border);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.1), 0 0 0 1px var(--los-glass-tile-hover-border);
+}
+
+.cyber-grid-bg {
+  background-color: var(--los-cyber-grid-bg);
+  background-image:
+    radial-gradient(circle at 50% 50%, var(--los-cyber-grid-glow) 0%, transparent 50%),
+    linear-gradient(var(--los-cyber-grid-dot) 1px, transparent 1px),
+    linear-gradient(90deg, var(--los-cyber-grid-dot) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
+  background-position: center, center, center;
+}

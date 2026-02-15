@@ -1,0 +1,107 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const features = [
+	{
+		title: 'AI Companion',
+		description: 'A personal AI that learns from your files. Store your knowledge in markdown, code, and notes.',
+		icon: '🧠'
+	},
+	{
+		title: 'Local First',
+		description: 'Your data lives on your device. Sync only what you want, where you want. No vendor lock-in.',
+		icon: '🔒'
+	},
+	{
+		title: 'Universal Console',
+		description: 'A unified interface for tasks, finance, habits, and knowledge management.',
+		icon: '⚡'
+	}
+];
+---
+
+<Layout title="Lifosy - The OS for your Life">
+	<main class="relative min-h-screen cyber-grid-bg flex flex-col items-center justify-center p-6 overflow-hidden">
+		<!-- Background Glow -->
+		<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[var(--los-accent)] rounded-full blur-[120px] opacity-10 pointer-events-none"></div>
+
+		<!-- Hero Section -->
+		<section class="max-w-5xl w-full mx-auto text-center space-y-8 relative z-10 pt-20 pb-32">
+			<div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--los-accent-dim)] bg-[rgba(0,255,0,0.05)] text-[var(--los-accent)] text-sm font-medium mb-4 animate-fade-in-up">
+				<span class="relative flex h-2 w-2">
+				  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--los-accent)] opacity-75"></span>
+				  <span class="relative inline-flex rounded-full h-2 w-2 bg-[var(--los-accent)]"></span>
+				</span>
+				v1.0 Public Beta
+			</div>
+
+			<h1 class="text-5xl md:text-7xl font-bold tracking-tight leading-tight text-white animate-fade-in-up delay-100">
+				Your Life, <span class="text-[var(--los-accent)]">Operating System</span>.
+			</h1>
+			
+			<p class="text-xl md:text-2xl text-[var(--los-muted)] max-w-3xl mx-auto leading-relaxed animate-fade-in-up delay-200">
+				Stop scattering your brain across 50 apps. Store your knowledge in files, and let AI bring it to life. <span class="text-[var(--los-fg)]">The preferred way for LLMs to think.</span>
+			</p>
+
+			<div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8 animate-fade-in-up delay-300">
+				<a href="https://console.lifosy.com" class="px-8 py-4 rounded-lg bg-[var(--los-accent)] text-black font-bold text-lg hover:bg-[#33ff33] transition-colors shadow-[0_0_20px_rgba(0,255,0,0.3)] hover:shadow-[0_0_30px_rgba(0,255,0,0.5)]">
+					Launch Console
+				</a>
+				<a href="https://github.com/lifosy/monorepo" class="px-8 py-4 rounded-lg glass-panel hover:bg-[rgba(255,255,255,0.05)] text-[var(--los-fg)] font-medium text-lg transition-colors border-white/10">
+					View Source
+				</a>
+			</div>
+		</section>
+
+		<!-- Feature Grid -->
+		<section class="max-w-7xl w-full mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10 pb-20">
+			{features.map((feature, i) => (
+				<div class="glass-tile p-8 rounded-xl space-y-4 animate-fade-in-up" style={`animation-delay: ${400 + i * 100}ms`}>
+					<div class="text-4xl mb-4">{feature.icon}</div>
+					<h3 class="text-2xl font-bold text-white">{feature.title}</h3>
+					<p class="text-[var(--los-muted)] leading-relaxed">
+						{feature.description}
+					</p>
+				</div>
+			))}
+		</section>
+
+		<!-- Local First Highlight -->
+		<section class="w-full max-w-5xl mx-auto rounded-2xl glass-panel p-12 md:p-20 text-center relative overflow-hidden border border-[var(--los-accent-dim)] animate-fade-in-up delay-700">
+			<div class="absolute inset-0 bg-[linear-gradient(45deg,rgba(0,255,0,0.05)_0%,transparent_100%)]"></div>
+			<div class="relative z-10 space-y-6">
+				<h2 class="text-3xl md:text-5xl font-bold text-white">Your Data, Your Rules.</h2>
+				<p class="text-xl text-[var(--los-muted)] max-w-2xl mx-auto">
+					Lifosy is built <span class="text-[var(--los-accent)]">Local-First</span>. We don't spy on you. Your data is meaningful, not just a product to be sold.
+				</p>
+			</div>
+		</section>
+
+		<footer class="py-12 text-center text-[var(--los-muted)] relative z-10">
+			<p>© {new Date().getFullYear()} Lifosy. Open Source & Independent.</p>
+		</footer>
+	</main>
+</Layout>
+
+<style>
+	@keyframes fade-in-up {
+		0% {
+			opacity: 0;
+			transform: translateY(20px);
+		}
+		100% {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	.animate-fade-in-up {
+		opacity: 0;
+		animation: fade-in-up 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+	}
+
+	.delay-100 { animation-delay: 100ms; }
+	.delay-200 { animation-delay: 200ms; }
+	.delay-300 { animation-delay: 300ms; }
+	.delay-700 { animation-delay: 700ms; }
+</style>
