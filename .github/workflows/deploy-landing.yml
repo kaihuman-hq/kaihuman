@@ -1,0 +1,26 @@
+name: "[PROD] Deploy Landing Page"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/landing-page/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-landing:
+    uses: ./.github/workflows/template-deploy-to-cloudflare.yaml
+    with:
+      buildTarget: landing:build
+      rootDir: ./apps/landing-page
+      distDir: ./dist
+      cfPagesName: lifosy-landing
+      branchName: main
+      commitGeneratedFile: false
+    secrets:
+      cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+      cf_api_token: ${{ secrets.CF_API_TOKEN }}

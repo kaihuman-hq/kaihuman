@@ -4,7 +4,9 @@
   "scripts": {
     "build": "turbo run build",
     "console:build": "turbo run build:prod --filter=@lifosy/app-console",
+    "landing:build": "turbo run build --filter=@lifosy/landing-page",
     "dev:console": "turbo run dev watch --filter=@lifosy/app-console --filter=@lifosy/ui",
+    "dev:landing": "turbo run dev --filter=@lifosy/landing-page",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "turbo run format",
