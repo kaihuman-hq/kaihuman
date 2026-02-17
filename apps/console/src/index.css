@@ -1,8 +1,11 @@
 @import "tailwindcss";
-@source "../../../packages/ui";
+@source "../../../packages/ui/src";
+@import "../../../packages/ui/src/styles.css";
+@import "../../../packages/ui/src/LifeOS/styles.css";
 @config "../../../packages/config/tailwind-preset.js";
 
 @layer base {
+
   html,
   body {
     width: 100%;

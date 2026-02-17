@@ -20,8 +20,7 @@ import { FileViewer } from '../components/FileViewer';
 import { VERSION } from '../version';
 
 export const Dashboard = () => {
-  const repo = githubProfileStore.currentRepo.value;
-  const repos = githubProfileStore.repos.value;
+  /* original repo/repos declarations removed for mock */
   const tree = githubFileStore.tree.value;
   const openFiles = githubFileStore.openFiles.value;
 
@@ -32,9 +31,14 @@ export const Dashboard = () => {
     activeId: string | null;
   }
   // --- STORE ACCESS ---
+  // --- STORE ACCESS ---
   // Using layoutStore directly for everything
   const columns = layoutStore.columns.value;
   const remoteConfig = layoutStore.remoteConfig.value;
+
+  /* original repo/repos declarations removed for mock */
+  const repo = githubProfileStore.currentRepo.value;
+  const repos = githubProfileStore.repos.value;
 
   // 1. Fetch Repos on Mount
   useEffect(() => {

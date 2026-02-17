@@ -57,7 +57,9 @@ import {
   MoreVertical,
   Trash,
   Edit,
-  Move
+  Move,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-preact';
 import {
   DndContext,
@@ -546,6 +548,15 @@ export const MainApp = ({
 
   const currentDashboardId = activeDashboardId || layoutStore.remoteConfig.value?.dashboards[0]?.id;
 
+  const handlePrevDashboard = () => {
+    const config = layoutStore.remoteConfig.value;
+    if (!config || !config.dashboards.length) return;
+    const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
+    // Find prev index, wrap around
+    const prevIndex = (currentIndex - 1 + config.dashboards.length) % config.dashboards.length;
+    setActiveDashboardId(config.dashboards[prevIndex]?.id || null);
+  };
+
   const handleNextDashboard = () => {
     const config = layoutStore.remoteConfig.value;
     if (!config || !config.dashboards.length) return;
@@ -610,7 +621,7 @@ export const MainApp = ({
         <TimeTrackingWidget
           content={tile.rawContent}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
-          mode={mode}
+          mode={mode as any}
         />
       );
     }
@@ -653,7 +664,7 @@ export const MainApp = ({
       return (
         <TimezoneWidget
           content={tile.rawContent}
-          mode={mode}
+          mode={mode as any}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       )
@@ -698,7 +709,7 @@ export const MainApp = ({
       return (
         <DataCollectionWidget
           content={tile.rawContent}
-          mode={mode}
+          mode={mode as any}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
@@ -707,7 +718,7 @@ export const MainApp = ({
       return (
         <DataCollectionWidget
           content={tile.rawContent}
-          mode={mode}
+          mode={mode as any}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
@@ -952,14 +963,7 @@ export const MainApp = ({
     }
   };
 
-  const handlePrevDashboard = () => {
-    const config = layoutStore.remoteConfig.value;
-    if (!config || !config.dashboards.length) return;
-    const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
-    // Find prev index, wrap around
-    const prevIndex = (currentIndex - 1 + config.dashboards.length) % config.dashboards.length;
-    setActiveDashboardId(config.dashboards[prevIndex]?.id || null);
-  };
+
 
   const getResponsiveGridClass = (count: number) => {
     return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
@@ -1632,6 +1636,28 @@ abbreviations: undefined
           }
           version={props.version}
         />
+      )}
+
+      {/* Workspace Switcher - Left Edge (Previous) */}
+      {!dragEnabled && layoutStore.remoteConfig.value && (
+        <div
+          className="fixed left-0 top-1/2 -translate-y-1/2 h-48 w-8 hover:w-12 bg-transparent hover:bg-[var(--los-glass-bg)] border-r border-transparent hover:border-[var(--los-accent)] rounded-r-lg z-[100] transition-all duration-300 cursor-pointer flex items-center justify-center group opacity-0 hover:opacity-100 hidden md:flex"
+          onClick={handlePrevDashboard}
+          title="Previous Workspace"
+        >
+          <ChevronLeft size={32} className="text-[var(--los-accent)]" />
+        </div>
+      )}
+
+      {/* Workspace Switcher - Right Edge (Next) */}
+      {!dragEnabled && layoutStore.remoteConfig.value && (
+        <div
+          className="fixed right-0 top-1/2 -translate-y-1/2 h-48 w-8 hover:w-12 bg-transparent hover:bg-[var(--los-glass-bg)] border-l border-transparent hover:border-[var(--los-accent)] rounded-l-lg z-[100] transition-all duration-300 cursor-pointer flex items-center justify-center group opacity-0 hover:opacity-100 hidden md:flex"
+          onClick={handleNextDashboard}
+          title="Next Workspace"
+        >
+          <ChevronRight size={32} className="text-[var(--los-accent)]" />
+        </div>
       )}
     </div>
   );
