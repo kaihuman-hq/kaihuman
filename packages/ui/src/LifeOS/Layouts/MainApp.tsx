@@ -546,6 +546,15 @@ export const MainApp = ({
 
   const currentDashboardId = activeDashboardId || layoutStore.remoteConfig.value?.dashboards[0]?.id;
 
+  const handlePrevDashboard = () => {
+    const config = layoutStore.remoteConfig.value;
+    if (!config || !config.dashboards.length) return;
+    const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
+    // Find prev index, wrap around
+    const prevIndex = (currentIndex - 1 + config.dashboards.length) % config.dashboards.length;
+    setActiveDashboardId(config.dashboards[prevIndex]?.id || null);
+  };
+
   const handleNextDashboard = () => {
     const config = layoutStore.remoteConfig.value;
     if (!config || !config.dashboards.length) return;
@@ -610,7 +619,7 @@ export const MainApp = ({
         <TimeTrackingWidget
           content={tile.rawContent}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
-          mode={mode}
+          mode={mode as any}
         />
       );
     }
@@ -653,7 +662,7 @@ export const MainApp = ({
       return (
         <TimezoneWidget
           content={tile.rawContent}
-          mode={mode}
+          mode={mode as any}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       )
@@ -698,7 +707,7 @@ export const MainApp = ({
       return (
         <DataCollectionWidget
           content={tile.rawContent}
-          mode={mode}
+          mode={mode as any}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
@@ -707,7 +716,7 @@ export const MainApp = ({
       return (
         <DataCollectionWidget
           content={tile.rawContent}
-          mode={mode}
+          mode={mode as any}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
@@ -952,14 +961,7 @@ export const MainApp = ({
     }
   };
 
-  const handlePrevDashboard = () => {
-    const config = layoutStore.remoteConfig.value;
-    if (!config || !config.dashboards.length) return;
-    const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
-    // Find prev index, wrap around
-    const prevIndex = (currentIndex - 1 + config.dashboards.length) % config.dashboards.length;
-    setActiveDashboardId(config.dashboards[prevIndex]?.id || null);
-  };
+
 
   const getResponsiveGridClass = (count: number) => {
     return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
@@ -1633,6 +1635,8 @@ abbreviations: undefined
           version={props.version}
         />
       )}
+
+
     </div>
   );
 };
