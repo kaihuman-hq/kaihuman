@@ -57,9 +57,7 @@ import {
   MoreVertical,
   Trash,
   Edit,
-  Move,
-  ChevronLeft,
-  ChevronRight
+  Move
 } from 'lucide-preact';
 import {
   DndContext,
@@ -1638,27 +1636,7 @@ abbreviations: undefined
         />
       )}
 
-      {/* Workspace Switcher - Left Edge (Previous) */}
-      {!dragEnabled && layoutStore.remoteConfig.value && (
-        <div
-          className="fixed left-0 top-1/2 -translate-y-1/2 h-48 w-8 hover:w-12 bg-transparent hover:bg-[var(--los-glass-bg)] border-r border-transparent hover:border-[var(--los-accent)] rounded-r-lg z-[100] transition-all duration-300 cursor-pointer flex items-center justify-center group opacity-0 hover:opacity-100 hidden md:flex"
-          onClick={handlePrevDashboard}
-          title="Previous Workspace"
-        >
-          <ChevronLeft size={32} className="text-[var(--los-accent)]" />
-        </div>
-      )}
 
-      {/* Workspace Switcher - Right Edge (Next) */}
-      {!dragEnabled && layoutStore.remoteConfig.value && (
-        <div
-          className="fixed right-0 top-1/2 -translate-y-1/2 h-48 w-8 hover:w-12 bg-transparent hover:bg-[var(--los-glass-bg)] border-l border-transparent hover:border-[var(--los-accent)] rounded-l-lg z-[100] transition-all duration-300 cursor-pointer flex items-center justify-center group opacity-0 hover:opacity-100 hidden md:flex"
-          onClick={handleNextDashboard}
-          title="Next Workspace"
-        >
-          <ChevronRight size={32} className="text-[var(--los-accent)]" />
-        </div>
-      )}
     </div>
   );
 };
