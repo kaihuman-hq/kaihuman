@@ -1,0 +1,12 @@
+{
+  "name": "@lifosy/cli",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "cargo build --release",
+    "dev": "cargo run",
+    "lint": "cargo clippy",
+    "format": "cargo fmt",
+    "test": "cargo test"
+  }
+}

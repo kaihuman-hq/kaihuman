@@ -157,15 +157,19 @@ export const MillerColumn = ({
         <div
           className={cn(
             "grid gap-px bg-[var(--los-bg)] overflow-y-auto overflow-x-hidden flex-1",
-            "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-8",
             "content-start",
             "animate-in fade-in slide-in-from-right-4 duration-300"
           )}
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))' }}
         >
           {filteredItems.map((tile) => {
             const isHovered = hoveredTileId === tile.id.toString();
             const isMenuOpen = activeMenu?.id === tile.id.toString();
             const showMenu = isHovered || isMenuOpen;
+
+            // Extract extension for display
+            const ext = tile.extension ? tile.extension.replace('.', '').toUpperCase() : (tile.type === 'FOLDER' ? 'DIR' : 'FILE');
+
 
             return (
               <div
@@ -177,6 +181,7 @@ export const MillerColumn = ({
                   "ring-1 ring-inset ring-[var(--los-border)] transition-colors group relative cursor-pointer w-full pb-[100%] aspect-square flex items-center justify-center",
                   isHovered ? "bg-white/10" : (tile.type === 'FOLDER' ? "bg-[var(--los-accent)]/5" : "bg-[var(--los-bg)]")
                 )}
+                title={tile.id.toString()} // Show full path on hover tooltip
               >
                 <div className="absolute inset-0 overflow-hidden p-6 flex flex-col items-center justify-center text-center">
 
@@ -191,7 +196,7 @@ export const MillerColumn = ({
                       "text-sm sm:text-base font-bold truncate w-full px-2",
                       "text-[var(--los-fg)] group-hover:text-[var(--los-accent)] transition-colors"
                     )}
-                    title={tile.title}
+                  // title={tile.title} // handled by parent div now
                   >
                     {tile.title}
                   </MonoText>
@@ -214,11 +219,11 @@ export const MillerColumn = ({
                     </div>
                   )}
 
-                  {/* ID Label (Subtle, Bottom) */}
+                  {/* Info Overlay (Bottom) */}
                   {isHovered && (
-                    <div className="absolute bottom-2 text-center w-full animate-in fade-in duration-200">
-                      <MonoText className="text-[9px] text-[var(--los-muted)] tracking-wider">
-                        {tile.id.toString().toUpperCase().slice(0, 4)}
+                    <div className="absolute bottom-2 text-center w-full animate-in fade-in duration-200 pointer-events-none">
+                      <MonoText className="text-[10px] text-[var(--los-muted)] tracking-wider bg-black/50 px-2 py-0.5 rounded-full inline-block">
+                        {ext}
                       </MonoText>
                     </div>
                   )}
