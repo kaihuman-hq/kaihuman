@@ -4,6 +4,7 @@ import { NotFound } from '@lifosy/ui';
 import { Route, Router } from 'preact-router';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/login';
+import { AuthCli } from './pages/AuthCli';
 import { ExtensionAuthBridge } from './components/ExtensionAuthBridge';
 
 // Simple protected route wrapper
@@ -29,6 +30,7 @@ export const App = () => {
       <ExtensionAuthBridge />
       <Router>
         <Route path="/login" component={Login} />
+        <Route path="/auth/cli" component={AuthCli} />
         <ProtectedRoute path="/" component={Dashboard} />
         <ProtectedRoute path="/files" component={Dashboard} />
         <ProtectedRoute path="/files/:rest*" component={Dashboard} />
