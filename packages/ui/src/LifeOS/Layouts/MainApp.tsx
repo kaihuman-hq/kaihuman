@@ -627,7 +627,7 @@ export const MainApp = ({
       return (
         <EventsWidget
           content={tile.rawContent}
-          mode={mode}
+          mode={mode as any}
         />
       );
     }
@@ -1219,6 +1219,7 @@ export const MainApp = ({
                             if (activeTileId === path) setActiveTileId(newPath); // Keep active
                           }}
                           onRequestMove={(path) => setFileToMove(path)}
+                          onNewFileClick={() => setShowNewFileWizard(true)}
                         />
                       )
                     })}
@@ -1443,6 +1444,47 @@ export const MainApp = ({
             setShowNewFileWizard(false);
             setDumpSaveProps(null); // Reset dump props
           }}
+          initialFolder={(() => {
+            // Logic to deduce current folder from FileSystem state (columns)
+            // If we are in Miller Mode, the last "active" text from previous columns + activeId of last column?
+            // Actually, `fileSystem.columns` has the state.
+            // If we are viewing a folder in GRID view (last column), that is the target.
+            if (fileSystem && fileSystem.columns.length > 0) {
+              // Try to find the path of the last column that isn't the file itself?
+              // The activeId in column N-1 points to the folder content in column N.
+              // So we want the activeId of the *second to last* column to get the folder path of the *last* column?
+              // Wait, if we are seeing a GRID in column N, it means column N-1 has an activeId which IS the folder path.
+              // If column N is the Grid view (items), then the folder path is the activeId of column N-1.
+
+              const columns = fileSystem.columns;
+              // Find the last column that has items (the current view)
+              // The folder path is derived from the activeId of the *previous* column.
+
+              // However, we want the current folder we are *looking at*.
+              // In MillerColumn logic, the LAST column is the one we are interacting with (Grid or List).
+              // Its parent is the activeId of the column before it.
+
+              if (columns.length > 1) {
+                const parentCol = columns[columns.length - 2];
+                if (parentCol && parentCol.activeId) return parentCol.activeId;
+              } else {
+                // Root column?
+                return ''; // Root
+              }
+
+              // Fallback: helper?
+              // If we have activeTileId (file), use its parent.
+              if (activeTileId && typeof activeTileId === 'string') {
+                const parts = activeTileId.split('/');
+                if (parts.length > 1) {
+                  parts.pop();
+                  return parts.join('/');
+                }
+                return '';
+              }
+            }
+            return '';
+          })()}
           onCreate={async (path, content) => {
             if (onCreateFile) await onCreateFile(path, content);
             setShowNewFileWizard(false); // Close wizard first
