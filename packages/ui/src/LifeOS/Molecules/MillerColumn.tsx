@@ -14,6 +14,7 @@ export interface MillerColumnProps {
   onDeleteFile?: (path: string) => void;
   onRenameFile?: (path: string, newPath: string) => void;
   onRequestMove?: (path: string) => void;
+  onNewFileClick?: () => void;
 }
 
 export const MillerColumn = ({
@@ -23,7 +24,8 @@ export const MillerColumn = ({
   onItemClick,
   onDeleteFile,
   onRenameFile,
-  onRequestMove
+  onRequestMove,
+  onNewFileClick
 }: MillerColumnProps) => {
   const [activeMenu, setActiveMenu] = useState<{ id: string, x: number, y: number } | null>(null);
   const [hoveredTileId, setHoveredTileId] = useState<string | null>(null);
@@ -160,7 +162,7 @@ export const MillerColumn = ({
             "content-start",
             "animate-in fade-in slide-in-from-right-4 duration-300"
           )}
-          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))' }}
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))' }}
         >
           {filteredItems.map((tile) => {
             const isHovered = hoveredTileId === tile.id.toString();
@@ -239,9 +241,30 @@ export const MillerColumn = ({
               )}
             </div>
           )}
+
+
+          {/* Add New File Tile */}
+          <div
+            onClick={(e) => { e.stopPropagation(); onNewFileClick?.(); }}
+            className={cn(
+              "ring-1 ring-inset ring-[var(--los-border)] transition-colors group relative cursor-pointer w-full pb-[100%] aspect-square flex items-center justify-center",
+              "bg-[var(--los-bg)] hover:bg-white/5 border-dashed border-2 border-[var(--los-border)] hover:border-[var(--los-accent)]"
+            )}
+            title="Create New File"
+          >
+            <div className="absolute inset-0 overflow-hidden p-6 flex flex-col items-center justify-center text-center">
+              <div className="text-[var(--los-muted)] group-hover:text-[var(--los-accent)] transition-colors">
+                {/* Plus Icon logic inline or imported */}
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </div>
+              <MonoText className="text-[var(--los-muted)] group-hover:text-[var(--los-accent)] mt-4 font-bold">NEW FILE</MonoText>
+            </div>
+          </div>
         </div>
         {renderContextMenu()}
-      </div>
+      </div >
     );
   }
 

@@ -105,8 +105,42 @@ export const Dashboard = () => {
     loadConfig();
   }, [tree.length, repo?.full_name]); // Re-run when tree loads or repo changes
 
+  // Helper to update recent files
+  const addToRecentFiles = useCallback((path: string) => {
+    const config = layoutStore.remoteConfig.value;
+    if (!config) return;
+
+    const recent = config.files?.recentlyOpened || [];
+    // Remove if exists, add to front
+    const newRecent = [path, ...recent.filter(p => p !== path)].slice(0, 10); // Limit to 10
+
+    // Only update if changed
+    if (JSON.stringify(newRecent) !== JSON.stringify(recent)) {
+      const newConfig = {
+        ...config,
+        files: {
+          ...config.files,
+          recentlyOpened: newRecent
+        }
+      };
+
+      // 1. Optimistic Update
+      layoutStore.remoteConfig.value = newConfig;
+
+      // 2. Persist
+      // Debounce this? For now, direct save is safer for correctness.
+      const CONFIG_PATH = '.lifeos/.dashboard.config.json';
+      const content = JSON.stringify(newConfig, null, 2);
+      githubFileStore.updateFileContent(CONFIG_PATH, content);
+      githubFileStore.saveFile(CONFIG_PATH);
+    }
+  }, []);
+
   // Navigate Handler adapter
   const handleNavigate = (item: TileDef) => {
+    if (item.type === 'FILE') {
+      addToRecentFiles(String(item.id));
+    }
     layoutStore.navigate(item.id as string);
   };
 
@@ -297,6 +331,7 @@ export const Dashboard = () => {
             try {
               await githubFileStore.createFile(path, content);
               await githubFileStore.openFile(path);
+              addToRecentFiles(path); // Update recent files on create
               layoutStore.navigate(path);
             } catch (e) {
               logger.error('Failed to create file:', e);
