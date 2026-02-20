@@ -25,7 +25,7 @@ export function App() {
   }, []);
 
   const handleLogin = () => {
-    chrome.tabs.create({ url: 'https://console.lifosy.com' }); // Or localhost if dev
+    chrome.tabs.create({ url: 'https://app.lifosy.com' }); // Or localhost if dev
   };
 
   const handleReadItLater = async () => {
