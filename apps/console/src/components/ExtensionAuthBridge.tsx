@@ -2,15 +2,16 @@ import { useEffect, useState } from 'preact/hooks';
 import { authStore, githubProfileStore } from '@lifosy/core';
 
 export function ExtensionAuthBridge() {
-  const [showToast, setShowToast] = useState(false);
+  // Accessing signal .value inside the component body tells Preact to re-render
+  // whenever these signals change.
+  const token = authStore.token.value;
+  const repo = githubProfileStore.currentRepo.value?.full_name;
+  const reposList = githubProfileStore.repos.value || [];
 
   useEffect(() => {
     // Expose token for the extension content script to grab
     // We put it in a specific hidden element that the content script can find easily
     // This is a simple bridge mechanism.
-    const token = authStore.token.value;
-    const repo = githubProfileStore.currentRepo.value?.full_name;
-
     if (token) {
       document.body.setAttribute('data-lifosy-auth', token);
     } else {
@@ -38,26 +39,15 @@ export function ExtensionAuthBridge() {
       document.body.removeAttribute('data-lifosy-repo');
       document.body.removeAttribute('data-lifosy-repos');
     };
-  }, [authStore.token.value, githubProfileStore.currentRepo.value?.full_name, githubProfileStore.repos.value]);
+  }, [token, repo, reposList]);
 
   useEffect(() => {
-    const handleOnboarded = () => {
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 5000);
-    };
-
-    window.addEventListener('EXTENSION_ONBOARDED', handleOnboarded);
-    return () => window.removeEventListener('EXTENSION_ONBOARDED', handleOnboarded);
+    // We can keep this empty or remove it, but nothing needed here since the success page handles it.
   }, []);
 
   return (
     <>
       <div id="lifosy-extension-bridge" style={{ display: 'none' }} />
-      {showToast && (
-        <div class="fixed bottom-4 left-4 z-50 flex items-center gap-3 rounded bg-[var(--los-accent)] px-4 py-3 font-mono text-sm font-bold text-black shadow-lg animate-in fade-in slide-in-from-bottom-4">
-          Browser extension onboarded!
-        </div>
-      )}
     </>
   );
 }

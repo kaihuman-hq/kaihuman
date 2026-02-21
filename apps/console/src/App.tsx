@@ -1,7 +1,7 @@
 import { authStore } from '@lifosy/core';
 import { NotFound } from '@lifosy/ui';
 
-import { Route, Router } from 'preact-router';
+import { Route, Router, route } from 'preact-router';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/login';
 import { AuthCli } from './pages/AuthCli';
@@ -13,9 +13,19 @@ const ProtectedRoute = ({ component: Component, ...props }: any) => {
   if (!authStore.isAuthenticated.value) {
     // Check if we just came back from auth
     if (authStore.handleCallback()) {
-      // Handled
+      // Callback handled successfully! Check if we saved a redirect path earlier
+      const redirectUrl = localStorage.getItem('lifeos_redirect');
+      if (redirectUrl && redirectUrl !== '/') {
+        localStorage.removeItem('lifeos_redirect');
+        // Route after a slight delay to allow auth state to settle
+        setTimeout(() => route(redirectUrl, true), 10);
+      }
     } else {
       if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        const path = window.location.pathname;
+        if (path !== '/' && !window.location.search.includes('access_token')) {
+          localStorage.setItem('lifeos_redirect', path);
+        }
         return <Login />;
       }
     }

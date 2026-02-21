@@ -1,7 +1,10 @@
 import { useEffect } from 'preact/hooks';
+import { githubProfileStore } from '@lifosy/core';
 
 export function ExtensionSuccess() {
   useEffect(() => {
+    // Fetch repos so AuthBridge can sync them to the extension via DOM
+    githubProfileStore.fetchRepos();
     // We don't necessarily need to do anything here because ExtensionAuthBridge 
     // runs globally and will inject the token into the DOM for the content script
     // to read. The content script will hear the token and dispatch EXTENSION_ONBOARDED.

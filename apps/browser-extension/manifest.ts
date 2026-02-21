@@ -3,7 +3,7 @@ import { defineManifest } from '@crxjs/vite-plugin'
 export default defineManifest({
   manifest_version: 3,
   name: 'Lifosy Browser Extension',
-  version: '1.0.0',
+  version: '1.0.1',
   description: 'Interact with your Lifosy repo from anywhere.',
   icons: {
     "16": "icon-16.png",

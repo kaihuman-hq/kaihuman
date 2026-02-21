@@ -38,10 +38,17 @@ window.addEventListener('lifosy-auth-update', (event: any) => {
 
 // Also observe DOM changes just in case, though the event is cleaner
 const observer = new MutationObserver((mutations) => {
+  let shouldExtract = false;
   for (const mutation of mutations) {
-    if (mutation.type === 'attributes' && mutation.attributeName === 'data-lifosy-auth') {
-      extractToken();
+    if (mutation.type === 'attributes' &&
+      (mutation.attributeName === 'data-lifosy-auth' ||
+        mutation.attributeName === 'data-lifosy-repo' ||
+        mutation.attributeName === 'data-lifosy-repos')) {
+      shouldExtract = true;
     }
+  }
+  if (shouldExtract) {
+    extractToken();
   }
 });
 
