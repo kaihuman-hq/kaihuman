@@ -15,6 +15,22 @@ interface HabitTrackerWidgetProps {
   onChange?: (newContent: string) => void;
 }
 
+const formatDaysHumanReadable = (totalDays: number) => {
+  if (totalDays < 30) return '';
+  const years = Math.floor(totalDays / 365);
+  let remainingDays = totalDays % 365;
+  const months = Math.floor(remainingDays / 30);
+  remainingDays = remainingDays % 30;
+
+  const parts = [];
+  if (years > 0) parts.push(`${years} year${years !== 1 ? 's' : ''}`);
+  if (months > 0) parts.push(`${months} month${months !== 1 ? 's' : ''}`);
+  if (remainingDays > 0) parts.push(`${remainingDays} day${remainingDays !== 1 ? 's' : ''}`);
+
+  if (parts.length === 0) return '';
+  return `(${parts.join(', ')})`;
+};
+
 export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidgetProps) => {
   const data = useMemo(() => parseHabitData(content), [content]);
   const stats = useMemo(() => calculateStats(data), [data]);
@@ -115,7 +131,9 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
 
   const streakText = useMemo(() => {
     if (stats.currentStreak > 0) {
-      return `You reached ${stats.currentStreak} goal${stats.currentStreak === 1 ? '' : 's'} in a row! Total: ${stats.totalCount}`;
+      const humanReadable = formatDaysHumanReadable(stats.currentStreak);
+      const extra = humanReadable ? ` ${humanReadable}` : '';
+      return `You reached ${stats.currentStreak} goal${stats.currentStreak === 1 ? '' : 's'} in a row!${extra} Total: ${stats.totalCount}`;
     }
     return `Start a streak today! Total completed: ${stats.totalCount}`;
   }, [stats]);
