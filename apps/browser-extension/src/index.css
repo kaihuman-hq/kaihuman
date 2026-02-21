@@ -1,3 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "../../../packages/ui/src/styles.css";
+@import "../../../packages/ui/src/LifeOS/styles.css";
+@source "../../../packages/ui/src";
+@config "../../../packages/config/tailwind-preset.js";

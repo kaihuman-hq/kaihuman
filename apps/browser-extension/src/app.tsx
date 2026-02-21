@@ -6,11 +6,16 @@ export function App() {
   const [activeTab, setActiveTab] = useState<{ title: string; url: string } | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [dumpNote, setDumpNote] = useState('');
+  const [activeRepo, setActiveRepo] = useState<string | null>(null);
+  const [repos, setRepos] = useState<{ full_name: string }[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for auth token
-    chrome.storage.local.get('lifeos_token', (result) => {
+    // Check for auth token, repo, and repos
+    chrome.storage.local.get(['lifeos_token', 'lifeos_repo', 'lifeos_repos'], (result) => {
       setToken((result.lifeos_token as string) || null);
+      setActiveRepo((result.lifeos_repo as string) || 'lifosy/monorepo');
+      setRepos((result.lifeos_repos as { full_name: string }[]) || []);
     });
 
     // Get active tab info
@@ -25,7 +30,13 @@ export function App() {
   }, []);
 
   const handleLogin = () => {
-    chrome.tabs.create({ url: 'https://app.lifosy.com' }); // Or localhost if dev
+    chrome.tabs.create({ url: 'https://app.lifosy.com/extension-onboarded' }); // Or localhost if dev
+  };
+
+  const handleRepoChange = (e: any) => {
+    const newRepo = e.target.value;
+    setActiveRepo(newRepo);
+    chrome.storage.local.set({ lifeos_repo: newRepo });
   };
 
   const handleReadItLater = async () => {
@@ -42,23 +53,35 @@ export function App() {
   const handleDumpNote = async () => {
     if (!token || !dumpNote.trim()) return;
     setStatus('saving');
-    // Simulate API call
-    setTimeout(() => {
-      console.log('Saved dump note:', dumpNote);
-      setDumpNote('');
-      setStatus('success');
-      setTimeout(() => setStatus('idle'), 2000);
-    }, 1000);
+    try {
+      setErrorMessage(null);
+      chrome.runtime.sendMessage({ type: 'DUMP_NOTE', note: dumpNote }, (response) => {
+        if (chrome.runtime.lastError || (response && response.error)) {
+          const err = chrome.runtime.lastError?.message || response?.error || 'Unknown error';
+          console.error('Error saving dump note:', err);
+          setErrorMessage(err);
+          setStatus('error');
+        } else {
+          setDumpNote('');
+          setStatus('success');
+          setTimeout(() => setStatus('idle'), 2000);
+        }
+      });
+    } catch (e: any) {
+      console.error(e);
+      setErrorMessage(e.message || 'Unknown error');
+      setStatus('error');
+    }
   };
 
   if (!token) {
     return (
-      <div class="w-80 h-96 bg-black text-white p-6 flex flex-col items-center justify-center space-y-4 font-mono">
-        <div class="text-xl font-bold">Lifosy</div>
-        <p class="text-center text-gray-400 text-sm">Please login to the console to use the extension.</p>
+      <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-6 flex flex-col items-center justify-center space-y-4 font-mono">
+        <div class="text-xl font-bold tracking-tight">Lifosy</div>
+        <p class="text-center text-[var(--los-fg-dim)] text-sm">Please login to the console to use the extension.</p>
         <button
           onClick={handleLogin}
-          class="px-4 py-2 bg-green-500 text-black font-bold rounded hover:bg-green-400 transition-colors"
+          class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold rounded hover:opacity-90 transition-opacity"
         >
           Open Console
         </button>
@@ -67,22 +90,37 @@ export function App() {
   }
 
   return (
-    <div class="w-80 bg-black text-white p-4 font-mono border border-gray-800">
-      <header class="flex items-center justify-between mb-4 pb-2 border-b border-gray-800">
-        <span class="font-bold text-green-500">Lifosy</span>
-        <span class="text-xs text-gray-500">Connected</span>
+    <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
+      <header class="flex items-center justify-between mb-4 pb-2 border-b border-[var(--los-border)]">
+        <span class="font-bold text-[var(--los-accent)] tracking-tight">Lifosy</span>
+        <div class="flex flex-col items-end gap-1">
+          <span class="text-xs text-[var(--los-success)] animate-pulse">● Connected</span>
+          {repos.length > 0 ? (
+            <select
+              value={activeRepo || 'lifosy/monorepo'}
+              onChange={handleRepoChange}
+              class="text-[10px] text-[var(--los-fg)] font-mono bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded px-1 py-0.5 max-w-[150px] truncate focus:outline-none focus:border-[var(--los-accent)]"
+            >
+              {repos.map(r => (
+                <option key={r.full_name} value={r.full_name}>{r.full_name}</option>
+              ))}
+            </select>
+          ) : (
+            activeRepo && <span class="text-[10px] text-[var(--los-fg-dim)] font-mono">{activeRepo}</span>
+          )}
+        </div>
       </header>
 
-      <div class="space-y-6">
+      <div class="space-y-6 flex-1">
         {/* Read It Later Section */}
         <section class="space-y-2">
-          <h2 class="text-sm font-bold text-gray-400">Read It Later</h2>
-          <div class="p-3 bg-gray-900 rounded border border-gray-800">
-            <div class="text-xs text-gray-400 truncate mb-2">{activeTab?.title || 'No active tab'}</div>
+          <h2 class="text-sm font-bold text-[var(--los-fg-dim)]">Read It Later</h2>
+          <div class="p-3 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]">
+            <div class="text-xs text-[var(--los-fg-dim)] line-clamp-2 mb-2">{activeTab?.title || 'No active tab'}</div>
             <button
               onClick={handleReadItLater}
               disabled={status === 'saving'}
-              class="w-full py-1.5 px-3 bg-gray-800 hover:bg-gray-700 text-xs rounded transition-colors flex items-center justify-center gap-2"
+              class="w-full py-1.5 px-3 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-xs rounded transition-colors flex items-center justify-center gap-2"
             >
               {status === 'saving' ? 'Saving...' : status === 'success' ? 'Saved!' : 'Save Page'}
             </button>
@@ -90,18 +128,28 @@ export function App() {
         </section>
 
         {/* Dump Note Section */}
-        <section class="space-y-2">
-          <h2 class="text-sm font-bold text-gray-400">Dump Note</h2>
+        <section class="space-y-2 flex flex-col flex-1">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-bold text-[var(--los-fg-dim)]">Dump Note</h2>
+            <span class="text-[10px] text-[var(--los-fg-dim)] line-clamp-1 break-all px-2 py-0.5 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]" title={`${activeRepo || 'lifosy/monorepo'}/.lifeos/dump.md`}>
+              .lifeos/dump.md
+            </span>
+          </div>
           <textarea
             value={dumpNote}
             onInput={(e) => setDumpNote((e.target as HTMLTextAreaElement).value)}
-            class="w-full h-24 bg-gray-900 border border-gray-800 rounded p-2 text-xs focus:border-green-500 focus:outline-none resize-none"
+            class="w-full min-h-[120px] bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded p-2 text-xs focus:border-[var(--los-accent)] focus:ring-1 focus:ring-[var(--los-accent)] focus:outline-none resize-none"
             placeholder="Type manually..."
           />
+          {status === 'error' && errorMessage && (
+            <div class="text-[10px] text-red-400 mt-1 mb-1 p-2 bg-red-950/30 rounded border border-red-900/50 break-words">
+              {errorMessage}
+            </div>
+          )}
           <button
             onClick={handleDumpNote}
             disabled={status === 'saving' || !dumpNote.trim()}
-            class="w-full py-1.5 px-3 bg-green-900/30 text-green-400 hover:bg-green-900/50 border border-green-900 text-xs rounded transition-colors"
+            class="w-full py-2 px-3 bg-[var(--los-accent)] text-black hover:opacity-90 font-bold text-xs rounded transition-opacity disabled:opacity-50 disabled:cursor-not-allowed mt-2"
           >
             Add Note
           </button>

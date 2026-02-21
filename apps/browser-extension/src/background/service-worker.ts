@@ -18,19 +18,94 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
+// Add comprehensive GitHub API helper
+async function githubUpsertFile(token: string, repoUrl: string, filePath: string, newContentLines: string, position: 'top' | 'bottom' = 'bottom') {
+  const url = `https://api.github.com/repos/${repoUrl}/contents/${filePath}`;
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github.v3+json',
+  };
+
+  let fileSha = '';
+  let currentContent = '';
+
+  try {
+    const getRes = await fetch(url, { headers });
+    if (getRes.ok) {
+      const data = await getRes.json();
+      fileSha = data.sha;
+      // Decode base64
+      currentContent = decodeURIComponent(escape(atob(data.content || '')));
+    } else if (getRes.status === 404) {
+      // File doesn't exist yet, we'll create it
+      currentContent = '';
+    } else {
+      throw new Error(`Failed to get file: ${getRes.statusText}`);
+    }
+
+    const updatedContent = currentContent
+      ? (position === 'top' ? `${newContentLines}\n\n${currentContent}` : `${currentContent}\n\n${newContentLines}`)
+      : newContentLines;
+
+    // Encode base64
+    const newBase64 = btoa(unescape(encodeURIComponent(updatedContent)));
+
+    const putRes = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        message: `Append to ${filePath} via Extension`,
+        content: newBase64,
+        sha: fileSha || undefined,
+      }),
+    });
+
+    if (!putRes.ok) {
+      throw new Error(`Failed to update file: ${putRes.statusText}`);
+    }
+  } catch (error) {
+    console.error('githubAppendToFile Error:', error);
+    throw error;
+  }
+}
+
 // Message Handling
-chrome.runtime.onMessage.addListener((message: Message) => {
+chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendResponse) => {
   if (message.type === 'AUTH_TOKEN_UPDATE' && message.token) {
     console.log('LifeOS Extension: Received token update');
-    chrome.storage.local.set({ lifeos_token: message.token }, () => {
-      console.log('LifeOS Extension: Token saved');
+    chrome.storage.local.set({
+      lifeos_token: message.token,
+      lifeos_repo: message.repo,
+      lifeos_repos: message.repos || []
+    }, () => {
+      console.log('LifeOS Extension: Token & Repo data saved');
     });
+    return false;
+  }
+
+  if (message.type === 'DUMP_NOTE') {
+    chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
+      const token = data.lifeos_token;
+      const repo = data.lifeos_repo || 'lifosy/monorepo';
+      if (!token) {
+        sendResponse({ error: 'No token found' });
+        return;
+      }
+      try {
+        await githubUpsertFile(token, repo, '.lifeos/dump.md', `- ${message.note.trim()}`, 'top');
+        sendResponse({ success: true });
+      } catch (error: any) {
+        sendResponse({ error: error.message });
+      }
+    });
+    return true; // Indicate async response
   }
 });
 
 async function saveToKnowledgeBase(text: string, url: string, pageTitle: string) {
-  const tokenData = await chrome.storage.local.get('lifeos_token');
+  const tokenData: any = await chrome.storage.local.get(['lifeos_token', 'lifeos_repo']);
   const token = tokenData.lifeos_token;
+  const repo = tokenData.lifeos_repo || 'lifosy/monorepo';
 
   if (!token) {
     console.warn('LifeOS Extension: No auth token found. Please login to Console.');
@@ -38,8 +113,11 @@ async function saveToKnowledgeBase(text: string, url: string, pageTitle: string)
     return;
   }
 
-  // Placeholder for actual API call
-  console.log('LifeOS Extension: Mock saving to knowledge base', { text, url, pageTitle });
-  // In a real implementation:
-  // fetch('https://api.github.com/repos/lifosy/monorepo/contents/knowledge/clippings.md', ...)
+  try {
+    const formatted = `### ${pageTitle}\n[Source](${url})\n\n> ${text.trim()}`;
+    await githubUpsertFile(token, repo, '.lifeos/clippings.md', formatted, 'top');
+    console.log('LifeOS Extension: Successfully saved to knowledge base');
+  } catch (e) {
+    console.error('LifeOS Extension: Error saving clipping', e);
+  }
 }
