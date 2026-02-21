@@ -117,12 +117,13 @@ export const calculateStats = (data: HabitData) => {
     }
 
     // WEEKLY STREAK
-    // 1. Identify all unique weeks (represented by Sunday date string or timestamp)
+    // 1. Identify all unique weeks (represented by Sunday date string)
     const getSunday = (dateStr: string) => {
-      const d = new Date(dateStr);
+      const [year, month, day] = dateStr.split('-');
+      const d = new Date(Number(year), Number(month) - 1, Number(day));
       d.setHours(0, 0, 0, 0);
       d.setDate(d.getDate() - d.getDay()); // Go to Sunday
-      return d.getTime();
+      return toLocDate(d);
     };
 
     const uniqueWeeks = new Set(sortedEntries.map(e => getSunday(e.date)));
@@ -132,25 +133,24 @@ export const calculateStats = (data: HabitData) => {
     thisWeekSunday.setDate(today.getDate() - today.getDay());
     thisWeekSunday.setHours(0, 0, 0, 0);
 
-    let checkTime = thisWeekSunday.getTime();
-    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+    let checkDate = new Date(thisWeekSunday);
 
-    if (uniqueWeeks.has(checkTime)) {
+    if (uniqueWeeks.has(toLocDate(checkDate))) {
       weekStreak = 1;
-      checkTime -= oneWeekMs;
-      while (uniqueWeeks.has(checkTime)) {
+      checkDate.setDate(checkDate.getDate() - 7);
+      while (uniqueWeeks.has(toLocDate(checkDate))) {
         weekStreak++;
-        checkTime -= oneWeekMs;
+        checkDate.setDate(checkDate.getDate() - 7);
       }
     } else {
       // Check last week
-      checkTime -= oneWeekMs;
-      if (uniqueWeeks.has(checkTime)) {
+      checkDate.setDate(checkDate.getDate() - 7);
+      if (uniqueWeeks.has(toLocDate(checkDate))) {
         weekStreak = 1;
-        checkTime -= oneWeekMs;
-        while (uniqueWeeks.has(checkTime)) {
+        checkDate.setDate(checkDate.getDate() - 7);
+        while (uniqueWeeks.has(toLocDate(checkDate))) {
           weekStreak++;
-          checkTime -= oneWeekMs;
+          checkDate.setDate(checkDate.getDate() - 7);
         }
       }
     }

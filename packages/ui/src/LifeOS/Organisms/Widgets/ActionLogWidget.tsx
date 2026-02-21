@@ -63,7 +63,7 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
 
   if (mode === 'MOBILE_COLLAPSED') {
     // Count items from today
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toISOString().split('T')[0] || '';
     const todayCount = data.entries.filter(e => e.timestamp && e.timestamp.startsWith(todayStr)).length;
 
     return (
