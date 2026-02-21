@@ -23,14 +23,22 @@ export function ExtensionAuthBridge() {
       document.body.removeAttribute('data-lifosy-repo');
     }
 
+    const reposList = githubProfileStore.repos.value || [];
+    if (reposList.length > 0) {
+      document.body.setAttribute('data-lifosy-repos', JSON.stringify(reposList));
+    } else {
+      document.body.removeAttribute('data-lifosy-repos');
+    }
+
     // Also dispatch an event in case the extension is listening
-    window.dispatchEvent(new CustomEvent('lifosy-auth-update', { detail: { token, repo } }));
+    window.dispatchEvent(new CustomEvent('lifosy-auth-update', { detail: { token, repo, repos: reposList } }));
 
     return () => {
       document.body.removeAttribute('data-lifosy-auth');
       document.body.removeAttribute('data-lifosy-repo');
+      document.body.removeAttribute('data-lifosy-repos');
     };
-  }, [authStore.token.value, githubProfileStore.currentRepo.value?.full_name]);
+  }, [authStore.token.value, githubProfileStore.currentRepo.value?.full_name, githubProfileStore.repos.value]);
 
   useEffect(() => {
     const handleOnboarded = () => {

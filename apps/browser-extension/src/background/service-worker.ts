@@ -73,8 +73,12 @@ async function githubUpsertFile(token: string, repoUrl: string, filePath: string
 chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendResponse) => {
   if (message.type === 'AUTH_TOKEN_UPDATE' && message.token) {
     console.log('LifeOS Extension: Received token update');
-    chrome.storage.local.set({ lifeos_token: message.token, lifeos_repo: message.repo }, () => {
-      console.log('LifeOS Extension: Token & Repo saved');
+    chrome.storage.local.set({
+      lifeos_token: message.token,
+      lifeos_repo: message.repo,
+      lifeos_repos: message.repos || []
+    }, () => {
+      console.log('LifeOS Extension: Token & Repo data saved');
     });
     return false;
   }

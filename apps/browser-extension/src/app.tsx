@@ -7,13 +7,15 @@ export function App() {
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [dumpNote, setDumpNote] = useState('');
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
+  const [repos, setRepos] = useState<{ full_name: string }[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for auth token and repo
-    chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], (result) => {
+    // Check for auth token, repo, and repos
+    chrome.storage.local.get(['lifeos_token', 'lifeos_repo', 'lifeos_repos'], (result) => {
       setToken((result.lifeos_token as string) || null);
       setActiveRepo((result.lifeos_repo as string) || 'lifosy/monorepo');
+      setRepos((result.lifeos_repos as { full_name: string }[]) || []);
     });
 
     // Get active tab info
@@ -28,7 +30,13 @@ export function App() {
   }, []);
 
   const handleLogin = () => {
-    chrome.tabs.create({ url: 'https://app.lifosy.com' }); // Or localhost if dev
+    chrome.tabs.create({ url: 'https://app.lifosy.com/extension-onboarded' }); // Or localhost if dev
+  };
+
+  const handleRepoChange = (e: any) => {
+    const newRepo = e.target.value;
+    setActiveRepo(newRepo);
+    chrome.storage.local.set({ lifeos_repo: newRepo });
   };
 
   const handleReadItLater = async () => {
@@ -85,9 +93,21 @@ export function App() {
     <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
       <header class="flex items-center justify-between mb-4 pb-2 border-b border-[var(--los-border)]">
         <span class="font-bold text-[var(--los-accent)] tracking-tight">Lifosy</span>
-        <div class="flex flex-col items-end">
+        <div class="flex flex-col items-end gap-1">
           <span class="text-xs text-[var(--los-success)] animate-pulse">● Connected</span>
-          {activeRepo && <span class="text-[10px] text-[var(--los-fg-dim)] font-mono">{activeRepo}</span>}
+          {repos.length > 0 ? (
+            <select
+              value={activeRepo || 'lifosy/monorepo'}
+              onChange={handleRepoChange}
+              class="text-[10px] text-[var(--los-fg)] font-mono bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded px-1 py-0.5 max-w-[150px] truncate focus:outline-none focus:border-[var(--los-accent)]"
+            >
+              {repos.map(r => (
+                <option key={r.full_name} value={r.full_name}>{r.full_name}</option>
+              ))}
+            </select>
+          ) : (
+            activeRepo && <span class="text-[10px] text-[var(--los-fg-dim)] font-mono">{activeRepo}</span>
+          )}
         </div>
       </header>
 
