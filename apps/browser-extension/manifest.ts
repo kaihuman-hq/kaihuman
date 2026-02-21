@@ -5,13 +5,19 @@ export default defineManifest({
   name: 'Lifosy Browser Extension',
   version: '1.0.0',
   description: 'Interact with your Lifosy repo from anywhere.',
+  icons: {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
   action: {
     default_popup: 'index.html',
     default_icon: {
-      "16": "src/assets/icon-16.png",
-      "32": "src/assets/icon-32.png",
-      "48": "src/assets/icon-48.png",
-      "128": "src/assets/icon-128.png"
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
     }
   },
   background: {
