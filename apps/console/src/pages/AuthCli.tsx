@@ -1,4 +1,4 @@
-import { authStore } from '@lifosy/core';
+import { authStore, githubProfileStore } from '@lifosy/core';
 import { Button } from '@lifosy/ui';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
@@ -33,7 +33,8 @@ export function AuthCli() {
       if (authStore.token.value) {
         setStatus('redirecting');
         const token = authStore.token.value;
-        const redirectUrl = `http://localhost:${port}/callback?token=${token}&state=${state || ''}`;
+        const activeRepo = githubProfileStore.currentRepo.value?.full_name || '';
+        const redirectUrl = `http://localhost:${port}/callback?token=${token}&state=${state || ''}&repo=${encodeURIComponent(activeRepo)}`;
 
         try {
           // We use window.location.href to redirect to the local CLI server
