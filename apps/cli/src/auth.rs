@@ -8,11 +8,12 @@ use tokio::sync::oneshot;
 use warp::Filter;
 
 // In real app this would be configurable or come from env
-const CONSOLE_URL: &str = "http://localhost:5173/auth/cli";
+const CONSOLE_URL: &str = "https://app.lifosy.com/auth/cli";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AuthConfig {
     pub token: String,
+    pub active_repo: Option<String>,
 }
 
 pub struct AuthManager {
@@ -42,6 +43,16 @@ impl AuthManager {
         Ok(config.token)
     }
 
+    pub fn get_active_repo(&self) -> Result<Option<String>> {
+        if !self.config_path.exists() {
+            return Ok(None);
+        }
+        
+        let content = fs::read_to_string(&self.config_path)?;
+        let config: AuthConfig = serde_json::from_str(&content)?;
+        Ok(config.active_repo)
+    }
+
     pub fn is_authenticated(&self) -> bool {
         self.config_path.exists()
     }
@@ -54,7 +65,7 @@ impl AuthManager {
     }
 
     pub async fn login(&self) -> Result<()> {
-        let (tx, rx) = oneshot::channel::<String>();
+        let (tx, rx) = oneshot::channel::<(String, Option<String>)>();
         let tx = Arc::new(std::sync::Mutex::new(Some(tx)));
 
         // 1. Setup local server to receive callback
@@ -62,8 +73,10 @@ impl AuthManager {
             .and(warp::query::<std::collections::HashMap<String, String>>())
             .map(move |params: std::collections::HashMap<String, String>| {
                 if let Some(token) = params.get("token") {
+                    let repo = params.get("repo").cloned();
                     if let Some(tx) = tx.lock().unwrap().take() {
-                        let _ = tx.send(token.clone());
+                        // We send both token and repo over the channel
+                        let _ = tx.send((token.clone(), repo));
                     }
                     warp::reply::html("<h1>Login successful!</h1><p>You can close this tab and return to the terminal.</p><script>window.close()</script>")
                 } else {
@@ -88,10 +101,10 @@ impl AuthManager {
                 anyhow::bail!("Server stopped unexpectedly");
             }
             res = rx => {
-                let token = res.context("Failed to receive token")?;
+                let (token, active_repo) = res.context("Failed to receive token")?;
                 
                 // 4. Save token
-                let config = AuthConfig { token: token.clone() };
+                let config = AuthConfig { token, active_repo };
                 fs::write(&self.config_path, serde_json::to_string_pretty(&config)?)?;
                 
                 println!("Successfully authenticated!");

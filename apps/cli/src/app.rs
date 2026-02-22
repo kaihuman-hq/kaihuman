@@ -24,6 +24,7 @@ pub struct App<'a> {
     pub note_textarea: TextArea<'a>,
     pub selected_repo_index: Option<usize>,
     pub should_quit: bool,
+    pub trigger_login: bool,
 }
 
 impl<'a> App<'a> {
@@ -38,6 +39,7 @@ impl<'a> App<'a> {
             note_textarea: TextArea::default(),
             selected_repo_index: None,
             should_quit: false,
+            trigger_login: false,
         };
         
         app.note_textarea.set_block(
@@ -46,8 +48,13 @@ impl<'a> App<'a> {
             .title("New Note (Enter to Submit, Esc to Cancel)")
         );
 
-        if let Ok(token) = app.auth_manager.get_token() {
-             app.github_client = Some(GithubClient::new(token).unwrap());
+        if app.auth_manager.is_authenticated() {
+            if let Ok(token) = app.auth_manager.get_token() {
+                app.github_client = Some(GithubClient::new(token).unwrap());
+            }
+        } else {
+            app.current_screen = CurrentScreen::Login;
+            app.trigger_login = true;
         }
 
         Ok(app)
@@ -57,11 +64,29 @@ impl<'a> App<'a> {
         loop {
             terminal.draw(|f| ui::ui(f, self))?;
 
+            // Trigger automatic login if needed
+            if self.trigger_login {
+                self.trigger_login = false;
+                if let Err(_e) = self.auth_manager.login().await {
+                    // TODO: Handle login error
+                } else {
+                    if let Ok(token) = self.auth_manager.get_token() {
+                        self.github_client = Some(GithubClient::new(token).unwrap());
+                    }
+                }
+                self.current_screen = CurrentScreen::Main;
+            }
+
             // Poll for events to allow for async updates if needed (e.g. a spinner)
             // For now, simple blocking read is fine because we await async actions immediately
             if event::poll(std::time::Duration::from_millis(100))? {
                 if let Event::Key(key) = event::read()? {
                     if key.kind == event::KeyEventKind::Press {
+                        if key.code == KeyCode::Char('c') && key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                            self.should_quit = true;
+                            continue;
+                        }
+
                         match self.current_screen {
                             CurrentScreen::Main => self.handle_main_input(terminal, key).await?,
                             CurrentScreen::Login => {}, // Login is blocking in handle_main_input currently
@@ -113,7 +138,14 @@ impl<'a> App<'a> {
                          self.refresh_repos().await;
                      }
                      self.current_screen = CurrentScreen::RepoSelect;
-                     self.repo_list_state.select(Some(0));
+                     
+                     let mut selected_idx = 0;
+                     if let Ok(Some(active_repo)) = self.auth_manager.get_active_repo() {
+                         if let Some(idx) = self.repos.iter().position(|r| r.full_name == active_repo) {
+                             selected_idx = idx;
+                         }
+                     }
+                     self.repo_list_state.select(Some(selected_idx));
                 }
             }
             _ => {}
