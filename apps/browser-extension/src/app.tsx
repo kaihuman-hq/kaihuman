@@ -13,9 +13,43 @@ export function App() {
   useEffect(() => {
     // Check for auth token, repo, and repos
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', 'lifeos_repos'], (result) => {
-      setToken((result.lifeos_token as string) || null);
-      setActiveRepo((result.lifeos_repo as string) || 'lifosy/monorepo');
-      setRepos((result.lifeos_repos as { full_name: string }[]) || []);
+      const storedToken = (result.lifeos_token as string) || null;
+      const storedRepo = (result.lifeos_repo as string) || 'lifosy/monorepo';
+      const storedRepos = (result.lifeos_repos as { full_name: string }[]) || [];
+
+      setToken(storedToken);
+      setActiveRepo(storedRepo);
+      setRepos(storedRepos);
+
+      // Fetch fresh repos if we have a token
+      if (storedToken) {
+        fetch('https://api.github.com/user/repos?per_page=100&sort=updated', {
+          headers: {
+            Authorization: `Bearer ${storedToken}`,
+            Accept: 'application/vnd.github.v3+json',
+          }
+        })
+          .then(res => {
+            if (!res.ok) throw new Error('Failed to fetch repos');
+            return res.json();
+          })
+          .then(data => {
+            const fetchedRepos = data.map((r: any) => ({ full_name: r.full_name }));
+            setRepos(fetchedRepos);
+
+            chrome.storage.local.set({ lifeos_repos: fetchedRepos });
+
+            // If current active repo is not in the list, default to the first one
+            if (fetchedRepos.length > 0 && !fetchedRepos.some((r: any) => r.full_name === storedRepo)) {
+              const newDefault = fetchedRepos[0].full_name;
+              setActiveRepo(newDefault);
+              chrome.storage.local.set({ lifeos_repo: newDefault });
+            }
+          })
+          .catch(err => {
+            console.error('Error fetching repos:', err);
+          });
+      }
     });
 
     // Get active tab info
@@ -99,10 +133,12 @@ export function App() {
             <select
               value={activeRepo || 'lifosy/monorepo'}
               onChange={handleRepoChange}
-              class="text-[10px] text-[var(--los-fg)] font-mono bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded px-1 py-0.5 max-w-[150px] truncate focus:outline-none focus:border-[var(--los-accent)]"
+              class="text-[10px] text-[var(--los-fg)] font-mono bg-[var(--los-bg)] border border-[var(--los-border)] rounded px-1 py-0.5 max-w-[150px] truncate focus:outline-none focus:border-[var(--los-accent)] cursor-pointer"
             >
               {repos.map(r => (
-                <option key={r.full_name} value={r.full_name}>{r.full_name}</option>
+                <option key={r.full_name} value={r.full_name} class="bg-[var(--los-bg)] text-[var(--los-fg)]">
+                  {r.full_name}
+                </option>
               ))}
             </select>
           ) : (
