@@ -9,11 +9,12 @@ interface AddToDashboardModalProps {
   isOpen: boolean;
   onClose: () => void;
   dashboards: DashboardWorkspace[];
-  onAddToDashboard: (dashboardId: string) => void;
+  onToggleDashboard: (dashboardId: string) => void;
   fileName: string;
+  currentDashboards: string[];
 }
 
-export const AddToDashboardModal = ({ isOpen, onClose, dashboards, onAddToDashboard, fileName }: AddToDashboardModalProps) => {
+export const AddToDashboardModal = ({ isOpen, onClose, dashboards, onToggleDashboard, fileName, currentDashboards }: AddToDashboardModalProps) => {
   if (!isOpen) return null;
 
   return (
@@ -31,26 +32,40 @@ export const AddToDashboardModal = ({ isOpen, onClose, dashboards, onAddToDashbo
 
         <div className="p-4 space-y-4">
           <MonoText className="text-xs text-[var(--los-muted)]">
-            Select a dashboard (workspace) for <span className="text-[var(--los-fg)]">{fileName}</span>:
+            Add or remove <span className="text-[var(--los-fg)]">{fileName}</span> from dashboards:
           </MonoText>
 
           <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-            {dashboards.map(ws => (
-              <button
-                key={ws.id}
-                onClick={() => {
-                  onAddToDashboard(ws.id);
-                  onClose();
-                }}
-                className="w-full flex items-center gap-3 p-3 text-left border border-[var(--los-border)] rounded hover:bg-[var(--los-accent)] hover:text-[var(--los-bg)] hover:border-[var(--los-accent)] transition-all group"
-              >
-                <LayoutGrid size={16} className="shrink-0 text-[var(--los-muted)] group-hover:text-[var(--los-bg)]" />
-                <div className="flex flex-col">
-                  <span className="font-mono text-sm font-bold">{ws.name}</span>
-                  <span className="font-mono text-[10px] opacity-60">ID: {ws.id}</span>
-                </div>
-              </button>
-            ))}
+            {dashboards.map(ws => {
+              const isAdded = currentDashboards.includes(ws.id);
+              return (
+                <button
+                  key={ws.id}
+                  onClick={() => onToggleDashboard(ws.id)}
+                  className={cn(
+                    "w-full flex items-center justify-between p-3 text-left border rounded transition-all group",
+                    isAdded
+                      ? "bg-[var(--los-accent)] text-[var(--los-bg)] border-[var(--los-accent)] hover:opacity-80"
+                      : "border-[var(--los-border)] hover:bg-[var(--los-accent)] hover:text-[var(--los-bg)] hover:border-[var(--los-accent)]"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <LayoutGrid size={16} className={cn("shrink-0", isAdded ? "text-[var(--los-bg)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-bg)]")} />
+                    <div className="flex flex-col">
+                      <span className="font-mono text-sm font-bold">{ws.name}</span>
+                      <span className={cn("font-mono text-[10px]", isAdded ? "opacity-90" : "opacity-60")}>ID: {ws.id}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    {isAdded ? (
+                      <X size={16} className="text-[var(--los-bg)]" />
+                    ) : (
+                      <Plus size={16} className="text-[var(--los-muted)] group-hover:text-[var(--los-bg)]" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
