@@ -321,29 +321,32 @@ export const MainApp = ({
   const setActiveId = (id: string | number | null) => { layoutStore.activeDragId.value = id; };
   const setNotFound = (val: boolean) => { layoutStore.notFound.value = val; };
 
-  const handleAddToDashboard = (dashboardId: string) => {
+  const handleToggleDashboard = (dashboardId: string) => {
     if (!fileToAddToDashboard || !config || !onConfigChange) return;
 
     // Check if already exists in that dashboard
     const exists = config.entries.some(e => e.path === fileToAddToDashboard && e.dashboard === dashboardId);
+
     if (exists) {
-      alert("File is already in this dashboard.");
-      return;
+      // Remove it
+      onConfigChange({
+        ...config,
+        entries: config.entries.filter(e => !(e.path === fileToAddToDashboard && e.dashboard === dashboardId))
+      });
+    } else {
+      // Add it
+      const newEntry: DashboardEntry = {
+        path: fileToAddToDashboard,
+        dashboard: dashboardId,
+        skipOnMobile: false
+      };
+
+      onConfigChange({
+        ...config,
+        entries: [...config.entries, newEntry]
+      });
     }
-
-    const newEntry: DashboardEntry = {
-      path: fileToAddToDashboard,
-      dashboard: dashboardId,
-      skipOnMobile: false
-    };
-
-    onConfigChange({
-      ...config,
-      entries: [...config.entries, newEntry]
-    });
-
-    setShowAddToDashboard(false);
-    setFileToAddToDashboard(null);
+    // We intentionally do not close the modal so users can toggle multiple dashboards
   };
 
   const toggleTileSize = (id: string | number) => {
@@ -1100,7 +1103,8 @@ export const MainApp = ({
           }}
           dashboards={config.dashboards}
           fileName={fileToAddToDashboard || ''}
-          onAddToDashboard={handleAddToDashboard}
+          currentDashboards={config.entries.filter(e => e.path === fileToAddToDashboard).map(e => e.dashboard)}
+          onToggleDashboard={handleToggleDashboard}
         />
       )}
 
