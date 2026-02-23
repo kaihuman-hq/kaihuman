@@ -25,11 +25,13 @@ pub struct App<'a> {
     pub selected_repo_index: Option<usize>,
     pub should_quit: bool,
     pub trigger_login: bool,
+    pub active_repo: Option<String>,
 }
 
 impl<'a> App<'a> {
     pub fn new() -> anyhow::Result<Self> {
         let auth_manager = AuthManager::new()?;
+        let active_repo = auth_manager.get_active_repo().unwrap_or(None);
         let mut app = Self {
             current_screen: CurrentScreen::Main,
             auth_manager,
@@ -40,6 +42,7 @@ impl<'a> App<'a> {
             selected_repo_index: None,
             should_quit: false,
             trigger_login: false,
+            active_repo,
         };
         
         app.note_textarea.set_block(
@@ -73,6 +76,7 @@ impl<'a> App<'a> {
                     if let Ok(token) = self.auth_manager.get_token() {
                         self.github_client = Some(GithubClient::new(token).unwrap());
                     }
+                    self.active_repo = self.auth_manager.get_active_repo().unwrap_or(None);
                 }
                 self.current_screen = CurrentScreen::Main;
             }
@@ -117,6 +121,7 @@ impl<'a> App<'a> {
                      if let Ok(token) = self.auth_manager.get_token() {
                         self.github_client = Some(GithubClient::new(token).unwrap());
                      }
+                     self.active_repo = self.auth_manager.get_active_repo().unwrap_or(None);
                 }
                 self.current_screen = CurrentScreen::Main;
             }
@@ -131,6 +136,52 @@ impl<'a> App<'a> {
                          if let Ok(token) = self.auth_manager.get_token() {
                             self.github_client = Some(GithubClient::new(token).unwrap());
                          }
+                         self.active_repo = self.auth_manager.get_active_repo().unwrap_or(None);
+                     }
+                     self.current_screen = CurrentScreen::Main;
+                } else if self.active_repo.is_some() {
+                     // Active repo already selected, jump straight to typing the note
+                     if let Some(active_name) = &self.active_repo {
+                         if let Some(idx) = self.repos.iter().position(|r| &r.full_name == active_name) {
+                             self.selected_repo_index = Some(idx);
+                             self.current_screen = CurrentScreen::NoteInput;
+                             self.note_textarea = TextArea::default();
+                             self.note_textarea.set_block(
+                                 ratatui::widgets::Block::default()
+                                 .borders(ratatui::widgets::Borders::ALL)
+                                 .title(format!("Add Note to {}", self.repos[idx].name))
+                             );
+                             return Ok(());
+                         }
+                     }
+                     
+                     // Fallback if active_repo does not exist in local repos cache yet
+                     if self.repos.is_empty() {
+                         self.refresh_repos().await;
+                     }
+                     self.current_screen = CurrentScreen::RepoSelect;
+                     self.repo_list_state.select(Some(0));
+                } else {
+                     if self.repos.is_empty() {
+                         self.refresh_repos().await;
+                     }
+                     self.current_screen = CurrentScreen::RepoSelect;
+                     self.repo_list_state.select(Some(0));
+                }
+            }
+            KeyCode::Char('s') => {
+                if self.github_client.is_none() {
+                     // Not authenticated, do nothing or prompt login
+                     self.current_screen = CurrentScreen::Login;
+                     terminal.draw(|f| ui::ui(f, self))?;
+                     
+                     if let Err(_e) = self.auth_manager.login().await {
+                         // Error
+                     } else {
+                         if let Ok(token) = self.auth_manager.get_token() {
+                            self.github_client = Some(GithubClient::new(token).unwrap());
+                         }
+                         self.active_repo = self.auth_manager.get_active_repo().unwrap_or(None);
                      }
                      self.current_screen = CurrentScreen::Main;
                 } else {
@@ -140,8 +191,8 @@ impl<'a> App<'a> {
                      self.current_screen = CurrentScreen::RepoSelect;
                      
                      let mut selected_idx = 0;
-                     if let Ok(Some(active_repo)) = self.auth_manager.get_active_repo() {
-                         if let Some(idx) = self.repos.iter().position(|r| r.full_name == active_repo) {
+                     if let Some(ref active_repo) = self.active_repo {
+                         if let Some(idx) = self.repos.iter().position(|r| &r.full_name == active_repo) {
                              selected_idx = idx;
                          }
                      }
@@ -176,14 +227,11 @@ impl<'a> App<'a> {
             }
             KeyCode::Enter => {
                 if let Some(i) = self.repo_list_state.selected() {
-                    self.selected_repo_index = Some(i);
-                    self.current_screen = CurrentScreen::NoteInput;
-                    self.note_textarea = TextArea::default();
-                    self.note_textarea.set_block(
-                        ratatui::widgets::Block::default()
-                        .borders(ratatui::widgets::Borders::ALL)
-                        .title(format!("Add Note to {}", self.repos[i].name))
-                    );
+                    let selected_repo_name = self.repos[i].full_name.clone();
+                    self.active_repo = Some(selected_repo_name.clone());
+                    let _ = self.auth_manager.set_active_repo(Some(selected_repo_name));
+                    
+                    self.current_screen = CurrentScreen::Main;
                 }
             }
             _ => {}
@@ -200,20 +248,31 @@ impl<'a> App<'a> {
                 if text.trim().is_empty() {
                     return;
                 }
-                
-                if let (Some(client), Some(idx)) = (&self.github_client, self.selected_repo_index) {
-                    let repo = &self.repos[idx];
-                    let owner = repo.full_name.split('/').next().unwrap_or("unknown");
-                    
-                    if let Err(_e) = client.append_to_inbox(owner, &repo.name, &text).await {
-                         // TODO: Handle Error
+                if let Some(client) = &self.github_client {
+                    if let Some(ref active_repo) = self.active_repo {
+                        let mut parts = active_repo.split('/');
+                        let owner = parts.next().unwrap_or("unknown");
+                        let repo = parts.next().unwrap_or("unknown");
+                        
+                        if let Err(e) = client.create_quicknote(owner, repo, &text).await {
+                             // Fallback logging for errors
+                             let _ = std::fs::write("error.log", format!("Error saving note: {:?}", e));
+                        }
+                    } else if let Some(idx) = self.selected_repo_index {
+                        // Fallback logic if they bypassed Active Repo somehow and ran from the old reposelect
+                        let repo = &self.repos[idx];
+                        let owner = repo.full_name.split('/').next().unwrap_or("unknown");
+                        
+                        if let Err(e) = client.create_quicknote(owner, &repo.name, &text).await {
+                             let _ = std::fs::write("error.log", format!("Error saving note: {:?}", e));
+                        }
                     }
                     self.current_screen = CurrentScreen::Main;
                 }
             }
-             _ => {
-                 self.note_textarea.input(key);
-             }
+            _ => {
+                self.note_textarea.input(key);
+            }
         }
     }
 

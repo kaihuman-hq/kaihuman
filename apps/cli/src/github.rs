@@ -18,7 +18,6 @@ pub struct ContentResponse {
 
 pub struct GithubClient {
     client: reqwest::Client,
-    token: String,
 }
 
 impl GithubClient {
@@ -33,7 +32,7 @@ impl GithubClient {
             .default_headers(headers)
             .build()?;
 
-        Ok(Self { client, token })
+        Ok(Self { client })
     }
 
     pub async fn list_repos(&self) -> Result<Vec<Repository>> {
@@ -44,6 +43,38 @@ impl GithubClient {
             .json()
             .await?;
         Ok(repos)
+    }
+
+    pub async fn create_quicknote(&self, owner: &str, repo: &str, text: &str) -> Result<()> {
+        let now = chrono::Utc::now();
+        // e.g. 2024-03-24T12-34-56Z handling colons that might not be great in file names
+        let timestamp = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true).replace(':', "-");
+        let path = format!(".lifeos/quicknotes/quicknote-{}.md", timestamp);
+        let url = format!("https://api.github.com/repos/{}/{}/contents/{}", owner, repo, path);
+
+        let encoded_content = BASE64_STANDARD.encode(text);
+        
+        #[derive(Serialize)]
+        struct PutBody {
+            message: String,
+            content: String,
+        }
+        
+        let body = PutBody {
+            message: "Add quicknote via CLI".to_string(),
+            content: encoded_content,
+        };
+        
+        let res = self.client.put(&url)
+            .json(&body)
+            .send()
+            .await?;
+            
+        if !res.status().is_success() {
+            bail!("Failed to create quicknote: {}", res.status());
+        }
+
+        Ok(())
     }
 
     pub async fn append_to_inbox(&self, owner: &str, repo: &str, text: &str) -> Result<()> {
