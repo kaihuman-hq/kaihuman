@@ -57,6 +57,18 @@ impl AuthManager {
         self.config_path.exists()
     }
     
+    pub fn set_active_repo(&self, repo: Option<String>) -> Result<()> {
+        let mut config: AuthConfig = if self.config_path.exists() {
+            let content = fs::read_to_string(&self.config_path)?;
+            serde_json::from_str(&content)?
+        } else {
+             anyhow::bail!("Not authenticated");
+        };
+        config.active_repo = repo;
+        fs::write(&self.config_path, serde_json::to_string_pretty(&config)?)?;
+        Ok(())
+    }
+    
     pub fn logout(&self) -> Result<()> {
         if self.config_path.exists() {
             fs::remove_file(&self.config_path)?;

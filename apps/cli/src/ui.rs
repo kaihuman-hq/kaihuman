@@ -34,7 +34,7 @@ pub fn ui(f: &mut Frame, app: &App) {
 
     // Footer/Status Bar
     let status_text = match app.current_screen {
-        CurrentScreen::Main => "q: Quit | n: New Note | l: Login",
+        CurrentScreen::Main => "q: Quit | n: New Note | s: Select Repo | l: Login",
         CurrentScreen::NoteInput => "Esc: Cancel | Enter: Save",
         CurrentScreen::RepoSelect => "Esc: Cancel | Enter: Select | \u{2191}\u{2193}: Navigate",
         CurrentScreen::Login => "Waiting for authentication...",
@@ -46,12 +46,25 @@ pub fn ui(f: &mut Frame, app: &App) {
     f.render_widget(status, chunks[2]);
 }
 
-fn render_main(f: &mut Frame, _app: &App, area: Rect) {
-    let text = vec![
+fn render_main(f: &mut Frame, app: &App, area: Rect) {
+    let mut text = vec![
         Line::from("Welcome to LifeOS CLI"),
         Line::from(""),
-        Line::from("Press 'n' to add a quick note."),
     ];
+
+    if app.github_client.is_some() {
+        if let Some(ref repo) = app.active_repo {
+            text.push(Line::from(format!("Active Repository: {}", repo)).style(Style::default().fg(Color::Green)));
+        } else {
+            text.push(Line::from("Authenticated").style(Style::default().fg(Color::Green)));
+        }
+        text.push(Line::from(""));
+        text.push(Line::from("Press 'n' to add a quick note."));
+        text.push(Line::from("Press 's' to select a different active repository."));
+    } else {
+        text.push(Line::from("Press 'l' to login."));
+    }
+
     let p = Paragraph::new(text)
         .block(Block::default().title("Home").borders(Borders::ALL));
     f.render_widget(p, area);
