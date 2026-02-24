@@ -92,10 +92,43 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
         return;
       }
       try {
-        await githubUpsertFile(token, repo, '.lifeos/dump.md', `- ${message.note.trim()}`, 'top');
+        const targetPath = message.path || '.lifeos/dump.md';
+        await githubUpsertFile(token, repo, targetPath, `- ${message.note.trim()}`, 'top');
         sendResponse({ success: true });
       } catch (error: any) {
         sendResponse({ error: error.message });
+      }
+    });
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'FETCH_QUICK_NOTES') {
+    chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
+      const token = data.lifeos_token;
+      const repo = data.lifeos_repo || 'lifosy/monorepo';
+      if (!token) {
+        sendResponse({ error: 'No token found' });
+        return;
+      }
+      try {
+        const url = `https://api.github.com/repos/${repo}/contents/.lifeos/.dashboard.config.json`;
+        const headers = {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github.v3+json',
+        };
+        const res = await fetch(url, { headers });
+        if (!res.ok) {
+          sendResponse({ quickNotes: [] });
+          return;
+        }
+        const configData = await res.json();
+        const content = decodeURIComponent(escape(atob(configData.content || '')));
+        const config = JSON.parse(content);
+        const quickNotes = config.files?.quickNotes || [];
+        sendResponse({ quickNotes });
+      } catch (error: any) {
+        console.error('Failed to fetch quick notes:', error);
+        sendResponse({ quickNotes: [] }); // default empty gracefully
       }
     });
     return true; // Indicate async response
