@@ -20,6 +20,12 @@ export default defineConfig({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4MB
+        runtimeCaching: [
+          {
+            urlPattern: /^http:\/\/127\.0\.0\.1:4000\/.*/i,
+            handler: 'NetworkOnly',
+          },
+        ],
       },
       manifest: {
         name: 'LifeOS',

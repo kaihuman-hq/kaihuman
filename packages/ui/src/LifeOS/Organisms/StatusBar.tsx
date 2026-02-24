@@ -2,6 +2,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoLabel, MonoText } from '../Atoms/Typography';
+import { aiStore } from '@lifosy/core';
 import { Sparkles, Archive, Search, Settings, GitBranch, GitCommit, LayoutGrid, ChevronUp, ArrowRight } from 'lucide-preact';
 
 export interface Repository {
@@ -537,6 +538,24 @@ export const StatusBar = ({
                 )}
               </div>
             ))}
+            <div
+              className="flex items-center gap-2 cursor-pointer group hover:bg-[var(--los-accent)]/10 px-2 py-1 rounded transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                aiStore.togglePanel();
+              }}
+              title={aiStore.isConnected.value ? "Local AI Connected (Click to close)" : "Local AI Disconnected (Click to connect)"}
+            >
+              <div className={cn(
+                "w-1.5 h-1.5 rounded-full",
+                aiStore.isConnected.value ? "bg-[var(--los-accent)] animate-pulse" : "bg-[var(--los-muted)]"
+              )} />
+              <MonoText className={cn(
+                "text-[10px] hidden sm:block font-bold",
+                aiStore.isConnected.value ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+              )}>AI</MonoText>
+            </div>
+
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
               <MonoText className="text-[10px] hidden sm:block">ONLINE</MonoText>

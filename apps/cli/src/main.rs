@@ -1,4 +1,5 @@
 use anyhow::Result;
+use clap::{Parser, Subcommand};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
@@ -11,11 +12,47 @@ mod app;
 mod auth;
 mod github;
 mod ui;
+mod server;
 
 use app::App;
 
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Start the local AI API server
+    Server {
+        /// Port to run the server on
+        #[arg(short, long, default_value_t = 4000)]
+        port: u16,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Some(Commands::Server { port }) => {
+            println!("Starting LifeOS local AI server...");
+            if let Err(e) = server::start_server(port).await {
+                eprintln!("Server error: {}", e);
+            }
+            Ok(())
+        }
+        None => {
+            // Run the standard TUI app
+            setup_and_run_tui().await
+        }
+    }
+}
+
+async fn setup_and_run_tui() -> Result<(), Box<dyn Error>> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();

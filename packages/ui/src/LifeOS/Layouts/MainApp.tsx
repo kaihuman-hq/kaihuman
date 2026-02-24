@@ -1,5 +1,6 @@
-import { ComponentChildren, h } from 'preact';
-import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
+import { h, ComponentChildren } from 'preact';
+import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
+import { AIPanel } from '../Templates/AIPanel';
 import { memo, createPortal } from 'preact/compat';
 import { SettingsView } from '../Organisms/SettingsView';
 import { AddToDashboardModal } from '../Organisms/AddToDashboardModal';
@@ -1714,7 +1715,8 @@ abbreviations: undefined
         />
       )}
 
-
+      {/* Local AI Server Panel */}
+      <AIPanel />
     </div>
   );
 };
