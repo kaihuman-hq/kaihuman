@@ -1,5 +1,6 @@
-import { ComponentChildren, h } from 'preact';
-import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
+import { h, ComponentChildren } from 'preact';
+import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
+import { AIPanel } from '../Templates/AIPanel';
 import { memo, createPortal } from 'preact/compat';
 import { SettingsView } from '../Organisms/SettingsView';
 import { AddToDashboardModal } from '../Organisms/AddToDashboardModal';
@@ -565,6 +566,30 @@ export const MainApp = ({
     // Find next index, wrap around
     const nextIndex = (currentIndex + 1) % config.dashboards.length;
     setActiveDashboardId(config.dashboards[nextIndex]?.id || null);
+  };
+
+  const handleToggleQuickNote = (path: string) => {
+    const config = layoutStore.remoteConfig.value;
+    if (!config || !onConfigChange) return;
+    const currentQuickNotes = config.files?.quickNotes || [];
+    let newQuickNotes;
+    if (currentQuickNotes.includes(path)) {
+      newQuickNotes = currentQuickNotes.filter(p => p !== path);
+    } else {
+      newQuickNotes = [...currentQuickNotes, path];
+    }
+    const newConfig = {
+      ...config,
+      files: {
+        ...(config.files || {}),
+        quickNotes: newQuickNotes
+      }
+    };
+    onConfigChange({ ...newConfig });
+  };
+
+  const isQuickNote = (path: string) => {
+    return (layoutStore.remoteConfig.value?.files?.quickNotes || []).includes(path);
   };
 
   // Filter entries for current dashboard
@@ -1224,6 +1249,8 @@ export const MainApp = ({
                           }}
                           onRequestMove={(path) => setFileToMove(path)}
                           onNewFileClick={() => setShowNewFileWizard(true)}
+                          onToggleQuickNote={handleToggleQuickNote}
+                          isQuickNote={isQuickNote}
                         />
                       )
                     })}
@@ -1272,6 +1299,8 @@ export const MainApp = ({
                                     onRenameFile={onRenameFile}
                                     onRequestMove={(path: string) => setFileToMove(path)}
                                     isMobile={isMobile}
+                                    onToggleQuickNote={handleToggleQuickNote}
+                                    isQuickNote={isQuickNote}
                                   />
                                 ))}
                               </div>
@@ -1284,6 +1313,8 @@ export const MainApp = ({
                                 <TileContentStructure
                                   tile={displayTiles.find(t => t.id === activeId)!}
                                   renderTileContent={renderTileContent}
+                                  onToggleQuickNote={handleToggleQuickNote}
+                                  isQuickNote={isQuickNote}
                                 />
                               </div>
                             ) : null) as any}
@@ -1304,6 +1335,8 @@ export const MainApp = ({
                           onDeleteFile={onDeleteFile}
                           onRenameFile={onRenameFile}
                           onRequestMove={(path: string) => setFileToMove(path)}
+                          onToggleQuickNote={handleToggleQuickNote}
+                          isQuickNote={isQuickNote}
                         />
                       </div>
                     ))
@@ -1682,7 +1715,8 @@ abbreviations: undefined
         />
       )}
 
-
+      {/* Local AI Server Panel */}
+      <AIPanel />
     </div>
   );
 };
@@ -2292,7 +2326,7 @@ const FocusedTileMemo = memo(FocusedTileInternal, (prev, next) => {
   return idEqual && contentEqual && zenEqual;
 });
 
-const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpanded, onDeleteFile, onRenameFile, onRequestMove }: { tile: TileDef, renderTileContent: any, onToggleSize?: () => void, isExpanded?: boolean, onDeleteFile?: (path: string) => void, onRenameFile?: (path: string, newPath: string) => void, onRequestMove?: (path: string) => void }) => {
+const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpanded, onDeleteFile, onRenameFile, onRequestMove, onToggleQuickNote, isQuickNote }: { tile: TileDef, renderTileContent: any, onToggleSize?: () => void, isExpanded?: boolean, onDeleteFile?: (path: string) => void, onRenameFile?: (path: string, newPath: string) => void, onRequestMove?: (path: string) => void, onToggleQuickNote?: (path: string) => void, isQuickNote?: (path: string) => boolean }) => {
   const [activeMenu, setActiveMenu] = useState<{ id: string, x: number, y: number } | null>(null);
 
   useEffect(() => {
@@ -2316,6 +2350,9 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
 
   const renderContextMenu = () => {
     if (!activeMenu) return null;
+
+    const ext = tile.extension?.toLowerCase();
+    const isMd = ext === '.md';
 
     return createPortal(
       <div
@@ -2349,6 +2386,18 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
         >
           <Move size={12} /> Move
         </div>
+        {isMd && onToggleQuickNote && isQuickNote && (
+          <div
+            className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveMenu(null);
+              onToggleQuickNote(String(tile.id));
+            }}
+          >
+            <FileText size={12} /> {isQuickNote(String(tile.id)) ? 'Remove Quick Note' : 'Add Quick Note'}
+          </div>
+        )}
         <div
           className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs text-red-400 hover:text-red-300"
           onClick={(e) => {
@@ -2419,7 +2468,7 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
   );
 };
 
-const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDragStart, handleDragSave, dragEnabled, isExpanded, onToggleSize, onDeleteFile, onRenameFile, onRequestMove, isMobile }: any) => {
+const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDragStart, handleDragSave, dragEnabled, isExpanded, onToggleSize, onDeleteFile, onRenameFile, onRequestMove, isMobile, onToggleQuickNote, isQuickNote }: any) => {
   const {
     attributes,
     listeners,
@@ -2503,6 +2552,8 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
         onDeleteFile={onDeleteFile}
         onRenameFile={onRenameFile}
         onRequestMove={onRequestMove}
+        onToggleQuickNote={onToggleQuickNote}
+        isQuickNote={isQuickNote}
       />
     </div >
   );

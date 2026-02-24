@@ -66,6 +66,7 @@ export interface DashboardFilesConfig {
   selected?: string; // Currently selected file path
   opened?: string[]; // List of opened file paths
   recentlyOpened?: string[]; // MRU list
+  quickNotes?: string[]; // Files available for quick notes in the extension
 }
 
 export interface DashboardConfig {

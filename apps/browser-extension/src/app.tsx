@@ -9,6 +9,8 @@ export function App() {
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
   const [repos, setRepos] = useState<{ full_name: string }[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [quickNotes, setQuickNotes] = useState<string[]>([]);
+  const [selectedNote, setSelectedNote] = useState<string>('.lifeos/dump.md');
 
   useEffect(() => {
     // Check for auth token, repo, and repos
@@ -61,6 +63,13 @@ export function App() {
         });
       }
     });
+
+    // Fetch quick notes
+    chrome.runtime.sendMessage({ type: 'FETCH_QUICK_NOTES' }, (response) => {
+      if (response && response.quickNotes) {
+        setQuickNotes(response.quickNotes);
+      }
+    });
   }, []);
 
   const handleLogin = () => {
@@ -89,7 +98,7 @@ export function App() {
     setStatus('saving');
     try {
       setErrorMessage(null);
-      chrome.runtime.sendMessage({ type: 'DUMP_NOTE', note: dumpNote }, (response) => {
+      chrome.runtime.sendMessage({ type: 'DUMP_NOTE', note: dumpNote, path: selectedNote }, (response) => {
         if (chrome.runtime.lastError || (response && response.error)) {
           const err = chrome.runtime.lastError?.message || response?.error || 'Unknown error';
           console.error('Error saving dump note:', err);
@@ -167,9 +176,23 @@ export function App() {
         <section class="space-y-2 flex flex-col flex-1">
           <div class="flex items-center justify-between">
             <h2 class="text-sm font-bold text-[var(--los-fg-dim)]">Dump Note</h2>
-            <span class="text-[10px] text-[var(--los-fg-dim)] line-clamp-1 break-all px-2 py-0.5 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]" title={`${activeRepo || 'lifosy/monorepo'}/.lifeos/dump.md`}>
-              .lifeos/dump.md
-            </span>
+            {quickNotes.length > 0 ? (
+              <select
+                value={selectedNote}
+                onChange={(e) => setSelectedNote((e.target as HTMLSelectElement).value)}
+                class="text-[10px] text-[var(--los-fg-dim)] font-mono bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded px-1 py-0.5 max-w-[150px] truncate focus:outline-none focus:border-[var(--los-accent)] cursor-pointer"
+                title={`${activeRepo || 'lifosy/monorepo'}/${selectedNote}`}
+              >
+                <option value=".lifeos/dump.md" class="bg-[var(--los-bg)]">.lifeos/dump.md</option>
+                {quickNotes.map((q) => (
+                  <option key={q} value={q} class="bg-[var(--los-bg)]">{q}</option>
+                ))}
+              </select>
+            ) : (
+              <span class="text-[10px] text-[var(--los-fg-dim)] line-clamp-1 break-all px-2 py-0.5 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]" title={`${activeRepo || 'lifosy/monorepo'}/${selectedNote}`}>
+                {selectedNote}
+              </span>
+            )}
           </div>
           <textarea
             value={dumpNote}

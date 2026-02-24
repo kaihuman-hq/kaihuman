@@ -15,6 +15,8 @@ export interface MillerColumnProps {
   onRenameFile?: (path: string, newPath: string) => void;
   onRequestMove?: (path: string) => void;
   onNewFileClick?: () => void;
+  onToggleQuickNote?: (path: string) => void;
+  isQuickNote?: (path: string) => boolean;
 }
 
 export const MillerColumn = ({
@@ -25,7 +27,9 @@ export const MillerColumn = ({
   onDeleteFile,
   onRenameFile,
   onRequestMove,
-  onNewFileClick
+  onNewFileClick,
+  onToggleQuickNote,
+  isQuickNote
 }: MillerColumnProps) => {
   const [activeMenu, setActiveMenu] = useState<{ id: string, x: number, y: number } | null>(null);
   const [hoveredTileId, setHoveredTileId] = useState<string | null>(null);
@@ -76,6 +80,9 @@ export const MillerColumn = ({
     const tile = items.find(i => i.id.toString() === activeMenu.id);
     if (!tile) return null;
 
+    const ext = tile.extension?.toLowerCase();
+    const isMd = ext === '.md';
+
     return createPortal(
       <div
         className="fixed z-[9999] bg-[#1a1a1f] border border-[var(--los-border)] shadow-xl rounded flex flex-col min-w-[120px] py-1 animate-in fade-in zoom-in-95 duration-100 text-white"
@@ -108,6 +115,18 @@ export const MillerColumn = ({
         >
           <Move size={12} /> Move
         </div>
+        {isMd && onToggleQuickNote && isQuickNote && (
+          <div
+            className="px-3 py-2 hover:bg-white/10 flex items-center gap-2 cursor-pointer text-xs transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveMenu(null);
+              onToggleQuickNote(tile.id.toString());
+            }}
+          >
+            <FileText size={12} /> {isQuickNote(tile.id.toString()) ? 'Remove Quick Note' : 'Add Quick Note'}
+          </div>
+        )}
         <div
           className="px-3 py-2 hover:bg-red-500/20 flex items-center gap-2 cursor-pointer text-xs text-red-400 hover:text-red-300 transition-colors"
           onClick={(e) => {

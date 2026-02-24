@@ -74,7 +74,7 @@ export const MainGrid = ({
           isCollapsed,
           className: cn(
             child.props.className,
-            "h-full w-full",
+            "h-full min-w-0", // min-w-0 prevents grid blowout, w-full removed to allow margins
             isHidden && "hidden",
             // Explicit grid placement
             column === 'left' && "md:col-start-1",
