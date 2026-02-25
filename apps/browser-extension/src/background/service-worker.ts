@@ -93,7 +93,39 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
       }
       try {
         const targetPath = message.path || '.lifeos/dump.md';
-        await githubUpsertFile(token, repo, targetPath, `- ${message.note.trim()}`, 'top');
+        await githubUpsertFile(token, repo, targetPath, `- ${message.note?.trim()}`, 'top');
+        sendResponse({ success: true });
+      } catch (error: any) {
+        sendResponse({ error: error.message });
+      }
+    });
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'ADD_ACTION_LOG') {
+    chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
+      const token = data.lifeos_token;
+      const repo = data.lifeos_repo || 'lifosy/monorepo';
+      if (!token) {
+        sendResponse({ error: 'No token found' });
+        return;
+      }
+      try {
+        const targetPath = message.path || '.lifeos/dump.actionlog.md';
+
+        // Generate timestamp YYYY-MM-DD HH:mm:ss
+        const now = new Date();
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+        // Format description and tags
+        let contentStr = `- ${timestamp} ${message.description?.trim() || ''}`;
+        if (message.tags && message.tags.length > 0) {
+          const tagsStr = message.tags.map((t: string) => `#${t.trim()}`).join(' ');
+          contentStr += ` ${tagsStr}`;
+        }
+
+        await githubUpsertFile(token, repo, targetPath, contentStr, 'bottom');
         sendResponse({ success: true });
       } catch (error: any) {
         sendResponse({ error: error.message });
