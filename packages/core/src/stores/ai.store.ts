@@ -28,7 +28,7 @@ class AIStore {
     try {
       const res = await fetch(`${this.SERVER_URL}/health`, {
         method: 'GET',
-        signal: AbortSignal.timeout(1000)
+        signal: AbortSignal.timeout(1000),
       });
       if (res.ok) {
         if (!this.isConnected.value) {
@@ -53,7 +53,7 @@ class AIStore {
 
     await this.checkConnection();
 
-    // Always open panel even if disconnected, to allow reading history 
+    // Always open panel even if disconnected, to allow reading history
     // or attempting to send if they start the server later
     this.isPanelOpen.value = true;
   }
@@ -70,7 +70,7 @@ class AIStore {
       id: crypto.randomUUID(),
       role: 'user',
       content: content.trim(),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
     this.history.value = [...this.history.value, userMsg];
     this.isTyping.value = true;
@@ -82,8 +82,8 @@ class AIStore {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMsg.content,
-          provider: this.activeProvider.value
-        })
+          provider: this.activeProvider.value,
+        }),
       });
 
       if (!res.ok) {
@@ -97,17 +97,16 @@ class AIStore {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: data.response || 'No response',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
       this.history.value = [...this.history.value, astMsg];
-
     } catch (e: any) {
       logger.error('[AIStore] Error sending message', e);
       const errorMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: `**Error communicating with local CLI:**\n\`\`\`text\n${e.message}\n\`\`\``,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
       this.history.value = [...this.history.value, errorMsg];
     } finally {

@@ -1,10 +1,20 @@
+import { computed, effect, signal } from '@preact/signals';
 import { Logger } from '../logger.js';
-import { signal, computed, effect } from '@preact/signals';
-import { TileDef, Column, DashboardConfig } from '../models/types.js';
+import type { Column, DashboardConfig, TileDef } from '../models/types.js';
 import { githubFileStore } from './github-file.store.js';
 
 export type ViewMode = 'DASHBOARD' | 'FILES' | 'GRAPH' | 'COMMITS' | 'SETTINGS' | 'WIKI';
-export type FocusViewMode = 'CODE' | 'WIDGET' | 'PREVIEW' | 'CHARTS' | 'ADD' | 'ACCOUNTS' | 'TABLE' | 'COLUMNS' | 'FEEDS' | 'ARCHIVE';
+export type FocusViewMode =
+  | 'CODE'
+  | 'WIDGET'
+  | 'PREVIEW'
+  | 'CHARTS'
+  | 'ADD'
+  | 'ACCOUNTS'
+  | 'TABLE'
+  | 'COLUMNS'
+  | 'FEEDS'
+  | 'ARCHIVE';
 
 export interface DumpSaveProps {
   initialContent: string;
@@ -134,14 +144,23 @@ export class LayoutStore {
         title: item.path.split('/').pop() || item.path,
         type: item.type === 'tree' ? 'FOLDER' : 'FILE',
         // content: null, // Core TileDef doesn't have content
-        extension: item.path.includes('.') ? `.${item.path.split('.').pop()}` : undefined
+        extension: item.path.includes('.') ? `.${item.path.split('.').pop()}` : undefined,
       };
 
       // In Core, we don't set UI content. MainApp handles that.
       // We DO set rawContent if file is open.
       const openFiles = githubFileStore.openFiles.value;
 
-      const isWidget = isTimeTracking || isEvents || isHabit || isTimezones || isRss || isReadItLater || isBudget || isActionLog || isDataCollection;
+      const isWidget =
+        isTimeTracking ||
+        isEvents ||
+        isHabit ||
+        isTimezones ||
+        isRss ||
+        isReadItLater ||
+        isBudget ||
+        isActionLog ||
+        isDataCollection;
 
       if (isWidget && openFiles && openFiles[item.path]) {
         tile.rawContent = openFiles[item.path]?.content;
@@ -167,14 +186,14 @@ export class LayoutStore {
 
   navigate(id: string) {
     // Find item in tree to getType
-    const item = githubFileStore.tree.value.find(i => i.path === id);
+    const item = githubFileStore.tree.value.find((i) => i.path === id);
     if (!item) return;
 
     const isFolder = item.type === 'tree';
 
     // Check if already in columns
     const cols = this.columns.value;
-    const colIndex = cols.findIndex(col => col.items.some(i => i.id === id));
+    const colIndex = cols.findIndex((col) => col.items.some((i) => i.id === id));
 
     // Optimization: If already active and focused, do nothing to prevent loops
     if (this.activeTileId.peek() === id && colIndex !== -1) {
@@ -189,7 +208,7 @@ export class LayoutStore {
       // 1. Root Column
       const rootChildren = this.getChildren('');
       const rootActiveId = (parts.length > 1 ? parts[0] : id) || '';
-      if (rootChildren.some(i => i.id === rootActiveId)) {
+      if (rootChildren.some((i) => i.id === rootActiveId)) {
         newColumns.push({ items: rootChildren, activeId: rootActiveId });
       } else {
         // Fallback
@@ -221,7 +240,6 @@ export class LayoutStore {
       if (!isFolder) this.activeTileId.value = id;
       return;
     }
-
 
     if (isFolder) {
       const newColumns = cols.slice(0, colIndex + 1);

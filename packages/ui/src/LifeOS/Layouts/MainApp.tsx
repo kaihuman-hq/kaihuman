@@ -87,6 +87,7 @@ import { NewFileWizard } from '../Organisms/NewFileWizard';
 import { MoveFileModal } from '../Organisms/MoveFileModal';
 import { SearchModal } from '../Organisms/SearchModal';
 import { NotFound } from '../Organisms/NotFound';
+import { ConflictModal } from '../Organisms/ConflictModal';
 import { WikiView } from '../Organisms/WikiView';
 import { TileDef as CoreTileDef } from '@lifosy/core';
 
@@ -1109,6 +1110,9 @@ export const MainApp = ({
           </div>
         </div>
       )}
+
+      {/* Global Modals */}
+      <ConflictModal />
 
       {/* Settings Overlay */}
       {showSettings && layoutStore.remoteConfig.value && onConfigChange && (

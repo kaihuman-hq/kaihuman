@@ -1,8 +1,8 @@
 import { effect, signal } from '@preact/signals';
-import { githubService } from '../services/github.service.js';
-import { authStore } from './auth.store.js';
 import { dbPromise } from '../db.js';
 import { Logger } from '../logger.js';
+import { githubService } from '../services/github.service.js';
+import { authStore } from './auth.store.js';
 
 const logger = new Logger('GithubProfileStore');
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import { ActionLogForm } from './components/ActionLogForm';
 import './index.css';
 
 export function App() {
@@ -117,6 +118,34 @@ export function App() {
     }
   };
 
+  const handleActionLog = async (desc: string, tags: string[]) => {
+    if (!token || !desc.trim()) return;
+    setStatus('saving');
+    try {
+      setErrorMessage(null);
+      chrome.runtime.sendMessage({
+        type: 'ADD_ACTION_LOG',
+        description: desc,
+        tags: tags,
+        path: selectedNote
+      }, (response) => {
+        if (chrome.runtime.lastError || (response && response.error)) {
+          const err = chrome.runtime.lastError?.message || response?.error || 'Unknown error';
+          console.error('Error saving action log:', err);
+          setErrorMessage(err);
+          setStatus('error');
+        } else {
+          setStatus('success');
+          setTimeout(() => setStatus('idle'), 2000);
+        }
+      });
+    } catch (e: any) {
+      console.error(e);
+      setErrorMessage(e.message || 'Unknown error');
+      setStatus('error');
+    }
+  };
+
   if (!token) {
     return (
       <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-6 flex flex-col items-center justify-center space-y-4 font-mono">
@@ -194,24 +223,35 @@ export function App() {
               </span>
             )}
           </div>
-          <textarea
-            value={dumpNote}
-            onInput={(e) => setDumpNote((e.target as HTMLTextAreaElement).value)}
-            class="w-full min-h-[120px] bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded p-2 text-xs focus:border-[var(--los-accent)] focus:ring-1 focus:ring-[var(--los-accent)] focus:outline-none resize-none"
-            placeholder="Type manually..."
-          />
-          {status === 'error' && errorMessage && (
-            <div class="text-[10px] text-red-400 mt-1 mb-1 p-2 bg-red-950/30 rounded border border-red-900/50 break-words">
-              {errorMessage}
-            </div>
+
+          {selectedNote.endsWith('.actionlog.md') ? (
+            <ActionLogForm
+              onAdd={handleActionLog}
+              status={status}
+              errorMessage={errorMessage}
+            />
+          ) : (
+            <>
+              <textarea
+                value={dumpNote}
+                onInput={(e) => setDumpNote((e.target as HTMLTextAreaElement).value)}
+                class="w-full min-h-[120px] bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded p-2 text-xs focus:border-[var(--los-accent)] focus:ring-1 focus:ring-[var(--los-accent)] focus:outline-none resize-none"
+                placeholder="Type manually..."
+              />
+              {status === 'error' && errorMessage && (
+                <div class="text-[10px] text-red-400 mt-1 mb-1 p-2 bg-red-950/30 rounded border border-red-900/50 break-words">
+                  {errorMessage}
+                </div>
+              )}
+              <button
+                onClick={handleDumpNote}
+                disabled={status === 'saving' || !dumpNote.trim()}
+                class="w-full py-2 px-3 bg-[var(--los-accent)] text-black hover:opacity-90 font-bold text-xs rounded transition-opacity disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+              >
+                Add Note
+              </button>
+            </>
           )}
-          <button
-            onClick={handleDumpNote}
-            disabled={status === 'saving' || !dumpNote.trim()}
-            class="w-full py-2 px-3 bg-[var(--los-accent)] text-black hover:opacity-90 font-bold text-xs rounded transition-opacity disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-          >
-            Add Note
-          </button>
         </section>
       </div>
     </div>
