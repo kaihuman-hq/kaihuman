@@ -1,4 +1,4 @@
-import { openDB, type DBSchema } from 'idb';
+import { type DBSchema, openDB } from 'idb';
 
 interface LifeOSDB extends DBSchema {
   auth: {

@@ -1,7 +1,7 @@
 import { signal } from '@preact/signals';
+import { Logger } from '../logger.js';
 import { githubService } from '../services/github.service.js';
 import { githubProfileStore } from './github-profile.store.js';
-import { Logger } from '../logger.js';
 
 const logger = new Logger('GithubCommitStore');
 
@@ -34,7 +34,7 @@ export class GithubCommitStore {
     this.error.value = null;
 
     try {
-      // @ts-ignore - types might be partial
+      // @ts-expect-error - types might be partial
       const data = await githubService.listCommits(repo.owner.login, repo.name, undefined, page);
       this.repoCommits.value = data.map((item: any) => ({
         sha: item.sha,
@@ -43,10 +43,10 @@ export class GithubCommitStore {
           author: {
             name: item.commit.author.name,
             email: item.commit.author.email,
-            date: item.commit.author.date
-          }
+            date: item.commit.author.date,
+          },
         },
-        html_url: item.html_url
+        html_url: item.html_url,
       }));
     } catch (err: any) {
       logger.error('Failed to load repo commits', err);
@@ -67,7 +67,7 @@ export class GithubCommitStore {
     this.error.value = null;
 
     try {
-      // @ts-ignore
+      // @ts-expect-error
       const data = await githubService.listCommits(repo.owner.login, repo.name, path);
 
       const parsed = data.map((item: any) => ({
@@ -77,17 +77,16 @@ export class GithubCommitStore {
           author: {
             name: item.commit.author.name,
             email: item.commit.author.email,
-            date: item.commit.author.date
-          }
+            date: item.commit.author.date,
+          },
         },
-        html_url: item.html_url
+        html_url: item.html_url,
       }));
 
       this.fileCommits.value = {
         ...this.fileCommits.value,
-        [path]: parsed
+        [path]: parsed,
       };
-
     } catch (err: any) {
       logger.error(`Failed to load commits for ${path}`, err);
       this.error.value = err.message;

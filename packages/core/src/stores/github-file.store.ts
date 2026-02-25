@@ -1,8 +1,8 @@
-import { signal, effect, computed } from '@preact/signals';
-import { githubService } from '../services/github.service.js';
-import { githubProfileStore } from './github-profile.store.js';
+import { computed, effect, signal } from '@preact/signals';
 import { openDB } from 'idb';
 import { Logger } from '../logger.js';
+import { githubService } from '../services/github.service.js';
+import { githubProfileStore } from './github-profile.store.js';
 
 const logger = new Logger('GithubFileStore');
 const dbPromise = openDB('life-os-db', 1);
@@ -32,6 +32,11 @@ export class GithubFileStore {
   lastSavedFile = signal<string | null>(null);
   loadedRepo = signal<string | null>(null);
 
+  // Track conflicts: path -> { localContent, remoteContent, remoteSha }
+  fileConflicts = signal<
+    Record<string, { localContent: string; remoteContent: string; remoteSha: string }>
+  >({});
+
   // Computed: currently open file content
   currentContent = computed(() => {
     const path = this.activeFile.value;
@@ -47,7 +52,9 @@ export class GithubFileStore {
     // But if we are switching repos, we MUST clear to prevent showing wrong files.
 
     if (this.loadedRepo.value !== repo.full_name) {
-      logger.info(`Switching repo from ${this.loadedRepo.value} to ${repo.full_name}. Clearing tree.`);
+      logger.info(
+        `Switching repo from ${this.loadedRepo.value} to ${repo.full_name}. Clearing tree.`,
+      );
       this.tree.value = [];
       this.activeFile.value = null;
       this.openFiles.value = {}; // Clear open files too? Yes, safer.
@@ -73,12 +80,15 @@ export class GithubFileStore {
       }
 
       // 2. Fetch fresh from network
-      const remoteTree = await githubService.fetchRepoTree(repo.owner.login, repo.name) as TreeItem[];
+      const remoteTree = (await githubService.fetchRepoTree(
+        repo.owner.login,
+        repo.name,
+      )) as TreeItem[];
 
       // 3. Smart Merge: Keep items from Cache that are NOT in Remote but have Local Content
       // This handles the "Eventual Consistency" of GitHub API after creation
       const mergedTree = [...remoteTree];
-      const remotePaths = new Set(remoteTree.map(t => t.path));
+      const remotePaths = new Set(remoteTree.map((t) => t.path));
 
       // Check for missing items
       for (const item of cachedTree) {
@@ -109,7 +119,6 @@ export class GithubFileStore {
 
       // 4. Update DB
       await db.put('trees', mergedTree, `tree:${repo.full_name} `);
-
     } catch (err: any) {
       logger.error('Failed to load tree', err);
       // Fallback to cache if request fails
@@ -124,15 +133,9 @@ export class GithubFileStore {
   pendingFiles = new Set<string>(); // Track in-flight requests
 
   async openFile(path: string) {
-    // If already open, just set active
-    if (this.openFiles.value[path]) {
-      this.activeFile.value = path;
-      return;
-    }
-
     // If pending, just wait (or ignore, assuming previous call handles it)
     if (this.pendingFiles.has(path)) {
-      logger.warn(`File ${path} is already loading.Ignoring duplicate request.`);
+      logger.warn(`File ${path} is already loading. Ignoring duplicate request.`);
       return;
     }
 
@@ -151,31 +154,63 @@ export class GithubFileStore {
       // 1. Try Cache
       const db = await dbPromise;
       // Use composite key
-      const cacheKey = `${repo.full_name}:${path} `;
+      const cacheKey = `${repo.full_name}:${path}`;
       const cachedData = await db.get('files', cacheKey);
 
-      if (cachedData) {
+      const isCurrentlyOpen = !!this.openFiles.value[path];
+
+      if (cachedData && !isCurrentlyOpen) {
         this.openFiles.value = {
           ...this.openFiles.value,
           [path]: { content: cachedData.content, sha: cachedData.sha },
         };
-        this.activeFile.value = path;
       }
+
+      this.activeFile.value = path;
 
       // Always revalidate from network
       try {
         const fileData = await githubService.getFileContent(repo.owner.login, repo.name, path);
+        const currentOpenData = this.openFiles.value[path];
 
-        // Only update if content changed or if we didn't have cache
-        if (!cachedData || fileData.sha !== cachedData.sha || fileData.content !== cachedData.content) {
+        // Conflict Detection:
+        // If we had local data (cached or already open),
+        // AND the remote SHA is different,
+        // AND the file is marked as locally dirty,
+        // AND the content actually differs:
+        if (
+          currentOpenData &&
+          fileData.sha !== currentOpenData.sha &&
+          this.dirtyFiles.value.has(path) &&
+          fileData.content !== currentOpenData.content
+        ) {
+          logger.warn(`Conflict detected for ${path} upon open.`);
+          this.fileConflicts.value = {
+            ...this.fileConflicts.value,
+            [path]: {
+              localContent: currentOpenData.content,
+              remoteContent: fileData.content,
+              remoteSha: fileData.sha,
+            },
+          };
+        }
+        // Only update if content changed or if we didn't have cache/open file
+        // AND there is no active conflict (either no conflict, or it's resolved/not dirty)
+        else if (
+          !currentOpenData ||
+          fileData.sha !== currentOpenData.sha ||
+          fileData.content !== currentOpenData.content
+        ) {
           this.openFiles.value = {
             ...this.openFiles.value,
             [path]: { content: fileData.content, sha: fileData.sha },
           };
 
-          // If we didn't have cache, we need to set active file (in case we didn't enter the if block above)
-          if (!cachedData) {
-            this.activeFile.value = path;
+          // Clear dirty flag if we are overriding cleanly (not user modified)
+          const dirty = new Set(this.dirtyFiles.value);
+          if (dirty.has(path)) {
+            dirty.delete(path);
+            this.dirtyFiles.value = dirty;
           }
 
           // Update Cache
@@ -183,17 +218,17 @@ export class GithubFileStore {
             path: cacheKey,
             content: fileData.content,
             sha: fileData.sha,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
         }
       } catch (netErr: any) {
         logger.warn('Background fetch failed', netErr);
         // If we didn't have cached data, this is a real error for the user
-        if (!cachedData) {
+        const isCurrentlyOpen = !!this.openFiles.value[path];
+        if (!isCurrentlyOpen && !cachedData) {
           throw netErr;
         }
       }
-
     } catch (err: any) {
       logger.error('Failed to open file', err);
       this.error.value = err.message;
@@ -219,17 +254,63 @@ export class GithubFileStore {
       const repo = githubProfileStore.currentRepo.value;
       if (repo) {
         const cacheKey = `${repo.full_name}:${path} `;
-        dbPromise.then(db => {
+        dbPromise.then((db) => {
           // NO extra key arg
           db.put('files', {
             path: cacheKey,
             content: newContent,
             sha: file.sha,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
         });
       }
     }
+  }
+
+  resolveConflict(path: string, resolution: 'keep_local' | 'use_remote') {
+    const conflict = this.fileConflicts.value[path];
+    if (!conflict) return;
+
+    if (resolution === 'keep_local') {
+      // Update local SHA to match remote, so our next save overwrites it
+      const current = this.openFiles.value[path];
+      if (current) {
+        this.openFiles.value = {
+          ...this.openFiles.value,
+          [path]: { ...current, sha: conflict.remoteSha },
+        };
+      }
+    } else if (resolution === 'use_remote') {
+      // Overwrite local content with remote
+      this.openFiles.value = {
+        ...this.openFiles.value,
+        [path]: { content: conflict.remoteContent, sha: conflict.remoteSha },
+      };
+
+      // Clear dirty flag as we are fully synchronized with remote
+      const dirty = new Set(this.dirtyFiles.value);
+      dirty.delete(path);
+      this.dirtyFiles.value = dirty;
+
+      // Update cache
+      const repo = githubProfileStore.currentRepo.value;
+      if (repo) {
+        const cacheKey = `${repo.full_name}:${path}`;
+        dbPromise.then((db) => {
+          db.put('files', {
+            path: cacheKey,
+            content: conflict.remoteContent,
+            sha: conflict.remoteSha,
+            timestamp: Date.now(),
+          });
+        });
+      }
+    }
+
+    // Remove from active conflicts
+    const newConflicts = { ...this.fileConflicts.value };
+    delete newConflicts[path];
+    this.fileConflicts.value = newConflicts;
   }
 
   savingFiles = signal<Set<string>>(new Set());
@@ -300,12 +381,12 @@ export class GithubFileStore {
 
             // Update DB with new SHA
             const cacheKey = `${repo.full_name}:${path} `;
-            dbPromise.then(db => {
+            dbPromise.then((db) => {
               db.put('files', {
                 path: cacheKey,
                 content: contentToSave,
                 sha: serverSha,
-                timestamp: Date.now()
+                timestamp: Date.now(),
               });
             });
           }
@@ -322,7 +403,6 @@ export class GithubFileStore {
           } else {
             logger.warn(`Saved ${path}, but content changed during save.Retrying...`);
           }
-
         } catch (e: any) {
           // HANDLE 409 CONFLICT
           if (e.status === 409) {
@@ -337,7 +417,7 @@ export class GithubFileStore {
               if (current) {
                 this.openFiles.value = {
                   ...this.openFiles.value,
-                  [path]: { ...current, sha: latest.sha }
+                  [path]: { ...current, sha: latest.sha },
                 };
                 // Loop will continue and try saving again with new SHA
               } else {
@@ -384,7 +464,7 @@ export class GithubFileStore {
       type: 'blob',
       sha: '', // No SHA yet
       url: '',
-      size: content.length
+      size: content.length,
     };
 
     // Create new tree array with optimistic item
@@ -403,7 +483,7 @@ export class GithubFileStore {
     // 4. Persist Tree to DB immediately (so reload works)
     const repo = githubProfileStore.currentRepo.value;
     if (repo) {
-      dbPromise.then(db => {
+      dbPromise.then((db) => {
         db.put('trees', newTree, `tree:${repo.full_name} `);
       });
     }
@@ -418,7 +498,7 @@ export class GithubFileStore {
     // 1. Get SHA (from open files or tree)
     let sha = this.openFiles.value[path]?.sha;
     if (!sha) {
-      const item = this.tree.value.find(t => t.path === path);
+      const item = this.tree.value.find((t) => t.path === path);
       sha = item?.sha || '';
     }
 
@@ -426,7 +506,11 @@ export class GithubFileStore {
     if (!sha) {
       logger.warn(`No SHA found for ${path}, attempting to fetch...`);
       try {
-        const { sha: serverSha } = await githubService.getFileContent(repo.owner.login, repo.name, path);
+        const { sha: serverSha } = await githubService.getFileContent(
+          repo.owner.login,
+          repo.name,
+          path,
+        );
         sha = serverSha;
       } catch (e) {
         logger.error(`Could not find SHA for ${path}, cannot delete.`);
@@ -450,7 +534,7 @@ export class GithubFileStore {
     // 3. Update Local State (Tree, OpenFiles, DB)
 
     // Remove from Tree
-    this.tree.value = this.tree.value.filter(t => t.path !== path);
+    this.tree.value = this.tree.value.filter((t) => t.path !== path);
     // Remove from OpenFiles
     const newOpenFiles = { ...this.openFiles.value };
     delete newOpenFiles[path];
@@ -463,7 +547,7 @@ export class GithubFileStore {
 
     // Update DB
     const cacheKey = `${repo.full_name}:${path} `;
-    dbPromise.then(async db => {
+    dbPromise.then(async (db) => {
       await db.delete('files', cacheKey);
       await db.put('trees', this.tree.value, `tree:${repo.full_name} `);
     });
@@ -473,7 +557,7 @@ export class GithubFileStore {
     const repo = githubProfileStore.currentRepo.value;
     if (!repo) return;
 
-    if (this.openFiles.value[newPath] || this.tree.value.find(t => t.path === newPath)) {
+    if (this.openFiles.value[newPath] || this.tree.value.find((t) => t.path === newPath)) {
       throw new Error(`Destination ${newPath} already exists`);
     }
 
@@ -510,7 +594,6 @@ export class GithubFileStore {
       // deleteFile handled removal.
       // We should open the new file.
       await this.openFile(newPath);
-
     } catch (e) {
       logger.error(`Rename failed`, e);
       throw e;
@@ -530,7 +613,7 @@ export class GithubFileStore {
       path,
       content,
       `Create ${path} (Rename)`,
-      undefined // No SHA = Create
+      undefined, // No SHA = Create
     );
 
     // Optimistically update our tree
@@ -540,12 +623,12 @@ export class GithubFileStore {
       type: 'blob',
       sha: res.content?.sha || '',
       url: '',
-      size: content.length
+      size: content.length,
     };
     this.tree.value = [...this.tree.value, newItem].sort((a, b) => a.path.localeCompare(b.path));
 
     // Update DB tree
-    dbPromise.then(db => {
+    dbPromise.then((db) => {
       db.put('trees', this.tree.value, `tree:${repo.full_name} `);
     });
   }
