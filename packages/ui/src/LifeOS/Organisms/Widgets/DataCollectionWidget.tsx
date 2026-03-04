@@ -58,7 +58,7 @@ export const DataCollectionWidget = ({ content, mode, onChange, className }: Dat
   }
 
   return (
-    <div className={cn("flex flex-col h-full w-full", className)}>
+    <div className={cn("flex-1 flex flex-col h-full w-full min-h-0", className)}>
       {/* FILTER SWITCHER (FOCUS MODE ONLY) */}
       {mode === 'FOCUS' && (
         <div className="flex items-center justify-end px-4 py-2 gap-2 border-b border-[var(--los-border)] overflow-x-auto scrollbar-hide">
@@ -80,8 +80,10 @@ export const DataCollectionWidget = ({ content, mode, onChange, className }: Dat
         </div>
       )}
 
-      <div className="flex-1 min-h-0 relative">
-        <DataCollectionChart data={filteredData} hideLegend={mode === 'SMALL' || mode === 'MOBILE_EXPANDED'} />
+      <div className="flex-1 min-h-0 relative min-h-[200px] w-full">
+        <div className="absolute inset-0">
+          <DataCollectionChart data={filteredData} hideLegend={mode === 'SMALL' || mode === 'MOBILE_EXPANDED'} />
+        </div>
       </div>
 
       {/* Footer Stats for Focus Mode? */}

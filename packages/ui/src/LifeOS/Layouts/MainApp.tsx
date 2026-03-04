@@ -2101,7 +2101,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
               />
             </div>
           ) : isActionLog && (viewMode === 'WIDGET' || viewMode === 'ADD') ? (
-            <div className="min-h-full w-full p-8">
+            <div className="flex flex-col min-h-full w-full p-8">
               <ActionLogWidget
                 content={tile.rawContent || ''}
                 mode={viewMode as any}
@@ -2113,7 +2113,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
               />
             </div>
           ) : viewMode === 'WIDGET' && hasWidget ? (
-            <div className="min-h-full w-full p-8">
+            <div className="flex flex-col min-h-full w-full p-8">
               {isTimeTracking && (
                 <TimeTrackingWidget
                   content={tile.rawContent!}
@@ -2192,7 +2192,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
               )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
-            <div className="min-h-full w-full p-8">
+            <div className="flex flex-col min-h-full w-full p-8">
               <TimeTrackingCharts
                 data={tile.rawContent!}
               />
