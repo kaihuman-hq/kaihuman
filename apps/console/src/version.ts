@@ -3,7 +3,7 @@
 
 export const VERSION = {
   version: '0.1.23',
-  buildTime: '2026-03-06T14:49:00.340Z',
-  gitHash: '9fcace8',
-  full: 'v0.1.23-9fcace8'
+  buildTime: '2026-03-06T15:02:45.690Z',
+  gitHash: 'cfd1bfb',
+  full: 'v0.1.23-cfd1bfb'
 } as const;
