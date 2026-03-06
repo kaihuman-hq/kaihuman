@@ -127,23 +127,54 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
   };
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [mousePos, setMousePos] = useState<{ x: number, y: number } | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!tooltipRef.current || !mousePos || !width || !height) return;
+    
+    const tooltip = tooltipRef.current;
+    const tooltipWidth = tooltip.offsetWidth;
+    const tooltipHeight = tooltip.offsetHeight;
+
+    const gap = 15;
+    
+    let left = mousePos.x - tooltipWidth / 2;
+    if (left < 0) left = 0;
+    if (left + tooltipWidth > width) left = width - tooltipWidth;
+
+    let top = mousePos.y + gap;
+    const xAxisY = height - padding.bottom;
+    
+    if (top + tooltipHeight > xAxisY) {
+        top = mousePos.y - gap - tooltipHeight;
+    }
+    
+    if (top < 0) top = 0;
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+    tooltip.style.opacity = '1';
+  }, [mousePos, width, height, padding.bottom]);
 
   const handleMouseMove = (e: any) => {
     if (!hasData || !width || !height) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left - padding.left;
+    const y = e.clientY - rect.top;
     const count = sortedRows.length;
     let index = 0;
     if (count > 1) {
       index = Math.min(Math.max(Math.round((x / chartWidth) * (count - 1)), 0), count - 1);
     }
     setHoveredIndex(index);
+    setMousePos({ x: e.clientX - rect.left, y });
   };
 
   return (
     <div className="flex flex-col h-full w-full">
       <div className="flex-1 w-full min-h-[200px] relative" ref={containerRef}>
-        <div className="absolute inset-0 pb-8" ref={chartRef} onMouseLeave={() => setHoveredIndex(null)}>
+        <div className="absolute inset-0 pb-8" ref={chartRef} onMouseLeave={() => { setHoveredIndex(null); setMousePos(null); }}>
           {(!hasData || !width || !height) ? (
             <div className="absolute inset-0 flex items-center justify-center text-[var(--los-muted)]">
               No data to chart
@@ -221,13 +252,10 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
               </svg>
 
               {/* Tooltip */}
-              {hoveredIndex !== null && (
+              {(hoveredIndex !== null && mousePos !== null) && (
                 <div
-                  className="absolute z-10 bg-[var(--los-bg)] border border-[var(--los-border)] p-2 rounded shadow-xl pointer-events-none"
-                  style={{
-                    left: Math.min(getX(hoveredIndex) + 20, width - 150),
-                    top: 20
-                  }}
+                  ref={tooltipRef}
+                  className="absolute z-10 bg-[var(--los-bg)] border border-[var(--los-border)] p-2 rounded shadow-xl pointer-events-none opacity-0"
                 >
                   <div className="text-[10px] text-[var(--los-muted)] font-mono mb-1">
                     {xColumn.type.includes('date')
