@@ -26,6 +26,17 @@ const parseDate = (val: any) => {
   return isNaN(d.getTime()) ? new Date() : d;
 };
 
+// Helper to format number with K/M abbreviations
+const formatNumber = (num: number) => {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  }
+  return num.toString();
+};
+
 export const DataCollectionChart = ({ data, width: propWidth, height: propHeight, hideLegend }: DataCollectionChartProps & { hideLegend?: boolean }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
@@ -94,7 +105,7 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
   // Chart Logic Validations
   const hasData = sortedRows.length > 0 && numericColumns.length > 0 && !!xColumn;
 
-  const padding = { top: 20, right: 20, bottom: 30, left: 40 };
+  const padding = { top: 20, right: 20, bottom: 30, left: 45 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -228,8 +239,8 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
                   return (
                     <g key={val}>
                       <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="var(--los-border)" strokeDasharray="4 4" />
-                      <text x={padding.left - 5} y={y + 3} textAnchor="end" className="text-[9px] fill-[var(--los-muted)] font-mono">
-                        {val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}
+                      <text x={padding.left - 5} y={y + 3} textAnchor="end" className="text-[10px] fill-[var(--los-muted)] font-mono">
+                        {formatNumber(val)}
                       </text>
                     </g>
                   )
