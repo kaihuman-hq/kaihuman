@@ -40,10 +40,27 @@ export const Tile = ({
           isCollapsed && "justify-center px-0 bg-[var(--los-bg)]"
         )}>
           <MonoText className={cn(
-            "text-[10px] uppercase tracking-widest truncate transition-opacity duration-200",
+            "text-[10px] uppercase tracking-widest truncate transition-opacity duration-200 flex",
             isCollapsed ? "opacity-0 w-0 hidden" : "opacity-100"
           )}>
-            {title}
+            {(() => {
+              if (!title) return null;
+              const lastSlashIdx = title.lastIndexOf('/');
+              const dirPart = lastSlashIdx !== -1 ? title.slice(0, lastSlashIdx + 1) : '';
+              const baseWithExt = lastSlashIdx !== -1 ? title.slice(lastSlashIdx + 1) : title;
+              
+              const firstDotIdx = baseWithExt.indexOf('.');
+              const namePart = firstDotIdx !== -1 ? baseWithExt.slice(0, firstDotIdx) : baseWithExt;
+              const extPart = firstDotIdx !== -1 ? baseWithExt.slice(firstDotIdx) : '';
+
+              return (
+                <span className="truncate">
+                  {dirPart && <span className="text-[var(--los-muted)]">{dirPart}</span>}
+                  <span className="text-[var(--los-fg)] font-bold">{namePart}</span>
+                  {extPart && <span className="text-[var(--los-muted)]">{extPart}</span>}
+                </span>
+              );
+            })()}
           </MonoText>
 
           {/* Collapsed Indicator */}

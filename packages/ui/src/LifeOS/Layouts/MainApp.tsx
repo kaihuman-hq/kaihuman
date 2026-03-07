@@ -7,6 +7,7 @@ import { AddToDashboardModal } from '../Organisms/AddToDashboardModal';
 
 import { cn } from '../../utils';
 import { Tile } from '../Molecules/Tile';
+import { EncryptedTileWrapper } from '../Molecules/EncryptedTileWrapper';
 import { StatusBar } from '../Organisms/StatusBar';
 import { Editor } from '../Organisms/Editor';
 import { Editor as RealEditor } from '../../components/editor/Editor';
@@ -279,6 +280,7 @@ export const MainApp = ({
   /* REMOVED COMPONENT_STATE: localConfig, moved to layoutStore.remoteConfig */
   // Original config backup for cancel
   const originalConfig = useRef<DashboardConfig | undefined>(undefined);
+  const [focusedViewMode, setFocusedViewMode] = useState<string>('WIDGET');
 
 
   // Store current drag id for drag overlay
@@ -622,7 +624,11 @@ export const MainApp = ({
       else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
       else {
         const parts = entry.path.split('.');
-        ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
+        if (lowerPath.endsWith('.enc') && parts.length > 2) {
+           ext = '.' + parts.slice(-2).join('.').toLowerCase(); // e.g., .md.enc
+        } else {
+           ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
+        }
       }
 
       return {
@@ -643,6 +649,33 @@ export const MainApp = ({
 
   // Helper to render tile content (Widget vs Default)
   const renderTileContent = (tile: TileDef, mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED') => {
+    
+    // Encrypted wrapper handling
+    if (tile.id.toString().endsWith('.enc')) {
+      // Create a duplicate tile without .enc for the inner widget's extension matching
+      const innerExt = tile.extension?.replace('.enc', '');
+      const innerTile = { ...tile, extension: innerExt };
+      
+      return (
+        <EncryptedTileWrapper 
+          tile={tile} 
+          mode={mode} 
+          onUnlocked={() => {
+            // Unlocked callback (state is internally managed)
+          }}
+        >
+          {(decryptedContent: string, handleSave: (newDecryptedContent: string) => void) => {
+            const tempTile = { ...innerTile, rawContent: decryptedContent, onContentChange: handleSave };
+            return renderRawTileContent(tempTile, mode);
+          }}
+        </EncryptedTileWrapper>
+      );
+    }
+    
+    return renderRawTileContent(tile, mode);
+  }
+
+  const renderRawTileContent = (tile: TileDef, mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED') => {
     if (tile.extension === '.timetracking.csv' && tile.rawContent) {
       return (
         <TimeTrackingWidget
@@ -684,6 +717,10 @@ export const MainApp = ({
           content={tile.rawContent}
           mode={mode}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
+          onOpenAdd={() => {
+            setFocusedViewMode('ADD');
+            setActiveTileId(tile.id);
+          }}
         />
       )
     }
@@ -1362,11 +1399,13 @@ export const MainApp = ({
                   }
                   */
                   setActiveTileId(null);
+                  setFocusedViewMode('WIDGET');
                 }}
                 renderEditor={renderEditor}
                 zenMode={zenMode}
                 onToggleZenMode={() => setZenMode(prev => !prev)}
                 onAddToReadItLater={onAddToReadItLater}
+                initialViewMode={focusedViewMode}
                 onAddToDashboard={config ? (path) => {
                   setFileToAddToDashboard(path);
                   setShowAddToDashboard(true);
@@ -1725,7 +1764,7 @@ abbreviations: undefined
   );
 };
 
-const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater, onAddToDashboard }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void, onAddToDashboard?: (path: string) => void }) => {
+const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater, onAddToDashboard, initialViewMode = 'WIDGET' }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void, onAddToDashboard?: (path: string) => void, initialViewMode?: string }) => {
   if (!tile) return null;
 
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
@@ -1741,13 +1780,45 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
 
 
   const isGenericCsv = tile.extension === '.csv' && !isTimeTracking && !isEvents && !isHabit && !isDataCollection && !isBudget;
-  const isAnyCsv = tile.extension?.toLowerCase()?.endsWith('.csv'); // For enabling TABLE view on all CSVs
+  const isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv'); // For enabling TABLE view on all CSVs
 
   const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog || isAnyCsv); // && !!tile.rawContent;
 
 
-  const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
+  const [viewMode, setViewMode] = useState<string>(initialViewMode || (hasWidget ? 'WIDGET' : 'CODE'));
   const [showHistory, setShowHistory] = useState(false);
+
+  // Encrypted Wrapper Interception
+  if (tile.id.toString().endsWith('.enc') && !tile.rawContent?.startsWith('DECRYPTED_')) {
+     const innerExt = tile.extension?.replace('.enc', '');
+     const innerTile = { ...tile, extension: innerExt };
+
+     return (
+       <EncryptedTileWrapper 
+         tile={tile} 
+         mode={'FOCUS'} 
+         onUnlocked={() => {
+           // Unlocked callback
+         }}
+       >
+         {(decryptedContent: string, handleSave: (newDecryptedContent: string) => void) => {
+           // We use a dummy prefix/check to prevent infinite loops, but realistically
+           // EncryptedTileWrapper handles the state.
+           const tempTile = { ...innerTile, rawContent: decryptedContent, onContentChange: handleSave };
+           return <FocusedTileInternal 
+             tile={tempTile} 
+             onClose={onClose} 
+             renderEditor={renderEditor} 
+             zenMode={zenMode} 
+             onToggleZenMode={onToggleZenMode} 
+             onAddToReadItLater={onAddToReadItLater} 
+             onAddToDashboard={onAddToDashboard} 
+             initialViewMode={initialViewMode} 
+           />;
+         }}
+       </EncryptedTileWrapper>
+     );
+  }
 
   // Fix 1.24: Deep Linking - Switch to WIDGET view when content loads if currently in CODE/empty state
   useEffect(() => {
@@ -1762,7 +1833,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
     const _isDataCollection = tile.extension === '.data-collection.csv';
     const _isBudget = tile.extension === '.budget.csv';
     const _isActionLog = tile.extension === '.actionlog.md';
-    const _isAnyCsv = tile.extension?.toLowerCase()?.endsWith('.csv');
+    const _isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv');
 
 
     const _hasWidget = (_isTimeTracking || _isEvents || _isHabit || _isTodos || _isTimezones || _isRss || _isReadItLater || _isDataCollection || _isBudget || _isActionLog || _isAnyCsv);
@@ -2420,11 +2491,26 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
   return (
     <div className="absolute inset-0 overflow-hidden p-4 flex flex-col pointer-events-none">
       <div className="flex justify-between items-start shrink-0 mb-2 pointer-events-auto">
-        <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity flex-1 mr-2 truncate">
-          {tile.title}
-        </MonoText>
+        <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity flex-1 mr-2 flex truncate">
+          {(() => {
+            if (!tile.title) return null;
+            const lastSlashIdx = tile.title.lastIndexOf('/');
+            const dirPart = lastSlashIdx !== -1 ? tile.title.slice(0, lastSlashIdx + 1) : '';
+            const baseWithExt = lastSlashIdx !== -1 ? tile.title.slice(lastSlashIdx + 1) : tile.title;
+            
+            const firstDotIdx = baseWithExt.indexOf('.');
+            const namePart = firstDotIdx !== -1 ? baseWithExt.slice(0, firstDotIdx) : baseWithExt;
+            const extPart = firstDotIdx !== -1 ? baseWithExt.slice(firstDotIdx) : '';
 
-        <div className="flex items-center gap-2">
+            return (
+              <span className="truncate">
+                {dirPart && <span className="text-[var(--los-muted)]">{dirPart}</span>}
+                <span className="text-[var(--los-fg)] font-bold">{namePart}</span>
+                {extPart && <span className="text-[var(--los-muted)]">{extPart}</span>}
+              </span>
+            );
+          })()}
+        </MonoText>        <div className="flex items-center gap-2">
           {onToggleSize && (
             <button
               onClick={(e) => {

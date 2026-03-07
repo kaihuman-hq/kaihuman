@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'preact/hooks';
 const logger = new Logger('FileViewer');
 
 import { githubFileStore } from '@lifosy/core';
+import { EncryptedTileWrapper, TileDef } from '@lifosy/ui';
 import { CodeMirrorEditor } from './editor/CodeMirrorEditor';
 
 interface FileViewerProps {
@@ -20,12 +21,30 @@ export const FileViewer = ({ path, zenMode }: FileViewerProps) => {
     githubFileStore.openFile(path);
   }, [path]);
 
+  const isEncrypted = path?.endsWith('.enc');
+
   // CodeMirrorEditor connects to the store internally to get content
   // for githubFileStore.activeFile
   return (
     <div className="h-full w-full relative">
-      {/* Ensure the editor takes full height */}
-      <CodeMirrorEditor path={path} zenMode={zenMode} />
+      {isEncrypted ? (
+        <EncryptedTileWrapper 
+          tile={{ id: path, rawContent: githubFileStore.openFiles.value[path]?.content } as TileDef} 
+          mode={zenMode ? 'FOCUS' : 'FOCUS'}
+        >
+          {(decryptedContent: string, handleSave: (newContent: string) => void) => (
+             <CodeMirrorEditor 
+               path={path} 
+               zenMode={zenMode} 
+               initialContent={decryptedContent} 
+               onChange={() => {}} // Editor internal state handles tracking dirty
+               onSave={(newContent) => handleSave(newContent)}
+             />
+          )}
+        </EncryptedTileWrapper>
+      ) : (
+        <CodeMirrorEditor path={path} zenMode={zenMode} />
+      )}
     </div>
   );
 };

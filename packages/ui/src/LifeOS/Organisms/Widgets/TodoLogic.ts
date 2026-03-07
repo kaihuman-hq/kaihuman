@@ -6,6 +6,7 @@ export interface TodoItem {
   id: string; // Unique ID (e.g., generated timestamp or hash, simplified here as group+index or just text hash)
   text: string;
   checked: boolean;
+  createdAt?: string;
   updatedAt?: number; // Timestamp
   rawLine: string; // Keep original formatting if possible
 }
@@ -66,8 +67,16 @@ export const parseTodos = (md: string): TodoData => {
       const indent = todoMatch[1] || '';
       // todoMatch[2] is the bullet char, ignored for logic but good to know
       const state = (todoMatch[3] || '').toLowerCase();
-      const text = todoMatch[4] || '';
+      let text = todoMatch[4] || '';
       const isChecked = state === 'x';
+
+      let createdAt: string | undefined;
+      const isoRegex = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\s+(.*)/;
+      const isoMatch = text.match(isoRegex);
+      if (isoMatch) {
+         createdAt = isoMatch[1];
+         text = isoMatch[2] || '';
+      }
 
       // Look ahead for ::updated::
       let updatedAt: number | undefined;
@@ -83,6 +92,7 @@ export const parseTodos = (md: string): TodoData => {
           id: `${currentGroup.name || 'group'}-${currentGroup.todos.length}-${Date.now()}`,
           text,
           checked: isChecked,
+          createdAt,
           updatedAt,
           rawLine: line
         });
@@ -109,7 +119,8 @@ export const serializeTodos = (data: TodoData): string => {
 
     for (const todo of group.todos) {
       const checkbox = todo.checked ? '[x]' : '[ ]';
-      md += `* ${checkbox} ${todo.text}\n`;
+      const fullText = todo.createdAt ? `${todo.createdAt} ${todo.text}` : todo.text;
+      md += `* ${checkbox} ${fullText}\n`;
 
       if (todo.updatedAt) {
         md += `::updated:: ${todo.updatedAt}\n`;
@@ -182,14 +193,17 @@ export const addTodo = (data: TodoData, groupName: string, text: string): TodoDa
   const targetGroup = { ...newGroups[groupIndex] };
   if (!targetGroup.todos) targetGroup.todos = []; // Safety
 
+  const createdAt = new Date().toISOString();
+
   targetGroup.todos = [
     ...targetGroup.todos,
     {
       id: `new-${Date.now()}`,
       text,
       checked: false,
+      createdAt,
       updatedAt: Date.now(),
-      rawLine: `* [ ] ${text}`
+      rawLine: `* [ ] ${createdAt} ${text}`
     }
   ];
   newGroups[groupIndex] = targetGroup as TodoGroup;

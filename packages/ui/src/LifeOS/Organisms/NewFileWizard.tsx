@@ -15,10 +15,12 @@ import {
   ArrowRight,
   X,
   AlertTriangle,
-  Database
+  Database,
+  Lock
 } from 'lucide-preact';
 import { TileDef } from '../Layouts/MainApp';
 import { FolderSelector, FolderItem } from './FolderSelector';
+import { encrypt, passwordStore } from '@lifosy/core';
 
 interface Template {
   id: string;
@@ -136,6 +138,11 @@ export const NewFileWizard = ({
   const [filename, setFilename] = useState(initialFilename);
   const [selectedFolder, setSelectedFolder] = useState<string>(initialFolder); // Empty string means root
 
+  // Encryption State
+  const [encryptFile, setEncryptFile] = useState(false);
+  const [password, setPassword] = useState('');
+  const [rememberPassword, setRememberPassword] = useState(false);
+
   // Validation State
   const [error, setError] = useState<string | null>(null);
 
@@ -173,8 +180,9 @@ export const NewFileWizard = ({
   const fullPath = useMemo(() => {
     if (!selectedTemplate || !filename) return '';
     const folderPrefix = selectedFolder ? (selectedFolder.endsWith('/') ? selectedFolder : `${selectedFolder}/`) : '';
-    return `${folderPrefix}${filename.trim()}${selectedTemplate.extension}`;
-  }, [selectedFolder, filename, selectedTemplate]);
+    const ext = `${selectedTemplate.extension}${encryptFile ? '.enc' : ''}`;
+    return `${folderPrefix}${filename.trim()}${ext}`;
+  }, [selectedFolder, filename, selectedTemplate, encryptFile]);
 
   // Validate on change
   useEffect(() => {
@@ -198,10 +206,27 @@ export const NewFileWizard = ({
   }, [fullPath, existingFiles]);
 
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!selectedTemplate || !filename || error) return;
-    onCreate(fullPath, initialContent || selectedTemplate.defaultContent);
-    onClose();
+    if (encryptFile && !password) {
+      setError('Password is required for encrypted files.');
+      return;
+    }
+    
+    // Disable UI safely
+    setError(null);
+    try {
+      let content = initialContent || selectedTemplate.defaultContent;
+      if (encryptFile) {
+        content = await encrypt(content, password);
+        passwordStore.setPassword(fullPath, password, rememberPassword);
+      }
+      onCreate(fullPath, content);
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Encryption failed.');
+      console.error(err);
+    }
   };
 
   return (
@@ -291,7 +316,9 @@ export const NewFileWizard = ({
                         error ? "border-red-500" : "border-[var(--los-border)] focus:border-[var(--los-accent)]"
                       )}
                     />
-                    <span className="text-[var(--los-muted)] font-mono ml-2 whitespace-nowrap">{selectedTemplate!.extension}</span>
+                    <span className="text-[var(--los-muted)] font-mono ml-2 whitespace-nowrap">
+                      {selectedTemplate!.extension}{encryptFile ? <span className="text-[var(--los-accent)]">.enc</span> : ''}
+                    </span>
                   </div>
                   {error && (
                     <div className="text-red-500 text-xs flex items-center gap-1 mt-1 animate-in slide-in-from-top-1">
@@ -328,11 +355,58 @@ export const NewFileWizard = ({
                     Navigate through folders to select a destination. Initial view shows root folders.
                   </p>
                 </div>
+
+                {/* Encryption Configuration */}
+                <div className="space-y-4 pt-4 border-t border-[var(--los-border)]">
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={encryptFile}
+                      onChange={(e) => setEncryptFile(e.currentTarget.checked)}
+                      className="accent-[var(--los-accent)] cursor-pointer"
+                    />
+                    <Lock size={14} className={encryptFile ? "text-[var(--los-accent)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-accent)] transition-colors"} />
+                    <MonoLabel className={encryptFile ? "text-[var(--los-fg)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)] transition-colors"}>
+                      Encrypt Content
+                    </MonoLabel>
+                  </label>
+
+                  {encryptFile && (
+                    <div className="space-y-4 pl-6 animate-in slide-in-from-top-2 fade-in duration-200 border-l border-[var(--los-border)] ml-1">
+                      <div className="space-y-2">
+                        <MonoLabel>PASSWORD</MonoLabel>
+                        <input
+                          type="password"
+                          value={password}
+                          onInput={(e) => setPassword(e.currentTarget.value)}
+                          placeholder="SuperSecretPassword123"
+                          className="w-full bg-transparent border-b py-2 text-xl font-mono text-[var(--los-fg)] border-[var(--los-border)] focus:border-[var(--los-accent)] focus:outline-none placeholder:text-[var(--los-muted)]/20"
+                        />
+                      </div>
+                      
+                      <label className="flex items-center gap-2 cursor-pointer group w-max mt-2">
+                        <input
+                          type="checkbox"
+                          checked={rememberPassword}
+                          onChange={(e) => setRememberPassword(e.currentTarget.checked)}
+                          className="accent-[var(--los-accent)] cursor-pointer"
+                        />
+                        <span className="text-xs text-[var(--los-muted)] group-hover:text-[var(--los-fg)] transition-colors font-mono uppercase">
+                          Remember in Browser (Local Storage)
+                        </span>
+                      </label>
+                      <p className="text-[10px] text-[var(--los-muted)] leading-relaxed max-w-lg">
+                        Encryption is performed using standard AES-GCM via the Web Crypto API. If you lose your password, the data cannot be recovered. 
+                        Unless "Remember in Browser" is checked, the password will only be preserved for this session.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <button
                 onClick={handleCreate}
-                disabled={!filename || !!error}
+                disabled={!filename || !!error || (encryptFile && !password)}
                 className="mt-4 bg-[var(--los-accent)] text-black font-bold py-3 px-6 flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity self-end w-full sm:w-auto"
               >
                 <span>CREATE FILE</span>
