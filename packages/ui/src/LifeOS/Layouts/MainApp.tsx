@@ -7,6 +7,7 @@ import { AddToDashboardModal } from '../Organisms/AddToDashboardModal';
 
 import { cn } from '../../utils';
 import { Tile } from '../Molecules/Tile';
+import { EncryptedTileWrapper } from '../Molecules/EncryptedTileWrapper';
 import { StatusBar } from '../Organisms/StatusBar';
 import { Editor } from '../Organisms/Editor';
 import { Editor as RealEditor } from '../../components/editor/Editor';
@@ -623,7 +624,11 @@ export const MainApp = ({
       else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
       else {
         const parts = entry.path.split('.');
-        ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
+        if (lowerPath.endsWith('.enc') && parts.length > 2) {
+           ext = '.' + parts.slice(-2).join('.').toLowerCase(); // e.g., .md.enc
+        } else {
+           ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
+        }
       }
 
       return {
@@ -644,6 +649,33 @@ export const MainApp = ({
 
   // Helper to render tile content (Widget vs Default)
   const renderTileContent = (tile: TileDef, mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED') => {
+    
+    // Encrypted wrapper handling
+    if (tile.id.toString().endsWith('.enc')) {
+      // Create a duplicate tile without .enc for the inner widget's extension matching
+      const innerExt = tile.extension?.replace('.enc', '');
+      const innerTile = { ...tile, extension: innerExt };
+      
+      return (
+        <EncryptedTileWrapper 
+          tile={tile} 
+          mode={mode} 
+          onUnlocked={() => {
+            // Unlocked callback (state is internally managed)
+          }}
+        >
+          {(decryptedContent: string, handleSave: (newDecryptedContent: string) => void) => {
+            const tempTile = { ...innerTile, rawContent: decryptedContent, onContentChange: handleSave };
+            return renderRawTileContent(tempTile, mode);
+          }}
+        </EncryptedTileWrapper>
+      );
+    }
+    
+    return renderRawTileContent(tile, mode);
+  }
+
+  const renderRawTileContent = (tile: TileDef, mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED') => {
     if (tile.extension === '.timetracking.csv' && tile.rawContent) {
       return (
         <TimeTrackingWidget
@@ -1748,13 +1780,45 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
 
 
   const isGenericCsv = tile.extension === '.csv' && !isTimeTracking && !isEvents && !isHabit && !isDataCollection && !isBudget;
-  const isAnyCsv = tile.extension?.toLowerCase()?.endsWith('.csv'); // For enabling TABLE view on all CSVs
+  const isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv'); // For enabling TABLE view on all CSVs
 
   const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog || isAnyCsv); // && !!tile.rawContent;
 
 
   const [viewMode, setViewMode] = useState<string>(initialViewMode || (hasWidget ? 'WIDGET' : 'CODE'));
   const [showHistory, setShowHistory] = useState(false);
+
+  // Encrypted Wrapper Interception
+  if (tile.id.toString().endsWith('.enc') && !tile.rawContent?.startsWith('DECRYPTED_')) {
+     const innerExt = tile.extension?.replace('.enc', '');
+     const innerTile = { ...tile, extension: innerExt };
+
+     return (
+       <EncryptedTileWrapper 
+         tile={tile} 
+         mode={'FOCUS'} 
+         onUnlocked={() => {
+           // Unlocked callback
+         }}
+       >
+         {(decryptedContent: string, handleSave: (newDecryptedContent: string) => void) => {
+           // We use a dummy prefix/check to prevent infinite loops, but realistically
+           // EncryptedTileWrapper handles the state.
+           const tempTile = { ...innerTile, rawContent: decryptedContent, onContentChange: handleSave };
+           return <FocusedTileInternal 
+             tile={tempTile} 
+             onClose={onClose} 
+             renderEditor={renderEditor} 
+             zenMode={zenMode} 
+             onToggleZenMode={onToggleZenMode} 
+             onAddToReadItLater={onAddToReadItLater} 
+             onAddToDashboard={onAddToDashboard} 
+             initialViewMode={initialViewMode} 
+           />;
+         }}
+       </EncryptedTileWrapper>
+     );
+  }
 
   // Fix 1.24: Deep Linking - Switch to WIDGET view when content loads if currently in CODE/empty state
   useEffect(() => {
@@ -1769,7 +1833,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
     const _isDataCollection = tile.extension === '.data-collection.csv';
     const _isBudget = tile.extension === '.budget.csv';
     const _isActionLog = tile.extension === '.actionlog.md';
-    const _isAnyCsv = tile.extension?.toLowerCase()?.endsWith('.csv');
+    const _isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv');
 
 
     const _hasWidget = (_isTimeTracking || _isEvents || _isHabit || _isTodos || _isTimezones || _isRss || _isReadItLater || _isDataCollection || _isBudget || _isActionLog || _isAnyCsv);

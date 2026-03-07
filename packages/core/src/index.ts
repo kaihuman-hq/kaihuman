@@ -7,4 +7,6 @@ export * from './stores/github-commit.store.js';
 export * from './stores/github-file.store.js';
 export * from './stores/github-profile.store.js';
 export * from './stores/layout.store.js';
+export * from './stores/password.store.js';
 export * from './stores/root.store.js';
+export * from './utils/crypto.js';

@@ -237,7 +237,8 @@ export const Dashboard = () => {
               lowerPath.endsWith('.readitlater.json') ||
               lowerPath.endsWith('.budget.csv') ||
               lowerPath.endsWith('.actionlog.md') ||
-              lowerPath.endsWith('.data-collection.csv');
+              lowerPath.endsWith('.data-collection.csv') ||
+              lowerPath.endsWith('.enc');
 
             if (isWidget) {
               return (

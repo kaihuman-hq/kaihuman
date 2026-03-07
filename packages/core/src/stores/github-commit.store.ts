@@ -34,7 +34,6 @@ export class GithubCommitStore {
     this.error.value = null;
 
     try {
-      // @ts-expect-error - types might be partial
       const data = await githubService.listCommits(repo.owner.login, repo.name, undefined, page);
       this.repoCommits.value = data.map((item: any) => ({
         sha: item.sha,
@@ -67,7 +66,6 @@ export class GithubCommitStore {
     this.error.value = null;
 
     try {
-      // @ts-expect-error
       const data = await githubService.listCommits(repo.owner.login, repo.name, path);
 
       const parsed = data.map((item: any) => ({

@@ -41,9 +41,15 @@ const nexusTheme = EditorView.theme(
 export const CodeMirrorEditor = ({
   path: propsPath,
   zenMode,
+  initialContent,
+  onChange,
+  onSave
 }: {
   path?: string;
   zenMode?: boolean;
+  initialContent?: string;
+  onChange?: (content: string) => void;
+  onSave?: (content: string) => void;
 }) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -60,6 +66,23 @@ export const CodeMirrorEditor = ({
 
   // Helper to save
   const handleSave = async () => {
+    if (onSave && initialContent !== undefined) {
+      // Controlled mode save
+      logger.debug(`Saving file via callback`);
+      setIsSaving(true);
+      try {
+        if (viewRef.current) {
+           await onSave(viewRef.current.state.doc.toString());
+        }
+        setHasUnsavedChanges(false);
+      } catch (e) {
+        logger.error('Failed to save via callback:', e);
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
     const currentPath = propsPath || githubFileStore.activeFile.value;
     if (currentPath) {
       logger.debug(`Saving file: ${currentPath}`);
@@ -126,7 +149,7 @@ export const CodeMirrorEditor = ({
     if (!parentRef.current) return;
 
     const startState = EditorState.create({
-      doc: '',
+      doc: initialContent !== undefined ? initialContent : '',
       extensions: [
         lineNumbers(),
         highlightActiveLineGutter(),
@@ -152,6 +175,14 @@ export const CodeMirrorEditor = ({
         themeCompartment.current.of(nexusTheme), // Dynamic Helper
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !isUpdatingFromStore.current) {
+            
+            if (onChange && initialContent !== undefined) {
+               // Controlled mode
+               setHasUnsavedChanges(true);
+               onChange(update.state.doc.toString());
+               return;
+            }
+
             // Update store for the CORRECT path
             const currentPath = propsPath || githubFileStore.activeFile.value;
             if (currentPath) {
@@ -222,6 +253,8 @@ export const CodeMirrorEditor = ({
 
   // Sync content with store
   useSignalEffect(() => {
+    if (initialContent !== undefined) return; // Skip store sync if controlled mode
+
     const effectivePath = propsPath || githubFileStore.activeFile.value;
 
     // Get content from OPEN files map directly
@@ -271,7 +304,7 @@ export const CodeMirrorEditor = ({
     }
   });
 
-  if (!propsPath && !githubFileStore.activeFile.value) {
+  if (!propsPath && !githubFileStore.activeFile.value && initialContent === undefined) {
     return (
       <div class="h-full flex items-center justify-center text-nexus-muted">
         Select a file to edit
