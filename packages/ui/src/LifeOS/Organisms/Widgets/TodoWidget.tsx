@@ -12,6 +12,7 @@ export interface TodoWidgetProps {
   mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED';
   className?: string;
   onChange?: (newContent: string) => void;
+  onOpenAdd?: () => void;
 }
 
 const formatRelTime = (ts?: number) => {
@@ -25,7 +26,7 @@ const formatRelTime = (ts?: number) => {
   return `${days}d ago`;
 }
 
-export const TodoWidget = ({ content, mode, className, onChange }: TodoWidgetProps) => {
+export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: TodoWidgetProps) => {
   const data: TodoData = useMemo(() => parseTodos(content), [content]);
 
   // In Small mode, hide old completed items.
@@ -59,6 +60,15 @@ export const TodoWidget = ({ content, mode, className, onChange }: TodoWidgetPro
       <div className={cn("flex flex-col items-center justify-center h-full w-full p-2 gap-1", className)}>
         <MonoHeader className="text-4xl font-bold leading-none">{openTodosCount}</MonoHeader>
         <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-wider">OPEN TASKS</MonoText>
+        
+        {onOpenAdd && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpenAdd(); }}
+            className="mt-4 flex items-center gap-1 px-3 py-1.5 border border-[var(--los-border)] rounded-sm text-[10px] uppercase text-[var(--los-muted)] hover:text-[var(--los-fg)] hover:border-[var(--los-accent)] transition-colors"
+          >
+            <Plus size={12} /> NEW TASK
+          </button>
+        )}
       </div>
     )
   }
@@ -68,7 +78,18 @@ export const TodoWidget = ({ content, mode, className, onChange }: TodoWidgetPro
     return (
       <CompactWidgetLayout>
         <div className="flex justify-between items-center shrink-0">
-          <MonoHeader className="text-xs text-[var(--los-muted)]">TOP PRIORITIES</MonoHeader>
+          <div className="flex items-center gap-2">
+            <MonoHeader className="text-xs text-[var(--los-muted)]">TOP PRIORITIES</MonoHeader>
+            {onOpenAdd && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onOpenAdd(); }}
+                className="text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black rounded-sm p-0.5 transition-colors"
+                title="Add New Task"
+              >
+                <Plus size={12} />
+              </button>
+            )}
+          </div>
           <MonoText className="text-[10px] text-[var(--los-accent)]">{topTodos.length} DUE</MonoText>
         </div>
 

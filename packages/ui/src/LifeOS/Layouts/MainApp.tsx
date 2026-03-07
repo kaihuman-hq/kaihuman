@@ -279,6 +279,7 @@ export const MainApp = ({
   /* REMOVED COMPONENT_STATE: localConfig, moved to layoutStore.remoteConfig */
   // Original config backup for cancel
   const originalConfig = useRef<DashboardConfig | undefined>(undefined);
+  const [focusedViewMode, setFocusedViewMode] = useState<string>('WIDGET');
 
 
   // Store current drag id for drag overlay
@@ -684,6 +685,10 @@ export const MainApp = ({
           content={tile.rawContent}
           mode={mode}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
+          onOpenAdd={() => {
+            setFocusedViewMode('ADD');
+            setActiveTileId(tile.id);
+          }}
         />
       )
     }
@@ -1362,11 +1367,13 @@ export const MainApp = ({
                   }
                   */
                   setActiveTileId(null);
+                  setFocusedViewMode('WIDGET');
                 }}
                 renderEditor={renderEditor}
                 zenMode={zenMode}
                 onToggleZenMode={() => setZenMode(prev => !prev)}
                 onAddToReadItLater={onAddToReadItLater}
+                initialViewMode={focusedViewMode}
                 onAddToDashboard={config ? (path) => {
                   setFileToAddToDashboard(path);
                   setShowAddToDashboard(true);
@@ -1725,7 +1732,7 @@ abbreviations: undefined
   );
 };
 
-const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater, onAddToDashboard }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void, onAddToDashboard?: (path: string) => void }) => {
+const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater, onAddToDashboard, initialViewMode = 'WIDGET' }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void, onAddToDashboard?: (path: string) => void, initialViewMode?: string }) => {
   if (!tile) return null;
 
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
@@ -1746,7 +1753,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
   const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog || isAnyCsv); // && !!tile.rawContent;
 
 
-  const [viewMode, setViewMode] = useState<string>(hasWidget ? 'WIDGET' : 'CODE');
+  const [viewMode, setViewMode] = useState<string>(initialViewMode || (hasWidget ? 'WIDGET' : 'CODE'));
   const [showHistory, setShowHistory] = useState(false);
 
   // Fix 1.24: Deep Linking - Switch to WIDGET view when content loads if currently in CODE/empty state

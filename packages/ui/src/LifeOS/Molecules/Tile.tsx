@@ -40,10 +40,23 @@ export const Tile = ({
           isCollapsed && "justify-center px-0 bg-[var(--los-bg)]"
         )}>
           <MonoText className={cn(
-            "text-[10px] uppercase tracking-widest truncate transition-opacity duration-200",
+            "text-[10px] uppercase tracking-widest truncate transition-opacity duration-200 flex",
             isCollapsed ? "opacity-0 w-0 hidden" : "opacity-100"
           )}>
-            {title}
+            {(() => {
+              if (!title) return null;
+              const firstDotIdx = title.indexOf('.');
+              if (firstDotIdx === -1) return <span className="text-[var(--los-fg)]">{title}</span>;
+              
+              const namePart = title.slice(0, firstDotIdx);
+              const extPart = title.slice(firstDotIdx);
+              return (
+                <span className="truncate">
+                  <span className="text-[var(--los-fg)]">{namePart}</span>
+                  <span className="text-[var(--los-muted)]">{extPart}</span>
+                </span>
+              );
+            })()}
           </MonoText>
 
           {/* Collapsed Indicator */}

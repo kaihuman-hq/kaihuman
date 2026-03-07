@@ -141,20 +141,44 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
   if (mode === 'MOBILE_COLLAPSED') {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full p-2 text-center gap-1">
-        <div className="text-[var(--los-accent)]">
-          <Flame size={24} />
-        </div>
         <div className="flex gap-4 items-center">
-          <div className="flex flex-col items-center">
-            <MonoHeader className="text-xl font-bold leading-none">{stats.currentStreak}</MonoHeader>
-            <MonoText className="text-[8px] text-[var(--los-muted)] uppercase tracking-wider">DAYS</MonoText>
+          <div className="text-[var(--los-accent)]">
+            <Flame size={24} />
           </div>
-          <div className="w-[1px] h-6 bg-[var(--los-border)]" />
-          <div className="flex flex-col items-center">
-            <MonoHeader className="text-xl font-bold leading-none">{stats.weekStreak}</MonoHeader>
-            <MonoText className="text-[8px] text-[var(--los-muted)] uppercase tracking-wider">WEEKS</MonoText>
+          <div className="flex gap-4 items-center">
+            <div className="flex flex-col items-center">
+              <MonoHeader className="text-xl font-bold leading-none">{stats.currentStreak}</MonoHeader>
+              <MonoText className="text-[8px] text-[var(--los-muted)] uppercase tracking-wider">DAYS</MonoText>
+            </div>
+            <div className="w-[1px] h-6 bg-[var(--los-border)]" />
+            <div className="flex flex-col items-center">
+              <MonoHeader className="text-xl font-bold leading-none">{stats.weekStreak}</MonoHeader>
+              <MonoText className="text-[8px] text-[var(--los-muted)] uppercase tracking-wider">WEEKS</MonoText>
+            </div>
           </div>
         </div>
+
+        {/* Small Action Buttons */}
+        {(!isCheckedToday || !isCheckedYesterday) && (
+          <div className="flex gap-2 mt-2">
+            {!isCheckedToday && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleCheckIn(today); }}
+                className="px-2 py-1 text-[9px] font-mono border border-[var(--los-border)] rounded-sm text-[var(--los-muted)] hover:text-black hover:bg-[var(--los-accent)] transition-colors"
+              >
+                CHECK IN TODAY
+              </button>
+            )}
+            {!isCheckedYesterday && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleCheckIn(yesterday); }}
+                className="px-2 py-1 text-[9px] font-mono border border-[var(--los-border)] rounded-sm text-[var(--los-muted)] hover:text-black hover:bg-[var(--los-muted)] transition-colors"
+              >
+                CHECK IN YESTERDAY
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
   }
