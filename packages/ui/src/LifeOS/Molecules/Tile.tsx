@@ -45,15 +45,19 @@ export const Tile = ({
           )}>
             {(() => {
               if (!title) return null;
-              const firstDotIdx = title.indexOf('.');
-              if (firstDotIdx === -1) return <span className="text-[var(--los-fg)]">{title}</span>;
+              const lastSlashIdx = title.lastIndexOf('/');
+              const dirPart = lastSlashIdx !== -1 ? title.slice(0, lastSlashIdx + 1) : '';
+              const baseWithExt = lastSlashIdx !== -1 ? title.slice(lastSlashIdx + 1) : title;
               
-              const namePart = title.slice(0, firstDotIdx);
-              const extPart = title.slice(firstDotIdx);
+              const firstDotIdx = baseWithExt.indexOf('.');
+              const namePart = firstDotIdx !== -1 ? baseWithExt.slice(0, firstDotIdx) : baseWithExt;
+              const extPart = firstDotIdx !== -1 ? baseWithExt.slice(firstDotIdx) : '';
+
               return (
                 <span className="truncate">
-                  <span className="text-[var(--los-fg)]">{namePart}</span>
-                  <span className="text-[var(--los-muted)]">{extPart}</span>
+                  {dirPart && <span className="text-[var(--los-muted)]">{dirPart}</span>}
+                  <span className="text-[var(--los-fg)] font-bold">{namePart}</span>
+                  {extPart && <span className="text-[var(--los-muted)]">{extPart}</span>}
                 </span>
               );
             })()}

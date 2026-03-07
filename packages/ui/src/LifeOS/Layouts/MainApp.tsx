@@ -2427,11 +2427,26 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
   return (
     <div className="absolute inset-0 overflow-hidden p-4 flex flex-col pointer-events-none">
       <div className="flex justify-between items-start shrink-0 mb-2 pointer-events-auto">
-        <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity flex-1 mr-2 truncate">
-          {tile.title}
-        </MonoText>
+        <MonoText className="text-xs opacity-50 group-hover:opacity-100 transition-opacity flex-1 mr-2 flex truncate">
+          {(() => {
+            if (!tile.title) return null;
+            const lastSlashIdx = tile.title.lastIndexOf('/');
+            const dirPart = lastSlashIdx !== -1 ? tile.title.slice(0, lastSlashIdx + 1) : '';
+            const baseWithExt = lastSlashIdx !== -1 ? tile.title.slice(lastSlashIdx + 1) : tile.title;
+            
+            const firstDotIdx = baseWithExt.indexOf('.');
+            const namePart = firstDotIdx !== -1 ? baseWithExt.slice(0, firstDotIdx) : baseWithExt;
+            const extPart = firstDotIdx !== -1 ? baseWithExt.slice(firstDotIdx) : '';
 
-        <div className="flex items-center gap-2">
+            return (
+              <span className="truncate">
+                {dirPart && <span className="text-[var(--los-muted)]">{dirPart}</span>}
+                <span className="text-[var(--los-fg)] font-bold">{namePart}</span>
+                {extPart && <span className="text-[var(--los-muted)]">{extPart}</span>}
+              </span>
+            );
+          })()}
+        </MonoText>        <div className="flex items-center gap-2">
           {onToggleSize && (
             <button
               onClick={(e) => {

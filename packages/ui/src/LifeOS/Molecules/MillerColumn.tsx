@@ -214,12 +214,29 @@ export const MillerColumn = ({
                   {/* Title (Big & Focused) */}
                   <MonoText
                     className={cn(
-                      "text-sm sm:text-base font-bold truncate w-full px-2",
+                      "text-sm sm:text-base font-bold truncate w-full px-2 flex justify-center",
                       "text-[var(--los-fg)] group-hover:text-[var(--los-accent)] transition-colors"
                     )}
                   // title={tile.title} // handled by parent div now
                   >
-                    {tile.title}
+                    {(() => {
+                      if (!tile.title) return null;
+                      const lastSlashIdx = tile.title.lastIndexOf('/');
+                      const dirPart = lastSlashIdx !== -1 ? tile.title.slice(0, lastSlashIdx + 1) : '';
+                      const baseWithExt = lastSlashIdx !== -1 ? tile.title.slice(lastSlashIdx + 1) : tile.title;
+                      
+                      const firstDotIdx = baseWithExt.indexOf('.');
+                      const namePart = firstDotIdx !== -1 ? baseWithExt.slice(0, firstDotIdx) : baseWithExt;
+                      const extPart = firstDotIdx !== -1 ? baseWithExt.slice(firstDotIdx) : '';
+
+                      return (
+                        <span className="truncate">
+                          {dirPart && <span className="text-[var(--los-muted)] font-normal">{dirPart}</span>}
+                          <span className="text-[var(--los-fg)] group-hover:text-[var(--los-accent)]">{namePart}</span>
+                          {extPart && <span className="text-[var(--los-muted)] font-normal">{extPart}</span>}
+                        </span>
+                      );
+                    })()}
                   </MonoText>
 
                   {/* Menu Trigger (Top Right) */}
@@ -333,10 +350,30 @@ export const MillerColumn = ({
               )}
 
               <MonoText className={cn(
-                "text-xs truncate hidden md:block",
+                "text-xs truncate hidden md:flex",
                 activeId === tile.id ? "text-[var(--los-fg)] font-bold" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]"
               )}>
-                {tile.title}
+                {(() => {
+                  if (!tile.title) return null;
+                  const lastSlashIdx = tile.title.lastIndexOf('/');
+                  const dirPart = lastSlashIdx !== -1 ? tile.title.slice(0, lastSlashIdx + 1) : '';
+                  const baseWithExt = lastSlashIdx !== -1 ? tile.title.slice(lastSlashIdx + 1) : tile.title;
+                  
+                  const firstDotIdx = baseWithExt.indexOf('.');
+                  const namePart = firstDotIdx !== -1 ? baseWithExt.slice(0, firstDotIdx) : baseWithExt;
+                  const extPart = firstDotIdx !== -1 ? baseWithExt.slice(firstDotIdx) : '';
+
+                  return (
+                    <span className="truncate">
+                      {dirPart && <span className="text-[var(--los-muted)] opacity-70">{dirPart}</span>}
+                      <span className={cn(
+                        "font-bold",
+                        activeId === tile.id ? "text-[var(--los-fg)]" : "text-[var(--los-fg)] opacity-90"
+                      )}>{namePart}</span>
+                      {extPart && <span className="text-[var(--los-muted)] opacity-70">{extPart}</span>}
+                    </span>
+                  );
+                })()}
               </MonoText>
             </div>
 
