@@ -97,6 +97,11 @@ export const TodoWidget = ({ content, mode, className, onChange }: TodoWidgetPro
                   </div>
                   <div className="flex-1 min-w-0">
                     <MonoText className="text-sm">{todo.text}</MonoText>
+                    {todo.createdAt && (
+                      <MonoText className="text-[10px] text-[var(--los-muted)] mt-0.5">
+                        {todo.createdAt.split('T')[0]}
+                      </MonoText>
+                    )}
                     <MonoText className="text-[10px] text-[var(--los-muted)] mt-0.5">
                       {formatRelTime(todo.updatedAt)}
                     </MonoText>
@@ -156,6 +161,11 @@ export const TodoWidget = ({ content, mode, className, onChange }: TodoWidgetPro
                         </MonoText>
                       )}
                     </div>
+                    {todo.createdAt && (
+                      <MonoText className="text-[10px] text-[var(--los-muted)] mt-0.5">
+                        {todo.createdAt.split('T')[0]}
+                      </MonoText>
+                    )}
                   </div>
                 </div>
               ))}
