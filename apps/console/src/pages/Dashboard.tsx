@@ -261,9 +261,9 @@ export const Dashboard = () => {
           }, [])}
 
           renderEditor={useCallback(
-            (path: string, zenMode?: boolean) => (
+            (path: string, zenMode?: boolean, contentOverride?: string, onSaveOverride?: (val: string) => void) => (
               <ErrorBoundary componentName={`Editor (${path})`}>
-                <FileViewer key={path} path={path} zenMode={zenMode} />
+                <FileViewer key={path} path={path} zenMode={zenMode} contentOverride={contentOverride} onSaveOverride={onSaveOverride} />
               </ErrorBoundary>
             ),
             [],
