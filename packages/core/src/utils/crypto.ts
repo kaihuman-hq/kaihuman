@@ -78,15 +78,34 @@ export async function encrypt(text: string, password: string): Promise<string> {
   const ivHex = bufferToHex(iv.buffer);
   const cipherHex = bufferToHex(cipherBuffer);
   
-  return `${saltHex}:${ivHex}:${cipherHex}`;
+  const rawHex = `${saltHex}:${ivHex}:${cipherHex}`;
+  
+  // Base64 encode the string to prevent transmission truncation or formatting issues
+  // in GitHub text files / JSON stringification.
+  return btoa(rawHex);
 }
 
 /**
- * Decrypts a cipher text string (format `salt:iv:ciphertext`) using a password.
+ * Decrypts a cipher text string (format `salt:iv:ciphertext` or base64) using a password.
  * Returns the decrypted plain text string.
  */
 export async function decrypt(encryptedHex: string, password: string): Promise<string> {
-  const parts = encryptedHex.split(':');
+  let cleanedStr = encryptedHex.trim();
+  
+  // If the file is completely empty (e.g. newly created file), return empty string.
+  if (cleanedStr === '') return '';
+
+  // If there are no colons, assume it is base64 encoded (the new standard).
+  // If there are colons, it is the old fallback raw hex format.
+  if (!cleanedStr.includes(':')) {
+    try {
+      cleanedStr = atob(cleanedStr);
+    } catch (e) {
+      throw new Error('Invalid encrypted format. Expected base64 or salt:iv:ciphertext.');
+    }
+  }
+
+  const parts = cleanedStr.split(':');
   if (parts.length !== 3) {
     throw new Error('Invalid encrypted format. Expected salt:iv:ciphertext');
   }

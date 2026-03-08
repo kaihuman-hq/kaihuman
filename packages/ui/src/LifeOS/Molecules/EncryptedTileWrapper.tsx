@@ -1,7 +1,8 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
+import { useSignal } from '@preact/signals';
 import { TileDef } from '../Layouts/MainApp';
-import { passwordStore, unlockedFiles, decrypt } from '@lifosy/core';
+import { passwordStore, unlockedFiles, decrypt, encrypt } from '@lifosy/core';
 import { Lock, Unlock, AlertTriangle } from 'lucide-preact';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
 
@@ -17,11 +18,11 @@ export interface EncryptedTileWrapperProps {
 }
 
 export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL' }: EncryptedTileWrapperProps) => {
-  const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isDecrypting, setIsDecrypting] = useState(false);
-  const [decryptedContentState, setDecryptedContentState] = useState<string | null>(null);
+  const password = useSignal('');
+  const remember = useSignal(false);
+  const error = useSignal<string | null>(null);
+  const isDecrypting = useSignal(false);
+  const decryptedContentState = useSignal<string | null>(null);
   const path = String(tile.id);
   
   // React to store changes (this ensures if another tile unlocks it, we know)
@@ -29,55 +30,74 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
 
   const handleUnlock = async (e?: Event) => {
     if (e) e.preventDefault();
-    if (!password) return;
+    if (!password.value) return;
     
-    setIsDecrypting(true);
-    setError(null);
+    isDecrypting.value = true;
+    error.value = null;
     try {
       const raw = tile.rawContent || '';
-      // We assume if it's already unlocked, we might not even reach here, but let's be safe
-      const decrypted = await decrypt(raw, password);
+      
+      let decrypted = '';
+      if (raw.trim() === '') {
+        decrypted = '';
+      } else {
+        decrypted = await decrypt(raw, password.value);
+      }
+      
       // Valid! Save password to store
-      passwordStore.setPassword(path, password, remember);
-      setDecryptedContentState(decrypted);
+      passwordStore.setPassword(path, password.value, remember.value);
+      unlockedFiles.value = { ...unlockedFiles.value, [path]: true };
+      decryptedContentState.value = decrypted;
       onUnlocked?.(decrypted);
     } catch (err) {
       console.error('Decryption error:', err);
-      setError('Incorrect password or corrupted file.');
+      error.value = 'Incorrect password or corrupted file.';
     } finally {
-      setIsDecrypting(false);
+      isDecrypting.value = false;
     }
   };
 
   // If already unlocked in the store, we should try decrypting automatically on mount
   useEffect(() => {
-    if (isUnlocked && tile.rawContent) {
+    if (isUnlocked && tile.rawContent !== undefined && tile.rawContent !== null) {
       const storedPw = passwordStore.getPassword(path);
       if (storedPw) {
-         decrypt(tile.rawContent, storedPw).then(dec => {
-             setDecryptedContentState(dec);
-             onUnlocked?.(dec);
-         }).catch(() => {
-             // Password was wrong or file corrupted? Clear it.
-             passwordStore.clearPassword(path);
-         });
+         if (tile.rawContent.trim() === '') {
+             decryptedContentState.value = '';
+             onUnlocked?.('');
+         } else {
+             decrypt(tile.rawContent, storedPw).then(dec => {
+                 decryptedContentState.value = dec;
+                 onUnlocked?.(dec);
+             }).catch(() => {
+                 // Password was wrong or file corrupted? Clear it.
+                 passwordStore.clearPassword(path);
+             });
+         }
       }
     }
-  }, [isUnlocked, tile.rawContent, path, onUnlocked]);
+  }, [isUnlocked, tile.rawContent, path]);
+
+  let childFn: any = null;
+  if (typeof children === 'function') {
+    childFn = children;
+  } else if (Array.isArray(children)) {
+    childFn = (children as any[]).find((c: any) => typeof c === 'function');
+  }
 
   // If unlocked and we have children to render (e.g. the actual widget)
-  if (isUnlocked && typeof children === 'function' && decryptedContentState !== null) {
+  if (isUnlocked && childFn && decryptedContentState.value !== null) {
       const handleSave = async (newDecrypted: string) => {
           // Inner widget wants to save changes. We must encrypt them first.
           const storedPw = passwordStore.getPassword(path);
           if (!storedPw) throw new Error('Password lost during session');
           
-          const newEncrypted = await import('@lifosy/core').then(m => m.encrypt(newDecrypted, storedPw));
+          const newEncrypted = await encrypt(newDecrypted, storedPw);
           tile.onContentChange?.(newEncrypted);
           // Optimistically update our local decrypted state so the widget stays responsive
-          setDecryptedContentState(newDecrypted);
+          decryptedContentState.value = newDecrypted;
       };
-      return <>{children(decryptedContentState, handleSave)}</>;
+      return <>{childFn(decryptedContentState.value, handleSave)}</>;
   }
 
   // Render Lock Screen
@@ -94,17 +114,18 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
         <form onSubmit={handleUnlock} className="flex flex-col items-center w-full gap-4">
           <input
             type="password"
-            value={password}
-            onInput={(e) => setPassword(e.currentTarget.value)}
+            autoComplete="current-password"
+            value={password.value}
+            onInput={(e) => password.value = e.currentTarget.value}
             placeholder="Enter password..."
             className="w-full bg-[var(--los-bg)] border-b border-[var(--los-border)] py-2 text-center font-mono text-sm focus:outline-none focus:border-[var(--los-accent)]"
-            disabled={isDecrypting}
+            disabled={isDecrypting.value}
           />
           
-          {error && (
+          {error.value && (
             <div className="text-red-500 text-xs flex items-center justify-center gap-1 animate-in zoom-in-95">
               <AlertTriangle size={12} />
-              <span>{error}</span>
+              <span>{error.value}</span>
             </div>
           )}
 
@@ -112,8 +133,8 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
             <label className="flex items-center gap-2 cursor-pointer mt-2 group text-xs text-[var(--los-muted)]">
               <input
                 type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.currentTarget.checked)}
+                checked={remember.value}
+                onChange={(e) => remember.value = e.currentTarget.checked}
                 className="accent-[var(--los-accent)]"
               />
               <span className="group-hover:text-[var(--los-fg)] transition-colors">Remember Password</span>
@@ -122,10 +143,10 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
 
           <button
             type="submit"
-            disabled={!password || isDecrypting}
+            disabled={!password.value || isDecrypting.value}
             className="mt-2 w-full max-w-[200px] bg-[var(--los-accent)] text-black font-bold py-2 px-4 flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-colors"
           >
-            {isDecrypting ? 'Decrypting...' : 'Unlock'}
+            {isDecrypting.value ? 'Decrypting...' : 'Unlock'}
             <Unlock size={14} />
           </button>
         </form>

@@ -11,15 +11,35 @@ import { CodeMirrorEditor } from './editor/CodeMirrorEditor';
 interface FileViewerProps {
   path: string;
   zenMode?: boolean;
+  contentOverride?: string;
+  onSaveOverride?: (newContent: string) => void;
 }
 
-export const FileViewer = ({ path, zenMode }: FileViewerProps) => {
-  // When this component mounts (tile focused), load the file
+export const FileViewer = ({ path, zenMode, contentOverride, onSaveOverride }: FileViewerProps) => {
+  // When this component mounts (tile focused), load the file ONLY if no content override is provided
   useEffect(() => {
+    if (contentOverride !== undefined) return;
+    
     logger.debug(`Mounting for ${path}`);
     if (!path) logger.error('Path is empty!');
     githubFileStore.openFile(path);
-  }, [path]);
+  }, [path, contentOverride]);
+
+  // If MainApp already decrypted the file, it passes the plaintext via contentOverride.
+  // We can skip the redundant encryption wrapper entirely.
+  if (contentOverride !== undefined) {
+      return (
+        <div className="h-full w-full relative">
+            <CodeMirrorEditor 
+               path={path} 
+               zenMode={zenMode} 
+               initialContent={contentOverride} 
+               onChange={() => {}} // Editor internal state handles tracking dirty
+               onSave={(newContent) => onSaveOverride?.(newContent)}
+             />
+        </div>
+      );
+  }
 
   const isEncrypted = path?.endsWith('.enc');
 

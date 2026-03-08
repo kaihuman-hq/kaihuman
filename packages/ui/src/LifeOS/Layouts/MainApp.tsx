@@ -116,7 +116,7 @@ export interface MainAppProps {
   repositories?: import('../Organisms/StatusBar').Repository[];
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
 
-  renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren;
+  renderEditor?: (path: string, zenMode?: boolean, contentOverride?: string, onSaveOverride?: (val: string) => void) => ComponentChildren;
   onAddToReadItLater?: (item: ReadItLaterItem) => void;
   onCreateFile?: (path: string, content: string) => void;
   onDeleteFile?: (path: string) => void;
@@ -810,7 +810,12 @@ export const MainApp = ({
     // renderEditor typically triggers a data fetch, whereas renderFile might be a static preview or lightweight view.
     // This ensures that deep-linked widgets (which start with no content) trigger a load.
     if (mode === 'FOCUS' && renderEditor && tile.type === 'FILE' && !tile.content) {
-      return renderEditor(String(tile.id), false);
+      return renderEditor(String(tile.id), false, tile.rawContent, tile.onContentChange);
+    }
+
+    if (tile.type === 'FILE' && renderEditor && tile.rawContent !== undefined && tile.extension?.match(/\.(md|txt|json|csv|enc)$/)) {
+      // If we have actual rawContent (e.g. from decryption), FORCE the use of renderEditor so it consumes it
+      return renderEditor(String(tile.id), mode === 'FOCUS', tile.rawContent, tile.onContentChange);
     }
 
     return tile.content || (renderFile && tile.type === 'FILE' ? renderFile(String(tile.id)) : undefined);
@@ -1764,7 +1769,7 @@ abbreviations: undefined
   );
 };
 
-const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater, onAddToDashboard, initialViewMode = 'WIDGET' }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void, onAddToDashboard?: (path: string) => void, initialViewMode?: string }) => {
+const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater, onAddToDashboard, initialViewMode = 'WIDGET' }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean, contentOverride?: string, onSaveOverride?: (val: string) => void) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void, onAddToDashboard?: (path: string) => void, initialViewMode?: string }) => {
   if (!tile) return null;
 
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
@@ -1789,7 +1794,8 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
   const [showHistory, setShowHistory] = useState(false);
 
   // Encrypted Wrapper Interception
-  if (tile.id.toString().endsWith('.enc') && !tile.rawContent?.startsWith('DECRYPTED_')) {
+  // We use a custom __isDecrypted flag on the tile to prevent infinite recursive interception
+  if (tile.id.toString().endsWith('.enc') && !(tile as any).__isDecrypted) {
      const innerExt = tile.extension?.replace('.enc', '');
      const innerTile = { ...tile, extension: innerExt };
 
@@ -1802,9 +1808,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
          }}
        >
          {(decryptedContent: string, handleSave: (newDecryptedContent: string) => void) => {
-           // We use a dummy prefix/check to prevent infinite loops, but realistically
-           // EncryptedTileWrapper handles the state.
-           const tempTile = { ...innerTile, rawContent: decryptedContent, onContentChange: handleSave };
+           const tempTile = { ...innerTile, rawContent: decryptedContent, onContentChange: handleSave, __isDecrypted: true } as any;
            return <FocusedTileInternal 
              tile={tempTile} 
              onClose={onClose} 
@@ -2350,9 +2354,9 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
                 onChange={(newContent) => tile.onContentChange?.(newContent)}
               />
             </div>
-          ) : viewMode === 'CODE' ? (
+          ) : viewMode === 'CODE' || (viewMode === 'WIDGET' && !hasWidget) ? (
             <div className="h-full w-full">
-              {renderEditor ? renderEditor(String(tile.id), zenMode) : (
+              {renderEditor ? renderEditor(String(tile.id), zenMode, tile.rawContent, tile.onContentChange) : (
                 tile.rawContent !== undefined ? (
                   <textarea
                     className="w-full h-full bg-[var(--los-bg)] text-[var(--los-fg)] font-mono text-xs p-4 resize-none focus:outline-none border-none"
