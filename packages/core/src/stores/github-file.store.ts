@@ -238,8 +238,15 @@ export class GithubFileStore {
   }
 
   updateFileContent(path: string, newContent: string) {
+    logger.info(`updateFileContent called for ${path}`);
     const file = this.openFiles.value[path];
+    if (!file) {
+      logger.error(`updateFileContent failed: file ${path} not found in openFiles`);
+    } else if (file.content === newContent) {
+      logger.info(`updateFileContent skipped: content unchanged for ${path}`);
+    }
     if (file && file.content !== newContent) {
+      logger.info(`updateFileContent updating ${path}`);
       this.openFiles.value = {
         ...this.openFiles.value,
         [path]: { ...file, content: newContent },
@@ -253,7 +260,7 @@ export class GithubFileStore {
       // Update DB immediately
       const repo = githubProfileStore.currentRepo.value;
       if (repo) {
-        const cacheKey = `${repo.full_name}:${path} `;
+        const cacheKey = `${repo.full_name}:${path}`;
         dbPromise.then((db) => {
           // NO extra key arg
           db.put('files', {

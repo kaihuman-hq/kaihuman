@@ -2,7 +2,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { useSignal } from '@preact/signals';
 import { TileDef } from '../Layouts/MainApp';
-import { passwordStore, unlockedFiles, decrypt } from '@lifosy/core';
+import { passwordStore, unlockedFiles, decrypt, encrypt } from '@lifosy/core';
 import { Lock, Unlock, AlertTriangle } from 'lucide-preact';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
 
@@ -92,7 +92,7 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
           const storedPw = passwordStore.getPassword(path);
           if (!storedPw) throw new Error('Password lost during session');
           
-          const newEncrypted = await import('@lifosy/core').then(m => m.encrypt(newDecrypted, storedPw));
+          const newEncrypted = await encrypt(newDecrypted, storedPw);
           tile.onContentChange?.(newEncrypted);
           // Optimistically update our local decrypted state so the widget stays responsive
           decryptedContentState.value = newDecrypted;
