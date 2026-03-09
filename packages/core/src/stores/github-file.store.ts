@@ -130,11 +130,11 @@ export class GithubFileStore {
     }
   }
 
-  pendingFiles = new Set<string>(); // Track in-flight requests
+  pendingFiles = signal(new Set<string>()); // Track in-flight requests
 
   async openFile(path: string) {
     // If pending, just wait (or ignore, assuming previous call handles it)
-    if (this.pendingFiles.has(path)) {
+    if (this.pendingFiles.value.has(path)) {
       logger.warn(`File ${path} is already loading. Ignoring duplicate request.`);
       return;
     }
@@ -142,7 +142,9 @@ export class GithubFileStore {
     const repo = githubProfileStore.currentRepo.value;
     if (!repo) return;
 
-    this.pendingFiles.add(path);
+    const newPending = new Set(this.pendingFiles.value);
+    newPending.add(path);
+    this.pendingFiles.value = newPending;
 
     try {
       // Find in tree to make sure it's a file
@@ -233,7 +235,9 @@ export class GithubFileStore {
       logger.error('Failed to open file', err);
       this.error.value = err.message;
     } finally {
-      this.pendingFiles.delete(path);
+      const newPending = new Set(this.pendingFiles.value);
+      newPending.delete(path);
+      this.pendingFiles.value = newPending;
     }
   }
 
@@ -251,8 +255,10 @@ export class GithubFileStore {
         ...this.openFiles.value,
         [path]: { ...file, content: newContent },
       };
-
-      // Mark dirty
+    }
+    
+    // ALWAYS mark dirty if updateFileContent is explicitly called as it implies user intent to save
+    if (file) {
       const dirty = new Set(this.dirtyFiles.value);
       dirty.add(path);
       this.dirtyFiles.value = dirty;

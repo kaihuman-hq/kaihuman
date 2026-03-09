@@ -167,7 +167,7 @@ export class LayoutStore {
       }
 
       // Handlers
-      if (isWidget) {
+      if (tile.type === 'FILE') {
         tile.onContentChange = (newContent: string) => {
           githubFileStore.updateFileContent(item.path, newContent);
           githubFileStore.saveFile(item.path);

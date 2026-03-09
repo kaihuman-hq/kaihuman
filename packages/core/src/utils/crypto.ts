@@ -91,9 +91,6 @@ export async function encrypt(text: string, password: string): Promise<string> {
  */
 export async function decrypt(encryptedHex: string, password: string): Promise<string> {
   let cleanedStr = encryptedHex.trim();
-  
-  // If the file is completely empty (e.g. newly created file), return empty string.
-  if (cleanedStr === '') return '';
 
   // If there are no colons, assume it is base64 encoded (the new standard).
   // If there are colons, it is the old fallback raw hex format.
@@ -107,8 +104,9 @@ export async function decrypt(encryptedHex: string, password: string): Promise<s
 
   const parts = cleanedStr.split(':');
   if (parts.length !== 3) {
-    throw new Error('Invalid encrypted format. Expected salt:iv:ciphertext');
+    throw new Error('Invalid encrypted format. The file is corrupted, empty, or not encrypted. Expected salt:iv:ciphertext.');
   }
+  
   
   const salt = hexToBuffer(parts[0]!);
   const iv = hexToBuffer(parts[1]!);
