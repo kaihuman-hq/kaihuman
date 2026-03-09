@@ -251,6 +251,23 @@ export const CodeMirrorEditor = ({
     }
   }, [zenMode]);
 
+  // Handle dynamically updated initialContent (e.g., when contentOverride is applied late)
+  useEffect(() => {
+    if (initialContent !== undefined && viewRef.current) {
+      const currentDoc = viewRef.current.state.doc.toString();
+      if (initialContent !== currentDoc) {
+        isUpdatingFromStore.current = true;
+        try {
+          viewRef.current.dispatch({
+            changes: { from: 0, to: currentDoc.length, insert: initialContent },
+          });
+        } finally {
+          isUpdatingFromStore.current = false;
+        }
+      }
+    }
+  }, [initialContent]);
+
   // Sync content with store
   useSignalEffect(() => {
     if (initialContent !== undefined) return; // Skip store sync if controlled mode
