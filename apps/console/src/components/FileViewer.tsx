@@ -49,7 +49,14 @@ export const FileViewer = ({ path, zenMode, contentOverride, onSaveOverride }: F
     <div className="h-full w-full relative">
       {isEncrypted ? (
         <EncryptedTileWrapper 
-          tile={{ id: path, rawContent: githubFileStore.openFiles.value[path]?.content } as TileDef} 
+          tile={{ 
+            id: path, 
+            rawContent: githubFileStore.openFiles.value[path]?.content,
+            onContentChange: (newContent: string) => {
+              githubFileStore.updateFileContent(path, newContent);
+              githubFileStore.saveFile(path).catch(e => logger.error('Failed to save encrypted file', e));
+            }
+          } as TileDef} 
           mode={zenMode ? 'FOCUS' : 'FOCUS'}
         >
           {(decryptedContent: string, handleSave: (newContent: string) => void) => (
