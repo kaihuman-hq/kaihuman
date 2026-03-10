@@ -1,9 +1,16 @@
 import { signal } from '@preact/signals';
+import { githubProfileStore } from './github-profile.store.js';
 
 const LS_KEY = 'lifosy_saved_passwords';
 
+// Build a globally unique key: "owner/repo:file/path.enc"
+function buildKey(path: string): string {
+  const repo = githubProfileStore.currentRepo.value;
+  return repo ? `${repo.full_name}:${path}` : path;
+}
+
 interface PasswordStore {
-  // Key is the file absolute path, value is the decrypted password
+  // Key is "repo:path", value is the password
   inMemoryPasswords: Record<string, string>;
   
   loadFromStorage(): void;
@@ -57,17 +64,18 @@ const store: PasswordStore = {
   },
 
   getPassword(path: string) {
-    return this.inMemoryPasswords[path];
+    return this.inMemoryPasswords[buildKey(path)];
   },
 
   setPassword(path: string, password: string, remember: boolean) {
-    this.inMemoryPasswords[path] = password;
+    const key = buildKey(path);
+    this.inMemoryPasswords[key] = password;
     unlockedFiles.value = { ...unlockedFiles.value, [path]: true };
-    
+
     if (remember) {
       try {
         const stored = localStorage.getItem(LS_KEY) ? JSON.parse(localStorage.getItem(LS_KEY)!) : {};
-        stored[path] = password;
+        stored[key] = password;
         localStorage.setItem(LS_KEY, JSON.stringify(stored));
       } catch (e) {
          console.warn('Failed to remember password:', e);
@@ -76,16 +84,17 @@ const store: PasswordStore = {
   },
 
   clearPassword(path: string) {
-    delete this.inMemoryPasswords[path];
-    
+    const key = buildKey(path);
+    delete this.inMemoryPasswords[key];
+
     const newUnlocked = { ...unlockedFiles.value };
     delete newUnlocked[path];
     unlockedFiles.value = newUnlocked;
-    
+
     try {
         const stored = localStorage.getItem(LS_KEY) ? JSON.parse(localStorage.getItem(LS_KEY)!) : {};
-        if (stored[path]) {
-            delete stored[path];
+        if (stored[key]) {
+            delete stored[key];
             localStorage.setItem(LS_KEY, JSON.stringify(stored));
         }
     } catch (e) {
