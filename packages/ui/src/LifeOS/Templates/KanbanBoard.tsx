@@ -1,6 +1,7 @@
 import { githubFileStore } from '@lifosy/core';
 import {
   ArrowLeft,
+  BarChart2,
   CalendarDays,
   CheckCircle2,
   Circle,
@@ -374,9 +375,10 @@ const AssignMilestonePanel = ({
 
 export interface KanbanBoardProps {
   onNavigateBack?: () => void;
+  onAnalyticsClick?: () => void;
 }
 
-export const KanbanBoard = ({ onNavigateBack }: KanbanBoardProps) => {
+export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardProps) => {
   const openFiles = githubFileStore.openFiles.value;
   const tree = githubFileStore.tree.value;
 
@@ -573,6 +575,18 @@ export const KanbanBoard = ({ onNavigateBack }: KanbanBoardProps) => {
             <Pencil size={10} />
             MILESTONES
           </button>
+
+          {onAnalyticsClick && (
+            <button
+              type="button"
+              onClick={onAnalyticsClick}
+              className="flex items-center gap-1.5 text-[10px] font-mono border border-[var(--los-border)] px-2 py-1 text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
+              title="Todo Analytics"
+            >
+              <BarChart2 size={10} />
+              ANALYTICS
+            </button>
+          )}
         </div>
       </div>
 

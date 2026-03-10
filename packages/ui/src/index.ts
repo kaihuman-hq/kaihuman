@@ -19,4 +19,7 @@ export * from './LifeOS/Organisms/WikiView';
 export * from './LifeOS/Organisms/Widgets/ActionLogLogic';
 export * from './LifeOS/Templates/AIPanel';
 export * from './LifeOS/Templates/KanbanBoard';
+export * from './LifeOS/Templates/TodoAnalytics';
+export * from './LifeOS/Charts/DonutChart';
+export * from './LifeOS/Charts/StackedBarChart';
 export * from './LifeOS/Molecules/EncryptedTileWrapper';
