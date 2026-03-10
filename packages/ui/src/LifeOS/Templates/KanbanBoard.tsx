@@ -380,6 +380,14 @@ export const KanbanBoard = ({ onNavigateBack }: KanbanBoardProps) => {
   const openFiles = githubFileStore.openFiles.value;
   const tree = githubFileStore.tree.value;
 
+  // When navigating directly to /board, the tree may not be loaded yet.
+  // The dashboard normally triggers loadTree(), so we do it here if needed.
+  useEffect(() => {
+    if (githubFileStore.tree.peek().length === 0) {
+      githubFileStore.loadTree();
+    }
+  }, []);
+
   const [milestoneFilter, setMilestoneFilter] = useState<string>('');
   const [showUpcoming, setShowUpcoming] = useState(false);
   const [showMilestoneManager, setShowMilestoneManager] = useState(false);
