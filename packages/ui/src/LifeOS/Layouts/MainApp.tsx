@@ -914,15 +914,6 @@ export const MainApp = ({
   // Check if activeTile is null but we have an ID and a cached tile
   const finalActiveTile = computedActiveTile || (activeTileId !== null && lastActiveTile.current && lastActiveTile.current.id === activeTileId ? lastActiveTile.current : null);
 
-  useEffect(() => {
-    if (finalActiveTile) {
-      // console.log('[MainApp] finalActiveTile Updated:', finalActiveTile.id);
-    } else {
-      // console.log('[MainApp] finalActiveTile is NULL');
-    }
-  }, [finalActiveTile]);
-
-
   // Update persisted reference
   useEffect(() => {
     if (finalActiveTile) {

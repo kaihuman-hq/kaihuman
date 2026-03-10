@@ -2,7 +2,9 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { useSignal } from '@preact/signals';
 import { TileDef } from '../Layouts/MainApp';
-import { passwordStore, unlockedFiles, decrypt, encrypt, githubFileStore } from '@lifosy/core';
+import { passwordStore, unlockedFiles, decrypt, encrypt, githubFileStore, Logger } from '@lifosy/core';
+
+const logger = new Logger('EncryptedTile');
 import { Lock, Unlock, AlertTriangle, Loader2 } from 'lucide-preact';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
 
@@ -83,7 +85,7 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
           onUnlocked?.(dec);
           if (password.value) passwordStore.setPassword(path, password.value, remember.value);
       }).catch((err) => {
-          console.error('[CRYPTO] Decryption failed for', path, 'err:', err);
+          logger.error('Decryption failed for ' + path, err);
           if (storedPw) passwordStore.clearPassword(path);
           flow.value = { status: 'LOCKED', error: 'Incorrect password or corrupted file.' };
       });
@@ -119,7 +121,7 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
             // Optimistically update our local FSM
             flow.value = { status: 'UNLOCKED', content: newDecrypted };
           } catch (e: any) {
-            console.error('Failed to save encrypted file:', e);
+            logger.error('Failed to save encrypted file', e);
           }
       };
       

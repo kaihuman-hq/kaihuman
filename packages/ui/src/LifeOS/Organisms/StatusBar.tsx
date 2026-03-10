@@ -2,7 +2,9 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoLabel, MonoText } from '../Atoms/Typography';
-import { aiStore } from '@lifosy/core';
+import { aiStore, Logger } from '@lifosy/core';
+
+const logger = new Logger('StatusBar');
 import { Sparkles, Archive, Search, Settings, GitBranch, GitCommit, LayoutGrid, ChevronUp, ArrowRight } from 'lucide-preact';
 
 export interface Repository {
@@ -358,11 +360,11 @@ export const StatusBar = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    console.log('[StatusBar] Dashboard button clicked'); // Debug log
+                    logger.debug('Dashboard button clicked');
                     if (onDashboardClick) {
                       onDashboardClick();
                     } else {
-                      console.log('[StatusBar] onDashboardClick is undefined');
+                      logger.debug('onDashboardClick is undefined');
                     }
                   }}
                   className="flex items-center gap-2 hover:text-[var(--los-accent)] transition-colors group cursor-pointer"
@@ -373,11 +375,11 @@ export const StatusBar = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    console.log('[StatusBar] Files button clicked'); // Debug log
+                    logger.debug('Files button clicked');
                     if (onFilesClick) {
                       onFilesClick();
                     } else {
-                      console.log('[StatusBar] onFilesClick is undefined');
+                      logger.debug('onFilesClick is undefined');
                     }
                   }}
                   className="flex items-center gap-2 hover:text-[var(--los-accent)] transition-colors group cursor-pointer"

@@ -1,5 +1,8 @@
 import { signal } from '@preact/signals';
+import { Logger } from '../logger.js';
 import { githubProfileStore } from './github-profile.store.js';
+
+const logger = new Logger('PasswordStore');
 
 const LS_KEY = 'lifosy_saved_passwords';
 
@@ -63,7 +66,7 @@ const store = {
         }
       }
     } catch (e) {
-      console.warn('Failed to load saved passwords from local storage:', e);
+      logger.warn('Failed to load saved passwords from local storage:', e);
     }
   },
 
@@ -110,7 +113,7 @@ const store = {
         localStorage.setItem(LS_KEY, JSON.stringify(stored));
         this._encryptedStored[key] = blob;
       } catch (e) {
-        console.warn('Failed to remember password:', e);
+        logger.warn('Failed to remember password:', e);
       }
     }
   },

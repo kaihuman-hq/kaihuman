@@ -20,7 +20,9 @@ import {
 } from 'lucide-preact';
 import { TileDef } from '../Layouts/MainApp';
 import { FolderSelector, FolderItem } from './FolderSelector';
-import { encrypt, passwordStore } from '@lifosy/core';
+import { encrypt, passwordStore, Logger } from '@lifosy/core';
+
+const logger = new Logger('NewFileWizard');
 
 interface Template {
   id: string;
@@ -225,7 +227,7 @@ export const NewFileWizard = ({
       onClose();
     } catch (err: any) {
       setError(err.message || 'Encryption failed.');
-      console.error(err);
+      logger.error('Encryption failed', err);
     }
   };
 
