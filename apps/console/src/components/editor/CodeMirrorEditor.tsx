@@ -5,7 +5,7 @@ import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState } from '@codemirror/state';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view';
-import { githubFileStore, githubProfileStore, Logger } from '@lifosy/core';
+import { githubFileStore, Logger } from '@lifosy/core';
 import { useSignalEffect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
@@ -98,31 +98,10 @@ export const CodeMirrorEditor = ({
     }
   };
 
-  // Auto-save interval (2 minutes)
-  useEffect(() => {
-    const intervalId = setInterval(
-      () => {
-        if (hasUnsavedChanges && !isSaving) {
-          logger.debug('Auto-saving...');
-          handleSave();
-        }
-      },
-      2 * 60 * 1000,
-    ); // 2 minutes
-
-    return () => clearInterval(intervalId);
-  }, [hasUnsavedChanges, isSaving]); // Re-create interval if status changes? No, closure captures state?
-  // Actually, intervals with closures can be tricky.
-  // Better to use ref for state or functional update, or just depend on [hasUnsavedChanges] (which resets timer on change - acceptable or not?)
-  // Resetting timer on every keystroke (hasUnsavedChanges true->true) is not ideal if we want strict "every 2 min".
-  // But if we toggle false->true (first change), timer starts.
-  // If we toggle true->false (save), timer stops.
-  // This essentially means "Auto-save 2 mins after the FIRST change".
-  // If I want "Check every 2 mins", I should start interval on mount and use Ref for checking state.
-
   const stateRef = useRef({ hasUnsavedChanges, isSaving });
   stateRef.current = { hasUnsavedChanges, isSaving };
 
+  // Auto-save interval (2 minutes) — uses ref to avoid stale closures
   useEffect(() => {
     const intervalId = setInterval(
       () => {
@@ -163,7 +142,7 @@ export const CodeMirrorEditor = ({
           // Save command
           {
             key: 'Mod-s',
-            run: (view) => {
+            run: (_view) => {
               handleSave();
               return true;
             },

@@ -1,5 +1,5 @@
 import { h, ComponentChildren } from 'preact';
-import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'preact/hooks';
 import { AIPanel } from '../Templates/AIPanel';
 import { memo, createPortal } from 'preact/compat';
 import { SettingsView } from '../Organisms/SettingsView';
@@ -164,8 +164,10 @@ const useIsMobile = () => {
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
+    let timer: ReturnType<typeof setTimeout>;
+    const debounced = () => { clearTimeout(timer); timer = setTimeout(check, 100); };
+    window.addEventListener('resize', debounced);
+    return () => { clearTimeout(timer); window.removeEventListener('resize', debounced); };
   }, []);
   return isMobile;
 };
@@ -591,9 +593,8 @@ export const MainApp = ({
     onConfigChange({ ...newConfig });
   };
 
-  const isQuickNote = (path: string) => {
-    return (layoutStore.remoteConfig.value?.files?.quickNotes || []).includes(path);
-  };
+  const quickNoteSet = useMemo(() => new Set(layoutStore.remoteConfig.value?.files?.quickNotes || []), [layoutStore.remoteConfig.value]);
+  const isQuickNote = useCallback((path: string) => quickNoteSet.has(path), [quickNoteSet]);
 
   // Filter entries for current dashboard
   const userEntries = useMemo(() => {
@@ -830,6 +831,24 @@ export const MainApp = ({
   // Constants
   const lastActiveTile = useRef<TileDef | null>(null);
 
+  // Available folders for new file wizard (derived from dashboard config)
+  const availableFolders = useMemo(() => {
+    const config = layoutStore.remoteConfig.value;
+    if (!config) return [];
+    const folders = new Set<string>();
+    config.entries.forEach(entry => {
+      const parts = entry.path.split('/');
+      if (parts.length > 1) {
+        let currentPath = '';
+        for (let i = 0; i < parts.length - 1; i++) {
+          currentPath += (i > 0 ? '/' : '') + parts[i];
+          folders.add(currentPath);
+        }
+      }
+    });
+    return Array.from(folders).sort();
+  }, [layoutStore.remoteConfig.value]);
+
   // Memoize the base active tile from source to avoid unnecessary re-calculations
   const baseActiveTile = useMemo(() => {
     return activeTileId !== null ? (
@@ -924,11 +943,10 @@ export const MainApp = ({
   // No, I'll just name the result `activeTile` and change the intermediate names.
 
   // Calculate Breadcrumbs Logic
-  const getBreadcrumbs = () => {
+  const breadcrumbs = useMemo(() => {
     if (activeTileId !== null && !isMillerMode) return ["root", "focus", `tile_${activeTileId}`];
 
     if (isMillerMode && fileSystem) {
-      // Traverse simple path
       const path: string[] = ['~'];
       fileSystem.columns.forEach(col => {
         if (col.activeId) {
@@ -939,7 +957,7 @@ export const MainApp = ({
       return path;
     }
     return ["~"];
-  };
+  }, [activeTileId, isMillerMode, fileSystem]);
 
   const activeTile = finalActiveTile;
 
@@ -1585,25 +1603,7 @@ export const MainApp = ({
           }}
           {...dumpSaveProps as any}
           fileSystem={fileSystem as any}
-          availableFolders={useMemo(() => {
-            const config = layoutStore.remoteConfig.value;
-            if (!config) return [];
-            const folders = new Set<string>();
-            config.entries.forEach(entry => {
-              const parts = entry.path.split('/');
-              if (parts.length > 1) {
-                // Has parent folder
-                // Add each valid parent path logic
-                // e.g. "a/b/c.txt" -> "a", "a/b"
-                let currentPath = '';
-                for (let i = 0; i < parts.length - 1; i++) {
-                  currentPath += (i > 0 ? '/' : '') + parts[i];
-                  folders.add(currentPath);
-                }
-              }
-            });
-            return Array.from(folders).sort();
-          }, [layoutStore.remoteConfig.value])}
+          availableFolders={availableFolders}
           existingFiles={existingFiles}
           onLoadFolder={onLoadFolder}
         />
@@ -1628,13 +1628,12 @@ export const MainApp = ({
       {!zenMode && (
         <StatusBar
           mode={activeTileId !== null ? "FOCUS" : (showFiles ? "FILES" : (dragEnabled ? "DND" : "NORMAL"))}
-          breadcrumbs={getBreadcrumbs()}
+          breadcrumbs={breadcrumbs}
           stats={[
             { label: "TILES", value: displayTiles.length.toString() },
             ...(layoutStore.remoteConfig.value ? [{ label: "WORKSPACE", value: layoutStore.remoteConfig.value.dashboards.find(d => d.id === currentDashboardId)?.name || "UNKNOWN" }] : [])
           ]}
           onDashboardClick={() => {
-            console.log('[MainApp] Status Bar: Dashboard Clicked');
             if (dragEnabled) {
               // Show cancellation menu or just cancel?
             } else {
@@ -1643,7 +1642,6 @@ export const MainApp = ({
             }
           }}
           onFilesClick={() => {
-            console.log('[MainApp] Status Bar: Files Clicked');
             if (showDumpMode) setShowDumpMode(false);
             setActiveTileId(null);
             setShowFiles(true);
@@ -1793,6 +1791,8 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
   const [viewMode, setViewMode] = useState<string>(initialViewMode || (hasWidget ? 'WIDGET' : 'CODE'));
   const [showHistory, setShowHistory] = useState(false);
 
+  const todoGroups = useMemo(() => TodoLogic.parseTodos(tile.rawContent || '').groups.map(g => g.name), [tile.rawContent]);
+
   // Encrypted Wrapper Interception
   // We use a custom __isDecrypted flag on the tile to prevent infinite recursive interception
   if (tile.id.toString().endsWith('.enc') && !(tile as any).__isDecrypted) {
@@ -1854,29 +1854,6 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
     }
     */
   }, [tile.rawContent]);
-
-  useEffect(() => {
-    const checkScroll = () => {
-      const ids = [
-        `focused-modal-container-${tile.id}`,
-        'focused-modal-inner',
-        'focused-modal-content-scroller'
-      ];
-
-      console.log('--- Scroll Debug ---');
-      ids.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-          console.log(`${id}: scrollHeight=${el.scrollHeight}, clientHeight=${el.clientHeight}, scrollTop=${el.scrollTop}, overflow=${window.getComputedStyle(el).overflow}`);
-        } else {
-          console.log(`${id}: NOT FOUND`);
-        }
-      });
-    };
-
-    const interval = setInterval(checkScroll, 2000);
-    return () => clearInterval(interval);
-  }, [tile.id]);
 
   return (
     <div
@@ -2288,7 +2265,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
               )}
               {isTodos && (
                 <TodoAddForm
-                  groups={useMemo(() => TodoLogic.parseTodos(tile.rawContent || '').groups.map(g => g.name), [tile.rawContent])}
+                  groups={todoGroups}
                   onCancel={() => setViewMode('WIDGET')}
                   onAdd={(group, text) => {
                     const data = TodoLogic.parseTodos(tile.rawContent || '');

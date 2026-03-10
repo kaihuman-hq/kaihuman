@@ -1,7 +1,5 @@
 import { authStore, githubFileStore, githubProfileStore, layoutStore, Logger } from '@lifosy/core';
-import { effect, useSignal } from '@preact/signals';
-import { h } from 'preact';
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo } from 'preact/hooks';
 
 const logger = new Logger('Dashboard');
 
@@ -137,12 +135,23 @@ export const Dashboard = () => {
   }, []);
 
   // Navigate Handler adapter
-  const handleNavigate = (item: TileDef) => {
+  const handleNavigate = useCallback((item: TileDef) => {
     if (item.type === 'FILE') {
       addToRecentFiles(String(item.id));
     }
     layoutStore.navigate(item.id as string);
-  };
+  }, [addToRecentFiles]);
+
+  // File contents map for grid mode — memoized to avoid object churn on every render
+  const gridFileContents = useMemo(() => {
+    const result: Record<string, string> = {};
+    if (openFiles) {
+      for (const path of Object.keys(openFiles)) {
+        result[path] = openFiles[path]?.content || '';
+      }
+    }
+    return result;
+  }, [openFiles]);
 
 
 
@@ -177,14 +186,6 @@ export const Dashboard = () => {
         <div>Loading Dashboard Configuration...</div>
       </div>
     );
-  }
-
-  // Preapare File Contents Map for Grid Mode
-  const gridFileContents: Record<string, string> = {};
-  if (remoteConfig && openFiles) {
-    Object.keys(openFiles).forEach((path) => {
-      gridFileContents[path] = openFiles[path]?.content || '';
-    });
   }
 
   return (
