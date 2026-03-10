@@ -40,21 +40,6 @@ export const Dashboard = () => {
   const repo = githubProfileStore.currentRepo.value;
   const repos = githubProfileStore.repos.value;
 
-  // DEBUG MOUNT TEST
-  useEffect(() => {
-    (async () => {
-      try {
-         const { encrypt, decrypt } = await import('@lifosy/core');
-         const enc = await encrypt('secret', '123');
-         console.log('DEBUG: Encrypting "secret" with "123":', enc);
-         const dec = await decrypt(enc, 'wrong');
-         console.log('DEBUG: FATAL ERROR - Successfully decrypted with wrong password:', dec);
-      } catch (e) {
-         console.log('DEBUG: Correctly threw error on wrong password:', e);
-      }
-    })();
-  }, []);
-
   // 1. Fetch Repos on Mount
   useEffect(() => {
     githubProfileStore.fetchRepos();
