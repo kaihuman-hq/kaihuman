@@ -2,6 +2,17 @@ import { type Message } from '../types';
 
 console.log('LifeOS Extension: Background script loaded');
 
+// Keep the service worker alive to prevent the HMR port (crx-client-port.js)
+// from disconnecting. Chrome suspends MV3 service workers after ~30s of
+// inactivity; the alarm wakes it up periodically so the Vite HMR connection
+// stays intact during development.
+chrome.alarms.create('swKeepAlive', { periodInMinutes: 0.5 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'swKeepAlive') {
+    // No-op: waking the worker is sufficient.
+  }
+});
+
 // Initialize Context Menu
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({

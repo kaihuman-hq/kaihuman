@@ -2,8 +2,10 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoLabel, MonoText } from '../Atoms/Typography';
-import { aiStore } from '@lifosy/core';
-import { Sparkles, Archive, Search, Settings, GitBranch, GitCommit, LayoutGrid, ChevronUp, ArrowRight } from 'lucide-preact';
+import { aiStore, Logger } from '@lifosy/core';
+
+const logger = new Logger('StatusBar');
+import { Sparkles, Archive, GitBranch, GitCommit, LayoutGrid, ChevronUp, ArrowRight, Kanban } from 'lucide-preact';
 
 export interface Repository {
   id: string;
@@ -42,7 +44,8 @@ export interface StatusBarProps {
   onNextWorkspace?: () => void; // Replaces onNextRepository usage for workspaces
 
   onDashboardClick?: () => void;
-  onFilesClick?: () => void; // New prop for Quick Links
+  onFilesClick?: () => void;
+  onBoardClick?: () => void;
   menuItems?: MenuItem[];
   recentFiles?: MenuItem[];
 
@@ -71,6 +74,7 @@ export const StatusBar = ({
 
   onDashboardClick,
   onFilesClick,
+  onBoardClick,
   menuItems,
   recentFiles,
   version
@@ -332,10 +336,10 @@ export const StatusBar = ({
         </div>
 
         {/* The Bar Itself */}
-        <div className="absolute top-0 left-0 right-0 h-full max-h-16 flex items-center justify-between px-4 w-full">
+        <div className="absolute top-0 left-0 right-0 h-full max-h-16 flex items-stretch justify-between w-full">
 
           {/* LEFT COLUMN */}
-          <div className="flex-1 flex items-center gap-4 min-w-0">
+          <div className="flex-1 flex items-center gap-4 min-w-0 pl-4">
             <div className={cn(
               "bg-[var(--los-accent)] text-black font-bold text-[10px] px-2 py-0.5 rounded-sm shrink-0 uppercase transition-all",
               isHovered ? "scale-110" : "scale-100"
@@ -354,18 +358,18 @@ export const StatusBar = ({
 
             {/* QUICK LINKS MODE */}
             {navMode === 'QUICK' && (
-              <div className="hidden md:flex items-center gap-4">
+              <div className="hidden md:flex h-full items-stretch gap-px">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    console.log('[StatusBar] Dashboard button clicked'); // Debug log
+                    logger.debug('Dashboard button clicked');
                     if (onDashboardClick) {
                       onDashboardClick();
                     } else {
-                      console.log('[StatusBar] onDashboardClick is undefined');
+                      logger.debug('onDashboardClick is undefined');
                     }
                   }}
-                  className="flex items-center gap-2 hover:text-[var(--los-accent)] transition-colors group cursor-pointer"
+                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
                 >
                   <LayoutGrid size={12} className="group-hover:animate-pulse" />
                   <MonoText className="text-xs font-bold uppercase">Dashboard</MonoText>
@@ -373,18 +377,27 @@ export const StatusBar = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    console.log('[StatusBar] Files button clicked'); // Debug log
+                    logger.debug('Files button clicked');
                     if (onFilesClick) {
                       onFilesClick();
                     } else {
-                      console.log('[StatusBar] onFilesClick is undefined');
+                      logger.debug('onFilesClick is undefined');
                     }
                   }}
-                  className="flex items-center gap-2 hover:text-[var(--los-accent)] transition-colors group cursor-pointer"
+                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
                 >
                   <Archive size={12} className="group-hover:animate-pulse" />
                   <MonoText className="text-xs font-bold uppercase">Files</MonoText>
                 </button>
+                {onBoardClick && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onBoardClick(); }}
+                    className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
+                  >
+                    <Kanban size={12} className="group-hover:animate-pulse" />
+                    <MonoText className="text-xs font-bold uppercase">Board</MonoText>
+                  </button>
+                )}
               </div>
             )}
 
@@ -488,7 +501,7 @@ export const StatusBar = ({
 
 
           {/* RIGHT COLUMN */}
-          <div className="flex-1 flex items-center justify-end gap-6 min-w-0">
+          <div className="flex-1 flex items-center justify-end gap-6 min-w-0 pr-4">
             {/* Version Info - Always visible on desktop */}
             {version && (
               <div

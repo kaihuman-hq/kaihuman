@@ -1,7 +1,6 @@
 import { authStore, githubFileStore, githubProfileStore, layoutStore, Logger } from '@lifosy/core';
-import { effect, useSignal } from '@preact/signals';
-import { h } from 'preact';
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo } from 'preact/hooks';
+import { route } from 'preact-router';
 
 const logger = new Logger('Dashboard');
 
@@ -39,21 +38,6 @@ export const Dashboard = () => {
   /* original repo/repos declarations removed for mock */
   const repo = githubProfileStore.currentRepo.value;
   const repos = githubProfileStore.repos.value;
-
-  // DEBUG MOUNT TEST
-  useEffect(() => {
-    (async () => {
-      try {
-         const { encrypt, decrypt } = await import('@lifosy/core');
-         const enc = await encrypt('secret', '123');
-         console.log('DEBUG: Encrypting "secret" with "123":', enc);
-         const dec = await decrypt(enc, 'wrong');
-         console.log('DEBUG: FATAL ERROR - Successfully decrypted with wrong password:', dec);
-      } catch (e) {
-         console.log('DEBUG: Correctly threw error on wrong password:', e);
-      }
-    })();
-  }, []);
 
   // 1. Fetch Repos on Mount
   useEffect(() => {
@@ -152,12 +136,23 @@ export const Dashboard = () => {
   }, []);
 
   // Navigate Handler adapter
-  const handleNavigate = (item: TileDef) => {
+  const handleNavigate = useCallback((item: TileDef) => {
     if (item.type === 'FILE') {
       addToRecentFiles(String(item.id));
     }
     layoutStore.navigate(item.id as string);
-  };
+  }, [addToRecentFiles]);
+
+  // File contents map for grid mode — memoized to avoid object churn on every render
+  const gridFileContents = useMemo(() => {
+    const result: Record<string, string> = {};
+    if (openFiles) {
+      for (const path of Object.keys(openFiles)) {
+        result[path] = openFiles[path]?.content || '';
+      }
+    }
+    return result;
+  }, [openFiles]);
 
 
 
@@ -194,14 +189,6 @@ export const Dashboard = () => {
     );
   }
 
-  // Preapare File Contents Map for Grid Mode
-  const gridFileContents: Record<string, string> = {};
-  if (remoteConfig && openFiles) {
-    Object.keys(openFiles).forEach((path) => {
-      gridFileContents[path] = openFiles[path]?.content || '';
-    });
-  }
-
   return (
     <div className="h-full w-full relative overflow-hidden">
       <ErrorBoundary componentName="MainApp">
@@ -216,6 +203,8 @@ export const Dashboard = () => {
               layoutStore.navigate(path.join('/'));
             }
           }}
+
+          onBoardClick={() => route('/board')}
 
           // Remote Config Props
           config={remoteConfig || undefined}

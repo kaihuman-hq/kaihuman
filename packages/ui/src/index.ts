@@ -12,10 +12,15 @@ export * from './utils';
 // LifeOS Exports
 export * from './LifeOS/Layouts/MainApp';
 export * from './LifeOS/Organisms/RepositorySelector';
+export * from './LifeOS/Organisms/StatusBar';
 export * from './LifeOS/types';
 export * from './LifeOS/Organisms/Widgets/ReadItLaterLogic';
 export * from './LifeOS/Organisms/NotFound';
 export * from './LifeOS/Organisms/WikiView';
 export * from './LifeOS/Organisms/Widgets/ActionLogLogic';
 export * from './LifeOS/Templates/AIPanel';
+export * from './LifeOS/Templates/KanbanBoard';
+export * from './LifeOS/Templates/TodoAnalytics';
+export * from './LifeOS/Charts/DonutChart';
+export * from './LifeOS/Charts/StackedBarChart';
 export * from './LifeOS/Molecules/EncryptedTileWrapper';

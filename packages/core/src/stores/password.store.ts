@@ -1,97 +1,142 @@
 import { signal } from '@preact/signals';
+import { Logger } from '../logger.js';
+import { githubProfileStore } from './github-profile.store.js';
+
+const logger = new Logger('PasswordStore');
 
 const LS_KEY = 'lifosy_saved_passwords';
 
-interface PasswordStore {
-  // Key is the file absolute path, value is the decrypted password
-  inMemoryPasswords: Record<string, string>;
-  
-  loadFromStorage(): void;
-  saveToStorage(): void;
-  
-  getPassword(path: string): string | undefined;
-  setPassword(path: string, password: string, remember: boolean): void;
-  clearPassword(path: string): void;
+// Static component of the obfuscation key. Combined with repo context so the same
+// file path in different repos produces a different ciphertext.
+const STATIC_KEY = 'lfs-pwstore-2025-k7v9x';
+
+// Build a globally unique storage key: "owner/repo:file/path.enc"
+function buildKey(path: string): string {
+  const repo = githubProfileStore.currentRepo.value;
+  return repo ? `${repo.full_name}:${path}` : path;
+}
+
+// Derive a pseudo-random keystream from a seed using djb2 mixing.
+// Deterministic: same seed → same stream. Not cryptographically secure,
+// but far better than plaintext for casual localStorage inspection.
+function expandKey(seed: string, length: number): Uint8Array {
+  const seedBytes = new TextEncoder().encode(seed);
+  const stream = new Uint8Array(length);
+  let h = 5381;
+  for (let i = 0; i < length; i++) {
+    h = (Math.imul(h, 33) ^ (seedBytes[i % seedBytes.length] ?? 0)) | 0;
+    stream[i] = (h >>> 0) & 0xff;
+  }
+  return stream;
+}
+
+function obfuscate(plaintext: string, repoFullName: string): string {
+  const cipherKey = `${STATIC_KEY}:${repoFullName}`;
+  const data = new TextEncoder().encode(plaintext);
+  const stream = expandKey(cipherKey, data.length);
+  const xored = data.map((b, i) => b ^ (stream[i] ?? 0));
+  return btoa(String.fromCharCode(...xored));
+}
+
+function deobfuscate(encoded: string, repoFullName: string): string {
+  const cipherKey = `${STATIC_KEY}:${repoFullName}`;
+  const data = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
+  const stream = expandKey(cipherKey, data.length);
+  const xored = data.map((b, i) => b ^ (stream[i] ?? 0));
+  return new TextDecoder().decode(xored);
 }
 
 // In-memory state as a signal so UI components can reactively re-render if a file unlocks
 export const unlockedFiles = signal<Record<string, boolean>>({});
 
-const store: PasswordStore = {
-  inMemoryPasswords: {},
+const store = {
+  // Decrypted passwords for the current session (never persisted)
+  inMemoryPasswords: {} as Record<string, string>,
+
+  // Raw obfuscated blobs loaded from localStorage (decrypted lazily via getPassword)
+  _encryptedStored: {} as Record<string, string>,
 
   loadFromStorage() {
     try {
-      const stored = localStorage.getItem(LS_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (typeof parsed === 'object') {
-          // Merge stored passwords into current memory
-          this.inMemoryPasswords = { ...this.inMemoryPasswords, ...parsed };
-          
-          // Pre-populate unlock status for UI reactivity
-          const unlocks: Record<string, boolean> = {};
-          for (const k of Object.keys(parsed)) {
-             unlocks[k] = true;
-          }
-          unlockedFiles.value = { ...unlockedFiles.value, ...unlocks };
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          this._encryptedStored = { ...parsed };
         }
       }
     } catch (e) {
-      console.warn('Failed to load saved passwords from local storage:', e);
+      logger.warn('Failed to load saved passwords from local storage:', e);
     }
   },
 
-  saveToStorage() {
-    try {
-      // Find which passwords the user wants remembered (or we just dump current state?)
-      // We only store passwords they specifically opted in for. 
-      // But for simplicity, we can just save everything that was explicitly marked "remember".
-      // To manage this, we keep a separate record of "rememberable" passwords, or pull them here.
-      
-      const stored = localStorage.getItem(LS_KEY) ? JSON.parse(localStorage.getItem(LS_KEY)!) : {};
-      localStorage.setItem(LS_KEY, JSON.stringify(stored));
-    } catch (e) {
-      console.warn('Failed to save passwords to local storage:', e);
-    }
-  },
+  getPassword(path: string): string | undefined {
+    const key = buildKey(path);
 
-  getPassword(path: string) {
-    return this.inMemoryPasswords[path];
+    // Fast path: already in memory
+    if (this.inMemoryPasswords[key] !== undefined) {
+      return this.inMemoryPasswords[key];
+    }
+
+    // Lazy-decrypt from stored obfuscated blob using current repo context
+    const blob = this._encryptedStored[key];
+    if (blob) {
+      const repo = githubProfileStore.currentRepo.value;
+      if (repo) {
+        try {
+          const decrypted = deobfuscate(blob, repo.full_name);
+          if (decrypted) {
+            this.inMemoryPasswords[key] = decrypted;
+            unlockedFiles.value = { ...unlockedFiles.value, [path]: true };
+            return decrypted;
+          }
+        } catch {
+          // Blob was from an old format or wrong key — ignore
+        }
+      }
+    }
+
+    return undefined;
   },
 
   setPassword(path: string, password: string, remember: boolean) {
-    this.inMemoryPasswords[path] = password;
+    const key = buildKey(path);
+    this.inMemoryPasswords[key] = password;
     unlockedFiles.value = { ...unlockedFiles.value, [path]: true };
-    
+
     if (remember) {
       try {
+        const repo = githubProfileStore.currentRepo.value;
+        const blob = obfuscate(password, repo?.full_name ?? 'unknown');
         const stored = localStorage.getItem(LS_KEY) ? JSON.parse(localStorage.getItem(LS_KEY)!) : {};
-        stored[path] = password;
+        stored[key] = blob;
         localStorage.setItem(LS_KEY, JSON.stringify(stored));
+        this._encryptedStored[key] = blob;
       } catch (e) {
-         console.warn('Failed to remember password:', e);
+        logger.warn('Failed to remember password:', e);
       }
     }
   },
 
   clearPassword(path: string) {
-    delete this.inMemoryPasswords[path];
-    
+    const key = buildKey(path);
+    delete this.inMemoryPasswords[key];
+    delete this._encryptedStored[key];
+
     const newUnlocked = { ...unlockedFiles.value };
     delete newUnlocked[path];
     unlockedFiles.value = newUnlocked;
-    
+
     try {
-        const stored = localStorage.getItem(LS_KEY) ? JSON.parse(localStorage.getItem(LS_KEY)!) : {};
-        if (stored[path]) {
-            delete stored[path];
-            localStorage.setItem(LS_KEY, JSON.stringify(stored));
-        }
-    } catch (e) {
-         // ignore
+      const stored = localStorage.getItem(LS_KEY) ? JSON.parse(localStorage.getItem(LS_KEY)!) : {};
+      if (stored[key]) {
+        delete stored[key];
+        localStorage.setItem(LS_KEY, JSON.stringify(stored));
+      }
+    } catch {
+      // ignore
     }
-  }
+  },
 };
 
 // Initialize from storage on module load

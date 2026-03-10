@@ -2,7 +2,9 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { useSignal } from '@preact/signals';
 import { TileDef } from '../Layouts/MainApp';
-import { passwordStore, unlockedFiles, decrypt, encrypt, githubFileStore } from '@lifosy/core';
+import { passwordStore, unlockedFiles, decrypt, encrypt, githubFileStore, Logger } from '@lifosy/core';
+
+const logger = new Logger('EncryptedTile');
 import { Lock, Unlock, AlertTriangle, Loader2 } from 'lucide-preact';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
 
@@ -32,33 +34,43 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
   // React to store changes (this ensures if another tile unlocks it, we know)
   const isGlobalUnlocked = unlockedFiles.value[path];
 
-  const isPendingFetch = githubFileStore.pendingFiles.value.has(path);
+  // Ensure the file content is loaded. The parent component (FocusedTileInternal, dashboard grid)
+  // provides rawContent from the file store, but nobody calls openFile for encrypted files in
+  // focus mode. Without this, EncryptedTileWrapper stays stuck in LOADING forever.
+  useEffect(() => {
+    if (tile.rawContent === undefined) {
+      githubFileStore.openFile(path);
+    }
+  }, [path, tile.rawContent]);
 
   // FSM Transition: Raw content fetched from GitHub
   useEffect(() => {
-    if (tile.rawContent === undefined && isPendingFetch) {
+    // Don't transition until we actually have content to decrypt.
+    // rawContent is undefined both before the file is requested AND while it is loading.
+    // Transitioning early (with undefined content) would cause the DECRYPTING effect to run
+    // against an empty string, fail, and incorrectly clear any stored password.
+    if (tile.rawContent === undefined) {
       if (flow.value.status !== 'LOADING') {
         flow.value = { status: 'LOADING' };
       }
       return;
     }
 
-    // If we have content but the wrapper natively sits in LOADING, naturally transition it to LOCKED
-    // Unless it's globally unlocked, in which case we auto-decrypt.
     if (flow.value.status === 'LOADING') {
       if (isGlobalUnlocked || passwordStore.getPassword(path)) {
-        // We have a stored password, attempt decrypt
         flow.value = { status: 'DECRYPTING' };
       } else {
         flow.value = { status: 'LOCKED' };
       }
     }
-  }, [tile.rawContent, isGlobalUnlocked, path, isPendingFetch, flow.value.status]);
+  }, [tile.rawContent, isGlobalUnlocked, path, flow.value.status]);
 
   // FSM Transition: Attempting Auto-Decrypt
   useEffect(() => {
     if (flow.value.status === 'DECRYPTING') {
-      if (tile.rawContent === undefined && isPendingFetch) return;
+      // Never attempt decryption without actual content — this prevents clearing stored passwords
+      // when the file hasn't been fetched yet.
+      if (tile.rawContent === undefined) return;
 
       const storedPw = passwordStore.getPassword(path);
       const activePw = storedPw || password.value;
@@ -68,28 +80,23 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
          return;
       }
 
-      // Safely handle nulls or non-strings from upstream by coercing to empty string
-      const safeRawContent = typeof tile.rawContent === 'string' ? tile.rawContent : '';
-
-      decrypt(safeRawContent, activePw).then(dec => {
-          console.log('[CRYPTO] Decrypt SUCCESS', path);
+      decrypt(tile.rawContent, activePw).then(dec => {
           flow.value = { status: 'UNLOCKED', content: dec };
           onUnlocked?.(dec);
           if (password.value) passwordStore.setPassword(path, password.value, remember.value);
       }).catch((err) => {
-          console.error('[CRYPTO] Decryption failed for', path, 'err:', err);
-          // Password was wrong or file corrupted
+          logger.error('Decryption failed for ' + path, err);
           if (storedPw) passwordStore.clearPassword(path);
           flow.value = { status: 'LOCKED', error: 'Incorrect password or corrupted file.' };
       });
     }
-  }, [flow.value.status, tile.rawContent, path, isPendingFetch]);
+  }, [flow.value.status, tile.rawContent, path]);
 
   const handleManualSubmit = (e: Event) => {
     e.preventDefault();
     if (!password.value) return;
-    if (tile.rawContent === undefined && isPendingFetch) return; // Cannot decrypt while Loading
-    
+    if (tile.rawContent === undefined) return; // Cannot decrypt without content
+
     flow.value = { status: 'DECRYPTING' };
   };
 
@@ -114,7 +121,7 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
             // Optimistically update our local FSM
             flow.value = { status: 'UNLOCKED', content: newDecrypted };
           } catch (e: any) {
-            console.error('Failed to save encrypted file:', e);
+            logger.error('Failed to save encrypted file', e);
           }
       };
       
