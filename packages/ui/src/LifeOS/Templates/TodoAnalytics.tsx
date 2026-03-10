@@ -424,7 +424,7 @@ export const TodoAnalytics = ({ onNavigateBack }: TodoAnalyticsProps) => {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[var(--los-bg)] text-[var(--los-fg)] overflow-hidden">
+    <div className="h-[calc(100vh-3rem)] md:h-[calc(100vh-2rem)] w-screen flex flex-col bg-[var(--los-bg)] text-[var(--los-fg)] overflow-hidden">
       {/* Header */}
       <div className="h-14 border-b border-[var(--los-border)] flex items-center justify-between px-6 shrink-0">
         <div className="flex items-center gap-4">

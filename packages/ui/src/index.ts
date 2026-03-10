@@ -12,6 +12,7 @@ export * from './utils';
 // LifeOS Exports
 export * from './LifeOS/Layouts/MainApp';
 export * from './LifeOS/Organisms/RepositorySelector';
+export * from './LifeOS/Organisms/StatusBar';
 export * from './LifeOS/types';
 export * from './LifeOS/Organisms/Widgets/ReadItLaterLogic';
 export * from './LifeOS/Organisms/NotFound';
