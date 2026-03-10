@@ -1,5 +1,6 @@
 import { authStore, githubFileStore, githubProfileStore, layoutStore, Logger } from '@lifosy/core';
 import { useCallback, useEffect, useMemo } from 'preact/hooks';
+import { route } from 'preact-router';
 
 const logger = new Logger('Dashboard');
 
@@ -202,6 +203,8 @@ export const Dashboard = () => {
               layoutStore.navigate(path.join('/'));
             }
           }}
+
+          onBoardClick={() => route('/board')}
 
           // Remote Config Props
           config={remoteConfig || undefined}

@@ -18,4 +18,5 @@ export * from './LifeOS/Organisms/NotFound';
 export * from './LifeOS/Organisms/WikiView';
 export * from './LifeOS/Organisms/Widgets/ActionLogLogic';
 export * from './LifeOS/Templates/AIPanel';
+export * from './LifeOS/Templates/KanbanBoard';
 export * from './LifeOS/Molecules/EncryptedTileWrapper';

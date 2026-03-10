@@ -3,6 +3,7 @@ import { NotFound } from '@lifosy/ui';
 
 import { Route, Router, route } from 'preact-router';
 import { Dashboard } from './pages/Dashboard';
+import { KanbanBoardPage } from './pages/KanbanBoardPage';
 import { Login } from './pages/login';
 import { AuthCli } from './pages/AuthCli';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
@@ -44,6 +45,7 @@ export const App = () => {
         <Route path="/auth/cli" component={AuthCli} />
         <ProtectedRoute path="/extension-onboarded" component={ExtensionSuccess} />
         <ProtectedRoute path="/" component={Dashboard} />
+        <ProtectedRoute path="/board" component={KanbanBoardPage} />
         <ProtectedRoute path="/files" component={Dashboard} />
         <ProtectedRoute path="/files/:rest*" component={Dashboard} />
         <ProtectedRoute path="/new" component={Dashboard} />

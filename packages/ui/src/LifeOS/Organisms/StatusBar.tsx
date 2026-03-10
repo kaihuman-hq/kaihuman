@@ -5,7 +5,7 @@ import { MonoLabel, MonoText } from '../Atoms/Typography';
 import { aiStore, Logger } from '@lifosy/core';
 
 const logger = new Logger('StatusBar');
-import { Sparkles, Archive, Search, Settings, GitBranch, GitCommit, LayoutGrid, ChevronUp, ArrowRight } from 'lucide-preact';
+import { Sparkles, Archive, GitBranch, GitCommit, LayoutGrid, ChevronUp, ArrowRight, Kanban } from 'lucide-preact';
 
 export interface Repository {
   id: string;
@@ -44,7 +44,8 @@ export interface StatusBarProps {
   onNextWorkspace?: () => void; // Replaces onNextRepository usage for workspaces
 
   onDashboardClick?: () => void;
-  onFilesClick?: () => void; // New prop for Quick Links
+  onFilesClick?: () => void;
+  onBoardClick?: () => void;
   menuItems?: MenuItem[];
   recentFiles?: MenuItem[];
 
@@ -73,6 +74,7 @@ export const StatusBar = ({
 
   onDashboardClick,
   onFilesClick,
+  onBoardClick,
   menuItems,
   recentFiles,
   version
@@ -387,6 +389,15 @@ export const StatusBar = ({
                   <Archive size={12} className="group-hover:animate-pulse" />
                   <MonoText className="text-xs font-bold uppercase">Files</MonoText>
                 </button>
+                {onBoardClick && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onBoardClick(); }}
+                    className="flex items-center gap-2 hover:text-[var(--los-accent)] transition-colors group cursor-pointer"
+                  >
+                    <Kanban size={12} className="group-hover:animate-pulse" />
+                    <MonoText className="text-xs font-bold uppercase">Board</MonoText>
+                  </button>
+                )}
               </div>
             )}
 

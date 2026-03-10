@@ -127,6 +127,8 @@ export interface MainAppProps {
   githubToken?: string;
   onCheckPath?: (path: string) => Promise<'FILE' | 'FOLDER' | null> | 'FILE' | 'FOLDER' | null;
 
+  onBoardClick?: () => void;
+
   // Version info
   version?: {
     version: string;
@@ -192,6 +194,7 @@ export const MainApp = ({
   onLoadFolder,
   githubToken,
   onCheckPath,
+  onBoardClick,
   ...props
 }: MainAppProps) => {
   const isMobile = useIsMobile();
@@ -1634,6 +1637,7 @@ export const MainApp = ({
             setActiveTileId(null);
             setShowFiles(true);
           }}
+          onBoardClick={onBoardClick}
 
           // Repository Switcher (Always available if props provided)
           currentRepository={props.currentRepository}
@@ -1779,7 +1783,13 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
   const [viewMode, setViewMode] = useState<string>(initialViewMode || (hasWidget ? 'WIDGET' : 'CODE'));
   const [showHistory, setShowHistory] = useState(false);
 
-  const todoGroups = useMemo(() => TodoLogic.parseTodos(tile.rawContent || '').groups.map(g => g.name), [tile.rawContent]);
+  const parsedTodoData = useMemo(() => TodoLogic.parseTodos(tile.rawContent || ''), [tile.rawContent]);
+  const todoTags = useMemo(() => {
+    const tags = new Set<string>();
+    parsedTodoData.items.forEach(item => item.tags.forEach(t => tags.add(t)));
+    return Array.from(tags);
+  }, [parsedTodoData]);
+  const todoMilestones = parsedTodoData.milestones;
 
   // Encrypted Wrapper Interception
   // We use a custom __isDecrypted flag on the tile to prevent infinite recursive interception
@@ -2253,11 +2263,12 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
               )}
               {isTodos && (
                 <TodoAddForm
-                  groups={todoGroups}
+                  existingTags={todoTags}
+                  milestones={todoMilestones}
                   onCancel={() => setViewMode('WIDGET')}
-                  onAdd={(group, text) => {
+                  onAdd={(text, tags, milestoneId) => {
                     const data = TodoLogic.parseTodos(tile.rawContent || '');
-                    const newData = TodoLogic.addTodo(data, group, text);
+                    const newData = TodoLogic.addTodo(data, text, tags, milestoneId);
                     const newContent = TodoLogic.serializeTodos(newData);
                     tile.onContentChange?.(newContent);
                     setViewMode('WIDGET');
