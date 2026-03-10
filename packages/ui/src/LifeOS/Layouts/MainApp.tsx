@@ -1620,10 +1620,7 @@ export const MainApp = ({
         <StatusBar
           mode={activeTileId !== null ? "FOCUS" : (showFiles ? "FILES" : (dragEnabled ? "DND" : "NORMAL"))}
           breadcrumbs={breadcrumbs}
-          stats={[
-            { label: "TILES", value: displayTiles.length.toString() },
-            ...(layoutStore.remoteConfig.value ? [{ label: "WORKSPACE", value: layoutStore.remoteConfig.value.dashboards.find(d => d.id === currentDashboardId)?.name || "UNKNOWN" }] : [])
-          ]}
+          stats={[]}
           onDashboardClick={() => {
             if (dragEnabled) {
               // Show cancellation menu or just cancel?
