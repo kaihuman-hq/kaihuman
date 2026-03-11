@@ -8,7 +8,7 @@ use tokio::sync::oneshot;
 use warp::Filter;
 
 // In real app this would be configurable or come from env
-const CONSOLE_URL: &str = "https://app.lifosy.com/auth/cli";
+const CONSOLE_URL: &str = "https://app.kaihuman.com/auth/cli";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AuthConfig {

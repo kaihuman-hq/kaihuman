@@ -38,10 +38,9 @@ export function ExtensionSuccess() {
           />
         </svg>
       </div>
-      <h1 class="text-2xl font-bold tracking-tight text-[var(--los-fg)]">Extension Connected!</h1>
+      <h1 class="text-2xl font-bold tracking-tight text-[var(--los-fg)]">You're connected.</h1>
       <p class="text-[var(--los-fg-dim)] text-center max-w-sm">
-        You've successfully authorized the KaiHuman browser extension. You can close this tab and
-        start using the extension from your browser toolbar.
+        KaiHuman is now available in your browser. Capture notes, log actions, and keep improving — one tab at a time.
       </p>
       <button
         type="button"
