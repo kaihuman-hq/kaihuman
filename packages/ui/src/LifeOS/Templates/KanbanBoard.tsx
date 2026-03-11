@@ -193,22 +193,53 @@ const FileSelect = ({
 
 // ─── AddTaskModal ─────────────────────────────────────────────────────────────
 
+function dirOf(filePath: string): string {
+  const idx = filePath.lastIndexOf('/');
+  return idx >= 0 ? filePath.slice(0, idx + 1) : '';
+}
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+}
+
+function toFileName(name: string): string {
+  const trimmed = name.trim();
+  return trimmed.endsWith('.md') ? trimmed : `${trimmed}.md`;
+}
+
 const AddTaskModal = ({
   todoFilePaths,
   parsedFiles,
   initialFilePath,
   onClose,
   onAdd,
+  onCreateFile,
+  onOpenFile,
 }: {
   todoFilePaths: string[];
   parsedFiles: { path: string; data: TodoData }[];
   initialFilePath: string;
   onClose: () => void;
-  onAdd: (filePath: string, text: string, tags: string[]) => void;
+  onAdd: (
+    filePath: string,
+    text: string,
+    tags: string[],
+    promptRefFile?: string,
+  ) => Promise<void> | void;
+  onCreateFile?: (path: string, content: string) => Promise<void>;
+  onOpenFile?: (path: string) => void;
 }) => {
   const [text, setText] = useState('');
   const [selectedFile, setSelectedFile] = useState(initialFilePath || todoFilePaths[0] || '');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [createPromptFile, setCreatePromptFile] = useState(false);
+  const [promptFileName, setPromptFileName] = useState('');
+  const [openAfter, setOpenAfter] = useState(false);
 
   const fileData = useMemo(
     () => parsedFiles.find((f) => f.path === selectedFile)?.data ?? null,
@@ -224,13 +255,25 @@ const AddTaskModal = ({
     return Array.from(tags).sort();
   }, [fileData]);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!text.trim() || !selectedFile) return;
-    onAdd(selectedFile, text.trim(), selectedTags);
+    let promptRefFile: string | undefined;
+    if (createPromptFile && promptFileName.trim() && onCreateFile) {
+      const fileName = toFileName(promptFileName);
+      promptRefFile = `${dirOf(selectedFile)}${fileName}`;
+    }
+    // Await the task save before creating the prompt file to avoid concurrent
+    // GitHub API pushes that cause 409 Conflict errors.
+    await onAdd(selectedFile, text.trim(), selectedTags, promptRefFile);
+    if (promptRefFile && onCreateFile) {
+      await onCreateFile(promptRefFile, '');
+      if (openAfter && onOpenFile) onOpenFile(promptRefFile);
+    }
     onClose();
   };
 
   const showFileDropdown = !initialFilePath && todoFilePaths.length > 1;
+  const basePath = dirOf(selectedFile);
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss pattern
@@ -309,6 +352,61 @@ const AddTaskModal = ({
             </div>
           </div>
         )}
+
+        {/* Prompt file */}
+        <div className="flex flex-col gap-3 border-t border-[var(--los-border)] pt-4">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={createPromptFile}
+              onChange={(e) => {
+                const v = e.currentTarget.checked;
+                if (v && !promptFileName) setPromptFileName(slugify(text) || 'prompt');
+                setCreatePromptFile(v);
+              }}
+              className="accent-[var(--los-accent)]"
+            />
+            <MonoLabel className="cursor-pointer">CREATE PROMPT FILE</MonoLabel>
+          </label>
+
+          {createPromptFile && (
+            <div className="flex flex-col gap-3 pl-4 border-l-2 border-[var(--los-accent)]/30">
+              <div className="flex flex-col gap-1">
+                <MonoLabel>FILENAME</MonoLabel>
+                <div className="flex items-center gap-2">
+                  {basePath && (
+                    <span className="text-[10px] font-mono text-[var(--los-muted)] shrink-0">
+                      {basePath}
+                    </span>
+                  )}
+                  <input
+                    type="text"
+                    value={promptFileName}
+                    onInput={(e) => setPromptFileName(e.currentTarget.value)}
+                    placeholder="prompt.md"
+                    className="flex-1 bg-transparent border border-[var(--los-border)] focus:border-[var(--los-accent)] px-2 py-1 text-xs font-mono outline-none transition-colors"
+                  />
+                </div>
+                <span className="text-[9px] font-mono text-[var(--los-muted)]">
+                  {basePath}
+                  {toFileName(promptFileName || 'prompt')}
+                </span>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={openAfter}
+                  onChange={(e) => setOpenAfter(e.currentTarget.checked)}
+                  className="accent-[var(--los-accent)]"
+                />
+                <MonoLabel className="cursor-pointer text-[10px]">
+                  OPEN IN FOCUS MODE AFTERWARDS
+                </MonoLabel>
+              </label>
+            </div>
+          )}
+        </div>
 
         <button
           type="button"
@@ -647,9 +745,16 @@ const AssignMilestonePanel = ({
 export interface KanbanBoardProps {
   onNavigateBack?: () => void;
   onAnalyticsClick?: () => void;
+  onCreateFile?: (path: string, content: string) => Promise<void>;
+  onOpenFile?: (path: string) => void;
 }
 
-export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardProps) => {
+export const KanbanBoard = ({
+  onNavigateBack,
+  onAnalyticsClick,
+  onCreateFile,
+  onOpenFile,
+}: KanbanBoardProps) => {
   const openFiles = githubFileStore.openFiles.value;
   const tree = githubFileStore.tree.value;
 
@@ -759,13 +864,19 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
     githubFileStore.saveFile(focusedFile);
   };
 
-  const handleAddTask = (filePath: string, text: string, tags: string[]) => {
+  const handleAddTask = async (
+    filePath: string,
+    text: string,
+    tags: string[],
+    promptRefFile?: string,
+  ) => {
     const file = openFiles[filePath];
     if (!file) return;
     const data = parseTodos(file.content);
-    const newData = addTodo(data, text, tags);
+    const prompt = promptRefFile ? { lines: [], refFile: promptRefFile } : undefined;
+    const newData = addTodo(data, text, tags, undefined, prompt);
     githubFileStore.updateFileContent(filePath, serializeTodos(newData));
-    githubFileStore.saveFile(filePath);
+    await githubFileStore.saveFile(filePath);
   };
 
   const isLoading = todoFilePaths.some((p) => !openFiles[p]);
@@ -1038,6 +1149,8 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
           initialFilePath={focusedFile}
           onClose={() => setShowAddTask(false)}
           onAdd={handleAddTask}
+          onCreateFile={onCreateFile}
+          onOpenFile={onOpenFile}
         />
       )}
     </div>

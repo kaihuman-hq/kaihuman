@@ -304,6 +304,7 @@ export const addTodo = (
   text: string,
   tags: string[] = [],
   milestoneId?: string,
+  prompt?: TodoPrompt,
 ): TodoData => {
   const item: TodoItem = {
     id: `item-${data.items.length}`,
@@ -311,6 +312,7 @@ export const addTodo = (
     status: 'backlog',
     tags,
     milestoneId,
+    prompt,
     createdAt: new Date().toISOString(),
     updatedAt: Date.now(),
   };

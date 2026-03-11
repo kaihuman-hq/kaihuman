@@ -17,7 +17,7 @@ import {
   sortableKeyboardCoordinates,
   useSortable,
 } from '@dnd-kit/sortable';
-import { Logger, layoutStore } from '@lifosy/core';
+import { githubFileStore, Logger, layoutStore } from '@lifosy/core';
 import {
   Edit,
   FileText,
@@ -2677,13 +2677,30 @@ const FocusedTileInternal = ({
                 <TodoAddForm
                   existingTags={todoTags}
                   milestones={todoMilestones}
+                  todosFilePath={String(tile.id)}
                   onCancel={() => setViewMode('WIDGET')}
-                  onAdd={(text, tags, milestoneId) => {
+                  onAdd={async (text, tags, milestoneId, promptRef) => {
                     const data = TodoLogic.parseTodos(tile.rawContent || '');
-                    const newData = TodoLogic.addTodo(data, text, tags, milestoneId);
+                    const newData = TodoLogic.addTodo(
+                      data,
+                      text,
+                      tags,
+                      milestoneId,
+                      promptRef?.prompt,
+                    );
                     const newContent = TodoLogic.serializeTodos(newData);
-                    tile.onContentChange?.(newContent);
+                    // Update store directly and await save before creating the prompt
+                    // file — running both concurrently causes a 409 Conflict on GitHub.
+                    githubFileStore.updateFileContent(String(tile.id), newContent);
+                    await githubFileStore.saveFile(String(tile.id));
                     setViewMode('WIDGET');
+                    if (promptRef) {
+                      const filePath = promptRef.prompt.refFile;
+                      if (filePath && onCreateFile) await onCreateFile(filePath, '');
+                      if (filePath && promptRef.openAfter) {
+                        setActiveTileId(filePath);
+                      }
+                    }
                   }}
                 />
               )}

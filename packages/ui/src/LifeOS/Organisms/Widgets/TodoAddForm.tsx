@@ -1,20 +1,57 @@
 import { useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../../Atoms/Typography';
-import type { Milestone } from './TodoLogic';
+import type { Milestone, TodoPrompt } from './TodoLogic';
+
+export interface PromptRef {
+  prompt: TodoPrompt;
+  openAfter: boolean;
+}
 
 interface TodoAddFormProps {
   existingTags: string[];
   milestones: Milestone[];
-  onAdd: (text: string, tags: string[], milestoneId?: string) => void;
+  /** Path of the .todos.md file — used to compute the prompt file directory */
+  todosFilePath?: string;
+  onAdd: (text: string, tags: string[], milestoneId?: string, promptRef?: PromptRef) => void;
   onCancel: () => void;
 }
 
-export const TodoAddForm = ({ existingTags, milestones, onAdd, onCancel }: TodoAddFormProps) => {
+function dirOf(filePath: string): string {
+  const idx = filePath.lastIndexOf('/');
+  return idx >= 0 ? filePath.slice(0, idx + 1) : '';
+}
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+}
+
+function toFileName(name: string): string {
+  const trimmed = name.trim();
+  return trimmed.endsWith('.md') ? trimmed : `${trimmed}.md`;
+}
+
+export const TodoAddForm = ({
+  existingTags,
+  milestones,
+  todosFilePath,
+  onAdd,
+  onCancel,
+}: TodoAddFormProps) => {
   const [text, setText] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [selectedMilestone, setSelectedMilestone] = useState('');
+  const [createPromptFile, setCreatePromptFile] = useState(false);
+  const [promptFileName, setPromptFileName] = useState('');
+  const [openAfter, setOpenAfter] = useState(false);
+
+  const basePath = todosFilePath ? dirOf(todosFilePath) : '';
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
@@ -29,10 +66,25 @@ export const TodoAddForm = ({ existingTags, milestones, onAdd, onCancel }: TodoA
     setNewTag('');
   };
 
+  const handleTogglePromptFile = (checked: boolean) => {
+    if (checked && !promptFileName) {
+      setPromptFileName(slugify(text) || 'prompt');
+    }
+    setCreatePromptFile(checked);
+  };
+
   const handleSubmit = (e: Event) => {
     e.preventDefault();
     if (!text.trim()) return;
-    onAdd(text.trim(), selectedTags, selectedMilestone || undefined);
+
+    let promptRef: PromptRef | undefined;
+    if (createPromptFile && promptFileName.trim()) {
+      const fileName = toFileName(promptFileName);
+      const filePath = `${basePath}${fileName}`;
+      promptRef = { prompt: { lines: [], refFile: filePath }, openAfter };
+    }
+
+    onAdd(text.trim(), selectedTags, selectedMilestone || undefined, promptRef);
   };
 
   return (
@@ -45,6 +97,8 @@ export const TodoAddForm = ({ existingTags, milestones, onAdd, onCancel }: TodoA
           <MonoLabel>TASK</MonoLabel>
           <input
             type="text"
+            // biome-ignore lint/a11y/noAutofocus: intentional form focus
+            autoFocus
             value={text}
             onInput={(e) => setText(e.currentTarget.value)}
             className="bg-[var(--los-bg)] border border-[var(--los-border)] px-3 py-2 text-sm font-mono focus:border-[var(--los-accent)] outline-none transition-colors"
@@ -126,6 +180,55 @@ export const TodoAddForm = ({ existingTags, milestones, onAdd, onCancel }: TodoA
             </select>
           </div>
         )}
+
+        {/* Prompt file */}
+        <div className="flex flex-col gap-3 border-t border-[var(--los-border)] pt-3">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={createPromptFile}
+              onChange={(e) => handleTogglePromptFile(e.currentTarget.checked)}
+              className="accent-[var(--los-accent)]"
+            />
+            <MonoLabel className="cursor-pointer">CREATE PROMPT FILE</MonoLabel>
+          </label>
+
+          {createPromptFile && (
+            <div className="flex flex-col gap-3 pl-4 border-l-2 border-[var(--los-accent)]/30">
+              <div className="flex flex-col gap-1">
+                <MonoLabel>FILENAME</MonoLabel>
+                <div className="flex items-center gap-2">
+                  {basePath && (
+                    <MonoText className="text-[10px] text-[var(--los-muted)] shrink-0">
+                      {basePath}
+                    </MonoText>
+                  )}
+                  <input
+                    type="text"
+                    value={promptFileName}
+                    onInput={(e) => setPromptFileName(e.currentTarget.value)}
+                    placeholder="prompt.md"
+                    className="flex-1 bg-[var(--los-bg)] border border-[var(--los-border)] px-2 py-1 text-xs font-mono focus:border-[var(--los-accent)] outline-none transition-colors"
+                  />
+                </div>
+                <MonoText className="text-[9px] text-[var(--los-muted)]">
+                  Full path: {basePath}
+                  {toFileName(promptFileName || 'prompt')}
+                </MonoText>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={openAfter}
+                  onChange={(e) => setOpenAfter(e.currentTarget.checked)}
+                  className="accent-[var(--los-accent)]"
+                />
+                <MonoLabel className="cursor-pointer">OPEN IN FOCUS MODE AFTERWARDS</MonoLabel>
+              </label>
+            </div>
+          )}
+        </div>
 
         {/* Actions */}
         <div className="flex gap-4 mt-2">
