@@ -1,35 +1,38 @@
-import { useEffect, useRef } from 'preact/hooks';
-import { EditorState } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
-import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
+import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
+import { EditorState } from '@codemirror/state';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { EditorView, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view';
+import { useEffect, useRef } from 'preact/hooks';
 
 // Theme customization to match Nexus
-const nexusTheme = EditorView.theme({
-  "&": {
-    height: "100%",
-    backgroundColor: "transparent",
-    color: "#e2e8f0" // text-nexus-text (slate-200 approx)
+const nexusTheme = EditorView.theme(
+  {
+    '&': {
+      height: '100%',
+      backgroundColor: 'transparent',
+      color: '#e2e8f0', // text-nexus-text (slate-200 approx)
+    },
+    '.cm-content': {
+      caretColor: '#38bdf8', // nexus-primary (sky-400)
+      fontFamily: 'JetBrains Mono, monospace', // Ensure mono font
+    },
+    '.cm-gutters': {
+      backgroundColor: 'transparent',
+      color: '#475569', // nexus-muted (slate-600)
+      border: 'none',
+    },
+    '.cm-activeLineGutter': {
+      backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    },
+    '.cm-activeLine': {
+      backgroundColor: 'rgba(56, 189, 248, 0.05)',
+    },
   },
-  ".cm-content": {
-    caretColor: "#38bdf8", // nexus-primary (sky-400)
-    fontFamily: "JetBrains Mono, monospace" // Ensure mono font
-  },
-  ".cm-gutters": {
-    backgroundColor: "transparent",
-    color: "#475569", // nexus-muted (slate-600)
-    border: "none"
-  },
-  ".cm-activeLineGutter": {
-    backgroundColor: "rgba(56, 189, 248, 0.1)"
-  },
-  ".cm-activeLine": {
-    backgroundColor: "rgba(56, 189, 248, 0.05)"
-  }
-}, { dark: true });
+  { dark: true },
+);
 
 export interface EditorProps {
   content: string;
@@ -60,12 +63,12 @@ export const Editor = ({ content, onChange, onSave, className }: EditorProps) =>
           ...historyKeymap,
           ...searchKeymap,
           {
-            key: "Mod-s",
+            key: 'Mod-s',
             run: (view) => {
               if (onSave) onSave(view.state.doc.toString());
               return true;
-            }
-          }
+            },
+          },
         ]),
         markdown(),
         syntaxHighlighting(defaultHighlightStyle),
@@ -75,13 +78,13 @@ export const Editor = ({ content, onChange, onSave, className }: EditorProps) =>
           if (update.docChanged && onChange) {
             onChange(update.state.doc.toString());
           }
-        })
-      ]
+        }),
+      ],
     });
 
     const view = new EditorView({
       state: startState,
-      parent: parentRef.current
+      parent: parentRef.current,
     });
 
     viewRef.current = view;
@@ -89,7 +92,7 @@ export const Editor = ({ content, onChange, onSave, className }: EditorProps) =>
     return () => {
       view.destroy();
     };
-  }, []); // Run once on mount
+  }, [onChange, onSave]); // Run once on mount
 
   // Sync content from prop if changed externally
   useEffect(() => {
@@ -99,10 +102,10 @@ export const Editor = ({ content, onChange, onSave, className }: EditorProps) =>
     const currentDoc = view.state.doc.toString();
     if (content !== currentDoc && content !== undefined) {
       view.dispatch({
-        changes: { from: 0, to: currentDoc.length, insert: content }
+        changes: { from: 0, to: currentDoc.length, insert: content },
       });
     }
   }, [content]);
 
-  return <div ref={parentRef} class={className || "h-full w-full overflow-hidden"} />;
+  return <div ref={parentRef} class={className || 'h-full w-full overflow-hidden'} />;
 };

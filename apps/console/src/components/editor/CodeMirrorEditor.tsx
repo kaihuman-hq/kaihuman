@@ -43,7 +43,7 @@ export const CodeMirrorEditor = ({
   zenMode,
   initialContent,
   onChange,
-  onSave
+  onSave,
 }: {
   path?: string;
   zenMode?: boolean;
@@ -72,7 +72,7 @@ export const CodeMirrorEditor = ({
       setIsSaving(true);
       try {
         if (viewRef.current) {
-           await onSave(viewRef.current.state.doc.toString());
+          await onSave(viewRef.current.state.doc.toString());
         }
         setHasUnsavedChanges(false);
       } catch (e) {
@@ -154,12 +154,11 @@ export const CodeMirrorEditor = ({
         themeCompartment.current.of(nexusTheme), // Dynamic Helper
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !isUpdatingFromStore.current) {
-            
             if (onChange && initialContent !== undefined) {
-               // Controlled mode
-               setHasUnsavedChanges(true);
-               onChange(update.state.doc.toString());
-               return;
+              // Controlled mode
+              setHasUnsavedChanges(true);
+              onChange(update.state.doc.toString());
+              return;
             }
 
             // Update store for the CORRECT path
@@ -317,6 +316,7 @@ export const CodeMirrorEditor = ({
         className={`absolute top-4 right-8 transition-opacity duration-300 ${hasUnsavedChanges ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       >
         <button
+          type="button"
           onClick={handleSave}
           disabled={isSaving}
           className="bg-[var(--los-accent)] text-black px-4 py-1.5 rounded-sm shadow-lg text-xs font-bold font-mono tracking-wider hover:opacity-90 active:scale-95 transition-all flex items-center gap-2"

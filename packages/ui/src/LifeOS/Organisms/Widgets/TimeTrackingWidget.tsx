@@ -1,19 +1,18 @@
-import { h } from 'preact';
+import { Pause, Play, Square } from 'lucide-preact';
 import { useMemo } from 'preact/hooks';
-import { Play, Square, Pause, Clock } from 'lucide-preact';
-import { CompactWidgetLayout, CompactHero, CompactList } from './CompactWidgetLayout';
+import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
+import { CompactHero, CompactWidgetLayout } from './CompactWidgetLayout';
 import {
-  parseTimeTracking,
-  serializeTimeTracking,
+  addPause,
   calculateDurationMinutes,
   formatDuration,
-  toggleStartStop,
-  addPause,
   isRunning,
-  TimeTrackingData
+  parseTimeTracking,
+  serializeTimeTracking,
+  type TimeTrackingData,
+  toggleStartStop,
 } from './TimeTrackingLogic';
-import { cn } from '../../../utils';
 
 export interface TimeTrackingWidgetProps {
   content: string;
@@ -27,12 +26,12 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
 
   // Calculate Today's stats
   const today = new Date().toISOString().split('T')[0];
-  const todayEntry = data.entries.find(e => e.date === today);
+  const todayEntry = data.entries.find((e) => e.date === today);
   const todayMinutes = todayEntry ? calculateDurationMinutes(todayEntry) : 0;
 
   // Calculate Current Week Stats (Simulated: sum of last 7 entries for simplicity/demo)
   // Real week logic requires date math, but "Duration of time tracking for current week" requested.
-  // We'll just sum all parsed entries for now as "Total Tracked" if date math is overkill, 
+  // We'll just sum all parsed entries for now as "Total Tracked" if date math is overkill,
   // but let's try to filter correctly.
   // Calculate Current Week Stats (Current ISO Week - Start Monday)
   const weekMinutes = useMemo(() => {
@@ -51,7 +50,7 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
     const mondayStr = `${year}-${month}-${d}`;
 
     return data.entries
-      .filter(e => e.date >= mondayStr)
+      .filter((e) => e.date >= mondayStr)
       .reduce((acc, curr) => acc + calculateDurationMinutes(curr), 0);
   }, [data]);
 
@@ -69,17 +68,25 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
 
   if (mode === 'MOBILE_COLLAPSED') {
     const now = new Date();
-    const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const dateStr = now.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
     const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
     return (
       <div className="flex justify-between items-center h-full w-full p-4">
         <div className="flex flex-col justify-center">
-          <MonoText className="text-[10px] text-[var(--los-muted)] uppercase mb-1">TRACKED TODAY</MonoText>
-          <MonoHeader className={cn(
-            "text-3xl font-bold",
-            active ? "text-[var(--los-accent)]" : "text-[var(--los-fg)]"
-          )}>
+          <MonoText className="text-[10px] text-[var(--los-muted)] uppercase mb-1">
+            TRACKED TODAY
+          </MonoText>
+          <MonoHeader
+            className={cn(
+              'text-3xl font-bold',
+              active ? 'text-[var(--los-accent)]' : 'text-[var(--los-fg)]',
+            )}
+          >
             {formatDuration(todayMinutes)}
           </MonoHeader>
         </div>
@@ -98,23 +105,30 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
           <MonoText className="text-xs text-[var(--los-muted)] uppercase tracking-wide mb-2">
             Today
           </MonoText>
-          <MonoHeader className={cn(
-            "text-6xl font-bold mb-4",
-            active ? "text-[var(--los-accent)]" : "text-[var(--los-fg)]"
-          )}>
+          <MonoHeader
+            className={cn(
+              'text-6xl font-bold mb-4',
+              active ? 'text-[var(--los-accent)]' : 'text-[var(--los-fg)]',
+            )}
+          >
             {formatDuration(todayMinutes)}
           </MonoHeader>
           <button
+            type="button"
             onClick={handleStartStop}
             className={cn(
-              "flex items-center justify-center gap-3 px-8 py-4 border rounded-full transition-all active:scale-95 group mb-6",
+              'flex items-center justify-center gap-3 px-8 py-4 border rounded-full transition-all active:scale-95 group mb-6',
               active
-                ? "border-[var(--los-accent)] bg-[var(--los-accent)] text-black"
-                : "border-[var(--los-border)] hover:bg-white/5 text-[var(--los-fg)]"
+                ? 'border-[var(--los-accent)] bg-[var(--los-accent)] text-black'
+                : 'border-[var(--los-border)] hover:bg-white/5 text-[var(--los-fg)]',
             )}
           >
-            {active ? <Square size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
-            <MonoText className="font-bold text-lg">{active ? "STOP" : "START"}</MonoText>
+            {active ? (
+              <Square size={24} fill="currentColor" />
+            ) : (
+              <Play size={24} fill="currentColor" />
+            )}
+            <MonoText className="font-bold text-lg">{active ? 'STOP' : 'START'}</MonoText>
           </button>
         </CompactHero>
 
@@ -125,8 +139,13 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
           </div>
           <div className="text-center">
             <MonoText className="text-[10px] text-[var(--los-muted)] uppercase">STATUS</MonoText>
-            <MonoText className={cn("text-xl", active ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")}>
-              {active ? "RUNNING" : "PAUSED"}
+            <MonoText
+              className={cn(
+                'text-xl',
+                active ? 'text-[var(--los-accent)]' : 'text-[var(--los-muted)]',
+              )}
+            >
+              {active ? 'RUNNING' : 'PAUSED'}
             </MonoText>
           </div>
         </div>
@@ -135,17 +154,16 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
   }
 
   return (
-    <div className={cn("flex flex-col w-full", mode === 'SMALL' ? "h-full" : "min-h-full")}>
+    <div className={cn('flex flex-col w-full', mode === 'SMALL' ? 'h-full' : 'min-h-full')}>
       {/* HEADER STATS */}
       <div className="flex justify-between items-end mb-4 shrink-0">
         <div>
           <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-wide">
             Today
           </MonoText>
-          <MonoHeader className={cn(
-            "text-2xl",
-            active ? "text-[var(--los-accent)]" : "text-[var(--los-fg)]"
-          )}>
+          <MonoHeader
+            className={cn('text-2xl', active ? 'text-[var(--los-accent)]' : 'text-[var(--los-fg)]')}
+          >
             {formatDuration(todayMinutes)}
           </MonoHeader>
         </div>
@@ -153,37 +171,41 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
           <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-wide">
             This Week
           </MonoText>
-          <MonoText className="text-sm">
-            {formatDuration(weekMinutes)}
-          </MonoText>
+          <MonoText className="text-sm">{formatDuration(weekMinutes)}</MonoText>
         </div>
       </div>
 
       {/* CONTROLS */}
       <div className="grid grid-cols-2 gap-2 mb-4 shrink-0">
         <button
+          type="button"
           onClick={handleStartStop}
           className={cn(
-            "flex items-center justify-center gap-2 p-3 border transition-all active:scale-95 group",
+            'flex items-center justify-center gap-2 p-3 border transition-all active:scale-95 group',
             active
-              ? "border-[var(--los-accent)] bg-[var(--los-accent)] text-black"
-              : "border-[var(--los-border)] hover:bg-white/5 text-[var(--los-fg)]"
+              ? 'border-[var(--los-accent)] bg-[var(--los-accent)] text-black'
+              : 'border-[var(--los-border)] hover:bg-white/5 text-[var(--los-fg)]',
           )}
         >
-          {active ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-          <MonoText className="font-bold">{active ? "STOP" : "START"}</MonoText>
+          {active ? (
+            <Square size={16} fill="currentColor" />
+          ) : (
+            <Play size={16} fill="currentColor" />
+          )}
+          <MonoText className="font-bold">{active ? 'STOP' : 'START'}</MonoText>
         </button>
 
         {/* Pause Menu */}
         <div className="flex gap-1">
-          {[15, 30, 60].map(min => (
+          {[15, 30, 60].map((min) => (
             <button
+              type="button"
               key={min}
               onClick={handlePause(min)}
               disabled={todayMinutes < min}
               className={cn(
-                "flex-1 border border-[var(--los-border)] flex flex-col items-center justify-center hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors",
-                "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                'flex-1 border border-[var(--los-border)] flex flex-col items-center justify-center hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors',
+                'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
               )}
               title={`Add ${min}m Pause`}
             >
@@ -195,19 +217,28 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
       </div>
 
       {/* HISTORY LIST (Visible in both, but expaned in FOCUS) */}
-      <div className={cn("flex-1 min-h-0 border-t border-[var(--los-border)] pt-2 relative", mode === 'SMALL' ? "overflow-y-auto" : "overflow-visible")}>
+      <div
+        className={cn(
+          'flex-1 min-h-0 border-t border-[var(--los-border)] pt-2 relative',
+          mode === 'SMALL' ? 'overflow-y-auto' : 'overflow-visible',
+        )}
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr>
-              <th className="py-2 text-[10px] text-[var(--los-muted)] uppercase font-normal border-b border-[var(--los-border)]">Date</th>
-              <th className="py-2 text-[10px] text-[var(--los-muted)] uppercase font-normal border-b border-[var(--los-border)] text-right">Hours</th>
+              <th className="py-2 text-[10px] text-[var(--los-muted)] uppercase font-normal border-b border-[var(--los-border)]">
+                Date
+              </th>
+              <th className="py-2 text-[10px] text-[var(--los-muted)] uppercase font-normal border-b border-[var(--los-border)] text-right">
+                Hours
+              </th>
             </tr>
           </thead>
           <tbody>
             {data.entries.slice(0, mode === 'SMALL' ? 5 : undefined).map((entry) => (
               <tr key={entry.date} className="group hover:bg-white/5">
                 <td className="py-2 text-xs font-mono text-[var(--los-muted)] group-hover:text-[var(--los-fg)]">
-                  {entry.date === today ? "Today" : entry.date}
+                  {entry.date === today ? 'Today' : entry.date}
                 </td>
                 <td className="py-2 text-xs font-mono text-right">
                   {formatDuration(calculateDurationMinutes(entry))}
@@ -219,7 +250,9 @@ export const TimeTrackingWidget = ({ content, onChange, mode }: TimeTrackingWidg
 
         {mode === 'SMALL' && data.entries.length > 5 && (
           <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[var(--los-bg)] to-transparent pointer-events-none flex items-end justify-center pb-1">
-            <MonoText className="text-[10px] text-[var(--los-muted)]">...and {data.entries.length - 5} more</MonoText>
+            <MonoText className="text-[10px] text-[var(--los-muted)]">
+              ...and {data.entries.length - 5} more
+            </MonoText>
           </div>
         )}
       </div>

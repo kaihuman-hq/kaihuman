@@ -12,7 +12,7 @@ export const parseHabitData = (csv: string): HabitData => {
   const entries: HabitEntry[] = [];
 
   // Skip header if present
-  const startIdx = (lines.length > 0 && lines[0]?.includes('iso date')) ? 1 : 0;
+  const startIdx = lines.length > 0 && lines[0]?.includes('iso date') ? 1 : 0;
 
   for (let i = startIdx; i < lines.length; i++) {
     const line = lines[i]?.trim();
@@ -22,7 +22,7 @@ export const parseHabitData = (csv: string): HabitData => {
     if (date && reached) {
       entries.push({
         date: date.trim(),
-        reached: reached.trim() === 'x'
+        reached: reached.trim() === 'x',
       });
     }
   }
@@ -34,7 +34,7 @@ export const serializeHabitData = (data: HabitData): string => {
   const header = 'iso date;goal reached';
   const lines = data.entries
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map(e => `${e.date};${e.reached ? 'x' : ''}`);
+    .map((e) => `${e.date};${e.reached ? 'x' : ''}`);
 
   return [header, ...lines].join('\n');
 };
@@ -43,7 +43,7 @@ export const checkIn = (content: string, date: string): string => {
   const data = parseHabitData(content);
 
   // Check if already exists
-  const existingIndex = data.entries.findIndex(e => e.date === date);
+  const existingIndex = data.entries.findIndex((e) => e.date === date);
 
   if (existingIndex >= 0) {
     const entry = data.entries[existingIndex];
@@ -59,12 +59,12 @@ export const checkIn = (content: string, date: string): string => {
 
 export const isCheckedIn = (content: string, date: string): boolean => {
   const data = parseHabitData(content);
-  return data.entries.some(e => e.date === date && e.reached);
-}
+  return data.entries.some((e) => e.date === date && e.reached);
+};
 
 export const calculateStats = (data: HabitData) => {
   const sortedEntries = [...data.entries]
-    .filter(e => e.reached)
+    .filter((e) => e.reached)
     .sort((a, b) => b.date.localeCompare(a.date)); // Descending order
 
   const totalCount = sortedEntries.length;
@@ -88,7 +88,9 @@ export const calculateStats = (data: HabitData) => {
     const yesterdayIso = toLocDate(yesterday);
 
     // DAILY STREAK
-    const uniqueDates = Array.from(new Set(sortedEntries.map(e => e.date))).sort((a, b) => b.localeCompare(a));
+    const uniqueDates = Array.from(new Set(sortedEntries.map((e) => e.date))).sort((a, b) =>
+      b.localeCompare(a),
+    );
 
     if (uniqueDates.length > 0) {
       const isToday = uniqueDates[0] === todayIso;
@@ -96,7 +98,7 @@ export const calculateStats = (data: HabitData) => {
 
       if (isToday || isYesterday) {
         currentStreak = 1;
-        let currentDate = new Date(uniqueDates[0]!);
+        let currentDate = new Date(uniqueDates[0] as string);
 
         for (let i = 1; i < uniqueDates.length; i++) {
           const dateStr = uniqueDates[i];
@@ -126,14 +128,14 @@ export const calculateStats = (data: HabitData) => {
       return toLocDate(d);
     };
 
-    const uniqueWeeks = new Set(sortedEntries.map(e => getSunday(e.date)));
+    const uniqueWeeks = new Set(sortedEntries.map((e) => getSunday(e.date)));
 
     // 2. check streak from this week backwards
     const thisWeekSunday = new Date(today);
     thisWeekSunday.setDate(today.getDate() - today.getDay());
     thisWeekSunday.setHours(0, 0, 0, 0);
 
-    let checkDate = new Date(thisWeekSunday);
+    const checkDate = new Date(thisWeekSunday);
 
     if (uniqueWeeks.has(toLocDate(checkDate))) {
       weekStreak = 1;
@@ -157,4 +159,4 @@ export const calculateStats = (data: HabitData) => {
   }
 
   return { currentStreak, totalCount, weekStreak };
-}
+};

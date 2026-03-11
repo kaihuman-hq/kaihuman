@@ -4,7 +4,14 @@
 
 export interface ColumnDefinition {
   name: string;
-  type: 'text' | 'number' | 'date' | 'auto:date' | 'auto:date:yesterday' | 'auto:number:sum' | 'auto:number:avg';
+  type:
+    | 'text'
+    | 'number'
+    | 'date'
+    | 'auto:date'
+    | 'auto:date:yesterday'
+    | 'auto:number:sum'
+    | 'auto:number:avg';
   unit?: string;
   isAuto?: boolean;
 }
@@ -43,7 +50,7 @@ export const parseDataCollection = (csv: string): DataCollectionData => {
     const parts = colStr.split(',');
     const def: any = { name: '', type: 'text' }; // Default
 
-    parts.forEach(part => {
+    parts.forEach((part) => {
       const [key, val] = part.split('::');
       if (key === 'name') def.name = val;
       if (key === 'type') def.type = val;
@@ -59,7 +66,7 @@ export const parseDataCollection = (csv: string): DataCollectionData => {
   });
 
   // Filter out invalid columns (no name)
-  const validColumns = columnDefs.filter(c => !!c.name);
+  const validColumns = columnDefs.filter((c) => !!c.name);
 
   // Parse Rows
   const rows: DataRow[] = [];
@@ -73,10 +80,18 @@ export const parseDataCollection = (csv: string): DataCollectionData => {
     validColumns.forEach((col, index) => {
       const rawVal = values[index];
 
-      if (col.type === 'number' || col.type === 'auto:number:sum' || col.type === 'auto:number:avg') {
+      if (
+        col.type === 'number' ||
+        col.type === 'auto:number:sum' ||
+        col.type === 'auto:number:avg'
+      ) {
         const num = parseFloat(rawVal || '0');
-        row[col.name] = isNaN(num) ? 0 : num;
-      } else if (col.type === 'date' || col.type === 'auto:date' || col.type === 'auto:date:yesterday') {
+        row[col.name] = Number.isNaN(num) ? 0 : num;
+      } else if (
+        col.type === 'date' ||
+        col.type === 'auto:date' ||
+        col.type === 'auto:date:yesterday'
+      ) {
         // Try parsing ISO date
         // If rawVal is empty/invalid, we keep it as null or handle it?
         // For auto fields, they should be regenerated on save, but on read we trust the file?
@@ -94,21 +109,25 @@ export const parseDataCollection = (csv: string): DataCollectionData => {
 
 export const serializeDataCollection = (data: DataCollectionData): string => {
   // Serialize Header
-  const header = data.columns.map(col => {
-    let part = `name::${col.name},type::${col.type}`;
-    if (col.unit) part += `,unit::${col.unit}`;
-    return part;
-  }).join(';');
+  const header = data.columns
+    .map((col) => {
+      let part = `name::${col.name},type::${col.type}`;
+      if (col.unit) part += `,unit::${col.unit}`;
+      return part;
+    })
+    .join(';');
 
   const lines = [header];
 
   // Serialize Rows
-  data.rows.forEach(row => {
-    const line = data.columns.map(col => {
-      const val = row[col.name];
-      if (val === null || val === undefined) return '';
-      return String(val);
-    }).join(';');
+  data.rows.forEach((row) => {
+    const line = data.columns
+      .map((col) => {
+        const val = row[col.name];
+        if (val === null || val === undefined) return '';
+        return String(val);
+      })
+      .join(';');
     lines.push(line);
   });
 
@@ -122,7 +141,7 @@ export const calculateAutoValues = (row: DataRow, columns: ColumnDefinition[]): 
   const newRow = { ...row };
 
   // First pass: Date autos (usually standalone)
-  columns.forEach(col => {
+  columns.forEach((col) => {
     if (col.type === 'auto:date') {
       if (!newRow[col.name]) {
         newRow[col.name] = new Date().toISOString();
@@ -140,9 +159,9 @@ export const calculateAutoValues = (row: DataRow, columns: ColumnDefinition[]): 
   // Second pass: Number aggs (sum/avg) depend on other number columns
   // "sum of all numbers" implies sum of all *other* number columns in this row?
   // The requirement says "sum/avg of all numbers". Assuming all *explicitly defined* number columns.
-  const numberColumns = columns.filter(c => c.type === 'number');
+  const numberColumns = columns.filter((c) => c.type === 'number');
 
-  columns.forEach(col => {
+  columns.forEach((col) => {
     if (col.type === 'auto:number:sum') {
       const sum = numberColumns.reduce((acc, c) => acc + (Number(newRow[c.name]) || 0), 0);
       newRow[col.name] = sum;
@@ -158,32 +177,42 @@ export const calculateAutoValues = (row: DataRow, columns: ColumnDefinition[]): 
 };
 
 export const recalculateAllRows = (rows: DataRow[], columns: ColumnDefinition[]): DataRow[] => {
-  return rows.map(row => calculateAutoValues(row, columns));
+  return rows.map((row) => calculateAutoValues(row, columns));
 };
 
-export const addColumn = (data: DataCollectionData, newCol: ColumnDefinition): DataCollectionData => {
-  if (data.columns.some(c => c.name === newCol.name)) {
+export const addColumn = (
+  data: DataCollectionData,
+  newCol: ColumnDefinition,
+): DataCollectionData => {
+  if (data.columns.some((c) => c.name === newCol.name)) {
     throw new Error(`Column "${newCol.name}" already exists.`);
   }
   const newColumns = [...data.columns, newCol];
   // Backfill rows
-  const newRows = data.rows.map(row => ({
-    ...row,
-    [newCol.name]: null
-  } as DataRow));
+  const newRows = data.rows.map(
+    (row) =>
+      ({
+        ...row,
+        [newCol.name]: null,
+      }) as DataRow,
+  );
 
   return {
     columns: newColumns,
-    rows: recalculateAllRows(newRows, newColumns)
+    rows: recalculateAllRows(newRows, newColumns),
   };
 };
 
-export const updateColumn = (data: DataCollectionData, oldName: string, newCol: ColumnDefinition): DataCollectionData => {
-  const colIndex = data.columns.findIndex(c => c.name === oldName);
+export const updateColumn = (
+  data: DataCollectionData,
+  oldName: string,
+  newCol: ColumnDefinition,
+): DataCollectionData => {
+  const colIndex = data.columns.findIndex((c) => c.name === oldName);
   if (colIndex === -1) throw new Error(`Column "${oldName}" not found.`);
 
   // Check name collision if renaming
-  if (oldName !== newCol.name && data.columns.some(c => c.name === newCol.name)) {
+  if (oldName !== newCol.name && data.columns.some((c) => c.name === newCol.name)) {
     throw new Error(`Column "${newCol.name}" already exists.`);
   }
 
@@ -193,7 +222,7 @@ export const updateColumn = (data: DataCollectionData, oldName: string, newCol: 
   let newRows = data.rows;
   if (oldName !== newCol.name) {
     // Rename key in rows
-    newRows = data.rows.map(row => {
+    newRows = data.rows.map((row) => {
       const { [oldName]: val, ...rest } = row;
       return { ...rest, [newCol.name]: val } as DataRow;
     });
@@ -201,20 +230,20 @@ export const updateColumn = (data: DataCollectionData, oldName: string, newCol: 
 
   return {
     columns: newColumns,
-    rows: recalculateAllRows(newRows, newColumns)
+    rows: recalculateAllRows(newRows, newColumns),
   };
 };
 
 export const deleteColumn = (data: DataCollectionData, colName: string): DataCollectionData => {
-  const newColumns = data.columns.filter(c => c.name !== colName);
-  const newRows = data.rows.map(row => {
+  const newColumns = data.columns.filter((c) => c.name !== colName);
+  const newRows = data.rows.map((row) => {
     const { [colName]: _, ...rest } = row;
     return rest;
   });
 
   return {
     columns: newColumns,
-    rows: recalculateAllRows(newRows, newColumns)
+    rows: recalculateAllRows(newRows, newColumns),
   };
 };
 
@@ -233,7 +262,9 @@ export type TimeFilterMode = 'ALL' | 'YTD' | 'LAST_YEAR' | 'LAST_6_MONTHS' | 'LA
 export const filterDataByTime = (data: DataCollectionData, mode: TimeFilterMode): DataRow[] => {
   if (mode === 'ALL') return data.rows;
 
-  const dateCol = data.columns.find(c => ['date', 'auto:date', 'auto:date:yesterday'].includes(c.type));
+  const dateCol = data.columns.find((c) =>
+    ['date', 'auto:date', 'auto:date:yesterday'].includes(c.type),
+  );
   if (!dateCol) return data.rows; // No date column found, return all
 
   const now = new Date();
@@ -248,12 +279,12 @@ export const filterDataByTime = (data: DataCollectionData, mode: TimeFilterMode)
     return d;
   };
 
-  return data.rows.filter(row => {
+  return data.rows.filter((row) => {
     const val = row[dateCol.name];
     if (!val) return false;
 
     const d = new Date(String(val));
-    if (isNaN(d.getTime())) return false;
+    if (Number.isNaN(d.getTime())) return false;
 
     if (mode === 'YTD') {
       return d.getFullYear() === currentYear;

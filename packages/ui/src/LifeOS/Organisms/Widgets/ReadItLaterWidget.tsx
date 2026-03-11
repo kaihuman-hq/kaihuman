@@ -1,11 +1,17 @@
-
-import { h, Fragment } from 'preact';
-import { useState, useMemo, useEffect } from 'preact/hooks';
-import { parseReadItLater, serializeReadItLater, markAsRead, markAsNew, deleteItem, deleteAllRead, ReadItLaterItem } from './ReadItLaterLogic';
-import { MonoText, MonoHeader } from '../../Atoms/Typography';
+import { Archive, Check, ExternalLink, RefreshCw, RotateCcw, Trash2 } from 'lucide-preact';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
-import { ExternalLink, Check, Trash2, Archive, RefreshCw, X, RotateCcw } from 'lucide-preact';
-import { CompactWidgetLayout, CompactList } from './CompactWidgetLayout';
+import { MonoHeader, MonoText } from '../../Atoms/Typography';
+import { CompactList, CompactWidgetLayout } from './CompactWidgetLayout';
+import {
+  deleteAllRead,
+  deleteItem,
+  markAsNew,
+  markAsRead,
+  parseReadItLater,
+  type ReadItLaterItem,
+  serializeReadItLater,
+} from './ReadItLaterLogic';
 
 interface ReadItLaterWidgetProps {
   content: string;
@@ -16,15 +22,22 @@ interface ReadItLaterWidgetProps {
 
 import { readItLaterService } from './ReadItLaterService';
 
-export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET', onChange }: ReadItLaterWidgetProps) => {
+export const ReadItLaterWidget = ({
+  content,
+  mode = 'SMALL',
+  focusMode = 'WIDGET',
+  onChange,
+}: ReadItLaterWidgetProps) => {
   const config = useMemo(() => parseReadItLater(content), [content]);
 
   // Manual subscription to optimistic changes
-  const [optimisticChanges, setOptimisticChanges] = useState(readItLaterService.optimisticChanges.value);
+  const [optimisticChanges, setOptimisticChanges] = useState(
+    readItLaterService.optimisticChanges.value,
+  );
 
   useEffect(() => {
     setOptimisticChanges(readItLaterService.optimisticChanges.value);
-    return readItLaterService.optimisticChanges.subscribe(val => {
+    return readItLaterService.optimisticChanges.subscribe((val) => {
       setOptimisticChanges(val);
     });
   }, []);
@@ -34,7 +47,7 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
     let items = [...config.items];
 
     // Apply Optimistic Overrides
-    items = items.map(item => {
+    items = items.map((item) => {
       const change = optimisticChanges[item.id];
       if (!change) return item;
 
@@ -43,19 +56,19 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
 
       return {
         ...item,
-        status: change.status || item.status
+        status: change.status || item.status,
       };
     });
 
     // Filter out deleted
-    // @ts-ignore
-    items = items.filter(i => !i._deleted);
+    // @ts-expect-error
+    items = items.filter((i) => !i._deleted);
 
     return items.sort((a, b) => b.createdAt - a.createdAt);
   }, [config.items, optimisticChanges]);
 
-  const newItems = mergedItems.filter(i => i.status === 'new');
-  const readItems = mergedItems.filter(i => i.status === 'read');
+  const newItems = mergedItems.filter((i) => i.status === 'new');
+  const readItems = mergedItems.filter((i) => i.status === 'read');
 
   const handleMarkAsRead = (id: string) => {
     if (!onChange) return;
@@ -82,7 +95,9 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
     if (!onChange) return;
     if (confirm('Are you sure you want to delete all read items?')) {
       // Optimistic update for all read items
-      readItems.forEach(i => readItLaterService.deleteItem(i.id));
+      readItems.forEach((i) => {
+        readItLaterService.deleteItem(i.id);
+      });
 
       const newConfig = deleteAllRead(config);
       onChange(serializeReadItLater(newConfig));
@@ -133,7 +148,9 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
       <CompactWidgetLayout>
         <div className="flex justify-between items-center shrink-0 border-b border-[var(--los-border)] pb-2">
           <MonoHeader className="text-xs text-[var(--los-muted)]">READING LIST</MonoHeader>
-          <MonoText className="text-[10px] text-[var(--los-accent)]">{newItems.length} ITEMS</MonoText>
+          <MonoText className="text-[10px] text-[var(--los-accent)]">
+            {newItems.length} ITEMS
+          </MonoText>
         </div>
 
         <CompactList>
@@ -144,7 +161,7 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {newItems.map(item => (
+              {newItems.map((item) => (
                 <ItemRow
                   key={item.id}
                   item={item}
@@ -158,7 +175,7 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
           )}
         </CompactList>
       </CompactWidgetLayout>
-    )
+    );
   }
 
   // Focus View
@@ -167,9 +184,12 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
     return (
       <div className="flex flex-col h-full w-full">
         <div className="border-b border-[var(--los-border)] p-2 flex justify-between items-center bg-[var(--los-bg)]">
-          <MonoText className="text-[var(--los-muted)] text-xs">ARCHIVED ITEMS ({readItems.length})</MonoText>
+          <MonoText className="text-[var(--los-muted)] text-xs">
+            ARCHIVED ITEMS ({readItems.length})
+          </MonoText>
           {readItems.length > 0 && (
             <button
+              type="button"
               onClick={handleDeleteAllRead}
               className="flex items-center gap-2 text-xs text-red-500 hover:text-red-400 font-mono px-2 py-1 rounded hover:bg-red-500/10 transition-colors"
             >
@@ -185,7 +205,7 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
               <MonoText>No archived items.</MonoText>
             </div>
           ) : (
-            readItems.map(item => (
+            readItems.map((item) => (
               <ItemRow
                 key={item.id}
                 item={item}
@@ -198,14 +218,16 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
           )}
         </div>
       </div>
-    )
+    );
   }
 
   // Default Focus Widget View (New Items)
   return (
     <div className="flex flex-col h-full w-full">
       <div className="border-b border-[var(--los-border)] p-2 flex justify-between items-center bg-[var(--los-bg)]">
-        <MonoText className="text-[var(--los-muted)] text-xs">READING LIST ({newItems.length})</MonoText>
+        <MonoText className="text-[var(--los-muted)] text-xs">
+          READING LIST ({newItems.length})
+        </MonoText>
       </div>
       <div className="flex-1 overflow-y-auto divide-y divide-[var(--los-border)]">
         {newItems.length === 0 ? (
@@ -214,7 +236,7 @@ export const ReadItLaterWidget = ({ content, mode = 'SMALL', focusMode = 'WIDGET
             <MonoText>All caught up!</MonoText>
           </div>
         ) : (
-          newItems.map(item => (
+          newItems.map((item) => (
             <ItemRow
               key={item.id}
               item={item}
@@ -235,14 +257,14 @@ const ItemRow = ({
   primaryIcon,
   primaryLabel,
   onDelete,
-  compact = false
+  compact = false,
 }: {
-  item: ReadItLaterItem,
-  onPrimary: () => void,
-  primaryIcon: any,
-  primaryLabel: string,
-  onDelete?: () => void,
-  compact?: boolean
+  item: ReadItLaterItem;
+  onPrimary: () => void;
+  primaryIcon: any;
+  primaryLabel: string;
+  onDelete?: () => void;
+  compact?: boolean;
 }) => {
   const [primaryState, setPrimaryState] = useState<'IDLE' | 'LOADING'>('IDLE');
   const [deleteState, setDeleteState] = useState<'IDLE' | 'LOADING'>('IDLE');
@@ -250,20 +272,26 @@ const ItemRow = ({
   const handlePrimary = async () => {
     setPrimaryState('LOADING');
     // Simulate delay/action
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, 400));
     onPrimary();
   };
 
   const handleDelete = async () => {
     setDeleteState('LOADING');
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, 400));
     if (onDelete) onDelete();
-  }
+  };
 
   return (
     <div className="py-3 px-2 group hover:bg-white/5 transition-colors flex flex-col gap-3 items-start">
       <div className="w-full">
-        <a href={item.url} target="_blank" rel="noopener noreferrer" className="block" onClick={(e) => e.stopPropagation()}>
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block"
+          onClick={(e) => e.stopPropagation()}
+        >
           <MonoText className="font-bold text-[var(--los-fg)] hover:text-[var(--los-accent)] whitespace-normal break-words block mb-1">
             {item.name || item.url}
           </MonoText>
@@ -274,8 +302,13 @@ const ItemRow = ({
             <>
               <span>•</span>
               <div className="flex gap-1">
-                {item.tags.map(tag => (
-                  <span key={tag} className="bg-[var(--los-border)] px-1 rounded text-[var(--los-fg)] opacity-70">#{tag}</span>
+                {item.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="bg-[var(--los-border)] px-1 rounded text-[var(--los-fg)] opacity-70"
+                  >
+                    #{tag}
+                  </span>
                 ))}
               </div>
             </>
@@ -283,17 +316,28 @@ const ItemRow = ({
         </div>
       </div>
 
-
-
       {/* Actions - Always Horizontal below */}
-      <div className={cn("flex flex-row gap-3 mt-1 border-t border-[var(--los-border)] pt-2 shrink-0 w-full justify-end", compact ? "py-1 mt-0" : "pt-2")}>
+      <div
+        className={cn(
+          'flex flex-row gap-3 mt-1 border-t border-[var(--los-border)] pt-2 shrink-0 w-full justify-end',
+          compact ? 'py-1 mt-0' : 'pt-2',
+        )}
+      >
         <button
-          onClick={(e) => { e.stopPropagation(); handlePrimary(); }}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handlePrimary();
+          }}
           title={primaryLabel}
           disabled={primaryState === 'LOADING'}
           className="flex-none flex justify-center p-2 hover:bg-[var(--los-accent)] hover:text-[var(--los-bg)] text-[var(--los-muted)] rounded transition-colors disabled:opacity-50"
         >
-          {primaryState === 'LOADING' ? <RefreshCw className="w-4 h-4 animate-spin" /> : primaryIcon}
+          {primaryState === 'LOADING' ? (
+            <RefreshCw className="w-4 h-4 animate-spin" />
+          ) : (
+            primaryIcon
+          )}
         </button>
 
         <a
@@ -309,15 +353,23 @@ const ItemRow = ({
 
         {onDelete && (
           <button
-            onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete();
+            }}
             title="Delete"
             disabled={deleteState === 'LOADING'}
             className="flex-none flex justify-center p-2 hover:text-red-500 text-[var(--los-muted)] rounded transition-colors disabled:opacity-50"
           >
-            {deleteState === 'LOADING' ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
+            {deleteState === 'LOADING' ? (
+              <RefreshCw className="w-5 h-5 animate-spin" />
+            ) : (
+              <Trash2 className="w-5 h-5" />
+            )}
           </button>
         )}
       </div>
-    </div >
-  )
-}
+    </div>
+  );
+};

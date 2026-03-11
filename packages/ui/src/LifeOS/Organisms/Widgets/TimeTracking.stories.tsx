@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite';
-import { TimeTrackingWidget } from './TimeTrackingWidget';
 import { TimeTrackingCharts } from './TimeTrackingCharts';
+import { TimeTrackingWidget } from './TimeTrackingWidget';
 
 const meta = {
   title: 'LifeOS/Organisms/Widgets/TimeTracking',
   parameters: {
-    backgrounds: { default: 'dark' }
-  }
+    backgrounds: { default: 'dark' },
+  },
 } satisfies Meta;
 
 export default meta;
@@ -28,17 +28,25 @@ const generateData = () => {
 
     // Varying start times 08:00 - 10:00
     const startH = 8 + Math.floor(Math.random() * 3);
-    const startM = Math.floor(Math.random() * 60).toString().padStart(2, '0');
+    const startM = Math.floor(Math.random() * 60)
+      .toString()
+      .padStart(2, '0');
 
     // Lunch break around 12-13
     const lunchStartH = 12;
-    const lunchStartM = Math.floor(Math.random() * 30).toString().padStart(2, '0');
+    const lunchStartM = Math.floor(Math.random() * 30)
+      .toString()
+      .padStart(2, '0');
     const lunchEndH = 13;
-    const lunchEndM = Math.floor(Math.random() * 30).toString().padStart(2, '0');
+    const lunchEndM = Math.floor(Math.random() * 30)
+      .toString()
+      .padStart(2, '0');
 
     // End time 16:00 - 19:00
     const endH = 16 + Math.floor(Math.random() * 4);
-    const endM = Math.floor(Math.random() * 60).toString().padStart(2, '0');
+    const endM = Math.floor(Math.random() * 60)
+      .toString()
+      .padStart(2, '0');
 
     // Construct line: start, lunch_start, lunch_end, end
     // Format: HH:MM
@@ -57,25 +65,17 @@ const richData = generateData();
 export const WidgetSmall: StoryObj = {
   render: () => (
     <div className="w-[300px] h-[300px] border border-[var(--los-border)] bg-[var(--los-bg)] p-4 relative overflow-hidden">
-      <TimeTrackingWidget
-        content={richData}
-        onChange={() => { }}
-        mode="SMALL"
-      />
+      <TimeTrackingWidget content={richData} onChange={() => {}} mode="SMALL" />
     </div>
-  )
+  ),
 };
 
 export const WidgetFocus: StoryObj = {
   render: () => (
     <div className="w-full h-[600px] border border-[var(--los-border)] bg-[var(--los-bg)] p-8 relative">
-      <TimeTrackingWidget
-        content={richData}
-        onChange={() => { }}
-        mode="FOCUS"
-      />
+      <TimeTrackingWidget content={richData} onChange={() => {}} mode="FOCUS" />
     </div>
-  )
+  ),
 };
 
 export const ChartsOnly: StoryObj = {
@@ -83,5 +83,5 @@ export const ChartsOnly: StoryObj = {
     <div className="w-full h-[500px] border border-[var(--los-border)] bg-[var(--los-bg)] p-8">
       <TimeTrackingCharts data={richData} />
     </div>
-  )
+  ),
 };

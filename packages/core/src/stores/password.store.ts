@@ -40,7 +40,7 @@ function obfuscate(plaintext: string, repoFullName: string): string {
 
 function deobfuscate(encoded: string, repoFullName: string): string {
   const cipherKey = `${STATIC_KEY}:${repoFullName}`;
-  const data = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
+  const data = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
   const stream = expandKey(cipherKey, data.length);
   const xored = data.map((b, i) => b ^ (stream[i] ?? 0));
   return new TextDecoder().decode(xored);
@@ -108,7 +108,9 @@ const store = {
       try {
         const repo = githubProfileStore.currentRepo.value;
         const blob = obfuscate(password, repo?.full_name ?? 'unknown');
-        const stored = localStorage.getItem(LS_KEY) ? JSON.parse(localStorage.getItem(LS_KEY)!) : {};
+        const stored = localStorage.getItem(LS_KEY)
+          ? JSON.parse(localStorage.getItem(LS_KEY)!)
+          : {};
         stored[key] = blob;
         localStorage.setItem(LS_KEY, JSON.stringify(stored));
         this._encryptedStored[key] = blob;

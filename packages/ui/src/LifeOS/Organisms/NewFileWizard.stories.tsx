@@ -31,9 +31,9 @@ const meta = {
       console.log('Loading folder:', path);
       return [
         { id: `${path}/subfolder`, title: 'Subfolder', type: 'FOLDER' },
-        { id: `${path}/file.txt`, title: 'file.txt', type: 'FILE' }
+        { id: `${path}/file.txt`, title: 'file.txt', type: 'FILE' },
       ] as any[];
-    }
+    },
   },
 } satisfies Meta<typeof NewFileWizard>;
 

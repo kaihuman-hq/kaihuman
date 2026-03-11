@@ -295,7 +295,7 @@ export const migrateLegacyFormat = (md: string): string => {
 export const setStatus = (data: TodoData, index: number, status: TodoStatus): TodoData => {
   const items = [...data.items];
   if (!items[index]) return data;
-  items[index] = { ...items[index]!, status, updatedAt: Date.now() };
+  items[index] = { ...(items[index] as TodoItem), status, updatedAt: Date.now() };
   return { ...data, items };
 };
 
@@ -324,7 +324,7 @@ export const setMilestone = (
 ): TodoData => {
   const items = [...data.items];
   if (!items[index]) return data;
-  items[index] = { ...items[index]!, milestoneId, updatedAt: Date.now() };
+  items[index] = { ...(items[index] as TodoItem), milestoneId, updatedAt: Date.now() };
   return { ...data, items };
 };
 
@@ -335,7 +335,7 @@ export const setPrompt = (
 ): TodoData => {
   const items = [...data.items];
   if (!items[index]) return data;
-  items[index] = { ...items[index]!, prompt };
+  items[index] = { ...(items[index] as TodoItem), prompt };
   return { ...data, items };
 };
 

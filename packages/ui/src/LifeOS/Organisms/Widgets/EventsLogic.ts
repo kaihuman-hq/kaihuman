@@ -6,7 +6,7 @@ export interface EventEntry {
   name: string;
   type: 'general' | 'birthday' | string; // extensible
   startDate: string; // ISO date YYYY-MM-DD
-  endDate: string;   // ISO date YYYY-MM-DD
+  endDate: string; // ISO date YYYY-MM-DD
 }
 
 export interface EventsData {
@@ -19,7 +19,6 @@ export interface UpcomingEvent {
   daysUntil: number;
   durationLabel: string; // e.g., "in 5 days", "Tomorrow", "Today"
 }
-
 
 import { Logger } from '@lifosy/core';
 
@@ -53,7 +52,7 @@ export const parseEvents = (csv: string): EventsData => {
       name: name.trim(),
       type: type.trim().toLowerCase(),
       startDate: start.trim(),
-      endDate: (end || start).trim() // Fallback to start if end missing
+      endDate: (end || start).trim(), // Fallback to start if end missing
     });
   }
   logger.debug(`Parsed entries: ${entries.length}`);
@@ -68,7 +67,6 @@ export const serializeEvents = (data: EventsData): string => {
   return csv;
 };
 
-
 export const getUpcomingEvents = (data: EventsData, limit = 8): UpcomingEvent[] => {
   const now = new Date();
   now.setHours(0, 0, 0, 0); // Normalize to start of day
@@ -78,7 +76,6 @@ export const getUpcomingEvents = (data: EventsData, limit = 8): UpcomingEvent[] 
 
   for (const entry of data.entries) {
     let nextDate: Date;
-
 
     if (entry.type === 'birthday') {
       // Parse original birthday
@@ -142,7 +139,7 @@ export const getUpcomingEvents = (data: EventsData, limit = 8): UpcomingEvent[] 
       entry,
       date: nextDate,
       daysUntil,
-      durationLabel: label
+      durationLabel: label,
     });
   }
 

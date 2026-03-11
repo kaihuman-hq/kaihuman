@@ -1,5 +1,5 @@
-
 import { Logger } from '@lifosy/core';
+
 const logger = new Logger('ReadItLaterLogic');
 
 export interface ReadItLaterItem {
@@ -17,17 +17,17 @@ export interface ReadItLaterConfig {
 }
 
 export const DEFAULT_CONFIG: ReadItLaterConfig = {
-  items: []
+  items: [],
 };
 
 export const parseReadItLater = (content: string): ReadItLaterConfig => {
   try {
     const parsed = JSON.parse(content);
     return {
-      items: Array.isArray(parsed.items) ? parsed.items : []
+      items: Array.isArray(parsed.items) ? parsed.items : [],
     };
   } catch (e) {
-    logger.warn("Failed to parse read it later config", e);
+    logger.warn('Failed to parse read it later config', e);
     return { items: [] };
   }
 };
@@ -37,7 +37,7 @@ export const serializeReadItLater = (config: ReadItLaterConfig): string => {
 };
 
 export const markAsRead = (config: ReadItLaterConfig, id: string): ReadItLaterConfig => {
-  const items = config.items.map(item => {
+  const items = config.items.map((item) => {
     if (item.id === id) {
       return { ...item, status: 'read' as const, updatedAt: Date.now() };
     }
@@ -47,7 +47,7 @@ export const markAsRead = (config: ReadItLaterConfig, id: string): ReadItLaterCo
 };
 
 export const markAsNew = (config: ReadItLaterConfig, id: string): ReadItLaterConfig => {
-  const items = config.items.map(item => {
+  const items = config.items.map((item) => {
     if (item.id === id) {
       return { ...item, status: 'new' as const, updatedAt: Date.now() };
     }
@@ -57,11 +57,11 @@ export const markAsNew = (config: ReadItLaterConfig, id: string): ReadItLaterCon
 };
 
 export const deleteItem = (config: ReadItLaterConfig, id: string): ReadItLaterConfig => {
-  const items = config.items.filter(item => item.id !== id);
+  const items = config.items.filter((item) => item.id !== id);
   return { ...config, items };
 };
 
 export const deleteAllRead = (config: ReadItLaterConfig): ReadItLaterConfig => {
-  const items = config.items.filter(item => item.status !== 'read');
+  const items = config.items.filter((item) => item.status !== 'read');
   return { ...config, items };
 };

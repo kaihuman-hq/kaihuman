@@ -1,4 +1,4 @@
-import { authStore, githubFileStore, githubProfileStore, layoutStore, Logger } from '@lifosy/core';
+import { authStore, githubFileStore, githubProfileStore, Logger, layoutStore } from '@lifosy/core';
 import { useCallback, useEffect, useMemo } from 'preact/hooks';
 import { route } from 'preact-router';
 
@@ -7,11 +7,11 @@ const logger = new Logger('Dashboard');
 import {
   DEFAULT_CONFIG as DEFAULT_RIL_CONFIG,
   MainApp,
-  WikiView, // Added import
   parseReadItLater,
   RepositorySelector,
   serializeReadItLater,
   type TileDef,
+  WikiView, // Added import
 } from '@lifosy/ui';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FileViewer } from '../components/FileViewer';
@@ -23,12 +23,6 @@ export const Dashboard = () => {
   const tree = githubFileStore.tree.value;
   const openFiles = githubFileStore.openFiles.value;
 
-  // Miller Columns State
-  // We store the FULL definition of columns here
-  interface Column {
-    items: TileDef[];
-    activeId: string | null;
-  }
   // --- STORE ACCESS ---
   // --- STORE ACCESS ---
   // Using layoutStore directly for everything
@@ -58,7 +52,7 @@ export const Dashboard = () => {
     if (!tree || tree.length === 0) return;
 
     const CONFIG_PATH = '.lifeos/.dashboard.config.json';
-    const configItem = tree.find(t => t.path === CONFIG_PATH);
+    const configItem = tree.find((t) => t.path === CONFIG_PATH);
 
     const loadConfig = async () => {
       logger.info('Checking for remote config...');
@@ -89,13 +83,11 @@ export const Dashboard = () => {
       logger.info('No config found, using default.');
       const DEFAULT_DASHBOARD_CONFIG = {
         version: 1,
-        dashboards: [
-          { id: 'default', name: 'Main' }
-        ],
+        dashboards: [{ id: 'default', name: 'Main' }],
         entries: [],
         files: {
-          recentlyOpened: []
-        }
+          recentlyOpened: [],
+        },
       };
 
       layoutStore.remoteConfig.value = DEFAULT_DASHBOARD_CONFIG;
@@ -111,7 +103,7 @@ export const Dashboard = () => {
 
     const recent = config.files?.recentlyOpened || [];
     // Remove if exists, add to front
-    const newRecent = [path, ...recent.filter(p => p !== path)].slice(0, 10); // Limit to 10
+    const newRecent = [path, ...recent.filter((p) => p !== path)].slice(0, 10); // Limit to 10
 
     // Only update if changed
     if (JSON.stringify(newRecent) !== JSON.stringify(recent)) {
@@ -119,8 +111,8 @@ export const Dashboard = () => {
         ...config,
         files: {
           ...config.files,
-          recentlyOpened: newRecent
-        }
+          recentlyOpened: newRecent,
+        },
       };
 
       // 1. Optimistic Update
@@ -136,12 +128,15 @@ export const Dashboard = () => {
   }, []);
 
   // Navigate Handler adapter
-  const handleNavigate = useCallback((item: TileDef) => {
-    if (item.type === 'FILE') {
-      addToRecentFiles(String(item.id));
-    }
-    layoutStore.navigate(item.id as string);
-  }, [addToRecentFiles]);
+  const handleNavigate = useCallback(
+    (item: TileDef) => {
+      if (item.type === 'FILE') {
+        addToRecentFiles(String(item.id));
+      }
+      layoutStore.navigate(item.id as string);
+    },
+    [addToRecentFiles],
+  );
 
   // File contents map for grid mode — memoized to avoid object churn on every render
   const gridFileContents = useMemo(() => {
@@ -153,8 +148,6 @@ export const Dashboard = () => {
     }
     return result;
   }, [openFiles]);
-
-
 
   if (!repo && repos.length === 0) {
     // Loading state or critical error if no repos
@@ -203,9 +196,7 @@ export const Dashboard = () => {
               layoutStore.navigate(path.join('/'));
             }
           }}
-
           onBoardClick={() => route('/board')}
-
           // Remote Config Props
           config={remoteConfig || undefined}
           fileContents={gridFileContents}
@@ -219,15 +210,21 @@ export const Dashboard = () => {
             githubFileStore.updateFileContent(CONFIG_PATH, content);
             githubFileStore.saveFile(CONFIG_PATH);
           }}
-
           // Repo Props
-          currentRepository={repo ? { id: String(repo.id), name: repo.full_name, branch: repo.default_branch } : undefined}
-          repositories={repos.map((r) => ({ id: String(r.id), name: r.full_name, branch: r.default_branch }))}
+          currentRepository={
+            repo
+              ? { id: String(repo.id), name: repo.full_name, branch: repo.default_branch }
+              : undefined
+          }
+          repositories={repos.map((r) => ({
+            id: String(r.id),
+            name: r.full_name,
+            branch: r.default_branch,
+          }))}
           onSelectRepository={(r) => {
             const found = repos.find((x) => String(x.id) === r.id);
             if (found) githubProfileStore.selectRepo(found);
           }}
-
           // Rendering Props
           renderFile={useCallback((path: string) => {
             const lowerPath = path.toLowerCase();
@@ -258,21 +255,29 @@ export const Dashboard = () => {
               </div>
             );
           }, [])}
-
           onFileChange={useCallback((path: string, newContent: string) => {
             githubFileStore.updateFileContent(path, newContent);
             githubFileStore.saveFile(path);
           }, [])}
-
           renderEditor={useCallback(
-            (path: string, zenMode?: boolean, contentOverride?: string, onSaveOverride?: (val: string) => void) => (
+            (
+              path: string,
+              zenMode?: boolean,
+              contentOverride?: string,
+              onSaveOverride?: (val: string) => void,
+            ) => (
               <ErrorBoundary componentName={`Editor (${path})`}>
-                <FileViewer key={path} path={path} zenMode={zenMode} contentOverride={contentOverride} onSaveOverride={onSaveOverride} />
+                <FileViewer
+                  key={path}
+                  path={path}
+                  zenMode={zenMode}
+                  contentOverride={contentOverride}
+                  onSaveOverride={onSaveOverride}
+                />
               </ErrorBoundary>
             ),
             [],
           )}
-
           onAddToReadItLater={async (item) => {
             const rilPath = '.lifeos/.readitlater.json';
             logger.debug('ReadItLater Handler triggered for:', item);
@@ -291,7 +296,7 @@ export const Dashboard = () => {
               const file = githubFileStore.openFiles.value[rilPath];
               const content = file?.content || '';
 
-              let config;
+              let config: ReturnType<typeof parseReadItLater> | undefined;
               try {
                 config = content ? parseReadItLater(content) : DEFAULT_RIL_CONFIG;
                 if (!config || !config.items) config = DEFAULT_RIL_CONFIG;
@@ -330,7 +335,6 @@ export const Dashboard = () => {
               logger.error('Failed to add to ReadItLater:', error);
             }
           }}
-
           // Handlers
           onCreateFile={useCallback(async (path: string, content: string) => {
             try {
@@ -342,21 +346,17 @@ export const Dashboard = () => {
               logger.error('Failed to create file:', e);
             }
           }, [])}
-
           onDeleteFile={useCallback(async (path: string) => {
             if (confirm(`Are you sure you want to delete ${path}?`)) {
               await githubFileStore.deleteFile(path);
             }
           }, [])}
-
           onRenameFile={useCallback(async (path: string, newPath: string) => {
             await githubFileStore.renameFile(path, newPath);
           }, [])}
-
           onMoveFile={useCallback(async (path: string, newPath: string) => {
             await githubFileStore.renameFile(path, newPath);
           }, [])}
-
           // Data Props
           existingFiles={tree ? tree.map((t) => t.path) : []}
           onLoadFolder={async (path: string) => {

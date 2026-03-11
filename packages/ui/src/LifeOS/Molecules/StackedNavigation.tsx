@@ -1,8 +1,6 @@
-import { h } from 'preact';
-import { TileDef, FileSystemState } from '../Layouts/MainApp';
-import { MillerColumn } from './MillerColumn';
 import { ArrowLeft } from 'lucide-preact';
-import { cn } from '../../utils';
+import type { FileSystemState, TileDef } from '../Layouts/MainApp';
+import { MillerColumn } from './MillerColumn';
 
 export interface StackedNavigationProps {
   fileSystem: FileSystemState;
@@ -21,7 +19,7 @@ export const StackedNavigation = ({
   renderTileContent,
   onDeleteFile,
   onRenameFile,
-  onRequestMove
+  onRequestMove,
 }: StackedNavigationProps) => {
   // Determine the active column to display (the last one)
   const activeColumnIndex = fileSystem.columns.length - 1;
@@ -37,7 +35,7 @@ export const StackedNavigation = ({
       // If we are at index 1, parent is index -1 (invalid), so we go to Root.
       // activeColumnIndex - 2 is only valid if activeColumnIndex >= 2.
 
-      const newPath: string[] = [];
+      const _newPath: string[] = [];
 
       // If activeColumnIndex == 1 (we are in a subfolder), we want to go to Root.
       if (activeColumnIndex === 1) {
@@ -45,7 +43,7 @@ export const StackedNavigation = ({
         return;
       }
 
-      if (parentCol && parentCol.activeId) {
+      if (parentCol?.activeId) {
         const parts = parentCol.activeId.toString().split('/');
         onNavigate(parts);
       }
@@ -58,6 +56,7 @@ export const StackedNavigation = ({
       <div className="flex items-center gap-3 p-4 border-b border-[var(--los-border)] bg-[var(--los-bg)]">
         {activeColumnIndex > 0 && (
           <button
+            type="button"
             onClick={handleBack}
             className="p-2 -ml-2 rounded-full hover:bg-white/10 active:bg-white/20 transition-colors"
           >
@@ -66,7 +65,11 @@ export const StackedNavigation = ({
         )}
         <div className="flex flex-col">
           <span className="text-xs text-[var(--los-muted)] uppercase tracking-wider">
-            {activeColumnIndex === 0 ? 'Home' : (fileSystem.columns[activeColumnIndex - 1]?.items.find(i => i.id === fileSystem.columns[activeColumnIndex - 1]?.activeId)?.title || 'Folder')}
+            {activeColumnIndex === 0
+              ? 'Home'
+              : fileSystem.columns[activeColumnIndex - 1]?.items.find(
+                  (i) => i.id === fileSystem.columns[activeColumnIndex - 1]?.activeId,
+                )?.title || 'Folder'}
           </span>
         </div>
       </div>
@@ -74,14 +77,14 @@ export const StackedNavigation = ({
       {/* Content Area - Reusing MillerColumn logic for the list/grid */}
       <div className="flex-1 overflow-hidden relative">
         <MillerColumn
-          items={activeColumn.items.map(t => ({
+          items={activeColumn.items.map((t) => ({
             ...t,
-            content: renderTileContent(t, 'SMALL')
+            content: renderTileContent(t, 'SMALL'),
           }))}
           activeId={activeColumn.activeId}
           variant="GRID" // Force grid on mobile? or List?
-          // Proposal said "Stack" but layout can be Grid or List. 
-          // Mobile users often prefer Lists for files, Grids for photos. 
+          // Proposal said "Stack" but layout can be Grid or List.
+          // Mobile users often prefer Lists for files, Grids for photos.
           // Let's stick to Grid for consistency with "Tiles", but maybe List is better for small screens?
           // MillerColumn handles "GRID" nicely with responsive cols-2.
           onItemClick={(item) => {

@@ -1,26 +1,23 @@
-import { h } from 'preact';
-import { useState, useMemo, useEffect } from 'preact/hooks';
-import { cn } from '../../utils';
-import { MonoHeader, MonoText, MonoLabel } from '../Atoms/Typography';
+import { encrypt, Logger, passwordStore } from '@lifosy/core';
 import {
-  FileText,
-  Rss,
-  ListTodo,
-  Calendar,
   Activity,
-  Globe,
-  Bookmark,
-  Folder,
-  ChevronRight,
-  ArrowRight,
-  X,
   AlertTriangle,
+  ArrowRight,
+  Bookmark,
+  Calendar,
   Database,
-  Lock
+  FileText,
+  Globe,
+  ListTodo,
+  Lock,
+  Rss,
+  X,
 } from 'lucide-preact';
-import { TileDef } from '../Layouts/MainApp';
-import { FolderSelector, FolderItem } from './FolderSelector';
-import { encrypt, passwordStore, Logger } from '@lifosy/core';
+import { useEffect, useMemo, useState } from 'preact/hooks';
+import { cn } from '../../utils';
+import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
+import type { TileDef } from '../Layouts/MainApp';
+import { type FolderItem, FolderSelector } from './FolderSelector';
 
 const logger = new Logger('NewFileWizard');
 
@@ -40,7 +37,7 @@ const TEMPLATES: Template[] = [
     description: 'Track custom metrics and data',
     icon: Database,
     extension: '.data-collection.csv',
-    defaultContent: 'name::created,type::auto:date;name::Value,type::number,unit::#\n'
+    defaultContent: 'name::created,type::auto:date;name::Value,type::number,unit::#\n',
   },
   {
     id: 'rss',
@@ -48,7 +45,7 @@ const TEMPLATES: Template[] = [
     description: 'Follow your favorite news feeds',
     icon: Rss,
     extension: '.rss.json',
-    defaultContent: JSON.stringify({ feeds: [], readItems: [] }, null, 2)
+    defaultContent: JSON.stringify({ feeds: [], readItems: [] }, null, 2),
   },
   {
     id: 'todo',
@@ -56,7 +53,7 @@ const TEMPLATES: Template[] = [
     description: 'Track tasks and progress',
     icon: ListTodo,
     extension: '.todos.md',
-    defaultContent: '# Tasks\n\n- [ ] New Task'
+    defaultContent: '# Tasks\n\n- [ ] New Task',
   },
   {
     id: 'events',
@@ -64,7 +61,7 @@ const TEMPLATES: Template[] = [
     description: 'Upcoming events and schedule',
     icon: Calendar,
     extension: '.events.csv',
-    defaultContent: 'id,title,date,type,description\n'
+    defaultContent: 'id,title,date,type,description\n',
   },
   {
     id: 'habit',
@@ -72,7 +69,7 @@ const TEMPLATES: Template[] = [
     description: 'Track daily habits and streaks',
     icon: Activity,
     extension: '.habit.csv',
-    defaultContent: 'id,title,frequency,target,history\n'
+    defaultContent: 'id,title,frequency,target,history\n',
   },
   {
     id: 'timezone',
@@ -80,7 +77,7 @@ const TEMPLATES: Template[] = [
     description: 'Track time across the world',
     icon: Globe,
     extension: '.timezones.json',
-    defaultContent: '[]'
+    defaultContent: '[]',
   },
   {
     id: 'readitlater',
@@ -88,7 +85,7 @@ const TEMPLATES: Template[] = [
     description: 'Save articles for later',
     icon: Bookmark,
     extension: '.readitlater.json',
-    defaultContent: JSON.stringify({ items: [] }, null, 2)
+    defaultContent: JSON.stringify({ items: [] }, null, 2),
   },
   {
     id: 'note',
@@ -96,8 +93,8 @@ const TEMPLATES: Template[] = [
     description: 'Markdown note',
     icon: FileText,
     extension: '.md',
-    defaultContent: ''
-  }
+    defaultContent: '',
+  },
 ];
 
 export interface NewFileWizardProps {
@@ -119,19 +116,19 @@ export const NewFileWizard = ({
   onClose,
   onCreate,
   fileSystem,
-  availableFolders = [],
+  availableFolders: _availableFolders = [],
   existingFiles = [],
   onLoadFolder,
   initialStep = 'TEMPLATE',
   initialContent,
   initialFilename = '',
-  initialFolder = ''
+  initialFolder = '',
 }: NewFileWizardProps) => {
   const [step, setStep] = useState<'TEMPLATE' | 'LOCATION'>(initialStep);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(() => {
     if (initialContent) {
       // Default to Note template for dumps, or find generic md
-      const noteTemplate = TEMPLATES.find(t => t.id === 'note');
+      const noteTemplate = TEMPLATES.find((t) => t.id === 'note');
       // Ensure we return Template or null, never undefined
       return noteTemplate || TEMPLATES[0] || null;
     }
@@ -153,11 +150,11 @@ export const NewFileWizard = ({
     // If we have a fileSystem prop (from MainApp), use its first column
     if (fileSystem && fileSystem.columns.length > 0 && fileSystem.columns[0]) {
       return fileSystem.columns[0].items
-        .filter(item => item.type === 'FOLDER')
-        .map(item => ({
+        .filter((item) => item.type === 'FOLDER')
+        .map((item) => ({
           id: String(item.id), // full path
           name: item.title,
-          hasChildren: true // Assume true for simplicity or check if we can know
+          hasChildren: true, // Assume true for simplicity or check if we can know
         }));
     }
     // Fallback? Or empty.
@@ -169,11 +166,11 @@ export const NewFileWizard = ({
     if (onLoadFolder) {
       const items = await onLoadFolder(path);
       return items
-        .filter(item => item.type === 'FOLDER')
-        .map(item => ({
+        .filter((item) => item.type === 'FOLDER')
+        .map((item) => ({
           id: String(item.id),
           name: item.title,
-          hasChildren: true
+          hasChildren: true,
         }));
     }
     return [];
@@ -181,7 +178,11 @@ export const NewFileWizard = ({
 
   const fullPath = useMemo(() => {
     if (!selectedTemplate || !filename) return '';
-    const folderPrefix = selectedFolder ? (selectedFolder.endsWith('/') ? selectedFolder : `${selectedFolder}/`) : '';
+    const folderPrefix = selectedFolder
+      ? selectedFolder.endsWith('/')
+        ? selectedFolder
+        : `${selectedFolder}/`
+      : '';
     const ext = `${selectedTemplate.extension}${encryptFile ? '.enc' : ''}`;
     return `${folderPrefix}${filename.trim()}${ext}`;
   }, [selectedFolder, filename, selectedTemplate, encryptFile]);
@@ -204,9 +205,7 @@ export const NewFileWizard = ({
     } else {
       setError(null);
     }
-
-  }, [fullPath, existingFiles]);
-
+  }, [fullPath, existingFiles, filename]);
 
   const handleCreate = async () => {
     if (!selectedTemplate || !filename || error) return;
@@ -214,7 +213,7 @@ export const NewFileWizard = ({
       setError('Password is required for encrypted files.');
       return;
     }
-    
+
     // Disable UI safely
     setError(null);
     try {
@@ -233,13 +232,11 @@ export const NewFileWizard = ({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop dismiss pattern */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss pattern */}
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative bg-[var(--los-bg)] border border-[var(--los-border)] w-full max-w-3xl h-[80vh] md:h-[650px] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-
         {/* Header */}
         <div className="h-14 border-b border-[var(--los-border)] flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-2">
@@ -250,6 +247,7 @@ export const NewFileWizard = ({
             </MonoText>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="hover:text-[var(--los-accent)] transition-colors"
           >
@@ -261,8 +259,9 @@ export const NewFileWizard = ({
         <div className="flex-1 overflow-y-auto p-6">
           {step === 'TEMPLATE' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {TEMPLATES.map(t => (
+              {TEMPLATES.map((t) => (
                 <button
+                  type="button"
                   key={t.id}
                   onClick={() => {
                     setSelectedTemplate(t);
@@ -292,10 +291,15 @@ export const NewFileWizard = ({
                   return Icon ? <Icon size={32} className="text-[var(--los-accent)]" /> : null;
                 })()}
                 <div>
-                  <MonoLabel className="text-[var(--los-accent)]">{selectedTemplate!.name}</MonoLabel>
-                  <MonoText className="text-xs text-[var(--los-muted)]">{selectedTemplate!.description}</MonoText>
+                  <MonoLabel className="text-[var(--los-accent)]">
+                    {selectedTemplate?.name}
+                  </MonoLabel>
+                  <MonoText className="text-xs text-[var(--los-muted)]">
+                    {selectedTemplate?.description}
+                  </MonoText>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setStep('TEMPLATE')}
                   className="ml-auto text-xs text-[var(--los-muted)] hover:text-[var(--los-fg)] underline"
                 >
@@ -312,14 +316,16 @@ export const NewFileWizard = ({
                       value={filename}
                       onInput={(e) => setFilename(e.currentTarget.value)}
                       placeholder="my-new-file"
-                      autoFocus
                       className={cn(
-                        "flex-1 bg-transparent border-b py-2 text-xl font-mono text-[var(--los-fg)] focus:outline-none placeholder:text-[var(--los-muted)]/20",
-                        error ? "border-red-500" : "border-[var(--los-border)] focus:border-[var(--los-accent)]"
+                        'flex-1 bg-transparent border-b py-2 text-xl font-mono text-[var(--los-fg)] focus:outline-none placeholder:text-[var(--los-muted)]/20',
+                        error
+                          ? 'border-red-500'
+                          : 'border-[var(--los-border)] focus:border-[var(--los-accent)]',
                       )}
                     />
                     <span className="text-[var(--los-muted)] font-mono ml-2 whitespace-nowrap">
-                      {selectedTemplate!.extension}{encryptFile ? <span className="text-[var(--los-accent)]">.enc</span> : ''}
+                      {selectedTemplate?.extension}
+                      {encryptFile ? <span className="text-[var(--los-accent)]">.enc</span> : ''}
                     </span>
                   </div>
                   {error && (
@@ -335,13 +341,15 @@ export const NewFileWizard = ({
                     <MonoLabel>LOCATION</MonoLabel>
                     <div className="flex items-center gap-2">
                       <button
+                        type="button"
                         onClick={() => setSelectedFolder('')}
                         className="text-[10px] text-[var(--los-muted)] hover:text-[var(--los-accent)] uppercase border border-[var(--los-border)] px-1.5 py-0.5 rounded hover:bg-white/5 transition-colors"
                       >
                         Select Root
                       </button>
                       <MonoText className="text-xs text-[var(--los-muted)]">
-                        Selected: <span className="text-[var(--los-fg)]">{selectedFolder || '/ (root)'}</span>
+                        Selected:{' '}
+                        <span className="text-[var(--los-fg)]">{selectedFolder || '/ (root)'}</span>
                       </MonoText>
                     </div>
                   </div>
@@ -354,7 +362,8 @@ export const NewFileWizard = ({
                     className="w-full"
                   />
                   <p className="text-[10px] text-[var(--los-muted)]">
-                    Navigate through folders to select a destination. Initial view shows root folders.
+                    Navigate through folders to select a destination. Initial view shows root
+                    folders.
                   </p>
                 </div>
 
@@ -367,8 +376,21 @@ export const NewFileWizard = ({
                       onChange={(e) => setEncryptFile(e.currentTarget.checked)}
                       className="accent-[var(--los-accent)] cursor-pointer"
                     />
-                    <Lock size={14} className={encryptFile ? "text-[var(--los-accent)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-accent)] transition-colors"} />
-                    <MonoLabel className={encryptFile ? "text-[var(--los-fg)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)] transition-colors"}>
+                    <Lock
+                      size={14}
+                      className={
+                        encryptFile
+                          ? 'text-[var(--los-accent)]'
+                          : 'text-[var(--los-muted)] group-hover:text-[var(--los-accent)] transition-colors'
+                      }
+                    />
+                    <MonoLabel
+                      className={
+                        encryptFile
+                          ? 'text-[var(--los-fg)]'
+                          : 'text-[var(--los-muted)] group-hover:text-[var(--los-fg)] transition-colors'
+                      }
+                    >
                       Encrypt Content
                     </MonoLabel>
                   </label>
@@ -385,7 +407,7 @@ export const NewFileWizard = ({
                           className="w-full bg-transparent border-b py-2 text-xl font-mono text-[var(--los-fg)] border-[var(--los-border)] focus:border-[var(--los-accent)] focus:outline-none placeholder:text-[var(--los-muted)]/20"
                         />
                       </div>
-                      
+
                       <label className="flex items-center gap-2 cursor-pointer group w-max mt-2">
                         <input
                           type="checkbox"
@@ -398,8 +420,9 @@ export const NewFileWizard = ({
                         </span>
                       </label>
                       <p className="text-[10px] text-[var(--los-muted)] leading-relaxed max-w-lg">
-                        Encryption is performed using standard AES-GCM via the Web Crypto API. If you lose your password, the data cannot be recovered. 
-                        Unless "Remember in Browser" is checked, the password will only be preserved for this session.
+                        Encryption is performed using standard AES-GCM via the Web Crypto API. If
+                        you lose your password, the data cannot be recovered. Unless "Remember in
+                        Browser" is checked, the password will only be preserved for this session.
                       </p>
                     </div>
                   )}
@@ -407,6 +430,7 @@ export const NewFileWizard = ({
               </div>
 
               <button
+                type="button"
                 onClick={handleCreate}
                 disabled={!filename || !!error || (encryptFile && !password)}
                 className="mt-4 bg-[var(--los-accent)] text-black font-bold py-3 px-6 flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity self-end w-full sm:w-auto"
@@ -417,7 +441,6 @@ export const NewFileWizard = ({
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

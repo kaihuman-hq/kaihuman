@@ -1,4 +1,4 @@
-import { h } from 'preact';
+import type { h } from 'preact';
 import { cn } from '../utils';
 
 export interface PanelProps extends h.JSX.HTMLAttributes<HTMLDivElement> {

@@ -1,4 +1,3 @@
-
 export interface ActionLogEntry {
   timestamp: string; // ISO String
   description: string;
@@ -16,9 +15,9 @@ export interface ActionLogFile {
  * ---
  * ...frontmatter...
  * ---
- * 
+ *
  * # Header
- * 
+ *
  * - YYYY-MM-DD HH:mm:ss Description #tag1 #tag2
  */
 export const parseActionLog = (content: string): ActionLogFile => {
@@ -37,7 +36,7 @@ export const parseActionLog = (content: string): ActionLogFile => {
     // Frontmatter handling
     if (line === '---') {
       fmCount++;
-      inFrontmatter = (fmCount === 1);
+      inFrontmatter = fmCount === 1;
       continue;
     }
 
@@ -58,11 +57,11 @@ export const parseActionLog = (content: string): ActionLogFile => {
     const listMatch = line.match(/^\s*([-*])\s+(.+)/);
 
     if (listMatch) {
-      const entryText = (listMatch[2] || "").trim();
+      const entryText = (listMatch[2] || '').trim();
       // Regex to find timestamp at start: YYYY-MM-DD HH:mm:ss
       // and tags at the end or anywhere #tag
 
-      // Simple parsing: split by first space? 
+      // Simple parsing: split by first space?
       // Timestamp format is "YYYY-MM-DD HH:mm:ss" which has spaces.
       // Expected: 2025-03-19 19:20:03 Flexible...
 
@@ -70,17 +69,18 @@ export const parseActionLog = (content: string): ActionLogFile => {
       const match = entryText.match(timestampRegex);
 
       if (match) {
-        const timestampStr = match[1] || "";
-        let rest = match[2] || "";
+        const timestampStr = match[1] || '';
+        const rest = match[2] || '';
 
         // Extract tags
         const tags: string[] = [];
         const tagRegex = /#([\w-]+)/g;
-        let tagMatch;
-        while ((tagMatch = tagRegex.exec(rest)) !== null) {
-          if (tagMatch && tagMatch[1]) {
+        let tagMatch = tagRegex.exec(rest);
+        while (tagMatch !== null) {
+          if (tagMatch[1]) {
             tags.push(tagMatch[1]);
           }
+          tagMatch = tagRegex.exec(rest);
         }
 
         // Description clean up (remove tags?)
@@ -88,14 +88,14 @@ export const parseActionLog = (content: string): ActionLogFile => {
         // Let's keep them in text for display but also parse them out.
         // Or remove them from description? "Flexible... "
         // Let's standard markdown behavior: Tags might be part of the text.
-        // But for clean UI, maybe we want separated tags. 
+        // But for clean UI, maybe we want separated tags.
         // Let's strip tags from description for the UI if they are at the end.
         // For simplicity: Description is everything after timestamp. Tags are extracted.
 
         entries.push({
           timestamp: timestampStr,
           description: rest,
-          tags: tags
+          tags: tags,
         });
       }
     }
@@ -122,14 +122,18 @@ export const serializeActionLog = (data: ActionLogFile): string => {
   lines.push('');
 
   // Entries
-  data.entries.forEach(e => {
+  data.entries.forEach((e) => {
     lines.push(`- ${e.timestamp} ${e.description}`);
   });
 
   return lines.join('\n');
 };
 
-export const appendAction = (data: ActionLogFile, description: string, tags: string[]): ActionLogFile => {
+export const appendAction = (
+  data: ActionLogFile,
+  description: string,
+  tags: string[],
+): ActionLogFile => {
   const now = new Date();
   // Format: YYYY-MM-DD HH:mm:ss
   const pad = (n: number) => n.toString().padStart(2, '0');
@@ -138,36 +142,37 @@ export const appendAction = (data: ActionLogFile, description: string, tags: str
   // Parse inline tags from description and merge with provided tags
   const inlineTags: string[] = [];
   const tagRegex = /#([\w-]+)/g;
-  let match;
-  while ((match = tagRegex.exec(description)) !== null) {
+  let match = tagRegex.exec(description);
+  while (match !== null) {
     if (match[1]) inlineTags.push(match[1]);
+    match = tagRegex.exec(description);
   }
 
   // Combine and deduplicate tags
   const allTags = Array.from(new Set([...tags, ...inlineTags]));
 
   // Construct full description - if tags were provided explicitly, append them if not already inline
-  // Logic: 
+  // Logic:
   // 1. If tag was inline, it's already in description.
   // 2. If tag was in 'tags' array (input field), append it to description?
   // The requirement says: "just add tags into the description by using the '#' character"
-  // It also implies we might still use the separate input. 
+  // It also implies we might still use the separate input.
   // Standard behavior: Append non-inline tags to the end of description string for storage consistency?
   // Or just rely on 'tags' array for metadata and keep description as is?
   // Existing logic appended tags to description. Let's keep that for non-inline tags.
 
-  const tagsToAppend = tags.filter(t => !description.includes(`#${t}`));
-  const tagsStr = tagsToAppend.map(t => `#${t}`).join(' ');
+  const tagsToAppend = tags.filter((t) => !description.includes(`#${t}`));
+  const tagsStr = tagsToAppend.map((t) => `#${t}`).join(' ');
   const fullDescription = tagsStr ? `${description} ${tagsStr}` : description;
 
   const newEntry: ActionLogEntry = {
     timestamp,
     description: fullDescription,
-    tags: allTags
+    tags: allTags,
   };
 
   return {
     ...data,
-    entries: [...data.entries, newEntry]
+    entries: [...data.entries, newEntry],
   };
 };

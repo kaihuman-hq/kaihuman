@@ -1,11 +1,16 @@
-
-import { h } from 'preact';
 import { useMemo } from 'preact/hooks';
-import { parseBudget, serializeBudget, getCategoryStats, getAccountStats, BudgetTransaction, CATEGORIES } from './BudgetLogic';
-import { BudgetAddForm } from './BudgetAddForm';
-import { MonoLabel, MonoText, MonoHeader } from '../../Atoms/Typography';
-import { CompactWidgetLayout, CompactHero, CompactList } from './CompactWidgetLayout';
 import { cn } from '../../../utils';
+import { MonoHeader, MonoLabel, MonoText } from '../../Atoms/Typography';
+import { BudgetAddForm } from './BudgetAddForm';
+import {
+  type BudgetTransaction,
+  CATEGORIES,
+  getAccountStats,
+  getCategoryStats,
+  parseBudget,
+  serializeBudget,
+} from './BudgetLogic';
+import { CompactHero, CompactWidgetLayout } from './CompactWidgetLayout';
 
 export interface BudgetWidgetProps {
   content: string;
@@ -19,8 +24,8 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
   const categoryStats = useMemo(() => getCategoryStats(transactions), [transactions]);
   const accountStats = useMemo(() => getAccountStats(transactions), [transactions]);
 
-  const maxCategoryValue = Math.max(...categoryStats.map(s => s.value), 1);
-  const maxAccountValue = Math.max(...accountStats.map(s => Math.abs(s.value)), 1);
+  const maxCategoryValue = Math.max(...categoryStats.map((s) => s.value), 1);
+  const maxAccountValue = Math.max(...accountStats.map((s) => Math.abs(s.value)), 1);
 
   const handleAdd = (newTransaction: BudgetTransaction) => {
     const newTransactions = [...transactions, newTransaction];
@@ -28,10 +33,9 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
     onChange?.(newContent);
   };
 
-
   const totalBalance = useMemo(() => {
     return transactions.reduce((acc, t) => {
-      const category = CATEGORIES.find(c => c.id === t.category);
+      const category = CATEGORIES.find((c) => c.id === t.category);
       const isExpense = category?.type === 'out';
       // If it's an expense, subtract the value
       return acc + (isExpense ? -t.value : t.value);
@@ -39,14 +43,19 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
   }, [transactions]);
 
   const renderCategoryChart = () => (
-    <div className={cn("flex flex-col gap-2 w-full p-4 custom-scrollbar", mode === 'SMALL' || mode === 'MOBILE_EXPANDED' ? "h-full overflow-y-auto" : "min-h-full")}>
+    <div
+      className={cn(
+        'flex flex-col gap-2 w-full p-4 custom-scrollbar',
+        mode === 'SMALL' || mode === 'MOBILE_EXPANDED' ? 'h-full overflow-y-auto' : 'min-h-full',
+      )}
+    >
       <div className="flex justify-between items-center mb-4 border-b border-[var(--los-border)] pb-2">
         <MonoLabel>Total Balance</MonoLabel>
-        <MonoText className={totalBalance >= 0 ? "text-green-500" : "text-red-500"}>
+        <MonoText className={totalBalance >= 0 ? 'text-green-500' : 'text-red-500'}>
           {totalBalance.toFixed(2)}
         </MonoText>
       </div>
-      {categoryStats.map(stat => (
+      {categoryStats.map((stat) => (
         <div key={stat.id} className="flex flex-col gap-1 w-full">
           <div className="flex justify-between items-end">
             <MonoLabel className="text-[10px] truncate max-w-[70%]">{stat.label}</MonoLabel>
@@ -57,7 +66,7 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
               className="h-full rounded-full transition-all duration-500"
               style={{
                 width: `${Math.max(0, (stat.value / maxCategoryValue) * 100)}%`,
-                backgroundColor: stat.color || 'var(--los-accent)'
+                backgroundColor: stat.color || 'var(--los-accent)',
               }}
             />
           </div>
@@ -72,8 +81,13 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
   );
 
   const renderAccountChart = () => (
-    <div className={cn("flex flex-col gap-2 w-full p-4 custom-scrollbar", mode === 'SMALL' || mode === 'MOBILE_EXPANDED' ? "h-full overflow-y-auto" : "min-h-full")}>
-      {accountStats.map(stat => (
+    <div
+      className={cn(
+        'flex flex-col gap-2 w-full p-4 custom-scrollbar',
+        mode === 'SMALL' || mode === 'MOBILE_EXPANDED' ? 'h-full overflow-y-auto' : 'min-h-full',
+      )}
+    >
+      {accountStats.map((stat) => (
         <div key={stat.id} className="flex flex-col gap-1 w-full">
           <div className="flex justify-between items-end">
             <MonoLabel className="text-[10px] truncate max-w-[70%]">{stat.label}</MonoLabel>
@@ -89,7 +103,7 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
                  Current Request: "render it the same way as bars, but with a red bar instead of white... Use the positive value for the width" 
              */}
             <div
-              className={`h-full rounded-full transition-all duration-500 ${stat.value < 0 ? "bg-red-500" : "bg-[var(--los-fg)]"}`}
+              className={`h-full rounded-full transition-all duration-500 ${stat.value < 0 ? 'bg-red-500' : 'bg-[var(--los-fg)]'}`}
               style={{ width: `${Math.max(0, (Math.abs(stat.value) / maxAccountValue) * 100)}%` }}
             />
           </div>
@@ -102,7 +116,6 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
       )}
     </div>
   );
-
 
   if (mode === 'ADD') {
     return (
@@ -117,36 +130,49 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
   }
 
   if (mode === 'MOBILE_COLLAPSED') {
-    const income = transactions.reduce((acc, t) => t.value > 0 ? acc + t.value : acc, 0);
-    const outcome = transactions.reduce((acc, t) => t.value < 0 ? acc + Math.abs(t.value) : acc, 0);
+    const income = transactions.reduce((acc, t) => (t.value > 0 ? acc + t.value : acc), 0);
+    const outcome = transactions.reduce(
+      (acc, t) => (t.value < 0 ? acc + Math.abs(t.value) : acc),
+      0,
+    );
     const balance = totalBalance;
-    const maxVal = Math.max(income, outcome, Math.abs(balance), 1);
+    const _maxVal = Math.max(income, outcome, Math.abs(balance), 1);
 
     return (
-
       <div className="flex flex-col items-center justify-center h-full w-full p-2 gap-1 text-center">
-        <MonoHeader className={cn("text-2xl font-bold leading-none", balance >= 0 ? "text-[var(--los-fg)]" : "text-red-500")}>
+        <MonoHeader
+          className={cn(
+            'text-2xl font-bold leading-none',
+            balance >= 0 ? 'text-[var(--los-fg)]' : 'text-red-500',
+          )}
+        >
           {balance.toFixed(0)}
         </MonoHeader>
-        <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-wider">BALANCE</MonoText>
+        <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-wider">
+          BALANCE
+        </MonoText>
       </div>
     );
   }
 
   if (mode === 'MOBILE_EXPANDED') {
     // Estimate "Monthly Budget" as (Total Balance + Total Expenses) for visualization
-    // or just normalize against max value. 
+    // or just normalize against max value.
     // Let's just show Total Balance as Hero.
     const topCategories = categoryStats.sort((a, b) => b.value - a.value).slice(0, 3);
 
     return (
       <CompactWidgetLayout>
         <CompactHero className="flex-1 justify-center">
-          <MonoLabel className="text-xs text-[var(--los-muted)] uppercase mb-2">Total Balance</MonoLabel>
-          <MonoHeader className={cn(
-            "text-5xl font-bold mb-4",
-            totalBalance >= 0 ? "text-green-500" : "text-red-500"
-          )}>
+          <MonoLabel className="text-xs text-[var(--los-muted)] uppercase mb-2">
+            Total Balance
+          </MonoLabel>
+          <MonoHeader
+            className={cn(
+              'text-5xl font-bold mb-4',
+              totalBalance >= 0 ? 'text-green-500' : 'text-red-500',
+            )}
+          >
             {totalBalance.toFixed(2)}
           </MonoHeader>
 
@@ -165,7 +191,7 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
             <span>Amount</span>
           </div>
           <div className="flex flex-col gap-2">
-            {topCategories.map(cat => (
+            {topCategories.map((cat) => (
               <div key={cat.id} className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} />
@@ -177,7 +203,7 @@ export const BudgetWidget = ({ content, mode, onChange }: BudgetWidgetProps) => 
           </div>
         </div>
       </CompactWidgetLayout>
-    )
+    );
   }
 
   // Default / SMALL / FOCUS (Widget tab)

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'preact/hooks';
 import { authStore, githubProfileStore } from '@lifosy/core';
+import { useEffect, useState } from 'preact/hooks';
 
 export function ExtensionAuthBridge() {
   // Accessing signal .value inside the component body tells Preact to re-render
@@ -32,7 +32,9 @@ export function ExtensionAuthBridge() {
     }
 
     // Also dispatch an event in case the extension is listening
-    window.dispatchEvent(new CustomEvent('lifosy-auth-update', { detail: { token, repo, repos: reposList } }));
+    window.dispatchEvent(
+      new CustomEvent('lifosy-auth-update', { detail: { token, repo, repos: reposList } }),
+    );
 
     return () => {
       document.body.removeAttribute('data-lifosy-auth');

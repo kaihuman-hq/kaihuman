@@ -1,6 +1,4 @@
-import { h } from 'preact';
-import { cn } from '../../utils';
-import { MonoHeader, MonoText } from '../Atoms/Typography';
+import { MonoText } from '../Atoms/Typography';
 
 export const Editor = () => {
   return (

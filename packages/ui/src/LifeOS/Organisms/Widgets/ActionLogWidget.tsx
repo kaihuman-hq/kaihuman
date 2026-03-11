@@ -1,11 +1,9 @@
-import { h } from 'preact';
 import { useMemo } from 'preact/hooks';
-
-import { parseActionLog, serializeActionLog, appendAction } from './ActionLogLogic';
-import { MonoText, MonoHeader } from '../../Atoms/Typography';
-import { ActionLogAddForm } from './ActionLogAddForm';
 import { cn } from '../../../utils';
-import { CompactWidgetLayout, CompactList } from './CompactWidgetLayout';
+import { MonoHeader, MonoText } from '../../Atoms/Typography';
+import { ActionLogAddForm } from './ActionLogAddForm';
+import { appendAction, parseActionLog, serializeActionLog } from './ActionLogLogic';
+import { CompactWidgetLayout } from './CompactWidgetLayout';
 
 export interface ActionLogWidgetProps {
   content: string;
@@ -39,7 +37,7 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
     let lastWeek = 0;
     let lastMonth = 0;
 
-    data.entries.forEach(e => {
+    data.entries.forEach((e) => {
       const d = new Date(e.timestamp);
       if (d >= oneWeekAgo) lastWeek++;
       if (d >= oneMonthAgo) lastMonth++;
@@ -64,7 +62,7 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
   if (mode === 'MOBILE_COLLAPSED') {
     // Count items from today
     const todayStr = new Date().toISOString().split('T')[0] || '';
-    const todayCount = data.entries.filter(e => e.timestamp && e.timestamp.startsWith(todayStr)).length;
+    const todayCount = data.entries.filter((e) => e.timestamp?.startsWith(todayStr)).length;
 
     return (
       <div className="flex flex-col items-center justify-center h-full w-full p-4 text-center">
@@ -96,27 +94,35 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[var(--los-bg)] pointer-events-none z-10 opactiy-50" />
           <div className="flex flex-col gap-3 opacity-60">
             <MonoHeader className="text-[10px] text-[var(--los-muted)]">RECENT</MonoHeader>
-            {recentLogs.map((entry, idx) => (
-              <div key={idx} className="flex gap-2 text-sm border-l-2 border-[var(--los-border)] pl-3">
-                <span className="text-[var(--los-muted)] text-xs whitespace-nowrap">{entry.timestamp.split(' ')[1]?.slice(0, 5)}</span>
+            {recentLogs.map((entry) => (
+              <div
+                key={entry.timestamp}
+                className="flex gap-2 text-sm border-l-2 border-[var(--los-border)] pl-3"
+              >
+                <span className="text-[var(--los-muted)] text-xs whitespace-nowrap">
+                  {entry.timestamp.split(' ')[1]?.slice(0, 5)}
+                </span>
                 <span className="truncate">{entry.description}</span>
               </div>
             ))}
           </div>
         </div>
       </CompactWidgetLayout>
-    )
+    );
   }
 
   return (
-    <div className={cn("w-full flex flex-col p-4 relative", mode === 'SMALL' ? "h-full" : "min-h-full")}>
+    <div
+      className={cn(
+        'w-full flex flex-col p-4 relative',
+        mode === 'SMALL' ? 'h-full' : 'min-h-full',
+      )}
+    >
       {/* Header */}
       {mode === 'SMALL' && (
         <div className="flex justify-between items-end mb-2 shrink-0">
           <MonoHeader className="text-sm">ACTION LOG</MonoHeader>
-          <MonoText className="text-[10px] text-[var(--los-muted)]">
-            {totalCount} ITEMS
-          </MonoText>
+          <MonoText className="text-[10px] text-[var(--los-muted)]">{totalCount} ITEMS</MonoText>
         </div>
       )}
 
@@ -142,10 +148,18 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
       )}
 
       {/* List */}
-      <div className={cn("flex-1 min-h-0 custom-scrollbar", mode === 'SMALL' ? "overflow-y-auto" : "overflow-visible")}>
+      <div
+        className={cn(
+          'flex-1 min-h-0 custom-scrollbar',
+          mode === 'SMALL' ? 'overflow-y-auto' : 'overflow-visible',
+        )}
+      >
         <div className="flex flex-col gap-3">
-          {displayEntries.map((entry, idx) => (
-            <div key={idx} className="flex flex-col gap-1 border-b border-[var(--los-border)] pb-2 last:border-0 last:pb-0">
+          {displayEntries.map((entry) => (
+            <div
+              key={entry.timestamp}
+              className="flex flex-col gap-1 border-b border-[var(--los-border)] pb-2 last:border-0 last:pb-0"
+            >
               <div className="flex justify-between items-start gap-2">
                 {/* Full Timestamp Display Requested */}
                 <MonoText className="text-[10px] text-[var(--los-accent)] shrink-0 whitespace-nowrap opacity-70">
@@ -158,7 +172,9 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
             </div>
           ))}
           {displayEntries.length === 0 && (
-            <div className="text-[var(--los-muted)] text-[10px] text-center mt-4">No actions logged yet.</div>
+            <div className="text-[var(--los-muted)] text-[10px] text-center mt-4">
+              No actions logged yet.
+            </div>
           )}
         </div>
       </div>
@@ -170,8 +186,12 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
             Total: <span className="text-[var(--los-fg)]">{totalCount}</span>
           </MonoText>
           <div className="flex gap-4">
-            <MonoText className="text-[10px] text-[var(--los-muted)]">Week: {stats.lastWeek}</MonoText>
-            <MonoText className="text-[10px] text-[var(--los-muted)]">Month: {stats.lastMonth}</MonoText>
+            <MonoText className="text-[10px] text-[var(--los-muted)]">
+              Week: {stats.lastWeek}
+            </MonoText>
+            <MonoText className="text-[10px] text-[var(--los-muted)]">
+              Month: {stats.lastMonth}
+            </MonoText>
           </div>
         </div>
       )}

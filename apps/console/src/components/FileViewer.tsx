@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'preact/hooks';
 const logger = new Logger('FileViewer');
 
 import { githubFileStore } from '@lifosy/core';
-import { EncryptedTileWrapper, TileDef } from '@lifosy/ui';
+import { EncryptedTileWrapper, type TileDef } from '@lifosy/ui';
 import { CodeMirrorEditor } from './editor/CodeMirrorEditor';
 
 interface FileViewerProps {
@@ -19,7 +19,7 @@ export const FileViewer = ({ path, zenMode, contentOverride, onSaveOverride }: F
   // When this component mounts (tile focused), load the file ONLY if no content override is provided
   useEffect(() => {
     if (contentOverride !== undefined) return;
-    
+
     logger.debug(`Mounting for ${path}`);
     if (!path) logger.error('Path is empty!');
     githubFileStore.openFile(path);
@@ -28,17 +28,17 @@ export const FileViewer = ({ path, zenMode, contentOverride, onSaveOverride }: F
   // If MainApp already decrypted the file, it passes the plaintext via contentOverride.
   // We can skip the redundant encryption wrapper entirely.
   if (contentOverride !== undefined) {
-      return (
-        <div className="h-full w-full relative">
-            <CodeMirrorEditor 
-               path={path} 
-               zenMode={zenMode} 
-               initialContent={contentOverride} 
-               onChange={() => {}} // Editor internal state handles tracking dirty
-               onSave={(newContent) => onSaveOverride?.(newContent)}
-             />
-        </div>
-      );
+    return (
+      <div className="h-full w-full relative">
+        <CodeMirrorEditor
+          path={path}
+          zenMode={zenMode}
+          initialContent={contentOverride}
+          onChange={() => {}} // Editor internal state handles tracking dirty
+          onSave={(newContent) => onSaveOverride?.(newContent)}
+        />
+      </div>
+    );
   }
 
   const isEncrypted = path?.endsWith('.enc');
@@ -48,25 +48,29 @@ export const FileViewer = ({ path, zenMode, contentOverride, onSaveOverride }: F
   return (
     <div className="h-full w-full relative">
       {isEncrypted ? (
-        <EncryptedTileWrapper 
-          tile={{ 
-            id: path, 
-            rawContent: githubFileStore.openFiles.value[path]?.content,
-            onContentChange: (newContent: string) => {
-              githubFileStore.updateFileContent(path, newContent);
-              githubFileStore.saveFile(path).catch(e => logger.error('Failed to save encrypted file', e));
-            }
-          } as TileDef} 
+        <EncryptedTileWrapper
+          tile={
+            {
+              id: path,
+              rawContent: githubFileStore.openFiles.value[path]?.content,
+              onContentChange: (newContent: string) => {
+                githubFileStore.updateFileContent(path, newContent);
+                githubFileStore
+                  .saveFile(path)
+                  .catch((e) => logger.error('Failed to save encrypted file', e));
+              },
+            } as TileDef
+          }
           mode={zenMode ? 'FOCUS' : 'FOCUS'}
         >
           {(decryptedContent: string, handleSave: (newContent: string) => void) => (
-             <CodeMirrorEditor 
-               path={path} 
-               zenMode={zenMode} 
-               initialContent={decryptedContent} 
-               onChange={() => {}} // Editor internal state handles tracking dirty
-               onSave={(newContent) => handleSave(newContent)}
-             />
+            <CodeMirrorEditor
+              path={path}
+              zenMode={zenMode}
+              initialContent={decryptedContent}
+              onChange={() => {}} // Editor internal state handles tracking dirty
+              onSave={(newContent) => handleSave(newContent)}
+            />
           )}
         </EncryptedTileWrapper>
       ) : (

@@ -26,6 +26,8 @@ coverage
 out/
 build
 dist
+dev-dist
+storybook-static
 
 # Generated files
 apps/console/src/version.ts

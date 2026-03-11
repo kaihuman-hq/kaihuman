@@ -1,8 +1,8 @@
-import { ComponentChildren, h, cloneElement, toChildArray, VNode } from 'preact';
-import { cn } from '../../utils';
 import { Logger } from '@lifosy/core';
+import { type ComponentChildren, cloneElement, toChildArray, type VNode } from 'preact';
+import { cn } from '../../utils';
 
-const logger = new Logger('MainGrid');
+const _logger = new Logger('MainGrid');
 
 export type GridState = 'DASHBOARD' | 'FOCUS' | 'ZEN';
 
@@ -16,44 +16,49 @@ export interface MainGridProps {
 export const MainGrid = ({
   children,
   viewState = 'DASHBOARD',
-  activeTileId,
-  className
+  activeTileId: _activeTileId,
+  className,
 }: MainGridProps) => {
   const kids = toChildArray(children) as VNode<any>[];
 
   // Identify children by column prop
-  const leftChild = kids.find(k => k.props?.column === 'left');
-  const rightChild = kids.find(k => k.props?.column === 'right');
+  const leftChild = kids.find((k) => k.props?.column === 'left');
+  const rightChild = kids.find((k) => k.props?.column === 'right');
   // Center is either explicitly marked, or it's the remaining one if not left/right
-  const centerChild = kids.find(k => k.props?.column === 'center')
-    || kids.find(k => k.props?.column !== 'left' && k.props?.column !== 'right');
+  const centerChild =
+    kids.find((k) => k.props?.column === 'center') ||
+    kids.find((k) => k.props?.column !== 'left' && k.props?.column !== 'right');
 
   // Debug
   // logger.debug(`Rendering. viewState: ${JSON.stringify(viewState)}`);
   // logger.debug(`Has Left: ${!!leftChild}, Has Right: ${!!rightChild}`);
 
   // Helper to determine grid cols
-  const leftWidth = leftChild ? "minmax(250px,1fr)" : "0px";
-  const rightWidth = rightChild ? "minmax(250px,1fr)" : "0px";
+  const leftWidth = leftChild ? 'minmax(250px,1fr)' : '0px';
+  const rightWidth = rightChild ? 'minmax(250px,1fr)' : '0px';
 
-  const dynamicVars = viewState === 'DASHBOARD' ? {
-    '--col-left': leftWidth,
-    '--col-right': rightWidth
-  } : {};
+  const dynamicVars =
+    viewState === 'DASHBOARD'
+      ? {
+          '--col-left': leftWidth,
+          '--col-right': rightWidth,
+        }
+      : {};
 
   return (
     <div
       className={cn(
-        "life-os-root h-screen w-full max-w-[100vw] overflow-hidden cyber-grid-bg",
-        "grid transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)]",
-        "grid-cols-1", // Mobile default
+        'life-os-root h-screen w-full max-w-[100vw] overflow-hidden cyber-grid-bg',
+        'grid transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)]',
+        'grid-cols-1', // Mobile default
 
         // Desktop (md+)
-        viewState === 'DASHBOARD' && "md:grid-cols-[var(--col-left)_minmax(400px,2fr)_var(--col-right)]",
-        viewState === 'ZEN' && "md:grid-cols-[0px_1fr_0px]",
-        viewState === 'FOCUS' && "md:grid-cols-[0px_1fr_0px] xl:grid-cols-[300px_1fr_300px]",
+        viewState === 'DASHBOARD' &&
+          'md:grid-cols-[var(--col-left)_minmax(400px,2fr)_var(--col-right)]',
+        viewState === 'ZEN' && 'md:grid-cols-[0px_1fr_0px]',
+        viewState === 'FOCUS' && 'md:grid-cols-[0px_1fr_0px] xl:grid-cols-[300px_1fr_300px]',
 
-        className
+        className,
       )}
       // Use CSS vars to allow media query class overrides work
       style={dynamicVars as any}
@@ -74,13 +79,13 @@ export const MainGrid = ({
           isCollapsed,
           className: cn(
             child.props.className,
-            "h-full min-w-0", // min-w-0 prevents grid blowout, w-full removed to allow margins
-            isHidden && "hidden",
+            'h-full min-w-0', // min-w-0 prevents grid blowout, w-full removed to allow margins
+            isHidden && 'hidden',
             // Explicit grid placement
-            column === 'left' && "md:col-start-1",
-            column === 'center' && "md:col-start-2",
-            column === 'right' && "md:col-start-3"
-          )
+            column === 'left' && 'md:col-start-1',
+            column === 'center' && 'md:col-start-2',
+            column === 'right' && 'md:col-start-3',
+          ),
         });
       })}
     </div>

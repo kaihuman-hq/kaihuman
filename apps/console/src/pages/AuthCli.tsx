@@ -4,7 +4,9 @@ import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 
 export function AuthCli() {
-  const [status, setStatus] = useState<'checking' | 'authenticated' | 'redirecting' | 'error'>('checking');
+  const [status, setStatus] = useState<'checking' | 'authenticated' | 'redirecting' | 'error'>(
+    'checking',
+  );
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
@@ -73,7 +75,9 @@ export function AuthCli() {
           <div class="space-y-4">
             <h2 class="text-2xl font-bold text-white">Authenticating CLI...</h2>
             <p class="text-nexus-muted">You are being redirected back to your terminal.</p>
-            <div class="animate-pulse text-sm text-nexus-muted">If nothing happens, check your terminal.</div>
+            <div class="animate-pulse text-sm text-nexus-muted">
+              If nothing happens, check your terminal.
+            </div>
           </div>
         )}
         {status === 'error' && (

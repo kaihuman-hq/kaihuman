@@ -7,14 +7,14 @@
   --los-fg: #e2e8f0;
   /* slate-200 */
   --los-border: #333333;
-  --los-accent: #00FF00;
+  --los-accent: #00ff00;
   /* Neon Green */
   --los-accent-dim: rgba(0, 255, 0, 0.2);
   --los-muted: #64748b;
   /* slate-500 */
 
   /* Typography */
-  --los-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --los-font-mono: "JetBrains Mono", "Fira Code", monospace;
 
   /* Spacing */
   --los-gap: 0px;
@@ -28,8 +28,16 @@
   --los-glass-blur: 16px;
   --los-glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 
-  --los-glass-tile-bg: linear-gradient(135deg, rgba(20, 20, 20, 0.7) 0%, rgba(10, 10, 10, 0.6) 100%);
-  --los-glass-tile-hover-bg: linear-gradient(135deg, rgba(30, 30, 30, 0.8) 0%, rgba(20, 20, 20, 0.7) 100%);
+  --los-glass-tile-bg: linear-gradient(
+    135deg,
+    rgba(20, 20, 20, 0.7) 0%,
+    rgba(10, 10, 10, 0.6) 100%
+  );
+  --los-glass-tile-hover-bg: linear-gradient(
+    135deg,
+    rgba(30, 30, 30, 0.8) 0%,
+    rgba(20, 20, 20, 0.7) 100%
+  );
   --los-glass-tile-hover-border: rgba(255, 255, 255, 0.15);
 
   --los-cyber-grid-bg: #050505;
@@ -57,8 +65,16 @@
   --los-glass-blur: 20px;
   --los-glass-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 
-  --los-glass-tile-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(241, 245, 249, 0.7) 100%);
-  --los-glass-tile-hover-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.85) 100%);
+  --los-glass-tile-bg: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(241, 245, 249, 0.7) 100%
+  );
+  --los-glass-tile-hover-bg: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(248, 250, 252, 0.85) 100%
+  );
   --los-glass-tile-hover-border: rgba(37, 99, 235, 0.3);
 
   --los-cyber-grid-bg: #f1f5f9;
@@ -87,7 +103,11 @@
   --los-glass-shadow: 0 4px 30px rgba(88, 28, 135, 0.15);
 
   --los-glass-tile-bg: linear-gradient(135deg, rgba(30, 10, 40, 0.7) 0%, rgba(15, 5, 25, 0.6) 100%);
-  --los-glass-tile-hover-bg: linear-gradient(135deg, rgba(45, 15, 60, 0.8) 0%, rgba(30, 10, 40, 0.7) 100%);
+  --los-glass-tile-hover-bg: linear-gradient(
+    135deg,
+    rgba(45, 15, 60, 0.8) 0%,
+    rgba(30, 10, 40, 0.7) 100%
+  );
   --los-glass-tile-hover-border: rgba(217, 70, 239, 0.3);
 
   --los-cyber-grid-bg: #0a0110;
@@ -132,7 +152,9 @@
   background: var(--los-glass-tile-hover-bg);
   border-color: var(--los-glass-tile-hover-border);
   transform: translateY(-2px);
-  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.1), 0 0 0 1px var(--los-glass-tile-hover-border);
+  box-shadow:
+    0 12px 40px 0 rgba(0, 0, 0, 0.1),
+    0 0 0 1px var(--los-glass-tile-hover-border);
 }
 
 /* Background Pattern */
@@ -142,6 +164,9 @@
     radial-gradient(circle at 50% 50%, var(--los-cyber-grid-glow) 0%, transparent 50%),
     linear-gradient(var(--los-cyber-grid-dot) 1px, transparent 1px),
     linear-gradient(90deg, var(--los-cyber-grid-dot) 1px, transparent 1px);
-  background-size: 100% 100%, 40px 40px, 40px 40px;
+  background-size:
+    100% 100%,
+    40px 40px,
+    40px 40px;
   background-position: center, center, center;
 }

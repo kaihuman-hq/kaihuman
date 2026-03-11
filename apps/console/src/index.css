@@ -1,11 +1,12 @@
 @import "tailwindcss";
 @source "../../../packages/ui/src";
+/* biome-ignore lint/correctness/noInvalidPositionAtImportRule: intentional post-source import */
 @import "../../../packages/ui/src/styles.css";
+/* biome-ignore lint/correctness/noInvalidPositionAtImportRule: intentional post-source import */
 @import "../../../packages/ui/src/LifeOS/styles.css";
 @config "../../../packages/config/tailwind-preset.js";
 
 @layer base {
-
   html,
   body {
     width: 100%;
@@ -32,15 +33,18 @@
   }
 
   ::-webkit-scrollbar-track {
+    /* biome-ignore lint/correctness/noUnknownFunction: tailwind theme() function */
     background: theme("colors.nexus.bg");
   }
 
   ::-webkit-scrollbar-thumb {
+    /* biome-ignore lint/correctness/noUnknownFunction: tailwind theme() function */
     background: theme("colors.nexus.border");
     border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
+    /* biome-ignore lint/correctness/noUnknownFunction: tailwind theme() function */
     background: theme("colors.nexus.muted");
   }
 }

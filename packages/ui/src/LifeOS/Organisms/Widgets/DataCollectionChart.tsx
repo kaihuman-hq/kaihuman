@@ -1,6 +1,5 @@
-import { h } from 'preact';
-import { useState, useMemo, useRef, useEffect } from 'preact/hooks';
-import { DataCollectionData } from './DataCollectionLogic';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import type { DataCollectionData } from './DataCollectionLogic';
 
 interface DataCollectionChartProps {
   data: DataCollectionData;
@@ -23,21 +22,26 @@ const COLORS = [
 const parseDate = (val: any) => {
   if (!val) return new Date();
   const d = new Date(val);
-  return isNaN(d.getTime()) ? new Date() : d;
+  return Number.isNaN(d.getTime()) ? new Date() : d;
 };
 
 // Helper to format number with K/M abbreviations
 const formatNumber = (num: number) => {
   if (num >= 1000000) {
-    return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    return `${(num / 1000000).toFixed(1).replace(/\.0$/, '')}M`;
   }
   if (num >= 1000) {
-    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return `${(num / 1000).toFixed(1).replace(/\.0$/, '')}k`;
   }
   return num.toString();
 };
 
-export const DataCollectionChart = ({ data, width: propWidth, height: propHeight, hideLegend }: DataCollectionChartProps & { hideLegend?: boolean }) => {
+export const DataCollectionChart = ({
+  data,
+  width: propWidth,
+  height: propHeight,
+  hideLegend,
+}: DataCollectionChartProps & { hideLegend?: boolean }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -62,28 +66,28 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
   // Identify Numeric Columns (Potential Lines)
   // Exclude 'created' if it is just x-axis
   const numericColumns = useMemo(() => {
-    return data.columns.filter(c =>
-      c.type === 'number' ||
-      c.type === 'auto:number:sum' ||
-      c.type === 'auto:number:avg'
+    return data.columns.filter(
+      (c) => c.type === 'number' || c.type === 'auto:number:sum' || c.type === 'auto:number:avg',
     );
   }, [data.columns]);
 
   // Identify X-Axis Column (Prefer 'created' or first date column)
   const xColumn = useMemo(() => {
-    return data.columns.find(c => c.name === 'created') ||
-      data.columns.find(c => c.type.includes('date')) ||
-      data.columns[0];
+    return (
+      data.columns.find((c) => c.name === 'created') ||
+      data.columns.find((c) => c.type.includes('date')) ||
+      data.columns[0]
+    );
   }, [data.columns]);
 
   // Toggle State for Lines (Empty means all selected)
   const [selectedLines, setSelectedLines] = useState<string[]>([]);
 
   const toggleLine = (name: string) => {
-    setSelectedLines(prev => {
+    setSelectedLines((prev) => {
       if (prev.length === 0) return [name];
       if (prev.includes(name)) {
-        const next = prev.filter(n => n !== name);
+        const next = prev.filter((n) => n !== name);
         return next;
       }
       return [...prev, name];
@@ -96,8 +100,10 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
   // Sort rows by date if xColumn is date
   const sortedRows = useMemo(() => {
     const rows = [...data.rows];
-    if (xColumn && xColumn.type.includes('date')) {
-      rows.sort((a, b) => parseDate(a[xColumn.name]).getTime() - parseDate(b[xColumn.name]).getTime());
+    if (xColumn?.type.includes('date')) {
+      rows.sort(
+        (a, b) => parseDate(a[xColumn.name]).getTime() - parseDate(b[xColumn.name]).getTime(),
+      );
     }
     return rows;
   }, [data.rows, xColumn]);
@@ -113,22 +119,22 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
   const tickValues = useMemo(() => {
     if (!hasData) return [40, 30, 20, 10, 0];
     let max = 0;
-    sortedRows.forEach(row => {
-      numericColumns.forEach(col => {
+    sortedRows.forEach((row) => {
+      numericColumns.forEach((col) => {
         if (isLineActive(col.name)) {
           const val = Number(row[col.name]) || 0;
           if (val > max) max = val;
         }
       });
     });
-    
+
     if (max === 0) return [4, 3, 2, 1, 0];
     const targetTicks = 5;
     const roughStep = max / (targetTicks - 1);
     const mag = Math.floor(Math.log10(roughStep));
-    const magPow = Math.pow(10, mag);
+    const magPow = 10 ** mag;
     const magMsd = Math.ceil(roughStep / magPow);
-    
+
     let niceStep = magMsd * magPow;
     if (magMsd > 5) niceStep = 10 * magPow;
     else if (magMsd > 2) niceStep = 5 * magPow;
@@ -138,8 +144,9 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
     const niceMax = Math.ceil(max / niceStep) * niceStep;
     const numTicks = Math.round(niceMax / niceStep) + 1;
     return Array.from({ length: numTicks }, (_, i) => niceMax - i * niceStep);
-  }, [sortedRows, numericColumns, selectedLines, hasData]);
-  
+    // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
+  }, [sortedRows, numericColumns, hasData, isLineActive]);
+
   const firstTick = tickValues[0];
   const yMax = firstTick !== undefined && firstTick > 0 ? firstTick : 10;
 
@@ -154,42 +161,44 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
   // Path Generator
   const createPath = (colName: string) => {
     if (sortedRows.length === 0) return '';
-    return sortedRows.map((row, i) => {
-      const val = Number(row[colName]) || 0;
-      return `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(val)}`;
-    }).join(' ');
+    return sortedRows
+      .map((row, i) => {
+        const val = Number(row[colName]) || 0;
+        return `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(val)}`;
+      })
+      .join(' ');
   };
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [mousePos, setMousePos] = useState<{ x: number, y: number } | null>(null);
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!tooltipRef.current || !mousePos || !width || !height) return;
-    
+
     const tooltip = tooltipRef.current;
     const tooltipWidth = tooltip.offsetWidth;
     const tooltipHeight = tooltip.offsetHeight;
 
     const gap = 15;
-    
+
     let left = mousePos.x - tooltipWidth / 2;
     if (left < 0) left = 0;
     if (left + tooltipWidth > width) left = width - tooltipWidth;
 
     let top = mousePos.y + gap;
     const xAxisY = height - padding.bottom;
-    
+
     if (top + tooltipHeight > xAxisY) {
-        top = mousePos.y - gap - tooltipHeight;
+      top = mousePos.y - gap - tooltipHeight;
     }
-    
+
     if (top < 0) top = 0;
 
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${top}px`;
     tooltip.style.opacity = '1';
-  }, [mousePos, width, height, padding.bottom]);
+  }, [mousePos, width, height]);
 
   const handleMouseMove = (e: any) => {
     if (!hasData || !width || !height) return;
@@ -213,11 +222,15 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
           {numericColumns.map((col, i) => (
             <button
               key={col.name}
+              type="button"
               onClick={() => toggleLine(col.name)}
               className="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity whitespace-nowrap"
               style={{ opacity: isLineActive(col.name) ? 1 : 0.4 }}
             >
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: COLORS[i % COLORS.length] }}
+              />
               <span className="text-[9px] font-mono text-[var(--los-muted)]">{col.name}</span>
             </button>
           ))}
@@ -225,38 +238,73 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
       )}
 
       <div className="flex-1 w-full min-h-[200px] relative" ref={containerRef}>
-        <div className="absolute inset-0" ref={chartRef} onMouseLeave={() => { setHoveredIndex(null); setMousePos(null); }}>
-          {(!hasData || !width || !height) ? (
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: chart mouse tracking */}
+        <div
+          className="absolute inset-0"
+          ref={chartRef}
+          onMouseLeave={() => {
+            setHoveredIndex(null);
+            setMousePos(null);
+          }}
+        >
+          {!hasData || !width || !height ? (
             <div className="absolute inset-0 flex items-center justify-center text-[var(--los-muted)]">
               No data to chart
             </div>
           ) : (
             <>
+              {/* biome-ignore lint/a11y/noSvgWithoutTitle: decorative icon */}
               <svg width={width} height={height} onMouseMove={handleMouseMove}>
                 {/* Grid Lines */}
                 {tickValues.map((val) => {
                   const y = getY(val);
                   return (
                     <g key={val}>
-                      <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="var(--los-border)" strokeDasharray="4 4" />
-                      <text x={padding.left - 5} y={y + 3} textAnchor="end" className="text-[10px] fill-[var(--los-muted)] font-mono">
+                      <line
+                        x1={padding.left}
+                        y1={y}
+                        x2={width - padding.right}
+                        y2={y}
+                        stroke="var(--los-border)"
+                        strokeDasharray="4 4"
+                      />
+                      <text
+                        x={padding.left - 5}
+                        y={y + 3}
+                        textAnchor="end"
+                        className="text-[10px] fill-[var(--los-muted)] font-mono"
+                      >
                         {formatNumber(val)}
                       </text>
                     </g>
-                  )
+                  );
                 })}
 
                 {/* X Axis */}
                 {sortedRows.length > 1 && (
                   <>
-                    <text x={padding.left} y={height - 5} className="text-[9px] fill-[var(--los-muted)] font-mono">
+                    <text
+                      x={padding.left}
+                      y={height - 5}
+                      className="text-[9px] fill-[var(--los-muted)] font-mono"
+                    >
                       {xColumn.type.includes('date')
-                        ? parseDate(sortedRows[0]?.[xColumn.name]).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })
+                        ? parseDate(sortedRows[0]?.[xColumn.name]).toLocaleDateString(undefined, {
+                            month: 'numeric',
+                            day: 'numeric',
+                          })
                         : sortedRows[0]?.[xColumn.name]}
                     </text>
-                    <text x={width - padding.right} y={height - 5} textAnchor="end" className="text-[9px] fill-[var(--los-muted)] font-mono">
+                    <text
+                      x={width - padding.right}
+                      y={height - 5}
+                      textAnchor="end"
+                      className="text-[9px] fill-[var(--los-muted)] font-mono"
+                    >
                       {xColumn.type.includes('date')
-                        ? parseDate(sortedRows[sortedRows.length - 1]?.[xColumn.name]).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })
+                        ? parseDate(
+                            sortedRows[sortedRows.length - 1]?.[xColumn.name],
+                          ).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })
                         : sortedRows[sortedRows.length - 1]?.[xColumn.name]}
                     </text>
                   </>
@@ -279,32 +327,35 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
                 {/* Hover Indicator */}
                 {hoveredIndex !== null && (
                   <line
-                    x1={getX(hoveredIndex)} y1={padding.top}
-                    x2={getX(hoveredIndex)} y2={height - padding.bottom}
+                    x1={getX(hoveredIndex)}
+                    y1={padding.top}
+                    x2={getX(hoveredIndex)}
+                    y2={height - padding.bottom}
                     stroke="var(--los-border)"
                   />
                 )}
 
                 {/* Dots on Hover */}
-                {hoveredIndex !== null && numericColumns.map((col, i) => {
-                  if (!isLineActive(col.name)) return null;
-                  const val = Number(sortedRows[hoveredIndex]?.[col.name]) || 0;
-                  return (
-                    <circle
-                      key={col.name}
-                      cx={getX(hoveredIndex)}
-                      cy={getY(val)}
-                      r="3"
-                      fill="var(--los-bg)"
-                      stroke={COLORS[i % COLORS.length]}
-                      strokeWidth="2"
-                    />
-                  )
-                })}
+                {hoveredIndex !== null &&
+                  numericColumns.map((col, i) => {
+                    if (!isLineActive(col.name)) return null;
+                    const val = Number(sortedRows[hoveredIndex]?.[col.name]) || 0;
+                    return (
+                      <circle
+                        key={col.name}
+                        cx={getX(hoveredIndex)}
+                        cy={getY(val)}
+                        r="3"
+                        fill="var(--los-bg)"
+                        stroke={COLORS[i % COLORS.length]}
+                        strokeWidth="2"
+                      />
+                    );
+                  })}
               </svg>
 
               {/* Tooltip */}
-              {(hoveredIndex !== null && mousePos !== null) && (
+              {hoveredIndex !== null && mousePos !== null && (
                 <div
                   ref={tooltipRef}
                   className="absolute z-10 bg-[var(--los-bg)] border border-[var(--los-border)] p-2 rounded shadow-xl pointer-events-none opacity-0"
@@ -319,20 +370,25 @@ export const DataCollectionChart = ({ data, width: propWidth, height: propHeight
                     const val = Number(sortedRows[hoveredIndex]?.[col.name]);
                     return (
                       <div key={col.name} className="flex items-center gap-2 text-[10px] font-mono">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                        />
                         <span className="text-[var(--los-muted)]">{col.name}:</span>
-                        <span className="text-[var(--los-fg)]">{isNaN(val) ? '-' : val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}</span>
+                        <span className="text-[var(--los-fg)]">
+                          {Number.isNaN(val)
+                            ? '-'
+                            : val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
+                        </span>
                       </div>
-                    )
+                    );
                   })}
                 </div>
               )}
             </>
           )}
         </div>
-
-
       </div>
     </div>
   );
-}
+};

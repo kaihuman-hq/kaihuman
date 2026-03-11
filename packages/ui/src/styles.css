@@ -1,5 +1,8 @@
+/* biome-ignore lint/suspicious/noUnknownAtRules: tailwind directive */
 @tailwind base;
+/* biome-ignore lint/suspicious/noUnknownAtRules: tailwind directive */
 @tailwind components;
+/* biome-ignore lint/suspicious/noUnknownAtRules: tailwind directive */
 @tailwind utilities;
 
 /* Custom Scrollbar Styles to match LifeOS Theme */

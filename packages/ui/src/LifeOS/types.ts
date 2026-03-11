@@ -1,6 +1,6 @@
 export type {
-  DashboardWorkspace,
+  DashboardConfig,
   DashboardEntry,
   DashboardFilesConfig,
-  DashboardConfig
+  DashboardWorkspace,
 } from '@lifosy/core';

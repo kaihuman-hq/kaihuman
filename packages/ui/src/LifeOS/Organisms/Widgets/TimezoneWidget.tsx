@@ -1,9 +1,14 @@
-import { h } from 'preact';
-import { useMemo, useState, useEffect } from 'preact/hooks';
-import { MonoText, MonoHeader } from '../../Atoms/Typography';
-import { parseTimezones, TimezoneData, getCurrentTimeInZone, getYearProgress, getISOWeekNumber } from './TimezoneLogic';
+import { Calendar, Globe, Trash2 } from 'lucide-preact';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
-import { Clock, Calendar, Globe, Trash2 } from 'lucide-preact';
+import { MonoHeader, MonoText } from '../../Atoms/Typography';
+import {
+  getCurrentTimeInZone,
+  getISOWeekNumber,
+  getYearProgress,
+  parseTimezones,
+  type TimezoneData,
+} from './TimezoneLogic';
 
 export interface TimezoneWidgetProps {
   content: string;
@@ -16,7 +21,7 @@ export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneW
   const data: TimezoneData = useMemo(() => parseTimezones(content), [content]);
 
   // Ticker for live clock
-  const [now, setNow] = useState(Date.now());
+  const [_now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000); // Update every second
     return () => clearInterval(timer);
@@ -27,7 +32,12 @@ export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneW
   // If no data, show placeholder
   if (data.timezones.length === 0) {
     return (
-      <div className={cn("flex flex-col h-full w-full justify-center items-center text-[var(--los-muted)]", className)}>
+      <div
+        className={cn(
+          'flex flex-col h-full w-full justify-center items-center text-[var(--los-muted)]',
+          className,
+        )}
+      >
         <Globe size={24} className="mb-2 opacity-50" />
         <MonoText>No Timezones Configured</MonoText>
       </div>
@@ -37,7 +47,7 @@ export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneW
   // Primary Timezone (First one)
   const primaryTz = data.timezones[0];
   if (!primaryTz) return null; // Should be handled by length check above, but for TS safety
-  const primaryTime = getCurrentTimeInZone(primaryTz.name);
+  const _primaryTime = getCurrentTimeInZone(primaryTz.name);
 
   // Logic for User's Local Time (System Time) - Used as main display in both modes
   const localTzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -45,17 +55,14 @@ export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneW
 
   if (mode === 'SMALL' || mode === 'MOBILE_EXPANDED') {
     return (
-      <div className={cn("flex flex-col h-full w-full p-2", className)}>
+      <div className={cn('flex flex-col h-full w-full p-2', className)}>
         {/* Top: Local Time Info */}
         <div className="flex-1 flex flex-col justify-center items-center text-center">
-
           <MonoHeader className="text-3xl mb-1">{localTime.time}</MonoHeader>
 
           <div className="flex items-center gap-2 text-[var(--los-muted)] mb-2">
             <Calendar size={12} />
-            <MonoText className="text-[10px] uppercase">
-              {localTime.date}
-            </MonoText>
+            <MonoText className="text-[10px] uppercase">{localTime.date}</MonoText>
           </div>
 
           <div className="flex items-center gap-2 text-[var(--los-accent)]">
@@ -71,13 +78,18 @@ export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneW
 
         {/* Extra Timezones */}
         <div className="flex w-full gap-2 mt-2 mb-2">
-          {data.timezones.slice(0, 2).map(tz => {
+          {data.timezones.slice(0, 2).map((tz) => {
             const tzTime = getCurrentTimeInZone(tz.name);
             const city = tz.cities[0] || tz.name.split('/')[1]?.replace(/_/g, ' ') || tz.name;
             return (
-              <div key={tz.id} className="flex-1 flex flex-col items-center bg-white/5 rounded-md p-1 min-w-0">
+              <div
+                key={tz.id}
+                className="flex-1 flex flex-col items-center bg-white/5 rounded-md p-1 min-w-0"
+              >
                 <MonoHeader className="text-sm font-bold">{tzTime.time}</MonoHeader>
-                <MonoText className="text-[8px] text-[var(--los-muted)] truncate w-full text-center uppercase tracking-wider">{city}</MonoText>
+                <MonoText className="text-[8px] text-[var(--los-muted)] truncate w-full text-center uppercase tracking-wider">
+                  {city}
+                </MonoText>
               </div>
             );
           })}
@@ -86,8 +98,12 @@ export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneW
         {/* Bottom: Year Progress */}
         <div className="mt-auto pt-4 border-t border-[var(--los-border)]">
           <div className="flex justify-between items-end mb-1">
-            <MonoText className="text-[10px] text-[var(--los-muted)]">Day {yearProgress.dayOfYear}</MonoText>
-            <MonoText className="text-[10px] text-[var(--los-muted)]">{yearProgress.daysRemaining} Left</MonoText>
+            <MonoText className="text-[10px] text-[var(--los-muted)]">
+              Day {yearProgress.dayOfYear}
+            </MonoText>
+            <MonoText className="text-[10px] text-[var(--los-muted)]">
+              {yearProgress.daysRemaining} Left
+            </MonoText>
           </div>
 
           <div className="h-1.5 w-full bg-[var(--los-border)] rounded-full overflow-hidden relative">
@@ -97,7 +113,9 @@ export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneW
             />
           </div>
           <div className="text-center mt-1">
-            <MonoText className="text-[10px] font-bold">{yearProgress.percentage.toFixed(1)}%</MonoText>
+            <MonoText className="text-[10px] font-bold">
+              {yearProgress.percentage.toFixed(1)}%
+            </MonoText>
           </div>
         </div>
       </div>
@@ -106,35 +124,45 @@ export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneW
 
   // FOCUS MODE
   return (
-    <div className={cn("flex flex-col h-full w-full", className)}>
+    <div className={cn('flex flex-col h-full w-full', className)}>
       <div className="flex justify-between items-center mb-6 shrink-0">
         <div className="flex items-end gap-4">
           <MonoHeader className="text-4xl">{localTime.time}</MonoHeader>
           <div className="flex flex-col pb-1">
-            <MonoText className="text-sm text-[var(--los-accent)]">{localTzName.replace('_', ' ')}</MonoText>
+            <MonoText className="text-sm text-[var(--los-accent)]">
+              {localTzName.replace('_', ' ')}
+            </MonoText>
             <MonoText className="text-[10px] text-[var(--los-muted)]">{localTime.date}</MonoText>
           </div>
         </div>
       </div>
 
-      <MonoHeader className="text-sm border-b border-[var(--los-border)] pb-2 mb-4">WORLD CLOCK</MonoHeader>
+      <MonoHeader className="text-sm border-b border-[var(--los-border)] pb-2 mb-4">
+        WORLD CLOCK
+      </MonoHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 overflow-y-auto pr-2 pb-4">
-        {data.timezones.map(tz => {
+        {data.timezones.map((tz) => {
           const time = getCurrentTimeInZone(tz.name);
-          const isPrimary = tz.id === primaryTz.id;
+          const _isPrimary = tz.id === primaryTz.id;
 
           return (
-            <div key={tz.id} className="bg-[var(--los-bg)] border border-[var(--los-border)] p-4 relative group hover:border-[var(--los-accent)] transition-colors">
+            <div
+              key={tz.id}
+              className="bg-[var(--los-bg)] border border-[var(--los-border)] p-4 relative group hover:border-[var(--los-accent)] transition-colors"
+            >
               <div className="flex justify-between items-start mb-2">
-                <MonoText className="text-xs text-[var(--los-muted)]">{tz.cities.join(', ')}</MonoText>
+                <MonoText className="text-xs text-[var(--los-muted)]">
+                  {tz.cities.join(', ')}
+                </MonoText>
                 {onChange && (
                   <button
+                    type="button"
                     onClick={() => {
                       // Remove logic
                       const newData = {
                         ...data,
-                        timezones: data.timezones.filter(t => t.id !== tz.id)
+                        timezones: data.timezones.filter((t) => t.id !== tz.id),
                       };
                       onChange(JSON.stringify(newData, null, 2));
                     }}
@@ -147,8 +175,12 @@ export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneW
               <div className="flex justify-between items-end">
                 <MonoHeader className="text-2xl">{time.time}</MonoHeader>
                 <div className="text-right">
-                  <MonoText className="text-[10px] text-[var(--los-muted)] block">{time.date}</MonoText>
-                  <MonoText className="text-[10px] text-[var(--los-accent)] block mt-0.5">{tz.offset}</MonoText>
+                  <MonoText className="text-[10px] text-[var(--los-muted)] block">
+                    {time.date}
+                  </MonoText>
+                  <MonoText className="text-[10px] text-[var(--los-accent)] block mt-0.5">
+                    {tz.offset}
+                  </MonoText>
                 </div>
               </div>
             </div>
@@ -168,11 +200,17 @@ export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneW
         <div className="flex justify-between mt-2">
           <div className="text-left">
             <MonoText className="text-xs font-bold">{yearProgress.dayOfYear} DAYS GONE</MonoText>
-            <MonoText className="text-[10px] text-[var(--los-muted)]">{(yearProgress.percentage).toFixed(2)}% COMPLETED</MonoText>
+            <MonoText className="text-[10px] text-[var(--los-muted)]">
+              {yearProgress.percentage.toFixed(2)}% COMPLETED
+            </MonoText>
           </div>
           <div className="text-right">
-            <MonoText className="text-xs font-bold">{yearProgress.daysRemaining} DAYS LEFT</MonoText>
-            <MonoText className="text-[10px] text-[var(--los-muted)]">UNTIL {new Date().getFullYear() + 1}</MonoText>
+            <MonoText className="text-xs font-bold">
+              {yearProgress.daysRemaining} DAYS LEFT
+            </MonoText>
+            <MonoText className="text-[10px] text-[var(--los-muted)]">
+              UNTIL {new Date().getFullYear() + 1}
+            </MonoText>
           </div>
         </div>
       </div>

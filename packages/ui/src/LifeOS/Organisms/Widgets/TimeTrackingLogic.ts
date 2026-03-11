@@ -4,7 +4,7 @@ export interface Interval {
   start: string; // HH:MM
   end?: string; // HH:MM
 }
-// ... (imports are top of file usually, but I can add it) 
+// ... (imports are top of file usually, but I can add it)
 // Actually I need to check where imports are.
 // I'll add the import at the top and replace the usages.
 
@@ -41,7 +41,7 @@ export const parseTimeTracking = (csv: string): TimeTrackingData => {
 
     if (!date || !timeString) continue;
 
-    const times = timeString.split(',').filter(t => t.trim() !== '');
+    const times = timeString.split(',').filter((t) => t.trim() !== '');
     const intervals: Interval[] = [];
 
     for (let j = 0; j < times.length; j += 2) {
@@ -50,7 +50,7 @@ export const parseTimeTracking = (csv: string): TimeTrackingData => {
       if (start) {
         intervals.push({
           start: start,
-          end: end // undefined if currently running
+          end: end, // undefined if currently running
         });
       }
     }
@@ -74,7 +74,7 @@ export const serializeTimeTracking = (data: TimeTrackingData): string => {
   const sortedEntries = [...data.entries].sort((a, b) => b.date.localeCompare(a.date));
 
   for (const entry of sortedEntries) {
-    const times = entry.intervals.flatMap(i => {
+    const times = entry.intervals.flatMap((i) => {
       const parts = [i.start];
       if (i.end) parts.push(i.end);
       return parts;
@@ -99,7 +99,7 @@ export const calculateDurationMinutes = (entry: DayEntry): number => {
 
     const startMin = (startParts[0] || 0) * 60 + (startParts[1] || 0);
 
-    let endMin;
+    let endMin: number | undefined;
     if (interval.end) {
       const endParts = interval.end.split(':').map(Number);
       if (endParts.length >= 2) {
@@ -116,7 +116,7 @@ export const calculateDurationMinutes = (entry: DayEntry): number => {
     }
 
     if (endMin !== undefined && endMin >= startMin) {
-      totalMinutes += (endMin - startMin);
+      totalMinutes += endMin - startMin;
     }
   }
   return totalMinutes;
@@ -137,13 +137,13 @@ export const toggleStartStop = (data: TimeTrackingData): TimeTrackingData => {
   const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
   const newData = { ...data, entries: [...data.entries] };
-  const dayEntryIndex = newData.entries.findIndex(e => e.date === today);
+  const dayEntryIndex = newData.entries.findIndex((e) => e.date === today);
 
   if (dayEntryIndex === -1) {
     // Start new day
     newData.entries.unshift({
       date: today,
-      intervals: [{ start: hm }]
+      intervals: [{ start: hm }],
     });
   } else {
     // Modify existing day
@@ -172,7 +172,7 @@ export const toggleStartStop = (data: TimeTrackingData): TimeTrackingData => {
 export const addPause = (data: TimeTrackingData, pauseMinutes: number): TimeTrackingData => {
   const today = toLocalISOString(new Date());
   const newData = { ...data, entries: [...data.entries] };
-  const dayEntryIndex = newData.entries.findIndex(e => e.date === today);
+  const dayEntryIndex = newData.entries.findIndex((e) => e.date === today);
 
   if (dayEntryIndex === -1) return data;
 
@@ -216,7 +216,7 @@ export const addPause = (data: TimeTrackingData, pauseMinutes: number): TimeTrac
 
 export const isRunning = (data: TimeTrackingData): boolean => {
   const today = toLocalISOString(new Date());
-  const entry = data.entries.find(e => e.date === today);
+  const entry = data.entries.find((e) => e.date === today);
   if (!entry) return false;
   const last = entry.intervals[entry.intervals.length - 1];
   return !!(last && !last.end);
@@ -253,7 +253,7 @@ export const getChartData = (data: TimeTrackingData): ChartData => {
     for (let i = 0; i < entry.intervals.length - 1; i++) {
       const current = entry.intervals[i];
       const next = entry.intervals[i + 1];
-      if (current && current.end && next) {
+      if (current?.end && next) {
         const endParts = current.end.split(':').map(Number);
         const nextStartParts = next.start.split(':').map(Number);
 
@@ -261,7 +261,7 @@ export const getChartData = (data: TimeTrackingData): ChartData => {
         const startM = (nextStartParts[0] || 0) * 60 + (nextStartParts[1] || 0);
 
         if (startM > endM) {
-          breakMins += (startM - endM);
+          breakMins += startM - endM;
         }
       }
     }
@@ -272,7 +272,9 @@ export const getChartData = (data: TimeTrackingData): ChartData => {
     // Weekly (ISO Week)
     const d = new Date(entry.date);
     const onejan = new Date(d.getFullYear(), 0, 1);
-    const weekNum = Math.ceil((((d.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
+    const weekNum = Math.ceil(
+      ((d.getTime() - onejan.getTime()) / 86400000 + onejan.getDay() + 1) / 7,
+    );
     const weekKey = `${d.getFullYear()}-W${weekNum}`;
     weeklyMap.set(weekKey, (weeklyMap.get(weekKey) || 0) + workHours);
 
@@ -283,7 +285,13 @@ export const getChartData = (data: TimeTrackingData): ChartData => {
 
   return {
     daily,
-    weekly: Array.from(weeklyMap.entries()).map(([week, hours]) => ({ week, hours: parseFloat(hours.toFixed(2)) })),
-    monthly: Array.from(monthlyMap.entries()).map(([month, hours]) => ({ month, hours: parseFloat(hours.toFixed(2)) }))
+    weekly: Array.from(weeklyMap.entries()).map(([week, hours]) => ({
+      week,
+      hours: parseFloat(hours.toFixed(2)),
+    })),
+    monthly: Array.from(monthlyMap.entries()).map(([month, hours]) => ({
+      month,
+      hours: parseFloat(hours.toFixed(2)),
+    })),
   };
 };

@@ -1,10 +1,8 @@
-import { h } from 'preact';
-import { useState, useMemo, useEffect } from 'preact/hooks';
-import { cn } from '../../utils';
+import { AlertTriangle, ArrowRight, X } from 'lucide-preact';
+import { useMemo, useState } from 'preact/hooks';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
-import { X, ArrowRight, Folder, AlertTriangle } from 'lucide-preact';
-import { FolderSelector, FolderItem } from './FolderSelector';
-import { TileDef } from '../Layouts/MainApp';
+import type { TileDef } from '../Layouts/MainApp';
+import { type FolderItem, FolderSelector } from './FolderSelector';
 
 export interface MoveFileModalProps {
   fileToMove: string; // The full path of file being moved
@@ -21,7 +19,7 @@ export const MoveFileModal = ({
   onClose,
   onMove,
   fileSystem,
-  onLoadFolder
+  onLoadFolder,
 }: MoveFileModalProps) => {
   // Extract filename from path
   const originalFilename = useMemo(() => fileToMove.split('/').pop() || '', [fileToMove]);
@@ -41,11 +39,11 @@ export const MoveFileModal = ({
   const rootItems = useMemo<FolderItem[]>(() => {
     if (fileSystem && fileSystem.columns.length > 0 && fileSystem.columns[0]) {
       return fileSystem.columns[0].items
-        .filter(item => item.type === 'FOLDER')
-        .map(item => ({
+        .filter((item) => item.type === 'FOLDER')
+        .map((item) => ({
           id: String(item.id),
           name: item.title,
-          hasChildren: true
+          hasChildren: true,
         }));
     }
     return [];
@@ -55,18 +53,22 @@ export const MoveFileModal = ({
     if (onLoadFolder) {
       const items = await onLoadFolder(path);
       return items
-        .filter(item => item.type === 'FOLDER')
-        .map(item => ({
+        .filter((item) => item.type === 'FOLDER')
+        .map((item) => ({
           id: String(item.id),
           name: item.title,
-          hasChildren: true
+          hasChildren: true,
         }));
     }
     return [];
   };
 
   const newPath = useMemo(() => {
-    const prefix = selectedFolder ? (selectedFolder.endsWith('/') ? selectedFolder : `${selectedFolder}/`) : '';
+    const prefix = selectedFolder
+      ? selectedFolder.endsWith('/')
+        ? selectedFolder
+        : `${selectedFolder}/`
+      : '';
     return `${prefix}${filename}`;
   }, [selectedFolder, filename]);
 
@@ -80,20 +82,18 @@ export const MoveFileModal = ({
       await onMove(fileToMove, newPath);
       onClose();
     } catch (e: any) {
-      setError(e.message || "Failed to move file");
+      setError(e.message || 'Failed to move file');
       setIsSubmitting(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop dismiss pattern */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss pattern */}
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative bg-[var(--los-bg)] border border-[var(--los-border)] w-full max-w-2xl flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-
         {/* Header */}
         <div className="h-14 border-b border-[var(--los-border)] flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-2">
@@ -102,6 +102,7 @@ export const MoveFileModal = ({
             <MonoText className="text-[var(--los-accent)]">{originalFilename}</MonoText>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="hover:text-[var(--los-accent)] transition-colors"
           >
@@ -130,13 +131,15 @@ export const MoveFileModal = ({
               <MonoLabel>DESTINATION FOLDER</MonoLabel>
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => setSelectedFolder('')}
                   className="text-[10px] text-[var(--los-muted)] hover:text-[var(--los-accent)] uppercase border border-[var(--los-border)] px-1.5 py-0.5 rounded hover:bg-white/5 transition-colors"
                 >
                   Select Root
                 </button>
                 <MonoText className="text-xs text-[var(--los-muted)]">
-                  Selected: <span className="text-[var(--los-fg)]">{selectedFolder || '/ (root)'}</span>
+                  Selected:{' '}
+                  <span className="text-[var(--los-fg)]">{selectedFolder || '/ (root)'}</span>
                 </MonoText>
               </div>
             </div>
@@ -158,12 +161,14 @@ export const MoveFileModal = ({
 
           <div className="flex justify-end gap-3 pt-4">
             <button
+              type="button"
               onClick={onClose}
               className="text-xs px-4 py-2 hover:bg-white/5 border border-transparent hover:border-[var(--los-border)] transition-all"
             >
               CANCEL
             </button>
             <button
+              type="button"
               onClick={handleMove}
               disabled={isSubmitting || !filename}
               className="bg-[var(--los-accent)] text-black font-bold px-6 py-2 flex items-center gap-2 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
@@ -172,7 +177,6 @@ export const MoveFileModal = ({
               <ArrowRight size={16} />
             </button>
           </div>
-
         </div>
       </div>
     </div>

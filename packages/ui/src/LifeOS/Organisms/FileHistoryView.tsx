@@ -1,9 +1,7 @@
-import { h } from 'preact';
-import { useEffect } from 'preact/hooks';
 import { githubCommitStore } from '@lifosy/core';
-import { MonoText, MonoHeader } from '../Atoms/Typography';
-import { Loader2, History, X } from 'lucide-preact';
-import { cn } from '../../utils';
+import { History, Loader2, X } from 'lucide-preact';
+import { useEffect } from 'preact/hooks';
+import { MonoHeader, MonoText } from '../Atoms/Typography';
 
 interface FileHistoryViewProps {
   path: string;
@@ -23,7 +21,7 @@ export const FileHistoryView = ({ path, onClose }: FileHistoryViewProps) => {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
@@ -34,7 +32,11 @@ export const FileHistoryView = ({ path, onClose }: FileHistoryViewProps) => {
           <History size={18} />
           <MonoHeader className="text-sm">HISTORY: {path}</MonoHeader>
         </div>
-        <button onClick={onClose} className="hover:text-[var(--los-accent)] transition-colors">
+        <button
+          type="button"
+          onClick={onClose}
+          className="hover:text-[var(--los-accent)] transition-colors"
+        >
           <X size={18} />
         </button>
       </div>
@@ -47,7 +49,9 @@ export const FileHistoryView = ({ path, onClose }: FileHistoryViewProps) => {
         ) : (
           <div className="space-y-4">
             {commits.length === 0 ? (
-              <div className="text-center text-[var(--los-muted)] py-8">No history found for this file.</div>
+              <div className="text-center text-[var(--los-muted)] py-8">
+                No history found for this file.
+              </div>
             ) : (
               <div className="relative border-l border-[var(--los-border)] ml-3 space-y-6">
                 {commits.map((commit) => (
@@ -64,7 +68,9 @@ export const FileHistoryView = ({ path, onClose }: FileHistoryViewProps) => {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mt-2 text-xs text-[var(--los-muted)]">
-                        <span className="font-medium text-[var(--los-accent)]">{commit.commit.author.name}</span>
+                        <span className="font-medium text-[var(--los-accent)]">
+                          {commit.commit.author.name}
+                        </span>
                         <span>•</span>
                         <span>{formatDate(commit.commit.author.date)}</span>
                       </div>

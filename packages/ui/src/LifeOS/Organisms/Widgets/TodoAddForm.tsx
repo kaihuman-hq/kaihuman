@@ -49,7 +49,6 @@ export const TodoAddForm = ({ existingTags, milestones, onAdd, onCancel }: TodoA
             onInput={(e) => setText(e.currentTarget.value)}
             className="bg-[var(--los-bg)] border border-[var(--los-border)] px-3 py-2 text-sm font-mono focus:border-[var(--los-accent)] outline-none transition-colors"
             placeholder="What needs to be done?"
-            autoFocus
           />
         </div>
 

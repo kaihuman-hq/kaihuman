@@ -1,9 +1,8 @@
-import { h } from 'preact';
+import { type AIProvider, aiStore } from '@lifosy/core';
+import { Bot, Loader2, MessageSquare, Send, Trash2, User, X } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { aiStore, AIProvider } from '@lifosy/core';
-import { X, Send, Bot, User, Loader2, MessageSquare, Settings2, Trash2 } from 'lucide-preact';
-import { MonoText, MonoLabel } from '../Atoms/Typography';
 import { cn } from '../../utils';
+import { MonoLabel, MonoText } from '../Atoms/Typography';
 
 export const AIPanel = () => {
   const [input, setInput] = useState('');
@@ -12,7 +11,7 @@ export const AIPanel = () => {
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [aiStore.history.value, aiStore.isTyping.value]);
+  }, []);
 
   const handleSend = () => {
     if (!input.trim() || aiStore.isTyping.value) return;
@@ -31,7 +30,6 @@ export const AIPanel = () => {
 
   return (
     <div className="fixed top-0 right-0 bottom-12 w-full md:w-[400px] bg-[var(--los-bg)] border-l border-[var(--los-border)] shadow-2xl z-[900] flex flex-col transform transition-transform duration-300 ease-spring pointer-events-auto">
-
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-[var(--los-border)] bg-[var(--los-bg-hover)]">
         <div className="flex items-center gap-2">
@@ -44,14 +42,23 @@ export const AIPanel = () => {
           <select
             className="bg-transparent border border-[var(--los-border)] rounded px-2 py-1 text-[10px] font-mono text-[var(--los-fg)] focus:outline-none focus:border-[var(--los-accent)]"
             value={aiStore.activeProvider.value}
-            onChange={(e) => aiStore.setProvider((e.target as HTMLSelectElement).value as AIProvider)}
+            onChange={(e) =>
+              aiStore.setProvider((e.target as HTMLSelectElement).value as AIProvider)
+            }
           >
-            <option value="copilot" className="bg-[var(--los-bg)]">Copilot</option>
-            <option value="claude" className="bg-[var(--los-bg)]">Claude</option>
-            <option value="gemini" className="bg-[var(--los-bg)]">Gemini</option>
+            <option value="copilot" className="bg-[var(--los-bg)]">
+              Copilot
+            </option>
+            <option value="claude" className="bg-[var(--los-bg)]">
+              Claude
+            </option>
+            <option value="gemini" className="bg-[var(--los-bg)]">
+              Gemini
+            </option>
           </select>
 
           <button
+            type="button"
             onClick={() => aiStore.clearHistory()}
             className="text-[var(--los-muted)] hover:text-[var(--los-fg)] transition-colors p-1"
             title="Clear Chat"
@@ -60,6 +67,7 @@ export const AIPanel = () => {
           </button>
 
           <button
+            type="button"
             onClick={() => aiStore.togglePanel()}
             className="text-[var(--los-muted)] hover:text-[var(--los-fg)] transition-colors p-1"
           >
@@ -74,7 +82,8 @@ export const AIPanel = () => {
           <div className="h-full flex flex-col items-center justify-center text-[var(--los-muted)] opacity-50 space-y-4">
             <MessageSquare size={32} />
             <MonoText className="text-xs text-center max-w-[250px]">
-              Ask a question to your local AI. CLI commands will be executed locally on your machine.
+              Ask a question to your local AI. CLI commands will be executed locally on your
+              machine.
             </MonoText>
           </div>
         ) : (
@@ -82,22 +91,25 @@ export const AIPanel = () => {
             <div
               key={msg.id || idx}
               className={cn(
-                "flex gap-3 max-w-[90%]",
-                msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
+                'flex gap-3 max-w-[90%]',
+                msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto',
               )}
             >
               <div className="shrink-0 mt-1">
-                {msg.role === 'user'
-                  ? <User size={14} className="text-[var(--los-muted)]" />
-                  : <Bot size={14} className="text-[var(--los-accent)]" />
-                }
+                {msg.role === 'user' ? (
+                  <User size={14} className="text-[var(--los-muted)]" />
+                ) : (
+                  <Bot size={14} className="text-[var(--los-accent)]" />
+                )}
               </div>
-              <div className={cn(
-                "px-3 py-2 rounded-lg text-sm font-mono whitespace-pre-wrap flex-1 min-w-0 border",
-                msg.role === 'user'
-                  ? "bg-[var(--los-bg-hover)] border-[var(--los-border)] text-right"
-                  : "bg-transparent border-transparent text-left"
-              )}>
+              <div
+                className={cn(
+                  'px-3 py-2 rounded-lg text-sm font-mono whitespace-pre-wrap flex-1 min-w-0 border',
+                  msg.role === 'user'
+                    ? 'bg-[var(--los-bg-hover)] border-[var(--los-border)] text-right'
+                    : 'bg-transparent border-transparent text-left',
+                )}
+              >
                 {msg.content}
               </div>
             </div>
@@ -108,7 +120,9 @@ export const AIPanel = () => {
         {aiStore.isTyping.value && (
           <div className="flex gap-3 max-w-[90%] mr-auto items-center text-[var(--los-muted)]">
             <Loader2 size={14} className="animate-spin" />
-            <MonoText className="text-[10px] animate-pulse">Running {aiStore.activeProvider.value} CLI...</MonoText>
+            <MonoText className="text-[10px] animate-pulse">
+              Running {aiStore.activeProvider.value} CLI...
+            </MonoText>
           </div>
         )}
 
@@ -126,6 +140,7 @@ export const AIPanel = () => {
               Please ensure the local CLI is running (`cargo run -- server`).
             </MonoText>
             <button
+              type="button"
               onClick={() => aiStore.checkConnection()} // Re-run the health check without toggling panel
               className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded text-xs font-bold transition-colors"
             >
@@ -145,6 +160,7 @@ export const AIPanel = () => {
                 rows={2}
               />
               <button
+                type="button"
                 onClick={handleSend}
                 disabled={!input.trim() || aiStore.isTyping.value}
                 className="absolute right-2 bottom-3 p-1.5 rounded-md text-[var(--los-muted)] hover:text-[var(--los-accent)] hover:bg-[var(--los-bg)] transition-all disabled:opacity-30 disabled:hover:text-[var(--los-muted)] disabled:hover:bg-transparent"
@@ -159,7 +175,6 @@ export const AIPanel = () => {
           </>
         )}
       </div>
-
     </div>
   );
 };

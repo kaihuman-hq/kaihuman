@@ -16,6 +16,7 @@ export interface TimezoneData {
 }
 
 import { Logger } from '@lifosy/core';
+
 const logger = new Logger('TimezoneLogic');
 
 export const parseTimezones = (json: string): TimezoneData => {
@@ -39,25 +40,53 @@ export const serializeTimezones = (data: TimezoneData): string => {
 export const AVAILABLE_TIMEZONES = [
   { name: 'UTC', offset: '+00:00', cities: ['UTC'] },
   { name: 'Europe/London', offset: '+00:00', cities: ['London', 'Edinburgh', 'Dublin', 'Lisbon'] },
-  { name: 'Europe/Paris', offset: '+01:00', cities: ['Paris', 'Berlin', 'Rome', 'Madrid', 'Amsterdam', 'Brussels', 'Vienna'] },
-  { name: 'Europe/Athens', offset: '+02:00', cities: ['Athens', 'Bucharest', 'Istanbul', 'Cairo', 'Jerusalem'] },
+  {
+    name: 'Europe/Paris',
+    offset: '+01:00',
+    cities: ['Paris', 'Berlin', 'Rome', 'Madrid', 'Amsterdam', 'Brussels', 'Vienna'],
+  },
+  {
+    name: 'Europe/Athens',
+    offset: '+02:00',
+    cities: ['Athens', 'Bucharest', 'Istanbul', 'Cairo', 'Jerusalem'],
+  },
   { name: 'Europe/Moscow', offset: '+03:00', cities: ['Moscow', 'St. Petersburg'] },
   { name: 'Asia/Dubai', offset: '+04:00', cities: ['Dubai', 'Abu Dhabi'] },
   { name: 'Asia/Karachi', offset: '+05:00', cities: ['Karachi', 'Islamabad'] },
   { name: 'Asia/Kolkata', offset: '+05:30', cities: ['Mumbai', 'Delhi', 'Bangalore', 'Kolkata'] },
   { name: 'Asia/Dhaka', offset: '+06:00', cities: ['Dhaka'] },
   { name: 'Asia/Bangkok', offset: '+07:00', cities: ['Bangkok', 'Hanoi', 'Jakarta'] },
-  { name: 'Asia/Singapore', offset: '+08:00', cities: ['Singapore', 'Kuala Lumpur', 'Hong Kong', 'Beijing', 'Shanghai', 'Taipei', 'Perth'] },
+  {
+    name: 'Asia/Singapore',
+    offset: '+08:00',
+    cities: ['Singapore', 'Kuala Lumpur', 'Hong Kong', 'Beijing', 'Shanghai', 'Taipei', 'Perth'],
+  },
   { name: 'Asia/Tokyo', offset: '+09:00', cities: ['Tokyo', 'Seoul', 'Osaka'] },
   { name: 'Australia/Sydney', offset: '+11:00', cities: ['Sydney', 'Melbourne', 'Canberra'] },
   { name: 'Pacific/Auckland', offset: '+13:00', cities: ['Auckland', 'Wellington'] },
 
   { name: 'Atlantic/Azores', offset: '-01:00', cities: ['Azores'] },
-  { name: 'America/Sao_Paulo', offset: '-03:00', cities: ['São Paulo', 'Rio de Janeiro', 'Brasilia', 'Buenos Aires'] },
-  { name: 'America/New_York', offset: '-05:00', cities: ['New York', 'Washington DC', 'Boston', 'Miami', 'Toronto', 'Montreal'] },
-  { name: 'America/Chicago', offset: '-06:00', cities: ['Chicago', 'Houston', 'Dallas', 'Mexico City'] },
+  {
+    name: 'America/Sao_Paulo',
+    offset: '-03:00',
+    cities: ['São Paulo', 'Rio de Janeiro', 'Brasilia', 'Buenos Aires'],
+  },
+  {
+    name: 'America/New_York',
+    offset: '-05:00',
+    cities: ['New York', 'Washington DC', 'Boston', 'Miami', 'Toronto', 'Montreal'],
+  },
+  {
+    name: 'America/Chicago',
+    offset: '-06:00',
+    cities: ['Chicago', 'Houston', 'Dallas', 'Mexico City'],
+  },
   { name: 'America/Denver', offset: '-07:00', cities: ['Denver', 'Salt Lake City', 'Calgary'] },
-  { name: 'America/Los_Angeles', offset: '-08:00', cities: ['Los Angeles', 'San Francisco', 'Seattle', 'Vancouver', 'Las Vegas'] },
+  {
+    name: 'America/Los_Angeles',
+    offset: '-08:00',
+    cities: ['Los Angeles', 'San Francisco', 'Seattle', 'Vancouver', 'Las Vegas'],
+  },
   { name: 'America/Anchorage', offset: '-09:00', cities: ['Anchorage'] },
   { name: 'Pacific/Honolulu', offset: '-10:00', cities: ['Honolulu'] },
 ];
@@ -89,7 +118,7 @@ export const getCurrentTimeInZone = (ianaName: string) => {
       hour: 'numeric',
       minute: 'numeric',
       hour12: false,
-      timeZone: ianaName
+      timeZone: ianaName,
     });
 
     // For date parts
@@ -97,7 +126,7 @@ export const getCurrentTimeInZone = (ianaName: string) => {
       weekday: 'long',
       month: 'short',
       day: 'numeric',
-      timeZone: ianaName
+      timeZone: ianaName,
     });
 
     // For week number, it's a bit complex with pure Intl, usually calculated on local date shifted.
@@ -107,9 +136,9 @@ export const getCurrentTimeInZone = (ianaName: string) => {
     return {
       time: timeFormatter.format(now),
       date: dateFormatter.format(now),
-      parts: dateFormatter.formatToParts(now)
+      parts: dateFormatter.formatToParts(now),
     };
-  } catch (e) {
+  } catch (_e) {
     return { time: '--:--', date: 'Invalid Timezone', parts: [] };
   }
 };
@@ -118,6 +147,6 @@ export const getISOWeekNumber = (d: Date) => {
   d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
   var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  var weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  var weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   return weekNo;
-}
+};
