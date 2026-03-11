@@ -40,7 +40,7 @@ export function ExtensionSuccess() {
       </div>
       <h1 class="text-2xl font-bold tracking-tight text-[var(--los-fg)]">Extension Connected!</h1>
       <p class="text-[var(--los-fg-dim)] text-center max-w-sm">
-        You've successfully authorized the Lifosy browser extension. You can close this tab and
+        You've successfully authorized the KaiHuman browser extension. You can close this tab and
         start using the extension from your browser toolbar.
       </p>
       <button

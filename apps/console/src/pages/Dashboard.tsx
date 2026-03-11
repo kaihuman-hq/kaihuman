@@ -153,7 +153,7 @@ export const Dashboard = () => {
     // Loading state or critical error if no repos
     return (
       <div className="h-screen flex items-center justify-center text-nexus-muted">
-        Loading LifeOS...
+        Loading KaiHuman...
       </div>
     );
   }

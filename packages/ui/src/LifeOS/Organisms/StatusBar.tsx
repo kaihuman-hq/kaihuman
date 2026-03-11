@@ -676,7 +676,7 @@ export const StatusBar = ({
                   isHovered || expanded ? 'text-sm' : 'text-[10px]',
                 )}
               >
-                Life OS
+                KaiHuman
               </span>
             </button>
           </div>
