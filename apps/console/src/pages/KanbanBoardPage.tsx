@@ -1,4 +1,4 @@
-import { githubFileStore, layoutStore } from '@lifosy/core';
+import { githubFileStore } from '@lifosy/core';
 import { KanbanBoard, StatusBar } from '@lifosy/ui';
 import { route } from 'preact-router';
 
@@ -11,9 +11,7 @@ export const KanbanBoardPage = () => (
         await githubFileStore.createFile(path, content);
       }}
       onOpenFile={(path) => {
-        layoutStore.view.value = 'FILES';
-        layoutStore.navigate(path);
-        route('/');
+        route(`/files/${encodeURIComponent(path)}`);
       }}
     />
     <StatusBar
