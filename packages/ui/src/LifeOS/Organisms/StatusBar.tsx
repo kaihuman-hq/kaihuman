@@ -1,11 +1,20 @@
-import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { aiStore, Logger } from '@lifosy/core';
+import { useEffect, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoLabel, MonoText } from '../Atoms/Typography';
-import { aiStore, Logger } from '@lifosy/core';
 
 const logger = new Logger('StatusBar');
-import { Sparkles, Archive, GitBranch, GitCommit, LayoutGrid, ChevronUp, ArrowRight, Kanban } from 'lucide-preact';
+
+import {
+  Archive,
+  ArrowRight,
+  ChevronUp,
+  GitBranch,
+  GitCommit,
+  Kanban,
+  LayoutGrid,
+  Sparkles,
+} from 'lucide-preact';
 
 export interface Repository {
   id: string;
@@ -59,13 +68,13 @@ export interface StatusBarProps {
 }
 
 export const StatusBar = ({
-  mode = "NORMAL",
-  breadcrumbs = ["~"],
+  mode = 'NORMAL',
+  breadcrumbs = ['~'],
   stats = [],
   currentRepository,
   repositories = [],
   onSelectRepository,
-  repositoryLabel = "REPOSITORY",
+  repositoryLabel: _repositoryLabel = 'REPOSITORY',
 
   currentWorkspace,
   workspaces = [],
@@ -77,7 +86,7 @@ export const StatusBar = ({
   onBoardClick,
   menuItems,
   recentFiles,
-  version
+  version,
 }: StatusBarProps) => {
   const [expanded, setExpanded] = useState(false);
   const [expandedMode, setExpandedMode] = useState<'MENU' | 'REPOS' | 'WORKSPACES'>('MENU');
@@ -88,7 +97,7 @@ export const StatusBar = ({
     // Initialize from localStorage, default to 'CONTEXT'
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('lifeos-statusbar-nav-mode');
-      return (saved === 'QUICK' || saved === 'CONTEXT') ? saved : 'CONTEXT';
+      return saved === 'QUICK' || saved === 'CONTEXT' ? saved : 'CONTEXT';
     }
     return 'CONTEXT';
   });
@@ -103,7 +112,7 @@ export const StatusBar = ({
   // Auto-collapse when mode changes (e.g. opening a file switches to FOCUS)
   useEffect(() => {
     setExpanded(false);
-  }, [mode]);
+  }, []);
 
   // Helper to handle expansion, toggling if already in that mode
   const handleToggleExpand = (mode: 'MENU' | 'REPOS' | 'WORKSPACES') => {
@@ -116,7 +125,7 @@ export const StatusBar = ({
   };
 
   // On Mobile, tapping the bar generally should wake it up / expand it
-  const handleBarClick = (e: MouseEvent) => {
+  const handleBarClick = (_e: MouseEvent) => {
     // If not expanded and not clicking a specific interactive element (handled by stoppropagation below)
     // we expand to menu by default on mobile/touch logic
     if (!expanded) {
@@ -129,74 +138,117 @@ export const StatusBar = ({
   return (
     <>
       {/* Expanded Magic Drawer Backdrop */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop dismiss pattern */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss pattern */}
       <div
         className={cn(
-          "fixed inset-0 bg-black/50 backdrop-blur-sm z-[990] transition-opacity duration-300",
-          expanded ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          'fixed inset-0 bg-black/50 backdrop-blur-sm z-[990] transition-opacity duration-300',
+          expanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
         )}
         onClick={() => setExpanded(false)}
       />
 
       {/* The Status Bar Container */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: status bar interactive container */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: status bar interactive container */}
       <div
         className={cn(
-          "fixed bottom-0 left-0 right-0 z-[1000] bg-[var(--los-bg)] border-t border-[var(--los-border)] transition-all duration-300 ease-spring",
+          'fixed bottom-0 left-0 right-0 z-[1000] bg-[var(--los-bg)] border-t border-[var(--los-border)] transition-all duration-300 ease-spring',
           // On mobile, if not expanded, it might need to be slightly taller or just standard.
           // We keep h-8 (32px) standard, h-16 (64px) on hover/touch-intent
-          expanded ? "h-[40vh]" : (isHovered ? "h-16" : "h-12 md:h-8"), // Increased base height for mobile touch targets
-          "shadow-2xl overflow-hidden"
+          expanded ? 'h-[40vh]' : isHovered ? 'h-16' : 'h-12 md:h-8', // Increased base height for mobile touch targets
+          'shadow-2xl overflow-hidden',
         )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={handleBarClick as any}
       >
-
         {/* Expanded Drawer Content */}
-        <div className={cn(
-          "absolute inset-0 top-16 p-6 transition-opacity duration-200 overflow-y-auto",
-          expanded ? "opacity-100 delay-100" : "opacity-0 pointer-events-none"
-        )}>
+        <div
+          className={cn(
+            'absolute inset-0 top-16 p-6 transition-opacity duration-200 overflow-y-auto',
+            expanded ? 'opacity-100 delay-100' : 'opacity-0 pointer-events-none',
+          )}
+        >
           {expandedMode === 'MENU' && (
             <div className="flex flex-col gap-6">
               {/* Main Actions Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {menuItems ? menuItems.map((item, i) => {
-                  if (item.type === 'REPOS' && repositories.length > 0) {
-                    return (
-                      <div
-                        key={i}
-                        onClick={(e) => { e.stopPropagation(); setExpandedMode('REPOS'); }}
-                        className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
-                      >
-                        <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full">{item.label || 'Repositories'}</MonoLabel>
-                      </div>
-                    )
-                  }
-                  if (item.type === 'WORKSPACES' && workspaces.length > 0) {
-                    return (
-                      <div
-                        key={i}
-                        onClick={(e) => { e.stopPropagation(); setExpandedMode('WORKSPACES'); }}
-                        className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
-                      >
-                        <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full">{item.label || 'Workspaces'}</MonoLabel>
-                      </div>
-                    )
-                  }
+                {menuItems
+                  ? menuItems.map((item) => {
+                      if (item.type === 'REPOS' && repositories.length > 0) {
+                        return (
+                          // biome-ignore lint/a11y/noStaticElementInteractions: menu item click handler
+                          // biome-ignore lint/a11y/useKeyWithClickEvents: menu item click handler
+                          <div
+                            key={item.label}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedMode('REPOS');
+                            }}
+                            className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                          >
+                            <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full">
+                              {item.label || 'Repositories'}
+                            </MonoLabel>
+                          </div>
+                        );
+                      }
+                      if (item.type === 'WORKSPACES' && workspaces.length > 0) {
+                        return (
+                          // biome-ignore lint/a11y/noStaticElementInteractions: menu item click handler
+                          // biome-ignore lint/a11y/useKeyWithClickEvents: menu item click handler
+                          <div
+                            key={item.label}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedMode('WORKSPACES');
+                            }}
+                            className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                          >
+                            <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full">
+                              {item.label || 'Workspaces'}
+                            </MonoLabel>
+                          </div>
+                        );
+                      }
 
-                  return (
-                    <div key={i}
-                      onClick={(e) => { e.stopPropagation(); item.onClick?.(); setExpanded(false); }}
-                      className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
-                    >
-                      <MonoLabel className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full" title={item.label}>{item.label}</MonoLabel>
-                    </div>
-                  )
-                }) : ['New File', 'Search', 'Settings', 'Git', 'Terminal', 'Zen Mode'].map((action, i) => (
-                  <div key={i} className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden">
-                    <MonoLabel className="group-hover:text-[var(--los-accent)] truncate w-full text-center" title={action}>{action}</MonoLabel>
-                  </div>
-                ))}
+                      return (
+                        // biome-ignore lint/a11y/noStaticElementInteractions: menu action click handler
+                        // biome-ignore lint/a11y/useKeyWithClickEvents: menu action click handler
+                        <div
+                          key={item.label}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            item.onClick?.();
+                            setExpanded(false);
+                          }}
+                          className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                        >
+                          <MonoLabel
+                            className="group-hover:text-[var(--los-accent)] uppercase text-center truncate w-full"
+                            title={item.label}
+                          >
+                            {item.label}
+                          </MonoLabel>
+                        </div>
+                      );
+                    })
+                  : ['New File', 'Search', 'Settings', 'Git', 'Terminal', 'Zen Mode'].map(
+                      (action) => (
+                        <div
+                          key={action}
+                          className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
+                        >
+                          <MonoLabel
+                            className="group-hover:text-[var(--los-accent)] truncate w-full text-center"
+                            title={action}
+                          >
+                            {action}
+                          </MonoLabel>
+                        </div>
+                      ),
+                    )}
               </div>
 
               {/* Recent Files Section */}
@@ -208,13 +260,23 @@ export const StatusBar = ({
                     <div className="h-px bg-[var(--los-border)] flex-1" />
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {recentFiles.map((item, i) => (
-                      <div key={`recent-${i}`}
-                        onClick={(e) => { e.stopPropagation(); item.onClick?.(); setExpanded(false); }}
+                    {recentFiles.map((item) => (
+                      // biome-ignore lint/a11y/noStaticElementInteractions: recent file click handler
+                      // biome-ignore lint/a11y/useKeyWithClickEvents: recent file click handler
+                      <div
+                        key={item.label}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          item.onClick?.();
+                          setExpanded(false);
+                        }}
                         className="border border-[var(--los-border)] p-3 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
                       >
                         <div className="flex items-center justify-center w-full">
-                          <MonoLabel className="group-hover:text-[var(--los-accent)] text-xs truncate w-full text-center" title={item.label}>
+                          <MonoLabel
+                            className="group-hover:text-[var(--los-accent)] text-xs truncate w-full text-center"
+                            title={item.label}
+                          >
                             {item.label.split('/').pop()}
                           </MonoLabel>
                         </div>
@@ -235,16 +297,22 @@ export const StatusBar = ({
                   <div className="border border-[var(--los-border)] p-4 flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <MonoLabel className="text-xs">Version:</MonoLabel>
-                      <MonoText className="text-sm text-[var(--los-fg)]">{version.version}</MonoText>
+                      <MonoText className="text-sm text-[var(--los-fg)]">
+                        {version.version}
+                      </MonoText>
                     </div>
                     <div className="flex items-center justify-between">
                       <MonoLabel className="text-xs">Build:</MonoLabel>
-                      <MonoText className="text-[10px] text-[var(--los-muted)]">{new Date(version.buildTime).toLocaleString()}</MonoText>
+                      <MonoText className="text-[10px] text-[var(--los-muted)]">
+                        {new Date(version.buildTime).toLocaleString()}
+                      </MonoText>
                     </div>
                     {version.gitHash && (
                       <div className="flex items-center justify-between">
                         <MonoLabel className="text-xs">Commit:</MonoLabel>
-                        <MonoText className="text-[10px] font-mono text-[var(--los-muted)]">{version.gitHash}</MonoText>
+                        <MonoText className="text-[10px] font-mono text-[var(--los-muted)]">
+                          {version.gitHash}
+                        </MonoText>
                       </div>
                     )}
                   </div>
@@ -256,14 +324,23 @@ export const StatusBar = ({
           {expandedMode === 'REPOS' && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2 mb-4">
-                <div onClick={() => setExpandedMode('MENU')} className="cursor-pointer hover:text-[var(--los-accent)] flex items-center gap-1">
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
+                {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
+                <div
+                  onClick={() => setExpandedMode('MENU')}
+                  className="cursor-pointer hover:text-[var(--los-accent)] flex items-center gap-1"
+                >
                   <ChevronUp className="rotate-[-90deg]" size={16} />
                   <MonoLabel>BACK</MonoLabel>
                 </div>
-                <MonoLabel className="text-[var(--los-accent)] uppercase ml-auto">REPOSITORIES</MonoLabel>
+                <MonoLabel className="text-[var(--los-accent)] uppercase ml-auto">
+                  REPOSITORIES
+                </MonoLabel>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {repositories.map((repo) => (
+                  // biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler
+                  // biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler
                   <div
                     key={repo.id}
                     onClick={(e) => {
@@ -272,22 +349,41 @@ export const StatusBar = ({
                       setExpanded(false);
                     }}
                     className={cn(
-                      "border p-4 cursor-pointer transition-colors flex items-center justify-between group",
+                      'border p-4 cursor-pointer transition-colors flex items-center justify-between group',
                       currentRepository?.id === repo.id
-                        ? "border-[var(--los-accent)] bg-[var(--los-accent-dim)]"
-                        : "border-[var(--los-border)] hover:border-[var(--los-fg)] hover:bg-white/5"
+                        ? 'border-[var(--los-accent)] bg-[var(--los-accent-dim)]'
+                        : 'border-[var(--los-border)] hover:border-[var(--los-fg)] hover:bg-white/5',
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      <GitBranch size={16} className={currentRepository?.id === repo.id ? "text-[var(--los-accent)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]"} />
+                      <GitBranch
+                        size={16}
+                        className={
+                          currentRepository?.id === repo.id
+                            ? 'text-[var(--los-accent)]'
+                            : 'text-[var(--los-muted)] group-hover:text-[var(--los-fg)]'
+                        }
+                      />
                       <div className="flex flex-col">
-                        <MonoText className={currentRepository?.id === repo.id ? "text-[var(--los-accent)]" : "text-[var(--los-fg)]"}>
+                        <MonoText
+                          className={
+                            currentRepository?.id === repo.id
+                              ? 'text-[var(--los-accent)]'
+                              : 'text-[var(--los-fg)]'
+                          }
+                        >
                           {repo.name}
                         </MonoText>
-                        {repo.branch && <MonoText className="text-[10px] text-[var(--los-muted)]">{repo.branch}</MonoText>}
+                        {repo.branch && (
+                          <MonoText className="text-[10px] text-[var(--los-muted)]">
+                            {repo.branch}
+                          </MonoText>
+                        )}
                       </div>
                     </div>
-                    {currentRepository?.id === repo.id && <div className="w-2 h-2 rounded-full bg-[var(--los-accent)]" />}
+                    {currentRepository?.id === repo.id && (
+                      <div className="w-2 h-2 rounded-full bg-[var(--los-accent)]" />
+                    )}
                   </div>
                 ))}
               </div>
@@ -297,14 +393,23 @@ export const StatusBar = ({
           {expandedMode === 'WORKSPACES' && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2 mb-4">
-                <div onClick={() => setExpandedMode('MENU')} className="cursor-pointer hover:text-[var(--los-accent)] flex items-center gap-1">
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
+                {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
+                <div
+                  onClick={() => setExpandedMode('MENU')}
+                  className="cursor-pointer hover:text-[var(--los-accent)] flex items-center gap-1"
+                >
                   <ChevronUp className="rotate-[-90deg]" size={16} />
                   <MonoLabel>BACK</MonoLabel>
                 </div>
-                <MonoLabel className="text-[var(--los-accent)] uppercase ml-auto">WORKSPACES</MonoLabel>
+                <MonoLabel className="text-[var(--los-accent)] uppercase ml-auto">
+                  WORKSPACES
+                </MonoLabel>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {workspaces.map((ws) => (
+                  // biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler
+                  // biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler
                   <div
                     key={ws.id}
                     onClick={(e) => {
@@ -313,21 +418,36 @@ export const StatusBar = ({
                       setExpanded(false);
                     }}
                     className={cn(
-                      "border p-4 cursor-pointer transition-colors flex items-center justify-between group",
+                      'border p-4 cursor-pointer transition-colors flex items-center justify-between group',
                       currentWorkspace?.id === ws.id
-                        ? "border-[var(--los-accent)] bg-[var(--los-accent-dim)]"
-                        : "border-[var(--los-border)] hover:border-[var(--los-fg)] hover:bg-white/5"
+                        ? 'border-[var(--los-accent)] bg-[var(--los-accent-dim)]'
+                        : 'border-[var(--los-border)] hover:border-[var(--los-fg)] hover:bg-white/5',
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      <LayoutGrid size={16} className={currentWorkspace?.id === ws.id ? "text-[var(--los-accent)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]"} />
+                      <LayoutGrid
+                        size={16}
+                        className={
+                          currentWorkspace?.id === ws.id
+                            ? 'text-[var(--los-accent)]'
+                            : 'text-[var(--los-muted)] group-hover:text-[var(--los-fg)]'
+                        }
+                      />
                       <div className="flex flex-col">
-                        <MonoText className={currentWorkspace?.id === ws.id ? "text-[var(--los-accent)]" : "text-[var(--los-fg)]"}>
+                        <MonoText
+                          className={
+                            currentWorkspace?.id === ws.id
+                              ? 'text-[var(--los-accent)]'
+                              : 'text-[var(--los-fg)]'
+                          }
+                        >
                           {ws.name}
                         </MonoText>
                       </div>
                     </div>
-                    {currentWorkspace?.id === ws.id && <div className="w-2 h-2 rounded-full bg-[var(--los-accent)]" />}
+                    {currentWorkspace?.id === ws.id && (
+                      <div className="w-2 h-2 rounded-full bg-[var(--los-accent)]" />
+                    )}
                   </div>
                 ))}
               </div>
@@ -337,21 +457,26 @@ export const StatusBar = ({
 
         {/* The Bar Itself */}
         <div className="absolute top-0 left-0 right-0 h-full max-h-16 flex items-stretch justify-between w-full">
-
           {/* LEFT COLUMN */}
           <div className="flex-1 flex items-center gap-4 min-w-0 pl-4">
-            <div className={cn(
-              "bg-[var(--los-accent)] text-black font-bold text-[10px] px-2 py-0.5 rounded-sm shrink-0 uppercase transition-all",
-              isHovered ? "scale-110" : "scale-100"
-            )}>
+            <div
+              className={cn(
+                'bg-[var(--los-accent)] text-black font-bold text-[10px] px-2 py-0.5 rounded-sm shrink-0 uppercase transition-all',
+                isHovered ? 'scale-110' : 'scale-100',
+              )}
+            >
               {mode}
             </div>
 
             {/* Quick Links Toggle Button - Fix: Prevent Squeezing with shrink-0 */}
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
             <div
               onClick={handleToggleNavMode as any}
               className="hidden md:flex items-center justify-center w-5 h-5 min-w-[1.25rem] shrink-0 border border-[var(--los-border)] hover:border-[var(--los-accent)] rounded-sm cursor-pointer transition-colors text-[10px] font-mono text-[var(--los-muted)] hover:text-[var(--los-fg)]"
-              title={navMode === 'CONTEXT' ? "Switch to Quick Links" : "Switch to Context Selectors"}
+              title={
+                navMode === 'CONTEXT' ? 'Switch to Quick Links' : 'Switch to Context Selectors'
+              }
             >
               {navMode === 'CONTEXT' ? '2' : '1'}
             </div>
@@ -360,6 +485,7 @@ export const StatusBar = ({
             {navMode === 'QUICK' && (
               <div className="hidden md:flex h-full items-stretch gap-px">
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     logger.debug('Dashboard button clicked');
@@ -375,6 +501,7 @@ export const StatusBar = ({
                   <MonoText className="text-xs font-bold uppercase">Dashboard</MonoText>
                 </button>
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     logger.debug('Files button clicked');
@@ -391,7 +518,11 @@ export const StatusBar = ({
                 </button>
                 {onBoardClick && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); onBoardClick(); }}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onBoardClick();
+                    }}
                     className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
                   >
                     <Kanban size={12} className="group-hover:animate-pulse" />
@@ -405,20 +536,34 @@ export const StatusBar = ({
             {navMode === 'CONTEXT' && (
               <>
                 {(currentRepository || repositories.length > 0) && (
-                  <div
-                    className={cn(
-                      "hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300",
-                      expanded && expandedMode === 'REPOS' ? "text-[var(--los-accent)]" : "text-[var(--los-fg)] hover:text-[var(--los-accent)]"
-                    )}
-                    onClick={(e) => { e.stopPropagation(); handleToggleExpand('REPOS'); }}
-                    title={`Change Repository`}
-                  >
-                    <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
-                    <div className="flex items-center whitespace-nowrap hidden md:flex">
-                      <MonoText className="text-xs font-bold ml-2">{currentRepository ? currentRepository.name : "SELECT REPO"}</MonoText>
-                      <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
+                  <>
+                    {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
+                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
+                    <div
+                      className={cn(
+                        'hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300',
+                        expanded && expandedMode === 'REPOS'
+                          ? 'text-[var(--los-accent)]'
+                          : 'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleExpand('REPOS');
+                      }}
+                      title={`Change Repository`}
+                    >
+                      <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
+                      <div className="flex items-center whitespace-nowrap hidden md:flex">
+                        <MonoText className="text-xs font-bold ml-2">
+                          {currentRepository ? currentRepository.name : 'SELECT REPO'}
+                        </MonoText>
+                        <ChevronUp
+                          size={10}
+                          className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  </>
                 )}
 
                 {currentRepository && currentWorkspace && (
@@ -426,79 +571,115 @@ export const StatusBar = ({
                 )}
 
                 {currentWorkspace && (
-                  <div
-                    className={cn(
-                      "hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300 relative z-20",
-                      "text-[var(--los-fg)] hover:text-[var(--los-accent)]"
-                    )}
-                    onClick={(e) => { e.stopPropagation(); handleToggleExpand('WORKSPACES' as any); }}
-                    title={`Change Workspace`}
-                  >
-                    {onNextWorkspace && (
-                      <div
-                        className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100 hidden md:block" // Hidden on mobile to avoid misclicks
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onNextWorkspace();
-                        }}
-                        title="Next Workspace"
-                      >
-                        <ArrowRight size={14} />
-                      </div>
-                    )}
+                  <>
+                    {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
+                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
+                    <div
+                      className={cn(
+                        'hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300 relative z-20',
+                        'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleExpand('WORKSPACES' as any);
+                      }}
+                      title={`Change Workspace`}
+                    >
+                      {onNextWorkspace && (
+                        <>
+                          {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
+                          {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
+                          <div
+                            className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100 hidden md:block" // Hidden on mobile to avoid misclicks
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onNextWorkspace();
+                            }}
+                            title="Next Workspace"
+                          >
+                            <ArrowRight size={14} />
+                          </div>
+                        </>
+                      )}
 
-                    <LayoutGrid size={12} className="group-hover:animate-pulse shrink-0" />
-                    <div className="flex items-center whitespace-nowrap hidden md:flex">
-                      <MonoText className="text-xs font-bold ml-2">{currentWorkspace.name}</MonoText>
-                      <ChevronUp size={10} className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]" />
+                      <LayoutGrid size={12} className="group-hover:animate-pulse shrink-0" />
+                      <div className="flex items-center whitespace-nowrap hidden md:flex">
+                        <MonoText className="text-xs font-bold ml-2">
+                          {currentWorkspace.name}
+                        </MonoText>
+                        <ChevronUp
+                          size={10}
+                          className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </>
             )}
 
             {/* Breadcrumbs (Shifted to Left on Hover/Expand) - Hidden entirely on mobile when NOT expanded */}
-            <div className={cn(
-              "hidden lg:flex items-center gap-2 transition-all duration-500 transform origin-left whitespace-nowrap overflow-hidden ml-2",
-              "opacity-100 translate-x-0 max-w-[500px]"
-            )}>
+            <div
+              className={cn(
+                'hidden lg:flex items-center gap-2 transition-all duration-500 transform origin-left whitespace-nowrap overflow-hidden ml-2',
+                'opacity-100 translate-x-0 max-w-[500px]',
+              )}
+            >
               <span className="text-[var(--los-muted)]">/</span>
               {breadcrumbs.map((crumb, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: breadcrumbs have no stable id
                 <span key={i} className="flex items-center gap-1">
-                  <MonoText className={cn("text-xs", i === breadcrumbs.length - 1 ? "text-[var(--los-fg)]" : "text-[var(--los-muted)]")}>
+                  <MonoText
+                    className={cn(
+                      'text-xs',
+                      i === breadcrumbs.length - 1
+                        ? 'text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)]',
+                    )}
+                  >
                     {crumb}
                   </MonoText>
-                  {i < breadcrumbs.length - 1 && <span className="text-[var(--los-muted)] text-[10px]">/</span>}
+                  {i < breadcrumbs.length - 1 && (
+                    <span className="text-[var(--los-muted)] text-[10px]">/</span>
+                  )}
                 </span>
               ))}
             </div>
           </div>
-
 
           {/* CENTER COLUMN */}
           <div className="flex-[2] flex items-center justify-center relative h-full">
             {/* Magic Button - Always interactable on mobile (opacity-100) or if hovered/expanded */}
             {/* On mobile, we make it smaller but visible? Or just the icon? */}
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 handleToggleExpand('MENU');
               }}
               className={cn(
-                "absolute transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-2 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black shadow-[0_0_15px_rgba(var(--los-accent-rgb),0.3)]",
+                'absolute transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-2 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black shadow-[0_0_15px_rgba(var(--los-accent-rgb),0.3)]',
                 // Show on mobile by default (opacity-100), show on desktop only when hovered/expanded
-                (isHovered || expanded)
-                  ? "px-6 py-2 scale-100 translate-y-0"
-                  : "px-2 py-0.5 scale-90 translate-y-0 opacity-80 hover:opacity-100"
-              )}>
-              <Sparkles size={(isHovered || expanded) ? 18 : 14} fill="currentColor" className="animate-pulse transition-all" />
-              <span className={cn(
-                "font-bold uppercase tracking-widest hidden sm:inline transition-all",
-                (isHovered || expanded) ? "text-sm" : "text-[10px]"
-              )}>Life OS</span>
+                isHovered || expanded
+                  ? 'px-6 py-2 scale-100 translate-y-0'
+                  : 'px-2 py-0.5 scale-90 translate-y-0 opacity-80 hover:opacity-100',
+              )}
+            >
+              <Sparkles
+                size={isHovered || expanded ? 18 : 14}
+                fill="currentColor"
+                className="animate-pulse transition-all"
+              />
+              <span
+                className={cn(
+                  'font-bold uppercase tracking-widest hidden sm:inline transition-all',
+                  isHovered || expanded ? 'text-sm' : 'text-[10px]',
+                )}
+              >
+                KaiHuman
+              </span>
             </button>
           </div>
-
 
           {/* RIGHT COLUMN */}
           <div className="flex-1 flex items-center justify-end gap-6 min-w-0 pr-4">
@@ -506,19 +687,24 @@ export const StatusBar = ({
             {version && (
               <div
                 className={cn(
-                  "hidden md:flex items-center gap-2 whitespace-nowrap relative group/version transition-all duration-300",
-                  "opacity-100"
+                  'hidden md:flex items-center gap-2 whitespace-nowrap relative group/version transition-all duration-300',
+                  'opacity-100',
                 )}
                 title={`Build: ${version.buildTime}${version.gitHash ? `\nCommit: ${version.gitHash}` : ''}`}
               >
                 <MonoLabel className="text-[9px]">VERSION</MonoLabel>
-                <MonoText className="text-[10px] text-[var(--los-muted)]">{version.version}</MonoText>
+                <MonoText className="text-[10px] text-[var(--los-muted)]">
+                  {version.version}
+                </MonoText>
               </div>
             )}
 
             {/* Stats hidden on small screens */}
-            {stats.map((stat, i) => (
-              <div key={i} className="hidden md:flex items-center gap-2 whitespace-nowrap relative group/stat">
+            {stats.map((stat) => (
+              <div
+                key={stat.label}
+                className="hidden md:flex items-center gap-2 whitespace-nowrap relative group/stat"
+              >
                 <MonoLabel className="text-[9px]">{stat.label}</MonoLabel>
 
                 {stat.options ? (
@@ -529,7 +715,9 @@ export const StatusBar = ({
 
                     {/* Dropdown Menu */}
                     <div className="absolute bottom-full right-0 mb-2 w-32 bg-[var(--los-bg)] border border-[var(--los-border)] shadow-xl rounded-sm opacity-0 invisible group-hover/stat:opacity-100 group-hover/stat:visible transition-all duration-200 flex flex-col z-[150]">
-                      {stat.options.map(opt => (
+                      {stat.options.map((opt) => (
+                        // biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler
+                        // biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler
                         <div
                           key={opt}
                           onClick={(e) => {
@@ -537,8 +725,10 @@ export const StatusBar = ({
                             stat.onOptionSelect?.(opt);
                           }}
                           className={cn(
-                            "px-3 py-2 text-[10px] cursor-pointer hover:bg-[var(--los-accent)] hover:text-black transition-colors font-mono uppercase",
-                            stat.value === opt ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                            'px-3 py-2 text-[10px] cursor-pointer hover:bg-[var(--los-accent)] hover:text-black transition-colors font-mono uppercase',
+                            stat.value === opt
+                              ? 'text-[var(--los-accent)]'
+                              : 'text-[var(--los-muted)]',
                           )}
                         >
                           {opt}
@@ -551,22 +741,38 @@ export const StatusBar = ({
                 )}
               </div>
             ))}
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
             <div
               className="flex items-center gap-2 cursor-pointer group hover:bg-[var(--los-accent)]/10 px-2 py-1 rounded transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 aiStore.togglePanel();
               }}
-              title={aiStore.isConnected.value ? "Local AI Connected (Click to close)" : "Local AI Disconnected (Click to connect)"}
+              title={
+                aiStore.isConnected.value
+                  ? 'Local AI Connected (Click to close)'
+                  : 'Local AI Disconnected (Click to connect)'
+              }
             >
-              <div className={cn(
-                "w-1.5 h-1.5 rounded-full",
-                aiStore.isConnected.value ? "bg-[var(--los-accent)] animate-pulse" : "bg-[var(--los-muted)]"
-              )} />
-              <MonoText className={cn(
-                "text-[10px] hidden sm:block font-bold",
-                aiStore.isConnected.value ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
-              )}>AI</MonoText>
+              <div
+                className={cn(
+                  'w-1.5 h-1.5 rounded-full',
+                  aiStore.isConnected.value
+                    ? 'bg-[var(--los-accent)] animate-pulse'
+                    : 'bg-[var(--los-muted)]',
+                )}
+              />
+              <MonoText
+                className={cn(
+                  'text-[10px] hidden sm:block font-bold',
+                  aiStore.isConnected.value
+                    ? 'text-[var(--los-accent)]'
+                    : 'text-[var(--los-muted)]',
+                )}
+              >
+                AI
+              </MonoText>
             </div>
 
             <div className="flex items-center gap-2">
@@ -574,7 +780,6 @@ export const StatusBar = ({
               <MonoText className="text-[10px] hidden sm:block">ONLINE</MonoText>
             </div>
           </div>
-
         </div>
       </div>
     </>

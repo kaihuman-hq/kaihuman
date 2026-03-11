@@ -1,10 +1,16 @@
-import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { githubFileStore, Logger, layoutStore } from '@lifosy/core';
+import {
+  Command,
+  CornerDownLeft,
+  File,
+  GitBranch,
+  LayoutGrid,
+  Loader2,
+  Search,
+} from 'lucide-preact';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
-import { Dialog, DialogContent, DialogOverlay } from '../../components/Dialog';
-import { Search, File, Loader2, X, CornerDownLeft, Command, Hash, GitBranch, LayoutGrid } from 'lucide-preact';
-import { MonoLabel, MonoText } from '../Atoms/Typography';
-import { Logger, githubFileStore, layoutStore } from '@lifosy/core';
+import { MonoText } from '../Atoms/Typography';
 
 const logger = new Logger('SearchModal');
 
@@ -44,14 +50,14 @@ export const SearchModal = ({
   isOpen,
   onClose,
   onSelect,
-  currentRepository = "lifosy/monorepo",
+  currentRepository = 'lifosy/monorepo',
   githubToken,
   repositories = [],
   workspaces = [],
   onSelectRepository,
   onSelectWorkspace,
   onNavigateToFiles,
-  onCreateNewFile
+  onCreateNewFile,
 }: SearchModalProps) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -74,21 +80,26 @@ export const SearchModal = ({
 
     // Static Commands
     const staticCommands = [
-      { name: "Navigate to Files", path: "cmd:files", type: 'COMMAND', onSelect: onNavigateToFiles },
-      { name: "Create new File", path: "cmd:new-file", type: 'COMMAND', onSelect: onCreateNewFile },
-      { name: "Open Wiki", path: "cmd:wiki", type: 'COMMAND', onSelect: () => handleOpenWiki() },
-      { name: "Change Repo", path: "cmd:repo", type: 'COMMAND', onSelect: () => { } }, // Triggered by UI flow usually? Or needs specific handler
-      { name: "Change Workspace", path: "cmd:workspace", type: 'COMMAND', onSelect: () => { } }
+      {
+        name: 'Navigate to Files',
+        path: 'cmd:files',
+        type: 'COMMAND',
+        onSelect: onNavigateToFiles,
+      },
+      { name: 'Create new File', path: 'cmd:new-file', type: 'COMMAND', onSelect: onCreateNewFile },
+      { name: 'Open Wiki', path: 'cmd:wiki', type: 'COMMAND', onSelect: () => handleOpenWiki() },
+      { name: 'Change Repo', path: 'cmd:repo', type: 'COMMAND', onSelect: () => {} }, // Triggered by UI flow usually? Or needs specific handler
+      { name: 'Change Workspace', path: 'cmd:workspace', type: 'COMMAND', onSelect: () => {} },
     ];
 
-    staticCommands.forEach(cmd => {
+    staticCommands.forEach((cmd) => {
       if (cmd.name.toLowerCase().includes(lowerQ)) {
         cmds.push(cmd as SearchResult);
       }
     });
 
     // Repositories (Switch to Repo ABC)
-    repositories.forEach(repo => {
+    repositories.forEach((repo) => {
       const label = `Switch to Repo ${repo.name} `;
       if (label.toLowerCase().includes(lowerQ) || repo.name.toLowerCase().includes(lowerQ)) {
         cmds.push({
@@ -96,13 +107,13 @@ export const SearchModal = ({
           path: `repo:${repo.id} `,
           type: 'REPO',
           description: repo.name,
-          onSelect: () => onSelectRepository?.(repo.id)
+          onSelect: () => onSelectRepository?.(repo.id),
         });
       }
     });
 
     // Workspaces (Change Workspace / Switch to Workspace ABC)
-    workspaces.forEach(ws => {
+    workspaces.forEach((ws) => {
       const label = `Switch to Workspace ${ws.name} `;
       if (label.toLowerCase().includes(lowerQ) || ws.name.toLowerCase().includes(lowerQ)) {
         cmds.push({
@@ -110,7 +121,7 @@ export const SearchModal = ({
           path: `ws:${ws.id} `,
           type: 'WORKSPACE',
           description: ws.name,
-          onSelect: () => onSelectWorkspace?.(ws.id)
+          onSelect: () => onSelectWorkspace?.(ws.id),
         });
       }
     });
@@ -126,11 +137,13 @@ export const SearchModal = ({
     }
 
     // 1. Look for .wiki.md files
-    const wikiFiles = tree.filter(f => f.path.endsWith('.wiki.md'));
+    const wikiFiles = tree.filter((f) => f.path.endsWith('.wiki.md'));
 
     if (wikiFiles.length === 0) {
-      // Show notification? 
-      alert('No wiki found. Please create a file ending with .wiki.md (e.g. docs/index.wiki.md) to start a wiki.');
+      // Show notification?
+      alert(
+        'No wiki found. Please create a file ending with .wiki.md (e.g. docs/index.wiki.md) to start a wiki.',
+      );
       return;
     }
 
@@ -147,6 +160,7 @@ export const SearchModal = ({
   };
 
   // Debounced Search
+  // biome-ignore lint/correctness/useExhaustiveDependencies: getCommands is inline and stable per render
   useEffect(() => {
     // Always show commands if query is empty (or maybe just top commands?)
     // Requirement says "searches for files and actions", implies user types something.
@@ -175,34 +189,40 @@ export const SearchModal = ({
         const qFile = encodeURIComponent(`filename:${query} repo:${currentRepository} `);
 
         const headers: Record<string, string> = {
-          'Accept': 'application/vnd.github.v3+json'
+          Accept: 'application/vnd.github.v3+json',
         };
 
         if (githubToken) {
-          headers['Authorization'] = `Bearer ${githubToken} `;
+          headers.Authorization = `Bearer ${githubToken} `;
         }
 
         const [resContent, resFile] = await Promise.all([
           fetch(`https://api.github.com/search/code?q=${qContent}&per_page=10`, { headers }),
-          fetch(`https://api.github.com/search/code?q=${qFile}&per_page=10`, { headers })
+          fetch(`https://api.github.com/search/code?q=${qFile}&per_page=10`, { headers }),
         ]);
 
         let combinedFiles: SearchResult[] = [];
 
         if (resContent.ok) {
           const data = await resContent.json();
-          combinedFiles = [...combinedFiles, ...(data.items || []).map((i: any) => ({ ...i, type: 'FILE' }))];
+          combinedFiles = [
+            ...combinedFiles,
+            ...(data.items || []).map((i: any) => ({ ...i, type: 'FILE' })),
+          ];
         }
 
         if (resFile.ok) {
           const data = await resFile.json();
           // Prepend filename matches
-          combinedFiles = [...(data.items || []).map((i: any) => ({ ...i, type: 'FILE' })), ...combinedFiles];
+          combinedFiles = [
+            ...(data.items || []).map((i: any) => ({ ...i, type: 'FILE' })),
+            ...combinedFiles,
+          ];
         }
 
         // Deduplicate files by path
         const seen = new Set<string>();
-        const uniqueFiles = combinedFiles.filter(item => {
+        const uniqueFiles = combinedFiles.filter((item) => {
           if (seen.has(item.path)) return false;
           seen.add(item.path);
           return true;
@@ -211,7 +231,6 @@ export const SearchModal = ({
         // Merge: Commands First, then Files
         setResults([...cmds, ...uniqueFiles].slice(0, 50));
         setSelectedIndex(0);
-
       } catch (e) {
         logger.error('Search error', e);
       } finally {
@@ -220,15 +239,15 @@ export const SearchModal = ({
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [query, currentRepository, githubToken, repositories, workspaces]);
+  }, [query, currentRepository, githubToken]);
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex(prev => (prev + 1) % results.length);
+      setSelectedIndex((prev) => (prev + 1) % results.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedIndex(prev => (prev - 1 + results.length) % results.length);
+      setSelectedIndex((prev) => (prev - 1 + results.length) % results.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (results[selectedIndex]) {
@@ -251,10 +270,14 @@ export const SearchModal = ({
 
   const getIcon = (type: SearchResultType) => {
     switch (type) {
-      case 'COMMAND': return Command;
-      case 'REPO': return GitBranch;
-      case 'WORKSPACE': return LayoutGrid;
-      default: return File;
+      case 'COMMAND':
+        return Command;
+      case 'REPO':
+        return GitBranch;
+      case 'WORKSPACE':
+        return LayoutGrid;
+      default:
+        return File;
     }
   };
 
@@ -263,6 +286,8 @@ export const SearchModal = ({
   return (
     <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh] px-4">
       {/* Backdrop */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop dismiss pattern */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss pattern */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
@@ -270,7 +295,6 @@ export const SearchModal = ({
 
       {/* Modal */}
       <div className="relative w-full max-w-2xl bg-[var(--los-bg)] border border-[var(--los-accent)] shadow-2xl shadow-[var(--los-accent)]/20 rounded-md overflow-hidden flex flex-col max-h-[60vh] animate-in fade-in zoom-in-95 duration-200">
-
         {/* Header / Input */}
         <div className="flex items-center px-4 py-3 border-b border-[var(--los-border)] gap-3">
           <Search className="text-[var(--los-accent)] shrink-0" size={20} />
@@ -285,7 +309,9 @@ export const SearchModal = ({
           />
           {loading && <Loader2 className="animate-spin text-[var(--los-muted)]" size={16} />}
           <div className="hidden md:flex gap-1">
-            <span className="text-[10px] text-[var(--los-muted)] border border-[var(--los-border)] px-1.5 rounded-sm">ESC</span>
+            <span className="text-[10px] text-[var(--los-muted)] border border-[var(--los-border)] px-1.5 rounded-sm">
+              ESC
+            </span>
           </div>
         </div>
 
@@ -300,23 +326,36 @@ export const SearchModal = ({
           {results.map((item, index) => {
             const Icon = getIcon(item.type);
             return (
+              // biome-ignore lint/a11y/noStaticElementInteractions: search result click handler
+              // biome-ignore lint/a11y/useKeyWithClickEvents: search result click handler
               <div
                 key={item.path}
                 onClick={() => handleSelect(item)}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-sm cursor-pointer transition-colors group",
-                  index === selectedIndex ? "bg-[var(--los-accent-dim)]" : "hover:bg-[var(--los-accent-dim)]"
+                  'flex items-center gap-3 px-3 py-2 rounded-sm cursor-pointer transition-colors group',
+                  index === selectedIndex
+                    ? 'bg-[var(--los-accent-dim)]'
+                    : 'hover:bg-[var(--los-accent-dim)]',
                 )}
               >
-                <Icon size={16} className={cn(
-                  "shrink-0",
-                  index === selectedIndex ? "text-[var(--los-accent)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]"
-                )} />
+                <Icon
+                  size={16}
+                  className={cn(
+                    'shrink-0',
+                    index === selectedIndex
+                      ? 'text-[var(--los-accent)]'
+                      : 'text-[var(--los-muted)] group-hover:text-[var(--los-fg)]',
+                  )}
+                />
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className={cn(
-                    "text-sm truncate font-mono",
-                    index === selectedIndex ? "text-[var(--los-fg)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]"
-                  )}>
+                  <span
+                    className={cn(
+                      'text-sm truncate font-mono',
+                      index === selectedIndex
+                        ? 'text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] group-hover:text-[var(--los-fg)]',
+                    )}
+                  >
                     {item.name}
                   </span>
                   {item.type === 'FILE' && (
@@ -340,10 +379,13 @@ export const SearchModal = ({
 
         {/* Footer */}
         <div className="px-4 py-1.5 border-t border-[var(--los-border)] bg-[var(--los-panel)] flex justify-between items-center">
-          <MonoText className="text-[10px] text-[var(--los-muted)]">GitHub Search API & Commands</MonoText>
-          <MonoText className="text-[10px] text-[var(--los-muted)]">{results.length} results</MonoText>
+          <MonoText className="text-[10px] text-[var(--los-muted)]">
+            GitHub Search API & Commands
+          </MonoText>
+          <MonoText className="text-[10px] text-[var(--los-muted)]">
+            {results.length} results
+          </MonoText>
         </div>
-
       </div>
     </div>
   );

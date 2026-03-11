@@ -7,17 +7,9 @@
     "jsxImportSource": "preact",
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"]
     }
   },
-  "include": [
-    "src/**/*",
-    ".storybook/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["src/**/*", ".storybook/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

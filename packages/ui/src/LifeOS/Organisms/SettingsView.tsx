@@ -1,9 +1,8 @@
-import { h } from 'preact';
+import { ArrowDown, ArrowUp, Check, Edit2, Plus, Trash2, X } from 'lucide-preact';
 import { useState } from 'preact/hooks';
-import { DashboardConfig, DashboardWorkspace } from '../types';
-import { MonoHeader, MonoText } from '../Atoms/Typography';
-import { X, Plus, Trash2, Edit2, Check, ArrowUp, ArrowDown } from 'lucide-preact';
 import { cn } from '../../utils';
+import { MonoHeader, MonoText } from '../Atoms/Typography';
+import type { DashboardConfig, DashboardWorkspace } from '../types';
 
 interface SettingsViewProps {
   config: DashboardConfig;
@@ -23,26 +22,31 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
     const newId = `d${Date.now()}`; // Simple ID generation
     const newWorkspace: DashboardWorkspace = {
       id: newId,
-      name: newDashboardName.trim()
+      name: newDashboardName.trim(),
     };
 
     onConfigChange({
       ...config,
-      dashboards: [...config.dashboards, newWorkspace]
+      dashboards: [...config.dashboards, newWorkspace],
     });
     setNewDashboardName('');
   };
 
   const handleDeleteWorkspace = (id: string) => {
     if (config.dashboards.length <= 1) {
-      setError("Cannot delete the last dashboard.");
+      setError('Cannot delete the last dashboard.');
       return;
     }
-    if (!confirm("Are you sure you want to delete this dashboard? Entries associated with it will be hidden.")) return;
+    if (
+      !confirm(
+        'Are you sure you want to delete this dashboard? Entries associated with it will be hidden.',
+      )
+    )
+      return;
 
     onConfigChange({
       ...config,
-      dashboards: config.dashboards.filter(d => d.id !== id)
+      dashboards: config.dashboards.filter((d) => d.id !== id),
     });
   };
 
@@ -56,9 +60,9 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
 
     onConfigChange({
       ...config,
-      dashboards: config.dashboards.map(d =>
-        d.id === editingId ? { ...d, name: editName.trim() } : d
-      )
+      dashboards: config.dashboards.map((d) =>
+        d.id === editingId ? { ...d, name: editName.trim() } : d,
+      ),
     });
     setEditingId(null);
     setEditName('');
@@ -79,7 +83,7 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
     }
     onConfigChange({
       ...config,
-      dashboards: newDashboards
+      dashboards: newDashboards,
     });
   };
 
@@ -89,7 +93,11 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--los-border)]">
           <MonoHeader>SETTINGS</MonoHeader>
-          <button onClick={onClose} className="text-[var(--los-muted)] hover:text-[var(--los-fg)]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+          >
             <X size={20} />
           </button>
         </div>
@@ -104,55 +112,77 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
             <div className="flex items-center gap-4">
               {['nexus', 'light', 'amethyst'].map((theme) => (
                 <button
+                  type="button"
                   key={theme}
                   onClick={() => onConfigChange({ ...config, theme: theme as any })} // Cast because types might lag? No, types are updated.
                   className={cn(
-                    "flex flex-col items-center gap-2 p-2 rounded border transition-all",
+                    'flex flex-col items-center gap-2 p-2 rounded border transition-all',
                     config.theme === theme || (!config.theme && theme === 'nexus')
-                      ? "border-[var(--los-accent)] bg-[var(--los-accent-dim)]"
-                      : "border-[var(--los-border)] hover:border-[var(--los-fg)]"
+                      ? 'border-[var(--los-accent)] bg-[var(--los-accent-dim)]'
+                      : 'border-[var(--los-border)] hover:border-[var(--los-fg)]',
                   )}
                 >
-                  <div className={cn(
-                    "w-12 h-12 rounded-full border shadow-sm",
-                    theme === 'nexus' && "bg-[#000000] border-[#333333]",
-                    theme === 'light' && "bg-[#ffffff] border-[#e2e8f0]",
-                    theme === 'amethyst' && "bg-[#0f0518] border-[#3b0764]",
-                  )}></div>
+                  <div
+                    className={cn(
+                      'w-12 h-12 rounded-full border shadow-sm',
+                      theme === 'nexus' && 'bg-[#000000] border-[#333333]',
+                      theme === 'light' && 'bg-[#ffffff] border-[#e2e8f0]',
+                      theme === 'amethyst' && 'bg-[#0f0518] border-[#3b0764]',
+                    )}
+                  ></div>
                   <MonoText className="text-[10px] uppercase">{theme}</MonoText>
                 </button>
               ))}
             </div>
 
             <div className="flex items-center justify-between border-b border-[var(--los-border)] pb-2 pt-4">
-              <MonoText className="text-[var(--los-muted)] text-xs">DASHBOARDS (WORKSPACES)</MonoText>
+              <MonoText className="text-[var(--los-muted)] text-xs">
+                DASHBOARDS (WORKSPACES)
+              </MonoText>
             </div>
 
             {/* List */}
             <div className="space-y-2">
               {config.dashboards.map((ws, index) => (
-                <div key={ws.id} className="flex items-center justify-between p-3 bg-[var(--los-bg)] border border-[var(--los-border)] rounded hover:bg-white/5 transition-colors group">
+                <div
+                  key={ws.id}
+                  className="flex items-center justify-between p-3 bg-[var(--los-bg)] border border-[var(--los-border)] rounded hover:bg-white/5 transition-colors group"
+                >
                   {editingId === ws.id ? (
                     <div className="flex items-center gap-2 flex-1 mr-4">
                       <input
                         className="flex-1 bg-black/20 border border-[var(--los-accent)] p-1 text-sm text-[var(--los-fg)] outline-none"
                         value={editName}
                         onInput={(e) => setEditName(e.currentTarget.value)}
-                        autoFocus
                       />
-                      <button onClick={saveEdit} className="text-green-500 hover:text-green-400"><Check size={16} /></button>
-                      <button onClick={() => setEditingId(null)} className="text-red-500 hover:text-red-400"><X size={16} /></button>
+                      <button
+                        type="button"
+                        onClick={saveEdit}
+                        className="text-green-500 hover:text-green-400"
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(null)}
+                        className="text-red-500 hover:text-red-400"
+                      >
+                        <X size={16} />
+                      </button>
                     </div>
                   ) : (
                     <div className="flex flex-col">
                       <MonoText className="text-[var(--los-fg)] font-bold">{ws.name}</MonoText>
-                      <MonoText className="text-[var(--los-muted)] text-[10px]">ID: {ws.id}</MonoText>
+                      <MonoText className="text-[var(--los-muted)] text-[10px]">
+                        ID: {ws.id}
+                      </MonoText>
                     </div>
                   )}
 
                   <div className="flex items-center gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="flex flex-col gap-1 mr-2">
                       <button
+                        type="button"
                         onClick={() => moveWorkspace(index, 'up')}
                         disabled={index === 0}
                         className="text-[var(--los-muted)] hover:text-[var(--los-fg)] disabled:opacity-30"
@@ -160,6 +190,7 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
                         <ArrowUp size={12} />
                       </button>
                       <button
+                        type="button"
                         onClick={() => moveWorkspace(index, 'down')}
                         disabled={index === config.dashboards.length - 1}
                         className="text-[var(--los-muted)] hover:text-[var(--los-fg)] disabled:opacity-30"
@@ -169,6 +200,7 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => startEdit(ws)}
                       className="p-1.5 border border-[var(--los-border)] rounded hover:bg-[var(--los-fg)] hover:text-[var(--los-bg)] transition-colors"
                       title="Rename"
@@ -176,6 +208,7 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
                       <Edit2 size={14} />
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDeleteWorkspace(ws.id)}
                       className="p-1.5 border border-red-900/50 text-red-500 rounded hover:bg-red-900/20 transition-colors"
                       title="Delete"
@@ -197,6 +230,7 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
                 onKeyDown={(e) => e.key === 'Enter' && handleAddWorkspace()}
               />
               <button
+                type="button"
                 onClick={handleAddWorkspace}
                 className="flex items-center gap-2 px-4 py-2 bg-[var(--los-fg)] text-[var(--los-bg)] font-bold text-sm rounded hover:opacity-90 transition-opacity"
               >
@@ -204,10 +238,7 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
               </button>
             </div>
 
-            {error && (
-              <MonoText className="text-red-500 text-xs mt-2">{error}</MonoText>
-            )}
-
+            {error && <MonoText className="text-red-500 text-xs mt-2">{error}</MonoText>}
           </section>
         </div>
       </div>

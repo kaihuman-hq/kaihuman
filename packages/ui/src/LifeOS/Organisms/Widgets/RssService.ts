@@ -1,6 +1,6 @@
-import { signal, computed } from '@preact/signals';
 import { Logger } from '@lifosy/core';
-import { RssItem, fetchFeedXml, parseFeedItems } from './RssLogic';
+import { signal } from '@preact/signals';
+import { fetchFeedXml, parseFeedItems, type RssItem } from './RssLogic';
 
 const logger = new Logger('RssService');
 
@@ -26,8 +26,8 @@ export class RssService {
           items: [],
           lastFetched: 0,
           loading: false,
-          error: null
-        }
+          error: null,
+        },
       };
     }
   }
@@ -38,7 +38,7 @@ export class RssService {
     const now = Date.now();
 
     // Cache valid?
-    if (feed && feed.items.length > 0 && (now - feed.lastFetched < CACHE_DURATION_MS)) {
+    if (feed && feed.items.length > 0 && now - feed.lastFetched < CACHE_DURATION_MS) {
       logger.debug(`[Cache Hit] ${url}`);
       return;
     }
@@ -57,10 +57,15 @@ export class RssService {
     logger.debug(`[Fetching] ${url}`);
 
     // Set Loading
-    const current = this.feeds.value[url] || { items: [], lastFetched: 0, loading: false, error: null };
+    const current = this.feeds.value[url] || {
+      items: [],
+      lastFetched: 0,
+      loading: false,
+      error: null,
+    };
     this.feeds.value = {
       ...this.feeds.value,
-      [url]: { ...current, loading: true, error: null }
+      [url]: { ...current, loading: true, error: null },
     };
 
     try {
@@ -78,8 +83,8 @@ export class RssService {
           items,
           lastFetched: Date.now(),
           loading: false,
-          error: null
-        }
+          error: null,
+        },
       };
     } catch (e: any) {
       logger.error(`Failed to fetch feed ${url}`, e);
@@ -91,8 +96,8 @@ export class RssService {
           items: current.items || [], // Fallback to empty array if somehow undefined
           lastFetched: current.lastFetched || 0,
           loading: false,
-          error: e.message || 'Unknown error'
-        }
+          error: e.message || 'Unknown error',
+        },
       };
     }
   }

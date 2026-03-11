@@ -2,13 +2,13 @@ import { authStore } from '@lifosy/core';
 import { NotFound } from '@lifosy/ui';
 
 import { Route, Router, route } from 'preact-router';
-import { Dashboard } from './pages/Dashboard';
-import { KanbanBoardPage } from './pages/KanbanBoardPage';
-import { TodoAnalyticsPage } from './pages/TodoAnalyticsPage';
-import { Login } from './pages/login';
-import { AuthCli } from './pages/AuthCli';
-import { ExtensionSuccess } from './pages/ExtensionSuccess';
 import { ExtensionAuthBridge } from './components/ExtensionAuthBridge';
+import { AuthCli } from './pages/AuthCli';
+import { Dashboard } from './pages/Dashboard';
+import { ExtensionSuccess } from './pages/ExtensionSuccess';
+import { KanbanBoardPage } from './pages/KanbanBoardPage';
+import { Login } from './pages/login';
+import { TodoAnalyticsPage } from './pages/TodoAnalyticsPage';
 
 // Simple protected route wrapper
 const ProtectedRoute = ({ component: Component, ...props }: any) => {

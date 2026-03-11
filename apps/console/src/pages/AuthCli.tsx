@@ -4,7 +4,9 @@ import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 
 export function AuthCli() {
-  const [status, setStatus] = useState<'checking' | 'authenticated' | 'redirecting' | 'error'>('checking');
+  const [status, setStatus] = useState<'checking' | 'authenticated' | 'redirecting' | 'error'>(
+    'checking',
+  );
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
@@ -56,8 +58,8 @@ export function AuthCli() {
     return (
       <div class="flex h-screen w-full flex-col items-center justify-center bg-nexus-bg text-nexus-text font-sans">
         <div class="max-w-md space-y-8 rounded-lg border border-nexus-border bg-nexus-panel p-10 shadow-2xl text-center">
-          <h2 class="text-2xl font-bold text-white">CLI Authentication</h2>
-          <p class="text-nexus-muted">You need to be logged in to authenticate the CLI.</p>
+          <h2 class="text-2xl font-bold text-white">KaiHuman CLI</h2>
+          <p class="text-nexus-muted">Sign in to connect your terminal to your continuous improvement system.</p>
           <Button onClick={() => authStore.login()} label="Login to Continue" className="w-full" />
         </div>
       </div>
@@ -73,7 +75,9 @@ export function AuthCli() {
           <div class="space-y-4">
             <h2 class="text-2xl font-bold text-white">Authenticating CLI...</h2>
             <p class="text-nexus-muted">You are being redirected back to your terminal.</p>
-            <div class="animate-pulse text-sm text-nexus-muted">If nothing happens, check your terminal.</div>
+            <div class="animate-pulse text-sm text-nexus-muted">
+              If nothing happens, check your terminal.
+            </div>
           </div>
         )}
         {status === 'error' && (

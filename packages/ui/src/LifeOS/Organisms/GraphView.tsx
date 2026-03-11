@@ -1,12 +1,11 @@
-import { h } from 'preact';
-import { useEffect, useRef, useState, useMemo, lazy, Suspense } from 'preact/compat';
-import { useSignal } from '@preact/signals';
-import { Logger, githubFileStore, githubService, githubProfileStore } from '@lifosy/core';
+import { githubFileStore, githubProfileStore, Logger } from '@lifosy/core';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'preact/compat';
+
 // import ForceGraph2D from 'react-force-graph-2d';
 const ForceGraph2D = lazy(() => import('react-force-graph-2d'));
+
+import { Loader2, RefreshCw, Share2 } from 'lucide-preact';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
-import { Loader2, Share2, RefreshCw } from 'lucide-preact';
-import { cn } from '../../utils';
 
 const logger = new Logger('GraphView');
 
@@ -15,9 +14,10 @@ const findLinks = (content: string): string[] => {
   const links: string[] = [];
   // Wiki links [[...]]
   const wikiRegex = /\[\[(.*?)\]\]/g;
-  let match;
+  let match: RegExpExecArray | null;
+  // biome-ignore lint/suspicious/noAssignInExpressions: standard regex exec loop
   while ((match = wikiRegex.exec(content)) !== null) {
-    if (match && match[1]) {
+    if (match?.[1]) {
       // Extract path, ignore alias like [[path|alias]]
       const linkPath = match[1].split('|')[0];
       if (linkPath) links.push(linkPath);
@@ -26,6 +26,7 @@ const findLinks = (content: string): string[] => {
 
   // Standard links [text](path)
   const stdRegex = /\[.*?\]\((.*?)\)/g;
+  // biome-ignore lint/suspicious/noAssignInExpressions: standard regex exec loop
   while ((match = stdRegex.exec(content)) !== null) {
     const link = match[1];
     if (link && !link.startsWith('http')) {
@@ -44,7 +45,7 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
   // Resize observer
   useEffect(() => {
     if (!containerRef.current) return;
-    const obs = new ResizeObserver(entries => {
+    const obs = new ResizeObserver((entries) => {
       if (!entries || !entries[0]) return;
       const { width, height } = entries[0].contentRect;
       setDimensions({ width, height });
@@ -59,15 +60,15 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
   // Build Graph Data
   const graphData = useMemo(() => {
     const nodes = tree
-      .filter(t => t.path.endsWith('.md'))
-      .map(t => ({
+      .filter((t) => t.path.endsWith('.md'))
+      .map((t) => ({
         id: t.path,
         name: t.path.split('/').pop() || t.path,
-        val: 1 // Default size
+        val: 1, // Default size
       }));
 
     const links: { source: string; target: string }[] = [];
-    const nodeIds = new Set(nodes.map(n => n.id));
+    const nodeIds = new Set(nodes.map((n) => n.id));
 
     // Iterate over all OPEN files (or cached ones if we had access to full cache synchronously)
     // githubFileStore.openFiles only has currently 'open' files.
@@ -84,7 +85,7 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
       // nodes.find(n => n.id === path)!.val += 1; // self-importance?
 
       const extractedLinks = findLinks(file.content);
-      extractedLinks.forEach(link => {
+      extractedLinks.forEach((link) => {
         // Resolve link to path
         // Simple resolution: exact match or relative?
         // Assuming simplified exact match or relative from root for now.
@@ -97,7 +98,7 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
           if (nodeIds.has(`${target}.md`)) target = `${target}.md`;
           // Try just filename match?
           else {
-            const found = nodes.find(n => n.name === target || n.name === `${target}.md`);
+            const found = nodes.find((n) => n.name === target || n.name === `${target}.md`);
             if (found) target = found.id;
           }
         }
@@ -114,7 +115,7 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
   const handleAnalyzeAll = async () => {
     setIsAnalyzing(true);
     setAnalyzedCount(0);
-    const mdFiles = tree.filter(t => t.path.endsWith('.md'));
+    const mdFiles = tree.filter((t) => t.path.endsWith('.md'));
     const repo = githubProfileStore.currentRepo.value;
 
     if (!repo) return;
@@ -123,17 +124,17 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
     // We'll use githubFileStore.openFile to fetch and cache.
     // But openFile sets activeFile, which might be annoying (flickering UI).
     // Better to use githubService directly and update cache/store silently?
-    // Reuse openFile for now but maybe suppress active switch? 
-    // Actually githubFileStore.openFile puts it in openFiles map. 
+    // Reuse openFile for now but maybe suppress active switch?
+    // Actually githubFileStore.openFile puts it in openFiles map.
 
     // Concurrency limit: 5
     const limit = 5;
     const queue = [...mdFiles];
-    let active = 0;
+    let _active = 0;
 
     const processNext = async () => {
       if (queue.length === 0) return;
-      active++;
+      _active++;
       const file = queue.shift();
       if (file) {
         try {
@@ -142,11 +143,11 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
             await githubFileStore.openFile(file.path);
           }
         } catch (e) {
-          logger.warn("Failed to analyze", file.path, e);
+          logger.warn('Failed to analyze', file.path, e);
         }
-        setAnalyzedCount(prev => prev + 1);
+        setAnalyzedCount((prev) => prev + 1);
       }
-      active--;
+      _active--;
       if (queue.length > 0) await processNext();
     };
 
@@ -168,6 +169,7 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
           </span>
         </div>
         <button
+          type="button"
           onClick={handleAnalyzeAll}
           disabled={isAnalyzing}
           className="flex items-center gap-2 px-3 py-1.5 text-xs border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-[var(--los-bg)] transition-colors disabled:opacity-50"
@@ -178,11 +180,13 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
       </div>
 
       <div ref={containerRef} className="flex-1 relative cursor-move">
-        <Suspense fallback={
-          <div className="flex h-full w-full items-center justify-center">
-            <Loader2 className="animate-spin text-[var(--los-muted)]" size={32} />
-          </div>
-        }>
+        <Suspense
+          fallback={
+            <div className="flex h-full w-full items-center justify-center">
+              <Loader2 className="animate-spin text-[var(--los-muted)]" size={32} />
+            </div>
+          }
+        >
           <ForceGraph2D
             width={dimensions.width}
             height={dimensions.height}

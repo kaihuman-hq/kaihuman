@@ -1,25 +1,13 @@
-import { h } from 'preact';
-import { useState, useEffect, useMemo } from 'preact/hooks';
-import { computed } from '@preact/signals';
-import { githubFileStore, layoutStore, Logger, TreeItem } from '@lifosy/core';
-import { cn } from '../../utils';
-import {
-  ChevronRight,
-  ChevronDown,
-  FileText,
-  Menu,
-  Search,
-  Hash,
-  Copy,
-  Check,
-  Edit3
-} from 'lucide-preact';
+import { githubFileStore, Logger, layoutStore, type TreeItem } from '@lifosy/core';
+import { Check, ChevronDown, ChevronRight, Copy, Edit3, FileText, Menu } from 'lucide-preact';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import remarkGfm from 'remark-gfm';
+import { cn } from '../../utils';
 import 'highlight.js/styles/github-dark.css'; // Or any other style
 
-const logger = new Logger('WikiView');
+const _logger = new Logger('WikiView');
 
 interface WikiViewProps {
   rootPath: string; // The root folder of the wiki
@@ -40,7 +28,7 @@ export const WikiView = ({ rootPath }: WikiViewProps) => {
 
     // items startsWith rootPath
     // items are markdown or folder
-    const relevantItems = tree.filter(item => {
+    const relevantItems = tree.filter((item) => {
       if (!item.path.startsWith(rootPath)) return false;
       if (item.type === 'tree') return true;
       return item.path.endsWith('.md');
@@ -53,11 +41,16 @@ export const WikiView = ({ rootPath }: WikiViewProps) => {
   useEffect(() => {
     if (!activeFile && wikiTree.length > 0) {
       // Try to find index.wiki.md or README.md or just first md
-      const index = wikiTree.find(i => i.path === `${rootPath}/index.wiki.md` || i.path === `${rootPath}/index.md` || i.path === `${rootPath}/README.md`);
+      const index = wikiTree.find(
+        (i) =>
+          i.path === `${rootPath}/index.wiki.md` ||
+          i.path === `${rootPath}/index.md` ||
+          i.path === `${rootPath}/README.md`,
+      );
       if (index) {
         setActiveFile(index.path);
       } else {
-        const firstFile = wikiTree.find(i => i.type !== 'tree');
+        const firstFile = wikiTree.find((i) => i.type !== 'tree');
         if (firstFile) setActiveFile(firstFile.path);
       }
     }
@@ -77,15 +70,17 @@ export const WikiView = ({ rootPath }: WikiViewProps) => {
       layoutStore.navigate(activeFile);
       layoutStore.view.value = 'DASHBOARD'; // Switch back to editor
     }
-  }
+  };
 
   return (
     <div className="flex h-full w-full bg-[#0d1117] text-[#c9d1d9]">
       {/* Sidebar */}
-      <div className={cn(
-        "flex-shrink-0 bg-[#010409] border-r border-[#30363d] transition-all duration-300 flex flex-col",
-        sidebarOpen ? "w-64" : "w-0 overflow-hidden"
-      )}>
+      <div
+        className={cn(
+          'flex-shrink-0 bg-[#010409] border-r border-[#30363d] transition-all duration-300 flex flex-col',
+          sidebarOpen ? 'w-64' : 'w-0 overflow-hidden',
+        )}
+      >
         <div className="p-4 border-b border-[#30363d] flex items-center justify-between">
           <span className="font-bold text-sm truncate">Wiki</span>
         </div>
@@ -101,10 +96,10 @@ export const WikiView = ({ rootPath }: WikiViewProps) => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-full min-w-0">
-
         {/* Header/Toolbar */}
         <div className="h-12 border-b border-[#30363d] flex items-center px-4 gap-4 bg-[#0d1117]">
           <button
+            type="button"
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-1 hover:bg-[#21262d] rounded text-[#8b949e]"
           >
@@ -115,6 +110,7 @@ export const WikiView = ({ rootPath }: WikiViewProps) => {
           </div>
           {activeFile && (
             <button
+              type="button"
               onClick={handleEdit}
               className="flex items-center gap-2 px-3 py-1 bg-[#238636] text-white text-xs font-bold rounded hover:bg-[#2ea043] transition-colors"
             >
@@ -133,15 +129,19 @@ export const WikiView = ({ rootPath }: WikiViewProps) => {
                 rehypePlugins={[rehypeHighlight]}
                 components={{
                   code: (({ node, inline, className, children, ...props }: any) => {
-                    const match = /language-(\w+)/.exec(className || '')
+                    const match = /language-(\w+)/.exec(className || '');
                     return !inline && match ? (
-                      <CodeBlock language={match[1]} value={String(children).replace(/\n$/, '')} {...props} />
+                      <CodeBlock
+                        language={match[1]}
+                        value={String(children).replace(/\n$/, '')}
+                        {...props}
+                      />
                     ) : (
                       <code className={className} {...props}>
                         {children}
                       </code>
-                    )
-                  }) as any
+                    );
+                  }) as any,
                 }}
               >
                 {content}
@@ -178,7 +178,7 @@ const WikiSidebar = ({ items, rootPath, activeFile, onSelect }: any) => {
             name: part,
             path: idx === parts.length - 1 ? item.path : null, // Only leaf has path matching item
             type: idx === parts.length - 1 ? item.type : 'tree',
-            children: {}
+            children: {},
           };
         }
         current = current.children[part];
@@ -188,24 +188,26 @@ const WikiSidebar = ({ items, rootPath, activeFile, onSelect }: any) => {
   }, [items, rootPath]);
 
   const renderTree = (nodes: any, depth = 0) => {
-    return Object.values(nodes).sort((a: any, b: any) => {
-      // Folders first
-      if (a.type !== b.type) return a.type === 'tree' ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    }).map((node: any) => (
-      <WikiTreeItem
-        key={node.path || node.name + depth}
-        node={node}
-        depth={depth}
-        activeFile={activeFile}
-        onSelect={onSelect}
-        renderChildren={renderTree}
-      />
-    ));
+    return Object.values(nodes)
+      .sort((a: any, b: any) => {
+        // Folders first
+        if (a.type !== b.type) return a.type === 'tree' ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      })
+      .map((node: any) => (
+        <WikiTreeItem
+          key={node.path || node.name + depth}
+          node={node}
+          depth={depth}
+          activeFile={activeFile}
+          onSelect={onSelect}
+          renderChildren={renderTree}
+        />
+      ));
   };
 
   return <div className="space-y-0.5">{renderTree(treeStructure)}</div>;
-}
+};
 
 const WikiTreeItem = ({ node, depth, activeFile, onSelect, renderChildren }: any) => {
   const [expanded, setExpanded] = useState(true); // Default expanded
@@ -222,11 +224,15 @@ const WikiTreeItem = ({ node, depth, activeFile, onSelect, renderChildren }: any
 
   return (
     <div>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: tree item click handler */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: tree item click handler */}
       <div
         className={cn(
-          "flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer select-none text-sm transition-colors",
-          isActive ? "bg-[#1f6feb] text-white" : "text-[#8b949e] hover:bg-[#161b22] hover:text-[#c9d1d9]",
-          !isActive && "active:bg-[#21262d]"
+          'flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer select-none text-sm transition-colors',
+          isActive
+            ? 'bg-[#1f6feb] text-white'
+            : 'text-[#8b949e] hover:bg-[#161b22] hover:text-[#c9d1d9]',
+          !isActive && 'active:bg-[#21262d]',
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
         onClick={handleClick}
@@ -239,11 +245,7 @@ const WikiTreeItem = ({ node, depth, activeFile, onSelect, renderChildren }: any
         {!isFolder && <FileText size={14} className="opacity-70" />}
         <span className="truncate">{node.name}</span>
       </div>
-      {isFolder && expanded && (
-        <div>
-          {renderChildren(node.children, depth + 1)}
-        </div>
-      )}
+      {isFolder && expanded && <div>{renderChildren(node.children, depth + 1)}</div>}
     </div>
   );
 };
@@ -263,6 +265,7 @@ const CodeBlock = ({ language, value }: any) => {
       <div className="flex items-center justify-between px-3 py-2 bg-[#0d1117] border-b border-[#30363d]">
         <span className="text-xs text-[#8b949e] font-mono">{language}</span>
         <button
+          type="button"
           onClick={onCopy}
           className="p-1 hover:bg-[#21262d] rounded text-[#8b949e] transition-colors"
           title="Copy code"
@@ -271,9 +274,7 @@ const CodeBlock = ({ language, value }: any) => {
         </button>
       </div>
       <pre className="!bg-[#161b22] !m-0 !p-4 overflow-x-auto text-sm">
-        <code className={`language-${language}`}>
-          {value}
-        </code>
+        <code className={`language-${language}`}>{value}</code>
       </pre>
     </div>
   );

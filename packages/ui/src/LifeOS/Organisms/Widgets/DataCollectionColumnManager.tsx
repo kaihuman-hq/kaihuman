@@ -1,8 +1,14 @@
-import { h } from 'preact';
 import { useState } from 'preact/hooks';
-import { DataCollectionData, ColumnDefinition, addColumn, updateColumn, deleteColumn, serializeDataCollection, parseDataCollection } from './DataCollectionLogic';
-import { MonoText, MonoHeader } from '../../Atoms/Typography';
-import { cn } from '../../../utils';
+import { MonoHeader, MonoText } from '../../Atoms/Typography';
+import {
+  addColumn,
+  type ColumnDefinition,
+  type DataCollectionData,
+  deleteColumn,
+  parseDataCollection,
+  serializeDataCollection,
+  updateColumn,
+} from './DataCollectionLogic';
 
 interface DataCollectionColumnManagerProps {
   content: string;
@@ -16,11 +22,14 @@ const COLUMN_TYPES = [
   'auto:date',
   'auto:date:yesterday',
   'auto:number:sum',
-  'auto:number:avg'
+  'auto:number:avg',
 ] as const;
 
-export const DataCollectionColumnManager = ({ content, onChange }: DataCollectionColumnManagerProps) => {
-  // Use local state for data or derive? 
+export const DataCollectionColumnManager = ({
+  content,
+  onChange,
+}: DataCollectionColumnManagerProps) => {
+  // Use local state for data or derive?
   // We should derive but we need logic functions that take Data object
   // So we parse on render? Or assume parent passes raw content?
   // Let's parse.
@@ -59,7 +68,7 @@ export const DataCollectionColumnManager = ({ content, onChange }: DataCollectio
   const handleSave = () => {
     try {
       if (!formName.trim()) {
-        setError("Name is required");
+        setError('Name is required');
         return;
       }
 
@@ -67,7 +76,7 @@ export const DataCollectionColumnManager = ({ content, onChange }: DataCollectio
         name: formName.trim(),
         type: formType as any,
         unit: formUnit.trim() || undefined,
-        isAuto: formType.startsWith('auto:') || undefined
+        isAuto: formType.startsWith('auto:') || undefined,
       };
 
       let newData: DataCollectionData;
@@ -104,22 +113,33 @@ export const DataCollectionColumnManager = ({ content, onChange }: DataCollectio
 
         <div className="space-y-2">
           {data.columns.map((col: ColumnDefinition) => (
-            <div key={col.name} className="flex items-center justify-between p-3 bg-[var(--los-bg)] border border-[var(--los-border)] rounded hover:bg-white/5 transition-colors">
+            <div
+              key={col.name}
+              className="flex items-center justify-between p-3 bg-[var(--los-bg)] border border-[var(--los-border)] rounded hover:bg-white/5 transition-colors"
+            >
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <MonoText className="text-[var(--los-fg)] font-bold">{col.name}</MonoText>
-                  {col.unit && <MonoText className="text-[var(--los-muted)] text-[10px]">({col.unit})</MonoText>}
+                  {col.unit && (
+                    <MonoText className="text-[var(--los-muted)] text-[10px]">
+                      ({col.unit})
+                    </MonoText>
+                  )}
                 </div>
-                <MonoText className="text-[var(--los-muted)] text-[10px] font-mono">{col.type}</MonoText>
+                <MonoText className="text-[var(--los-muted)] text-[10px] font-mono">
+                  {col.type}
+                </MonoText>
               </div>
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={() => handleEdit(col)}
                   className="px-2 py-1 text-[10px] border border-[var(--los-border)] rounded hover:bg-[var(--los-fg)] hover:text-[var(--los-bg)] transition-colors"
                 >
                   EDIT
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleDelete(col.name)}
                   className="px-2 py-1 text-[10px] border border-red-900/50 text-red-500 rounded hover:bg-red-900/20 transition-colors"
                 >
@@ -144,8 +164,11 @@ export const DataCollectionColumnManager = ({ content, onChange }: DataCollectio
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-[10px] text-[var(--los-muted)]">NAME</label>
+            <label htmlFor="col-name" className="text-[10px] text-[var(--los-muted)]">
+              NAME
+            </label>
             <input
+              id="col-name"
               className="w-full bg-black/20 border border-[var(--los-border)] p-2 text-xs text-[var(--los-fg)] focus:outline-none focus:border-[var(--los-accent)]"
               value={formName}
               onInput={(e) => setFormName(e.currentTarget.value)}
@@ -154,21 +177,29 @@ export const DataCollectionColumnManager = ({ content, onChange }: DataCollectio
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] text-[var(--los-muted)]">TYPE</label>
+            <label htmlFor="col-type" className="text-[10px] text-[var(--los-muted)]">
+              TYPE
+            </label>
             <select
+              id="col-type"
               className="w-full bg-black/20 border border-[var(--los-border)] p-2 text-xs text-[var(--los-fg)] focus:outline-none focus:border-[var(--los-accent)] appearance-none"
               value={formType}
               onChange={(e) => setFormType(e.currentTarget.value)}
             >
-              {COLUMN_TYPES.map(t => (
-                <option key={t} value={t}>{t}</option>
+              {COLUMN_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
               ))}
             </select>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] text-[var(--los-muted)]">UNIT (OPTIONAL)</label>
+            <label htmlFor="col-unit" className="text-[10px] text-[var(--los-muted)]">
+              UNIT (OPTIONAL)
+            </label>
             <input
+              id="col-unit"
               className="w-full bg-black/20 border border-[var(--los-border)] p-2 text-xs text-[var(--los-fg)] focus:outline-none focus:border-[var(--los-accent)]"
               value={formUnit}
               onInput={(e) => setFormUnit(e.currentTarget.value)}
@@ -177,15 +208,12 @@ export const DataCollectionColumnManager = ({ content, onChange }: DataCollectio
           </div>
         </div>
 
-        {error && (
-          <div className="text-red-500 text-[10px] mt-2 font-mono">
-            ! {error}
-          </div>
-        )}
+        {error && <div className="text-red-500 text-[10px] mt-2 font-mono">! {error}</div>}
 
         <div className="flex gap-2 mt-4 justify-end">
           {editingName && (
             <button
+              type="button"
               onClick={resetForm}
               className="px-4 py-2 text-xs border border-[var(--los-border)] rounded hover:bg-white/5 transition-colors"
             >
@@ -193,6 +221,7 @@ export const DataCollectionColumnManager = ({ content, onChange }: DataCollectio
             </button>
           )}
           <button
+            type="button"
             onClick={handleSave}
             className="px-4 py-2 text-xs bg-[var(--los-fg)] text-[var(--los-bg)] font-bold rounded hover:opacity-90 transition-opacity"
           >

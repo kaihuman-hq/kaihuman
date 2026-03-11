@@ -1,10 +1,7 @@
-import { h } from 'preact';
-import { useEffect } from 'preact/hooks';
-import { useSignal } from '@preact/signals';
 import { githubCommitStore } from '@lifosy/core';
+import { ExternalLink, GitCommit, Loader2 } from 'lucide-preact';
+import { useEffect } from 'preact/hooks';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
-import { Loader2, GitCommit, ExternalLink } from 'lucide-preact';
-import { cn } from '../../utils';
 
 export const CommitsView = () => {
   useEffect(() => {
@@ -17,7 +14,7 @@ export const CommitsView = () => {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
@@ -59,12 +56,17 @@ export const CommitsView = () => {
 
           <div className="space-y-1">
             {commits.map((item) => (
-              <div key={item.sha} className="grid grid-cols-[1fr_150px_180px_100px] gap-4 px-4 py-3 hover:bg-[var(--los-accent)]/5 border border-transparent hover:border-[var(--los-accent)]/20 transition-colors rounded-sm group">
+              <div
+                key={item.sha}
+                className="grid grid-cols-[1fr_150px_180px_100px] gap-4 px-4 py-3 hover:bg-[var(--los-accent)]/5 border border-transparent hover:border-[var(--los-accent)]/20 transition-colors rounded-sm group"
+              >
                 <div className="truncate font-medium text-[var(--los-fg)] flex items-center gap-2">
                   <span title={item.commit.message}>{item.commit.message.split('\n')[0]}</span>
                 </div>
                 <div className="truncate text-[var(--los-muted)]">{item.commit.author.name}</div>
-                <div className="truncate text-[var(--los-muted)] text-xs font-mono pt-1">{formatDate(item.commit.author.date)}</div>
+                <div className="truncate text-[var(--los-muted)] text-xs font-mono pt-1">
+                  {formatDate(item.commit.author.date)}
+                </div>
                 <div className="flex items-center gap-2">
                   <a
                     href={item.html_url}

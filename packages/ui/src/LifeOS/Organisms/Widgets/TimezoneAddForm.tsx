@@ -1,9 +1,7 @@
-import { h } from 'preact';
-import { useState, useMemo } from 'preact/hooks';
-import { MonoText, MonoHeader } from '../../Atoms/Typography';
-import { AVAILABLE_TIMEZONES, TimezoneEntry } from './TimezoneLogic';
-import { cn } from '../../../utils';
 import { Plus, Search } from 'lucide-preact';
+import { useMemo, useState } from 'preact/hooks';
+import { MonoHeader, MonoText } from '../../Atoms/Typography';
+import { AVAILABLE_TIMEZONES, type TimezoneEntry } from './TimezoneLogic';
 
 export interface TimezoneAddFormProps {
   onAdd: (entry: TimezoneEntry) => void;
@@ -17,9 +15,10 @@ export const TimezoneAddForm = ({ onAdd, onCancel }: TimezoneAddFormProps) => {
   const filtered = useMemo(() => {
     if (!search) return AVAILABLE_TIMEZONES;
     const lower = search.toLowerCase();
-    return AVAILABLE_TIMEZONES.filter(tz =>
-      tz.name.toLowerCase().includes(lower) ||
-      tz.cities.some(c => c.toLowerCase().includes(lower))
+    return AVAILABLE_TIMEZONES.filter(
+      (tz) =>
+        tz.name.toLowerCase().includes(lower) ||
+        tz.cities.some((c) => c.toLowerCase().includes(lower)),
     );
   }, [search]);
 
@@ -33,7 +32,6 @@ export const TimezoneAddForm = ({ onAdd, onCancel }: TimezoneAddFormProps) => {
         </div>
         <input
           type="text"
-          autoFocus
           placeholder="Search City or Timezone..."
           className="w-full bg-[var(--los-bg)] border border-[var(--los-border)] p-2 pl-9 text-xs font-mono focus:outline-none focus:border-[var(--los-accent)] transition-colors"
           value={search}
@@ -47,9 +45,10 @@ export const TimezoneAddForm = ({ onAdd, onCancel }: TimezoneAddFormProps) => {
             <MonoText>No matches found.</MonoText>
           </div>
         ) : (
-          filtered.map((tz, i) => (
+          filtered.map((tz) => (
             <button
-              key={i}
+              key={tz.name}
+              type="button"
               onClick={() => {
                 const newEntry: TimezoneEntry = {
                   id: crypto.randomUUID(),
@@ -57,7 +56,7 @@ export const TimezoneAddForm = ({ onAdd, onCancel }: TimezoneAddFormProps) => {
                   offset: tz.offset,
                   cities: tz.cities,
                   createdAt: Date.now(),
-                  updatedAt: Date.now()
+                  updatedAt: Date.now(),
                 };
                 onAdd(newEntry);
               }}
@@ -73,7 +72,10 @@ export const TimezoneAddForm = ({ onAdd, onCancel }: TimezoneAddFormProps) => {
                 <MonoText className="text-[10px] text-[var(--los-muted)] group-hover:text-[var(--los-fg)]">
                   {tz.offset}
                 </MonoText>
-                <Plus size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--los-accent)]" />
+                <Plus
+                  size={14}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--los-accent)]"
+                />
               </div>
             </button>
           ))
@@ -82,6 +84,7 @@ export const TimezoneAddForm = ({ onAdd, onCancel }: TimezoneAddFormProps) => {
 
       <div className="mt-4 flex justify-end">
         <button
+          type="button"
           onClick={onCancel}
           className="px-4 py-2 border border-[var(--los-border)] hover:bg-white/5 transition-colors text-xs font-mono"
         >

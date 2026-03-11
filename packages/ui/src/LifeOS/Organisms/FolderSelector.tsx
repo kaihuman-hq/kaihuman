@@ -1,9 +1,7 @@
-import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
-import { cn } from '../../utils';
 import { Logger } from '@lifosy/core';
-import { MonoText } from '../Atoms/Typography';
-import { Folder, ChevronRight, Check } from 'lucide-preact';
+import { Check, ChevronRight, Folder } from 'lucide-preact';
+import { useRef, useState } from 'preact/hooks';
+import { cn } from '../../utils';
 
 const logger = new Logger('FolderSelector');
 
@@ -31,8 +29,16 @@ interface Column {
   activeId: string | null; // Which item in this column is active (drilled down)
 }
 
-export const FolderSelector = ({ rootItems, onLoadFolder, onSelect, selectedPath, className }: FolderSelectorProps) => {
-  const [columns, setColumns] = useState<Column[]>([{ parentId: null, items: rootItems, activeId: null }]);
+export const FolderSelector = ({
+  rootItems,
+  onLoadFolder,
+  onSelect,
+  selectedPath,
+  className,
+}: FolderSelectorProps) => {
+  const [columns, setColumns] = useState<Column[]>([
+    { parentId: null, items: rootItems, activeId: null },
+  ]);
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -55,7 +61,7 @@ export const FolderSelector = ({ rootItems, onLoadFolder, onSelect, selectedPath
       // Check if already loading
       if (loadingIds.has(item.id)) return;
 
-      setLoadingIds(prev => {
+      setLoadingIds((prev) => {
         const next = new Set(prev);
         next.add(item.id);
         return next;
@@ -63,7 +69,7 @@ export const FolderSelector = ({ rootItems, onLoadFolder, onSelect, selectedPath
 
       try {
         const children = await onLoadFolder(item.id);
-        setLoadingIds(prev => {
+        setLoadingIds((prev) => {
           const next = new Set(prev);
           next.delete(item.id);
           return next;
@@ -74,13 +80,16 @@ export const FolderSelector = ({ rootItems, onLoadFolder, onSelect, selectedPath
           // Auto-scroll to right
           setTimeout(() => {
             if (containerRef.current) {
-              containerRef.current.scrollTo({ left: containerRef.current.scrollWidth, behavior: 'smooth' });
+              containerRef.current.scrollTo({
+                left: containerRef.current.scrollWidth,
+                behavior: 'smooth',
+              });
             }
           }, 10);
         }
       } catch (e) {
-        logger.error("Failed to load folder", e);
-        setLoadingIds(prev => {
+        logger.error('Failed to load folder', e);
+        setLoadingIds((prev) => {
           const next = new Set(prev);
           next.delete(item.id);
           return next;
@@ -92,7 +101,10 @@ export const FolderSelector = ({ rootItems, onLoadFolder, onSelect, selectedPath
   return (
     <div
       ref={containerRef}
-      className={cn("flex overflow-x-auto h-64 border border-[var(--los-border)] bg-[var(--los-bg)]", className)}
+      className={cn(
+        'flex overflow-x-auto h-64 border border-[var(--los-border)] bg-[var(--los-bg)]',
+        className,
+      )}
     >
       {columns.map((col, index) => (
         <div
@@ -102,24 +114,35 @@ export const FolderSelector = ({ rootItems, onLoadFolder, onSelect, selectedPath
           {col.items.length === 0 ? (
             <div className="p-4 text-xs text-[var(--los-muted)] italic">Empty folder</div>
           ) : (
-            col.items.map(item => {
+            col.items.map((item) => {
               const isActive = col.activeId === item.id;
               const isSelected = selectedPath === item.id;
               const isLoading = loadingIds.has(item.id);
 
               return (
+                // biome-ignore lint/a11y/noStaticElementInteractions: list item click handler
+                // biome-ignore lint/a11y/useKeyWithClickEvents: list item click handler
                 <div
                   key={item.id}
                   onClick={() => handleItemClick(col, item, index)}
                   className={cn(
-                    "flex items-center justify-between p-2 cursor-pointer text-xs font-mono border-b border-[var(--los-border)]/20 transition-colors hover:bg-white/5",
-                    isActive ? "bg-[var(--los-accent)]/10 text-[var(--los-accent)]" : "text-[var(--los-muted)]",
-                    isSelected && !isActive && "text-[var(--los-fg)]" // Highlight selected even if drill-down moved past it?
+                    'flex items-center justify-between p-2 cursor-pointer text-xs font-mono border-b border-[var(--los-border)]/20 transition-colors hover:bg-white/5',
+                    isActive
+                      ? 'bg-[var(--los-accent)]/10 text-[var(--los-accent)]'
+                      : 'text-[var(--los-muted)]',
+                    isSelected && !isActive && 'text-[var(--los-fg)]', // Highlight selected even if drill-down moved past it?
                     // Actually, usually last active IS selected.
                   )}
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <Folder size={14} className={cn(isActive || isSelected ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")} />
+                    <Folder
+                      size={14}
+                      className={cn(
+                        isActive || isSelected
+                          ? 'text-[var(--los-accent)]'
+                          : 'text-[var(--los-muted)]',
+                      )}
+                    />
                     <span className="truncate">{item.name}</span>
                   </div>
 
@@ -127,7 +150,13 @@ export const FolderSelector = ({ rootItems, onLoadFolder, onSelect, selectedPath
                     <div className="w-3 h-3 rounded-full border border-[var(--los-muted)] border-t-[var(--los-accent)] animate-spin shrink-0" />
                   ) : (
                     item.hasChildren && (
-                      <ChevronRight size={12} className={cn("shrink-0", isActive ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]/50")} />
+                      <ChevronRight
+                        size={12}
+                        className={cn(
+                          'shrink-0',
+                          isActive ? 'text-[var(--los-accent)]' : 'text-[var(--los-muted)]/50',
+                        )}
+                      />
                     )
                   )}
 

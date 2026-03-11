@@ -1,6 +1,6 @@
-import { Component, ComponentChildren, h } from 'preact';
 import { Logger } from '@lifosy/core';
 import { AlertTriangle, RefreshCw } from 'lucide-preact';
+import { Component, type ComponentChildren, h } from 'preact';
 
 const logger = new Logger('ErrorBoundary');
 
@@ -44,11 +44,11 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="bg-red-500/10 p-4 rounded-full mb-4 text-red-500 border border-red-500/20">
             <AlertTriangle size={32} />
           </div>
-          <h3 className="text-lg font-mono font-bold text-red-500 mb-2">
-            Something went wrong
-          </h3>
+          <h3 className="text-lg font-mono font-bold text-red-500 mb-2">Something went wrong</h3>
           <p className="font-mono text-[var(--los-muted)] mb-6 max-w-md text-sm">
-            {this.props.componentName ? `The ${this.props.componentName} component encountered an error.` : 'An unexpected error occurred.'}
+            {this.props.componentName
+              ? `The ${this.props.componentName} component encountered an error.`
+              : 'An unexpected error occurred.'}
           </p>
 
           <div className="bg-black/30 p-4 rounded-md w-full max-w-lg overflow-auto max-h-48 mb-6 text-left border border-[var(--los-border)]">
@@ -58,6 +58,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </div>
 
           <button
+            type="button"
             onClick={this.handleRetry}
             className="flex items-center gap-2 px-4 py-2 bg-[var(--los-accent)] text-black rounded-sm font-mono text-sm font-bold hover:opacity-90 transition-opacity"
           >

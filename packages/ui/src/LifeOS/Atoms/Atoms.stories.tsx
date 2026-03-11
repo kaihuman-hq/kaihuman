@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite';
 import { TileFrame } from './TileFrame';
-import { MonoHeader, MonoText, MonoLabel } from './Typography';
+import { MonoHeader, MonoLabel, MonoText } from './Typography';
 
 const meta = {
   title: 'LifeOS/Atoms',
   parameters: {
-    backgrounds: { default: 'dark' }
-  }
+    backgrounds: { default: 'dark' },
+  },
 } satisfies Meta;
 
 export default meta;
@@ -46,7 +46,8 @@ export const Typography: StoryObj = {
       <div>
         <MonoLabel>Paragraph</MonoLabel>
         <MonoText>
-          A keyboard-centric, terminal-aesthetic "Life Operating System" that prioritizes speed, density, and focus over standard GUI conventions.
+          A keyboard-centric, terminal-aesthetic "Life Operating System" that prioritizes speed,
+          density, and focus over standard GUI conventions.
         </MonoText>
       </div>
       <div>
@@ -56,5 +57,5 @@ export const Typography: StoryObj = {
         </div>
       </div>
     </div>
-  )
-}
+  ),
+};

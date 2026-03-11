@@ -1,4 +1,3 @@
-
 export interface BudgetTransaction {
   name: string;
   account: string;
@@ -45,11 +44,11 @@ export const parseBudget = (content: string): BudgetTransaction[] => {
     const parts = line.split(';');
     if (parts.length >= 5) {
       transactions.push({
-        name: parts[0] || "",
-        account: parts[1] || "",
-        category: parts[2] || "",
-        date: parts[3] || "",
-        value: parseFloat(parts[4] || "0")
+        name: parts[0] || '',
+        account: parts[1] || '',
+        category: parts[2] || '',
+        date: parts[3] || '',
+        value: parseFloat(parts[4] || '0'),
       });
     }
   }
@@ -59,7 +58,7 @@ export const parseBudget = (content: string): BudgetTransaction[] => {
   // Strategy: Keep the one with the LATEST date.
   const latestMap = new Map<string, BudgetTransaction>();
 
-  transactions.forEach(t => {
+  transactions.forEach((t) => {
     const key = `${t.name}|${t.account}|${t.category}`;
     const existing = latestMap.get(key);
 
@@ -78,9 +77,7 @@ export const parseBudget = (content: string): BudgetTransaction[] => {
 };
 
 export const serializeBudget = (transactions: BudgetTransaction[]): string => {
-  const lines = [
-    'name;account;category;date;value'
-  ];
+  const lines = ['name;account;category;date;value'];
 
   for (const t of transactions) {
     lines.push(`${t.name};${t.account};${t.category};${t.date};${t.value}`);
@@ -92,10 +89,10 @@ export const serializeBudget = (transactions: BudgetTransaction[]): string => {
 export const getCategoryStats = (transactions: BudgetTransaction[]) => {
   const stats: Record<string, number> = {};
 
-  transactions.forEach(t => {
+  transactions.forEach((t) => {
     // For calculating "costs" or "budget usage", we generally might want to ignore earnings?
-    // Or maybe we want to visualize earnings too. 
-    // The requirement says "bar chart per category (cumulated)". 
+    // Or maybe we want to visualize earnings too.
+    // The requirement says "bar chart per category (cumulated)".
     // Assuming we sum up values.
 
     // NOTE: In the example, earnings are positive, expenses are positive numbers too.
@@ -105,25 +102,27 @@ export const getCategoryStats = (transactions: BudgetTransaction[]) => {
     stats[t.category] = current + t.value;
   });
 
-  return Object.entries(stats).map(([id, value]) => ({
-    id,
-    label: CATEGORIES.find(c => c.id === id)?.label || id,
-    value,
-    color: CATEGORIES.find(c => c.id === id)?.color || '#ccc'
-  })).sort((a, b) => b.value - a.value);
+  return Object.entries(stats)
+    .map(([id, value]) => ({
+      id,
+      label: CATEGORIES.find((c) => c.id === id)?.label || id,
+      value,
+      color: CATEGORIES.find((c) => c.id === id)?.color || '#ccc',
+    }))
+    .sort((a, b) => b.value - a.value);
 };
 
 export const getAccountStats = (transactions: BudgetTransaction[]) => {
   const stats: Record<string, number> = {};
 
-  transactions.forEach(t => {
+  transactions.forEach((t) => {
     // Calculate IN vs OUT per account?
     // Or just raw activity volume?
     // Requirement: "bar chart per account (cumulated)"
     // Usually "Budget" implies tracking expenses.
     // If we assume standard positive numbers for both earnings and expenses in the file:
 
-    const category = CATEGORIES.find(c => c.id === t.category);
+    const category = CATEGORIES.find((c) => c.id === t.category);
     const isIncome = category?.type === 'in';
 
     // If we want "Balance" per account:
@@ -137,17 +136,19 @@ export const getAccountStats = (transactions: BudgetTransaction[]) => {
     }
   });
 
-  return Object.entries(stats).map(([id, value]) => ({
-    id,
-    label: id,
-    value
-  })).sort((a, b) => b.value - a.value);
+  return Object.entries(stats)
+    .map(([id, value]) => ({
+      id,
+      label: id,
+      value,
+    }))
+    .sort((a, b) => b.value - a.value);
 };
 
 export const getUniqueAccounts = (transactions: BudgetTransaction[]): string[] => {
-  return Array.from(new Set(transactions.map(t => t.account))).sort();
+  return Array.from(new Set(transactions.map((t) => t.account))).sort();
 };
 
 export const getUniqueNames = (transactions: BudgetTransaction[]): string[] => {
-  return Array.from(new Set(transactions.map(t => t.name))).sort();
+  return Array.from(new Set(transactions.map((t) => t.name))).sort();
 };

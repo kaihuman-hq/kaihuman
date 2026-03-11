@@ -6,12 +6,13 @@ import {
   ChevronRight,
   Circle,
   Copy,
+  Eye,
   FileText,
   PlayCircle,
   Plus,
   XCircle,
 } from 'lucide-preact';
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
 import { CompactList, CompactWidgetLayout } from './CompactWidgetLayout';
@@ -126,6 +127,37 @@ const StatusBadge = ({
           })}
         </div>
       )}
+    </div>
+  );
+};
+
+// ─── AnimatingTodoItem ────────────────────────────────────────────────────────
+
+const AnimatingTodoItem = ({ text, status }: { text: string; status: TodoStatus }) => {
+  const [phase, setPhase] = useState<'show' | 'exit'>('show');
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      setTimeout(() => setPhase('exit'), 120);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const { icon: Icon, className: iconClass } = STATUS_ICON[status];
+
+  return (
+    <div
+      className={cn(
+        'border-b border-[var(--los-border)] px-1 py-2 transition-all duration-500',
+        phase === 'exit' ? 'opacity-0 translate-x-6' : 'opacity-100 translate-x-0',
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <Icon size={12} className={cn(iconClass, 'mt-0.5 shrink-0')} />
+        <MonoText className="text-xs break-words leading-relaxed opacity-40 line-through">
+          {text}
+        </MonoText>
+      </div>
     </div>
   );
 };
@@ -355,18 +387,36 @@ const MilestonePicker = ({
 
 // ─── Main Widget ──────────────────────────────────────────────────────────────
 
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+const ANIM_DURATION_MS = 700;
+
 export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: TodoWidgetProps) => {
   const data: TodoData = useMemo(() => parseTodos(content), [content]);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [showAllInFocus, setShowAllInFocus] = useState(false);
+  const [animatingOut, setAnimatingOut] = useState<
+    { id: string; text: string; status: TodoStatus }[]
+  >([]);
 
   const displayData = useMemo(() => {
-    const base =
-      mode === 'SMALL' || mode === 'MOBILE_EXPANDED' || mode === 'MOBILE_COLLAPSED'
-        ? getVisibleTodos(data)
-        : data;
+    let base: TodoData;
+    if (mode === 'SMALL') {
+      // Only backlog/in-progress; done items animate out separately
+      base = {
+        ...data,
+        items: data.items.filter((it) => it.status === 'backlog' || it.status === 'in-progress'),
+      };
+    } else if (mode === 'MOBILE_EXPANDED' || mode === 'MOBILE_COLLAPSED') {
+      base = getVisibleTodos(data);
+    } else if (mode === 'FOCUS' && !showAllInFocus) {
+      // Show open + done/rejected < 2 hours
+      base = getVisibleTodos(data, TWO_HOURS_MS);
+    } else {
+      base = data;
+    }
     if (!activeTag) return base;
     return { ...base, items: base.items.filter((it) => it.tags.includes(activeTag)) };
-  }, [data, mode, activeTag]);
+  }, [data, mode, activeTag, showAllInFocus]);
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
@@ -379,7 +429,17 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
   const handleCycleStatus = (index: number) => {
     const item = data.items[index];
     if (!item) return;
-    const newData = setStatus(data, index, NEXT_STATUS[item.status]);
+    const nextStatus = NEXT_STATUS[item.status];
+
+    // In SMALL mode, animate the item out when it becomes done/rejected
+    if (mode === 'SMALL' && (nextStatus === 'done' || nextStatus === 'rejected')) {
+      setAnimatingOut((prev) => [...prev, { id: item.id, text: item.text, status: nextStatus }]);
+      setTimeout(() => {
+        setAnimatingOut((prev) => prev.filter((a) => a.id !== item.id));
+      }, ANIM_DURATION_MS);
+    }
+
+    const newData = setStatus(data, index, nextStatus);
     onChange?.(serializeTodos(newData));
   };
 
@@ -509,7 +569,11 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
   }
 
   const isFocus = mode === 'FOCUS';
-  const hiddenCount = data.items.length - displayData.items.length;
+  const hiddenCount = isFocus
+    ? showAllInFocus
+      ? 0
+      : data.items.length - displayData.items.length
+    : data.items.filter((it) => it.status !== 'backlog' && it.status !== 'in-progress').length;
 
   // ── SMALL / FOCUS ─────────────────────────────────────────────────────────
   return (
@@ -527,6 +591,22 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
             >
               <AlertTriangle size={10} />
               MIGRATE
+            </button>
+          )}
+          {isFocus && (
+            <button
+              type="button"
+              onClick={() => setShowAllInFocus((v) => !v)}
+              className={cn(
+                'flex items-center gap-1 text-[10px] font-mono border px-2 py-0.5 transition-colors',
+                showAllInFocus
+                  ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                  : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
+              )}
+              title={showAllInFocus ? 'Showing all items' : 'Showing open + recent completed'}
+            >
+              <Eye size={10} />
+              {showAllInFocus ? 'ALL' : 'RECENT'}
             </button>
           )}
           <MonoText className="text-[10px] text-[var(--los-muted)]">{activeCount} ACTIVE</MonoText>
@@ -651,11 +731,29 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
           );
         })}
 
-        {/* Hidden items notice (small mode) */}
+        {/* Animating-out items (SMALL mode only) */}
+        {!isFocus &&
+          animatingOut.map((a) => <AnimatingTodoItem key={a.id} text={a.text} status={a.status} />)}
+
+        {/* Hidden items notice */}
         {!isFocus && hiddenCount > 0 && (
           <div className="text-center py-2">
             <MonoText className="text-[10px] text-[var(--los-muted)]">
-              + {hiddenCount} completed older than 1h
+              + {hiddenCount} completed
+            </MonoText>
+          </div>
+        )}
+        {isFocus && !showAllInFocus && hiddenCount > 0 && (
+          <div className="text-center py-2">
+            <MonoText className="text-[10px] text-[var(--los-muted)]">
+              + {hiddenCount} older than 2h —{' '}
+              <button
+                type="button"
+                onClick={() => setShowAllInFocus(true)}
+                className="underline hover:text-[var(--los-fg)] transition-colors"
+              >
+                show all
+              </button>
             </MonoText>
           </div>
         )}

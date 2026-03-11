@@ -1,8 +1,11 @@
-
-import { h } from 'preact';
-import { useState, useMemo } from 'preact/hooks';
-import { CATEGORIES, BudgetTransaction, getUniqueAccounts, getUniqueNames } from './BudgetLogic';
+import { useMemo, useState } from 'preact/hooks';
 import { MonoLabel } from '../../Atoms/Typography';
+import {
+  type BudgetTransaction,
+  CATEGORIES,
+  getUniqueAccounts,
+  getUniqueNames,
+} from './BudgetLogic';
 
 interface BudgetAddFormProps {
   transactions: BudgetTransaction[];
@@ -36,7 +39,7 @@ export const BudgetAddForm = ({ transactions, onAdd }: BudgetAddFormProps) => {
       account,
       category,
       date,
-      value: parseFloat(value)
+      value: parseFloat(value),
     });
 
     // Reset form slightly for easier next entry
@@ -46,7 +49,6 @@ export const BudgetAddForm = ({ transactions, onAdd }: BudgetAddFormProps) => {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4 max-w-md w-full mx-auto">
-
       {/* NAME FIELD */}
       <div className="flex flex-col gap-2">
         <MonoLabel>Name</MonoLabel>
@@ -58,12 +60,21 @@ export const BudgetAddForm = ({ transactions, onAdd }: BudgetAddFormProps) => {
               value={name}
               onChange={(e) => setName(e.currentTarget.value)}
             >
-              <option value="" disabled>Select Name</option>
-              {uniqueNames.map(n => <option key={n} value={n}>{n}</option>)}
+              <option value="" disabled>
+                Select Name
+              </option>
+              {uniqueNames.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
             </select>
             <button
               type="button"
-              onClick={() => { setUseCustomName(true); setName(''); }}
+              onClick={() => {
+                setUseCustomName(true);
+                setName('');
+              }}
               className="px-2 py-1 border border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-fg)]"
             >
               +
@@ -81,7 +92,10 @@ export const BudgetAddForm = ({ transactions, onAdd }: BudgetAddFormProps) => {
             {showNameDropdown && (
               <button
                 type="button"
-                onClick={() => { setUseCustomName(false); setName(''); }}
+                onClick={() => {
+                  setUseCustomName(false);
+                  setName('');
+                }}
                 className="px-2 py-1 border border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-fg)]"
               >
                 List
@@ -102,12 +116,21 @@ export const BudgetAddForm = ({ transactions, onAdd }: BudgetAddFormProps) => {
               value={account}
               onChange={(e) => setAccount(e.currentTarget.value)}
             >
-              <option value="" disabled>Select Account</option>
-              {uniqueAccounts.map(a => <option key={a} value={a}>{a}</option>)}
+              <option value="" disabled>
+                Select Account
+              </option>
+              {uniqueAccounts.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
             </select>
             <button
               type="button"
-              onClick={() => { setUseCustomAccount(true); setAccount(''); }}
+              onClick={() => {
+                setUseCustomAccount(true);
+                setAccount('');
+              }}
               className="px-2 py-1 border border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-fg)]"
             >
               +
@@ -125,7 +148,10 @@ export const BudgetAddForm = ({ transactions, onAdd }: BudgetAddFormProps) => {
             {showAccountDropdown && (
               <button
                 type="button"
-                onClick={() => { setUseCustomAccount(false); setAccount(''); }}
+                onClick={() => {
+                  setUseCustomAccount(false);
+                  setAccount('');
+                }}
                 className="px-2 py-1 border border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-fg)]"
               >
                 List
@@ -143,7 +169,11 @@ export const BudgetAddForm = ({ transactions, onAdd }: BudgetAddFormProps) => {
           value={category}
           onChange={(e) => setCategory(e.currentTarget.value)}
         >
-          {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+          {CATEGORIES.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -177,7 +207,6 @@ export const BudgetAddForm = ({ transactions, onAdd }: BudgetAddFormProps) => {
       >
         Add Transaction
       </button>
-
     </form>
   );
 };

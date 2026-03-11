@@ -6,8 +6,8 @@ export function Login() {
     <div class="flex h-screen w-full items-center justify-center bg-nexus-bg text-nexus-text font-sans">
       <div class="w-full max-w-md space-y-8 rounded-lg border border-nexus-border bg-nexus-panel p-10 shadow-2xl">
         <div class="text-center">
-          <h2 class="mt-6 text-3xl font-bold tracking-tight text-white">Life OS</h2>
-          <p class="mt-2 text-sm text-nexus-muted">Sign in to access your dashboard</p>
+          <h2 class="mt-6 text-3xl font-bold tracking-tight text-white">KaiHuman</h2>
+          <p class="mt-2 text-sm text-nexus-muted">The ever-improving human. Sign in to begin.</p>
         </div>
 
         <div class="mt-8 space-y-6">

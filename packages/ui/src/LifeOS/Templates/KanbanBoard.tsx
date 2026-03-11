@@ -4,19 +4,23 @@ import {
   BarChart2,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   Circle,
   Pencil,
   PlayCircle,
+  Plus,
+  Search,
   Tags,
   Trash2,
   X,
   XCircle,
 } from 'lucide-preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
 import {
   addMilestone,
+  addTodo,
   getUpcomingMilestone,
   type Milestone,
   parseTodos,
@@ -50,6 +54,371 @@ const NEXT_STATUS: Record<TodoStatus, TodoStatus> = {
   'in-progress': 'done',
   done: 'backlog',
   rejected: 'backlog',
+};
+
+const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatFilePath(fp: string): { dir: string; name: string } {
+  const parts = fp.split('/');
+  const raw = parts.pop() ?? fp;
+  const dir = parts.length > 0 ? `${parts.join('/')}/` : '';
+  const name = raw.replace(/\.todos\.md$/, '');
+  return { dir, name };
+}
+
+function filterByAge(items: AggregatedItem[], recentOnly: boolean): AggregatedItem[] {
+  if (!recentOnly) return items;
+  const cutoff = Date.now() - TWO_WEEKS_MS;
+  return items.filter((a) => {
+    const ts = a.item.updatedAt ?? (a.item.createdAt ? new Date(a.item.createdAt).getTime() : null);
+    if (!ts) return true;
+    return ts >= cutoff;
+  });
+}
+
+// ─── FileSelect ───────────────────────────────────────────────────────────────
+
+const FileSelect = ({
+  value,
+  options,
+  onChange,
+  allowEmpty = true,
+  triggerClassName,
+  dropdownClassName,
+}: {
+  value: string;
+  options: string[];
+  onChange: (val: string) => void;
+  allowEmpty?: boolean;
+  triggerClassName?: string;
+  dropdownClassName?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const display = value ? formatFilePath(value) : null;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          'flex items-center gap-1.5 bg-[var(--los-bg)] border border-[var(--los-border)] font-mono outline-none transition-colors hover:border-[var(--los-fg)]',
+          triggerClassName ?? 'text-[10px] px-2 py-1 text-[var(--los-muted)]',
+        )}
+      >
+        <span className="flex-1 truncate text-left">
+          {display ? (
+            <>
+              <span className="opacity-60">{display.dir}</span>
+              <span className="font-bold text-[var(--los-fg)]">{display.name}</span>
+            </>
+          ) : (
+            <span>All files</span>
+          )}
+        </span>
+        <ChevronDown size={8} className="shrink-0" />
+      </button>
+
+      {open && (
+        <div
+          className={cn(
+            'absolute top-full left-0 z-50 mt-0.5 bg-[var(--los-bg)] border border-[var(--los-border)] shadow-lg overflow-y-auto',
+            dropdownClassName ?? 'min-w-[180px] max-w-[320px] max-h-60',
+          )}
+        >
+          {allowEmpty && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange('');
+                setOpen(false);
+              }}
+              className={cn(
+                'w-full text-left px-3 py-2 text-[10px] font-mono hover:bg-white/5 transition-colors',
+                value === '' ? 'text-[var(--los-accent)]' : 'text-[var(--los-muted)]',
+              )}
+            >
+              All files
+            </button>
+          )}
+          {options.map((fp) => {
+            const { dir, name } = formatFilePath(fp);
+            return (
+              <button
+                key={fp}
+                type="button"
+                onClick={() => {
+                  onChange(fp);
+                  setOpen(false);
+                }}
+                className={cn(
+                  'w-full text-left px-3 py-2 text-[10px] font-mono hover:bg-white/5 transition-colors leading-snug',
+                  value === fp ? 'bg-[var(--los-accent)]/10' : '',
+                )}
+              >
+                {dir && (
+                  <span className="block text-[var(--los-muted)] opacity-70 text-[9px]">{dir}</span>
+                )}
+                <span
+                  className={cn(
+                    'font-bold',
+                    value === fp ? 'text-[var(--los-accent)]' : 'text-[var(--los-fg)]',
+                  )}
+                >
+                  {name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── AddTaskModal ─────────────────────────────────────────────────────────────
+
+function dirOf(filePath: string): string {
+  const idx = filePath.lastIndexOf('/');
+  return idx >= 0 ? filePath.slice(0, idx + 1) : '';
+}
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+}
+
+function toFileName(name: string): string {
+  const trimmed = name.trim();
+  return trimmed.endsWith('.md') ? trimmed : `${trimmed}.md`;
+}
+
+const AddTaskModal = ({
+  todoFilePaths,
+  parsedFiles,
+  initialFilePath,
+  onClose,
+  onAdd,
+  onCreateFile,
+  onOpenFile,
+}: {
+  todoFilePaths: string[];
+  parsedFiles: { path: string; data: TodoData }[];
+  initialFilePath: string;
+  onClose: () => void;
+  onAdd: (
+    filePath: string,
+    text: string,
+    tags: string[],
+    promptRefFile?: string,
+  ) => Promise<void> | void;
+  onCreateFile?: (path: string, content: string) => Promise<void>;
+  onOpenFile?: (path: string) => void;
+}) => {
+  const [text, setText] = useState('');
+  const [selectedFile, setSelectedFile] = useState(initialFilePath || todoFilePaths[0] || '');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [createPromptFile, setCreatePromptFile] = useState(false);
+  const [promptFileName, setPromptFileName] = useState('');
+  const [openAfter, setOpenAfter] = useState(false);
+
+  const fileData = useMemo(
+    () => parsedFiles.find((f) => f.path === selectedFile)?.data ?? null,
+    [parsedFiles, selectedFile],
+  );
+
+  const availableTags = useMemo(() => {
+    if (!fileData) return [];
+    const tags = new Set<string>();
+    for (const item of fileData.items) {
+      for (const t of item.tags) tags.add(t);
+    }
+    return Array.from(tags).sort();
+  }, [fileData]);
+
+  const handleAdd = async () => {
+    if (!text.trim() || !selectedFile) return;
+    let promptRefFile: string | undefined;
+    if (createPromptFile && promptFileName.trim() && onCreateFile) {
+      const fileName = toFileName(promptFileName);
+      promptRefFile = `${dirOf(selectedFile)}${fileName}`;
+    }
+    // Await the task save before creating the prompt file to avoid concurrent
+    // GitHub API pushes that cause 409 Conflict errors.
+    await onAdd(selectedFile, text.trim(), selectedTags, promptRefFile);
+    if (promptRefFile && onCreateFile) {
+      await onCreateFile(promptRefFile, '');
+      if (openAfter && onOpenFile) onOpenFile(promptRefFile);
+    }
+    onClose();
+  };
+
+  const showFileDropdown = !initialFilePath && todoFilePaths.length > 1;
+  const basePath = dirOf(selectedFile);
+
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss pattern
+    // biome-ignore lint/a11y/noStaticElementInteractions: backdrop dismiss pattern
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: stop propagation */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: stop propagation */}
+      <div
+        className="relative bg-[var(--los-bg)] border border-[var(--los-border)] w-full max-w-lg p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <MonoHeader>ADD TASK</MonoHeader>
+          <button
+            type="button"
+            onClick={onClose}
+            className="hover:text-[var(--los-accent)] transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {showFileDropdown && (
+          <div className="mb-4">
+            <MonoLabel className="mb-1 block">FILE</MonoLabel>
+            <FileSelect
+              value={selectedFile}
+              options={todoFilePaths}
+              onChange={(fp) => {
+                setSelectedFile(fp);
+                setSelectedTags([]);
+              }}
+              allowEmpty={false}
+              triggerClassName="w-full text-sm px-3 py-2 text-[var(--los-fg)] justify-between"
+              dropdownClassName="w-full max-h-60"
+            />
+          </div>
+        )}
+
+        <input
+          // biome-ignore lint/a11y/noAutofocus: intentional modal focus
+          autoFocus
+          type="text"
+          value={text}
+          onInput={(e) => setText(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleAdd();
+          }}
+          placeholder="Task description"
+          className="w-full bg-transparent border border-[var(--los-border)] focus:border-[var(--los-accent)] px-3 py-2 text-sm font-mono outline-none transition-colors mb-4"
+        />
+
+        {availableTags.length > 0 && (
+          <div className="mb-4">
+            <MonoLabel className="mb-2 block">TAGS</MonoLabel>
+            <div className="flex flex-wrap gap-1.5">
+              {availableTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() =>
+                    setSelectedTags((prev) =>
+                      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+                    )
+                  }
+                  className={cn(
+                    'text-[10px] font-mono px-2 py-0.5 border transition-colors',
+                    selectedTags.includes(tag)
+                      ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/10'
+                      : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)]',
+                  )}
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Prompt file */}
+        <div className="flex flex-col gap-3 border-t border-[var(--los-border)] pt-4">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={createPromptFile}
+              onChange={(e) => {
+                const v = e.currentTarget.checked;
+                if (v && !promptFileName) setPromptFileName(slugify(text) || 'prompt');
+                setCreatePromptFile(v);
+              }}
+              className="accent-[var(--los-accent)]"
+            />
+            <MonoLabel className="cursor-pointer">CREATE PROMPT FILE</MonoLabel>
+          </label>
+
+          {createPromptFile && (
+            <div className="flex flex-col gap-3 pl-4 border-l-2 border-[var(--los-accent)]/30">
+              <div className="flex flex-col gap-1">
+                <MonoLabel>FILENAME</MonoLabel>
+                <div className="flex items-center gap-2">
+                  {basePath && (
+                    <span className="text-[10px] font-mono text-[var(--los-muted)] shrink-0">
+                      {basePath}
+                    </span>
+                  )}
+                  <input
+                    type="text"
+                    value={promptFileName}
+                    onInput={(e) => setPromptFileName(e.currentTarget.value)}
+                    placeholder="prompt.md"
+                    className="flex-1 bg-transparent border border-[var(--los-border)] focus:border-[var(--los-accent)] px-2 py-1 text-xs font-mono outline-none transition-colors"
+                  />
+                </div>
+                <span className="text-[9px] font-mono text-[var(--los-muted)]">
+                  {basePath}
+                  {toFileName(promptFileName || 'prompt')}
+                </span>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={openAfter}
+                  onChange={(e) => setOpenAfter(e.currentTarget.checked)}
+                  className="accent-[var(--los-accent)]"
+                />
+                <MonoLabel className="cursor-pointer text-[10px]">
+                  OPEN IN FOCUS MODE AFTERWARDS
+                </MonoLabel>
+              </label>
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={!text.trim() || !selectedFile}
+          className="w-full py-2 bg-[var(--los-accent)] text-black text-xs font-mono font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+        >
+          ADD TASK
+        </button>
+      </div>
+    </div>
+  );
 };
 
 // ─── MilestoneManager ────────────────────────────────────────────────────────
@@ -198,12 +567,15 @@ const MilestoneManager = ({
 const KanbanCard = ({
   agg,
   onStatusChange,
+  onOpenFile,
 }: {
   agg: AggregatedItem;
   onStatusChange: (filePath: string, itemIndex: number, newStatus: TodoStatus) => void;
+  onOpenFile?: (path: string) => void;
 }) => {
   const { item, filePath } = agg;
-  const fileName = filePath.split('/').pop() ?? filePath;
+  const { name: fileName } = formatFilePath(filePath);
+  const promptRefFile = item.prompt?.refFile;
 
   const handleDragStart = (e: DragEvent) => {
     e.dataTransfer?.setData(
@@ -239,13 +611,29 @@ const KanbanCard = ({
         <MonoText className="text-[9px] text-[var(--los-muted)] opacity-60 truncate max-w-[60%]">
           {fileName}
         </MonoText>
-        <button
-          type="button"
-          onClick={() => onStatusChange(filePath, agg.itemIndex, NEXT_STATUS[item.status])}
-          className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors opacity-0 group-hover:opacity-100"
-        >
-          → {STATUS_LABELS[NEXT_STATUS[item.status]]}
-        </button>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {promptRefFile && onOpenFile && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenFile(promptRefFile);
+              }}
+              title={`Open prompt: ${promptRefFile}`}
+              className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors flex items-center gap-1"
+            >
+              <Pencil size={9} />
+              PROMPT
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onStatusChange(filePath, agg.itemIndex, NEXT_STATUS[item.status])}
+            className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors"
+          >
+            → {STATUS_LABELS[NEXT_STATUS[item.status]]}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -270,7 +658,7 @@ const AssignMilestonePanel = ({
     .map((item, idx) => ({ item, idx }))
     .filter(({ item }) => item.status === 'backlog' || item.status === 'in-progress');
 
-  const fileName = filePath.split('/').pop() ?? filePath;
+  const { name: fileName } = formatFilePath(filePath);
   const selectedMilestone = data.milestones.find((m) => m.id === selectedMilestoneId);
 
   return (
@@ -376,9 +764,16 @@ const AssignMilestonePanel = ({
 export interface KanbanBoardProps {
   onNavigateBack?: () => void;
   onAnalyticsClick?: () => void;
+  onCreateFile?: (path: string, content: string) => Promise<void>;
+  onOpenFile?: (path: string) => void;
 }
 
-export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardProps) => {
+export const KanbanBoard = ({
+  onNavigateBack,
+  onAnalyticsClick,
+  onCreateFile,
+  onOpenFile,
+}: KanbanBoardProps) => {
   const openFiles = githubFileStore.openFiles.value;
   const tree = githubFileStore.tree.value;
 
@@ -393,9 +788,17 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
   const [milestoneFilter, setMilestoneFilter] = useState<string>('');
   const [showUpcoming, setShowUpcoming] = useState(false);
   const [showMilestoneManager, setShowMilestoneManager] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
   const [dragOverStatus, setDragOverStatus] = useState<TodoStatus | null>(null);
   const [focusedFile, setFocusedFile] = useState<string>('');
   const [assignMode, setAssignMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showRecentOnly, setShowRecentOnly] = useState<Record<TodoStatus, boolean>>({
+    backlog: false,
+    'in-progress': false,
+    done: true,
+    rejected: true,
+  });
 
   // Find all .todos.md files in the tree and open them
   const todoFilePaths = useMemo(
@@ -437,17 +840,24 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
 
   // Aggregate all items
   const allItems = useMemo<AggregatedItem[]>(() => {
+    const q = searchQuery.trim().toLowerCase();
     const result: AggregatedItem[] = [];
     for (const { path, data } of parsedFiles) {
       if (focusedFile && path !== focusedFile) continue;
       data.items.forEach((item, idx) => {
         if (milestoneFilter && item.milestoneId !== milestoneFilter) return;
         if (showUpcoming && upcomingMilestone && item.milestoneId !== upcomingMilestone.id) return;
+        if (q) {
+          const matchesText = item.text.toLowerCase().includes(q);
+          const matchesTag = item.tags.some((t) => t.toLowerCase().includes(q));
+          const matchesMilestone = !!item.milestoneId?.toLowerCase().includes(q);
+          if (!matchesText && !matchesTag && !matchesMilestone) return;
+        }
         result.push({ item, itemIndex: idx, filePath: path });
       });
     }
     return result;
-  }, [parsedFiles, milestoneFilter, showUpcoming, upcomingMilestone, focusedFile]);
+  }, [parsedFiles, milestoneFilter, showUpcoming, upcomingMilestone, focusedFile, searchQuery]);
 
   const focusedFileData = useMemo(
     () => parsedFiles.find((f) => f.path === focusedFile)?.data ?? null,
@@ -473,13 +883,28 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
     githubFileStore.saveFile(focusedFile);
   };
 
+  const handleAddTask = async (
+    filePath: string,
+    text: string,
+    tags: string[],
+    promptRefFile?: string,
+  ) => {
+    const file = openFiles[filePath];
+    if (!file) return;
+    const data = parseTodos(file.content);
+    const prompt = promptRefFile ? { lines: [], refFile: promptRefFile } : undefined;
+    const newData = addTodo(data, text, tags, undefined, prompt);
+    githubFileStore.updateFileContent(filePath, serializeTodos(newData));
+    await githubFileStore.saveFile(filePath);
+  };
+
   const isLoading = todoFilePaths.some((p) => !openFiles[p]);
 
   return (
     <div className="h-[calc(100vh-3rem)] md:h-[calc(100vh-2rem)] w-screen flex flex-col bg-[var(--los-bg)] text-[var(--los-fg)] overflow-hidden">
       {/* Header */}
-      <div className="h-14 border-b border-[var(--los-border)] flex items-center justify-between px-6 shrink-0">
-        <div className="flex items-center gap-4">
+      <div className="h-14 border-b border-[var(--los-border)] flex items-center gap-4 px-6 shrink-0">
+        <div className="flex items-center gap-4 shrink-0">
           {onNavigateBack && (
             <button
               type="button"
@@ -493,21 +918,14 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
           <div className="h-4 w-px bg-[var(--los-border)]" />
           <MonoHeader>KANBAN BOARD</MonoHeader>
           {todoFilePaths.length > 1 ? (
-            <select
+            <FileSelect
               value={focusedFile}
-              onChange={(e) => {
-                setFocusedFile(e.currentTarget.value);
+              options={todoFilePaths}
+              onChange={(fp) => {
+                setFocusedFile(fp);
                 setAssignMode(false);
               }}
-              className="bg-[var(--los-bg)] border border-[var(--los-border)] text-[10px] font-mono px-2 py-1 focus:border-[var(--los-accent)] outline-none text-[var(--los-muted)] transition-colors"
-            >
-              <option value="">All files</option>
-              {todoFilePaths.map((fp) => (
-                <option key={fp} value={fp}>
-                  {fp.split('/').pop()}
-                </option>
-              ))}
-            </select>
+            />
           ) : (
             <MonoText className="text-[10px] text-[var(--los-muted)]">
               {todoFilePaths.length} file{todoFilePaths.length !== 1 ? 's' : ''}
@@ -530,7 +948,28 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Search */}
+        <div className="flex-1 flex items-center gap-1.5 border border-[var(--los-border)] px-2 py-1 focus-within:border-[var(--los-accent)] transition-colors min-w-0 max-w-xs">
+          <Search size={11} className="text-[var(--los-muted)] shrink-0" />
+          <input
+            type="text"
+            value={searchQuery}
+            onInput={(e) => setSearchQuery(e.currentTarget.value)}
+            placeholder="Search tasks…"
+            className="flex-1 bg-transparent text-[10px] font-mono outline-none text-[var(--los-fg)] placeholder:text-[var(--los-muted)] min-w-0"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="text-[var(--los-muted)] hover:text-[var(--los-fg)] transition-colors shrink-0"
+            >
+              <X size={10} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
           {upcomingMilestone && (
             <button
               type="button"
@@ -613,7 +1052,9 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
         <div className="flex-1 overflow-hidden flex">
           {COLUMNS.map((col) => {
             const colItems = allItems.filter((a) => a.item.status === col.status);
+            const filteredItems = filterByAge(colItems, showRecentOnly[col.status]);
             const ColIcon = col.icon;
+            const isFiltered = showRecentOnly[col.status];
             return (
               <div
                 key={col.status}
@@ -626,8 +1067,43 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
                   <ColIcon size={12} className={col.colorClass} />
                   <MonoLabel className="text-xs">{col.label.toUpperCase()}</MonoLabel>
                   <span className="ml-auto text-[10px] font-mono text-[var(--los-muted)]">
-                    {colItems.length}
+                    {isFiltered && filteredItems.length !== colItems.length
+                      ? `${filteredItems.length}/${colItems.length}`
+                      : colItems.length}
                   </span>
+                  {col.status === 'backlog' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddTask(true)}
+                      className="flex items-center gap-1 text-[9px] font-mono border border-[var(--los-border)] px-1.5 py-0.5 text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
+                      title="Add new task"
+                    >
+                      <Plus size={9} />
+                      ADD
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowRecentOnly((prev) => ({
+                        ...prev,
+                        [col.status]: !prev[col.status],
+                      }))
+                    }
+                    className={cn(
+                      'text-[9px] font-mono border px-1 py-0.5 transition-colors',
+                      isFiltered
+                        ? 'border-[var(--los-accent)]/60 text-[var(--los-accent)]'
+                        : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)]',
+                    )}
+                    title={
+                      isFiltered
+                        ? 'Showing last 2 weeks · click to show all'
+                        : 'Showing all · click to show last 2 weeks'
+                    }
+                  >
+                    {isFiltered ? '2W' : 'ALL'}
+                  </button>
                 </div>
 
                 {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop target column */}
@@ -657,16 +1133,17 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
                     }
                   }}
                 >
-                  {colItems.length === 0 ? (
+                  {filteredItems.length === 0 ? (
                     <div className="flex items-center justify-center h-16 text-[var(--los-muted)] text-[10px] font-mono opacity-40">
                       empty
                     </div>
                   ) : (
-                    colItems.map((agg) => (
+                    filteredItems.map((agg) => (
                       <KanbanCard
                         key={`${agg.filePath}-${agg.itemIndex}`}
                         agg={agg}
                         onStatusChange={handleStatusChange}
+                        onOpenFile={onOpenFile}
                       />
                     ))
                   )}
@@ -682,6 +1159,18 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
           milestones={allMilestones}
           allFilePaths={todoFilePaths}
           onClose={() => setShowMilestoneManager(false)}
+        />
+      )}
+
+      {showAddTask && (
+        <AddTaskModal
+          todoFilePaths={todoFilePaths}
+          parsedFiles={parsedFiles}
+          initialFilePath={focusedFile}
+          onClose={() => setShowAddTask(false)}
+          onAdd={handleAddTask}
+          onCreateFile={onCreateFile}
+          onOpenFile={onOpenFile}
         />
       )}
     </div>

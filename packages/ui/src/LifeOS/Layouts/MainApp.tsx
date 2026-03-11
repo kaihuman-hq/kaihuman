@@ -1,96 +1,92 @@
-import { h, ComponentChildren } from 'preact';
-import { useState, useEffect, useRef, useMemo, useCallback } from 'preact/hooks';
-import { AIPanel } from '../Templates/AIPanel';
-import { memo, createPortal } from 'preact/compat';
-import { SettingsView } from '../Organisms/SettingsView';
-import { AddToDashboardModal } from '../Organisms/AddToDashboardModal';
-
-import { cn } from '../../utils';
-import { Tile } from '../Molecules/Tile';
-import { EncryptedTileWrapper } from '../Molecules/EncryptedTileWrapper';
-import { StatusBar } from '../Organisms/StatusBar';
-import { Editor } from '../Organisms/Editor';
-import { Editor as RealEditor } from '../../components/editor/Editor';
-import { MonoText, MonoHeader } from '../Atoms/Typography';
-import { MainGrid } from './MainGrid';
-import { MillerColumn } from '../Molecules/MillerColumn';
-import { TimeTrackingWidget } from '../Organisms/Widgets/TimeTrackingWidget';
-import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
-import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
-import { HabitTrackerWidget } from '../Organisms/Widgets/HabitTrackerWidget';
-import { TodoWidget } from '../Organisms/Widgets/TodoWidget';
-import { TimezoneWidget } from '../Organisms/Widgets/TimezoneWidget';
-import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
-import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
-import { TimezoneAddForm } from '../Organisms/Widgets/TimezoneAddForm';
-import { RssWidget, RssFeedManager } from '../Organisms/Widgets/RssWidget';
-import { ReadItLaterWidget } from '../Organisms/Widgets/ReadItLaterWidget';
-import { ReadItLaterItem } from '../Organisms/Widgets/ReadItLaterLogic';
-import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
-import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
-import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
-import { ActionLogWidget } from '../Organisms/Widgets/ActionLogWidget';
-import { layoutStore } from '@lifosy/core';
-import { DataCollectionWidget } from '../Organisms/Widgets/DataCollectionWidget';
-import { DataCollectionAddForm } from '../Organisms/Widgets/DataCollectionAddForm';
-import { DataCollectionColumnManager } from '../Organisms/Widgets/DataCollectionColumnManager';
-import { DataCollectionData, parseDataCollection, serializeDataCollection, calculateAutoValues } from '../Organisms/Widgets/DataCollectionLogic';
-import { BudgetWidget } from '../Organisms/Widgets/BudgetWidget';
-import { DashboardConfig, DashboardEntry } from '../types';
-// 3.12, 3.11 Views
-import { CommitsView } from '../Organisms/CommitsView';
-import { GraphView } from '../Organisms/GraphView';
-import { FileHistoryView } from '../Organisms/FileHistoryView';
-import { CsvTableView } from '../Organisms/Widgets/CsvTableView';
 import {
-  FileText,
-  Layout,
-  Maximize2,
-  Minimize2,
-  Grid,
-  List,
-  Plus,
-  ArrowLeft,
-  Settings,
-  X,
-  History,
-  GitCommit,
-  Share2,
-  MoreVertical,
-  Trash,
-  Edit,
-  Move
-} from 'lucide-preact';
-import {
-  DndContext,
   closestCenter,
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+  defaultDropAnimationSideEffects,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
-  DragOverlay,
-  defaultDropAnimationSideEffects,
-  DragStartEvent,
-  DragEndEvent
 } from '@dnd-kit/core';
 import {
   arrayMove,
+  rectSortingStrategy,
   SortableContext,
   sortableKeyboardCoordinates,
-  rectSortingStrategy,
-  useSortable
+  useSortable,
 } from '@dnd-kit/sortable';
-import { Logger } from '@lifosy/core';
+import { githubFileStore, Logger, layoutStore } from '@lifosy/core';
+import {
+  Edit,
+  FileText,
+  GitCommit,
+  History,
+  Maximize2,
+  Minimize2,
+  MoreVertical,
+  Move,
+  Plus,
+  Trash,
+  X,
+} from 'lucide-preact';
+import type { ComponentChildren } from 'preact';
+import { createPortal, memo } from 'preact/compat';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { Editor as RealEditor } from '../../components/editor/Editor';
+import { cn } from '../../utils';
+import { MonoHeader, MonoText } from '../Atoms/Typography';
+import { EncryptedTileWrapper } from '../Molecules/EncryptedTileWrapper';
+import { MillerColumn } from '../Molecules/MillerColumn';
+import { Tile } from '../Molecules/Tile';
+import { AddToDashboardModal } from '../Organisms/AddToDashboardModal';
+// 3.12, 3.11 Views
+import { CommitsView } from '../Organisms/CommitsView';
+import { Editor } from '../Organisms/Editor';
+import { FileHistoryView } from '../Organisms/FileHistoryView';
+import { GraphView } from '../Organisms/GraphView';
+import { SettingsView } from '../Organisms/SettingsView';
+import { StatusBar } from '../Organisms/StatusBar';
+import { ActionLogWidget } from '../Organisms/Widgets/ActionLogWidget';
+import { BudgetWidget } from '../Organisms/Widgets/BudgetWidget';
+import { CsvTableView } from '../Organisms/Widgets/CsvTableView';
+import { DataCollectionAddForm } from '../Organisms/Widgets/DataCollectionAddForm';
+import { DataCollectionColumnManager } from '../Organisms/Widgets/DataCollectionColumnManager';
+import {
+  parseDataCollection,
+  serializeDataCollection,
+} from '../Organisms/Widgets/DataCollectionLogic';
+import { DataCollectionWidget } from '../Organisms/Widgets/DataCollectionWidget';
+import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
+import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
+import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
+import { HabitTrackerWidget } from '../Organisms/Widgets/HabitTrackerWidget';
+import type { ReadItLaterItem } from '../Organisms/Widgets/ReadItLaterLogic';
+import { ReadItLaterWidget } from '../Organisms/Widgets/ReadItLaterWidget';
+import { RssFeedManager, RssWidget } from '../Organisms/Widgets/RssWidget';
+import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
+import { TimeTrackingWidget } from '../Organisms/Widgets/TimeTrackingWidget';
+import { TimezoneAddForm } from '../Organisms/Widgets/TimezoneAddForm';
+import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
+import { TimezoneWidget } from '../Organisms/Widgets/TimezoneWidget';
+import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
+import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
+import { TodoWidget } from '../Organisms/Widgets/TodoWidget';
+import { AIPanel } from '../Templates/AIPanel';
+import type { DashboardConfig, DashboardEntry } from '../types';
+import { MainGrid } from './MainGrid';
 
 const logger = new Logger('MainApp');
+
 import { CSS } from '@dnd-kit/utilities';
-import { NewFileWizard } from '../Organisms/NewFileWizard';
-import { MoveFileModal } from '../Organisms/MoveFileModal';
-import { SearchModal } from '../Organisms/SearchModal';
-import { NotFound } from '../Organisms/NotFound';
+import type { TileDef as CoreTileDef } from '@lifosy/core';
 import { ConflictModal } from '../Organisms/ConflictModal';
+import { MoveFileModal } from '../Organisms/MoveFileModal';
+import { NewFileWizard } from '../Organisms/NewFileWizard';
+import { NotFound } from '../Organisms/NotFound';
+import { SearchModal } from '../Organisms/SearchModal';
 import { WikiView } from '../Organisms/WikiView';
-import { TileDef as CoreTileDef } from '@lifosy/core';
 
 export interface TileDef extends CoreTileDef {
   /** Component or element to render when this tile is focused */
@@ -116,7 +112,12 @@ export interface MainAppProps {
   repositories?: import('../Organisms/StatusBar').Repository[];
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
 
-  renderEditor?: (path: string, zenMode?: boolean, contentOverride?: string, onSaveOverride?: (val: string) => void) => ComponentChildren;
+  renderEditor?: (
+    path: string,
+    zenMode?: boolean,
+    contentOverride?: string,
+    onSaveOverride?: (val: string) => void,
+  ) => ComponentChildren;
   onAddToReadItLater?: (item: ReadItLaterItem) => void;
   onCreateFile?: (path: string, content: string) => void;
   onDeleteFile?: (path: string) => void;
@@ -140,7 +141,8 @@ export interface MainAppProps {
 
 // Helper to parse URL into state
 const parseUrlState = () => {
-  if (typeof window === 'undefined') return { showFiles: false, activeTileId: null, showNewFileWizard: false };
+  if (typeof window === 'undefined')
+    return { showFiles: false, activeTileId: null, showNewFileWizard: false };
   const path = window.location.pathname;
   if (path === '/files/new') {
     return { showFiles: true, activeTileId: null, showNewFileWizard: true };
@@ -167,9 +169,15 @@ const useIsMobile = () => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
     let timer: ReturnType<typeof setTimeout>;
-    const debounced = () => { clearTimeout(timer); timer = setTimeout(check, 100); };
+    const debounced = () => {
+      clearTimeout(timer);
+      timer = setTimeout(check, 100);
+    };
     window.addEventListener('resize', debounced);
-    return () => { clearTimeout(timer); window.removeEventListener('resize', debounced); };
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', debounced);
+    };
   }, []);
   return isMobile;
 };
@@ -203,10 +211,14 @@ export const MainApp = ({
   const prevRepoName = useRef(props.currentRepository?.name);
 
   useEffect(() => {
-    logger.info('[MainApp] Repo Name Changed Check:', { prev: prevRepoName.current, curr: props.currentRepository?.name });
+    logger.info('[MainApp] Repo Name Changed Check:', {
+      prev: prevRepoName.current,
+      curr: props.currentRepository?.name,
+    });
     // Only reset if repo name ACTUALLY changed (skip on mount)
     if (prevRepoName.current !== props.currentRepository?.name) {
-      if (prevRepoName.current) { // Only if we had a previous repo (not initial load)
+      if (prevRepoName.current) {
+        // Only if we had a previous repo (not initial load)
         logger.info('[MainApp] Switching Repo - Resetting View');
         layoutStore.setFocus(null);
         if (layoutStore.view.value === 'FILES') layoutStore.view.value = 'DASHBOARD';
@@ -234,7 +246,7 @@ export const MainApp = ({
         if (stored === 'light' || stored === 'amethyst' || stored === 'nexus') {
           themeToUse = stored;
         }
-      } catch (e) {
+      } catch (_e) {
         // Ignore
       }
     }
@@ -250,10 +262,9 @@ export const MainApp = ({
     // 3. Persist to LocalStorage (Cache)
     try {
       localStorage.setItem('lifeos-theme', themeToUse);
-    } catch (e) {
+    } catch (_e) {
       // Ignore
     }
-
   }, [config?.theme]);
 
   // --- STORE ACCESSORS ---
@@ -287,13 +298,12 @@ export const MainApp = ({
   const originalConfig = useRef<DashboardConfig | undefined>(undefined);
   const [focusedViewMode, setFocusedViewMode] = useState<string>('WIDGET');
 
-
   // Store current drag id for drag overlay
   const activeId = layoutStore.activeDragId.value;
 
-
   // --- SETTERS / ACTIONS ADAPTERS ---
-  const setActiveTileId = (id: string | number | null) => layoutStore.setFocus(id ? String(id) : null);
+  const setActiveTileId = (id: string | number | null) =>
+    layoutStore.setFocus(id ? String(id) : null);
 
   const setShowFiles = (show: boolean) => {
     if (show) layoutStore.view.value = 'FILES';
@@ -313,46 +323,72 @@ export const MainApp = ({
     else if (layoutStore.view.value === 'COMMITS') layoutStore.view.value = 'DASHBOARD';
   };
 
-  const setShowNewFileWizard = (show: boolean) => { layoutStore.showNewFileWizard.value = show; };
-  const setShowDumpMode = (show: boolean) => { layoutStore.showDumpMode.value = show; };
+  const setShowNewFileWizard = (show: boolean) => {
+    layoutStore.showNewFileWizard.value = show;
+  };
+  const setShowDumpMode = (show: boolean) => {
+    layoutStore.showDumpMode.value = show;
+  };
   const setZenMode = (val: boolean | ((prev: boolean) => boolean)) => {
     if (typeof val === 'function') layoutStore.zenMode.value = !!val(layoutStore.zenMode.value);
     else layoutStore.zenMode.value = !!val;
   };
-  const setActiveDashboardId = (id: string | null) => { layoutStore.activeDashboardId.value = id; };
-  const setFileToMove = (path: string | null) => { layoutStore.fileToMove.value = path; };
-  const setDumpContent = (content: string) => { layoutStore.dumpContent.value = content; };
-  const setDumpSaveProps = (props: any) => { layoutStore.dumpSaveProps.value = props; };
+  const setActiveDashboardId = (id: string | null) => {
+    layoutStore.activeDashboardId.value = id;
+  };
+  const setFileToMove = (path: string | null) => {
+    layoutStore.fileToMove.value = path;
+  };
+  const setDumpContent = (content: string) => {
+    layoutStore.dumpContent.value = content;
+  };
+  const setDumpSaveProps = (props: any) => {
+    layoutStore.dumpSaveProps.value = props;
+  };
 
-  const setShowAddToDashboard = (show: boolean) => { layoutStore.showAddToDashboard.value = show; };
-  const setFileToAddToDashboard = (path: string | null) => { layoutStore.fileToAddToDashboard.value = path; };
-  const setDragEnabled = (enabled: boolean) => { layoutStore.dragEnabled.value = enabled; };
-  const setActiveId = (id: string | number | null) => { layoutStore.activeDragId.value = id; };
-  const setNotFound = (val: boolean) => { layoutStore.notFound.value = val; };
+  const setShowAddToDashboard = (show: boolean) => {
+    layoutStore.showAddToDashboard.value = show;
+  };
+  const setFileToAddToDashboard = (path: string | null) => {
+    layoutStore.fileToAddToDashboard.value = path;
+  };
+  const setDragEnabled = (enabled: boolean) => {
+    layoutStore.dragEnabled.value = enabled;
+  };
+  const setActiveId = (id: string | number | null) => {
+    layoutStore.activeDragId.value = id;
+  };
+  const setNotFound = (val: boolean) => {
+    layoutStore.notFound.value = val;
+  };
 
   const handleToggleDashboard = (dashboardId: string) => {
     if (!fileToAddToDashboard || !config || !onConfigChange) return;
 
     // Check if already exists in that dashboard
-    const exists = config.entries.some(e => e.path === fileToAddToDashboard && e.dashboard === dashboardId);
+    const exists = config.entries.some(
+      (e) => e.path === fileToAddToDashboard && e.dashboard === dashboardId,
+    );
 
     if (exists) {
       // Remove it
       onConfigChange({
         ...config,
-        entries: config.entries.filter(e => !(e.path === fileToAddToDashboard && e.dashboard === dashboardId))
+        entries: config.entries.filter(
+          (e) => !(e.path === fileToAddToDashboard && e.dashboard === dashboardId),
+        ),
       });
     } else {
       // Add it
       const newEntry: DashboardEntry = {
         path: fileToAddToDashboard,
         dashboard: dashboardId,
-        skipOnMobile: false
+        skipOnMobile: false,
       };
 
       onConfigChange({
         ...config,
-        entries: [...config.entries, newEntry]
+        entries: [...config.entries, newEntry],
       });
     }
     // We intentionally do not close the modal so users can toggle multiple dashboards
@@ -374,7 +410,7 @@ export const MainApp = ({
       initialContent: content,
       initialFilename: filename,
       initialFolder: targetFolder,
-      initialStep: 'LOCATION'
+      initialStep: 'LOCATION',
     });
     // Trigger New File Wizard
     setShowNewFileWizard(true);
@@ -382,9 +418,7 @@ export const MainApp = ({
 
   // Store original config when entering Drag Mode for cancellation
 
-
   // Store current drag id for drag overlay
-
 
   // Nav Overlay Hover State
   const [hoverNav, setHoverNav] = useState<'prev' | 'next' | null>(null);
@@ -406,7 +440,10 @@ export const MainApp = ({
       url = '/files/new';
     } else if (activeTileId && typeof activeTileId === 'string') {
       // Split by slash and encode each segment to preserve structure
-      const cleanPath = activeTileId.split('/').map(segment => encodeURIComponent(segment)).join('/');
+      const cleanPath = activeTileId
+        .split('/')
+        .map((segment) => encodeURIComponent(segment))
+        .join('/');
       url = `/files/${cleanPath}`;
     } else if (showFiles) {
       url = '/files';
@@ -440,7 +477,7 @@ export const MainApp = ({
           }
 
           setCheckingPath(true);
-          Promise.resolve(onCheckPath(path)).then(type => {
+          Promise.resolve(onCheckPath(path)).then((type) => {
             setCheckingPath(false);
             if (type === 'FOLDER') {
               logger.info('[MainApp] Path is FOLDER -> Showing Files');
@@ -458,7 +495,9 @@ export const MainApp = ({
               onNavigate?.(parts);
             } else {
               // Check dashboard entries as fallback
-              const dashEntry = layoutStore.remoteConfig.value?.entries.find(e => e.path === path);
+              const dashEntry = layoutStore.remoteConfig.value?.entries.find(
+                (e) => e.path === path,
+              );
               if (dashEntry) {
                 logger.info('[MainApp] Path is Dashboard Entry -> Switch Dashboard');
                 setActiveTileId(path);
@@ -477,7 +516,7 @@ export const MainApp = ({
         if (fileSystem) {
           // ... (existing fallback logic)
           // Simplistic check: If path exists as a Tile of type FOLDER -> navigate there
-          const dashEntry = layoutStore.remoteConfig.value?.entries.find(e => e.path === path);
+          const dashEntry = layoutStore.remoteConfig.value?.entries.find((e) => e.path === path);
           if (dashEntry) {
             setActiveTileId(path);
             setShowFiles(false);
@@ -486,8 +525,8 @@ export const MainApp = ({
           }
 
           // Priority 2: Check FileSystem
-          const allItems = fileSystem.columns.flatMap(c => c.items);
-          const item = allItems.find(i => i.id === path);
+          const allItems = fileSystem.columns.flatMap((c) => c.items);
+          const item = allItems.find((i) => i.id === path);
 
           if (item) {
             if (item.type === 'FOLDER') {
@@ -514,7 +553,9 @@ export const MainApp = ({
         // This is the critical part for /files
         const currentIsFiles = layoutStore.view.value === 'FILES';
         if (state.showFiles !== currentIsFiles) {
-          logger.info(`[MainApp] Resolving State: showFiles=${state.showFiles}`, { currentView: layoutStore.view.value });
+          logger.info(`[MainApp] Resolving State: showFiles=${state.showFiles}`, {
+            currentView: layoutStore.view.value,
+          });
           setShowFiles(state.showFiles);
         }
         setShowNewFileWizard(!!state.showNewFileWizard);
@@ -525,11 +566,26 @@ export const MainApp = ({
     resolvePath();
     window.addEventListener('popstate', resolvePath);
     return () => window.removeEventListener('popstate', resolvePath);
-  }, [fileSystem, layoutStore.remoteConfig.value, onCheckPath, onNavigate]); // Re-run when FS loads or props change
-
+  }, [
+    fileSystem,
+    onCheckPath,
+    onNavigate,
+    activeTileId,
+    notFound,
+    // biome-ignore lint/correctness/useExhaustiveDependencies: signals handle reactivity
+    setActiveTileId,
+    // biome-ignore lint/correctness/useExhaustiveDependencies: signals handle reactivity
+    setNotFound,
+    // biome-ignore lint/correctness/useExhaustiveDependencies: signals handle reactivity
+    setShowDumpMode,
+    // biome-ignore lint/correctness/useExhaustiveDependencies: signals handle reactivity
+    setShowFiles,
+    // biome-ignore lint/correctness/useExhaustiveDependencies: signals handle reactivity
+    setShowNewFileWizard,
+  ]); // Re-run when FS loads or props change
 
   /* REMOVED useEffect syncing config prop to localConfig as we use layoutStore directly */
-  // If config prop is provided (e.g. initial load from Dashboard), ensure store matches? 
+  // If config prop is provided (e.g. initial load from Dashboard), ensure store matches?
   // Dashboard already syncs store from file. MainApp should just observe store.
 
   const handleDragStartLogic = () => {
@@ -561,7 +617,7 @@ export const MainApp = ({
   const handlePrevDashboard = () => {
     const config = layoutStore.remoteConfig.value;
     if (!config || !config.dashboards.length) return;
-    const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
+    const currentIndex = config.dashboards.findIndex((d) => d.id === currentDashboardId);
     // Find prev index, wrap around
     const prevIndex = (currentIndex - 1 + config.dashboards.length) % config.dashboards.length;
     setActiveDashboardId(config.dashboards[prevIndex]?.id || null);
@@ -570,7 +626,7 @@ export const MainApp = ({
   const handleNextDashboard = () => {
     const config = layoutStore.remoteConfig.value;
     if (!config || !config.dashboards.length) return;
-    const currentIndex = config.dashboards.findIndex(d => d.id === currentDashboardId);
+    const currentIndex = config.dashboards.findIndex((d) => d.id === currentDashboardId);
     // Find next index, wrap around
     const nextIndex = (currentIndex + 1) % config.dashboards.length;
     setActiveDashboardId(config.dashboards[nextIndex]?.id || null);
@@ -580,9 +636,9 @@ export const MainApp = ({
     const config = layoutStore.remoteConfig.value;
     if (!config || !onConfigChange) return;
     const currentQuickNotes = config.files?.quickNotes || [];
-    let newQuickNotes;
+    let newQuickNotes: string[];
     if (currentQuickNotes.includes(path)) {
-      newQuickNotes = currentQuickNotes.filter(p => p !== path);
+      newQuickNotes = currentQuickNotes.filter((p) => p !== path);
     } else {
       newQuickNotes = [...currentQuickNotes, path];
     }
@@ -590,29 +646,32 @@ export const MainApp = ({
       ...config,
       files: {
         ...(config.files || {}),
-        quickNotes: newQuickNotes
-      }
+        quickNotes: newQuickNotes,
+      },
     };
     onConfigChange({ ...newConfig });
   };
 
-  const quickNoteSet = useMemo(() => new Set(layoutStore.remoteConfig.value?.files?.quickNotes || []), [layoutStore.remoteConfig.value]);
+  const quickNoteSet = useMemo(
+    () => new Set(layoutStore.remoteConfig.value?.files?.quickNotes || []),
+    [],
+  );
   const isQuickNote = useCallback((path: string) => quickNoteSet.has(path), [quickNoteSet]);
 
   // Filter entries for current dashboard
   const userEntries = useMemo(() => {
     const config = layoutStore.remoteConfig.value;
     if (!config || !currentDashboardId) return [];
-    return config.entries.filter(e => e.dashboard === currentDashboardId);
-  }, [layoutStore.remoteConfig.value, currentDashboardId]);
+    return config.entries.filter((e) => e.dashboard === currentDashboardId);
+  }, [currentDashboardId]);
 
   // Convert config entries to tiles
   const dashboardTiles = useMemo(() => {
     const config = layoutStore.remoteConfig.value;
     if (!config) return tiles; // Fallback to legacy tiles
 
-    return userEntries.map((entry, index) => {
-      const extension = entry.path.split('.').slice(1).join('.'); // .events.csv etc. leads to events.csv
+    return userEntries.map((entry, _index) => {
+      const _extension = entry.path.split('.').slice(1).join('.'); // .events.csv etc. leads to events.csv
       // Better extension extraction:
       let ext = '';
       const lowerPath = entry.path?.toLowerCase() || '';
@@ -629,9 +688,9 @@ export const MainApp = ({
       else {
         const parts = entry.path.split('.');
         if (lowerPath.endsWith('.enc') && parts.length > 2) {
-           ext = '.' + parts.slice(-2).join('.').toLowerCase(); // e.g., .md.enc
+          ext = `.${parts.slice(-2).join('.').toLowerCase()}`; // e.g., .md.enc
         } else {
-           ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
+          ext = parts.length > 1 ? `.${parts.slice(1).join('.').toLowerCase()}` : '';
         }
       }
 
@@ -644,42 +703,51 @@ export const MainApp = ({
         onContentChange: (newContent: string) => {
           onFileChange?.(entry.path, newContent);
         },
-        content: renderFile ? renderFile(entry.path) : undefined
+        content: renderFile ? renderFile(entry.path) : undefined,
       } as TileDef;
     });
-  }, [layoutStore.remoteConfig.value, userEntries, fileContents, tiles]);
+  }, [userEntries, fileContents, tiles, onFileChange, renderFile]);
 
   const displayTiles = dashboardTiles;
 
   // Helper to render tile content (Widget vs Default)
-  const renderTileContent = (tile: TileDef, mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED') => {
-    
+  const renderTileContent = (
+    tile: TileDef,
+    mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED',
+  ) => {
     // Encrypted wrapper handling
     if (tile.id.toString().endsWith('.enc')) {
       // Create a duplicate tile without .enc for the inner widget's extension matching
       const innerExt = tile.extension?.replace('.enc', '');
       const innerTile = { ...tile, extension: innerExt };
-      
+
       return (
-        <EncryptedTileWrapper 
-          tile={tile} 
-          mode={mode} 
+        <EncryptedTileWrapper
+          tile={tile}
+          mode={mode}
           onUnlocked={() => {
             // Unlocked callback (state is internally managed)
           }}
         >
           {(decryptedContent: string, handleSave: (newDecryptedContent: string) => void) => {
-            const tempTile = { ...innerTile, rawContent: decryptedContent, onContentChange: handleSave };
+            const tempTile = {
+              ...innerTile,
+              rawContent: decryptedContent,
+              onContentChange: handleSave,
+            };
             return renderRawTileContent(tempTile, mode);
           }}
         </EncryptedTileWrapper>
       );
     }
-    
-    return renderRawTileContent(tile, mode);
-  }
 
-  const renderRawTileContent = (tile: TileDef, mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED') => {
+    return renderRawTileContent(tile, mode);
+  };
+
+  const renderRawTileContent = (
+    tile: TileDef,
+    mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED',
+  ) => {
     if (tile.extension === '.timetracking.csv' && tile.rawContent) {
       return (
         <TimeTrackingWidget
@@ -690,12 +758,7 @@ export const MainApp = ({
       );
     }
     if (tile.extension === '.events.csv' && tile.rawContent) {
-      return (
-        <EventsWidget
-          content={tile.rawContent}
-          mode={mode as any}
-        />
-      );
+      return <EventsWidget content={tile.rawContent} mode={mode as any} />;
     }
     if (tile.extension === '.habit.csv' && tile.rawContent) {
       return (
@@ -726,7 +789,7 @@ export const MainApp = ({
             setActiveTileId(tile.id);
           }}
         />
-      )
+      );
     }
     if (tile.extension === '.timezones.json' && tile.rawContent) {
       return (
@@ -735,7 +798,7 @@ export const MainApp = ({
           mode={mode as any}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
-      )
+      );
     }
     if (tile.extension?.toLowerCase() === '.rss.json' && tile.rawContent) {
       return (
@@ -751,16 +814,17 @@ export const MainApp = ({
               name: item.title,
               tags: [],
               createdAt: Date.now(),
-              updatedAt: Date.now()
+              updatedAt: Date.now(),
             };
             if (onAddToReadItLater && newItem) {
-              logger.debug(`RssWidget onReadItLater triggered. Calling onAddToReadItLater prop... ${newItem.name}`);
+              logger.debug(
+                `RssWidget onReadItLater triggered. Calling onAddToReadItLater prop... ${newItem.name}`,
+              );
               onAddToReadItLater(newItem);
             } else {
               logger.error('onAddToReadItLater prop is UNDEFINED');
             }
-          }
-          }
+          }}
         />
       );
     }
@@ -795,7 +859,15 @@ export const MainApp = ({
       return (
         <BudgetWidget
           content={tile.rawContent}
-          mode={mode === 'FOCUS' ? 'FOCUS' : (mode === 'MOBILE_EXPANDED' ? 'MOBILE_EXPANDED' : (mode === 'MOBILE_COLLAPSED' ? 'MOBILE_COLLAPSED' : 'SMALL'))}
+          mode={
+            mode === 'FOCUS'
+              ? 'FOCUS'
+              : mode === 'MOBILE_EXPANDED'
+                ? 'MOBILE_EXPANDED'
+                : mode === 'MOBILE_COLLAPSED'
+                  ? 'MOBILE_COLLAPSED'
+                  : 'SMALL'
+          }
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
@@ -804,7 +876,15 @@ export const MainApp = ({
       return (
         <ActionLogWidget
           content={tile.rawContent}
-          mode={mode === 'FOCUS' ? 'FOCUS' : (mode === 'MOBILE_EXPANDED' ? 'MOBILE_EXPANDED' : (mode === 'MOBILE_COLLAPSED' ? 'MOBILE_COLLAPSED' : 'SMALL'))}
+          mode={
+            mode === 'FOCUS'
+              ? 'FOCUS'
+              : mode === 'MOBILE_EXPANDED'
+                ? 'MOBILE_EXPANDED'
+                : mode === 'MOBILE_COLLAPSED'
+                  ? 'MOBILE_COLLAPSED'
+                  : 'SMALL'
+          }
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
@@ -817,12 +897,19 @@ export const MainApp = ({
       return renderEditor(String(tile.id), false, tile.rawContent, tile.onContentChange);
     }
 
-    if (tile.type === 'FILE' && renderEditor && tile.rawContent !== undefined && tile.extension?.match(/\.(md|txt|json|csv|enc)$/)) {
+    if (
+      tile.type === 'FILE' &&
+      renderEditor &&
+      tile.rawContent !== undefined &&
+      tile.extension?.match(/\.(md|txt|json|csv|enc)$/)
+    ) {
       // If we have actual rawContent (e.g. from decryption), FORCE the use of renderEditor so it consumes it
       return renderEditor(String(tile.id), mode === 'FOCUS', tile.rawContent, tile.onContentChange);
     }
 
-    return tile.content || (renderFile && tile.type === 'FILE' ? renderFile(String(tile.id)) : undefined);
+    return (
+      tile.content || (renderFile && tile.type === 'FILE' ? renderFile(String(tile.id)) : undefined)
+    );
   };
 
   // If fileSystem is provided, we use the Miller Column Layout (or Stack on Mobile)
@@ -839,7 +926,7 @@ export const MainApp = ({
     const config = layoutStore.remoteConfig.value;
     if (!config) return [];
     const folders = new Set<string>();
-    config.entries.forEach(entry => {
+    config.entries.forEach((entry) => {
       const parts = entry.path.split('/');
       if (parts.length > 1) {
         let currentPath = '';
@@ -850,17 +937,16 @@ export const MainApp = ({
       }
     });
     return Array.from(folders).sort();
-  }, [layoutStore.remoteConfig.value]);
+  }, []);
 
   // Memoize the base active tile from source to avoid unnecessary re-calculations
   const baseActiveTile = useMemo(() => {
-    return activeTileId !== null ? (
-      isMillerMode
-        ? fileSystem?.columns.flatMap(c => c.items).find(t => t.id === activeTileId)
-        : displayTiles.find(t => t.id === activeTileId)
-    ) : null;
+    return activeTileId !== null
+      ? isMillerMode
+        ? fileSystem?.columns.flatMap((c) => c.items).find((t) => t.id === activeTileId)
+        : displayTiles.find((t) => t.id === activeTileId)
+      : null;
   }, [activeTileId, isMillerMode, fileSystem, displayTiles]);
-
 
   // Fix: Enhance activeTile from fileSystem with content props if missing
   // This ensures 'Files View' behaves exactly like 'Dashboard View' in Focus Mode
@@ -887,16 +973,19 @@ export const MainApp = ({
       else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
       else {
         const parts = entryPath.split('.');
-        ext = parts.length > 1 ? '.' + parts.slice(1).join('.').toLowerCase() : '';
+        ext = parts.length > 1 ? `.${parts.slice(1).join('.').toLowerCase()}` : '';
       }
 
       // 2. Determine if we need to update the tile
-      const currentContent = fileContents[entryPath] !== undefined ? fileContents[entryPath] : baseActiveTile.rawContent;
+      const currentContent =
+        fileContents[entryPath] !== undefined ? fileContents[entryPath] : baseActiveTile.rawContent;
 
       // Update if extension mismatch OR content missing OR content changed
-      const needsUpdate = (ext !== baseActiveTile.extension) ||
-        (!baseActiveTile.rawContent) ||
-        (fileContents[entryPath] !== undefined && fileContents[entryPath] !== baseActiveTile.rawContent);
+      const needsUpdate =
+        ext !== baseActiveTile.extension ||
+        !baseActiveTile.rawContent ||
+        (fileContents[entryPath] !== undefined &&
+          fileContents[entryPath] !== baseActiveTile.rawContent);
 
       if (needsUpdate) {
         return {
@@ -905,17 +994,20 @@ export const MainApp = ({
           rawContent: currentContent,
           onContentChange: (newContent: string) => {
             onFileChange?.(entryPath, newContent);
-          }
+          },
         };
       }
     }
     return baseActiveTile;
   }, [baseActiveTile, isMillerMode, fileContents, onFileChange]);
 
-
   // Persist Active Tile: If we had a tile, but now it's gone, but ID persists -> use old one
   // Check if activeTile is null but we have an ID and a cached tile
-  const finalActiveTile = computedActiveTile || (activeTileId !== null && lastActiveTile.current && lastActiveTile.current.id === activeTileId ? lastActiveTile.current : null);
+  const finalActiveTile =
+    computedActiveTile ||
+    (activeTileId !== null && lastActiveTile.current && lastActiveTile.current.id === activeTileId
+      ? lastActiveTile.current
+      : null);
 
   // Update persisted reference
   useEffect(() => {
@@ -938,19 +1030,19 @@ export const MainApp = ({
 
   // Calculate Breadcrumbs Logic
   const breadcrumbs = useMemo(() => {
-    if (activeTileId !== null && !isMillerMode) return ["root", "focus", `tile_${activeTileId}`];
+    if (activeTileId !== null && !isMillerMode) return ['root', 'focus', `tile_${activeTileId}`];
 
     if (isMillerMode && fileSystem) {
       const path: string[] = ['~'];
-      fileSystem.columns.forEach(col => {
+      fileSystem.columns.forEach((col) => {
         if (col.activeId) {
-          const activeItem = col.items.find(i => i.id === col.activeId);
+          const activeItem = col.items.find((i) => i.id === col.activeId);
           if (activeItem) path.push(String(activeItem.title));
         }
       });
       return path;
     }
-    return ["~"];
+    return ['~'];
   }, [activeTileId, isMillerMode, fileSystem]);
 
   const activeTile = finalActiveTile;
@@ -968,11 +1060,11 @@ export const MainApp = ({
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8, // Require movement before drag starts to allow clicks
-      }
+      },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -987,12 +1079,12 @@ export const MainApp = ({
       const config = layoutStore.remoteConfig.value;
       if (!config || !currentDashboardId) return;
       // Find indices
-      const oldIndex = userEntries.findIndex(e => e.path === active.id);
-      const newIndex = userEntries.findIndex(e => e.path === over?.id);
+      const oldIndex = userEntries.findIndex((e) => e.path === active.id);
+      const newIndex = userEntries.findIndex((e) => e.path === over?.id);
 
       if (oldIndex !== -1 && newIndex !== -1) {
         const newOrder = arrayMove(userEntries, oldIndex, newIndex);
-        const otherEntries = config.entries.filter(e => e.dashboard !== currentDashboardId);
+        const otherEntries = config.entries.filter((e) => e.dashboard !== currentDashboardId);
         const newConfig = { ...config, entries: [...otherEntries, ...newOrder] };
         layoutStore.remoteConfig.value = newConfig;
         onConfigChange?.(newConfig);
@@ -1044,16 +1136,16 @@ export const MainApp = ({
     }
   };
 
-
-
-  const getResponsiveGridClass = (count: number) => {
-    return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
+  const getResponsiveGridClass = (_count: number) => {
+    return 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
   };
 
   // Search State
   // const [showSearch, setShowSearch] = useState(false); // REMOVED local state
   const showSearch = layoutStore.showSearch.value;
-  const setShowSearch = (val: boolean) => { layoutStore.showSearch.value = val; };
+  const setShowSearch = (val: boolean) => {
+    layoutStore.showSearch.value = val;
+  };
 
   // Keyboard Shortcuts (Global)
   useEffect(() => {
@@ -1067,14 +1159,17 @@ export const MainApp = ({
       // Toggle Zen Mode (Ctrl+Shift+Z or Cmd+Shift+Z)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
         e.preventDefault();
-        setZenMode(prev => !prev);
+        setZenMode((prev) => !prev);
       }
     };
 
     // Use capture phase to ensure we get the event before CodeMirror or other inputs
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, []);
+  }, [
+    // biome-ignore lint/correctness/useExhaustiveDependencies: signals handle reactivity
+    setZenMode,
+  ]);
 
   // Fix 1.5 & 1.6: Dynamic Theme Color for Mobile Safari and Zen Mode
   useEffect(() => {
@@ -1092,11 +1187,11 @@ export const MainApp = ({
     } else {
       // Create if missing
       const meta = document.createElement('meta');
-      meta.name = "theme-color";
+      meta.name = 'theme-color';
       meta.content = darkThemeColor;
       document.head.appendChild(meta);
     }
-  }, [zenMode]);
+  }, []);
 
   const showWiki = layoutStore.view.value === 'WIKI';
 
@@ -1115,6 +1210,7 @@ export const MainApp = ({
               <MonoHeader>REPOSITORY HISTORY</MonoHeader>
             </div>
             <button
+              type="button"
               onClick={() => setShowCommits(false)}
               className="p-2 hover:bg-white/10 rounded-sm"
             >
@@ -1131,6 +1227,7 @@ export const MainApp = ({
         <div className="fixed inset-0 z-50 bg-[var(--los-bg)] animate-in fade-in zoom-in-95 duration-200 flex flex-col">
           <div className="absolute top-4 right-4 z-50">
             <button
+              type="button"
               onClick={() => setShowGraph(false)}
               className="p-2 bg-[var(--los-bg)] border border-[var(--los-border)] hover:bg-[var(--los-accent)] hover://text-[var(--los-bg)] rounded-sm transition-colors shadow-lg"
             >
@@ -1138,11 +1235,13 @@ export const MainApp = ({
             </button>
           </div>
           <div className="flex-1 overflow-hidden">
-            <GraphView onNavigate={(path) => {
-              setShowGraph(false);
-              setShowFiles(true);
-              setActiveTileId(path);
-            }} />
+            <GraphView
+              onNavigate={(path) => {
+                setShowGraph(false);
+                setShowFiles(true);
+                setActiveTileId(path);
+              }}
+            />
           </div>
         </div>
       )}
@@ -1153,6 +1252,7 @@ export const MainApp = ({
           <WikiView rootPath={layoutStore.activeWikiRoot.value || ''} />
           <div className="absolute top-3 right-4 z-50">
             <button
+              type="button"
               className="p-2 bg-black/50 hover:bg-black/70 rounded text-white backdrop-blur-sm"
               onClick={() => {
                 layoutStore.view.value = 'DASHBOARD';
@@ -1186,7 +1286,9 @@ export const MainApp = ({
           }}
           dashboards={config.dashboards}
           fileName={fileToAddToDashboard || ''}
-          currentDashboards={config.entries.filter(e => e.path === fileToAddToDashboard).map(e => e.dashboard)}
+          currentDashboards={config.entries
+            .filter((e) => e.path === fileToAddToDashboard)
+            .map((e) => e.dashboard)}
           onToggleDashboard={handleToggleDashboard}
         />
       )}
@@ -1195,12 +1297,12 @@ export const MainApp = ({
       <SearchModal
         isOpen={showSearch}
         onClose={() => setShowSearch(false)}
-        currentRepository={props.currentRepository?.name || "Lifosy/monorepo"}
+        currentRepository={props.currentRepository?.name || 'Lifosy/monorepo'}
         githubToken={githubToken}
         repositories={props.repositories || []}
-        workspaces={config ? config.dashboards.map(d => ({ id: d.id, name: d.name })) : []}
+        workspaces={config ? config.dashboards.map((d) => ({ id: d.id, name: d.name })) : []}
         onSelectRepository={(repoId) => {
-          const repo = props.repositories?.find(r => r.id === repoId);
+          const repo = props.repositories?.find((r) => r.id === repoId);
           if (repo && props.onSelectRepository) {
             props.onSelectRepository(repo);
           }
@@ -1220,7 +1322,7 @@ export const MainApp = ({
           if (item.type === 'FILE') {
             logger.debug(`Opening file from search: ${item.path}`);
             // Check if it's in userEntries to switch dashboard?
-            const entry = layoutStore.remoteConfig.value?.entries.find(e => e.path === item.path);
+            const entry = layoutStore.remoteConfig.value?.entries.find((e) => e.path === item.path);
             if (entry) {
               // Switch dashboard
               setActiveDashboardId(entry.dashboard);
@@ -1244,8 +1346,7 @@ export const MainApp = ({
         }}
       />
       {/* CENTER STAGE: The Matrix OR The Active Tile */}
-      <MainGrid viewState={zenMode ? 'ZEN' : (activeTileId !== null ? 'FOCUS' : 'DASHBOARD')}>
-
+      <MainGrid viewState={zenMode ? 'ZEN' : activeTileId !== null ? 'FOCUS' : 'DASHBOARD'}>
         {/* Not Found State or Loading State */}
         {checkingPath ? (
           <Tile column="center" title="Loading...">
@@ -1255,21 +1356,26 @@ export const MainApp = ({
           </Tile>
         ) : notFound ? (
           <Tile column="center" title="404">
-            <NotFound onGoHome={() => {
-              window.history.pushState({}, '', '/');
-              setNotFound(false);
-              setActiveTileId(null);
-              setShowFiles(false);
-            }} />
+            <NotFound
+              onGoHome={() => {
+                window.history.pushState({}, '', '/');
+                setNotFound(false);
+                setActiveTileId(null);
+                setShowFiles(false);
+              }}
+            />
           </Tile>
         ) : (
-          <Tile title={activeTileId !== null ? `FOCUS: ${activeTileId}` : undefined} column="center">
+          <Tile
+            title={activeTileId !== null ? `FOCUS: ${activeTileId}` : undefined}
+            column="center"
+          >
             {activeTileId === null ? (
               isMillerMode ? (
                 // MILLER COLUMNS LAYOUT (Centered & Max-Width)
                 isMobile ? (
                   <StackedNavigation
-                    fileSystem={fileSystem!}
+                    fileSystem={fileSystem as FileSystemState}
                     onNavigate={(path) => onNavigate?.(path)}
                     onItemClick={(item) => {
                       if (onItemClick) onItemClick(item);
@@ -1285,14 +1391,15 @@ export const MainApp = ({
                   />
                 ) : (
                   <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto mx-auto w-full max-w-screen-2xl">
-                    {fileSystem!.columns.map((col, index) => {
-                      const isLast = index === fileSystem!.columns.length - 1;
+                    {fileSystem?.columns.map((col, index) => {
+                      const isLast = index === fileSystem?.columns.length - 1;
                       return (
                         <MillerColumn
+                          // biome-ignore lint/suspicious/noArrayIndexKey: column index is stable
                           key={index}
-                          items={col.items.map(t => ({
+                          items={col.items.map((t) => ({
                             ...t,
-                            content: renderTileContent(t, 'SMALL')
+                            content: renderTileContent(t, 'SMALL'),
                           }))}
                           activeId={col.activeId}
                           variant={isLast ? 'GRID' : 'LIST'}
@@ -1310,7 +1417,7 @@ export const MainApp = ({
                           onToggleQuickNote={handleToggleQuickNote}
                           isQuickNote={isQuickNote}
                         />
-                      )
+                      );
                     })}
                   </div>
                 )
@@ -1318,8 +1425,10 @@ export const MainApp = ({
                 // LEGACY SINGLE GRID LAYOUT OR DASHBOARD
                 <div
                   className={cn(
-                    "absolute top-0 left-0 right-0 bottom-8 overflow-y-auto overflow-x-hidden",
-                    !layoutStore.remoteConfig.value || showFiles ? "block" : getResponsiveGridClass(displayTiles.length)
+                    'absolute top-0 left-0 right-0 bottom-8 overflow-y-auto overflow-x-hidden',
+                    !layoutStore.remoteConfig.value || showFiles
+                      ? 'block'
+                      : getResponsiveGridClass(displayTiles.length),
                   )}
                   key="matrix"
                 >
@@ -1330,58 +1439,68 @@ export const MainApp = ({
                       onDragStart={handleDragStart}
                       onDragEnd={handleDragEnd}
                     >
-                      {(
-                        <>
-                          <SortableContext
-                            items={userEntries.map(e => e.path)}
-                            strategy={rectSortingStrategy}
-                          >
-                            {(
-                              <div className={cn(
-                                "grid gap-px bg-[var(--los-bg)] content-start w-full p-4 md:p-0",
-                                "max-w-screen-2xl mx-auto", // Center content
-                                getResponsiveGridClass(displayTiles.length)
-                              )}>
-                                {displayTiles.map((tile) => (
-                                  <SortableTileItem
-                                    key={tile.id}
-                                    tile={tile}
-                                    renderTileContent={renderTileContent}
-                                    setActiveTileId={setActiveTileId}
-                                    handleDragStart={handleDragStartLogic}
-                                    handleDragSave={handleDragSave}
-                                    dragEnabled={dragEnabled}
-                                    isExpanded={expandedTiles.has(String(tile.id))}
-                                    onToggleSize={() => toggleTileSize(tile.id)}
-                                    onDeleteFile={onDeleteFile}
-                                    onRenameFile={onRenameFile}
-                                    onRequestMove={(path: string) => setFileToMove(path)}
-                                    isMobile={isMobile}
-                                    onToggleQuickNote={handleToggleQuickNote}
-                                    isQuickNote={isQuickNote}
-                                  />
-                                ))}
-                              </div>
-                            ) as any}
-                          </SortableContext>
+                      {
+                        (
+                          <>
+                            <SortableContext
+                              items={userEntries.map((e) => e.path)}
+                              strategy={rectSortingStrategy}
+                            >
+                              {
+                                (
+                                  <div
+                                    className={cn(
+                                      'grid gap-px bg-[var(--los-bg)] content-start w-full p-4 md:p-0',
+                                      'max-w-screen-2xl mx-auto', // Center content
+                                      getResponsiveGridClass(displayTiles.length),
+                                    )}
+                                  >
+                                    {displayTiles.map((tile) => (
+                                      <SortableTileItem
+                                        key={tile.id}
+                                        tile={tile}
+                                        renderTileContent={renderTileContent}
+                                        setActiveTileId={setActiveTileId}
+                                        handleDragStart={handleDragStartLogic}
+                                        handleDragSave={handleDragSave}
+                                        dragEnabled={dragEnabled}
+                                        isExpanded={expandedTiles.has(String(tile.id))}
+                                        onToggleSize={() => toggleTileSize(tile.id)}
+                                        onDeleteFile={onDeleteFile}
+                                        onRenameFile={onRenameFile}
+                                        onRequestMove={(path: string) => setFileToMove(path)}
+                                        isMobile={isMobile}
+                                        onToggleQuickNote={handleToggleQuickNote}
+                                        isQuickNote={isQuickNote}
+                                      />
+                                    ))}
+                                  </div>
+                                ) as any
+                              }
+                            </SortableContext>
 
-                          <DragOverlay dropAnimation={dropAnimation}>
-                            {(activeId ? (
-                              <div className="bg-[var(--los-bg)] ring-2 ring-[var(--los-accent)] opacity-90 scale-95 w-full h-full pb-[100%]">
-                                <TileContentStructure
-                                  tile={displayTiles.find(t => t.id === activeId)!}
-                                  renderTileContent={renderTileContent}
-                                  onToggleQuickNote={handleToggleQuickNote}
-                                  isQuickNote={isQuickNote}
-                                />
-                              </div>
-                            ) : null) as any}
-                          </DragOverlay>
-                        </>
-                      ) as any}
+                            <DragOverlay dropAnimation={dropAnimation}>
+                              {
+                                (activeId ? (
+                                  <div className="bg-[var(--los-bg)] ring-2 ring-[var(--los-accent)] opacity-90 scale-95 w-full h-full pb-[100%]">
+                                    <TileContentStructure
+                                      tile={displayTiles.find((t) => t.id === activeId) as TileDef}
+                                      renderTileContent={renderTileContent}
+                                      onToggleQuickNote={handleToggleQuickNote}
+                                      isQuickNote={isQuickNote}
+                                    />
+                                  </div>
+                                ) : null) as any
+                              }
+                            </DragOverlay>
+                          </>
+                        ) as any
+                      }
                     </DndContext>
                   ) : (
                     displayTiles.map((tile) => (
+                      // biome-ignore lint/a11y/noStaticElementInteractions: tile grid click handler
+                      // biome-ignore lint/a11y/useKeyWithClickEvents: tile grid click handler
                       <div
                         key={tile.id}
                         onClick={() => setActiveTileId(tile.id)}
@@ -1420,19 +1539,27 @@ export const MainApp = ({
                 }}
                 renderEditor={renderEditor}
                 zenMode={zenMode}
-                onToggleZenMode={() => setZenMode(prev => !prev)}
+                onToggleZenMode={() => setZenMode((prev) => !prev)}
                 onAddToReadItLater={onAddToReadItLater}
+                onCreateFile={onCreateFile}
                 initialViewMode={focusedViewMode}
-                onAddToDashboard={config ? (path) => {
-                  setFileToAddToDashboard(path);
-                  setShowAddToDashboard(true);
-                } : undefined}
+                onAddToDashboard={
+                  config
+                    ? (path) => {
+                        setFileToAddToDashboard(path);
+                        setShowAddToDashboard(true);
+                      }
+                    : undefined
+                }
               />
             ) : (
               // Should not happen, but safe fallback
               <div className="flex items-center justify-center h-full text-red-500">
                 Error: Tile not found
-                {(() => { setActiveTileId(null); return null; })()}
+                {(() => {
+                  setActiveTileId(null);
+                  return null;
+                })()}
               </div>
             )}
           </Tile>
@@ -1442,68 +1569,109 @@ export const MainApp = ({
       {/* Desktop Navigation Overlays (Fix: JS-based hover state for guaranteed visibility) */}
       {(() => {
         const config = layoutStore.remoteConfig.value;
-        const shouldRender = !activeTileId && !showFiles && !showWiki && !showGraph && !showCommits && !zenMode && !showDumpMode && config && config.dashboards.length > 1;
+        const shouldRender =
+          !activeTileId &&
+          !showFiles &&
+          !showWiki &&
+          !showGraph &&
+          !showCommits &&
+          !zenMode &&
+          !showDumpMode &&
+          config &&
+          config.dashboards.length > 1;
         if (config) {
           // logger.debug('[MainApp] Nav Overlay Check:', { activeTileId, dashCount: config.dashboards.length, shouldRender, hoverNav });
         }
         return shouldRender;
       })() && (
-          <>
-            {/* Left Overlay - Previous */}
+        <>
+          {/* Left Overlay - Previous */}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: nav overlay uses title for accessibility */}
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: nav overlay uses title for accessibility */}
+          <div
+            onMouseEnter={() => setHoverNav('prev')}
+            onMouseLeave={() => setHoverNav(null)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrevDashboard();
+            }}
+            title="Previous Workspace"
+            className="hidden md:flex absolute top-0 left-0 bottom-8 w-24 z-[50] pointer-events-auto items-center justify-start pl-4 cursor-pointer select-none"
+          >
+            {/* Visual Container (Gradient & Icon) */}
             <div
-              onMouseEnter={() => setHoverNav('prev')}
-              onMouseLeave={() => setHoverNav(null)}
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePrevDashboard();
-              }}
-              title="Previous Workspace"
-              className="hidden md:flex absolute top-0 left-0 bottom-8 w-24 z-[50] pointer-events-auto items-center justify-start pl-4 cursor-pointer select-none"
-            >
-              {/* Visual Container (Gradient & Icon) */}
-              <div className={cn(
-                "absolute inset-0 bg-gradient-to-r from-black/60 to-transparent transition-opacity duration-300",
-                hoverNav === 'prev' ? "opacity-100" : "opacity-0"
-              )} />
+              className={cn(
+                'absolute inset-0 bg-gradient-to-r from-black/60 to-transparent transition-opacity duration-300',
+                hoverNav === 'prev' ? 'opacity-100' : 'opacity-0',
+              )}
+            />
 
-              <div className={cn(
-                "relative z-10 text-white transition-all duration-300 transform",
-                hoverNav === 'prev' ? "opacity-100 translate-x-4" : "opacity-0 translate-x-0"
-              )}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </div>
-            </div>
-
-            {/* Right Overlay - Next */}
             <div
-              onMouseEnter={() => setHoverNav('next')}
-              onMouseLeave={() => setHoverNav(null)}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleNextDashboard();
-              }}
-              title="Next Workspace"
-              className="hidden md:flex absolute top-0 right-0 bottom-8 w-24 z-[50] pointer-events-auto items-center justify-end pr-4 cursor-pointer select-none"
+              className={cn(
+                'relative z-10 text-white transition-all duration-300 transform',
+                hoverNav === 'prev' ? 'opacity-100 translate-x-4' : 'opacity-0 translate-x-0',
+              )}
             >
-              {/* Visual Container (Gradient & Icon) */}
-              <div className={cn(
-                "absolute inset-0 bg-gradient-to-l from-black/60 to-transparent transition-opacity duration-300",
-                hoverNav === 'next' ? "opacity-100" : "opacity-0"
-              )} />
-
-              <div className={cn(
-                "relative z-10 text-white transition-all duration-300 transform",
-                hoverNav === 'next' ? "opacity-100 -translate-x-4" : "opacity-0 translate-x-0"
-              )}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </div>
+              {/* biome-ignore lint/a11y/noSvgWithoutTitle: decorative icon */}
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
             </div>
-          </>
-        )}
+          </div>
+
+          {/* Right Overlay - Next */}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: nav overlay uses title for accessibility */}
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: nav overlay uses title for accessibility */}
+          <div
+            onMouseEnter={() => setHoverNav('next')}
+            onMouseLeave={() => setHoverNav(null)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNextDashboard();
+            }}
+            title="Next Workspace"
+            className="hidden md:flex absolute top-0 right-0 bottom-8 w-24 z-[50] pointer-events-auto items-center justify-end pr-4 cursor-pointer select-none"
+          >
+            {/* Visual Container (Gradient & Icon) */}
+            <div
+              className={cn(
+                'absolute inset-0 bg-gradient-to-l from-black/60 to-transparent transition-opacity duration-300',
+                hoverNav === 'next' ? 'opacity-100' : 'opacity-0',
+              )}
+            />
+
+            <div
+              className={cn(
+                'relative z-10 text-white transition-all duration-300 transform',
+                hoverNav === 'next' ? 'opacity-100 -translate-x-4' : 'opacity-0 translate-x-0',
+              )}
+            >
+              {/* biome-ignore lint/a11y/noSvgWithoutTitle: decorative icon */}
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Dump Mode Overlay */}
       {showDumpMode && (
@@ -1514,6 +1682,7 @@ export const MainApp = ({
               <MonoHeader>QUICK DUMP</MonoHeader>
             </div>
             <button
+              type="button"
               onClick={() => {
                 setShowDumpMode(false);
                 window.history.pushState({}, '', '/');
@@ -1563,7 +1732,7 @@ export const MainApp = ({
 
               if (columns.length > 1) {
                 const parentCol = columns[columns.length - 2];
-                if (parentCol && parentCol.activeId) return parentCol.activeId;
+                if (parentCol?.activeId) return parentCol.activeId;
               } else {
                 // Root column?
                 return ''; // Root
@@ -1595,7 +1764,7 @@ export const MainApp = ({
               setShowDumpMode(false);
             }
           }}
-          {...dumpSaveProps as any}
+          {...(dumpSaveProps as any)}
           fileSystem={fileSystem as any}
           availableFolders={availableFolders}
           existingFiles={existingFiles}
@@ -1621,7 +1790,9 @@ export const MainApp = ({
       {/* Sticky Status Bar */}
       {!zenMode && (
         <StatusBar
-          mode={activeTileId !== null ? "FOCUS" : (showFiles ? "FILES" : (dragEnabled ? "DND" : "NORMAL"))}
+          mode={
+            activeTileId !== null ? 'FOCUS' : showFiles ? 'FILES' : dragEnabled ? 'DND' : 'NORMAL'
+          }
           breadcrumbs={breadcrumbs}
           stats={[]}
           onDashboardClick={() => {
@@ -1638,15 +1809,27 @@ export const MainApp = ({
             setShowFiles(true);
           }}
           onBoardClick={onBoardClick}
-
           // Repository Switcher (Always available if props provided)
           currentRepository={props.currentRepository}
           repositories={props.repositories}
           onSelectRepository={props.onSelectRepository}
-
           // Workspace Switcher (Only if config exists)
-          currentWorkspace={layoutStore.remoteConfig.value ? { id: currentDashboardId || '', name: layoutStore.remoteConfig.value.dashboards?.find(d => d.id === currentDashboardId)?.name || 'Unknown' } : undefined}
-          workspaces={layoutStore.remoteConfig.value ? layoutStore.remoteConfig.value.dashboards.map(d => ({ id: d.id, name: d.name })) : undefined}
+          currentWorkspace={
+            layoutStore.remoteConfig.value
+              ? {
+                  id: currentDashboardId || '',
+                  name:
+                    layoutStore.remoteConfig.value.dashboards?.find(
+                      (d) => d.id === currentDashboardId,
+                    )?.name || 'Unknown',
+                }
+              : undefined
+          }
+          workspaces={
+            layoutStore.remoteConfig.value
+              ? layoutStore.remoteConfig.value.dashboards.map((d) => ({ id: d.id, name: d.name }))
+              : undefined
+          }
           onSelectWorkspace={(ws) => {
             if (!dragEnabled && layoutStore.remoteConfig.value) {
               setActiveDashboardId(ws.id);
@@ -1654,36 +1837,54 @@ export const MainApp = ({
               if (showDumpMode) setShowDumpMode(false);
             }
           }}
-          onNextWorkspace={!dragEnabled && layoutStore.remoteConfig.value ? () => {
-            if (showDumpMode) setShowDumpMode(false);
-            handleNextDashboard();
-          } : undefined}
+          onNextWorkspace={
+            !dragEnabled && layoutStore.remoteConfig.value
+              ? () => {
+                  if (showDumpMode) setShowDumpMode(false);
+                  handleNextDashboard();
+                }
+              : undefined
+          }
+          menuItems={
+            dragEnabled
+              ? [
+                  { label: 'Save Order', onClick: handleDragSave },
+                  { label: 'Cancel Reorder', onClick: handleDragCancel },
+                ]
+              : [
+                  ...(layoutStore.remoteConfig.value
+                    ? [
+                        {
+                          label: 'Dashboard',
+                          onClick: () => {
+                            setShowFiles(false);
+                            setActiveTileId(null);
+                            if (showDumpMode) setShowDumpMode(false);
+                          },
+                        },
+                      ]
+                    : []),
+                  {
+                    label: 'Files',
+                    onClick: () => {
+                      setShowFiles(true);
+                      setActiveTileId(null);
+                      setNotFound(false);
+                      if (showDumpMode) setShowDumpMode(false);
+                    },
+                  },
+                  { label: 'New File', onClick: () => setShowNewFileWizard(true) },
+                  {
+                    label: 'Quick Note',
+                    onClick: async () => {
+                      const now = new Date();
+                      const pad = (n: number) => n.toString().padStart(2, '0');
+                      // Format: quicknote-YYYY-MM-DD-HH:mm:ss.md
+                      const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+                      const filename = `quicknote-${timestamp}.md`;
+                      const path = `.lifeos/quicknotes/${filename}`;
 
-          menuItems={dragEnabled ? [
-            { label: "Save Order", onClick: handleDragSave },
-            { label: "Cancel Reorder", onClick: handleDragCancel }
-          ] : [
-            ...(layoutStore.remoteConfig.value ? [{ label: "Dashboard", onClick: () => { setShowFiles(false); setActiveTileId(null); if (showDumpMode) setShowDumpMode(false); } }] : []),
-            {
-              label: "Files", onClick: () => {
-                setShowFiles(true);
-                setActiveTileId(null);
-                setNotFound(false);
-                if (showDumpMode) setShowDumpMode(false);
-              }
-            },
-            { label: "New File", onClick: () => setShowNewFileWizard(true) },
-            {
-              label: "Quick Note",
-              onClick: async () => {
-                const now = new Date();
-                const pad = (n: number) => n.toString().padStart(2, '0');
-                // Format: quicknote-YYYY-MM-DD-HH:mm:ss.md
-                const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-                const filename = `quicknote-${timestamp}.md`;
-                const path = `.lifeos/quicknotes/${filename}`;
-
-                const content = `---
+                      const content = `---
 type: generic
 created: ${now.toISOString()}
 description: A generic markdown document template for general note-taking and documentation.
@@ -1691,63 +1892,91 @@ abbreviations: undefined
 ---
 
 `;
-                if (onCreateFile) {
-                  await onCreateFile(path, content);
-                }
-                // Open file view
-                setShowFiles(true);
-                // Navigate to it
-                setActiveTileId(path);
-                if (showDumpMode) setShowDumpMode(false);
-              }
-            },
-            {
-              label: "Search",
-              // Fix 1.21: Add Search to Magic Menu (works on mobile)
-              onClick: () => setShowSearch(true)
-            },
-            { label: "Graph", onClick: () => { setShowGraph(true); if (showDumpMode) setShowDumpMode(false); } },
-            { label: "Commits", onClick: () => { setShowCommits(true); if (showDumpMode) setShowDumpMode(false); } },
-            // Expanded Menu Items (Repositories, Workspaces)
-            { label: "Repositories", type: 'REPOS' },
-            { label: "Workspaces", type: 'WORKSPACES' },
-            { label: "Settings", onClick: () => { setShowSettings(true); if (showDumpMode) setShowDumpMode(false); } },
-            ...((layoutStore.remoteConfig.value && !showFiles && activeTileId === null) ? [{ label: "Edit Layout", onClick: handleDragStartLogic }] : []),
-          ]}
-          recentFiles={!dragEnabled && layoutStore.remoteConfig.value ? (layoutStore.remoteConfig.value.files?.recentlyOpened || []).map((path: string) => ({
-            label: path,
-            onClick: () => {
-              const conf = layoutStore.remoteConfig.value;
-              if (conf) {
-                const entry = conf.entries.find(e => e.path === path);
-                const isFoundInDashboard = !!entry;
+                      if (onCreateFile) {
+                        await onCreateFile(path, content);
+                      }
+                      // Open file view
+                      setShowFiles(true);
+                      // Navigate to it
+                      setActiveTileId(path);
+                      if (showDumpMode) setShowDumpMode(false);
+                    },
+                  },
+                  {
+                    label: 'Search',
+                    // Fix 1.21: Add Search to Magic Menu (works on mobile)
+                    onClick: () => setShowSearch(true),
+                  },
+                  {
+                    label: 'Graph',
+                    onClick: () => {
+                      setShowGraph(true);
+                      if (showDumpMode) setShowDumpMode(false);
+                    },
+                  },
+                  {
+                    label: 'Commits',
+                    onClick: () => {
+                      setShowCommits(true);
+                      if (showDumpMode) setShowDumpMode(false);
+                    },
+                  },
+                  // Expanded Menu Items (Repositories, Workspaces)
+                  { label: 'Repositories', type: 'REPOS' },
+                  { label: 'Workspaces', type: 'WORKSPACES' },
+                  {
+                    label: 'Settings',
+                    onClick: () => {
+                      setShowSettings(true);
+                      if (showDumpMode) setShowDumpMode(false);
+                    },
+                  },
+                  ...(layoutStore.remoteConfig.value && !showFiles && activeTileId === null
+                    ? [{ label: 'Edit Layout', onClick: handleDragStartLogic }]
+                    : []),
+                ]
+          }
+          recentFiles={
+            !dragEnabled && layoutStore.remoteConfig.value
+              ? (layoutStore.remoteConfig.value.files?.recentlyOpened || []).map(
+                  (path: string) => ({
+                    label: path,
+                    onClick: () => {
+                      const conf = layoutStore.remoteConfig.value;
+                      if (conf) {
+                        const entry = conf.entries.find((e) => e.path === path);
+                        const isFoundInDashboard = !!entry;
 
-                if (isFoundInDashboard) {
-                  // Scenario 1: File is pinned to a Dashboard
-                  setShowFiles(false); // Switch to dashboard view
-                  setActiveDashboardId(entry!.dashboard);
-                  setActiveTileId(entry!.path);
-                  if (showDumpMode) setShowDumpMode(false);
-                } else {
-                  // Scenario 2: File is NOT on any dashboard (accessed via File Tree)
-                  // We switch to "Files" mode (Miller Columns) and try to navigate to it.
-                  logger.debug(`File not found in dashboard, switching to File View: ${path}`);
-                  setShowFiles(true);
-                  // Trigger navigation in parent (Dashboard.tsx) to update columns
-                  if (onItemClick) {
-                    onItemClick({
-                      id: path,
-                      title: path.split('/').pop() || path,
-                      type: 'FILE'
-                    });
-                  }
-                  // Also set active tile locally so it focuses if rendered
-                  setActiveTileId(path);
-                  if (showDumpMode) setShowDumpMode(false);
-                }
-              }
-            }
-          })) : []
+                        if (isFoundInDashboard) {
+                          // Scenario 1: File is pinned to a Dashboard
+                          setShowFiles(false); // Switch to dashboard view
+                          setActiveDashboardId(entry?.dashboard);
+                          setActiveTileId(entry?.path);
+                          if (showDumpMode) setShowDumpMode(false);
+                        } else {
+                          // Scenario 2: File is NOT on any dashboard (accessed via File Tree)
+                          // We switch to "Files" mode (Miller Columns) and try to navigate to it.
+                          logger.debug(
+                            `File not found in dashboard, switching to File View: ${path}`,
+                          );
+                          setShowFiles(true);
+                          // Trigger navigation in parent (Dashboard.tsx) to update columns
+                          if (onItemClick) {
+                            onItemClick({
+                              id: path,
+                              title: path.split('/').pop() || path,
+                              type: 'FILE',
+                            });
+                          }
+                          // Also set active tile locally so it focuses if rendered
+                          setActiveTileId(path);
+                          if (showDumpMode) setShowDumpMode(false);
+                        }
+                      }
+                    },
+                  }),
+                )
+              : []
           }
           version={props.version}
         />
@@ -1759,7 +1988,32 @@ abbreviations: undefined
   );
 };
 
-const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZenMode, onAddToReadItLater, onAddToDashboard, initialViewMode = 'WIDGET' }: { tile: TileDef; onClose: () => void; renderEditor?: (path: string, zenMode?: boolean, contentOverride?: string, onSaveOverride?: (val: string) => void) => ComponentChildren, zenMode?: boolean, onToggleZenMode?: () => void, onAddToReadItLater?: (item: ReadItLaterItem) => void, onAddToDashboard?: (path: string) => void, initialViewMode?: string }) => {
+const FocusedTileInternal = ({
+  tile,
+  onClose,
+  renderEditor,
+  zenMode,
+  onToggleZenMode,
+  onAddToReadItLater,
+  onAddToDashboard,
+  onCreateFile,
+  initialViewMode = 'WIDGET',
+}: {
+  tile: TileDef;
+  onClose: () => void;
+  renderEditor?: (
+    path: string,
+    zenMode?: boolean,
+    contentOverride?: string,
+    onSaveOverride?: (val: string) => void,
+  ) => ComponentChildren;
+  zenMode?: boolean;
+  onToggleZenMode?: () => void;
+  onAddToReadItLater?: (item: ReadItLaterItem) => void;
+  onAddToDashboard?: (path: string) => void;
+  onCreateFile?: (path: string, content: string) => Promise<void> | void;
+  initialViewMode?: string;
+}) => {
   if (!tile) return null;
 
   const isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
@@ -1773,20 +2027,48 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
   const isBudget = tile.extension === '.budget.csv';
   const isActionLog = tile.extension === '.actionlog.md';
 
-
-  const isGenericCsv = tile.extension === '.csv' && !isTimeTracking && !isEvents && !isHabit && !isDataCollection && !isBudget;
+  const isGenericCsv =
+    tile.extension === '.csv' &&
+    !isTimeTracking &&
+    !isEvents &&
+    !isHabit &&
+    !isDataCollection &&
+    !isBudget;
   const isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv'); // For enabling TABLE view on all CSVs
 
-  const hasWidget = (isTimeTracking || isEvents || isHabit || isTodos || isTimezones || isRss || isReadItLater || isDataCollection || isBudget || isActionLog || isAnyCsv); // && !!tile.rawContent;
+  const hasWidget =
+    isTimeTracking ||
+    isEvents ||
+    isHabit ||
+    isTodos ||
+    isTimezones ||
+    isRss ||
+    isReadItLater ||
+    isDataCollection ||
+    isBudget ||
+    isActionLog ||
+    isAnyCsv; // && !!tile.rawContent;
 
-
-  const [viewMode, setViewMode] = useState<string>(initialViewMode || (hasWidget ? 'WIDGET' : 'CODE'));
+  // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
+  const [viewMode, setViewMode] = useState<string>(
+    initialViewMode || (hasWidget ? 'WIDGET' : 'CODE'),
+  );
+  // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const [showHistory, setShowHistory] = useState(false);
 
-  const parsedTodoData = useMemo(() => TodoLogic.parseTodos(tile.rawContent || ''), [tile.rawContent]);
+  // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
+  const parsedTodoData = useMemo(
+    () => TodoLogic.parseTodos(tile.rawContent || ''),
+    [tile.rawContent],
+  );
+  // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const todoTags = useMemo(() => {
     const tags = new Set<string>();
-    parsedTodoData.items.forEach(item => item.tags.forEach(t => tags.add(t)));
+    parsedTodoData.items.forEach((item) => {
+      item.tags.forEach((t) => {
+        tags.add(t);
+      });
+    });
     return Array.from(tags);
   }, [parsedTodoData]);
   const todoMilestones = parsedTodoData.milestones;
@@ -1794,35 +2076,44 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
   // Encrypted Wrapper Interception
   // We use a custom __isDecrypted flag on the tile to prevent infinite recursive interception
   if (tile.id.toString().endsWith('.enc') && !(tile as any).__isDecrypted) {
-     const innerExt = tile.extension?.replace('.enc', '');
-     const innerTile = { ...tile, extension: innerExt };
+    const innerExt = tile.extension?.replace('.enc', '');
+    const innerTile = { ...tile, extension: innerExt };
 
-     return (
-       <EncryptedTileWrapper 
-         tile={tile} 
-         mode={'FOCUS'} 
-         onUnlocked={() => {
-           // Unlocked callback
-         }}
-       >
-         {(decryptedContent: string, handleSave: (newDecryptedContent: string) => void) => {
-           const tempTile = { ...innerTile, rawContent: decryptedContent, onContentChange: handleSave, __isDecrypted: true } as any;
-           return <FocusedTileInternal 
-             tile={tempTile} 
-             onClose={onClose} 
-             renderEditor={renderEditor} 
-             zenMode={zenMode} 
-             onToggleZenMode={onToggleZenMode} 
-             onAddToReadItLater={onAddToReadItLater} 
-             onAddToDashboard={onAddToDashboard} 
-             initialViewMode={initialViewMode} 
-           />;
-         }}
-       </EncryptedTileWrapper>
-     );
+    return (
+      <EncryptedTileWrapper
+        tile={tile}
+        mode={'FOCUS'}
+        onUnlocked={() => {
+          // Unlocked callback
+        }}
+      >
+        {(decryptedContent: string, handleSave: (newDecryptedContent: string) => void) => {
+          const tempTile = {
+            ...innerTile,
+            rawContent: decryptedContent,
+            onContentChange: handleSave,
+            __isDecrypted: true,
+          } as any;
+          return (
+            <FocusedTileInternal
+              tile={tempTile}
+              onClose={onClose}
+              renderEditor={renderEditor}
+              zenMode={zenMode}
+              onToggleZenMode={onToggleZenMode}
+              onAddToReadItLater={onAddToReadItLater}
+              onAddToDashboard={onAddToDashboard}
+              onCreateFile={onCreateFile}
+              initialViewMode={initialViewMode}
+            />
+          );
+        }}
+      </EncryptedTileWrapper>
+    );
   }
 
   // Fix 1.24: Deep Linking - Switch to WIDGET view when content loads if currently in CODE/empty state
+  // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   useEffect(() => {
     // Re-evaluate hasWidget logic here because props update
     const _isTimeTracking = tile.extension?.toLowerCase() === '.timetracking.csv';
@@ -1837,13 +2128,22 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
     const _isActionLog = tile.extension === '.actionlog.md';
     const _isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv');
 
-
-    const _hasWidget = (_isTimeTracking || _isEvents || _isHabit || _isTodos || _isTimezones || _isRss || _isReadItLater || _isDataCollection || _isBudget || _isActionLog || _isAnyCsv);
+    const _hasWidget =
+      _isTimeTracking ||
+      _isEvents ||
+      _isHabit ||
+      _isTodos ||
+      _isTimezones ||
+      _isRss ||
+      _isReadItLater ||
+      _isDataCollection ||
+      _isBudget ||
+      _isActionLog ||
+      _isAnyCsv;
 
     if (viewMode === 'CODE') {
       // console.log('[FocusedTileInternal] ViewMode is CODE. HasWidget:', _hasWidget, 'RawContent length:', tile.rawContent?.length);
     }
-
 
     /* REMOVED: Auto-switch to WIDGET view on content change.
        This was causing the editor to close when saving.
@@ -1851,14 +2151,14 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
       setViewMode('WIDGET');
     }
     */
-  }, [tile.rawContent]);
+  }, [tile.extension, viewMode]);
 
   return (
     <div
       className={cn(
-        "absolute top-0 bottom-8 z-10 p-8 flex flex-col",
-        zenMode ? "bg-stone-950" : "bg-[var(--los-bg)]", // Darker background in Zen Mode
-        "left-0 right-0 mx-auto w-full max-w-screen-2xl" // Center & Constrain
+        'absolute top-0 bottom-8 z-10 p-8 flex flex-col',
+        zenMode ? 'bg-stone-950' : 'bg-[var(--los-bg)]', // Darker background in Zen Mode
+        'left-0 right-0 mx-auto w-full max-w-screen-2xl', // Center & Constrain
       )}
       key={`focused-${tile.id}`}
       id={`focused-modal-container-${tile.id}`}
@@ -1866,56 +2166,97 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
       <div
         id="focused-modal-inner"
         className={cn(
-          "flex-1 min-h-0 overflow-hidden border border-[var(--los-border)] flex flex-col relative animate-in fade-in slide-in-from-bottom-4 duration-300",
-          zenMode ? "bg-transparent" : "bg-[var(--los-bg)]"
+          'flex-1 min-h-0 overflow-hidden border border-[var(--los-border)] flex flex-col relative animate-in fade-in slide-in-from-bottom-4 duration-300',
+          zenMode ? 'bg-transparent' : 'bg-[var(--los-bg)]',
         )}
       >
         {/* Fix 1.17: Responsive Layout for Mobile - 3 rows: Actions, Title, Content Toggles */}
-        <div className={cn(
-          "min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2 transition-opacity duration-500",
-          zenMode ? "opacity-10 hover:opacity-100" : "opacity-100"
-        )}
+        <div
+          className={cn(
+            'min-h-12 border-b border-[var(--los-border)] flex flex-col px-4 py-2 shrink-0 gap-2 transition-opacity duration-500',
+            zenMode ? 'opacity-10 hover:opacity-100' : 'opacity-100',
+          )}
           id="focused-modal-header"
-        >    {/* Mobile: Row 1 - Actions (Right Aligned) - Strictly hidden on Desktop */}
+        >
+          {' '}
+          {/* Mobile: Row 1 - Actions (Right Aligned) - Strictly hidden on Desktop */}
           <div className="md:hidden">
             <div className="flex w-full justify-end gap-2 mb-2">
               <button
-                onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowHistory(!showHistory);
+                }}
                 className={cn(
-                  "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
-                  showHistory ? "text-[var(--los-accent)]" : (zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")
+                  'flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors',
+                  showHistory
+                    ? 'text-[var(--los-accent)]'
+                    : zenMode
+                      ? 'text-[var(--los-accent)]'
+                      : 'text-[var(--los-muted)]',
                 )}
                 title="Toggle History"
               >
-                <History size={14} className={cn("transition-colors", showHistory && "text-[var(--los-accent)]")} />
+                <History
+                  size={14}
+                  className={cn('transition-colors', showHistory && 'text-[var(--los-accent)]')}
+                />
               </button>
 
               {onAddToDashboard && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); onAddToDashboard(String(tile.id)); }}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddToDashboard(String(tile.id));
+                  }}
                   className={cn(
-                    "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
-                    zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                    'flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors',
+                    zenMode ? 'text-[var(--los-accent)]' : 'text-[var(--los-muted)]',
                   )}
                   title="Add to Dashboard"
                 >
                   {/* Fix 1.23: "Add to Dashboard" icon ambiguity */}
-                  <Plus size={14} className={cn("transition-colors", zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]")} />
+                  <Plus
+                    size={14}
+                    className={cn(
+                      'transition-colors',
+                      zenMode
+                        ? 'text-[var(--los-accent)]'
+                        : 'text-[var(--los-muted)] group-hover:text-[var(--los-fg)]',
+                    )}
+                  />
                 </button>
               )}
               <button
-                onClick={(e) => { e.stopPropagation(); onToggleZenMode?.(); }}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleZenMode?.();
+                }}
                 className={cn(
-                  "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
-                  zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                  'flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors',
+                  zenMode ? 'text-[var(--los-accent)]' : 'text-[var(--los-muted)]',
                 )}
                 title="Toggle Zen Mode (Ctrl+Shift+Z)"
               >
-                <div className={cn("w-2 h-2 border transition-colors", zenMode ? "bg-[var(--los-accent)] border-[var(--los-accent)]" : "border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+                <div
+                  className={cn(
+                    'w-2 h-2 border transition-colors',
+                    zenMode
+                      ? 'bg-[var(--los-accent)] border-[var(--los-accent)]'
+                      : 'border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]',
+                  )}
+                />
               </button>
 
               <button
-                onClick={(e) => { e.stopPropagation(); onClose(); }}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
                 className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
                 title="Close Tile"
               >
@@ -1923,7 +2264,6 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
               </button>
             </div>
           </div>
-
           <div className="flex items-center justify-between w-full gap-4">
             {/* Fix 1.16: Truncate Title */}
             <MonoHeader className="text-[var(--los-accent)] text-lg truncate flex-1 md:flex-none">
@@ -1933,54 +2273,99 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
             {/* Desktop: Actions (Normal Layout) */}
             <div className="hidden md:flex items-center gap-2">
               <button
-                onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowHistory(!showHistory);
+                }}
                 className={cn(
-                  "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
-                  showHistory ? "text-[var(--los-accent)]" : (zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]")
+                  'flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors',
+                  showHistory
+                    ? 'text-[var(--los-accent)]'
+                    : zenMode
+                      ? 'text-[var(--los-accent)]'
+                      : 'text-[var(--los-muted)]',
                 )}
                 title="Toggle History"
               >
-                <span className="text-[10px] hidden md:inline">{showHistory ? "HISTORY ON" : "HISTORY"}</span>
-                <History size={14} className={cn("transition-colors", showHistory && "text-[var(--los-accent)]")} />
+                <span className="text-[10px] hidden md:inline">
+                  {showHistory ? 'HISTORY ON' : 'HISTORY'}
+                </span>
+                <History
+                  size={14}
+                  className={cn('transition-colors', showHistory && 'text-[var(--los-accent)]')}
+                />
               </button>
 
               {onAddToDashboard && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); onAddToDashboard(String(tile.id)); }}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddToDashboard(String(tile.id));
+                  }}
                   className={cn(
-                    "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
-                    zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                    'flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors',
+                    zenMode ? 'text-[var(--los-accent)]' : 'text-[var(--los-muted)]',
                   )}
                   title="Add to Dashboard"
                 >
                   <span className="text-[10px] hidden md:inline">[+ DASHBOARD]</span>
                   {/* Fix 1.23: "Add to Dashboard" icon ambiguity */}
-                  <Plus size={14} className={cn("transition-colors", zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)] group-hover:text-[var(--los-fg)]")} />
+                  <Plus
+                    size={14}
+                    className={cn(
+                      'transition-colors',
+                      zenMode
+                        ? 'text-[var(--los-accent)]'
+                        : 'text-[var(--los-muted)] group-hover:text-[var(--los-fg)]',
+                    )}
+                  />
                 </button>
               )}
               <button
-                onClick={(e) => { e.stopPropagation(); onToggleZenMode?.(); }}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleZenMode?.();
+                }}
                 className={cn(
-                  "flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors",
-                  zenMode ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+                  'flex items-center gap-2 group px-2 py-1 hover:bg-white/10 rounded-sm transition-colors',
+                  zenMode ? 'text-[var(--los-accent)]' : 'text-[var(--los-muted)]',
                 )}
                 title="Toggle Zen Mode (Ctrl+Shift+Z)"
               >
-                {zenMode ? <span className="text-[10px] hidden md:inline">EXIT ZEN</span> : <span className="text-[10px] hidden md:inline">ZEN MODE</span>}
-                <div className={cn("w-2 h-2 border transition-colors", zenMode ? "bg-[var(--los-accent)] border-[var(--los-accent)]" : "border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]")} />
+                {zenMode ? (
+                  <span className="text-[10px] hidden md:inline">EXIT ZEN</span>
+                ) : (
+                  <span className="text-[10px] hidden md:inline">ZEN MODE</span>
+                )}
+                <div
+                  className={cn(
+                    'w-2 h-2 border transition-colors',
+                    zenMode
+                      ? 'bg-[var(--los-accent)] border-[var(--los-accent)]'
+                      : 'border-[var(--los-muted)] group-hover:bg-[var(--los-muted)]',
+                  )}
+                />
               </button>
 
               <button
-                onClick={(e) => { e.stopPropagation(); onClose(); }}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
                 className="flex items-center gap-2 group px-2 py-1 hover:bg-red-500/10 rounded-sm transition-colors"
                 title="Close Tile"
               >
-                <span className="text-[10px] text-[var(--los-muted)] group-hover:text-red-500 hidden md:inline">[CLOSE]</span>
+                <span className="text-[10px] text-[var(--los-muted)] group-hover:text-red-500 hidden md:inline">
+                  [CLOSE]
+                </span>
                 <div className="w-2 h-2 rounded-full border border-[var(--los-muted)] group-hover:border-red-500 group-hover:bg-red-500 transition-colors" />
               </button>
             </div>
           </div>
-
           <div className="w-full overflow-x-auto scrollbar-hide pb-1">
             {hasWidget && (
               <div
@@ -1988,10 +2373,13 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
                 className="flex bg-[var(--los-border)] rounded-sm p-0.5 overflow-x-auto w-full md:w-auto md:max-w-none scrollbar-hide shrink-0"
               >
                 <button
+                  type="button"
                   onClick={() => setViewMode('WIDGET')}
                   className={cn(
-                    "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                    viewMode === 'WIDGET' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                    'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                    viewMode === 'WIDGET'
+                      ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                      : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                   )}
                 >
                   WIDGET
@@ -1999,10 +2387,13 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
 
                 {isTimeTracking && (
                   <button
+                    type="button"
                     onClick={() => setViewMode('CHARTS')}
                     className={cn(
-                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                      viewMode === 'CHARTS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'CHARTS'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                     )}
                   >
                     CHARTS
@@ -2011,22 +2402,36 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
 
                 {(isEvents || isTodos || isTimezones || isDataCollection) && (
                   <button
+                    type="button"
                     onClick={() => setViewMode('ADD')}
                     className={cn(
-                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                      viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'ADD'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                     )}
                   >
-                    {isEvents ? 'ADD EVENT' : isTodos ? 'ADD TASK' : isTimezones ? 'ADD TIMEZONE' : isActionLog ? 'ADD ACTION' : 'ADD ENTRY'}
+                    {isEvents
+                      ? 'ADD EVENT'
+                      : isTodos
+                        ? 'ADD TASK'
+                        : isTimezones
+                          ? 'ADD TIMEZONE'
+                          : isActionLog
+                            ? 'ADD ACTION'
+                            : 'ADD ENTRY'}
                   </button>
                 )}
 
                 {isActionLog && (
                   <button
+                    type="button"
                     onClick={() => setViewMode('ADD')}
                     className={cn(
-                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                      viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'ADD'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                     )}
                   >
                     ADD ACTION
@@ -2036,19 +2441,25 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
                 {isBudget && (
                   <>
                     <button
+                      type="button"
                       onClick={() => setViewMode('ACCOUNTS')}
                       className={cn(
-                        "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                        viewMode === 'ACCOUNTS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                        'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                        viewMode === 'ACCOUNTS'
+                          ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                          : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                       )}
                     >
                       ACCOUNTS
                     </button>
                     <button
+                      type="button"
                       onClick={() => setViewMode('ADD')}
                       className={cn(
-                        "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                        viewMode === 'ADD' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                        'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                        viewMode === 'ADD'
+                          ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                          : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                       )}
                     >
                       ADD TRANSACTION
@@ -2058,10 +2469,13 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
 
                 {isAnyCsv && (
                   <button
+                    type="button"
                     onClick={() => setViewMode('TABLE')}
                     className={cn(
-                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                      viewMode === 'TABLE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'TABLE'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                     )}
                   >
                     TABLE
@@ -2070,10 +2484,13 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
 
                 {isDataCollection && (
                   <button
+                    type="button"
                     onClick={() => setViewMode('COLUMNS')}
                     className={cn(
-                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                      viewMode === 'COLUMNS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'COLUMNS'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                     )}
                   >
                     COLUMNS
@@ -2082,10 +2499,13 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
 
                 {isRss && (
                   <button
+                    type="button"
                     onClick={() => setViewMode('FEEDS')}
                     className={cn(
-                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                      viewMode === 'FEEDS' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'FEEDS'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                     )}
                   >
                     MANAGE FEEDS
@@ -2094,10 +2514,13 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
 
                 {isReadItLater && (
                   <button
+                    type="button"
                     onClick={() => setViewMode('ARCHIVE')}
                     className={cn(
-                      "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                      viewMode === 'ARCHIVE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'ARCHIVE'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                     )}
                   >
                     ARCHIVE
@@ -2105,10 +2528,13 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
                 )}
 
                 <button
+                  type="button"
                   onClick={() => setViewMode('CODE')}
                   className={cn(
-                    "px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center",
-                    viewMode === 'CODE' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                    'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                    viewMode === 'CODE'
+                      ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                      : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                   )}
                 >
                   CODE
@@ -2122,14 +2548,12 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
         <div
           id="focused-modal-content-scroller"
           className={cn(
-            "flex-1 min-h-0 relative",
-            viewMode === 'CODE' ? "overflow-hidden" : "overflow-y-auto"
-          )}>
+            'flex-1 min-h-0 relative',
+            viewMode === 'CODE' ? 'overflow-hidden' : 'overflow-y-auto',
+          )}
+        >
           {showHistory && (
-            <FileHistoryView
-              path={String(tile.id)}
-              onClose={() => setShowHistory(false)}
-            />
+            <FileHistoryView path={String(tile.id)} onClose={() => setShowHistory(false)} />
           )}
 
           {/* Content Area */}
@@ -2138,7 +2562,8 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
             <div className="min-h-full w-full p-8">
               <CsvTableView content={tile.rawContent || ''} />
             </div>
-          ) : isBudget && (viewMode === 'WIDGET' || viewMode === 'ACCOUNTS' || viewMode === 'ADD') ? (
+          ) : isBudget &&
+            (viewMode === 'WIDGET' || viewMode === 'ACCOUNTS' || viewMode === 'ADD') ? (
             <div className="min-h-full w-full p-8">
               <BudgetWidget
                 content={tile.rawContent || ''}
@@ -2166,34 +2591,29 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
             <div className="flex flex-col min-h-full w-full p-8">
               {isTimeTracking && (
                 <TimeTrackingWidget
-                  content={tile.rawContent!}
+                  content={tile.rawContent as string}
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                   mode="FOCUS"
                 />
               )}
-              {isEvents && (
-                <EventsWidget
-                  content={tile.rawContent!}
-                  mode="FOCUS"
-                />
-              )}
+              {isEvents && <EventsWidget content={tile.rawContent as string} mode="FOCUS" />}
               {isHabit && (
                 <HabitTrackerWidget
-                  content={tile.rawContent!}
+                  content={tile.rawContent as string}
                   mode="FOCUS"
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
               {isTodos && (
                 <TodoWidget
-                  content={tile.rawContent!}
+                  content={tile.rawContent as string}
                   mode="FOCUS"
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
               {isTimezones && (
                 <TimezoneWidget
-                  content={tile.rawContent!}
+                  content={tile.rawContent as string}
                   mode="FOCUS"
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
@@ -2211,7 +2631,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
                       name: item.title,
                       tags: [],
                       createdAt: Date.now(),
-                      updatedAt: Date.now()
+                      updatedAt: Date.now(),
                     };
                     if (onAddToReadItLater) {
                       logger.debug(`(Focused) RssWidget onReadItLater triggered. ${newItem.name}`);
@@ -2224,7 +2644,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
               )}
               {isReadItLater && (
                 <ReadItLaterWidget
-                  content={tile.rawContent!}
+                  content={tile.rawContent as string}
                   mode="FOCUS"
                   focusMode="WIDGET"
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
@@ -2232,20 +2652,16 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
               )}
               {isDataCollection && (
                 <DataCollectionWidget
-                  content={tile.rawContent!}
+                  content={tile.rawContent as string}
                   mode="FOCUS"
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
-              {isGenericCsv && (
-                <CsvTableView content={tile.rawContent || ''} />
-              )}
+              {isGenericCsv && <CsvTableView content={tile.rawContent || ''} />}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="flex flex-col min-h-full w-full p-8">
-              <TimeTrackingCharts
-                data={tile.rawContent!}
-              />
+              <TimeTrackingCharts data={tile.rawContent as string} />
             </div>
           ) : viewMode === 'ADD' && (isEvents || isTodos || isTimezones || isDataCollection) ? (
             <div className="min-h-full w-full p-8 flex justify-center items-start">
@@ -2265,13 +2681,31 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
                 <TodoAddForm
                   existingTags={todoTags}
                   milestones={todoMilestones}
+                  todosFilePath={String(tile.id)}
                   onCancel={() => setViewMode('WIDGET')}
-                  onAdd={(text, tags, milestoneId) => {
+                  onAdd={async (text, tags, milestoneId, promptRef) => {
                     const data = TodoLogic.parseTodos(tile.rawContent || '');
-                    const newData = TodoLogic.addTodo(data, text, tags, milestoneId);
+                    const newData = TodoLogic.addTodo(
+                      data,
+                      text,
+                      tags,
+                      milestoneId,
+                      promptRef?.prompt,
+                    );
                     const newContent = TodoLogic.serializeTodos(newData);
-                    tile.onContentChange?.(newContent);
+                    // Update store directly and await save before creating the prompt
+                    // file — running both concurrently causes a 409 Conflict on GitHub.
+                    githubFileStore.updateFileContent(String(tile.id), newContent);
+                    await githubFileStore.saveFile(String(tile.id));
                     setViewMode('WIDGET');
+                    if (promptRef) {
+                      const filePath = promptRef.prompt.refFile;
+                      if (filePath && onCreateFile) await onCreateFile(filePath, '');
+                      if (filePath && promptRef.openAfter) {
+                        layoutStore.view.value = 'FILES';
+                        layoutStore.navigate(filePath);
+                      }
+                    }
                   }}
                 />
               )}
@@ -2299,9 +2733,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
                   }}
                 />
               )}
-
             </div>
-
           ) : viewMode === 'COLUMNS' && isDataCollection ? (
             <div className="min-h-full w-full">
               <DataCollectionColumnManager
@@ -2324,7 +2756,7 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
           ) : viewMode === 'ARCHIVE' && isReadItLater ? (
             <div className="min-h-full w-full">
               <ReadItLaterWidget
-                content={tile.rawContent!}
+                content={tile.rawContent as string}
                 mode="FOCUS"
                 focusMode="ARCHIVE"
                 onChange={(newContent) => tile.onContentChange?.(newContent)}
@@ -2332,41 +2764,39 @@ const FocusedTileInternal = ({ tile, onClose, renderEditor, zenMode, onToggleZen
             </div>
           ) : viewMode === 'CODE' || (viewMode === 'WIDGET' && !hasWidget) ? (
             <div className="h-full w-full">
-              {renderEditor ? renderEditor(String(tile.id), zenMode, tile.rawContent, tile.onContentChange) : (
-                tile.rawContent !== undefined ? (
-                  <textarea
-                    className="w-full h-full bg-[var(--los-bg)] text-[var(--los-fg)] font-mono text-xs p-4 resize-none focus:outline-none border-none"
-                    value={tile.rawContent}
-                    onInput={(e) => tile.onContentChange?.(e.currentTarget.value)}
-                    spellcheck={false}
-                  />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center text-[var(--los-muted)]">
-                    <MonoText>No Editor Available</MonoText>
-                  </div>
-                )
+              {renderEditor ? (
+                renderEditor(String(tile.id), zenMode, tile.rawContent, tile.onContentChange)
+              ) : tile.rawContent !== undefined ? (
+                <textarea
+                  className="w-full h-full bg-[var(--los-bg)] text-[var(--los-fg)] font-mono text-xs p-4 resize-none focus:outline-none border-none"
+                  value={tile.rawContent}
+                  onInput={(e) => tile.onContentChange?.(e.currentTarget.value)}
+                  spellcheck={false}
+                />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center text-[var(--los-muted)]">
+                  <MonoText>No Editor Available</MonoText>
+                </div>
               )}
             </div>
+          ) : tile.content ? (
+            tile.content
           ) : (
-            tile.content ? tile.content : (
-              <div className="p-8 flex items-center justify-center text-[var(--los-muted)]">
-                <MonoText>No content defined for this tile.</MonoText>
-              </div>
-            )
+            <div className="p-8 flex items-center justify-center text-[var(--los-muted)]">
+              <MonoText>No content defined for this tile.</MonoText>
+            </div>
           )}
 
           {/* Fix 1.25: Ensure data is fetched even if we are in WIDGET mode and content is missing */}
           {/* We render the Editor hidden so it mounts and triggers the data fetch */}
           {hasWidget && viewMode !== 'CODE' && !tile.rawContent && renderEditor && (
-            <div style={{ display: 'none' }}>
-              {renderEditor(String(tile.id), false)}
-            </div>
+            <div style={{ display: 'none' }}>{renderEditor(String(tile.id), false)}</div>
           )}
         </div>
       </div>
     </div>
   );
-}
+};
 
 // Memoize FocusedTile to prevent re-renders when MainApp updates but Tile content hasn't changed
 const FocusedTileMemo = memo(FocusedTileInternal, (prev, next) => {
@@ -2381,8 +2811,28 @@ const FocusedTileMemo = memo(FocusedTileInternal, (prev, next) => {
   return idEqual && contentEqual && zenEqual;
 });
 
-const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpanded, onDeleteFile, onRenameFile, onRequestMove, onToggleQuickNote, isQuickNote }: { tile: TileDef, renderTileContent: any, onToggleSize?: () => void, isExpanded?: boolean, onDeleteFile?: (path: string) => void, onRenameFile?: (path: string, newPath: string) => void, onRequestMove?: (path: string) => void, onToggleQuickNote?: (path: string) => void, isQuickNote?: (path: string) => boolean }) => {
-  const [activeMenu, setActiveMenu] = useState<{ id: string, x: number, y: number } | null>(null);
+const TileContentStructure = ({
+  tile,
+  renderTileContent,
+  onToggleSize,
+  isExpanded,
+  onDeleteFile,
+  onRenameFile,
+  onRequestMove,
+  onToggleQuickNote,
+  isQuickNote,
+}: {
+  tile: TileDef;
+  renderTileContent: any;
+  onToggleSize?: () => void;
+  isExpanded?: boolean;
+  onDeleteFile?: (path: string) => void;
+  onRenameFile?: (path: string, newPath: string) => void;
+  onRequestMove?: (path: string) => void;
+  onToggleQuickNote?: (path: string) => void;
+  isQuickNote?: (path: string) => boolean;
+}) => {
+  const [activeMenu, setActiveMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     const handleClick = () => setActiveMenu(null);
@@ -2410,17 +2860,21 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
     const isMd = ext === '.md';
 
     return createPortal(
+      // biome-ignore lint/a11y/noStaticElementInteractions: context menu container
+      // biome-ignore lint/a11y/useKeyWithClickEvents: context menu container
       <div
         className="fixed z-[9999] bg-[#1a1a1f] border border-[var(--los-border)] shadow-xl rounded flex flex-col min-w-[120px] py-1 animate-in fade-in zoom-in-95 duration-100"
         style={{ top: activeMenu.y, left: activeMenu.x }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: context menu item */}
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: context menu item */}
         <div
           className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
           onClick={(e) => {
             e.stopPropagation();
             setActiveMenu(null);
-            const newName = prompt("Rename to:", tile.title);
+            const newName = prompt('Rename to:', tile.title);
             if (newName && newName !== tile.title && onRenameFile) {
               const parts = String(tile.id).split('/');
               parts.pop();
@@ -2431,6 +2885,8 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
         >
           <Edit size={12} /> Rename
         </div>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: context menu item */}
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: context menu item */}
         <div
           className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
           onClick={(e) => {
@@ -2442,6 +2898,8 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
           <Move size={12} /> Move
         </div>
         {isMd && onToggleQuickNote && isQuickNote && (
+          // biome-ignore lint/a11y/noStaticElementInteractions: context menu item
+          // biome-ignore lint/a11y/useKeyWithClickEvents: context menu item
           <div
             className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs"
             onClick={(e) => {
@@ -2450,9 +2908,12 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
               onToggleQuickNote(String(tile.id));
             }}
           >
-            <FileText size={12} /> {isQuickNote(String(tile.id)) ? 'Remove Quick Note' : 'Add Quick Note'}
+            <FileText size={12} />{' '}
+            {isQuickNote(String(tile.id)) ? 'Remove Quick Note' : 'Add Quick Note'}
           </div>
         )}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: context menu item */}
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: context menu item */}
         <div
           className="px-3 py-2 hover:bg-white/5 flex items-center gap-2 cursor-pointer text-xs text-red-400 hover:text-red-300"
           onClick={(e) => {
@@ -2464,7 +2925,7 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
           <Trash size={12} /> Delete
         </div>
       </div>,
-      document.body
+      document.body,
     );
   };
 
@@ -2476,8 +2937,9 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
             if (!tile.title) return null;
             const lastSlashIdx = tile.title.lastIndexOf('/');
             const dirPart = lastSlashIdx !== -1 ? tile.title.slice(0, lastSlashIdx + 1) : '';
-            const baseWithExt = lastSlashIdx !== -1 ? tile.title.slice(lastSlashIdx + 1) : tile.title;
-            
+            const baseWithExt =
+              lastSlashIdx !== -1 ? tile.title.slice(lastSlashIdx + 1) : tile.title;
+
             const firstDotIdx = baseWithExt.indexOf('.');
             const namePart = firstDotIdx !== -1 ? baseWithExt.slice(0, firstDotIdx) : baseWithExt;
             const extPart = firstDotIdx !== -1 ? baseWithExt.slice(firstDotIdx) : '';
@@ -2490,15 +2952,17 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
               </span>
             );
           })()}
-        </MonoText>        <div className="flex items-center gap-2">
+        </MonoText>{' '}
+        <div className="flex items-center gap-2">
           {onToggleSize && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleSize();
               }}
               className="text-[var(--los-muted)] hover:text-[var(--los-accent)] transition-colors p-1"
-              title={isExpanded ? "Collapse" : "Expand"}
+              title={isExpanded ? 'Collapse' : 'Expand'}
             >
               {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
             </button>
@@ -2506,10 +2970,11 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
 
           {tile.type === 'FILE' && onDeleteFile && (
             <button
+              type="button"
               onClick={handleMenuTrigger}
               className={cn(
-                "p-1 rounded cursor-pointer transition-colors",
-                activeMenu ? "text-white bg-white/10" : "text-[var(--los-muted)] hover:text-white"
+                'p-1 rounded cursor-pointer transition-colors',
+                activeMenu ? 'text-white bg-white/10' : 'text-[var(--los-muted)] hover:text-white',
               )}
             >
               <MoreVertical size={14} />
@@ -2538,21 +3003,32 @@ const TileContentStructure = ({ tile, renderTileContent, onToggleSize, isExpande
   );
 };
 
-const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDragStart, handleDragSave, dragEnabled, isExpanded, onToggleSize, onDeleteFile, onRenameFile, onRequestMove, isMobile, onToggleQuickNote, isQuickNote }: any) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({ id: tile.id, disabled: !dragEnabled });
+const SortableTileItem = ({
+  tile,
+  setActiveTileId,
+  renderTileContent,
+  handleDragStart,
+  handleDragSave,
+  dragEnabled,
+  isExpanded,
+  onToggleSize,
+  onDeleteFile,
+  onRenameFile,
+  onRequestMove,
+  isMobile,
+  onToggleQuickNote,
+  isQuickNote,
+}: any) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: tile.id,
+    disabled: !dragEnabled,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0 : 1, // Hide orig element while dragging overlay
-    zIndex: isDragging ? 999 : 'auto'
+    zIndex: isDragging ? 999 : 'auto',
   };
 
   const [pressing, setPressing] = useState(false);
@@ -2574,9 +3050,10 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
   }, [pressing, handleDragStart, handleDragSave, dragEnabled]);
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: sortable tile handles drag and click
+    // biome-ignore lint/a11y/useKeyWithClickEvents: sortable tile handles drag and click
     <div
       ref={setNodeRef}
-
       {...(attributes as any)}
       {...(listeners as any)}
       onMouseDown={() => {
@@ -2604,19 +3081,24 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
         if (!dragEnabled) setActiveTileId(tile.id);
       }}
       className={cn(
-        "bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full",
-        !isExpanded && (isMobile ? "h-44 pb-0" : "pb-[100%]"), // Mobile: Compact Fixed Height (h-44), Desktop: Square
-        isExpanded && "min-h-[60dvh] md:min-h-auto md:h-auto md:row-span-2 md:col-span-2 pb-0", // Mobile: Compact Expanded (60dvh > width), Desktop: 2x2 grid
-        dragEnabled && "touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95"
+        'bg-[var(--los-bg)] ring-1 ring-inset ring-[var(--los-border)] hover:bg-white/5 transition-colors group relative cursor-pointer w-full',
+        !isExpanded && (isMobile ? 'h-44 pb-0' : 'pb-[100%]'), // Mobile: Compact Fixed Height (h-44), Desktop: Square
+        isExpanded && 'min-h-[60dvh] md:min-h-auto md:h-auto md:row-span-2 md:col-span-2 pb-0', // Mobile: Compact Expanded (60dvh > width), Desktop: 2x2 grid
+        dragEnabled && 'touch-none cursor-move ring-[var(--los-accent)] ring-2 opacity-90 scale-95',
       )}
       style={{
         ...style,
-        paddingBottom: (isExpanded || isMobile) ? '0' : undefined
+        paddingBottom: isExpanded || isMobile ? '0' : undefined,
       }}
     >
       <TileContentStructure
         tile={tile}
-        renderTileContent={(t: TileDef, m: any) => renderTileContent(t, isMobile ? (isExpanded ? 'MOBILE_EXPANDED' : 'MOBILE_COLLAPSED') : 'SMALL')}
+        renderTileContent={(t: TileDef, _m: any) =>
+          renderTileContent(
+            t,
+            isMobile ? (isExpanded ? 'MOBILE_EXPANDED' : 'MOBILE_COLLAPSED') : 'SMALL',
+          )
+        }
         isExpanded={isExpanded}
         onToggleSize={onToggleSize}
         onDeleteFile={onDeleteFile}
@@ -2625,13 +3107,17 @@ const SortableTileItem = ({ tile, setActiveTileId, renderTileContent, handleDrag
         onToggleQuickNote={onToggleQuickNote}
         isQuickNote={isQuickNote}
       />
-    </div >
+    </div>
   );
 };
 
 // Default dummy data if none provided
-const defaultTiles: TileDef[] = Array.from({ length: 24 }, (_, i) => ({
+const _defaultTiles: TileDef[] = Array.from({ length: 24 }, (_, i) => ({
   id: i,
   title: `Tile 0${i + 1}`,
-  content: <div className="p-8"><Editor /></div>
+  content: (
+    <div className="p-8">
+      <Editor />
+    </div>
+  ),
 }));

@@ -1,15 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite';
 import { useState } from 'preact/hooks';
-import { MainApp, TileDef } from './MainApp';
-import { MonoHeader, MonoText } from '../Atoms/Typography';
-import { DashboardConfig } from '../types';
+import { MonoText } from '../Atoms/Typography';
+import type { DashboardConfig } from '../types';
+import { MainApp } from './MainApp';
 
 const meta = {
   title: 'LifeOS/Layouts',
   parameters: {
     backgrounds: { default: 'dark' },
-    layout: 'fullscreen'
-  }
+    layout: 'fullscreen',
+  },
 } satisfies Meta;
 
 export default meta;
@@ -25,13 +25,25 @@ export const TileMatrix: StoryObj = {
         id: `item_${i}`,
         title: isFolder ? `Folder ${i}` : `File ${i}`,
         type: isFolder ? 'FOLDER' : 'FILE',
-        content: <div className="p-8"><MonoText>Content for {i}</MonoText></div>,
-        children: isFolder ? Array.from({ length: 10 }, (_, j) => ({
-          id: `child_${i}_${j}`,
-          title: `Child File ${i}-${j}`,
-          type: 'FILE',
-          content: <div className="p-8"><MonoText>Child Content {i}-{j}</MonoText></div>
-        })) : undefined
+        content: (
+          <div className="p-8">
+            <MonoText>Content for {i}</MonoText>
+          </div>
+        ),
+        children: isFolder
+          ? Array.from({ length: 10 }, (_, j) => ({
+              id: `child_${i}_${j}`,
+              title: `Child File ${i}-${j}`,
+              type: 'FILE',
+              content: (
+                <div className="p-8">
+                  <MonoText>
+                    Child Content {i}-{j}
+                  </MonoText>
+                </div>
+              ),
+            }))
+          : undefined,
       };
     });
 
@@ -40,13 +52,13 @@ export const TileMatrix: StoryObj = {
       activeId: string | null;
     }
 
-    const [columns, setColumns] = useState<StoryColumn[]>([
-      { items: matrixItems, activeId: null }
-    ]);
+    const [columns, setColumns] = useState<StoryColumn[]>([{ items: matrixItems, activeId: null }]);
 
     const handleNavigate = (item: any) => {
       if (item.type === 'FOLDER') {
-        const colIndex = columns.findIndex((col: any) => col.items.some((i: any) => i.id === item.id));
+        const colIndex = columns.findIndex((col: any) =>
+          col.items.some((i: any) => i.id === item.id),
+        );
         const newColumns = [...columns].slice(0, colIndex + 1);
         newColumns[colIndex] = { ...newColumns[colIndex], activeId: item.id } as any;
 
@@ -55,30 +67,32 @@ export const TileMatrix: StoryObj = {
 
         setColumns(newColumns);
       } else {
-        const colIndex = columns.findIndex((col: any) => col.items.some((i: any) => i.id === item.id));
+        const colIndex = columns.findIndex((col: any) =>
+          col.items.some((i: any) => i.id === item.id),
+        );
         const newColumns = [...columns].slice(0, colIndex + 1);
         newColumns[colIndex] = { ...newColumns[colIndex], activeId: item.id } as any;
         setColumns(newColumns);
       }
     };
 
-    return <MainApp
-      fileSystem={{ columns }}
-      onItemClick={handleNavigate}
-      onNavigate={(path) => {
-        if (path.length === 0) {
-          setColumns([{ items: matrixItems, activeId: null }]);
-          setCurrentRepo(mockRepos[0]); // Optional: reset repo too if needed
-        }
-      }}
-      currentRepository={currentRepo}
-      repositories={mockRepos}
-      onSelectRepository={(repo: any) => setCurrentRepo(repo)}
-    />;
-  }
+    return (
+      <MainApp
+        fileSystem={{ columns }}
+        onItemClick={handleNavigate}
+        onNavigate={(path) => {
+          if (path.length === 0) {
+            setColumns([{ items: matrixItems, activeId: null }]);
+            setCurrentRepo(mockRepos[0]); // Optional: reset repo too if needed
+          }
+        }}
+        currentRepository={currentRepo}
+        repositories={mockRepos}
+        onSelectRepository={(repo: any) => setCurrentRepo(repo)}
+      />
+    );
+  },
 };
-
-
 
 // ... (existing code)
 
@@ -98,26 +112,36 @@ ${new Date().toISOString().split('T')[0]};09:00,11:30`);
         setCsvContent(newVal);
         console.log('CSV Updated:', newVal);
       },
-      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+      content: (
+        <div className="p-4">
+          <MonoText>Raw Editor Fallback</MonoText>
+        </div>
+      ),
     };
 
-    const [columns, setColumns] = useState<any[]>([
-      { items: [timeTrackingTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    const [columns, _setColumns] = useState<any[]>([
+      {
+        items: [
+          timeTrackingTile,
+          ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' })),
+        ],
+        activeId: null,
+      },
     ]);
 
-    return <MainApp
-      fileSystem={{ columns }}
-      onItemClick={(item) => {
-        // partial nav logic
-        if (item.type === 'FOLDER') {
-          // ... folder logic ...
-        }
-      }}
-    />;
-  }
+    return (
+      <MainApp
+        fileSystem={{ columns }}
+        onItemClick={(item) => {
+          // partial nav logic
+          if (item.type === 'FOLDER') {
+            // ... folder logic ...
+          }
+        }}
+      />
+    );
+  },
 };
-
-
 
 export const HabitTracking: StoryObj = {
   render: () => {
@@ -146,20 +170,32 @@ export const HabitTracking: StoryObj = {
       onContentChange: (newVal: string) => {
         setCsvContent(newVal);
       },
-      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+      content: (
+        <div className="p-4">
+          <MonoText>Raw Editor Fallback</MonoText>
+        </div>
+      ),
     };
 
-    const [columns, setColumns] = useState<any[]>([
-      { items: [habitTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    const [columns, _setColumns] = useState<any[]>([
+      {
+        items: [
+          habitTile,
+          ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' })),
+        ],
+        activeId: null,
+      },
     ]);
 
-    return <MainApp
-      fileSystem={{ columns }}
-      onItemClick={(item) => {
-        // partial nav logic
-      }}
-    />;
-  }
+    return (
+      <MainApp
+        fileSystem={{ columns }}
+        onItemClick={(_item) => {
+          // partial nav logic
+        }}
+      />
+    );
+  },
 };
 
 const mockRepos = [
@@ -172,103 +208,95 @@ export const ConfiguredDashboard: StoryObj = {
   render: () => {
     // Sample Config from user
     const sampleConfig: DashboardConfig = {
-      "version": 1,
-      "dashboards": [
+      version: 1,
+      dashboards: [
         {
-          "id": "d0",
-          "name": "Personal"
+          id: 'd0',
+          name: 'Personal',
         },
         {
-          "id": "d1",
-          "name": "Work Proj A"
+          id: 'd1',
+          name: 'Work Proj A',
         },
         {
-          "id": "d2",
-          "name": "Learning"
+          id: 'd2',
+          name: 'Learning',
         },
         {
-          "id": "d3",
-          "name": "Finance"
+          id: 'd3',
+          name: 'Finance',
         },
         {
-          "id": "d4",
-          "name": "Health & Fitness"
+          id: 'd4',
+          name: 'Health & Fitness',
         },
         {
-          "id": "d5",
-          "name": "Archive 2023"
-        }
+          id: 'd5',
+          name: 'Archive 2023',
+        },
       ],
-      "entries": [
+      entries: [
         {
-          "path": "test2.habit.csv",
-          "dashboard": "d0",
-          "skipOnMobile": false
+          path: 'test2.habit.csv',
+          dashboard: 'd0',
+          skipOnMobile: false,
         },
         {
-          "path": "my2.achievements.md",
-          "dashboard": "d1",
-          "skipOnMobile": false
+          path: 'my2.achievements.md',
+          dashboard: 'd1',
+          skipOnMobile: false,
         },
         {
-          "path": "generic-test/generic-other.csv.md",
-          "dashboard": "d3",
-          "skipOnMobile": false
+          path: 'generic-test/generic-other.csv.md',
+          dashboard: 'd3',
+          skipOnMobile: false,
         },
         {
-          "path": "test-todos.todos.md",
-          "dashboard": "d2",
-          "skipOnMobile": false
+          path: 'test-todos.todos.md',
+          dashboard: 'd2',
+          skipOnMobile: false,
         },
         {
-          "path": "reditlater.readitlater.json",
-          "dashboard": "d2",
-          "skipOnMobile": false
+          path: 'reditlater.readitlater.json',
+          dashboard: 'd2',
+          skipOnMobile: false,
         },
         {
-          "path": ".lifeos/.readitlater.json",
-          "dashboard": "d0",
-          "skipOnMobile": false
+          path: '.lifeos/.readitlater.json',
+          dashboard: 'd0',
+          skipOnMobile: false,
         },
         {
-          "path": "my-date-time.timezones.json",
-          "dashboard": "d0",
-          "skipOnMobile": false
-        }
+          path: 'my-date-time.timezones.json',
+          dashboard: 'd0',
+          skipOnMobile: false,
+        },
       ],
-      "files": {
-        "selected": "0_event.events.csv",
-        "opened": [
-          "0_event.events.csv"
+      files: {
+        selected: '0_event.events.csv',
+        opened: ['0_event.events.csv'],
+        recentlyOpened: [
+          '0_event.events.csv',
+          'my-lifosy-event.lifosy-event.json',
+          'testidea .tldraw.json',
+          '.lifeos/.readitlater.json',
         ],
-        "recentlyOpened": [
-          "0_event.events.csv",
-          "my-lifosy-event.lifosy-event.json",
-          "testidea .tldraw.json",
-          ".lifeos/.readitlater.json"
-        ]
-      }
+      },
     };
 
     // Mock file contents
     const mockFileContents: Record<string, string> = {
-      "test2.habit.csv": "iso date;goal reached\n2023-10-01;x",
-      "my2.achievements.md": "# Achievements\n- Built a dashboard",
-      ".lifeos/.readitlater.json": "[]",
-      "my-date-time.timezones.json": "{}",
+      'test2.habit.csv': 'iso date;goal reached\n2023-10-01;x',
+      'my2.achievements.md': '# Achievements\n- Built a dashboard',
+      '.lifeos/.readitlater.json': '[]',
+      'my-date-time.timezones.json': '{}',
       // ... others empty
     };
 
     const [config, setConfig] = useState<DashboardConfig>(sampleConfig);
 
-    return (
-      <MainApp
-        config={config}
-        onConfigChange={setConfig}
-        fileContents={mockFileContents}
-      />
-    );
-  }
+    return <MainApp config={config} onConfigChange={setConfig} fileContents={mockFileContents} />;
+  },
 };
 
 export const TodoList: StoryObj = {
@@ -292,20 +320,32 @@ export const TodoList: StoryObj = {
         setMdContent(newVal);
         console.log('Todos Updated:', newVal);
       },
-      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+      content: (
+        <div className="p-4">
+          <MonoText>Raw Editor Fallback</MonoText>
+        </div>
+      ),
     };
 
-    const [columns, setColumns] = useState<any[]>([
-      { items: [todoTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    const [columns, _setColumns] = useState<any[]>([
+      {
+        items: [
+          todoTile,
+          ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' })),
+        ],
+        activeId: null,
+      },
     ]);
 
-    return <MainApp
-      fileSystem={{ columns }}
-      onItemClick={(item) => {
-        // partial nav
-      }}
-    />;
-  }
+    return (
+      <MainApp
+        fileSystem={{ columns }}
+        onItemClick={(_item) => {
+          // partial nav
+        }}
+      />
+    );
+  },
 };
 
 export const TimezoneClock: StoryObj = {
@@ -341,20 +381,32 @@ export const TimezoneClock: StoryObj = {
         setJsonContent(newVal);
         console.log('Timezones Updated:', newVal);
       },
-      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+      content: (
+        <div className="p-4">
+          <MonoText>Raw Editor Fallback</MonoText>
+        </div>
+      ),
     };
 
-    const [columns, setColumns] = useState<any[]>([
-      { items: [tzTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    const [columns, _setColumns] = useState<any[]>([
+      {
+        items: [
+          tzTile,
+          ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' })),
+        ],
+        activeId: null,
+      },
     ]);
 
-    return <MainApp
-      fileSystem={{ columns }}
-      onItemClick={(item) => {
-        // partial nav
-      }}
-    />;
-  }
+    return (
+      <MainApp
+        fileSystem={{ columns }}
+        onItemClick={(_item) => {
+          // partial nav
+        }}
+      />
+    );
+  },
 };
 
 export const RssReader: StoryObj = {
@@ -381,20 +433,32 @@ export const RssReader: StoryObj = {
         setJsonContent(newVal);
         console.log('RSS Updated:', newVal);
       },
-      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+      content: (
+        <div className="p-4">
+          <MonoText>Raw Editor Fallback</MonoText>
+        </div>
+      ),
     };
 
-    const [columns, setColumns] = useState<any[]>([
-      { items: [rssTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    const [columns, _setColumns] = useState<any[]>([
+      {
+        items: [
+          rssTile,
+          ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' })),
+        ],
+        activeId: null,
+      },
     ]);
 
-    return <MainApp
-      fileSystem={{ columns }}
-      onItemClick={(item) => {
-        // partial nav
-      }}
-    />;
-  }
+    return (
+      <MainApp
+        fileSystem={{ columns }}
+        onItemClick={(_item) => {
+          // partial nav
+        }}
+      />
+    );
+  },
 };
 
 export const ReadItLater: StoryObj = {
@@ -432,20 +496,32 @@ export const ReadItLater: StoryObj = {
         setJsonContent(newVal);
         console.log('ReadItLater Updated:', newVal);
       },
-      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+      content: (
+        <div className="p-4">
+          <MonoText>Raw Editor Fallback</MonoText>
+        </div>
+      ),
     };
 
-    const [columns, setColumns] = useState<any[]>([
-      { items: [rilTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    const [columns, _setColumns] = useState<any[]>([
+      {
+        items: [
+          rilTile,
+          ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' })),
+        ],
+        activeId: null,
+      },
     ]);
 
-    return <MainApp
-      fileSystem={{ columns }}
-      onItemClick={(item) => {
-        // partial nav
-      }}
-    />;
-  }
+    return (
+      <MainApp
+        fileSystem={{ columns }}
+        onItemClick={(_item) => {
+          // partial nav
+        }}
+      />
+    );
+  },
 };
 
 export const BudgetWidgetStory: StoryObj = {
@@ -466,20 +542,32 @@ Kino;bwbank:adam;entertainment;2024-08-06;30`);
       onContentChange: (newVal: string) => {
         setCsvContent(newVal);
       },
-      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+      content: (
+        <div className="p-4">
+          <MonoText>Raw Editor Fallback</MonoText>
+        </div>
+      ),
     };
 
-    const [columns, setColumns] = useState<any[]>([
-      { items: [budgetTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    const [columns, _setColumns] = useState<any[]>([
+      {
+        items: [
+          budgetTile,
+          ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' })),
+        ],
+        activeId: null,
+      },
     ]);
 
-    return <MainApp
-      fileSystem={{ columns }}
-      onItemClick={(item) => {
-        // partial nav
-      }}
-    />;
-  }
+    return (
+      <MainApp
+        fileSystem={{ columns }}
+        onItemClick={(_item) => {
+          // partial nav
+        }}
+      />
+    );
+  },
 };
 
 export const ActionLogWidgetStory: StoryObj = {
@@ -507,18 +595,30 @@ abbreviations: -
         setMdContent(newVal);
         console.log('Action Log Updated:', newVal);
       },
-      content: <div className="p-4"><MonoText>Raw Editor Fallback</MonoText></div>
+      content: (
+        <div className="p-4">
+          <MonoText>Raw Editor Fallback</MonoText>
+        </div>
+      ),
     };
 
-    const [columns, setColumns] = useState<any[]>([
-      { items: [logTile, ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' }))], activeId: null }
+    const [columns, _setColumns] = useState<any[]>([
+      {
+        items: [
+          logTile,
+          ...mockRepos.map((r, i) => ({ id: `r_${i}`, title: r.name, type: 'FOLDER' })),
+        ],
+        activeId: null,
+      },
     ]);
 
-    return <MainApp
-      fileSystem={{ columns }}
-      onItemClick={(item) => {
-        // partial nav
-      }}
-    />;
-  }
+    return (
+      <MainApp
+        fileSystem={{ columns }}
+        onItemClick={(_item) => {
+          // partial nav
+        }}
+      />
+    );
+  },
 };

@@ -1,4 +1,3 @@
-import { h } from 'preact';
 import { RepositorySelector } from '../Organisms/RepositorySelector';
 
 export default {
@@ -21,9 +20,5 @@ export const Selector = () => (
 );
 
 export const Loading = () => (
-  <RepositorySelector
-    repositories={[]}
-    isLoading={true}
-    onSelect={() => { }}
-  />
+  <RepositorySelector repositories={[]} isLoading={true} onSelect={() => {}} />
 );

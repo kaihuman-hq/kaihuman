@@ -1,8 +1,7 @@
-import { h, Fragment } from 'preact';
-import { useState, useMemo, useRef, useEffect, useCallback } from 'preact/hooks';
-import { MonoHeader } from '../../Atoms/Typography';
-import { parseTimeTracking, getChartData, TimeTrackingData } from './TimeTrackingLogic';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
+import { MonoHeader } from '../../Atoms/Typography';
+import { getChartData, parseTimeTracking, type TimeTrackingData } from './TimeTrackingLogic';
 
 interface TimeTrackingChartsProps {
   data: string | TimeTrackingData;
@@ -48,13 +47,13 @@ const NativeLineChart = ({ data, width, height, colors }: any) => {
   // Path Generators
   const createPath = (key: string) => {
     if (data.length <= 1) {
-      // For single point, just draw a small line or invalid path? 
+      // For single point, just draw a small line or invalid path?
       // Better to draw nothing for line, but dots will show.
       return `M ${getX(0)} ${getY(data[0][key])}`;
     }
-    return data.map((d: any, i: number) =>
-      `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d[key])}`
-    ).join(' ');
+    return data
+      .map((d: any, i: number) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d[key])}`)
+      .join(' ');
   };
 
   const handleMouseMove = (e: any) => {
@@ -69,15 +68,25 @@ const NativeLineChart = ({ data, width, height, colors }: any) => {
   };
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: chart interaction div
     <div className="relative w-full h-full" onMouseLeave={() => setHoveredIndex(null)}>
-      <svg width={width} height={height} onMouseMove={handleMouseMove}>
+      <svg
+        width={width}
+        height={height}
+        onMouseMove={handleMouseMove}
+        role="img"
+        aria-label="Line chart"
+      >
         {/* Grid */}
         {Array.from({ length: 5 }).map((_, i) => {
           const y = padding.top + (chartHeight / 4) * i;
           return (
-            <line key={i}
-              x1={padding.left} y1={y}
-              x2={width - padding.right} y2={y}
+            <line
+              key={y}
+              x1={padding.left}
+              y1={y}
+              x2={width - padding.right}
+              y2={y}
               stroke={colors.border}
               strokeOpacity={0.5}
               strokeDasharray="3 3"
@@ -90,35 +99,75 @@ const NativeLineChart = ({ data, width, height, colors }: any) => {
           const val = maxHours - (maxHours / 4) * i;
           const y = padding.top + (chartHeight / 4) * i;
           return (
-            <text key={i} x={padding.left - 6} y={y + 3} textAnchor="end" fill={colors.muted} className="font-mono text-[9px]">
+            <text
+              key={val}
+              x={padding.left - 6}
+              y={y + 3}
+              textAnchor="end"
+              fill={colors.muted}
+              className="font-mono text-[9px]"
+            >
               {val.toFixed(0)}
             </text>
-          )
+          );
         })}
 
         {/* X Axis First/Last Labels */}
-        <text x={padding.left} y={height - 5} fill={colors.muted} className="font-mono text-[9px]">{data[0].date}</text>
+        <text x={padding.left} y={height - 5} fill={colors.muted} className="font-mono text-[9px]">
+          {data[0].date}
+        </text>
         {data.length > 1 && (
-          <text x={width - padding.right} y={height - 5} textAnchor="end" fill={colors.muted} className="font-mono text-[9px]">{data[data.length - 1].date}</text>
+          <text
+            x={width - padding.right}
+            y={height - 5}
+            textAnchor="end"
+            fill={colors.muted}
+            className="font-mono text-[9px]"
+          >
+            {data[data.length - 1].date}
+          </text>
         )}
 
         {/* Lines */}
-        <path d={createPath('breakHours')} fill="none" stroke={colors.muted} strokeWidth="2" strokeDasharray="4 4" />
+        <path
+          d={createPath('breakHours')}
+          fill="none"
+          stroke={colors.muted}
+          strokeWidth="2"
+          strokeDasharray="4 4"
+        />
         <path d={createPath('workHours')} fill="none" stroke={colors.accent} strokeWidth="2" />
 
         {/* Hover Highlight */}
         {hoveredIndex !== null && (
           <line
-            x1={getX(hoveredIndex)} y1={padding.top}
-            x2={getX(hoveredIndex)} y2={height - padding.bottom}
-            stroke={colors.border} strokeWidth="1"
+            x1={getX(hoveredIndex)}
+            y1={padding.top}
+            x2={getX(hoveredIndex)}
+            y2={height - padding.bottom}
+            stroke={colors.border}
+            strokeWidth="1"
           />
         )}
 
         {hoveredIndex !== null && (
           <>
-            <circle cx={getX(hoveredIndex)} cy={getY(data[hoveredIndex].workHours)} r="4" fill={colors.bg} stroke={colors.accent} strokeWidth="2" />
-            <circle cx={getX(hoveredIndex)} cy={getY(data[hoveredIndex].breakHours)} r="4" fill={colors.bg} stroke={colors.muted} strokeWidth="2" />
+            <circle
+              cx={getX(hoveredIndex)}
+              cy={getY(data[hoveredIndex].workHours)}
+              r="4"
+              fill={colors.bg}
+              stroke={colors.accent}
+              strokeWidth="2"
+            />
+            <circle
+              cx={getX(hoveredIndex)}
+              cy={getY(data[hoveredIndex].breakHours)}
+              r="4"
+              fill={colors.bg}
+              stroke={colors.muted}
+              strokeWidth="2"
+            />
           </>
         )}
       </svg>
@@ -129,12 +178,27 @@ const NativeLineChart = ({ data, width, height, colors }: any) => {
           className="absolute pointer-events-none bg-[var(--los-bg)] border border-[var(--los-border)] p-2 rounded shadow-lg z-10"
           style={{
             left: Math.min(getX(hoveredIndex) + 10, width - 150), // Prevent overflow right
-            top: 10
+            top: 10,
           }}
         >
-          <p className="text-[10px] text-[var(--los-muted)] mb-1" style={{ fontFamily: 'var(--los-font-mono)' }}>{data[hoveredIndex].date}</p>
-          <p className="text-[10px]" style={{ fontFamily: 'var(--los-font-mono)', color: colors.accent }}>Work: {data[hoveredIndex].workHours}h</p>
-          <p className="text-[10px]" style={{ fontFamily: 'var(--los-font-mono)', color: colors.muted }}>Breaks: {data[hoveredIndex].breakHours}h</p>
+          <p
+            className="text-[10px] text-[var(--los-muted)] mb-1"
+            style={{ fontFamily: 'var(--los-font-mono)' }}
+          >
+            {data[hoveredIndex].date}
+          </p>
+          <p
+            className="text-[10px]"
+            style={{ fontFamily: 'var(--los-font-mono)', color: colors.accent }}
+          >
+            Work: {data[hoveredIndex].workHours}h
+          </p>
+          <p
+            className="text-[10px]"
+            style={{ fontFamily: 'var(--los-font-mono)', color: colors.muted }}
+          >
+            Breaks: {data[hoveredIndex].breakHours}h
+          </p>
         </div>
       )}
     </div>
@@ -153,25 +217,35 @@ const NativeBarChart = ({ data, width, height, colors }: any) => {
   const barWidth = (chartWidth / data.length) * 0.8;
   const gap = (chartWidth / data.length) * 0.2;
 
-  const getX = (index: number) => padding.left + (index * ((chartWidth / data.length))) + gap / 2;
+  const getX = (index: number) => padding.left + index * (chartWidth / data.length) + gap / 2;
   const getY = (val: number) => padding.top + chartHeight - (val / maxHours) * chartHeight;
   const getH = (val: number) => (val / maxHours) * chartHeight;
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: chart interaction div
     <div className="relative w-full h-full" onMouseLeave={() => setHoveredIndex(null)}>
-      <svg width={width} height={height} onMouseMove={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX - rect.left - padding.left;
-        const index = Math.floor(x / (chartWidth / data.length));
-        if (index >= 0 && index < data.length) setHoveredIndex(index);
-      }}>
+      <svg
+        width={width}
+        height={height}
+        role="img"
+        aria-label="Bar chart"
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left - padding.left;
+          const index = Math.floor(x / (chartWidth / data.length));
+          if (index >= 0 && index < data.length) setHoveredIndex(index);
+        }}
+      >
         {/* Grid */}
         {Array.from({ length: 5 }).map((_, i) => {
           const y = padding.top + (chartHeight / 4) * i;
           return (
-            <line key={i}
-              x1={padding.left} y1={y}
-              x2={width - padding.right} y2={y}
+            <line
+              key={y}
+              x1={padding.left}
+              y1={y}
+              x2={width - padding.right}
+              y2={y}
               stroke={colors.border}
               strokeOpacity={0.5}
               strokeDasharray="3 3"
@@ -184,10 +258,17 @@ const NativeBarChart = ({ data, width, height, colors }: any) => {
           const val = maxHours - (maxHours / 4) * i;
           const y = padding.top + (chartHeight / 4) * i;
           return (
-            <text key={i} x={padding.left - 6} y={y + 3} textAnchor="end" fill={colors.muted} className="font-mono text-[9px]">
+            <text
+              key={val}
+              x={padding.left - 6}
+              y={y + 3}
+              textAnchor="end"
+              fill={colors.muted}
+              className="font-mono text-[9px]"
+            >
               {val.toFixed(0)}
             </text>
-          )
+          );
         })}
 
         {/* X Axis Labels (Every 5th or first/last if too many) */}
@@ -195,16 +276,23 @@ const NativeBarChart = ({ data, width, height, colors }: any) => {
           // Simple thinning logic
           if (data.length > 10 && i % Math.ceil(data.length / 5) !== 0) return null;
           return (
-            <text key={i} x={getX(i) + barWidth / 2} y={height - 5} textAnchor="middle" fill={colors.muted} className="font-mono text-[9px]">
+            <text
+              key={d.week || d.month}
+              x={getX(i) + barWidth / 2}
+              y={height - 5}
+              textAnchor="middle"
+              fill={colors.muted}
+              className="font-mono text-[9px]"
+            >
               {d.week || d.month}
             </text>
-          )
+          );
         })}
 
         {/* Bars */}
         {data.map((d: any, i: number) => (
           <rect
-            key={i}
+            key={d.week || d.month}
             x={getX(i)}
             y={getY(d.hours)}
             width={barWidth}
@@ -221,16 +309,26 @@ const NativeBarChart = ({ data, width, height, colors }: any) => {
           className="absolute pointer-events-none bg-[var(--los-bg)] border border-[var(--los-border)] p-2 rounded shadow-lg z-10"
           style={{
             left: Math.min(getX(hoveredIndex) + barWidth + 10, width - 150),
-            top: getY(data[hoveredIndex].hours)
+            top: getY(data[hoveredIndex].hours),
           }}
         >
-          <p className="text-[10px] text-[var(--los-muted)] mb-1" style={{ fontFamily: 'var(--los-font-mono)' }}>{data[hoveredIndex].week || data[hoveredIndex].month}</p>
-          <p className="text-[10px]" style={{ fontFamily: 'var(--los-font-mono)', color: colors.accent }}>{data[hoveredIndex].hours}h</p>
+          <p
+            className="text-[10px] text-[var(--los-muted)] mb-1"
+            style={{ fontFamily: 'var(--los-font-mono)' }}
+          >
+            {data[hoveredIndex].week || data[hoveredIndex].month}
+          </p>
+          <p
+            className="text-[10px]"
+            style={{ fontFamily: 'var(--los-font-mono)', color: colors.accent }}
+          >
+            {data[hoveredIndex].hours}h
+          </p>
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
 // --- Main Component ---
 
@@ -262,19 +360,25 @@ export const TimeTrackingCharts = ({ data }: TimeTrackingChartsProps) => {
         <div className="flex gap-2">
           <div className="flex bg-[var(--los-border)] rounded-sm p-0.5">
             <button
+              type="button"
               onClick={() => setView('DAILY')}
               className={cn(
-                "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
-                view === 'DAILY' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                'px-3 py-1 text-[10px] font-mono transition-colors rounded-sm',
+                view === 'DAILY'
+                  ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                  : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
               )}
             >
               DAILY
             </button>
             <button
+              type="button"
               onClick={() => setView('AGGREGATED')}
               className={cn(
-                "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
-                view === 'AGGREGATED' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                'px-3 py-1 text-[10px] font-mono transition-colors rounded-sm',
+                view === 'AGGREGATED'
+                  ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                  : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
               )}
             >
               AGGREGATED
@@ -284,19 +388,25 @@ export const TimeTrackingCharts = ({ data }: TimeTrackingChartsProps) => {
           {view === 'AGGREGATED' && (
             <div className="flex bg-[var(--los-border)] rounded-sm p-0.5 animate-in fade-in slide-in-from-right-2">
               <button
+                type="button"
                 onClick={() => setAggregation('WEEKLY')}
                 className={cn(
-                  "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
-                  aggregation === 'WEEKLY' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                  'px-3 py-1 text-[10px] font-mono transition-colors rounded-sm',
+                  aggregation === 'WEEKLY'
+                    ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                    : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                 )}
               >
                 WEEK
               </button>
               <button
+                type="button"
                 onClick={() => setAggregation('MONTHLY')}
                 className={cn(
-                  "px-3 py-1 text-[10px] font-mono transition-colors rounded-sm",
-                  aggregation === 'MONTHLY' ? "bg-[var(--los-bg)] text-[var(--los-fg)]" : "text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                  'px-3 py-1 text-[10px] font-mono transition-colors rounded-sm',
+                  aggregation === 'MONTHLY'
+                    ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                    : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                 )}
               >
                 MONTH

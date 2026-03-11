@@ -1,6 +1,5 @@
-
-import { signal } from '@preact/signals';
 import { Logger } from '@lifosy/core';
+import { signal } from '@preact/signals';
 
 const logger = new Logger('ReadItLaterService');
 
@@ -23,8 +22,8 @@ export class ReadItLaterService {
       [id]: {
         ...(current[id] || { timestamp: Date.now() }),
         ...change,
-        timestamp: Date.now()
-      }
+        timestamp: Date.now(),
+      },
     };
     logger.debug(`[Optimistic] Applied change for ${id}:`, change);
   }
@@ -41,7 +40,7 @@ export class ReadItLaterService {
     this.applyChange(id, { deleted: true });
   }
 
-  // Clear optimistic change once we see it reflected in the props (optional for cleanup, 
+  // Clear optimistic change once we see it reflected in the props (optional for cleanup,
   // but for now relying on timestamp or just keeping it is fine as long as it matches)
   // Ideally we should prune old optimistic changes, but for this session 15min in-memory is fine.
 }

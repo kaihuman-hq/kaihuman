@@ -1,22 +1,25 @@
-
-import { h } from 'preact';
-import { useState, useMemo } from 'preact/hooks';
+import { ArrowDown, ArrowUp, Filter } from 'lucide-preact';
+import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
-import { MonoText, MonoLabel } from '../../Atoms/Typography';
-import { ArrowUp, ArrowDown, Filter, X } from 'lucide-preact';
+import { MonoLabel, MonoText } from '../../Atoms/Typography';
 
 export interface CsvTableViewProps {
   content: string;
 }
 
 export const CsvTableView = ({ content }: CsvTableViewProps) => {
-  const [sortConfig, setSortConfig] = useState<{ key: number; direction: 'asc' | 'desc' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: number; direction: 'asc' | 'desc' } | null>(
+    null,
+  );
   const [filters, setFilters] = useState<Record<number, string>>({});
   const [showFilters, setShowFilters] = useState(false);
 
   const { headers, rows } = useMemo(() => {
     if (!content) return { headers: [], rows: [] };
-    const lines = content.split('\n').map(l => l.trim()).filter(l => l);
+    const lines = content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l);
     if (lines.length === 0) return { headers: [], rows: [] };
 
     // Attempt to detect separator (comma or semicolon)
@@ -25,17 +28,17 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
 
     const separator = firstLine.includes(';') ? ';' : ',';
 
-    const headers = firstLine.split(separator).map(h => h.trim());
-    const rows = lines.slice(1).map(line => line.split(separator).map(c => c.trim()));
+    const headers = firstLine.split(separator).map((h) => h.trim());
+    const rows = lines.slice(1).map((line) => line.split(separator).map((c) => c.trim()));
 
     return { headers, rows };
   }, [content]);
 
   // Filtering
   const filteredRows = useMemo(() => {
-    return rows.filter(row => {
+    return rows.filter((row) => {
       return Object.entries(filters).every(([colIndex, filterValue]) => {
-        const cellValue = row[parseInt(colIndex)] || '';
+        const cellValue = row[parseInt(colIndex, 10)] || '';
         return cellValue.toLowerCase().includes(filterValue.toLowerCase());
       });
     });
@@ -53,13 +56,11 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
       const numA = parseFloat(valA);
       const numB = parseFloat(valB);
 
-      if (!isNaN(numA) && !isNaN(numB)) {
+      if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
         return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
       }
 
-      return sortConfig.direction === 'asc'
-        ? valA.localeCompare(valB)
-        : valB.localeCompare(valA);
+      return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
     });
     return sorted;
   }, [filteredRows, sortConfig]);
@@ -73,7 +74,7 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
   };
 
   const handleFilterChange = (index: number, value: string) => {
-    setFilters(prev => {
+    setFilters((prev) => {
       if (!value) {
         const next = { ...prev };
         delete next[index];
@@ -89,10 +90,11 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
       <div className="flex items-center justify-between p-2 border-b border-[var(--los-border)]">
         <MonoLabel className="text-xs">{rows.length} rows</MonoLabel>
         <button
+          type="button"
           onClick={() => setShowFilters(!showFilters)}
           className={cn(
-            "p-1 rounded hover:bg-[var(--los-border)] transition-colors",
-            showFilters ? "text-[var(--los-accent)]" : "text-[var(--los-muted)]"
+            'p-1 rounded hover:bg-[var(--los-border)] transition-colors',
+            showFilters ? 'text-[var(--los-accent)]' : 'text-[var(--los-muted)]',
           )}
           title="Toggle Filters"
         >
@@ -106,18 +108,29 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
           <thead className="sticky top-0 bg-[var(--los-bg)] z-10 shadow-sm">
             <tr>
               {headers.map((header, i) => (
-                <th key={i} className="p-2 border-b border-[var(--los-border)] min-w-[100px]">
+                <th key={header} className="p-2 border-b border-[var(--los-border)] min-w-[100px]">
                   <div className="flex flex-col gap-2">
                     <button
+                      type="button"
                       className="flex items-center gap-2 hover:text-[var(--los-accent)] w-full text-left group"
                       onClick={() => handleSort(i)}
                     >
-                      <MonoLabel className="text-xs font-bold truncate uppercase">{header}</MonoLabel>
-                      <span className={cn(
-                        "opacity-0 transition-opacity",
-                        sortConfig?.key === i ? "opacity-100 text-[var(--los-accent)]" : "group-hover:opacity-50"
-                      )}>
-                        {sortConfig?.key === i && sortConfig.direction === 'desc' ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
+                      <MonoLabel className="text-xs font-bold truncate uppercase">
+                        {header}
+                      </MonoLabel>
+                      <span
+                        className={cn(
+                          'opacity-0 transition-opacity',
+                          sortConfig?.key === i
+                            ? 'opacity-100 text-[var(--los-accent)]'
+                            : 'group-hover:opacity-50',
+                        )}
+                      >
+                        {sortConfig?.key === i && sortConfig.direction === 'desc' ? (
+                          <ArrowDown size={12} />
+                        ) : (
+                          <ArrowUp size={12} />
+                        )}
                       </span>
                     </button>
 
@@ -137,10 +150,13 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((row, rIndex) => (
-              <tr key={rIndex} className="hover:bg-[var(--los-border)]/10 transition-colors border-b border-[var(--los-border)]/50 last:border-0">
-                {headers.map((_, cIndex) => (
-                  <td key={cIndex} className="p-2 truncate max-w-[200px]" title={row[cIndex]}>
+            {sortedRows.map((row) => (
+              <tr
+                key={row.join('|')}
+                className="hover:bg-[var(--los-border)]/10 transition-colors border-b border-[var(--los-border)]/50 last:border-0"
+              >
+                {headers.map((header, cIndex) => (
+                  <td key={header} className="p-2 truncate max-w-[200px]" title={row[cIndex]}>
                     <MonoText className="text-xs">{row[cIndex]}</MonoText>
                   </td>
                 ))}

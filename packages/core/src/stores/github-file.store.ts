@@ -256,7 +256,7 @@ export class GithubFileStore {
         [path]: { ...file, content: newContent },
       };
     }
-    
+
     // ALWAYS mark dirty if updateFileContent is explicitly called as it implies user intent to save
     if (file) {
       const dirty = new Set(this.dirtyFiles.value);

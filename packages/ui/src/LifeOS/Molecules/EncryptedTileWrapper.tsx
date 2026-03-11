@@ -1,36 +1,51 @@
-import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import {
+  decrypt,
+  encrypt,
+  githubFileStore,
+  Logger,
+  passwordStore,
+  unlockedFiles,
+} from '@lifosy/core';
 import { useSignal } from '@preact/signals';
-import { TileDef } from '../Layouts/MainApp';
-import { passwordStore, unlockedFiles, decrypt, encrypt, githubFileStore, Logger } from '@lifosy/core';
+import { useEffect } from 'preact/hooks';
+import type { TileDef } from '../Layouts/MainApp';
 
 const logger = new Logger('EncryptedTile');
-import { Lock, Unlock, AlertTriangle, Loader2 } from 'lucide-preact';
-import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
+
+import { AlertTriangle, Loader2, Lock, Unlock } from 'lucide-preact';
+import { MonoHeader, MonoText } from '../Atoms/Typography';
 
 export interface EncryptedTileWrapperProps {
   tile: TileDef;
   onUnlocked?: (decryptedContent: string) => void;
   // Fallback renderer if we want to render the original children when unlocked.
-  children?: (decryptedContent: string, handleEncryptedContentChange: (newDecryptedContent: string) => void) => preact.ComponentChildren;
+  children?: (
+    decryptedContent: string,
+    handleEncryptedContentChange: (newDecryptedContent: string) => void,
+  ) => preact.ComponentChildren;
   mode?: 'SMALL' | 'FOCUS' | 'MOBILE_COLLAPSED' | 'MOBILE_EXPANDED';
 }
 
-type FlowState = 
-  | { status: 'LOADING' } 
+type FlowState =
+  | { status: 'LOADING' }
   | { status: 'LOCKED'; error?: string }
   | { status: 'DECRYPTING' }
   | { status: 'UNLOCKED'; content: string };
 
-export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL' }: EncryptedTileWrapperProps) => {
+export const EncryptedTileWrapper = ({
+  tile,
+  onUnlocked,
+  children,
+  mode = 'SMALL',
+}: EncryptedTileWrapperProps) => {
   const password = useSignal('');
   const remember = useSignal(false);
-  
+
   // Use a local state signal to represent the precise FSM status of this specific wrapper instance.
   // Default to LOADING if we haven't received rawContent from the network yet.
   const flow = useSignal<FlowState>({ status: 'LOADING' });
   const path = String(tile.id);
-  
+
   // React to store changes (this ensures if another tile unlocks it, we know)
   const isGlobalUnlocked = unlockedFiles.value[path];
 
@@ -63,7 +78,7 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
         flow.value = { status: 'LOCKED' };
       }
     }
-  }, [tile.rawContent, isGlobalUnlocked, path, flow.value.status]);
+  }, [tile.rawContent, isGlobalUnlocked, path, flow.value.status, flow]);
 
   // FSM Transition: Attempting Auto-Decrypt
   useEffect(() => {
@@ -76,21 +91,23 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
       const activePw = storedPw || password.value;
 
       if (!activePw) {
-         flow.value = { status: 'LOCKED' };
-         return;
+        flow.value = { status: 'LOCKED' };
+        return;
       }
 
-      decrypt(tile.rawContent, activePw).then(dec => {
+      decrypt(tile.rawContent, activePw)
+        .then((dec) => {
           flow.value = { status: 'UNLOCKED', content: dec };
           onUnlocked?.(dec);
           if (password.value) passwordStore.setPassword(path, password.value, remember.value);
-      }).catch((err) => {
-          logger.error('Decryption failed for ' + path, err);
+        })
+        .catch((err) => {
+          logger.error(`Decryption failed for ${path}`, err);
           if (storedPw) passwordStore.clearPassword(path);
           flow.value = { status: 'LOCKED', error: 'Incorrect password or corrupted file.' };
-      });
+        });
     }
-  }, [flow.value.status, tile.rawContent, path]);
+  }, [flow.value.status, tile.rawContent, path, password.value, remember.value, onUnlocked, flow]);
 
   const handleManualSubmit = (e: Event) => {
     e.preventDefault();
@@ -109,51 +126,61 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
 
   // Render: Unlocked Flow
   if (flow.value.status === 'UNLOCKED' && childFn) {
-      const handleSave = async (newDecrypted: string) => {
-          try {
-            // Inner widget wants to save changes. We must encrypt them first.
-            const storedPw = passwordStore.getPassword(path);
-            if (!storedPw) throw new Error('Password lost during session');
-            
-            const newEncrypted = await encrypt(newDecrypted, storedPw);
-            tile.onContentChange?.(newEncrypted);
-            
-            // Optimistically update our local FSM
-            flow.value = { status: 'UNLOCKED', content: newDecrypted };
-          } catch (e: any) {
-            logger.error('Failed to save encrypted file', e);
-          }
-      };
-      
-      return <>{childFn(flow.value.content, handleSave)}</>;
+    const handleSave = async (newDecrypted: string) => {
+      try {
+        // Inner widget wants to save changes. We must encrypt them first.
+        const storedPw = passwordStore.getPassword(path);
+        if (!storedPw) throw new Error('Password lost during session');
+
+        const newEncrypted = await encrypt(newDecrypted, storedPw);
+        tile.onContentChange?.(newEncrypted);
+
+        // Optimistically update our local FSM
+        flow.value = { status: 'UNLOCKED', content: newDecrypted };
+      } catch (e: any) {
+        logger.error('Failed to save encrypted file', e);
+      }
+    };
+
+    return <>{childFn(flow.value.content, handleSave)}</>;
   }
 
   // Render: Lock Screen & Loading
   const isFocus = mode === 'FOCUS';
   const stateStatus = flow.value.status;
   const isPending = stateStatus === 'LOADING' || stateStatus === 'DECRYPTING';
-  
+
   return (
     <div className="w-full h-full flex items-center justify-center p-4 bg-[var(--los-bg)] text-[var(--los-fg)] flex-col gap-4">
-      <div className={`flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-[var(--los-border)] rounded-md ${isFocus ? 'max-w-md w-full' : 'w-full h-full'}`}>
+      <div
+        className={`flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-[var(--los-border)] rounded-md ${isFocus ? 'max-w-md w-full' : 'w-full h-full'}`}
+      >
         <div className="mb-4 text-[var(--los-muted)]">
-          {isPending ? <Loader2 size={isFocus ? 48 : 24} className="animate-spin" /> : <Lock size={isFocus ? 48 : 24} />}
+          {isPending ? (
+            <Loader2 size={isFocus ? 48 : 24} className="animate-spin" />
+          ) : (
+            <Lock size={isFocus ? 48 : 24} />
+          )}
         </div>
-        
+
         {isFocus && <MonoHeader className="mb-2">Encrypted File</MonoHeader>}
-        {stateStatus === 'LOADING' && <MonoText className="text-[var(--los-muted)] mb-4">Fetching content...</MonoText>}
-        
+        {stateStatus === 'LOADING' && (
+          <MonoText className="text-[var(--los-muted)] mb-4">Fetching content...</MonoText>
+        )}
+
         <form onSubmit={handleManualSubmit} className="flex flex-col items-center w-full gap-4">
           <input
             type="password"
             autoComplete="current-password"
             value={password.value}
-            onInput={(e) => password.value = e.currentTarget.value}
+            onInput={(e) => {
+              password.value = e.currentTarget.value;
+            }}
             placeholder="Enter password..."
             className="w-full bg-[var(--los-bg)] border-b border-[var(--los-border)] py-2 text-center font-mono text-sm focus:outline-none focus:border-[var(--los-accent)]"
             disabled={isPending}
           />
-          
+
           {stateStatus === 'LOCKED' && flow.value.error && (
             <div className="text-red-500 text-xs flex items-center justify-center gap-1 animate-in zoom-in-95">
               <AlertTriangle size={12} />
@@ -162,15 +189,21 @@ export const EncryptedTileWrapper = ({ tile, onUnlocked, children, mode = 'SMALL
           )}
 
           {isFocus && (
-            <label className={`flex items-center gap-2 cursor-pointer mt-2 group text-xs text-[var(--los-muted)] ${isPending && 'opacity-50'}`}>
+            <label
+              className={`flex items-center gap-2 cursor-pointer mt-2 group text-xs text-[var(--los-muted)] ${isPending && 'opacity-50'}`}
+            >
               <input
                 type="checkbox"
                 checked={remember.value}
-                onChange={(e) => remember.value = e.currentTarget.checked}
+                onChange={(e) => {
+                  remember.value = e.currentTarget.checked;
+                }}
                 className="accent-[var(--los-accent)]"
                 disabled={isPending}
               />
-              <span className="group-hover:text-[var(--los-fg)] transition-colors">Remember Password</span>
+              <span className="group-hover:text-[var(--los-fg)] transition-colors">
+                Remember Password
+              </span>
             </label>
           )}
 

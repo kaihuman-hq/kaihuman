@@ -1,13 +1,10 @@
-import { defineConfig } from 'vite';
+import { resolve } from 'node:path';
 import preact from '@preact/preset-vite';
+import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
-import { resolve } from 'path';
 
 export default defineConfig({
-  plugins: [
-    preact(),
-    dts({ include: ['src'] })
-  ],
+  plugins: [preact(), dts({ include: ['src'] })],
   resolve: {
     alias: {
       react: 'preact/compat',

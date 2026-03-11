@@ -5,14 +5,14 @@
 // Helper to derive a key from a password
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const enc = new TextEncoder();
-  
+
   // Import the password as key material
   const keyMaterial = await window.crypto.subtle.importKey(
     'raw',
     enc.encode(password),
     { name: 'PBKDF2' },
     false,
-    ['deriveBits', 'deriveKey']
+    ['deriveBits', 'deriveKey'],
   );
 
   // Derive the AES-GCM key using PBKDF2
@@ -21,12 +21,12 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
       name: 'PBKDF2',
       salt: salt.buffer as ArrayBuffer,
       iterations: 100000,
-      hash: 'SHA-256'
+      hash: 'SHA-256',
     },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     true,
-    ['encrypt', 'decrypt']
+    ['encrypt', 'decrypt'],
   );
 }
 
@@ -58,28 +58,28 @@ function hexToBuffer(hexString: string): Uint8Array {
  */
 export async function encrypt(text: string, password: string): Promise<string> {
   const enc = new TextEncoder();
-  
+
   // Generate random salt and IV
   const salt = window.crypto.getRandomValues(new Uint8Array(16));
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  
+
   const key = await deriveKey(password, salt);
-  
+
   const cipherBuffer = await window.crypto.subtle.encrypt(
     {
       name: 'AES-GCM',
-      iv: iv.buffer as ArrayBuffer
+      iv: iv.buffer as ArrayBuffer,
     },
     key,
-    enc.encode(text)
+    enc.encode(text),
   );
-  
+
   const saltHex = bufferToHex(salt.buffer);
   const ivHex = bufferToHex(iv.buffer);
   const cipherHex = bufferToHex(cipherBuffer);
-  
+
   const rawHex = `${saltHex}:${ivHex}:${cipherHex}`;
-  
+
   // Base64 encode the string to prevent transmission truncation or formatting issues
   // in GitHub text files / JSON stringification.
   return btoa(rawHex);
@@ -104,25 +104,26 @@ export async function decrypt(encryptedHex: string, password: string): Promise<s
 
   const parts = cleanedStr.split(':');
   if (parts.length !== 3) {
-    throw new Error('Invalid encrypted format. The file is corrupted, empty, or not encrypted. Expected salt:iv:ciphertext.');
+    throw new Error(
+      'Invalid encrypted format. The file is corrupted, empty, or not encrypted. Expected salt:iv:ciphertext.',
+    );
   }
-  
-  
+
   const salt = hexToBuffer(parts[0]!);
   const iv = hexToBuffer(parts[1]!);
   const cipherText = hexToBuffer(parts[2]!);
-  
+
   const key = await deriveKey(password, salt);
-  
+
   const decryptedBuffer = await window.crypto.subtle.decrypt(
     {
       name: 'AES-GCM',
-      iv: iv.buffer as ArrayBuffer
+      iv: iv.buffer as ArrayBuffer,
     },
     key,
-    cipherText.buffer as ArrayBuffer
+    cipherText.buffer as ArrayBuffer,
   );
-  
+
   const dec = new TextDecoder();
   return dec.decode(decryptedBuffer);
 }

@@ -1,7 +1,5 @@
-import { h } from 'preact';
 import { useState } from 'preact/hooks';
-import { MonoText, MonoHeader } from '../../Atoms/Typography';
-import { cn } from '../../../utils';
+import { MonoHeader } from '../../Atoms/Typography';
 
 interface ActionLogAddFormProps {
   onAdd: (description: string, tags: string[]) => void;
@@ -16,7 +14,10 @@ export const ActionLogAddForm = ({ onAdd, onCancel }: ActionLogAddFormProps) => 
     e.preventDefault();
     if (!description.trim()) return;
 
-    const tags = tagsInput.split(',').map(t => t.trim()).filter(t => !!t);
+    const tags = tagsInput
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => !!t);
     onAdd(description, tags);
     setDescription('');
     setTagsInput('');
@@ -28,6 +29,7 @@ export const ActionLogAddForm = ({ onAdd, onCancel }: ActionLogAddFormProps) => 
         <MonoHeader>ADD ACTION</MonoHeader>
         {onCancel && (
           <button
+            type="button"
             onClick={onCancel}
             className="text-xs text-[var(--los-muted)] hover:text-[var(--los-fg)] px-2 py-1"
           >
@@ -38,10 +40,14 @@ export const ActionLogAddForm = ({ onAdd, onCancel }: ActionLogAddFormProps) => 
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
-          <label className="block text-[10px] text-[var(--los-muted)] mb-1 uppercase tracking-wider">
+          <label
+            for="action-log-description"
+            className="block text-[10px] text-[var(--los-muted)] mb-1 uppercase tracking-wider"
+          >
             Description
           </label>
           <textarea
+            id="action-log-description"
             value={description}
             onInput={(e) => setDescription(e.currentTarget.value)}
             className="w-full bg-[var(--los-bg)] border border-[var(--los-border)] p-2 text-xs text-[var(--los-fg)] outline-none focus:border-[var(--los-accent)] transition-colors min-h-[80px]"
@@ -52,15 +58,18 @@ export const ActionLogAddForm = ({ onAdd, onCancel }: ActionLogAddFormProps) => 
                 handleSubmit(e);
               }
             }}
-            autoFocus
           />
         </div>
 
         <div>
-          <label className="block text-[10px] text-[var(--los-muted)] mb-1 uppercase tracking-wider">
+          <label
+            for="action-log-tags"
+            className="block text-[10px] text-[var(--los-muted)] mb-1 uppercase tracking-wider"
+          >
             Tags (comma separated)
           </label>
           <input
+            id="action-log-tags"
             type="text"
             value={tagsInput}
             onInput={(e) => setTagsInput(e.currentTarget.value)}
