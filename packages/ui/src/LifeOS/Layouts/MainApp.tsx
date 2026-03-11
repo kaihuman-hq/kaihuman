@@ -1541,6 +1541,7 @@ export const MainApp = ({
                 zenMode={zenMode}
                 onToggleZenMode={() => setZenMode((prev) => !prev)}
                 onAddToReadItLater={onAddToReadItLater}
+                onCreateFile={onCreateFile}
                 initialViewMode={focusedViewMode}
                 onAddToDashboard={
                   config
@@ -1995,6 +1996,7 @@ const FocusedTileInternal = ({
   onToggleZenMode,
   onAddToReadItLater,
   onAddToDashboard,
+  onCreateFile,
   initialViewMode = 'WIDGET',
 }: {
   tile: TileDef;
@@ -2009,6 +2011,7 @@ const FocusedTileInternal = ({
   onToggleZenMode?: () => void;
   onAddToReadItLater?: (item: ReadItLaterItem) => void;
   onAddToDashboard?: (path: string) => void;
+  onCreateFile?: (path: string, content: string) => Promise<void> | void;
   initialViewMode?: string;
 }) => {
   if (!tile) return null;
@@ -2100,6 +2103,7 @@ const FocusedTileInternal = ({
               onToggleZenMode={onToggleZenMode}
               onAddToReadItLater={onAddToReadItLater}
               onAddToDashboard={onAddToDashboard}
+              onCreateFile={onCreateFile}
               initialViewMode={initialViewMode}
             />
           );
