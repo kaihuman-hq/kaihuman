@@ -9,6 +9,7 @@ import {
   Pencil,
   PlayCircle,
   Plus,
+  Search,
   Tags,
   Trash2,
   X,
@@ -667,6 +668,7 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
   const [dragOverStatus, setDragOverStatus] = useState<TodoStatus | null>(null);
   const [focusedFile, setFocusedFile] = useState<string>('');
   const [assignMode, setAssignMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showRecentOnly, setShowRecentOnly] = useState<Record<TodoStatus, boolean>>({
     backlog: false,
     'in-progress': false,
@@ -714,17 +716,24 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
 
   // Aggregate all items
   const allItems = useMemo<AggregatedItem[]>(() => {
+    const q = searchQuery.trim().toLowerCase();
     const result: AggregatedItem[] = [];
     for (const { path, data } of parsedFiles) {
       if (focusedFile && path !== focusedFile) continue;
       data.items.forEach((item, idx) => {
         if (milestoneFilter && item.milestoneId !== milestoneFilter) return;
         if (showUpcoming && upcomingMilestone && item.milestoneId !== upcomingMilestone.id) return;
+        if (q) {
+          const matchesText = item.text.toLowerCase().includes(q);
+          const matchesTag = item.tags.some((t) => t.toLowerCase().includes(q));
+          const matchesMilestone = !!item.milestoneId?.toLowerCase().includes(q);
+          if (!matchesText && !matchesTag && !matchesMilestone) return;
+        }
         result.push({ item, itemIndex: idx, filePath: path });
       });
     }
     return result;
-  }, [parsedFiles, milestoneFilter, showUpcoming, upcomingMilestone, focusedFile]);
+  }, [parsedFiles, milestoneFilter, showUpcoming, upcomingMilestone, focusedFile, searchQuery]);
 
   const focusedFileData = useMemo(
     () => parsedFiles.find((f) => f.path === focusedFile)?.data ?? null,
@@ -764,8 +773,8 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
   return (
     <div className="h-[calc(100vh-3rem)] md:h-[calc(100vh-2rem)] w-screen flex flex-col bg-[var(--los-bg)] text-[var(--los-fg)] overflow-hidden">
       {/* Header */}
-      <div className="h-14 border-b border-[var(--los-border)] flex items-center justify-between px-6 shrink-0">
-        <div className="flex items-center gap-4">
+      <div className="h-14 border-b border-[var(--los-border)] flex items-center gap-4 px-6 shrink-0">
+        <div className="flex items-center gap-4 shrink-0">
           {onNavigateBack && (
             <button
               type="button"
@@ -809,7 +818,28 @@ export const KanbanBoard = ({ onNavigateBack, onAnalyticsClick }: KanbanBoardPro
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Search */}
+        <div className="flex-1 flex items-center gap-1.5 border border-[var(--los-border)] px-2 py-1 focus-within:border-[var(--los-accent)] transition-colors min-w-0 max-w-xs">
+          <Search size={11} className="text-[var(--los-muted)] shrink-0" />
+          <input
+            type="text"
+            value={searchQuery}
+            onInput={(e) => setSearchQuery(e.currentTarget.value)}
+            placeholder="Search tasks…"
+            className="flex-1 bg-transparent text-[10px] font-mono outline-none text-[var(--los-fg)] placeholder:text-[var(--los-muted)] min-w-0"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="text-[var(--los-muted)] hover:text-[var(--los-fg)] transition-colors shrink-0"
+            >
+              <X size={10} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
           {upcomingMilestone && (
             <button
               type="button"
