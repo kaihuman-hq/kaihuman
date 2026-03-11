@@ -567,12 +567,15 @@ const MilestoneManager = ({
 const KanbanCard = ({
   agg,
   onStatusChange,
+  onOpenFile,
 }: {
   agg: AggregatedItem;
   onStatusChange: (filePath: string, itemIndex: number, newStatus: TodoStatus) => void;
+  onOpenFile?: (path: string) => void;
 }) => {
   const { item, filePath } = agg;
   const { name: fileName } = formatFilePath(filePath);
+  const promptRefFile = item.prompt?.refFile;
 
   const handleDragStart = (e: DragEvent) => {
     e.dataTransfer?.setData(
@@ -608,13 +611,29 @@ const KanbanCard = ({
         <MonoText className="text-[9px] text-[var(--los-muted)] opacity-60 truncate max-w-[60%]">
           {fileName}
         </MonoText>
-        <button
-          type="button"
-          onClick={() => onStatusChange(filePath, agg.itemIndex, NEXT_STATUS[item.status])}
-          className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors opacity-0 group-hover:opacity-100"
-        >
-          → {STATUS_LABELS[NEXT_STATUS[item.status]]}
-        </button>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {promptRefFile && onOpenFile && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenFile(promptRefFile);
+              }}
+              title={`Open prompt: ${promptRefFile}`}
+              className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors flex items-center gap-1"
+            >
+              <Pencil size={9} />
+              PROMPT
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onStatusChange(filePath, agg.itemIndex, NEXT_STATUS[item.status])}
+            className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors"
+          >
+            → {STATUS_LABELS[NEXT_STATUS[item.status]]}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1124,6 +1143,7 @@ export const KanbanBoard = ({
                         key={`${agg.filePath}-${agg.itemIndex}`}
                         agg={agg}
                         onStatusChange={handleStatusChange}
+                        onOpenFile={onOpenFile}
                       />
                     ))
                   )}
