@@ -11,6 +11,7 @@ export const KanbanBoardPage = () => (
         await githubFileStore.createFile(path, content);
       }}
       onOpenFile={(path) => {
+        layoutStore.view.value = 'FILES';
         layoutStore.navigate(path);
         route('/');
       }}

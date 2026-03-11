@@ -2698,7 +2698,8 @@ const FocusedTileInternal = ({
                       const filePath = promptRef.prompt.refFile;
                       if (filePath && onCreateFile) await onCreateFile(filePath, '');
                       if (filePath && promptRef.openAfter) {
-                        setActiveTileId(filePath);
+                        layoutStore.view.value = 'FILES';
+                        layoutStore.navigate(filePath);
                       }
                     }
                   }}
