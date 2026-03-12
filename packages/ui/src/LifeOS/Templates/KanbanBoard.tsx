@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Circle,
+  Palette,
   Pencil,
   PlayCircle,
   Plus,
@@ -57,6 +58,19 @@ const NEXT_STATUS: Record<TodoStatus, TodoStatus> = {
 };
 
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+
+const BADGE_COLORS = [
+  '#60a5fa', // blue
+  '#4ade80', // green
+  '#f59e0b', // amber
+  '#f472b6', // pink
+  '#a78bfa', // violet
+  '#34d399', // emerald
+  '#fb923c', // orange
+  '#38bdf8', // sky
+  '#e879f9', // fuchsia
+  '#a3e635', // lime
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -599,10 +613,12 @@ const KanbanCard = ({
   agg,
   onStatusChange,
   onOpenFile,
+  borderColor,
 }: {
   agg: AggregatedItem;
   onStatusChange: (filePath: string, itemIndex: number, newStatus: TodoStatus) => void;
   onOpenFile?: (path: string) => void;
+  borderColor?: string;
 }) => {
   const { item, filePath } = agg;
   const { name: fileName } = formatFilePath(filePath);
@@ -621,7 +637,8 @@ const KanbanCard = ({
     <div
       draggable
       onDragStart={handleDragStart}
-      className="border border-[var(--los-border)] bg-[var(--los-bg)] p-3 space-y-2 hover:border-[var(--los-accent)]/50 transition-colors group cursor-grab active:cursor-grabbing active:opacity-50"
+      style={borderColor ? { borderColor } : undefined}
+      className="border border-[var(--los-border)] bg-[var(--los-bg)] p-3 space-y-2 hover:opacity-90 transition-colors group cursor-grab active:cursor-grabbing active:opacity-50"
     >
       <MonoText className="text-xs leading-relaxed break-words">{item.text}</MonoText>
 
@@ -830,6 +847,7 @@ export const KanbanBoard = ({
     done: true,
     rejected: true,
   });
+  const [colorMode, setColorMode] = useState(false);
 
   // Find all .todos.md files in the tree and open them
   const todoFilePaths = useMemo(
@@ -894,6 +912,29 @@ export const KanbanBoard = ({
     () => parsedFiles.find((f) => f.path === focusedFile)?.data ?? null,
     [parsedFiles, focusedFile],
   );
+
+  // Sort file paths by most recently added item (newest first)
+  const sortedFilePaths = useMemo(() => {
+    return [...todoFilePaths].sort((a, b) => {
+      const latestOf = (fp: string) =>
+        parsedFiles
+          .find((f) => f.path === fp)
+          ?.data.items.map((i) => i.createdAt ?? '')
+          .filter(Boolean)
+          .sort()
+          .at(-1) ?? '';
+      return latestOf(b).localeCompare(latestOf(a));
+    });
+  }, [todoFilePaths, parsedFiles]);
+
+  // Assign a stable color to each file path (based on sorted order)
+  const fileColors = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    sortedFilePaths.forEach((fp, i) => {
+      map[fp] = BADGE_COLORS[i % BADGE_COLORS.length];
+    });
+    return map;
+  }, [sortedFilePaths]);
 
   const handleStatusChange = (filePath: string, itemIndex: number, newStatus: TodoStatus) => {
     const file = openFiles[filePath];
@@ -1039,6 +1080,21 @@ export const KanbanBoard = ({
 
           <button
             type="button"
+            onClick={() => setColorMode((v) => !v)}
+            className={cn(
+              'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
+              colorMode
+                ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)]',
+            )}
+            title="Toggle list colors"
+          >
+            <Palette size={10} />
+            COLOR
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowMilestoneManager(true)}
             className="flex items-center gap-1.5 text-[10px] font-mono border border-[var(--los-border)] px-2 py-1 text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
           >
@@ -1059,6 +1115,53 @@ export const KanbanBoard = ({
           )}
         </div>
       </div>
+
+      {/* List badges row */}
+      {todoFilePaths.length > 1 && (
+        <div className="border-b border-[var(--los-border)] flex items-center gap-2 px-4 py-2 overflow-x-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => setFocusedFile('')}
+            className={cn(
+              'text-[10px] font-mono border px-2 py-0.5 shrink-0 transition-colors whitespace-nowrap',
+              !focusedFile
+                ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
+            )}
+          >
+            ALL
+          </button>
+          <div className="w-px h-4 bg-[var(--los-border)] shrink-0" />
+          {sortedFilePaths.map((fp) => {
+            const { name } = formatFilePath(fp);
+            const isActive = focusedFile === fp;
+            const color = colorMode ? fileColors[fp] : undefined;
+            return (
+              <button
+                key={fp}
+                type="button"
+                onClick={() => setFocusedFile(isActive ? '' : fp)}
+                style={
+                  color ? { borderColor: color, color: isActive ? color : undefined } : undefined
+                }
+                className={cn(
+                  'text-[10px] font-mono border px-2 py-0.5 shrink-0 transition-colors whitespace-nowrap',
+                  isActive
+                    ? colorMode
+                      ? 'opacity-100 bg-white/5'
+                      : 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                    : colorMode
+                      ? 'opacity-50 hover:opacity-100'
+                      : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
+                )}
+                title={fp}
+              >
+                {name}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Assign Mode */}
       {assignMode && focusedFile && focusedFileData ? (
@@ -1083,7 +1186,9 @@ export const KanbanBoard = ({
         <div className="flex-1 overflow-x-auto overflow-y-hidden flex">
           {COLUMNS.map((col) => {
             const colItems = allItems.filter((a) => a.item.status === col.status);
-            const filteredItems = filterByAge(colItems, showRecentOnly[col.status]);
+            const filteredItems = filterByAge(colItems, showRecentOnly[col.status]).sort((a, b) =>
+              (b.item.createdAt ?? '').localeCompare(a.item.createdAt ?? ''),
+            );
             const ColIcon = col.icon;
             const isFiltered = showRecentOnly[col.status];
             return (
@@ -1175,6 +1280,7 @@ export const KanbanBoard = ({
                         agg={agg}
                         onStatusChange={handleStatusChange}
                         onOpenFile={onOpenFile}
+                        borderColor={colorMode ? fileColors[agg.filePath] : undefined}
                       />
                     ))
                   )}
