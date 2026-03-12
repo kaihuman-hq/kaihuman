@@ -20,6 +20,7 @@ export * from './LifeOS/Organisms/Widgets/ReadItLaterLogic';
 export * from './LifeOS/Organisms/WikiView';
 export * from './LifeOS/Templates/AIPanel';
 export * from './LifeOS/Templates/KanbanBoard';
+export * from './LifeOS/Templates/Login';
 export * from './LifeOS/Templates/TodoAnalytics';
 export * from './LifeOS/types';
 export * from './utils';
