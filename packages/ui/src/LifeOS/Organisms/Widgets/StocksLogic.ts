@@ -84,7 +84,7 @@ export function serializeStocks(entries: StockEntry[]): string {
     const ts = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     return `${ts};${e.value};${e.invest}`;
   });
-  return lines.join('\n') + (lines.length ? '\n' : '');
+  return `${lines.join('\n')}${lines.length ? '\n' : ''}`;
 }
 
 export function addEntry(content: string, value: number, invest: number, date?: Date): string {
@@ -97,7 +97,6 @@ export function addEntry(content: string, value: number, invest: number, date?: 
 // ─── Period key helpers ────────────────────────────────────────────────────────
 
 function getWeekKey(d: Date): string {
-  // ISO week number
   const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   tmp.setUTCDate(tmp.getUTCDate() + 4 - (tmp.getUTCDay() || 7));
   const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
@@ -120,7 +119,7 @@ function periodKey(d: Date, period: StockPeriod): string {
 }
 
 function shortLabel(key: string, period: StockPeriod): string {
-  if (period === 'weekly') return key.replace(/^\d{4}-/, ''); // W12
+  if (period === 'weekly') return key.replace(/^\d{4}-/, '');
   if (period === 'monthly') {
     const [, mm] = key.split('-');
     return mm ?? key;
@@ -133,7 +132,6 @@ function shortLabel(key: string, period: StockPeriod): string {
 export function aggregateByPeriod(entries: StockEntry[], period: StockPeriod): PeriodPoint[] {
   if (entries.length === 0) return [];
 
-  // Latest entry per period
   const map = new Map<string, StockEntry>();
   for (const e of entries) {
     map.set(periodKey(e.timestamp, period), e);
@@ -170,6 +168,12 @@ export interface StockStats {
   latestProfitPct: number;
   changeVsPrev: number | null;
   changeVsPrevPct: number | null;
+  /** Compound Annual Growth Rate (requires ≥2 entries spanning >1 year) */
+  cagr: number | null;
+  /** All-time high value across all entries */
+  allTimeHigh: number;
+  /** Drawdown from ATH as a negative percentage */
+  drawdownPct: number;
 }
 
 export function getStats(entries: StockEntry[]): StockStats | null {
@@ -183,6 +187,19 @@ export function getStats(entries: StockEntry[]): StockStats | null {
   const changeVsPrevPct =
     prev && prev.value > 0 ? ((latest.value - prev.value) / prev.value) * 100 : null;
 
+  // CAGR: only meaningful if span ≥ 1 year
+  let cagr: number | null = null;
+  const first = entries[0] as StockEntry;
+  const yearsElapsed =
+    (latest.timestamp.getTime() - first.timestamp.getTime()) / (365.25 * 24 * 3600 * 1000);
+  if (yearsElapsed >= 1 && first.value > 0) {
+    cagr = ((latest.value / first.value) ** (1 / yearsElapsed) - 1) * 100;
+  }
+
+  // ATH and drawdown
+  const allTimeHigh = Math.max(...entries.map((e) => e.value));
+  const drawdownPct = allTimeHigh > 0 ? ((latest.value - allTimeHigh) / allTimeHigh) * 100 : 0;
+
   return {
     latestValue: latest.value,
     latestInvest: latest.invest,
@@ -190,17 +207,160 @@ export function getStats(entries: StockEntry[]): StockStats | null {
     latestProfitPct,
     changeVsPrev,
     changeVsPrevPct,
+    cagr,
+    allTimeHigh,
+    drawdownPct,
   };
 }
 
 // ─── Forecast ─────────────────────────────────────────────────────────────────
 
-export interface ForecastResult {
-  yearEndValue: number;
-  r2: number; // coefficient of determination
+/** A projected period point (future, not observed). */
+export interface ForecastPoint {
+  label: string;
+  value: number;
 }
 
-/** Linear regression on all entries, project to Dec 31 of current year. */
+export interface PeriodForecast {
+  /** Future periods projected until year-end (or next 2 years for yearly). */
+  forecastPoints: ForecastPoint[];
+  /** Projected value on the last period of the current year. null if no future periods. */
+  yearEndValue: number | null;
+  /** Projected profit at year-end based on latest known invest amount. */
+  yearEndProfit: number | null;
+  /** Average period-over-period growth used as basis for the trend. */
+  avgGrowthPct: number;
+  /** How many remaining periods are projected. */
+  periodsRemaining: number;
+  /** R² of the linear fit on recent aggregated data. */
+  r2: number;
+}
+
+// How many past periods to include in the regression per time scale.
+const LOOKBACK: Record<StockPeriod, number> = {
+  weekly: 52,
+  monthly: 24,
+  yearly: 999,
+};
+
+function linearRegressionOnIndices(ys: number[]): {
+  slope: number;
+  intercept: number;
+  r2: number;
+} {
+  const n = ys.length;
+  if (n < 2) return { slope: 0, intercept: ys[0] ?? 0, r2: 0 };
+
+  const meanX = (n - 1) / 2;
+  const meanY = ys.reduce((a, b) => a + b, 0) / n;
+
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (i - meanX) * ((ys[i] as number) - meanY);
+    den += (i - meanX) ** 2;
+  }
+  if (den === 0) return { slope: 0, intercept: meanY, r2: 0 };
+
+  const slope = num / den;
+  const intercept = meanY - slope * meanX;
+
+  const ssTot = ys.reduce((a, y) => a + (y - meanY) ** 2, 0);
+  const ssRes = ys.reduce((a, y, i) => a + (y - (slope * i + intercept)) ** 2, 0);
+  const r2 = ssTot > 0 ? 1 - ssRes / ssTot : 1;
+
+  return { slope, intercept, r2 };
+}
+
+function getRemainingPeriodLabels(period: StockPeriod, after: Date): string[] {
+  const today = after;
+  const year = today.getFullYear();
+  const labels: string[] = [];
+
+  if (period === 'monthly') {
+    // Remaining full months after the current one
+    const currentMonth = today.getMonth(); // 0-based
+    for (let m = currentMonth + 1; m <= 11; m++) {
+      labels.push(String(m + 1).padStart(2, '0'));
+    }
+  } else if (period === 'weekly') {
+    const currentWeekKey = getWeekKey(today);
+    const currentWeek = parseInt(currentWeekKey.split('-W')[1] ?? '0', 10);
+    for (let w = currentWeek + 1; w <= 52; w++) {
+      labels.push(`W${String(w).padStart(2, '0')}`);
+    }
+  } else {
+    // yearly: project the next 2 years
+    labels.push(String(year + 1));
+    labels.push(String(year + 2));
+  }
+
+  return labels;
+}
+
+/**
+ * Build a period-aware forecast using linear regression on aggregated period indices.
+ *
+ * Lookback window: 52 weeks / 24 months / all years.
+ * Projects forward through remaining periods of the current year (weekly/monthly)
+ * or the next 2 years (yearly).
+ */
+export function buildPeriodForecast(
+  aggregated: PeriodPoint[],
+  period: StockPeriod,
+): PeriodForecast | null {
+  if (aggregated.length < 2) return null;
+
+  const recent = aggregated.slice(-LOOKBACK[period]);
+  const ys = recent.map((p) => p.value);
+  const { slope, intercept, r2 } = linearRegressionOnIndices(ys);
+
+  // Average period-over-period % growth
+  const growthRates: number[] = [];
+  for (let i = 1; i < recent.length; i++) {
+    const prev = recent[i - 1] as PeriodPoint;
+    const curr = recent[i] as PeriodPoint;
+    if (prev.value > 0) growthRates.push(((curr.value - prev.value) / prev.value) * 100);
+  }
+  const avgGrowthPct =
+    growthRates.length > 0 ? growthRates.reduce((a, b) => a + b, 0) / growthRates.length : 0;
+
+  // Remaining period labels from the last known aggregated period's date perspective
+  const remainingLabels = getRemainingPeriodLabels(period, new Date());
+  const periodsRemaining = remainingLabels.length;
+
+  // Project forward from the end of the lookback window
+  const baseIndex = recent.length;
+  const forecastPoints: ForecastPoint[] = remainingLabels.map((label, i) => ({
+    label,
+    value: Math.max(0, slope * (baseIndex + i) + intercept),
+  }));
+
+  const lastForecast = forecastPoints[forecastPoints.length - 1];
+  const yearEndValue = lastForecast ? lastForecast.value : null;
+
+  const latestInvest = (aggregated[aggregated.length - 1] as PeriodPoint).invest;
+  const yearEndProfit = yearEndValue !== null ? yearEndValue - latestInvest : null;
+
+  return {
+    forecastPoints,
+    yearEndValue,
+    yearEndProfit,
+    avgGrowthPct,
+    periodsRemaining,
+    r2,
+  };
+}
+
+/**
+ * Legacy: linear regression on raw timestamps → year-end projection.
+ * Kept for backward compatibility. Prefer buildPeriodForecast for display.
+ */
+export interface ForecastResult {
+  yearEndValue: number;
+  r2: number;
+}
+
 export function forecastYearEnd(entries: StockEntry[]): ForecastResult | null {
   if (entries.length < 2) return null;
 
@@ -225,7 +385,6 @@ export function forecastYearEnd(entries: StockEntry[]): ForecastResult | null {
   const yearEnd = new Date(new Date().getFullYear(), 11, 31).getTime();
   const yearEndValue = slope * yearEnd + intercept;
 
-  // R²
   const ssTot = ys.reduce((a, y) => a + (y - meanY) ** 2, 0);
   const ssRes = ys.reduce((a, y, i) => a + (y - (slope * (xs[i] as number) + intercept)) ** 2, 0);
   const r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0;
