@@ -1,4 +1,4 @@
-import { githubFileStore } from '@lifosy/core';
+import { githubFileStore, layoutStore } from '@lifosy/core';
 import {
   ArrowLeft,
   BarChart2,
@@ -844,6 +844,7 @@ export const KanbanBoard = ({
 }: KanbanBoardProps) => {
   const openFiles = githubFileStore.openFiles.value;
   const tree = githubFileStore.tree.value;
+  const remoteConfig = layoutStore.remoteConfig.value;
 
   // When navigating directly to /board, the tree may not be loaded yet.
   // The dashboard normally triggers loadTree(), so we do it here if needed.
@@ -852,6 +853,42 @@ export const KanbanBoard = ({
       githubFileStore.loadTree();
     }
   }, []);
+
+  // When navigating directly to /board, the dashboard config may not be loaded yet.
+  // Load it from the tree if available and not already in the store.
+  useEffect(() => {
+    if (!tree || tree.length === 0) return;
+    if (layoutStore.remoteConfig.peek()) return; // already loaded by Dashboard
+
+    const CONFIG_PATH = '.lifeos/.dashboard.config.json';
+    const configItem = tree.find((t) => t.path === CONFIG_PATH);
+
+    const loadConfig = async () => {
+      if (configItem) {
+        try {
+          let content = githubFileStore.openFiles.peek()[CONFIG_PATH]?.content;
+          if (!content) {
+            await githubFileStore.openFile(CONFIG_PATH);
+            content = githubFileStore.openFiles.peek()[CONFIG_PATH]?.content;
+          }
+          if (content) {
+            layoutStore.remoteConfig.value = JSON.parse(content);
+            return;
+          }
+        } catch {
+          // fall through to default
+        }
+      }
+      layoutStore.remoteConfig.value = {
+        version: 1,
+        dashboards: [{ id: 'default', name: 'Main' }],
+        entries: [],
+        files: { recentlyOpened: [] },
+      };
+    };
+
+    loadConfig();
+  }, [tree]);
 
   const [milestoneFilter, setMilestoneFilter] = useState<string>('');
   const [showUpcoming, setShowUpcoming] = useState(false);
@@ -869,11 +906,18 @@ export const KanbanBoard = ({
   });
   const [colorMode, setColorMode] = useState(false);
 
-  // Find all .todos.md files in the tree and open them
-  const todoFilePaths = useMemo(
-    () => (tree ?? []).filter((t) => t.path.endsWith('.todos.md')).map((t) => t.path),
-    [tree],
-  );
+  // Find .todos.md files assigned to any workspace in the dashboard config.
+  // Falls back to scanning the full tree only when no config is available.
+  const todoFilePaths = useMemo(() => {
+    if (remoteConfig) {
+      const paths = remoteConfig.entries
+        .filter((e) => e.path.endsWith('.todos.md'))
+        .map((e) => e.path);
+      // Deduplicate in case the same file appears in multiple workspaces
+      return [...new Set(paths)];
+    }
+    return (tree ?? []).filter((t) => t.path.endsWith('.todos.md')).map((t) => t.path);
+  }, [remoteConfig, tree]);
 
   useEffect(() => {
     for (const path of todoFilePaths) {
