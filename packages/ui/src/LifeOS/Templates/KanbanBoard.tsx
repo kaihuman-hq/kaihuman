@@ -92,6 +92,26 @@ function filterByAge(items: AggregatedItem[], recentOnly: boolean): AggregatedIt
   });
 }
 
+// ─── Age buckets ──────────────────────────────────────────────────────────────
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+const AGE_BUCKETS = [
+  { key: 'new' as const, label: null }, // < 1 day  — no divider
+  { key: 'day' as const, label: '> 1 day' }, // 1–3 days
+  { key: 'days' as const, label: '> 3 days' }, // 3–7 days
+  { key: 'week' as const, label: '> 1 week' }, // ≥ 7 days / undated
+];
+
+function getAgeBucket(createdAt: string | undefined): (typeof AGE_BUCKETS)[number]['key'] {
+  if (!createdAt) return 'week';
+  const age = Date.now() - new Date(createdAt).getTime();
+  if (age < ONE_DAY_MS) return 'new';
+  if (age < 3 * ONE_DAY_MS) return 'day';
+  if (age < 7 * ONE_DAY_MS) return 'days';
+  return 'week';
+}
+
 // ─── FileSelect ───────────────────────────────────────────────────────────────
 
 const FileSelect = ({
@@ -1244,7 +1264,7 @@ export const KanbanBoard = ({
 
                 {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop target column */}
                 <div
-                  className="flex-1 overflow-y-auto p-3 space-y-2"
+                  className="flex-1 overflow-y-auto"
                   onDragOver={(e) => {
                     e.preventDefault();
                     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
@@ -1274,15 +1294,36 @@ export const KanbanBoard = ({
                       empty
                     </div>
                   ) : (
-                    filteredItems.map((agg) => (
-                      <KanbanCard
-                        key={`${agg.filePath}-${agg.itemIndex}`}
-                        agg={agg}
-                        onStatusChange={handleStatusChange}
-                        onOpenFile={onOpenFile}
-                        borderColor={colorMode ? fileColors[agg.filePath] : undefined}
-                      />
-                    ))
+                    AGE_BUCKETS.map((bucket) => {
+                      const bucketItems = filteredItems.filter(
+                        (a) => getAgeBucket(a.item.createdAt) === bucket.key,
+                      );
+                      if (bucketItems.length === 0) return null;
+                      return (
+                        <div key={bucket.key}>
+                          {bucket.label && (
+                            <div className="flex items-center gap-2 px-3 py-2">
+                              <div className="h-px flex-1 bg-[var(--los-border)]" />
+                              <span className="text-[9px] font-mono text-[var(--los-muted)] uppercase tracking-widest shrink-0 opacity-60">
+                                {bucket.label}
+                              </span>
+                              <div className="h-px flex-1 bg-[var(--los-border)]" />
+                            </div>
+                          )}
+                          <div className="flex flex-col gap-2 p-3 pt-2">
+                            {bucketItems.map((agg) => (
+                              <KanbanCard
+                                key={`${agg.filePath}-${agg.itemIndex}`}
+                                agg={agg}
+                                onStatusChange={handleStatusChange}
+                                onOpenFile={onOpenFile}
+                                borderColor={colorMode ? fileColors[agg.filePath] : undefined}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
