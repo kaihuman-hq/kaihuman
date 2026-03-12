@@ -1907,6 +1907,7 @@ abbreviations: undefined
                     // Fix 1.21: Add Search to Magic Menu (works on mobile)
                     onClick: () => setShowSearch(true),
                   },
+                  ...(onBoardClick ? [{ label: 'Board', onClick: onBoardClick }] : []),
                   {
                     label: 'Graph',
                     onClick: () => {

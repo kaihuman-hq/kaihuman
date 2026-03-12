@@ -96,6 +96,7 @@ const FileSelect = ({
   dropdownClassName?: string;
 }) => {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -109,13 +110,22 @@ const FileSelect = ({
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return options;
+    const q = search.toLowerCase();
+    return options.filter((fp) => fp.toLowerCase().includes(q));
+  }, [options, search]);
+
   const display = value ? formatFilePath(value) : null;
 
   return (
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setSearch('');
+          setOpen((v) => !v);
+        }}
         className={cn(
           'flex items-center gap-1.5 bg-[var(--los-bg)] border border-[var(--los-border)] font-mono outline-none transition-colors hover:border-[var(--los-fg)]',
           triggerClassName ?? 'text-[10px] px-2 py-1 text-[var(--los-muted)]',
@@ -137,54 +147,75 @@ const FileSelect = ({
       {open && (
         <div
           className={cn(
-            'absolute top-full left-0 z-50 mt-0.5 bg-[var(--los-bg)] border border-[var(--los-border)] shadow-lg overflow-y-auto',
+            'absolute top-full left-0 z-50 mt-0.5 bg-[var(--los-bg)] border border-[var(--los-border)] shadow-lg flex flex-col',
             dropdownClassName ?? 'min-w-[180px] max-w-[320px] max-h-60',
           )}
         >
-          {allowEmpty && (
-            <button
-              type="button"
-              onClick={() => {
-                onChange('');
-                setOpen(false);
-              }}
-              className={cn(
-                'w-full text-left px-3 py-2 text-[10px] font-mono hover:bg-white/5 transition-colors',
-                value === '' ? 'text-[var(--los-accent)]' : 'text-[var(--los-muted)]',
-              )}
-            >
-              All files
-            </button>
-          )}
-          {options.map((fp) => {
-            const { dir, name } = formatFilePath(fp);
-            return (
+          <div className="flex items-center gap-1.5 border-b border-[var(--los-border)] px-2 py-1.5 shrink-0">
+            <Search size={10} className="text-[var(--los-muted)] shrink-0" />
+            <input
+              // biome-ignore lint/a11y/noAutofocus: intentional focus on dropdown open
+              autoFocus
+              type="text"
+              value={search}
+              onInput={(e) => setSearch(e.currentTarget.value)}
+              placeholder="Search lists…"
+              className="flex-1 bg-transparent text-[10px] font-mono outline-none text-[var(--los-fg)] placeholder:text-[var(--los-muted)] min-w-0"
+            />
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {allowEmpty && !search && (
               <button
-                key={fp}
                 type="button"
                 onClick={() => {
-                  onChange(fp);
+                  onChange('');
                   setOpen(false);
                 }}
                 className={cn(
-                  'w-full text-left px-3 py-2 text-[10px] font-mono hover:bg-white/5 transition-colors leading-snug',
-                  value === fp ? 'bg-[var(--los-accent)]/10' : '',
+                  'w-full text-left px-3 py-2 text-[10px] font-mono hover:bg-white/5 transition-colors',
+                  value === '' ? 'text-[var(--los-accent)]' : 'text-[var(--los-muted)]',
                 )}
               >
-                {dir && (
-                  <span className="block text-[var(--los-muted)] opacity-70 text-[9px]">{dir}</span>
-                )}
-                <span
+                All files
+              </button>
+            )}
+            {filteredOptions.map((fp) => {
+              const { dir, name } = formatFilePath(fp);
+              return (
+                <button
+                  key={fp}
+                  type="button"
+                  onClick={() => {
+                    onChange(fp);
+                    setOpen(false);
+                  }}
                   className={cn(
-                    'font-bold',
-                    value === fp ? 'text-[var(--los-accent)]' : 'text-[var(--los-fg)]',
+                    'w-full text-left px-3 py-2 text-[10px] font-mono hover:bg-white/5 transition-colors leading-snug',
+                    value === fp ? 'bg-[var(--los-accent)]/10' : '',
                   )}
                 >
-                  {name}
-                </span>
-              </button>
-            );
-          })}
+                  {dir && (
+                    <span className="block text-[var(--los-muted)] opacity-70 text-[9px]">
+                      {dir}
+                    </span>
+                  )}
+                  <span
+                    className={cn(
+                      'font-bold',
+                      value === fp ? 'text-[var(--los-accent)]' : 'text-[var(--los-fg)]',
+                    )}
+                  >
+                    {name}
+                  </span>
+                </button>
+              );
+            })}
+            {filteredOptions.length === 0 && (
+              <div className="px-3 py-2 text-[10px] font-mono text-[var(--los-muted)]">
+                No results
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -354,8 +385,8 @@ const AddTaskModal = ({
         )}
 
         {/* Prompt file */}
-        <div className="flex flex-col gap-3 border-t border-[var(--los-border)] pt-4">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
+        <div className="flex flex-col gap-4 border-t border-[var(--los-border)] pt-5">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={createPromptFile}
@@ -364,14 +395,14 @@ const AddTaskModal = ({
                 if (v && !promptFileName) setPromptFileName(slugify(text) || 'prompt');
                 setCreatePromptFile(v);
               }}
-              className="accent-[var(--los-accent)]"
+              className="accent-[var(--los-accent)] w-4 h-4 shrink-0"
             />
             <MonoLabel className="cursor-pointer">CREATE PROMPT FILE</MonoLabel>
           </label>
 
           {createPromptFile && (
-            <div className="flex flex-col gap-3 pl-4 border-l-2 border-[var(--los-accent)]/30">
-              <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-4 pl-4 border-l-2 border-[var(--los-accent)]/30">
+              <div className="flex flex-col gap-2">
                 <MonoLabel>FILENAME</MonoLabel>
                 <div className="flex items-center gap-2">
                   {basePath && (
@@ -393,12 +424,12 @@ const AddTaskModal = ({
                 </span>
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer select-none">
+              <label className="flex items-center gap-3 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={openAfter}
                   onChange={(e) => setOpenAfter(e.currentTarget.checked)}
-                  className="accent-[var(--los-accent)]"
+                  className="accent-[var(--los-accent)] w-4 h-4 shrink-0"
                 />
                 <MonoLabel className="cursor-pointer text-[10px]">
                   OPEN IN FOCUS MODE AFTERWARDS
@@ -412,7 +443,7 @@ const AddTaskModal = ({
           type="button"
           onClick={handleAdd}
           disabled={!text.trim() || !selectedFile}
-          className="w-full py-2 bg-[var(--los-accent)] text-black text-xs font-mono font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+          className="w-full mt-5 py-2 bg-[var(--los-accent)] text-black text-xs font-mono font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
         >
           ADD TASK
         </button>
@@ -903,7 +934,7 @@ export const KanbanBoard = ({
   return (
     <div className="h-[calc(100vh-3rem)] md:h-[calc(100vh-2rem)] w-screen flex flex-col bg-[var(--los-bg)] text-[var(--los-fg)] overflow-hidden">
       {/* Header */}
-      <div className="h-14 border-b border-[var(--los-border)] flex items-center gap-4 px-6 shrink-0">
+      <div className="min-h-14 border-b border-[var(--los-border)] flex flex-wrap items-center gap-4 px-4 md:px-6 py-2 shrink-0">
         <div className="flex items-center gap-4 shrink-0">
           {onNavigateBack && (
             <button
@@ -1049,7 +1080,7 @@ export const KanbanBoard = ({
           <MonoText>No .todos.md files found in this repository.</MonoText>
         </div>
       ) : !assignMode ? (
-        <div className="flex-1 overflow-hidden flex">
+        <div className="flex-1 overflow-x-auto overflow-y-hidden flex">
           {COLUMNS.map((col) => {
             const colItems = allItems.filter((a) => a.item.status === col.status);
             const filteredItems = filterByAge(colItems, showRecentOnly[col.status]);
@@ -1059,7 +1090,7 @@ export const KanbanBoard = ({
               <div
                 key={col.status}
                 className={cn(
-                  'flex-1 min-w-0 flex flex-col border-r border-[var(--los-border)] last:border-r-0 transition-colors',
+                  'flex-1 min-w-[200px] flex flex-col border-r border-[var(--los-border)] last:border-r-0 transition-colors',
                   dragOverStatus === col.status && 'bg-[var(--los-accent)]/5',
                 )}
               >
