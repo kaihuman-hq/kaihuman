@@ -995,7 +995,7 @@ export const KanbanBoard = ({
   const fileColors = useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     sortedFilePaths.forEach((fp, i) => {
-      map[fp] = BADGE_COLORS[i % BADGE_COLORS.length];
+      map[fp] = BADGE_COLORS[i % BADGE_COLORS.length] ?? '';
     });
     return map;
   }, [sortedFilePaths]);

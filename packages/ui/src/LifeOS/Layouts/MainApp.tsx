@@ -65,6 +65,7 @@ import { HabitTrackerWidget } from '../Organisms/Widgets/HabitTrackerWidget';
 import type { ReadItLaterItem } from '../Organisms/Widgets/ReadItLaterLogic';
 import { ReadItLaterWidget } from '../Organisms/Widgets/ReadItLaterWidget';
 import { RssFeedManager, RssWidget } from '../Organisms/Widgets/RssWidget';
+import { StocksWidget } from '../Organisms/Widgets/StocksWidget';
 import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
 import { TimeTrackingWidget } from '../Organisms/Widgets/TimeTrackingWidget';
 import { TimezoneAddForm } from '../Organisms/Widgets/TimezoneAddForm';
@@ -685,6 +686,7 @@ export const MainApp = ({
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
       else if (lowerPath.endsWith('.budget.csv')) ext = '.budget.csv';
       else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
+      else if (lowerPath.endsWith('.stocks.csv')) ext = '.stocks.csv';
       else {
         const parts = entry.path.split('.');
         if (lowerPath.endsWith('.enc') && parts.length > 2) {
@@ -890,6 +892,16 @@ export const MainApp = ({
       );
     }
 
+    if (tile.extension === '.stocks.csv' && tile.rawContent) {
+      return (
+        <StocksWidget
+          content={tile.rawContent}
+          mode="SMALL"
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+
     // Fix 1.25: If mode is FOCUS and we have no content for a file, prefer renderEditor over renderFile
     // renderEditor typically triggers a data fetch, whereas renderFile might be a static preview or lightweight view.
     // This ensures that deep-linked widgets (which start with no content) trigger a load.
@@ -971,6 +983,7 @@ export const MainApp = ({
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
       else if (lowerPath.endsWith('.budget.csv')) ext = '.budget.csv';
       else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
+      else if (lowerPath.endsWith('.stocks.csv')) ext = '.stocks.csv';
       else {
         const parts = entryPath.split('.');
         ext = parts.length > 1 ? `.${parts.slice(1).join('.').toLowerCase()}` : '';
@@ -2027,6 +2040,7 @@ const FocusedTileInternal = ({
   const isDataCollection = tile.extension === '.data-collection.csv';
   const isBudget = tile.extension === '.budget.csv';
   const isActionLog = tile.extension === '.actionlog.md';
+  const isStocks = tile.extension === '.stocks.csv';
 
   const isGenericCsv =
     tile.extension === '.csv' &&
@@ -2034,7 +2048,8 @@ const FocusedTileInternal = ({
     !isEvents &&
     !isHabit &&
     !isDataCollection &&
-    !isBudget;
+    !isBudget &&
+    !isStocks;
   const isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv'); // For enabling TABLE view on all CSVs
 
   const hasWidget =
@@ -2048,6 +2063,7 @@ const FocusedTileInternal = ({
     isDataCollection ||
     isBudget ||
     isActionLog ||
+    isStocks ||
     isAnyCsv; // && !!tile.rawContent;
 
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
@@ -2127,6 +2143,7 @@ const FocusedTileInternal = ({
     const _isDataCollection = tile.extension === '.data-collection.csv';
     const _isBudget = tile.extension === '.budget.csv';
     const _isActionLog = tile.extension === '.actionlog.md';
+    const _isStocks = tile.extension === '.stocks.csv';
     const _isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv');
 
     const _hasWidget =
@@ -2140,6 +2157,7 @@ const FocusedTileInternal = ({
       _isDataCollection ||
       _isBudget ||
       _isActionLog ||
+      _isStocks ||
       _isAnyCsv;
 
     if (viewMode === 'CODE') {
@@ -2439,6 +2457,21 @@ const FocusedTileInternal = ({
                   </button>
                 )}
 
+                {isStocks && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('ADD')}
+                    className={cn(
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'ADD'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+                    )}
+                  >
+                    ADD ENTRY
+                  </button>
+                )}
+
                 {isBudget && (
                   <>
                     <button
@@ -2585,6 +2618,17 @@ const FocusedTileInternal = ({
                   tile.onContentChange?.(c);
                   // Fixed: Keep in ADD mode to allow multiple additions
                   // if (viewMode === 'ADD') setViewMode('WIDGET');
+                }}
+              />
+            </div>
+          ) : isStocks && (viewMode === 'WIDGET' || viewMode === 'ADD') ? (
+            <div className="flex flex-col min-h-full w-full">
+              <StocksWidget
+                content={tile.rawContent || ''}
+                mode={viewMode === 'ADD' ? 'ADD' : 'FOCUS'}
+                onChange={(c) => {
+                  tile.onContentChange?.(c);
+                  if (viewMode === 'ADD') setViewMode('WIDGET');
                 }}
               />
             </div>

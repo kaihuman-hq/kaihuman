@@ -221,7 +221,7 @@ export const parseTodos = (md: string): TodoData => {
     const metaLine = (lines[i + 1] ?? '').trim();
     if (metaLine.startsWith('::updated::') || metaLine.startsWith('::created::')) {
       const updatedMatch = metaLine.match(/::updated::\s*(\d+)/);
-      if (updatedMatch) updatedAt = parseInt(updatedMatch[1], 10);
+      if (updatedMatch?.[1]) updatedAt = parseInt(updatedMatch[1], 10);
       const createdMatch = metaLine.match(/::created::\s*(\S+)/);
       // Only use ::created:: if no inline ISO prefix was already found
       if (createdMatch && !createdAt) createdAt = createdMatch[1];

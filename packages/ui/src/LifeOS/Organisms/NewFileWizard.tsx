@@ -11,6 +11,7 @@ import {
   ListTodo,
   Lock,
   Rss,
+  TrendingUp,
   X,
 } from 'lucide-preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
@@ -31,6 +32,14 @@ interface Template {
 }
 
 const TEMPLATES: Template[] = [
+  {
+    id: 'stocks',
+    name: 'Stocks / Portfolio',
+    description: 'Track portfolio value and investment over time with charts and forecast',
+    icon: TrendingUp,
+    extension: '.stocks.csv',
+    defaultContent: '',
+  },
   {
     id: 'data-collection',
     name: 'Data Collection',
