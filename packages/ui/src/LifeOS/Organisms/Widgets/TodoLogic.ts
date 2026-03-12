@@ -216,11 +216,15 @@ export const parseTodos = (md: string): TodoData => {
       })
       .trim();
 
-    // Legacy ::updated:: line
+    // Metadata line: ::updated:: <ms> ::created:: <iso>  (either or both may be present)
     let updatedAt: number | undefined;
-    if ((lines[i + 1] ?? '').trim().startsWith('::updated::')) {
-      const parts = (lines[i + 1] ?? '').trim().split('::updated::');
-      if (parts[1]) updatedAt = parseInt(parts[1].trim(), 10);
+    const metaLine = (lines[i + 1] ?? '').trim();
+    if (metaLine.startsWith('::updated::') || metaLine.startsWith('::created::')) {
+      const updatedMatch = metaLine.match(/::updated::\s*(\d+)/);
+      if (updatedMatch?.[1]) updatedAt = parseInt(updatedMatch[1], 10);
+      const createdMatch = metaLine.match(/::created::\s*(\S+)/);
+      // Only use ::created:: if no inline ISO prefix was already found
+      if (createdMatch && !createdAt) createdAt = createdMatch[1];
       i++;
     }
 
@@ -270,7 +274,12 @@ export const serializeTodos = (data: TodoData): string => {
     const suffix = [tagStr, milestoneStr].filter(Boolean).join(' ');
     result += `- ${marker} ${item.text}${suffix ? ` ${suffix}` : ''}\n`;
 
-    if (item.updatedAt) result += `::updated:: ${item.updatedAt}\n`;
+    if (item.updatedAt || item.createdAt) {
+      const metaParts: string[] = [];
+      if (item.updatedAt) metaParts.push(`::updated:: ${item.updatedAt}`);
+      if (item.createdAt) metaParts.push(`::created:: ${item.createdAt}`);
+      result += `${metaParts.join(' ')}\n`;
+    }
 
     if (item.prompt) {
       for (const pLine of item.prompt.lines) result += `  > ${pLine}\n`;
