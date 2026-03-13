@@ -1,7 +1,9 @@
-import { ArrowDown, ArrowUp, Filter } from 'lucide-preact';
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Filter } from 'lucide-preact';
 import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoLabel, MonoText } from '../../Atoms/Typography';
+
+const PAGE_SIZE = 50;
 
 export interface CsvTableViewProps {
   content: string;
@@ -13,6 +15,7 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
   );
   const [filters, setFilters] = useState<Record<number, string>>({});
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(0);
 
   const { headers, rows } = useMemo(() => {
     if (!content) return { headers: [], rows: [] };
@@ -22,13 +25,20 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
       .filter((l) => l);
     if (lines.length === 0) return { headers: [], rows: [] };
 
-    // Attempt to detect separator (comma or semicolon)
     const firstLine = lines[0];
     if (!firstLine) return { headers: [], rows: [] };
 
-    const separator = firstLine.includes(';') ? ';' : ',';
+    // Strip bracket metadata before detecting separator to avoid semicolons
+    // inside [...] being mistaken for the field separator.
+    const lineForSepDetect = firstLine.replace(/\[[^\]]*\]/g, '');
+    const separator = lineForSepDetect.includes(';') ? ';' : ',';
 
-    const headers = firstLine.split(separator).map((h) => h.trim());
+    const headers = firstLine.split(separator).map((h) => {
+      const trimmed = h.trim();
+      // Decode bracket-encoded column metadata: ColName[title:X;unit:Y] → ColName
+      const bracketIdx = trimmed.indexOf('[');
+      return bracketIdx > 0 ? trimmed.slice(0, bracketIdx).trim() : trimmed;
+    });
     const rows = lines.slice(1).map((line) => line.split(separator).map((c) => c.trim()));
 
     return { headers, rows };
@@ -38,7 +48,7 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
       return Object.entries(filters).every(([colIndex, filterValue]) => {
-        const cellValue = row[parseInt(colIndex, 10)] || '';
+        const cellValue = row[Number.parseInt(colIndex, 10)] || '';
         return cellValue.toLowerCase().includes(filterValue.toLowerCase());
       });
     });
@@ -52,7 +62,6 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
       const valA = a[sortConfig.key] || '';
       const valB = b[sortConfig.key] || '';
 
-      // Try numeric sort
       const numA = parseFloat(valA);
       const numB = parseFloat(valB);
 
@@ -65,7 +74,12 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
     return sorted;
   }, [filteredRows, sortConfig]);
 
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pagedRows = sortedRows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
   const handleSort = (index: number) => {
+    setPage(0);
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig && sortConfig.key === index && sortConfig.direction === 'asc') {
       direction = 'desc';
@@ -74,6 +88,7 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
   };
 
   const handleFilterChange = (index: number, value: string) => {
+    setPage(0);
     setFilters((prev) => {
       if (!value) {
         const next = { ...prev };
@@ -88,7 +103,7 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
     <div className="flex flex-col w-full h-full overflow-hidden bg-[var(--los-bg)]">
       {/* Toolbar */}
       <div className="flex items-center justify-between p-2 border-b border-[var(--los-border)]">
-        <MonoLabel className="text-xs">{rows.length} rows</MonoLabel>
+        <MonoLabel className="text-xs">{sortedRows.length} rows</MonoLabel>
         <button
           type="button"
           onClick={() => setShowFilters(!showFilters)}
@@ -108,7 +123,10 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
           <thead className="sticky top-0 bg-[var(--los-bg)] z-10 shadow-sm">
             <tr>
               {headers.map((header, i) => (
-                <th key={header} className="p-2 border-b border-[var(--los-border)] min-w-[100px]">
+                <th
+                  key={`h-${i}-${header}`}
+                  className="p-2 border-b border-[var(--los-border)] min-w-[100px]"
+                >
                   <div className="flex flex-col gap-2">
                     <button
                       type="button"
@@ -150,19 +168,24 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((row) => (
+            {pagedRows.map((row, rowIdx) => (
               <tr
-                key={row.join('|')}
+                // biome-ignore lint/suspicious/noArrayIndexKey: page-relative index is stable within this render
+                key={rowIdx}
                 className="hover:bg-[var(--los-border)]/10 transition-colors border-b border-[var(--los-border)]/50 last:border-0"
               >
                 {headers.map((header, cIndex) => (
-                  <td key={header} className="p-2 truncate max-w-[200px]" title={row[cIndex]}>
+                  <td
+                    key={`c-${cIndex}-${header}`}
+                    className="p-2 truncate max-w-[200px]"
+                    title={row[cIndex]}
+                  >
                     <MonoText className="text-xs">{row[cIndex]}</MonoText>
                   </td>
                 ))}
               </tr>
             ))}
-            {sortedRows.length === 0 && (
+            {pagedRows.length === 0 && (
               <tr>
                 <td colSpan={headers.length} className="p-8 text-center text-[var(--los-muted)]">
                   <MonoText>No data found</MonoText>
@@ -172,6 +195,31 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-3 py-2 border-t border-[var(--los-border)] shrink-0">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={safePage === 0}
+            className="p-1 text-[var(--los-muted)] hover:text-[var(--los-fg)] disabled:opacity-30 transition-colors"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <MonoText className="text-[10px] text-[var(--los-muted)]">
+            {safePage + 1} / {totalPages} ({sortedRows.length} rows)
+          </MonoText>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={safePage >= totalPages - 1}
+            className="p-1 text-[var(--los-muted)] hover:text-[var(--los-fg)] disabled:opacity-30 transition-colors"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

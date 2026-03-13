@@ -149,7 +149,7 @@ export function App() {
   if (!token) {
     return (
       <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-6 flex flex-col items-center justify-center space-y-4 font-mono">
-        <div class="text-xl font-bold tracking-tight">KaiHuman</div>
+        <div class="text-xl font-bold tracking-tight">kaihuman</div>
         <p class="text-center text-[var(--los-fg-dim)] text-sm">Please login to the console to use the extension.</p>
         <button
           onClick={handleLogin}
@@ -164,7 +164,7 @@ export function App() {
   return (
     <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
       <header class="flex items-center justify-between mb-4 pb-2 border-b border-[var(--los-border)]">
-        <span class="font-bold text-[var(--los-accent)] tracking-tight">KaiHuman</span>
+        <span class="font-bold text-[var(--los-accent)] tracking-tight">kaihuman</span>
         <div class="flex flex-col items-end gap-1">
           <span class="text-xs text-[var(--los-success)] animate-pulse">● Connected</span>
           {repos.length > 0 ? (

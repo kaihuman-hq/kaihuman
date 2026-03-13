@@ -28,13 +28,19 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: 'LifeOS',
-        short_name: 'LifeOS',
-        description: 'Life Operating System',
+        name: 'kaihuman',
+        short_name: 'kh',
+        description: 'The ever-improving human.',
         theme_color: '#0a0a0f',
         background_color: '#0a0a0f',
         display: 'standalone',
         icons: [
+          {
+            src: 'logo.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
           {
             src: 'pwa-192x192.png',
             sizes: '192x192',

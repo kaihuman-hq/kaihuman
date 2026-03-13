@@ -153,7 +153,7 @@ export const Dashboard = () => {
     // Loading state or critical error if no repos
     return (
       <div className="h-screen flex items-center justify-center text-nexus-muted">
-        Loading KaiHuman...
+        Loading kaihuman...
       </div>
     );
   }
@@ -240,6 +240,7 @@ export const Dashboard = () => {
               lowerPath.endsWith('.actionlog.md') ||
               lowerPath.endsWith('.data-collection.csv') ||
               lowerPath.endsWith('.stocks.csv') ||
+              lowerPath.endsWith('.consumption.csv') ||
               lowerPath.endsWith('.enc');
 
             if (isWidget) {

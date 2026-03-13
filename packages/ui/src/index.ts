@@ -7,6 +7,7 @@ export * from './components/Input';
 export * from './components/Panel';
 export * from './components/Sidebar';
 export * from './components/SplitView';
+export * from './LifeOS/Atoms/Logo';
 export * from './LifeOS/Charts/DonutChart';
 export * from './LifeOS/Charts/StackedBarChart';
 // LifeOS Exports
@@ -16,6 +17,8 @@ export * from './LifeOS/Organisms/NotFound';
 export * from './LifeOS/Organisms/RepositorySelector';
 export { type MenuItem, StatusBar, type StatusBarProps } from './LifeOS/Organisms/StatusBar';
 export * from './LifeOS/Organisms/Widgets/ActionLogLogic';
+export * from './LifeOS/Organisms/Widgets/ConsumptionLogic';
+export * from './LifeOS/Organisms/Widgets/ConsumptionWidget';
 export * from './LifeOS/Organisms/Widgets/ReadItLaterLogic';
 export * from './LifeOS/Organisms/Widgets/StocksLogic';
 export * from './LifeOS/Organisms/Widgets/StocksWidget';

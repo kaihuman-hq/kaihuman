@@ -50,6 +50,7 @@ import { SettingsView } from '../Organisms/SettingsView';
 import { StatusBar } from '../Organisms/StatusBar';
 import { ActionLogWidget } from '../Organisms/Widgets/ActionLogWidget';
 import { BudgetWidget } from '../Organisms/Widgets/BudgetWidget';
+import { ConsumptionWidget } from '../Organisms/Widgets/ConsumptionWidget';
 import { CsvTableView } from '../Organisms/Widgets/CsvTableView';
 import { DataCollectionAddForm } from '../Organisms/Widgets/DataCollectionAddForm';
 import { DataCollectionColumnManager } from '../Organisms/Widgets/DataCollectionColumnManager';
@@ -687,6 +688,7 @@ export const MainApp = ({
       else if (lowerPath.endsWith('.budget.csv')) ext = '.budget.csv';
       else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
       else if (lowerPath.endsWith('.stocks.csv')) ext = '.stocks.csv';
+      else if (lowerPath.endsWith('.consumption.csv')) ext = '.consumption.csv';
       else {
         const parts = entry.path.split('.');
         if (lowerPath.endsWith('.enc') && parts.length > 2) {
@@ -901,6 +903,15 @@ export const MainApp = ({
         />
       );
     }
+    if (tile.extension === '.consumption.csv' && tile.rawContent) {
+      return (
+        <ConsumptionWidget
+          content={tile.rawContent}
+          mode="SMALL"
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
 
     // Fix 1.25: If mode is FOCUS and we have no content for a file, prefer renderEditor over renderFile
     // renderEditor typically triggers a data fetch, whereas renderFile might be a static preview or lightweight view.
@@ -984,6 +995,7 @@ export const MainApp = ({
       else if (lowerPath.endsWith('.budget.csv')) ext = '.budget.csv';
       else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
       else if (lowerPath.endsWith('.stocks.csv')) ext = '.stocks.csv';
+      else if (lowerPath.endsWith('.consumption.csv')) ext = '.consumption.csv';
       else {
         const parts = entryPath.split('.');
         ext = parts.length > 1 ? `.${parts.slice(1).join('.').toLowerCase()}` : '';
@@ -2041,6 +2053,7 @@ const FocusedTileInternal = ({
   const isBudget = tile.extension === '.budget.csv';
   const isActionLog = tile.extension === '.actionlog.md';
   const isStocks = tile.extension === '.stocks.csv';
+  const isConsumption = tile.extension === '.consumption.csv';
 
   const isGenericCsv =
     tile.extension === '.csv' &&
@@ -2049,7 +2062,8 @@ const FocusedTileInternal = ({
     !isHabit &&
     !isDataCollection &&
     !isBudget &&
-    !isStocks;
+    !isStocks &&
+    !isConsumption;
   const isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv'); // For enabling TABLE view on all CSVs
 
   const hasWidget =
@@ -2064,6 +2078,7 @@ const FocusedTileInternal = ({
     isBudget ||
     isActionLog ||
     isStocks ||
+    isConsumption ||
     isAnyCsv; // && !!tile.rawContent;
 
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
@@ -2144,6 +2159,7 @@ const FocusedTileInternal = ({
     const _isBudget = tile.extension === '.budget.csv';
     const _isActionLog = tile.extension === '.actionlog.md';
     const _isStocks = tile.extension === '.stocks.csv';
+    const _isConsumption = tile.extension === '.consumption.csv';
     const _isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv');
 
     const _hasWidget =
@@ -2158,6 +2174,7 @@ const FocusedTileInternal = ({
       _isBudget ||
       _isActionLog ||
       _isStocks ||
+      _isConsumption ||
       _isAnyCsv;
 
     if (viewMode === 'CODE') {
@@ -2630,6 +2647,14 @@ const FocusedTileInternal = ({
                   tile.onContentChange?.(c);
                   if (viewMode === 'ADD') setViewMode('WIDGET');
                 }}
+              />
+            </div>
+          ) : isConsumption && viewMode === 'WIDGET' ? (
+            <div className="flex flex-col min-h-full w-full">
+              <ConsumptionWidget
+                content={tile.rawContent || ''}
+                mode="FOCUS"
+                onChange={(c) => tile.onContentChange?.(c)}
               />
             </div>
           ) : viewMode === 'WIDGET' && hasWidget ? (

@@ -1,6 +1,7 @@
 import { aiStore, Logger } from '@lifosy/core';
 import { useEffect, useState } from 'preact/hooks';
 import { cn } from '../../utils';
+import { Logo } from '../Atoms/Logo';
 import { MonoLabel, MonoText } from '../Atoms/Typography';
 
 const logger = new Logger('StatusBar');
@@ -13,7 +14,6 @@ import {
   GitCommit,
   Kanban,
   LayoutGrid,
-  Sparkles,
 } from 'lucide-preact';
 
 export interface Repository {
@@ -665,18 +665,14 @@ export const StatusBar = ({
                   : 'px-2 py-0.5 scale-90 translate-y-0 opacity-80 hover:opacity-100',
               )}
             >
-              <Sparkles
-                size={isHovered || expanded ? 18 : 14}
-                fill="currentColor"
-                className="animate-pulse transition-all"
-              />
+              <Logo size={isHovered || expanded ? 18 : 14} className="transition-all" />
               <span
                 className={cn(
                   'font-bold uppercase tracking-widest hidden sm:inline transition-all',
                   isHovered || expanded ? 'text-sm' : 'text-[10px]',
                 )}
               >
-                KaiHuman
+                kaihuman
               </span>
             </button>
           </div>

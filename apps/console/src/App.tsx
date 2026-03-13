@@ -12,24 +12,23 @@ import { TodoAnalyticsPage } from './pages/TodoAnalyticsPage';
 
 // Simple protected route wrapper
 const ProtectedRoute = ({ component: Component, ...props }: any) => {
+  // Always process OAuth callback first — handles re-auth when a stale token is already in storage.
+  // Without this, isAuthenticated would be true from the old token and the new token would be lost.
+  if (authStore.handleCallback()) {
+    const redirectUrl = localStorage.getItem('lifeos_redirect');
+    if (redirectUrl && redirectUrl !== '/') {
+      localStorage.removeItem('lifeos_redirect');
+      setTimeout(() => route(redirectUrl, true), 10);
+    }
+  }
+
   if (!authStore.isAuthenticated.value) {
-    // Check if we just came back from auth
-    if (authStore.handleCallback()) {
-      // Callback handled successfully! Check if we saved a redirect path earlier
-      const redirectUrl = localStorage.getItem('lifeos_redirect');
-      if (redirectUrl && redirectUrl !== '/') {
-        localStorage.removeItem('lifeos_redirect');
-        // Route after a slight delay to allow auth state to settle
-        setTimeout(() => route(redirectUrl, true), 10);
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      const path = window.location.pathname;
+      if (path !== '/' && !window.location.search.includes('access_token')) {
+        localStorage.setItem('lifeos_redirect', path);
       }
-    } else {
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-        const path = window.location.pathname;
-        if (path !== '/' && !window.location.search.includes('access_token')) {
-          localStorage.setItem('lifeos_redirect', path);
-        }
-        return <Login />;
-      }
+      return <Login />;
     }
   }
 

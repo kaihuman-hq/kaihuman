@@ -46,11 +46,14 @@ export class AuthStore {
       const token = await db.get('auth', 'token');
       const user = await db.get('auth', 'user');
 
-      if (token) this.token.value = token;
+      // Only restore from DB if handleCallback() hasn't already set a fresh token.
+      // handleCallback() runs synchronously during render (before this async resumes),
+      // so a non-null token here means we already have something fresher than the DB.
+      if (token && !this.token.value) this.token.value = token;
       if (user) this.user.value = user;
 
       // Fallback to localStorage if DB empty (migration path)
-      if (!token && localStorage.getItem(STORAGE_KEY_TOKEN)) {
+      if (!this.token.value && localStorage.getItem(STORAGE_KEY_TOKEN)) {
         this.token.value = localStorage.getItem(STORAGE_KEY_TOKEN);
       }
     }

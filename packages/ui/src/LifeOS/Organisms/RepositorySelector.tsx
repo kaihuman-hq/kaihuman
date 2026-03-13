@@ -34,7 +34,7 @@ export const RepositorySelector = ({
         </h1>
         <p className="text-[#666] mb-12 text-center text-sm max-w-lg">
           Choose a GitHub repository to mount as your file system. This will act as the root of your
-          KaiHuman instance.
+          kaihuman instance.
         </p>
 
         {isLoading ? (

@@ -7,6 +7,7 @@ import {
   LayoutGrid,
   TrendingUp,
 } from 'lucide-preact';
+import { Logo } from '../Atoms/Logo';
 
 const FEATURES = [
   {
@@ -47,7 +48,7 @@ export const Login = ({ onLogin }: LoginProps) => (
       {/* Wordmark */}
       <div>
         <span className="text-xs font-mono tracking-[0.3em] text-[var(--los-accent)] uppercase">
-          KaiHuman
+          kaihuman
         </span>
       </div>
 
@@ -96,7 +97,7 @@ export const Login = ({ onLogin }: LoginProps) => (
       {/* Mobile wordmark */}
       <div className="flex flex-col items-center gap-2 lg:hidden">
         <span className="text-xs font-mono tracking-[0.3em] text-[var(--los-accent)] uppercase">
-          KaiHuman
+          kaihuman
         </span>
         <p className="text-[10px] font-mono text-[var(--los-muted)] text-center">
           The ever-improving human.
@@ -105,9 +106,7 @@ export const Login = ({ onLogin }: LoginProps) => (
 
       {/* Desktop label */}
       <div className="hidden lg:flex flex-col items-center gap-2">
-        <div className="w-10 h-10 border border-[var(--los-border)] flex items-center justify-center">
-          <span className="text-[var(--los-accent)] font-mono font-bold text-lg">K</span>
-        </div>
+        <Logo size={40} />
         <span className="text-[10px] font-mono tracking-[0.25em] text-[var(--los-muted)] uppercase">
           Sign in to continue
         </span>
@@ -132,7 +131,7 @@ export const Login = ({ onLogin }: LoginProps) => (
           </span>
         </div>
         <p className="text-[11px] font-mono text-[var(--los-muted)] leading-relaxed">
-          KaiHuman reads and writes files{' '}
+          kaihuman reads and writes files{' '}
           <span className="text-[var(--los-fg)]">directly to your GitHub repositories</span>. This
           is not optional — it is how the app works. Your notes, tasks, and knowledge base are
           stored as plain markdown files in your repos.
