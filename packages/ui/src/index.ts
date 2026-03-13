@@ -7,6 +7,7 @@ export * from './components/Input';
 export * from './components/Panel';
 export * from './components/Sidebar';
 export * from './components/SplitView';
+export * from './LifeOS/Atoms/Logo';
 export * from './LifeOS/Charts/DonutChart';
 export * from './LifeOS/Charts/StackedBarChart';
 // LifeOS Exports
