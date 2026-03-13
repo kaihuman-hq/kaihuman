@@ -14,6 +14,7 @@ export interface ColumnMeta {
   title: string;
   unit: string;
   yearlyTarget: number; // 0 = not set
+  higherIsBetter: boolean; // false = less is better (default), true = more is better
 }
 
 export interface DailyEntry {
@@ -51,7 +52,14 @@ export interface YearlyStats {
 function parseColumnMeta(header: string): ColumnMeta {
   const bracketIdx = header.indexOf('[');
   if (bracketIdx === -1) {
-    return { rawKey: header, key: header.trim(), title: header.trim(), unit: '', yearlyTarget: 0 };
+    return {
+      rawKey: header,
+      key: header.trim(),
+      title: header.trim(),
+      unit: '',
+      yearlyTarget: 0,
+      higherIsBetter: false,
+    };
   }
   const key = header.slice(0, bracketIdx).trim();
   const closeIdx = header.lastIndexOf(']');
@@ -69,6 +77,7 @@ function parseColumnMeta(header: string): ColumnMeta {
     title: meta.title ?? key,
     unit: meta.unit ?? '',
     yearlyTarget: meta.yearlyTarget ? Number(meta.yearlyTarget.replace(',', '.')) : 0,
+    higherIsBetter: meta.higherIsBetter === 'true',
   };
 }
 
@@ -339,11 +348,13 @@ export function buildRawKey(meta: {
   title: string;
   unit: string;
   yearlyTarget: number;
+  higherIsBetter?: boolean;
 }): string {
   const parts: string[] = [];
   if (meta.title && meta.title !== meta.key) parts.push(`title:${meta.title}`);
   if (meta.unit) parts.push(`unit:${meta.unit}`);
   if (meta.yearlyTarget > 0) parts.push(`yearlyTarget:${meta.yearlyTarget}`);
+  if (meta.higherIsBetter) parts.push('higherIsBetter:true');
   return parts.length > 0 ? `${meta.key}[${parts.join(';')}]` : meta.key;
 }
 
@@ -356,7 +367,13 @@ function buildHeaderLine(data: ConsumptionData, columns: ColumnMeta[]): string {
 
 export function addColumn(
   data: ConsumptionData,
-  meta: { key: string; title: string; unit: string; yearlyTarget: number },
+  meta: {
+    key: string;
+    title: string;
+    unit: string;
+    yearlyTarget: number;
+    higherIsBetter?: boolean;
+  },
 ): ConsumptionData {
   const rawKey = buildRawKey(meta);
   const newCol: ColumnMeta = {
@@ -365,6 +382,7 @@ export function addColumn(
     title: meta.title || meta.key,
     unit: meta.unit,
     yearlyTarget: meta.yearlyTarget,
+    higherIsBetter: meta.higherIsBetter ?? false,
   };
   const columns = [...data.columns, newCol];
   const rawHeaderLine = buildHeaderLine(data, columns);

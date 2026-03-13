@@ -88,7 +88,7 @@ export const ConsumptionWidget = ({ content, mode, onChange }: ConsumptionWidget
 // --- Recent entries table ---
 
 const RecentTable = ({ data, compact }: { data: ConsumptionData; compact?: boolean }) => {
-  const recent = data.entries.slice(-10).reverse();
+  const recent = data.entries.slice(-30).reverse();
 
   if (recent.length === 0) {
     return <div className="p-4 text-[var(--los-muted)] font-mono text-xs">No entries yet</div>;
@@ -263,6 +263,7 @@ const ColumnsTab = ({
   const [title, setTitle] = useState('');
   const [unit, setUnit] = useState('');
   const [yearlyTarget, setYearlyTarget] = useState('');
+  const [higherIsBetter, setHigherIsBetter] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleAdd = () => {
@@ -282,12 +283,14 @@ const ColumnsTab = ({
         title: title.trim() || trimmedKey,
         unit: unit.trim(),
         yearlyTarget: yearlyTarget ? Number(yearlyTarget) : 0,
+        higherIsBetter,
       }),
     );
     setKey('');
     setTitle('');
     setUnit('');
     setYearlyTarget('');
+    setHigherIsBetter(false);
   };
 
   return (
@@ -300,6 +303,7 @@ const ColumnsTab = ({
               <th className="text-left py-1.5 px-2 text-[var(--los-muted)]">Title</th>
               <th className="text-left py-1.5 px-2 text-[var(--los-muted)]">Unit</th>
               <th className="text-right py-1.5 px-2 text-[var(--los-muted)]">Yearly Target</th>
+              <th className="text-center py-1.5 px-2 text-[var(--los-muted)]">↑ Better</th>
               <th className="py-1.5 px-2" />
             </tr>
           </thead>
@@ -311,6 +315,9 @@ const ColumnsTab = ({
                 <td className="py-1.5 px-2">{col.unit || '–'}</td>
                 <td className="py-1.5 px-2 text-right tabular-nums">
                   {col.yearlyTarget > 0 ? col.yearlyTarget : '–'}
+                </td>
+                <td className="py-1.5 px-2 text-center text-[var(--los-muted)]">
+                  {col.higherIsBetter ? '✓' : '–'}
                 </td>
                 <td className="py-1.5 px-2 text-right">
                   <button
@@ -373,6 +380,17 @@ const ColumnsTab = ({
             />
           </div>
         </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={higherIsBetter}
+            onChange={(e) => setHigherIsBetter(e.currentTarget.checked)}
+            className="accent-[var(--los-accent)] cursor-pointer"
+          />
+          <span className="text-[10px] font-mono text-[var(--los-muted)]">
+            Higher is better (e.g. solar production)
+          </span>
+        </label>
         {error && <div className="text-red-400 text-[10px] font-mono">{error}</div>}
         <button
           type="button"
@@ -546,14 +564,17 @@ const MonthlyView = ({
                   {stats ? formatNum(stats.avgPerDayByKey[metricKey] ?? 0) : '–'}
                 </td>
                 <td className="py-1.5 px-2 text-right tabular-nums">
-                  {change !== null ? (
-                    <span className={change > 0 ? 'text-red-400' : 'text-green-400'}>
-                      {change > 0 ? '+' : ''}
-                      {change.toFixed(1)}%
-                    </span>
-                  ) : (
-                    '–'
-                  )}
+                  {change !== null
+                    ? (() => {
+                        const isGood = col?.higherIsBetter ? change > 0 : change < 0;
+                        return (
+                          <span className={isGood ? 'text-green-400' : 'text-red-400'}>
+                            {change > 0 ? '+' : ''}
+                            {change.toFixed(1)}%
+                          </span>
+                        );
+                      })()
+                    : '–'}
                 </td>
                 <td className="py-1.5 px-2 text-right text-[var(--los-muted)]">
                   {stats?.daysCount ?? '–'}
@@ -603,8 +624,16 @@ const YearlyView = ({
                   col.yearlyTarget > 0 ? ((total / col.yearlyTarget) * 100).toFixed(0) : null;
                 const trend =
                   prevTotal !== undefined && prevTotal > 0 ? (total > prevTotal ? '▲' : '▼') : null;
-                const trendColor =
-                  trend === '▲' ? 'text-red-400' : trend === '▼' ? 'text-green-400' : '';
+                const isUp = trend === '▲';
+                const trendColor = trend
+                  ? col.higherIsBetter
+                    ? isUp
+                      ? 'text-green-400'
+                      : 'text-red-400'
+                    : isUp
+                      ? 'text-red-400'
+                      : 'text-green-400'
+                  : '';
                 return (
                   <td key={col.key} className="py-1.5 px-2 text-right tabular-nums">
                     {formatNum(total)}
@@ -624,6 +653,8 @@ const YearlyView = ({
 
 // --- Multi-year monthly comparison chart ---
 
+type ChartMode = 'avg' | 'cumulative';
+
 const CompareView = ({
   data,
   monthlyStats,
@@ -637,6 +668,8 @@ const CompareView = ({
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [activeYears, setActiveYears] = useState<Set<number>>(() => new Set(years));
+  const [chartMode, setChartMode] = useState<ChartMode>('cumulative');
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -648,24 +681,56 @@ const CompareView = ({
     return () => obs.disconnect();
   }, []);
 
+  const toggleYear = (year: number) => {
+    setActiveYears((prev) => {
+      // All selected → click one → isolate it
+      if (prev.size === years.length) return new Set([year]);
+      // Sole selection clicked again → reset to all
+      if (prev.size === 1 && prev.has(year)) return new Set(years);
+      // Otherwise toggle membership
+      const next = new Set(prev);
+      if (next.has(year)) next.delete(year);
+      else next.add(year);
+      // If that would empty the set, reset to all
+      return next.size === 0 ? new Set(years) : next;
+    });
+  };
+
   const col = data.columns.find((c) => c.key === metricKey);
 
-  // Per year: array of 12 monthly avg-per-day values (null = no data)
-  const yearData = years.map((year) =>
-    MONTH_NAMES.map((_, i) => {
-      const m = i + 1;
-      return (
-        monthlyStats.find((s) => s.year === year && s.month === m)?.avgPerDayByKey[metricKey] ??
-        null
-      );
-    }),
-  );
+  // Per year: 12 values based on mode
+  const yearData = useMemo(() => {
+    return years.map((year) => {
+      const monthly = MONTH_NAMES.map((_, i) => {
+        const m = i + 1;
+        const stats = monthlyStats.find((s) => s.year === year && s.month === m);
+        if (!stats) return null;
+        return chartMode === 'avg'
+          ? (stats.avgPerDayByKey[metricKey] ?? null)
+          : (stats.totalByKey[metricKey] ?? null);
+      });
 
-  const allValues = yearData.flat().filter((v): v is number => v !== null);
+      if (chartMode === 'cumulative') {
+        let cumSum = 0;
+        return monthly.map((v) => {
+          if (v === null) return null;
+          cumSum += v;
+          return cumSum;
+        });
+      }
+      return monthly;
+    });
+  }, [years, monthlyStats, metricKey, chartMode]);
+
+  // Only use active years for scale
+  const activeIndices = years.map((y, i) => (activeYears.has(y) ? i : -1)).filter((i) => i >= 0);
+  const allValues = activeIndices
+    .flatMap((i) => yearData[i] ?? [])
+    .filter((v): v is number => v !== null);
   const maxVal = allValues.length > 0 ? Math.max(...allValues) * 1.1 : 1;
 
   const { width, height } = dimensions;
-  const PAD = { top: 20, right: 60, bottom: 30, left: 45 };
+  const PAD = { top: 20, right: 60, bottom: 30, left: 55 };
   const cw = Math.max(width - PAD.left - PAD.right, 1);
   const ch = Math.max(height - PAD.top - PAD.bottom, 1);
 
@@ -687,26 +752,60 @@ const CompareView = ({
     return parts.join(' ');
   };
 
+  const modeLabel =
+    chartMode === 'avg'
+      ? `Avg per day${col?.unit ? ` (${col.unit})` : ''} — per month`
+      : `Cumulative total${col?.unit ? ` (${col.unit})` : ''} — running sum per year`;
+
   return (
-    <div className="p-4 flex flex-col h-full">
-      <div className="text-[10px] font-mono text-[var(--los-muted)] mb-1">
-        Avg per day{col?.unit ? ` (${col.unit})` : ''} — same month across years
+    <div className="p-4">
+      {/* Controls row */}
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        {/* Mode toggle */}
+        <div className="flex gap-1">
+          {(['avg', 'cumulative'] as ChartMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setChartMode(m)}
+              className={cn(
+                'px-2 py-1 text-[10px] font-mono rounded-sm transition-colors',
+                chartMode === m
+                  ? 'bg-[var(--los-accent-dim)] text-[var(--los-accent)]'
+                  : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+              )}
+            >
+              {m === 'avg' ? 'Avg / day' : 'Cumulative'}
+            </button>
+          ))}
+        </div>
+
+        {/* Clickable year legend */}
+        <div className="flex flex-wrap gap-2">
+          {years.map((year, i) => {
+            const active = activeYears.has(year);
+            const color = YEAR_COLORS[i % YEAR_COLORS.length] ?? '#60a5fa';
+            return (
+              <button
+                key={year}
+                type="button"
+                onClick={() => toggleYear(year)}
+                className={cn(
+                  'flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[10px] font-mono transition-opacity',
+                  active ? 'opacity-100' : 'opacity-30',
+                )}
+              >
+                <div style={{ width: 16, height: 2, background: color, flexShrink: 0 }} />
+                <span style={{ color: active ? color : undefined }}>{year}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 mb-2">
-        {years.map((year, i) => (
-          <div key={year} className="flex items-center gap-1.5">
-            <div
-              className="w-4 h-px"
-              style={{ background: YEAR_COLORS[i % YEAR_COLORS.length], height: '2px' }}
-            />
-            <span className="text-[10px] font-mono text-[var(--los-muted)]">{year}</span>
-          </div>
-        ))}
-      </div>
+      <div className="text-[10px] font-mono text-[var(--los-muted)] mb-2">{modeLabel}</div>
 
-      <div ref={chartRef} className="flex-1 min-h-0">
+      <div ref={chartRef} className="w-full h-[400px]">
         {width > 0 && height > 0 && (
           <svg width={width} height={height} role="img" aria-label="Monthly comparison chart">
             {/* Grid lines */}
@@ -731,7 +830,7 @@ const CompareView = ({
                     fill="var(--los-muted)"
                     className="font-mono text-[9px]"
                   >
-                    {val.toFixed(1)}
+                    {val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val.toFixed(1)}
                   </text>
                 </g>
               );
@@ -751,14 +850,15 @@ const CompareView = ({
               </text>
             ))}
 
-            {/* Lines per year */}
-            {yearData.map((points, yi) => {
+            {/* Lines per active year */}
+            {years.map((year, yi) => {
+              if (!activeYears.has(year)) return null;
+              const points = yearData[yi] ?? [];
               const color = YEAR_COLORS[yi % YEAR_COLORS.length] ?? '#60a5fa';
               const pathD = buildPath(points);
-              // Label at last non-null point
               const lastIdx = points.reduce<number>((acc, v, i) => (v !== null ? i : acc), -1);
               return (
-                <g key={years[yi]}>
+                <g key={year}>
                   {pathD && <path d={pathD} fill="none" stroke={color} strokeWidth={1.5} />}
                   {points.map((val, mi) =>
                     val !== null ? (
@@ -776,7 +876,7 @@ const CompareView = ({
                         fill={color}
                         className="font-mono text-[9px]"
                       >
-                        {years[yi]}
+                        {year}
                       </text>
                     );
                   })()}
