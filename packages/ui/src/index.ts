@@ -16,6 +16,8 @@ export * from './LifeOS/Organisms/NotFound';
 export * from './LifeOS/Organisms/RepositorySelector';
 export { type MenuItem, StatusBar, type StatusBarProps } from './LifeOS/Organisms/StatusBar';
 export * from './LifeOS/Organisms/Widgets/ActionLogLogic';
+export * from './LifeOS/Organisms/Widgets/ConsumptionLogic';
+export * from './LifeOS/Organisms/Widgets/ConsumptionWidget';
 export * from './LifeOS/Organisms/Widgets/ReadItLaterLogic';
 export * from './LifeOS/Organisms/Widgets/StocksLogic';
 export * from './LifeOS/Organisms/Widgets/StocksWidget';

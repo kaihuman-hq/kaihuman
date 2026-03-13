@@ -139,6 +139,7 @@ export class LayoutStore {
       const isActionLog = item.path.toLowerCase().endsWith('.actionlog.md');
       const isDataCollection = item.path.toLowerCase().endsWith('.data-collection.csv');
       const isStocks = item.path.toLowerCase().endsWith('.stocks.csv');
+      const isConsumption = item.path.toLowerCase().endsWith('.consumption.csv');
 
       const tile: TileDef = {
         id: item.path,
@@ -162,7 +163,8 @@ export class LayoutStore {
         isBudget ||
         isActionLog ||
         isDataCollection ||
-        isStocks;
+        isStocks ||
+        isConsumption;
 
       if (isWidget && openFiles && openFiles[item.path]) {
         tile.rawContent = openFiles[item.path]?.content;

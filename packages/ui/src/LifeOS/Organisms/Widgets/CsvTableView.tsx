@@ -28,7 +28,12 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
 
     const separator = firstLine.includes(';') ? ';' : ',';
 
-    const headers = firstLine.split(separator).map((h) => h.trim());
+    const headers = firstLine.split(separator).map((h) => {
+      const trimmed = h.trim();
+      // Decode bracket-encoded column metadata: ColName[title:X;unit:Y] → ColName
+      const bracketIdx = trimmed.indexOf('[');
+      return bracketIdx > 0 ? trimmed.slice(0, bracketIdx).trim() : trimmed;
+    });
     const rows = lines.slice(1).map((line) => line.split(separator).map((c) => c.trim()));
 
     return { headers, rows };

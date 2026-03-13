@@ -13,6 +13,7 @@ import {
   Rss,
   TrendingUp,
   X,
+  Zap,
 } from 'lucide-preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../utils';
@@ -32,6 +33,16 @@ interface Template {
 }
 
 const TEMPLATES: Template[] = [
+  {
+    id: 'consumption',
+    name: 'Consumption Tracker',
+    description:
+      'Track daily meter readings (electricity, gas, water, solar) with monthly/yearly reports',
+    icon: Zap,
+    extension: '.consumption.csv',
+    // Column format: Name[title:Display;unit:Unit;yearlyTarget:Number]
+    defaultContent: 'created\n',
+  },
   {
     id: 'stocks',
     name: 'Stocks / Portfolio',
