@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { DataCollectionData } from './DataCollectionLogic';
+import { parseCollectionDate, type DataCollectionData } from './DataCollectionLogic';
 
 interface DataCollectionChartProps {
   data: DataCollectionData;
@@ -18,12 +18,8 @@ const COLORS = [
   '#ffffff', // White
 ];
 
-// Helper to reliably parse date
-const parseDate = (val: any) => {
-  if (!val) return new Date();
-  const d = new Date(val);
-  return Number.isNaN(d.getTime()) ? new Date() : d;
-};
+// Helper to reliably parse date — delegates to the shared logic helper
+const parseDate = (val: unknown): Date => parseCollectionDate(val) ?? new Date();
 
 // Helper to format number with K/M abbreviations
 const formatNumber = (num: number) => {
@@ -35,6 +31,284 @@ const formatNumber = (num: number) => {
   }
   return num.toString();
 };
+
+// ─── Delta Chart ──────────────────────────────────────────────────────────────
+
+/**
+ * Shows the change between consecutive rows for each numeric column.
+ * Positive deltas → green tint, negative → red tint.
+ */
+export const DataCollectionDeltaChart = ({
+  data,
+  hideLegend,
+}: DataCollectionChartProps & { hideLegend?: boolean }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      if (!entries[0]) return;
+      const { width, height } = entries[0].contentRect;
+      setDimensions({ width, height });
+    });
+    observer.observe(chartRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const { width, height } = dimensions;
+
+  const numericColumns = useMemo(
+    () =>
+      data.columns.filter(
+        (c) => c.type === 'number' || c.type === 'auto:number:sum' || c.type === 'auto:number:avg',
+      ),
+    [data.columns],
+  );
+
+  const xColumn = useMemo(
+    () =>
+      data.columns.find((c) => c.name === 'created') ||
+      data.columns.find((c) => c.type.includes('date')) ||
+      data.columns[0],
+    [data.columns],
+  );
+
+  const [selectedLines, setSelectedLines] = useState<string[]>([]);
+  const isLineActive = (name: string) => selectedLines.length === 0 || selectedLines.includes(name);
+
+  // Sort rows by date, then compute deltas between consecutive entries
+  const { deltaRows, labels } = useMemo(() => {
+    const rows = [...data.rows];
+    if (xColumn?.type.includes('date')) {
+      rows.sort((a, b) => parseDate(a[xColumn.name]).getTime() - parseDate(b[xColumn.name]).getTime());
+    }
+    if (rows.length < 2) return { deltaRows: [], labels: [] };
+
+    const dr = rows.slice(1).map((row, i) => {
+      const prev = rows[i] as (typeof rows)[0];
+      const deltas: Record<string, number> = {};
+      for (const col of numericColumns) {
+        deltas[col.name] = (Number(row[col.name]) || 0) - (Number(prev[col.name]) || 0);
+      }
+      return { row, deltas };
+    });
+
+    const lbl = rows.slice(1).map((row) =>
+      xColumn?.type.includes('date')
+        ? parseDate(row[xColumn.name]).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+        : String(row[xColumn?.name ?? ''] ?? ''),
+    );
+
+    return { deltaRows: dr, labels: lbl };
+  }, [data.rows, xColumn, numericColumns]);
+
+  const hasData = deltaRows.length > 0 && numericColumns.length > 0;
+
+  const pad = { top: 20, right: 16, bottom: 28, left: 48 };
+  const cw = width - pad.left - pad.right;
+  const ch = height - pad.top - pad.bottom;
+
+  // Symmetric Y range around 0
+  const yExtent = useMemo(() => {
+    if (!hasData) return 1;
+    let max = 0;
+    for (const { deltas } of deltaRows) {
+      for (const col of numericColumns) {
+        if (isLineActive(col.name)) max = Math.max(max, Math.abs(deltas[col.name] ?? 0));
+      }
+    }
+    return max || 1;
+    // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
+  }, [deltaRows, numericColumns, hasData, isLineActive]);
+
+  const getX = (i: number) =>
+    deltaRows.length <= 1
+      ? pad.left + cw / 2
+      : pad.left + (i / (deltaRows.length - 1)) * cw;
+
+  const getY = (v: number) => pad.top + ch / 2 - (v / yExtent) * (ch / 2);
+  const zeroY = pad.top + ch / 2;
+
+  const formatNum = (v: number) =>
+    v >= 1000 || v <= -1000
+      ? `${(v / 1000).toFixed(1)}k`
+      : v.toFixed(v % 1 === 0 ? 0 : 2);
+
+  useEffect(() => {
+    if (!tooltipRef.current || !mousePos || !width || !height) return;
+    const t = tooltipRef.current;
+    let left = mousePos.x - t.offsetWidth / 2;
+    if (left < 0) left = 0;
+    if (left + t.offsetWidth > width) left = width - t.offsetWidth;
+    let top = mousePos.y + 15;
+    if (top + t.offsetHeight > height - pad.bottom) top = mousePos.y - 15 - t.offsetHeight;
+    t.style.left = `${left}px`;
+    t.style.top = `${top}px`;
+    t.style.opacity = '1';
+  }, [mousePos, width, height]);
+
+  return (
+    <div className="flex flex-col h-full w-full">
+      {!hideLegend && hasData && (
+        <div className="h-8 border-b border-[var(--los-border)] flex items-center justify-end px-2 gap-3 shrink-0 overflow-x-auto scrollbar-hide">
+          {numericColumns.map((col, i) => (
+            <button
+              key={col.name}
+              type="button"
+              onClick={() =>
+                setSelectedLines((prev) => {
+                  if (prev.length === 0) return [col.name];
+                  if (prev.includes(col.name)) {
+                    const next = prev.filter((n) => n !== col.name);
+                    return next;
+                  }
+                  return [...prev, col.name];
+                })
+              }
+              className="flex items-center gap-1.5 hover:opacity-100 transition-opacity whitespace-nowrap"
+              style={{ opacity: isLineActive(col.name) ? 1 : 0.4 }}
+            >
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+              <span className="text-[9px] font-mono text-[var(--los-muted)]">{col.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex-1 w-full min-h-[200px] relative" ref={containerRef}>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: chart mouse tracking */}
+        <div
+          className="absolute inset-0"
+          ref={chartRef}
+          onMouseLeave={() => { setHoveredIndex(null); setMousePos(null); }}
+        >
+          {!hasData || !width || !height ? (
+            <div className="absolute inset-0 flex items-center justify-center text-[var(--los-muted)] text-xs font-mono">
+              Need at least 2 rows to show deltas
+            </div>
+          ) : (
+            <>
+              {/* biome-ignore lint/a11y/noSvgWithoutTitle: decorative chart */}
+              <svg
+                width={width}
+                height={height}
+                onMouseMove={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left - pad.left;
+                  const idx = Math.min(Math.max(Math.round((x / cw) * (deltaRows.length - 1)), 0), deltaRows.length - 1);
+                  setHoveredIndex(idx);
+                  setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+                }}
+              >
+                {/* Y axis ticks: +max, 0, -max */}
+                {[yExtent, yExtent / 2, 0, -yExtent / 2, -yExtent].map((v) => {
+                  const y = getY(v);
+                  return (
+                    <g key={v}>
+                      <line
+                        x1={pad.left} y1={y}
+                        x2={width - pad.right} y2={y}
+                        stroke={v === 0 ? 'var(--los-muted)' : 'var(--los-border)'}
+                        strokeDasharray={v === 0 ? undefined : '3 3'}
+                        strokeOpacity={v === 0 ? 0.6 : 0.4}
+                      />
+                      <text x={pad.left - 4} y={y + 3} textAnchor="end" fill="var(--los-muted)" fontSize="8" fontFamily="monospace">
+                        {formatNum(v)}
+                      </text>
+                    </g>
+                  );
+                })}
+
+                {/* X axis labels: first and last */}
+                {deltaRows.length > 1 && (
+                  <>
+                    <text x={pad.left} y={height - 6} fill="var(--los-muted)" fontSize="8" fontFamily="monospace">{labels[0]}</text>
+                    <text x={width - pad.right} y={height - 6} textAnchor="end" fill="var(--los-muted)" fontSize="8" fontFamily="monospace">{labels[labels.length - 1]}</text>
+                  </>
+                )}
+
+                {/* Lines */}
+                {numericColumns.map((col, i) => {
+                  if (!isLineActive(col.name)) return null;
+                  const pts = deltaRows
+                    .map((dr, idx) => `${idx === 0 ? 'M' : 'L'}${getX(idx).toFixed(1)},${getY(dr.deltas[col.name] ?? 0).toFixed(1)}`)
+                    .join(' ');
+                  return <path key={col.name} d={pts} fill="none" stroke={COLORS[i % COLORS.length]} strokeWidth="1.5" />;
+                })}
+
+                {/* Zero line fill areas (subtle) */}
+                {numericColumns.length === 1 && isLineActive(numericColumns[0]!.name) && (() => {
+                  const col = numericColumns[0]!;
+                  const pts = deltaRows.map((dr, idx) =>
+                    `${getX(idx).toFixed(1)},${getY(dr.deltas[col.name] ?? 0).toFixed(1)}`
+                  ).join(' ');
+                  const first = `${getX(0).toFixed(1)},${zeroY.toFixed(1)}`;
+                  const last = `${getX(deltaRows.length - 1).toFixed(1)},${zeroY.toFixed(1)}`;
+                  return (
+                    <polygon
+                      points={`${first} ${pts} ${last}`}
+                      fill={COLORS[0]}
+                      fillOpacity="0.08"
+                    />
+                  );
+                })()}
+
+                {/* Hover line */}
+                {hoveredIndex !== null && (
+                  <line
+                    x1={getX(hoveredIndex)} y1={pad.top}
+                    x2={getX(hoveredIndex)} y2={height - pad.bottom}
+                    stroke="var(--los-border)"
+                  />
+                )}
+
+                {/* Hover dots */}
+                {hoveredIndex !== null && numericColumns.map((col, i) => {
+                  if (!isLineActive(col.name)) return null;
+                  const v = deltaRows[hoveredIndex]?.deltas[col.name] ?? 0;
+                  return (
+                    <circle key={col.name} cx={getX(hoveredIndex)} cy={getY(v)} r="3"
+                      fill="var(--los-bg)" stroke={COLORS[i % COLORS.length]} strokeWidth="2" />
+                  );
+                })}
+              </svg>
+
+              {/* Tooltip */}
+              {hoveredIndex !== null && mousePos !== null && (
+                <div
+                  ref={tooltipRef}
+                  className="absolute z-10 bg-[var(--los-bg)] border border-[var(--los-border)] p-2 rounded shadow-xl pointer-events-none opacity-0 text-[10px] font-mono"
+                >
+                  <div className="text-[var(--los-muted)] mb-1">{labels[hoveredIndex]}</div>
+                  {numericColumns.map((col, i) => {
+                    if (!isLineActive(col.name)) return null;
+                    const v = deltaRows[hoveredIndex]?.deltas[col.name] ?? 0;
+                    return (
+                      <div key={col.name} className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                        <span className="text-[var(--los-muted)]">{col.name}:</span>
+                        <span className={v >= 0 ? 'text-green-400' : 'text-red-400'}>
+                          {v >= 0 ? '+' : ''}{formatNum(v)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Main Chart ───────────────────────────────────────────────────────────────
 
 export const DataCollectionChart = ({
   data,

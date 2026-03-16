@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
-import { DataCollectionChart } from './DataCollectionChart';
+import { DataCollectionChart, DataCollectionDeltaChart } from './DataCollectionChart';
 import { parseDataCollection } from './DataCollectionLogic';
 
 export interface DataCollectionWidgetProps {
@@ -39,6 +39,7 @@ export const DataCollectionWidget = ({
 }: DataCollectionWidgetProps) => {
   const data = useMemo(() => parseDataCollection(content), [content]);
   const [filterMode, setFilterMode] = useState<TimeFilterMode>('ALL');
+  const [chartView, setChartView] = useState<'chart' | 'delta'>('chart');
 
   const filteredRows = useMemo(() => {
     if (mode === 'SMALL' || mode === 'MOBILE_EXPANDED') return data.rows;
@@ -70,11 +71,26 @@ export const DataCollectionWidget = ({
 
   return (
     <div className={cn('flex-1 flex flex-col h-full w-full min-h-0', className)}>
-      {/* FILTER SWITCHER (FOCUS MODE ONLY) */}
+      {/* FILTER + VIEW SWITCHER (FOCUS MODE ONLY) */}
       {mode === 'FOCUS' && (
-        <div className="flex items-center justify-end px-4 py-2 gap-2 border-b border-[var(--los-border)] overflow-x-auto scrollbar-hide">
+        <div className="flex items-center px-4 py-2 gap-2 border-b border-[var(--los-border)] overflow-x-auto scrollbar-hide">
+          {/* View toggle */}
           <FilterButton
-            label="ALL YEARS"
+            label="CHART"
+            active={chartView === 'chart'}
+            onClick={() => setChartView('chart')}
+          />
+          <FilterButton
+            label="DELTA"
+            active={chartView === 'delta'}
+            onClick={() => setChartView('delta')}
+          />
+
+          <div className="flex-1" />
+
+          {/* Time filter (only meaningful for chart view) */}
+          <FilterButton
+            label="ALL"
             active={filterMode === 'ALL'}
             onClick={() => setFilterMode('ALL')}
           />
@@ -113,10 +129,14 @@ export const DataCollectionWidget = ({
 
       <div className="flex-1 min-h-0 relative min-h-[200px] w-full">
         <div className="absolute inset-0">
-          <DataCollectionChart
-            data={filteredData}
-            hideLegend={mode === 'SMALL' || mode === 'MOBILE_EXPANDED'}
-          />
+          {mode === 'FOCUS' && chartView === 'delta' ? (
+            <DataCollectionDeltaChart data={filteredData} />
+          ) : (
+            <DataCollectionChart
+              data={filteredData}
+              hideLegend={mode === 'SMALL' || mode === 'MOBILE_EXPANDED'}
+            />
+          )}
         </div>
       </div>
 

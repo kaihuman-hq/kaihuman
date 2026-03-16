@@ -305,6 +305,25 @@ export const deleteColumn = (data: DataCollectionData, colName: string): DataCol
 };
 
 /**
+ * Parse a date value from a data collection row.
+ * Handles full ISO timestamps and date-only strings like "2025-11-23".
+ * Date-only strings are interpreted as local midnight to avoid UTC vs local
+ * timezone off-by-one issues.
+ */
+export function parseCollectionDate(val: unknown): Date | null {
+  if (!val) return null;
+  const s = String(val).trim();
+  if (!s) return null;
+  // Date-only YYYY-MM-DD: interpret as local midnight
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const d = new Date(`${s}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
  * Filter rows by time.
  * Logic: Find the FIRST column that is basically a date (date, auto:date, auto:date:yesterday).
  * Return rows that match the year criteria.
@@ -328,7 +347,6 @@ export const filterDataByTime = (data: DataCollectionData, mode: TimeFilterMode)
   const currentYear = now.getFullYear();
   const lastYear = currentYear - 1;
 
-  // Calculate cutoff dates for relative ranges
   const getCutoffDate = (monthsAgo: number) => {
     const d = new Date();
     d.setMonth(d.getMonth() - monthsAgo);
@@ -337,25 +355,13 @@ export const filterDataByTime = (data: DataCollectionData, mode: TimeFilterMode)
   };
 
   return data.rows.filter((row) => {
-    const val = row[dateCol.name];
-    if (!val) return false;
+    const d = parseCollectionDate(row[dateCol.name]);
+    if (!d) return false;
 
-    const d = new Date(String(val));
-    if (Number.isNaN(d.getTime())) return false;
-
-    if (mode === 'YTD') {
-      return d.getFullYear() === currentYear;
-    }
-    if (mode === 'LAST_YEAR') {
-      return d.getFullYear() === lastYear;
-    }
-    if (mode === 'LAST_6_MONTHS') {
-      return d >= getCutoffDate(6);
-    }
-    if (mode === 'LAST_12_MONTHS') {
-      return d >= getCutoffDate(12);
-    }
-
+    if (mode === 'YTD') return d.getFullYear() === currentYear;
+    if (mode === 'LAST_YEAR') return d.getFullYear() === lastYear;
+    if (mode === 'LAST_6_MONTHS') return d >= getCutoffDate(6);
+    if (mode === 'LAST_12_MONTHS') return d >= getCutoffDate(12);
     return true;
   });
 };
