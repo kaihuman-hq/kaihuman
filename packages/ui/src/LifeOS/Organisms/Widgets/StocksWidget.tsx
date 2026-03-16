@@ -536,7 +536,7 @@ const AddForm = ({ onAdd }: { onAdd: (value: number, invest: number, date: Date)
         />
       </div>
       <div className="flex flex-col gap-1">
-        <MonoText className="text-[10px] text-[var(--los-muted)]">Total Invested</MonoText>
+        <MonoText className="text-[10px] text-[var(--los-muted)]">Invested this period</MonoText>
         <input
           type="number"
           step="any"

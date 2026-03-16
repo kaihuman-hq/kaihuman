@@ -1,25 +1,35 @@
 /**
  * Logic for the Stocks Widget (.stocks.csv)
  *
- * Format: semicolon-delimited CSV, no mandatory header
- *   timestamp;value;invest
+ * Format: comma-delimited CSV with header
+ *   timestamp,current value,invest
+ *
+ * The "invest" column is the incremental amount invested at that entry (optional).
+ * Empty invest cells mean no new investment at that point.
  *
  * Timestamps accepted:
  *   - German: DD.MM.YYYY HH:MM:SS  or  DD.MM.YYYY
  *   - ISO:    YYYY-MM-DD HH:MM:SS  or  YYYY-MM-DD
  *
- * Aggregation: only the LATEST entry per period (week/month/year) is used.
+ * Legacy format (semicolon-delimited) is also accepted for backward compatibility.
+ * In the legacy format the invest column stores the cumulative total invested;
+ * it is converted to incremental deltas during parsing.
+ *
+ * Aggregation: the LATEST value entry per period (week/month/year) is used;
+ * all invest deltas within a period are summed.
  */
 
 export interface StockEntry {
   timestamp: Date;
   value: number;
+  /** Incremental invest amount at this entry (0 if nothing new was invested). */
   invest: number;
 }
 
 export interface PeriodPoint {
   label: string;
   value: number;
+  /** Cumulative total invested up to and including this period. */
   invest: number;
   profit: number;
   profitPct: number | null; // % vs previous period
@@ -48,15 +58,33 @@ function parseTimestamp(raw: string): Date | null {
   return null;
 }
 
+/** Detect the delimiter from the first non-header data line. */
+function detectDelimiter(content: string): ',' | ';' {
+  for (const line of content.split('\n')) {
+    const t = line.trim();
+    if (!t || t.startsWith('#')) continue;
+    // Skip header: any line whose first field is a known header name
+    const firstField = t.split(/[,;]/)[0]?.trim().toLowerCase() ?? '';
+    if (firstField === 'timestamp' || firstField === 'zeitstempel') continue;
+    // If the line has a semicolon we treat it as semicolon-delimited
+    return t.includes(';') ? ';' : ',';
+  }
+  return ',';
+}
+
 export function parseStocks(content: string): StockEntry[] {
   if (!content.trim()) return [];
 
-  const entries: StockEntry[] = [];
+  const delimiter = detectDelimiter(content);
+  const legacyCumulative = delimiter === ';';
+
+  const rawEntries: { timestamp: Date; value: number; investRaw: number }[] = [];
+
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
 
-    const parts = trimmed.split(';');
+    const parts = trimmed.split(delimiter);
     if (parts.length < 2) continue;
 
     // Skip header line
@@ -67,24 +95,45 @@ export function parseStocks(content: string): StockEntry[] {
     if (!ts) continue;
 
     const value = Number.parseFloat((parts[1] ?? '0').replace(',', '.').trim());
-    const invest =
-      parts[2] !== undefined ? Number.parseFloat(parts[2].replace(',', '.').trim()) : 0;
+    const rawInvest =
+      parts[2] !== undefined && parts[2].trim() !== ''
+        ? Number.parseFloat(parts[2].replace(',', '.').trim())
+        : 0;
     if (Number.isNaN(value)) continue;
 
-    entries.push({ timestamp: ts, value, invest: Number.isNaN(invest) ? 0 : invest });
+    rawEntries.push({ timestamp: ts, value, investRaw: Number.isNaN(rawInvest) ? 0 : rawInvest });
   }
 
-  return entries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  rawEntries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+  // Convert cumulative invest (legacy) to incremental deltas
+  const entries: StockEntry[] = [];
+  if (legacyCumulative) {
+    let prevCumulative = 0;
+    for (const e of rawEntries) {
+      const delta = Math.max(0, e.investRaw - prevCumulative);
+      prevCumulative = e.investRaw;
+      entries.push({ timestamp: e.timestamp, value: e.value, invest: delta });
+    }
+  } else {
+    for (const e of rawEntries) {
+      entries.push({ timestamp: e.timestamp, value: e.value, invest: e.investRaw });
+    }
+  }
+
+  return entries;
 }
 
 export function serializeStocks(entries: StockEntry[]): string {
+  const header = 'timestamp,current value,invest';
   const lines = entries.map((e) => {
     const d = e.timestamp;
     const pad = (n: number) => String(n).padStart(2, '0');
     const ts = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    return `${ts};${e.value};${e.invest}`;
+    const investStr = e.invest > 0 ? String(e.invest) : '';
+    return `${ts},${e.value},${investStr}`;
   });
-  return `${lines.join('\n')}${lines.length ? '\n' : ''}`;
+  return [header, ...lines].join('\n') + '\n';
 }
 
 export function addEntry(content: string, value: number, invest: number, date?: Date): string {
@@ -132,25 +181,33 @@ function shortLabel(key: string, period: StockPeriod): string {
 export function aggregateByPeriod(entries: StockEntry[], period: StockPeriod): PeriodPoint[] {
   if (entries.length === 0) return [];
 
-  const map = new Map<string, StockEntry>();
+  // For each period: keep the last (latest) value entry, sum all invest deltas
+  const valueMap = new Map<string, StockEntry>();
+  const investMap = new Map<string, number>();
+
   for (const e of entries) {
-    map.set(periodKey(e.timestamp, period), e);
+    const key = periodKey(e.timestamp, period);
+    valueMap.set(key, e); // overwrites with later entry → last per period
+    investMap.set(key, (investMap.get(key) ?? 0) + e.invest);
   }
 
-  const keys = [...map.keys()].sort();
+  const keys = [...valueMap.keys()].sort();
   const points: PeriodPoint[] = [];
+  let cumulativeInvest = 0;
 
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i] as string;
-    const entry = map.get(key) as StockEntry;
-    const prev = i > 0 ? (map.get(keys[i - 1] as string) as StockEntry) : null;
-    const profit = entry.value - entry.invest;
+    const entry = valueMap.get(key) as StockEntry;
+    cumulativeInvest += investMap.get(key) ?? 0;
+
+    const prev = i > 0 ? points[i - 1] : null;
+    const profit = entry.value - cumulativeInvest;
     const profitPct = prev ? ((entry.value - prev.value) / prev.value) * 100 : null;
 
     points.push({
       label: shortLabel(key, period),
       value: entry.value,
-      invest: entry.invest,
+      invest: cumulativeInvest,
       profit,
       profitPct,
     });
@@ -181,8 +238,9 @@ export function getStats(entries: StockEntry[]): StockStats | null {
   const latest = entries[entries.length - 1] as StockEntry;
   const prev = entries.length > 1 ? (entries[entries.length - 2] as StockEntry) : null;
 
-  const latestProfit = latest.value - latest.invest;
-  const latestProfitPct = latest.invest > 0 ? (latestProfit / latest.invest) * 100 : 0;
+  const totalInvested = entries.reduce((sum, e) => sum + e.invest, 0);
+  const latestProfit = latest.value - totalInvested;
+  const latestProfitPct = totalInvested > 0 ? (latestProfit / totalInvested) * 100 : 0;
   const changeVsPrev = prev ? latest.value - prev.value : null;
   const changeVsPrevPct =
     prev && prev.value > 0 ? ((latest.value - prev.value) / prev.value) * 100 : null;
@@ -202,7 +260,7 @@ export function getStats(entries: StockEntry[]): StockStats | null {
 
   return {
     latestValue: latest.value,
-    latestInvest: latest.invest,
+    latestInvest: totalInvested,
     latestProfit,
     latestProfitPct,
     changeVsPrev,
