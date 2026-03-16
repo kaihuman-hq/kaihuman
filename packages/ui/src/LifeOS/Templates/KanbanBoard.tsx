@@ -302,6 +302,7 @@ const AddTaskModal = ({
   const [text, setText] = useState('');
   const [selectedFile, setSelectedFile] = useState(initialFilePath || todoFilePaths[0] || '');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState('');
   const [createPromptFile, setCreatePromptFile] = useState(false);
   const [promptFileName, setPromptFileName] = useState('');
   const [openAfter, setOpenAfter] = useState(false);
@@ -319,6 +320,13 @@ const AddTaskModal = ({
     }
     return Array.from(tags).sort();
   }, [fileData]);
+
+  const addNewTag = () => {
+    const t = newTag.trim().toLowerCase().replace(/\s+/g, '-');
+    if (!t || selectedTags.includes(t)) return;
+    setSelectedTags((prev) => [...prev, t]);
+    setNewTag('');
+  };
 
   const handleAdd = async () => {
     if (!text.trim() || !selectedFile) return;
@@ -391,10 +399,10 @@ const AddTaskModal = ({
           className="w-full bg-transparent border border-[var(--los-border)] focus:border-[var(--los-accent)] px-3 py-2 text-sm font-mono outline-none transition-colors mb-4"
         />
 
-        {availableTags.length > 0 && (
-          <div className="mb-4">
-            <MonoLabel className="mb-2 block">TAGS</MonoLabel>
-            <div className="flex flex-wrap gap-1.5">
+        <div className="mb-4">
+          <MonoLabel className="mb-2 block">TAGS</MonoLabel>
+          {availableTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
               {availableTags.map((tag) => (
                 <button
                   key={tag}
@@ -415,8 +423,36 @@ const AddTaskModal = ({
                 </button>
               ))}
             </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newTag}
+              onInput={(e) => setNewTag(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addNewTag();
+                }
+              }}
+              className="flex-1 bg-transparent border border-[var(--los-border)] focus:border-[var(--los-accent)] px-3 py-1.5 text-sm font-mono outline-none transition-colors"
+              placeholder="new-tag"
+            />
+            <button
+              type="button"
+              onClick={addNewTag}
+              disabled={!newTag.trim()}
+              className="px-3 border border-[var(--los-border)] text-xs font-mono hover:bg-white/5 disabled:opacity-40 transition-colors"
+            >
+              ADD
+            </button>
           </div>
-        )}
+          {selectedTags.length > 0 && (
+            <MonoText className="text-[10px] text-[var(--los-muted)] mt-1">
+              Selected: {selectedTags.map((t) => `#${t}`).join(' ')}
+            </MonoText>
+          )}
+        </div>
 
         {/* Prompt file */}
         <div className="flex flex-col gap-4 border-t border-[var(--los-border)] pt-5">
