@@ -169,20 +169,17 @@ export const SearchModal = ({
     const cmds = getCommands(query);
 
     if (!query) {
-      // Just show commands by default if query empty?
-      // Or show nothing?
-      // "currently it (only) searches..." implies we should search commands too.
-      // Let's show all commands if query is empty
+      setLoading(false);
       setResults(cmds.slice(0, 50));
       return;
     }
 
     // Set immediate results with commands while waiting for API
+    setLoading(true);
     setResults(cmds);
     setSelectedIndex(0);
 
     const timer = setTimeout(async () => {
-      setLoading(true);
       try {
         // GitHub Search (Content + Filename)
         const qContent = encodeURIComponent(`${query} repo:${currentRepository} `);
