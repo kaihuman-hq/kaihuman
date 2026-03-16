@@ -27,6 +27,26 @@ export interface DataCollectionData {
   rows: DataRow[];
 }
 
+/** Try to parse a raw string as a date. Returns ISO string, or null if not parseable. */
+function tryParseAsDate(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+
+  // German: DD.MM.YYYY [HH:MM:SS]
+  const deMatch = s.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/);
+  if (deMatch) {
+    const [, dd, mm, yyyy, hh = '00', mi = '00', sec = '00'] = deMatch;
+    const d = new Date(`${yyyy}-${mm}-${dd}T${hh}:${mi}:${sec}`);
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+
+  // ISO / any format native Date understands
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d.toISOString();
+
+  return null;
+}
+
 /**
  * Parsing Logic
  * Format:
@@ -68,13 +88,31 @@ export const parseDataCollection = (csv: string): DataCollectionData => {
   // Filter out invalid columns (no name)
   const validColumns = columnDefs.filter((c) => !!c.name);
 
+  // Auto-detect data row delimiter: the header uses ';' to separate column
+  // definitions, but data rows may use ',' (as in files exported from spreadsheets).
+  // Pick whichever delimiter produces the expected number of columns on the first
+  // non-empty data line; fall back to ';' if neither matches.
+  let rowDelimiter = ';';
+  for (let i = 1; i < lines.length; i++) {
+    const l = lines[i]?.trim();
+    if (!l) continue;
+    if (l.split(',').length === validColumns.length) {
+      rowDelimiter = ',';
+    }
+    // ';' is already the default; no need to re-check
+    break;
+  }
+
   // Parse Rows
+  // Track columns that need migration from number → date
+  const numberToDateMigrations = new Set<string>();
+
   const rows: DataRow[] = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]?.trim();
     if (!line) continue;
 
-    const values = line.split(';');
+    const values = line.split(rowDelimiter);
     const row: DataRow = {};
 
     validColumns.forEach((col, index) => {
@@ -85,23 +123,42 @@ export const parseDataCollection = (csv: string): DataCollectionData => {
         col.type === 'auto:number:sum' ||
         col.type === 'auto:number:avg'
       ) {
-        const num = parseFloat(rawVal || '0');
-        row[col.name] = Number.isNaN(num) ? 0 : num;
+        const rawStr = (rawVal || '').trim();
+        // Use Number() (strict) so "2025-01-15" or "15.03.2024" are not
+        // partially parsed as numbers the way parseFloat() would.
+        const num = rawStr !== '' ? Number(rawStr) : 0;
+        if (Number.isNaN(num) && rawStr !== '') {
+          // Not a valid number — try to migrate to date
+          const asDate = tryParseAsDate(rawStr);
+          if (asDate !== null) {
+            numberToDateMigrations.add(col.name);
+            row[col.name] = asDate;
+          } else {
+            row[col.name] = 0;
+          }
+        } else {
+          row[col.name] = Number.isNaN(num) ? 0 : num;
+        }
       } else if (
         col.type === 'date' ||
         col.type === 'auto:date' ||
         col.type === 'auto:date:yesterday'
       ) {
-        // Try parsing ISO date
-        // If rawVal is empty/invalid, we keep it as null or handle it?
-        // For auto fields, they should be regenerated on save, but on read we trust the file?
-        // Let's trust the file content for read.
         row[col.name] = rawVal || null;
       } else {
         row[col.name] = rawVal || null;
       }
     });
     rows.push(row);
+  }
+
+  // Apply column migrations: number → date
+  for (const colName of numberToDateMigrations) {
+    const col = validColumns.find((c) => c.name === colName);
+    if (col) {
+      col.type = 'date';
+      col.isAuto = false;
+    }
   }
 
   return { columns: validColumns, rows };
@@ -248,6 +305,25 @@ export const deleteColumn = (data: DataCollectionData, colName: string): DataCol
 };
 
 /**
+ * Parse a date value from a data collection row.
+ * Handles full ISO timestamps and date-only strings like "2025-11-23".
+ * Date-only strings are interpreted as local midnight to avoid UTC vs local
+ * timezone off-by-one issues.
+ */
+export function parseCollectionDate(val: unknown): Date | null {
+  if (!val) return null;
+  const s = String(val).trim();
+  if (!s) return null;
+  // Date-only YYYY-MM-DD: interpret as local midnight
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const d = new Date(`${s}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
  * Filter rows by time.
  * Logic: Find the FIRST column that is basically a date (date, auto:date, auto:date:yesterday).
  * Return rows that match the year criteria.
@@ -271,7 +347,6 @@ export const filterDataByTime = (data: DataCollectionData, mode: TimeFilterMode)
   const currentYear = now.getFullYear();
   const lastYear = currentYear - 1;
 
-  // Calculate cutoff dates for relative ranges
   const getCutoffDate = (monthsAgo: number) => {
     const d = new Date();
     d.setMonth(d.getMonth() - monthsAgo);
@@ -280,25 +355,13 @@ export const filterDataByTime = (data: DataCollectionData, mode: TimeFilterMode)
   };
 
   return data.rows.filter((row) => {
-    const val = row[dateCol.name];
-    if (!val) return false;
+    const d = parseCollectionDate(row[dateCol.name]);
+    if (!d) return false;
 
-    const d = new Date(String(val));
-    if (Number.isNaN(d.getTime())) return false;
-
-    if (mode === 'YTD') {
-      return d.getFullYear() === currentYear;
-    }
-    if (mode === 'LAST_YEAR') {
-      return d.getFullYear() === lastYear;
-    }
-    if (mode === 'LAST_6_MONTHS') {
-      return d >= getCutoffDate(6);
-    }
-    if (mode === 'LAST_12_MONTHS') {
-      return d >= getCutoffDate(12);
-    }
-
+    if (mode === 'YTD') return d.getFullYear() === currentYear;
+    if (mode === 'LAST_YEAR') return d.getFullYear() === lastYear;
+    if (mode === 'LAST_6_MONTHS') return d >= getCutoffDate(6);
+    if (mode === 'LAST_12_MONTHS') return d >= getCutoffDate(12);
     return true;
   });
 };

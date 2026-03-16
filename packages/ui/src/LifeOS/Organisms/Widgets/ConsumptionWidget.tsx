@@ -79,7 +79,7 @@ export const ConsumptionWidget = ({ content, mode, onChange }: ConsumptionWidget
         </div>
       );
     }
-    return <RecentTable data={data} compact />;
+    return <SmallWidget data={data} onDataChange={handleDataChange} />;
   }
 
   return <FocusView data={data} onDataChange={handleDataChange} />;
@@ -134,6 +134,162 @@ const RecentTable = ({ data, compact }: { data: ConsumptionData; compact?: boole
           ))}
         </tbody>
       </table>
+    </div>
+  );
+};
+
+// --- Small widget with quick-add ---
+
+const SmallWidget = ({
+  data,
+  onDataChange,
+}: {
+  data: ConsumptionData;
+  onDataChange: (newData: ConsumptionData) => void;
+}) => {
+  const [adding, setAdding] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
+  const [readings, setReadings] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const currentYear = new Date().getFullYear();
+
+  const yearlyTotals = useMemo(() => {
+    const stats = getYearlyStats(data);
+    return stats.find((s) => s.year === currentYear)?.totalByKey ?? {};
+  }, [data, currentYear]);
+
+  const lastReadings = useMemo(() => {
+    const result: Record<string, number> = {};
+    const sorted = [...data.entries].sort((a, b) => a.date.localeCompare(b.date));
+    for (const entry of sorted) {
+      for (const col of data.columns) {
+        const val = entry.readings[col.key];
+        if (val !== undefined && !Number.isNaN(val)) {
+          result[col.key] = val;
+        }
+      }
+    }
+    return result;
+  }, [data]);
+
+  const handleSubmit = () => {
+    if (!date) {
+      setError('Date required');
+      return;
+    }
+    if (data.entries.some((e) => e.date === date)) {
+      setError('Entry already exists');
+      return;
+    }
+    const parsedReadings: Record<string, number> = {};
+    for (const col of data.columns) {
+      const val = readings[col.key];
+      parsedReadings[col.key] = val ? Number(val) : NaN;
+    }
+    setError(null);
+    onDataChange(addConsumptionEntry(data, date, parsedReadings));
+    setReadings({});
+    setAdding(false);
+  };
+
+  if (adding) {
+    return (
+      <div className="p-3 space-y-2 overflow-auto h-full custom-scrollbar">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[9px] font-mono text-[var(--los-muted)] uppercase tracking-wider">
+            New Entry
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(false);
+              setError(null);
+            }}
+            className="text-[var(--los-muted)] hover:text-[var(--los-fg)] transition-colors font-mono text-xs leading-none"
+          >
+            ✕
+          </button>
+        </div>
+        <div>
+          <div className="text-[9px] font-mono text-[var(--los-muted)] mb-0.5">DATE</div>
+          <input
+            type="date"
+            value={date}
+            onInput={(e) => setDate(e.currentTarget.value)}
+            className="bg-transparent border-b border-[var(--los-border)] py-0.5 text-xs font-mono focus:outline-none focus:border-[var(--los-accent)] text-[var(--los-fg)] w-full"
+          />
+        </div>
+        {data.columns.map((col) => {
+          const last = lastReadings[col.key];
+          return (
+            <div key={col.key}>
+              <div className="text-[9px] font-mono text-[var(--los-muted)] mb-0.5">
+                {col.title.toUpperCase()}
+                {col.unit ? ` (${col.unit})` : ''}
+                {last !== undefined ? (
+                  <span className="ml-1 opacity-50">last: {formatNum(last)}</span>
+                ) : null}
+              </div>
+              <input
+                type="number"
+                value={readings[col.key] ?? ''}
+                onInput={(e) =>
+                  setReadings((prev) => ({ ...prev, [col.key]: e.currentTarget.value }))
+                }
+                placeholder={last !== undefined ? String(Math.round(last)) : '0'}
+                className="w-full bg-transparent border-b border-[var(--los-border)] py-0.5 text-xs font-mono focus:outline-none focus:border-[var(--los-accent)] text-[var(--los-fg)]"
+              />
+            </div>
+          );
+        })}
+        {error && <div className="text-red-400 text-[9px] font-mono">{error}</div>}
+        <button
+          type="button"
+          onClick={handleSubmit}
+          className="px-3 py-1 bg-[var(--los-accent-dim)] text-[var(--los-accent)] text-[9px] font-mono hover:opacity-80 transition-opacity"
+        >
+          ADD
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-stretch h-full w-full">
+      {/* Yearly totals */}
+      <div className="flex-1 flex flex-col justify-center gap-2 p-3 min-w-0">
+        <div className="text-[9px] font-mono text-[var(--los-muted)] uppercase tracking-wider">
+          {currentYear}
+        </div>
+        {data.columns.map((col) => {
+          const total = yearlyTotals[col.key];
+          return (
+            <div key={col.key} className="flex items-baseline gap-1.5 min-w-0">
+              <span className="text-[10px] font-mono text-[var(--los-muted)] truncate shrink-0">
+                {col.title}
+              </span>
+              <span className="text-sm font-mono font-bold text-[var(--los-fg)] tabular-nums">
+                {total !== undefined && !Number.isNaN(total) ? formatNum(total) : '–'}
+              </span>
+              {col.unit && (
+                <span className="text-[9px] font-mono text-[var(--los-muted)]">{col.unit}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Add button */}
+      <button
+        type="button"
+        onClick={() => setAdding(true)}
+        className="flex items-center justify-center w-10 shrink-0 border-l border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] transition-colors font-mono text-lg leading-none"
+        title="Add entry"
+      >
+        +
+      </button>
     </div>
   );
 };
@@ -194,19 +350,22 @@ const FocusView = ({
           </button>
         ))}
 
-        {showMetricSelector && (
-          <select
-            value={activeMetricKey}
-            onChange={(e) => setSelectedMetricKey((e.target as HTMLSelectElement).value)}
-            className="ml-2 text-[10px] font-mono bg-[var(--los-bg)] text-[var(--los-fg)] border border-[var(--los-border)] rounded-sm px-2 py-1"
-          >
-            {data.columns.map((col) => (
-              <option key={col.key} value={col.key}>
-                {col.title}
-              </option>
-            ))}
-          </select>
-        )}
+        {showMetricSelector &&
+          data.columns.map((col) => (
+            <button
+              key={col.key}
+              type="button"
+              onClick={() => setSelectedMetricKey(col.key)}
+              className={cn(
+                'px-2 py-0.5 text-[10px] font-mono rounded-full border transition-colors',
+                activeMetricKey === col.key
+                  ? 'bg-[var(--los-accent-dim)] text-[var(--los-accent)] border-[var(--los-accent)]'
+                  : 'text-[var(--los-muted)] border-[var(--los-border)] hover:text-[var(--los-fg)]',
+              )}
+            >
+              {col.title}
+            </button>
+          ))}
 
         {showYearSelector && (
           <select

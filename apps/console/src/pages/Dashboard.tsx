@@ -42,11 +42,15 @@ export const Dashboard = () => {
   useEffect(() => {
     if (repo) {
       logger.info(`Loading tree for ${repo.full_name}`);
+      // Reset config and active dashboard so the loading spinner shows while the
+      // new repo's config and files are being fetched.
+      layoutStore.remoteConfig.value = null;
+      layoutStore.activeDashboardId.value = null;
       githubFileStore.loadTree();
     }
   }, [repo?.full_name]);
 
-  // 3. Load Remote Config
+  // 3. Load Remote Config and pre-load dashboard files
   useEffect(() => {
     // Only run if we have a tree and no config (or repo changed)
     if (!tree || tree.length === 0) return;
@@ -56,41 +60,53 @@ export const Dashboard = () => {
 
     const loadConfig = async () => {
       logger.info('Checking for remote config...');
+      let config: import('@lifosy/core').DashboardConfig | null = null;
+
       if (configItem) {
         try {
           // Check if already open
           let content = openFiles[CONFIG_PATH]?.content;
           if (!content) {
-            const fileData = await githubFileStore.openFile(CONFIG_PATH);
-            // fileData in openFile doesn't return, it updates store.
-            // We wait for store update or grab from store now?
-            // openFile is async, so after await, it should be in openFiles
+            await githubFileStore.openFile(CONFIG_PATH);
             content = githubFileStore.openFiles.peek()[CONFIG_PATH]?.content;
           }
 
           if (content) {
-            const parsed = JSON.parse(content);
+            config = JSON.parse(content);
             logger.info('Config loaded successfully');
-            layoutStore.remoteConfig.value = parsed;
-            return;
           }
         } catch (e) {
           logger.error('Failed to load config', e);
         }
       }
 
-      // Fallback: Default Config
-      logger.info('No config found, using default.');
-      const DEFAULT_DASHBOARD_CONFIG = {
-        version: 1,
-        dashboards: [{ id: 'default', name: 'Main' }],
-        entries: [],
-        files: {
-          recentlyOpened: [],
-        },
-      };
+      if (!config) {
+        // Fallback: Default Config
+        logger.info('No config found, using default.');
+        config = {
+          version: 1,
+          dashboards: [{ id: 'default', name: 'Main' }],
+          entries: [],
+          files: { recentlyOpened: [] },
+        };
+      }
 
-      layoutStore.remoteConfig.value = DEFAULT_DASHBOARD_CONFIG;
+      // Pre-load all files for the default dashboard so tiles render with content
+      // immediately when remoteConfig is revealed (no empty-widget flash).
+      const defaultDashboardId = config.dashboards?.[0]?.id;
+      if (defaultDashboardId) {
+        const entries = (config.entries ?? []).filter(
+          (e: { dashboard: string }) => e.dashboard === defaultDashboardId,
+        );
+        if (entries.length > 0) {
+          logger.info(`Pre-loading ${entries.length} dashboard files…`);
+          await Promise.allSettled(
+            entries.map((e: { path: string }) => githubFileStore.openFile(e.path)),
+          );
+        }
+      }
+
+      layoutStore.remoteConfig.value = config;
     };
 
     loadConfig();

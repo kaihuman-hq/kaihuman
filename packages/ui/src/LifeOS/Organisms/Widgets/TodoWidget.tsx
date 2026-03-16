@@ -473,16 +473,13 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
   // ── MOBILE_COLLAPSED ──────────────────────────────────────────────────────
   if (mode === 'MOBILE_COLLAPSED') {
     return (
-      <div
-        className={cn(
-          'flex flex-col items-center justify-center h-full w-full p-2 gap-1',
-          className,
-        )}
-      >
-        <MonoHeader className="text-4xl font-bold leading-none">{activeCount}</MonoHeader>
-        <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-wider">
-          OPEN TASKS
-        </MonoText>
+      <div className={cn('flex items-stretch h-full w-full', className)}>
+        <div className="flex flex-col items-center justify-center flex-1 p-2 gap-1">
+          <MonoHeader className="text-4xl font-bold leading-none">{activeCount}</MonoHeader>
+          <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-wider">
+            OPEN TASKS
+          </MonoText>
+        </div>
         {onOpenAdd && (
           <button
             type="button"
@@ -490,9 +487,10 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
               e.stopPropagation();
               onOpenAdd();
             }}
-            className="mt-4 flex items-center gap-1 px-3 py-1.5 border border-[var(--los-border)] text-[10px] uppercase text-[var(--los-muted)] hover:text-[var(--los-fg)] hover:border-[var(--los-accent)] transition-colors"
+            className="flex items-center justify-center w-10 shrink-0 border-l border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] transition-colors font-mono text-lg leading-none"
+            title="Add task"
           >
-            <Plus size={12} /> NEW TASK
+            +
           </button>
         )}
       </div>
@@ -577,7 +575,8 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
 
   // ── SMALL / FOCUS ─────────────────────────────────────────────────────────
   return (
-    <div className={cn('flex flex-col w-full', isFocus ? 'min-h-full' : 'h-full', className)}>
+    <div className={cn('flex items-stretch w-full', isFocus ? 'min-h-full' : 'h-full', className)}>
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
       {/* Header */}
       <div className="flex justify-between items-center mb-2 shrink-0 px-1">
         <MonoHeader className="text-sm">TASKS</MonoHeader>
@@ -758,6 +757,20 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
           </div>
         )}
       </div>
+      </div>
+      {!isFocus && onOpenAdd && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenAdd();
+          }}
+          className="flex items-center justify-center w-10 shrink-0 border-l border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] transition-colors font-mono text-lg leading-none"
+          title="Add task"
+        >
+          +
+        </button>
+      )}
     </div>
   );
 };
