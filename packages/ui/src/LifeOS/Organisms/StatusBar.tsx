@@ -648,7 +648,7 @@ export const StatusBar = ({
           </div>
 
           {/* CENTER COLUMN */}
-          <div className="flex-[2] flex items-center justify-center relative h-full">
+          <div className="flex-[2] flex items-center justify-center relative h-full pointer-events-none">
             {/* Magic Button - Always interactable on mobile (opacity-100) or if hovered/expanded */}
             {/* On mobile, we make it smaller but visible? Or just the icon? */}
             <button
@@ -658,7 +658,7 @@ export const StatusBar = ({
                 handleToggleExpand('MENU');
               }}
               className={cn(
-                'absolute transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-2 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black shadow-[0_0_15px_rgba(var(--los-accent-rgb),0.3)]',
+                'absolute pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-2 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black shadow-[0_0_15px_rgba(var(--los-accent-rgb),0.3)]',
                 // Show on mobile by default (opacity-100), show on desktop only when hovered/expanded
                 isHovered || expanded
                   ? 'px-6 py-2 scale-100 translate-y-0'
@@ -668,7 +668,7 @@ export const StatusBar = ({
               <Logo size={isHovered || expanded ? 18 : 14} className="transition-all" />
               <span
                 className={cn(
-                  'font-bold uppercase tracking-widest hidden sm:inline transition-all',
+                  'font-bold uppercase tracking-widest hidden md:inline transition-all',
                   isHovered || expanded ? 'text-sm' : 'text-[10px]',
                 )}
               >
