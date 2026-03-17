@@ -9,6 +9,7 @@ export interface StackedNavigationProps {
   renderTileContent: (tile: TileDef, mode: 'SMALL' | 'FOCUS') => any;
   onDeleteFile?: (path: string) => void;
   onRenameFile?: (path: string, newPath: string) => void;
+  onRenameFolder?: (path: string, newPath: string) => void;
   onRequestMove?: (path: string) => void;
 }
 
@@ -19,6 +20,7 @@ export const StackedNavigation = ({
   renderTileContent,
   onDeleteFile,
   onRenameFile,
+  onRenameFolder,
   onRequestMove,
 }: StackedNavigationProps) => {
   // Determine the active column to display (the last one)
@@ -108,6 +110,7 @@ export const StackedNavigation = ({
           }}
           onDeleteFile={onDeleteFile}
           onRenameFile={onRenameFile}
+          onRenameFolder={onRenameFolder}
           onRequestMove={onRequestMove}
         />
       </div>

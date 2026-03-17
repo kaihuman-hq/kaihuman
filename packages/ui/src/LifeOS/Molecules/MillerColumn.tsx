@@ -21,6 +21,7 @@ export interface MillerColumnProps {
   onItemClick: (item: TileDef) => void;
   onDeleteFile?: (path: string) => void;
   onRenameFile?: (path: string, newPath: string) => void;
+  onRenameFolder?: (path: string, newPath: string) => void;
   onRequestMove?: (path: string) => void;
   onNewFileClick?: () => void;
   onToggleQuickNote?: (path: string) => void;
@@ -34,6 +35,7 @@ export const MillerColumn = ({
   onItemClick,
   onDeleteFile,
   onRenameFile,
+  onRenameFolder,
   onRequestMove,
   onNewFileClick,
   onToggleQuickNote,
@@ -91,6 +93,8 @@ export const MillerColumn = ({
     const ext = tile.extension?.toLowerCase();
     const isMd = ext === '.md';
 
+    const isFolder = tile.type === 'FOLDER';
+
     return createPortal(
       // biome-ignore lint/a11y/noStaticElementInteractions: context menu container
       // biome-ignore lint/a11y/useKeyWithClickEvents: context menu container
@@ -106,56 +110,65 @@ export const MillerColumn = ({
           onClick={(e) => {
             e.stopPropagation();
             setActiveMenu(null);
-            const newName = prompt('Rename to:', tile.title);
-            if (newName && newName !== tile.title) {
+            const currentName = tile.id.toString().split('/').pop() ?? tile.title;
+            const newName = prompt('Rename to:', currentName);
+            if (newName && newName !== currentName) {
               const parts = tile.id.toString().split('/');
               parts.pop();
               const newPath = [...parts, newName].join('/');
-              onRenameFile?.(tile.id.toString(), newPath);
+              if (isFolder) {
+                onRenameFolder?.(tile.id.toString(), newPath);
+              } else {
+                onRenameFile?.(tile.id.toString(), newPath);
+              }
             }
           }}
         >
           <Edit size={12} /> Rename
         </div>
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: menu item */}
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: menu item */}
-        <div
-          className="px-3 py-2 hover:bg-white/10 flex items-center gap-2 cursor-pointer text-xs transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-            setActiveMenu(null);
-            onRequestMove?.(tile.id.toString());
-          }}
-        >
-          <Move size={12} /> Move
-        </div>
-        {isMd && onToggleQuickNote && isQuickNote && (
-          // biome-ignore lint/a11y/noStaticElementInteractions: menu item
-          // biome-ignore lint/a11y/useKeyWithClickEvents: menu item
-          <div
-            className="px-3 py-2 hover:bg-white/10 flex items-center gap-2 cursor-pointer text-xs transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              setActiveMenu(null);
-              onToggleQuickNote(tile.id.toString());
-            }}
-          >
-            <FileText size={12} />{' '}
-            {isQuickNote(tile.id.toString()) ? 'Remove Quick Note' : 'Add Quick Note'}
-          </div>
+        {!isFolder && (
+          <>
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: menu item */}
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: menu item */}
+            <div
+              className="px-3 py-2 hover:bg-white/10 flex items-center gap-2 cursor-pointer text-xs transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveMenu(null);
+                onRequestMove?.(tile.id.toString());
+              }}
+            >
+              <Move size={12} /> Move
+            </div>
+            {isMd && onToggleQuickNote && isQuickNote && (
+              // biome-ignore lint/a11y/noStaticElementInteractions: menu item
+              // biome-ignore lint/a11y/useKeyWithClickEvents: menu item
+              <div
+                className="px-3 py-2 hover:bg-white/10 flex items-center gap-2 cursor-pointer text-xs transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveMenu(null);
+                  onToggleQuickNote(tile.id.toString());
+                }}
+              >
+                <FileText size={12} />{' '}
+                {isQuickNote(tile.id.toString()) ? 'Remove Quick Note' : 'Add Quick Note'}
+              </div>
+            )}
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: menu item */}
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: menu item */}
+            <div
+              className="px-3 py-2 hover:bg-red-500/20 flex items-center gap-2 cursor-pointer text-xs text-red-400 hover:text-red-300 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveMenu(null);
+                onDeleteFile?.(tile.id.toString());
+              }}
+            >
+              <Trash size={12} /> Delete
+            </div>
+          </>
         )}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: menu item */}
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: menu item */}
-        <div
-          className="px-3 py-2 hover:bg-red-500/20 flex items-center gap-2 cursor-pointer text-xs text-red-400 hover:text-red-300 transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-            setActiveMenu(null);
-            onDeleteFile?.(tile.id.toString());
-          }}
-        >
-          <Trash size={12} /> Delete
-        </div>
       </div>,
       document.body,
     );
@@ -204,10 +217,10 @@ export const MillerColumn = ({
         <div
           className={cn(
             'grid gap-px bg-[var(--los-bg)] overflow-y-auto overflow-x-hidden flex-1',
-            'content-start',
+            'content-start justify-center',
             'animate-in fade-in slide-in-from-right-4 duration-300',
           )}
-          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))' }}
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 300px))' }}
         >
           {filteredItems.map((tile) => {
             const isHovered = hoveredTileId === tile.id.toString();
@@ -283,7 +296,7 @@ export const MillerColumn = ({
                   </MonoText>
 
                   {/* Menu Trigger (Top Right) */}
-                  {tile.type === 'FILE' && showMenu && (
+                  {showMenu && (
                     <div className="absolute top-2 right-2 z-[100] animate-in fade-in duration-200">
                       {/* biome-ignore lint/a11y/noStaticElementInteractions: menu trigger */}
                       {/* biome-ignore lint/a11y/useKeyWithClickEvents: menu trigger */}
@@ -475,23 +488,21 @@ export const MillerColumn = ({
               </MonoText>
             </div>
 
-            {tile.type === 'FILE' && (
-              <div className="relative shrink-0">
-                {/* biome-ignore lint/a11y/noStaticElementInteractions: menu trigger */}
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: menu trigger */}
-                <div
-                  onClick={(e) => handleMenuTrigger(e, tile.id.toString())}
-                  className={cn(
-                    'p-1 rounded cursor-pointer hover:bg-white/10',
-                    activeId === tile.id || activeMenu?.id === tile.id
-                      ? 'text-[var(--los-fg)]'
-                      : 'text-[var(--los-muted)] opacity-0 group-hover:opacity-100 transition-opacity',
-                  )}
-                >
-                  <MoreVertical size={12} />
-                </div>
+            <div className="relative shrink-0">
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: menu trigger */}
+              {/* biome-ignore lint/a11y/useKeyWithClickEvents: menu trigger */}
+              <div
+                onClick={(e) => handleMenuTrigger(e, tile.id.toString())}
+                className={cn(
+                  'p-1 rounded cursor-pointer hover:bg-white/10',
+                  activeId === tile.id || activeMenu?.id === tile.id
+                    ? 'text-[var(--los-fg)]'
+                    : 'text-[var(--los-muted)] opacity-0 group-hover:opacity-100 transition-opacity',
+                )}
+              >
+                <MoreVertical size={12} />
               </div>
-            )}
+            </div>
           </div>
         ))}
       </div>

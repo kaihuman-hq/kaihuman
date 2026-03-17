@@ -44,6 +44,14 @@ export class GithubFileStore {
     return this.openFiles.value[path]?.content || '';
   });
 
+  // Computed: resolved app folder — '.kh' if present, falls back to '.lifeos' for backwards compatibility
+  appFolder = computed(() => {
+    const tree = this.tree.value;
+    if (tree.some((t) => t.path.startsWith('.kh/'))) return '.kh';
+    if (tree.some((t) => t.path.startsWith('.lifeos/'))) return '.lifeos';
+    return '.kh';
+  });
+
   async loadTree() {
     const repo = githubProfileStore.currentRepo.value;
     if (!repo) return;
@@ -98,7 +106,7 @@ export class GithubFileStore {
           // Logic: If we have content, it's likely a local file we care about (newly created or working on).
           // If we don't, it might be a deleted file we should drop.
 
-          const cacheKey = `${repo.full_name}:${item.path} `;
+          const cacheKey = `${repo.full_name}:${item.path}`;
           const hasFile = await db.getKey('files', cacheKey);
 
           if (hasFile) {
@@ -393,7 +401,7 @@ export class GithubFileStore {
             }
 
             // Update DB with new SHA
-            const cacheKey = `${repo.full_name}:${path} `;
+            const cacheKey = `${repo.full_name}:${path}`;
             dbPromise.then((db) => {
               db.put('files', {
                 path: cacheKey,
@@ -504,6 +512,122 @@ export class GithubFileStore {
     await this.saveFile(path);
   }
 
+  async renameFolder(oldPrefix: string, newPrefix: string) {
+    const repo = githubProfileStore.currentRepo.peek();
+    if (!repo) return;
+
+    const tree = this.tree.peek();
+    // Pass only blobs to the Git Trees API (subtrees are implicit in blob paths)
+    const blobItems = tree.filter(
+      (t) => t.path.startsWith(`${oldPrefix}/`) && t.type === 'blob',
+    );
+
+    this.isLoading.value = true;
+    try {
+      await githubService.renameFolder(
+        repo.owner.login,
+        repo.name,
+        repo.default_branch,
+        oldPrefix,
+        newPrefix,
+        blobItems,
+      );
+
+      // Optimistically rewrite the tree in-memory immediately.
+      // We cannot rely on a follow-up loadTree() call because GitHub's REST API
+      // can return stale ref/tree data for a short window after a commit.
+      const oldPrefixSlash = `${oldPrefix}/`;
+      const updatedTree = tree
+        .filter((t) => t.path !== oldPrefix && !t.path.startsWith(oldPrefixSlash))
+        .concat(
+          tree
+            .filter((t) => t.path === oldPrefix || t.path.startsWith(oldPrefixSlash))
+            .map((t) => ({ ...t, path: newPrefix + t.path.slice(oldPrefix.length) })),
+        )
+        .sort((a, b) => {
+          if (a.type === 'tree' && b.type !== 'tree') return -1;
+          if (a.type !== 'tree' && b.type === 'tree') return 1;
+          return a.path.localeCompare(b.path);
+        });
+
+      this.tree.value = updatedTree;
+
+      // Persist updated tree + clean up old file entries in IDB
+      const db = await dbPromise;
+      await db.put('trees', updatedTree, `tree:${repo.full_name} `);
+      for (const item of blobItems) {
+        await db.delete('files', `${repo.full_name}:${item.path}`);
+        await db.delete('files', `${repo.full_name}:${item.path} `);
+      }
+
+      // Clear stale entries from openFiles
+      const newOpenFiles = { ...this.openFiles.peek() };
+      for (const key of Object.keys(newOpenFiles)) {
+        if (key.startsWith(oldPrefixSlash)) {
+          delete newOpenFiles[key];
+        }
+      }
+      this.openFiles.value = newOpenFiles;
+    } finally {
+      this.isLoading.value = false;
+    }
+  }
+
+  async migrateAppFolder() {
+    const repo = githubProfileStore.currentRepo.peek();
+    if (!repo) return;
+
+    const tree = this.tree.peek();
+    const hasKh = tree.some((t) => t.path.startsWith('.kh/'));
+    const hasLifeos = tree.some((t) => t.path.startsWith('.lifeos/'));
+
+    // Nothing to do: already on .kh or no .lifeos folder present
+    if (hasKh || !hasLifeos) return;
+
+    // Guard against concurrent tabs running migration simultaneously
+    const flagKey = `kh_migration_done:${repo.full_name}`;
+    if (localStorage.getItem(flagKey) === 'done') return;
+
+    logger.info('[Migration] Starting .lifeos → .kh migration...');
+
+    const lifeosItems = tree.filter(
+      (t) => t.path.startsWith('.lifeos/') && t.type === 'blob',
+    );
+
+    await githubService.renameFolder(
+      repo.owner.login,
+      repo.name,
+      repo.default_branch,
+      '.lifeos',
+      '.kh',
+      lifeosItems,
+    );
+
+    localStorage.setItem(flagKey, 'done');
+    logger.info('[Migration] .lifeos → .kh migration complete. Cleaning up IDB...');
+
+    // Clean up stale IDB cache entries BEFORE reloading tree (so smart merge doesn't re-add them)
+    const db = await dbPromise;
+    for (const item of lifeosItems) {
+      // Delete both key variants (openFile stores without space, saveFile stored with space)
+      await db.delete('files', `${repo.full_name}:${item.path}`);
+      await db.delete('files', `${repo.full_name}:${item.path} `);
+    }
+
+    // Clear stale .lifeos/ entries from in-memory openFiles
+    const newOpenFiles = { ...this.openFiles.peek() };
+    for (const key of Object.keys(newOpenFiles)) {
+      if (key.startsWith('.lifeos/')) {
+        delete newOpenFiles[key];
+      }
+    }
+    this.openFiles.value = newOpenFiles;
+
+    logger.info('[Migration] IDB cleaned. Reloading tree...');
+    // Reload tree so appFolder recomputes to '.kh'
+    await this.loadTree();
+  }
+
   async deleteFile(path: string) {
     const repo = githubProfileStore.currentRepo.value;
     if (!repo) return;
@@ -559,7 +683,7 @@ export class GithubFileStore {
     }
 
     // Update DB
-    const cacheKey = `${repo.full_name}:${path} `;
+    const cacheKey = `${repo.full_name}:${path}`;
     dbPromise.then(async (db) => {
       await db.delete('files', cacheKey);
       await db.put('trees', this.tree.value, `tree:${repo.full_name} `);

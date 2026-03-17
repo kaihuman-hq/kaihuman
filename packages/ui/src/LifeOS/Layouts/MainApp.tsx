@@ -124,6 +124,7 @@ export interface MainAppProps {
   onCreateFile?: (path: string, content: string) => void;
   onDeleteFile?: (path: string) => void;
   onRenameFile?: (path: string, newPath: string) => void;
+  onRenameFolder?: (path: string, newPath: string) => void;
   onMoveFile?: (path: string, newPath: string) => void;
   existingFiles?: string[];
   onLoadFolder?: (path: string) => Promise<TileDef[]>;
@@ -199,6 +200,7 @@ export const MainApp = ({
   onCreateFile,
   onDeleteFile,
   onRenameFile,
+  onRenameFolder,
   onMoveFile,
   existingFiles,
   onLoadFolder,
@@ -279,6 +281,8 @@ export const MainApp = ({
   const showGraph = layoutStore.view.value === 'GRAPH';
   const showCommits = layoutStore.view.value === 'COMMITS';
   const activeDashboardId = layoutStore.activeDashboardId.value;
+  const currentDashboardId = layoutStore.currentDashboardId.value;
+  const userEntries = layoutStore.userEntries.value;
   const zenMode = layoutStore.zenMode.value;
   const showNewFileWizard = layoutStore.showNewFileWizard.value;
   const showDumpMode = layoutStore.showDumpMode.value;
@@ -406,7 +410,7 @@ export const MainApp = ({
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}`;
     const filename = `quicknote-${timestamp}`;
 
-    const targetFolder = '.lifeos/quicknotes';
+    const targetFolder = `${githubFileStore.appFolder.peek()}/quicknotes`;
 
     setDumpSaveProps({
       initialContent: content,
@@ -614,8 +618,6 @@ export const MainApp = ({
     originalConfig.current = undefined;
   };
 
-  const currentDashboardId = activeDashboardId || layoutStore.remoteConfig.value?.dashboards[0]?.id;
-
   const handlePrevDashboard = () => {
     const config = layoutStore.remoteConfig.value;
     if (!config || !config.dashboards.length) return;
@@ -661,12 +663,6 @@ export const MainApp = ({
   const isQuickNote = useCallback((path: string) => quickNoteSet.has(path), [quickNoteSet]);
 
   // Filter entries for current dashboard
-  const userEntries = useMemo(() => {
-    const config = layoutStore.remoteConfig.value;
-    if (!config || !currentDashboardId) return [];
-    return config.entries.filter((e) => e.dashboard === currentDashboardId);
-  }, [currentDashboardId]);
-
   // Convert config entries to tiles
   const dashboardTiles = useMemo(() => {
     const config = layoutStore.remoteConfig.value;
@@ -909,6 +905,10 @@ export const MainApp = ({
           content={tile.rawContent}
           mode="SMALL"
           onChange={(newContent) => tile.onContentChange?.(newContent)}
+          onOpenAdd={() => {
+            setFocusedViewMode('ADD');
+            setActiveTileId(tile.id);
+          }}
         />
       );
     }
@@ -1412,6 +1412,7 @@ export const MainApp = ({
                       if (onRenameFile) await onRenameFile(path, newPath);
                       if (activeTileId === path) setActiveTileId(newPath);
                     }}
+                    onRenameFolder={onRenameFolder}
                     onRequestMove={(path) => setFileToMove(path)}
                   />
                 ) : (
@@ -1437,6 +1438,7 @@ export const MainApp = ({
                             if (onRenameFile) await onRenameFile(path, newPath);
                             if (activeTileId === path) setActiveTileId(newPath); // Keep active
                           }}
+                          onRenameFolder={onRenameFolder}
                           onRequestMove={(path) => setFileToMove(path)}
                           onNewFileClick={() => setShowNewFileWizard(true)}
                           onToggleQuickNote={handleToggleQuickNote}
@@ -1907,7 +1909,7 @@ export const MainApp = ({
                       // Format: quicknote-YYYY-MM-DD-HH:mm:ss.md
                       const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
                       const filename = `quicknote-${timestamp}.md`;
-                      const path = `.lifeos/quicknotes/${filename}`;
+                      const path = `${githubFileStore.appFolder.peek()}/quicknotes/${filename}`;
 
                       const content = `---
 type: generic
@@ -2649,12 +2651,13 @@ const FocusedTileInternal = ({
                 }}
               />
             </div>
-          ) : isConsumption && viewMode === 'WIDGET' ? (
+          ) : isConsumption && (viewMode === 'WIDGET' || viewMode === 'ADD') ? (
             <div className="flex flex-col min-h-full w-full">
               <ConsumptionWidget
                 content={tile.rawContent || ''}
                 mode="FOCUS"
                 onChange={(c) => tile.onContentChange?.(c)}
+                initialTab={viewMode === 'ADD' ? 'ADD' : undefined}
               />
             </div>
           ) : viewMode === 'WIDGET' && hasWidget ? (
@@ -2933,7 +2936,7 @@ const TileContentStructure = ({
       // biome-ignore lint/a11y/noStaticElementInteractions: context menu container
       // biome-ignore lint/a11y/useKeyWithClickEvents: context menu container
       <div
-        className="fixed z-[9999] bg-[#1a1a1f] border border-[var(--los-border)] shadow-xl rounded flex flex-col min-w-[120px] py-1 animate-in fade-in zoom-in-95 duration-100"
+        className="fixed z-[9999] bg-[#1a1a1f] border border-[var(--los-border)] shadow-xl rounded flex flex-col min-w-[120px] py-1 animate-in fade-in zoom-in-95 duration-100 text-white"
         style={{ top: activeMenu.y, left: activeMenu.x }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -3059,15 +3062,10 @@ const TileContentStructure = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 w-full mb-2 pointer-events-auto">
+      <div className="flex-1 overflow-y-auto min-h-0 w-full pointer-events-auto">
         {renderTileContent(tile, 'SMALL')}
       </div>
 
-      <div className="text-right shrink-0 mt-auto">
-        <MonoText className="text-[10px] text-[var(--los-muted)]">
-          {`ID: ${tile.id.toString().toUpperCase().slice(0, 4)}`}
-        </MonoText>
-      </div>
       {renderContextMenu()}
     </div>
   );

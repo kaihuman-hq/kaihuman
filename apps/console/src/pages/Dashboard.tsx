@@ -55,17 +55,24 @@ export const Dashboard = () => {
     // Only run if we have a tree and no config (or repo changed)
     if (!tree || tree.length === 0) return;
 
-    const CONFIG_PATH = '.lifeos/.dashboard.config.json';
-    const configItem = tree.find((t) => t.path === CONFIG_PATH);
-
     const loadConfig = async () => {
+      // Migrate .lifeos → .kh if needed (idempotent, no-op if already migrated)
+      await githubFileStore.migrateAppFolder();
+
+      // Show spinner while reloading
+      layoutStore.remoteConfig.value = null;
+
       logger.info('Checking for remote config...');
       let config: import('@lifosy/core').DashboardConfig | null = null;
 
+      const folder = githubFileStore.appFolder.peek();
+      const CONFIG_PATH = `${folder}/.dashboard.config.json`;
+      const configItem = githubFileStore.tree.peek().find((t) => t.path === CONFIG_PATH);
+
       if (configItem) {
         try {
-          // Check if already open
-          let content = openFiles[CONFIG_PATH]?.content;
+          // Always use peek() to get the freshest openFiles, not the closed-over snapshot
+          let content = githubFileStore.openFiles.peek()[CONFIG_PATH]?.content;
           if (!content) {
             await githubFileStore.openFile(CONFIG_PATH);
             content = githubFileStore.openFiles.peek()[CONFIG_PATH]?.content;
@@ -91,11 +98,68 @@ export const Dashboard = () => {
         };
       }
 
+      // Rewrite any residual .lifeos/ paths → .kh/ in the config
+      // (handles the case where migration ran but config content wasn't updated yet)
+      const rewrite = (p: string) => p.replace(/^\.lifeos\//, '.kh/');
+      const rewrittenEntries = config.entries.map((e) => ({ ...e, path: rewrite(e.path) }));
+      const rewrittenRecent = (config.files?.recentlyOpened ?? []).map(rewrite);
+      const rewrittenQuickNotes = (config.files?.quickNotes ?? []).map(rewrite);
+      const rewrittenSelected = config.files?.selected ? rewrite(config.files.selected) : config.files?.selected;
+      const rewrittenOpened = (config.files?.opened ?? []).map(rewrite);
+      const needsRewrite =
+        JSON.stringify(rewrittenEntries) !== JSON.stringify(config.entries) ||
+        JSON.stringify(rewrittenRecent) !== JSON.stringify(config.files?.recentlyOpened ?? []);
+      if (needsRewrite) {
+        logger.info('[Migration] Rewriting .lifeos/ → .kh/ path references in config');
+        config = {
+          ...config,
+          entries: rewrittenEntries,
+          files: {
+            ...config.files,
+            recentlyOpened: rewrittenRecent,
+            quickNotes: rewrittenQuickNotes,
+            selected: rewrittenSelected,
+            opened: rewrittenOpened,
+          },
+        };
+        if (configItem) {
+          githubFileStore.updateFileContent(CONFIG_PATH, JSON.stringify(config, null, 2));
+          githubFileStore.saveFile(CONFIG_PATH);
+        }
+      }
+
+      // Validate config entries against the current tree.
+      // Remove any references to files that no longer exist.
+      const currentTree = githubFileStore.tree.peek();
+      const validPaths = new Set(currentTree.map((t) => t.path));
+      const cleanEntries = config.entries.filter((e) => validPaths.has(e.path));
+      const cleanRecent = (config.files?.recentlyOpened ?? []).filter((p) => validPaths.has(p));
+
+      const hasStale =
+        cleanEntries.length !== config.entries.length ||
+        cleanRecent.length !== (config.files?.recentlyOpened?.length ?? 0);
+
+      if (hasStale) {
+        logger.info(
+          `Removed ${config.entries.length - cleanEntries.length} stale dashboard entries and ${(config.files?.recentlyOpened?.length ?? 0) - cleanRecent.length} stale recent files from config`,
+        );
+        config = {
+          ...config,
+          entries: cleanEntries,
+          files: { ...config.files, recentlyOpened: cleanRecent },
+        };
+        if (configItem) {
+          // Config file exists — update and save it
+          githubFileStore.updateFileContent(CONFIG_PATH, JSON.stringify(config, null, 2));
+          githubFileStore.saveFile(CONFIG_PATH);
+        }
+      }
+
       // Pre-load all files for the default dashboard so tiles render with content
       // immediately when remoteConfig is revealed (no empty-widget flash).
       const defaultDashboardId = config.dashboards?.[0]?.id;
       if (defaultDashboardId) {
-        const entries = (config.entries ?? []).filter(
+        const entries = config.entries.filter(
           (e: { dashboard: string }) => e.dashboard === defaultDashboardId,
         );
         if (entries.length > 0) {
@@ -136,7 +200,7 @@ export const Dashboard = () => {
 
       // 2. Persist
       // Debounce this? For now, direct save is safer for correctness.
-      const CONFIG_PATH = '.lifeos/.dashboard.config.json';
+      const CONFIG_PATH = `${githubFileStore.appFolder.peek()}/.dashboard.config.json`;
       const content = JSON.stringify(newConfig, null, 2);
       githubFileStore.updateFileContent(CONFIG_PATH, content);
       githubFileStore.saveFile(CONFIG_PATH);
@@ -217,11 +281,21 @@ export const Dashboard = () => {
           config={remoteConfig || undefined}
           fileContents={gridFileContents}
           onConfigChange={(newConfig) => {
+            // Pre-load any files that were just added to the dashboard
+            const currentPaths = new Set(
+              layoutStore.remoteConfig.value?.entries.map((e) => e.path) ?? [],
+            );
+            for (const entry of newConfig.entries) {
+              if (!currentPaths.has(entry.path) && !githubFileStore.openFiles.peek()[entry.path]) {
+                githubFileStore.openFile(entry.path);
+              }
+            }
+
             // 1. Optimistic Update
             layoutStore.remoteConfig.value = newConfig;
 
             // 2. Persist
-            const CONFIG_PATH = '.lifeos/.dashboard.config.json';
+            const CONFIG_PATH = `${githubFileStore.appFolder.peek()}/.dashboard.config.json`;
             const content = JSON.stringify(newConfig, null, 2);
             githubFileStore.updateFileContent(CONFIG_PATH, content);
             githubFileStore.saveFile(CONFIG_PATH);
@@ -297,7 +371,7 @@ export const Dashboard = () => {
             [],
           )}
           onAddToReadItLater={async (item) => {
-            const rilPath = '.lifeos/.readitlater.json';
+            const rilPath = `${githubFileStore.appFolder.peek()}/.readitlater.json`;
             logger.debug('ReadItLater Handler triggered for:', item);
             try {
               let fileExists = githubFileStore.tree.value.some((t) => t.path === rilPath);
@@ -365,12 +439,33 @@ export const Dashboard = () => {
             }
           }, [])}
           onDeleteFile={useCallback(async (path: string) => {
-            if (confirm(`Are you sure you want to delete ${path}?`)) {
-              await githubFileStore.deleteFile(path);
-            }
+            if (!confirm(`Are you sure you want to delete ${path}?`)) return;
+
+            await githubFileStore.deleteFile(path);
+
+            // Remove the deleted file from the dashboard config immediately
+            const current = layoutStore.remoteConfig.value;
+            if (!current) return;
+
+            const CONFIG_PATH = `${githubFileStore.appFolder.peek()}/.dashboard.config.json`;
+            const newConfig = {
+              ...current,
+              entries: current.entries.filter((e) => e.path !== path),
+              files: {
+                ...current.files,
+                recentlyOpened: (current.files?.recentlyOpened ?? []).filter((p) => p !== path),
+              },
+            };
+
+            layoutStore.remoteConfig.value = newConfig;
+            githubFileStore.updateFileContent(CONFIG_PATH, JSON.stringify(newConfig, null, 2));
+            githubFileStore.saveFile(CONFIG_PATH);
           }, [])}
           onRenameFile={useCallback(async (path: string, newPath: string) => {
             await githubFileStore.renameFile(path, newPath);
+          }, [])}
+          onRenameFolder={useCallback(async (path: string, newPath: string) => {
+            await githubFileStore.renameFolder(path, newPath);
           }, [])}
           onMoveFile={useCallback(async (path: string, newPath: string) => {
             await githubFileStore.renameFile(path, newPath);
