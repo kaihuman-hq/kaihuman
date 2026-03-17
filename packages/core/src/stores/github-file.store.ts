@@ -517,6 +517,7 @@ export class GithubFileStore {
     if (!repo) return;
 
     const tree = this.tree.peek();
+    // Pass only blobs to the Git Trees API (subtrees are implicit in blob paths)
     const blobItems = tree.filter(
       (t) => t.path.startsWith(`${oldPrefix}/`) && t.type === 'blob',
     );
@@ -532,8 +533,28 @@ export class GithubFileStore {
         blobItems,
       );
 
-      // Clean up IDB entries for old paths
+      // Optimistically rewrite the tree in-memory immediately.
+      // We cannot rely on a follow-up loadTree() call because GitHub's REST API
+      // can return stale ref/tree data for a short window after a commit.
+      const oldPrefixSlash = `${oldPrefix}/`;
+      const updatedTree = tree
+        .filter((t) => t.path !== oldPrefix && !t.path.startsWith(oldPrefixSlash))
+        .concat(
+          tree
+            .filter((t) => t.path === oldPrefix || t.path.startsWith(oldPrefixSlash))
+            .map((t) => ({ ...t, path: newPrefix + t.path.slice(oldPrefix.length) })),
+        )
+        .sort((a, b) => {
+          if (a.type === 'tree' && b.type !== 'tree') return -1;
+          if (a.type !== 'tree' && b.type === 'tree') return 1;
+          return a.path.localeCompare(b.path);
+        });
+
+      this.tree.value = updatedTree;
+
+      // Persist updated tree + clean up old file entries in IDB
       const db = await dbPromise;
+      await db.put('trees', updatedTree, `tree:${repo.full_name} `);
       for (const item of blobItems) {
         await db.delete('files', `${repo.full_name}:${item.path}`);
         await db.delete('files', `${repo.full_name}:${item.path} `);
@@ -542,13 +563,11 @@ export class GithubFileStore {
       // Clear stale entries from openFiles
       const newOpenFiles = { ...this.openFiles.peek() };
       for (const key of Object.keys(newOpenFiles)) {
-        if (key.startsWith(`${oldPrefix}/`)) {
+        if (key.startsWith(oldPrefixSlash)) {
           delete newOpenFiles[key];
         }
       }
       this.openFiles.value = newOpenFiles;
-
-      await this.loadTree();
     } finally {
       this.isLoading.value = false;
     }
