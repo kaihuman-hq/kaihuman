@@ -512,6 +512,51 @@ export class GithubFileStore {
     await this.saveFile(path);
   }
 
+  async migrateAppFolder() {
+    const repo = githubProfileStore.currentRepo.peek();
+    if (!repo) return;
+
+    const tree = this.tree.peek();
+    const hasKh = tree.some((t) => t.path.startsWith('.kh/'));
+    const hasLifeos = tree.some((t) => t.path.startsWith('.lifeos/'));
+
+    // Nothing to do: already on .kh or no .lifeos folder present
+    if (hasKh || !hasLifeos) return;
+
+    // Guard against concurrent tabs running migration simultaneously
+    const flagKey = `kh_migration_done:${repo.full_name}`;
+    if (localStorage.getItem(flagKey) === 'done') return;
+
+    logger.info('[Migration] Starting .lifeos → .kh migration...');
+
+    const lifeosItems = tree.filter(
+      (t) => t.path.startsWith('.lifeos/') && t.type === 'blob',
+    );
+
+    await githubService.renameFolder(
+      repo.owner.login,
+      repo.name,
+      repo.default_branch,
+      '.lifeos',
+      '.kh',
+      lifeosItems,
+    );
+
+    localStorage.setItem(flagKey, 'done');
+    logger.info('[Migration] .lifeos → .kh migration complete. Reloading tree...');
+
+    // Reload tree so appFolder recomputes to '.kh'
+    await this.loadTree();
+
+    // Clean up stale IDB cache entries for old .lifeos/ paths
+    dbPromise.then(async (db) => {
+      for (const item of lifeosItems) {
+        await db.delete('files', `${repo.full_name}:${item.path}`);
+      }
+      await db.put('trees', this.tree.peek(), `tree:${repo.full_name}`);
+    });
+  }
+
   async deleteFile(path: string) {
     const repo = githubProfileStore.currentRepo.value;
     if (!repo) return;

@@ -132,6 +132,92 @@ export class GithubService {
     return data;
   }
 
+  /**
+   * Atomically renames all blobs under oldPrefix/ to newPrefix/ using the Git Trees API.
+   * Produces a single commit regardless of how many files are renamed.
+   * Items must be the already-known tree blobs (with SHAs) — no extra fetch needed.
+   */
+  async renameFolder(
+    owner: string,
+    repo: string,
+    branch: string,
+    oldPrefix: string,
+    newPrefix: string,
+    items: { path: string; mode: string; type: string; sha: string }[],
+  ) {
+    const client = this.getClient();
+
+    // 1. Get current HEAD commit SHA
+    const { data: refData } = await client.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+    });
+    const headSha = refData.object.sha;
+
+    // 2. Get the tree SHA for the current commit
+    const { data: commitData } = await client.git.getCommit({
+      owner,
+      repo,
+      commit_sha: headSha,
+    });
+    const baseTreeSha = commitData.tree.sha;
+
+    // 3. Build the delta: add files at new prefix, delete files at old prefix
+    const treeEntries: {
+      path: string;
+      mode: '100644' | '100755' | '040000' | '160000' | '120000';
+      type: 'blob' | 'tree' | 'commit';
+      sha: string | null;
+    }[] = [];
+
+    for (const item of items) {
+      if (!item.sha) continue; // skip uncommitted local files
+      const relativePath = item.path.slice(oldPrefix.length + 1); // strip "oldPrefix/"
+      // Add at new location
+      treeEntries.push({
+        path: `${newPrefix}/${relativePath}`,
+        mode: item.mode as '100644',
+        type: item.type as 'blob',
+        sha: item.sha,
+      });
+      // Delete from old location (sha: null means deletion)
+      treeEntries.push({
+        path: item.path,
+        mode: item.mode as '100644',
+        type: item.type as 'blob',
+        sha: null,
+      });
+    }
+
+    if (treeEntries.length === 0) return;
+
+    // 4. Create new tree based on the current one
+    const { data: newTree } = await client.git.createTree({
+      owner,
+      repo,
+      base_tree: baseTreeSha,
+      tree: treeEntries,
+    });
+
+    // 5. Create a new commit
+    const { data: newCommit } = await client.git.createCommit({
+      owner,
+      repo,
+      message: `chore: migrate ${oldPrefix} → ${newPrefix}`,
+      tree: newTree.sha,
+      parents: [headSha],
+    });
+
+    // 6. Advance the branch ref
+    await client.git.updateRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+      sha: newCommit.sha,
+    });
+  }
+
   async listCommits(owner: string, repo: string, path?: string, page = 1, perPage = 30) {
     const client = this.getClient();
     const { data } = await client.repos.listCommits({

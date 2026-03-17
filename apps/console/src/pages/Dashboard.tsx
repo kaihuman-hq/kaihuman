@@ -56,6 +56,9 @@ export const Dashboard = () => {
     if (!tree || tree.length === 0) return;
 
     const loadConfig = async () => {
+      // Migrate .lifeos → .kh if needed (idempotent, no-op if already migrated)
+      await githubFileStore.migrateAppFolder();
+
       // Show spinner while reloading
       layoutStore.remoteConfig.value = null;
 
@@ -93,6 +96,36 @@ export const Dashboard = () => {
           entries: [],
           files: { recentlyOpened: [] },
         };
+      }
+
+      // Rewrite any residual .lifeos/ paths → .kh/ in the config
+      // (handles the case where migration ran but config content wasn't updated yet)
+      const rewrite = (p: string) => p.replace(/^\.lifeos\//, '.kh/');
+      const rewrittenEntries = config.entries.map((e) => ({ ...e, path: rewrite(e.path) }));
+      const rewrittenRecent = (config.files?.recentlyOpened ?? []).map(rewrite);
+      const rewrittenQuickNotes = (config.files?.quickNotes ?? []).map(rewrite);
+      const rewrittenSelected = config.files?.selected ? rewrite(config.files.selected) : config.files?.selected;
+      const rewrittenOpened = (config.files?.opened ?? []).map(rewrite);
+      const needsRewrite =
+        JSON.stringify(rewrittenEntries) !== JSON.stringify(config.entries) ||
+        JSON.stringify(rewrittenRecent) !== JSON.stringify(config.files?.recentlyOpened ?? []);
+      if (needsRewrite) {
+        logger.info('[Migration] Rewriting .lifeos/ → .kh/ path references in config');
+        config = {
+          ...config,
+          entries: rewrittenEntries,
+          files: {
+            ...config.files,
+            recentlyOpened: rewrittenRecent,
+            quickNotes: rewrittenQuickNotes,
+            selected: rewrittenSelected,
+            opened: rewrittenOpened,
+          },
+        };
+        if (configItem) {
+          githubFileStore.updateFileContent(CONFIG_PATH, JSON.stringify(config, null, 2));
+          githubFileStore.saveFile(CONFIG_PATH);
+        }
       }
 
       // Validate config entries against the current tree.
