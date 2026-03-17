@@ -106,7 +106,7 @@ export class GithubFileStore {
           // Logic: If we have content, it's likely a local file we care about (newly created or working on).
           // If we don't, it might be a deleted file we should drop.
 
-          const cacheKey = `${repo.full_name}:${item.path} `;
+          const cacheKey = `${repo.full_name}:${item.path}`;
           const hasFile = await db.getKey('files', cacheKey);
 
           if (hasFile) {
@@ -401,7 +401,7 @@ export class GithubFileStore {
             }
 
             // Update DB with new SHA
-            const cacheKey = `${repo.full_name}:${path} `;
+            const cacheKey = `${repo.full_name}:${path}`;
             dbPromise.then((db) => {
               db.put('files', {
                 path: cacheKey,
@@ -543,18 +543,28 @@ export class GithubFileStore {
     );
 
     localStorage.setItem(flagKey, 'done');
-    logger.info('[Migration] .lifeos → .kh migration complete. Reloading tree...');
+    logger.info('[Migration] .lifeos → .kh migration complete. Cleaning up IDB...');
 
+    // Clean up stale IDB cache entries BEFORE reloading tree (so smart merge doesn't re-add them)
+    const db = await dbPromise;
+    for (const item of lifeosItems) {
+      // Delete both key variants (openFile stores without space, saveFile stored with space)
+      await db.delete('files', `${repo.full_name}:${item.path}`);
+      await db.delete('files', `${repo.full_name}:${item.path} `);
+    }
+
+    // Clear stale .lifeos/ entries from in-memory openFiles
+    const newOpenFiles = { ...this.openFiles.peek() };
+    for (const key of Object.keys(newOpenFiles)) {
+      if (key.startsWith('.lifeos/')) {
+        delete newOpenFiles[key];
+      }
+    }
+    this.openFiles.value = newOpenFiles;
+
+    logger.info('[Migration] IDB cleaned. Reloading tree...');
     // Reload tree so appFolder recomputes to '.kh'
     await this.loadTree();
-
-    // Clean up stale IDB cache entries for old .lifeos/ paths
-    dbPromise.then(async (db) => {
-      for (const item of lifeosItems) {
-        await db.delete('files', `${repo.full_name}:${item.path}`);
-      }
-      await db.put('trees', this.tree.peek(), `tree:${repo.full_name}`);
-    });
   }
 
   async deleteFile(path: string) {
@@ -612,7 +622,7 @@ export class GithubFileStore {
     }
 
     // Update DB
-    const cacheKey = `${repo.full_name}:${path} `;
+    const cacheKey = `${repo.full_name}:${path}`;
     dbPromise.then(async (db) => {
       await db.delete('files', cacheKey);
       await db.put('trees', this.tree.value, `tree:${repo.full_name} `);
