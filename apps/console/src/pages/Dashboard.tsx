@@ -55,8 +55,6 @@ export const Dashboard = () => {
     // Only run if we have a tree and no config (or repo changed)
     if (!tree || tree.length === 0) return;
 
-    const CONFIG_PATH = '.lifeos/.dashboard.config.json';
-
     const loadConfig = async () => {
       // Show spinner while reloading
       layoutStore.remoteConfig.value = null;
@@ -64,6 +62,8 @@ export const Dashboard = () => {
       logger.info('Checking for remote config...');
       let config: import('@lifosy/core').DashboardConfig | null = null;
 
+      const folder = githubFileStore.appFolder.peek();
+      const CONFIG_PATH = `${folder}/.dashboard.config.json`;
       const configItem = githubFileStore.tree.peek().find((t) => t.path === CONFIG_PATH);
 
       if (configItem) {
@@ -167,7 +167,7 @@ export const Dashboard = () => {
 
       // 2. Persist
       // Debounce this? For now, direct save is safer for correctness.
-      const CONFIG_PATH = '.lifeos/.dashboard.config.json';
+      const CONFIG_PATH = `${githubFileStore.appFolder.peek()}/.dashboard.config.json`;
       const content = JSON.stringify(newConfig, null, 2);
       githubFileStore.updateFileContent(CONFIG_PATH, content);
       githubFileStore.saveFile(CONFIG_PATH);
@@ -262,7 +262,7 @@ export const Dashboard = () => {
             layoutStore.remoteConfig.value = newConfig;
 
             // 2. Persist
-            const CONFIG_PATH = '.lifeos/.dashboard.config.json';
+            const CONFIG_PATH = `${githubFileStore.appFolder.peek()}/.dashboard.config.json`;
             const content = JSON.stringify(newConfig, null, 2);
             githubFileStore.updateFileContent(CONFIG_PATH, content);
             githubFileStore.saveFile(CONFIG_PATH);
@@ -338,7 +338,7 @@ export const Dashboard = () => {
             [],
           )}
           onAddToReadItLater={async (item) => {
-            const rilPath = '.lifeos/.readitlater.json';
+            const rilPath = `${githubFileStore.appFolder.peek()}/.readitlater.json`;
             logger.debug('ReadItLater Handler triggered for:', item);
             try {
               let fileExists = githubFileStore.tree.value.some((t) => t.path === rilPath);
@@ -414,7 +414,7 @@ export const Dashboard = () => {
             const current = layoutStore.remoteConfig.value;
             if (!current) return;
 
-            const CONFIG_PATH = '.lifeos/.dashboard.config.json';
+            const CONFIG_PATH = `${githubFileStore.appFolder.peek()}/.dashboard.config.json`;
             const newConfig = {
               ...current,
               entries: current.entries.filter((e) => e.path !== path),

@@ -44,6 +44,14 @@ export class GithubFileStore {
     return this.openFiles.value[path]?.content || '';
   });
 
+  // Computed: resolved app folder — '.kh' if present, falls back to '.lifeos' for backwards compatibility
+  appFolder = computed(() => {
+    const tree = this.tree.value;
+    if (tree.some((t) => t.path.startsWith('.kh/'))) return '.kh';
+    if (tree.some((t) => t.path.startsWith('.lifeos/'))) return '.lifeos';
+    return '.kh';
+  });
+
   async loadTree() {
     const repo = githubProfileStore.currentRepo.value;
     if (!repo) return;

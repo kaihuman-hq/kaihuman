@@ -408,7 +408,7 @@ export const MainApp = ({
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}`;
     const filename = `quicknote-${timestamp}`;
 
-    const targetFolder = '.lifeos/quicknotes';
+    const targetFolder = `${githubFileStore.appFolder.peek()}/quicknotes`;
 
     setDumpSaveProps({
       initialContent: content,
@@ -1905,7 +1905,7 @@ export const MainApp = ({
                       // Format: quicknote-YYYY-MM-DD-HH:mm:ss.md
                       const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
                       const filename = `quicknote-${timestamp}.md`;
-                      const path = `.lifeos/quicknotes/${filename}`;
+                      const path = `${githubFileStore.appFolder.peek()}/quicknotes/${filename}`;
 
                       const content = `---
 type: generic

@@ -896,7 +896,7 @@ export const KanbanBoard = ({
     if (!tree || tree.length === 0) return;
     if (layoutStore.remoteConfig.peek()) return; // already loaded by Dashboard
 
-    const CONFIG_PATH = '.lifeos/.dashboard.config.json';
+    const CONFIG_PATH = `${githubFileStore.appFolder.peek()}/.dashboard.config.json`;
     const configItem = tree.find((t) => t.path === CONFIG_PATH);
 
     const loadConfig = async () => {
