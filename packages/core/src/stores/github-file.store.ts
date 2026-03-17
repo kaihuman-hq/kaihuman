@@ -512,6 +512,48 @@ export class GithubFileStore {
     await this.saveFile(path);
   }
 
+  async renameFolder(oldPrefix: string, newPrefix: string) {
+    const repo = githubProfileStore.currentRepo.peek();
+    if (!repo) return;
+
+    const tree = this.tree.peek();
+    const blobItems = tree.filter(
+      (t) => t.path.startsWith(`${oldPrefix}/`) && t.type === 'blob',
+    );
+
+    this.isLoading.value = true;
+    try {
+      await githubService.renameFolder(
+        repo.owner.login,
+        repo.name,
+        repo.default_branch,
+        oldPrefix,
+        newPrefix,
+        blobItems,
+      );
+
+      // Clean up IDB entries for old paths
+      const db = await dbPromise;
+      for (const item of blobItems) {
+        await db.delete('files', `${repo.full_name}:${item.path}`);
+        await db.delete('files', `${repo.full_name}:${item.path} `);
+      }
+
+      // Clear stale entries from openFiles
+      const newOpenFiles = { ...this.openFiles.peek() };
+      for (const key of Object.keys(newOpenFiles)) {
+        if (key.startsWith(`${oldPrefix}/`)) {
+          delete newOpenFiles[key];
+        }
+      }
+      this.openFiles.value = newOpenFiles;
+
+      await this.loadTree();
+    } finally {
+      this.isLoading.value = false;
+    }
+  }
+
   async migrateAppFolder() {
     const repo = githubProfileStore.currentRepo.peek();
     if (!repo) return;

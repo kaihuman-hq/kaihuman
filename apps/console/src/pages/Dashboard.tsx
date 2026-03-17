@@ -464,6 +464,9 @@ export const Dashboard = () => {
           onRenameFile={useCallback(async (path: string, newPath: string) => {
             await githubFileStore.renameFile(path, newPath);
           }, [])}
+          onRenameFolder={useCallback(async (path: string, newPath: string) => {
+            await githubFileStore.renameFolder(path, newPath);
+          }, [])}
           onMoveFile={useCallback(async (path: string, newPath: string) => {
             await githubFileStore.renameFile(path, newPath);
           }, [])}

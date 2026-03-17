@@ -124,6 +124,7 @@ export interface MainAppProps {
   onCreateFile?: (path: string, content: string) => void;
   onDeleteFile?: (path: string) => void;
   onRenameFile?: (path: string, newPath: string) => void;
+  onRenameFolder?: (path: string, newPath: string) => void;
   onMoveFile?: (path: string, newPath: string) => void;
   existingFiles?: string[];
   onLoadFolder?: (path: string) => Promise<TileDef[]>;
@@ -199,6 +200,7 @@ export const MainApp = ({
   onCreateFile,
   onDeleteFile,
   onRenameFile,
+  onRenameFolder,
   onMoveFile,
   existingFiles,
   onLoadFolder,
@@ -1410,6 +1412,7 @@ export const MainApp = ({
                       if (onRenameFile) await onRenameFile(path, newPath);
                       if (activeTileId === path) setActiveTileId(newPath);
                     }}
+                    onRenameFolder={onRenameFolder}
                     onRequestMove={(path) => setFileToMove(path)}
                   />
                 ) : (
@@ -1435,6 +1438,7 @@ export const MainApp = ({
                             if (onRenameFile) await onRenameFile(path, newPath);
                             if (activeTileId === path) setActiveTileId(newPath); // Keep active
                           }}
+                          onRenameFolder={onRenameFolder}
                           onRequestMove={(path) => setFileToMove(path)}
                           onNewFileClick={() => setShowNewFileWizard(true)}
                           onToggleQuickNote={handleToggleQuickNote}
