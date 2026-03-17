@@ -48,11 +48,13 @@ export interface ConsumptionWidgetProps {
   content: string;
   mode: 'SMALL' | 'FOCUS' | 'MOBILE_EXPANDED' | 'MOBILE_COLLAPSED';
   onChange?: (newContent: string) => void;
+  onOpenAdd?: () => void;
+  initialTab?: FocusTab;
 }
 
 type FocusTab = 'RECENT' | 'MONTHLY' | 'YEARLY' | 'COMPARE' | 'COLUMNS' | 'ADD';
 
-export const ConsumptionWidget = ({ content, mode, onChange }: ConsumptionWidgetProps) => {
+export const ConsumptionWidget = ({ content, mode, onChange, onOpenAdd, initialTab }: ConsumptionWidgetProps) => {
   const { data, modified } = useMemo(() => parseConsumption(content), [content]);
 
   // Write back gap-filled data once per unique content change
@@ -79,10 +81,10 @@ export const ConsumptionWidget = ({ content, mode, onChange }: ConsumptionWidget
         </div>
       );
     }
-    return <SmallWidget data={data} onDataChange={handleDataChange} />;
+    return <SmallWidget data={data} onDataChange={handleDataChange} onOpenAdd={onOpenAdd} />;
   }
 
-  return <FocusView data={data} onDataChange={handleDataChange} />;
+  return <FocusView data={data} onDataChange={handleDataChange} initialTab={initialTab} />;
 };
 
 // --- Recent entries table ---
@@ -143,9 +145,11 @@ const RecentTable = ({ data, compact }: { data: ConsumptionData; compact?: boole
 const SmallWidget = ({
   data,
   onDataChange,
+  onOpenAdd,
 }: {
   data: ConsumptionData;
   onDataChange: (newData: ConsumptionData) => void;
+  onOpenAdd?: () => void;
 }) => {
   const [adding, setAdding] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
@@ -284,7 +288,7 @@ const SmallWidget = ({
       {/* Add button */}
       <button
         type="button"
-        onClick={() => setAdding(true)}
+        onClick={() => (onOpenAdd ? onOpenAdd() : setAdding(true))}
         className="flex items-center justify-center w-10 shrink-0 border-l border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] transition-colors font-mono text-lg leading-none"
         title="Add entry"
       >
@@ -299,11 +303,14 @@ const SmallWidget = ({
 const FocusView = ({
   data,
   onDataChange,
+  initialTab,
 }: {
   data: ConsumptionData;
   onDataChange: (newData: ConsumptionData) => void;
+  initialTab?: FocusTab;
 }) => {
   const [tab, setTab] = useState<FocusTab>(() => {
+    if (initialTab) return initialTab;
     if (data.columns.length === 0) return 'COLUMNS';
     if (data.entries.length === 0) return 'ADD';
     return 'RECENT';

@@ -909,6 +909,10 @@ export const MainApp = ({
           content={tile.rawContent}
           mode="SMALL"
           onChange={(newContent) => tile.onContentChange?.(newContent)}
+          onOpenAdd={() => {
+            setFocusedViewMode('ADD');
+            setActiveTileId(tile.id);
+          }}
         />
       );
     }
@@ -2649,12 +2653,13 @@ const FocusedTileInternal = ({
                 }}
               />
             </div>
-          ) : isConsumption && viewMode === 'WIDGET' ? (
+          ) : isConsumption && (viewMode === 'WIDGET' || viewMode === 'ADD') ? (
             <div className="flex flex-col min-h-full w-full">
               <ConsumptionWidget
                 content={tile.rawContent || ''}
                 mode="FOCUS"
                 onChange={(c) => tile.onContentChange?.(c)}
+                initialTab={viewMode === 'ADD' ? 'ADD' : undefined}
               />
             </div>
           ) : viewMode === 'WIDGET' && hasWidget ? (
