@@ -204,10 +204,10 @@ export const MillerColumn = ({
         <div
           className={cn(
             'grid gap-px bg-[var(--los-bg)] overflow-y-auto overflow-x-hidden flex-1',
-            'content-start',
+            'content-start justify-center',
             'animate-in fade-in slide-in-from-right-4 duration-300',
           )}
-          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))' }}
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 300px))' }}
         >
           {filteredItems.map((tile) => {
             const isHovered = hoveredTileId === tile.id.toString();
