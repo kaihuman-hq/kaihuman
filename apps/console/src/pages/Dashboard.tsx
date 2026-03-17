@@ -56,16 +56,20 @@ export const Dashboard = () => {
     if (!tree || tree.length === 0) return;
 
     const CONFIG_PATH = '.lifeos/.dashboard.config.json';
-    const configItem = tree.find((t) => t.path === CONFIG_PATH);
 
     const loadConfig = async () => {
+      // Show spinner while reloading
+      layoutStore.remoteConfig.value = null;
+
       logger.info('Checking for remote config...');
       let config: import('@lifosy/core').DashboardConfig | null = null;
 
+      const configItem = githubFileStore.tree.peek().find((t) => t.path === CONFIG_PATH);
+
       if (configItem) {
         try {
-          // Check if already open
-          let content = openFiles[CONFIG_PATH]?.content;
+          // Always use peek() to get the freshest openFiles, not the closed-over snapshot
+          let content = githubFileStore.openFiles.peek()[CONFIG_PATH]?.content;
           if (!content) {
             await githubFileStore.openFile(CONFIG_PATH);
             content = githubFileStore.openFiles.peek()[CONFIG_PATH]?.content;
@@ -91,11 +95,38 @@ export const Dashboard = () => {
         };
       }
 
+      // Validate config entries against the current tree.
+      // Remove any references to files that no longer exist.
+      const currentTree = githubFileStore.tree.peek();
+      const validPaths = new Set(currentTree.map((t) => t.path));
+      const cleanEntries = config.entries.filter((e) => validPaths.has(e.path));
+      const cleanRecent = (config.files?.recentlyOpened ?? []).filter((p) => validPaths.has(p));
+
+      const hasStale =
+        cleanEntries.length !== config.entries.length ||
+        cleanRecent.length !== (config.files?.recentlyOpened?.length ?? 0);
+
+      if (hasStale) {
+        logger.info(
+          `Removed ${config.entries.length - cleanEntries.length} stale dashboard entries and ${(config.files?.recentlyOpened?.length ?? 0) - cleanRecent.length} stale recent files from config`,
+        );
+        config = {
+          ...config,
+          entries: cleanEntries,
+          files: { ...config.files, recentlyOpened: cleanRecent },
+        };
+        if (configItem) {
+          // Config file exists — update and save it
+          githubFileStore.updateFileContent(CONFIG_PATH, JSON.stringify(config, null, 2));
+          githubFileStore.saveFile(CONFIG_PATH);
+        }
+      }
+
       // Pre-load all files for the default dashboard so tiles render with content
       // immediately when remoteConfig is revealed (no empty-widget flash).
       const defaultDashboardId = config.dashboards?.[0]?.id;
       if (defaultDashboardId) {
-        const entries = (config.entries ?? []).filter(
+        const entries = config.entries.filter(
           (e: { dashboard: string }) => e.dashboard === defaultDashboardId,
         );
         if (entries.length > 0) {
@@ -365,9 +396,27 @@ export const Dashboard = () => {
             }
           }, [])}
           onDeleteFile={useCallback(async (path: string) => {
-            if (confirm(`Are you sure you want to delete ${path}?`)) {
-              await githubFileStore.deleteFile(path);
-            }
+            if (!confirm(`Are you sure you want to delete ${path}?`)) return;
+
+            await githubFileStore.deleteFile(path);
+
+            // Remove the deleted file from the dashboard config immediately
+            const current = layoutStore.remoteConfig.value;
+            if (!current) return;
+
+            const CONFIG_PATH = '.lifeos/.dashboard.config.json';
+            const newConfig = {
+              ...current,
+              entries: current.entries.filter((e) => e.path !== path),
+              files: {
+                ...current.files,
+                recentlyOpened: (current.files?.recentlyOpened ?? []).filter((p) => p !== path),
+              },
+            };
+
+            layoutStore.remoteConfig.value = newConfig;
+            githubFileStore.updateFileContent(CONFIG_PATH, JSON.stringify(newConfig, null, 2));
+            githubFileStore.saveFile(CONFIG_PATH);
           }, [])}
           onRenameFile={useCallback(async (path: string, newPath: string) => {
             await githubFileStore.renameFile(path, newPath);
