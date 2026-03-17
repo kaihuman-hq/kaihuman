@@ -63,6 +63,18 @@ export class LayoutStore {
   // Resize State
   expandedTiles = signal<Set<string>>(new Set());
 
+  // Derived state
+  currentDashboardId = computed<string | undefined>(
+    () => this.activeDashboardId.value ?? this.remoteConfig.value?.dashboards[0]?.id,
+  );
+
+  userEntries = computed(() => {
+    const config = this.remoteConfig.value;
+    const dashboardId = this.currentDashboardId.value;
+    if (!config || !dashboardId) return [];
+    return config.entries.filter((e) => e.dashboard === dashboardId);
+  });
+
   constructor() {
     // Log View Changes
     effect(() => {

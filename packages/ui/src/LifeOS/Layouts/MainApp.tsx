@@ -279,6 +279,8 @@ export const MainApp = ({
   const showGraph = layoutStore.view.value === 'GRAPH';
   const showCommits = layoutStore.view.value === 'COMMITS';
   const activeDashboardId = layoutStore.activeDashboardId.value;
+  const currentDashboardId = layoutStore.currentDashboardId.value;
+  const userEntries = layoutStore.userEntries.value;
   const zenMode = layoutStore.zenMode.value;
   const showNewFileWizard = layoutStore.showNewFileWizard.value;
   const showDumpMode = layoutStore.showDumpMode.value;
@@ -614,8 +616,6 @@ export const MainApp = ({
     originalConfig.current = undefined;
   };
 
-  const currentDashboardId = activeDashboardId || layoutStore.remoteConfig.value?.dashboards[0]?.id;
-
   const handlePrevDashboard = () => {
     const config = layoutStore.remoteConfig.value;
     if (!config || !config.dashboards.length) return;
@@ -661,12 +661,6 @@ export const MainApp = ({
   const isQuickNote = useCallback((path: string) => quickNoteSet.has(path), [quickNoteSet]);
 
   // Filter entries for current dashboard
-  const userEntries = useMemo(() => {
-    const config = layoutStore.remoteConfig.value;
-    if (!config || !currentDashboardId) return [];
-    return config.entries.filter((e) => e.dashboard === currentDashboardId);
-  }, [currentDashboardId, config]);
-
   // Convert config entries to tiles
   const dashboardTiles = useMemo(() => {
     const config = layoutStore.remoteConfig.value;
