@@ -2932,7 +2932,7 @@ const TileContentStructure = ({
       // biome-ignore lint/a11y/noStaticElementInteractions: context menu container
       // biome-ignore lint/a11y/useKeyWithClickEvents: context menu container
       <div
-        className="fixed z-[9999] bg-[#1a1a1f] border border-[var(--los-border)] shadow-xl rounded flex flex-col min-w-[120px] py-1 animate-in fade-in zoom-in-95 duration-100"
+        className="fixed z-[9999] bg-[#1a1a1f] border border-[var(--los-border)] shadow-xl rounded flex flex-col min-w-[120px] py-1 animate-in fade-in zoom-in-95 duration-100 text-white"
         style={{ top: activeMenu.y, left: activeMenu.x }}
         onClick={(e) => e.stopPropagation()}
       >
