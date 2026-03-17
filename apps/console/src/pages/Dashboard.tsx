@@ -248,6 +248,16 @@ export const Dashboard = () => {
           config={remoteConfig || undefined}
           fileContents={gridFileContents}
           onConfigChange={(newConfig) => {
+            // Pre-load any files that were just added to the dashboard
+            const currentPaths = new Set(
+              layoutStore.remoteConfig.value?.entries.map((e) => e.path) ?? [],
+            );
+            for (const entry of newConfig.entries) {
+              if (!currentPaths.has(entry.path) && !githubFileStore.openFiles.peek()[entry.path]) {
+                githubFileStore.openFile(entry.path);
+              }
+            }
+
             // 1. Optimistic Update
             layoutStore.remoteConfig.value = newConfig;
 

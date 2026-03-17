@@ -665,7 +665,7 @@ export const MainApp = ({
     const config = layoutStore.remoteConfig.value;
     if (!config || !currentDashboardId) return [];
     return config.entries.filter((e) => e.dashboard === currentDashboardId);
-  }, [currentDashboardId]);
+  }, [currentDashboardId, config]);
 
   // Convert config entries to tiles
   const dashboardTiles = useMemo(() => {
