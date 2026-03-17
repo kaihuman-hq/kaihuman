@@ -3059,15 +3059,10 @@ const TileContentStructure = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 w-full mb-2 pointer-events-auto">
+      <div className="flex-1 overflow-y-auto min-h-0 w-full pointer-events-auto">
         {renderTileContent(tile, 'SMALL')}
       </div>
 
-      <div className="text-right shrink-0 mt-auto">
-        <MonoText className="text-[10px] text-[var(--los-muted)]">
-          {`ID: ${tile.id.toString().toUpperCase().slice(0, 4)}`}
-        </MonoText>
-      </div>
       {renderContextMenu()}
     </div>
   );
