@@ -56,9 +56,12 @@ interface ForecastChartProps {
   forecast: ForecastPoint[];
   width: number;
   height: number;
+  period: StockPeriod;
 }
 
-const ForecastChart = ({ historical, forecast, width, height }: ForecastChartProps) => {
+const ForecastChart = ({ historical, forecast, width, height, period }: ForecastChartProps) => {
+  const seq = (i: number) =>
+    `${period === 'weekly' ? 'W' : period === 'monthly' ? 'M' : 'Y'}${i + 1}`;
   const [hoveredIdx, setHoveredIdx] = useState<{ idx: number; isForecast: boolean } | null>(null);
 
   const allValues = [...historical.map((p) => p.value), ...forecast.map((p) => p.value)];
@@ -166,7 +169,7 @@ const ForecastChart = ({ historical, forecast, width, height }: ForecastChartPro
           const isForecast = i >= historical.length;
           return (
             <text
-              key={`xl-${isForecast ? 'f' : 'h'}-${p.label}`}
+              key={`xl-${p.relativeLabel}`}
               x={toX(i)}
               y={height - 6}
               textAnchor="middle"
@@ -175,7 +178,7 @@ const ForecastChart = ({ historical, forecast, width, height }: ForecastChartPro
               fontFamily="monospace"
               opacity={isForecast ? 0.8 : 1}
             >
-              {p.label}
+              {seq(i)}
             </text>
           );
         })}
@@ -221,7 +224,7 @@ const ForecastChart = ({ historical, forecast, width, height }: ForecastChartPro
       </svg>
 
       {/* Tooltip */}
-      {hovered && hoveredX !== null && (
+      {hovered && hoveredX !== null && hoveredIdx !== null && (
         <div
           className="absolute pointer-events-none z-10 border border-[var(--los-border)] bg-[var(--los-bg)] p-2 text-[10px] font-mono"
           style={{
@@ -229,14 +232,17 @@ const ForecastChart = ({ historical, forecast, width, height }: ForecastChartPro
             top: pad.top,
           }}
         >
+          <p className="text-[var(--los-muted)] mb-0.5">
+            {seq(hoveredIdx.isForecast ? historical.length - 1 + hoveredIdx.idx : hoveredIdx.idx)}
+          </p>
           <p
             className={cn(
               'mb-1',
-              hoveredIdx?.isForecast ? 'text-amber-400' : 'text-[var(--los-muted)]',
+              hoveredIdx.isForecast ? 'text-amber-400' : 'text-[var(--los-fg)]',
             )}
           >
-            {hovered.label}
-            {hoveredIdx?.isForecast ? ' (forecast)' : ''}
+            {hovered.relativeLabel}
+            {hoveredIdx.isForecast ? ' (forecast)' : ''}
           </p>
           <p className="text-[var(--los-accent)]">{fmtNum(hovered.value)}</p>
           {'invest' in hovered && (hovered as PeriodPoint).invest > 0 && (
@@ -273,9 +279,12 @@ interface GroupedBarChartProps {
   points: PeriodPoint[];
   width: number;
   height: number;
+  period: StockPeriod;
 }
 
-const GroupedBarChart = ({ points, width, height }: GroupedBarChartProps) => {
+const GroupedBarChart = ({ points, width, height, period }: GroupedBarChartProps) => {
+  const seq = (i: number) =>
+    `${period === 'weekly' ? 'W' : period === 'monthly' ? 'M' : 'Y'}${i + 1}`;
   const [hovered, setHovered] = useState<number | null>(null);
 
   if (points.length === 0) return null;
@@ -379,7 +388,7 @@ const GroupedBarChart = ({ points, width, height }: GroupedBarChartProps) => {
                   fontSize="8"
                   fontFamily="monospace"
                 >
-                  {p.label}
+                  {seq(i)}
                 </text>
               )}
             </g>
@@ -395,7 +404,8 @@ const GroupedBarChart = ({ points, width, height }: GroupedBarChartProps) => {
             top: pad.top,
           }}
         >
-          <p className="text-[var(--los-muted)] mb-1">{points[hovered]?.label}</p>
+          <p className="text-[var(--los-muted)] mb-0.5">{seq(hovered)}</p>
+          <p className="text-[var(--los-fg)] mb-1">{points[hovered]?.relativeLabel}</p>
           <p className="text-[var(--los-muted)]">Invest: {fmtNum(points[hovered]?.invest ?? 0)}</p>
           <p className="text-[var(--los-accent)]">Value: {fmtNum(points[hovered]?.value ?? 0)}</p>
           <p
@@ -418,10 +428,16 @@ interface ChangeChartProps {
   points: PeriodPoint[];
   width: number;
   height: number;
+  period: StockPeriod;
 }
 
-const ChangeChart = ({ points, width, height }: ChangeChartProps) => {
+const ChangeChart = ({ points, width, height, period }: ChangeChartProps) => {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
   if (points.length < 2) return null;
+
+  const seq = (i: number) =>
+    `${period === 'weekly' ? 'W' : period === 'monthly' ? 'M' : 'Y'}${i + 1}`;
 
   const pad = { top: 10, right: 8, bottom: 24, left: 40 };
   const cw = width - pad.left - pad.right;
@@ -440,53 +456,213 @@ const ChangeChart = ({ points, width, height }: ChangeChartProps) => {
     .join(' ');
   const labelStep = Math.max(Math.ceil(points.length / 10), 1);
 
+  const hoveredPoint = hoveredIdx !== null ? points[hoveredIdx] : null;
+  const hoveredX = hoveredIdx !== null ? pad.left + hoveredIdx * step : null;
+
   return (
-    <svg width={width} height={height} role="img" aria-label="change chart">
-      <line
-        x1={pad.left}
-        y1={pad.top + mid}
-        x2={width - pad.right}
-        y2={pad.top + mid}
-        stroke="var(--los-border)"
-        strokeDasharray="3 3"
-      />
-      <path d={ptsPath} fill="none" stroke="var(--los-accent)" strokeWidth="1.5" />
-      {pctValues.map((v, i) => (
-        <circle
-          key={`pct-${points[i]?.label ?? i}`}
-          cx={pad.left + i * step}
-          cy={toY(v)}
-          r="2"
-          fill={v >= 0 ? '#4ade80' : '#f87171'}
-        />
-      ))}
-      {points.map((p, i) => {
-        if (i % labelStep !== 0 && i !== points.length - 1) return null;
-        return (
-          <text
-            key={p.label}
-            x={pad.left + i * step}
-            y={height - 6}
-            textAnchor="middle"
-            fill="var(--los-muted)"
-            fontSize="8"
-            fontFamily="monospace"
-          >
-            {p.label}
-          </text>
-        );
-      })}
-      <text
-        x={pad.left - 4}
-        y={pad.top + mid + 3}
-        textAnchor="end"
-        fill="var(--los-muted)"
-        fontSize="8"
-        fontFamily="monospace"
+    // biome-ignore lint/a11y/noStaticElementInteractions: chart hover tracking
+    <div className="relative" onMouseLeave={() => setHoveredIdx(null)}>
+      <svg
+        width={width}
+        height={height}
+        role="img"
+        aria-label="change chart"
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left - pad.left;
+          const idx = Math.max(0, Math.min(points.length - 1, Math.round(x / step)));
+          setHoveredIdx(idx);
+        }}
       >
-        0%
-      </text>
-    </svg>
+        <line
+          x1={pad.left}
+          y1={pad.top + mid}
+          x2={width - pad.right}
+          y2={pad.top + mid}
+          stroke="var(--los-border)"
+          strokeDasharray="3 3"
+        />
+        <path d={ptsPath} fill="none" stroke="var(--los-accent)" strokeWidth="1.5" />
+        {points.map((p, i) => (
+          <circle
+            key={p.relativeLabel}
+            cx={pad.left + i * step}
+            cy={toY(p.profitPct ?? 0)}
+            r={hoveredIdx === i ? 3.5 : 2}
+            fill={(p.profitPct ?? 0) >= 0 ? '#4ade80' : '#f87171'}
+          />
+        ))}
+        {points.map((p, i) => {
+          if (i % labelStep !== 0 && i !== points.length - 1) return null;
+          return (
+            <text
+              key={`xl-${p.relativeLabel}`}
+              x={pad.left + i * step}
+              y={height - 6}
+              textAnchor="middle"
+              fill="var(--los-muted)"
+              fontSize="8"
+              fontFamily="monospace"
+            >
+              {seq(i)}
+            </text>
+          );
+        })}
+        <text
+          x={pad.left - 4}
+          y={pad.top + mid + 3}
+          textAnchor="end"
+          fill="var(--los-muted)"
+          fontSize="8"
+          fontFamily="monospace"
+        >
+          0%
+        </text>
+        {/* Hover marker */}
+        {hoveredX !== null && (
+          <line
+            x1={hoveredX}
+            y1={pad.top}
+            x2={hoveredX}
+            y2={height - pad.bottom}
+            stroke="var(--los-fg)"
+            strokeOpacity={0.3}
+          />
+        )}
+      </svg>
+
+      {/* Tooltip */}
+      {hoveredPoint != null && hoveredIdx !== null && hoveredX !== null && (
+        <div
+          className="absolute pointer-events-none z-10 border border-[var(--los-border)] bg-[var(--los-bg)] p-2 text-[10px] font-mono"
+          style={{
+            left: Math.min(hoveredX + 8, width - 110),
+            top: pad.top,
+          }}
+        >
+          <p className="text-[var(--los-muted)] mb-0.5">{seq(hoveredIdx)}</p>
+          <p className="text-[var(--los-fg)] mb-1">{hoveredPoint.relativeLabel}</p>
+          <p
+            className={cn(
+              'font-bold',
+              (hoveredPoint.profitPct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400',
+            )}
+          >
+            {fmtPct(hoveredPoint.profitPct ?? 0)}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Overview Table ───────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 10;
+
+const OverviewTable = ({ points, period }: { points: PeriodPoint[]; period: StockPeriod }) => {
+  const [page, setPage] = useState(0);
+
+  const seq = (i: number) =>
+    `${period === 'weekly' ? 'W' : period === 'monthly' ? 'M' : 'Y'}${i + 1}`;
+
+  // Build rows: most recent first, with profit diff vs chronological previous
+  const rows = [...points]
+    .map((p, chronIdx) => ({
+      ...p,
+      chronIdx,
+      profitDiff: chronIdx > 0 ? p.profit - (points[chronIdx - 1]?.profit ?? 0) : null,
+    }))
+    .reverse();
+
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE);
+  const pageRows = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const fmtDiff = (v: number) => `${v >= 0 ? '+' : ''}${fmtNum(v)}`;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="border border-[var(--los-border)] overflow-x-auto">
+        <table className="w-full text-[10px] font-mono">
+          <thead>
+            <tr className="border-b border-[var(--los-border)]">
+              <th className="text-left px-3 py-2 text-[var(--los-muted)] font-normal">Period</th>
+              <th className="text-right px-3 py-2 text-[var(--los-muted)] font-normal">Invest</th>
+              <th className="text-right px-3 py-2 text-[var(--los-muted)] font-normal">
+                Portfolio
+              </th>
+              <th className="text-right px-3 py-2 text-[var(--los-muted)] font-normal">Profit</th>
+              <th className="text-right px-3 py-2 text-[var(--los-muted)] font-normal">Profit Δ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((row) => (
+              <tr
+                key={row.chronIdx}
+                className="border-b border-[var(--los-border)]/50 hover:bg-white/5"
+              >
+                <td className="px-3 py-1.5">
+                  <span className="text-[var(--los-muted)]">{seq(row.chronIdx)}</span>
+                  <span className="text-[var(--los-fg)] ml-2">{row.relativeLabel}</span>
+                </td>
+                <td className="px-3 py-1.5 text-right text-[var(--los-muted)]">
+                  {fmtNum(row.invest)}
+                </td>
+                <td className="px-3 py-1.5 text-right text-[var(--los-accent)]">
+                  {fmtNum(row.value)}
+                </td>
+                <td
+                  className={cn(
+                    'px-3 py-1.5 text-right',
+                    row.profit >= 0 ? 'text-green-400' : 'text-red-400',
+                  )}
+                >
+                  {fmtNum(row.profit)}
+                </td>
+                <td
+                  className={cn(
+                    'px-3 py-1.5 text-right',
+                    row.profitDiff === null
+                      ? 'text-[var(--los-muted)]'
+                      : row.profitDiff >= 0
+                        ? 'text-green-400'
+                        : 'text-red-400',
+                  )}
+                >
+                  {row.profitDiff !== null ? fmtDiff(row.profitDiff) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-[10px] font-mono text-[var(--los-muted)]">
+          <span>
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, rows.length)} of {rows.length}
+          </span>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-2 py-0.5 border border-[var(--los-border)] disabled:opacity-30 hover:border-[var(--los-fg)] transition-colors"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page === totalPages - 1}
+              className="px-2 py-0.5 border border-[var(--los-border)] disabled:opacity-30 hover:border-[var(--los-fg)] transition-colors"
+            >
+              →
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -564,12 +740,14 @@ const StatTile = ({
   sub,
   positive,
   neutral,
+  extras,
 }: {
   label: string;
   value: string;
   sub?: string;
   positive?: boolean;
   neutral?: boolean;
+  extras?: { label: string; value: string; positive?: boolean }[];
 }) => (
   <div className="border border-[var(--los-border)] p-3 flex flex-col gap-1">
     <MonoLabel className="text-[10px]">{label}</MonoLabel>
@@ -588,6 +766,26 @@ const StatTile = ({
       {value}
     </span>
     {sub && <span className="text-[9px] font-mono text-[var(--los-muted)]">{sub}</span>}
+    {extras && extras.length > 0 && (
+      <div className="flex flex-col gap-0.5 mt-0.5 pt-1 border-t border-[var(--los-border)]/40">
+        {extras.map((extra) => (
+          <div key={extra.label} className="flex justify-between gap-1 text-[9px] font-mono">
+            <span className="text-[var(--los-muted)]">{extra.label}</span>
+            <span
+              className={
+                extra.positive === true
+                  ? 'text-green-400'
+                  : extra.positive === false
+                    ? 'text-red-400'
+                    : 'text-[var(--los-fg)]'
+              }
+            >
+              {extra.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
   </div>
 );
 
@@ -601,6 +799,32 @@ export const StocksWidget = ({ content, mode, onChange }: StocksWidgetProps) => 
   const stats = getStats(entries);
   const aggregated = aggregateByPeriod(entries, period);
   const periodForecast = buildPeriodForecast(aggregated, period);
+
+  // Yearly breakdowns for stat tiles
+  const currentYear = new Date().getFullYear();
+  const yearlyData = aggregateByPeriod(entries, 'yearly');
+  const currentYearPoint = yearlyData.find((p) => p.relativeLabel === String(currentYear)) ?? null;
+  const lastYearPoint = yearlyData.find((p) => p.relativeLabel === String(currentYear - 1)) ?? null;
+  const prevToLastYearPoint =
+    yearlyData.find((p) => p.relativeLabel === String(currentYear - 2)) ?? null;
+
+  const investCurrentYear = currentYearPoint
+    ? entries
+        .filter((e) => e.timestamp.getFullYear() === currentYear)
+        .reduce((sum, e) => sum + e.invest, 0)
+    : null;
+  const investLastYear = lastYearPoint
+    ? entries
+        .filter((e) => e.timestamp.getFullYear() === currentYear - 1)
+        .reduce((sum, e) => sum + e.invest, 0)
+    : null;
+
+  const profitCurrentYear = currentYearPoint
+    ? currentYearPoint.profit - (lastYearPoint?.profit ?? 0)
+    : null;
+  const profitLastYear = lastYearPoint
+    ? lastYearPoint.profit - (prevToLastYearPoint?.profit ?? 0)
+    : null;
 
   if (mode === 'ADD') {
     return (
@@ -667,13 +891,57 @@ export const StocksWidget = ({ content, mode, onChange }: StocksWidgetProps) => 
       {/* ── Stats row ──────────────────────────────────────────────────────── */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatTile label="Current Value" value={fmtNum(stats.latestValue)} neutral />
-          <StatTile label="Total Invested" value={fmtNum(stats.latestInvest)} neutral />
+          <StatTile
+            label="Current Value"
+            value={fmtNum(stats.latestValue)}
+            neutral
+            extras={[
+              ...(lastYearPoint !== null
+                ? [{ label: `${currentYear - 1}`, value: fmtNum(lastYearPoint.value) }]
+                : []),
+              ...(prevToLastYearPoint !== null
+                ? [{ label: `${currentYear - 2}`, value: fmtNum(prevToLastYearPoint.value) }]
+                : []),
+            ]}
+          />
+          <StatTile
+            label="Total Invested"
+            value={fmtNum(stats.latestInvest)}
+            neutral
+            extras={[
+              ...(investCurrentYear !== null
+                ? [{ label: `${currentYear}`, value: fmtNum(investCurrentYear) }]
+                : []),
+              ...(investLastYear !== null
+                ? [{ label: `${currentYear - 1}`, value: fmtNum(investLastYear) }]
+                : []),
+            ]}
+          />
           <StatTile
             label="Total Profit"
             value={fmtNum(stats.latestProfit)}
             sub={fmtPct(stats.latestProfitPct)}
             positive={stats.latestProfit >= 0}
+            extras={[
+              ...(profitCurrentYear !== null
+                ? [
+                    {
+                      label: `${currentYear}`,
+                      value: `${profitCurrentYear >= 0 ? '+' : ''}${fmtNum(profitCurrentYear)}`,
+                      positive: profitCurrentYear >= 0,
+                    },
+                  ]
+                : []),
+              ...(profitLastYear !== null
+                ? [
+                    {
+                      label: `${currentYear - 1}`,
+                      value: `${profitLastYear >= 0 ? '+' : ''}${fmtNum(profitLastYear)}`,
+                      positive: profitLastYear >= 0,
+                    },
+                  ]
+                : []),
+            ]}
           />
           {stats.cagr !== null ? (
             <StatTile
@@ -788,14 +1056,20 @@ export const StocksWidget = ({ content, mode, onChange }: StocksWidgetProps) => 
                 Profit
               </span>
             </div>
-            <GroupedBarChart points={aggregated} width={chartW} height={chartH} />
+            <GroupedBarChart points={aggregated} width={chartW} height={chartH} period={period} />
           </>
         )}
         {chartTab === 'value' && (
-          <ForecastChart historical={aggregated} forecast={[]} width={chartW} height={chartH} />
+          <ForecastChart
+            historical={aggregated}
+            forecast={[]}
+            width={chartW}
+            height={chartH}
+            period={period}
+          />
         )}
         {chartTab === 'change' && (
-          <ChangeChart points={aggregated} width={chartW} height={chartH} />
+          <ChangeChart points={aggregated} width={chartW} height={chartH} period={period} />
         )}
         {chartTab === 'forecast' && periodForecast && (
           <div className="flex flex-col gap-4">
@@ -804,6 +1078,7 @@ export const StocksWidget = ({ content, mode, onChange }: StocksWidgetProps) => 
               forecast={periodForecast.forecastPoints}
               width={chartW}
               height={chartH}
+              period={period}
             />
 
             {/* Forecast table */}
@@ -838,7 +1113,7 @@ export const StocksWidget = ({ content, mode, onChange }: StocksWidgetProps) => 
                             i === periodForecast.forecastPoints.length - 1 && 'font-bold',
                           )}
                         >
-                          <td className="px-3 py-1.5 text-amber-400">{fp.label}</td>
+                          <td className="px-3 py-1.5 text-amber-400">{fp.relativeLabel}</td>
                           <td className="px-3 py-1.5 text-right text-[var(--los-fg)]">
                             {fmtNum(fp.value)}
                           </td>
@@ -891,6 +1166,11 @@ export const StocksWidget = ({ content, mode, onChange }: StocksWidgetProps) => 
           </div>
         )}
       </div>
+
+      {/* ── Overview table ──────────────────────────────────────────────────── */}
+      {chartTab === 'bars' && aggregated.length > 0 && (
+        <OverviewTable points={aggregated} period={period} />
+      )}
 
       <p className="text-[9px] font-mono text-[var(--los-muted)] opacity-40">
         {entries.length} entries · {aggregated.length} {period} periods
