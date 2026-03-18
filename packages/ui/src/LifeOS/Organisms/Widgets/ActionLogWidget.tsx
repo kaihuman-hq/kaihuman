@@ -15,6 +15,7 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
   const [focusView, setFocusView] = useState<'log' | 'report'>('log');
   const [search, setSearch] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [showAllTags, setShowAllTags] = useState(false);
 
   const data = useMemo(() => parseActionLog(content), [content]);
 
@@ -252,7 +253,7 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
           {/* Tag badges */}
           {allTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {allTags.map(({ tag, count }) => (
+              {(showAllTags ? allTags : allTags.slice(0, 10)).map(({ tag, count }) => (
                 <button
                   key={tag}
                   type="button"
@@ -268,6 +269,15 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
                   <span className="ml-1 opacity-60">{count}</span>
                 </button>
               ))}
+              {allTags.length > 10 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllTags((v) => !v)}
+                  className="text-[10px] font-mono px-2 py-0.5 border border-dashed border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-fg)] hover:border-[var(--los-fg)] transition-colors"
+                >
+                  {showAllTags ? 'Show less' : `+${allTags.length - 10} more`}
+                </button>
+              )}
             </div>
           )}
 
