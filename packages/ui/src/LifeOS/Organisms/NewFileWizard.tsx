@@ -34,6 +34,54 @@ interface Template {
 
 const TEMPLATES: Template[] = [
   {
+    id: 'note',
+    name: 'Note',
+    description: 'Markdown note',
+    icon: FileText,
+    extension: '.md',
+    defaultContent: '',
+  },
+  {
+    id: 'todo',
+    name: 'Todo List',
+    description: 'Track tasks and progress',
+    icon: ListTodo,
+    extension: '.todos.md',
+    defaultContent: '# Tasks\n\n- [ ] New Task',
+  },
+  {
+    id: 'data-collection',
+    name: 'Data Collection',
+    description: 'Track custom metrics and data',
+    icon: Database,
+    extension: '.data-collection.csv',
+    defaultContent: 'name::created,type::auto:date;name::Value,type::number,unit::#\n',
+  },
+  {
+    id: 'habit',
+    name: 'Habit Tracker',
+    description: 'Track daily habits and streaks',
+    icon: Activity,
+    extension: '.habit.csv',
+    defaultContent: 'id,title,frequency,target,history\n',
+  },
+  {
+    id: 'rss',
+    name: 'RSS Reader',
+    description: 'Follow your favorite news feeds',
+    icon: Rss,
+    extension: '.rss.json',
+    defaultContent: JSON.stringify({ feeds: [], readItems: [] }, null, 2),
+  },
+  {
+    id: 'events',
+    name: 'Events',
+    description: 'Upcoming events and schedule',
+    icon: Calendar,
+    extension: '.events.csv',
+    defaultContent: 'id,title,date,type,description\n',
+  },
+  {
     id: 'consumption',
     name: 'Consumption Tracker',
     description:
@@ -52,46 +100,6 @@ const TEMPLATES: Template[] = [
     defaultContent: '',
   },
   {
-    id: 'data-collection',
-    name: 'Data Collection',
-    description: 'Track custom metrics and data',
-    icon: Database,
-    extension: '.data-collection.csv',
-    defaultContent: 'name::created,type::auto:date;name::Value,type::number,unit::#\n',
-  },
-  {
-    id: 'rss',
-    name: 'RSS Reader',
-    description: 'Follow your favorite news feeds',
-    icon: Rss,
-    extension: '.rss.json',
-    defaultContent: JSON.stringify({ feeds: [], readItems: [] }, null, 2),
-  },
-  {
-    id: 'todo',
-    name: 'Todo List',
-    description: 'Track tasks and progress',
-    icon: ListTodo,
-    extension: '.todos.md',
-    defaultContent: '# Tasks\n\n- [ ] New Task',
-  },
-  {
-    id: 'events',
-    name: 'Events',
-    description: 'Upcoming events and schedule',
-    icon: Calendar,
-    extension: '.events.csv',
-    defaultContent: 'id,title,date,type,description\n',
-  },
-  {
-    id: 'habit',
-    name: 'Habit Tracker',
-    description: 'Track daily habits and streaks',
-    icon: Activity,
-    extension: '.habit.csv',
-    defaultContent: 'id,title,frequency,target,history\n',
-  },
-  {
     id: 'timezone',
     name: 'Timezones',
     description: 'Track time across the world',
@@ -106,14 +114,6 @@ const TEMPLATES: Template[] = [
     icon: Bookmark,
     extension: '.readitlater.json',
     defaultContent: JSON.stringify({ items: [] }, null, 2),
-  },
-  {
-    id: 'note',
-    name: 'Note',
-    description: 'Markdown note',
-    icon: FileText,
-    extension: '.md',
-    defaultContent: '',
   },
 ];
 
@@ -145,6 +145,7 @@ export const NewFileWizard = ({
   initialFolder = '',
 }: NewFileWizardProps) => {
   const [step, setStep] = useState<'TEMPLATE' | 'LOCATION'>(initialStep);
+  const [templateSearch, setTemplateSearch] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(() => {
     if (initialContent) {
       // Default to Note template for dumps, or find generic md
@@ -278,33 +279,47 @@ export const NewFileWizard = ({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {step === 'TEMPLATE' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {TEMPLATES.map((t) => (
-                <button
-                  type="button"
-                  key={t.id}
-                  onClick={() => {
-                    setSelectedTemplate(t);
-                    setStep('LOCATION');
-                  }}
-                  className="flex flex-col items-start gap-4 p-4 border border-[var(--los-border)] hover:border-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-all text-left group"
-                >
-                  <div className="p-2 bg-[var(--los-bg)] border border-[var(--los-border)] rounded-md group-hover:border-[var(--los-accent)] group-hover:text-[var(--los-accent)] transition-colors">
-                    <t.icon size={24} />
-                  </div>
-                  <div>
-                    <MonoLabel className="text-base group-hover:text-[var(--los-accent)] transition-colors block mb-1">
-                      {t.name}
-                    </MonoLabel>
-                    <p className="text-xs text-[var(--los-muted)] leading-relaxed">
-                      {t.description}
-                    </p>
-                  </div>
-                </button>
-              ))}
+            <div className="flex flex-col gap-4">
+              <input
+                type="text"
+                value={templateSearch}
+                onInput={(e) => setTemplateSearch(e.currentTarget.value)}
+                placeholder="Search templates..."
+                className="w-full bg-transparent border border-[var(--los-border)] focus:border-[var(--los-accent)] px-3 py-2 text-sm font-mono text-[var(--los-fg)] focus:outline-none placeholder:text-[var(--los-muted)]/50"
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {TEMPLATES.filter(
+                  (t) =>
+                    !templateSearch ||
+                    t.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                    t.description.toLowerCase().includes(templateSearch.toLowerCase()),
+                ).map((t) => (
+                  <button
+                    type="button"
+                    key={t.id}
+                    onClick={() => {
+                      setSelectedTemplate(t);
+                      setStep('LOCATION');
+                    }}
+                    className="flex flex-col items-start gap-4 p-4 border border-[var(--los-border)] hover:border-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-all text-left group"
+                  >
+                    <div className="p-2 bg-[var(--los-bg)] border border-[var(--los-border)] rounded-md group-hover:border-[var(--los-accent)] group-hover:text-[var(--los-accent)] transition-colors">
+                      <t.icon size={24} />
+                    </div>
+                    <div>
+                      <MonoLabel className="text-base group-hover:text-[var(--los-accent)] transition-colors block mb-1">
+                        {t.name}
+                      </MonoLabel>
+                      <p className="text-xs text-[var(--los-muted)] leading-relaxed">
+                        {t.description}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-8 w-full max-w-2xl mx-auto mt-4 px-4 pb-12">
+            <div className="flex flex-col gap-8 w-full max-w-2xl mx-auto mt-4 px-4">
               <div className="flex items-center gap-4 p-4 border border-[var(--los-border)] bg-[var(--los-accent)]/5">
                 {(() => {
                   const Icon = selectedTemplate?.icon;
@@ -448,19 +463,24 @@ export const NewFileWizard = ({
                   )}
                 </div>
               </div>
-
-              <button
-                type="button"
-                onClick={handleCreate}
-                disabled={!filename || !!error || (encryptFile && !password)}
-                className="mt-4 bg-[var(--los-accent)] text-black font-bold py-3 px-6 flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity self-end w-full sm:w-auto"
-              >
-                <span>CREATE FILE</span>
-                <ArrowRight size={16} />
-              </button>
             </div>
           )}
         </div>
+
+        {/* Footer: Create File button, only shown on LOCATION step */}
+        {step === 'LOCATION' && (
+          <div className="shrink-0 border-t border-[var(--los-border)] px-6 py-4 flex justify-end">
+            <button
+              type="button"
+              onClick={handleCreate}
+              disabled={!filename || !!error || (encryptFile && !password)}
+              className="bg-[var(--los-accent)] text-black font-bold py-3 px-6 flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity w-full sm:w-auto"
+            >
+              <span>CREATE FILE</span>
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
