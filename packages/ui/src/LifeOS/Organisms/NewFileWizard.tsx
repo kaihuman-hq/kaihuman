@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Bookmark,
   Calendar,
+  ClipboardList,
   Database,
   FileText,
   Globe,
@@ -40,6 +41,14 @@ const TEMPLATES: Template[] = [
     icon: FileText,
     extension: '.md',
     defaultContent: '',
+  },
+  {
+    id: 'actionlog',
+    name: 'Action Log',
+    description: 'Log actions, events, and notes with tags',
+    icon: ClipboardList,
+    extension: '.actionlog.md',
+    defaultContent: '---\n---\n\n# Action Log\n\n',
   },
   {
     id: 'todo',
