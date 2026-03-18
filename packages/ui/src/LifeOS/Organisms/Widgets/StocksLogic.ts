@@ -28,6 +28,8 @@ export interface StockEntry {
 
 export interface PeriodPoint {
   label: string;
+  /** Full relative label: "W5/2025", "M2/2025", "2025" */
+  relativeLabel: string;
   value: number;
   /** Cumulative total invested up to and including this period. */
   invest: number;
@@ -176,6 +178,20 @@ function shortLabel(key: string, period: StockPeriod): string {
   return key;
 }
 
+function makeRelativeLabel(key: string, period: StockPeriod): string {
+  if (period === 'weekly') {
+    const wIdx = key.indexOf('-W');
+    const year = key.slice(0, wIdx);
+    const week = parseInt(key.slice(wIdx + 2), 10);
+    return `W${week}/${year}`;
+  }
+  if (period === 'monthly') {
+    const [year, month] = key.split('-');
+    return `M${parseInt(month ?? '0', 10)}/${year}`;
+  }
+  return key; // yearly: key is already "2025"
+}
+
 // ─── Aggregation ──────────────────────────────────────────────────────────────
 
 export function aggregateByPeriod(entries: StockEntry[], period: StockPeriod): PeriodPoint[] {
@@ -206,6 +222,7 @@ export function aggregateByPeriod(entries: StockEntry[], period: StockPeriod): P
 
     points.push({
       label: shortLabel(key, period),
+      relativeLabel: makeRelativeLabel(key, period),
       value: entry.value,
       invest: cumulativeInvest,
       profit,
@@ -276,6 +293,8 @@ export function getStats(entries: StockEntry[]): StockStats | null {
 /** A projected period point (future, not observed). */
 export interface ForecastPoint {
   label: string;
+  /** Full relative label: "W5/2025", "M2/2025", "2025" */
+  relativeLabel: string;
   value: number;
 }
 
@@ -389,10 +408,18 @@ export function buildPeriodForecast(
 
   // Project forward from the end of the lookback window
   const baseIndex = recent.length;
-  const forecastPoints: ForecastPoint[] = remainingLabels.map((label, i) => ({
-    label,
-    value: Math.max(0, slope * (baseIndex + i) + intercept),
-  }));
+  const forecastYear = new Date().getFullYear();
+  const forecastPoints: ForecastPoint[] = remainingLabels.map((label, i) => {
+    let relativeLabel: string;
+    if (period === 'weekly') {
+      relativeLabel = `${label}/${forecastYear}`;
+    } else if (period === 'monthly') {
+      relativeLabel = `M${parseInt(label, 10)}/${forecastYear}`;
+    } else {
+      relativeLabel = label; // yearly: label is already "2025" etc.
+    }
+    return { label, relativeLabel, value: Math.max(0, slope * (baseIndex + i) + intercept) };
+  });
 
   const lastForecast = forecastPoints[forecastPoints.length - 1];
   const yearEndValue = lastForecast ? lastForecast.value : null;
