@@ -740,12 +740,14 @@ const StatTile = ({
   sub,
   positive,
   neutral,
+  extras,
 }: {
   label: string;
   value: string;
   sub?: string;
   positive?: boolean;
   neutral?: boolean;
+  extras?: { label: string; value: string; positive?: boolean }[];
 }) => (
   <div className="border border-[var(--los-border)] p-3 flex flex-col gap-1">
     <MonoLabel className="text-[10px]">{label}</MonoLabel>
@@ -764,6 +766,26 @@ const StatTile = ({
       {value}
     </span>
     {sub && <span className="text-[9px] font-mono text-[var(--los-muted)]">{sub}</span>}
+    {extras && extras.length > 0 && (
+      <div className="flex flex-col gap-0.5 mt-0.5 pt-1 border-t border-[var(--los-border)]/40">
+        {extras.map((extra) => (
+          <div key={extra.label} className="flex justify-between gap-1 text-[9px] font-mono">
+            <span className="text-[var(--los-muted)]">{extra.label}</span>
+            <span
+              className={
+                extra.positive === true
+                  ? 'text-green-400'
+                  : extra.positive === false
+                    ? 'text-red-400'
+                    : 'text-[var(--los-fg)]'
+              }
+            >
+              {extra.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
   </div>
 );
 
@@ -777,6 +799,32 @@ export const StocksWidget = ({ content, mode, onChange }: StocksWidgetProps) => 
   const stats = getStats(entries);
   const aggregated = aggregateByPeriod(entries, period);
   const periodForecast = buildPeriodForecast(aggregated, period);
+
+  // Yearly breakdowns for stat tiles
+  const currentYear = new Date().getFullYear();
+  const yearlyData = aggregateByPeriod(entries, 'yearly');
+  const currentYearPoint = yearlyData.find((p) => p.relativeLabel === String(currentYear)) ?? null;
+  const lastYearPoint = yearlyData.find((p) => p.relativeLabel === String(currentYear - 1)) ?? null;
+  const prevToLastYearPoint =
+    yearlyData.find((p) => p.relativeLabel === String(currentYear - 2)) ?? null;
+
+  const investCurrentYear = currentYearPoint
+    ? entries
+        .filter((e) => e.timestamp.getFullYear() === currentYear)
+        .reduce((sum, e) => sum + e.invest, 0)
+    : null;
+  const investLastYear = lastYearPoint
+    ? entries
+        .filter((e) => e.timestamp.getFullYear() === currentYear - 1)
+        .reduce((sum, e) => sum + e.invest, 0)
+    : null;
+
+  const profitCurrentYear = currentYearPoint
+    ? currentYearPoint.profit - (lastYearPoint?.profit ?? 0)
+    : null;
+  const profitLastYear = lastYearPoint
+    ? lastYearPoint.profit - (prevToLastYearPoint?.profit ?? 0)
+    : null;
 
   if (mode === 'ADD') {
     return (
@@ -843,13 +891,57 @@ export const StocksWidget = ({ content, mode, onChange }: StocksWidgetProps) => 
       {/* ── Stats row ──────────────────────────────────────────────────────── */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatTile label="Current Value" value={fmtNum(stats.latestValue)} neutral />
-          <StatTile label="Total Invested" value={fmtNum(stats.latestInvest)} neutral />
+          <StatTile
+            label="Current Value"
+            value={fmtNum(stats.latestValue)}
+            neutral
+            extras={[
+              ...(lastYearPoint !== null
+                ? [{ label: `${currentYear - 1}`, value: fmtNum(lastYearPoint.value) }]
+                : []),
+              ...(prevToLastYearPoint !== null
+                ? [{ label: `${currentYear - 2}`, value: fmtNum(prevToLastYearPoint.value) }]
+                : []),
+            ]}
+          />
+          <StatTile
+            label="Total Invested"
+            value={fmtNum(stats.latestInvest)}
+            neutral
+            extras={[
+              ...(investCurrentYear !== null
+                ? [{ label: `${currentYear}`, value: fmtNum(investCurrentYear) }]
+                : []),
+              ...(investLastYear !== null
+                ? [{ label: `${currentYear - 1}`, value: fmtNum(investLastYear) }]
+                : []),
+            ]}
+          />
           <StatTile
             label="Total Profit"
             value={fmtNum(stats.latestProfit)}
             sub={fmtPct(stats.latestProfitPct)}
             positive={stats.latestProfit >= 0}
+            extras={[
+              ...(profitCurrentYear !== null
+                ? [
+                    {
+                      label: `${currentYear}`,
+                      value: `${profitCurrentYear >= 0 ? '+' : ''}${fmtNum(profitCurrentYear)}`,
+                      positive: profitCurrentYear >= 0,
+                    },
+                  ]
+                : []),
+              ...(profitLastYear !== null
+                ? [
+                    {
+                      label: `${currentYear - 1}`,
+                      value: `${profitLastYear >= 0 ? '+' : ''}${fmtNum(profitLastYear)}`,
+                      positive: profitLastYear >= 0,
+                    },
+                  ]
+                : []),
+            ]}
           />
           {stats.cagr !== null ? (
             <StatTile
