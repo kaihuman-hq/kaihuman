@@ -69,6 +69,10 @@ impl AuthManager {
         Ok(())
     }
     
+    pub fn config_dir(&self) -> &std::path::Path {
+        self.config_path.parent().expect("config_path has a parent")
+    }
+
     pub fn logout(&self) -> Result<()> {
         if self.config_path.exists() {
             fs::remove_file(&self.config_path)?;
