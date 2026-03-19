@@ -10,9 +10,11 @@ use std::{error::Error, io};
 
 mod app;
 mod auth;
+mod files;
+mod git;
 mod github;
-mod ui;
 mod server;
+mod ui;
 
 use app::App;
 
