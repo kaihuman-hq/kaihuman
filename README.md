@@ -1,135 +1,91 @@
-# Turborepo starter
+# Lifosy Monorepo
 
-This Turborepo starter is maintained by the Turborepo core team.
+A personal life-OS built on GitHub — notes, dashboards, habits, and tasks, all stored as files in your own repos.
 
-## Using this example
+## Apps
 
-Run the following command:
+| App | Stack | Description |
+|-----|-------|-------------|
+| `apps/cli` | Rust + Ratatui | Terminal UI — notes, file browser, AI prompt, dashboard |
+| `apps/console` | Preact + Vite | Web dashboard (files, kanban, analytics) |
+| `apps/browser-extension` | Preact + CRXJS | Browser extension |
+
+## Prerequisites
+
+- [Rust](https://rustup.rs/) (stable)
+- [Node.js](https://nodejs.org/) LTS + [pnpm](https://pnpm.io/)
+- `git` on `$PATH` (used by the CLI for repo sync)
+- Optional: `claude`, `copilot`, or `gemini` CLI on `$PATH` for AI features
+
+## CLI — quick start
 
 ```sh
-npx create-turbo@latest
+cd apps/cli
+
+# Run directly (dev mode)
+cargo run
+
+# Run with a subcommand
+cargo run -- server          # start local AI proxy on :4000
+cargo run -- server --port 3000
+
+# Build a release binary
+cargo build --release
+./target/release/cli
 ```
 
-## What's inside?
+### First launch
 
-This Turborepo includes the following packages/apps:
+The CLI opens a browser window to authenticate via GitHub OAuth. After that it drops you into the TUI.
 
-### Apps and Packages
+### Key bindings
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+| Key | Action |
+|-----|--------|
+| `l` | Login (GitHub OAuth) |
+| `s` | Select active repository |
+| `n` | Add a quick note to active repo |
+| `a` | AI prompt — pipe to Claude / Copilot / Gemini |
+| `f` | File browser (syncs repo first) |
+| `d` | Dashboard config view (syncs repo first) |
+| `q` / `Ctrl+C` | Quit |
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+**AI prompt:** `Tab` cycles provider · `Ctrl+Enter` sends · `Esc` cancels
 
-### Utilities
+**File editor:** `Ctrl+S` saves · `Esc` closes
 
-This Turborepo has some additional tools already setup for you:
+See [`doc/documentation.md`](doc/documentation.md) for full key-binding reference.
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+## Web console — quick start
 
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+```sh
+pnpm install
+pnpm dev --filter=@lifosy/app-console
+# → http://localhost:5173
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+## Monorepo commands
 
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+```sh
+pnpm turbo build          # build everything
+pnpm turbo dev            # dev servers for all apps
+pnpm turbo check          # lint + type-check
+pnpm turbo test           # run tests
 ```
 
-### Develop
+## Packages
 
-To develop all apps and packages, run the following command:
+| Package | Description |
+|---------|-------------|
+| `packages/core` | Shared business logic, GitHub service, Preact Signals stores |
+| `packages/ui` | Shared Preact UI components |
+| `packages/config` | Shared TypeScript / Biome / Tailwind config |
 
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+## Config files stored by the CLI
 
 ```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+~/.config/com/lifosy/cli/
+  auth.json            # GitHub token + active repo
+  recent_files.json    # Last 20 opened files (relative repo paths)
+  repos/<owner>/<repo> # Shallow git clone of active repo
 ```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)

@@ -2,11 +2,11 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
 };
 
-use crate::app::{App, CurrentScreen};
+use crate::app::{App, CurrentScreen, MENU_ITEMS};
 
 pub fn ui(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
@@ -19,12 +19,12 @@ pub fn ui(f: &mut Frame, app: &App) {
         .split(f.area());
 
     // Title
-    let title = Paragraph::new("Lifosy CLI")
+    let title = Paragraph::new("kaihuman CLI")
         .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(title, chunks[0]);
 
-    // Main content
+    // Content
     match app.current_screen {
         CurrentScreen::Main => render_main(f, app, chunks[1]),
         CurrentScreen::Login => render_login(f, chunks[1]),
@@ -42,15 +42,15 @@ pub fn ui(f: &mut Frame, app: &App) {
         app.status_message.as_str()
     } else {
         match app.current_screen {
-            CurrentScreen::Main => "q: Quit | n: Note | s: Repo | a: AI | f: Files | d: Dashboard | l: Login",
+            CurrentScreen::Main => "↑↓: Navigate | Enter / letter key: Select | q: Quit",
             CurrentScreen::Login => "Waiting for browser authentication…",
-            CurrentScreen::RepoSelect => "Esc: Cancel | Enter: Select | ↑↓: Navigate",
-            CurrentScreen::NoteInput => "Esc: Cancel | Enter: Save",
-            CurrentScreen::AiPrompt => "Tab: Provider | Ctrl+Enter: Send | Esc: Back",
-            CurrentScreen::AiResponse => "↑↓: Scroll | Esc/Enter: Back to prompt",
-            CurrentScreen::FileBrowser => "Esc: Back | ↑↓: Navigate | Enter: Open",
+            CurrentScreen::RepoSelect => "↑↓: Navigate | Enter: Select | Esc: Cancel",
+            CurrentScreen::NoteInput => "Enter: Save | Esc: Cancel",
+            CurrentScreen::AiPrompt => "Tab: cycle provider | Enter: send | Esc: back",
+            CurrentScreen::AiResponse => "↑↓: Scroll | Esc / Enter: Back to prompt",
+            CurrentScreen::FileBrowser => "↑↓: Navigate | Enter: Open | Esc: Back",
             CurrentScreen::FileEditor => "Ctrl+S: Save | Esc: Close",
-            CurrentScreen::DashboardView => "Esc: Back | ↑↓: Navigate | Enter: Open",
+            CurrentScreen::DashboardView => "↑↓: Navigate | Enter: Open | Esc: Back",
         }
     };
 
@@ -60,38 +60,57 @@ pub fn ui(f: &mut Frame, app: &App) {
     f.render_widget(status, chunks[2]);
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Main — navigable menu ─────────────────────────────────────────────────────
 
 fn render_main(f: &mut Frame, app: &App, area: Rect) {
-    let mut lines = vec![Line::from("Welcome to Lifosy CLI"), Line::from("")];
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Min(1)])
+        .split(area);
 
-    if app.github_client.is_some() {
-        if let Some(ref repo) = app.active_repo {
-            lines.push(
-                Line::from(format!("Active repo: {}", repo))
-                    .style(Style::default().fg(Color::Green)),
-            );
-        } else {
-            lines.push(Line::from("Authenticated").style(Style::default().fg(Color::Green)));
-        }
-        lines.push(Line::from(""));
-        lines.push(Line::from("n  New quick note"));
-        lines.push(Line::from("s  Select active repository"));
-        lines.push(Line::from("a  AI prompt (Claude / Copilot / Gemini)"));
-        lines.push(Line::from("f  File browser  (syncs repo)"));
-        lines.push(Line::from("d  Dashboard config  (syncs repo)"));
+    // Info line
+    let info = if let Some(ref repo) = app.active_repo {
+        Paragraph::new(format!("Repo: {}", repo))
+            .style(Style::default().fg(Color::Green))
+            .block(Block::default().borders(Borders::ALL))
     } else {
-        lines.push(Line::from("Not authenticated. Press 'l' to login."));
-    }
+        Paragraph::new("Not authenticated")
+            .style(Style::default().fg(Color::Yellow))
+            .block(Block::default().borders(Borders::ALL))
+    };
+    f.render_widget(info, chunks[0]);
 
-    let p = Paragraph::new(lines).block(Block::default().title("Home").borders(Borders::ALL));
-    f.render_widget(p, area);
+    // Menu list
+    let items: Vec<ListItem> = MENU_ITEMS
+        .iter()
+        .map(|(key, label)| {
+            ListItem::new(Line::from(vec![
+                Span::styled(format!(" [{}]  ", key), Style::default().fg(Color::DarkGray)),
+                Span::raw(*label),
+            ]))
+        })
+        .collect();
+
+    let list = List::new(items)
+        .block(Block::default().title("Menu").borders(Borders::ALL))
+        .highlight_style(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("▶ ");
+
+    let mut state = ListState::default();
+    state.select(Some(app.menu_index));
+    f.render_stateful_widget(list, chunks[1], &mut state);
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 
 fn render_login(f: &mut Frame, area: Rect) {
     let text = vec![
+        Line::from(""),
         Line::from("Opening your browser to authenticate…"),
         Line::from(""),
         Line::from("If the browser did not open, visit:"),
@@ -106,7 +125,8 @@ fn render_login(f: &mut Frame, area: Rect) {
 // ── Repo select ───────────────────────────────────────────────────────────────
 
 fn render_repo_select(f: &mut Frame, app: &App, area: Rect) {
-    let items: Vec<ListItem> = app.repos.iter().map(|r| ListItem::new(r.full_name.clone())).collect();
+    let items: Vec<ListItem> =
+        app.repos.iter().map(|r| ListItem::new(r.full_name.clone())).collect();
     let list = List::new(items)
         .block(Block::default().title("Select Repository").borders(Borders::ALL))
         .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Yellow))
@@ -132,7 +152,7 @@ fn render_ai_response(f: &mut Frame, app: &App, area: Rect) {
     let p = Paragraph::new(app.ai_response.as_str())
         .block(
             Block::default()
-                .title(format!("{} response", app.ai_provider.name()))
+                .title(format!("{} — response (↑↓ scroll | Esc: back)", app.ai_provider.name()))
                 .borders(Borders::ALL),
         )
         .wrap(Wrap { trim: false })
@@ -147,31 +167,31 @@ fn render_file_browser(f: &mut Frame, app: &App, area: Rect) {
         .file_browser_items
         .iter()
         .map(|item| {
-            let label = if item.is_recent {
-                format!("★ {}", item.path)
+            let (icon, style) = if item.is_recent {
+                ("★ ", Style::default().fg(Color::Yellow))
             } else if item.is_dir {
-                format!("▶ {}/", item.path)
+                ("▶ ", Style::default().fg(Color::Cyan))
             } else {
-                format!("  {}", item.path)
+                ("  ", Style::default())
             };
-            let style = if item.is_recent {
-                Style::default().fg(Color::Yellow)
-            } else if item.is_dir {
-                Style::default().fg(Color::Cyan)
+            let label = if item.is_dir {
+                format!("{}{}/", icon, item.path)
             } else {
-                Style::default()
+                format!("{}{}", icon, item.path)
             };
             ListItem::new(label).style(style)
         })
         .collect();
 
-    let title = format!(
-        "Files — {}",
-        app.active_repo.as_deref().unwrap_or("no repo")
-    );
+    let title = if items.is_empty() {
+        "Files — syncing…".to_string()
+    } else {
+        format!("Files — {} ({})", app.active_repo.as_deref().unwrap_or("?"), items.len())
+    };
+
     let list = List::new(items)
         .block(Block::default().title(title).borders(Borders::ALL))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::White))
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::White).bg(Color::DarkGray))
         .highlight_symbol(">> ");
     f.render_stateful_widget(list, area, &mut app.file_browser_state.clone());
 }
@@ -186,24 +206,28 @@ fn render_file_editor(f: &mut Frame, app: &App, area: Rect) {
 
 fn render_dashboard_view(f: &mut Frame, app: &App, area: Rect) {
     let Some(ref cfg) = app.dashboard_config else {
-        let p = Paragraph::new("No dashboard.config.json found in repository.")
-            .block(Block::default().title("Dashboard").borders(Borders::ALL));
+        let msg = if app.dashboard_config_path.is_empty() {
+            "dashboard.config.json not found.\nLooked in: root, .kh/, .lifeos/".to_string()
+        } else {
+            format!("Loaded from: {}", app.dashboard_config_path)
+        };
+        let p = Paragraph::new(msg)
+            .block(Block::default().title("Dashboard").borders(Borders::ALL))
+            .wrap(Wrap { trim: true });
         f.render_widget(p, area);
         return;
     };
 
-    // Split into info panel (top) + file list (bottom)
-    let chunks = Layout::default()
+    let split = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(6), Constraint::Min(1)])
+        .constraints([Constraint::Length(5), Constraint::Min(1)])
         .split(area);
 
-    // Info panel: workspaces + theme
+    // Info panel
     let mut info_lines = vec![Line::from(Span::styled(
-        "dashboard.config.json",
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        format!("Config: {}", app.dashboard_config_path),
+        Style::default().fg(Color::Cyan),
     ))];
-
     if let Some(ref ws) = cfg.dashboards {
         let names: Vec<&str> = ws.iter().map(|w| w.name.as_str()).collect();
         info_lines.push(Line::from(format!("Workspaces: {}", names.join(", "))));
@@ -211,12 +235,11 @@ fn render_dashboard_view(f: &mut Frame, app: &App, area: Rect) {
     if let Some(ref theme) = cfg.theme {
         info_lines.push(Line::from(format!("Theme: {}", theme)));
     }
-
     let info = Paragraph::new(info_lines)
-        .block(Block::default().title("Config").borders(Borders::ALL));
-    f.render_widget(info, chunks[0]);
+        .block(Block::default().title("Dashboard Config").borders(Borders::ALL));
+    f.render_widget(info, split[0]);
 
-    // File list: primary files + entry paths (shared file_browser_items / state)
+    // File list
     let items: Vec<ListItem> = app
         .file_browser_items
         .iter()
@@ -235,9 +258,9 @@ fn render_dashboard_view(f: &mut Frame, app: &App, area: Rect) {
         })
         .collect();
 
-    let list = List::new(items)
+    let file_list = List::new(items)
         .block(Block::default().title("Files (Enter to open)").borders(Borders::ALL))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::White))
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::White).bg(Color::DarkGray))
         .highlight_symbol(">> ");
-    f.render_stateful_widget(list, chunks[1], &mut app.file_browser_state.clone());
+    f.render_stateful_widget(file_list, split[1], &mut app.file_browser_state.clone());
 }

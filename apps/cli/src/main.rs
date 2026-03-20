@@ -10,6 +10,7 @@ use std::{error::Error, io};
 
 mod app;
 mod auth;
+mod db;
 mod files;
 mod git;
 mod github;

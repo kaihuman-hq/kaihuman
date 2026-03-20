@@ -45,3 +45,44 @@ pub async fn sync_repo(config_dir: &Path, owner: &str, repo: &str, token: &str) 
 
     Ok(repo_dir)
 }
+
+/// Stage, commit, and push a single file in the local clone.
+pub async fn commit_and_push(repo_dir: &Path, rel_path: &str) -> Result<()> {
+    let dir = repo_dir.to_str().unwrap_or("");
+
+    let add = Command::new("git")
+        .args(["-C", dir, "add", rel_path])
+        .output()
+        .await
+        .context("git add failed")?;
+    if !add.status.success() {
+        anyhow::bail!("git add: {}", String::from_utf8_lossy(&add.stderr).trim());
+    }
+
+    let msg = format!("Update {} via kaihuman CLI", rel_path);
+    let commit = Command::new("git")
+        .args(["-C", dir, "commit", "-m", &msg])
+        .output()
+        .await
+        .context("git commit failed")?;
+    if !commit.status.success() {
+        let out = String::from_utf8_lossy(&commit.stdout);
+        let err = String::from_utf8_lossy(&commit.stderr);
+        // "nothing to commit" is not an error
+        if out.contains("nothing to commit") || err.contains("nothing to commit") {
+            return Ok(());
+        }
+        anyhow::bail!("git commit: {}", err.trim());
+    }
+
+    let push = Command::new("git")
+        .args(["-C", dir, "push"])
+        .output()
+        .await
+        .context("git push failed")?;
+    if !push.status.success() {
+        anyhow::bail!("git push: {}", String::from_utf8_lossy(&push.stderr).trim());
+    }
+
+    Ok(())
+}
