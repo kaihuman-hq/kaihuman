@@ -103,12 +103,9 @@ impl AuthManager {
         // We need the port to tell the console where to redirect.
         let (addr, server) = warp::serve(callback).bind_ephemeral(([127, 0, 0, 1], 0));
         let port = addr.port();
-        
-        println!("Listening on http://127.0.0.1:{}", port);
 
         // 2. Open Browser
         let url = format!("{}?port={}", CONSOLE_URL, port);
-        println!("Opening browser to authenticate: {}", url);
         webbrowser::open(&url).context("Failed to open browser")?;
 
         // 3. Wait for token (race with server)
@@ -122,8 +119,6 @@ impl AuthManager {
                 // 4. Save token
                 let config = AuthConfig { token, active_repo };
                 fs::write(&self.config_path, serde_json::to_string_pretty(&config)?)?;
-                
-                println!("Successfully authenticated!");
                 Ok(())
             }
         }
