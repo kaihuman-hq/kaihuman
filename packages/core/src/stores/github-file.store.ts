@@ -518,9 +518,7 @@ export class GithubFileStore {
 
     const tree = this.tree.peek();
     // Pass only blobs to the Git Trees API (subtrees are implicit in blob paths)
-    const blobItems = tree.filter(
-      (t) => t.path.startsWith(`${oldPrefix}/`) && t.type === 'blob',
-    );
+    const blobItems = tree.filter((t) => t.path.startsWith(`${oldPrefix}/`) && t.type === 'blob');
 
     this.isLoading.value = true;
     try {
@@ -590,9 +588,7 @@ export class GithubFileStore {
 
     logger.info('[Migration] Starting .lifeos → .kh migration...');
 
-    const lifeosItems = tree.filter(
-      (t) => t.path.startsWith('.lifeos/') && t.type === 'blob',
-    );
+    const lifeosItems = tree.filter((t) => t.path.startsWith('.lifeos/') && t.type === 'blob');
 
     await githubService.renameFolder(
       repo.owner.login,

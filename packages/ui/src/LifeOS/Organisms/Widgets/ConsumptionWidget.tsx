@@ -54,7 +54,13 @@ export interface ConsumptionWidgetProps {
 
 type FocusTab = 'RECENT' | 'MONTHLY' | 'YEARLY' | 'COMPARE' | 'COLUMNS' | 'ADD';
 
-export const ConsumptionWidget = ({ content, mode, onChange, onOpenAdd, initialTab }: ConsumptionWidgetProps) => {
+export const ConsumptionWidget = ({
+  content,
+  mode,
+  onChange,
+  onOpenAdd,
+  initialTab,
+}: ConsumptionWidgetProps) => {
   const { data, modified } = useMemo(() => parseConsumption(content), [content]);
 
   // Write back gap-filled data once per unique content change

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { parseCollectionDate, type DataCollectionData } from './DataCollectionLogic';
+import { type DataCollectionData, parseCollectionDate } from './DataCollectionLogic';
 
 interface DataCollectionChartProps {
   data: DataCollectionData;
@@ -85,7 +85,9 @@ export const DataCollectionDeltaChart = ({
   const { deltaRows, labels } = useMemo(() => {
     const rows = [...data.rows];
     if (xColumn?.type.includes('date')) {
-      rows.sort((a, b) => parseDate(a[xColumn.name]).getTime() - parseDate(b[xColumn.name]).getTime());
+      rows.sort(
+        (a, b) => parseDate(a[xColumn.name]).getTime() - parseDate(b[xColumn.name]).getTime(),
+      );
     }
     if (rows.length < 2) return { deltaRows: [], labels: [] };
 
@@ -100,7 +102,10 @@ export const DataCollectionDeltaChart = ({
 
     const lbl = rows.slice(1).map((row) =>
       xColumn?.type.includes('date')
-        ? parseDate(row[xColumn.name]).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+        ? parseDate(row[xColumn.name]).toLocaleDateString(undefined, {
+            month: 'short',
+            year: '2-digit',
+          })
         : String(row[xColumn?.name ?? ''] ?? ''),
     );
 
@@ -127,17 +132,13 @@ export const DataCollectionDeltaChart = ({
   }, [deltaRows, numericColumns, hasData, isLineActive]);
 
   const getX = (i: number) =>
-    deltaRows.length <= 1
-      ? pad.left + cw / 2
-      : pad.left + (i / (deltaRows.length - 1)) * cw;
+    deltaRows.length <= 1 ? pad.left + cw / 2 : pad.left + (i / (deltaRows.length - 1)) * cw;
 
   const getY = (v: number) => pad.top + ch / 2 - (v / yExtent) * (ch / 2);
   const zeroY = pad.top + ch / 2;
 
   const formatNum = (v: number) =>
-    v >= 1000 || v <= -1000
-      ? `${(v / 1000).toFixed(1)}k`
-      : v.toFixed(v % 1 === 0 ? 0 : 2);
+    v >= 1000 || v <= -1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(v % 1 === 0 ? 0 : 2);
 
   useEffect(() => {
     if (!tooltipRef.current || !mousePos || !width || !height) return;
@@ -173,7 +174,10 @@ export const DataCollectionDeltaChart = ({
               className="flex items-center gap-1.5 hover:opacity-100 transition-opacity whitespace-nowrap"
               style={{ opacity: isLineActive(col.name) ? 1 : 0.4 }}
             >
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: COLORS[i % COLORS.length] }}
+              />
               <span className="text-[9px] font-mono text-[var(--los-muted)]">{col.name}</span>
             </button>
           ))}
@@ -185,7 +189,10 @@ export const DataCollectionDeltaChart = ({
         <div
           className="absolute inset-0"
           ref={chartRef}
-          onMouseLeave={() => { setHoveredIndex(null); setMousePos(null); }}
+          onMouseLeave={() => {
+            setHoveredIndex(null);
+            setMousePos(null);
+          }}
         >
           {!hasData || !width || !height ? (
             <div className="absolute inset-0 flex items-center justify-center text-[var(--los-muted)] text-xs font-mono">
@@ -200,7 +207,10 @@ export const DataCollectionDeltaChart = ({
                 onMouseMove={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
                   const x = e.clientX - rect.left - pad.left;
-                  const idx = Math.min(Math.max(Math.round((x / cw) * (deltaRows.length - 1)), 0), deltaRows.length - 1);
+                  const idx = Math.min(
+                    Math.max(Math.round((x / cw) * (deltaRows.length - 1)), 0),
+                    deltaRows.length - 1,
+                  );
                   setHoveredIndex(idx);
                   setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
                 }}
@@ -211,13 +221,22 @@ export const DataCollectionDeltaChart = ({
                   return (
                     <g key={v}>
                       <line
-                        x1={pad.left} y1={y}
-                        x2={width - pad.right} y2={y}
+                        x1={pad.left}
+                        y1={y}
+                        x2={width - pad.right}
+                        y2={y}
                         stroke={v === 0 ? 'var(--los-muted)' : 'var(--los-border)'}
                         strokeDasharray={v === 0 ? undefined : '3 3'}
                         strokeOpacity={v === 0 ? 0.6 : 0.4}
                       />
-                      <text x={pad.left - 4} y={y + 3} textAnchor="end" fill="var(--los-muted)" fontSize="8" fontFamily="monospace">
+                      <text
+                        x={pad.left - 4}
+                        y={y + 3}
+                        textAnchor="end"
+                        fill="var(--los-muted)"
+                        fontSize="8"
+                        fontFamily="monospace"
+                      >
                         {formatNum(v)}
                       </text>
                     </g>
@@ -227,8 +246,25 @@ export const DataCollectionDeltaChart = ({
                 {/* X axis labels: first and last */}
                 {deltaRows.length > 1 && (
                   <>
-                    <text x={pad.left} y={height - 6} fill="var(--los-muted)" fontSize="8" fontFamily="monospace">{labels[0]}</text>
-                    <text x={width - pad.right} y={height - 6} textAnchor="end" fill="var(--los-muted)" fontSize="8" fontFamily="monospace">{labels[labels.length - 1]}</text>
+                    <text
+                      x={pad.left}
+                      y={height - 6}
+                      fill="var(--los-muted)"
+                      fontSize="8"
+                      fontFamily="monospace"
+                    >
+                      {labels[0]}
+                    </text>
+                    <text
+                      x={width - pad.right}
+                      y={height - 6}
+                      textAnchor="end"
+                      fill="var(--los-muted)"
+                      fontSize="8"
+                      fontFamily="monospace"
+                    >
+                      {labels[labels.length - 1]}
+                    </text>
                   </>
                 )}
 
@@ -236,46 +272,72 @@ export const DataCollectionDeltaChart = ({
                 {numericColumns.map((col, i) => {
                   if (!isLineActive(col.name)) return null;
                   const pts = deltaRows
-                    .map((dr, idx) => `${idx === 0 ? 'M' : 'L'}${getX(idx).toFixed(1)},${getY(dr.deltas[col.name] ?? 0).toFixed(1)}`)
+                    .map(
+                      (dr, idx) =>
+                        `${idx === 0 ? 'M' : 'L'}${getX(idx).toFixed(1)},${getY(dr.deltas[col.name] ?? 0).toFixed(1)}`,
+                    )
                     .join(' ');
-                  return <path key={col.name} d={pts} fill="none" stroke={COLORS[i % COLORS.length]} strokeWidth="1.5" />;
+                  return (
+                    <path
+                      key={col.name}
+                      d={pts}
+                      fill="none"
+                      stroke={COLORS[i % COLORS.length]}
+                      strokeWidth="1.5"
+                    />
+                  );
                 })}
 
                 {/* Zero line fill areas (subtle) */}
-                {numericColumns.length === 1 && isLineActive(numericColumns[0]!.name) && (() => {
-                  const col = numericColumns[0]!;
-                  const pts = deltaRows.map((dr, idx) =>
-                    `${getX(idx).toFixed(1)},${getY(dr.deltas[col.name] ?? 0).toFixed(1)}`
-                  ).join(' ');
-                  const first = `${getX(0).toFixed(1)},${zeroY.toFixed(1)}`;
-                  const last = `${getX(deltaRows.length - 1).toFixed(1)},${zeroY.toFixed(1)}`;
-                  return (
-                    <polygon
-                      points={`${first} ${pts} ${last}`}
-                      fill={COLORS[0]}
-                      fillOpacity="0.08"
-                    />
-                  );
-                })()}
+                {numericColumns.length === 1 &&
+                  isLineActive(numericColumns[0]?.name) &&
+                  (() => {
+                    const col = numericColumns[0] as (typeof numericColumns)[0];
+                    const pts = deltaRows
+                      .map(
+                        (dr, idx) =>
+                          `${getX(idx).toFixed(1)},${getY(dr.deltas[col.name] ?? 0).toFixed(1)}`,
+                      )
+                      .join(' ');
+                    const first = `${getX(0).toFixed(1)},${zeroY.toFixed(1)}`;
+                    const last = `${getX(deltaRows.length - 1).toFixed(1)},${zeroY.toFixed(1)}`;
+                    return (
+                      <polygon
+                        points={`${first} ${pts} ${last}`}
+                        fill={COLORS[0]}
+                        fillOpacity="0.08"
+                      />
+                    );
+                  })()}
 
                 {/* Hover line */}
                 {hoveredIndex !== null && (
                   <line
-                    x1={getX(hoveredIndex)} y1={pad.top}
-                    x2={getX(hoveredIndex)} y2={height - pad.bottom}
+                    x1={getX(hoveredIndex)}
+                    y1={pad.top}
+                    x2={getX(hoveredIndex)}
+                    y2={height - pad.bottom}
                     stroke="var(--los-border)"
                   />
                 )}
 
                 {/* Hover dots */}
-                {hoveredIndex !== null && numericColumns.map((col, i) => {
-                  if (!isLineActive(col.name)) return null;
-                  const v = deltaRows[hoveredIndex]?.deltas[col.name] ?? 0;
-                  return (
-                    <circle key={col.name} cx={getX(hoveredIndex)} cy={getY(v)} r="3"
-                      fill="var(--los-bg)" stroke={COLORS[i % COLORS.length]} strokeWidth="2" />
-                  );
-                })}
+                {hoveredIndex !== null &&
+                  numericColumns.map((col, i) => {
+                    if (!isLineActive(col.name)) return null;
+                    const v = deltaRows[hoveredIndex]?.deltas[col.name] ?? 0;
+                    return (
+                      <circle
+                        key={col.name}
+                        cx={getX(hoveredIndex)}
+                        cy={getY(v)}
+                        r="3"
+                        fill="var(--los-bg)"
+                        stroke={COLORS[i % COLORS.length]}
+                        strokeWidth="2"
+                      />
+                    );
+                  })}
               </svg>
 
               {/* Tooltip */}
@@ -290,10 +352,14 @@ export const DataCollectionDeltaChart = ({
                     const v = deltaRows[hoveredIndex]?.deltas[col.name] ?? 0;
                     return (
                       <div key={col.name} className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                        />
                         <span className="text-[var(--los-muted)]">{col.name}:</span>
                         <span className={v >= 0 ? 'text-green-400' : 'text-red-400'}>
-                          {v >= 0 ? '+' : ''}{formatNum(v)}
+                          {v >= 0 ? '+' : ''}
+                          {formatNum(v)}
                         </span>
                       </div>
                     );
