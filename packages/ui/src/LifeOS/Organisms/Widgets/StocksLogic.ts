@@ -135,7 +135,7 @@ export function serializeStocks(entries: StockEntry[]): string {
     const investStr = e.invest > 0 ? String(e.invest) : '';
     return `${ts},${e.value},${investStr}`;
   });
-  return [header, ...lines].join('\n') + '\n';
+  return `${[header, ...lines].join('\n')}\n`;
 }
 
 export function addEntry(content: string, value: number, invest: number, date?: Date): string {

@@ -577,186 +577,190 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
   return (
     <div className={cn('flex items-stretch w-full', isFocus ? 'min-h-full' : 'h-full', className)}>
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-2 shrink-0 px-1">
-        <MonoHeader className="text-sm">TASKS</MonoHeader>
-        <div className="flex items-center gap-3">
-          {data.isLegacyFormat && (
-            <button
-              type="button"
-              onClick={handleMigrate}
-              className="flex items-center gap-1 text-[10px] font-mono text-yellow-400 hover:text-yellow-300 border border-yellow-400/30 px-2 py-0.5 hover:bg-yellow-400/10 transition-colors"
-              title="This file uses the old format. Click to migrate."
-            >
-              <AlertTriangle size={10} />
-              MIGRATE
-            </button>
-          )}
-          {isFocus && (
-            <button
-              type="button"
-              onClick={() => setShowAllInFocus((v) => !v)}
-              className={cn(
-                'flex items-center gap-1 text-[10px] font-mono border px-2 py-0.5 transition-colors',
-                showAllInFocus
-                  ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
-                  : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
-              )}
-              title={showAllInFocus ? 'Showing all items' : 'Showing open + recent completed'}
-            >
-              <Eye size={10} />
-              {showAllInFocus ? 'ALL' : 'RECENT'}
-            </button>
-          )}
-          <MonoText className="text-[10px] text-[var(--los-muted)]">{activeCount} ACTIVE</MonoText>
-        </div>
-      </div>
-
-      {/* Tag Filter Chips — focus mode only */}
-      {isFocus && allTags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3 px-1">
-          <button
-            type="button"
-            onClick={() => setActiveTag(null)}
-            className={cn(
-              'text-[10px] font-mono px-2 py-0.5 border transition-colors',
-              !activeTag
-                ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
-                : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
+        {/* Header */}
+        <div className="flex justify-between items-center mb-2 shrink-0 px-1">
+          <MonoHeader className="text-sm">TASKS</MonoHeader>
+          <div className="flex items-center gap-3">
+            {data.isLegacyFormat && (
+              <button
+                type="button"
+                onClick={handleMigrate}
+                className="flex items-center gap-1 text-[10px] font-mono text-yellow-400 hover:text-yellow-300 border border-yellow-400/30 px-2 py-0.5 hover:bg-yellow-400/10 transition-colors"
+                title="This file uses the old format. Click to migrate."
+              >
+                <AlertTriangle size={10} />
+                MIGRATE
+              </button>
             )}
-          >
-            ALL
-          </button>
-          {allTags.map((tag) => (
+            {isFocus && (
+              <button
+                type="button"
+                onClick={() => setShowAllInFocus((v) => !v)}
+                className={cn(
+                  'flex items-center gap-1 text-[10px] font-mono border px-2 py-0.5 transition-colors',
+                  showAllInFocus
+                    ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                    : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
+                )}
+                title={showAllInFocus ? 'Showing all items' : 'Showing open + recent completed'}
+              >
+                <Eye size={10} />
+                {showAllInFocus ? 'ALL' : 'RECENT'}
+              </button>
+            )}
+            <MonoText className="text-[10px] text-[var(--los-muted)]">
+              {activeCount} ACTIVE
+            </MonoText>
+          </div>
+        </div>
+
+        {/* Tag Filter Chips — focus mode only */}
+        {isFocus && allTags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3 px-1">
             <button
-              key={tag}
               type="button"
-              onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+              onClick={() => setActiveTag(null)}
               className={cn(
                 'text-[10px] font-mono px-2 py-0.5 border transition-colors',
-                activeTag === tag
+                !activeTag
                   ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
                   : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
               )}
             >
-              #{tag}
+              ALL
             </button>
-          ))}
-        </div>
-      )}
-
-      {/* Task List */}
-      <div
-        className={cn(
-          'flex-1 min-h-0 border-t border-[var(--los-border)]',
-          isFocus ? 'overflow-visible' : 'overflow-y-auto',
-        )}
-      >
-        {displayData.items.map((item) => {
-          const idx = data.items.indexOf(item);
-          const isDone = item.status === 'done';
-          const isRejected = item.status === 'rejected';
-          const dimmed = isDone || isRejected;
-
-          return (
-            <div
-              key={item.id}
-              className="group border-b border-[var(--los-border)] last:border-0 px-1 py-2 hover:bg-white/5 transition-colors"
-            >
-              <div className="flex items-start gap-2">
-                {isFocus ? (
-                  <div className="mt-0.5">
-                    <StatusBadge status={item.status} onPick={(s) => handlePickStatus(idx, s)} />
-                  </div>
-                ) : (
-                  <div className="mt-0.5">
-                    <StatusBadge
-                      status={item.status}
-                      compact
-                      onCycle={() => handleCycleStatus(idx)}
-                    />
-                  </div>
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+                className={cn(
+                  'text-[10px] font-mono px-2 py-0.5 border transition-colors',
+                  activeTag === tag
+                    ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                    : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
                 )}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        )}
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <MonoText
-                      className={cn(
-                        'text-xs break-words leading-relaxed',
-                        dimmed ? 'opacity-40 line-through' : 'opacity-100',
-                      )}
-                    >
-                      {item.text}
-                    </MonoText>
-                    {isFocus && data.milestones.length > 0 ? (
-                      <MilestonePicker
-                        milestoneId={item.milestoneId}
-                        milestones={data.milestones}
-                        onChange={(id) => handleSetMilestone(idx, id)}
+        {/* Task List */}
+        <div
+          className={cn(
+            'flex-1 min-h-0 border-t border-[var(--los-border)]',
+            isFocus ? 'overflow-visible' : 'overflow-y-auto',
+          )}
+        >
+          {displayData.items.map((item) => {
+            const idx = data.items.indexOf(item);
+            const isDone = item.status === 'done';
+            const isRejected = item.status === 'rejected';
+            const dimmed = isDone || isRejected;
+
+            return (
+              <div
+                key={item.id}
+                className="group border-b border-[var(--los-border)] last:border-0 px-1 py-2 hover:bg-white/5 transition-colors"
+              >
+                <div className="flex items-start gap-2">
+                  {isFocus ? (
+                    <div className="mt-0.5">
+                      <StatusBadge status={item.status} onPick={(s) => handlePickStatus(idx, s)} />
+                    </div>
+                  ) : (
+                    <div className="mt-0.5">
+                      <StatusBadge
+                        status={item.status}
+                        compact
+                        onCycle={() => handleCycleStatus(idx)}
                       />
-                    ) : (
-                      item.milestoneId && (
-                        <span className="shrink-0 text-[9px] font-mono text-[var(--los-accent)] border border-[var(--los-accent)]/30 px-1 py-0.5 rounded-sm opacity-70">
-                          !{item.milestoneId}
-                        </span>
-                      )
-                    )}
-                  </div>
-
-                  {/* Tags */}
-                  {item.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {item.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="text-[9px] font-mono text-[var(--los-muted)] opacity-70"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
                     </div>
                   )}
 
-                  {/* Prompt — focus mode only */}
-                  {isFocus && (
-                    <PromptSection
-                      item={item}
-                      onSave={(lines, refFile) => handleSetPrompt(idx, lines, refFile)}
-                    />
-                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <MonoText
+                        className={cn(
+                          'text-xs break-words leading-relaxed',
+                          dimmed ? 'opacity-40 line-through' : 'opacity-100',
+                        )}
+                      >
+                        {item.text}
+                      </MonoText>
+                      {isFocus && data.milestones.length > 0 ? (
+                        <MilestonePicker
+                          milestoneId={item.milestoneId}
+                          milestones={data.milestones}
+                          onChange={(id) => handleSetMilestone(idx, id)}
+                        />
+                      ) : (
+                        item.milestoneId && (
+                          <span className="shrink-0 text-[9px] font-mono text-[var(--los-accent)] border border-[var(--los-accent)]/30 px-1 py-0.5 rounded-sm opacity-70">
+                            !{item.milestoneId}
+                          </span>
+                        )
+                      )}
+                    </div>
+
+                    {/* Tags */}
+                    {item.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {item.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-[9px] font-mono text-[var(--los-muted)] opacity-70"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Prompt — focus mode only */}
+                    {isFocus && (
+                      <PromptSection
+                        item={item}
+                        onSave={(lines, refFile) => handleSetPrompt(idx, lines, refFile)}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
+            );
+          })}
+
+          {/* Animating-out items (SMALL mode only) */}
+          {!isFocus &&
+            animatingOut.map((a) => (
+              <AnimatingTodoItem key={a.id} text={a.text} status={a.status} />
+            ))}
+
+          {/* Hidden items notice */}
+          {!isFocus && hiddenCount > 0 && (
+            <div className="text-center py-2">
+              <MonoText className="text-[10px] text-[var(--los-muted)]">
+                + {hiddenCount} completed
+              </MonoText>
             </div>
-          );
-        })}
-
-        {/* Animating-out items (SMALL mode only) */}
-        {!isFocus &&
-          animatingOut.map((a) => <AnimatingTodoItem key={a.id} text={a.text} status={a.status} />)}
-
-        {/* Hidden items notice */}
-        {!isFocus && hiddenCount > 0 && (
-          <div className="text-center py-2">
-            <MonoText className="text-[10px] text-[var(--los-muted)]">
-              + {hiddenCount} completed
-            </MonoText>
-          </div>
-        )}
-        {isFocus && !showAllInFocus && hiddenCount > 0 && (
-          <div className="text-center py-2">
-            <MonoText className="text-[10px] text-[var(--los-muted)]">
-              + {hiddenCount} older than 2h —{' '}
-              <button
-                type="button"
-                onClick={() => setShowAllInFocus(true)}
-                className="underline hover:text-[var(--los-fg)] transition-colors"
-              >
-                show all
-              </button>
-            </MonoText>
-          </div>
-        )}
-      </div>
+          )}
+          {isFocus && !showAllInFocus && hiddenCount > 0 && (
+            <div className="text-center py-2">
+              <MonoText className="text-[10px] text-[var(--los-muted)]">
+                + {hiddenCount} older than 2h —{' '}
+                <button
+                  type="button"
+                  onClick={() => setShowAllInFocus(true)}
+                  className="underline hover:text-[var(--los-fg)] transition-colors"
+                >
+                  show all
+                </button>
+              </MonoText>
+            </div>
+          )}
+        </div>
       </div>
       {!isFocus && onOpenAdd && (
         <button

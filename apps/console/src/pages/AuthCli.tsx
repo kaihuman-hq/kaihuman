@@ -59,7 +59,9 @@ export function AuthCli() {
       <div class="flex h-screen w-full flex-col items-center justify-center bg-nexus-bg text-nexus-text font-sans">
         <div class="max-w-md space-y-8 rounded-lg border border-nexus-border bg-nexus-panel p-10 shadow-2xl text-center">
           <h2 class="text-2xl font-bold text-white">kaihuman CLI</h2>
-          <p class="text-nexus-muted">Sign in to connect your terminal to your continuous improvement system.</p>
+          <p class="text-nexus-muted">
+            Sign in to connect your terminal to your continuous improvement system.
+          </p>
           <Button onClick={() => authStore.login()} label="Login to Continue" className="w-full" />
         </div>
       </div>

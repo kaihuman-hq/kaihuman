@@ -280,7 +280,7 @@ export const MainApp = ({
   const showSettings = layoutStore.view.value === 'SETTINGS';
   const showGraph = layoutStore.view.value === 'GRAPH';
   const showCommits = layoutStore.view.value === 'COMMITS';
-  const activeDashboardId = layoutStore.activeDashboardId.value;
+  const _activeDashboardId = layoutStore.activeDashboardId.value;
   const currentDashboardId = layoutStore.currentDashboardId.value;
   const userEntries = layoutStore.userEntries.value;
   const zenMode = layoutStore.zenMode.value;

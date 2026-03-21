@@ -12,6 +12,7 @@ export const Logo = ({ size = 32, className }: LogoProps) => (
     width={size}
     height={size}
     className={cn('shrink-0', className)}
+    role="img"
     aria-label="kaihuman"
   >
     <rect width="512" height="512" rx="88" fill="#0e0e0e" />

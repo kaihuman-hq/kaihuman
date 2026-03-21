@@ -97,7 +97,7 @@ export async function decrypt(encryptedHex: string, password: string): Promise<s
   if (!cleanedStr.includes(':')) {
     try {
       cleanedStr = atob(cleanedStr);
-    } catch (e) {
+    } catch (_e) {
       throw new Error('Invalid encrypted format. Expected base64 or salt:iv:ciphertext.');
     }
   }
@@ -109,9 +109,9 @@ export async function decrypt(encryptedHex: string, password: string): Promise<s
     );
   }
 
-  const salt = hexToBuffer(parts[0]!);
-  const iv = hexToBuffer(parts[1]!);
-  const cipherText = hexToBuffer(parts[2]!);
+  const salt = hexToBuffer(parts[0] as string);
+  const iv = hexToBuffer(parts[1] as string);
+  const cipherText = hexToBuffer(parts[2] as string);
 
   const key = await deriveKey(password, salt);
 

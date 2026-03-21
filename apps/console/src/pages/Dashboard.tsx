@@ -104,7 +104,9 @@ export const Dashboard = () => {
       const rewrittenEntries = config.entries.map((e) => ({ ...e, path: rewrite(e.path) }));
       const rewrittenRecent = (config.files?.recentlyOpened ?? []).map(rewrite);
       const rewrittenQuickNotes = (config.files?.quickNotes ?? []).map(rewrite);
-      const rewrittenSelected = config.files?.selected ? rewrite(config.files.selected) : config.files?.selected;
+      const rewrittenSelected = config.files?.selected
+        ? rewrite(config.files.selected)
+        : config.files?.selected;
       const rewrittenOpened = (config.files?.opened ?? []).map(rewrite);
       const needsRewrite =
         JSON.stringify(rewrittenEntries) !== JSON.stringify(config.entries) ||

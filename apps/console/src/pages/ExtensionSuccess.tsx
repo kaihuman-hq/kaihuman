@@ -40,7 +40,8 @@ export function ExtensionSuccess() {
       </div>
       <h1 class="text-2xl font-bold tracking-tight text-[var(--los-fg)]">You're connected.</h1>
       <p class="text-[var(--los-fg-dim)] text-center max-w-sm">
-        kaihuman is now available in your browser. Capture notes, log actions, and keep improving — one tab at a time.
+        kaihuman is now available in your browser. Capture notes, log actions, and keep improving —
+        one tab at a time.
       </p>
       <button
         type="button"
