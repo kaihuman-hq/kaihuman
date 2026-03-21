@@ -98,23 +98,24 @@ export const CodeMirrorEditor = ({
     }
   };
 
-  const stateRef = useRef({ hasUnsavedChanges, isSaving });
-  stateRef.current = { hasUnsavedChanges, isSaving };
+  const stateRef = useRef({ hasUnsavedChanges, isSaving, handleSave });
+  stateRef.current = { hasUnsavedChanges, isSaving, handleSave };
 
-  // Auto-save interval (2 minutes) — uses ref to avoid stale closures
+  // Auto-save interval (2 minutes) — reads everything through stateRef so the
+  // interval never closes over stale values (path, save handler, dirty flag).
   useEffect(() => {
     const intervalId = setInterval(
       () => {
         if (stateRef.current.hasUnsavedChanges && !stateRef.current.isSaving) {
           logger.debug('Auto-saving...');
-          handleSave();
+          stateRef.current.handleSave();
         }
       },
       2 * 60 * 1000,
     );
 
     return () => clearInterval(intervalId);
-  }, []); // Run once on mount
+  }, []); // Intentionally runs once — stateRef keeps it current
 
   // Compartment for dynamic theme switching
   const themeCompartment = useRef(new Compartment());

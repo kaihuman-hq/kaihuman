@@ -271,19 +271,21 @@ export class GithubFileStore {
       dirty.add(path);
       this.dirtyFiles.value = dirty;
 
-      // Update DB immediately
+      // Persist edit to IDB immediately so content survives a browser suspend/crash
+      // before the next explicit save reaches GitHub.
       const repo = githubProfileStore.currentRepo.value;
       if (repo) {
         const cacheKey = `${repo.full_name}:${path}`;
-        dbPromise.then((db) => {
-          // NO extra key arg
-          db.put('files', {
-            path: cacheKey,
-            content: newContent,
-            sha: file.sha,
-            timestamp: Date.now(),
-          });
-        });
+        dbPromise
+          .then((db) =>
+            db.put('files', {
+              path: cacheKey,
+              content: newContent,
+              sha: file.sha,
+              timestamp: Date.now(),
+            }),
+          )
+          .catch((e) => logger.error(`Failed to persist edit for ${path} to cache`, e));
       }
     }
   }
@@ -313,18 +315,20 @@ export class GithubFileStore {
       dirty.delete(path);
       this.dirtyFiles.value = dirty;
 
-      // Update cache
+      // Persist resolution to cache so it survives a tab close
       const repo = githubProfileStore.currentRepo.value;
       if (repo) {
         const cacheKey = `${repo.full_name}:${path}`;
-        dbPromise.then((db) => {
-          db.put('files', {
-            path: cacheKey,
-            content: conflict.remoteContent,
-            sha: conflict.remoteSha,
-            timestamp: Date.now(),
-          });
-        });
+        dbPromise
+          .then((db) =>
+            db.put('files', {
+              path: cacheKey,
+              content: conflict.remoteContent,
+              sha: conflict.remoteSha,
+              timestamp: Date.now(),
+            }),
+          )
+          .catch((e) => logger.error(`Failed to persist conflict resolution for ${path}`, e));
       }
     }
 
@@ -361,7 +365,10 @@ export class GithubFileStore {
       let attempts = 0;
       const MAX_ATTEMPTS = 3;
 
-      // LOOP: Keep saving as long as it's dirty (changes happened while saving)
+      // LOOP: Keep saving as long as it's dirty (changes happened while saving).
+      // The loop can exit either because the file is clean (success) or because
+      // MAX_ATTEMPTS was reached without an exception (all attempts silently skipped
+      // or the content kept changing). We detect the latter case after the loop.
       while (this.dirtyFiles.value.has(path) && attempts < MAX_ATTEMPTS) {
         attempts++;
 
@@ -400,16 +407,19 @@ export class GithubFileStore {
               };
             }
 
-            // Update DB with new SHA
+            // Persist new SHA to cache so a reload after save uses the correct SHA
             const cacheKey = `${repo.full_name}:${path}`;
-            dbPromise.then((db) => {
-              db.put('files', {
+            try {
+              const db = await dbPromise;
+              await db.put('files', {
                 path: cacheKey,
                 content: contentToSave,
                 sha: serverSha,
                 timestamp: Date.now(),
               });
-            });
+            } catch (e) {
+              logger.error(`Failed to update cache SHA after saving ${path}`, e);
+            }
           }
 
           // 3. Mark as NOT dirty (for THIS content version)
@@ -454,12 +464,17 @@ export class GithubFileStore {
           throw e; // Re-throw other errors to exit
         }
       }
+
+      // If the loop exited because max attempts were exhausted (not because the
+      // file became clean), inform the user so they know the save did not complete.
+      if (this.dirtyFiles.value.has(path)) {
+        const msg = `Could not save ${path} after ${MAX_ATTEMPTS} attempts. Your changes are preserved locally — please try again.`;
+        logger.error(msg);
+        this.error.value = msg;
+      }
     } catch (err: any) {
       logger.error('Failed to save', err);
       this.error.value = err.message;
-      // Note: We leave it in 'dirty' state so user can try again or auto-retry later?
-      // Or should we throw to alert caller?
-      // For now, silent fail in store, UI shows error via 'error' signal.
     } finally {
       const doneSaving = new Set(this.savingFiles.value);
       doneSaving.delete(path);
@@ -496,17 +511,24 @@ export class GithubFileStore {
     });
     this.tree.value = newTree;
 
-    // 3. Mark dirty and Save
+    // 3. Mark dirty
     const dirty = new Set(this.dirtyFiles.value);
     dirty.add(path);
     this.dirtyFiles.value = dirty;
 
-    // 4. Persist Tree to DB immediately (so reload works)
+    // 4. Persist both the file content and the updated tree to IDB *before* the
+    //    network save.  This ensures the smart-merge in loadTree() can recover the
+    //    new file if the browser closes while the GitHub request is in flight.
     const repo = githubProfileStore.currentRepo.value;
     if (repo) {
-      dbPromise.then((db) => {
-        db.put('trees', newTree, `tree:${repo.full_name} `);
-      });
+      try {
+        const db = await dbPromise;
+        const cacheKey = `${repo.full_name}:${path}`;
+        await db.put('files', { path: cacheKey, content, sha: '', timestamp: Date.now() });
+        await db.put('trees', newTree, `tree:${repo.full_name} `);
+      } catch (e) {
+        logger.error('Failed to persist new file to cache before save', e);
+      }
     }
 
     await this.saveFile(path);
@@ -678,12 +700,16 @@ export class GithubFileStore {
       this.activeFile.value = null;
     }
 
-    // Update DB
+    // Await IDB cleanup: if we leave a stale file entry behind, loadTree's smart
+    // merge will see content in the cache and resurrect the deleted file in the tree.
     const cacheKey = `${repo.full_name}:${path}`;
-    dbPromise.then(async (db) => {
+    try {
+      const db = await dbPromise;
       await db.delete('files', cacheKey);
       await db.put('trees', this.tree.value, `tree:${repo.full_name} `);
-    });
+    } catch (e) {
+      logger.error(`Failed to clean up IDB cache after deleting ${path}`, e);
+    }
   }
 
   async renameFile(oldPath: string, newPath: string) {
