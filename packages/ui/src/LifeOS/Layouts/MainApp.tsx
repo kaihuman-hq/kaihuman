@@ -17,7 +17,7 @@ import {
   sortableKeyboardCoordinates,
   useSortable,
 } from '@dnd-kit/sortable';
-import { githubFileStore, Logger, layoutStore } from '@lifosy/core';
+import { githubFileStore, githubProfileStore, Logger, layoutStore } from '@lifosy/core';
 import {
   Edit,
   FileText,
@@ -83,6 +83,7 @@ const logger = new Logger('MainApp');
 
 import { CSS } from '@dnd-kit/utilities';
 import type { TileDef as CoreTileDef } from '@lifosy/core';
+import { setupPushNotifications } from '@lifosy/core';
 import { ConflictModal } from '../Organisms/ConflictModal';
 import { MoveFileModal } from '../Organisms/MoveFileModal';
 import { NewFileWizard } from '../Organisms/NewFileWizard';
@@ -1299,6 +1300,11 @@ export const MainApp = ({
           config={layoutStore.remoteConfig.value}
           onConfigChange={onConfigChange}
           onClose={() => setShowSettings(false)}
+          onSetupNotifications={(() => {
+            const repo = githubProfileStore.currentRepo.value;
+            if (!repo) return undefined;
+            return () => setupPushNotifications(repo.owner.login, repo.name);
+          })()}
         />
       )}
 

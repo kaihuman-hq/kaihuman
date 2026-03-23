@@ -6,10 +6,13 @@ import {
   ChevronRight,
   Circle,
   Copy,
+  Edit2,
   Eye,
   FileText,
   PlayCircle,
   Plus,
+  Trash2,
+  X,
   XCircle,
 } from 'lucide-preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
@@ -385,6 +388,163 @@ const MilestonePicker = ({
   );
 };
 
+// ─── MilestoneManager ────────────────────────────────────────────────────────
+
+const MilestoneManager = ({
+  milestones,
+  onChange,
+}: {
+  milestones: Milestone[];
+  onChange: (milestones: Milestone[]) => void;
+}) => {
+  const [open, setOpen] = useState(milestones.length > 0);
+  const [newName, setNewName] = useState('');
+  const [newDate, setNewDate] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState('');
+
+  const genId = (name: string) =>
+    `${name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 20)}-${Date.now().toString(36).slice(-4)}`;
+
+  const handleAdd = () => {
+    if (!newName.trim()) return;
+    const ms: Milestone = {
+      id: genId(newName),
+      name: newName.trim(),
+      ...(newDate ? { dueDate: newDate } : {}),
+    };
+    onChange([...milestones, ms]);
+    setNewName('');
+    setNewDate('');
+  };
+
+  const handleUpdateDate = (id: string) => {
+    onChange(milestones.map((m) => (m.id === id ? { ...m, dueDate: editDate || undefined } : m)));
+    setEditingId(null);
+  };
+
+  const handleDelete = (id: string) => {
+    onChange(milestones.filter((m) => m.id !== id));
+  };
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className="mb-3 px-1">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-[10px] font-mono text-[var(--los-muted)] hover:text-[var(--los-fg)] transition-colors"
+      >
+        {open ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+        MILESTONES{milestones.length > 0 ? ` (${milestones.length})` : ''}
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-1.5 pl-2 border-l border-[var(--los-border)]">
+          {milestones.map((m) => {
+            const overdue = m.dueDate && m.dueDate < today;
+            return (
+              <div
+                key={m.id}
+                className="flex items-center gap-2 py-1 border border-[var(--los-border)] px-2 text-xs font-mono"
+              >
+                <span className="text-[var(--los-accent)] shrink-0 text-[10px]">!{m.id}</span>
+                <span className="flex-1 min-w-0 truncate text-[var(--los-fg)]">{m.name}</span>
+                {editingId === m.id ? (
+                  <>
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.currentTarget.value)}
+                      className="bg-transparent border-b border-[var(--los-accent)] text-[10px] outline-none text-[var(--los-fg)] w-28"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateDate(m.id)}
+                      className="text-[var(--los-accent)] hover:opacity-80 shrink-0"
+                    >
+                      <Check size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(null)}
+                      className="text-[var(--los-muted)] hover:text-[var(--los-fg)] shrink-0"
+                    >
+                      <X size={12} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className={cn(
+                        'text-[10px] shrink-0',
+                        overdue ? 'text-red-400' : 'text-[var(--los-muted)]',
+                      )}
+                    >
+                      {m.dueDate ?? '—'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(m.id);
+                        setEditDate(m.dueDate ?? '');
+                      }}
+                      className="text-[var(--los-muted)] hover:text-[var(--los-fg)] shrink-0"
+                      title="Edit due date"
+                    >
+                      <Edit2 size={10} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(m.id)}
+                      className="text-red-500/50 hover:text-red-500 shrink-0"
+                      title="Delete milestone"
+                    >
+                      <Trash2 size={10} />
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Add new milestone */}
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              type="text"
+              value={newName}
+              onInput={(e) => setNewName(e.currentTarget.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              placeholder="Name"
+              className="flex-1 min-w-0 bg-transparent border-b border-[var(--los-border)] focus:border-[var(--los-accent)] text-[10px] font-mono outline-none text-[var(--los-fg)] placeholder-[var(--los-muted)] py-0.5"
+            />
+            <input
+              type="date"
+              value={newDate}
+              onChange={(e) => setNewDate(e.currentTarget.value)}
+              className="bg-transparent border-b border-[var(--los-border)] focus:border-[var(--los-accent)] text-[10px] font-mono outline-none text-[var(--los-fg)] w-28 py-0.5"
+            />
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={!newName.trim()}
+              className="text-[var(--los-accent)] hover:opacity-80 disabled:opacity-30 shrink-0"
+              title="Add milestone"
+            >
+              <Plus size={12} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Main Widget ──────────────────────────────────────────────────────────────
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
@@ -464,6 +624,10 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
 
   const handleMigrate = () => {
     onChange?.(migrateLegacyFormat(content));
+  };
+
+  const handleMilestonesChange = (milestones: Milestone[]) => {
+    onChange?.(serializeTodos({ ...data, milestones }));
   };
 
   const activeCount = data.items.filter(
@@ -613,6 +777,11 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
             </MonoText>
           </div>
         </div>
+
+        {/* Milestone Manager — focus mode only */}
+        {isFocus && (
+          <MilestoneManager milestones={data.milestones} onChange={handleMilestonesChange} />
+        )}
 
         {/* Tag Filter Chips — focus mode only */}
         {isFocus && allTags.length > 0 && (

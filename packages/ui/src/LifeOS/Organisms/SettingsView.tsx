@@ -1,5 +1,18 @@
-import { ArrowDown, ArrowUp, Check, Edit2, Plus, Trash2, X } from 'lucide-preact';
-import { useState } from 'preact/hooks';
+import type { PushSetupResult } from '@lifosy/core';
+import { isPushEnabled } from '@lifosy/core';
+import {
+  ArrowDown,
+  ArrowUp,
+  Bell,
+  BellOff,
+  Check,
+  Copy,
+  Edit2,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-preact';
+import { useEffect, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
 import type { DashboardConfig, DashboardWorkspace } from '../types';
@@ -8,13 +21,46 @@ interface SettingsViewProps {
   config: DashboardConfig;
   onConfigChange: (newConfig: DashboardConfig) => void;
   onClose: () => void;
+  /** Called when the user clicks "Enable notifications". Resolves with setup result, rejects with Error. */
+  onSetupNotifications?: () => Promise<PushSetupResult>;
 }
 
-export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewProps) => {
+export const SettingsView = ({
+  config,
+  onConfigChange,
+  onClose,
+  onSetupNotifications,
+}: SettingsViewProps) => {
   const [newDashboardName, setNewDashboardName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // Notifications state
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [notifStatus, setNotifStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [notifError, setNotifError] = useState<string | null>(null);
+  const [setupResult, setSetupResult] = useState<PushSetupResult | null>(null);
+  const [yamlCopied, setYamlCopied] = useState(false);
+
+  useEffect(() => {
+    isPushEnabled().then(setPushEnabled);
+  }, []);
+
+  const handleEnableNotifications = async () => {
+    if (!onSetupNotifications) return;
+    setNotifStatus('loading');
+    setNotifError(null);
+    try {
+      const result = await onSetupNotifications();
+      setSetupResult(result);
+      setPushEnabled(true);
+      setNotifStatus('done');
+    } catch (e: unknown) {
+      setNotifStatus('error');
+      setNotifError(e instanceof Error ? e.message : 'Setup failed. Please try again.');
+    }
+  };
 
   const handleAddWorkspace = () => {
     if (!newDashboardName.trim()) return;
@@ -240,6 +286,88 @@ export const SettingsView = ({ config, onConfigChange, onClose }: SettingsViewPr
 
             {error && <MonoText className="text-red-500 text-xs mt-2">{error}</MonoText>}
           </section>
+
+          {/* Notifications Section */}
+          {onSetupNotifications && (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between border-b border-[var(--los-border)] pb-2 pt-4">
+                <MonoText className="text-[var(--los-muted)] text-xs">NOTIFICATIONS</MonoText>
+              </div>
+
+              <div className="flex items-start justify-between gap-4 p-4 bg-black/10 border border-[var(--los-border)] rounded">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    {pushEnabled ? (
+                      <Bell size={14} className="text-[var(--los-accent)]" />
+                    ) : (
+                      <BellOff size={14} className="text-[var(--los-muted)]" />
+                    )}
+                    <MonoText className="text-sm">
+                      {pushEnabled ? 'Enabled on this device' : 'Not enabled on this device'}
+                    </MonoText>
+                  </div>
+                  <MonoText className="text-[10px] text-[var(--los-muted)] leading-relaxed">
+                    {pushEnabled
+                      ? 'You will receive notifications for overdue todo milestones via a GitHub Action in your repo.'
+                      : 'Get notified about overdue todo milestones. A GitHub Action workflow and secret will be created in your repo automatically.'}
+                  </MonoText>
+                  {notifError && (
+                    <MonoText className="text-red-400 text-[10px] mt-1">{notifError}</MonoText>
+                  )}
+                  {notifStatus === 'done' && setupResult?.workflowCreated && (
+                    <MonoText className="text-green-400 text-[10px] mt-1">
+                      ✓ Notifications enabled. The workflow runs at 07:00, 12:00 and 17:00 UTC.
+                    </MonoText>
+                  )}
+                  {notifStatus === 'done' && setupResult && !setupResult.workflowCreated && (
+                    <div className="mt-2 space-y-2">
+                      <MonoText className="text-yellow-400 text-[10px]">
+                        ✓ Device registered. The GitHub token lacks the{' '}
+                        <code className="bg-white/10 px-1">workflow</code> scope, so the Actions
+                        workflow could not be created automatically. Add it manually:
+                      </MonoText>
+                      <MonoText className="text-[var(--los-muted)] text-[10px]">
+                        Path: <code className="bg-white/10 px-1">{setupResult.workflowPath}</code>
+                      </MonoText>
+                      <div className="relative">
+                        <pre className="text-[9px] font-mono bg-black/30 border border-[var(--los-border)] p-2 overflow-x-auto leading-relaxed text-[var(--los-fg)] max-h-40">
+                          {setupResult.workflowYaml}
+                        </pre>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(setupResult.workflowYaml);
+                            setYamlCopied(true);
+                            setTimeout(() => setYamlCopied(false), 2000);
+                          }}
+                          className="absolute top-1 right-1 flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 bg-[var(--los-bg)] border border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-fg)] transition-colors"
+                        >
+                          {yamlCopied ? <Check size={9} /> : <Copy size={9} />}
+                          {yamlCopied ? 'COPIED' : 'COPY'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleEnableNotifications}
+                  disabled={notifStatus === 'loading'}
+                  className={cn(
+                    'shrink-0 flex items-center gap-2 px-3 py-1.5 text-xs font-bold border rounded transition-colors',
+                    pushEnabled
+                      ? 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]'
+                      : 'border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-[var(--los-bg)]',
+                    notifStatus === 'loading' && 'opacity-50 cursor-not-allowed',
+                  )}
+                >
+                  <Bell size={12} />
+                  {notifStatus === 'loading' ? 'Setting up…' : pushEnabled ? 'Re-enable' : 'Enable'}
+                </button>
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </div>
