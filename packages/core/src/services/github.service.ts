@@ -218,6 +218,47 @@ export class GithubService {
     });
   }
 
+  /** Create or update a file, fetching the current SHA automatically when needed. */
+  async upsertRepoFile(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+  ) {
+    let sha: string | undefined;
+    try {
+      const existing = await this.getFileContent(owner, repo, path);
+      sha = existing.sha;
+    } catch {
+      // File does not exist yet — create it
+    }
+    return this.saveFile(owner, repo, path, content, message, sha);
+  }
+
+  async getActionsPublicKey(owner: string, repo: string): Promise<{ key_id: string; key: string }> {
+    const client = this.getClient();
+    const { data } = await client.rest.actions.getRepoPublicKey({ owner, repo });
+    return { key_id: data.key_id, key: data.key };
+  }
+
+  async setActionsSecret(
+    owner: string,
+    repo: string,
+    secretName: string,
+    encryptedValue: string,
+    keyId: string,
+  ) {
+    const client = this.getClient();
+    await client.rest.actions.createOrUpdateRepoSecret({
+      owner,
+      repo,
+      secret_name: secretName,
+      encrypted_value: encryptedValue,
+      key_id: keyId,
+    });
+  }
+
   async listCommits(owner: string, repo: string, path?: string, page = 1, perPage = 30) {
     const client = this.getClient();
     const { data } = await client.repos.listCommits({

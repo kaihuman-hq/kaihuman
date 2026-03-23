@@ -290,7 +290,7 @@ export const DataCollectionDeltaChart = ({
 
                 {/* Zero line fill areas (subtle) */}
                 {numericColumns.length === 1 &&
-                  isLineActive(numericColumns[0]?.name) &&
+                  isLineActive((numericColumns[0] as (typeof numericColumns)[0]).name) &&
                   (() => {
                     const col = numericColumns[0] as (typeof numericColumns)[0];
                     const pts = deltaRows
