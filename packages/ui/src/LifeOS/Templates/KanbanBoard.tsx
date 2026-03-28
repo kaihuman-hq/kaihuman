@@ -1525,7 +1525,7 @@ export const KanbanBoard = ({
 
       {showAddTask && (
         <AddTaskModal
-          todoFilePaths={todoFilePaths}
+          todoFilePaths={sortedFilePaths}
           parsedFiles={parsedFiles}
           initialFilePath={focusedFile}
           onClose={() => setShowAddTask(false)}
