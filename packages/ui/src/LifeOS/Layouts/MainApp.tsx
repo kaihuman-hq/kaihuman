@@ -133,6 +133,7 @@ export interface MainAppProps {
   onCheckPath?: (path: string) => Promise<'FILE' | 'FOLDER' | null> | 'FILE' | 'FOLDER' | null;
 
   onBoardClick?: () => void;
+  onShortcutsClick?: () => void;
 
   // Version info
   version?: {
@@ -208,6 +209,7 @@ export const MainApp = ({
   githubToken,
   onCheckPath,
   onBoardClick,
+  onShortcutsClick,
   ...props
 }: MainAppProps) => {
   const isMobile = useIsMobile();
@@ -1349,6 +1351,7 @@ export const MainApp = ({
         onCreateNewFile={() => {
           setShowNewFileWizard(true);
         }}
+        onOpenShortcuts={onShortcutsClick}
         onSelect={(item) => {
           if (item.type === 'FILE') {
             logger.debug(`Opening file from search: ${item.path}`);
@@ -1940,6 +1943,7 @@ abbreviations: undefined
                     // Fix 1.21: Add Search to Magic Menu (works on mobile)
                     onClick: () => setShowSearch(true),
                   },
+                  ...(onShortcutsClick ? [{ label: 'Shortcuts', onClick: onShortcutsClick }] : []),
                   ...(onBoardClick ? [{ label: 'Board', onClick: onBoardClick }] : []),
                   {
                     label: 'Graph',

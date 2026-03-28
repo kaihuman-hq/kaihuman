@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-03-28 — Shortcuts in magic menu + command palette, /new route added
+
+- **Magic menu**: added "Shortcuts" item (between Search and Board); routes to `/shortcuts`; conditional on `onShortcutsClick` prop being provided
+- **Command palette** (`Ctrl+K`): added "Open Shortcuts" command to static commands list
+- **`/new` added to shortcuts page** as "New File" entry with suggested name "KH New"
+- Wired `onShortcutsClick` and `onOpenShortcuts` through `MainApp` → `SearchModal` → `Dashboard`
+
+## 2026-03-28 — Shortcuts page, quick-note route, Android manifest shortcuts
+
+- **`/quick-note` route**: new page for fast note capture to `.kh/dump.md`; prepends dated entries (`- YYYY-MM-DD text`) to the top of the file, auto-creates on first use
+- **`/shortcuts` page**: platform-aware guide listing all quick-capture routes; auto-detects iOS/Android/desktop; shows step-by-step instructions per route and per platform; platform can be toggled manually; explains iOS icon limitation; notes Android long-press shortcut
+- **Android manifest shortcuts**: `shortcuts` array added to `vite.config.ts` manifest so Android users get long-press shortcuts on the installed app icon without needing extra home screen icons
+- `QUICK_ROUTES` registry in `ShortcutsPage.tsx` — single place to add future quick routes
+
 ## 2026-03-28 — Inbox todos, quick-todo route, move between files
 
 - **`/quick-todo` route** (`apps/console`): new focused page for fast todo capture into `.kh/inbox.todos.md`; auto-focuses input, parses tags from space/comma-separated input, creates the inbox file if it doesn't exist yet

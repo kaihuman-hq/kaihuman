@@ -5,6 +5,9 @@
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
 | Quick todo to inbox | `/quick-todo` | 2026-03-28 |
+| Quick note to dump.md | `/quick-note` | 2026-03-28 |
+| Shortcuts setup guide | `/shortcuts` | 2026-03-28 |
+| Android long-press shortcuts | manifest.webmanifest | 2026-03-28 |
 | Inbox always on board | KanbanBoard | 2026-03-28 |
 | Move todo between files | KanbanBoard card hover | 2026-03-28 |
 

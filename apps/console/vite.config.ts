@@ -34,6 +34,23 @@ export default defineConfig({
         theme_color: '#0a0a0f',
         background_color: '#0a0a0f',
         display: 'standalone',
+        // Android long-press shortcuts — keep in sync with QUICK_ROUTES in ShortcutsPage.tsx
+        shortcuts: [
+          {
+            name: 'Quick Todo',
+            short_name: 'KH Inbox',
+            description: 'Capture a task to your inbox',
+            url: '/quick-todo',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Quick Note',
+            short_name: 'KH Note',
+            description: 'Capture a quick thought',
+            url: '/quick-note',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
         icons: [
           {
             src: 'logo.svg',

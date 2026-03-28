@@ -279,6 +279,7 @@ export const Dashboard = () => {
             }
           }}
           onBoardClick={() => route('/board')}
+          onShortcutsClick={() => route('/shortcuts')}
           // Remote Config Props
           config={remoteConfig || undefined}
           fileContents={gridFileContents}
