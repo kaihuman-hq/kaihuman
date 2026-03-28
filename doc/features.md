@@ -1,5 +1,13 @@
 # Features
 
+## Console (`apps/console`)
+
+| Feature | Route/Location | Added |
+|---------|---------------|-------|
+| Quick todo to inbox | `/quick-todo` | 2026-03-28 |
+| Inbox always on board | KanbanBoard | 2026-03-28 |
+| Move todo between files | KanbanBoard card hover | 2026-03-28 |
+
 ## CLI (`apps/cli`)
 
 | Feature | Key | Added |

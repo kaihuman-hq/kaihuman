@@ -8,6 +8,7 @@ import { Dashboard } from './pages/Dashboard';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
 import { KanbanBoardPage } from './pages/KanbanBoardPage';
 import { Login } from './pages/login';
+import { QuickTodoPage } from './pages/QuickTodoPage';
 import { TodoAnalyticsPage } from './pages/TodoAnalyticsPage';
 
 // Simple protected route wrapper
@@ -47,6 +48,7 @@ export const App = () => {
         <ProtectedRoute path="/" component={Dashboard} />
         <ProtectedRoute path="/board" component={KanbanBoardPage} />
         <ProtectedRoute path="/analytics" component={TodoAnalyticsPage} />
+        <ProtectedRoute path="/quick-todo" component={QuickTodoPage} />
         <ProtectedRoute path="/files" component={Dashboard} />
         <ProtectedRoute path="/files/:rest*" component={Dashboard} />
         <ProtectedRoute path="/new" component={Dashboard} />

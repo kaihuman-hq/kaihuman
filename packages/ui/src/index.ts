@@ -22,6 +22,7 @@ export * from './LifeOS/Organisms/Widgets/ConsumptionWidget';
 export * from './LifeOS/Organisms/Widgets/ReadItLaterLogic';
 export * from './LifeOS/Organisms/Widgets/StocksLogic';
 export * from './LifeOS/Organisms/Widgets/StocksWidget';
+export * from './LifeOS/Organisms/Widgets/TodoLogic';
 export * from './LifeOS/Organisms/WikiView';
 export * from './LifeOS/Templates/AIPanel';
 export * from './LifeOS/Templates/KanbanBoard';

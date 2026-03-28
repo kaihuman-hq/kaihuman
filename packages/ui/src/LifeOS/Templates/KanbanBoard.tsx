@@ -669,16 +669,33 @@ const KanbanCard = ({
   agg,
   onStatusChange,
   onOpenFile,
+  onMove,
+  otherFilePaths,
   borderColor,
 }: {
   agg: AggregatedItem;
   onStatusChange: (filePath: string, itemIndex: number, newStatus: TodoStatus) => void;
   onOpenFile?: (path: string) => void;
+  onMove?: (targetFilePath: string) => void;
+  otherFilePaths?: string[];
   borderColor?: string;
 }) => {
   const { item, filePath } = agg;
   const { name: fileName } = formatFilePath(filePath);
   const promptRefFile = item.prompt?.refFile;
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
+  const moveMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMoveMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (moveMenuRef.current && !moveMenuRef.current.contains(e.target as Node)) {
+        setShowMoveMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMoveMenu]);
 
   const handleDragStart = (e: DragEvent) => {
     e.dataTransfer?.setData(
@@ -687,6 +704,8 @@ const KanbanCard = ({
     );
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
   };
+
+  const canMove = onMove && otherFilePaths && otherFilePaths.length > 0;
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop source
@@ -715,7 +734,12 @@ const KanbanCard = ({
         <MonoText className="text-[9px] text-[var(--los-muted)] opacity-60 truncate max-w-[60%]">
           {fileName}
         </MonoText>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div
+          className={cn(
+            'flex items-center gap-1 transition-opacity',
+            showMoveMenu ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          )}
+        >
           {promptRefFile && onOpenFile && (
             <button
               type="button"
@@ -729,6 +753,45 @@ const KanbanCard = ({
               <Pencil size={9} />
               PROMPT
             </button>
+          )}
+          {canMove && (
+            <div ref={moveMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMoveMenu((v) => !v);
+                }}
+                className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors"
+              >
+                MOVE
+              </button>
+              {showMoveMenu && (
+                <div className="absolute bottom-full right-0 mb-1 bg-[var(--los-bg)] border border-[var(--los-border)] shadow-lg z-50 min-w-[140px] max-h-48 overflow-y-auto">
+                  {otherFilePaths.map((fp) => {
+                    const { dir, name } = formatFilePath(fp);
+                    return (
+                      <button
+                        key={fp}
+                        type="button"
+                        onClick={() => {
+                          onMove(fp);
+                          setShowMoveMenu(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-[9px] font-mono hover:bg-white/5 transition-colors leading-snug"
+                      >
+                        {dir && (
+                          <span className="block text-[var(--los-muted)] opacity-70 text-[9px]">
+                            {dir}
+                          </span>
+                        )}
+                        <span className="font-bold text-[var(--los-fg)]">{name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           )}
           <button
             type="button"
@@ -944,15 +1007,25 @@ export const KanbanBoard = ({
 
   // Find .todos.md files assigned to any workspace in the dashboard config.
   // Falls back to scanning the full tree only when no config is available.
+  // The inbox file (.kh/inbox.todos.md) is always included if it exists in the tree.
   const todoFilePaths = useMemo(() => {
+    const appFolder = githubFileStore.appFolder.peek();
+    const inboxPath = `${appFolder}/inbox.todos.md`;
+    let paths: string[];
     if (remoteConfig) {
-      const paths = remoteConfig.entries
-        .filter((e) => e.path.endsWith('.todos.md'))
-        .map((e) => e.path);
-      // Deduplicate in case the same file appears in multiple workspaces
-      return [...new Set(paths)];
+      paths = [
+        ...new Set(
+          remoteConfig.entries.filter((e) => e.path.endsWith('.todos.md')).map((e) => e.path),
+        ),
+      ];
+    } else {
+      paths = (tree ?? []).filter((t) => t.path.endsWith('.todos.md')).map((t) => t.path);
     }
-    return (tree ?? []).filter((t) => t.path.endsWith('.todos.md')).map((t) => t.path);
+    // Always surface the inbox if it exists in the tree but isn't already listed
+    if ((tree ?? []).some((t) => t.path === inboxPath) && !paths.includes(inboxPath)) {
+      paths = [inboxPath, ...paths];
+    }
+    return paths;
   }, [remoteConfig, tree]);
 
   useEffect(() => {
@@ -1068,6 +1141,29 @@ export const KanbanBoard = ({
     const newData = addTodo(data, text, tags, undefined, prompt);
     githubFileStore.updateFileContent(filePath, serializeTodos(newData));
     await githubFileStore.saveFile(filePath);
+  };
+
+  const handleMoveTodo = async (
+    sourceFilePath: string,
+    itemIndex: number,
+    targetFilePath: string,
+  ) => {
+    const sourceFile = openFiles[sourceFilePath];
+    const targetFile = openFiles[targetFilePath];
+    if (!sourceFile || !targetFile) return;
+    const sourceData = parseTodos(sourceFile.content);
+    const item = sourceData.items[itemIndex];
+    if (!item) return;
+    const newSourceData = {
+      ...sourceData,
+      items: sourceData.items.filter((_, i) => i !== itemIndex),
+    };
+    const targetData = parseTodos(targetFile.content);
+    const newTargetData = { ...targetData, items: [...targetData.items, item] };
+    githubFileStore.updateFileContent(sourceFilePath, serializeTodos(newSourceData));
+    await githubFileStore.saveFile(sourceFilePath);
+    githubFileStore.updateFileContent(targetFilePath, serializeTodos(newTargetData));
+    await githubFileStore.saveFile(targetFilePath);
   };
 
   const isLoading = todoFilePaths.some((p) => !openFiles[p]);
@@ -1397,6 +1493,13 @@ export const KanbanBoard = ({
                                 agg={agg}
                                 onStatusChange={handleStatusChange}
                                 onOpenFile={onOpenFile}
+                                onMove={
+                                  todoFilePaths.length > 1
+                                    ? (targetPath) =>
+                                        handleMoveTodo(agg.filePath, agg.itemIndex, targetPath)
+                                    : undefined
+                                }
+                                otherFilePaths={todoFilePaths.filter((fp) => fp !== agg.filePath)}
                                 borderColor={colorMode ? fileColors[agg.filePath] : undefined}
                               />
                             ))}
