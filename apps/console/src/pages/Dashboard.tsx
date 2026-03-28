@@ -279,6 +279,7 @@ export const Dashboard = () => {
             }
           }}
           onBoardClick={() => route('/board')}
+          onActionLogClick={() => route('/action-log')}
           onShortcutsClick={() => route('/shortcuts')}
           // Remote Config Props
           config={remoteConfig || undefined}

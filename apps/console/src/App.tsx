@@ -3,11 +3,13 @@ import { NotFound } from '@lifosy/ui';
 
 import { Route, Router, route } from 'preact-router';
 import { ExtensionAuthBridge } from './components/ExtensionAuthBridge';
+import { ActionLogViewPage } from './pages/ActionLogViewPage';
 import { AuthCli } from './pages/AuthCli';
 import { Dashboard } from './pages/Dashboard';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
 import { KanbanBoardPage } from './pages/KanbanBoardPage';
 import { Login } from './pages/login';
+import { QuickLogPage } from './pages/QuickLogPage';
 import { QuickNotePage } from './pages/QuickNotePage';
 import { QuickTodoPage } from './pages/QuickTodoPage';
 import { ShortcutsPage } from './pages/ShortcutsPage';
@@ -50,8 +52,10 @@ export const App = () => {
         <ProtectedRoute path="/" component={Dashboard} />
         <ProtectedRoute path="/board" component={KanbanBoardPage} />
         <ProtectedRoute path="/analytics" component={TodoAnalyticsPage} />
+        <ProtectedRoute path="/action-log" component={ActionLogViewPage} />
         <ProtectedRoute path="/quick-todo" component={QuickTodoPage} />
         <ProtectedRoute path="/quick-note" component={QuickNotePage} />
+        <ProtectedRoute path="/quick-log" component={QuickLogPage} />
         <ProtectedRoute path="/shortcuts" component={ShortcutsPage} />
         <ProtectedRoute path="/files" component={Dashboard} />
         <ProtectedRoute path="/files/:rest*" component={Dashboard} />

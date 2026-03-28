@@ -133,6 +133,7 @@ export interface MainAppProps {
   onCheckPath?: (path: string) => Promise<'FILE' | 'FOLDER' | null> | 'FILE' | 'FOLDER' | null;
 
   onBoardClick?: () => void;
+  onActionLogClick?: () => void;
   onShortcutsClick?: () => void;
 
   // Version info
@@ -209,6 +210,7 @@ export const MainApp = ({
   githubToken,
   onCheckPath,
   onBoardClick,
+  onActionLogClick,
   onShortcutsClick,
   ...props
 }: MainAppProps) => {
@@ -1352,6 +1354,7 @@ export const MainApp = ({
           setShowNewFileWizard(true);
         }}
         onOpenShortcuts={onShortcutsClick}
+        onOpenActionLog={onActionLogClick}
         onSelect={(item) => {
           if (item.type === 'FILE') {
             logger.debug(`Opening file from search: ${item.path}`);
@@ -1945,6 +1948,7 @@ abbreviations: undefined
                   },
                   ...(onShortcutsClick ? [{ label: 'Shortcuts', onClick: onShortcutsClick }] : []),
                   ...(onBoardClick ? [{ label: 'Board', onClick: onBoardClick }] : []),
+                  ...(onActionLogClick ? [{ label: 'Action Log', onClick: onActionLogClick }] : []),
                   {
                     label: 'Graph',
                     onClick: () => {

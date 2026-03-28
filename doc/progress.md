@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-03-28 — Action Log view, inbox, quick-log route
+
+- **`ActionLogView` template** (`packages/ui`): single-column combined view of all `.actionlog.md` files from dashboard config; always includes `inbox.actionlog.md` if it exists; search input; clickable tag cloud (frequency-sorted); date separators (sticky, formatted); entry rows show file source + MOVE dropdown on hover; add-entry panel (collapsible) with file selector, description textarea, tags — creates inbox on first use; footer stats
+- **Move between files**: removes from source, inserts into target maintaining chronological order; saves sequentially
+- **`/action-log` route** + `ActionLogViewPage.tsx` wrapper
+- **`inbox.actionlog.md`**: lives in `.kh/`, always surfaced on the view if it exists in the tree; add panel always offers it even if not yet created
+- **`/quick-log` route** + `QuickLogPage.tsx`: focused quick capture to inbox; same pattern as quick-todo/quick-note
+- **Shortcuts page**: added "Quick Log" (`/quick-log`) entry
+- **Android manifest**: added "Quick Log" shortcut
+- **Magic menu**: "Action Log" item wired via `onActionLogClick` prop
+- **Command palette**: "Open Action Log" command added
+
 ## 2026-03-28 — Shortcuts in magic menu + command palette, /new route added
 
 - **Magic menu**: added "Shortcuts" item (between Search and Board); routes to `/shortcuts`; conditional on `onShortcutsClick` prop being provided

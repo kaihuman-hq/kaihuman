@@ -29,6 +29,12 @@ export const QUICK_ROUTES: QuickRoute[] = [
     description: 'Capture a quick thought to your notes',
   },
   {
+    name: 'Quick Log',
+    path: '/quick-log',
+    suggestedName: 'KH Log',
+    description: 'Capture a timestamped action log entry to your inbox',
+  },
+  {
     name: 'New File',
     path: '/new',
     suggestedName: 'KH New',

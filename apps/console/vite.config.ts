@@ -50,6 +50,13 @@ export default defineConfig({
             url: '/quick-note',
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
           },
+          {
+            name: 'Quick Log',
+            short_name: 'KH Log',
+            description: 'Log a timestamped action',
+            url: '/quick-log',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
         ],
         icons: [
           {
