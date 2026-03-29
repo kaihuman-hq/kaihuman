@@ -56,7 +56,7 @@ const TEMPLATES: Template[] = [
     description: 'Track tasks and progress',
     icon: ListTodo,
     extension: '.todos.md',
-    defaultContent: '# Tasks\n\n- [ ] New Task',
+    defaultContent: '- [ ] New Task',
   },
   {
     id: 'data-collection',

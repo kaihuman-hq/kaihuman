@@ -994,7 +994,7 @@ export const KanbanBoard = ({
   const [showMilestoneManager, setShowMilestoneManager] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [dragOverStatus, setDragOverStatus] = useState<TodoStatus | null>(null);
-  const [focusedFile, setFocusedFile] = useState<string>('');
+  const [focusedFiles, setFocusedFiles] = useState<Set<string>>(new Set());
   const [assignMode, setAssignMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showRecentOnly, setShowRecentOnly] = useState<Record<TodoStatus, boolean>>({
@@ -1065,7 +1065,7 @@ export const KanbanBoard = ({
     const q = searchQuery.trim().toLowerCase();
     const result: AggregatedItem[] = [];
     for (const { path, data } of parsedFiles) {
-      if (focusedFile && path !== focusedFile) continue;
+      if (focusedFiles.size > 0 && !focusedFiles.has(path)) continue;
       data.items.forEach((item, idx) => {
         if (milestoneFilter && item.milestoneId !== milestoneFilter) return;
         if (showUpcoming && upcomingMilestone && item.milestoneId !== upcomingMilestone.id) return;
@@ -1079,12 +1079,13 @@ export const KanbanBoard = ({
       });
     }
     return result;
-  }, [parsedFiles, milestoneFilter, showUpcoming, upcomingMilestone, focusedFile, searchQuery]);
+  }, [parsedFiles, milestoneFilter, showUpcoming, upcomingMilestone, focusedFiles, searchQuery]);
 
-  const focusedFileData = useMemo(
-    () => parsedFiles.find((f) => f.path === focusedFile)?.data ?? null,
-    [parsedFiles, focusedFile],
-  );
+  const focusedFileData = useMemo(() => {
+    if (focusedFiles.size !== 1) return null;
+    const fp = [...focusedFiles][0] ?? '';
+    return parsedFiles.find((f) => f.path === fp)?.data ?? null;
+  }, [parsedFiles, focusedFiles]);
 
   // Sort file paths by most recently added item (newest first)
   const sortedFilePaths = useMemo(() => {
@@ -1119,13 +1120,14 @@ export const KanbanBoard = ({
   };
 
   const handleAssignMilestone = (itemIndex: number, milestoneId: string | undefined) => {
-    if (!focusedFile) return;
-    const file = openFiles[focusedFile];
+    if (focusedFiles.size !== 1) return;
+    const fp = [...focusedFiles][0] ?? '';
+    const file = openFiles[fp];
     if (!file) return;
     const data = parseTodos(file.content);
     const newData = setMilestone(data, itemIndex, milestoneId);
-    githubFileStore.updateFileContent(focusedFile, serializeTodos(newData));
-    githubFileStore.saveFile(focusedFile);
+    githubFileStore.updateFileContent(fp, serializeTodos(newData));
+    githubFileStore.saveFile(fp);
   };
 
   const handleAddTask = async (
@@ -1187,10 +1189,10 @@ export const KanbanBoard = ({
           <MonoHeader>KANBAN BOARD</MonoHeader>
           {todoFilePaths.length > 1 ? (
             <FileSelect
-              value={focusedFile}
+              value={focusedFiles.size === 1 ? ([...focusedFiles][0] ?? '') : ''}
               options={todoFilePaths}
               onChange={(fp) => {
-                setFocusedFile(fp);
+                setFocusedFiles(fp ? new Set([fp]) : new Set());
                 setAssignMode(false);
               }}
             />
@@ -1199,7 +1201,7 @@ export const KanbanBoard = ({
               {todoFilePaths.length} file{todoFilePaths.length !== 1 ? 's' : ''}
             </MonoText>
           )}
-          {focusedFile && focusedFileData && focusedFileData.milestones.length > 0 && (
+          {focusedFiles.size === 1 && focusedFileData && focusedFileData.milestones.length > 0 && (
             <button
               type="button"
               onClick={() => setAssignMode((v) => !v)}
@@ -1317,10 +1319,10 @@ export const KanbanBoard = ({
         <div className="border-b border-[var(--los-border)] flex items-center gap-2 px-4 py-2 overflow-x-auto shrink-0">
           <button
             type="button"
-            onClick={() => setFocusedFile('')}
+            onClick={() => setFocusedFiles(new Set())}
             className={cn(
               'text-[10px] font-mono border px-2 py-0.5 shrink-0 transition-colors whitespace-nowrap',
-              !focusedFile
+              focusedFiles.size === 0
                 ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
                 : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
             )}
@@ -1330,13 +1332,20 @@ export const KanbanBoard = ({
           <div className="w-px h-4 bg-[var(--los-border)] shrink-0" />
           {sortedFilePaths.map((fp) => {
             const { name } = formatFilePath(fp);
-            const isActive = focusedFile === fp;
+            const isActive = focusedFiles.has(fp);
             const color = colorMode ? fileColors[fp] : undefined;
             return (
               <button
                 key={fp}
                 type="button"
-                onClick={() => setFocusedFile(isActive ? '' : fp)}
+                onClick={() =>
+                  setFocusedFiles((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(fp)) next.delete(fp);
+                    else next.add(fp);
+                    return next;
+                  })
+                }
                 style={
                   color ? { borderColor: color, color: isActive ? color : undefined } : undefined
                 }
@@ -1360,9 +1369,9 @@ export const KanbanBoard = ({
       )}
 
       {/* Assign Mode */}
-      {assignMode && focusedFile && focusedFileData ? (
+      {assignMode && focusedFiles.size === 1 && focusedFileData ? (
         <AssignMilestonePanel
-          filePath={focusedFile}
+          filePath={[...focusedFiles][0] ?? ''}
           data={focusedFileData}
           onSave={handleAssignMilestone}
           onClose={() => setAssignMode(false)}
@@ -1527,7 +1536,7 @@ export const KanbanBoard = ({
         <AddTaskModal
           todoFilePaths={sortedFilePaths}
           parsedFiles={parsedFiles}
-          initialFilePath={focusedFile}
+          initialFilePath={focusedFiles.size === 1 ? ([...focusedFiles][0] ?? '') : ''}
           onClose={() => setShowAddTask(false)}
           onAdd={handleAddTask}
           onCreateFile={onCreateFile}
