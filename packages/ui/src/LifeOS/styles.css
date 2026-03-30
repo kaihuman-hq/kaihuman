@@ -9,6 +9,7 @@
   --los-border: #333333;
   --los-accent: #00ff00;
   /* Neon Green */
+  --los-accent-rgb: 0, 255, 0;
   --los-accent-dim: rgba(0, 255, 0, 0.2);
   --los-muted: #64748b;
   /* slate-500 */
@@ -55,6 +56,7 @@
   /* slate-300 */
   --los-accent: #2563eb;
   /* Blue 600 */
+  --los-accent-rgb: 37, 99, 235;
   --los-accent-dim: rgba(37, 99, 235, 0.1);
   --los-muted: #64748b;
   /* slate-500 */
@@ -93,6 +95,7 @@
   /* purple-950 */
   --los-accent: #d946ef;
   /* Fuchsia 500 */
+  --los-accent-rgb: 217, 70, 239;
   --los-accent-dim: rgba(217, 70, 239, 0.15);
   --los-muted: #a855f7;
   /* purple-500 */
