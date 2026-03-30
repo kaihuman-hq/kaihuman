@@ -230,8 +230,54 @@ const WorkspaceSubView = ({
 // Items excluded from the mobile More sheet — handled by tabs
 const SHEET_EXCLUDED = new Set(['Dashboard', 'Board', 'Search', 'Quick Note']);
 
+// ---------------------------------------------------------------------------
+// RecentFilesSubView
+// ---------------------------------------------------------------------------
+
+interface RecentFilesSubViewProps {
+  recentFiles: MenuItem[];
+  onClose: () => void;
+  onBack: () => void;
+}
+
+const RecentFilesSubView = ({ recentFiles, onClose, onBack }: RecentFilesSubViewProps) => (
+  <div className="flex flex-col">
+    <div className="flex items-center gap-3 px-2 py-3 border-b border-[var(--los-border)]">
+      <button
+        type="button"
+        onClick={onBack}
+        className="text-[var(--los-muted)] hover:text-[var(--los-fg)] transition-colors"
+      >
+        <ChevronUp className="-rotate-90" size={16} />
+      </button>
+      <MonoLabel className="text-xs text-[var(--los-muted)]">RECENT FILES</MonoLabel>
+    </div>
+    {recentFiles.length === 0 ? (
+      <div className="px-6 py-4">
+        <MonoText className="text-sm text-[var(--los-muted)]">No recent files</MonoText>
+      </div>
+    ) : (
+      recentFiles.map((item) => (
+        // biome-ignore lint/a11y/noStaticElementInteractions: list item
+        // biome-ignore lint/a11y/useKeyWithClickEvents: list item
+        <div
+          key={item.label}
+          onClick={() => {
+            item.onClick?.();
+            onClose();
+          }}
+          className="flex items-center px-6 h-12 cursor-pointer hover:bg-[var(--los-accent)]/5 hover:text-[var(--los-accent)] transition-colors overflow-hidden"
+        >
+          <MonoText className="text-sm truncate">{item.label}</MonoText>
+        </div>
+      ))
+    )}
+  </div>
+);
+
 interface MobileMoreSheetProps {
   menuItems?: MenuItem[];
+  recentFiles?: MenuItem[];
   repositories: Repository[];
   workspaces: Repository[];
   currentRepository?: Repository;
@@ -242,6 +288,7 @@ interface MobileMoreSheetProps {
 
 const MobileMoreSheet = ({
   menuItems,
+  recentFiles,
   repositories,
   workspaces,
   currentRepository,
@@ -348,8 +395,35 @@ const MobileMoreSheet = ({
             </div>
           )}
 
+          {sheetMode === 'RECENT' && (
+            <RecentFilesSubView
+              recentFiles={recentFiles ?? []}
+              onClose={close}
+              onBack={() => {
+                navigationStore.sheetMode.value = 'MENU';
+              }}
+            />
+          )}
+
           {sheetMode === 'MENU' && (
             <div className="flex flex-col">
+              {recentFiles && recentFiles.length > 0 && (
+                <>
+                  {/* biome-ignore lint/a11y/noStaticElementInteractions: menu item */}
+                  {/* biome-ignore lint/a11y/useKeyWithClickEvents: menu item */}
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigationStore.sheetMode.value = 'RECENT';
+                    }}
+                    className="flex items-center justify-between px-6 h-12 cursor-pointer hover:bg-[var(--los-accent)]/5 hover:text-[var(--los-accent)] transition-colors"
+                  >
+                    <MonoText className="text-sm uppercase">Recent Files</MonoText>
+                    <ChevronUp className="rotate-90" size={14} />
+                  </div>
+                  <div className="h-px bg-[var(--los-border)] my-1 mx-4" />
+                </>
+              )}
               {sheetItems.map((item, idx) => {
                 const showSeparator = idx === firstContextIdx && firstContextIdx > 0;
                 return (
@@ -468,6 +542,7 @@ export const StatusBar = ({
       {/* ── Mobile More sheet (hidden on desktop) ──────────────────────── */}
       <MobileMoreSheet
         menuItems={menuItems}
+        recentFiles={recentFiles}
         repositories={repositories}
         workspaces={workspaces}
         currentRepository={currentRepository}
