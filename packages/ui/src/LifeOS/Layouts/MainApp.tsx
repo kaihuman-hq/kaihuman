@@ -363,6 +363,26 @@ export const MainApp = ({
   const setFileToAddToDashboard = (path: string | null) => {
     layoutStore.fileToAddToDashboard.value = path;
   };
+
+  const handleQuickNote = async () => {
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const filename = `quicknote-${timestamp}.md`;
+    const path = `${githubFileStore.appFolder.peek()}/quicknotes/${filename}`;
+    const content = `---
+type: generic
+created: ${now.toISOString()}
+description: A generic markdown document template for general note-taking and documentation.
+abbreviations: undefined
+---
+
+`;
+    if (onCreateFile) await onCreateFile(path, content);
+    setShowFiles(true);
+    setActiveTileId(path);
+    if (showDumpMode) setShowDumpMode(false);
+  };
   const setDragEnabled = (enabled: boolean) => {
     layoutStore.dragEnabled.value = enabled;
   };
@@ -1428,7 +1448,7 @@ export const MainApp = ({
                     onRequestMove={(path) => setFileToMove(path)}
                   />
                 ) : (
-                  <div className="absolute top-0 left-0 right-0 bottom-8 flex flex-row overflow-x-auto mx-auto w-full max-w-screen-2xl">
+                  <div className="absolute top-0 left-0 right-0 bottom-14 md:bottom-8 flex flex-row overflow-x-auto mx-auto w-full max-w-screen-2xl">
                     {fileSystem?.columns.map((col, index) => {
                       const isLast = index === fileSystem?.columns.length - 1;
                       return (
@@ -1464,7 +1484,7 @@ export const MainApp = ({
                 // LEGACY SINGLE GRID LAYOUT OR DASHBOARD
                 <div
                   className={cn(
-                    'absolute top-0 left-0 right-0 bottom-8 overflow-y-auto overflow-x-hidden',
+                    'absolute top-0 left-0 right-0 bottom-14 md:bottom-8 overflow-y-auto overflow-x-hidden',
                     !layoutStore.remoteConfig.value || showFiles
                       ? 'block'
                       : getResponsiveGridClass(displayTiles.length),
@@ -1848,6 +1868,10 @@ export const MainApp = ({
             setShowFiles(true);
           }}
           onBoardClick={onBoardClick}
+          onShortcutsClick={onShortcutsClick}
+          onSearchClick={() => {
+            layoutStore.showSearch.value = true;
+          }}
           // Repository Switcher (Always available if props provided)
           currentRepository={props.currentRepository}
           repositories={props.repositories}
@@ -1913,34 +1937,7 @@ export const MainApp = ({
                     },
                   },
                   { label: 'New File', onClick: () => setShowNewFileWizard(true) },
-                  {
-                    label: 'Quick Note',
-                    onClick: async () => {
-                      const now = new Date();
-                      const pad = (n: number) => n.toString().padStart(2, '0');
-                      // Format: quicknote-YYYY-MM-DD-HH:mm:ss.md
-                      const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-                      const filename = `quicknote-${timestamp}.md`;
-                      const path = `${githubFileStore.appFolder.peek()}/quicknotes/${filename}`;
-
-                      const content = `---
-type: generic
-created: ${now.toISOString()}
-description: A generic markdown document template for general note-taking and documentation.
-abbreviations: undefined
----
-
-`;
-                      if (onCreateFile) {
-                        await onCreateFile(path, content);
-                      }
-                      // Open file view
-                      setShowFiles(true);
-                      // Navigate to it
-                      setActiveTileId(path);
-                      if (showDumpMode) setShowDumpMode(false);
-                    },
-                  },
+                  { label: 'Quick Note', onClick: handleQuickNote },
                   {
                     label: 'Search',
                     // Fix 1.21: Add Search to Magic Menu (works on mobile)
@@ -2208,7 +2205,7 @@ const FocusedTileInternal = ({
   return (
     <div
       className={cn(
-        'absolute top-0 bottom-8 z-10 p-8 flex flex-col',
+        'absolute top-0 bottom-14 md:bottom-8 z-10 p-8 flex flex-col',
         zenMode ? 'bg-stone-950' : 'bg-[var(--los-bg)]', // Darker background in Zen Mode
         'left-0 right-0 mx-auto w-full max-w-screen-2xl', // Center & Constrain
       )}

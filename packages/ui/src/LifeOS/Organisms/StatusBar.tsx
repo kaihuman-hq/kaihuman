@@ -1,20 +1,20 @@
-import { aiStore, Logger } from '@lifosy/core';
-import { useEffect, useState } from 'preact/hooks';
-import { cn } from '../../utils';
-import { Logo } from '../Atoms/Logo';
-import { MonoLabel, MonoText } from '../Atoms/Typography';
-
-const logger = new Logger('StatusBar');
-
+import { aiStore, navigationStore } from '@lifosy/core';
 import {
   Archive,
   ArrowRight,
   ChevronUp,
   GitBranch,
   GitCommit,
+  Home,
   Kanban,
   LayoutGrid,
+  MoreHorizontal,
+  Search as SearchIcon,
 } from 'lucide-preact';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { cn } from '../../utils';
+import { Logo } from '../Atoms/Logo';
+import { MonoLabel, MonoText } from '../Atoms/Typography';
 
 export interface Repository {
   id: string;
@@ -47,14 +47,18 @@ export interface StatusBarProps {
   repositoryLabel?: string;
 
   // Workspace (Local Context)
-  currentWorkspace?: Repository; // Reusing Repository interface for Name/ID
+  currentWorkspace?: Repository;
   workspaces?: Repository[];
   onSelectWorkspace?: (ws: Repository) => void;
-  onNextWorkspace?: () => void; // Replaces onNextRepository usage for workspaces
+  onNextWorkspace?: () => void;
 
+  // Navigation
   onDashboardClick?: () => void;
   onFilesClick?: () => void;
   onBoardClick?: () => void;
+  onShortcutsClick?: () => void;
+  onSearchClick?: () => void;
+
   menuItems?: MenuItem[];
   recentFiles?: MenuItem[];
 
@@ -66,6 +70,400 @@ export interface StatusBarProps {
     full?: string;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Internal sub-components
+// ---------------------------------------------------------------------------
+
+interface SubViewProps {
+  onClose: () => void;
+  onBack: () => void;
+}
+
+interface RepoSubViewProps extends SubViewProps {
+  repositories: Repository[];
+  currentRepository?: Repository;
+  onSelectRepository?: (repo: Repository) => void;
+}
+
+const RepoSubView = ({
+  repositories,
+  currentRepository,
+  onSelectRepository,
+  onClose,
+  onBack,
+}: RepoSubViewProps) => (
+  <div className="flex flex-col gap-2">
+    <div className="flex items-center gap-2 mb-4">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: back button */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: back button */}
+      <div
+        onClick={onBack}
+        className="cursor-pointer hover:text-[var(--los-accent)] flex items-center gap-1"
+      >
+        <ChevronUp className="rotate-[-90deg]" size={16} />
+        <MonoLabel>BACK</MonoLabel>
+      </div>
+      <MonoLabel className="text-[var(--los-accent)] uppercase ml-auto">REPOSITORIES</MonoLabel>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {repositories.map((repo) => (
+        // biome-ignore lint/a11y/noStaticElementInteractions: repo selection
+        // biome-ignore lint/a11y/useKeyWithClickEvents: repo selection
+        <div
+          key={repo.id}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectRepository?.(repo);
+            onClose();
+          }}
+          className={cn(
+            'border p-4 cursor-pointer transition-colors flex items-center justify-between group',
+            currentRepository?.id === repo.id
+              ? 'border-[var(--los-accent)] bg-[var(--los-accent-dim)]'
+              : 'border-[var(--los-border)] hover:border-[var(--los-fg)] hover:bg-white/5',
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <GitBranch
+              size={16}
+              className={
+                currentRepository?.id === repo.id
+                  ? 'text-[var(--los-accent)]'
+                  : 'text-[var(--los-muted)] group-hover:text-[var(--los-fg)]'
+              }
+            />
+            <div className="flex flex-col">
+              <MonoText
+                className={
+                  currentRepository?.id === repo.id
+                    ? 'text-[var(--los-accent)]'
+                    : 'text-[var(--los-fg)]'
+                }
+              >
+                {repo.name}
+              </MonoText>
+              {repo.branch && (
+                <MonoText className="text-[10px] text-[var(--los-muted)]">{repo.branch}</MonoText>
+              )}
+            </div>
+          </div>
+          {currentRepository?.id === repo.id && (
+            <div className="w-2 h-2 rounded-full bg-[var(--los-accent)]" />
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+interface WorkspaceSubViewProps extends SubViewProps {
+  workspaces: Repository[];
+  currentWorkspace?: Repository;
+  onSelectWorkspace?: (ws: Repository) => void;
+}
+
+const WorkspaceSubView = ({
+  workspaces,
+  currentWorkspace,
+  onSelectWorkspace,
+  onClose,
+  onBack,
+}: WorkspaceSubViewProps) => (
+  <div className="flex flex-col gap-2">
+    <div className="flex items-center gap-2 mb-4">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: back button */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: back button */}
+      <div
+        onClick={onBack}
+        className="cursor-pointer hover:text-[var(--los-accent)] flex items-center gap-1"
+      >
+        <ChevronUp className="rotate-[-90deg]" size={16} />
+        <MonoLabel>BACK</MonoLabel>
+      </div>
+      <MonoLabel className="text-[var(--los-accent)] uppercase ml-auto">WORKSPACES</MonoLabel>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {workspaces.map((ws) => (
+        // biome-ignore lint/a11y/noStaticElementInteractions: workspace selection
+        // biome-ignore lint/a11y/useKeyWithClickEvents: workspace selection
+        <div
+          key={ws.id}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectWorkspace?.(ws);
+            onClose();
+          }}
+          className={cn(
+            'border p-4 cursor-pointer transition-colors flex items-center justify-between group',
+            currentWorkspace?.id === ws.id
+              ? 'border-[var(--los-accent)] bg-[var(--los-accent-dim)]'
+              : 'border-[var(--los-border)] hover:border-[var(--los-fg)] hover:bg-white/5',
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <LayoutGrid
+              size={16}
+              className={
+                currentWorkspace?.id === ws.id
+                  ? 'text-[var(--los-accent)]'
+                  : 'text-[var(--los-muted)] group-hover:text-[var(--los-fg)]'
+              }
+            />
+            <MonoText
+              className={
+                currentWorkspace?.id === ws.id ? 'text-[var(--los-accent)]' : 'text-[var(--los-fg)]'
+              }
+            >
+              {ws.name}
+            </MonoText>
+          </div>
+          {currentWorkspace?.id === ws.id && (
+            <div className="w-2 h-2 rounded-full bg-[var(--los-accent)]" />
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// Items excluded from the mobile More sheet — handled by tabs
+const SHEET_EXCLUDED = new Set(['Dashboard', 'Board', 'Search', 'Quick Note']);
+
+// ---------------------------------------------------------------------------
+// RecentFilesSubView
+// ---------------------------------------------------------------------------
+
+interface RecentFilesSubViewProps {
+  recentFiles: MenuItem[];
+  onClose: () => void;
+  onBack: () => void;
+}
+
+const RecentFilesSubView = ({ recentFiles, onClose, onBack }: RecentFilesSubViewProps) => (
+  <div className="flex flex-col">
+    <div className="flex items-center gap-3 px-2 py-3 border-b border-[var(--los-border)]">
+      <button
+        type="button"
+        onClick={onBack}
+        className="text-[var(--los-muted)] hover:text-[var(--los-fg)] transition-colors"
+      >
+        <ChevronUp className="-rotate-90" size={16} />
+      </button>
+      <MonoLabel className="text-xs text-[var(--los-muted)]">RECENT FILES</MonoLabel>
+    </div>
+    {recentFiles.length === 0 ? (
+      <div className="px-6 py-4">
+        <MonoText className="text-sm text-[var(--los-muted)]">No recent files</MonoText>
+      </div>
+    ) : (
+      recentFiles.map((item) => (
+        // biome-ignore lint/a11y/noStaticElementInteractions: list item
+        // biome-ignore lint/a11y/useKeyWithClickEvents: list item
+        <div
+          key={item.label}
+          onClick={() => {
+            item.onClick?.();
+            onClose();
+          }}
+          className="flex items-center px-6 h-12 cursor-pointer hover:bg-[var(--los-accent)]/5 hover:text-[var(--los-accent)] transition-colors overflow-hidden"
+        >
+          <MonoText className="text-sm truncate">{item.label}</MonoText>
+        </div>
+      ))
+    )}
+  </div>
+);
+
+interface MobileMoreSheetProps {
+  menuItems?: MenuItem[];
+  recentFiles?: MenuItem[];
+  repositories: Repository[];
+  workspaces: Repository[];
+  currentRepository?: Repository;
+  currentWorkspace?: Repository;
+  onSelectRepository?: (repo: Repository) => void;
+  onSelectWorkspace?: (ws: Repository) => void;
+}
+
+const MobileMoreSheet = ({
+  menuItems,
+  recentFiles,
+  repositories,
+  workspaces,
+  currentRepository,
+  currentWorkspace,
+  onSelectRepository,
+  onSelectWorkspace,
+}: MobileMoreSheetProps) => {
+  const open = navigationStore.moreSheetOpen.value;
+  const sheetMode = navigationStore.sheetMode.value;
+
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragStartY = useRef<number | null>(null);
+
+  const close = () => {
+    navigationStore.moreSheetOpen.value = false;
+    navigationStore.sheetMode.value = 'MENU';
+  };
+
+  const handlePointerDown = (e: PointerEvent) => {
+    dragStartY.current = e.clientY;
+  };
+
+  const handlePointerMove = (e: PointerEvent) => {
+    if (dragStartY.current === null || !panelRef.current) return;
+    const delta = Math.max(0, e.clientY - dragStartY.current);
+    panelRef.current.style.transform = `translateY(${delta}px)`;
+  };
+
+  const handlePointerUp = (e: PointerEvent) => {
+    if (dragStartY.current === null || !panelRef.current) return;
+    const delta = e.clientY - dragStartY.current;
+    if (delta > 80) {
+      panelRef.current.style.transform = '';
+      close();
+    } else {
+      panelRef.current.style.transform = '';
+    }
+    dragStartY.current = null;
+  };
+
+  const sheetItems = (menuItems ?? []).filter((item) => !SHEET_EXCLUDED.has(item.label));
+  const firstContextIdx = sheetItems.findIndex(
+    (item) => item.type === 'REPOS' || item.type === 'WORKSPACES',
+  );
+
+  return (
+    // Entire sheet is md:hidden — desktop uses the inline drawer
+    <div className="md:hidden">
+      {/* Backdrop */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop dismiss */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss */}
+      <div
+        className={cn(
+          'fixed inset-0 z-[990] bg-black/50 transition-opacity duration-300',
+          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+        )}
+        onClick={close}
+      />
+
+      {/* Panel */}
+      <div
+        ref={panelRef}
+        className={cn(
+          'fixed bottom-0 left-0 right-0 z-[995] bg-[var(--los-bg)] border-t border-[var(--los-border)] max-h-[60vh] overflow-y-auto transition-transform duration-300',
+          open ? 'translate-y-0' : 'translate-y-full',
+        )}
+      >
+        {/* Drag handle */}
+        <div
+          className="flex justify-center pt-3 pb-2 touch-none"
+          onPointerDown={handlePointerDown as any}
+          onPointerMove={handlePointerMove as any}
+          onPointerUp={handlePointerUp as any}
+        >
+          <div className="w-10 h-1 rounded-full bg-[var(--los-border)]" />
+        </div>
+
+        <div className="pb-safe pb-4">
+          {sheetMode === 'REPOS' && (
+            <div className="px-4">
+              <RepoSubView
+                repositories={repositories}
+                currentRepository={currentRepository}
+                onSelectRepository={onSelectRepository}
+                onClose={close}
+                onBack={() => {
+                  navigationStore.sheetMode.value = 'MENU';
+                }}
+              />
+            </div>
+          )}
+
+          {sheetMode === 'WORKSPACES' && (
+            <div className="px-4">
+              <WorkspaceSubView
+                workspaces={workspaces}
+                currentWorkspace={currentWorkspace}
+                onSelectWorkspace={onSelectWorkspace}
+                onClose={close}
+                onBack={() => {
+                  navigationStore.sheetMode.value = 'MENU';
+                }}
+              />
+            </div>
+          )}
+
+          {sheetMode === 'RECENT' && (
+            <RecentFilesSubView
+              recentFiles={recentFiles ?? []}
+              onClose={close}
+              onBack={() => {
+                navigationStore.sheetMode.value = 'MENU';
+              }}
+            />
+          )}
+
+          {sheetMode === 'MENU' && (
+            <div className="flex flex-col">
+              {recentFiles && recentFiles.length > 0 && (
+                <>
+                  {/* biome-ignore lint/a11y/noStaticElementInteractions: menu item */}
+                  {/* biome-ignore lint/a11y/useKeyWithClickEvents: menu item */}
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigationStore.sheetMode.value = 'RECENT';
+                    }}
+                    className="flex items-center justify-between px-6 h-12 cursor-pointer hover:bg-[var(--los-accent)]/5 hover:text-[var(--los-accent)] transition-colors"
+                  >
+                    <MonoText className="text-sm uppercase">Recent Files</MonoText>
+                    <ChevronUp className="rotate-90" size={14} />
+                  </div>
+                  <div className="h-px bg-[var(--los-border)] my-1 mx-4" />
+                </>
+              )}
+              {sheetItems.map((item, idx) => {
+                const showSeparator = idx === firstContextIdx && firstContextIdx > 0;
+                return (
+                  <div key={item.label}>
+                    {showSeparator && <div className="h-px bg-[var(--los-border)] my-1 mx-4" />}
+                    {/* biome-ignore lint/a11y/noStaticElementInteractions: menu item */}
+                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: menu item */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (item.type === 'REPOS') {
+                          navigationStore.sheetMode.value = 'REPOS';
+                        } else if (item.type === 'WORKSPACES') {
+                          navigationStore.sheetMode.value = 'WORKSPACES';
+                        } else {
+                          item.onClick?.();
+                          close();
+                        }
+                      }}
+                      className="flex items-center justify-between px-6 h-12 cursor-pointer hover:bg-[var(--los-accent)]/5 hover:text-[var(--los-accent)] transition-colors"
+                    >
+                      <MonoText className="text-sm uppercase">{item.label}</MonoText>
+                      {(item.type === 'REPOS' || item.type === 'WORKSPACES') && (
+                        <ChevronUp className="rotate-90" size={14} />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 export const StatusBar = ({
   mode = 'NORMAL',
@@ -84,107 +482,108 @@ export const StatusBar = ({
   onDashboardClick,
   onFilesClick,
   onBoardClick,
+  onShortcutsClick,
+  onSearchClick,
+
   menuItems,
   recentFiles,
   version,
 }: StatusBarProps) => {
-  const [expanded, setExpanded] = useState(false);
-  const [expandedMode, setExpandedMode] = useState<'MENU' | 'REPOS' | 'WORKSPACES'>('MENU');
+  // Ephemeral desktop hover state — no cross-component sharing needed
   const [isHovered, setIsHovered] = useState(false);
 
-  // Quick Links Toggle State
-  const [navMode, setNavMode] = useState<'QUICK' | 'CONTEXT'>(() => {
-    // Initialize from localStorage, default to 'CONTEXT'
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('lifeos-statusbar-nav-mode');
-      return saved === 'QUICK' || saved === 'CONTEXT' ? saved : 'CONTEXT';
-    }
-    return 'CONTEXT';
-  });
+  // Read navigation store signals (Preact auto-subscribes on .value read in render)
+  const expanded = navigationStore.desktopDrawerOpen.value;
+  const expandedMode = navigationStore.desktopDrawerMode.value;
+  const activeTab = navigationStore.activeTab.value;
 
-  const handleToggleNavMode = (e: MouseEvent) => {
-    e.stopPropagation();
-    const newMode = navMode === 'CONTEXT' ? 'QUICK' : 'CONTEXT';
-    setNavMode(newMode);
-    localStorage.setItem('lifeos-statusbar-nav-mode', newMode);
-  };
-
-  // Auto-collapse when mode changes (e.g. opening a file switches to FOCUS)
+  // Clean up stale localStorage key from old nav mode toggle
   useEffect(() => {
-    setExpanded(false);
+    localStorage.removeItem('lifeos-statusbar-nav-mode');
   }, []);
 
-  // Helper to handle expansion, toggling if already in that mode
+  // Initialise activeTab from the current URL on mount
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path === '/board') navigationStore.activeTab.value = 'BOARD';
+    else navigationStore.activeTab.value = 'HOME';
+  }, []);
+
   const handleToggleExpand = (mode: 'MENU' | 'REPOS' | 'WORKSPACES') => {
     if (expanded && expandedMode === mode) {
-      setExpanded(false);
+      navigationStore.desktopDrawerOpen.value = false;
     } else {
-      setExpandedMode(mode);
-      setExpanded(true);
+      navigationStore.desktopDrawerMode.value = mode;
+      navigationStore.desktopDrawerOpen.value = true;
     }
   };
 
-  // On Mobile, tapping the bar generally should wake it up / expand it
-  const handleBarClick = (_e: MouseEvent) => {
-    // If not expanded and not clicking a specific interactive element (handled by stoppropagation below)
-    // we expand to menu by default on mobile/touch logic
-    if (!expanded) {
-      // Logic: If on mobile (or just generally), clicking the empty space expands the menu
-      setExpandedMode('MENU');
-      setExpanded(true);
-    }
-  };
+  const tabClass = (tab: typeof activeTab) =>
+    cn(
+      'flex-1 flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors',
+      activeTab === tab ? 'text-[var(--los-accent)]' : 'text-[var(--los-muted)]',
+    );
 
   return (
     <>
-      {/* Expanded Magic Drawer Backdrop */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop dismiss pattern */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss pattern */}
+      {/* ── Desktop drawer backdrop (hidden on mobile) ─────────────────── */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop dismiss */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss */}
       <div
         className={cn(
-          'fixed inset-0 bg-black/50 backdrop-blur-sm z-[990] transition-opacity duration-300',
+          'hidden md:block fixed inset-0 bg-black/50 backdrop-blur-sm z-[990] transition-opacity duration-300',
           expanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
         )}
-        onClick={() => setExpanded(false)}
+        onClick={() => {
+          navigationStore.desktopDrawerOpen.value = false;
+        }}
       />
 
-      {/* The Status Bar Container */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: status bar interactive container */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: status bar interactive container */}
+      {/* ── Mobile More sheet (hidden on desktop) ──────────────────────── */}
+      <MobileMoreSheet
+        menuItems={menuItems}
+        recentFiles={recentFiles}
+        repositories={repositories}
+        workspaces={workspaces}
+        currentRepository={currentRepository}
+        currentWorkspace={currentWorkspace}
+        onSelectRepository={onSelectRepository}
+        onSelectWorkspace={onSelectWorkspace}
+      />
+
+      {/* ── Status Bar Container ────────────────────────────────────────── */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: mouse enter/leave for desktop hover animation only */}
       <div
         className={cn(
-          'fixed bottom-0 left-0 right-0 z-[1000] bg-[var(--los-bg)] border-t border-[var(--los-border)] transition-all duration-300 ease-spring',
-          // On mobile, if not expanded, it might need to be slightly taller or just standard.
-          // We keep h-8 (32px) standard, h-16 (64px) on hover/touch-intent
-          expanded ? 'h-[40vh]' : isHovered ? 'h-16' : 'h-12 md:h-8', // Increased base height for mobile touch targets
-          'shadow-2xl overflow-hidden',
+          'fixed bottom-0 left-0 right-0 z-[1000] bg-[var(--los-bg)] border-t border-[var(--los-border)] transition-all duration-300 ease-spring shadow-2xl overflow-hidden',
+          // Mobile: always h-14 (tab bar height). Desktop: expands on hover/open.
+          'h-14',
+          expanded ? 'md:h-[40vh]' : isHovered ? 'md:h-16' : 'md:h-8',
         )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        onClick={handleBarClick as any}
       >
-        {/* Expanded Drawer Content */}
+        {/* ── Desktop drawer content (hidden on mobile) ───────────────── */}
         <div
           className={cn(
-            'absolute inset-0 top-16 p-6 transition-opacity duration-200 overflow-y-auto',
+            'hidden md:block absolute inset-0 top-16 p-6 transition-opacity duration-200 overflow-y-auto',
             expanded ? 'opacity-100 delay-100' : 'opacity-0 pointer-events-none',
           )}
         >
           {expandedMode === 'MENU' && (
             <div className="flex flex-col gap-6">
-              {/* Main Actions Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {menuItems
                   ? menuItems.map((item) => {
                       if (item.type === 'REPOS' && repositories.length > 0) {
                         return (
-                          // biome-ignore lint/a11y/noStaticElementInteractions: menu item click handler
-                          // biome-ignore lint/a11y/useKeyWithClickEvents: menu item click handler
+                          // biome-ignore lint/a11y/noStaticElementInteractions: menu item
+                          // biome-ignore lint/a11y/useKeyWithClickEvents: menu item
                           <div
                             key={item.label}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setExpandedMode('REPOS');
+                              navigationStore.desktopDrawerMode.value = 'REPOS';
                             }}
                             className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
                           >
@@ -196,13 +595,13 @@ export const StatusBar = ({
                       }
                       if (item.type === 'WORKSPACES' && workspaces.length > 0) {
                         return (
-                          // biome-ignore lint/a11y/noStaticElementInteractions: menu item click handler
-                          // biome-ignore lint/a11y/useKeyWithClickEvents: menu item click handler
+                          // biome-ignore lint/a11y/noStaticElementInteractions: menu item
+                          // biome-ignore lint/a11y/useKeyWithClickEvents: menu item
                           <div
                             key={item.label}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setExpandedMode('WORKSPACES');
+                              navigationStore.desktopDrawerMode.value = 'WORKSPACES';
                             }}
                             className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
                           >
@@ -212,16 +611,15 @@ export const StatusBar = ({
                           </div>
                         );
                       }
-
                       return (
-                        // biome-ignore lint/a11y/noStaticElementInteractions: menu action click handler
-                        // biome-ignore lint/a11y/useKeyWithClickEvents: menu action click handler
+                        // biome-ignore lint/a11y/noStaticElementInteractions: menu item
+                        // biome-ignore lint/a11y/useKeyWithClickEvents: menu item
                         <div
                           key={item.label}
                           onClick={(e) => {
                             e.stopPropagation();
                             item.onClick?.();
-                            setExpanded(false);
+                            navigationStore.desktopDrawerOpen.value = false;
                           }}
                           className="border border-[var(--los-border)] p-4 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
                         >
@@ -251,7 +649,6 @@ export const StatusBar = ({
                     )}
               </div>
 
-              {/* Recent Files Section */}
               {recentFiles && recentFiles.length > 0 && (
                 <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300 delay-100">
                   <div className="flex items-center gap-4">
@@ -261,32 +658,29 @@ export const StatusBar = ({
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {recentFiles.map((item) => (
-                      // biome-ignore lint/a11y/noStaticElementInteractions: recent file click handler
-                      // biome-ignore lint/a11y/useKeyWithClickEvents: recent file click handler
+                      // biome-ignore lint/a11y/noStaticElementInteractions: recent file
+                      // biome-ignore lint/a11y/useKeyWithClickEvents: recent file
                       <div
                         key={item.label}
                         onClick={(e) => {
                           e.stopPropagation();
                           item.onClick?.();
-                          setExpanded(false);
+                          navigationStore.desktopDrawerOpen.value = false;
                         }}
                         className="border border-[var(--los-border)] p-3 hover:border-[var(--los-accent)] hover:bg-[var(--los-accent-dim)] cursor-pointer group flex flex-col justify-center items-center gap-2 overflow-hidden"
                       >
-                        <div className="flex items-center justify-center w-full">
-                          <MonoLabel
-                            className="group-hover:text-[var(--los-accent)] text-xs truncate w-full text-center"
-                            title={item.label}
-                          >
-                            {item.label.split('/').pop()}
-                          </MonoLabel>
-                        </div>
+                        <MonoLabel
+                          className="group-hover:text-[var(--los-accent)] text-xs truncate w-full text-center"
+                          title={item.label}
+                        >
+                          {item.label.split('/').pop()}
+                        </MonoLabel>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Version Info for Mobile - Shows in Menu */}
               {version && (
                 <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300 delay-100">
                   <div className="flex items-center gap-4">
@@ -322,141 +716,36 @@ export const StatusBar = ({
           )}
 
           {expandedMode === 'REPOS' && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2 mb-4">
-                {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
-                <div
-                  onClick={() => setExpandedMode('MENU')}
-                  className="cursor-pointer hover:text-[var(--los-accent)] flex items-center gap-1"
-                >
-                  <ChevronUp className="rotate-[-90deg]" size={16} />
-                  <MonoLabel>BACK</MonoLabel>
-                </div>
-                <MonoLabel className="text-[var(--los-accent)] uppercase ml-auto">
-                  REPOSITORIES
-                </MonoLabel>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {repositories.map((repo) => (
-                  // biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler
-                  // biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler
-                  <div
-                    key={repo.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectRepository?.(repo);
-                      setExpanded(false);
-                    }}
-                    className={cn(
-                      'border p-4 cursor-pointer transition-colors flex items-center justify-between group',
-                      currentRepository?.id === repo.id
-                        ? 'border-[var(--los-accent)] bg-[var(--los-accent-dim)]'
-                        : 'border-[var(--los-border)] hover:border-[var(--los-fg)] hover:bg-white/5',
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <GitBranch
-                        size={16}
-                        className={
-                          currentRepository?.id === repo.id
-                            ? 'text-[var(--los-accent)]'
-                            : 'text-[var(--los-muted)] group-hover:text-[var(--los-fg)]'
-                        }
-                      />
-                      <div className="flex flex-col">
-                        <MonoText
-                          className={
-                            currentRepository?.id === repo.id
-                              ? 'text-[var(--los-accent)]'
-                              : 'text-[var(--los-fg)]'
-                          }
-                        >
-                          {repo.name}
-                        </MonoText>
-                        {repo.branch && (
-                          <MonoText className="text-[10px] text-[var(--los-muted)]">
-                            {repo.branch}
-                          </MonoText>
-                        )}
-                      </div>
-                    </div>
-                    {currentRepository?.id === repo.id && (
-                      <div className="w-2 h-2 rounded-full bg-[var(--los-accent)]" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <RepoSubView
+              repositories={repositories}
+              currentRepository={currentRepository}
+              onSelectRepository={onSelectRepository}
+              onClose={() => {
+                navigationStore.desktopDrawerOpen.value = false;
+              }}
+              onBack={() => {
+                navigationStore.desktopDrawerMode.value = 'MENU';
+              }}
+            />
           )}
 
           {expandedMode === 'WORKSPACES' && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2 mb-4">
-                {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
-                <div
-                  onClick={() => setExpandedMode('MENU')}
-                  className="cursor-pointer hover:text-[var(--los-accent)] flex items-center gap-1"
-                >
-                  <ChevronUp className="rotate-[-90deg]" size={16} />
-                  <MonoLabel>BACK</MonoLabel>
-                </div>
-                <MonoLabel className="text-[var(--los-accent)] uppercase ml-auto">
-                  WORKSPACES
-                </MonoLabel>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {workspaces.map((ws) => (
-                  // biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler
-                  // biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler
-                  <div
-                    key={ws.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectWorkspace?.(ws);
-                      setExpanded(false);
-                    }}
-                    className={cn(
-                      'border p-4 cursor-pointer transition-colors flex items-center justify-between group',
-                      currentWorkspace?.id === ws.id
-                        ? 'border-[var(--los-accent)] bg-[var(--los-accent-dim)]'
-                        : 'border-[var(--los-border)] hover:border-[var(--los-fg)] hover:bg-white/5',
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <LayoutGrid
-                        size={16}
-                        className={
-                          currentWorkspace?.id === ws.id
-                            ? 'text-[var(--los-accent)]'
-                            : 'text-[var(--los-muted)] group-hover:text-[var(--los-fg)]'
-                        }
-                      />
-                      <div className="flex flex-col">
-                        <MonoText
-                          className={
-                            currentWorkspace?.id === ws.id
-                              ? 'text-[var(--los-accent)]'
-                              : 'text-[var(--los-fg)]'
-                          }
-                        >
-                          {ws.name}
-                        </MonoText>
-                      </div>
-                    </div>
-                    {currentWorkspace?.id === ws.id && (
-                      <div className="w-2 h-2 rounded-full bg-[var(--los-accent)]" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <WorkspaceSubView
+              workspaces={workspaces}
+              currentWorkspace={currentWorkspace}
+              onSelectWorkspace={onSelectWorkspace}
+              onClose={() => {
+                navigationStore.desktopDrawerOpen.value = false;
+              }}
+              onBack={() => {
+                navigationStore.desktopDrawerMode.value = 'MENU';
+              }}
+            />
           )}
         </div>
 
-        {/* The Bar Itself */}
-        <div className="absolute top-0 left-0 right-0 h-full max-h-16 flex items-stretch justify-between w-full">
+        {/* ── Desktop bar (hidden on mobile) ──────────────────────────── */}
+        <div className="hidden md:flex absolute top-0 left-0 right-0 h-full max-h-16 items-stretch justify-between w-full">
           {/* LEFT COLUMN */}
           <div className="flex-1 flex items-center gap-4 min-w-0 pl-4">
             <div
@@ -468,163 +757,143 @@ export const StatusBar = ({
               {mode}
             </div>
 
-            {/* Quick Links Toggle Button - Fix: Prevent Squeezing with shrink-0 */}
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
-            <div
-              onClick={handleToggleNavMode as any}
-              className="hidden md:flex items-center justify-center w-5 h-5 min-w-[1.25rem] shrink-0 border border-[var(--los-border)] hover:border-[var(--los-accent)] rounded-sm cursor-pointer transition-colors text-[10px] font-mono text-[var(--los-muted)] hover:text-[var(--los-fg)]"
-              title={
-                navMode === 'CONTEXT' ? 'Switch to Quick Links' : 'Switch to Context Selectors'
-              }
-            >
-              {navMode === 'CONTEXT' ? '2' : '1'}
+            {/* Nav Links — always visible on desktop */}
+            <div className="hidden md:flex h-full items-stretch gap-px">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDashboardClick?.();
+                }}
+                className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
+              >
+                <LayoutGrid size={12} className="group-hover:animate-pulse" />
+                <MonoText className="text-xs font-bold uppercase">Dashboard</MonoText>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFilesClick?.();
+                }}
+                className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
+              >
+                <Archive size={12} className="group-hover:animate-pulse" />
+                <MonoText className="text-xs font-bold uppercase">Files</MonoText>
+              </button>
+              {onBoardClick && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onBoardClick();
+                  }}
+                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
+                >
+                  <Kanban size={12} className="group-hover:animate-pulse" />
+                  <MonoText className="text-xs font-bold uppercase">Board</MonoText>
+                </button>
+              )}
+              {onShortcutsClick && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onShortcutsClick();
+                  }}
+                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
+                >
+                  <MonoText className="text-xs font-bold uppercase">Shortcuts</MonoText>
+                </button>
+              )}
             </div>
 
-            {/* QUICK LINKS MODE */}
-            {navMode === 'QUICK' && (
-              <div className="hidden md:flex h-full items-stretch gap-px">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    logger.debug('Dashboard button clicked');
-                    if (onDashboardClick) {
-                      onDashboardClick();
-                    } else {
-                      logger.debug('onDashboardClick is undefined');
-                    }
-                  }}
-                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
-                >
-                  <LayoutGrid size={12} className="group-hover:animate-pulse" />
-                  <MonoText className="text-xs font-bold uppercase">Dashboard</MonoText>
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    logger.debug('Files button clicked');
-                    if (onFilesClick) {
-                      onFilesClick();
-                    } else {
-                      logger.debug('onFilesClick is undefined');
-                    }
-                  }}
-                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
-                >
-                  <Archive size={12} className="group-hover:animate-pulse" />
-                  <MonoText className="text-xs font-bold uppercase">Files</MonoText>
-                </button>
-                {onBoardClick && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onBoardClick();
-                    }}
-                    className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
-                  >
-                    <Kanban size={12} className="group-hover:animate-pulse" />
-                    <MonoText className="text-xs font-bold uppercase">Board</MonoText>
-                  </button>
-                )}
-              </div>
+            {/* Separator between nav links and context selectors */}
+            {(currentRepository || repositories.length > 0 || currentWorkspace) && (
+              <div className="hidden md:block h-4 w-px bg-[var(--los-border)] mx-2" />
             )}
 
-            {/* CONTEXT SELECTORS MODE */}
-            {navMode === 'CONTEXT' && (
+            {/* Context Selectors */}
+            {(currentRepository || repositories.length > 0) && (
               <>
-                {(currentRepository || repositories.length > 0) && (
-                  <>
-                    {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
-                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
-                    <div
-                      className={cn(
-                        'hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300',
-                        expanded && expandedMode === 'REPOS'
-                          ? 'text-[var(--los-accent)]'
-                          : 'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleExpand('REPOS');
-                      }}
-                      title={`Change Repository`}
-                    >
-                      <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
-                      <div className="flex items-center whitespace-nowrap hidden md:flex">
-                        <MonoText className="text-xs font-bold ml-2">
-                          {currentRepository ? currentRepository.name : 'SELECT REPO'}
-                        </MonoText>
-                        <ChevronUp
-                          size={10}
-                          className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {currentRepository && currentWorkspace && (
-                  <div className="hidden md:block h-4 w-px bg-[var(--los-border)] mx-1" />
-                )}
-
-                {currentWorkspace && (
-                  <>
-                    {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
-                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
-                    <div
-                      className={cn(
-                        'hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300 relative z-20',
-                        'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleExpand('WORKSPACES' as any);
-                      }}
-                      title={`Change Workspace`}
-                    >
-                      {onNextWorkspace && (
-                        <>
-                          {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
-                          {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
-                          <div
-                            className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100 hidden md:block" // Hidden on mobile to avoid misclicks
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onNextWorkspace();
-                            }}
-                            title="Next Workspace"
-                          >
-                            <ArrowRight size={14} />
-                          </div>
-                        </>
-                      )}
-
-                      <LayoutGrid size={12} className="group-hover:animate-pulse shrink-0" />
-                      <div className="flex items-center whitespace-nowrap hidden md:flex">
-                        <MonoText className="text-xs font-bold ml-2">
-                          {currentWorkspace.name}
-                        </MonoText>
-                        <ChevronUp
-                          size={10}
-                          className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: context selector */}
+                {/* biome-ignore lint/a11y/useKeyWithClickEvents: context selector */}
+                <div
+                  className={cn(
+                    'hidden md:flex items-center gap-2 cursor-pointer group transition-all duration-300',
+                    expanded && expandedMode === 'REPOS'
+                      ? 'text-[var(--los-accent)]'
+                      : 'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleExpand('REPOS');
+                  }}
+                  title="Change Repository"
+                >
+                  <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
+                  <div className="flex items-center whitespace-nowrap">
+                    <MonoText className="text-xs font-bold ml-2">
+                      {currentRepository ? currentRepository.name : 'SELECT REPO'}
+                    </MonoText>
+                    <ChevronUp
+                      size={10}
+                      className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
+                    />
+                  </div>
+                </div>
               </>
             )}
 
-            {/* Breadcrumbs (Shifted to Left on Hover/Expand) - Hidden entirely on mobile when NOT expanded */}
-            <div
-              className={cn(
-                'hidden lg:flex items-center gap-2 transition-all duration-500 transform origin-left whitespace-nowrap overflow-hidden ml-2',
-                'opacity-100 translate-x-0 max-w-[500px]',
-              )}
-            >
+            {currentRepository && currentWorkspace && (
+              <div className="hidden md:block h-4 w-px bg-[var(--los-border)] mx-1" />
+            )}
+
+            {currentWorkspace && (
+              <>
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: context selector */}
+                {/* biome-ignore lint/a11y/useKeyWithClickEvents: context selector */}
+                <div
+                  className={cn(
+                    'hidden md:flex items-center gap-2 cursor-pointer group transition-all duration-300 relative z-20',
+                    'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleExpand('WORKSPACES');
+                  }}
+                  title="Change Workspace"
+                >
+                  {onNextWorkspace && (
+                    <>
+                      {/* biome-ignore lint/a11y/noStaticElementInteractions: next workspace */}
+                      {/* biome-ignore lint/a11y/useKeyWithClickEvents: next workspace */}
+                      <div
+                        className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100 hidden md:block"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNextWorkspace();
+                        }}
+                        title="Next Workspace"
+                      >
+                        <ArrowRight size={14} />
+                      </div>
+                    </>
+                  )}
+                  <LayoutGrid size={12} className="group-hover:animate-pulse shrink-0" />
+                  <div className="flex items-center whitespace-nowrap">
+                    <MonoText className="text-xs font-bold ml-2">{currentWorkspace.name}</MonoText>
+                    <ChevronUp
+                      size={10}
+                      className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Breadcrumbs */}
+            <div className="hidden lg:flex items-center gap-2 transition-all duration-500 transform origin-left whitespace-nowrap overflow-hidden ml-2 opacity-100 translate-x-0 max-w-[500px]">
               <span className="text-[var(--los-muted)]">/</span>
               {breadcrumbs.map((crumb, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: breadcrumbs have no stable id
@@ -647,10 +916,8 @@ export const StatusBar = ({
             </div>
           </div>
 
-          {/* CENTER COLUMN */}
+          {/* CENTER COLUMN — magic button (overflow menu for secondary destinations) */}
           <div className="flex-[2] flex items-center justify-center relative h-full pointer-events-none">
-            {/* Magic Button - Always interactable on mobile (opacity-100) or if hovered/expanded */}
-            {/* On mobile, we make it smaller but visible? Or just the icon? */}
             <button
               type="button"
               onClick={(e) => {
@@ -658,8 +925,7 @@ export const StatusBar = ({
                 handleToggleExpand('MENU');
               }}
               className={cn(
-                'absolute pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-2 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black shadow-[0_0_15px_rgba(var(--los-accent-rgb),0.3)]',
-                // Show on mobile by default (opacity-100), show on desktop only when hovered/expanded
+                'absolute pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] flex items-center gap-2 rounded-full border border-[var(--los-accent)] text-[var(--los-accent)] hover:bg-[var(--los-accent)] hover:text-black shadow-[0_0_15px_rgba(0,255,0,0.3)]',
                 isHovered || expanded
                   ? 'px-6 py-2 scale-100 translate-y-0'
                   : 'px-2 py-0.5 scale-90 translate-y-0 opacity-80 hover:opacity-100',
@@ -679,13 +945,9 @@ export const StatusBar = ({
 
           {/* RIGHT COLUMN */}
           <div className="flex-1 flex items-center justify-end gap-6 min-w-0 pr-4">
-            {/* Version Info - Always visible on desktop */}
             {version && (
               <div
-                className={cn(
-                  'hidden md:flex items-center gap-2 whitespace-nowrap relative group/version transition-all duration-300',
-                  'opacity-100',
-                )}
+                className="hidden md:flex items-center gap-2 whitespace-nowrap opacity-100"
                 title={`Build: ${version.buildTime}${version.gitHash ? `\nCommit: ${version.gitHash}` : ''}`}
               >
                 <MonoLabel className="text-[9px]">VERSION</MonoLabel>
@@ -695,25 +957,21 @@ export const StatusBar = ({
               </div>
             )}
 
-            {/* Stats hidden on small screens */}
             {stats.map((stat) => (
               <div
                 key={stat.label}
                 className="hidden md:flex items-center gap-2 whitespace-nowrap relative group/stat"
               >
                 <MonoLabel className="text-[9px]">{stat.label}</MonoLabel>
-
                 {stat.options ? (
                   <div className="relative">
                     <MonoText className="text-[10px] cursor-pointer hover:text-[var(--los-accent)] transition-colors">
                       {stat.value}
                     </MonoText>
-
-                    {/* Dropdown Menu */}
                     <div className="absolute bottom-full right-0 mb-2 w-32 bg-[var(--los-bg)] border border-[var(--los-border)] shadow-xl rounded-sm opacity-0 invisible group-hover/stat:opacity-100 group-hover/stat:visible transition-all duration-200 flex flex-col z-[150]">
                       {stat.options.map((opt) => (
-                        // biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler
-                        // biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler
+                        // biome-ignore lint/a11y/noStaticElementInteractions: stat option
+                        // biome-ignore lint/a11y/useKeyWithClickEvents: stat option
                         <div
                           key={opt}
                           onClick={(e) => {
@@ -737,8 +995,9 @@ export const StatusBar = ({
                 )}
               </div>
             ))}
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
+
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: AI toggle */}
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: AI toggle */}
             <div
               className="flex items-center gap-2 cursor-pointer group hover:bg-[var(--los-accent)]/10 px-2 py-1 rounded transition-colors"
               onClick={(e) => {
@@ -776,6 +1035,72 @@ export const StatusBar = ({
               <MonoText className="text-[10px] hidden sm:block">ONLINE</MonoText>
             </div>
           </div>
+        </div>
+
+        {/* ── Mobile tab bar (hidden on desktop) ──────────────────────── */}
+        <div className="flex md:hidden absolute bottom-0 left-0 right-0 h-14">
+          {/* Home */}
+          <button
+            type="button"
+            className={tabClass('HOME')}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigationStore.activeTab.value = 'HOME';
+              onDashboardClick?.();
+            }}
+          >
+            <Home size={18} />
+            <MonoText className="text-[9px] uppercase">Home</MonoText>
+          </button>
+
+          {/* Board */}
+          <button
+            type="button"
+            className={tabClass('BOARD')}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onBoardClick) {
+                navigationStore.activeTab.value = 'BOARD';
+                onBoardClick();
+              }
+            }}
+            disabled={!onBoardClick}
+          >
+            <Kanban size={18} />
+            <MonoText className="text-[9px] uppercase">Board</MonoText>
+          </button>
+
+          {/* Search */}
+          <button
+            type="button"
+            className={tabClass('SEARCH')}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSearchClick?.();
+            }}
+          >
+            <SearchIcon size={18} />
+            <MonoText className="text-[9px] uppercase">Search</MonoText>
+          </button>
+
+          {/* More */}
+          <button
+            type="button"
+            className={tabClass('MORE')}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (navigationStore.moreSheetOpen.value) {
+                navigationStore.moreSheetOpen.value = false;
+              } else {
+                navigationStore.activeTab.value = 'MORE';
+                navigationStore.sheetMode.value = 'MENU';
+                navigationStore.moreSheetOpen.value = true;
+              }
+            }}
+          >
+            <MoreHorizontal size={18} />
+            <MonoText className="text-[9px] uppercase">More</MonoText>
+          </button>
         </div>
       </div>
     </>
