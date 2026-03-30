@@ -1848,6 +1848,7 @@ export const MainApp = ({
             setShowFiles(true);
           }}
           onBoardClick={onBoardClick}
+          onShortcutsClick={onShortcutsClick}
           // Repository Switcher (Always available if props provided)
           currentRepository={props.currentRepository}
           repositories={props.repositories}

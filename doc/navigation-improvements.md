@@ -25,11 +25,11 @@ Fix: remove the toggle entirely. Both nav links and context selectors fit in the
 
 ### Action items
 
-- [ ] **1.1** Add `onShortcutsClick?: () => void` to `StatusBarProps` and wire it from `MainApp.tsx` (the prop already exists on `MainAppProps` and flows to `menuItems`; promote it to a direct prop so it can appear inline in the bar)
-- [ ] **1.2** Remove `navMode` state, `handleToggleNavMode`, and the `1`/`2` toggle button from `StatusBar.tsx`; remove both `localStorage` calls (`getItem` init and `setItem` in handler)
-- [ ] **1.3** Replace the two conditional nav blocks (`navMode === 'QUICK'` / `navMode === 'CONTEXT'`) with a single always-on `hidden md:flex` block structured as: `[Dashboard] [Board] [Files] [Shortcuts]  |  [Repo ↑]  [Workspace → ↑]`; the `|` separator is a `div.h-4.w-px.bg-[var(--los-border)]`
-- [ ] **1.4** Add a one-time `useEffect(() => { localStorage.removeItem('lifeos-statusbar-nav-mode'); }, [])` to clean up stale keys in existing browsers
-- [ ] **1.5** Verify: at ≥768px all four nav links and both context selectors are visible simultaneously; magic button still opens the 40vh overflow drawer; `pnpm turbo typecheck` passes
+- [x] **1.1** Add `onShortcutsClick?: () => void` to `StatusBarProps` and wire it from `MainApp.tsx` (the prop already exists on `MainAppProps` and flows to `menuItems`; promote it to a direct prop so it can appear inline in the bar)
+- [x] **1.2** Remove `navMode` state, `handleToggleNavMode`, and the `1`/`2` toggle button from `StatusBar.tsx`; remove both `localStorage` calls (`getItem` init and `setItem` in handler)
+- [x] **1.3** Replace the two conditional nav blocks (`navMode === 'QUICK'` / `navMode === 'CONTEXT'`) with a single always-on `hidden md:flex` block structured as: `[Dashboard] [Board] [Files] [Shortcuts]  |  [Repo ↑]  [Workspace → ↑]`; the `|` separator is a `div.h-4.w-px.bg-[var(--los-border)]`
+- [x] **1.4** Add a one-time `useEffect(() => { localStorage.removeItem('lifeos-statusbar-nav-mode'); }, [])` to clean up stale keys in existing browsers
+- [x] **1.5** Verify: at ≥768px all four nav links and both context selectors are visible simultaneously; magic button still opens the 40vh overflow drawer; `pnpm turbo typecheck` passes
 
 ---
 

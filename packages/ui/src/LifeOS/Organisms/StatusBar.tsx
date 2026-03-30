@@ -1,11 +1,4 @@
-import { aiStore, Logger } from '@lifosy/core';
-import { useEffect, useState } from 'preact/hooks';
-import { cn } from '../../utils';
-import { Logo } from '../Atoms/Logo';
-import { MonoLabel, MonoText } from '../Atoms/Typography';
-
-const logger = new Logger('StatusBar');
-
+import { aiStore } from '@lifosy/core';
 import {
   Archive,
   ArrowRight,
@@ -15,6 +8,10 @@ import {
   Kanban,
   LayoutGrid,
 } from 'lucide-preact';
+import { useEffect, useState } from 'preact/hooks';
+import { cn } from '../../utils';
+import { Logo } from '../Atoms/Logo';
+import { MonoLabel, MonoText } from '../Atoms/Typography';
 
 export interface Repository {
   id: string;
@@ -55,6 +52,7 @@ export interface StatusBarProps {
   onDashboardClick?: () => void;
   onFilesClick?: () => void;
   onBoardClick?: () => void;
+  onShortcutsClick?: () => void;
   menuItems?: MenuItem[];
   recentFiles?: MenuItem[];
 
@@ -84,6 +82,7 @@ export const StatusBar = ({
   onDashboardClick,
   onFilesClick,
   onBoardClick,
+  onShortcutsClick,
   menuItems,
   recentFiles,
   version,
@@ -92,26 +91,9 @@ export const StatusBar = ({
   const [expandedMode, setExpandedMode] = useState<'MENU' | 'REPOS' | 'WORKSPACES'>('MENU');
   const [isHovered, setIsHovered] = useState(false);
 
-  // Quick Links Toggle State
-  const [navMode, setNavMode] = useState<'QUICK' | 'CONTEXT'>(() => {
-    // Initialize from localStorage, default to 'CONTEXT'
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('lifeos-statusbar-nav-mode');
-      return saved === 'QUICK' || saved === 'CONTEXT' ? saved : 'CONTEXT';
-    }
-    return 'CONTEXT';
-  });
-
-  const handleToggleNavMode = (e: MouseEvent) => {
-    e.stopPropagation();
-    const newMode = navMode === 'CONTEXT' ? 'QUICK' : 'CONTEXT';
-    setNavMode(newMode);
-    localStorage.setItem('lifeos-statusbar-nav-mode', newMode);
-  };
-
-  // Auto-collapse when mode changes (e.g. opening a file switches to FOCUS)
+  // Clean up stale localStorage key from old nav mode toggle
   useEffect(() => {
-    setExpanded(false);
+    localStorage.removeItem('lifeos-statusbar-nav-mode');
   }, []);
 
   // Helper to handle expansion, toggling if already in that mode
@@ -468,153 +450,138 @@ export const StatusBar = ({
               {mode}
             </div>
 
-            {/* Quick Links Toggle Button - Fix: Prevent Squeezing with shrink-0 */}
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
-            <div
-              onClick={handleToggleNavMode as any}
-              className="hidden md:flex items-center justify-center w-5 h-5 min-w-[1.25rem] shrink-0 border border-[var(--los-border)] hover:border-[var(--los-accent)] rounded-sm cursor-pointer transition-colors text-[10px] font-mono text-[var(--los-muted)] hover:text-[var(--los-fg)]"
-              title={
-                navMode === 'CONTEXT' ? 'Switch to Quick Links' : 'Switch to Context Selectors'
-              }
-            >
-              {navMode === 'CONTEXT' ? '2' : '1'}
+            {/* Nav Links — always visible on desktop */}
+            <div className="hidden md:flex h-full items-stretch gap-px">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDashboardClick?.();
+                }}
+                className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
+              >
+                <LayoutGrid size={12} className="group-hover:animate-pulse" />
+                <MonoText className="text-xs font-bold uppercase">Dashboard</MonoText>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFilesClick?.();
+                }}
+                className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
+              >
+                <Archive size={12} className="group-hover:animate-pulse" />
+                <MonoText className="text-xs font-bold uppercase">Files</MonoText>
+              </button>
+              {onBoardClick && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onBoardClick();
+                  }}
+                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
+                >
+                  <Kanban size={12} className="group-hover:animate-pulse" />
+                  <MonoText className="text-xs font-bold uppercase">Board</MonoText>
+                </button>
+              )}
+              {onShortcutsClick && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onShortcutsClick();
+                  }}
+                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
+                >
+                  <MonoText className="text-xs font-bold uppercase">Shortcuts</MonoText>
+                </button>
+              )}
             </div>
 
-            {/* QUICK LINKS MODE */}
-            {navMode === 'QUICK' && (
-              <div className="hidden md:flex h-full items-stretch gap-px">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    logger.debug('Dashboard button clicked');
-                    if (onDashboardClick) {
-                      onDashboardClick();
-                    } else {
-                      logger.debug('onDashboardClick is undefined');
-                    }
-                  }}
-                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
-                >
-                  <LayoutGrid size={12} className="group-hover:animate-pulse" />
-                  <MonoText className="text-xs font-bold uppercase">Dashboard</MonoText>
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    logger.debug('Files button clicked');
-                    if (onFilesClick) {
-                      onFilesClick();
-                    } else {
-                      logger.debug('onFilesClick is undefined');
-                    }
-                  }}
-                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
-                >
-                  <Archive size={12} className="group-hover:animate-pulse" />
-                  <MonoText className="text-xs font-bold uppercase">Files</MonoText>
-                </button>
-                {onBoardClick && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onBoardClick();
-                    }}
-                    className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
-                  >
-                    <Kanban size={12} className="group-hover:animate-pulse" />
-                    <MonoText className="text-xs font-bold uppercase">Board</MonoText>
-                  </button>
-                )}
-              </div>
+            {/* Separator between nav links and context selectors */}
+            {(currentRepository || repositories.length > 0 || currentWorkspace) && (
+              <div className="hidden md:block h-4 w-px bg-[var(--los-border)] mx-2" />
             )}
 
-            {/* CONTEXT SELECTORS MODE */}
-            {navMode === 'CONTEXT' && (
+            {/* Context Selectors — always visible on desktop */}
+            {(currentRepository || repositories.length > 0) && (
               <>
-                {(currentRepository || repositories.length > 0) && (
-                  <>
-                    {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
-                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
-                    <div
-                      className={cn(
-                        'hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300',
-                        expanded && expandedMode === 'REPOS'
-                          ? 'text-[var(--los-accent)]'
-                          : 'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleExpand('REPOS');
-                      }}
-                      title={`Change Repository`}
-                    >
-                      <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
-                      <div className="flex items-center whitespace-nowrap hidden md:flex">
-                        <MonoText className="text-xs font-bold ml-2">
-                          {currentRepository ? currentRepository.name : 'SELECT REPO'}
-                        </MonoText>
-                        <ChevronUp
-                          size={10}
-                          className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
-                        />
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
+                {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
+                <div
+                  className={cn(
+                    'hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300',
+                    expanded && expandedMode === 'REPOS'
+                      ? 'text-[var(--los-accent)]'
+                      : 'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleExpand('REPOS');
+                  }}
+                  title="Change Repository"
+                >
+                  <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
+                  <div className="flex items-center whitespace-nowrap hidden md:flex">
+                    <MonoText className="text-xs font-bold ml-2">
+                      {currentRepository ? currentRepository.name : 'SELECT REPO'}
+                    </MonoText>
+                    <ChevronUp
+                      size={10}
+                      className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {currentRepository && currentWorkspace && (
+              <div className="hidden md:block h-4 w-px bg-[var(--los-border)] mx-1" />
+            )}
+
+            {currentWorkspace && (
+              <>
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
+                {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
+                <div
+                  className={cn(
+                    'hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300 relative z-20',
+                    'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleExpand('WORKSPACES');
+                  }}
+                  title="Change Workspace"
+                >
+                  {onNextWorkspace && (
+                    <>
+                      {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
+                      {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
+                      <div
+                        className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100 hidden md:block"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNextWorkspace();
+                        }}
+                        title="Next Workspace"
+                      >
+                        <ArrowRight size={14} />
                       </div>
-                    </div>
-                  </>
-                )}
-
-                {currentRepository && currentWorkspace && (
-                  <div className="hidden md:block h-4 w-px bg-[var(--los-border)] mx-1" />
-                )}
-
-                {currentWorkspace && (
-                  <>
-                    {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
-                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
-                    <div
-                      className={cn(
-                        'hidden md:flex items-center gap-2 cursor-pointer group transtion-all duration-300 relative z-20',
-                        'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleExpand('WORKSPACES' as any);
-                      }}
-                      title={`Change Workspace`}
-                    >
-                      {onNextWorkspace && (
-                        <>
-                          {/* biome-ignore lint/a11y/noStaticElementInteractions: interactive div click handler */}
-                          {/* biome-ignore lint/a11y/useKeyWithClickEvents: interactive div click handler */}
-                          <div
-                            className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100 hidden md:block" // Hidden on mobile to avoid misclicks
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onNextWorkspace();
-                            }}
-                            title="Next Workspace"
-                          >
-                            <ArrowRight size={14} />
-                          </div>
-                        </>
-                      )}
-
-                      <LayoutGrid size={12} className="group-hover:animate-pulse shrink-0" />
-                      <div className="flex items-center whitespace-nowrap hidden md:flex">
-                        <MonoText className="text-xs font-bold ml-2">
-                          {currentWorkspace.name}
-                        </MonoText>
-                        <ChevronUp
-                          size={10}
-                          className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )}
+                  <LayoutGrid size={12} className="group-hover:animate-pulse shrink-0" />
+                  <div className="flex items-center whitespace-nowrap hidden md:flex">
+                    <MonoText className="text-xs font-bold ml-2">{currentWorkspace.name}</MonoText>
+                    <ChevronUp
+                      size={10}
+                      className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
+                    />
+                  </div>
+                </div>
               </>
             )}
 
