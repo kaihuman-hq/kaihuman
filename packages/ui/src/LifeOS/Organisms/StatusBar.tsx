@@ -1,7 +1,6 @@
 import { aiStore, navigationStore } from '@lifosy/core';
 import {
   Archive,
-  ArrowRight,
   ChevronUp,
   GitBranch,
   GitCommit,
@@ -477,7 +476,7 @@ export const StatusBar = ({
   currentWorkspace,
   workspaces = [],
   onSelectWorkspace,
-  onNextWorkspace,
+  onNextWorkspace: _onNextWorkspace,
 
   onDashboardClick,
   onFilesClick,
@@ -808,90 +807,6 @@ export const StatusBar = ({
               )}
             </div>
 
-            {/* Separator between nav links and context selectors */}
-            {(currentRepository || repositories.length > 0 || currentWorkspace) && (
-              <div className="hidden md:block h-4 w-px bg-[var(--los-border)] mx-2" />
-            )}
-
-            {/* Context Selectors */}
-            {(currentRepository || repositories.length > 0) && (
-              <>
-                {/* biome-ignore lint/a11y/noStaticElementInteractions: context selector */}
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: context selector */}
-                <div
-                  className={cn(
-                    'hidden md:flex items-center gap-2 cursor-pointer group transition-all duration-300',
-                    expanded && expandedMode === 'REPOS'
-                      ? 'text-[var(--los-accent)]'
-                      : 'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggleExpand('REPOS');
-                  }}
-                  title="Change Repository"
-                >
-                  <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
-                  <div className="flex items-center whitespace-nowrap">
-                    <MonoText className="text-xs font-bold ml-2">
-                      {currentRepository ? currentRepository.name : 'SELECT REPO'}
-                    </MonoText>
-                    <ChevronUp
-                      size={10}
-                      className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
-            {currentRepository && currentWorkspace && (
-              <div className="hidden md:block h-4 w-px bg-[var(--los-border)] mx-1" />
-            )}
-
-            {currentWorkspace && (
-              <>
-                {/* biome-ignore lint/a11y/noStaticElementInteractions: context selector */}
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: context selector */}
-                <div
-                  className={cn(
-                    'hidden md:flex items-center gap-2 cursor-pointer group transition-all duration-300 relative z-20',
-                    'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggleExpand('WORKSPACES');
-                  }}
-                  title="Change Workspace"
-                >
-                  {onNextWorkspace && (
-                    <>
-                      {/* biome-ignore lint/a11y/noStaticElementInteractions: next workspace */}
-                      {/* biome-ignore lint/a11y/useKeyWithClickEvents: next workspace */}
-                      <div
-                        className="mr-1 p-1.5 hover:bg-[var(--los-accent)] hover:text-black rounded-sm transition-all opacity-0 group-hover:opacity-100 hidden md:block"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onNextWorkspace();
-                        }}
-                        title="Next Workspace"
-                      >
-                        <ArrowRight size={14} />
-                      </div>
-                    </>
-                  )}
-                  <LayoutGrid size={12} className="group-hover:animate-pulse shrink-0" />
-                  <div className="flex items-center whitespace-nowrap">
-                    <MonoText className="text-xs font-bold ml-2">{currentWorkspace.name}</MonoText>
-                    <ChevronUp
-                      size={10}
-                      className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
             {/* Breadcrumbs */}
             <div className="hidden lg:flex items-center gap-2 transition-all duration-500 transform origin-left whitespace-nowrap overflow-hidden ml-2 opacity-100 translate-x-0 max-w-[500px]">
               <span className="text-[var(--los-muted)]">/</span>
@@ -945,6 +860,35 @@ export const StatusBar = ({
 
           {/* RIGHT COLUMN */}
           <div className="flex-1 flex items-center justify-end gap-6 min-w-0 pr-4">
+            {(currentRepository || repositories.length > 0) && (
+              /* biome-ignore lint/a11y/noStaticElementInteractions: context selector */
+              /* biome-ignore lint/a11y/useKeyWithClickEvents: context selector */
+              <div
+                className={cn(
+                  'hidden md:flex items-center gap-2 cursor-pointer group transition-all duration-300',
+                  expanded && expandedMode === 'REPOS'
+                    ? 'text-[var(--los-accent)]'
+                    : 'text-[var(--los-fg)] hover:text-[var(--los-accent)]',
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleExpand('REPOS');
+                }}
+                title="Change Repository"
+              >
+                <GitCommit size={12} className="group-hover:animate-pulse shrink-0" />
+                <div className="flex items-center whitespace-nowrap">
+                  <MonoText className="text-xs font-bold ml-2">
+                    {currentRepository ? currentRepository.name : 'SELECT REPO'}
+                  </MonoText>
+                  <ChevronUp
+                    size={10}
+                    className="ml-1 text-[var(--los-muted)] group-hover:text-[var(--los-accent)]"
+                  />
+                </div>
+              </div>
+            )}
+
             {version && (
               <div
                 className="hidden md:flex items-center gap-2 whitespace-nowrap opacity-100"
@@ -1028,11 +972,6 @@ export const StatusBar = ({
               >
                 AI
               </MonoText>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              <MonoText className="text-[10px] hidden sm:block">ONLINE</MonoText>
             </div>
           </div>
         </div>
