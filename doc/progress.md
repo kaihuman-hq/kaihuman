@@ -1,6 +1,10 @@
 # Progress
 
-## 2026-04-02 — Board card URL rendering
+## 2026-04-02 — Board card inline editing + URL rendering
+
+- **KanbanBoard / KanbanCard**: added EDIT button (pencil icon) on each card; clicking it opens an inline textarea pre-filled with the todo's current text; SAVE commits the change, CANCEL discards it; drag-and-drop is disabled while editing
+- **TodoLogic**: added `updateTodoText` helper (same pattern as `setStatus`)
+- **KanbanBoard**: todo card text now detects URLs (`http://`/`https://`) and renders them as clickable links that open in a new tab
 
 - **KanbanBoard**: todo card text now detects URLs (`http://`/`https://`) and renders them as clickable anchor tags opening in a new tab
 

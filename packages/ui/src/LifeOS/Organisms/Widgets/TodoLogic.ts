@@ -308,6 +308,13 @@ export const setStatus = (data: TodoData, index: number, status: TodoStatus): To
   return { ...data, items };
 };
 
+export const updateTodoText = (data: TodoData, index: number, text: string): TodoData => {
+  const items = [...data.items];
+  if (!items[index]) return data;
+  items[index] = { ...(items[index] as TodoItem), text, updatedAt: Date.now() };
+  return { ...data, items };
+};
+
 export const addTodo = (
   data: TodoData,
   text: string,

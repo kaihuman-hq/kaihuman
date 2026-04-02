@@ -34,6 +34,7 @@ import {
   type TodoData,
   type TodoItem,
   type TodoStatus,
+  updateTodoText,
 } from '../Organisms/Widgets/TodoLogic';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -697,6 +698,7 @@ const KanbanCard = ({
   onStatusChange,
   onOpenFile,
   onMove,
+  onEditText,
   otherFilePaths,
   borderColor,
 }: {
@@ -704,6 +706,7 @@ const KanbanCard = ({
   onStatusChange: (filePath: string, itemIndex: number, newStatus: TodoStatus) => void;
   onOpenFile?: (path: string) => void;
   onMove?: (targetFilePath: string) => void;
+  onEditText?: (filePath: string, itemIndex: number, text: string) => void;
   otherFilePaths?: string[];
   borderColor?: string;
 }) => {
@@ -711,6 +714,8 @@ const KanbanCard = ({
   const { name: fileName } = formatFilePath(filePath);
   const promptRefFile = item.prompt?.refFile;
   const [showMoveMenu, setShowMoveMenu] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState('');
   const moveMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -737,100 +742,160 @@ const KanbanCard = ({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop source
     <div
-      draggable
-      onDragStart={handleDragStart}
+      draggable={!editing}
+      onDragStart={editing ? undefined : handleDragStart}
       style={borderColor ? { borderColor } : undefined}
-      className="border border-[var(--los-border)] bg-[var(--los-bg)] p-3 space-y-2 hover:opacity-90 transition-colors group cursor-grab active:cursor-grabbing active:opacity-50"
+      className={cn(
+        'border border-[var(--los-border)] bg-[var(--los-bg)] p-3 space-y-2 transition-colors group',
+        editing
+          ? 'cursor-default'
+          : 'hover:opacity-90 cursor-grab active:cursor-grabbing active:opacity-50',
+      )}
     >
-      <MonoText className="text-xs leading-relaxed break-words">
-        {renderTextWithLinks(item.text)}
-      </MonoText>
-
-      <div className="flex flex-wrap gap-1">
-        {item.tags.map((t) => (
-          <span key={t} className="text-[9px] font-mono text-[var(--los-muted)]">
-            #{t}
-          </span>
-        ))}
-        {item.milestoneId && (
-          <span className="text-[9px] font-mono text-[var(--los-accent)] border border-[var(--los-accent)]/30 px-1">
-            !{item.milestoneId}
-          </span>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between">
-        <MonoText className="text-[9px] text-[var(--los-muted)] opacity-60 truncate max-w-[60%]">
-          {fileName}
-        </MonoText>
-        <div
-          className={cn(
-            'flex items-center gap-1 transition-opacity',
-            showMoveMenu ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-          )}
-        >
-          {promptRefFile && onOpenFile && (
+      {editing ? (
+        // biome-ignore lint/a11y/noStaticElementInteractions: stop propagation wrapper
+        // biome-ignore lint/a11y/useKeyWithClickEvents: stop propagation wrapper
+        <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+          <textarea
+            // biome-ignore lint/a11y/noAutofocus: intentional focus on edit open
+            autoFocus
+            className="w-full bg-transparent border border-[var(--los-border)] focus:border-[var(--los-accent)] text-xs font-mono p-2 outline-none resize-y min-h-[60px] text-[var(--los-fg)]"
+            value={editText}
+            onInput={(e) => setEditText(e.currentTarget.value)}
+          />
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onOpenFile(promptRefFile);
+                const trimmed = editText.trim();
+                if (trimmed && onEditText) onEditText(filePath, agg.itemIndex, trimmed);
+                setEditing(false);
               }}
-              title={`Open prompt: ${promptRefFile}`}
-              className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors flex items-center gap-1"
+              className="text-[9px] font-mono px-2 py-0.5 bg-[var(--los-accent)] text-black hover:opacity-90"
             >
-              <Pencil size={9} />
-              PROMPT
+              SAVE
             </button>
-          )}
-          {canMove && (
-            <div ref={moveMenuRef} className="relative">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMoveMenu((v) => !v);
-                }}
-                className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors"
-              >
-                MOVE
-              </button>
-              {showMoveMenu && (
-                <div className="absolute bottom-full right-0 mb-1 bg-[var(--los-bg)] border border-[var(--los-border)] shadow-lg z-50 min-w-[140px] max-h-48 overflow-y-auto">
-                  {otherFilePaths.map((fp) => {
-                    const { dir, name } = formatFilePath(fp);
-                    return (
-                      <button
-                        key={fp}
-                        type="button"
-                        onClick={() => {
-                          onMove(fp);
-                          setShowMoveMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-[9px] font-mono hover:bg-white/5 transition-colors leading-snug"
-                      >
-                        {dir && (
-                          <span className="block text-[var(--los-muted)] opacity-70 text-[9px]">
-                            {dir}
-                          </span>
-                        )}
-                        <span className="font-bold text-[var(--los-fg)]">{name}</span>
-                      </button>
-                    );
-                  })}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditing(false);
+              }}
+              className="text-[9px] font-mono px-2 py-0.5 border border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+            >
+              CANCEL
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <MonoText className="text-xs leading-relaxed break-words">
+            {renderTextWithLinks(item.text)}
+          </MonoText>
+
+          <div className="flex flex-wrap gap-1">
+            {item.tags.map((t) => (
+              <span key={t} className="text-[9px] font-mono text-[var(--los-muted)]">
+                #{t}
+              </span>
+            ))}
+            {item.milestoneId && (
+              <span className="text-[9px] font-mono text-[var(--los-accent)] border border-[var(--los-accent)]/30 px-1">
+                !{item.milestoneId}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between">
+            <MonoText className="text-[9px] text-[var(--los-muted)] opacity-60 truncate max-w-[60%]">
+              {fileName}
+            </MonoText>
+            <div
+              className={cn(
+                'flex items-center gap-1 transition-opacity',
+                showMoveMenu ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+              )}
+            >
+              {onEditText && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditText(item.text);
+                    setEditing(true);
+                  }}
+                  title="Edit todo text"
+                  className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors flex items-center gap-1"
+                >
+                  <Pencil size={9} />
+                  EDIT
+                </button>
+              )}
+              {promptRefFile && onOpenFile && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenFile(promptRefFile);
+                  }}
+                  title={`Open prompt: ${promptRefFile}`}
+                  className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors flex items-center gap-1"
+                >
+                  <Pencil size={9} />
+                  PROMPT
+                </button>
+              )}
+              {canMove && (
+                <div ref={moveMenuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMoveMenu((v) => !v);
+                    }}
+                    className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors"
+                  >
+                    MOVE
+                  </button>
+                  {showMoveMenu && (
+                    <div className="absolute bottom-full right-0 mb-1 bg-[var(--los-bg)] border border-[var(--los-border)] shadow-lg z-50 min-w-[140px] max-h-48 overflow-y-auto">
+                      {otherFilePaths.map((fp) => {
+                        const { dir, name } = formatFilePath(fp);
+                        return (
+                          <button
+                            key={fp}
+                            type="button"
+                            onClick={() => {
+                              onMove(fp);
+                              setShowMoveMenu(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-[9px] font-mono hover:bg-white/5 transition-colors leading-snug"
+                          >
+                            {dir && (
+                              <span className="block text-[var(--los-muted)] opacity-70 text-[9px]">
+                                {dir}
+                              </span>
+                            )}
+                            <span className="font-bold text-[var(--los-fg)]">{name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
+              <button
+                type="button"
+                onClick={() => onStatusChange(filePath, agg.itemIndex, NEXT_STATUS[item.status])}
+                className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors"
+              >
+                → {STATUS_LABELS[NEXT_STATUS[item.status]]}
+              </button>
             </div>
-          )}
-          <button
-            type="button"
-            onClick={() => onStatusChange(filePath, agg.itemIndex, NEXT_STATUS[item.status])}
-            className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors"
-          >
-            → {STATUS_LABELS[NEXT_STATUS[item.status]]}
-          </button>
-        </div>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -1144,6 +1209,15 @@ export const KanbanBoard = ({
     if (!file) return;
     const data = parseTodos(file.content);
     const newData = setStatus(data, itemIndex, newStatus);
+    githubFileStore.updateFileContent(filePath, serializeTodos(newData));
+    githubFileStore.saveFile(filePath);
+  };
+
+  const handleEditText = (filePath: string, itemIndex: number, text: string) => {
+    const file = openFiles[filePath];
+    if (!file) return;
+    const data = parseTodos(file.content);
+    const newData = updateTodoText(data, itemIndex, text);
     githubFileStore.updateFileContent(filePath, serializeTodos(newData));
     githubFileStore.saveFile(filePath);
   };
@@ -1531,6 +1605,7 @@ export const KanbanBoard = ({
                                 agg={agg}
                                 onStatusChange={handleStatusChange}
                                 onOpenFile={onOpenFile}
+                                onEditText={handleEditText}
                                 onMove={
                                   todoFilePaths.length > 1
                                     ? (targetPath) =>
