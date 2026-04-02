@@ -16,6 +16,7 @@ import {
   X,
   XCircle,
 } from 'lucide-preact';
+import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
@@ -663,6 +664,32 @@ const MilestoneManager = ({
   );
 };
 
+const URL_RE = /https?:\/\/[^\s]+/g;
+
+function renderTextWithLinks(text: string) {
+  const parts: (string | JSX.Element)[] = [];
+  let last = 0;
+  URL_RE.lastIndex = 0;
+  for (const m of text.matchAll(URL_RE)) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    parts.push(
+      <a
+        key={m.index}
+        href={m[0]}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline text-[var(--los-accent)] break-all"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {m[0]}
+      </a>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
 // ─── KanbanCard ───────────────────────────────────────────────────────────────
 
 const KanbanCard = ({
@@ -715,7 +742,9 @@ const KanbanCard = ({
       style={borderColor ? { borderColor } : undefined}
       className="border border-[var(--los-border)] bg-[var(--los-bg)] p-3 space-y-2 hover:opacity-90 transition-colors group cursor-grab active:cursor-grabbing active:opacity-50"
     >
-      <MonoText className="text-xs leading-relaxed break-words">{item.text}</MonoText>
+      <MonoText className="text-xs leading-relaxed break-words">
+        {renderTextWithLinks(item.text)}
+      </MonoText>
 
       <div className="flex flex-wrap gap-1">
         {item.tags.map((t) => (
