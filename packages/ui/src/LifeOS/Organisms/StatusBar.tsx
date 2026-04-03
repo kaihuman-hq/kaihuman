@@ -6,9 +6,9 @@ import {
   GitCommit,
   Home,
   Kanban,
+  Keyboard,
   LayoutGrid,
   MoreHorizontal,
-  Search as SearchIcon,
 } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
@@ -59,6 +59,7 @@ export interface StatusBarProps {
   onSearchClick?: () => void;
 
   menuItems?: MenuItem[];
+  shortcutItems?: MenuItem[];
   recentFiles?: MenuItem[];
 
   // Version info
@@ -227,7 +228,7 @@ const WorkspaceSubView = ({
 );
 
 // Items excluded from the mobile More sheet — handled by tabs
-const SHEET_EXCLUDED = new Set(['Dashboard', 'Board', 'Search', 'Quick Note']);
+const SHEET_EXCLUDED = new Set(['Dashboard', 'Board', 'Quick Note', 'Shortcuts']);
 
 // ---------------------------------------------------------------------------
 // RecentFilesSubView
@@ -274,8 +275,39 @@ const RecentFilesSubView = ({ recentFiles, onClose, onBack }: RecentFilesSubView
   </div>
 );
 
+interface ShortcutsSubViewProps {
+  items: MenuItem[];
+  onClose: () => void;
+}
+
+const ShortcutsSubView = ({ items, onClose }: ShortcutsSubViewProps) => (
+  <div className="flex flex-col">
+    {items.length === 0 ? (
+      <div className="px-6 py-4">
+        <MonoText className="text-sm text-[var(--los-muted)]">No shortcuts</MonoText>
+      </div>
+    ) : (
+      items.map((item) => (
+        // biome-ignore lint/a11y/noStaticElementInteractions: list item
+        // biome-ignore lint/a11y/useKeyWithClickEvents: list item
+        <div
+          key={item.label}
+          onClick={() => {
+            item.onClick?.();
+            onClose();
+          }}
+          className="flex items-center px-6 h-12 cursor-pointer hover:bg-[var(--los-accent)]/5 hover:text-[var(--los-accent)] transition-colors"
+        >
+          <MonoText className="text-sm uppercase">{item.label}</MonoText>
+        </div>
+      ))
+    )}
+  </div>
+);
+
 interface MobileMoreSheetProps {
   menuItems?: MenuItem[];
+  shortcutItems?: MenuItem[];
   recentFiles?: MenuItem[];
   repositories: Repository[];
   workspaces: Repository[];
@@ -287,6 +319,7 @@ interface MobileMoreSheetProps {
 
 const MobileMoreSheet = ({
   menuItems,
+  shortcutItems,
   recentFiles,
   repositories,
   workspaces,
@@ -351,7 +384,7 @@ const MobileMoreSheet = ({
       <div
         ref={panelRef}
         className={cn(
-          'fixed bottom-0 left-0 right-0 z-[995] bg-[var(--los-bg)] border-t border-[var(--los-border)] max-h-[60vh] overflow-y-auto transition-transform duration-300',
+          'fixed bottom-14 left-0 right-0 z-[995] bg-[var(--los-bg)] border-t border-[var(--los-border)] max-h-[60vh] overflow-y-auto transition-transform duration-300',
           open ? 'translate-y-0' : 'translate-y-full',
         )}
       >
@@ -402,6 +435,10 @@ const MobileMoreSheet = ({
                 navigationStore.sheetMode.value = 'MENU';
               }}
             />
+          )}
+
+          {sheetMode === 'SHORTCUTS' && (
+            <ShortcutsSubView items={shortcutItems ?? []} onClose={close} />
           )}
 
           {sheetMode === 'MENU' && (
@@ -485,6 +522,7 @@ export const StatusBar = ({
   onSearchClick,
 
   menuItems,
+  shortcutItems,
   recentFiles,
   version,
 }: StatusBarProps) => {
@@ -495,6 +533,8 @@ export const StatusBar = ({
   const expanded = navigationStore.desktopDrawerOpen.value;
   const expandedMode = navigationStore.desktopDrawerMode.value;
   const activeTab = navigationStore.activeTab.value;
+  const sheetOpen = navigationStore.moreSheetOpen.value;
+  const sheetMode = navigationStore.sheetMode.value;
 
   // Clean up stale localStorage key from old nav mode toggle
   useEffect(() => {
@@ -541,6 +581,7 @@ export const StatusBar = ({
       {/* ── Mobile More sheet (hidden on desktop) ──────────────────────── */}
       <MobileMoreSheet
         menuItems={menuItems}
+        shortcutItems={shortcutItems}
         recentFiles={recentFiles}
         repositories={repositories}
         workspaces={workspaces}
@@ -1009,26 +1050,42 @@ export const StatusBar = ({
             <MonoText className="text-[9px] uppercase">Board</MonoText>
           </button>
 
-          {/* Search */}
+          {/* Shortcuts */}
           <button
             type="button"
-            className={tabClass('SEARCH')}
+            className={cn(
+              'flex-1 flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors',
+              sheetOpen && sheetMode === 'SHORTCUTS'
+                ? 'text-[var(--los-accent)]'
+                : 'text-[var(--los-muted)]',
+            )}
             onClick={(e) => {
               e.stopPropagation();
-              onSearchClick?.();
+              if (sheetOpen && sheetMode === 'SHORTCUTS') {
+                navigationStore.moreSheetOpen.value = false;
+              } else {
+                navigationStore.activeTab.value = 'MORE';
+                navigationStore.sheetMode.value = 'SHORTCUTS';
+                navigationStore.moreSheetOpen.value = true;
+              }
             }}
           >
-            <SearchIcon size={18} />
-            <MonoText className="text-[9px] uppercase">Search</MonoText>
+            <Keyboard size={18} />
+            <MonoText className="text-[9px] uppercase">Shortcuts</MonoText>
           </button>
 
           {/* More */}
           <button
             type="button"
-            className={tabClass('MORE')}
+            className={cn(
+              'flex-1 flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors',
+              sheetOpen && sheetMode !== 'SHORTCUTS'
+                ? 'text-[var(--los-accent)]'
+                : 'text-[var(--los-muted)]',
+            )}
             onClick={(e) => {
               e.stopPropagation();
-              if (navigationStore.moreSheetOpen.value) {
+              if (sheetOpen && sheetMode !== 'SHORTCUTS') {
                 navigationStore.moreSheetOpen.value = false;
               } else {
                 navigationStore.activeTab.value = 'MORE';

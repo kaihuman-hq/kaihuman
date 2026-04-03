@@ -15,6 +15,7 @@ import {
 } from '@lifosy/ui';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FileViewer } from '../components/FileViewer';
+import { QUICK_ROUTES } from './ShortcutsPage';
 
 import { VERSION } from '../version';
 
@@ -281,6 +282,7 @@ export const Dashboard = () => {
           onBoardClick={() => route('/board')}
           onActionLogClick={() => route('/action-log')}
           onShortcutsClick={() => route('/shortcuts')}
+          shortcutItems={QUICK_ROUTES.map((r) => ({ label: r.name, onClick: () => route(r.path) }))}
           // Remote Config Props
           config={remoteConfig || undefined}
           fileContents={gridFileContents}
