@@ -1,7 +1,7 @@
 import { signal } from '@preact/signals';
 
-export type NavActiveTab = 'HOME' | 'BOARD' | 'SEARCH' | 'MORE';
-export type NavSheetMode = 'MENU' | 'REPOS' | 'WORKSPACES' | 'RECENT';
+export type NavActiveTab = 'HOME' | 'BOARD' | 'SHORTCUTS' | 'MORE';
+export type NavSheetMode = 'MENU' | 'REPOS' | 'WORKSPACES' | 'RECENT' | 'SHORTCUTS';
 
 export class NavigationStore {
   // Mobile More sheet

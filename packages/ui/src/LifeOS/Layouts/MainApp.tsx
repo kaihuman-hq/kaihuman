@@ -135,6 +135,7 @@ export interface MainAppProps {
   onBoardClick?: () => void;
   onActionLogClick?: () => void;
   onShortcutsClick?: () => void;
+  shortcutItems?: import('../Organisms/StatusBar').MenuItem[];
 
   // Version info
   version?: {
@@ -212,6 +213,7 @@ export const MainApp = ({
   onBoardClick,
   onActionLogClick,
   onShortcutsClick,
+  shortcutItems,
   ...props
 }: MainAppProps) => {
   const isMobile = useIsMobile();
@@ -2017,6 +2019,7 @@ abbreviations: undefined
                 )
               : []
           }
+          shortcutItems={shortcutItems}
           version={props.version}
         />
       )}
