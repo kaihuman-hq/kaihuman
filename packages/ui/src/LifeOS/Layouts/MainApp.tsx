@@ -151,6 +151,11 @@ const parseUrlState = () => {
   if (typeof window === 'undefined')
     return { showFiles: false, activeTileId: null, showNewFileWizard: false };
   const path = window.location.pathname;
+  if (path === '/new/save') {
+    // Wizard opened while dump mode is active — preserve both flags so that
+    // closing the wizard without saving returns to dump mode, not file view.
+    return { showFiles: false, activeTileId: null, showNewFileWizard: true, showDumpMode: true };
+  }
   if (path === '/files/new') {
     return { showFiles: true, activeTileId: null, showNewFileWizard: true };
   }
@@ -467,10 +472,14 @@ abbreviations: undefined
     }
 
     let url = '/';
-    if (showDumpMode) {
-      url = '/new';
+    if (showNewFileWizard && showDumpMode) {
+      // Wizard opened from dump mode: encode both flags in the URL so the
+      // URL→State round-trip keeps dump mode alive and returns here on close.
+      url = '/new/save';
     } else if (showNewFileWizard) {
       url = '/files/new';
+    } else if (showDumpMode) {
+      url = '/new';
     } else if (activeTileId && typeof activeTileId === 'string') {
       // Split by slash and encode each segment to preserve structure
       const cleanPath = activeTileId
@@ -1742,16 +1751,26 @@ abbreviations: undefined
               <FileText className="text-[var(--los-accent)]" size={20} />
               <MonoHeader>QUICK DUMP</MonoHeader>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setShowDumpMode(false);
-                window.history.pushState({}, '', '/');
-              }}
-              className="p-2 hover:bg-white/10 rounded-sm"
-            >
-              <X size={20} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleDumpSave(dumpContent)}
+                disabled={!dumpContent.trim()}
+                className="px-3 py-1.5 bg-[var(--los-accent)] text-black text-xs font-mono font-bold hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                SAVE
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDumpMode(false);
+                  window.history.pushState({}, '', '/');
+                }}
+                className="p-2 hover:bg-white/10 rounded-sm"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-hidden p-4">
             <RealEditor

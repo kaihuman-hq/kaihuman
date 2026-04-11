@@ -46,7 +46,21 @@ export const Editor = ({ content, onChange, onSave, className }: EditorProps) =>
   const viewRef = useRef<EditorView | null>(null);
   const initialContentRef = useRef(content);
 
-  // Initial setup
+  // Keep callback refs current so the editor closure never goes stale,
+  // without including the callbacks in the setup effect's dependency array
+  // (which would destroy+recreate the editor — and lose focus — on every keystroke).
+  const onChangeRef = useRef(onChange);
+  const onSaveRef = useRef(onSave);
+  onChangeRef.current = onChange;
+  onSaveRef.current = onSave;
+
+  // Prevents the echo loop: Store→View dispatch fires updateListener which
+  // calls onChange which updates the signal which schedules another content
+  // sync effect which dispatches again → freeze. When this flag is set we
+  // are in the middle of a programmatic dispatch and onChange must be skipped.
+  const isUpdatingFromStore = useRef(false);
+
+  // Initial setup — runs once on mount only
   useEffect(() => {
     if (!parentRef.current) return;
 
@@ -65,7 +79,7 @@ export const Editor = ({ content, onChange, onSave, className }: EditorProps) =>
           {
             key: 'Mod-s',
             run: (view) => {
-              if (onSave) onSave(view.state.doc.toString());
+              if (onSaveRef.current) onSaveRef.current(view.state.doc.toString());
               return true;
             },
           },
@@ -75,8 +89,9 @@ export const Editor = ({ content, onChange, onSave, className }: EditorProps) =>
         oneDark,
         nexusTheme,
         EditorView.updateListener.of((update) => {
-          if (update.docChanged && onChange) {
-            onChange(update.state.doc.toString());
+          // Skip when the change came from a programmatic content sync — not the user.
+          if (update.docChanged && !isUpdatingFromStore.current && onChangeRef.current) {
+            onChangeRef.current(update.state.doc.toString());
           }
         }),
       ],
@@ -92,18 +107,25 @@ export const Editor = ({ content, onChange, onSave, className }: EditorProps) =>
     return () => {
       view.destroy();
     };
-  }, [onChange, onSave]); // Run once on mount
+  }, []); // Empty deps: editor is created once and never torn down due to callback churn
 
-  // Sync content from prop if changed externally
+  // Sync content from prop if changed externally (e.g. programmatic reset).
+  // Uses isUpdatingFromStore to prevent the dispatch from calling onChange,
+  // which would update the signal, which would schedule another sync effect.
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
 
     const currentDoc = view.state.doc.toString();
     if (content !== currentDoc && content !== undefined) {
-      view.dispatch({
-        changes: { from: 0, to: currentDoc.length, insert: content },
-      });
+      isUpdatingFromStore.current = true;
+      try {
+        view.dispatch({
+          changes: { from: 0, to: currentDoc.length, insert: content },
+        });
+      } finally {
+        isUpdatingFromStore.current = false;
+      }
     }
   }, [content]);
 
