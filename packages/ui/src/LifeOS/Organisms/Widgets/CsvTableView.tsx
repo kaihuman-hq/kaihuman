@@ -6,10 +6,11 @@ import { MonoLabel, MonoText } from '../../Atoms/Typography';
 const PAGE_SIZE = 50;
 
 export interface CsvTableViewProps {
-  content: string;
+  content?: string;
+  data?: { headers: string[]; rows: string[][] };
 }
 
-export const CsvTableView = ({ content }: CsvTableViewProps) => {
+export const CsvTableView = ({ content, data }: CsvTableViewProps) => {
   const [sortConfig, setSortConfig] = useState<{ key: number; direction: 'asc' | 'desc' } | null>(
     null,
   );
@@ -18,6 +19,7 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
   const [page, setPage] = useState(0);
 
   const { headers, rows } = useMemo(() => {
+    if (data) return data;
     if (!content) return { headers: [], rows: [] };
     const lines = content
       .split('\n')
@@ -42,7 +44,7 @@ export const CsvTableView = ({ content }: CsvTableViewProps) => {
     const rows = lines.slice(1).map((line) => line.split(separator).map((c) => c.trim()));
 
     return { headers, rows };
-  }, [content]);
+  }, [content, data]);
 
   // Filtering
   const filteredRows = useMemo(() => {
