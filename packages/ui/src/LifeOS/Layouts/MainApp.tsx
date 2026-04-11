@@ -34,7 +34,6 @@ import {
 import type { ComponentChildren } from 'preact';
 import { createPortal, memo } from 'preact/compat';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { Editor as RealEditor } from '../../components/editor/Editor';
 import { cn } from '../../utils';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
 import { EncryptedTileWrapper } from '../Molecules/EncryptedTileWrapper';
@@ -43,6 +42,7 @@ import { Tile } from '../Molecules/Tile';
 import { AddToDashboardModal } from '../Organisms/AddToDashboardModal';
 // 3.12, 3.11 Views
 import { CommitsView } from '../Organisms/CommitsView';
+import { DumpView } from '../Organisms/DumpView';
 import { Editor } from '../Organisms/Editor';
 import { FileHistoryView } from '../Organisms/FileHistoryView';
 import { GraphView } from '../Organisms/GraphView';
@@ -1773,12 +1773,7 @@ abbreviations: undefined
             </div>
           </div>
           <div className="flex-1 overflow-hidden p-4">
-            <RealEditor
-              content={dumpContent}
-              onChange={setDumpContent}
-              onSave={handleDumpSave}
-              className="h-full w-full"
-            />
+            <DumpView content={dumpContent} onChange={setDumpContent} onSave={handleDumpSave} />
           </div>
         </div>
       )}
