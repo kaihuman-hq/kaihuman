@@ -20,6 +20,11 @@ export default defineConfig({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4MB
+        // Serve cached index.html for all navigation requests so that iOS PWA
+        // shortcuts to /quick-todo, /quick-note, /quick-log etc. load the SPA
+        // at the correct URL instead of falling through to the network (which
+        // may redirect to / and land on Dashboard).
+        navigateFallback: 'index.html',
         runtimeCaching: [
           {
             urlPattern: /^http:\/\/127\.0\.0\.1:4000\/.*/i,
