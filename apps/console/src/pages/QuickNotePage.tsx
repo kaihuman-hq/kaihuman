@@ -3,8 +3,10 @@ import { StatusBar } from '@lifosy/ui';
 import { ArrowLeft } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { useManifest } from '../hooks/useManifest';
 
 export const QuickNotePage = () => {
+  useManifest('/manifest-quick-note.webmanifest');
   const tree = githubFileStore.tree.value;
   const openFiles = githubFileStore.openFiles.value;
   const appFolder = githubFileStore.appFolder.value;
