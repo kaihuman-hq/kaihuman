@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import { Editor } from '../../components/editor/Editor';
 import { LogView } from './LogView';
 import { CsvTableView } from './Widgets/CsvTableView';
@@ -85,7 +85,7 @@ function jsonToTableData(content: string, format: 'json_array' | 'jsonl') {
     for (const k of Object.keys(obj)) keySet.add(k);
   }
   const headers = [...keySet].sort();
-  const rows = objects.map((obj) => headers.map((h) => String(obj[h] ?? '')));
+  const rows = objects.map((obj) => headers.map((h) => obj[h] ?? ''));
   return { headers, rows };
 }
 
@@ -113,22 +113,9 @@ export interface DumpViewProps {
 
 export const DumpView = ({ content, onChange, onSave }: DumpViewProps) => {
   const [mode, setMode] = useState<ViewMode>('RAW');
-  const hasAutoSwitched = useRef(false);
 
   const format = useMemo(() => detectFormat(content), [content]);
   const availableModes = AVAILABLE_MODES[format];
-
-  // Auto-switch to TABLE on first structured detection; reset when content clears
-  useEffect(() => {
-    if (format !== 'raw' && !hasAutoSwitched.current) {
-      hasAutoSwitched.current = true;
-      setMode('TABLE');
-    }
-    if (format === 'raw') {
-      hasAutoSwitched.current = false;
-      setMode('RAW');
-    }
-  }, [format]);
 
   // Fall back to first available mode if current mode becomes unavailable
   const activeMode = availableModes.includes(mode) ? mode : availableModes[0];

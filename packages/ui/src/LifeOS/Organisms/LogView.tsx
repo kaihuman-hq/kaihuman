@@ -3,6 +3,18 @@ import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoLabel, MonoText } from '../Atoms/Typography';
 
+function isComplex(v: unknown): v is object {
+  return typeof v === 'object' && v !== null;
+}
+
+function cellDisplay(v: unknown): string {
+  if (isComplex(v)) {
+    const s = JSON.stringify(v);
+    return s.length > 80 ? `${s.slice(0, 80)}…` : s;
+  }
+  return String(v ?? '');
+}
+
 const PAGE_SIZE = 50;
 
 const TIMESTAMP_KEYS = ['timestamp', 'time', 'ts', 'date'];
@@ -23,6 +35,7 @@ export interface LogViewProps {
 export const LogView = ({ entries }: LogViewProps) => {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
+  const [expandedRow, setExpandedRow] = useState<Record<string, unknown> | null>(null);
 
   const columns = useMemo(() => {
     const keySet = new Set<string>();
@@ -85,29 +98,77 @@ export const LogView = ({ entries }: LogViewProps) => {
             </tr>
           </thead>
           <tbody>
-            {paged.map((row, i) => (
-              <tr
-                // biome-ignore lint/suspicious/noArrayIndexKey: page-relative index is stable within this render
-                key={i}
-                className="border-b border-[var(--los-border)]/50 hover:bg-[var(--los-border)]/10 transition-colors last:border-0"
-              >
-                {columns.map((col) => {
-                  const val = String(row[col] ?? '');
-                  const isLevel = col === lvlKey;
-                  return (
-                    <td key={col} className="p-2 max-w-[300px]" title={val}>
-                      {isLevel ? (
-                        <span className={cn('text-xs font-mono font-bold', levelColor(val))}>
-                          {val.toUpperCase()}
-                        </span>
-                      ) : (
-                        <MonoText className="text-xs truncate block">{val}</MonoText>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {paged.map((row, i) => {
+              const hasComplex = Object.values(row).some(isComplex);
+              const isExpanded = expandedRow === row;
+              return (
+                <>
+                  <tr
+                    // biome-ignore lint/suspicious/noArrayIndexKey: page-relative index is stable within this render
+                    key={i}
+                    onClick={() => hasComplex && setExpandedRow(isExpanded ? null : row)}
+                    className={cn(
+                      'border-b border-[var(--los-border)]/50 transition-colors last:border-0',
+                      hasComplex
+                        ? 'cursor-pointer hover:bg-[var(--los-accent)]/5'
+                        : 'hover:bg-[var(--los-border)]/10',
+                      isExpanded && 'bg-[var(--los-accent)]/5',
+                    )}
+                  >
+                    {columns.map((col) => {
+                      const raw = row[col];
+                      const val = cellDisplay(raw);
+                      const isLevel = col === lvlKey;
+                      return (
+                        <td
+                          key={col}
+                          className="p-2 max-w-[300px]"
+                          title={isComplex(raw) ? JSON.stringify(raw) : val}
+                        >
+                          {isLevel ? (
+                            <span className={cn('text-xs font-mono font-bold', levelColor(val))}>
+                              {val.toUpperCase()}
+                            </span>
+                          ) : (
+                            <MonoText
+                              className={cn(
+                                'text-xs truncate block',
+                                isComplex(raw) && 'text-[var(--los-accent)]',
+                              )}
+                            >
+                              {val}
+                            </MonoText>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {isExpanded && (
+                    <tr key={`${i}-expanded`}>
+                      <td colSpan={columns.length} className="p-0">
+                        <div className="p-3 border-b border-[var(--los-border)] bg-[var(--los-bg)]">
+                          <div className="flex flex-col gap-2">
+                            {Object.entries(row).map(([key, val]) => {
+                              if (!isComplex(val)) return null;
+                              return (
+                                <div key={key}>
+                                  <MonoLabel className="text-[10px] uppercase text-[var(--los-muted)] mb-1 block">
+                                    {key}
+                                  </MonoLabel>
+                                  <pre className="text-xs font-mono text-[var(--los-fg)] whitespace-pre-wrap break-all bg-[var(--los-border)]/10 p-2 rounded">
+                                    {JSON.stringify(val, null, 2)}
+                                  </pre>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
             {paged.length === 0 && (
               <tr>
                 <td colSpan={columns.length} className="p-8 text-center">
