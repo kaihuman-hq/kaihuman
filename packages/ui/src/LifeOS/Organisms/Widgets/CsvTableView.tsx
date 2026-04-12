@@ -5,9 +5,21 @@ import { MonoLabel, MonoText } from '../../Atoms/Typography';
 
 const PAGE_SIZE = 50;
 
+function isComplex(v: unknown): v is object {
+  return typeof v === 'object' && v !== null;
+}
+
+function cellDisplay(v: unknown): string {
+  if (isComplex(v)) {
+    const s = JSON.stringify(v);
+    return s.length > 60 ? `${s.slice(0, 60)}…` : s;
+  }
+  return String(v ?? '');
+}
+
 export interface CsvTableViewProps {
   content?: string;
-  data?: { headers: string[]; rows: string[][] };
+  data?: { headers: string[]; rows: unknown[][] };
 }
 
 export const CsvTableView = ({ content, data }: CsvTableViewProps) => {
@@ -17,18 +29,19 @@ export const CsvTableView = ({ content, data }: CsvTableViewProps) => {
   const [filters, setFilters] = useState<Record<number, string>>({});
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
+  const [expandedRow, setExpandedRow] = useState<unknown[] | null>(null);
 
   const { headers, rows } = useMemo(() => {
     if (data) return data;
-    if (!content) return { headers: [], rows: [] };
+    if (!content) return { headers: [], rows: [] as unknown[][] };
     const lines = content
       .split('\n')
       .map((l) => l.trim())
       .filter((l) => l);
-    if (lines.length === 0) return { headers: [], rows: [] };
+    if (lines.length === 0) return { headers: [], rows: [] as unknown[][] };
 
     const firstLine = lines[0];
-    if (!firstLine) return { headers: [], rows: [] };
+    if (!firstLine) return { headers: [], rows: [] as unknown[][] };
 
     // Strip bracket metadata before detecting separator to avoid semicolons
     // inside [...] being mistaken for the field separator.
@@ -41,7 +54,9 @@ export const CsvTableView = ({ content, data }: CsvTableViewProps) => {
       const bracketIdx = trimmed.indexOf('[');
       return bracketIdx > 0 ? trimmed.slice(0, bracketIdx).trim() : trimmed;
     });
-    const rows = lines.slice(1).map((line) => line.split(separator).map((c) => c.trim()));
+    const rows: unknown[][] = lines
+      .slice(1)
+      .map((line) => line.split(separator).map((c) => c.trim()));
 
     return { headers, rows };
   }, [content, data]);
@@ -50,7 +65,7 @@ export const CsvTableView = ({ content, data }: CsvTableViewProps) => {
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
       return Object.entries(filters).every(([colIndex, filterValue]) => {
-        const cellValue = row[Number.parseInt(colIndex, 10)] || '';
+        const cellValue = cellDisplay(row[Number.parseInt(colIndex, 10)]);
         return cellValue.toLowerCase().includes(filterValue.toLowerCase());
       });
     });
@@ -61,8 +76,8 @@ export const CsvTableView = ({ content, data }: CsvTableViewProps) => {
     if (!sortConfig) return filteredRows;
     const sorted = [...filteredRows];
     sorted.sort((a, b) => {
-      const valA = a[sortConfig.key] || '';
-      const valB = b[sortConfig.key] || '';
+      const valA = cellDisplay(a[sortConfig.key]);
+      const valB = cellDisplay(b[sortConfig.key]);
 
       const numA = parseFloat(valA);
       const numB = parseFloat(valB);
@@ -170,23 +185,68 @@ export const CsvTableView = ({ content, data }: CsvTableViewProps) => {
             </tr>
           </thead>
           <tbody>
-            {pagedRows.map((row, rowIdx) => (
-              <tr
-                // biome-ignore lint/suspicious/noArrayIndexKey: page-relative index is stable within this render
-                key={rowIdx}
-                className="hover:bg-[var(--los-border)]/10 transition-colors border-b border-[var(--los-border)]/50 last:border-0"
-              >
-                {headers.map((header, cIndex) => (
-                  <td
-                    key={`c-${cIndex}-${header}`}
-                    className="p-2 truncate max-w-[200px]"
-                    title={row[cIndex]}
+            {pagedRows.map((row, rowIdx) => {
+              const hasComplex = row.some(isComplex);
+              const isExpanded = expandedRow === row;
+              return (
+                <>
+                  <tr
+                    // biome-ignore lint/suspicious/noArrayIndexKey: page-relative index is stable within this render
+                    key={rowIdx}
+                    onClick={() => hasComplex && setExpandedRow(isExpanded ? null : row)}
+                    className={cn(
+                      'transition-colors border-b border-[var(--los-border)]/50 last:border-0',
+                      hasComplex
+                        ? 'cursor-pointer hover:bg-[var(--los-accent)]/5'
+                        : 'hover:bg-[var(--los-border)]/10',
+                      isExpanded && 'bg-[var(--los-accent)]/5',
+                    )}
                   >
-                    <MonoText className="text-xs">{row[cIndex]}</MonoText>
-                  </td>
-                ))}
-              </tr>
-            ))}
+                    {headers.map((header, cIndex) => {
+                      const val = row[cIndex];
+                      const display = cellDisplay(val);
+                      return (
+                        <td
+                          key={`c-${cIndex}-${header}`}
+                          className="p-2 truncate max-w-[200px]"
+                          title={isComplex(val) ? JSON.stringify(val) : display}
+                        >
+                          <MonoText
+                            className={cn('text-xs', isComplex(val) && 'text-[var(--los-accent)]')}
+                          >
+                            {display}
+                          </MonoText>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {isExpanded && (
+                    <tr key={`${rowIdx}-expanded`}>
+                      <td colSpan={headers.length} className="p-0">
+                        <div className="p-3 border-b border-[var(--los-border)] bg-[var(--los-bg)]">
+                          <div className="flex flex-col gap-2">
+                            {headers.map((header, cIndex) => {
+                              const val = row[cIndex];
+                              if (!isComplex(val)) return null;
+                              return (
+                                <div key={header}>
+                                  <MonoLabel className="text-[10px] uppercase text-[var(--los-muted)] mb-1 block">
+                                    {header}
+                                  </MonoLabel>
+                                  <pre className="text-xs font-mono text-[var(--los-fg)] whitespace-pre-wrap break-all bg-[var(--los-border)]/10 p-2 rounded">
+                                    {JSON.stringify(val, null, 2)}
+                                  </pre>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
             {pagedRows.length === 0 && (
               <tr>
                 <td colSpan={headers.length} className="p-8 text-center text-[var(--los-muted)]">

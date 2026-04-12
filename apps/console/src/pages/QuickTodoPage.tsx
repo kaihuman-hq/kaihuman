@@ -3,8 +3,10 @@ import { addTodo, parseTodos, StatusBar, serializeTodos } from '@lifosy/ui';
 import { ArrowLeft } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { useManifest } from '../hooks/useManifest';
 
 export const QuickTodoPage = () => {
+  useManifest('/manifest-quick-todo.webmanifest');
   const tree = githubFileStore.tree.value;
   const openFiles = githubFileStore.openFiles.value;
   const appFolder = githubFileStore.appFolder.value;

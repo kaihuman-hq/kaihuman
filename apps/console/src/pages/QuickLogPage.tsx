@@ -3,8 +3,10 @@ import { appendAction, parseActionLog, StatusBar, serializeActionLog } from '@li
 import { ArrowLeft } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { useManifest } from '../hooks/useManifest';
 
 export const QuickLogPage = () => {
+  useManifest('/manifest-quick-log.webmanifest');
   const tree = githubFileStore.tree.value;
   const openFiles = githubFileStore.openFiles.value;
   const appFolder = githubFileStore.appFolder.value;
