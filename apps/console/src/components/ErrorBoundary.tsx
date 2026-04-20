@@ -1,6 +1,6 @@
 import { Logger } from '@lifosy/core';
 import { AlertTriangle, RefreshCw } from 'lucide-preact';
-import { Component, type ComponentChildren, h } from 'preact';
+import { Component, type ComponentChildren } from 'preact';
 
 const logger = new Logger('ErrorBoundary');
 

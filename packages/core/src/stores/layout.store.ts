@@ -235,20 +235,20 @@ export class LayoutStore {
       // 2. Intermediate Columns
       let currentPath = parts[0];
       for (let i = 1; i < parts.length; i++) {
-        const children = this.getChildren(currentPath + '/');
+        const children = this.getChildren(`${currentPath}/`);
         let activeId = '';
         if (i === parts.length - 1) {
           activeId = id;
         } else {
-          activeId = currentPath + '/' + parts[i];
+          activeId = `${currentPath}/${parts[i]}`;
         }
         newColumns.push({ items: children, activeId });
-        currentPath += '/' + parts[i];
+        currentPath += `/${parts[i]}`;
       }
 
       // 3. Final expansion if folder
       if (isFolder) {
-        const children = this.getChildren(id + '/');
+        const children = this.getChildren(`${id}/`);
         newColumns.push({ items: children, activeId: null });
       }
 

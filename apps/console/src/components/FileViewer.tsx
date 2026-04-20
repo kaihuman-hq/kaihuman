@@ -1,6 +1,5 @@
 import { Logger } from '@lifosy/core';
-import { h } from 'preact';
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect } from 'preact/hooks';
 
 const logger = new Logger('FileViewer');
 

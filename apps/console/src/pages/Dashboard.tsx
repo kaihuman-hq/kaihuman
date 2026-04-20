@@ -11,13 +11,11 @@ import {
   RepositorySelector,
   serializeReadItLater,
   type TileDef,
-  WikiView, // Added import
 } from '@lifosy/ui';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FileViewer } from '../components/FileViewer';
-import { QUICK_ROUTES } from './ShortcutsPage';
-
 import { VERSION } from '../version';
+import { QUICK_ROUTES } from './ShortcutsPage';
 
 export const Dashboard = () => {
   /* original repo/repos declarations removed for mock */
@@ -385,7 +383,7 @@ export const Dashboard = () => {
                 if (!githubFileStore.openFiles.value[rilPath]) {
                   try {
                     await githubFileStore.openFile(rilPath);
-                  } catch (e) {
+                  } catch (_e) {
                     fileExists = false;
                   }
                 }
@@ -398,11 +396,11 @@ export const Dashboard = () => {
               try {
                 config = content ? parseReadItLater(content) : DEFAULT_RIL_CONFIG;
                 if (!config || !config.items) config = DEFAULT_RIL_CONFIG;
-              } catch (e) {
+              } catch (_e) {
                 config = DEFAULT_RIL_CONFIG;
               }
 
-              const isDuplicate = config.items && config.items.some((i) => i.url === item.url);
+              const isDuplicate = config.items?.some((i) => i.url === item.url);
               if (isDuplicate) return;
 
               const newItems = [item, ...(config.items || [])];
@@ -416,7 +414,7 @@ export const Dashboard = () => {
                 try {
                   await githubFileStore.createFile(rilPath, newContent);
                 } catch (e: any) {
-                  if (e.message && e.message.includes('already exists')) {
+                  if (e.message?.includes('already exists')) {
                     if (!githubFileStore.openFiles.value[rilPath]) {
                       githubFileStore.openFiles.value = {
                         ...githubFileStore.openFiles.value,

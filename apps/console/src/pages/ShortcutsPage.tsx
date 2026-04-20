@@ -40,6 +40,12 @@ export const QUICK_ROUTES: QuickRoute[] = [
     suggestedName: 'KH New',
     description: 'Open a blank editor and create a new file',
   },
+  {
+    name: 'Knowledge Base',
+    path: '/knowledge',
+    suggestedName: 'KH Knowledge',
+    description: 'Pin, browse, and query your AI knowledge base',
+  },
 ];
 
 // ─── Platform detection ───────────────────────────────────────────────────────

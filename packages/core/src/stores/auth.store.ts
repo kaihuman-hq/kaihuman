@@ -138,7 +138,7 @@ export class AuthStore {
     if (!this.token.value) return;
 
     try {
-      logger.debug('Fetching user with token:', this.token.value?.substring(0, 10) + '...');
+      logger.debug('Fetching user with token:', `${this.token.value?.substring(0, 10)}...`);
       const res = await fetch('https://api.github.com/user', {
         headers: {
           Authorization: `Bearer ${this.token.value}`,

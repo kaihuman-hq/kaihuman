@@ -1,7 +1,6 @@
 import { authStore, githubProfileStore } from '@lifosy/core';
 import { Button } from '@lifosy/ui';
 import { useEffect, useState } from 'preact/hooks';
-import { route } from 'preact-router';
 
 export function AuthCli() {
   const [status, setStatus] = useState<'checking' | 'authenticated' | 'redirecting' | 'error'>(
