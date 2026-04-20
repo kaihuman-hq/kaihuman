@@ -4,8 +4,9 @@ import { getScaffoldFiles, getSkillOnlyFiles, KB_SKILL_VERSION } from './kb-skil
 export type KBFile = { name: string; path: string; sha: string };
 
 function parseRepo(fullName: string): { owner: string; repo: string } {
-  const [owner, repo] = fullName.split('/') as [string, string];
-  return { owner, repo };
+  const slash = fullName.indexOf('/');
+  if (slash === -1) throw new Error(`Invalid repo format: "${fullName}" (expected "owner/repo")`);
+  return { owner: fullName.slice(0, slash), repo: fullName.slice(slash + 1) };
 }
 
 export async function getInstalledSkillVersion(fullName: string): Promise<string | null> {

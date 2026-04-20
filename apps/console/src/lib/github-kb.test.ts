@@ -6,7 +6,7 @@ import {
   scaffoldKB,
   updateSkillsIfNeeded,
 } from './github-kb';
-import { KB_SKILL_VERSION } from './kb-skills';
+import { getScaffoldFiles, KB_SKILL_VERSION } from './kb-skills';
 
 vi.mock('@lifosy/core', () => ({
   authStore: { token: { value: 'test-token' } },
@@ -55,7 +55,7 @@ describe('isKBInitialized', () => {
 describe('updateSkillsIfNeeded', () => {
   it('returns false and writes nothing when installed version matches', async () => {
     vi.mocked(githubService.getFileContent).mockResolvedValue({
-      content: KB_SKILL_VERSION,
+      content: `${KB_SKILL_VERSION}\n`,
       sha: 'abc',
     });
     const updated = await updateSkillsIfNeeded('owner/repo');
@@ -139,7 +139,9 @@ describe('scaffoldKB', () => {
   it('calls upsertRepoFile for all 9 scaffold files', async () => {
     vi.mocked(githubService.upsertRepoFile).mockResolvedValue({} as any);
     await scaffoldKB('owner/repo');
-    expect(githubService.upsertRepoFile).toHaveBeenCalledTimes(9);
+    expect(githubService.upsertRepoFile).toHaveBeenCalledTimes(
+      Object.keys(getScaffoldFiles()).length,
+    );
   });
 
   it('writes files with expected paths including .kh/.skill-version, .kh/raw/.gitkeep, and .claude/commands/kb-ingest.md', async () => {
