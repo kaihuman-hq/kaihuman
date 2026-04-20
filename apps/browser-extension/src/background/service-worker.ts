@@ -190,8 +190,9 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
         const date = new Date().toISOString().slice(0, 10);
         const slug = urlToSlug(url);
         const path = `.kh/raw/${Date.now()}-${slug}.md`;
-        const escapedTitle = title.replace(/"/g, '\\"');
-        const content = `---\ntitle: "${escapedTitle}"\nurl: ${url}\ndate: ${date}\nprocessed: false\n---\n\n${text}`;
+        const escapedTitle = title.replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"');
+        const safeUrl = url.replace(/'/g, "''");
+        const content = `---\ntitle: "${escapedTitle}"\nurl: '${safeUrl}'\ndate: ${date}\nprocessed: false\n---\n\n${text}`;
         await githubUpsertFile(token, repo, path, content);
         sendResponse({ success: true });
       } catch (error: any) {
