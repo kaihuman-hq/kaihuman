@@ -34,9 +34,8 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
 function bufferToHex(buffer: ArrayBuffer): string {
   const byteArr = new Uint8Array(buffer);
   let hexString = '';
-  for (let i = 0; i < byteArr.length; i++) {
-    const hex = byteArr[i]!.toString(16);
-    hexString += hex.length === 1 ? '0' + hex : hex;
+  for (const byte of byteArr) {
+    hexString += byte.toString(16).padStart(2, '0');
   }
   return hexString;
 }

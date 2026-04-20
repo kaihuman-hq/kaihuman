@@ -1,5 +1,5 @@
 import { authStore, githubProfileStore } from '@lifosy/core';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect } from 'preact/hooks';
 
 export function ExtensionAuthBridge() {
   // Accessing signal .value inside the component body tells Preact to re-render
@@ -47,9 +47,5 @@ export function ExtensionAuthBridge() {
     // We can keep this empty or remove it, but nothing needed here since the success page handles it.
   }, []);
 
-  return (
-    <>
-      <div id="lifosy-extension-bridge" style={{ display: 'none' }} />
-    </>
-  );
+  return <div id="lifosy-extension-bridge" style={{ display: 'none' }} />;
 }

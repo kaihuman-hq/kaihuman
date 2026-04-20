@@ -22,6 +22,7 @@
   "scripts": {
     "lint": "biome check src/ vite.config.ts .storybook/",
     "format": "biome check --write src/ vite.config.ts .storybook/",
+    "fix": "biome check --write --unsafe src/ vite.config.ts .storybook/",
     "build": "vite build",
     "watch": "vite build --watch",
     "storybook": "storybook dev -p 6006",

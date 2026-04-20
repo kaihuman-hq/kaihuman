@@ -1,4 +1,4 @@
-import { computed, effect, signal } from '@preact/signals';
+import { computed, signal } from '@preact/signals';
 import { openDB } from 'idb';
 import { Logger } from '../logger.js';
 import { githubService } from '../services/github.service.js';
@@ -667,7 +667,7 @@ export class GithubFileStore {
           path,
         );
         sha = serverSha;
-      } catch (e) {
+      } catch (_e) {
         logger.error(`Could not find SHA for ${path}, cannot delete.`);
         // If it doesn't exist on server, just clean up local state
       }

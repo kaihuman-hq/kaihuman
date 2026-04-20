@@ -519,7 +519,7 @@ export const StatusBar = ({
   onFilesClick,
   onBoardClick,
   onShortcutsClick,
-  onSearchClick,
+  onSearchClick: _onSearchClick,
 
   menuItems,
   shortcutItems,
