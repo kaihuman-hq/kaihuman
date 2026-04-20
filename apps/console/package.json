@@ -14,7 +14,8 @@
     "check-types": "tsc --noEmit",
     "version:bump": "node scripts/bump-version.js",
     "version:bump:minor": "node scripts/bump-version.js minor",
-    "version:bump:major": "node scripts/bump-version.js major"
+    "version:bump:major": "node scripts/bump-version.js major",
+    "test": "vitest run"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.1",
@@ -36,9 +37,11 @@
     "@lifosy/config": "workspace:*",
     "@preact/preset-vite": "^2.9.3",
     "@tailwindcss/vite": "^4.1.18",
+    "@vitest/coverage-v8": "^4.1.4",
     "tailwindcss": "^4.1.18",
     "typescript": "5.9.2",
     "vite": "^7.3.1",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^4.1.4"
   }
 }

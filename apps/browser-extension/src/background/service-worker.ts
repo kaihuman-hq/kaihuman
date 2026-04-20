@@ -190,8 +190,9 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
         const date = new Date().toISOString().slice(0, 10);
         const slug = urlToSlug(url);
         const path = `.kh/raw/${Date.now()}-${slug}.md`;
-        const escapedTitle = title.replace(/"/g, '\\"');
-        const content = `---\ntitle: "${escapedTitle}"\nurl: ${url}\ndate: ${date}\nprocessed: false\n---\n\n${text}`;
+        const escapedTitle = title.replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"');
+        const safeUrl = url.replace(/'/g, "''");
+        const content = `---\ntitle: "${escapedTitle}"\nurl: '${safeUrl}'\ndate: ${date}\nprocessed: false\ntags: [general]\n---\n\n${text}`;
         await githubUpsertFile(token, repo, path, content);
         sendResponse({ success: true });
       } catch (error: any) {
@@ -230,5 +231,16 @@ async function saveToKnowledgeBase(text: string, url: string, pageTitle: string)
     console.log('LifeOS Extension: Successfully saved to knowledge base');
   } catch (e) {
     console.error('LifeOS Extension: Error saving clipping', e);
+  }
+}
+
+function urlToSlug(url: string): string {
+  try {
+    const { hostname, pathname } = new URL(url);
+    const last = pathname.replace(/\/$/, '').split('/').pop() || '';
+    const base = last || hostname.replace(/^www\./, '');
+    return base.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40);
+  } catch {
+    return 'article';
   }
 }

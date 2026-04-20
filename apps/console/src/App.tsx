@@ -8,6 +8,7 @@ import { AuthCli } from './pages/AuthCli';
 import { Dashboard } from './pages/Dashboard';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
 import { KanbanBoardPage } from './pages/KanbanBoardPage';
+import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { Login } from './pages/login';
 import { QuickLogPage } from './pages/QuickLogPage';
 import { QuickNotePage } from './pages/QuickNotePage';
@@ -57,6 +58,7 @@ export const App = () => {
         <ProtectedRoute path="/quick-note" component={QuickNotePage} />
         <ProtectedRoute path="/quick-log" component={QuickLogPage} />
         <ProtectedRoute path="/shortcuts" component={ShortcutsPage} />
+        <ProtectedRoute path="/knowledge" component={KnowledgeBasePage} />
         <ProtectedRoute path="/files" component={Dashboard} />
         <ProtectedRoute path="/files/:rest*" component={Dashboard} />
         <ProtectedRoute path="/new" component={Dashboard} />
