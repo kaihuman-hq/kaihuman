@@ -68,6 +68,26 @@ export async function updateSkillsIfNeeded(fullName: string): Promise<boolean> {
   return true;
 }
 
+export async function addRawNote(
+  fullName: string,
+  title: string,
+  text: string,
+  tags: string[] = ['general'],
+): Promise<void> {
+  const { owner, repo } = parseRepo(fullName);
+  const slug =
+    title
+      .replace(/[^a-z0-9]+/gi, '-')
+      .toLowerCase()
+      .slice(0, 40) || 'note';
+  const date = new Date().toISOString().slice(0, 10);
+  const escapedTitle = title.replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"');
+  const tagList = tags.length > 0 ? tags : ['general'];
+  const content = `---\ntitle: "${escapedTitle}"\nurl: ''\ndate: ${date}\nprocessed: false\ntags: [${tagList.join(', ')}]\n---\n\n${text}`;
+  const path = `.kh/raw/${Date.now()}-${slug}.md`;
+  await githubService.upsertRepoFile(owner, repo, path, content, `note: add "${title}"`);
+}
+
 export async function listKBDir(fullName: string, dir: 'raw' | 'wiki'): Promise<KBFile[]> {
   const token = authStore.token.value;
   if (!token) return [];

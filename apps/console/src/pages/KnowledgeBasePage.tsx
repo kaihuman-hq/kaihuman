@@ -1,6 +1,7 @@
 import { githubProfileStore } from '@lifosy/core';
 import { useEffect, useState } from 'preact/hooks';
 import {
+  addRawNote,
   claudeMdExists,
   isKBInitialized,
   type KBFile,
@@ -20,6 +21,11 @@ export function KnowledgeBasePage() {
   const [claudeMdConflict, setClaudeMdConflict] = useState(false);
   const [skillsUpdated, setSkillsUpdated] = useState(false);
   const [view, setView] = useState<'inbox' | 'wiki'>('inbox');
+  const [addingNote, setAddingNote] = useState(false);
+  const [noteTitle, setNoteTitle] = useState('');
+  const [noteText, setNoteText] = useState('');
+  const [noteTags, setNoteTags] = useState('');
+  const [submittingNote, setSubmittingNote] = useState(false);
 
   async function load(fullName: string) {
     setLoading(true);
@@ -83,6 +89,26 @@ export function KnowledgeBasePage() {
       return;
     }
     await doScaffold(false);
+  }
+
+  async function handleAddNote() {
+    if (!repo || !noteText.trim()) return;
+    setSubmittingNote(true);
+    try {
+      const tags = noteTags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      await addRawNote(repo.full_name, noteTitle.trim() || 'Manual note', noteText.trim(), tags);
+      setNoteTitle('');
+      setNoteText('');
+      setNoteTags('');
+      setAddingNote(false);
+      const raw = await listKBDir(repo.full_name, 'raw');
+      setRawFiles(raw);
+    } finally {
+      setSubmittingNote(false);
+    }
   }
 
   async function doScaffold(skipClaudeMd: boolean) {
@@ -194,22 +220,79 @@ export function KnowledgeBasePage() {
         </button>
       </nav>
 
-      <div class="flex-1 overflow-y-auto space-y-1 min-h-0">
+      <div class="flex-1 overflow-y-auto min-h-0 flex flex-col gap-2">
         {view === 'inbox' ? (
-          rawFiles.length === 0 ? (
-            <p class="text-xs text-[var(--los-fg-dim)]">
-              No articles pinned yet. Use the browser extension to pin pages.
-            </p>
-          ) : (
-            rawFiles.map((f) => (
-              <div
-                key={f.sha}
-                class="px-3 py-2 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)] text-xs text-[var(--los-fg)] truncate"
-              >
-                {f.name.replace(/^\d+-/, '').replace(/\.md$/, '')}
+          <>
+            {addingNote ? (
+              <div class="flex flex-col gap-2 p-3 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]">
+                <input
+                  type="text"
+                  placeholder="Title (optional)"
+                  value={noteTitle}
+                  onInput={(e) => setNoteTitle((e.target as HTMLInputElement).value)}
+                  class="bg-transparent border border-[var(--los-border)] rounded px-2 py-1 text-xs text-[var(--los-fg)] placeholder:text-[var(--los-fg-dim)] focus:outline-none focus:border-[var(--los-accent)]"
+                />
+                <input
+                  type="text"
+                  placeholder="Tags (optional, comma-separated — default: general)"
+                  value={noteTags}
+                  onInput={(e) => setNoteTags((e.target as HTMLInputElement).value)}
+                  class="bg-transparent border border-[var(--los-border)] rounded px-2 py-1 text-xs text-[var(--los-fg)] placeholder:text-[var(--los-fg-dim)] focus:outline-none focus:border-[var(--los-accent)]"
+                />
+                <textarea
+                  placeholder="Paste or type content..."
+                  value={noteText}
+                  onInput={(e) => setNoteText((e.target as HTMLTextAreaElement).value)}
+                  rows={6}
+                  class="bg-transparent border border-[var(--los-border)] rounded px-2 py-1 text-xs text-[var(--los-fg)] placeholder:text-[var(--los-fg-dim)] focus:outline-none focus:border-[var(--los-accent)] resize-none"
+                />
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAddNote}
+                    disabled={submittingNote || !noteText.trim()}
+                    class="px-3 py-1 bg-[var(--los-accent)] text-black font-bold text-xs rounded hover:opacity-90 disabled:opacity-50"
+                  >
+                    {submittingNote ? 'Saving...' : 'Save to inbox'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddingNote(false);
+                      setNoteTitle('');
+                      setNoteText('');
+                      setNoteTags('');
+                    }}
+                    class="px-3 py-1 border border-[var(--los-border)] text-[var(--los-fg-dim)] text-xs rounded hover:border-[var(--los-accent)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            ))
-          )
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingNote(true)}
+                class="self-start px-3 py-1 border border-[var(--los-border)] text-[var(--los-fg-dim)] text-xs rounded hover:border-[var(--los-accent)] hover:text-[var(--los-fg)]"
+              >
+                + Add note
+              </button>
+            )}
+            {rawFiles.length === 0 ? (
+              <p class="text-xs text-[var(--los-fg-dim)]">
+                No articles pinned yet. Use the browser extension to pin pages.
+              </p>
+            ) : (
+              rawFiles.map((f) => (
+                <div
+                  key={f.sha}
+                  class="px-3 py-2 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)] text-xs text-[var(--los-fg)] truncate"
+                >
+                  {f.name.replace(/^\d+-/, '').replace(/\.md$/, '')}
+                </div>
+              ))
+            )}
+          </>
         ) : wikiFiles.length === 0 ? (
           <p class="text-xs text-[var(--los-fg-dim)]">
             No wiki pages yet. Run <code>/kb-ingest</code> in Claude Code to compile articles.

@@ -1,4 +1,4 @@
-export const KB_SKILL_VERSION = '1.0.0';
+export const KB_SKILL_VERSION = '1.1.0';
 
 export const KB_INGEST_SKILL = `# /kb-ingest
 
@@ -78,6 +78,53 @@ Question or query passed via $ARGUMENTS
 ## Output
 
 Comprehensive answer with citations to wiki pages that support the answer.
+`;
+
+export const KB_SESSION_SKILL = `# /kb-session
+
+Summarize this Claude Code session and save it to the knowledge base.
+
+## Config
+
+Read \`~/.claude/kb.json\`. Expected format:
+\`\`\`json
+{ "repo": "owner/repo-name" }
+\`\`\`
+
+If the file does not exist or \`repo\` is missing, ask the user once:
+> "What is your knowledge base repo? (e.g. adam/notes)"
+
+Then save it and never ask again:
+\`\`\`bash
+echo '{"repo":"OWNER/REPO"}' > ~/.claude/kb.json
+\`\`\`
+
+## Write the summary
+
+Summarize this session concisely (under 300 words):
+- What project/repo was worked on
+- What was built or changed — name specific files, functions, decisions
+- Problems encountered and how they were resolved
+- Anything worth remembering for future sessions
+
+## Save to KB
+
+Build the note, then write it using the \`gh\` CLI:
+
+~~~bash
+REPO=$(cat ~/.claude/kb.json | grep -o '"repo":"[^"]*"' | cut -d'"' -f4)
+TIMESTAMP=$(date +%s)
+DATE=$(date +%Y-%m-%d)
+PROJECT=$(basename "$PWD")
+SLUG="$PROJECT-session"
+CONTENT=$(printf -- '---\ntitle: "Session: %s – %s"\nurl: '"''"'\ndate: %s\nprocessed: false\ntags: [session]\n---\n\n%s' "$PROJECT" "ONE_LINE_SUMMARY" "$DATE" "FULL_SUMMARY" | base64 -w 0)
+gh api "repos/$REPO/contents/.kh/raw/$TIMESTAMP-$SLUG.md" \
+  --method PUT \
+  --field message="note: add session summary for $PROJECT" \
+  --field "content=$CONTENT"
+~~~
+
+Confirm with the path that was written.
 `;
 
 export const KB_CLAUDE_MD = `# Knowledge Base
@@ -192,6 +239,7 @@ export function getScaffoldFiles(): Record<string, string> {
     '.claude/commands/kb-ingest.md': KB_INGEST_SKILL,
     '.claude/commands/kb-lint.md': KB_LINT_SKILL,
     '.claude/commands/kb-ask.md': KB_ASK_SKILL,
+    '.claude/commands/kb-session.md': KB_SESSION_SKILL,
     'CLAUDE.md': KB_CLAUDE_MD,
   };
 }
@@ -202,6 +250,7 @@ export function getSkillOnlyFiles(): Record<string, string> {
     '.claude/commands/kb-ingest.md': KB_INGEST_SKILL,
     '.claude/commands/kb-lint.md': KB_LINT_SKILL,
     '.claude/commands/kb-ask.md': KB_ASK_SKILL,
+    '.claude/commands/kb-session.md': KB_SESSION_SKILL,
     'CLAUDE.md': KB_CLAUDE_MD,
   };
 }
