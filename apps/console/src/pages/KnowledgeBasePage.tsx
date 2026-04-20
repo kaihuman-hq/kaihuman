@@ -19,13 +19,11 @@ export function KnowledgeBasePage() {
   const [skillsUpdated, setSkillsUpdated] = useState(false);
   const [view, setView] = useState<'inbox' | 'wiki'>('inbox');
 
-  useEffect(() => {
-    if (!repo) return;
-    load(repo.full_name);
-  }, [repo?.full_name]);
-
   async function load(fullName: string) {
     setLoading(true);
+    setSkillsUpdated(false);
+    setRawFiles([]);
+    setWikiFiles([]);
     const init = await isKBInitialized(fullName);
     setInitialized(init);
     if (init) {
@@ -41,11 +39,48 @@ export function KnowledgeBasePage() {
     setLoading(false);
   }
 
+  useEffect(() => {
+    if (!repo) return;
+    const fullName = repo.full_name;
+    let cancelled = false;
+    setLoading(true);
+    setSkillsUpdated(false);
+    setRawFiles([]);
+    setWikiFiles([]);
+
+    async function run() {
+      const init = await isKBInitialized(fullName);
+      if (cancelled) return;
+      setInitialized(init);
+      if (init) {
+        const updated = await updateSkillsIfNeeded(fullName);
+        if (cancelled) return;
+        setSkillsUpdated(updated);
+        const [raw, wiki] = await Promise.all([
+          listKBDir(fullName, 'raw'),
+          listKBDir(fullName, 'wiki'),
+        ]);
+        if (cancelled) return;
+        setRawFiles(raw);
+        setWikiFiles(wiki);
+      }
+      setLoading(false);
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [repo?.full_name]);
+
   async function handleSetup() {
     if (!repo) return;
     setScaffolding(true);
-    await scaffoldKB(repo.full_name);
-    setScaffolding(false);
+    try {
+      await scaffoldKB(repo.full_name);
+    } finally {
+      setScaffolding(false);
+    }
     await load(repo.full_name);
   }
 
