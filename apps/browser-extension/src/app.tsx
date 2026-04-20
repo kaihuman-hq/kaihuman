@@ -99,6 +99,7 @@ export function App() {
           text: (document.body?.innerText ?? '').trim(),
         }),
       });
+      if (!result?.result) throw new Error('Cannot read page content — restricted page?');
       chrome.runtime.sendMessage({ type: 'PIN_ARTICLE', ...result.result }, (response) => {
         if (chrome.runtime.lastError || response?.error) {
           const err = chrome.runtime.lastError?.message || response?.error || 'Unknown error';
