@@ -221,7 +221,10 @@ export const CsvTableView = ({ content, data }: CsvTableViewProps) => {
                     })}
                   </tr>
                   {isExpanded && (
-                    <tr key={`${rowIdx}-expanded`}>
+                    <tr
+                      // biome-ignore lint/suspicious/noArrayIndexKey: page-relative index is stable within this render
+                      key={`${rowIdx}-expanded`}
+                    >
                       <td colSpan={headers.length} className="p-0">
                         <div className="p-3 border-b border-[var(--los-border)] bg-[var(--los-bg)]">
                           <div className="flex flex-col gap-2">

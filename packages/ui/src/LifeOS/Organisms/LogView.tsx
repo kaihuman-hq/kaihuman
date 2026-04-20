@@ -144,7 +144,10 @@ export const LogView = ({ entries }: LogViewProps) => {
                     })}
                   </tr>
                   {isExpanded && (
-                    <tr key={`${i}-expanded`}>
+                    <tr
+                      // biome-ignore lint/suspicious/noArrayIndexKey: page-relative index is stable within this render
+                      key={`${i}-expanded`}
+                    >
                       <td colSpan={columns.length} className="p-0">
                         <div className="p-3 border-b border-[var(--los-border)] bg-[var(--los-bg)]">
                           <div className="flex flex-col gap-2">

@@ -80,6 +80,40 @@ Question or query passed via $ARGUMENTS
 Comprehensive answer with citations to wiki pages that support the answer.
 `;
 
+export const KB_CLAUDE_MD = `# Knowledge Base
+
+This repo is a personal AI knowledge base managed with Claude Code.
+
+## Structure
+
+\`\`\`
+.kh/
+  raw/        # Pinned articles (frontmatter: processed: false → true)
+  wiki/       # Compiled knowledge pages with backlinks
+  schema.md   # Domain definition and page format rules
+  index.md    # Master index of all wiki pages
+  log.md      # Processing and audit history
+.claude/commands/
+  kb-ingest.md  # /kb-ingest — compile raw articles into wiki
+  kb-lint.md    # /kb-lint  — audit and repair wiki
+  kb-ask.md     # /kb-ask   — answer questions from wiki
+\`\`\`
+
+## Workflow
+
+1. Articles are pinned via the browser extension → land in \`.kh/raw/\` with \`processed: false\`
+2. Run \`/kb-ingest\` to compile them into \`.kh/wiki/\` pages
+3. Run \`/kb-lint\` periodically to fix orphans, dead links, and contradictions
+4. Run \`/kb-ask <question>\` to query the knowledge base
+
+## Guidelines
+
+- Always read \`.kh/schema.md\` before creating or editing wiki pages
+- Wiki pages use \`[[wikilink]]\` syntax for cross-references
+- Keep raw files intact after processing — only the frontmatter changes
+- The index in \`.kh/index.md\` is the canonical entry point for navigation
+`;
+
 export const KB_SCHEMA_TEMPLATE = `# Knowledge Base Schema
 
 ## Domain
@@ -158,6 +192,7 @@ export function getScaffoldFiles(): Record<string, string> {
     '.claude/commands/kb-ingest.md': KB_INGEST_SKILL,
     '.claude/commands/kb-lint.md': KB_LINT_SKILL,
     '.claude/commands/kb-ask.md': KB_ASK_SKILL,
+    'CLAUDE.md': KB_CLAUDE_MD,
   };
 }
 
@@ -167,5 +202,6 @@ export function getSkillOnlyFiles(): Record<string, string> {
     '.claude/commands/kb-ingest.md': KB_INGEST_SKILL,
     '.claude/commands/kb-lint.md': KB_LINT_SKILL,
     '.claude/commands/kb-ask.md': KB_ASK_SKILL,
+    'CLAUDE.md': KB_CLAUDE_MD,
   };
 }
