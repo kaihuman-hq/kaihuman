@@ -3,6 +3,7 @@ import {
   getInstalledSkillVersion,
   isKBInitialized,
   listKBDir,
+  scaffoldKB,
   updateSkillsIfNeeded,
 } from './github-kb';
 import { KB_SKILL_VERSION } from './kb-skills';
@@ -131,5 +132,22 @@ describe('listKBDir', () => {
       }),
     );
     vi.unstubAllGlobals();
+  });
+});
+
+describe('scaffoldKB', () => {
+  it('calls upsertRepoFile for all 9 scaffold files', async () => {
+    vi.mocked(githubService.upsertRepoFile).mockResolvedValue({} as any);
+    await scaffoldKB('owner/repo');
+    expect(githubService.upsertRepoFile).toHaveBeenCalledTimes(9);
+  });
+
+  it('writes files with expected paths including .kh/.skill-version, .kh/raw/.gitkeep, and .claude/commands/kb-ingest.md', async () => {
+    vi.mocked(githubService.upsertRepoFile).mockResolvedValue({} as any);
+    await scaffoldKB('owner/repo');
+    const writtenPaths = vi.mocked(githubService.upsertRepoFile).mock.calls.map((c) => c[2]);
+    expect(writtenPaths).toContain('.kh/.skill-version');
+    expect(writtenPaths).toContain('.kh/raw/.gitkeep');
+    expect(writtenPaths).toContain('.claude/commands/kb-ingest.md');
   });
 });
