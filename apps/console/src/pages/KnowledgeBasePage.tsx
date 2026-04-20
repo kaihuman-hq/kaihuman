@@ -26,6 +26,7 @@ export function KnowledgeBasePage() {
   const [noteText, setNoteText] = useState('');
   const [noteTags, setNoteTags] = useState('');
   const [submittingNote, setSubmittingNote] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function load(fullName: string) {
     setLoading(true);
@@ -111,6 +112,14 @@ export function KnowledgeBasePage() {
     }
   }
 
+  function handleCopyInstall() {
+    const cmd = `mkdir -p ~/.claude/commands && gh api repos/${repo?.full_name}/contents/.claude/commands/kb-session.md --jq '.content' | base64 -d > ~/.claude/commands/kb-session.md`;
+    navigator.clipboard.writeText(cmd).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   async function doScaffold(skipClaudeMd: boolean) {
     if (!repo) return;
     setClaudeMdConflict(false);
@@ -191,6 +200,13 @@ export function KnowledgeBasePage() {
               skills updated to v{KB_SKILL_VERSION}
             </span>
           )}
+          <button
+            type="button"
+            onClick={handleCopyInstall}
+            class="text-[10px] text-[var(--los-fg-dim)] border border-[var(--los-border)] rounded px-2 py-0.5 hover:border-[var(--los-accent)] hover:text-[var(--los-fg)] transition-colors"
+          >
+            {copied ? 'Copied!' : 'Install /kb-session'}
+          </button>
           <span class="text-[10px] text-[var(--los-fg-dim)]">{repo.full_name}</span>
         </div>
       </header>
