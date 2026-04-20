@@ -23,9 +23,25 @@ export async function isKBInitialized(fullName: string): Promise<boolean> {
   return (await getInstalledSkillVersion(fullName)) !== null;
 }
 
-export async function scaffoldKB(fullName: string): Promise<void> {
+export async function claudeMdExists(fullName: string): Promise<boolean> {
   const { owner, repo } = parseRepo(fullName);
-  for (const [path, content] of Object.entries(getScaffoldFiles())) {
+  try {
+    await githubService.getFileContent(owner, repo, 'CLAUDE.md');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function scaffoldKB(
+  fullName: string,
+  { skipClaudeMd = false }: { skipClaudeMd?: boolean } = {},
+): Promise<void> {
+  const { owner, repo } = parseRepo(fullName);
+  const files = Object.entries(getScaffoldFiles()).filter(
+    ([path]) => !(skipClaudeMd && path === 'CLAUDE.md'),
+  );
+  for (const [path, content] of files) {
     await githubService.upsertRepoFile(
       owner,
       repo,

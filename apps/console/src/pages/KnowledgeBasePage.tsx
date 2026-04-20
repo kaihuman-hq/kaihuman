@@ -1,6 +1,7 @@
 import { githubProfileStore } from '@lifosy/core';
 import { useEffect, useState } from 'preact/hooks';
 import {
+  claudeMdExists,
   isKBInitialized,
   type KBFile,
   listKBDir,
@@ -16,6 +17,7 @@ export function KnowledgeBasePage() {
   const [wikiFiles, setWikiFiles] = useState<KBFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [scaffolding, setScaffolding] = useState(false);
+  const [claudeMdConflict, setClaudeMdConflict] = useState(false);
   const [skillsUpdated, setSkillsUpdated] = useState(false);
   const [view, setView] = useState<'inbox' | 'wiki'>('inbox');
 
@@ -75,9 +77,20 @@ export function KnowledgeBasePage() {
 
   async function handleSetup() {
     if (!repo) return;
+    const hasClaudeMd = await claudeMdExists(repo.full_name);
+    if (hasClaudeMd) {
+      setClaudeMdConflict(true);
+      return;
+    }
+    await doScaffold(false);
+  }
+
+  async function doScaffold(skipClaudeMd: boolean) {
+    if (!repo) return;
+    setClaudeMdConflict(false);
     setScaffolding(true);
     try {
-      await scaffoldKB(repo.full_name);
+      await scaffoldKB(repo.full_name, { skipClaudeMd });
       await load(repo.full_name);
     } finally {
       setScaffolding(false);
@@ -106,14 +119,38 @@ export function KnowledgeBasePage() {
           <code class="text-xs">.kh/</code> and <code class="text-xs">.claude/commands/</code> in
           your repo.
         </p>
-        <button
-          type="button"
-          onClick={handleSetup}
-          disabled={scaffolding}
-          class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50"
-        >
-          {scaffolding ? 'Setting up...' : 'Set Up Knowledge Base'}
-        </button>
+        {claudeMdConflict ? (
+          <div class="space-y-3">
+            <p class="text-xs text-[var(--los-warning)]">
+              A <code>CLAUDE.md</code> already exists in this repo. Overwrite it?
+            </p>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                onClick={() => doScaffold(false)}
+                class="px-3 py-1.5 bg-[var(--los-accent)] text-black font-bold text-xs rounded hover:opacity-90"
+              >
+                Overwrite
+              </button>
+              <button
+                type="button"
+                onClick={() => doScaffold(true)}
+                class="px-3 py-1.5 border border-[var(--los-border)] text-[var(--los-fg)] text-xs rounded hover:border-[var(--los-accent)]"
+              >
+                Keep existing
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSetup}
+            disabled={scaffolding}
+            class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50"
+          >
+            {scaffolding ? 'Setting up...' : 'Set Up Knowledge Base'}
+          </button>
+        )}
       </div>
     );
   }
