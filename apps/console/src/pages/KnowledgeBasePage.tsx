@@ -78,10 +78,10 @@ export function KnowledgeBasePage() {
     setScaffolding(true);
     try {
       await scaffoldKB(repo.full_name);
+      await load(repo.full_name);
     } finally {
       setScaffolding(false);
     }
-    await load(repo.full_name);
   }
 
   if (!repo) {
