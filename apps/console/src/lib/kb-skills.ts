@@ -8,7 +8,7 @@ Ingest raw markdown files into the knowledge base wiki.
 
 1. Read \`.kh/schema.md\` to understand domain, page format, and index structure
 2. Read existing wiki pages from \`.kh/wiki/\` to understand current state
-3. Find all unprocessed raw files in \`.kh/raw/\` (those without \`processed: true\` in frontmatter)
+3. Find all unprocessed raw files in \`.kh/raw/\` (where frontmatter has \`processed: false\`)
 4. For each unprocessed file:
    - Extract key concepts and entities
    - Create or update corresponding wiki pages in \`.kh/wiki/\`
