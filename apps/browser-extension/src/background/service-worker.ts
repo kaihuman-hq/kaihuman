@@ -176,7 +176,42 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
     });
     return true; // Indicate async response
   }
+
+  if (message.type === 'PIN_ARTICLE') {
+    chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
+      const token = data.lifeos_token;
+      const repo = data.lifeos_repo || 'lifosy/monorepo';
+      if (!token) {
+        sendResponse({ error: 'No token found' });
+        return;
+      }
+      try {
+        const { title, url, text } = message as { title: string; url: string; text: string };
+        const date = new Date().toISOString().slice(0, 10);
+        const slug = urlToSlug(url);
+        const path = `.kh/raw/${Date.now()}-${slug}.md`;
+        const escapedTitle = title.replace(/"/g, '\\"');
+        const content = `---\ntitle: "${escapedTitle}"\nurl: ${url}\ndate: ${date}\nprocessed: false\n---\n\n${text}`;
+        await githubUpsertFile(token, repo, path, content);
+        sendResponse({ success: true });
+      } catch (error: any) {
+        sendResponse({ error: error.message });
+      }
+    });
+    return true;
+  }
 });
+
+function urlToSlug(url: string): string {
+  try {
+    const { hostname, pathname } = new URL(url);
+    const last = pathname.replace(/\/$/, '').split('/').pop() || '';
+    const base = last || hostname.replace(/^www\./, '');
+    return base.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40);
+  } catch {
+    return 'article';
+  }
+}
 
 async function saveToKnowledgeBase(text: string, url: string, pageTitle: string) {
   const tokenData: any = await chrome.storage.local.get(['lifeos_token', 'lifeos_repo']);

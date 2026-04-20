@@ -1,3 +1,5 @@
+import { extractArticle } from './extract';
+
 console.log('LifeOS Extension: Content script loaded');
 
 // Function to extract token and send to background
@@ -53,3 +55,10 @@ const observer = new MutationObserver((mutations) => {
 });
 
 observer.observe(document.body, { attributes: true });
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === 'EXTRACT_ARTICLE') {
+    sendResponse(extractArticle());
+    return false;
+  }
+});
