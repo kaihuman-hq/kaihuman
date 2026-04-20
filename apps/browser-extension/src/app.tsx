@@ -4,7 +4,7 @@ import './index.css';
 
 export function App() {
   const [token, setToken] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<{ title: string; url: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<{ title: string; url: string; tabId: number } | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [dumpNote, setDumpNote] = useState('');
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
@@ -61,6 +61,7 @@ export function App() {
         setActiveTab({
           title: tabs[0].title || '',
           url: tabs[0].url || '',
+          tabId: tabs[0].id ?? 0,
         });
       }
     });
@@ -86,12 +87,32 @@ export function App() {
   const handleReadItLater = async () => {
     if (!token || !activeTab) return;
     setStatus('saving');
-    // Simulate API call
-    setTimeout(() => {
-      console.log('Saved to Read-it-later:', activeTab);
-      setStatus('success');
-      setTimeout(() => setStatus('idle'), 2000);
-    }, 1000);
+    setErrorMessage(null);
+    try {
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: activeTab.tabId },
+        func: () => ({
+          title: document.title,
+          url:
+            (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.href ||
+            window.location.href,
+          text: (document.body?.innerText ?? '').trim(),
+        }),
+      });
+      chrome.runtime.sendMessage({ type: 'PIN_ARTICLE', ...result.result }, (response) => {
+        if (chrome.runtime.lastError || response?.error) {
+          const err = chrome.runtime.lastError?.message || response?.error || 'Unknown error';
+          setErrorMessage(err);
+          setStatus('error');
+        } else {
+          setStatus('success');
+          setTimeout(() => setStatus('idle'), 2000);
+        }
+      });
+    } catch (e: any) {
+      setErrorMessage(e.message || 'Unknown error');
+      setStatus('error');
+    }
   };
 
   const handleDumpNote = async () => {
@@ -196,7 +217,7 @@ export function App() {
               disabled={status === 'saving'}
               class="w-full py-1.5 px-3 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-xs rounded transition-colors flex items-center justify-center gap-2"
             >
-              {status === 'saving' ? 'Saving...' : status === 'success' ? 'Saved!' : 'Save Page'}
+              {status === 'saving' ? 'Saving...' : status === 'success' ? 'Saved!' : 'Pin to Knowledge Base'}
             </button>
           </div>
         </section>
