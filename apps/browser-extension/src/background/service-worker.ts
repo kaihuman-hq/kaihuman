@@ -233,14 +233,3 @@ async function saveToKnowledgeBase(text: string, url: string, pageTitle: string)
     console.error('LifeOS Extension: Error saving clipping', e);
   }
 }
-
-function urlToSlug(url: string): string {
-  try {
-    const { hostname, pathname } = new URL(url);
-    const last = pathname.replace(/\/$/, '').split('/').pop() || '';
-    const base = last || hostname.replace(/^www\./, '');
-    return base.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40);
-  } catch {
-    return 'article';
-  }
-}
