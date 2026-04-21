@@ -135,6 +135,8 @@ export interface MainAppProps {
   onBoardClick?: () => void;
   onActionLogClick?: () => void;
   onShortcutsClick?: () => void;
+  onKnowledgeClick?: () => void;
+  onKBCommandsClick?: () => void;
   shortcutItems?: import('../Organisms/StatusBar').MenuItem[];
 
   // Version info
@@ -218,6 +220,8 @@ export const MainApp = ({
   onBoardClick,
   onActionLogClick,
   onShortcutsClick,
+  onKnowledgeClick,
+  onKBCommandsClick,
   shortcutItems,
   ...props
 }: MainAppProps) => {
@@ -1386,6 +1390,8 @@ abbreviations: undefined
         }}
         onOpenShortcuts={onShortcutsClick}
         onOpenActionLog={onActionLogClick}
+        onOpenKnowledge={onKnowledgeClick}
+        onOpenKBCommands={onKBCommandsClick}
         onSelect={(item) => {
           if (item.type === 'FILE') {
             logger.debug(`Opening file from search: ${item.path}`);
@@ -1962,6 +1968,9 @@ abbreviations: undefined
                   ...(onShortcutsClick ? [{ label: 'Shortcuts', onClick: onShortcutsClick }] : []),
                   ...(onBoardClick ? [{ label: 'Board', onClick: onBoardClick }] : []),
                   ...(onActionLogClick ? [{ label: 'Action Log', onClick: onActionLogClick }] : []),
+                  ...(onKnowledgeClick
+                    ? [{ label: 'Knowledge Base', onClick: onKnowledgeClick }]
+                    : []),
                   {
                     label: 'Graph',
                     onClick: () => {

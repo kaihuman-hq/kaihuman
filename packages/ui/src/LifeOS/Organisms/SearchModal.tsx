@@ -46,6 +46,8 @@ export interface SearchModalProps {
   onCreateNewFile?: () => void;
   onOpenShortcuts?: () => void;
   onOpenActionLog?: () => void;
+  onOpenKnowledge?: () => void;
+  onOpenKBCommands?: () => void;
 }
 
 export const SearchModal = ({
@@ -62,6 +64,8 @@ export const SearchModal = ({
   onCreateNewFile,
   onOpenShortcuts,
   onOpenActionLog,
+  onOpenKnowledge,
+  onOpenKBCommands,
 }: SearchModalProps) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -99,6 +103,18 @@ export const SearchModal = ({
         onSelect: onOpenActionLog,
       },
       { name: 'Open Wiki', path: 'cmd:wiki', type: 'COMMAND', onSelect: () => handleOpenWiki() },
+      {
+        name: 'Open Knowledge Base',
+        path: 'cmd:knowledge',
+        type: 'COMMAND',
+        onSelect: onOpenKnowledge,
+      },
+      {
+        name: 'Knowledge Base Commands',
+        path: 'cmd:kb-commands',
+        type: 'COMMAND',
+        onSelect: onOpenKBCommands,
+      },
       { name: 'Change Repo', path: 'cmd:repo', type: 'COMMAND', onSelect: () => {} }, // Triggered by UI flow usually? Or needs specific handler
       { name: 'Change Workspace', path: 'cmd:workspace', type: 'COMMAND', onSelect: () => {} },
     ];
