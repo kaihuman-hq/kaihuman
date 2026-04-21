@@ -41,14 +41,10 @@ export async function scaffoldKB(
   const files = Object.entries(getScaffoldFiles()).filter(
     ([path]) => !(skipClaudeMd && path === 'CLAUDE.md'),
   );
+  // All scaffold files are new (called only when !isKBInitialized), so create
+  // directly without a pre-check GET to avoid spurious 404s in the network log.
   for (const [path, content] of files) {
-    await githubService.upsertRepoFile(
-      owner,
-      repo,
-      path,
-      content,
-      'chore: scaffold knowledge base',
-    );
+    await githubService.saveFile(owner, repo, path, content, 'chore: scaffold knowledge base');
   }
 }
 
@@ -88,7 +84,10 @@ export async function addRawNote(
   await githubService.upsertRepoFile(owner, repo, path, content, `note: add "${title}"`);
 }
 
-export async function listKBDir(fullName: string, dir: 'raw' | 'wiki'): Promise<KBFile[]> {
+export async function listKBDir(
+  fullName: string,
+  dir: 'raw' | 'wiki' | 'raw/processed',
+): Promise<KBFile[]> {
   const token = authStore.token.value;
   if (!token) return [];
   const res = await fetch(`https://api.github.com/repos/${fullName}/contents/.kh/${dir}`, {

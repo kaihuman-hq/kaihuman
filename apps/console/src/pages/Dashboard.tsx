@@ -1,5 +1,5 @@
 import { authStore, githubFileStore, githubProfileStore, Logger, layoutStore } from '@lifosy/core';
-import { useCallback, useEffect, useMemo } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 
 const logger = new Logger('Dashboard');
@@ -14,10 +14,13 @@ import {
 } from '@lifosy/ui';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FileViewer } from '../components/FileViewer';
+import { KBCommandsModal } from '../components/KBCommandsModal';
 import { VERSION } from '../version';
 import { QUICK_ROUTES } from './ShortcutsPage';
 
 export const Dashboard = () => {
+  const [showKBCommands, setShowKBCommands] = useState(false);
+
   /* original repo/repos declarations removed for mock */
   const tree = githubFileStore.tree.value;
   const openFiles = githubFileStore.openFiles.value;
@@ -280,6 +283,8 @@ export const Dashboard = () => {
           onBoardClick={() => route('/board')}
           onActionLogClick={() => route('/action-log')}
           onShortcutsClick={() => route('/shortcuts')}
+          onKnowledgeClick={() => route('/knowledge')}
+          onKBCommandsClick={() => setShowKBCommands(true)}
           shortcutItems={QUICK_ROUTES.map((r) => ({ label: r.name, onClick: () => route(r.path) }))}
           // Remote Config Props
           config={remoteConfig || undefined}
@@ -493,6 +498,7 @@ export const Dashboard = () => {
           version={VERSION}
         />
       </ErrorBoundary>
+      <KBCommandsModal isOpen={showKBCommands} onClose={() => setShowKBCommands(false)} />
     </div>
   );
 };
