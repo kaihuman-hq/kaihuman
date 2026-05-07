@@ -152,13 +152,29 @@ export class LayoutStore {
       const isDataCollection = item.path.toLowerCase().endsWith('.data-collection.csv');
       const isStocks = item.path.toLowerCase().endsWith('.stocks.csv');
       const isConsumption = item.path.toLowerCase().endsWith('.consumption.csv');
+      const isBoardOverview = item.path.toLowerCase().endsWith('.board-overview.json');
+
+      // Use compound extension for known widget types; fall back to last segment
+      let extension: string | undefined;
+      if (isTimeTracking) extension = '.timetracking.csv';
+      else if (isEvents) extension = '.events.csv';
+      else if (isHabit) extension = '.habit.csv';
+      else if (isTimezones) extension = '.timezones.json';
+      else if (isRss) extension = '.rss.json';
+      else if (isReadItLater) extension = '.readitlater.json';
+      else if (isBudget) extension = '.budget.csv';
+      else if (isActionLog) extension = '.actionlog.md';
+      else if (isDataCollection) extension = '.data-collection.csv';
+      else if (isStocks) extension = '.stocks.csv';
+      else if (isConsumption) extension = '.consumption.csv';
+      else if (isBoardOverview) extension = '.board-overview.json';
+      else extension = item.path.includes('.') ? `.${item.path.split('.').pop()}` : undefined;
 
       const tile: TileDef = {
         id: item.path,
         title: item.path.split('/').pop() || item.path,
         type: item.type === 'tree' ? 'FOLDER' : 'FILE',
-        // content: null, // Core TileDef doesn't have content
-        extension: item.path.includes('.') ? `.${item.path.split('.').pop()}` : undefined,
+        extension,
       };
 
       // In Core, we don't set UI content. MainApp handles that.
@@ -176,7 +192,8 @@ export class LayoutStore {
         isActionLog ||
         isDataCollection ||
         isStocks ||
-        isConsumption;
+        isConsumption ||
+        isBoardOverview;
 
       if (isWidget && openFiles && openFiles[item.path]) {
         tile.rawContent = openFiles[item.path]?.content;

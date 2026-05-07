@@ -49,6 +49,7 @@ import { GraphView } from '../Organisms/GraphView';
 import { SettingsView } from '../Organisms/SettingsView';
 import { StatusBar } from '../Organisms/StatusBar';
 import { ActionLogWidget } from '../Organisms/Widgets/ActionLogWidget';
+import { BoardOverviewWidget } from '../Organisms/Widgets/BoardOverviewWidget';
 import { BudgetWidget } from '../Organisms/Widgets/BudgetWidget';
 import { ConsumptionWidget } from '../Organisms/Widgets/ConsumptionWidget';
 import { CsvTableView } from '../Organisms/Widgets/CsvTableView';
@@ -725,6 +726,7 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
       else if (lowerPath.endsWith('.stocks.csv')) ext = '.stocks.csv';
       else if (lowerPath.endsWith('.consumption.csv')) ext = '.consumption.csv';
+      else if (lowerPath.endsWith('.board-overview.json')) ext = '.board-overview.json';
       else {
         const parts = entry.path.split('.');
         if (lowerPath.endsWith('.enc') && parts.length > 2) {
@@ -949,6 +951,17 @@ abbreviations: undefined
             setFocusedViewMode('ADD');
             setActiveTileId(tile.id);
           }}
+        />
+      );
+    }
+
+    if (tile.extension === '.board-overview.json') {
+      return (
+        <BoardOverviewWidget
+          content={tile.rawContent ?? '{}'}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+          onNavigate={onBoardClick}
         />
       );
     }
@@ -1627,6 +1640,7 @@ abbreviations: undefined
                       }
                     : undefined
                 }
+                onBoardClick={onBoardClick}
               />
             ) : (
               // Should not happen, but safe fallback
@@ -2062,6 +2076,7 @@ const FocusedTileInternal = ({
   onAddToReadItLater,
   onAddToDashboard,
   onCreateFile,
+  onBoardClick,
   initialViewMode = 'WIDGET',
 }: {
   tile: TileDef;
@@ -2077,6 +2092,7 @@ const FocusedTileInternal = ({
   onAddToReadItLater?: (item: ReadItLaterItem) => void;
   onAddToDashboard?: (path: string) => void;
   onCreateFile?: (path: string, content: string) => Promise<void> | void;
+  onBoardClick?: () => void;
   initialViewMode?: string;
 }) => {
   if (!tile) return null;
@@ -2093,6 +2109,7 @@ const FocusedTileInternal = ({
   const isActionLog = tile.extension === '.actionlog.md';
   const isStocks = tile.extension === '.stocks.csv';
   const isConsumption = tile.extension === '.consumption.csv';
+  const isBoardOverview = tile.extension === '.board-overview.json';
 
   const isGenericCsv =
     tile.extension === '.csv' &&
@@ -2118,7 +2135,8 @@ const FocusedTileInternal = ({
     isActionLog ||
     isStocks ||
     isConsumption ||
-    isAnyCsv; // && !!tile.rawContent;
+    isAnyCsv || // && !!tile.rawContent;
+    isBoardOverview;
 
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const [viewMode, setViewMode] = useState<string>(
@@ -2768,6 +2786,14 @@ const FocusedTileInternal = ({
                 />
               )}
               {isGenericCsv && <CsvTableView content={tile.rawContent || ''} />}
+              {isBoardOverview && (
+                <BoardOverviewWidget
+                  content={tile.rawContent ?? '{}'}
+                  mode="FOCUS"
+                  onChange={(c) => tile.onContentChange?.(c)}
+                  onNavigate={onBoardClick}
+                />
+              )}
             </div>
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="flex flex-col min-h-full w-full p-8">

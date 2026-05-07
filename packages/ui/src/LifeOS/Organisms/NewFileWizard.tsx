@@ -9,6 +9,7 @@ import {
   Database,
   FileText,
   Globe,
+  Kanban,
   ListTodo,
   Lock,
   Rss,
@@ -123,6 +124,15 @@ const TEMPLATES: Template[] = [
     icon: Bookmark,
     extension: '.readitlater.json',
     defaultContent: JSON.stringify({ items: [] }, null, 2),
+  },
+  {
+    id: 'board-overview',
+    name: 'Board Overview',
+    description:
+      'Dashboard widget showing inbox, in-progress, and overdue counts. Opens the Board on click.',
+    icon: Kanban,
+    extension: '.board-overview.json',
+    defaultContent: '{}',
   },
 ];
 
