@@ -1,0 +1,64 @@
+/* Hallmark · genre: atmospheric · macrostructure: Manifesto · theme: Terminal · enrichment: none · nav: N5 · footer: Ft5 */
+
+:root {
+  /* — Colors (OKLCH · green-black anchor, hue 145) — */
+  /* Converted from original: #050505 bg · #e2e8f0 fg · #00FF00 accent · #64748b muted */
+  --color-paper:      oklch(5%   0.005 145);  /* ≈ #050505 near-black, green-cast */
+  --color-paper-2:    oklch(10%  0.008 145);  /* elevated surface */
+  --color-paper-3:    oklch(15%  0.010 145);  /* highest surface */
+  --color-rule:       oklch(22%  0.006 145);  /* ≈ #333 dark border */
+  --color-neutral:    oklch(52%  0.060 244);  /* ≈ #64748b cool-muted */
+  --color-muted:      oklch(42%  0.050 244);  /* dimmer muted */
+  --color-ink:        oklch(91%  0.008 230);  /* ≈ #e2e8f0 cool near-white */
+  --color-ink-2:      oklch(72%  0.010 220);  /* dimmer text */
+  --color-accent:     oklch(87%  0.295 142);  /* ≈ #00FF00 neon green */
+  --color-accent-dim: oklch(87%  0.100 142 / 0.15);  /* dim glow */
+  --color-bloom:      oklch(40%  0.120 142 / 0.08);  /* hero radial bloom */
+  --color-focus:      oklch(87%  0.295 142);  /* neon green focus ring */
+
+  /* — Typography — */
+  --font-display: 'Tomorrow', 'Space Grotesk', system-ui, sans-serif;
+  --font-body:    'JetBrains Mono', 'Fira Code', monospace;
+
+  /* — Type scale · 1.25 major third — */
+  --text-xs:       0.64rem;
+  --text-sm:       0.8rem;
+  --text-base:     1rem;
+  --text-md:       1.25rem;
+  --text-lg:       1.5625rem;
+  --text-xl:       1.9531rem;
+  --text-2xl:      2.4414rem;
+  --text-3xl:      3.0518rem;
+  --text-4xl:      3.8147rem;
+  --text-display-s: clamp(2.5rem,  4vw + 1rem, 4.5rem);
+  --text-display:   clamp(3rem,    7vw + 1rem, 6.5rem);
+
+  /* — Spacing · 4pt scale — */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs:  0.5rem;
+  --space-sm:  0.75rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 9rem;
+
+  /* — Motion — */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in:     cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long:  420ms;
+
+  /* — Z-index — */
+  --z-base:     1;
+  --z-raised:   10;
+  --z-dropdown: 100;
+  --z-sticky:   200;
+  --z-modal:    400;
+  --z-toast:    500;
+  --z-tooltip:  600;
+}
