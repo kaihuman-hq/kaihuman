@@ -1,6 +1,6 @@
 import { githubFileStore, layoutStore } from '@lifosy/core';
 import { CheckCircle2, Circle, Clock, ExternalLink, PlayCircle, XCircle } from 'lucide-preact';
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../../Atoms/Typography';
 import { parseTodos, type TodoStatus } from './TodoLogic';
@@ -112,6 +112,14 @@ function useStats(cfg: BoardOverviewConfig) {
     }
     return paths;
   }, [remoteConfig, tree]);
+
+  useEffect(() => {
+    for (const path of todoFilePaths) {
+      if (!openFiles[path]) {
+        githubFileStore.openFile(path);
+      }
+    }
+  }, [todoFilePaths, openFiles]);
 
   const stats = useMemo(() => {
     const overdueCutoff = cfg.overdueDays * 24 * 60 * 60 * 1000;
