@@ -13,6 +13,7 @@ vi.mock('@lifosy/core', () => ({
   githubService: {
     getFileContent: vi.fn(),
     upsertRepoFile: vi.fn(),
+    saveFile: vi.fn(),
   },
 }));
 
@@ -136,18 +137,16 @@ describe('listKBDir', () => {
 });
 
 describe('scaffoldKB', () => {
-  it('calls upsertRepoFile for all 9 scaffold files', async () => {
-    vi.mocked(githubService.upsertRepoFile).mockResolvedValue({} as any);
+  it('calls saveFile once for every scaffold file', async () => {
+    vi.mocked(githubService.saveFile).mockResolvedValue({} as any);
     await scaffoldKB('owner/repo');
-    expect(githubService.upsertRepoFile).toHaveBeenCalledTimes(
-      Object.keys(getScaffoldFiles()).length,
-    );
+    expect(githubService.saveFile).toHaveBeenCalledTimes(Object.keys(getScaffoldFiles()).length);
   });
 
   it('writes files with expected paths including .kh/.skill-version, .kh/raw/.gitkeep, and .claude/commands/kb-ingest.md', async () => {
-    vi.mocked(githubService.upsertRepoFile).mockResolvedValue({} as any);
+    vi.mocked(githubService.saveFile).mockResolvedValue({} as any);
     await scaffoldKB('owner/repo');
-    const writtenPaths = vi.mocked(githubService.upsertRepoFile).mock.calls.map((c) => c[2]);
+    const writtenPaths = vi.mocked(githubService.saveFile).mock.calls.map((c) => c[2]);
     expect(writtenPaths).toContain('.kh/.skill-version');
     expect(writtenPaths).toContain('.kh/raw/.gitkeep');
     expect(writtenPaths).toContain('.claude/commands/kb-ingest.md');
