@@ -8,6 +8,7 @@ import { EditorView, highlightActiveLineGutter, keymap, lineNumbers } from '@cod
 import { githubFileStore, Logger } from '@lifosy/core';
 import { useSignalEffect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { syncDocPreservingSelection } from './docSync';
 
 const logger = new Logger('CodeMirrorEditor');
 
@@ -237,9 +238,7 @@ export const CodeMirrorEditor = ({
       if (initialContent !== currentDoc) {
         isUpdatingFromStore.current = true;
         try {
-          viewRef.current.dispatch({
-            changes: { from: 0, to: currentDoc.length, insert: initialContent },
-          });
+          syncDocPreservingSelection(viewRef.current, initialContent);
         } finally {
           isUpdatingFromStore.current = false;
         }
@@ -286,9 +285,7 @@ export const CodeMirrorEditor = ({
       if (content !== doc && content !== null) {
         isUpdatingFromStore.current = true;
         try {
-          view.dispatch({
-            changes: { from: 0, to: doc.length, insert: content },
-          });
+          syncDocPreservingSelection(view, content);
         } finally {
           isUpdatingFromStore.current = false;
         }
