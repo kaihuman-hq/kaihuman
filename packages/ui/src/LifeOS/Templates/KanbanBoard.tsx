@@ -308,6 +308,8 @@ const AddTaskModal = ({
   const [createPromptFile, setCreatePromptFile] = useState(false);
   const [promptFileName, setPromptFileName] = useState('');
   const [openAfter, setOpenAfter] = useState(false);
+  const [createAnother, setCreateAnother] = useState(false);
+  const textInputRef = useRef<HTMLInputElement>(null);
 
   const fileData = useMemo(
     () => parsedFiles.find((f) => f.path === selectedFile)?.data ?? null,
@@ -344,8 +346,35 @@ const AddTaskModal = ({
       await onCreateFile(promptRefFile, '');
       if (openAfter && onOpenFile) onOpenFile(promptRefFile);
     }
-    onClose();
+    if (createAnother) {
+      setText('');
+      setSelectedTags([]);
+      setNewTag('');
+      setCreatePromptFile(false);
+      setPromptFileName('');
+      textInputRef.current?.focus();
+    } else {
+      onClose();
+    }
   };
+
+  // Keep a ref to handleAdd to avoid stale closure in the keyboard listener
+  const handleAddRef = useRef(handleAdd);
+  useEffect(() => {
+    handleAddRef.current = handleAdd;
+  });
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        handleAddRef.current();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   const showFileDropdown = !initialFilePath && todoFilePaths.length > 1;
   const basePath = dirOf(selectedFile);
@@ -389,13 +418,14 @@ const AddTaskModal = ({
         )}
 
         <input
+          ref={textInputRef}
           // biome-ignore lint/a11y/noAutofocus: intentional modal focus
           autoFocus
           type="text"
           value={text}
           onInput={(e) => setText(e.currentTarget.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') handleAdd();
+            if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) handleAdd();
           }}
           placeholder="Task description"
           className="w-full bg-transparent border border-[var(--los-border)] focus:border-[var(--los-accent)] px-3 py-2 text-sm font-mono outline-none transition-colors mb-4"
@@ -511,14 +541,26 @@ const AddTaskModal = ({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={!text.trim() || !selectedFile}
-          className="w-full mt-5 py-2 bg-[var(--los-accent)] text-black text-xs font-mono font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-        >
-          ADD TASK
-        </button>
+        <div className="mt-5 flex flex-col gap-3">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={createAnother}
+              onChange={(e) => setCreateAnother(e.currentTarget.checked)}
+              className="accent-[var(--los-accent)] w-4 h-4 shrink-0"
+            />
+            <MonoLabel className="cursor-pointer text-[10px]">CREATE ANOTHER AFTER SAVING</MonoLabel>
+          </label>
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={!text.trim() || !selectedFile}
+            className="w-full py-2 bg-[var(--los-accent)] text-black text-xs font-mono font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity flex items-center justify-center gap-2"
+          >
+            ADD TASK
+            <span className="opacity-50 font-normal text-[9px]">ctrl+↵</span>
+          </button>
+        </div>
       </div>
     </div>
   );

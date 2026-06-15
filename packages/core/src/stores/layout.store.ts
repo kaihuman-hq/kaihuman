@@ -179,7 +179,9 @@ export class LayoutStore {
 
       // In Core, we don't set UI content. MainApp handles that.
       // We DO set rawContent if file is open.
-      const openFiles = githubFileStore.openFiles.value;
+      // Use peek() to avoid subscribing the columns signal to every file content change —
+      // rawContent updates reach the UI via the fileContents prop in Dashboard instead.
+      const openFiles = githubFileStore.openFiles.peek();
 
       const isWidget =
         isTimeTracking ||

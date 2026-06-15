@@ -25,6 +25,7 @@ export class GithubFileStore {
   // State
   tree = signal<TreeItem[]>([]);
   openFiles = signal<Record<string, FileContent>>({});
+  private idbWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
   activeFile = signal<string | null>(null);
   dirtyFiles = signal<Set<string>>(new Set());
   isLoading = signal<boolean>(false);
@@ -271,21 +272,30 @@ export class GithubFileStore {
       dirty.add(path);
       this.dirtyFiles.value = dirty;
 
-      // Persist edit to IDB immediately so content survives a browser suspend/crash
-      // before the next explicit save reaches GitHub.
+      // Persist edit to IDB so content survives a browser suspend/crash before
+      // the next explicit save reaches GitHub. Debounced to avoid hammering IDB
+      // on every keystroke — 500 ms of idle after the last change flushes.
       const repo = githubProfileStore.currentRepo.value;
       if (repo) {
         const cacheKey = `${repo.full_name}:${path}`;
-        dbPromise
-          .then((db) =>
-            db.put('files', {
-              path: cacheKey,
-              content: newContent,
-              sha: file.sha,
-              timestamp: Date.now(),
-            }),
-          )
-          .catch((e) => logger.error(`Failed to persist edit for ${path} to cache`, e));
+        clearTimeout(this.idbWriteTimers.get(cacheKey));
+        this.idbWriteTimers.set(
+          cacheKey,
+          setTimeout(() => {
+            this.idbWriteTimers.delete(cacheKey);
+            const latestFile = this.openFiles.peek()[path];
+            dbPromise
+              .then((db) =>
+                db.put('files', {
+                  path: cacheKey,
+                  content: latestFile?.content ?? newContent,
+                  sha: latestFile?.sha ?? file.sha,
+                  timestamp: Date.now(),
+                }),
+              )
+              .catch((e) => logger.error(`Failed to persist edit for ${path} to cache`, e));
+          }, 500),
+        );
       }
     }
   }
