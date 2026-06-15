@@ -697,10 +697,9 @@ abbreviations: undefined
     onConfigChange({ ...newConfig });
   };
 
-  const quickNoteSet = useMemo(
-    () => new Set(layoutStore.remoteConfig.value?.files?.quickNotes || []),
-    [],
-  );
+  // Read remoteConfig.value here so Preact tracks the subscription — the Set is
+  // derived inline so it's always current without a stale useMemo.
+  const quickNoteSet = new Set(layoutStore.remoteConfig.value?.files?.quickNotes || []);
   const isQuickNote = useCallback((path: string) => quickNoteSet.has(path), [quickNoteSet]);
 
   // Filter entries for current dashboard
@@ -811,15 +810,6 @@ abbreviations: undefined
         />
       );
     }
-    if (tile.extension === '.habit.csv' && tile.rawContent) {
-      return (
-        <HabitTrackerWidget
-          content={tile.rawContent}
-          mode={mode}
-          onChange={(newContent) => tile.onContentChange?.(newContent)}
-        />
-      );
-    }
     if (tile.extension === '.todos.md' && tile.rawContent) {
       return (
         <TodoWidget
@@ -875,15 +865,6 @@ abbreviations: undefined
         <ReadItLaterWidget
           content={tile.rawContent}
           mode={mode}
-          onChange={(newContent) => tile.onContentChange?.(newContent)}
-        />
-      );
-    }
-    if (tile.extension === '.data-collection.csv' && tile.rawContent) {
-      return (
-        <DataCollectionWidget
-          content={tile.rawContent}
-          mode={mode as any}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );

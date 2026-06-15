@@ -20,11 +20,21 @@ export interface TimezoneWidgetProps {
 export const TimezoneWidget = ({ content, mode, className, onChange }: TimezoneWidgetProps) => {
   const data: TimezoneData = useMemo(() => parseTimezones(content), [content]);
 
-  // Ticker for live clock
+  // Ticker for live clock — pauses when the tab is hidden to avoid wasted work
   const [_now, setNow] = useState(Date.now());
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000); // Update every second
-    return () => clearInterval(timer);
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const start = () => {
+      timer = setInterval(() => setNow(Date.now()), 1000);
+    };
+    const stop = () => clearInterval(timer);
+    const onVisibility = () => (document.hidden ? stop() : start());
+    document.addEventListener('visibilitychange', onVisibility);
+    start();
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   const yearProgress = getYearProgress();
