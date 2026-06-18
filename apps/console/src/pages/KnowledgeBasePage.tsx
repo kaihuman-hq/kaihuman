@@ -17,7 +17,6 @@ export function KnowledgeBasePage() {
   const repo = githubProfileStore.currentRepo.value;
   const [initialized, setInitialized] = useState<boolean | null>(null);
   const [rawFiles, setRawFiles] = useState<KBFile[]>([]);
-  const [wikiFiles, setWikiFiles] = useState<KBFile[]>([]);
   const [processedFiles, setProcessedFiles] = useState<KBFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [scaffolding, setScaffolding] = useState(false);
@@ -35,20 +34,17 @@ export function KnowledgeBasePage() {
     setLoading(true);
     setSkillsUpdated(false);
     setRawFiles([]);
-    setWikiFiles([]);
     setProcessedFiles([]);
     const init = await isKBInitialized(fullName);
     setInitialized(init);
     if (init) {
       const updated = await updateSkillsIfNeeded(fullName);
       setSkillsUpdated(updated);
-      const [raw, wiki, processed] = await Promise.all([
+      const [raw, processed] = await Promise.all([
         listKBDir(fullName, 'raw'),
-        listKBDir(fullName, 'wiki'),
         listKBDir(fullName, 'raw/processed'),
       ]);
       setRawFiles(raw);
-      setWikiFiles(wiki);
       setProcessedFiles(processed);
     }
     setLoading(false);
@@ -61,7 +57,6 @@ export function KnowledgeBasePage() {
     setLoading(true);
     setSkillsUpdated(false);
     setRawFiles([]);
-    setWikiFiles([]);
     setProcessedFiles([]);
 
     async function run() {
@@ -72,14 +67,12 @@ export function KnowledgeBasePage() {
         const updated = await updateSkillsIfNeeded(fullName);
         if (cancelled) return;
         setSkillsUpdated(updated);
-        const [raw, wiki, processed] = await Promise.all([
+        const [raw, processed] = await Promise.all([
           listKBDir(fullName, 'raw'),
-          listKBDir(fullName, 'wiki'),
           listKBDir(fullName, 'raw/processed'),
         ]);
         if (cancelled) return;
         setRawFiles(raw);
-        setWikiFiles(wiki);
         setProcessedFiles(processed);
       }
       setLoading(false);
@@ -147,6 +140,7 @@ export function KnowledgeBasePage() {
       onDashboardClick={() => route('/')}
       onFilesClick={() => route('/')}
       onBoardClick={() => route('/board')}
+      onWikiClick={() => route('/wiki')}
     />
   );
 
@@ -247,7 +241,7 @@ export function KnowledgeBasePage() {
           {(
             [
               { id: 'inbox', label: 'Inbox', count: rawFiles.length },
-              { id: 'wiki', label: 'Wiki', count: wikiFiles.length },
+              { id: 'wiki', label: 'Wiki', count: null },
               { id: 'processed', label: 'Processed', count: processedFiles.length },
             ] as const
           ).map(({ id, label, count }) => (
@@ -261,7 +255,7 @@ export function KnowledgeBasePage() {
                   : 'border-[var(--los-border)] text-[var(--los-fg-dim)] hover:border-[var(--los-accent)]'
               }`}
             >
-              {label} ({count})
+              {count !== null ? `${label} (${count})` : label}
             </button>
           ))}
         </nav>
@@ -340,20 +334,19 @@ export function KnowledgeBasePage() {
               )}
             </>
           ) : view === 'wiki' ? (
-            wikiFiles.length === 0 ? (
+            <div class="flex flex-col gap-3">
               <p class="text-xs text-[var(--los-fg-dim)]">
-                No wiki pages yet. Run <code>/kb-ingest</code> in Claude Code to compile articles.
+                Wiki pages live in <code class="text-xs">.kh/wiki/</code>. Open the wiki to browse
+                and read them.
               </p>
-            ) : (
-              wikiFiles.map((f) => (
-                <div
-                  key={f.sha}
-                  class="px-3 py-2 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)] text-xs text-[var(--los-fg)] truncate"
-                >
-                  {f.name.replace(/\.md$/, '')}
-                </div>
-              ))
-            )
+              <button
+                type="button"
+                onClick={() => route('/wiki')}
+                class="self-start px-3 py-1.5 bg-[var(--los-accent)] text-black font-bold text-xs rounded hover:opacity-90"
+              >
+                Open wiki →
+              </button>
+            </div>
           ) : processedFiles.length === 0 ? (
             <p class="text-xs text-[var(--los-fg-dim)]">
               No processed articles yet. Run <code>/kb-ingest</code> to compile inbox articles.
