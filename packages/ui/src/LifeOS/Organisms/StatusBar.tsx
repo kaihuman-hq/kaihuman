@@ -55,6 +55,7 @@ export interface StatusBarProps {
   onDashboardClick?: () => void;
   onFilesClick?: () => void;
   onBoardClick?: () => void;
+  onWikiClick?: () => void;
   onShortcutsClick?: () => void;
   onSearchClick?: () => void;
 
@@ -518,6 +519,7 @@ export const StatusBar = ({
   onDashboardClick,
   onFilesClick,
   onBoardClick,
+  onWikiClick,
   onShortcutsClick,
   onSearchClick: _onSearchClick,
 
@@ -832,6 +834,18 @@ export const StatusBar = ({
                 >
                   <Kanban size={12} className="group-hover:animate-pulse" />
                   <MonoText className="text-xs font-bold uppercase">Board</MonoText>
+                </button>
+              )}
+              {onWikiClick && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onWikiClick();
+                  }}
+                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
+                >
+                  <MonoText className="text-xs font-bold uppercase">Wiki</MonoText>
                 </button>
               )}
               {onShortcutsClick && (

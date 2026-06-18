@@ -15,6 +15,7 @@ import { QuickNotePage } from './pages/QuickNotePage';
 import { QuickTodoPage } from './pages/QuickTodoPage';
 import { ShortcutsPage } from './pages/ShortcutsPage';
 import { TodoAnalyticsPage } from './pages/TodoAnalyticsPage';
+import { WikiPage } from './pages/WikiPage';
 
 // Simple protected route wrapper
 const ProtectedRoute = ({ component: Component, ...props }: any) => {
@@ -59,6 +60,7 @@ export const App = () => {
         <ProtectedRoute path="/quick-log" component={QuickLogPage} />
         <ProtectedRoute path="/shortcuts" component={ShortcutsPage} />
         <ProtectedRoute path="/knowledge" component={KnowledgeBasePage} />
+        <ProtectedRoute path="/wiki" component={WikiPage} />
         <ProtectedRoute path="/files" component={Dashboard} />
         <ProtectedRoute path="/files/:rest*" component={Dashboard} />
         <ProtectedRoute path="/new" component={Dashboard} />

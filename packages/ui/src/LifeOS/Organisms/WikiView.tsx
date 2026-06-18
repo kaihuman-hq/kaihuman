@@ -9,11 +9,16 @@ import 'highlight.js/styles/github-dark.css'; // Or any other style
 
 const _logger = new Logger('WikiView');
 
-interface WikiViewProps {
-  rootPath: string; // The root folder of the wiki
+function stripFrontmatter(content: string): string {
+  return content.replace(/^---[\s\S]*?---\n?/, '');
 }
 
-export const WikiView = ({ rootPath }: WikiViewProps) => {
+interface WikiViewProps {
+  rootPath?: string; // optional — defaults to '' (whole repo)
+  onEdit?: (path: string) => void; // caller handles navigation
+}
+
+export const WikiView = ({ rootPath = '', onEdit }: WikiViewProps) => {
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -25,33 +30,26 @@ export const WikiView = ({ rootPath }: WikiViewProps) => {
   // Filter tree to only show items under rootPath and valid extensions
   const wikiTree = useMemo(() => {
     if (!tree) return [];
-
-    // items startsWith rootPath
-    // items are markdown or folder
-    const relevantItems = tree.filter((item) => {
-      if (!item.path.startsWith(rootPath)) return false;
+    return tree.filter((item) => {
+      if (rootPath && !item.path.startsWith(rootPath)) return false;
       if (item.type === 'tree') return true;
+      if (!rootPath) return true; // all-files mode: show everything
       return item.path.endsWith('.md');
     });
-
-    return relevantItems;
   }, [tree, rootPath]);
 
   // Set initial active file if none
   useEffect(() => {
     if (!activeFile && wikiTree.length > 0) {
-      // Try to find index.wiki.md or README.md or just first md
-      const index = wikiTree.find(
-        (i) =>
-          i.path === `${rootPath}/index.wiki.md` ||
-          i.path === `${rootPath}/index.md` ||
-          i.path === `${rootPath}/README.md`,
-      );
+      const candidates = rootPath
+        ? [`${rootPath}/index.wiki.md`, `${rootPath}/index.md`, `${rootPath}/README.md`]
+        : ['index.wiki.md', 'index.md', 'README.md'];
+      const index = wikiTree.find((i) => candidates.includes(i.path));
       if (index) {
         setActiveFile(index.path);
       } else {
-        const firstFile = wikiTree.find((i) => i.type !== 'tree');
-        if (firstFile) setActiveFile(firstFile.path);
+        const firstMd = wikiTree.find((i) => i.type !== 'tree' && i.path.endsWith('.md'));
+        if (firstMd) setActiveFile(firstMd.path);
       }
     }
   }, [wikiTree, activeFile, rootPath]);
@@ -63,12 +61,16 @@ export const WikiView = ({ rootPath }: WikiViewProps) => {
     }
   }, [activeFile]);
 
-  const content = activeFile ? openFiles[activeFile]?.content : '';
+  const rawContent = activeFile ? openFiles[activeFile]?.content : '';
+  const content = rawContent ? stripFrontmatter(rawContent) : '';
 
   const handleEdit = () => {
-    if (activeFile) {
+    if (!activeFile) return;
+    if (onEdit) {
+      onEdit(activeFile);
+    } else {
       layoutStore.navigate(activeFile);
-      layoutStore.view.value = 'DASHBOARD'; // Switch back to editor
+      layoutStore.view.value = 'DASHBOARD';
     }
   };
 
@@ -123,7 +125,7 @@ export const WikiView = ({ rootPath }: WikiViewProps) => {
         {/* Markdown Content */}
         <div className="flex-1 overflow-y-auto p-8 lg:px-16 xl:px-32">
           <div className="prose prose-invert max-w-4xl mx-auto pb-20">
-            {activeFile && content ? (
+            {activeFile && content && activeFile.endsWith('.md') ? (
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight]}
@@ -146,6 +148,18 @@ export const WikiView = ({ rootPath }: WikiViewProps) => {
               >
                 {content}
               </ReactMarkdown>
+            ) : activeFile && !activeFile.endsWith('.md') ? (
+              <div className="text-center text-[#8b949e] mt-20 space-y-4">
+                <p>No preview for this file type.</p>
+                <button
+                  type="button"
+                  onClick={handleEdit}
+                  className="flex items-center gap-2 px-3 py-1 bg-[#238636] text-white text-xs font-bold rounded hover:bg-[#2ea043] transition-colors mx-auto"
+                >
+                  <Edit3 size={14} />
+                  Open in editor
+                </button>
+              </div>
             ) : (
               <div className="text-center text-[#8b949e] mt-20">
                 {activeFile ? 'Loading content...' : 'Select a page from the sidebar'}
@@ -213,6 +227,7 @@ const WikiTreeItem = ({ node, depth, activeFile, onSelect, renderChildren }: any
   const [expanded, setExpanded] = useState(true); // Default expanded
   const isFolder = node.type === 'tree';
   const isActive = node.path === activeFile;
+  const isNonMd = !isFolder && !node.name.endsWith('.md');
 
   const handleClick = () => {
     if (isFolder) {
@@ -231,7 +246,9 @@ const WikiTreeItem = ({ node, depth, activeFile, onSelect, renderChildren }: any
           'flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer select-none text-sm transition-colors',
           isActive
             ? 'bg-[#1f6feb] text-white'
-            : 'text-[#8b949e] hover:bg-[#161b22] hover:text-[#c9d1d9]',
+            : isNonMd
+              ? 'text-[#484f58] hover:bg-[#161b22] hover:text-[#8b949e]'
+              : 'text-[#8b949e] hover:bg-[#161b22] hover:text-[#c9d1d9]',
           !isActive && 'active:bg-[#21262d]',
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
