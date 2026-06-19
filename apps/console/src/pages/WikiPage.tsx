@@ -1,4 +1,4 @@
-import { githubFileStore, layoutStore } from '@lifosy/core';
+import { githubFileStore } from '@lifosy/core';
 import { StatusBar, WikiView } from '@lifosy/ui';
 import { useEffect } from 'preact/hooks';
 import { route } from 'preact-router';
@@ -16,8 +16,13 @@ export const WikiPage = () => {
       <div class="h-[calc(100vh-2rem)]">
         <WikiView
           onEdit={(path) => {
-            layoutStore.navigate(path);
-            route('/');
+            // Route to the file's URL so MainApp's URL→State resolver opens it in
+            // the editor. Routing to '/' would reset activeTileId to null on mount.
+            const cleanPath = path
+              .split('/')
+              .map((segment) => encodeURIComponent(segment))
+              .join('/');
+            route(`/files/${cleanPath}`);
           }}
         />
       </div>
