@@ -137,6 +137,7 @@ export interface MainAppProps {
   onActionLogClick?: () => void;
   onShortcutsClick?: () => void;
   onKnowledgeClick?: () => void;
+  onWikiClick?: () => void;
   onKBCommandsClick?: () => void;
   shortcutItems?: import('../Organisms/StatusBar').MenuItem[];
 
@@ -222,6 +223,7 @@ export const MainApp = ({
   onActionLogClick,
   onShortcutsClick,
   onKnowledgeClick,
+  onWikiClick,
   onKBCommandsClick,
   shortcutItems,
   ...props
@@ -1966,6 +1968,7 @@ abbreviations: undefined
                   ...(onKnowledgeClick
                     ? [{ label: 'Knowledge Base', onClick: onKnowledgeClick }]
                     : []),
+                  ...(onWikiClick ? [{ label: 'Wiki', onClick: onWikiClick }] : []),
                   {
                     label: 'Graph',
                     onClick: () => {
