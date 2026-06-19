@@ -1,4 +1,6 @@
 import { githubFileStore, Logger, layoutStore, type TreeItem } from '@lifosy/core';
+import hljs from 'highlight.js/lib/core';
+import json from 'highlight.js/lib/languages/json';
 import { Check, ChevronDown, ChevronRight, Copy, Edit3, FileText, Menu } from 'lucide-preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import ReactMarkdown from 'react-markdown';
@@ -7,10 +9,71 @@ import remarkGfm from 'remark-gfm';
 import { cn } from '../../utils';
 import 'highlight.js/styles/github-dark.css'; // Or any other style
 
+hljs.registerLanguage('json', json);
+
 const _logger = new Logger('WikiView');
 
 function stripFrontmatter(content: string): string {
   return content.replace(/^---[\s\S]*?---\n?/, '');
+}
+
+// Heuristic: a decoded file is treated as binary if it contains a NUL byte or a
+// high proportion of U+FFFD replacement characters (produced when invalid UTF-8
+// bytes are decoded). Binary files have no meaningful text preview.
+function isProbablyBinary(content: string): boolean {
+  if (content.includes('\u0000')) return true;
+  const sample = content.slice(0, 1000);
+  if (!sample) return false;
+  let bad = 0;
+  for (const ch of sample) {
+    if (ch === '\ufffd') bad++;
+  }
+  return bad > sample.length * 0.1;
+}
+
+// Minimal RFC-4180-style CSV parser: handles double-quoted fields containing
+// commas, escaped quotes (""), and CRLF/LF line endings.
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      row.push(field);
+      field = '';
+    } else if (ch === '\n') {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+    } else if (ch !== '\r') {
+      field += ch;
+    }
+  }
+
+  // Flush the trailing field/row unless the file ended on a clean line break.
+  if (field !== '' || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+
+  return rows;
 }
 
 interface WikiViewProps {
@@ -61,8 +124,12 @@ export const WikiView = ({ rootPath = '', onEdit }: WikiViewProps) => {
     }
   }, [activeFile]);
 
-  const rawContent = activeFile ? openFiles[activeFile]?.content : '';
-  const content = rawContent ? stripFrontmatter(rawContent) : '';
+  // `fileData` is defined (even with empty content) once the file has loaded,
+  // which lets us distinguish "still loading" from "loaded but empty".
+  const fileData = activeFile ? openFiles[activeFile] : undefined;
+  const isLoaded = fileData !== undefined;
+  const rawContent = fileData?.content ?? '';
+  const lowerPath = activeFile?.toLowerCase() ?? '';
 
   const handleEdit = () => {
     if (!activeFile) return;
@@ -122,10 +189,14 @@ export const WikiView = ({ rootPath = '', onEdit }: WikiViewProps) => {
           )}
         </div>
 
-        {/* Markdown Content */}
+        {/* Preview Content */}
         <div className="flex-1 overflow-y-auto p-8 lg:px-16 xl:px-32">
-          <div className="prose prose-invert max-w-4xl mx-auto pb-20">
-            {activeFile && content && activeFile.endsWith('.md') ? (
+          {!activeFile ? (
+            <div className="text-center text-[#8b949e] mt-20">Select a page from the sidebar</div>
+          ) : !isLoaded ? (
+            <div className="text-center text-[#8b949e] mt-20">Loading content...</div>
+          ) : lowerPath.endsWith('.md') ? (
+            <div className="prose prose-invert max-w-4xl mx-auto pb-20">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight]}
@@ -146,26 +217,34 @@ export const WikiView = ({ rootPath = '', onEdit }: WikiViewProps) => {
                   }) as any,
                 }}
               >
-                {content}
+                {stripFrontmatter(rawContent)}
               </ReactMarkdown>
-            ) : activeFile && !activeFile.endsWith('.md') ? (
-              <div className="text-center text-[#8b949e] mt-20 space-y-4">
-                <p>No preview for this file type.</p>
-                <button
-                  type="button"
-                  onClick={handleEdit}
-                  className="flex items-center gap-2 px-3 py-1 bg-[#238636] text-white text-xs font-bold rounded hover:bg-[#2ea043] transition-colors mx-auto"
-                >
-                  <Edit3 size={14} />
-                  Open in editor
-                </button>
-              </div>
-            ) : (
-              <div className="text-center text-[#8b949e] mt-20">
-                {activeFile ? 'Loading content...' : 'Select a page from the sidebar'}
-              </div>
-            )}
-          </div>
+            </div>
+          ) : isProbablyBinary(rawContent) ? (
+            <div className="text-center text-[#8b949e] mt-20 space-y-4">
+              <p>No preview available for this binary file.</p>
+              <button
+                type="button"
+                onClick={handleEdit}
+                className="flex items-center gap-2 px-3 py-1 bg-[#238636] text-white text-xs font-bold rounded hover:bg-[#2ea043] transition-colors mx-auto"
+              >
+                <Edit3 size={14} />
+                Open in editor
+              </button>
+            </div>
+          ) : (
+            <div className="max-w-5xl mx-auto pb-20">
+              {lowerPath.endsWith('.json') ? (
+                <JsonPreview content={rawContent} />
+              ) : lowerPath.endsWith('.csv') ? (
+                <CsvPreview content={rawContent} />
+              ) : (
+                <pre className="whitespace-pre-wrap break-words rounded-md bg-[#161b22] border border-[#30363d] p-4 text-sm font-mono text-[#c9d1d9]">
+                  {rawContent}
+                </pre>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -263,6 +342,80 @@ const WikiTreeItem = ({ node, depth, activeFile, onSelect, renderChildren }: any
         <span className="truncate">{node.name}</span>
       </div>
       {isFolder && expanded && <div>{renderChildren(node.children, depth + 1)}</div>}
+    </div>
+  );
+};
+
+// -- JSON Preview (syntax highlighted) --
+const JsonPreview = ({ content }: { content: string }) => {
+  const html = useMemo(() => {
+    try {
+      return hljs.highlight(content, { language: 'json' }).value;
+    } catch {
+      return null;
+    }
+  }, [content]);
+
+  return (
+    <pre className="rounded-md bg-[#161b22] border border-[#30363d] p-4 overflow-x-auto text-sm">
+      {html !== null ? (
+        <code
+          className="hljs language-json"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight.js produces escaped markup
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      ) : (
+        <code className="language-json">{content}</code>
+      )}
+    </pre>
+  );
+};
+
+// -- CSV Preview (table) --
+const CsvPreview = ({ content }: { content: string }) => {
+  const rows = useMemo(() => parseCsv(content), [content]);
+
+  if (rows.length === 0) {
+    return <div className="text-center text-[#8b949e] mt-20">Empty file.</div>;
+  }
+
+  const [header, ...body] = rows;
+  const columnCount = rows.reduce((max, row) => Math.max(max, row.length), 0);
+
+  return (
+    <div className="overflow-x-auto rounded-md border border-[#30363d]">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="bg-[#161b22]">
+            {Array.from({ length: columnCount }, (_, i) => (
+              <th
+                key={`h-${i}-${header?.[i] ?? ''}`}
+                className="border border-[#30363d] px-3 py-2 text-left font-semibold text-[#c9d1d9] whitespace-nowrap"
+              >
+                {header?.[i] ?? ''}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {body.map((row, rowIdx) => (
+            <tr
+              // biome-ignore lint/suspicious/noArrayIndexKey: CSV rows have no stable id
+              key={rowIdx}
+              className="odd:bg-[#0d1117] even:bg-[#010409]"
+            >
+              {Array.from({ length: columnCount }, (_, ci) => (
+                <td
+                  key={`c-${ci}-${header?.[ci] ?? ''}`}
+                  className="border border-[#30363d] px-3 py-2 text-[#c9d1d9] align-top"
+                >
+                  {row[ci] ?? ''}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };
