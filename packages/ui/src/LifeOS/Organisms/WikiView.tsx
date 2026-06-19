@@ -224,7 +224,7 @@ const WikiSidebar = ({ items, rootPath, activeFile, onSelect }: any) => {
 };
 
 const WikiTreeItem = ({ node, depth, activeFile, onSelect, renderChildren }: any) => {
-  const [expanded, setExpanded] = useState(true); // Default expanded
+  const [expanded, setExpanded] = useState(false); // Collapsed by default — lazily reveal children on expand
   const isFolder = node.type === 'tree';
   const isActive = node.path === activeFile;
   const isNonMd = !isFolder && !node.name.endsWith('.md');
