@@ -284,6 +284,7 @@ export const Dashboard = () => {
           onActionLogClick={() => route('/action-log')}
           onShortcutsClick={() => route('/shortcuts')}
           onKnowledgeClick={() => route('/knowledge')}
+          onWikiClick={() => route('/wiki')}
           onKBCommandsClick={() => setShowKBCommands(true)}
           shortcutItems={QUICK_ROUTES.map((r) => ({ label: r.name, onClick: () => route(r.path) }))}
           // Remote Config Props
