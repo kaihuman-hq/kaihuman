@@ -312,7 +312,7 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
       </div>
 
       {/* Streak Stats — icon + number summary below the heat map */}
-      <div className="flex items-center gap-4 flex-wrap">
+      <div className="flex items-center justify-center gap-4 flex-wrap">
         <div className="flex items-center gap-1.5">
           <Flame size={14} className="text-[var(--los-accent)]" />
           <MonoText className="text-sm font-bold text-[var(--los-fg)]">
