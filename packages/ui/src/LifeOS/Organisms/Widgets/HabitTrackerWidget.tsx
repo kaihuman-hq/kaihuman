@@ -1,5 +1,5 @@
 import { Logger } from '@lifosy/core';
-import { CheckCircle, Flame } from 'lucide-preact';
+import { CalendarCheck, CheckCircle, Flame, Trophy } from 'lucide-preact';
 import { useMemo } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
@@ -308,6 +308,33 @@ export const HabitTrackerWidget = ({ content, mode, onChange }: HabitTrackerWidg
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Streak Stats — icon + number summary below the heat map */}
+      <div className="flex items-center justify-center gap-4 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <Flame size={14} className="text-[var(--los-accent)]" />
+          <MonoText className="text-sm font-bold text-[var(--los-fg)]">
+            {stats.currentStreak}
+          </MonoText>
+          <MonoText className="text-[9px] text-[var(--los-muted)] uppercase tracking-wider">
+            days
+          </MonoText>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <CalendarCheck size={14} className="text-[var(--los-accent)]" />
+          <MonoText className="text-sm font-bold text-[var(--los-fg)]">{stats.weekStreak}</MonoText>
+          <MonoText className="text-[9px] text-[var(--los-muted)] uppercase tracking-wider">
+            weeks
+          </MonoText>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Trophy size={14} className="text-[var(--los-accent)]" />
+          <MonoText className="text-sm font-bold text-[var(--los-fg)]">{stats.totalCount}</MonoText>
+          <MonoText className="text-[9px] text-[var(--los-muted)] uppercase tracking-wider">
+            total
+          </MonoText>
         </div>
       </div>
 
