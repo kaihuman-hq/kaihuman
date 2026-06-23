@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-06-23 — Cascivo migration Phase 3: remove unused Radix Dialog/DropdownMenu
+
+- `@lifosy/ui`'s `Dialog` and `DropdownMenu` were full Radix-based compound
+  components (10–12 sub-exports each) with **no consumers** anywhere in the repo.
+  Rather than speculatively re-wrap 24 unused sub-components over Cascivo, they
+  were removed: deleted `components/Dialog.tsx` + `components/DropdownMenu.tsx`,
+  dropped their `index.ts` exports, and removed `@radix-ui/react-dialog` +
+  `@radix-ui/react-dropdown-menu` (−39 packages) and the Radix `external` entry
+  from the lib build. A Cascivo-backed Modal/Dropdown can be added when a real
+  consumer needs one.
+- *Verified*: console build green; `tsc` clean; spike (2/2) + console suite
+  (28/28) green; Biome clean; 0 Radix references remain.
+
 ## 2026-06-23 — Cascivo migration Phase 3 (start): Button + Input primitives
 
 - **Button** (`packages/ui/src/components/Button.tsx`): re-implemented as a thin

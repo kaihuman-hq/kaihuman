@@ -44,7 +44,6 @@ export default defineConfig({
         'react-markdown',
         'rehype-highlight',
         'remark-gfm',
-        /^@radix-ui\/.*/,
       ],
       output: {
         globals: {

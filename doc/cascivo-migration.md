@@ -156,9 +156,12 @@ Derived from the live registry; finalize each with `get_component` at execution.
     (`outline`→ghost, `danger`→destructive), `size` (`icon`→md), and `label`.
   - **[x] Input** — wraps Cascivo `Input`; `error` widened to `boolean | string`
     (string drives Cascivo's message).
-  - [ ] Dialog (remove `@radix-ui/react-dialog`), DropdownMenu
-    (remove `@radix-ui/react-dropdown-menu`), Panel/Sidebar/SplitView, FileTree,
-    Charts.
+  - **[x] Dialog + DropdownMenu** — these were unused Radix compound components
+    (no consumers anywhere). Per the "no speculative code" rule they were
+    **removed** (files + exports) rather than re-wrapped, dropping
+    `@radix-ui/react-dialog` + `@radix-ui/react-dropdown-menu` (−39 packages). A
+    Cascivo-backed Modal/Dropdown can be added when a real consumer needs one.
+  - [ ] Panel/Sidebar/SplitView, FileTree, Charts.
 - **Phase 4 — Editor swap.** Replace CodeMirror behind the `Editor`/
   `CodeMirrorEditor` API; port save/zen/auto-save wrappers to `onSave` + `theme`
   + `ref`. **Gate:** behavior tests (markdown, find, undo, selection-preserving

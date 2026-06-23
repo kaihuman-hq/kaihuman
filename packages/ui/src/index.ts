@@ -1,6 +1,4 @@
 export * from './components/Button';
-export * from './components/Dialog';
-export * from './components/DropdownMenu';
 export * from './components/editor/Editor';
 export * from './components/files/FileTree';
 export * from './components/Input';
