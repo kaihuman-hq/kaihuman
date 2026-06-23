@@ -1,49 +1,40 @@
+import { Button as CascivoButtonImport } from '@cascivo/react';
 import type { h } from 'preact';
-import { cn } from '../utils';
+
+// Cascivo ships React prop types; alias to a Preact-typed signature to bridge
+// the JSX type systems (same pattern as the Radix wrappers in this package).
+const CascivoButton = CascivoButtonImport as unknown as (
+  props: Record<string, unknown>,
+) => h.JSX.Element;
 
 export interface ButtonProps extends h.JSX.HTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger';
   size?: 'sm' | 'md' | 'lg' | 'icon';
+  /** Convenience alias for text content. */
+  label?: string;
 }
 
+// Map this package's API onto Cascivo's Button. The extra `outline`/`danger`
+// variants and `icon` size (kept for API compatibility) fold onto the nearest
+// Cascivo equivalent.
+const VARIANT_MAP = {
+  primary: 'primary',
+  secondary: 'secondary',
+  ghost: 'ghost',
+  outline: 'ghost',
+  danger: 'destructive',
+} as const;
+
+const SIZE_MAP = { sm: 'sm', md: 'md', lg: 'lg', icon: 'md' } as const;
+
 export const Button = ({
-  className,
   variant = 'primary',
   size = 'md',
   label,
   children,
   ...props
-}: ButtonProps & { label?: string }) => {
-  const variants = {
-    primary:
-      'bg-nexus-primary text-nexus-bg hover:bg-[#33f2ff] hover:shadow-[0_0_15px_rgba(0,240,255,0.5)] border-none',
-    secondary:
-      'bg-nexus-secondary text-white hover:bg-[#8020ff] hover:shadow-[0_0_15px_rgba(112,0,255,0.5)] border-none',
-    ghost: 'bg-transparent text-nexus-text hover:bg-white/10 border-none',
-    outline:
-      'bg-transparent text-nexus-primary border border-nexus-primary hover:bg-nexus-primary/10 hover:shadow-[0_0_10px_rgba(0,240,255,0.3)]',
-    danger:
-      'bg-nexus-accent text-white hover:bg-[#ff2055] hover:shadow-[0_0_15px_rgba(255,0,60,0.5)] border-none',
-  };
-
-  const sizes = {
-    sm: 'h-8 px-3 text-xs',
-    md: 'h-10 px-4 text-sm',
-    lg: 'h-12 px-6 text-base',
-    icon: 'h-10 w-10 p-2 flex items-center justify-center',
-  };
-
-  return (
-    <button
-      className={cn(
-        'inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-nexus-primary disabled:pointer-events-none disabled:opacity-50 cursor-pointer',
-        variants[variant],
-        sizes[size],
-        className,
-      )}
-      {...props}
-    >
-      {label || children}
-    </button>
-  );
-};
+}: ButtonProps) => (
+  <CascivoButton variant={VARIANT_MAP[variant]} size={SIZE_MAP[size]} {...props}>
+    {label ?? children}
+  </CascivoButton>
+);

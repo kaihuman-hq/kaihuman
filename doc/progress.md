@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-06-23 — Cascivo migration Phase 3 (start): Button + Input primitives
+
+- **Button** (`packages/ui/src/components/Button.tsx`): re-implemented as a thin
+  wrapper over Cascivo's `Button`, preserving the existing `@lifosy/ui` API —
+  `variant` (`outline`→ghost, `danger`→destructive), `size` (`icon`→md), and the
+  `label` convenience. Console call sites (e.g. `AuthCli.tsx`) unchanged.
+- **Input** (`packages/ui/src/components/Input.tsx`): wraps Cascivo's `Input`;
+  `error` widened to `boolean | string` (the string form supplies Cascivo's
+  message). Drops the bespoke Tailwind input styling.
+- **Build wiring**: `@lifosy/ui` lib build now externalizes `@cascivo/*` and
+  `@preact/signals-react[/runtime]`; the console app build aliases
+  `@preact/signals-react → @preact/signals` and the `/runtime` `useSignals` to a
+  no-op shim, so Cascivo runs under Preact in the real app (not just the spike).
+  React-typed Cascivo components are bridged with an
+  `as unknown as (props) => h.JSX.Element` cast (same pattern as the Radix
+  wrappers).
+- Fixed a latent type error in the Phase 2 `CascivoBridge` story (same cast).
+- *Verified*: console production build green; `tsc` clean (no new errors beyond
+  the pre-existing `packages/core` baseline); spike (2/2) + console suite (28/28)
+  green; Biome clean.
+
 ## 2026-06-23 — Cascivo migration Phase 2: theme/token bridge
 
 - **Bridge stylesheet** (`packages/ui/src/cascivo.css`, exported as

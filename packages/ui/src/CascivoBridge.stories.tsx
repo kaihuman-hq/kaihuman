@@ -1,4 +1,20 @@
-import { Badge, Button, Card, CardContent, Input } from '@cascivo/react';
+import {
+  Badge as BadgeImport,
+  Button as ButtonImport,
+  CardContent as CardContentImport,
+  Card as CardImport,
+  Input as InputImport,
+} from '@cascivo/react';
+import type { h } from 'preact';
+
+// Cascivo ships React prop types; cast to Preact-typed signatures so JSX with
+// Preact element children type-checks (same bridge pattern as the wrappers).
+type AnyComp = (props: Record<string, unknown>) => h.JSX.Element;
+const Button = ButtonImport as unknown as AnyComp;
+const Input = InputImport as unknown as AnyComp;
+const Badge = BadgeImport as unknown as AnyComp;
+const Card = CardImport as unknown as AnyComp;
+const CardContent = CardContentImport as unknown as AnyComp;
 
 // Phase 2 visual check: renders raw Cascivo components under the LifeOS theme
 // bridge (.life-os-root[data-theme="dark"] + cascivo.css brand overrides) so the

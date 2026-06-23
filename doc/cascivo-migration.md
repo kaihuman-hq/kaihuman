@@ -140,12 +140,25 @@ Derived from the live registry; finalize each with `get_component` at execution.
   build resolves and bundles the full Cascivo CSS chain; `Cascivo/Theme Bridge`
   Storybook story renders Cascivo Button/Input/Badge/Card under the bridge for
   visual confirmation.
-- **Phase 3 — Migrate primitives incrementally.** Leaf-first
+- **Phase 3 — Migrate primitives incrementally. IN PROGRESS.** Leaf-first
   (Button → Input → Dialog → DropdownMenu → Panel/Sidebar/SplitView → FileTree →
-  Charts). For each: vendor via `add_to_project`, wrap behind the existing
-  `@lifosy/ui` export so console call sites don't change, update its Storybook
-  story, remove orphaned deps (Radix) once the last consumer migrates.
-  *Verify per component:* build + `tsc` + `biome` + `vitest` + story diff.
+  Charts). Each existing `@lifosy/ui` export is re-implemented as a thin wrapper
+  over the Cascivo component so console call sites don't change; Radix removed
+  once its last consumer migrates. *Verify per component:* build + `tsc` +
+  `biome` + `vitest`.
+  - **Build wiring (done once):** `@lifosy/ui` lib build externalizes
+    `@cascivo/*` + `@preact/signals-react[/runtime]`; the console app build
+    aliases `@preact/signals-react → @preact/signals` and the `/runtime`
+    `useSignals` to the no-op shim (mirrors the spike). React-typed Cascivo
+    components are bridged with an `as unknown as (props) => h.JSX.Element`
+    cast (same pattern as the existing Radix wrappers).
+  - **[x] Button** — wraps Cascivo `Button`; preserves `variant`
+    (`outline`→ghost, `danger`→destructive), `size` (`icon`→md), and `label`.
+  - **[x] Input** — wraps Cascivo `Input`; `error` widened to `boolean | string`
+    (string drives Cascivo's message).
+  - [ ] Dialog (remove `@radix-ui/react-dialog`), DropdownMenu
+    (remove `@radix-ui/react-dropdown-menu`), Panel/Sidebar/SplitView, FileTree,
+    Charts.
 - **Phase 4 — Editor swap.** Replace CodeMirror behind the `Editor`/
   `CodeMirrorEditor` API; port save/zen/auto-save wrappers to `onSave` + `theme`
   + `ref`. **Gate:** behavior tests (markdown, find, undo, selection-preserving
