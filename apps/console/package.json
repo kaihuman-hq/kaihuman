@@ -18,6 +18,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@cascivo/editor": "^0.1.1",
+    "@cascivo/react": "^0.3.3",
+    "@cascivo/themes": "^0.2.4",
     "@codemirror/commands": "^6.10.1",
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/language": "^6.12.1",
@@ -28,6 +31,7 @@
     "@lifosy/core": "workspace:*",
     "@lifosy/ui": "workspace:*",
     "@preact/signals": "^2.0.1",
+    "@preact/signals-react": "^3.10.2",
     "lucide-preact": "^0.562.0",
     "preact": "^10.25.4",
     "preact-router": "^4.1.2"

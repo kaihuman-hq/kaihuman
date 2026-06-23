@@ -1,5 +1,30 @@
 # Progress
 
+## 2026-06-23 — Cascivo UI migration: plan + Phase 0 integration spike
+
+- **Plan** (`doc/cascivo-migration.md`): full plan to migrate the console's UI
+  (which lives in `@lifosy/ui`) onto Cascivo — a CSS-native, signal-driven,
+  AI-first React design system. Includes the `@lifosy/ui` → Cascivo component
+  mapping derived from the live registry (181 components), a phased rollout, and
+  risks. Decisions: own the source (copy-paste model), Tailwind coexistence,
+  editor migrated to `@cascivo/editor`.
+- **AI tooling wired** (`.mcp.json`): added the Cascivo MCP server
+  (`npx -y @cascivo/mcp`) so the migration is driven by `list_components` /
+  `select_component` / `get_component` / `add_to_project`.
+- **Phase 0 integration spike (green)**: proved Cascivo's React/`signals-react`
+  components mount under Preact. Cascivo imports `@preact/signals-react` +
+  `@preact/signals-react/runtime`; the bridge aliases `@preact/signals-react →
+  @preact/signals` and stubs `useSignals` as a no-op
+  (`apps/console/src/shims/signals-react-runtime.ts`). Spike test
+  `apps/console/src/spikes/cascivo-preact.spike.test.tsx` (run via
+  `vitest.spike.config.ts`) mounts a real Cascivo `<Button>` under Preact and
+  confirms signal-driven re-render. Spikes excluded from the default suite.
+- **Editor re-validated**: the upgraded `editor/code-editor` manifest now covers
+  the previously-missing capabilities (markdown highlighting, find/replace, real
+  undo/redo, `applyEdit`/`getSelection` for selection-preserving sync, `onSave`,
+  live `theme`). Open item: large-document performance, to be measured before
+  retiring CodeMirror.
+
 ## 2026-06-22 — Restore habit-tracker streak stats on the dashboard
 
 - **Missing stats row** (`HabitTrackerWidget.tsx`): on the desktop dashboard, `.habit.csv` tiles render in `SMALL` mode, which showed the heat map and a line of muted motivational text but no icon-with-number stats — unlike the mobile views (`MOBILE_COLLAPSED`/`MOBILE_EXPANDED`), which display a `Flame` icon plus streak numbers. The dashboard tile was therefore "missing the icons with numbers below the heat map".
