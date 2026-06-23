@@ -165,10 +165,20 @@ Derived from the live registry; finalize each with `get_component` at execution.
     references); removed for consistency, dropping the orphaned
     `react-resizable-panels` (SplitView's only dep). `@dnd-kit` kept (still used
     by `MainApp`).
-  - [ ] **Charts (DonutChart, StackedBarChart)** — the only *used* primitives
-    (consumed by `TodoAnalytics`). Map to Cascivo `chart/pie-chart` +
-    `chart/bar-chart`, but the data APIs differ and the output is visual, so this
-    needs careful translation + visual sign-off (candidate for Phase 5).
+  - **[—] Charts (DonutChart, StackedBarChart) — kept custom (deliberate).**
+    The only *used* primitives (consumed by `TodoAnalytics`). They are small
+    (126 + 171 lines), dependency-free SVG, and tuned to the app: **per-segment
+    semantic colors** (status colors) and a **center label/value** in the donut.
+    Cascivo's `chart/pie-chart` / `chart/bar-chart` use their own theme palette
+    and accessor-based APIs and don't cleanly support those, so swapping would
+    regress a real analytics view for no dependency savings. Revisit in Phase 5
+    only if the app moves to Cascivo's chart styling wholesale.
+
+**Phase 3 outcome:** Button + Input migrated to Cascivo; Dialog, DropdownMenu,
+Panel, Sidebar, SplitView, FileTree removed as unused (dropping
+`@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`,
+`react-resizable-panels`); charts deliberately kept. `@lifosy/ui`'s generic
+component surface is now Cascivo-backed.
 - **Phase 4 — Editor swap.** Replace CodeMirror behind the `Editor`/
   `CodeMirrorEditor` API; port save/zen/auto-save wrappers to `onSave` + `theme`
   + `ref`. **Gate:** behavior tests (markdown, find, undo, selection-preserving
