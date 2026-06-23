@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-06-23 — Cascivo migration Phase 2: theme/token bridge
+
+- **Bridge stylesheet** (`packages/ui/src/cascivo.css`, exported as
+  `@lifosy/ui/cascivo.css`): remaps Cascivo's semantic color/font tokens
+  (`--cascivo-color-*`, `--cascivo-font-*`) onto the live LifeOS palette
+  (`--los-*`), so Cascivo components automatically follow the active LifeOS
+  theme (nexus / light / amethyst). Declared unlayered to win over Cascivo's
+  layered theme values.
+- **data-theme**: LifeOS themes live on `<html>`; Cascivo's `dark.css` keys off
+  `[data-theme='dark']`. Set `data-theme="dark"` on the inner `.life-os-root`
+  (`apps/console/src/App.tsx`) so Cascivo's structural tokens (radius, shadow,
+  ring, status, chart, fonts) apply without colliding with LifeOS switching.
+- **CSS import order** (components → tokens+theme → brand overrides): wired in
+  `apps/console/src/main.tsx` (+ `index.css` for the brand layer) and
+  `packages/ui/.storybook/preview.ts`.
+- **Storybook bridge** (`packages/ui/src/CascivoBridge.stories.tsx` +
+  signals-react alias/shim in `.storybook/main.ts`): renders raw Cascivo
+  Button/Input/Badge/Card under the bridge for visual verification.
+- **Deps**: added `@cascivo/react` / `@cascivo/themes` / `@cascivo/tokens` to
+  `@lifosy/ui`.
+- *Verified*: console production build resolves+bundles the full Cascivo CSS
+  chain; spike (2/2) and console suite (28/28) green; Biome clean.
+
 ## 2026-06-23 — Cascivo UI migration: plan + Phase 0 integration spike
 
 - **Plan** (`doc/cascivo-migration.md`): full plan to migrate the console's UI

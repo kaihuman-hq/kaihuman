@@ -4,6 +4,10 @@
 @import "../../../packages/ui/src/styles.css";
 /* biome-ignore lint/correctness/noInvalidPositionAtImportRule: intentional post-source import */
 @import "../../../packages/ui/src/LifeOS/styles.css";
+/* Cascivo brand-override layer — maps Cascivo tokens onto the LifeOS palette.
+   Loads last so it wins over the imported Cascivo theme. */
+/* biome-ignore lint/correctness/noInvalidPositionAtImportRule: intentional post-source import */
+@import "../../../packages/ui/src/cascivo.css";
 @config "../../../packages/config/tailwind-preset.js";
 
 @layer base {

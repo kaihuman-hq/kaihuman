@@ -1,0 +1,63 @@
+/* Cascivo ↔ LifeOS theme bridge — BRAND OVERRIDES (must load last).
+ *
+ * Cascivo components read semantic `--cascivo-color-*` tokens. The structural
+ * tokens (radius, shadow, ring, status, chart, fonts) come from
+ * `@cascivo/themes/dark` (activated by `data-theme="dark"` on `.life-os-root`).
+ * This file remaps only the *brand* color tokens onto the live LifeOS palette
+ * (`--los-*`), so Cascivo components automatically track the active LifeOS
+ * theme (nexus / light / amethyst) — those themes swap `--los-*` on <html>,
+ * and these mappings inherit it.
+ *
+ * Declared unlayered so it wins over Cascivo's layered `[data-theme='dark']`
+ * values regardless of selector specificity.
+ */
+
+.life-os-root {
+  /* Typography — the app is monospace throughout */
+  --cascivo-font-sans: var(--los-font-mono);
+  --cascivo-font-display: var(--los-font-mono);
+  --cascivo-font-mono: var(--los-font-mono);
+
+  /* Surface */
+  --cascivo-color-background: var(--los-bg);
+  --cascivo-color-bg: var(--los-bg);
+  --cascivo-color-surface: color-mix(in oklch, var(--los-bg) 92%, white);
+  --cascivo-color-surface-2: color-mix(in oklch, var(--los-bg) 86%, white);
+  --cascivo-color-surface-raised: color-mix(in oklch, var(--los-bg) 86%, white);
+  --cascivo-color-surface-overlay: color-mix(in oklch, var(--los-bg) 92%, white);
+  --cascivo-color-bg-subtle: color-mix(in oklch, var(--los-bg) 92%, white);
+
+  /* Border */
+  --cascivo-color-border: var(--los-border);
+  --cascivo-color-border-strong: var(--los-border);
+  --cascivo-border-subtle: var(--los-border);
+  --cascivo-border-default: var(--los-border);
+  --cascivo-border-strong: var(--los-border);
+
+  /* Text */
+  --cascivo-color-foreground: var(--los-fg);
+  --cascivo-color-text: var(--los-fg);
+  --cascivo-color-foreground-muted: var(--los-muted);
+  --cascivo-color-text-subtle: var(--los-muted);
+  --cascivo-color-text-muted: var(--los-muted);
+
+  /* Accent — the LifeOS neon/brand color drives accent AND primary CTAs */
+  --cascivo-color-accent: var(--los-accent);
+  --cascivo-color-accent-hover: var(--los-accent);
+  --cascivo-color-accent-active: var(--los-accent);
+  --cascivo-color-accent-foreground: var(--los-bg);
+  --cascivo-color-accent-content: var(--los-bg);
+  --cascivo-color-text-on-accent: var(--los-bg);
+  --cascivo-color-accent-subtle: var(--los-accent-dim);
+  --cascivo-color-accent-muted: var(--los-accent-dim);
+
+  --cascivo-color-primary: var(--los-accent);
+  --cascivo-color-primary-hover: var(--los-accent);
+  --cascivo-color-primary-active: var(--los-accent);
+  --cascivo-color-primary-fg: var(--los-bg);
+  --cascivo-color-primary-content: var(--los-bg);
+
+  /* Focus ring */
+  --cascivo-color-focus-ring: var(--los-accent);
+  --cascivo-ring-color: var(--los-accent-dim);
+}

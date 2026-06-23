@@ -17,7 +17,8 @@
       "default": "./dist/index.mjs"
     },
     "./styles.css": "./src/styles.css",
-    "./LifeOS/styles.css": "./src/LifeOS/styles.css"
+    "./LifeOS/styles.css": "./src/LifeOS/styles.css",
+    "./cascivo.css": "./src/cascivo.css"
   },
   "scripts": {
     "lint": "biome check src/ vite.config.ts .storybook/",
@@ -32,6 +33,9 @@
     "preact": "^10.0.0"
   },
   "dependencies": {
+    "@cascivo/react": "^0.3.3",
+    "@cascivo/themes": "^0.2.4",
+    "@cascivo/tokens": "^0.3.2",
     "@codemirror/commands": "^6.10.1",
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/language": "^6.12.1",

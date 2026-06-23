@@ -127,10 +127,19 @@ Derived from the live registry; finalize each with `get_component` at execution.
 - **Phase 0 — Foundation. DONE.** MCP wired; AI resources mirrored; Preact +
   signals bridge proven via passing spike; editor re-validated.
 - **Phase 1 — Mapping. DONE (this document).**
-- **Phase 2 — Theme/token bridge.** Map the LifeOS `--los-*` / "Nexus" palette
-  onto a Cascivo `data-theme`; set the required CSS import order
-  (components → tokens+theme → brand overrides); apply `data-theme` on
-  `life-os-root`. *Verify:* Storybook Button/Dialog match current look.
+- **Phase 2 — Theme/token bridge. DONE.** LifeOS sets `data-theme` (nexus /
+  light / amethyst) on `<html>`; Cascivo's `dark.css` keys off
+  `[data-theme='dark']`, so `data-theme="dark"` is set on the inner
+  `.life-os-root` for Cascivo's structural tokens (radius/shadow/ring/status/
+  chart/fonts) without colliding. The brand-override layer
+  (`packages/ui/src/cascivo.css`, exported as `@lifosy/ui/cascivo.css`) remaps
+  Cascivo's semantic color/font tokens onto the live `--los-*` palette, so
+  Cascivo components automatically track the active LifeOS theme. CSS import
+  order (components → tokens+theme → brand) is wired in `main.tsx` + `index.css`
+  (app) and `.storybook/preview.ts` (Storybook). *Verified:* console production
+  build resolves and bundles the full Cascivo CSS chain; `Cascivo/Theme Bridge`
+  Storybook story renders Cascivo Button/Input/Badge/Card under the bridge for
+  visual confirmation.
 - **Phase 3 — Migrate primitives incrementally.** Leaf-first
   (Button → Input → Dialog → DropdownMenu → Panel/Sidebar/SplitView → FileTree →
   Charts). For each: vendor via `add_to_project`, wrap behind the existing
