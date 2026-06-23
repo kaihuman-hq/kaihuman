@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-06-23 — Cascivo migration Phase 3: remove unused Panel/Sidebar/SplitView/FileTree
+
+- Confirmed `Panel`, `Sidebar`, `SplitView` (ResizablePanelGroup/Panel/Handle),
+  and `FileTree` are unused exports (0 references anywhere). Removed the four
+  component files + their `index.ts` exports, consistent with the earlier
+  Dialog/DropdownMenu decision.
+- Dropped the now-orphaned `react-resizable-panels` (SplitView's only dependency).
+  `@dnd-kit` kept — still used by `MainApp`.
+- Remaining Phase 3 item: the charts (DonutChart/StackedBarChart), the only
+  *used* primitives, deferred for careful visual migration.
+- *Verified*: console build green; `tsc` clean; spike (2/2) + console suite
+  (28/28) green; Biome clean.
+
 ## 2026-06-23 — Cascivo migration Phase 3: remove unused Radix Dialog/DropdownMenu
 
 - `@lifosy/ui`'s `Dialog` and `DropdownMenu` were full Radix-based compound

@@ -161,7 +161,14 @@ Derived from the live registry; finalize each with `get_component` at execution.
     **removed** (files + exports) rather than re-wrapped, dropping
     `@radix-ui/react-dialog` + `@radix-ui/react-dropdown-menu` (−39 packages). A
     Cascivo-backed Modal/Dropdown can be added when a real consumer needs one.
-  - [ ] Panel/Sidebar/SplitView, FileTree, Charts.
+  - **[x] Panel, Sidebar, SplitView, FileTree** — also unused exports (0
+    references); removed for consistency, dropping the orphaned
+    `react-resizable-panels` (SplitView's only dep). `@dnd-kit` kept (still used
+    by `MainApp`).
+  - [ ] **Charts (DonutChart, StackedBarChart)** — the only *used* primitives
+    (consumed by `TodoAnalytics`). Map to Cascivo `chart/pie-chart` +
+    `chart/bar-chart`, but the data APIs differ and the output is visual, so this
+    needs careful translation + visual sign-off (candidate for Phase 5).
 - **Phase 4 — Editor swap.** Replace CodeMirror behind the `Editor`/
   `CodeMirrorEditor` API; port save/zen/auto-save wrappers to `onSave` + `theme`
   + `ref`. **Gate:** behavior tests (markdown, find, undo, selection-preserving

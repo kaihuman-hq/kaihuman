@@ -55,7 +55,6 @@
     "preact": "^10.25.4",
     "react-force-graph-2d": "^1.29.0",
     "react-markdown": "^10.1.0",
-    "react-resizable-panels": "^4.4.1",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^2.2.1"
