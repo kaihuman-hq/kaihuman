@@ -1,5 +1,29 @@
 # Progress
 
+## 2026-06-24 — Fix Cascivo editor layout (gutter gap + active-line drift)
+
+- **Symptom**: vs the official demo, the editor had too much gutter→text gap and
+  the active-line highlight sat ~half a line too low.
+- **Root cause**: a cascade-layer ordering problem. Cascivo wraps its component
+  CSS in `@layer cascivo.component`, which was imported *before* Tailwind in
+  `main.tsx`, so it appeared first in the cascade — *earlier* layers lose. Thus
+  Tailwind's Preflight (`* { margin:0; padding:0 }` in `@layer base`) overrode
+  the editor's `padding-block`/`padding-inline`. The active-line/gutter overlays
+  position via `top: var(--cascivo-space-3)` (a `top`, not padding — so *not*
+  reset), while the text lost its matching `padding-block` → the highlight
+  dropped by `space-3` and the gutter spacing collapsed.
+- **Fix**: declare the cascade order so Cascivo's layers come *after* Tailwind's
+  (`@layer theme, base, components, utilities, cascivo.tokens, cascivo.base,
+  cascivo.theme, cascivo.component;` at the top of `index.css`) and import
+  `index.css` *before* the Cascivo CSS in `main.tsx` so that order takes effect.
+  Verified in the bundled CSS: `@layer base` now precedes `@layer
+  cascivo.component`, so Cascivo's component styles win over Preflight.
+- *Note for the library*: any Tailwind app that imports Cascivo CSS before
+  Tailwind gets its components silently reset by Preflight. Worth documenting the
+  required layer order (or shipping a guard).
+- *Verified*: console build green; bundled layer order corrected; spikes (5/5) +
+  suite (20/20) green; Biome clean.
+
 ## 2026-06-24 — Fix Cascivo editor rendering on a light background
 
 - **Symptom**: the markdown editor rendered on a near-white background with a
