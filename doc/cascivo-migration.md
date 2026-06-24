@@ -179,11 +179,15 @@ Panel, Sidebar, SplitView, FileTree removed as unused (dropping
 `@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`,
 `react-resizable-panels`); charts deliberately kept. `@lifosy/ui`'s generic
 component surface is now Cascivo-backed.
-- **Phase 4 — Editor swap.** Replace CodeMirror behind the `Editor`/
-  `CodeMirrorEditor` API; port save/zen/auto-save wrappers to `onSave` + `theme`
-  + `ref`. **Gate:** behavior tests (markdown, find, undo, selection-preserving
-  sync) **and** large-doc performance. On pass, drop the seven `@codemirror/*`
-  deps. On fail, keep CodeMirror; use `editor/highlight` only for previews.
+- **Phase 4 — Editor swap. BLOCKED (publish issue).** Target:
+  `apps/console/src/components/editor/CodeMirrorEditor.tsx`. The Preact bridge is
+  ready, but `@cascivo/editor@0.1.1` ships **no `dist/`** (tarball has only
+  package.json/README/LICENSE) and the registry's `editor/code-editor` has
+  `files: []`, so neither the npm nor the copy-paste path is importable. See
+  `doc/cascivo-editor-package-feedback.md`. Once the package ships its build, run
+  the validation gate (markdown / find / undo / selection-preserving sync via
+  `ref.applyEdit`+`getSelection` / `onSave` / live `theme` / large-doc perf),
+  then replace CodeMirror behind the existing API and drop `@codemirror/*`.
 - **Phase 5 — Domain widgets re-skin (optional).** Swap widgets' internal
   primitives to the migrated wrappers; optionally re-back chart widgets with
   Cascivo charts. No behavior change.

@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-06-24 — Cascivo Phase 4 blocked (editor publish) + charts feedback
+
+- **Phase 4 (editor swap) blocked**: `@cascivo/editor@0.1.1` ships no `dist/`
+  (the published tarball contains only package.json/README/LICENSE despite
+  `files: ["dist"]`), and the registry's `editor/code-editor` has `files: []` —
+  so neither the npm package nor the copy-paste source is importable. The Preact
+  bridge + migration target are ready; the swap can land once the package ships
+  its build. Wrote `doc/cascivo-editor-package-feedback.md` with the root cause
+  and fix.
+- **Charts feedback**: wrote `doc/cascivo-charts-feedback.md` — a per-chart gap
+  analysis (DonutChart→PieChart, StackedBarChart→BarChart) listing exactly what
+  Cascivo's chart components need for a zero-downside swap. Headline blocker:
+  per-datum/per-series `color` overrides (both charts encode meaning in color);
+  plus donut center label/value, thickness, and tooltip/empty-state parity.
+- No app code changed this round (investigation + docs only).
+
 ## 2026-06-23 — Cascivo migration Phase 3: remove unused Panel/Sidebar/SplitView/FileTree
 
 - Confirmed `Panel`, `Sidebar`, `SplitView` (ResizablePanelGroup/Panel/Handle),
