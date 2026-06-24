@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-06-24 — Fix white active-line number in the editor gutter
+
+- **Symptom**: the active line's gutter cell rendered as a solid white box over
+  the line number.
+- **Cause**: the previous theme fix set `--cascivo-editor-gutter-active:
+  var(--los-fg)`, but that token is the *background* of the active gutter line
+  (not the number's text color); `--los-fg` is near-white, so it painted a white
+  block.
+- **Fix** (`packages/ui/src/cascivo.css`): remove the override so the editor's
+  own fallback applies — `var(--cascivo-editor-gutter-active,
+  var(--cascivo-editor-current-line))` → the subtle
+  `rgba(--los-accent-rgb, 0.06)` tint, matching the code area's active line.
+- *Verified*: console build green; the white override is gone from the bundled
+  CSS; suite (20/20) green; Biome clean.
+
 ## 2026-06-24 — Fix Cascivo editor layout (gutter gap + active-line drift)
 
 - **Symptom**: vs the official demo, the editor had too much gutter→text gap and

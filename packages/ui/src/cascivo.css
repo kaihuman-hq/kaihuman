@@ -70,7 +70,6 @@
   --cascivo-editor-fg: var(--los-fg);
   --cascivo-editor-gutter-bg: var(--los-bg);
   --cascivo-editor-gutter-fg: var(--los-muted);
-  --cascivo-editor-gutter-active: var(--los-fg);
   --cascivo-editor-current-line: rgba(var(--los-accent-rgb), 0.06);
   --cascivo-editor-selection: var(--los-accent-dim);
   --cascivo-editor-border: var(--los-border);
