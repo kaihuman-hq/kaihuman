@@ -33,16 +33,10 @@
     "preact": "^10.0.0"
   },
   "dependencies": {
+    "@cascivo/editor": "^0.2.1",
     "@cascivo/react": "^0.3.3",
     "@cascivo/themes": "^0.2.4",
     "@cascivo/tokens": "^0.3.2",
-    "@codemirror/commands": "^6.10.1",
-    "@codemirror/lang-markdown": "^6.5.0",
-    "@codemirror/language": "^6.12.1",
-    "@codemirror/search": "^6.6.0",
-    "@codemirror/state": "^6.5.4",
-    "@codemirror/theme-one-dark": "^6.1.3",
-    "@codemirror/view": "^6.39.11",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",

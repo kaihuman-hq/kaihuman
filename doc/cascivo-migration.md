@@ -179,15 +179,23 @@ Panel, Sidebar, SplitView, FileTree removed as unused (dropping
 `@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`,
 `react-resizable-panels`); charts deliberately kept. `@lifosy/ui`'s generic
 component surface is now Cascivo-backed.
-- **Phase 4 — Editor swap. BLOCKED (publish issue).** Target:
-  `apps/console/src/components/editor/CodeMirrorEditor.tsx`. The Preact bridge is
-  ready, but `@cascivo/editor@0.1.1` ships **no `dist/`** (tarball has only
-  package.json/README/LICENSE) and the registry's `editor/code-editor` has
-  `files: []`, so neither the npm nor the copy-paste path is importable. See
-  `doc/cascivo-editor-package-feedback.md`. Once the package ships its build, run
-  the validation gate (markdown / find / undo / selection-preserving sync via
-  `ref.applyEdit`+`getSelection` / `onSave` / live `theme` / large-doc perf),
-  then replace CodeMirror behind the existing API and drop `@codemirror/*`.
+- **Phase 4 — Editor swap. DONE.** `@cascivo/editor@0.2.1` shipped its build
+  (the prior empty-publish blocker is resolved). The validation gate passed —
+  `apps/console/src/spikes/cascivo-editor.spike.test.tsx` mounts the real
+  `CodeEditor` under Preact and exercises the imperative handle: markdown
+  language, `onValueChange`, and `applyEdit`/`getSelection`/`undo`/`redo`/
+  `openFind`/`focus` (selection-preserving sync verified — `applyEdit` →
+  `"Xhello"`). Both editors were ported to Cascivo's `CodeEditor`:
+  - `apps/console/src/components/editor/CodeMirrorEditor.tsx` (the live editing
+    surface) — same external API (`path`/`zenMode`/`initialContent`/`onChange`/
+    `onSave`); uncontrolled `defaultValue` + `ref.applyEdit` for store/prop
+    external sync (echo-guarded); `onSave` for Mod-S; `theme` for Zen mode;
+    `wrap` for `.md`; auto-save + save-button preserved.
+  - `packages/ui/src/components/editor/Editor.tsx` (used by `DumpView`).
+  - Deleted the now-orphaned `docSync.ts` + `docSync.test.ts`; removed all seven
+    `@codemirror/*` deps from the console and `@lifosy/ui` (−24 packages). The
+    `CodeMirrorEditor` filename is now a misnomer (kept to avoid churn; cosmetic
+    rename is a possible follow-up). Cascivo's `virtualize` handles large docs.
 - **Phase 5 — Domain widgets re-skin (optional).** Swap widgets' internal
   primitives to the migrated wrappers; optionally re-back chart widgets with
   Cascivo charts. No behavior change.

@@ -30,7 +30,6 @@ export default defineConfig({
         // Externalize heavy deps to let consumer bundle/tree-shake them
         'lucide-preact',
         'framer-motion',
-        /^@codemirror\/.*/,
         /^@dnd-kit\/.*/,
         'clsx',
         'tailwind-merge',

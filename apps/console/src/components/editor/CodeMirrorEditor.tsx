@@ -1,43 +1,19 @@
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { markdown } from '@codemirror/lang-markdown';
-import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
-import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
-import { Compartment, EditorState } from '@codemirror/state';
-import { oneDark } from '@codemirror/theme-one-dark';
-import { EditorView, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view';
+import { CodeEditor, type CodeEditorHandle } from '@cascivo/editor';
 import { githubFileStore, Logger } from '@lifosy/core';
 import { useSignalEffect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { syncDocPreservingSelection } from './docSync';
 
 const logger = new Logger('CodeMirrorEditor');
 
-// Theme customization to match Nexus
-const nexusTheme = EditorView.theme(
-  {
-    '&': {
-      height: '100%',
-      backgroundColor: 'transparent',
-      color: '#e2e8f0', // text-nexus-text (slate-200 approx)
-    },
-    '.cm-content': {
-      caretColor: '#38bdf8', // nexus-primary (sky-400)
-      fontFamily: 'JetBrains Mono, monospace', // Ensure mono font
-    },
-    '.cm-gutters': {
-      backgroundColor: 'transparent',
-      color: '#475569', // nexus-muted (slate-600)
-      border: 'none',
-    },
-    '.cm-activeLineGutter': {
-      backgroundColor: 'rgba(56, 189, 248, 0.1)',
-    },
-    '.cm-activeLine': {
-      backgroundColor: 'rgba(56, 189, 248, 0.05)',
-    },
-  },
-  { dark: true },
-);
+// Zen-mode overrides — a partial map of --cascivo-editor-* props that Cascivo
+// spreads onto the editor root and re-applies live when the object changes.
+const ZEN_THEME = {
+  '--cascivo-editor-bg': '#0c0a09',
+  '--cascivo-editor-fg': '#a8a29e',
+  '--cascivo-editor-gutter-bg': '#0c0a09',
+  '--cascivo-editor-gutter-fg': '#44403c',
+  '--cascivo-editor-current-line': 'rgba(56, 189, 248, 0.08)',
+} as const;
 
 export const CodeMirrorEditor = ({
   path: propsPath,
@@ -52,248 +28,103 @@ export const CodeMirrorEditor = ({
   onChange?: (content: string) => void;
   onSave?: (content: string) => void;
 }) => {
-  const parentRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
-
-  // Track active file to handle switching content
+  const editorRef = useRef<CodeEditorHandle | null>(null);
+  // Latest editor text — kept current via onValueChange so external syncs can
+  // compute the replace range without a getValue() on the handle.
+  const docRef = useRef(initialContent ?? '');
+  // Set while applying an external (store/prop) change so the resulting
+  // onValueChange does not echo back into the store. applyEdit is synchronous,
+  // so this flag is safe to clear right after the call.
+  const isUpdatingFromStore = useRef(false);
   const currentPathRef = useRef<string | null>(null);
 
-  // Ref to prevent echo loop (Store -> View -> Store)
-  const isUpdatingFromStore = useRef(false);
-
-  // Local state for tracking dirty status
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Helper to save
-  const handleSave = async () => {
-    if (onSave && initialContent !== undefined) {
-      // Controlled mode save
-      logger.debug(`Saving file via callback`);
-      setIsSaving(true);
-      try {
-        if (viewRef.current) {
-          await onSave(viewRef.current.state.doc.toString());
-        }
-        setHasUnsavedChanges(false);
-      } catch (e) {
-        logger.error('Failed to save via callback:', e);
-      } finally {
-        setIsSaving(false);
-      }
-      return;
-    }
+  const controlled = initialContent !== undefined;
 
-    const currentPath = propsPath || githubFileStore.activeFile.value;
-    if (currentPath) {
-      logger.debug(`Saving file: ${currentPath}`);
-      setIsSaving(true);
-      try {
-        await githubFileStore.saveFile(currentPath);
-        setHasUnsavedChanges(false);
-      } catch (e) {
-        logger.error('Failed to save:', e);
-      } finally {
-        setIsSaving(false);
-      }
+  // Replace the whole document via the undoable handle, guarding the echo.
+  const syncExternal = (next: string) => {
+    const view = editorRef.current;
+    if (!view || next === docRef.current) return;
+    isUpdatingFromStore.current = true;
+    try {
+      view.applyEdit({ from: 0, to: docRef.current.length }, next);
+      docRef.current = next;
+    } finally {
+      isUpdatingFromStore.current = false;
     }
   };
 
+  const handleChange = (value: string) => {
+    docRef.current = value;
+    if (isUpdatingFromStore.current) return; // external sync, not a user edit
+    setHasUnsavedChanges(true);
+    if (controlled) {
+      onChange?.(value);
+      return;
+    }
+    const currentPath = propsPath || githubFileStore.activeFile.value;
+    if (currentPath) githubFileStore.updateFileContent(currentPath, value);
+  };
+
+  const handleSave = async (value: string) => {
+    setIsSaving(true);
+    try {
+      if (controlled) {
+        await onSave?.(value);
+      } else {
+        const currentPath = propsPath || githubFileStore.activeFile.value;
+        if (currentPath) await githubFileStore.saveFile(currentPath);
+      }
+      setHasUnsavedChanges(false);
+    } catch (e) {
+      logger.error('Failed to save:', e);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Auto-save every 2 minutes when dirty — read through a ref so the interval
+  // never closes over stale state.
   const stateRef = useRef({ hasUnsavedChanges, isSaving, handleSave });
   stateRef.current = { hasUnsavedChanges, isSaving, handleSave };
-
-  // Auto-save interval (2 minutes) — reads everything through stateRef so the
-  // interval never closes over stale values (path, save handler, dirty flag).
   useEffect(() => {
-    const intervalId = setInterval(
+    const id = setInterval(
       () => {
-        if (stateRef.current.hasUnsavedChanges && !stateRef.current.isSaving) {
+        const s = stateRef.current;
+        if (s.hasUnsavedChanges && !s.isSaving) {
           logger.debug('Auto-saving...');
-          stateRef.current.handleSave();
+          s.handleSave(docRef.current);
         }
       },
       2 * 60 * 1000,
     );
+    return () => clearInterval(id);
+  }, []);
 
-    return () => clearInterval(intervalId);
-  }, []); // Intentionally runs once — stateRef keeps it current
-
-  // Compartment for dynamic theme switching
-  const themeCompartment = useRef(new Compartment());
-
-  // Initial setup
+  // Controlled mode: sync when the parent pushes new content (e.g. a late
+  // contentOverride or decrypted plaintext).
   useEffect(() => {
-    // Determine effective path (prop takes precedence, though usually one or other is used)
-    const initialPath = propsPath || githubFileStore.activeFile.value;
-
-    logger.debug(`Mounting. Path: ${initialPath} Ref: ${!!parentRef.current}`);
-    if (!parentRef.current) return;
-
-    const startState = EditorState.create({
-      doc: initialContent !== undefined ? initialContent : '',
-      extensions: [
-        lineNumbers(),
-        highlightActiveLineGutter(),
-        history(),
-        bracketMatching(),
-        highlightSelectionMatches(),
-        keymap.of([
-          ...defaultKeymap,
-          ...historyKeymap,
-          ...searchKeymap,
-          // Save command
-          {
-            key: 'Mod-s',
-            run: (_view) => {
-              handleSave();
-              return true;
-            },
-          },
-        ]),
-        markdown(),
-        syntaxHighlighting(defaultHighlightStyle),
-        oneDark, // Base theme
-        themeCompartment.current.of(nexusTheme), // Dynamic Helper
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged && !isUpdatingFromStore.current) {
-            if (onChange && initialContent !== undefined) {
-              // Controlled mode
-              setHasUnsavedChanges(true);
-              onChange(update.state.doc.toString());
-              return;
-            }
-
-            // Update store for the CORRECT path
-            const currentPath = propsPath || githubFileStore.activeFile.value;
-            if (currentPath) {
-              githubFileStore.updateFileContent(currentPath, update.state.doc.toString());
-              // Mark as dirty
-              setHasUnsavedChanges(true);
-            }
-          }
-        }),
-        // Conditional line wrapping for markdown
-        initialPath?.endsWith('.md') ? EditorView.lineWrapping : [],
-      ],
-    });
-
-    const view = new EditorView({
-      state: startState,
-      parent: parentRef.current,
-    });
-
-    viewRef.current = view;
-
-    // Reset unsaved changes on load?
-    setHasUnsavedChanges(false);
-
-    return () => {
-      view.destroy();
-    };
-  }, [propsPath]);
-
-  // Dynamic Theme Update
-  useEffect(() => {
-    if (viewRef.current) {
-      // Define Zen Theme override
-      const zenTheme = EditorView.theme(
-        {
-          '&': {
-            backgroundColor: '#0c0a09 !important', // Force overrides
-            color: '#a8a29e',
-          },
-          '.cm-scroller': {
-            backgroundColor: 'inherit !important',
-          },
-          '.cm-gutters': {
-            backgroundColor: '#0c0a09 !important', // Match gutter specifically
-            color: '#44403c', // Dimmed gutter text
-          },
-          '.cm-activeLine': {
-            backgroundColor: 'rgba(56, 189, 248, 0.08) !important',
-            backdropFilter: 'brightness(1.5)',
-          },
-          '.cm-content': {
-            fontFamily: 'JetBrains Mono, monospace',
-          },
-          '.cm-cursor': {
-            borderLeftColor: '#38bdf8',
-          },
-        },
-        { dark: true },
-      );
-
-      viewRef.current.dispatch({
-        effects: themeCompartment.current.reconfigure(
-          zenMode ? [nexusTheme, zenTheme] : nexusTheme,
-        ),
-      });
-    }
-  }, [zenMode]);
-
-  // Handle dynamically updated initialContent (e.g., when contentOverride is applied late)
-  useEffect(() => {
-    if (initialContent !== undefined && viewRef.current) {
-      const currentDoc = viewRef.current.state.doc.toString();
-      if (initialContent !== currentDoc) {
-        isUpdatingFromStore.current = true;
-        try {
-          syncDocPreservingSelection(viewRef.current, initialContent);
-        } finally {
-          isUpdatingFromStore.current = false;
-        }
-      }
-    }
+    if (initialContent !== undefined) syncExternal(initialContent);
   }, [initialContent]);
 
-  // Sync content with store
+  // Store mode: follow the active file's content (path switch or remote pull).
   useSignalEffect(() => {
-    if (initialContent !== undefined) return; // Skip store sync if controlled mode
-
+    if (initialContent !== undefined) return; // controlled — skip store sync
     const effectivePath = propsPath || githubFileStore.activeFile.value;
-
-    // Get content from OPEN files map directly
     const content = effectivePath
-      ? githubFileStore.openFiles.value[effectivePath]?.content || ''
+      ? (githubFileStore.openFiles.value[effectivePath]?.content ?? '')
       : '';
+    if (!effectivePath) return;
 
-    const view = viewRef.current;
-
-    if (!view || !effectivePath) return;
-
-    // Logic to update view if content changed EXTERNALLY
     if (effectivePath !== currentPathRef.current) {
       currentPathRef.current = effectivePath;
-      const currentDoc = view.state.doc.toString();
-      if (content !== currentDoc) {
-        isUpdatingFromStore.current = true;
-        try {
-          view.dispatch({
-            changes: { from: 0, to: currentDoc.length, insert: content || '' },
-          });
-        } finally {
-          isUpdatingFromStore.current = false;
-        }
-        // New file loaded -> clean state
-        setHasUnsavedChanges(false);
-      }
-    } else {
-      // Path is same.
-      // If content matches doc, we are good.
-      // If content differs, it means external update (e.g. pull).
-      const doc = view.state.doc.toString();
-      if (content !== doc && content !== null) {
-        isUpdatingFromStore.current = true;
-        try {
-          syncDocPreservingSelection(view, content);
-        } finally {
-          isUpdatingFromStore.current = false;
-        }
-        // External update -> Reset dirty? Or keep dirty if we had changes?
-        // Usually external update overwrites, so we are now "in sync" with that version (but maybe that version is unsaved?)
-        // Let's assume external update means we accept it.
-        setHasUnsavedChanges(false);
-      }
+      syncExternal(content);
+      setHasUnsavedChanges(false);
+    } else if (content !== docRef.current) {
+      syncExternal(content);
+      setHasUnsavedChanges(false);
     }
   });
 
@@ -305,9 +136,21 @@ export const CodeMirrorEditor = ({
     );
   }
 
+  const effectivePath = propsPath || githubFileStore.activeFile.value;
+
   return (
     <div className="h-full w-full relative group">
-      <div ref={parentRef} class="h-full w-full overflow-hidden" />
+      <CodeEditor
+        ref={editorRef}
+        language="markdown"
+        defaultValue={docRef.current}
+        onValueChange={handleChange}
+        onSave={handleSave}
+        wrap={effectivePath ? effectivePath.endsWith('.md') : true}
+        bracketMatching
+        theme={zenMode ? ZEN_THEME : undefined}
+        className="h-full w-full"
+      />
 
       {/* Save Button Overlay */}
       <div
@@ -315,7 +158,7 @@ export const CodeMirrorEditor = ({
       >
         <button
           type="button"
-          onClick={handleSave}
+          onClick={() => handleSave(docRef.current)}
           disabled={isSaving}
           className="bg-[var(--los-accent)] text-black px-4 py-1.5 rounded-sm shadow-lg text-xs font-bold font-mono tracking-wider hover:opacity-90 active:scale-95 transition-all flex items-center gap-2"
         >

@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-06-24 — Cascivo Phase 4 DONE: CodeMirror → Cascivo CodeEditor
+
+- `@cascivo/editor@0.2.1` shipped its build (prior empty-publish blocker fixed).
+  Validation gate (`apps/console/src/spikes/cascivo-editor.spike.test.tsx`)
+  mounts the real `CodeEditor` under Preact and verifies the imperative handle:
+  markdown language, `onValueChange`, and `applyEdit`/`getSelection`/`undo`/
+  `redo`/`openFind`/`focus` (selection-preserving sync confirmed).
+- Ported both editors to Cascivo's `CodeEditor`:
+  - `apps/console/src/components/editor/CodeMirrorEditor.tsx` — same external API;
+    uncontrolled `defaultValue` + `ref.applyEdit` for store/prop external sync
+    (echo-guarded); native `onSave` (Mod-S); `theme` for Zen mode; `.md` wrap;
+    auto-save + save-button preserved. `bracketMatching` on; `virtualize` (auto)
+    handles large docs.
+  - `packages/ui/src/components/editor/Editor.tsx` (used by `DumpView`).
+- Removed orphaned `docSync.ts` + `docSync.test.ts`; dropped all seven
+  `@codemirror/*` deps from the console and `@lifosy/ui` (−24 packages). Wired
+  `@cascivo/editor/styles.css` into `main.tsx` + Storybook preview.
+- *Verified*: console build green; `tsc` clean; gates (5/5) + console suite
+  (20/20, was 28 — the 8 docSync tests were removed with the helper) green;
+  Biome clean; 0 CodeMirror source references remain.
+
 ## 2026-06-24 — Cascivo Phase 4 blocked (editor publish) + charts feedback
 
 - **Phase 4 (editor swap) blocked**: `@cascivo/editor@0.1.1` ships no `dist/`
