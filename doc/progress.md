@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-06-24 — Fix Cascivo editor rendering on a light background
+
+- **Symptom**: the markdown editor rendered on a near-white background with a
+  washed-out active-line band, despite the dark app theme.
+- **Root cause**: `@cascivo/tokens` declares every `--cascivo-editor-*` at
+  `:root` with a *light* fallback (e.g.
+  `--cascivo-editor-bg: var(--cascivo-color-surface, oklch(0.985 …))`). The
+  LifeOS bridge sets `--cascivo-color-*` on `.life-os-root` (and Cascivo's dark
+  theme keys off `[data-theme="dark"]`, also on `.life-os-root`), so at `:root`
+  those references are undefined → the editor tokens compute to their light
+  fallbacks and inherit down. `.life-os-root` never re-declared them, so the
+  editor stayed light.
+- **Fix** (`packages/ui/src/cascivo.css`): re-declare the `--cascivo-editor-*`
+  tokens (bg/fg/gutter/current-line/selection/border + the syntax palette) on
+  `.life-os-root` so they re-resolve against the dark `--los-*` / accent / chart
+  tokens. Active line is now a subtle `rgba(--los-accent-rgb, 0.06)` tint.
+- *Note for the library*: editor tokens declared at `:root` referencing
+  `--cascivo-color-*` will mis-resolve for any consumer that scopes the theme to
+  a sub-element via `data-theme` (a documented pattern) — worth defining them
+  alongside the theme tokens, or with theme-aware fallbacks.
+- *Verified*: console build green; bundled CSS carries the `.life-os-root`
+  editor-token overrides; spikes (5/5) + suite (20/20) green; Biome clean.
+
 ## 2026-06-24 — Cascivo charts migrated (DonutChart/StackedBarChart → @cascivo/charts)
 
 - The charts feedback shipped in **`@cascivo/charts@0.3.0`** (a standalone
