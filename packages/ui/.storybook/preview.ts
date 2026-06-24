@@ -2,6 +2,7 @@ import type { Preview } from '@storybook/preact-vite';
 // Cascivo CSS, in required order: components → tokens+theme → brand overrides.
 import '@cascivo/react/styles.css';
 import '@cascivo/editor/styles.css';
+import '@cascivo/charts/styles.css';
 import '@cascivo/themes/dark.css';
 import '../src/styles.css';
 import '../src/LifeOS/styles.css';

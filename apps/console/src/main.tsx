@@ -5,6 +5,7 @@ import { App } from './App';
 // (imported by ./index.css from @lifosy/ui/cascivo.css) must load last.
 import '@cascivo/react/styles.css';
 import '@cascivo/editor/styles.css';
+import '@cascivo/charts/styles.css';
 import '@cascivo/themes/dark.css';
 import './index.css';
 

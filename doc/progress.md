@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-06-24 — Cascivo charts migrated (DonutChart/StackedBarChart → @cascivo/charts)
+
+- The charts feedback shipped in **`@cascivo/charts@0.3.0`** (a standalone
+  package — `@cascivo/react` bundles only components; editor/icons/charts are
+  separate). It ships a real `dist/` with per-datum/series `color`,
+  `centerValue`/`centerLabel`/`thickness`/`size`/`emptyLabel`/`tooltipFormat`
+  (pie) and `xLabelEvery`/`tooltip` + `toStackedSeries` (bar).
+- Re-implemented `packages/ui/src/LifeOS/Charts/DonutChart.tsx` and
+  `StackedBarChart.tsx` as thin wrappers over Cascivo's `PieChart`/`BarChart`,
+  preserving their exact APIs so `TodoAnalytics` is unchanged: semantic per-slice
+  / per-series colors, donut center value/label + size/thickness, `toStackedSeries`
+  pivot (per-segment color preserved), the app's grid/axis colors applied via
+  `--cascivo-chart-*` tokens, `plain`/`legend={false}` (callers own the legend).
+- Wired `@cascivo/charts/styles.css` into `main.tsx` + Storybook; added a
+  `Cascivo/Charts` story for visual verification. Added `@cascivo/charts` to
+  `@lifosy/ui` (charts live there) and the console (for the CSS import).
+- *Verified*: console production build green (full chain TodoAnalytics → wrappers
+  → @cascivo/charts compiles/bundles); `tsc` clean; spikes (5/5) + console suite
+  (20/20) green; Biome clean. **This completes the Phase 3 primitive migration.**
+
 ## 2026-06-24 — Cascivo Phase 4 DONE: CodeMirror → Cascivo CodeEditor
 
 - `@cascivo/editor@0.2.1` shipped its build (prior empty-publish blocker fixed).

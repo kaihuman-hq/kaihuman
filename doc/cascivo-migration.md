@@ -165,20 +165,22 @@ Derived from the live registry; finalize each with `get_component` at execution.
     references); removed for consistency, dropping the orphaned
     `react-resizable-panels` (SplitView's only dep). `@dnd-kit` kept (still used
     by `MainApp`).
-  - **[—] Charts (DonutChart, StackedBarChart) — kept custom (deliberate).**
-    The only *used* primitives (consumed by `TodoAnalytics`). They are small
-    (126 + 171 lines), dependency-free SVG, and tuned to the app: **per-segment
-    semantic colors** (status colors) and a **center label/value** in the donut.
-    Cascivo's `chart/pie-chart` / `chart/bar-chart` use their own theme palette
-    and accessor-based APIs and don't cleanly support those, so swapping would
-    regress a real analytics view for no dependency savings. Revisit in Phase 5
-    only if the app moves to Cascivo's chart styling wholesale.
+  - **[x] Charts (DonutChart, StackedBarChart) — migrated.** After the charts
+    feedback shipped in **`@cascivo/charts@0.3.0`** (a standalone package, not
+    `@cascivo/react`), both were re-implemented as thin wrappers over Cascivo's
+    `PieChart` / `BarChart`, preserving their exact APIs so `TodoAnalytics` is
+    unchanged. Per-slice/series semantic color via `PieChartDatum.color` /
+    `BarChartSeries.color`; donut `centerValue`/`centerLabel` + `size`/
+    `thickness`; `toStackedSeries` pivots the app's row data (with per-segment
+    color preserved); the app's grid/axis colors are applied via
+    `--cascivo-chart-grid`/`--cascivo-chart-axis` on a wrapper; both charts run
+    `plain`/`legend={false}` since the callers render their own legends.
 
-**Phase 3 outcome:** Button + Input migrated to Cascivo; Dialog, DropdownMenu,
-Panel, Sidebar, SplitView, FileTree removed as unused (dropping
+**Phase 3 outcome:** Button + Input + Charts migrated to Cascivo; Dialog,
+DropdownMenu, Panel, Sidebar, SplitView, FileTree removed as unused (dropping
 `@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`,
-`react-resizable-panels`); charts deliberately kept. `@lifosy/ui`'s generic
-component surface is now Cascivo-backed.
+`react-resizable-panels`). `@lifosy/ui`'s generic component surface is now
+Cascivo-backed.
 - **Phase 4 — Editor swap. DONE.** `@cascivo/editor@0.2.1` shipped its build
   (the prior empty-publish blocker is resolved). The validation gate passed —
   `apps/console/src/spikes/cascivo-editor.spike.test.tsx` mounts the real

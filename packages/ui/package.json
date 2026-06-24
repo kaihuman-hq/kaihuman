@@ -33,6 +33,7 @@
     "preact": "^10.0.0"
   },
   "dependencies": {
+    "@cascivo/charts": "^0.3.0",
     "@cascivo/editor": "^0.2.1",
     "@cascivo/react": "^0.3.3",
     "@cascivo/themes": "^0.2.4",

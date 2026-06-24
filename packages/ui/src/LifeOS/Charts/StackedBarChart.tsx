@@ -1,4 +1,9 @@
-import { useState } from 'preact/hooks';
+import { BarChart as BarChartImport, type StackedRow, toStackedSeries } from '@cascivo/charts';
+import type { h } from 'preact';
+
+// Cascivo ships React prop types; cast to a Preact-typed signature (same bridge
+// pattern as the other wrappers in this package).
+const BarChart = BarChartImport as unknown as (props: Record<string, unknown>) => h.JSX.Element;
 
 export interface StackedBarSegment {
   value: number;
@@ -19,153 +24,32 @@ interface StackedBarChartProps {
 }
 
 export const StackedBarChart = ({ data, width, height, colors }: StackedBarChartProps) => {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-
   if (!width || !height || data.length === 0) return null;
 
-  const padding = { top: 10, right: 10, bottom: 24, left: 32 };
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
+  // The app's row-oriented data maps 1:1 onto Cascivo's StackedRow; `key` is the
+  // layer (series) id and carries the semantic per-layer color.
+  const rows: StackedRow[] = data.map((bar) => ({
+    label: bar.label,
+    segments: bar.segments.map((seg) => ({ key: seg.label, value: seg.value, color: seg.color })),
+  }));
 
-  const maxTotal = Math.max(...data.map((d) => d.segments.reduce((s, seg) => s + seg.value, 0)), 1);
-
-  const barStep = chartWidth / data.length;
-  const barWidth = Math.max(barStep * 0.75, 2);
-  const getX = (i: number) => padding.left + i * barStep + (barStep - barWidth) / 2;
-  const getBarH = (val: number) => (val / maxTotal) * chartHeight;
-  const yTicks = 4;
-  const labelStep = Math.max(Math.ceil(data.length / 8), 1);
+  // Preserve the app's exact grid/axis colors via the Cascivo chart tokens.
+  const tokenStyle = {
+    '--cascivo-chart-grid': colors.border,
+    '--cascivo-chart-axis': colors.muted,
+  } as Record<string, string>;
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: chart mouse tracking
-    <div className="relative w-full h-full" onMouseLeave={() => setHoveredIndex(null)}>
-      <svg
+    <div style={tokenStyle as h.JSX.CSSProperties}>
+      <BarChart
+        mode="stacked"
+        {...toStackedSeries(rows)}
         width={width}
         height={height}
-        role="img"
-        aria-label="Stacked bar chart"
-        onMouseMove={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          const x = e.clientX - rect.left - padding.left;
-          const idx = Math.floor(x / barStep);
-          setHoveredIndex(idx >= 0 && idx < data.length ? idx : null);
-        }}
-      >
-        {/* Grid lines + Y labels */}
-        {Array.from({ length: yTicks + 1 }).map((_, i) => {
-          const y = padding.top + (chartHeight / yTicks) * i;
-          const val = Math.round(maxTotal - (maxTotal / yTicks) * i);
-          return (
-            <g key={`grid-${val}`}>
-              <line
-                x1={padding.left}
-                y1={y}
-                x2={width - padding.right}
-                y2={y}
-                stroke={colors.border}
-                strokeOpacity={0.5}
-                strokeDasharray="3 3"
-              />
-              {i < yTicks && (
-                <text
-                  x={padding.left - 4}
-                  y={y + 3}
-                  textAnchor="end"
-                  fill={colors.muted}
-                  fontSize="9"
-                  fontFamily="monospace"
-                >
-                  {val}
-                </text>
-              )}
-            </g>
-          );
-        })}
-
-        {/* Stacked bars */}
-        {data.map((bar, i) => {
-          let yOffset = padding.top + chartHeight;
-          const x = getX(i);
-          return (
-            <g key={bar.label} opacity={hoveredIndex !== null && hoveredIndex !== i ? 0.4 : 1}>
-              {bar.segments.map((seg) => {
-                if (seg.value === 0) return null;
-                const h = getBarH(seg.value);
-                yOffset -= h;
-                return (
-                  <rect
-                    key={seg.label}
-                    x={x}
-                    y={yOffset}
-                    width={barWidth}
-                    height={h}
-                    fill={seg.color}
-                  />
-                );
-              })}
-            </g>
-          );
-        })}
-
-        {/* X axis labels (thinned) */}
-        {data.map((bar, i) => {
-          if (i % labelStep !== 0 && i !== data.length - 1) return null;
-          return (
-            <text
-              key={bar.label}
-              x={getX(i) + barWidth / 2}
-              y={height - 6}
-              textAnchor="middle"
-              fill={colors.muted}
-              fontSize="8"
-              fontFamily="monospace"
-            >
-              {bar.label}
-            </text>
-          );
-        })}
-      </svg>
-
-      {/* Tooltip */}
-      {hoveredIndex !== null &&
-        data[hoveredIndex] &&
-        (() => {
-          const bar = data[hoveredIndex];
-          const total = bar.segments.reduce((s, seg) => s + seg.value, 0);
-          return (
-            <div
-              className="absolute pointer-events-none z-10 shadow-xl"
-              style={{
-                left: Math.min(getX(hoveredIndex) + barWidth + 8, width - 148),
-                top: padding.top,
-                background: colors.bg,
-                border: `1px solid ${colors.border}`,
-                padding: '6px 8px',
-              }}
-            >
-              <p
-                style={{
-                  fontFamily: 'monospace',
-                  fontSize: 10,
-                  color: colors.muted,
-                  marginBottom: 4,
-                }}
-              >
-                {bar.label} · {total}
-              </p>
-              {bar.segments
-                .filter((s) => s.value > 0)
-                .map((seg) => (
-                  <p
-                    key={seg.label}
-                    style={{ fontFamily: 'monospace', fontSize: 10, color: seg.color }}
-                  >
-                    {seg.label}: {seg.value}
-                  </p>
-                ))}
-            </div>
-          );
-        })()}
+        tooltip
+        legend={false} // the caller renders its own legend below the chart
+        title="Timeline"
+      />
     </div>
   );
 };
