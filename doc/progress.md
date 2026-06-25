@@ -1,5 +1,267 @@
 # Progress
 
+## 2026-06-25 — Switch to @cascivo/react 0.3.7 (per-component CSS, no monolith)
+
+- `@cascivo/react@0.3.7` ships each component prebuilt with its CSS co-located
+  (`button/button.js` → `button.module.js` → `import './button.css'`) and
+  `sideEffects: ["**/*.css"]`. Importing a component now pulls in only that
+  component's CSS automatically — the 252KB aggregate `styles.css` is only needed
+  for no-bundler/CDN setups (per the library's own README).
+- Reverted the interim copy-paste vendoring: deleted
+  `packages/ui/src/components/cascivo/{button,input}.tsx` and
+  `cascivo-components.css`, and pointed the `@lifosy/ui` Button/Input wrappers
+  back at `@cascivo/react` (re-added as a `@lifosy/ui` dependency, `^0.3.7`).
+  Dropped the corresponding `cascivo-components.css` imports (console
+  `index.css` + Storybook) and the `./cascivo-components.css` package export.
+- `InputProps` now extends `JSX.InputHTMLAttributes` (was `HTMLAttributes`) so
+  `placeholder`/`value`/etc. type-check; still omits the numeric `size` (collides
+  with Cascivo's `'sm'|'md'|'lg'`). Fixes a pre-existing story type error that
+  the dts build never surfaced. The `Input` wrapper drops the unused `forwardRef`
+  (no caller forwards a ref to it).
+- Also bumped `@cascivo/editor` 0.2.1→0.2.2 and `@cascivo/charts` 0.3.0→0.3.1.
+- **Bundle impact** (console, gzip): CSS still ~17KB (per-component tree-shaking
+  matches the hand-vendored result), monolith gone.
+- *Verified*: full build green (6/6); bundled CSS carries `_button_`/`_input_`
+  and none of the monolith-only classes (accordion/carousel/data-table/dropdown
+  = 0); `tsc` clean (ui + console); spikes (5/5) + console suite (20/20) green;
+  Biome clean.
+
+## 2026-06-25 — Drop the 252KB @cascivo/react CSS monolith (copy-paste model)
+
+- `@cascivo/react/styles.css` shipped the CSS for all 254 component class-groups
+  (252KB raw / ~33KB gzip) but we only used `Button` + `Input` from it.
+- Switched those two to Cascivo's **copy-paste model**: vendored the components
+  (`npx cascivo add button input`) into
+  `packages/ui/src/components/cascivo/{button,input}.tsx`, adapted them to Preact
+  types, and flattened their per-component CSS-modules into
+  `packages/ui/src/cascivo-components.css` (~6KB, stable class names, kept in
+  `@layer cascivo.component`). The `@lifosy/ui` Button/Input wrappers now point at
+  the vendored components.
+- Removed the `@cascivo/react` dependency (console + `@lifosy/ui`) and its
+  `styles.css` import (main.tsx + Storybook); added `@cascivo/core` as a direct
+  `@lifosy/ui` dep (the vendored components use `cn`/`Slot`/`useMachine`).
+  Editor + charts (separate, already-small packages) are unchanged.
+- **Bundle impact** (console, gzip): CSS **48.6KB → 17.1KB (−31.5KB)**; JS
+  ~unchanged (345→342KB). Initial JS+CSS now ~359KB gz — **−33% vs the original
+  pre-Cascivo `main`** (was 539KB gz), realizing the earlier "future win".
+- *Verified*: console build green; no `@cascivo/react` refs remain; bundled CSS
+  carries `cascivo-btn`/`cascivo-field` and none of the monolith classes; `tsc`
+  clean; spikes (5/5) + suite (20/20) green; Biome clean.
+
+## 2026-06-24 — Fix white active-line number in the editor gutter
+
+- **Symptom**: the active line's gutter cell rendered as a solid white box over
+  the line number.
+- **Cause**: the previous theme fix set `--cascivo-editor-gutter-active:
+  var(--los-fg)`, but that token is the *background* of the active gutter line
+  (not the number's text color); `--los-fg` is near-white, so it painted a white
+  block.
+- **Fix** (`packages/ui/src/cascivo.css`): remove the override so the editor's
+  own fallback applies — `var(--cascivo-editor-gutter-active,
+  var(--cascivo-editor-current-line))` → the subtle
+  `rgba(--los-accent-rgb, 0.06)` tint, matching the code area's active line.
+- *Verified*: console build green; the white override is gone from the bundled
+  CSS; suite (20/20) green; Biome clean.
+
+## 2026-06-24 — Fix Cascivo editor layout (gutter gap + active-line drift)
+
+- **Symptom**: vs the official demo, the editor had too much gutter→text gap and
+  the active-line highlight sat ~half a line too low.
+- **Root cause**: a cascade-layer ordering problem. Cascivo wraps its component
+  CSS in `@layer cascivo.component`, which was imported *before* Tailwind in
+  `main.tsx`, so it appeared first in the cascade — *earlier* layers lose. Thus
+  Tailwind's Preflight (`* { margin:0; padding:0 }` in `@layer base`) overrode
+  the editor's `padding-block`/`padding-inline`. The active-line/gutter overlays
+  position via `top: var(--cascivo-space-3)` (a `top`, not padding — so *not*
+  reset), while the text lost its matching `padding-block` → the highlight
+  dropped by `space-3` and the gutter spacing collapsed.
+- **Fix**: declare the cascade order so Cascivo's layers come *after* Tailwind's
+  (`@layer theme, base, components, utilities, cascivo.tokens, cascivo.base,
+  cascivo.theme, cascivo.component;` at the top of `index.css`) and import
+  `index.css` *before* the Cascivo CSS in `main.tsx` so that order takes effect.
+  Verified in the bundled CSS: `@layer base` now precedes `@layer
+  cascivo.component`, so Cascivo's component styles win over Preflight.
+- *Note for the library*: any Tailwind app that imports Cascivo CSS before
+  Tailwind gets its components silently reset by Preflight. Worth documenting the
+  required layer order (or shipping a guard).
+- *Verified*: console build green; bundled layer order corrected; spikes (5/5) +
+  suite (20/20) green; Biome clean.
+
+## 2026-06-24 — Fix Cascivo editor rendering on a light background
+
+- **Symptom**: the markdown editor rendered on a near-white background with a
+  washed-out active-line band, despite the dark app theme.
+- **Root cause**: `@cascivo/tokens` declares every `--cascivo-editor-*` at
+  `:root` with a *light* fallback (e.g.
+  `--cascivo-editor-bg: var(--cascivo-color-surface, oklch(0.985 …))`). The
+  LifeOS bridge sets `--cascivo-color-*` on `.life-os-root` (and Cascivo's dark
+  theme keys off `[data-theme="dark"]`, also on `.life-os-root`), so at `:root`
+  those references are undefined → the editor tokens compute to their light
+  fallbacks and inherit down. `.life-os-root` never re-declared them, so the
+  editor stayed light.
+- **Fix** (`packages/ui/src/cascivo.css`): re-declare the `--cascivo-editor-*`
+  tokens (bg/fg/gutter/current-line/selection/border + the syntax palette) on
+  `.life-os-root` so they re-resolve against the dark `--los-*` / accent / chart
+  tokens. Active line is now a subtle `rgba(--los-accent-rgb, 0.06)` tint.
+- *Note for the library*: editor tokens declared at `:root` referencing
+  `--cascivo-color-*` will mis-resolve for any consumer that scopes the theme to
+  a sub-element via `data-theme` (a documented pattern) — worth defining them
+  alongside the theme tokens, or with theme-aware fallbacks.
+- *Verified*: console build green; bundled CSS carries the `.life-os-root`
+  editor-token overrides; spikes (5/5) + suite (20/20) green; Biome clean.
+
+## 2026-06-24 — Cascivo charts migrated (DonutChart/StackedBarChart → @cascivo/charts)
+
+- The charts feedback shipped in **`@cascivo/charts@0.3.0`** (a standalone
+  package — `@cascivo/react` bundles only components; editor/icons/charts are
+  separate). It ships a real `dist/` with per-datum/series `color`,
+  `centerValue`/`centerLabel`/`thickness`/`size`/`emptyLabel`/`tooltipFormat`
+  (pie) and `xLabelEvery`/`tooltip` + `toStackedSeries` (bar).
+- Re-implemented `packages/ui/src/LifeOS/Charts/DonutChart.tsx` and
+  `StackedBarChart.tsx` as thin wrappers over Cascivo's `PieChart`/`BarChart`,
+  preserving their exact APIs so `TodoAnalytics` is unchanged: semantic per-slice
+  / per-series colors, donut center value/label + size/thickness, `toStackedSeries`
+  pivot (per-segment color preserved), the app's grid/axis colors applied via
+  `--cascivo-chart-*` tokens, `plain`/`legend={false}` (callers own the legend).
+- Wired `@cascivo/charts/styles.css` into `main.tsx` + Storybook; added a
+  `Cascivo/Charts` story for visual verification. Added `@cascivo/charts` to
+  `@lifosy/ui` (charts live there) and the console (for the CSS import).
+- *Verified*: console production build green (full chain TodoAnalytics → wrappers
+  → @cascivo/charts compiles/bundles); `tsc` clean; spikes (5/5) + console suite
+  (20/20) green; Biome clean. **This completes the Phase 3 primitive migration.**
+
+## 2026-06-24 — Cascivo Phase 4 DONE: CodeMirror → Cascivo CodeEditor
+
+- `@cascivo/editor@0.2.1` shipped its build (prior empty-publish blocker fixed).
+  Validation gate (`apps/console/src/spikes/cascivo-editor.spike.test.tsx`)
+  mounts the real `CodeEditor` under Preact and verifies the imperative handle:
+  markdown language, `onValueChange`, and `applyEdit`/`getSelection`/`undo`/
+  `redo`/`openFind`/`focus` (selection-preserving sync confirmed).
+- Ported both editors to Cascivo's `CodeEditor`:
+  - `apps/console/src/components/editor/CodeMirrorEditor.tsx` — same external API;
+    uncontrolled `defaultValue` + `ref.applyEdit` for store/prop external sync
+    (echo-guarded); native `onSave` (Mod-S); `theme` for Zen mode; `.md` wrap;
+    auto-save + save-button preserved. `bracketMatching` on; `virtualize` (auto)
+    handles large docs.
+  - `packages/ui/src/components/editor/Editor.tsx` (used by `DumpView`).
+- Removed orphaned `docSync.ts` + `docSync.test.ts`; dropped all seven
+  `@codemirror/*` deps from the console and `@lifosy/ui` (−24 packages). Wired
+  `@cascivo/editor/styles.css` into `main.tsx` + Storybook preview.
+- *Verified*: console build green; `tsc` clean; gates (5/5) + console suite
+  (20/20, was 28 — the 8 docSync tests were removed with the helper) green;
+  Biome clean; 0 CodeMirror source references remain.
+
+## 2026-06-24 — Cascivo Phase 4 blocked (editor publish) + charts feedback
+
+- **Phase 4 (editor swap) blocked**: `@cascivo/editor@0.1.1` ships no `dist/`
+  (the published tarball contains only package.json/README/LICENSE despite
+  `files: ["dist"]`), and the registry's `editor/code-editor` has `files: []` —
+  so neither the npm package nor the copy-paste source is importable. The Preact
+  bridge + migration target are ready; the swap can land once the package ships
+  its build. Wrote `doc/cascivo-editor-package-feedback.md` with the root cause
+  and fix.
+- **Charts feedback**: wrote `doc/cascivo-charts-feedback.md` — a per-chart gap
+  analysis (DonutChart→PieChart, StackedBarChart→BarChart) listing exactly what
+  Cascivo's chart components need for a zero-downside swap. Headline blocker:
+  per-datum/per-series `color` overrides (both charts encode meaning in color);
+  plus donut center label/value, thickness, and tooltip/empty-state parity.
+- No app code changed this round (investigation + docs only).
+
+## 2026-06-23 — Cascivo migration Phase 3: remove unused Panel/Sidebar/SplitView/FileTree
+
+- Confirmed `Panel`, `Sidebar`, `SplitView` (ResizablePanelGroup/Panel/Handle),
+  and `FileTree` are unused exports (0 references anywhere). Removed the four
+  component files + their `index.ts` exports, consistent with the earlier
+  Dialog/DropdownMenu decision.
+- Dropped the now-orphaned `react-resizable-panels` (SplitView's only dependency).
+  `@dnd-kit` kept — still used by `MainApp`.
+- Remaining Phase 3 item: the charts (DonutChart/StackedBarChart), the only
+  *used* primitives, deferred for careful visual migration.
+- *Verified*: console build green; `tsc` clean; spike (2/2) + console suite
+  (28/28) green; Biome clean.
+
+## 2026-06-23 — Cascivo migration Phase 3: remove unused Radix Dialog/DropdownMenu
+
+- `@lifosy/ui`'s `Dialog` and `DropdownMenu` were full Radix-based compound
+  components (10–12 sub-exports each) with **no consumers** anywhere in the repo.
+  Rather than speculatively re-wrap 24 unused sub-components over Cascivo, they
+  were removed: deleted `components/Dialog.tsx` + `components/DropdownMenu.tsx`,
+  dropped their `index.ts` exports, and removed `@radix-ui/react-dialog` +
+  `@radix-ui/react-dropdown-menu` (−39 packages) and the Radix `external` entry
+  from the lib build. A Cascivo-backed Modal/Dropdown can be added when a real
+  consumer needs one.
+- *Verified*: console build green; `tsc` clean; spike (2/2) + console suite
+  (28/28) green; Biome clean; 0 Radix references remain.
+
+## 2026-06-23 — Cascivo migration Phase 3 (start): Button + Input primitives
+
+- **Button** (`packages/ui/src/components/Button.tsx`): re-implemented as a thin
+  wrapper over Cascivo's `Button`, preserving the existing `@lifosy/ui` API —
+  `variant` (`outline`→ghost, `danger`→destructive), `size` (`icon`→md), and the
+  `label` convenience. Console call sites (e.g. `AuthCli.tsx`) unchanged.
+- **Input** (`packages/ui/src/components/Input.tsx`): wraps Cascivo's `Input`;
+  `error` widened to `boolean | string` (the string form supplies Cascivo's
+  message). Drops the bespoke Tailwind input styling.
+- **Build wiring**: `@lifosy/ui` lib build now externalizes `@cascivo/*` and
+  `@preact/signals-react[/runtime]`; the console app build aliases
+  `@preact/signals-react → @preact/signals` and the `/runtime` `useSignals` to a
+  no-op shim, so Cascivo runs under Preact in the real app (not just the spike).
+  React-typed Cascivo components are bridged with an
+  `as unknown as (props) => h.JSX.Element` cast (same pattern as the Radix
+  wrappers).
+- Fixed a latent type error in the Phase 2 `CascivoBridge` story (same cast).
+- *Verified*: console production build green; `tsc` clean (no new errors beyond
+  the pre-existing `packages/core` baseline); spike (2/2) + console suite (28/28)
+  green; Biome clean.
+
+## 2026-06-23 — Cascivo migration Phase 2: theme/token bridge
+
+- **Bridge stylesheet** (`packages/ui/src/cascivo.css`, exported as
+  `@lifosy/ui/cascivo.css`): remaps Cascivo's semantic color/font tokens
+  (`--cascivo-color-*`, `--cascivo-font-*`) onto the live LifeOS palette
+  (`--los-*`), so Cascivo components automatically follow the active LifeOS
+  theme (nexus / light / amethyst). Declared unlayered to win over Cascivo's
+  layered theme values.
+- **data-theme**: LifeOS themes live on `<html>`; Cascivo's `dark.css` keys off
+  `[data-theme='dark']`. Set `data-theme="dark"` on the inner `.life-os-root`
+  (`apps/console/src/App.tsx`) so Cascivo's structural tokens (radius, shadow,
+  ring, status, chart, fonts) apply without colliding with LifeOS switching.
+- **CSS import order** (components → tokens+theme → brand overrides): wired in
+  `apps/console/src/main.tsx` (+ `index.css` for the brand layer) and
+  `packages/ui/.storybook/preview.ts`.
+- **Storybook bridge** (`packages/ui/src/CascivoBridge.stories.tsx` +
+  signals-react alias/shim in `.storybook/main.ts`): renders raw Cascivo
+  Button/Input/Badge/Card under the bridge for visual verification.
+- **Deps**: added `@cascivo/react` / `@cascivo/themes` / `@cascivo/tokens` to
+  `@lifosy/ui`.
+- *Verified*: console production build resolves+bundles the full Cascivo CSS
+  chain; spike (2/2) and console suite (28/28) green; Biome clean.
+
+## 2026-06-23 — Cascivo UI migration: plan + Phase 0 integration spike
+
+- **Plan** (`doc/cascivo-migration.md`): full plan to migrate the console's UI
+  (which lives in `@lifosy/ui`) onto Cascivo — a CSS-native, signal-driven,
+  AI-first React design system. Includes the `@lifosy/ui` → Cascivo component
+  mapping derived from the live registry (181 components), a phased rollout, and
+  risks. Decisions: own the source (copy-paste model), Tailwind coexistence,
+  editor migrated to `@cascivo/editor`.
+- **AI tooling wired** (`.mcp.json`): added the Cascivo MCP server
+  (`npx -y @cascivo/mcp`) so the migration is driven by `list_components` /
+  `select_component` / `get_component` / `add_to_project`.
+- **Phase 0 integration spike (green)**: proved Cascivo's React/`signals-react`
+  components mount under Preact. Cascivo imports `@preact/signals-react` +
+  `@preact/signals-react/runtime`; the bridge aliases `@preact/signals-react →
+  @preact/signals` and stubs `useSignals` as a no-op
+  (`apps/console/src/shims/signals-react-runtime.ts`). Spike test
+  `apps/console/src/spikes/cascivo-preact.spike.test.tsx` (run via
+  `vitest.spike.config.ts`) mounts a real Cascivo `<Button>` under Preact and
+  confirms signal-driven re-render. Spikes excluded from the default suite.
+- **Editor re-validated**: the upgraded `editor/code-editor` manifest now covers
+  the previously-missing capabilities (markdown highlighting, find/replace, real
+  undo/redo, `applyEdit`/`getSelection` for selection-preserving sync, `onSave`,
+  live `theme`). Open item: large-document performance, to be measured before
+  retiring CodeMirror.
+
 ## 2026-06-22 — Restore habit-tracker streak stats on the dashboard
 
 - **Missing stats row** (`HabitTrackerWidget.tsx`): on the desktop dashboard, `.habit.csv` tiles render in `SMALL` mode, which showed the heat map and a line of muted motivational text but no icon-with-number stats — unlike the mobile views (`MOBILE_COLLAPSED`/`MOBILE_EXPANDED`), which display a `Flame` icon plus streak numbers. The dashboard tile was therefore "missing the icons with numbers below the heat map".

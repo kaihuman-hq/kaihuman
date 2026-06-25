@@ -45,7 +45,10 @@ const ProtectedRoute = ({ component: Component, ...props }: any) => {
 
 export const App = () => {
   return (
-    <div class="life-os-root h-screen w-screen overflow-hidden bg-[var(--los-bg)] text-[var(--los-fg)] font-mono selection:bg-[var(--los-accent-dim)] selection:text-[var(--los-accent)]">
+    <div
+      data-theme="dark"
+      class="life-os-root h-screen w-screen overflow-hidden bg-[var(--los-bg)] text-[var(--los-fg)] font-mono selection:bg-[var(--los-accent-dim)] selection:text-[var(--los-accent)]"
+    >
       <ExtensionAuthBridge />
       <Router>
         <Route path="/login" component={Login} />

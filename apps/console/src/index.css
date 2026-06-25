@@ -1,9 +1,25 @@
+/* Cascade layer order: Cascivo's layers come AFTER Tailwind's so Cascivo's
+   component styles (e.g. the editor's padding/layout) win over Tailwind's
+   Preflight reset (`* { margin:0; padding:0 }` in @layer base). Must be the
+   first @layer statement — main.tsx imports this file before any Cascivo CSS. */
+@layer theme,
+  base,
+  components,
+  utilities,
+  cascivo.tokens,
+  cascivo.base,
+  cascivo.theme,
+  cascivo.component;
 @import "tailwindcss";
 @source "../../../packages/ui/src";
 /* biome-ignore lint/correctness/noInvalidPositionAtImportRule: intentional post-source import */
 @import "../../../packages/ui/src/styles.css";
 /* biome-ignore lint/correctness/noInvalidPositionAtImportRule: intentional post-source import */
 @import "../../../packages/ui/src/LifeOS/styles.css";
+/* Cascivo brand-override layer — maps Cascivo tokens onto the LifeOS palette.
+   Loads last so it wins over the imported Cascivo theme. */
+/* biome-ignore lint/correctness/noInvalidPositionAtImportRule: intentional post-source import */
+@import "../../../packages/ui/src/cascivo.css";
 @config "../../../packages/config/tailwind-preset.js";
 
 @layer base {

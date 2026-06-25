@@ -17,7 +17,8 @@
       "default": "./dist/index.mjs"
     },
     "./styles.css": "./src/styles.css",
-    "./LifeOS/styles.css": "./src/LifeOS/styles.css"
+    "./LifeOS/styles.css": "./src/LifeOS/styles.css",
+    "./cascivo.css": "./src/cascivo.css"
   },
   "scripts": {
     "lint": "biome check src/ vite.config.ts .storybook/",
@@ -32,20 +33,17 @@
     "preact": "^10.0.0"
   },
   "dependencies": {
-    "@codemirror/commands": "^6.10.1",
-    "@codemirror/lang-markdown": "^6.5.0",
-    "@codemirror/language": "^6.12.1",
-    "@codemirror/search": "^6.6.0",
-    "@codemirror/state": "^6.5.4",
-    "@codemirror/theme-one-dark": "^6.1.3",
-    "@codemirror/view": "^6.39.11",
+    "@cascivo/charts": "^0.3.1",
+    "@cascivo/core": "^0.2.0",
+    "@cascivo/editor": "^0.2.2",
+    "@cascivo/react": "^0.3.7",
+    "@cascivo/themes": "^0.2.4",
+    "@cascivo/tokens": "^0.3.2",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@lifosy/core": "workspace:*",
     "@preact/signals": "^2.0.1",
-    "@radix-ui/react-dialog": "^1.1.15",
-    "@radix-ui/react-dropdown-menu": "^2.1.16",
     "clsx": "^2.1.0",
     "framer-motion": "^12.26.2",
     "highlight.js": "^11.11.1",
@@ -53,7 +51,6 @@
     "preact": "^10.25.4",
     "react-force-graph-2d": "^1.29.0",
     "react-markdown": "^10.1.0",
-    "react-resizable-panels": "^4.4.1",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^2.2.1"

@@ -91,6 +91,12 @@ export default defineConfig({
       'react-dom/test-utils': 'preact/test-utils',
       'react-dom': 'preact/compat', // Must be below test-utils
       'react/jsx-runtime': 'preact/jsx-runtime',
+      // Bridge Cascivo's React signals adapter onto Preact's native signals.
+      '@preact/signals-react/runtime': path.resolve(
+        __dirname,
+        './src/shims/signals-react-runtime.ts',
+      ),
+      '@preact/signals-react': '@preact/signals',
     },
   },
   server: {

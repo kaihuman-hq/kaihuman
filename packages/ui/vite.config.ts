@@ -30,18 +30,19 @@ export default defineConfig({
         // Externalize heavy deps to let consumer bundle/tree-shake them
         'lucide-preact',
         'framer-motion',
-        /^@codemirror\/.*/,
         /^@dnd-kit\/.*/,
         'clsx',
         'tailwind-merge',
         '@lifosy/core',
         '@preact/signals',
+        '@preact/signals-react',
+        '@preact/signals-react/runtime',
+        /^@cascivo\/.*/,
         'react-force-graph-2d',
         'highlight.js',
         'react-markdown',
         'rehype-highlight',
         'remark-gfm',
-        /^@radix-ui\/.*/,
       ],
       output: {
         globals: {

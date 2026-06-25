@@ -1,26 +1,24 @@
+import { Input as CascivoInputImport } from '@cascivo/react';
 import type { h } from 'preact';
-import { forwardRef } from 'preact/compat';
-import { cn } from '../utils';
 
-export interface InputProps extends h.JSX.HTMLAttributes<HTMLInputElement> {
+// Cascivo ships React prop types; alias to a Preact-typed signature to bridge
+// the JSX type systems (same pattern as the Radix wrappers in this package).
+const CascivoInput = CascivoInputImport as unknown as (
+  props: Record<string, unknown>,
+) => h.JSX.Element;
+
+// Omit `size`: Cascivo's Input takes a `'sm' | 'md' | 'lg'` size prop, which
+// collides with HTML's numeric `size` attribute.
+export interface InputProps extends Omit<h.JSX.InputHTMLAttributes<HTMLInputElement>, 'size'> {
   type?: string;
-  error?: boolean;
+  /** `true` toggles the error state; a string also supplies Cascivo's message. */
+  error?: boolean | string;
 }
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, error, ...props }, ref) => {
-    return (
-      <input
-        type={type}
-        className={cn(
-          'flex h-10 w-full rounded-md border border-nexus-border bg-nexus-panel px-3 py-2 text-sm text-nexus-text ring-offset-nexus-bg file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-nexus-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-nexus-primary focus-visible:border-nexus-primary disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200',
-          error && 'border-nexus-accent focus-visible:ring-nexus-accent',
-          className,
-        )}
-        ref={ref}
-        {...props}
-      />
-    );
-  },
+export const Input = ({ error, ...props }: InputProps) => (
+  <CascivoInput
+    error={typeof error === 'string' ? error : undefined}
+    aria-invalid={error ? true : undefined}
+    {...props}
+  />
 );
-Input.displayName = 'Input';
