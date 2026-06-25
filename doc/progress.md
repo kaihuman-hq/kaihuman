@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-06-25 — Drop the 252KB @cascivo/react CSS monolith (copy-paste model)
+
+- `@cascivo/react/styles.css` shipped the CSS for all 254 component class-groups
+  (252KB raw / ~33KB gzip) but we only used `Button` + `Input` from it.
+- Switched those two to Cascivo's **copy-paste model**: vendored the components
+  (`npx cascivo add button input`) into
+  `packages/ui/src/components/cascivo/{button,input}.tsx`, adapted them to Preact
+  types, and flattened their per-component CSS-modules into
+  `packages/ui/src/cascivo-components.css` (~6KB, stable class names, kept in
+  `@layer cascivo.component`). The `@lifosy/ui` Button/Input wrappers now point at
+  the vendored components.
+- Removed the `@cascivo/react` dependency (console + `@lifosy/ui`) and its
+  `styles.css` import (main.tsx + Storybook); added `@cascivo/core` as a direct
+  `@lifosy/ui` dep (the vendored components use `cn`/`Slot`/`useMachine`).
+  Editor + charts (separate, already-small packages) are unchanged.
+- **Bundle impact** (console, gzip): CSS **48.6KB → 17.1KB (−31.5KB)**; JS
+  ~unchanged (345→342KB). Initial JS+CSS now ~359KB gz — **−33% vs the original
+  pre-Cascivo `main`** (was 539KB gz), realizing the earlier "future win".
+- *Verified*: console build green; no `@cascivo/react` refs remain; bundled CSS
+  carries `cascivo-btn`/`cascivo-field` and none of the monolith classes; `tsc`
+  clean; spikes (5/5) + suite (20/20) green; Biome clean.
+
 ## 2026-06-24 — Fix white active-line number in the editor gutter
 
 - **Symptom**: the active line's gutter cell rendered as a solid white box over

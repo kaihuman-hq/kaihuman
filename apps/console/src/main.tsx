@@ -5,7 +5,6 @@ import { App } from './App';
 // Cascivo's @layer cascivo.component appears first and Tailwind's Preflight
 // (@layer base) overrides the editor's padding/layout.
 import './index.css';
-import '@cascivo/react/styles.css';
 import '@cascivo/editor/styles.css';
 import '@cascivo/charts/styles.css';
 import '@cascivo/themes/dark.css';

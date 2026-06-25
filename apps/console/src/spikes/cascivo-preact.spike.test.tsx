@@ -1,11 +1,11 @@
-import { Button } from '@cascivo/react';
 import { signal } from '@preact/signals';
 import { render } from 'preact';
 import { expect, test } from 'vitest';
+import { CascivoButton as Button } from '../../../../packages/ui/src/components/cascivo/button';
 
-// KEYSTONE SPIKE: prove a Cascivo React/signals-react component mounts under
-// Preact (preact/compat + signals-react bridge). If the import chain or the
-// useSignals no-op were broken, mounting would throw.
+// KEYSTONE SPIKE: prove a vendored Cascivo component (uses @cascivo/core signals)
+// mounts under Preact (preact/compat + signals-react bridge). If the import chain
+// or the useSignals no-op were broken, mounting would throw.
 test('cascivo Button mounts and renders under preact/compat', () => {
   const root = document.createElement('div');
   document.body.appendChild(root);

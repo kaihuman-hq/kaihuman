@@ -68,9 +68,6 @@ importers:
       '@cascivo/editor':
         specifier: ^0.2.1
         version: 0.2.1(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@cascivo/react':
-        specifier: ^0.3.3
-        version: 0.3.3(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/themes':
         specifier: ^0.2.4
         version: 0.2.4(@cascivo/tokens@0.3.2)
@@ -202,12 +199,12 @@ importers:
       '@cascivo/charts':
         specifier: ^0.3.0
         version: 0.3.0(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@cascivo/core':
+        specifier: ^0.2.0
+        version: 0.2.0(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/editor':
         specifier: ^0.2.1
         version: 0.2.1(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@cascivo/react':
-        specifier: ^0.3.3
-        version: 0.3.3(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/themes':
         specifier: ^0.2.4
         version: 0.2.4(@cascivo/tokens@0.3.2)
@@ -967,6 +964,13 @@ packages:
       react: '>=18.0.0'
       react-dom: '>=18.0.0'
 
+  '@cascivo/core@0.2.0':
+    resolution: {integrity: sha512-wok3ReodFK5c2qPvcel/3yjwRpYJyDvKYW/wbmdl4nb33BHABNxO4yehVNjXpMaiIdO/qYpu6q7KhvFkrTlLJQ==}
+    peerDependencies:
+      '@preact/signals-react': '>=2.0.0'
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
+
   '@cascivo/editor@0.2.1':
     resolution: {integrity: sha512-sbxl1aGROD3vBq0ovYDkAWWxQx43JR2eo4Nz3X45GsivIaVAicyP1xvPNcIUIqz8ZxNptbNBt5+sg41x1IJLdQ==}
     peerDependencies:
@@ -974,22 +978,10 @@ packages:
       react: '>=18.0.0'
       react-dom: '>=18.0.0'
 
-  '@cascivo/i18n@0.1.6':
-    resolution: {integrity: sha512-rAvex4DipyZhitEJaFWDd4leBuvK4JaFpF5yQlvZW/Afvi1Uwo2hHolEcWZQY2k6maR1Biq1pGwFi+XYd5fqzQ==}
-    peerDependencies:
-      '@preact/signals-react': '>=2.0.0'
-
   '@cascivo/i18n@0.1.7':
     resolution: {integrity: sha512-lTUPjzxMfA5w5vjyZ6FFaJ72dLTDUe/ecqPblEPJR8I46d8xi81ZETPTmTymOXkBkixh+0SLliLOk6aCROhvCA==}
     peerDependencies:
       '@preact/signals-react': '>=2.0.0'
-
-  '@cascivo/react@0.3.3':
-    resolution: {integrity: sha512-dLXRi2/Mpzs0SUso0KYaCJ2CQ0IlXKj/VCj4YQaLyvdKsWZtVKAJ6GvSpe0WNhbOmOtxHxJugDMAimDvUbtV0w==}
-    peerDependencies:
-      '@preact/signals-react': '>=2.0.0'
-      react: '>=18.0.0'
-      react-dom: '>=18.0.0'
 
   '@cascivo/themes@0.2.4':
     resolution: {integrity: sha512-huxq51pVKWaaT0IsyB4dFx3Rqo+iEVfHSiTbmrWPmy9rcFEIUz0ZQV0ic/NUzx6Tksg4kYITcvVJgzxQWd8lhQ==}
@@ -6135,6 +6127,12 @@ snapshots:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
 
+  '@cascivo/core@0.2.0(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@preact/signals-react': 3.10.2(react@18.3.1)
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+
   '@cascivo/editor@0.2.1(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@cascivo/core': 0.1.3(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -6143,14 +6141,6 @@ snapshots:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
 
-  '@cascivo/i18n@0.1.6(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
-    dependencies:
-      '@cascivo/core': 0.1.3(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@preact/signals-react': 3.10.2(react@18.3.1)
-    transitivePeerDependencies:
-      - react
-      - react-dom
-
   '@cascivo/i18n@0.1.7(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@cascivo/core': 0.1.3(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -6158,14 +6148,6 @@ snapshots:
     transitivePeerDependencies:
       - react
       - react-dom
-
-  '@cascivo/react@0.3.3(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
-    dependencies:
-      '@cascivo/core': 0.1.3(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@cascivo/i18n': 0.1.6(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@preact/signals-react': 3.10.2(react@18.3.1)
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
 
   '@cascivo/themes@0.2.4(@cascivo/tokens@0.3.2)':
     dependencies:
