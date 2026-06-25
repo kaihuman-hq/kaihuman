@@ -1,5 +1,39 @@
 # Progress
 
+## 2026-06-25 — Fix editor padding/active-line drift (robustly) + per-file language
+
+- **Symptom (recurrence)**: the markdown editor again rendered with no inner
+  padding — text/line-numbers flush to the border, no gutter→text gap — and the
+  active-line highlight sat one `space-3` (12px) below its row. Exactly the
+  cascade-layer bug the 2026-06-24 fix targeted, but back in the production
+  build.
+- **Root cause**: cascade-layer priority is set by *first appearance*. The
+  bundler hoists Cascivo's `@layer cascivo.component` CSS (pulled in as a
+  component dependency of the editor) to the very top of the bundle — *before*
+  the `@layer …` order declaration that lived in `index.css` (which landed
+  ~60 KB later). So `cascivo.component` resolved as the **lowest**-priority
+  layer and Tailwind's Preflight (`* { padding: 0 }` in `@layer base`) won,
+  collapsing the editor's `padding`/`padding-inline`/`padding-block`. The
+  active-line overlay positions via `top: var(--cascivo-space-3)` (a `top`, not
+  padding — so *not* reset), while the text lost its matching `padding-block`,
+  dropping the highlight by `space-3`. Verified against the real bundle: pre
+  padding computed `0px` (broken) → `12px` (fixed).
+- **Fix**: declare the cascade order in an inline `<style>` in
+  `index.html`'s `<head>` — guaranteed to precede the bundled stylesheet, so it
+  wins regardless of how the bundler orders the CSS. The `index.css` statement
+  is kept as a (non-authoritative) mirror with an updated comment.
+- **Per-file language**: the editor hardcoded `language="markdown"` for every
+  file. Added `languageForPath` (`apps/console/src/components/editor/language.ts`)
+  and wired it into `CodeMirrorEditor` so the grammar is derived from the file
+  extension — `.md`/`.markdown` → `markdown` (so markdown highlighting is
+  reliably set), plus `json`/`javascript`/`typescript`/`css`/`html`/`bash` using
+  Cascivo's **registered** grammar names (short aliases like `ts`/`js` silently
+  fall back to plaintext, so the long names are used); unknown/extension-less
+  files default to `markdown` (this app is markdown-centric).
+- *Verified*: console `tsc` + Biome clean; `vite build` green; full console
+  suite 31/31 (incl. new `language.test.ts`); padding/highlight fix confirmed in
+  a browser against the actual production CSS bundle (0px → 12px).
+
 ## 2026-06-25 — Nextgen is the default landing page + "try the demo" link
 
 - Added a **"▶ Try the live demo — no signup"** call-to-action next to the

@@ -1,7 +1,11 @@
 /* Cascade layer order: Cascivo's layers come AFTER Tailwind's so Cascivo's
    component styles (e.g. the editor's padding/layout) win over Tailwind's
-   Preflight reset (`* { margin:0; padding:0 }` in @layer base). Must be the
-   first @layer statement — main.tsx imports this file before any Cascivo CSS. */
+   Preflight reset (`* { margin:0; padding:0 }` in @layer base).
+   NOTE: this declaration is NOT authoritative — the bundler hoists Cascivo's
+   `@layer cascivo.component` CSS (imported as a component dependency) above it,
+   so the layer order would otherwise resolve with cascivo.component FIRST (=
+   lowest priority) and Preflight would win. The guaranteed-first declaration
+   lives in `index.html`'s <head>; this mirrors it for clarity. */
 @layer theme,
   base,
   components,
