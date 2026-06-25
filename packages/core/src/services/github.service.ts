@@ -1,5 +1,7 @@
 import { Octokit } from '@octokit/rest';
+import { demoMode } from '../demo-mode.js';
 import { authStore } from '../stores/auth.store.js';
+import { inMemoryGithubService } from './github.service.memory.js';
 
 export class GithubService {
   private octokit: Octokit | null = null;
@@ -272,4 +274,20 @@ export class GithubService {
   }
 }
 
-export const githubService = new GithubService();
+const realGithubService = new GithubService();
+
+/**
+ * Public service handle used by all stores. In demo mode every call is routed
+ * transparently to the in-memory implementation; otherwise it hits GitHub via
+ * Octokit. Implemented as a Proxy so the routing decision is made per call and
+ * no store needs to branch on demo mode.
+ */
+export const githubService = new Proxy(realGithubService, {
+  get(target, prop) {
+    const impl: object = demoMode.value ? inMemoryGithubService : target;
+    const value = Reflect.get(impl, prop, impl);
+    return typeof value === 'function'
+      ? (value as (...args: unknown[]) => unknown).bind(impl)
+      : value;
+  },
+});

@@ -1,4 +1,5 @@
 import { effect, signal } from '@preact/signals';
+import { demoMode } from '../demo-mode.js';
 import { Logger } from '../logger.js';
 import { githubService } from '../services/github.service.js';
 import { authStore } from './auth.store.js';
@@ -43,8 +44,11 @@ export class GithubProfileStore {
 
     // 2. Persist to localStorage on change
     effect(() => {
-      if (this.currentRepo.value) {
-        localStorage.setItem('lifeos_current_repo', JSON.stringify(this.currentRepo.value));
+      const repo = this.currentRepo.value;
+      // Demo sessions are ephemeral — never persist the fake repo selection.
+      if (demoMode.value) return;
+      if (repo) {
+        localStorage.setItem('lifeos_current_repo', JSON.stringify(repo));
       } else {
         localStorage.removeItem('lifeos_current_repo');
       }

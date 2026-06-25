@@ -6,6 +6,7 @@ import { ExtensionAuthBridge } from './components/ExtensionAuthBridge';
 import { ActionLogViewPage } from './pages/ActionLogViewPage';
 import { AuthCli } from './pages/AuthCli';
 import { Dashboard } from './pages/Dashboard';
+import { DemoEntry } from './pages/DemoEntry';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
 import { KanbanBoardPage } from './pages/KanbanBoardPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
@@ -52,6 +53,7 @@ export const App = () => {
       <ExtensionAuthBridge />
       <Router>
         <Route path="/login" component={Login} />
+        <Route path="/demo" component={DemoEntry} />
         <Route path="/auth/cli" component={AuthCli} />
         <ProtectedRoute path="/extension-onboarded" component={ExtensionSuccess} />
         <ProtectedRoute path="/" component={Dashboard} />

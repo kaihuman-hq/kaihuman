@@ -1,5 +1,36 @@
 # Progress
 
+## 2026-06-25 — Demo mode (in-memory, seeded data)
+
+- Added a **demo mode** so the console can be shown (e.g. for a screen
+  recording) with realistic data and no GitHub account. Entered via a **"View
+  demo"** button on the login screen or the **`/demo`** deep link. All data is
+  generated, lives only in memory, and disappears on refresh — edits and saves
+  during the session operate on the temporary in-memory store.
+- **Mechanism (no store/widget changes):** every read/write already funnels
+  through the `githubService` singleton. It is now a small `Proxy` façade that
+  routes each call to either the real Octokit-backed service or a new
+  `InMemoryGithubService` (a seeded `Map<path,{content,sha}>` returning
+  Octokit-shaped responses), based on a global `demoMode` signal
+  (`packages/core/src/demo-mode.ts`).
+- **Ephemerality:** durable writes are skipped while `demoMode` is on — the
+  auth/profile persistence effects early-return, and the file store's
+  IndexedDB handle is wrapped so `put`/`delete`/`get`/`getKey` become no-ops.
+  No fake token or repo ever touches localStorage/IndexedDB.
+- **Seed (`packages/core/src/demo/seed.ts`):** a fake repo + user and a virtual
+  filesystem dated relative to "now", including a `.kh/.dashboard.config.json`
+  wiring three workspaces (Overview / Finance / Reading) to one of every widget
+  (todos + Kanban inbox, time-tracking, habits, events, action log, timezones,
+  board overview, budget, stocks, consumption, data-collection, read-it-later,
+  RSS) plus plain notes for the file browser.
+- **Orchestration:** `enterDemoMode()` / `exitDemoMode()` in
+  `stores/demo.store.ts`; console wires the login button and a `/demo` route
+  (`pages/DemoEntry.tsx`).
+- *Verified*: 28 console tests pass (seed integrity, format contracts,
+  in-memory service round-trip); Overview, Finance, Board and Analytics all
+  render via the real app with zero console errors. Added `fake-indexeddb`
+  (root devDependency) so store-importing tests run under jsdom.
+
 ## 2026-06-25 — Switch to @cascivo/react 0.3.7 (per-component CSS, no monolith)
 
 - `@cascivo/react@0.3.7` ships each component prebuilt with its CSS co-located
