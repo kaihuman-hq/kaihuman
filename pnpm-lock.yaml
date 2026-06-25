@@ -63,11 +63,11 @@ importers:
   apps/console:
     dependencies:
       '@cascivo/charts':
-        specifier: ^0.3.0
-        version: 0.3.0(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^0.3.1
+        version: 0.3.1(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/editor':
-        specifier: ^0.2.1
-        version: 0.2.1(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^0.2.2
+        version: 0.2.2(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/themes':
         specifier: ^0.2.4
         version: 0.2.4(@cascivo/tokens@0.3.2)
@@ -197,14 +197,14 @@ importers:
   packages/ui:
     dependencies:
       '@cascivo/charts':
-        specifier: ^0.3.0
-        version: 0.3.0(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^0.3.1
+        version: 0.3.1(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/core':
         specifier: ^0.2.0
         version: 0.2.0(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/editor':
-        specifier: ^0.2.1
-        version: 0.2.1(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^0.2.2
+        version: 0.2.2(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/themes':
         specifier: ^0.2.4
         version: 0.2.4(@cascivo/tokens@0.3.2)
@@ -950,15 +950,8 @@ packages:
     resolution: {integrity: sha512-VERIM64vtTP1C4mxQ5thVT9fK0apjPFobqybMtA1UdUujWka24ERHbRHFGmpbbhp73MhV+KSsHQH9C6uOTdEQA==}
     engines: {node: '>=18'}
 
-  '@cascivo/charts@0.3.0':
-    resolution: {integrity: sha512-iNV6E+o1KU5HKjFlbI4JujpzSoMeojRQ85ujHvuhonvdO5b4cxXBgD0pA1B2isBN8VGYdbFasEvjG1EJBX/+VQ==}
-    peerDependencies:
-      '@preact/signals-react': '>=2.0.0'
-      react: '>=18.0.0'
-      react-dom: '>=18.0.0'
-
-  '@cascivo/core@0.1.3':
-    resolution: {integrity: sha512-AeYugTgVYwhaKEz61PpFF+s+uSVptksH6X0pLmWgzo6dvBRmvJUmKbZjwpAvUo0mxPcT8PxKtsDjA8JI6Y3heg==}
+  '@cascivo/charts@0.3.1':
+    resolution: {integrity: sha512-uhA+r2uwOlcg/1dO8rFG16Q97AMf7n+JOckKiUETVkrP5R1KApfsSdvEMfWLSBIDsh9yMPgVbT/4tWHV3vDdUQ==}
     peerDependencies:
       '@preact/signals-react': '>=2.0.0'
       react: '>=18.0.0'
@@ -971,15 +964,15 @@ packages:
       react: '>=18.0.0'
       react-dom: '>=18.0.0'
 
-  '@cascivo/editor@0.2.1':
-    resolution: {integrity: sha512-sbxl1aGROD3vBq0ovYDkAWWxQx43JR2eo4Nz3X45GsivIaVAicyP1xvPNcIUIqz8ZxNptbNBt5+sg41x1IJLdQ==}
+  '@cascivo/editor@0.2.2':
+    resolution: {integrity: sha512-FMZChkbNUXHsJdv6jidhj+jl0zewcz5SUhFmuihFHw56pMA1DQY7QD042geBTmtT7ggR4l82KE2t76ekfW+fvQ==}
     peerDependencies:
       '@preact/signals-react': '>=2.0.0'
       react: '>=18.0.0'
       react-dom: '>=18.0.0'
 
-  '@cascivo/i18n@0.1.7':
-    resolution: {integrity: sha512-lTUPjzxMfA5w5vjyZ6FFaJ72dLTDUe/ecqPblEPJR8I46d8xi81ZETPTmTymOXkBkixh+0SLliLOk6aCROhvCA==}
+  '@cascivo/i18n@0.1.8':
+    resolution: {integrity: sha512-te51N6uPQA9dM8ibG9/vfF7AUUzYFLlOL4ADS0nAewB4yfbpunS51WHERK0LdS0V30uoexmvnKGkVx9g/iUzmg==}
     peerDependencies:
       '@preact/signals-react': '>=2.0.0'
 
@@ -6113,16 +6106,10 @@ snapshots:
     dependencies:
       fontkitten: 1.0.2
 
-  '@cascivo/charts@0.3.0(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@cascivo/charts@0.3.1(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@cascivo/core': 0.1.3(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@cascivo/i18n': 0.1.7(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@preact/signals-react': 3.10.2(react@18.3.1)
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
-
-  '@cascivo/core@0.1.3(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
-    dependencies:
+      '@cascivo/core': 0.2.0(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@cascivo/i18n': 0.1.8(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@preact/signals-react': 3.10.2(react@18.3.1)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
@@ -6133,17 +6120,17 @@ snapshots:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
 
-  '@cascivo/editor@0.2.1(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@cascivo/editor@0.2.2(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@cascivo/core': 0.1.3(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@cascivo/i18n': 0.1.7(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@cascivo/core': 0.2.0(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@cascivo/i18n': 0.1.8(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@preact/signals-react': 3.10.2(react@18.3.1)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
 
-  '@cascivo/i18n@0.1.7(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@cascivo/i18n@0.1.8(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@cascivo/core': 0.1.3(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@cascivo/core': 0.2.0(@preact/signals-react@3.10.2(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@preact/signals-react': 3.10.2(react@18.3.1)
     transitivePeerDependencies:
       - react

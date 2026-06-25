@@ -34,9 +34,9 @@
     "preact": "^10.0.0"
   },
   "dependencies": {
-    "@cascivo/charts": "^0.3.0",
+    "@cascivo/charts": "^0.3.1",
     "@cascivo/core": "^0.2.0",
-    "@cascivo/editor": "^0.2.1",
+    "@cascivo/editor": "^0.2.2",
     "@cascivo/themes": "^0.2.4",
     "@cascivo/tokens": "^0.3.2",
     "@dnd-kit/core": "^6.3.1",
