@@ -6,7 +6,6 @@ import '@cascivo/themes/dark.css';
 import '../src/styles.css';
 import '../src/LifeOS/styles.css';
 import '../src/cascivo.css';
-import '../src/cascivo-components.css';
 
 const preview: Preview = {
   parameters: {

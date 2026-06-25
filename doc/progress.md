@@ -1,5 +1,31 @@
 # Progress
 
+## 2026-06-25 — Switch to @cascivo/react 0.3.7 (per-component CSS, no monolith)
+
+- `@cascivo/react@0.3.7` ships each component prebuilt with its CSS co-located
+  (`button/button.js` → `button.module.js` → `import './button.css'`) and
+  `sideEffects: ["**/*.css"]`. Importing a component now pulls in only that
+  component's CSS automatically — the 252KB aggregate `styles.css` is only needed
+  for no-bundler/CDN setups (per the library's own README).
+- Reverted the interim copy-paste vendoring: deleted
+  `packages/ui/src/components/cascivo/{button,input}.tsx` and
+  `cascivo-components.css`, and pointed the `@lifosy/ui` Button/Input wrappers
+  back at `@cascivo/react` (re-added as a `@lifosy/ui` dependency, `^0.3.7`).
+  Dropped the corresponding `cascivo-components.css` imports (console
+  `index.css` + Storybook) and the `./cascivo-components.css` package export.
+- `InputProps` now extends `JSX.InputHTMLAttributes` (was `HTMLAttributes`) so
+  `placeholder`/`value`/etc. type-check; still omits the numeric `size` (collides
+  with Cascivo's `'sm'|'md'|'lg'`). Fixes a pre-existing story type error that
+  the dts build never surfaced. The `Input` wrapper drops the unused `forwardRef`
+  (no caller forwards a ref to it).
+- Also bumped `@cascivo/editor` 0.2.1→0.2.2 and `@cascivo/charts` 0.3.0→0.3.1.
+- **Bundle impact** (console, gzip): CSS still ~17KB (per-component tree-shaking
+  matches the hand-vendored result), monolith gone.
+- *Verified*: full build green (6/6); bundled CSS carries `_button_`/`_input_`
+  and none of the monolith-only classes (accordion/carousel/data-table/dropdown
+  = 0); `tsc` clean (ui + console); spikes (5/5) + console suite (20/20) green;
+  Biome clean.
+
 ## 2026-06-25 — Drop the 252KB @cascivo/react CSS monolith (copy-paste model)
 
 - `@cascivo/react/styles.css` shipped the CSS for all 254 component class-groups

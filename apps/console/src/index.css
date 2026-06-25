@@ -20,10 +20,6 @@
    Loads last so it wins over the imported Cascivo theme. */
 /* biome-ignore lint/correctness/noInvalidPositionAtImportRule: intentional post-source import */
 @import "../../../packages/ui/src/cascivo.css";
-/* Vendored Cascivo component styles (button/input) — replaces the 252KB
-   @cascivo/react/styles.css monolith. In @layer cascivo.component. */
-/* biome-ignore lint/correctness/noInvalidPositionAtImportRule: intentional post-source import */
-@import "../../../packages/ui/src/cascivo-components.css";
 @config "../../../packages/config/tailwind-preset.js";
 
 @layer base {

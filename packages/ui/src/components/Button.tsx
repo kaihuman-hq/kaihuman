@@ -1,5 +1,11 @@
+import { Button as CascivoButtonImport } from '@cascivo/react';
 import type { h } from 'preact';
-import { CascivoButton } from './cascivo/button';
+
+// Cascivo ships React prop types; alias to a Preact-typed signature to bridge
+// the JSX type systems (same pattern as the Radix wrappers in this package).
+const CascivoButton = CascivoButtonImport as unknown as (
+  props: Record<string, unknown>,
+) => h.JSX.Element;
 
 export interface ButtonProps extends h.JSX.HTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger';
@@ -8,9 +14,9 @@ export interface ButtonProps extends h.JSX.HTMLAttributes<HTMLButtonElement> {
   label?: string;
 }
 
-// Map this package's API onto the vendored Cascivo Button. The extra
-// `outline`/`danger` variants and `icon` size (kept for API compatibility) fold
-// onto the nearest Cascivo equivalent.
+// Map this package's API onto Cascivo's Button. The extra `outline`/`danger`
+// variants and `icon` size (kept for API compatibility) fold onto the nearest
+// Cascivo equivalent.
 const VARIANT_MAP = {
   primary: 'primary',
   secondary: 'secondary',

@@ -2,9 +2,9 @@ import { Button } from './components/Button';
 import { Input } from './components/Input';
 
 // Phase 2 visual check: renders the Cascivo-backed Button/Input under the LifeOS
-// theme bridge (.life-os-root[data-theme="dark"] + cascivo.css + the vendored
-// cascivo-components.css) so the neon accent / mono font / --los-* palette can be
-// verified.
+// theme bridge (.life-os-root[data-theme="dark"] + cascivo.css) so the neon
+// accent / mono font / --los-* palette can be verified. Each component's CSS is
+// pulled in automatically by @cascivo/react when the component is imported.
 const meta = {
   title: 'Cascivo/Theme Bridge',
 };

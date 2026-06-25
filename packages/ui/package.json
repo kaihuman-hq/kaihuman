@@ -18,8 +18,7 @@
     },
     "./styles.css": "./src/styles.css",
     "./LifeOS/styles.css": "./src/LifeOS/styles.css",
-    "./cascivo.css": "./src/cascivo.css",
-    "./cascivo-components.css": "./src/cascivo-components.css"
+    "./cascivo.css": "./src/cascivo.css"
   },
   "scripts": {
     "lint": "biome check src/ vite.config.ts .storybook/",
@@ -37,6 +36,7 @@
     "@cascivo/charts": "^0.3.1",
     "@cascivo/core": "^0.2.0",
     "@cascivo/editor": "^0.2.2",
+    "@cascivo/react": "^0.3.7",
     "@cascivo/themes": "^0.2.4",
     "@cascivo/tokens": "^0.3.2",
     "@dnd-kit/core": "^6.3.1",
