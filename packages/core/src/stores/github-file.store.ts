@@ -1,11 +1,31 @@
 import { computed, signal } from '@preact/signals';
 import { openDB } from 'idb';
+import { demoMode } from '../demo-mode.js';
 import { Logger } from '../logger.js';
 import { githubService } from '../services/github.service.js';
 import { githubProfileStore } from './github-profile.store.js';
 
 const logger = new Logger('GithubFileStore');
-const dbPromise = openDB('life-os-db', 1);
+
+// In demo mode the in-memory service is the single source of truth, so the
+// IndexedDB cache is bypassed entirely: writes (put/delete) become no-ops and
+// reads (get/getKey) return undefined. This keeps demo edits temporary and
+// in-memory without branching at every cache call site.
+const NEUTERED_IN_DEMO = new Set(['put', 'delete', 'get', 'getKey']);
+const dbPromise = openDB('life-os-db', 1).then(
+  (db) =>
+    new Proxy(db, {
+      get(target, prop) {
+        if (demoMode.value && typeof prop === 'string' && NEUTERED_IN_DEMO.has(prop)) {
+          return async () => undefined;
+        }
+        // Access via the real db so idb's own proxy resolves the method, then
+        // bind it back to the db so `this` is correct after our wrapper.
+        const value = (target as unknown as Record<string | symbol, unknown>)[prop];
+        return typeof value === 'function' ? (value as () => unknown).bind(target) : value;
+      },
+    }),
+);
 
 export interface TreeItem {
   path: string;

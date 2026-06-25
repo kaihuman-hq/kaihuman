@@ -39,9 +39,11 @@ const FEATURES = [
 
 export interface LoginProps {
   onLogin: () => void;
+  /** When provided, shows a "View demo" button that launches an in-memory demo. */
+  onTryDemo?: () => void;
 }
 
-export const Login = ({ onLogin }: LoginProps) => (
+export const Login = ({ onLogin, onTryDemo }: LoginProps) => (
   <div className="life-os-root min-h-screen w-full cyber-grid-bg flex flex-col lg:flex-row">
     {/* ── Left: Hero (desktop only) ──────────────────────────────────────── */}
     <div className="hidden lg:flex flex-1 flex-col justify-between p-16 border-r border-[var(--los-border)]">
@@ -121,6 +123,17 @@ export const Login = ({ onLogin }: LoginProps) => (
         <Github size={18} />
         Sign in with GitHub
       </button>
+
+      {onTryDemo && (
+        <button
+          type="button"
+          onClick={onTryDemo}
+          className="w-full max-w-sm -mt-6 flex items-center justify-center gap-3 border border-[var(--los-border)] text-[var(--los-fg)] font-mono font-bold text-sm uppercase tracking-widest px-6 py-4 hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
+        >
+          <LayoutGrid size={18} />
+          View demo
+        </button>
+      )}
 
       {/* Permissions notice */}
       <div className="w-full max-w-sm border border-[var(--los-accent)]/40 bg-[var(--los-accent)]/5 p-5 flex flex-col gap-3">

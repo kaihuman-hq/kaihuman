@@ -4,6 +4,7 @@
 
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
+| Demo mode (in-memory seeded data) | `/demo` + login "View demo" | 2026-06-25 |
 | Quick todo to inbox | `/quick-todo` | 2026-03-28 |
 | Quick note to dump.md | `/quick-note` | 2026-03-28 |
 | Shortcuts setup guide | `/shortcuts` | 2026-03-28 |

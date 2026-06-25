@@ -2,6 +2,7 @@
 import { computed, effect, signal } from '@preact/signals';
 import { z } from 'zod';
 import { dbPromise } from '../db.js';
+import { demoMode } from '../demo-mode.js';
 import { Logger } from '../logger.js';
 
 const logger = new Logger('AuthStore');
@@ -61,6 +62,8 @@ export class AuthStore {
     // Persist token to DB on change
     effect(() => {
       const saveToken = async () => {
+        // Demo sessions are ephemeral — never persist the fake token.
+        if (demoMode.value) return;
         const db = await dbPromise;
         if (this.token.value) {
           // Keep localStorage as backup/sync for now, but primary source is DB for local-first
@@ -84,6 +87,7 @@ export class AuthStore {
     // Persist user profile
     effect(() => {
       const saveUser = async () => {
+        if (demoMode.value) return;
         const db = await dbPromise;
         if (this.user.value) {
           await db.put('auth', this.user.value, 'user');
@@ -118,6 +122,20 @@ export class AuthStore {
     // 4. Do NOT force reload. ProtectedRoute checks isAuthenticated and will show Login.
   }
 
+  /** Seed an in-memory session for demo mode. Relies on `demoMode` already being
+   * true so the persistence effects skip writing the fake credentials. */
+  enterDemo(user: GithubProfile) {
+    localStorage.removeItem('lifeos_logged_out');
+    this.user.value = user;
+    this.token.value = 'demo-token';
+  }
+
+  /** Clear the in-memory demo session. */
+  exitDemo() {
+    this.token.value = null;
+    this.user.value = null;
+  }
+
   handleCallback() {
     const params = new URLSearchParams(window.location.search);
     const accessToken = params.get('access_token');
@@ -136,6 +154,7 @@ export class AuthStore {
 
   private async fetchUser() {
     if (!this.token.value) return;
+    if (demoMode.value) return; // demo user is seeded directly, never fetched
 
     try {
       logger.debug('Fetching user with token:', `${this.token.value?.substring(0, 10)}...`);
