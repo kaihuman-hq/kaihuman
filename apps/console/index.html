@@ -7,6 +7,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0a0a0f" />
   <title>kaihuman</title>
+  <!-- Cascade layer order guard. Cascivo's component CSS (e.g. the editor's
+       padding/active-line layout) lives in @layer cascivo.component; Tailwind's
+       Preflight reset (`* { padding: 0 }`) lives in @layer base. Layer priority
+       is set by FIRST appearance, so this declaration must precede every other
+       @layer rule the browser sees. The bundler hoists Cascivo's component CSS
+       (pulled in as a component dependency) above the same declaration in
+       index.css, so declaring it here — inline in <head>, before the bundled
+       stylesheet — is the only place guaranteed to win. -->
+  <style>@layer theme, base, components, utilities, cascivo.tokens, cascivo.base, cascivo.theme, cascivo.component;</style>
 </head>
 
 <body>

@@ -2,6 +2,7 @@ import { CodeEditor, type CodeEditorHandle } from '@cascivo/editor';
 import { githubFileStore, Logger } from '@lifosy/core';
 import { useSignalEffect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { languageForPath } from './language';
 
 const logger = new Logger('CodeMirrorEditor');
 
@@ -142,7 +143,7 @@ export const CodeMirrorEditor = ({
     <div className="h-full w-full relative group">
       <CodeEditor
         ref={editorRef}
-        language="markdown"
+        language={languageForPath(effectivePath)}
         defaultValue={docRef.current}
         onValueChange={handleChange}
         onSave={handleSave}
