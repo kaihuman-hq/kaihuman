@@ -1,5 +1,11 @@
 # Features
 
+## Landing page (`apps/landing-page-nextgen`)
+
+| Feature | Location | Added |
+|---------|----------|-------|
+| Auto-generated product screencast (demo-mode walkthrough) | demo section + `scripts/record-screencast.mjs` | 2026-06-25 |
+
 ## Console (`apps/console`)
 
 | Feature | Route/Location | Added |

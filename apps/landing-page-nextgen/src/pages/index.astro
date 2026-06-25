@@ -1,22 +1,5 @@
 ---
 import Layout from '../layouts/Layout.astro';
-
-// Deterministic habit streak data — 12 weeks × 7 days
-// 1 = completed, 0 = missed. Replace with real data when available.
-const streak = [
-  1,1,0,1,1,1,0,
-  1,1,1,1,0,1,1,
-  0,1,1,1,1,1,0,
-  1,0,1,1,1,1,1,
-  1,1,1,0,1,1,1,
-  1,1,1,1,1,0,1,
-  1,1,0,1,1,1,1,
-  0,1,1,1,1,1,1,
-  1,1,1,1,0,1,1,
-  1,0,1,1,1,1,1,
-  1,1,1,1,1,1,0,
-  1,1,1,0,1,1,1,
-];
 ---
 
 <Layout title="kaihuman — The ever-improving human.">
@@ -68,90 +51,27 @@ const streak = [
       <div class="section-inner">
         <p class="demo__eyebrow">// see it in action</p>
 
-        <!-- Terminal screencast animation -->
-        <div class="demo__terminal reveal" aria-label="App demo — placeholder">
-          <div class="demo__terminal-header">
-            <span class="demo__terminal-title">kaihuman &nbsp;·&nbsp; daily.md</span>
-            <span class="demo__terminal-badge">PLACEHOLDER</span>
+        <!-- Live product screencast — auto-generated from the app's demo mode.
+             Regenerate with: node scripts/record-screencast.mjs -->
+        <div class="demo__player reveal">
+          <div class="demo__player-bar">
+            <span class="demo__player-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="demo__player-title">app.kaihuman.com &nbsp;·&nbsp; live demo</span>
+            <span class="demo__player-badge">DEMO</span>
           </div>
-          <div class="demo__terminal-body" role="presentation" aria-hidden="true">
-            <div class="tl l1"><span class="dim">$ </span>kaihuman sync</div>
-            <div class="tl l2"><span class="chk">✓</span> connecting to github...</div>
-            <div class="tl l3"><span class="chk">✓</span> synced 3 files &nbsp;<span class="dim">(daily.md · habits.md · todos.md)</span></div>
-            <div class="tl l4 tl--blank"></div>
-            <div class="tl l5"><span class="dim">// </span>2026-05-20 &nbsp;·&nbsp; monday</div>
-            <div class="tl l6 tl--blank"></div>
-            <div class="tl l7">habits:</div>
-            <div class="tl l8">&nbsp;&nbsp;meditation &nbsp;&nbsp;&nbsp;<span class="bar-fill">████████████</span><span class="bar-rest">░░░░</span>&nbsp; 12 days &nbsp;<span class="chk">✓</span></div>
-            <div class="tl l9">&nbsp;&nbsp;exercise &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="bar-fill">████████</span><span class="bar-rest">░░░░░░░░</span>&nbsp;&nbsp; 8 days &nbsp;<span class="chk">✓</span></div>
-            <div class="tl l10">&nbsp;&nbsp;reading &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="bar-fill">██████</span><span class="bar-rest">░░░░░░░░░░</span>&nbsp;&nbsp; 6 days &nbsp;<span class="chk">✓</span></div>
-            <div class="tl l11">&nbsp;&nbsp;journaling &nbsp;&nbsp;<span class="bar-fill">████████████</span><span class="bar-rest">░░░░</span>&nbsp; 12 days &nbsp;<span class="chk">✓</span></div>
-            <div class="tl l12 tl--blank"></div>
-            <div class="tl l13">todos:</div>
-            <div class="tl l14">&nbsp;&nbsp;<span class="done">[x]</span> morning pages</div>
-            <div class="tl l15">&nbsp;&nbsp;<span class="done">[x]</span> 5km run</div>
-            <div class="tl l16">&nbsp;&nbsp;<span class="todo">[ ]</span> review q2 goals</div>
-            <div class="tl l17 tl--blank"></div>
-            <div class="tl l18 tl--accent"><span class="dim">// </span>kaizen delta: +1.0% &nbsp;<span class="cursor" aria-hidden="true">_</span></div>
-          </div>
+          <video
+            class="demo__player-video"
+            autoplay
+            muted
+            loop
+            playsinline
+            preload="metadata"
+            poster="/screencast-poster.jpg"
+            aria-label="kaihuman product walkthrough: dashboards, kanban board, analytics, action log, wiki and the markdown editor"
+          >
+            <source src="/screencast.webm" type="video/webm" />
+          </video>
         </div>
-
-        <!-- Screenshot panels -->
-        <div class="demo__screens">
-
-          <!-- Panel 1: Habit streak grid -->
-          <figure class="demo__screen reveal" style="--i: 1" aria-label="Habit tracker screenshot placeholder">
-            <p class="demo__screen-label">// habit streaks</p>
-            <div
-              class="streak-grid"
-              role="img"
-              aria-label="12-week habit completion grid"
-            >
-              {streak.map((s) => (
-                <span class:list={['streak-dot', s ? 'streak-dot--on' : 'streak-dot--off']} />
-              ))}
-            </div>
-            <figcaption class="demo__screen-caption">meditation &nbsp;·&nbsp; 12-week streak</figcaption>
-          </figure>
-
-          <!-- Panel 2: Daily journal -->
-          <figure class="demo__screen reveal" style="--i: 2" aria-label="Daily journal screenshot placeholder">
-            <p class="demo__screen-label">// daily journal</p>
-            <div class="demo__journal" role="presentation">
-              <p class="jl jl--h">## morning reflection</p>
-              <p class="jl jl--blank"></p>
-              <p class="jl">focus: <span class="jl--accent">deep work block</span></p>
-              <p class="jl">energy: <span class="jl--accent">high</span></p>
-              <p class="jl jl--blank"></p>
-              <p class="jl jl--h">## gratitude</p>
-              <p class="jl">- clear morning air</p>
-              <p class="jl">- made progress on goals</p>
-              <p class="jl">- strong reading session</p>
-              <p class="jl jl--blank"></p>
-              <p class="jl jl--dim">_</p>
-            </div>
-            <figcaption class="demo__screen-caption">daily.md &nbsp;·&nbsp; 2026-05-20</figcaption>
-          </figure>
-
-          <!-- Panel 3: Knowledge base -->
-          <figure class="demo__screen reveal" style="--i: 3" aria-label="Knowledge base screenshot placeholder">
-            <p class="demo__screen-label">// knowledge base</p>
-            <div class="demo__knowledge" role="presentation">
-              <p class="kb"><span class="kb-arr">→</span> kaizen-principles.md <span class="kb-n">12</span></p>
-              <p class="kb"><span class="kb-arr">→</span> books/read.md <span class="kb-n">47</span></p>
-              <p class="kb"><span class="kb-arr">→</span> decisions/2026.md <span class="kb-n">8</span></p>
-              <p class="kb"><span class="kb-arr">→</span> projects/active.md <span class="kb-n">3</span></p>
-              <p class="kb"><span class="kb-arr">→</span> learnings/week.md <span class="kb-n">6</span></p>
-              <p class="kb"><span class="kb-arr">→</span> goals/q2-2026.md <span class="kb-n">9</span></p>
-            </div>
-            <figcaption class="demo__screen-caption">knowledge.md &nbsp;·&nbsp; 85 linked notes</figcaption>
-          </figure>
-
-        </div>
-
-        <p class="demo__replace-note">
-          // placeholder &mdash; replace with real screencast + screenshots when ready
-        </p>
       </div>
     </section>
 
@@ -274,21 +194,6 @@ const streak = [
     { threshold: 0.06 }
   );
   document.querySelectorAll<HTMLElement>('.reveal').forEach((el) => revealObserver.observe(el));
-
-  // Trigger terminal line animations when terminal scrolls into view
-  const terminalObserver = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-playing');
-          terminalObserver.unobserve(entry.target);
-        }
-      }
-    },
-    { threshold: 0.15 }
-  );
-  const terminal = document.querySelector<HTMLElement>('.demo__terminal');
-  if (terminal) terminalObserver.observe(terminal);
 </script>
 
 <style>
@@ -857,225 +762,64 @@ const streak = [
     margin-bottom: var(--space-xl);
   }
 
-  /* Terminal */
-  .demo__terminal {
+  /* Framed app-window player */
+  .demo__player {
     background: var(--color-paper);
     border: 1px solid var(--color-rule);
-    border-radius: 4px;
+    border-radius: 6px;
     overflow: hidden;
-    margin-bottom: var(--space-xl);
-    box-shadow: 0 0 60px oklch(87% 0.295 142 / 0.06);
+    box-shadow: 0 0 80px oklch(87% 0.295 142 / 0.08);
   }
 
-  .demo__terminal-header {
+  .demo__player-bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: var(--space-md);
     padding: var(--space-sm) var(--space-md);
     background: var(--color-paper-2);
     border-bottom: 1px solid var(--color-rule);
-    gap: var(--space-md);
   }
 
-  .demo__terminal-title {
+  .demo__player-dots {
+    display: inline-flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .demo__player-dots i {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--color-rule);
+  }
+
+  .demo__player-title {
     font-family: var(--font-body);
     font-size: var(--text-xs);
     color: var(--color-neutral);
     letter-spacing: 0.06em;
+    margin-inline: auto;
   }
 
-  .demo__terminal-badge {
+  .demo__player-badge {
     font-family: var(--font-body);
     font-size: 0.6rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    color: var(--color-muted);
-    border: 1px solid var(--color-rule);
+    color: var(--color-accent);
+    border: 1px solid oklch(87% 0.295 142 / 0.35);
     padding: 2px 6px;
     border-radius: 2px;
-    white-space: nowrap;
-  }
-
-  .demo__terminal-body {
-    padding: var(--space-lg) var(--space-xl);
-    font-family: var(--font-body);
-    font-size: clamp(0.7rem, 1.2vw + 0.3rem, var(--text-sm));
-    line-height: 1.8;
-    color: var(--color-ink);
-    min-height: 22rem;
-    overflow: hidden;
-  }
-
-  /* Terminal line animations — paused until .is-playing fires */
-  .tl {
-    opacity: 0;
-    transform: translateX(-4px);
-    animation: tl-appear 0.25s var(--ease-out) forwards;
-    animation-play-state: paused;
-  }
-
-  .tl--blank { min-height: 0.9em; }
-
-  .demo__terminal.is-playing .tl { animation-play-state: running; }
-
-  .demo__terminal.is-playing .l1  { animation-delay: 0.10s; }
-  .demo__terminal.is-playing .l2  { animation-delay: 0.55s; }
-  .demo__terminal.is-playing .l3  { animation-delay: 0.95s; }
-  .demo__terminal.is-playing .l4  { animation-delay: 1.20s; }
-  .demo__terminal.is-playing .l5  { animation-delay: 1.35s; }
-  .demo__terminal.is-playing .l6  { animation-delay: 1.55s; }
-  .demo__terminal.is-playing .l7  { animation-delay: 1.70s; }
-  .demo__terminal.is-playing .l8  { animation-delay: 1.90s; }
-  .demo__terminal.is-playing .l9  { animation-delay: 2.10s; }
-  .demo__terminal.is-playing .l10 { animation-delay: 2.30s; }
-  .demo__terminal.is-playing .l11 { animation-delay: 2.50s; }
-  .demo__terminal.is-playing .l12 { animation-delay: 2.70s; }
-  .demo__terminal.is-playing .l13 { animation-delay: 2.85s; }
-  .demo__terminal.is-playing .l14 { animation-delay: 3.05s; }
-  .demo__terminal.is-playing .l15 { animation-delay: 3.20s; }
-  .demo__terminal.is-playing .l16 { animation-delay: 3.35s; }
-  .demo__terminal.is-playing .l17 { animation-delay: 3.50s; }
-  .demo__terminal.is-playing .l18 { animation-delay: 3.65s; }
-
-  @keyframes tl-appear {
-    to { opacity: 1; transform: none; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .tl {
-      animation: none;
-      opacity: 1;
-      transform: none;
-    }
-  }
-
-  /* Terminal inline styles */
-  .dim       { color: var(--color-muted); }
-  .chk       { color: var(--color-accent); }
-  .bar-fill  { color: var(--color-accent); }
-  .bar-rest  { color: var(--color-rule); }
-  .done      { color: var(--color-accent); }
-  .todo      { color: var(--color-muted); }
-
-  .tl--accent { color: var(--color-accent); }
-
-  .cursor {
-    display: inline-block;
-    color: var(--color-accent);
-    animation: blink 1s step-end infinite;
-  }
-
-  @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .cursor { animation: none; }
-  }
-
-  /* Screenshot panels */
-  .demo__screens {
-    display: grid;
-    grid-template-columns: 1.1fr 1fr 0.9fr;
-    gap: var(--space-md);
-    margin-bottom: var(--space-lg);
-  }
-
-  .demo__screen {
-    background: var(--color-paper);
-    border: 1px solid var(--color-rule);
-    border-radius: 4px;
-    padding: var(--space-lg);
-    overflow: hidden;
-  }
-
-  .demo__screen-label {
-    font-family: var(--font-body);
-    font-size: var(--text-xs);
-    color: var(--color-accent);
-    letter-spacing: 0.08em;
-    margin-bottom: var(--space-md);
-  }
-
-  .demo__screen-caption {
-    font-family: var(--font-body);
-    font-size: var(--text-xs);
-    color: var(--color-muted);
-    margin-top: var(--space-md);
-    letter-spacing: 0.06em;
-  }
-
-  /* Streak grid */
-  .streak-grid {
-    display: grid;
-    grid-template-rows: repeat(7, 1fr);
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
-    gap: 3px;
-    aspect-ratio: 12 / 7;
-  }
-
-  .streak-dot {
-    border-radius: 1px;
-    min-width: 0;
-  }
-
-  .streak-dot--on  { background: var(--color-accent); }
-  .streak-dot--off { background: var(--color-rule); }
-
-  /* Journal panel */
-  .demo__journal {
-    font-family: var(--font-body);
-    font-size: clamp(0.65rem, 1vw + 0.3rem, var(--text-xs));
-    line-height: 1.8;
-  }
-
-  .jl      { color: var(--color-neutral); margin: 0; }
-  .jl--h   { color: var(--color-ink); font-weight: 700; }
-  .jl--accent { color: var(--color-accent); }
-  .jl--dim { color: var(--color-muted); }
-  .jl--blank { min-height: 0.9em; }
-
-  /* Knowledge base panel */
-  .demo__knowledge {
-    font-family: var(--font-body);
-    font-size: clamp(0.65rem, 1vw + 0.3rem, var(--text-xs));
-    line-height: 1;
-  }
-
-  .kb {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-xs);
-    padding-block: 0.45em;
-    border-bottom: 1px solid var(--color-rule);
-    color: var(--color-neutral);
-    margin: 0;
-  }
-
-  .kb:last-child { border-bottom: none; }
-
-  .kb-arr { color: var(--color-muted); flex-shrink: 0; }
-
-  .kb-n {
-    color: var(--color-accent);
-    font-variant-numeric: tabular-nums;
     flex-shrink: 0;
-    margin-left: auto;
   }
 
-  .demo__replace-note {
-    font-family: var(--font-body);
-    font-size: var(--text-xs);
-    color: var(--color-muted);
-    letter-spacing: 0.06em;
-    text-align: center;
-    padding-top: var(--space-sm);
-    border-top: 1px solid var(--color-rule);
-    margin-top: var(--space-sm);
+  .demo__player-video {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1440 / 900;
+    background: var(--color-paper);
   }
 
   /* ── REVEAL ANIMATION ─────────────────────────────────── */
@@ -1103,16 +847,6 @@ const streak = [
   }
 
   /* ── RESPONSIVE ───────────────────────────────────────── */
-
-  @media (max-width: 48rem) {
-    .demo__screens {
-      grid-template-columns: 1fr;
-    }
-
-    .streak-grid {
-      aspect-ratio: 12 / 7;
-    }
-  }
 
   @media (max-width: 40rem) {
     .nav-pill {
