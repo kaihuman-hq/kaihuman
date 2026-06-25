@@ -72,6 +72,13 @@ import Layout from '../layouts/Layout.astro';
             <source src="/screencast.webm" type="video/webm" />
           </video>
         </div>
+
+        <p class="demo__try reveal" style="--i: 1">
+          <a class="demo__try-link" href="https://app.kaihuman.com/demo">
+            ▶ Try the live demo — no signup
+          </a>
+          <span class="demo__try-note">// runs in your browser, nothing is saved</span>
+        </p>
       </div>
     </section>
 
@@ -820,6 +827,49 @@ import Layout from '../layouts/Layout.astro';
     height: auto;
     aspect-ratio: 1440 / 900;
     background: var(--color-paper);
+  }
+
+  .demo__try {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    margin-top: var(--space-xl);
+  }
+
+  .demo__try-link {
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    text-decoration: none;
+    color: var(--color-accent);
+    border: 1px solid oklch(87% 0.295 142 / 0.35);
+    padding: var(--space-sm) var(--space-xl);
+    border-radius: 2px;
+    transition:
+      border-color var(--dur-short) var(--ease-out),
+      box-shadow var(--dur-short) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .demo__try-link:hover {
+      border-color: var(--color-accent);
+      box-shadow: 0 0 24px oklch(87% 0.295 142 / 0.2);
+    }
+  }
+
+  .demo__try-link:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 3px;
+  }
+
+  .demo__try-note {
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    color: var(--color-muted);
+    letter-spacing: 0.06em;
   }
 
   /* ── REVEAL ANIMATION ─────────────────────────────────── */

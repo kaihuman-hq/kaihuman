@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-06-25 — Nextgen is the default landing page + "try the demo" link
+
+- Added a **"▶ Try the live demo — no signup"** call-to-action next to the
+  screencast on both landing pages, linking to
+  `https://app.kaihuman.com/demo` (the console's `/demo` deep link that seeds
+  the in-memory demo) so visitors can play around themselves.
+- **Made the nextgen landing page the production default.** The
+  `[PROD] Deploy Landing Page` workflow (`deploy-landing.yml`, which targets the
+  `lifosy-landing` Cloudflare Pages project) now builds and deploys
+  `apps/landing-page-nextgen` and triggers on `apps/landing-page-nextgen/**`.
+  The redundant `deploy-landing-nextgen.yml` (which deployed nextgen to the
+  separate `kh-landingpage-nextgen` preview project) was removed. The old
+  `apps/landing-page` app remains in the repo but is no longer auto-deployed.
+
 ## 2026-06-25 — Auto-generated product screencast on the landing pages
 
 - The **nextgen landing page** demo section previously held a hand-built
