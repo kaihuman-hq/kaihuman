@@ -11,26 +11,41 @@
 //     package built once (`pnpm --filter @lifosy/ui build`).
 //   - A Chromium for Playwright (bundled in CI; locally run
 //     `pnpm exec playwright install chromium`).
+//   - ffmpeg, used to trim the leading load + re-encode for a seamless loop.
+//     Playwright bundles one; the script finds it automatically (or set
+//     FFMPEG_PATH / have `ffmpeg` on PATH). Without it the raw, un-trimmed
+//     clip is shipped (the loop will not be seamless).
 //
-// Output (committed, consumed by src/pages/index.astro):
-//   public/screencast.webm         — the looping hero screencast
-//   public/screencast-poster.jpg   — first-frame poster
+// Output (committed, consumed by each landing page's index.astro):
+//   <app>/public/screencast.webm         — the looping hero screencast
+//   <app>/public/screencast-poster.jpg   — first-frame poster
+//
+// Seamless loop: the clip begins and ends on the exact same Overview frame
+// (cursor centred, held a beat). The recording's leading `/demo` load is then
+// trimmed off so frame 1 is that established Overview — wrapping from the last
+// frame back to the first is invisible.
 //
 // The demo data lives only in memory and is seeded by visiting `/demo`. Because
 // a full page reload wipes that in-memory session, every navigation after the
 // initial load is done client-side (history.pushState + popstate, which
 // preact-router listens to) — never a fresh `page.goto`.
 
-import { spawn } from 'node:child_process';
-import { mkdtemp, readdir, rename, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, readdirSync } from 'node:fs';
+import { copyFile, mkdtemp, readdir, rename, rm } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PUBLIC_DIR = join(__dirname, '..', 'public');
 const REPO_ROOT = join(__dirname, '..', '..', '..');
+
+// Both landing pages receive the same asset.
+const OUTPUT_DIRS = [
+  join(REPO_ROOT, 'apps', 'landing-page-nextgen', 'public'),
+  join(REPO_ROOT, 'apps', 'landing-page', 'public'),
+];
 
 const BASE = 'http://localhost:4300';
 const WIDTH = 1440;
@@ -76,6 +91,40 @@ async function ensureServer() {
   }
   console.log('• Dev server is up.');
   return child;
+}
+
+// ─── ffmpeg discovery (prefers the Playwright-bundled binary) ─────────────────
+
+function findFfmpeg() {
+  if (process.env.FFMPEG_PATH && existsSync(process.env.FFMPEG_PATH)) {
+    return process.env.FFMPEG_PATH;
+  }
+  const binName =
+    process.platform === 'win32'
+      ? 'ffmpeg-win64.exe'
+      : process.platform === 'darwin'
+        ? 'ffmpeg-mac'
+        : 'ffmpeg-linux';
+  const roots = [
+    process.env.PLAYWRIGHT_BROWSERS_PATH,
+    join(homedir(), '.cache', 'ms-playwright'),
+    join(homedir(), 'Library', 'Caches', 'ms-playwright'),
+    join(process.env.LOCALAPPDATA ?? '', 'ms-playwright'),
+  ].filter(Boolean);
+  for (const root of roots) {
+    try {
+      for (const entry of readdirSync(root)) {
+        if (entry.startsWith('ffmpeg-')) {
+          const candidate = join(root, entry, binName);
+          if (existsSync(candidate)) return candidate;
+        }
+      }
+    } catch {}
+  }
+  // Fall back to PATH.
+  const probe = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['ffmpeg']);
+  if (probe.status === 0) return String(probe.stdout).trim().split(/\r?\n/)[0];
+  return null;
 }
 
 // ─── Cursor overlay (recorded videos have no real pointer) ───────────────────
@@ -130,10 +179,13 @@ try {
   });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('  ⚠ page error:', e.message));
+  // Video starts recording when the first page is created — anchor wall-clock
+  // here so we can later trim the leading load to the loop's first frame.
+  const videoT0 = Date.now();
 
-  // Track the synthetic cursor position so clicks can pulse + move smoothly.
-  let cx = WIDTH / 2;
-  let cy = HEIGHT / 2;
+  const CENTER = [WIDTH / 2, HEIGHT / 2];
+  let cx = CENTER[0];
+  let cy = CENTER[1];
   const setCursor = (x, y) => page.evaluate(([x, y]) => window.__khMoveCursor?.(x, y), [x, y]);
 
   const pause = (ms) => page.waitForTimeout(ms);
@@ -180,30 +232,37 @@ try {
       dispatchEvent(new PopStateEvent('popstate'));
     }, url);
 
-  // ── Scene 1 — Seed demo + land on the Overview dashboard ──────────────────
+  // ── Setup (trimmed away) — seed demo, land on Overview, paint fully ───────
   console.log('• Recording…');
   await page.goto(`${BASE}/demo`, { waitUntil: 'networkidle' });
   await pause(3800);
+  await page.screenshot({ path: join(videoDir, 'poster.jpg'), quality: 90 });
   await page.evaluate(CURSOR_SCRIPT);
-  await setCursor(cx, cy);
-  await page.screenshot({ path: join(PUBLIC_DIR, 'screencast-poster.jpg'), quality: 90 });
-  await glideTo(360, 140);
-  await pause(700);
-  await glideTo(900, 130);
-  await pause(900);
-  await glideTo(1250, 200);
-  await pause(1400);
+  await setCursor(cx, cy); // centred
+  await pause(500);
 
-  // ── Scene 2 — Switch workspaces: Overview → Finance → Reading → Overview ──
+  // ── Loop start anchor: Overview, cursor centred, fully painted ────────────
+  const loopStartMs = Date.now() - videoT0;
+  await pause(1100); // opening hold (part of the loop)
+
+  // ── Overview — a little exploratory movement ──────────────────────────────
+  await glideTo(360, 140);
+  await pause(600);
+  await glideTo(900, 130);
+  await pause(800);
+  await glideTo(1250, 200);
+  await pause(1200);
+
+  // ── Switch workspaces: Overview → Finance → Reading → Overview ────────────
   const nextWs = page.locator('[title="Next Workspace"]');
   await clickLocator(nextWs); // Finance
   await pause(3200);
   await clickLocator(nextWs); // Reading
   await pause(3000);
   await clickLocator(nextWs); // back to Overview
-  await pause(1800);
+  await pause(1600);
 
-  // ── Scene 3 — Kanban board ────────────────────────────────────────────────
+  // ── Kanban board ──────────────────────────────────────────────────────────
   await nav('/board');
   await pause(3200);
   await glideTo(720, 450);
@@ -212,19 +271,19 @@ try {
   await page.mouse.wheel(0, -320);
   await pause(1400);
 
-  // ── Scene 4 — Todo analytics ─────────────────────────────────────────────
+  // ── Todo analytics ────────────────────────────────────────────────────────
   await nav('/analytics');
   await pause(4200);
 
-  // ── Scene 5 — Action log ─────────────────────────────────────────────────
+  // ── Action log ────────────────────────────────────────────────────────────
   await nav('/action-log');
   await pause(3600);
 
-  // ── Scene 6 — Wiki ───────────────────────────────────────────────────────
+  // ── Wiki ──────────────────────────────────────────────────────────────────
   await nav('/wiki');
   await pause(3600);
 
-  // ── Scene 7 — Files browser + markdown editor ────────────────────────────
+  // ── Files browser + markdown editor ───────────────────────────────────────
   await nav('/');
   await pause(2000);
   await clickLocator(page.getByRole('button', { name: 'Files' }).first());
@@ -234,19 +293,67 @@ try {
   await clickLocator(page.getByText('welcome.md', { exact: true }).first());
   await pause(2600);
 
-  // ── Scene 8 — Close on the Overview dashboard ────────────────────────────
+  // ── Loop end: return to Overview, re-centre cursor, hold to match the start
   await nav('/');
-  await pause(2600);
+  await pause(900);
+  await glideTo(...CENTER);
+  await pause(1400); // closing hold — mirrors the opening frame
 
   // Finalize: Playwright writes the webm on context close.
   await ctx.close();
   const files = (await readdir(videoDir)).filter((f) => f.endsWith('.webm'));
   if (files.length === 0) throw new Error('No video was produced.');
-  const out = join(PUBLIC_DIR, 'screencast.webm');
-  await rm(out, { force: true });
-  await rename(join(videoDir, files[0]), out);
-  console.log(`✓ Wrote ${out}`);
-  console.log(`✓ Wrote ${join(PUBLIC_DIR, 'screencast-poster.jpg')}`);
+  const raw = join(videoDir, files[0]);
+
+  // Trim the leading load + re-encode so frame 1 is the established Overview.
+  const ffmpeg = findFfmpeg();
+  let finalWebm = raw;
+  if (ffmpeg) {
+    const startSec = Math.max(0, loopStartMs / 1000 - 0.2);
+    const trimmed = join(videoDir, 'screencast.webm');
+    console.log(`• Trimming first ${startSec.toFixed(2)}s for a seamless loop…`);
+    const res = spawnSync(
+      ffmpeg,
+      // prettier-ignore
+      [
+        '-loglevel',
+        'error',
+        '-y',
+        '-ss',
+        String(startSec),
+        '-i',
+        raw,
+        '-an',
+        '-c:v',
+        'libvpx',
+        '-b:v',
+        '1600k',
+        '-crf',
+        '12',
+        '-deadline',
+        'good',
+        '-cpu-used',
+        '1',
+        trimmed,
+      ],
+      { stdio: 'inherit' },
+    );
+    if (res.status === 0 && existsSync(trimmed)) finalWebm = trimmed;
+    else console.log('  ⚠ ffmpeg trim failed — shipping the raw clip.');
+  } else {
+    console.log('  ⚠ ffmpeg not found — shipping the raw clip (loop not trimmed).');
+  }
+
+  for (const dir of OUTPUT_DIRS) {
+    const outWebm = join(dir, 'screencast.webm');
+    const outPoster = join(dir, 'screencast-poster.jpg');
+    await rm(outWebm, { force: true });
+    await copyFile(finalWebm, outWebm);
+    await copyFile(join(videoDir, 'poster.jpg'), outPoster);
+    console.log(`✓ Wrote ${outWebm}`);
+    console.log(`✓ Wrote ${outPoster}`);
+  }
+  await rename(raw, join(videoDir, '_used.webm')).catch(() => {});
 } finally {
   if (browser) await browser.close();
   if (videoDir) await rm(videoDir, { recursive: true, force: true });

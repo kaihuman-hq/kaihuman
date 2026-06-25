@@ -1,31 +1,40 @@
 # Progress
 
-## 2026-06-25 — Auto-generated product screencast on the landing page
+## 2026-06-25 — Auto-generated product screencast on the landing pages
 
 - The **nextgen landing page** demo section previously held a hand-built
   terminal mock + three placeholder "screenshot" panels marked *PLACEHOLDER*.
   Replaced them with a **real, auto-generated screencast** of the app, framed
   as an app window (title bar + `DEMO` badge), autoplaying muted on loop with a
-  poster frame (`apps/landing-page-nextgen/src/pages/index.astro`).
+  poster frame. The same player was added to the **original landing page**
+  (`apps/landing-page`) right below the hero. Both consume the same asset.
 - **Recorder (`apps/landing-page-nextgen/scripts/record-screencast.mjs`):** a
   Playwright script that drives the console's **demo mode** through a scripted
-  storyline and records it to `public/screencast.webm` (+ a first-frame
-  `screencast-poster.jpg`). Run with `pnpm --filter @lifosy/landing-page-nextgen
-  screencast` (it reuses a running dev server on :4300 or starts one itself).
+  storyline and records it to each landing page's `public/screencast.webm`
+  (+ a first-frame `screencast-poster.jpg`). Run with
+  `pnpm --filter @lifosy/landing-page-nextgen screencast` (it reuses a running
+  dev server on :4300 or starts one itself).
 - **Storyline:** Overview dashboard → Finance → Reading workspaces → Kanban
   board → todo analytics → action log → wiki → files browser + markdown editor
   → back to Overview. A synthetic on-screen cursor (the recorded video has no
   real pointer) glides and pulses on clicks for legibility.
+- **Seamless loop:** the clip is recorded so it begins *and* ends on the exact
+  same Overview frame (cursor centred, held a beat); ffmpeg then trims off the
+  leading `/demo` load and re-encodes (VP8), so wrapping from the last frame
+  back to the first is invisible. ffmpeg is auto-discovered (Playwright's
+  bundled binary, `FFMPEG_PATH`, or `ffmpeg` on PATH); without it the raw clip
+  is shipped un-trimmed.
 - **Key constraint:** demo data lives only in memory and is wiped by a full
   page reload, so every transition after the initial `/demo` load is done
   client-side via `history.pushState` + a `popstate` event (which
   preact-router listens to) — never a fresh navigation.
-- **Format:** VP8 WebM (≈4.5 MB, 1440×900, ~54 s). The poster image is the
+- **Format:** VP8 WebM (≈3.7 MB, 1440×900, ~51 s). The poster image is the
   graceful fallback for browsers without WebM support.
 - Added `playwright` as a root devDependency.
-- *Verified*: nextgen build bundles the video and poster into `dist/` with the
-  correct `<video>`/`<source>` references and zero remaining placeholder
-  markup; the built page renders the screencast playing in its frame.
+- *Verified*: both landing-page builds bundle the video + poster into `dist/`
+  with correct `<video>`/`<source>` references and zero remaining placeholder
+  markup; first and last video frames are the same Overview view; both built
+  pages render the screencast playing in its frame.
 
 ## 2026-06-25 — Demo mode (in-memory, seeded data)
 
