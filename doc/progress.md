@@ -1,5 +1,55 @@
 # Progress
 
+## 2026-06-25 — Nextgen is the default landing page + "try the demo" link
+
+- Added a **"▶ Try the live demo — no signup"** call-to-action next to the
+  screencast on both landing pages, linking to
+  `https://app.kaihuman.com/demo` (the console's `/demo` deep link that seeds
+  the in-memory demo) so visitors can play around themselves.
+- **Made the nextgen landing page the production default.** The
+  `[PROD] Deploy Landing Page` workflow (`deploy-landing.yml`, which targets the
+  `lifosy-landing` Cloudflare Pages project) now builds and deploys
+  `apps/landing-page-nextgen` and triggers on `apps/landing-page-nextgen/**`.
+  The redundant `deploy-landing-nextgen.yml` (which deployed nextgen to the
+  separate `kh-landingpage-nextgen` preview project) was removed. The old
+  `apps/landing-page` app remains in the repo but is no longer auto-deployed.
+
+## 2026-06-25 — Auto-generated product screencast on the landing pages
+
+- The **nextgen landing page** demo section previously held a hand-built
+  terminal mock + three placeholder "screenshot" panels marked *PLACEHOLDER*.
+  Replaced them with a **real, auto-generated screencast** of the app, framed
+  as an app window (title bar + `DEMO` badge), autoplaying muted on loop with a
+  poster frame. The same player was added to the **original landing page**
+  (`apps/landing-page`) right below the hero. Both consume the same asset.
+- **Recorder (`apps/landing-page-nextgen/scripts/record-screencast.mjs`):** a
+  Playwright script that drives the console's **demo mode** through a scripted
+  storyline and records it to each landing page's `public/screencast.webm`
+  (+ a first-frame `screencast-poster.jpg`). Run with
+  `pnpm --filter @lifosy/landing-page-nextgen screencast` (it reuses a running
+  dev server on :4300 or starts one itself).
+- **Storyline:** Overview dashboard → Finance → Reading workspaces → Kanban
+  board → todo analytics → action log → wiki → files browser + markdown editor
+  → back to Overview. A synthetic on-screen cursor (the recorded video has no
+  real pointer) glides and pulses on clicks for legibility.
+- **Seamless loop:** the clip is recorded so it begins *and* ends on the exact
+  same Overview frame (cursor centred, held a beat); ffmpeg then trims off the
+  leading `/demo` load and re-encodes (VP8), so wrapping from the last frame
+  back to the first is invisible. ffmpeg is auto-discovered (Playwright's
+  bundled binary, `FFMPEG_PATH`, or `ffmpeg` on PATH); without it the raw clip
+  is shipped un-trimmed.
+- **Key constraint:** demo data lives only in memory and is wiped by a full
+  page reload, so every transition after the initial `/demo` load is done
+  client-side via `history.pushState` + a `popstate` event (which
+  preact-router listens to) — never a fresh navigation.
+- **Format:** VP8 WebM (≈3.7 MB, 1440×900, ~51 s). The poster image is the
+  graceful fallback for browsers without WebM support.
+- Added `playwright` as a root devDependency.
+- *Verified*: both landing-page builds bundle the video + poster into `dist/`
+  with correct `<video>`/`<source>` references and zero remaining placeholder
+  markup; first and last video frames are the same Overview view; both built
+  pages render the screencast playing in its frame.
+
 ## 2026-06-25 — Demo mode (in-memory, seeded data)
 
 - Added a **demo mode** so the console can be shown (e.g. for a screen

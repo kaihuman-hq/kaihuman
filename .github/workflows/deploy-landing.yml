@@ -1,11 +1,15 @@
 name: "[PROD] Deploy Landing Page"
 
+# The nextgen landing page is the default/production site, served by the
+# `lifosy-landing` Cloudflare Pages project. It deploys on changes to either
+# the nextgen app or its source assets (e.g. the auto-generated screencast).
+
 on:
   push:
     branches:
       - main
     paths:
-      - "apps/landing-page/**"
+      - "apps/landing-page-nextgen/**"
   workflow_dispatch:
 
 permissions:
@@ -15,8 +19,8 @@ jobs:
   publish-landing:
     uses: ./.github/workflows/template-deploy-to-cloudflare.yaml
     with:
-      buildTarget: landing:build
-      rootDir: ./apps/landing-page
+      buildTarget: landing-nextgen:build
+      rootDir: ./apps/landing-page-nextgen
       distDir: ./dist
       cfPagesName: lifosy-landing
       branchName: main
