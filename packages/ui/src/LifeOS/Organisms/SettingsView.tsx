@@ -15,7 +15,8 @@ import {
 import { useEffect, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
-import type { DashboardConfig, DashboardWorkspace } from '../types';
+import { DEFAULT_NAVBAR, NAVBAR_ITEMS, type NavbarItemDef } from '../navbar-items';
+import type { DashboardConfig, DashboardWorkspace, NavItemId } from '../types';
 
 interface SettingsViewProps {
   config: DashboardConfig;
@@ -131,6 +132,30 @@ export const SettingsView = ({
       ...config,
       dashboards: newDashboards,
     });
+  };
+
+  // --- Bottom navbar configuration ---
+  const navbar = config.navbar ?? DEFAULT_NAVBAR;
+  const enabledNavItems = navbar
+    .map((id) => NAVBAR_ITEMS.find((item) => item.id === id))
+    .filter((item): item is NavbarItemDef => item !== undefined);
+  const availableNavItems = NAVBAR_ITEMS.filter((item) => !navbar.includes(item.id));
+
+  const toggleNavItem = (id: NavItemId) => {
+    onConfigChange({
+      ...config,
+      navbar: navbar.includes(id) ? navbar.filter((n) => n !== id) : [...navbar, id],
+    });
+  };
+
+  const moveNavItem = (index: number, direction: 'up' | 'down') => {
+    const next = [...navbar];
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= next.length) return;
+    const item = next[index] as NavItemId;
+    next.splice(index, 1);
+    next.splice(target, 0, item);
+    onConfigChange({ ...config, navbar: next });
   };
 
   return (
@@ -285,6 +310,97 @@ export const SettingsView = ({
             </div>
 
             {error && <MonoText className="text-red-500 text-xs mt-2">{error}</MonoText>}
+          </section>
+
+          {/* Bottom Navbar Section */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--los-border)] pb-2">
+              <MonoText className="text-[var(--los-muted)] text-xs">BOTTOM NAVBAR</MonoText>
+            </div>
+            <MonoText className="text-[10px] text-[var(--los-muted)] leading-relaxed">
+              Choose which items appear in the desktop bottom navbar and use the arrows to reorder
+              them.
+            </MonoText>
+
+            {/* Enabled items (ordered) */}
+            <div className="space-y-2">
+              {enabledNavItems.map((item, index) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between p-3 bg-[var(--los-bg)] border border-[var(--los-border)] rounded hover:bg-white/5 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon size={14} className="text-[var(--los-accent)]" />
+                      <MonoText className="text-[var(--los-fg)] font-bold">{item.label}</MonoText>
+                    </div>
+                    <div className="flex items-center gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex flex-col gap-1 mr-2">
+                        <button
+                          type="button"
+                          onClick={() => moveNavItem(index, 'up')}
+                          disabled={index === 0}
+                          className="text-[var(--los-muted)] hover:text-[var(--los-fg)] disabled:opacity-30"
+                        >
+                          <ArrowUp size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveNavItem(index, 'down')}
+                          disabled={index === enabledNavItems.length - 1}
+                          className="text-[var(--los-muted)] hover:text-[var(--los-fg)] disabled:opacity-30"
+                        >
+                          <ArrowDown size={12} />
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleNavItem(item.id)}
+                        className="p-1.5 border border-[var(--los-border)] rounded hover:bg-[var(--los-fg)] hover:text-[var(--los-bg)] transition-colors"
+                        title="Remove from navbar"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {enabledNavItems.length === 0 && (
+                <MonoText className="text-[10px] text-[var(--los-muted)]">
+                  No items selected — the navbar will be empty.
+                </MonoText>
+              )}
+            </div>
+
+            {/* Available items to add */}
+            {availableNavItems.length > 0 && (
+              <div className="space-y-2 pt-4 border-t border-dashed border-[var(--los-border)]">
+                <MonoText className="text-[10px] text-[var(--los-muted)]">AVAILABLE</MonoText>
+                {availableNavItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-3 border border-[var(--los-border)] rounded opacity-70 hover:opacity-100 transition-opacity"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon size={14} className="text-[var(--los-muted)]" />
+                        <MonoText className="text-[var(--los-fg)]">{item.label}</MonoText>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleNavItem(item.id)}
+                        className="flex items-center gap-1 px-2 py-1 border border-[var(--los-border)] rounded text-xs hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
+                        title="Add to navbar"
+                      >
+                        <Plus size={12} /> ADD
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           {/* Notifications Section */}

@@ -69,10 +69,25 @@ export interface DashboardFilesConfig {
   quickNotes?: string[]; // Files available for quick notes in the extension
 }
 
+// Identifiers for the items that can appear in the desktop bottom navbar.
+// Each maps to a navigation destination available from the magic menu.
+export type NavItemId =
+  | 'dashboard'
+  | 'files'
+  | 'board'
+  | 'shortcuts'
+  | 'wiki'
+  | 'knowledge'
+  | 'actionLog'
+  | 'graph'
+  | 'commits';
+
 export interface DashboardConfig {
   version: number;
   dashboards: DashboardWorkspace[];
   entries: DashboardEntry[];
   theme?: 'nexus' | 'light' | 'amethyst'; // Default 'nexus'
   files: DashboardFilesConfig;
+  /** Ordered list of items shown in the desktop bottom navbar. Defaults to Dashboard, Files, Board, Shortcuts. */
+  navbar?: NavItemId[];
 }
