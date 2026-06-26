@@ -177,6 +177,8 @@ const parseUrlState = () => {
 };
 
 import { StackedNavigation } from '../Molecules/StackedNavigation';
+import { DEFAULT_NAVBAR, NAVBAR_ITEMS } from '../navbar-items';
+import type { NavItemId } from '../types';
 
 // Helper hook for mobile detection
 const useIsMobile = () => {
@@ -1256,6 +1258,43 @@ abbreviations: undefined
 
   const showWiki = layoutStore.view.value === 'WIKI';
 
+  // Resolve the configurable desktop navbar: map each enabled item id to its
+  // navigation handler, skipping any item whose destination isn't wired up.
+  const navHandlers: Partial<Record<NavItemId, () => void>> = {
+    dashboard: () => {
+      if (dragEnabled) return;
+      if (showDumpMode) setShowDumpMode(false);
+      handleDashboardClick();
+    },
+    files: () => {
+      if (showDumpMode) setShowDumpMode(false);
+      setActiveTileId(null);
+      setShowFiles(true);
+    },
+    board: onBoardClick,
+    shortcuts: onShortcutsClick,
+    wiki: onWikiClick,
+    knowledge: onKnowledgeClick,
+    actionLog: onActionLogClick,
+    graph: () => {
+      setShowGraph(true);
+      if (showDumpMode) setShowDumpMode(false);
+    },
+    commits: () => {
+      setShowCommits(true);
+      if (showDumpMode) setShowDumpMode(false);
+    },
+  };
+
+  const navbarLinks = (layoutStore.remoteConfig.value?.navbar ?? DEFAULT_NAVBAR)
+    .map((id) => {
+      const def = NAVBAR_ITEMS.find((n) => n.id === id);
+      const onClick = navHandlers[id];
+      if (!def || !onClick) return null;
+      return { id, label: def.label, icon: def.icon, onClick };
+    })
+    .filter((link): link is NonNullable<typeof link> => link !== null);
+
   return (
     <div
       className="h-screen w-full max-w-[100vw] bg-[var(--los-bg)] overflow-hidden relative"
@@ -1888,6 +1927,7 @@ abbreviations: undefined
           }}
           onBoardClick={onBoardClick}
           onShortcutsClick={onShortcutsClick}
+          navbar={navbarLinks}
           onSearchClick={() => {
             layoutStore.showSearch.value = true;
           }}

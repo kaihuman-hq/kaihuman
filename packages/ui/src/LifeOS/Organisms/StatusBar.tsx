@@ -1,6 +1,5 @@
 import { aiStore, navigationStore } from '@lifosy/core';
 import {
-  Archive,
   ChevronUp,
   GitBranch,
   GitCommit,
@@ -27,6 +26,14 @@ export interface MenuItem {
   onClick?: () => void;
   icon?: any;
   type?: 'REPOS' | 'WORKSPACES' | 'ACTION';
+}
+
+/** A resolved item rendered in the configurable desktop bottom navbar. */
+export interface NavbarLink {
+  id: string;
+  label: string;
+  icon?: any;
+  onClick: () => void;
 }
 
 export interface StatusBarProps {
@@ -58,6 +65,9 @@ export interface StatusBarProps {
   onWikiClick?: () => void;
   onShortcutsClick?: () => void;
   onSearchClick?: () => void;
+
+  /** Configurable desktop nav links (ordered). Falls back to nothing when omitted. */
+  navbar?: NavbarLink[];
 
   menuItems?: MenuItem[];
   shortcutItems?: MenuItem[];
@@ -517,11 +527,10 @@ export const StatusBar = ({
   onNextWorkspace: _onNextWorkspace,
 
   onDashboardClick,
-  onFilesClick,
   onBoardClick,
-  onWikiClick,
-  onShortcutsClick,
   onSearchClick: _onSearchClick,
+
+  navbar = [],
 
   menuItems,
   shortcutItems,
@@ -799,67 +808,25 @@ export const StatusBar = ({
               {mode}
             </div>
 
-            {/* Nav Links — always visible on desktop */}
+            {/* Nav Links — configurable in Settings, always visible on desktop */}
             <div className="hidden md:flex h-full items-stretch gap-px">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDashboardClick?.();
-                }}
-                className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
-              >
-                <LayoutGrid size={12} className="group-hover:animate-pulse" />
-                <MonoText className="text-xs font-bold uppercase">Dashboard</MonoText>
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onFilesClick?.();
-                }}
-                className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
-              >
-                <Archive size={12} className="group-hover:animate-pulse" />
-                <MonoText className="text-xs font-bold uppercase">Files</MonoText>
-              </button>
-              {onBoardClick && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onBoardClick();
-                  }}
-                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
-                >
-                  <Kanban size={12} className="group-hover:animate-pulse" />
-                  <MonoText className="text-xs font-bold uppercase">Board</MonoText>
-                </button>
-              )}
-              {onWikiClick && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onWikiClick();
-                  }}
-                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
-                >
-                  <MonoText className="text-xs font-bold uppercase">Wiki</MonoText>
-                </button>
-              )}
-              {onShortcutsClick && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onShortcutsClick();
-                  }}
-                  className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
-                >
-                  <MonoText className="text-xs font-bold uppercase">Shortcuts</MonoText>
-                </button>
-              )}
+              {navbar.map((link) => {
+                const Icon = link.icon;
+                return (
+                  <button
+                    key={link.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      link.onClick();
+                    }}
+                    className="h-full px-3 flex items-center gap-2 hover:text-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-colors group cursor-pointer"
+                  >
+                    {Icon && <Icon size={12} className="group-hover:animate-pulse" />}
+                    <MonoText className="text-xs font-bold uppercase">{link.label}</MonoText>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Breadcrumbs */}

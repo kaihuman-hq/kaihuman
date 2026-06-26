@@ -3,4 +3,5 @@ export type {
   DashboardEntry,
   DashboardFilesConfig,
   DashboardWorkspace,
+  NavItemId,
 } from '@lifosy/core';

@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-06-26 — Configurable desktop bottom navbar
+
+- **What**: the desktop bottom navbar items are now configurable from Settings
+  instead of being hardcoded. Users choose which destinations appear and in what
+  order; the choice is persisted to the repo's internal `.kh` settings file
+  (`.kh/.dashboard.config.json`) alongside the rest of the dashboard config.
+- **Config**: added `navbar?: NavItemId[]` to `DashboardConfig`
+  (`packages/core/src/models/types.ts`) plus the `NavItemId` union. When unset it
+  defaults to the historical items — Dashboard, Files, Board, Shortcuts.
+- **Catalog**: `packages/ui/src/LifeOS/navbar-items.ts` defines `NAVBAR_ITEMS`
+  (id/label/icon) and `DEFAULT_NAVBAR`. Beyond the four defaults it offers the
+  other magic-menu destinations: Wiki, Knowledge Base, Action Log, Graph,
+  Commits.
+- **UI**: `StatusBar` now renders the desktop nav links from a resolved `navbar`
+  prop; `MainApp` builds that list from config (mapping each id to its existing
+  navigation handler and skipping unwired destinations); `SettingsView` gained a
+  "Bottom Navbar" section with enable/disable + reorder controls that write back
+  through the standard `onConfigChange` → GitHub persistence path.
+- **Tests**: `apps/console/src/navbar-config.test.ts` covers the catalog
+  invariants and the default set.
+
 ## 2026-06-25 — Fix editor padding/active-line drift (robustly) + per-file language
 
 - **Symptom (recurrence)**: the markdown editor again rendered with no inner
