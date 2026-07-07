@@ -14,6 +14,36 @@ import { MonoText } from '../Atoms/Typography';
 
 const logger = new Logger('SearchModal');
 
+// GitHub's Search API is fronted by a stricter abuse-rate-limiter than the
+// rest of the REST API, and responses from that limiter can arrive without
+// CORS headers (surfacing as an opaque "Failed to fetch" in the browser) or
+// as a 403. One retry with a short backoff (honoring Retry-After when present)
+// smooths over transient throttling without hanging the search UI.
+async function fetchGithubSearchWithRetry(
+  url: string,
+  headers: Record<string, string>,
+  maxRetries = 1,
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, { headers });
+      if (res.status === 403 && attempt < maxRetries) {
+        const retryAfterSeconds = Number(res.headers.get('retry-after')) || 2;
+        await new Promise((resolve) => setTimeout(resolve, retryAfterSeconds * 1000));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
+      }
+    }
+  }
+  throw lastError;
+}
+
 export type SearchResultType = 'FILE' | 'COMMAND' | 'REPO' | 'WORKSPACE';
 
 export interface SearchResult {
@@ -220,28 +250,40 @@ export const SearchModal = ({
           headers.Authorization = `Bearer ${githubToken} `;
         }
 
-        const [resContent, resFile] = await Promise.all([
-          fetch(`https://api.github.com/search/code?q=${qContent}&per_page=10`, { headers }),
-          fetch(`https://api.github.com/search/code?q=${qFile}&per_page=10`, { headers }),
+        // Content and filename searches are independent — allSettled so a
+        // secondary-rate-limit/CORS failure on one doesn't wipe out the other.
+        const [contentResult, fileResult] = await Promise.allSettled([
+          fetchGithubSearchWithRetry(
+            `https://api.github.com/search/code?q=${qContent}&per_page=10`,
+            headers,
+          ),
+          fetchGithubSearchWithRetry(
+            `https://api.github.com/search/code?q=${qFile}&per_page=10`,
+            headers,
+          ),
         ]);
 
         let combinedFiles: SearchResult[] = [];
 
-        if (resContent.ok) {
-          const data = await resContent.json();
+        if (contentResult.status === 'fulfilled' && contentResult.value.ok) {
+          const data = await contentResult.value.json();
           combinedFiles = [
             ...combinedFiles,
             ...(data.items || []).map((i: any) => ({ ...i, type: 'FILE' })),
           ];
+        } else if (contentResult.status === 'rejected') {
+          logger.warn('GitHub content search failed', contentResult.reason);
         }
 
-        if (resFile.ok) {
-          const data = await resFile.json();
+        if (fileResult.status === 'fulfilled' && fileResult.value.ok) {
+          const data = await fileResult.value.json();
           // Prepend filename matches
           combinedFiles = [
             ...(data.items || []).map((i: any) => ({ ...i, type: 'FILE' })),
             ...combinedFiles,
           ];
+        } else if (fileResult.status === 'rejected') {
+          logger.warn('GitHub filename search failed', fileResult.reason);
         }
 
         // Deduplicate files by path
