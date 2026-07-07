@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-07-07 — Harden cmd+k GitHub code search against CORS/rate-limit failures
+
+- **Symptom**: the cmd+k search modal's GitHub code search (e.g.
+  `filename:devto repo:urbanisierung/life-os`) started failing in the browser
+  with a CORS error ("missing allow origin header").
+- **Root cause**: `SearchModal.tsx` fires two direct `fetch()` calls per
+  keystroke straight to `api.github.com/search/code` (content search + filename
+  search) via `Promise.all`. GitHub's Search API sits behind a stricter
+  abuse/rate-limit layer than the rest of the REST API (which the app's other
+  GitHub calls go through via Octokit and don't hit this problem); throttled
+  responses from that layer can come back without CORS headers, which the
+  browser surfaces as an opaque CORS failure rather than a readable 403. Since
+  the two searches were joined with `Promise.all`, one failing request wiped
+  out both result sets.
+- **Fix**: `packages/ui/src/LifeOS/Organisms/SearchModal.tsx` — switched to
+  `Promise.allSettled` so a failure on one query no longer discards the other,
+  and added `fetchGithubSearchWithRetry`, a single retry with backoff
+  (honoring `Retry-After` on 403s, exponential backoff on network/CORS
+  failures) before giving up on that query.
+
 ## 2026-06-26 — Configurable desktop bottom navbar
 
 - **What**: the desktop bottom navbar items are now configurable from Settings
