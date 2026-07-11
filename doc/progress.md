@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-07-11 — Fix real root cause of cmd+k search failures: malformed auth header
+
+- **Symptom**: after PR #112 the cmd+k GitHub code search still failed with the
+  same CORS / "Failed to fetch" errors.
+- **Root cause**: `SearchModal.tsx` built the auth header as
+  `` `Bearer ${githubToken} ` `` — with a **trailing space** after the token.
+  That makes the credential invalid, so GitHub ignores the token and treats
+  every search request as *unauthenticated*. The Search API's unauthenticated
+  quota is only ~10 requests/minute, but the modal fires two requests per
+  debounced keystroke, so it exhausts the quota almost immediately and gets
+  `403` secondary-rate-limit responses — which arrive without CORS headers and
+  surface as the opaque CORS error. PR #112's `Promise.allSettled` + retry
+  treated the symptom but couldn't help, because auth was permanently broken and
+  every retry burned more of the tiny unauthenticated quota. Every other GitHub
+  call in the repo (e.g. `apps/console/src/lib/github-kb.ts`) uses
+  `` `Bearer ${token}` `` with no trailing space.
+- **Fix**: `packages/ui/src/LifeOS/Organisms/SearchModal.tsx` — removed the
+  trailing space so the token is sent correctly and requests use the
+  authenticated Search API rate limit, eliminating the throttling that produced
+  the CORS errors.
+
 ## 2026-07-07 — Harden cmd+k GitHub code search against CORS/rate-limit failures
 
 - **Symptom**: the cmd+k search modal's GitHub code search (e.g.

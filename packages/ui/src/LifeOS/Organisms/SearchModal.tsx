@@ -247,7 +247,7 @@ export const SearchModal = ({
         };
 
         if (githubToken) {
-          headers.Authorization = `Bearer ${githubToken} `;
+          headers.Authorization = `Bearer ${githubToken}`;
         }
 
         // Content and filename searches are independent — allSettled so a
