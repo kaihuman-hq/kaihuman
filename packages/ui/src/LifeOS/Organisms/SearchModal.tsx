@@ -11,23 +11,28 @@ import {
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoText } from '../Atoms/Typography';
+import { matchFilenames } from './search-filename-matcher';
 
 const logger = new Logger('SearchModal');
 
-// GitHub's Search API is fronted by a stricter abuse-rate-limiter than the
-// rest of the REST API, and responses from that limiter can arrive without
-// CORS headers (surfacing as an opaque "Failed to fetch" in the browser) or
-// as a 403. One retry with a short backoff (honoring Retry-After when present)
-// smooths over transient throttling without hanging the search UI.
+// GitHub's code-search endpoint has a dedicated rate limit (~10 req/min even
+// when authenticated) with a secondary limiter that penalizes bursts. When it
+// throttles, the rejection arrives without CORS headers and surfaces in the
+// browser as an opaque "Failed to fetch" rather than a readable 403. To stay
+// under that budget the modal now issues a single content-search request per
+// keystroke (filename matches come from the local repo tree), aborts the
+// in-flight request when the query changes, and retries once with backoff
+// (honoring Retry-After) to ride out transient throttling.
 async function fetchGithubSearchWithRetry(
   url: string,
   headers: Record<string, string>,
+  signal: AbortSignal,
   maxRetries = 1,
 ): Promise<Response> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const res = await fetch(url, { headers });
+      const res = await fetch(url, { headers, signal });
       if (res.status === 403 && attempt < maxRetries) {
         const retryAfterSeconds = Number(res.headers.get('retry-after')) || 2;
         await new Promise((resolve) => setTimeout(resolve, retryAfterSeconds * 1000));
@@ -35,6 +40,7 @@ async function fetchGithubSearchWithRetry(
       }
       return res;
     } catch (err) {
+      if (signal.aborted) throw err;
       lastError = err;
       if (attempt < maxRetries) {
         await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
@@ -231,16 +237,21 @@ export const SearchModal = ({
       return;
     }
 
-    // Set immediate results with commands while waiting for API
+    // Filename matches come from the already-loaded repo tree, so show them
+    // (plus commands) instantly while the content search is in flight.
+    const filenameMatches: SearchResult[] = matchFilenames(githubFileStore.tree.value, query).map(
+      (f) => ({ ...f, type: 'FILE' }),
+    );
     setLoading(true);
-    setResults(cmds);
+    setResults([...cmds, ...filenameMatches].slice(0, 50));
     setSelectedIndex(0);
 
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
-        // GitHub Search (Content + Filename)
-        const qContent = encodeURIComponent(`${query} repo:${currentRepository} `);
-        const qFile = encodeURIComponent(`filename:${query} repo:${currentRepository} `);
+        // Single content-search request keeps us under the code-search rate
+        // limit; filename matches already came from the local tree above.
+        const qContent = encodeURIComponent(`${query} repo:${currentRepository}`);
 
         const headers: Record<string, string> = {
           Accept: 'application/vnd.github.v3+json',
@@ -250,61 +261,41 @@ export const SearchModal = ({
           headers.Authorization = `Bearer ${githubToken}`;
         }
 
-        // Content and filename searches are independent — allSettled so a
-        // secondary-rate-limit/CORS failure on one doesn't wipe out the other.
-        const [contentResult, fileResult] = await Promise.allSettled([
-          fetchGithubSearchWithRetry(
-            `https://api.github.com/search/code?q=${qContent}&per_page=10`,
-            headers,
-          ),
-          fetchGithubSearchWithRetry(
-            `https://api.github.com/search/code?q=${qFile}&per_page=10`,
-            headers,
-          ),
-        ]);
+        const res = await fetchGithubSearchWithRetry(
+          `https://api.github.com/search/code?q=${qContent}&per_page=10`,
+          headers,
+          controller.signal,
+        );
 
-        let combinedFiles: SearchResult[] = [];
-
-        if (contentResult.status === 'fulfilled' && contentResult.value.ok) {
-          const data = await contentResult.value.json();
-          combinedFiles = [
-            ...combinedFiles,
-            ...(data.items || []).map((i: any) => ({ ...i, type: 'FILE' })),
-          ];
-        } else if (contentResult.status === 'rejected') {
-          logger.warn('GitHub content search failed', contentResult.reason);
+        let contentFiles: SearchResult[] = [];
+        if (res.ok) {
+          const data = await res.json();
+          contentFiles = (data.items || []).map((i: any) => ({ ...i, type: 'FILE' }));
+        } else {
+          logger.warn('GitHub content search failed', res.status);
         }
 
-        if (fileResult.status === 'fulfilled' && fileResult.value.ok) {
-          const data = await fileResult.value.json();
-          // Prepend filename matches
-          combinedFiles = [
-            ...(data.items || []).map((i: any) => ({ ...i, type: 'FILE' })),
-            ...combinedFiles,
-          ];
-        } else if (fileResult.status === 'rejected') {
-          logger.warn('GitHub filename search failed', fileResult.reason);
-        }
-
-        // Deduplicate files by path
+        // Merge: filename matches first, then content matches; dedupe by path.
         const seen = new Set<string>();
-        const uniqueFiles = combinedFiles.filter((item) => {
+        const uniqueFiles = [...filenameMatches, ...contentFiles].filter((item) => {
           if (seen.has(item.path)) return false;
           seen.add(item.path);
           return true;
         });
 
-        // Merge: Commands First, then Files
         setResults([...cmds, ...uniqueFiles].slice(0, 50));
         setSelectedIndex(0);
       } catch (e) {
-        logger.error('Search error', e);
+        if (!controller.signal.aborted) logger.error('Search error', e);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }, 500);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [query, currentRepository, githubToken]);
 
   const handleKeyDown = (e: KeyboardEvent) => {

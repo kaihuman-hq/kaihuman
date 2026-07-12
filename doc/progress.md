@@ -1,5 +1,46 @@
 # Progress
 
+## 2026-07-12 — Fix persistent cmd+k search CORS failures by cutting request volume
+
+- **Root cause (confirmed)**: `SearchModal.tsx` fired two concurrent
+  `/search/code` requests per debounced keystroke against GitHub's code-search
+  endpoint, whose dedicated limit is ~10 req/min even when authenticated. Its
+  limiter rejections arrive without CORS headers, so the browser reports an
+  opaque "Failed to fetch" / CORS error instead of a 403. #113's trailing-space
+  theory was invalid — the Fetch spec strips trailing whitespace from header
+  values, so auth was never broken.
+- **Fix**:
+  - New pure `matchFilenames()` (`packages/ui/src/LifeOS/Organisms/search-filename-matcher.ts`)
+    resolves filename matches locally from the already-loaded `githubFileStore`
+    tree — zero API calls, instant, works while throttled. Prefix matches rank
+    above substring matches.
+  - `SearchModal.tsx` now issues a **single** content-search request per
+    debounce (down from two), aborts the in-flight request when the query
+    changes or the modal closes (via `AbortController`), and no longer needs
+    `Promise.allSettled`. Removed the dangling trailing `%20` from the query.
+  - Unit tests in `apps/console/src/search-filename-matcher.test.ts` (run under
+    console's vitest, importing the matcher via relative path like
+    `navbar-config.test.ts`).
+
+## 2026-07-11 — Investigation + fix plan for persistent cmd+k search CORS failures
+
+- **Symptom**: after both #112 and #113 the cmd+k search still fails — the
+  content `/search/code` request returns data while the parallel
+  `filename:` request is blocked by CORS ("No 'Access-Control-Allow-Origin'
+  header").
+- **Finding**: #113's premise was wrong — the Fetch spec strips
+  leading/trailing whitespace from header values before sending
+  (`new Headers({Authorization: 'Bearer abc '})` → `'Bearer abc'`), so the
+  trailing space never reached the wire and auth was never broken. The real
+  root cause is request volume: two concurrent `/search/code` requests per
+  debounced keystroke against the code-search endpoint's dedicated
+  10 req/min (authenticated) limit; GitHub's limiter rejections arrive
+  without CORS headers and surface as opaque CORS errors.
+- **Plan**: `docs/superpowers/plans/2026-07-11-searchmodal-cors-fix.md` —
+  replace the `filename:` API request with local matching against the
+  already-loaded `githubFileStore` tree, keep a single content-search
+  request per debounce, and abort in-flight searches on query change.
+
 ## 2026-07-11 — Fix real root cause of cmd+k search failures: malformed auth header
 
 - **Symptom**: after PR #112 the cmd+k GitHub code search still failed with the
