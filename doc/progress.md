@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-07-12 — Fix persistent cmd+k search CORS failures by cutting request volume
+
+- **Root cause (confirmed)**: `SearchModal.tsx` fired two concurrent
+  `/search/code` requests per debounced keystroke against GitHub's code-search
+  endpoint, whose dedicated limit is ~10 req/min even when authenticated. Its
+  limiter rejections arrive without CORS headers, so the browser reports an
+  opaque "Failed to fetch" / CORS error instead of a 403. #113's trailing-space
+  theory was invalid — the Fetch spec strips trailing whitespace from header
+  values, so auth was never broken.
+- **Fix**:
+  - New pure `matchFilenames()` (`packages/ui/src/LifeOS/Organisms/search-filename-matcher.ts`)
+    resolves filename matches locally from the already-loaded `githubFileStore`
+    tree — zero API calls, instant, works while throttled. Prefix matches rank
+    above substring matches.
+  - `SearchModal.tsx` now issues a **single** content-search request per
+    debounce (down from two), aborts the in-flight request when the query
+    changes or the modal closes (via `AbortController`), and no longer needs
+    `Promise.allSettled`. Removed the dangling trailing `%20` from the query.
+  - Unit tests in `apps/console/src/search-filename-matcher.test.ts` (run under
+    console's vitest, importing the matcher via relative path like
+    `navbar-config.test.ts`).
+
 ## 2026-07-11 — Investigation + fix plan for persistent cmd+k search CORS failures
 
 - **Symptom**: after both #112 and #113 the cmd+k search still fails — the
