@@ -25,6 +25,7 @@ cli server --port 3000
 | `l` | Login via browser (GitHub OAuth) |
 | `s` | Select active repository |
 | `n` | Add a quick note to active repo |
+| `k` | Add a knowledge note to `.kh/raw/` (compiled by `/kb-ingest`) |
 | `a` | Open AI prompt |
 | `f` | Open file browser (syncs repo) |
 | `d` | Open dashboard config view (syncs repo) |

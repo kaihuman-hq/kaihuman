@@ -79,7 +79,7 @@ export async function addRawNote(
   const date = new Date().toISOString().slice(0, 10);
   const escapedTitle = title.replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"');
   const tagList = tags.length > 0 ? tags : ['general'];
-  const content = `---\ntitle: "${escapedTitle}"\nurl: ''\ndate: ${date}\nprocessed: false\ntags: [${tagList.join(', ')}]\n---\n\n${text}`;
+  const content = `---\ntype: note\ntitle: "${escapedTitle}"\nurl: ''\ndate: ${date}\nprocessed: false\ntags: [${tagList.join(', ')}]\n---\n\n${text}`;
   const path = `.kh/raw/${Date.now()}-${slug}.md`;
   await githubService.upsertRepoFile(owner, repo, path, content, `note: add "${title}"`);
 }

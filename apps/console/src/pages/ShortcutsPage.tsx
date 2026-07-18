@@ -29,6 +29,12 @@ export const QUICK_ROUTES: QuickRoute[] = [
     description: 'Capture a quick thought to your notes',
   },
   {
+    name: 'Quick Knowledge',
+    path: '/quick-knowledge',
+    suggestedName: 'KH Learn',
+    description: 'Capture something you learned to your knowledge base inbox',
+  },
+  {
     name: 'Quick Log',
     path: '/quick-log',
     suggestedName: 'KH Log',

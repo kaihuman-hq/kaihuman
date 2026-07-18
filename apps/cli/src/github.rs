@@ -77,6 +77,55 @@ impl GithubClient {
         Ok(())
     }
 
+    /// Write a knowledge capture to `.kh/raw/` as an immutable, OKF-aligned markdown
+    /// file. Zero required structure — the whole text is the body; a title and slug
+    /// are derived from the first line. `/kb-ingest` later folds it into the journal
+    /// and wiki.
+    pub async fn create_kb_note(&self, owner: &str, repo: &str, text: &str) -> Result<()> {
+        let now = chrono::Utc::now();
+        let timestamp = now.timestamp_millis();
+        let date = now.format("%Y-%m-%d").to_string();
+
+        let first_line = text.lines().find(|l| !l.trim().is_empty()).unwrap_or("note").trim();
+        let slug: String = {
+            let s: String = first_line
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+                .collect();
+            let s = s.trim_matches('-').chars().take(40).collect::<String>();
+            if s.is_empty() { "note".to_string() } else { s }
+        };
+        let title = first_line.replace('"', "'").chars().take(80).collect::<String>();
+
+        let path = format!(".kh/raw/{}-{}.md", timestamp, slug);
+        let url = format!("https://api.github.com/repos/{}/{}/contents/{}", owner, repo, path);
+
+        let file_content = format!(
+            "---\ntype: note\ntitle: \"{}\"\nurl: ''\ndate: {}\nprocessed: false\ntags: [general]\n---\n\n{}\n",
+            title, date, text
+        );
+        let encoded_content = BASE64_STANDARD.encode(file_content);
+
+        #[derive(Serialize)]
+        struct PutBody {
+            message: String,
+            content: String,
+        }
+
+        let body = PutBody {
+            message: "note: add knowledge capture via CLI".to_string(),
+            content: encoded_content,
+        };
+
+        let res = self.client.put(&url).json(&body).send().await?;
+
+        if !res.status().is_success() {
+            bail!("Failed to create knowledge note: {}", res.status());
+        }
+
+        Ok(())
+    }
+
     pub async fn append_to_inbox(&self, owner: &str, repo: &str, text: &str) -> Result<()> {
         let path = "inbox.md";
         let url = format!("https://api.github.com/repos/{}/{}/contents/{}", owner, repo, path);

@@ -56,6 +56,13 @@ export default defineConfig({
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
           },
           {
+            name: 'Quick Knowledge',
+            short_name: 'KH Learn',
+            description: 'Capture something you learned',
+            url: '/quick-knowledge',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
             name: 'Quick Log',
             short_name: 'KH Log',
             description: 'Log a timestamped action',

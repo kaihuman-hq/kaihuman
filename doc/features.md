@@ -10,6 +10,9 @@
 
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
+| Cheatsheet (tabbed reference: KB how-to, capture, CLI keys, slash commands) | `/cheatsheet` | 2026-07-18 |
+| Quick Knowledge capture (free-text → `.kh/raw/`) | `/quick-knowledge` | 2026-07-18 |
+| KB journal — monthly `.kh/journal/YYYY-MM.md` from `/kb-ingest` | `.kh/journal/` | 2026-07-18 |
 | Configurable desktop bottom navbar (stored in `.kh` config) | Settings → Bottom Navbar | 2026-06-26 |
 | Demo mode (in-memory seeded data) | `/demo` + login "View demo" | 2026-06-25 |
 | Quick todo to inbox | `/quick-todo` | 2026-03-28 |
@@ -25,6 +28,7 @@
 |---------|-----|-------|
 | GitHub OAuth login | `l` | Initial |
 | Quick note to active repo | `n` | Initial |
+| Knowledge note to `.kh/raw/` | `k` | 2026-07-18 |
 | Select active repository | `s` | Initial |
 | Local AI server proxy | `cargo run -- server` | Initial |
 | AI prompt (Claude / Copilot / Gemini) | `a` | 2026-03-19 |

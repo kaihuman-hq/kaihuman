@@ -5,12 +5,14 @@ import { Route, Router, route } from 'preact-router';
 import { ExtensionAuthBridge } from './components/ExtensionAuthBridge';
 import { ActionLogViewPage } from './pages/ActionLogViewPage';
 import { AuthCli } from './pages/AuthCli';
+import { CheatsheetPage } from './pages/CheatsheetPage';
 import { Dashboard } from './pages/Dashboard';
 import { DemoEntry } from './pages/DemoEntry';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
 import { KanbanBoardPage } from './pages/KanbanBoardPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { Login } from './pages/login';
+import { QuickKnowledgePage } from './pages/QuickKnowledgePage';
 import { QuickLogPage } from './pages/QuickLogPage';
 import { QuickNotePage } from './pages/QuickNotePage';
 import { QuickTodoPage } from './pages/QuickTodoPage';
@@ -62,8 +64,10 @@ export const App = () => {
         <ProtectedRoute path="/action-log" component={ActionLogViewPage} />
         <ProtectedRoute path="/quick-todo" component={QuickTodoPage} />
         <ProtectedRoute path="/quick-note" component={QuickNotePage} />
+        <ProtectedRoute path="/quick-knowledge" component={QuickKnowledgePage} />
         <ProtectedRoute path="/quick-log" component={QuickLogPage} />
         <ProtectedRoute path="/shortcuts" component={ShortcutsPage} />
+        <ProtectedRoute path="/cheatsheet" component={CheatsheetPage} />
         <ProtectedRoute path="/knowledge" component={KnowledgeBasePage} />
         <ProtectedRoute path="/wiki" component={WikiPage} />
         <ProtectedRoute path="/files" component={Dashboard} />

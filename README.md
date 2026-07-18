@@ -45,6 +45,7 @@ The CLI opens a browser window to authenticate via GitHub OAuth. After that it d
 | `l` | Login (GitHub OAuth) |
 | `s` | Select active repository |
 | `n` | Add a quick note to active repo |
+| `k` | Add a knowledge note to `.kh/raw/` (compiled by `/kb-ingest`) |
 | `a` | AI prompt — pipe to Claude / Copilot / Gemini |
 | `f` | File browser (syncs repo first) |
 | `d` | Dashboard config view (syncs repo first) |

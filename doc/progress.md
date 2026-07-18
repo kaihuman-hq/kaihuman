@@ -1,5 +1,40 @@
 # Progress
 
+## 2026-07-18 — Knowledge base: capture-everywhere + journal-as-derived-artifact + cheatsheet
+
+Reworked the knowledge base around low-friction capture and an auditable,
+re-buildable wiki. Concept summary in the "How it works" section of the
+Cheatsheet page (`/cheatsheet`).
+
+- **Pipeline (KB skills → v2.0.0, `apps/console/src/lib/kb-skills.ts`)**:
+  - `/kb-ingest` now appends every capture **verbatim** to a monthly journal
+    `.kh/journal/YYYY-MM.md` (single `# YYYY-MM` heading, one
+    `## [YYYY-MM-DD HH:MM] Title` section per capture) in addition to compiling
+    the deduplicated wiki. The journal is the human-readable log; the wiki is the
+    synthesized view.
+  - **Raw captures are immutable**; ingestion only flips `processed` and copies
+    the body into the journal — a bad compile is recoverable from git.
+  - **Provenance**: every wiki page carries a `## Sources` section linking claims
+    back to their journal entry / raw file. `/kb-lint` now flags missing sources
+    and topic drift (near-duplicate pages).
+  - **Canonical Topics** list in `schema.md` steers ingest toward merging rather
+    than fragmenting. Schema frontmatter is OKF-aligned (`type` field on captures
+    and wiki pages). Added `.kh/journal/.gitkeep` to the scaffold; refreshed
+    `CLAUDE.md` template and documented running ingest/index on a routine.
+- **Capture everywhere** (all write to `.kh/raw/` with `type` frontmatter):
+  - CLI: new `k` — "New knowledge note" menu item + `create_kb_note`
+    (`apps/cli/src/github.rs`, `app.rs`) writing an OKF-aligned file to
+    `.kh/raw/`, zero required structure.
+  - Console: `/quick-knowledge` page (`QuickKnowledgePage.tsx`) + PWA manifest +
+    home-screen shortcut (QUICK_ROUTES, vite `shortcuts`). Free-text only; the
+    first line becomes the title.
+  - Extension `PIN_ARTICLE` and console `addRawNote` now stamp `type:`
+    (`article` / `note`); `/kb-session` stamps `type: session`.
+- **Cheatsheet page** (`CheatsheetPage.tsx`, `/cheatsheet`): tabbed reference —
+  Knowledge Base (how the wiki works, required), Quick Capture, CLI Keys, Slash
+  Commands. Reachable from the Magic Menu (`onCheatsheetClick` plumbed through
+  `packages/ui/.../MainApp.tsx`).
+
 ## 2026-07-12 — Fix persistent cmd+k search CORS failures by cutting request volume
 
 - **Root cause (confirmed)**: `SearchModal.tsx` fired two concurrent

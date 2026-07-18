@@ -1,23 +1,37 @@
-export const KB_SKILL_VERSION = '1.5.0';
+export const KB_SKILL_VERSION = '2.0.0';
 
 export const KB_INGEST_SKILL = `# /kb-ingest
 
-Ingest raw markdown files into the knowledge base wiki.
+Compile raw captures in \`.kh/raw/\` into the wiki, and append them to the monthly journal.
+
+## Principles
+
+- **Raw notes are immutable.** Never rewrite a capture's prose. Only its \`processed\` flag changes, and its body is copied verbatim into the journal. A bad run is always recoverable by re-ingesting.
+- **The wiki is derived.** Prefer updating an existing page over creating a new one. Consult the **Canonical Topics** list in \`.kh/schema.md\` and reuse those page slugs so knowledge does not fragment into near-duplicate pages.
+- **Everything is cited.** Every claim added to a wiki page links back to its source — the journal entry or the raw file it came from — so the synthesized wiki stays auditable.
 
 ## Process
 
-1. Read \`.kh/schema.md\` to understand domain, page format, and index structure
-2. Read existing wiki pages from \`.kh/wiki/\` to understand current state
-3. List \`.kh/raw/\` — process only direct children (files), not \`.kh/raw/processed/\`
+1. Read \`.kh/schema.md\` — domain, page format, index structure, and the Canonical Topics list.
+2. Read existing wiki pages in \`.kh/wiki/\` to understand current state.
+3. List \`.kh/raw/\` — process only direct children (files), not \`.kh/raw/processed/\`. Sort oldest-first by the numeric timestamp prefix.
 4. For each file in \`.kh/raw/\`:
-   - Extract key concepts and entities
-   - Create or update corresponding wiki pages in \`.kh/wiki/\`
-   - Add backlinks between related pages
-   - Update \`.kh/index.kb.md\` with new entries and maintain structure
-   - Append processing notes to \`.kh/log.md\`
-   - Update the file's frontmatter to \`processed: true\`
-   - Move the file to \`.kh/raw/processed/\` (write updated content there, then delete from \`.kh/raw/\`)
-5. Commit changes with a meaningful message
+   a. Read the full capture and its frontmatter.
+   b. **Append to the journal.** Take the month \`YYYY-MM\` from the frontmatter \`date\` (fallback: today). Open or create \`.kh/journal/YYYY-MM.md\`; if new, start it with a single \`# YYYY-MM\` heading. Append, keeping entries in chronological order:
+
+      ~~~markdown
+      ## [YYYY-MM-DD HH:MM] <Title>
+
+      <the capture body, verbatim>
+      ~~~
+
+      Use the frontmatter \`title\` if it is meaningful; otherwise derive a short title from the first line.
+   c. **Update the wiki.** For each concept in the capture, create or update \`.kh/wiki/<topic-slug>.md\`, preferring an existing canonical page over a new one. Add \`[[wikilink]]\` backlinks between related pages. Under the page's \`## Sources\` section, add a link to the journal entry (\`../journal/YYYY-MM.md\`) or the raw file — this is the provenance for what you synthesized.
+   d. Update \`.kh/index.kb.md\` with new or changed entries.
+   e. Append a one-line note to \`.kh/log.md\`.
+   f. Set \`processed: true\` in the raw file's frontmatter and move it to \`.kh/raw/processed/\` (write the updated content there, then delete from \`.kh/raw/\`).
+5. If a genuinely new durable topic appeared, add its slug to the **Canonical Topics** list in \`.kh/schema.md\`.
+6. Commit changes with a meaningful message.
 
 ## Moving a processed file
 
@@ -27,13 +41,13 @@ For each \`.kh/raw/FILENAME.md\`, after updating its frontmatter:
 REPO=owner/repo   # the repo being operated on
 SHA=$(gh api repos/$REPO/contents/.kh/raw/FILENAME.md --jq '.sha')
 CONTENT=$(printf '%s' "UPDATED_CONTENT_WITH_PROCESSED_TRUE" | base64 -w 0)
-gh api repos/$REPO/contents/.kh/raw/processed/FILENAME.md \
-  --method PUT \
-  --field message="chore: ingest FILENAME" \
+gh api repos/$REPO/contents/.kh/raw/processed/FILENAME.md \\
+  --method PUT \\
+  --field message="chore: ingest FILENAME" \\
   --field "content=$CONTENT"
-gh api repos/$REPO/contents/.kh/raw/FILENAME.md \
-  --method DELETE \
-  --field message="chore: move FILENAME to processed" \
+gh api repos/$REPO/contents/.kh/raw/FILENAME.md \\
+  --method DELETE \\
+  --field message="chore: move FILENAME to processed" \\
   --field sha=$SHA
 ~~~
 
@@ -43,14 +57,18 @@ Files in \`.kh/raw/\` (direct children only — skip the \`processed/\` subdirec
 
 ## Output
 
-- Updated wiki pages in \`.kh/wiki/\`
-- Updated \`.kh/index.kb.md\` with new entries
-- Updated \`.kh/log.md\` with processing notes
-- Ingested files moved to \`.kh/raw/processed/\` with \`processed: true\` in frontmatter
+- Chronological entries appended to \`.kh/journal/YYYY-MM.md\` (verbatim capture bodies)
+- Updated wiki pages in \`.kh/wiki/\` with \`## Sources\` provenance links
+- Updated \`.kh/index.kb.md\` and \`.kh/log.md\`
+- Ingested files moved to \`.kh/raw/processed/\` with \`processed: true\`
 
 ## After ingestion
 
-Run \`/kb-index\` to rebuild \`.kh/search.kb.json\` with the new wiki pages.
+Run \`/kb-index\` to rebuild \`.kh/search.kb.json\` so the new wiki pages are searchable.
+
+## Running on a schedule
+
+This skill is safe to run manually or from a routine (e.g. a nightly cron). When running unattended, prefer committing to a branch or at least writing a clear summary to \`.kh/log.md\` so the changes can be reviewed. Because raw captures are immutable and the wiki is derived, git history is always the undo.
 `;
 
 export const KB_LINT_SKILL = `# /kb-lint
@@ -64,6 +82,8 @@ Check for:
 - **Orphans**: Wiki pages not referenced in index.kb.md
 - **Dead links**: Wiki pages linking to non-existent pages
 - **Missing links**: Related pages that should be linked but aren't
+- **Missing sources**: Wiki pages without a \`## Sources\` section citing provenance
+- **Topic drift**: Near-duplicate pages that should be merged into a Canonical Topic
 - **Index drift**: Index structure not matching actual wiki organization
 
 ## Repairs
@@ -73,6 +93,7 @@ Fix automatically where possible:
 - Remove dead links from pages
 - Update index.kb.md to include orphaned pages
 - Add missing cross-references
+- Flag contradictions and un-cited claims with \`> ⚠️ NEEDS REVIEW: <reason>\`
 
 ## Output
 
@@ -102,7 +123,7 @@ Answer questions using the knowledge base.
 
 2. Read the candidate wiki pages from \`.kh/wiki/\`
 3. Synthesize a comprehensive answer from their content
-4. Cite the specific wiki pages used
+4. Cite the specific wiki pages used. When a page's claim matters, follow its \`## Sources\` links back to the journal or raw capture so the answer is grounded in what was actually written.
 
 ## Input
 
@@ -240,10 +261,10 @@ TIMESTAMP=$(date +%s)
 DATE=$(date +%Y-%m-%d)
 PROJECT=$(basename "$PWD")
 SLUG="$PROJECT-session"
-CONTENT=$(printf -- '---\ntitle: "Session: %s – %s"\nurl: '"''"'\ndate: %s\nprocessed: false\ntags: [session]\n---\n\n%s' "$PROJECT" "ONE_LINE_SUMMARY" "$DATE" "FULL_SUMMARY" | base64 -w 0)
-gh api "repos/$REPO/contents/.kh/raw/$TIMESTAMP-$SLUG.md" \
-  --method PUT \
-  --field message="note: add session summary for $PROJECT" \
+CONTENT=$(printf -- '---\\ntype: session\\ntitle: "Session: %s – %s"\\nurl: '"''"'\\ndate: %s\\nprocessed: false\\ntags: [session]\\n---\\n\\n%s' "$PROJECT" "ONE_LINE_SUMMARY" "$DATE" "FULL_SUMMARY" | base64 -w 0)
+gh api "repos/$REPO/contents/.kh/raw/$TIMESTAMP-$SLUG.md" \\
+  --method PUT \\
+  --field message="note: add session summary for $PROJECT" \\
   --field "content=$CONTENT"
 ~~~
 
@@ -258,32 +279,43 @@ This repo is a personal AI knowledge base managed with Claude Code.
 
 \`\`\`
 .kh/
-  raw/        # Pinned articles (frontmatter: processed: false → true)
-  wiki/       # Compiled knowledge pages with backlinks
-  schema.md   # Domain definition and page format rules
-  index.kb.md    # Master index of all wiki pages
+  raw/        # Captures awaiting processing (frontmatter: processed: false → true)
+    processed/  # Captures after ingestion (immutable archive)
+  journal/    # Human-readable monthly log — one YYYY-MM.md per month
+  wiki/       # Compiled, deduplicated knowledge pages with backlinks + sources
+  schema.md   # Domain definition, page format, and Canonical Topics list
+  index.kb.md # Master index of all wiki pages
   log.md      # Processing and audit history
 .claude/commands/
-  kb-ingest.md  # /kb-ingest — compile raw articles into wiki
+  kb-ingest.md  # /kb-ingest — compile raw captures into journal + wiki
   kb-index.md   # /kb-index  — build search index from wiki pages
   kb-lint.md    # /kb-lint   — audit and repair wiki
   kb-ask.md     # /kb-ask    — answer questions from wiki
 \`\`\`
 
-## Workflow
+## Capture → knowledge flow
 
-1. Articles are pinned via the browser extension → land in \`.kh/raw/\` with \`processed: false\`
-2. Run \`/kb-ingest\` to compile them into \`.kh/wiki/\` pages and move them to \`.kh/raw/processed/\`
-3. Run \`/kb-index\` to rebuild \`.kh/search.kb.json\` from all wiki pages
-4. Run \`/kb-lint\` periodically to fix orphans, dead links, and contradictions
-5. Run \`/kb-ask <question>\` to query the knowledge base
+1. Captures land in \`.kh/raw/\` with \`processed: false\`, via the browser extension, the console
+   ("Add note" / \`/quick-knowledge\`), or the CLI (\`k\` — new knowledge note).
+2. Run \`/kb-ingest\` to:
+   - append each capture verbatim to \`.kh/journal/YYYY-MM.md\` (the monthly log you can read),
+   - synthesize its concepts into \`.kh/wiki/\` pages (the deduplicated view), and
+   - move the capture to \`.kh/raw/processed/\`.
+3. Run \`/kb-index\` to rebuild \`.kh/search.kb.json\` from all wiki pages.
+4. Run \`/kb-lint\` periodically to fix orphans, dead links, missing sources, and topic drift.
+5. Run \`/kb-ask <question>\` to query the knowledge base.
 
 ## Guidelines
 
-- Always read \`.kh/schema.md\` before creating or editing wiki pages
-- Wiki pages use \`[[wikilink]]\` syntax for cross-references
-- Keep raw files intact after processing — only the frontmatter changes
-- The index in \`.kh/index.kb.md\` is the canonical entry point for navigation
+- **Raw captures are immutable.** Ingestion only flips their \`processed\` flag and copies the body
+  verbatim into the journal. Never rewrite a capture's prose.
+- **The wiki is derived and re-buildable.** Prefer updating an existing Canonical Topic page over
+  creating a near-duplicate. Git history is the undo for any bad ingest.
+- Always read \`.kh/schema.md\` before creating or editing wiki pages.
+- Wiki pages use \`[[wikilink]]\` syntax for cross-references and carry a \`## Sources\` section that
+  links each claim back to its journal entry or raw capture (provenance).
+- The index in \`.kh/index.kb.md\` is the canonical entry point for navigation.
+- \`/kb-ingest\` + \`/kb-index\` can be run on a schedule (routine/cron) for hands-off upkeep.
 `;
 
 export const KB_SCHEMA_TEMPLATE = `# Knowledge Base Schema
@@ -292,12 +324,29 @@ export const KB_SCHEMA_TEMPLATE = `# Knowledge Base Schema
 
 **Domain**: [Domain name or topic area]
 
-## Wiki Page Format
+## Capture frontmatter (\`.kh/raw/\`)
 
-Each wiki page uses the following structure:
+Every raw capture carries YAML frontmatter. Aligned with the Open Knowledge Format (OKF) —
+\`type\` is the only strictly required field; the rest are recommended:
 
 \`\`\`markdown
 ---
+type: note        # note | article | session
+title: "Short title"
+url: ''            # source URL if the capture came from a page
+date: YYYY-MM-DD
+processed: false
+tags: [tag1, tag2]
+---
+
+Free-form body — anything you learned. No structure required at capture time.
+\`\`\`
+
+## Wiki page format (\`.kh/wiki/\`)
+
+\`\`\`markdown
+---
+type: concept
 title: Page Title
 tags: [tag1, tag2, tag3]
 created: YYYY-MM-DD
@@ -316,7 +365,31 @@ updated: YYYY-MM-DD
 ## Related Topics
 - [[Link to related page 1]]
 - [[Link to related page 2]]
+
+## Sources
+- [Journal YYYY-MM](../journal/YYYY-MM.md) — [YYYY-MM-DD HH:MM] entry
+- [Raw capture](../raw/processed/<file>.md)
 \`\`\`
+
+Every wiki page must carry a \`## Sources\` section citing where its content came from. This
+provenance is what lets you trust the synthesized wiki over time — you can always check what you
+actually wrote versus what was summarized.
+
+## Journal (\`.kh/journal/\`)
+
+One file per month, \`YYYY-MM.md\`. A single \`# YYYY-MM\` heading, then one section per capture in
+chronological order, body copied verbatim:
+
+\`\`\`markdown
+# 2026-07
+
+## [2026-07-17 14:32] Zustand selectors avoid re-renders
+
+Selecting a slice with a selector function only re-renders when that slice changes...
+\`\`\`
+
+The journal is the human-readable record of everything captured; the wiki is the synthesized,
+deduplicated view built from it.
 
 ## Index Format
 
@@ -333,6 +406,14 @@ The \`.kh/index.kb.md\` file maintains the structure:
 - [[Page Title 3]]
 - [[Page Title 4]]
 \`\`\`
+
+## Canonical Topics
+
+Maintain the list of durable wiki page slugs here so \`/kb-ingest\` merges captures into existing
+pages instead of fragmenting knowledge into near-duplicates. Add a slug only when a genuinely new
+topic appears.
+
+- (none yet)
 
 ## Tags
 
@@ -360,6 +441,7 @@ export function getScaffoldFiles(): Record<string, string> {
       '# Knowledge Base Index\n\n## Getting Started\n\nWelcome to your knowledge base. Start by reading the schema in `.kh/schema.md` to understand the structure.\n',
     '.kh/log.md': '# Knowledge Base Log\n\nProcessing and audit history.\n',
     '.kh/raw/.gitkeep': '',
+    '.kh/journal/.gitkeep': '',
     '.kh/wiki/.gitkeep': '',
     '.claude/commands/kb-ingest.md': KB_INGEST_SKILL,
     '.claude/commands/kb-index.md': KB_INDEX_SKILL,
