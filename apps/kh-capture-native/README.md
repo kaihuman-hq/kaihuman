@@ -1,54 +1,56 @@
 # KH Capture (native-sdk) — experimental
 
 A native desktop quick-capture window built with [native-sdk](https://native-sdk.dev)
-(Zig core). It's the **Stage 2 experiment** that runs *in parallel* with the
-working `cli capture` + wofi overlay — a place to evaluate native-sdk without
-touching the shipped flow.
+(Zig core). It runs *in parallel* with the shipped `cli capture` + wofi overlay —
+a place to evaluate native-sdk without touching the shipped flow.
 
-## What it is (and the deliberate design choice)
+## What it is — self-contained (no `cli` dependency)
 
-A **thin GUI over the tested `cli capture`**: a small window with a text field;
-on submit it spawns `cli capture <text>` via native-sdk's `spawn` effect. The
-Rust CLI keeps ownership of everything that's hard and already tested — GitHub
-auth, the offline-safe local spool, retry/backoff — so this app:
+A small window with a text field that, on submit, **POSTs the note directly to
+the GitHub contents API** (`.kh/raw/<ts>-<slug>.md`). It reuses the CLI's saved
+login rather than asking you to manage a token:
 
-- inherits offline-safety for free,
-- never duplicates auth/push logic, and
-- only exercises the native-sdk surfaces that matter for the trial: markup UI,
-  the effects channel (`spawn`), and window lifecycle.
+1. **Boot** — `initEffects` resolves `~/.config/cli/auth.json` (via `$HOME` /
+   `$XDG_CONFIG_HOME`) and reads it with `fx.readFile`, extracting `token` and
+   `active_repo`.
+2. **Submit** — builds the OKF markdown + base64 JSON body and PUTs it with
+   `fx.fetch` (`authorization: Bearer …`).
+3. **On failure** — writes the note as markdown into the CLI's **own spool dir**
+   (`~/.config/cli/spool/`) with `fx.writeFile`. The next `cli capture` / overlay
+   run flushes it to GitHub — so the two capture paths rescue each other and no
+   thought is lost, even offline.
 
-If the experiment graduates, the obvious next step is to drop the CLI dependency
-and call the GitHub API directly from Zig via `fx.fetch`, reading the token from
-the CLI's `auth.json` with `fx.readFile` (both are documented native-sdk
-effects). The **automation server** — native-sdk lets an agent see and drive the
-running window — is the feature that would make this worth choosing over Tauri.
+This exercises the native-sdk surfaces that matter for the trial: markup UI, the
+effects channel (file read/write + HTTP), and window lifecycle.
+
+> Earlier this app shelled out to `cli capture` via `fx.spawn`. That simpler
+> variant is in git history if you'd rather run the thin-shell version.
 
 ## ⚠️ Status: doc-derived, not yet compiled
 
-This app was written from the published native-sdk docs and has **not** been
-compiled against a live toolchain (no Zig/native CLI in the authoring
-environment). It's a faithful ~90% sketch. Expect to reconcile a few exact
-symbol names on first build — every such spot is marked `VERIFY(api)` in
-`src/main.zig` and `app.zon`.
-
-The fastest way to reconcile: scaffold a throwaway app and diff the glue.
+Written from the published native-sdk docs; **not** compiled against a live
+toolchain (no Zig/native CLI in the authoring environment). The plain-Zig std
+parts (env, base64, epoch date, string scanning, JSON extraction) are idiomatic
+and self-contained; the native-sdk symbols are inferred and marked `VERIFY(api)`.
+Expect to reconcile a few names on first build. Fastest way:
 
 ```sh
 npm install -g @native-sdk/cli
 native init _scratch --template zig-core   # reference scaffold
-# compare _scratch/src/main.zig + app.zon against this app's files
+# diff _scratch/src/main.zig + app.zon against this app's files
 ```
 
 ### Points to verify against the scaffold
 
 | Where | Assumption to confirm |
 |-------|----------------------|
-| `main.zig` | `Effects` import path (`canvas.Effects`?) |
-| `main.zig` | Effect **key** type — string assumed; may be int/enum |
+| `main.zig` | `Effects` import path; effect-**key** type (string assumed) |
 | `main.zig` | `canvas.TextBuffer(N)` / `canvas.TextInputEvent` names |
-| `main.zig` | `spawn` exit payload type + `.code` field (`canvas.ProcessExit`?) |
-| `main.zig` | `.update_fx` field on `canvas.UiApp` |
-| `app.zon` | permission strings for subprocess spawn (`"command"`) + window |
+| `main.zig` | `fx.readFile` / `fx.writeFile` result type (`FileResult`, `.outcome`, `.bytes`) |
+| `main.zig` | `fx.fetch` `.method = .put`, header struct shape, `Response` (`.outcome`, `.status`, `.body`) |
+| `main.zig` | `std.time.epoch` field/method names for your Zig version |
+| `main.zig` | `.init_fx` / `.update_fx` fields on `canvas.UiApp` |
+| `app.zon` | permission strings for network + filesystem effects (`"net"`/`"fs"` are placeholders) |
 
 ## Build & run
 
@@ -56,19 +58,19 @@ native init _scratch --template zig-core   # reference scaffold
 cd apps/kh-capture-native
 native dev            # hot-reloading dev window
 native build          # release binary → zig-out/bin/kh-capture
-native dev --core     # run the core under node with no window (logic only)
-native check          # typecheck + validate .native / app.zon without building
+native dev --core     # run the core under node, no window (logic only)
+native check          # typecheck + validate .native / app.zon
 ```
 
-Prerequisite: the `cli` binary must be on `PATH` and logged in once
-(`cargo build --release` in `apps/cli`, install to `~/.local/bin`, run `cli`,
-press `l` to log in and `s` to select your `.kh/` repo). See
-[`../cli/scripts/README.md`](../cli/scripts/README.md).
+Prerequisite: log in once with the CLI so `auth.json` exists —
+`cargo build --release` in `apps/cli`, run `cli`, press `l` (log in) and `s`
+(select your `.kh/` repo). The native app reads that file; it needs no separate
+setup.
 
 ## Hyprland integration
 
 The app doesn't declare always-on-top; Hyprland handles the overlay behaviour, so
-it stays portable. Bind the binary to a key and pin/float/center it:
+it stays portable. Bind the binary and pin/float/center it:
 
 ```ini
 # ~/.config/hypr/hyprland.conf
@@ -80,5 +82,22 @@ windowrulev2 = pin,    class:^(kh-capture)$
 windowrulev2 = size 560 160, class:^(kh-capture)$
 ```
 
-Run this on `Super+Shift+K` next to the script overlay on `Super+K`, and compare
-the two side by side — that's the whole point of shipping it in parallel.
+Run this on `Super+Shift+K` next to the script overlay on `Super+K` and compare.
+
+## Automation server — the reason to pick native-sdk
+
+native-sdk can expose the running window to an external agent (read the a11y
+tree, dispatch input, assert on widget state) — the feature that would justify
+this over Tauri for an AI-native setup. It's a **build flag**, not app code:
+
+```sh
+native build -Dautomation=true
+# then drive it via the file-based protocol dir / the CLI:
+native automate snapshot
+native automate assert 'role=button name="Save"'
+native automate widget-click canvas 1
+```
+
+A Claude Code skill could, for example, open this window, type a note, and submit
+it — capture as an agent action. That integration is left as the next experiment
+once the app compiles.

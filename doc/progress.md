@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-07-18 — Native-sdk capture app: self-contained (drop the `cli` dependency)
+
+Next step for the native-sdk experiment: make it stand alone instead of shelling
+out to `cli capture`.
+
+- **Direct GitHub API** (`src/main.zig` rewritten): `initEffects` reads the CLI's
+  `~/.config/cli/auth.json` via `fx.readFile` (path resolved from `$HOME` /
+  `$XDG_CONFIG_HOME`, token + `active_repo` extracted with a small allocator-free
+  JSON scanner); submit builds the OKF markdown + base64 JSON body and PUTs it to
+  the contents API via `fx.fetch`. Capture builders (slug, `std.time.epoch` date,
+  base64) are plain Zig std.
+- **Offline interop**: on a failed push the note is written as markdown into the
+  **CLI's own spool dir** (`fx.writeFile`), so `cli capture`'s existing flush
+  picks it up next run — the two capture paths rescue each other; nothing is lost.
+- **app.zon**: dropped `command` (no more spawn); added placeholder `net`/`fs`
+  permissions (VERIFY — the docs don't publish exact strings for network/file
+  effects).
+- **README**: rewritten for the self-contained architecture; documents enabling
+  the **automation server** (`native build -Dautomation=true` + `native automate`)
+  as the differentiator, and refreshed the `VERIFY(api)` reconciliation table.
+- Still doc-derived / not compiled here; the previous `fx.spawn` thin-shell
+  variant remains in git history.
+
 ## 2026-07-18 — Experiment: native-sdk capture app (`apps/kh-capture-native`)
 
 Stage 2, running in parallel with the shipped `cli capture` + wofi overlay — a

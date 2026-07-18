@@ -19,9 +19,11 @@
         },
     },
 
-    // "command" is required to spawn the `cli` subprocess; "window" for
-    // closeWindow. VERIFY(api): confirm the exact permission strings against a
-    // freshly scaffolded app (`native init --template zig-core`).
-    .permissions = .{ "view", "command", "window" },
+    // This build performs HTTP (fetch) and file I/O (readFile/writeFile), and
+    // closes its own window. VERIFY(api): the docs don't publish the exact
+    // permission strings for network/filesystem effects — reconcile against a
+    // freshly scaffolded app (`native init --template zig-core`). "net"/"fs" are
+    // placeholders; the effects may need no manifest permission at all.
+    .permissions = .{ "view", "window", "net", "fs" },
     .capabilities = .{ "shortcuts" },
 }
