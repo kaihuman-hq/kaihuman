@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-07-18 — `kb-agent-capture` skill: agent-driven capture via the automation server
+
+First repo-level Claude Code skill (`.claude/skills/`), and the payoff of the
+native-sdk automation server.
+
+- **`.claude/skills/kb-agent-capture/SKILL.md`**: teaches a Claude Code session to
+  capture a note by *driving the `kh-capture` window* through native-sdk's
+  automation server (`native automate wait/assert/snapshot/widget-click`) — open,
+  type, submit, assert `captured ✓`. Framed as both an agent action and the app's
+  end-to-end acceptance test (how an agent operates *and* verifies the GUI).
+- **`apps/kh-capture-native/scripts/agent-capture.sh`**: the driver. Degrades
+  gracefully — if `native`, the built binary, or any automate step is missing, it
+  falls back to `cli capture`, so capture never fails. `timeout`-guards each
+  automate call.
+- Experimental: depends on the app compiling with `native build -Dautomation=true`.
+  The input-dispatch subcommand and assertion regex syntax are flagged `VERIFY(api)`
+  (confirm via `native automate --help`).
+
 ## 2026-07-18 — Native-sdk capture app: self-contained (drop the `cli` dependency)
 
 Next step for the native-sdk experiment: make it stand alone instead of shelling

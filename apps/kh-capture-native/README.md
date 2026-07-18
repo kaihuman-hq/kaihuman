@@ -98,6 +98,10 @@ native automate assert 'role=button name="Save"'
 native automate widget-click canvas 1
 ```
 
-A Claude Code skill could, for example, open this window, type a note, and submit
-it — capture as an agent action. That integration is left as the next experiment
-once the app compiles.
+A Claude Code skill does exactly this: **`kb-agent-capture`**
+([`.claude/skills/kb-agent-capture/SKILL.md`](../../.claude/skills/kb-agent-capture/SKILL.md))
+drives this window through the automation server — opens it, types a note,
+clicks Save, and asserts `captured ✓` — so a Claude session can capture as an
+agent action, and the same sequence serves as the app's end-to-end acceptance
+test. Its driver is [`scripts/agent-capture.sh`](scripts/agent-capture.sh),
+which falls back to `cli capture` when automation isn't available.
