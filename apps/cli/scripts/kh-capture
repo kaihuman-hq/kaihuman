@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+#
+# kh-capture — quick-capture overlay for the knowledge base (wlroots / Hyprland).
+#
+# Pops a single-line prompt, then pipes what you type into `cli capture`, which
+# spools it locally and pushes it to `.kh/raw/` on GitHub. Bind it to a key in
+# hyprland.conf (see hyprland-kh-capture.conf):
+#
+#     bind = SUPER, K, exec, ~/.local/bin/kh-capture
+#
+# Prompt backend preference: wofi → fuzzel → zenity (first one found wins).
+# For multi-line capture, use the floating-terminal variant instead — see
+# hyprland-kh-capture.conf.
+#
+set -euo pipefail
+
+# Path to the compiled CLI. Override with KH_CLI=/path/to/cli if it isn't on PATH.
+CLI="${KH_CLI:-cli}"
+
+notify() { command -v notify-send >/dev/null 2>&1 && notify-send "$@" || true; }
+
+read_line() {
+  if command -v wofi >/dev/null 2>&1; then
+    # In --dmenu mode wofi returns the typed text even when it matches no entry.
+    printf '' | wofi --dmenu --prompt "learned:"
+  elif command -v fuzzel >/dev/null 2>&1; then
+    printf '' | fuzzel --dmenu --prompt "learned: "
+  elif command -v zenity >/dev/null 2>&1; then
+    zenity --entry --title "kh-capture" --text "learned:"
+  else
+    return 2
+  fi
+}
+
+# A non-zero exit from the picker means the user pressed Esc (cancel) — or, with
+# status 2, that no picker is installed.
+if ! text=$(read_line); then
+  [ "$?" = "2" ] && notify "kh-capture" "Install wofi, fuzzel, or zenity for the overlay."
+  exit 0
+fi
+
+# Ignore empty / whitespace-only input.
+[ -n "${text//[[:space:]]/}" ] || exit 0
+
+if printf '%s\n' "$text" | "$CLI" capture; then
+  notify "Captured to knowledge base" "$text"
+else
+  notify "kh-capture failed" "Check: is \`$CLI\` on PATH and logged in?"
+fi

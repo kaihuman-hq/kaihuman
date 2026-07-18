@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-07-18 — Desktop quick-capture: `cli capture` + Hyprland overlay (offline-safe)
+
+Stage 1 of OS-level capture on Linux/Hyprland — reuses the CLI's auth + push
+instead of a new app (on Wayland the compositor owns the hotkey, so a native
+framework wouldn't have helped the hard part anyway).
+
+- **`cli capture` subcommand** (`apps/cli/src/capture.rs`, wired in `main.rs`):
+  resolves text from args → piped stdin → `$EDITOR`. **Spools every capture to a
+  local file _before_ pushing**, so an offline/failed push never loses a thought;
+  the next capture flushes the whole spool to `.kh/raw/`, oldest first, with
+  retry + backoff.
+- **github.rs refactor**: extracted `build_kb_note(text) -> (filename, content)`
+  (freezes capture-time timestamp/date so offline captures keep their real time)
+  and a generic `put_file`; `create_kb_note` now composes them (TUI `k` behaviour
+  unchanged).
+- **Overlay** (`apps/cli/scripts/`): `kh-capture` (wofi → fuzzel → zenity, returns
+  typed text and pipes to `cli capture`), `hyprland-kh-capture.conf` (`Super+K`
+  bind + optional floating-terminal multi-line variant with window rules), and a
+  `README.md` setup guide.
+- Docs: README (subcommands, desktop-capture section, spool dir), documentation.md
+  (`cli capture` usage), Cheatsheet Quick-Capture tab.
+
 ## 2026-07-18 — Knowledge base: capture-everywhere + journal-as-derived-artifact + cheatsheet
 
 Reworked the knowledge base around low-friction capture and an auditable,

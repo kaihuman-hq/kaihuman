@@ -14,7 +14,25 @@ cargo build --release
 cli          # Launch TUI
 cli server   # Start local AI proxy server (default port 4000)
 cli server --port 3000
+
+cli capture "TIL ..."        # Capture a knowledge note to .kh/raw/
+echo "note" | cli capture    # …or read from stdin (used by the desktop overlay)
+cli capture                  # …or open $EDITOR for a multi-line note
 ```
+
+## `cli capture` — knowledge quick-capture
+
+Writes a free-text note to `.kh/raw/` in the active repo as an OKF-aligned
+markdown file (`type: note`; title and slug derived from the first line), later
+folded into the journal + wiki by `/kb-ingest`.
+
+It is **offline-safe**: every capture is written to a local spool (in the CLI
+config dir) *before* the network push. If a push fails, the note stays on disk
+and the next capture flushes the whole backlog to GitHub, oldest first.
+
+Text is resolved from CLI args, else piped stdin, else `$EDITOR`. This is the
+engine behind the Hyprland `Super+K` overlay — see
+[`apps/cli/scripts/README.md`](../apps/cli/scripts/README.md).
 
 ## TUI Key Bindings
 

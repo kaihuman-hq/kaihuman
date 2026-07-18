@@ -147,6 +147,14 @@ const CaptureTab = () => (
     <Section title="Ways to capture">
       <CmdRow cmd="CLI · k" label="New knowledge note from the terminal TUI → .kh/raw/" />
       <CmdRow
+        cmd="Hyprland · Super+K"
+        label="Desktop overlay (wofi/fuzzel) → cli capture → .kh/raw/. Offline-safe; see apps/cli/scripts."
+      />
+      <CmdRow
+        cmd="cli capture"
+        label="Headless capture: args, piped stdin, or $EDITOR. Spools locally, then pushes with retry."
+      />
+      <CmdRow
         cmd="/quick-knowledge"
         label="One-tap mobile/desktop capture page. Add it to your home screen from Shortcuts."
       />

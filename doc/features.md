@@ -29,6 +29,8 @@
 | GitHub OAuth login | `l` | Initial |
 | Quick note to active repo | `n` | Initial |
 | Knowledge note to `.kh/raw/` | `k` | 2026-07-18 |
+| Headless knowledge capture (offline-safe spool) | `cli capture` | 2026-07-18 |
+| Desktop quick-capture overlay (Hyprland `Super+K`) | `scripts/kh-capture` | 2026-07-18 |
 | Select active repository | `s` | Initial |
 | Local AI server proxy | `cargo run -- server` | Initial |
 | AI prompt (Claude / Copilot / Gemini) | `a` | 2026-03-19 |

@@ -10,6 +10,7 @@ use std::{error::Error, io};
 
 mod app;
 mod auth;
+mod capture;
 mod db;
 mod files;
 mod git;
@@ -34,6 +35,11 @@ enum Commands {
         #[arg(short, long, default_value_t = 4000)]
         port: u16,
     },
+    /// Capture a knowledge note to .kh/raw/ (offline-safe; flushes a local spool)
+    Capture {
+        /// Note text. If omitted, reads piped stdin, or opens $EDITOR when interactive.
+        text: Vec<String>,
+    },
 }
 
 #[tokio::main]
@@ -45,6 +51,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("Starting LifeOS local AI server...");
             if let Err(e) = server::start_server(port).await {
                 eprintln!("Server error: {}", e);
+            }
+            Ok(())
+        }
+        Some(Commands::Capture { text }) => {
+            let inline = if text.is_empty() { None } else { Some(text.join(" ")) };
+            if let Err(e) = capture::run(inline).await {
+                eprintln!("capture error: {}", e);
+                std::process::exit(1);
             }
             Ok(())
         }
