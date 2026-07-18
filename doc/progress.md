@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-07-18 — Experiment: native-sdk capture app (`apps/kh-capture-native`)
+
+Stage 2, running in parallel with the shipped `cli capture` + wofi overlay — a
+place to evaluate [native-sdk](https://native-sdk.dev) (Zig core).
+
+- **Thin GUI over the tested CLI**: a native-sdk window (`src/app.native` markup +
+  `src/main.zig` Zig core) that, on submit, spawns `cli capture <text>` via the
+  `spawn` effect. The Rust CLI keeps ownership of auth + offline spool + retry, so
+  the app inherits offline-safety and duplicates no push logic. Manifest in
+  `app.zon`; always-on-top/float/center delegated to Hyprland window rules.
+- **Honest status**: doc-derived, **not compiled** against a live toolchain (no
+  Zig/native CLI in the environment). Uncertain symbol names are flagged inline
+  with `VERIFY(api)` and tabulated in the app README with a one-command way to
+  reconcile against `native init --template zig-core`.
+- No workspace impact: Zig-core app has no `package.json`, so pnpm/turbo ignore
+  it. Documented upgrade path: drop the CLI dependency by calling the GitHub API
+  via `fx.fetch` + reading `auth.json` via `fx.readFile`; the automation server is
+  the reason to prefer native-sdk over Tauri if it graduates.
+
 ## 2026-07-18 — Desktop quick-capture: `cli capture` + Hyprland overlay (offline-safe)
 
 Stage 1 of OS-level capture on Linux/Hyprland — reuses the CLI's auth + push

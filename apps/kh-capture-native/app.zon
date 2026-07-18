@@ -1,0 +1,27 @@
+.{
+    // App identity
+    .id = "com.lifosy.kh-capture",
+    .name = "kh-capture",
+    .display_name = "KH Capture",
+    .version = "0.1.0",
+
+    // A single small capture window. always-on-top / float / center are handled
+    // by Hyprland window rules (see README) rather than declared here, so this
+    // stays portable across compositors.
+    .windows = .{
+        .{
+            .label = "main",
+            .title = "KH Capture",
+            .width = 560,
+            .height = 160,
+            .resizable = true,
+            .restore_state = false,
+        },
+    },
+
+    // "command" is required to spawn the `cli` subprocess; "window" for
+    // closeWindow. VERIFY(api): confirm the exact permission strings against a
+    // freshly scaffolded app (`native init --template zig-core`).
+    .permissions = .{ "view", "command", "window" },
+    .capabilities = .{ "shortcuts" },
+}
