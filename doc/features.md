@@ -32,7 +32,7 @@
 | Headless knowledge capture (offline-safe spool) | `cli capture` | 2026-07-18 |
 | Desktop quick-capture overlay (Hyprland `Super+K`) | `scripts/kh-capture` | 2026-07-18 |
 | Native-sdk capture app (experimental, Zig core, direct GitHub API + auth.json reuse) | `apps/kh-capture-native` | 2026-07-18 |
-| Agent-driven capture skill (drives native app via automation server; app acceptance test) | `.claude/skills/kb-agent-capture` | 2026-07-18 |
+| Agent-driven capture command (drives native app via automation server; auto-scaffolded to KB repo) | `/kb-agent-capture` | 2026-07-18 |
 | Select active repository | `s` | Initial |
 | Local AI server proxy | `cargo run -- server` | Initial |
 | AI prompt (Claude / Copilot / Gemini) | `a` | 2026-03-19 |

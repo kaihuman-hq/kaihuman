@@ -232,6 +232,10 @@ const CommandsTab = () => (
         cmd="/kb-session"
         label="Summarize the current Claude Code session and save it to the KB inbox."
       />
+      <CmdRow
+        cmd="/kb-agent-capture"
+        label="Capture by driving the native kh-capture app via its automation server (experimental). Doubles as the app's acceptance test; falls back to cli capture."
+      />
     </Section>
   </div>
 );

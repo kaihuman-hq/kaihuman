@@ -1,4 +1,4 @@
-export const KB_SKILL_VERSION = '2.0.0';
+export const KB_SKILL_VERSION = '2.1.0';
 
 export const KB_INGEST_SKILL = `# /kb-ingest
 
@@ -271,6 +271,60 @@ gh api "repos/$REPO/contents/.kh/raw/$TIMESTAMP-$SLUG.md" \\
 Confirm with the path that was written.
 `;
 
+export const KB_AGENT_CAPTURE_SKILL = `# /kb-agent-capture
+
+Capture a note into \`.kh/raw/\` by **driving the \`kh-capture\` native window**
+(native-sdk automation server) as an agent action — open it, type the note,
+submit, and assert success. The same flow serves as the native app's end-to-end
+acceptance test: it is how an agent both operates and verifies the GUI.
+
+> For plain, reliable capture that doesn't need the GUI, prefer
+> \`cli capture "<text>"\` — simpler and offline-safe. Use this when the point is
+> to exercise or verify the native app through automation.
+
+## Status
+
+Experimental. Requires the \`kh-capture\` native app (native-sdk) to be built with
+automation enabled. Steps marked VERIFY need confirming against
+\`native automate --help\` — the exact input-dispatch subcommand isn't pinned in
+the public docs. If any step is uncertain or fails, fall back to \`cli capture\`.
+
+## Prerequisites
+
+1. \`cli\` logged in once — the app reuses \`~/.config/cli/auth.json\`
+   (run \`cli\`, press \`l\` then \`s\`).
+2. Build with automation: \`native build -Dautomation=true\` → \`zig-out/bin/kh-capture\`.
+
+## Steps
+
+All \`native automate\` commands run from the native app's directory.
+
+1. Launch \`zig-out/bin/kh-capture &\` if no window is up.
+2. \`native automate wait\` — block until the window is ready.
+3. \`native automate snapshot\` — confirm the text input and Save button:
+   \`native automate assert 'role=button name="Save"'\`.
+4. Type the note into the autofocused input.
+   **VERIFY**: confirm the subcommand via \`native automate --help\`
+   (assumed \`native automate type "<text>"\`).
+5. Submit: \`native automate widget-click canvas <n>\` on the Save button (index
+   from the snapshot), or dispatch Enter.
+6. Verify: on a good push the app sets status \`captured ✓\` and auto-closes.
+   \`native automate assert 'name~="captured"'\`, or re-snapshot and confirm the
+   window closed.
+7. (Optional) Confirm \`.kh/raw/<ts>-<slug>.md\` landed on GitHub.
+
+## Fallback — always works
+
+\`\`\`bash
+cli capture "the note text"
+\`\`\`
+
+Offline-safe: spools locally and pushes with retry. If the automation drive
+fails for any reason, use this and report that automation was unavailable. The
+native app also spools into the CLI's spool dir on failure, so a note captured
+by either path is never lost.
+`;
+
 export const KB_CLAUDE_MD = `# Knowledge Base
 
 This repo is a personal AI knowledge base managed with Claude Code.
@@ -291,6 +345,7 @@ This repo is a personal AI knowledge base managed with Claude Code.
   kb-index.md   # /kb-index  — build search index from wiki pages
   kb-lint.md    # /kb-lint   — audit and repair wiki
   kb-ask.md     # /kb-ask    — answer questions from wiki
+  kb-agent-capture.md  # /kb-agent-capture — capture via the native app's automation server
 \`\`\`
 
 ## Capture → knowledge flow
@@ -448,6 +503,7 @@ export function getScaffoldFiles(): Record<string, string> {
     '.claude/commands/kb-lint.md': KB_LINT_SKILL,
     '.claude/commands/kb-ask.md': KB_ASK_SKILL,
     '.claude/commands/kb-session.md': KB_SESSION_SKILL,
+    '.claude/commands/kb-agent-capture.md': KB_AGENT_CAPTURE_SKILL,
     'CLAUDE.md': KB_CLAUDE_MD,
   };
 }
@@ -460,6 +516,7 @@ export function getSkillOnlyFiles(): Record<string, string> {
     '.claude/commands/kb-lint.md': KB_LINT_SKILL,
     '.claude/commands/kb-ask.md': KB_ASK_SKILL,
     '.claude/commands/kb-session.md': KB_SESSION_SKILL,
+    '.claude/commands/kb-agent-capture.md': KB_AGENT_CAPTURE_SKILL,
     'CLAUDE.md': KB_CLAUDE_MD,
   };
 }

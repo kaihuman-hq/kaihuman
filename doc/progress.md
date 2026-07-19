@@ -1,22 +1,27 @@
 # Progress
 
-## 2026-07-18 — `kb-agent-capture` skill: agent-driven capture via the automation server
+## 2026-07-18 — `/kb-agent-capture`: agent-driven capture, auto-scaffolded into the KB repo
 
-First repo-level Claude Code skill (`.claude/skills/`), and the payoff of the
-native-sdk automation server.
+The payoff of the native-sdk automation server, delivered through the **same
+scaffold mechanism as the other `/kb-*` commands** so it lives in the user's KB
+repo (not this one) and auto-updates on version bump.
 
-- **`.claude/skills/kb-agent-capture/SKILL.md`**: teaches a Claude Code session to
-  capture a note by *driving the `kh-capture` window* through native-sdk's
-  automation server (`native automate wait/assert/snapshot/widget-click`) — open,
-  type, submit, assert `captured ✓`. Framed as both an agent action and the app's
-  end-to-end acceptance test (how an agent operates *and* verifies the GUI).
-- **`apps/kh-capture-native/scripts/agent-capture.sh`**: the driver. Degrades
-  gracefully — if `native`, the built binary, or any automate step is missing, it
-  falls back to `cli capture`, so capture never fails. `timeout`-guards each
-  automate call.
-- Experimental: depends on the app compiling with `native build -Dautomation=true`.
-  The input-dispatch subcommand and assertion regex syntax are flagged `VERIFY(api)`
-  (confirm via `native automate --help`).
+- **kb-skills.ts → v2.1.0**: new `KB_AGENT_CAPTURE_SKILL` added to both
+  `getScaffoldFiles` and `getSkillOnlyFiles` as
+  `.claude/commands/kb-agent-capture.md`, so `updateSkillsIfNeeded` writes it into
+  every initialised KB repo. Teaches a Claude session to capture by *driving the
+  `kh-capture` window* via the automation server (`native automate
+  wait/assert/snapshot/widget-click`) — open, type, submit, assert `captured ✓` —
+  framed as both an agent action and the app's end-to-end acceptance test.
+  Self-contained; falls back to `cli capture`. Tests + KBCommandsModal +
+  Cheatsheet Slash-Commands tab updated to match.
+- **`apps/kh-capture-native/scripts/agent-capture.sh`**: the local reference
+  driver / acceptance-test harness for the app, degrading gracefully to
+  `cli capture` on any missing/failed automate step (each call `timeout`-guarded).
+- Removed the earlier hand-placed `.claude/skills/kb-agent-capture/SKILL.md`
+  (single source of truth is now the scaffold).
+- Experimental: depends on the app compiling with `native build -Dautomation=true`;
+  input-dispatch subcommand + assertion regex flagged `VERIFY(api)`.
 
 ## 2026-07-18 — Native-sdk capture app: self-contained (drop the `cli` dependency)
 

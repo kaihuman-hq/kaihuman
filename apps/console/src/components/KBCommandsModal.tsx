@@ -36,6 +36,12 @@ const COMMANDS = [
     detail:
       'Supports multiple repos: resolves target from ~/.claude/kb.json by matching current project name, falling back to a default. Use "/kb-session set-default owner/repo" to set the default, or "/kb-session set owner/repo" to map the current project to a specific repo. Install with the "Install /kb-session" button on the Knowledge Base page.',
   },
+  {
+    name: '/kb-agent-capture',
+    description: 'Capture a note by driving the native kh-capture app via its automation server.',
+    detail:
+      'Experimental. Opens the kh-capture native window, types the note, submits, and asserts success — capture as an agent action, doubling as the app’s end-to-end acceptance test. Requires the app built with `native build -Dautomation=true`. Falls back to `cli capture` when automation is unavailable.',
+  },
 ];
 
 export function KBCommandsModal({ isOpen, onClose }: KBCommandsModalProps) {

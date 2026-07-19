@@ -98,10 +98,15 @@ native automate assert 'role=button name="Save"'
 native automate widget-click canvas 1
 ```
 
-A Claude Code skill does exactly this: **`kb-agent-capture`**
-([`.claude/skills/kb-agent-capture/SKILL.md`](../../.claude/skills/kb-agent-capture/SKILL.md))
-drives this window through the automation server — opens it, types a note,
-clicks Save, and asserts `captured ✓` — so a Claude session can capture as an
-agent action, and the same sequence serves as the app's end-to-end acceptance
-test. Its driver is [`scripts/agent-capture.sh`](scripts/agent-capture.sh),
-which falls back to `cli capture` when automation isn't available.
+A Claude Code skill does exactly this: **`/kb-agent-capture`** drives this window
+through the automation server — opens it, types a note, clicks Save, and asserts
+`captured ✓` — so a Claude session can capture as an agent action, and the same
+sequence serves as the app's end-to-end acceptance test.
+
+That skill is **auto-scaffolded into your knowledge-base repo** (not this one),
+alongside `/kb-ingest`, `/kb-ask`, etc. — it's defined in
+`apps/console/src/lib/kb-skills.ts` and written to `.kh`-enabled repos as
+`.claude/commands/kb-agent-capture.md` (and auto-updated on version bump). This
+repo keeps [`scripts/agent-capture.sh`](scripts/agent-capture.sh) as the local
+reference driver / acceptance-test harness, which falls back to `cli capture`
+when automation isn't available.
