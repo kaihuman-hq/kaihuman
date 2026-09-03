@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { ActionLogForm } from './components/ActionLogForm';
+import { PinnedTabsPanel } from './components/PinnedTabsPanel';
 import './index.css';
 
 export function App() {
@@ -222,6 +223,8 @@ export function App() {
             </button>
           </div>
         </section>
+
+        <PinnedTabsPanel repo={activeRepo || 'lifosy/monorepo'} />
 
         {/* Dump Note Section */}
         <section class="space-y-2 flex flex-col flex-1">

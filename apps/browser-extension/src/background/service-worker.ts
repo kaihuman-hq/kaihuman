@@ -1,4 +1,12 @@
 import { type Message } from '../types';
+import {
+  PINNED_TABS_PATH,
+  type PinnedTabsConfig,
+  parsePinnedTabs,
+  serializePinnedTabs,
+  tabsToOpen,
+  toPinnedTabs,
+} from './pinned-tabs';
 
 console.log('LifeOS Extension: Background script loaded');
 
@@ -78,6 +86,81 @@ async function githubUpsertFile(token: string, repoUrl: string, filePath: string
     console.error('githubAppendToFile Error:', error);
     throw error;
   }
+}
+
+// GitHub stores file content as base64; `atob`/`btoa` only speak latin-1, so round-trip
+// through UTF-8 bytes to keep non-ASCII tab titles intact.
+function decodeBase64(value: string): string {
+  const binary = atob(value.replace(/\s/g, ''));
+  return new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)));
+}
+
+function encodeBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+// Unlike githubUpsertFile this replaces the file wholesale, which is what a
+// snapshot-style JSON document needs.
+async function githubReadFile(
+  token: string,
+  repoUrl: string,
+  filePath: string,
+): Promise<{ content: string; sha: string } | null> {
+  const res = await fetch(`https://api.github.com/repos/${repoUrl}/contents/${filePath}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Failed to read ${filePath}: ${res.statusText}`);
+  const data = await res.json();
+  return { content: decodeBase64(data.content || ''), sha: data.sha };
+}
+
+async function githubWriteFile(
+  token: string,
+  repoUrl: string,
+  filePath: string,
+  content: string,
+  sha?: string,
+) {
+  const res = await fetch(`https://api.github.com/repos/${repoUrl}/contents/${filePath}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
+    body: JSON.stringify({
+      message: `Update ${filePath} via Extension`,
+      content: encodeBase64(content),
+      sha,
+    }),
+  });
+  if (!res.ok) throw new Error(`Failed to write ${filePath}: ${res.statusText}`);
+}
+
+async function savePinnedTabs(token: string, repo: string): Promise<number> {
+  const pinned = await chrome.tabs.query({ pinned: true, currentWindow: true });
+  const config: PinnedTabsConfig = {
+    tabs: toPinnedTabs(pinned),
+    updatedAt: new Date().toISOString(),
+  };
+  const existing = await githubReadFile(token, repo, PINNED_TABS_PATH);
+  await githubWriteFile(token, repo, PINNED_TABS_PATH, serializePinnedTabs(config), existing?.sha);
+  return config.tabs.length;
+}
+
+async function loadPinnedTabs(token: string, repo: string): Promise<number> {
+  const file = await githubReadFile(token, repo, PINNED_TABS_PATH);
+  if (!file) throw new Error(`No pinned tabs saved yet — ${repo}/${PINNED_TABS_PATH} not found`);
+  const config = parsePinnedTabs(file.content);
+  const openTabs = await chrome.tabs.query({ currentWindow: true });
+  const missing = tabsToOpen(
+    config.tabs,
+    openTabs.map((tab) => tab.url || ''),
+  );
+  for (const tab of missing) {
+    await chrome.tabs.create({ url: tab.url, pinned: true, active: false });
+  }
+  return missing.length;
 }
 
 // Message Handling
@@ -172,6 +255,27 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
       } catch (error: any) {
         console.error('Failed to fetch quick notes:', error);
         sendResponse({ quickNotes: [] }); // default empty gracefully
+      }
+    });
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'SAVE_PINNED_TABS' || message.type === 'LOAD_PINNED_TABS') {
+    chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
+      const token = data.lifeos_token;
+      const repo = data.lifeos_repo || 'lifosy/monorepo';
+      if (!token) {
+        sendResponse({ error: 'No token found' });
+        return;
+      }
+      try {
+        const count =
+          message.type === 'SAVE_PINNED_TABS'
+            ? await savePinnedTabs(token, repo)
+            : await loadPinnedTabs(token, repo);
+        sendResponse({ success: true, count });
+      } catch (error: any) {
+        sendResponse({ error: error.message });
       }
     });
     return true; // Indicate async response

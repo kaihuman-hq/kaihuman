@@ -1,5 +1,29 @@
 # Progress
 
+## 2026-09-03 — Chrome pinned tabs synced through the GitHub repo
+
+- **Feature**: the browser extension popup gained a **Pinned Tabs** section with
+  *Load* and *Save current*, backed by `.kh/browser.pinnedtabs.json` in the active
+  repo (matching the existing `.kh/<name>.<type>.<ext>` data-file convention).
+  - *Save current* snapshots the pinned tabs of the current window and **replaces**
+    the file, so unpinning a tab and saving again drops it.
+  - *Load* opens every stored tab pinned in the current window, skipping URLs that
+    are already open — repeated loads are a no-op rather than a duplicate storm.
+- **Implementation**:
+  - `src/background/pinned-tabs.ts` holds the pure logic (parse/serialize, tab
+    projection, already-open de-duplication) so it is unit-testable without Chrome;
+    `pinned-tabs.test.ts` covers it (15 cases, run under the extension's vitest).
+  - `service-worker.ts` gained `LOAD_PINNED_TABS` / `SAVE_PINNED_TABS` handlers plus
+    `githubReadFile` / `githubWriteFile`. The existing `githubUpsertFile` *appends*,
+    which is wrong for a snapshot document, so the new helpers replace file contents
+    whole. They also base64 round-trip through `TextEncoder`/`TextDecoder` instead of
+    the deprecated `escape`/`unescape` pair, keeping non-ASCII tab titles intact.
+  - `manifest.ts` adds the `tabs` permission — `activeTab` only exposes the URL of the
+    tab the popup was opened from, not every pinned tab.
+- **Safety**: the repo file is remote input, so `isOpenableUrl` restricts restored tabs
+  to `http`/`https`; a `javascript:` or `file:` entry committed to the repo is dropped
+  rather than navigated to.
+
 ## 2026-07-12 — Fix persistent cmd+k search CORS failures by cutting request volume
 
 - **Root cause (confirmed)**: `SearchModal.tsx` fired two concurrent
