@@ -30,6 +30,6 @@ export default defineManifest({
       js: ['src/content/index.ts'],
     },
   ],
-  permissions: ['contextMenus', 'storage', 'activeTab', 'scripting', 'alarms'],
+  permissions: ['contextMenus', 'storage', 'activeTab', 'scripting', 'alarms', 'tabs'],
   host_permissions: ['<all_urls>'],
 })

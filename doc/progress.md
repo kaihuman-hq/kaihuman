@@ -1,5 +1,97 @@
 # Progress
 
+## 2026-09-09 — Fix "message port closed" on rename; reorder tab groups
+
+- **Bug**: renaming a group failed with *"The message port closed before a response was
+  received."*
+  - **Root cause**: not the handler. A new `service-worker.test.ts` drives the real
+    `onMessage` listener against a mocked `chrome`/`fetch` and shows it responds on every
+    path — success, a failing GitHub read, a rejected fetch, an empty name. The failure is
+    MV3 collecting the idle service worker (~30s) and the waking message losing the port in
+    the teardown race. Rename is the flow that exposes it because it is the only one with a
+    long human pause — click Rename, read, type a name — between the popup's previous
+    message and the write.
+  - **Fix**: the popup opens a `chrome.runtime.connect` port on mount and disconnects on
+    unmount, and the worker accepts it via `onConnect`. An open port keeps the worker alive
+    for the popup's lifetime, so no request can race its teardown.
+  - Also fixed: pressing Enter in the rename field bypassed the emptiness check that
+    disables the Save button, so it round-tripped to the worker just to fail validation.
+- **Reorder**: each row gained ↑/↓ buttons; order is the group order in the repo file.
+  `moveGroup` swaps with the neighbour and deliberately returns the *same config object* at
+  either end of the list, which lets the worker skip the write and avoid an empty commit.
+  The buttons are disabled at the ends, so that path is defensive only.
+- **Tests**: 51 cases (was 37) — six for `moveGroup` (both directions, `updatedAt` stamping,
+  the no-op identity return, non-mutation of the input, missing group) and seven driving the
+  service worker's message listener end to end.
+
+## 2026-09-09 — Pinned tab groups: rename and delete
+
+- **Rename** edits a group's name in place from the popup row, keeping its id, tabs and
+  `createdAt`. It reuses `putGroup`, so no new write path was needed.
+- **Delete** removes the group from `.kh/browser.pinnedtabs.json` behind an inline two-step
+  confirmation — the row turns into "Delete this group?" rather than firing on one click,
+  since the write is destructive and lands in the repo. Deleting only forgets the entry; the
+  window keeps whatever it currently has pinned.
+- Deleting the group a window was running needs no extra cleanup: the session-stored active
+  group is already validated against the group list before use, so it falls straight through
+  to `matchGroup` on the next read.
+- **New pure helpers**: `removeGroup` (throws, naming the group, when it is already gone) and
+  `normalizeGroupName`, which now backs both "save as new" and rename so the two cannot drift
+  on whitespace or empty-name handling. Tests grew from 34 to 37 cases.
+
+## 2026-09-09 — Pinned tabs: multiple named groups per repo
+
+- **Feature**: `.kh/browser.pinnedtabs.json` now holds *many* named groups instead of one
+  flat list. The popup renders each group with its name, tab count and creation date, and
+  marks the one the current window is running.
+  - **Load** makes the window's pinned set *equal* the group — it opens what is missing and
+    **unpins** (never closes) pinned tabs the group does not contain. Without this, switching
+    from one group to another left the union pinned, which broke detection and made the next
+    save write both groups' tabs into one.
+  - **Update** writes the window's pinned tabs back into the loaded group, keeping its id,
+    name and `createdAt`.
+  - **Save current** stores the window's pinned tabs as a new, named group.
+- **Detecting the loaded group** uses two tiers, because neither alone is sufficient:
+  - `chrome.storage.session` remembers which group each window loaded. Chrome clears session
+    storage on restart — the same lifetime as the window ids it is keyed by — so a remembered
+    entry can never survive into a *reused* window id and point at the wrong group.
+  - When there is no memory (after a restart, or a window loaded into by hand), `matchGroup`
+    scores each group by the share of its tabs currently pinned and claims the best above 50%.
+    This still identifies the group after the user has edited a pinned tab, which is exactly
+    when the "update the correct group" requirement bites.
+- **Migration**: `parsePinnedTabs` still accepts the previous `{ tabs: [...] }` shape and folds
+  it into a single group (`id: "default"`, name "Pinned tabs"), so files written by the first
+  release keep working untouched.
+- **Schema**: groups carry `id` (a `crypto.randomUUID()`), `name`, `createdAt` and `tabs`; the
+  file keeps a top-level `updatedAt`. Malformed groups throw an error naming the offending
+  entry rather than being silently dropped.
+- **Tests**: `pinned-tabs.test.ts` grew from 15 to 30 cases, covering v1 migration, group
+  put/find, unpin selection, and the match scoring (including tie-breaking and empty groups).
+
+## 2026-09-03 — Chrome pinned tabs synced through the GitHub repo
+
+- **Feature**: the browser extension popup gained a **Pinned Tabs** section with
+  *Load* and *Save current*, backed by `.kh/browser.pinnedtabs.json` in the active
+  repo (matching the existing `.kh/<name>.<type>.<ext>` data-file convention).
+  - *Save current* snapshots the pinned tabs of the current window and **replaces**
+    the file, so unpinning a tab and saving again drops it.
+  - *Load* opens every stored tab pinned in the current window, skipping URLs that
+    are already open — repeated loads are a no-op rather than a duplicate storm.
+- **Implementation**:
+  - `src/background/pinned-tabs.ts` holds the pure logic (parse/serialize, tab
+    projection, already-open de-duplication) so it is unit-testable without Chrome;
+    `pinned-tabs.test.ts` covers it (15 cases, run under the extension's vitest).
+  - `service-worker.ts` gained `LOAD_PINNED_TABS` / `SAVE_PINNED_TABS` handlers plus
+    `githubReadFile` / `githubWriteFile`. The existing `githubUpsertFile` *appends*,
+    which is wrong for a snapshot document, so the new helpers replace file contents
+    whole. They also base64 round-trip through `TextEncoder`/`TextDecoder` instead of
+    the deprecated `escape`/`unescape` pair, keeping non-ASCII tab titles intact.
+  - `manifest.ts` adds the `tabs` permission — `activeTab` only exposes the URL of the
+    tab the popup was opened from, not every pinned tab.
+- **Safety**: the repo file is remote input, so `isOpenableUrl` restricts restored tabs
+  to `http`/`https`; a `javascript:` or `file:` entry committed to the repo is dropped
+  rather than navigated to.
+
 ## 2026-07-12 — Fix persistent cmd+k search CORS failures by cutting request volume
 
 - **Root cause (confirmed)**: `SearchModal.tsx` fired two concurrent
