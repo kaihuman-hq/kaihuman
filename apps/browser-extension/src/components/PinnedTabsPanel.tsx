@@ -46,9 +46,14 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
     setActiveId(response.activeId);
   };
 
-  // The popup is short-lived, so the group list is fetched once when it opens.
+  // The popup is short-lived, so the group list is fetched once when it opens. The port is
+  // held for as long as the popup lives: MV3 collects an idle service worker after ~30s, and
+  // without this a request sent after a pause (typing a new group name) races its teardown and
+  // fails with "The message port closed before a response was received".
   useEffect(() => {
+    const port = chrome.runtime.connect({ name: 'pinned-tabs-popup' });
     refresh().catch((e: Error) => setError(e.message));
+    return () => port.disconnect();
   }, []);
 
   const run = async (label: string, action: () => Promise<string>) => {
@@ -100,6 +105,12 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
       return `Deleted ${name}`;
     });
 
+  const move = (group: GroupSummary, offset: -1 | 1) =>
+    run(`move:${group.id}`, async () => {
+      await send({ type: 'MOVE_PINNED_TAB_GROUP', groupId: group.id, offset });
+      return `Moved ${group.name} ${offset < 0 ? 'up' : 'down'}`;
+    });
+
   const startRename = (group: GroupSummary) => {
     setDraftName(group.name);
     setEditing({ id: group.id, mode: 'rename' });
@@ -130,7 +141,7 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
             No tab groups yet — pin some tabs and save them below.
           </p>
         )}
-        {groups.map((group) => {
+        {groups.map((group, index) => {
           const active = group.id === activeId;
           const edit = editing?.id === group.id ? editing.mode : null;
           return (
@@ -145,7 +156,7 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
                     value={draftName}
                     onInput={(e) => setDraftName((e.target as HTMLInputElement).value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') rename(group);
+                      if (e.key === 'Enter' && draftName.trim()) rename(group);
                       if (e.key === 'Escape') setEditing(null);
                     }}
                     disabled={!!busy}
@@ -224,7 +235,25 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
                         <span class="text-[10px] text-[var(--los-fg-dim)] truncate">
                           {plural(group.tabCount)} · {formatCreatedAt(group.createdAt)}
                         </span>
-                        <div class="flex gap-2 shrink-0">
+                        <div class="flex gap-2 shrink-0 items-center">
+                          <button
+                            type="button"
+                            onClick={() => move(group, -1)}
+                            disabled={!!busy || index === 0}
+                            title="Move group up"
+                            class="text-[10px] text-[var(--los-fg-dim)] hover:text-[var(--los-accent)] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => move(group, 1)}
+                            disabled={!!busy || index === groups.length - 1}
+                            title="Move group down"
+                            class="text-[10px] text-[var(--los-fg-dim)] hover:text-[var(--los-accent)] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                          >
+                            ↓
+                          </button>
                           <button
                             type="button"
                             onClick={() => startRename(group)}

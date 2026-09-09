@@ -158,6 +158,25 @@ export function removeGroup(
   return { groups, updatedAt };
 }
 
+/**
+ * Moves a group one slot towards the front (offset -1) or back (offset 1). Returns the config
+ * untouched when the group is already at that end, so callers can skip an empty write.
+ */
+export function moveGroup(
+  config: PinnedTabsConfig,
+  groupId: string,
+  offset: number,
+  updatedAt: string,
+): PinnedTabsConfig {
+  const index = config.groups.findIndex((group) => group.id === groupId);
+  if (index === -1) throw missingGroup(groupId);
+  const target = index + offset;
+  if (target < 0 || target >= config.groups.length) return config;
+  const groups = [...config.groups];
+  [groups[index], groups[target]] = [groups[target], groups[index]];
+  return { groups, updatedAt };
+}
+
 /** Group tabs that are safe to open and not pinned in the window yet. */
 export function tabsToOpen(stored: PinnedTab[], pinnedUrls: string[]): PinnedTab[] {
   const seen = new Set(pinnedUrls.map(normalizeUrl));

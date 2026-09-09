@@ -23,6 +23,7 @@ date; the group the current window is running is marked and shows **Update** ins
   id, name and creation date. This is how you add or remove a tab from a saved group.
 - **Save current** — types a name and stores the window's pinned tabs as a new group.
 - **Rename** — edits the group's name in place, keeping its tabs and creation date.
+- **↑ / ↓** — reorders the group in the list; the order is stored in the repo file.
 - **Delete** — forgets the group after an inline confirmation. It only removes the entry from
   the repo; whatever is pinned in the window stays pinned.
 

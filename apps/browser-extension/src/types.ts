@@ -6,6 +6,7 @@ export interface Message {
     | 'LOAD_PINNED_TAB_GROUP'
     | 'SAVE_PINNED_TAB_GROUP'
     | 'RENAME_PINNED_TAB_GROUP'
+    | 'MOVE_PINNED_TAB_GROUP'
     | 'DELETE_PINNED_TAB_GROUP';
   token?: string;
   path?: string;

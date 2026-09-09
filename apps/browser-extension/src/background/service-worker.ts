@@ -2,6 +2,7 @@ import { type Message } from '../types';
 import {
   findGroup,
   matchGroup,
+  moveGroup,
   normalizeGroupName,
   PINNED_TABS_PATH,
   type PinnedTabGroup,
@@ -26,6 +27,14 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'swKeepAlive') {
     // No-op: waking the worker is sufficient.
   }
+});
+
+// An open port keeps the MV3 service worker from being collected. The popup holds one for
+// as long as it is open, so a request fired after the user has spent a while typing (renaming
+// a tab group, say) still finds the worker alive instead of racing its teardown — which
+// surfaced as "The message port closed before a response was received".
+chrome.runtime.onConnect.addListener(() => {
+  // Accepting the port is the whole job — holding it open is what keeps the worker alive.
 });
 
 // Initialize Context Menu
@@ -264,6 +273,15 @@ async function renamePinnedTabGroup(token: string, repo: string, groupId: string
   return { name: group.name };
 }
 
+async function movePinnedTabGroup(token: string, repo: string, groupId: string, offset: number) {
+  const { config, sha } = await readConfig(token, repo);
+  const next = moveGroup(config, groupId, offset, new Date().toISOString());
+  // moveGroup hands back the same object at the ends of the list; skip the pointless commit.
+  if (next === config) return { moved: false };
+  await writeConfig(token, repo, next, sha);
+  return { moved: true };
+}
+
 /** Only forgets the group; the window keeps whatever it currently has pinned. */
 async function deletePinnedTabGroup(token: string, repo: string, groupId: string) {
   const { config, sha } = await readConfig(token, repo);
@@ -374,6 +392,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
     message.type === 'LOAD_PINNED_TAB_GROUP' ||
     message.type === 'SAVE_PINNED_TAB_GROUP' ||
     message.type === 'RENAME_PINNED_TAB_GROUP' ||
+    message.type === 'MOVE_PINNED_TAB_GROUP' ||
     message.type === 'DELETE_PINNED_TAB_GROUP'
   ) {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
@@ -400,6 +419,11 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
           sendResponse({
             success: true,
             ...(await renamePinnedTabGroup(token, repo, message.groupId, message.name)),
+          });
+        } else if (message.type === 'MOVE_PINNED_TAB_GROUP') {
+          sendResponse({
+            success: true,
+            ...(await movePinnedTabGroup(token, repo, message.groupId, message.offset)),
           });
         } else {
           sendResponse({

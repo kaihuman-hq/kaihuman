@@ -1,5 +1,29 @@
 # Progress
 
+## 2026-09-09 — Fix "message port closed" on rename; reorder tab groups
+
+- **Bug**: renaming a group failed with *"The message port closed before a response was
+  received."*
+  - **Root cause**: not the handler. A new `service-worker.test.ts` drives the real
+    `onMessage` listener against a mocked `chrome`/`fetch` and shows it responds on every
+    path — success, a failing GitHub read, a rejected fetch, an empty name. The failure is
+    MV3 collecting the idle service worker (~30s) and the waking message losing the port in
+    the teardown race. Rename is the flow that exposes it because it is the only one with a
+    long human pause — click Rename, read, type a name — between the popup's previous
+    message and the write.
+  - **Fix**: the popup opens a `chrome.runtime.connect` port on mount and disconnects on
+    unmount, and the worker accepts it via `onConnect`. An open port keeps the worker alive
+    for the popup's lifetime, so no request can race its teardown.
+  - Also fixed: pressing Enter in the rename field bypassed the emptiness check that
+    disables the Save button, so it round-tripped to the worker just to fail validation.
+- **Reorder**: each row gained ↑/↓ buttons; order is the group order in the repo file.
+  `moveGroup` swaps with the neighbour and deliberately returns the *same config object* at
+  either end of the list, which lets the worker skip the write and avoid an empty commit.
+  The buttons are disabled at the ends, so that path is defensive only.
+- **Tests**: 51 cases (was 37) — six for `moveGroup` (both directions, `updatedAt` stamping,
+  the no-op identity return, non-mutation of the input, missing group) and seven driving the
+  service worker's message listener end to end.
+
 ## 2026-09-09 — Pinned tab groups: rename and delete
 
 - **Rename** edits a group's name in place from the popup row, keeping its id, tabs and

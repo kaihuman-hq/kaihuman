@@ -23,7 +23,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
-| Named pinned-tab groups (save/load/update/rename/delete via `.kh/browser.pinnedtabs.json`) | popup → Pinned Tabs | 2026-09-09 |
+| Named pinned-tab groups (save/load/update/rename/reorder/delete via `.kh/browser.pinnedtabs.json`) | popup → Pinned Tabs | 2026-09-09 |
 | Pinned tabs sync (save/restore Chrome pinned tabs via `.kh/browser.pinnedtabs.json`) | popup → Pinned Tabs | 2026-09-03 |
 
 ## CLI (`apps/cli`)

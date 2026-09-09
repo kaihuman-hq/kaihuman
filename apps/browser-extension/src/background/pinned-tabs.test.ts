@@ -3,6 +3,7 @@ import {
   findGroup,
   isOpenableUrl,
   matchGroup,
+  moveGroup,
   normalizeGroupName,
   PINNED_TABS_PATH,
   type PinnedTabGroup,
@@ -192,6 +193,38 @@ describe('removeGroup', () => {
   it('throws when the group is already gone', () => {
     expect(() => removeGroup(config(group('g1', [])), 'g2', 'now')).toThrow(
       `Tab group "g2" no longer exists in ${PINNED_TABS_PATH}`,
+    );
+  });
+});
+
+describe('moveGroup', () => {
+  const before = config(group('a', []), group('b', []), group('c', []));
+
+  it('moves a group towards the front', () => {
+    expect(moveGroup(before, 'b', -1, 'now').groups.map((g) => g.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  it('moves a group towards the back', () => {
+    expect(moveGroup(before, 'b', 1, 'now').groups.map((g) => g.id)).toEqual(['a', 'c', 'b']);
+  });
+
+  it('stamps updatedAt on a real move', () => {
+    expect(moveGroup(before, 'b', 1, 'now').updatedAt).toBe('now');
+  });
+
+  it('returns the config untouched at either end, so no empty write happens', () => {
+    expect(moveGroup(before, 'a', -1, 'now')).toBe(before);
+    expect(moveGroup(before, 'c', 1, 'now')).toBe(before);
+  });
+
+  it('leaves the original config unmutated', () => {
+    moveGroup(before, 'b', 1, 'now');
+    expect(before.groups.map((g) => g.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('throws when the group is gone', () => {
+    expect(() => moveGroup(before, 'zz', 1, 'now')).toThrow(
+      `Tab group "zz" no longer exists in ${PINNED_TABS_PATH}`,
     );
   });
 });
