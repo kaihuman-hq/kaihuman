@@ -1,5 +1,34 @@
 # Progress
 
+## 2026-09-09 — Pinned tabs: multiple named groups per repo
+
+- **Feature**: `.kh/browser.pinnedtabs.json` now holds *many* named groups instead of one
+  flat list. The popup renders each group with its name, tab count and creation date, and
+  marks the one the current window is running.
+  - **Load** makes the window's pinned set *equal* the group — it opens what is missing and
+    **unpins** (never closes) pinned tabs the group does not contain. Without this, switching
+    from one group to another left the union pinned, which broke detection and made the next
+    save write both groups' tabs into one.
+  - **Update** writes the window's pinned tabs back into the loaded group, keeping its id,
+    name and `createdAt`.
+  - **Save current** stores the window's pinned tabs as a new, named group.
+- **Detecting the loaded group** uses two tiers, because neither alone is sufficient:
+  - `chrome.storage.session` remembers which group each window loaded. Chrome clears session
+    storage on restart — the same lifetime as the window ids it is keyed by — so a remembered
+    entry can never survive into a *reused* window id and point at the wrong group.
+  - When there is no memory (after a restart, or a window loaded into by hand), `matchGroup`
+    scores each group by the share of its tabs currently pinned and claims the best above 50%.
+    This still identifies the group after the user has edited a pinned tab, which is exactly
+    when the "update the correct group" requirement bites.
+- **Migration**: `parsePinnedTabs` still accepts the previous `{ tabs: [...] }` shape and folds
+  it into a single group (`id: "default"`, name "Pinned tabs"), so files written by the first
+  release keep working untouched.
+- **Schema**: groups carry `id` (a `crypto.randomUUID()`), `name`, `createdAt` and `tabs`; the
+  file keeps a top-level `updatedAt`. Malformed groups throw an error naming the offending
+  entry rather than being silently dropped.
+- **Tests**: `pinned-tabs.test.ts` grew from 15 to 30 cases, covering v1 migration, group
+  put/find, unpin selection, and the match scoring (including tie-breaking and empty groups).
+
 ## 2026-09-03 — Chrome pinned tabs synced through the GitHub repo
 
 - **Feature**: the browser extension popup gained a **Pinned Tabs** section with

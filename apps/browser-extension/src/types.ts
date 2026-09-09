@@ -1,5 +1,10 @@
 export interface Message {
-  type: 'AUTH_TOKEN_UPDATE' | 'ADD_ACTION_LOG' | 'SAVE_PINNED_TABS' | 'LOAD_PINNED_TABS';
+  type:
+    | 'AUTH_TOKEN_UPDATE'
+    | 'ADD_ACTION_LOG'
+    | 'LIST_PINNED_TAB_GROUPS'
+    | 'LOAD_PINNED_TAB_GROUP'
+    | 'SAVE_PINNED_TAB_GROUP';
   token?: string;
   path?: string;
   note?: string;

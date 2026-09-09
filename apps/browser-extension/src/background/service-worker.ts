@@ -1,10 +1,15 @@
 import { type Message } from '../types';
 import {
+  findGroup,
+  matchGroup,
   PINNED_TABS_PATH,
+  type PinnedTabGroup,
   type PinnedTabsConfig,
   parsePinnedTabs,
+  putGroup,
   serializePinnedTabs,
   tabsToOpen,
+  tabsToUnpin,
   toPinnedTabs,
 } from './pinned-tabs';
 
@@ -137,30 +142,119 @@ async function githubWriteFile(
   if (!res.ok) throw new Error(`Failed to write ${filePath}: ${res.statusText}`);
 }
 
-async function savePinnedTabs(token: string, repo: string): Promise<number> {
-  const pinned = await chrome.tabs.query({ pinned: true, currentWindow: true });
-  const config: PinnedTabsConfig = {
-    tabs: toPinnedTabs(pinned),
-    updatedAt: new Date().toISOString(),
-  };
-  const existing = await githubReadFile(token, repo, PINNED_TABS_PATH);
-  await githubWriteFile(token, repo, PINNED_TABS_PATH, serializePinnedTabs(config), existing?.sha);
-  return config.tabs.length;
+const EMPTY_CONFIG: PinnedTabsConfig = { groups: [], updatedAt: '' };
+
+// Which group each window is running. Session storage is wiped when Chrome restarts,
+// exactly like the window ids it is keyed by, so a stale entry can never point at the
+// wrong group; after a restart we fall back to matching the window's pinned tabs.
+async function readActiveGroups(): Promise<Record<string, string>> {
+  const stored = await chrome.storage.session.get('activeGroups');
+  return (stored.activeGroups as Record<string, string> | undefined) ?? {};
 }
 
-async function loadPinnedTabs(token: string, repo: string): Promise<number> {
+async function rememberActiveGroup(windowId: number, groupId: string) {
+  const activeGroups = await readActiveGroups();
+  await chrome.storage.session.set({ activeGroups: { ...activeGroups, [windowId]: groupId } });
+}
+
+async function recallActiveGroup(windowId: number): Promise<string | undefined> {
+  return (await readActiveGroups())[windowId];
+}
+
+async function readConfig(token: string, repo: string) {
   const file = await githubReadFile(token, repo, PINNED_TABS_PATH);
-  if (!file) throw new Error(`No pinned tabs saved yet — ${repo}/${PINNED_TABS_PATH} not found`);
-  const config = parsePinnedTabs(file.content);
-  const openTabs = await chrome.tabs.query({ currentWindow: true });
+  return { config: file ? parsePinnedTabs(file.content) : EMPTY_CONFIG, sha: file?.sha };
+}
+
+async function writeConfig(token: string, repo: string, config: PinnedTabsConfig, sha?: string) {
+  await githubWriteFile(token, repo, PINNED_TABS_PATH, serializePinnedTabs(config), sha);
+}
+
+/** The window the popup belongs to, plus its pinned tabs in one round-trip. */
+async function currentWindow() {
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const pinned = tabs.filter((tab) => tab.pinned);
+  return { windowId: tabs[0]?.windowId, pinned };
+}
+
+async function activeGroupId(
+  groups: PinnedTabGroup[],
+  windowId: number | undefined,
+  pinnedUrls: string[],
+): Promise<string | null> {
+  const remembered = windowId === undefined ? undefined : await recallActiveGroup(windowId);
+  if (remembered && groups.some((group) => group.id === remembered)) return remembered;
+  return matchGroup(groups, pinnedUrls);
+}
+
+async function listPinnedTabGroups(token: string, repo: string) {
+  const { config } = await readConfig(token, repo);
+  const { windowId, pinned } = await currentWindow();
+  const activeId = await activeGroupId(
+    config.groups,
+    windowId,
+    pinned.map((tab) => tab.url || ''),
+  );
+  return {
+    groups: config.groups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      createdAt: group.createdAt,
+      tabCount: group.tabs.length,
+    })),
+    activeId,
+  };
+}
+
+/** Makes the window's pinned set match the group: unpin what is not in it, open what is missing. */
+async function loadPinnedTabGroup(token: string, repo: string, groupId: string) {
+  const { config } = await readConfig(token, repo);
+  const group = findGroup(config, groupId);
+  const { windowId, pinned } = await currentWindow();
+
+  const stale = tabsToUnpin(pinned, group.tabs);
+  for (const tab of stale) {
+    if (tab.id !== undefined) await chrome.tabs.update(tab.id, { pinned: false });
+  }
   const missing = tabsToOpen(
-    config.tabs,
-    openTabs.map((tab) => tab.url || ''),
+    group.tabs,
+    pinned.filter((tab) => !stale.includes(tab)).map((tab) => tab.url || ''),
   );
   for (const tab of missing) {
     await chrome.tabs.create({ url: tab.url, pinned: true, active: false });
   }
-  return missing.length;
+
+  if (windowId !== undefined) await rememberActiveGroup(windowId, group.id);
+  return { opened: missing.length, unpinned: stale.length, name: group.name };
+}
+
+/**
+ * Writes the window's pinned tabs into `groupId`, or into a new group called `name`.
+ * Updating keeps the group's id, name and createdAt so history is not rewritten.
+ */
+async function savePinnedTabGroup(
+  token: string,
+  repo: string,
+  groupId: string | undefined,
+  name: string | undefined,
+) {
+  const { config, sha } = await readConfig(token, repo);
+  const { windowId, pinned } = await currentWindow();
+  const tabs = toPinnedTabs(pinned);
+  const now = new Date().toISOString();
+
+  let group: PinnedTabGroup;
+  if (groupId) {
+    group = { ...findGroup(config, groupId), tabs };
+  } else {
+    const trimmed = (name || '').trim();
+    if (!trimmed) throw new Error('Give the tab group a name before saving it');
+    group = { id: crypto.randomUUID(), name: trimmed, createdAt: now, tabs };
+  }
+
+  await writeConfig(token, repo, putGroup(config, group, now), sha);
+  if (windowId !== undefined) await rememberActiveGroup(windowId, group.id);
+  return { count: tabs.length, name: group.name };
 }
 
 // Message Handling
@@ -260,7 +354,11 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
     return true; // Indicate async response
   }
 
-  if (message.type === 'SAVE_PINNED_TABS' || message.type === 'LOAD_PINNED_TABS') {
+  if (
+    message.type === 'LIST_PINNED_TAB_GROUPS' ||
+    message.type === 'LOAD_PINNED_TAB_GROUP' ||
+    message.type === 'SAVE_PINNED_TAB_GROUP'
+  ) {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
       const token = data.lifeos_token;
       const repo = data.lifeos_repo || 'lifosy/monorepo';
@@ -269,11 +367,19 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
         return;
       }
       try {
-        const count =
-          message.type === 'SAVE_PINNED_TABS'
-            ? await savePinnedTabs(token, repo)
-            : await loadPinnedTabs(token, repo);
-        sendResponse({ success: true, count });
+        if (message.type === 'LIST_PINNED_TAB_GROUPS') {
+          sendResponse({ success: true, ...(await listPinnedTabGroups(token, repo)) });
+        } else if (message.type === 'LOAD_PINNED_TAB_GROUP') {
+          sendResponse({
+            success: true,
+            ...(await loadPinnedTabGroup(token, repo, message.groupId)),
+          });
+        } else {
+          sendResponse({
+            success: true,
+            ...(await savePinnedTabGroup(token, repo, message.groupId, message.name)),
+          });
+        }
       } catch (error: any) {
         sendResponse({ error: error.message });
       }

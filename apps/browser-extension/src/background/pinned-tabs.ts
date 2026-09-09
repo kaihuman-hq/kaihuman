@@ -1,13 +1,26 @@
-/** Repo file mirroring the pinned tabs of the browser window. */
+/** Repo file holding every saved group of pinned tabs. */
 export const PINNED_TABS_PATH = '.kh/browser.pinnedtabs.json';
+
+/** A window counts as running a group once more than this share of the group is pinned in it. */
+export const GROUP_MATCH_THRESHOLD = 0.5;
+
+const LEGACY_GROUP_ID = 'default';
+const LEGACY_GROUP_NAME = 'Pinned tabs';
 
 export interface PinnedTab {
   url: string;
   title: string;
 }
 
-export interface PinnedTabsConfig {
+export interface PinnedTabGroup {
+  id: string;
+  name: string;
+  createdAt: string;
   tabs: PinnedTab[];
+}
+
+export interface PinnedTabsConfig {
+  groups: PinnedTabGroup[];
   updatedAt: string;
 }
 
@@ -34,6 +47,32 @@ export function normalizeUrl(url: string): string {
   }
 }
 
+function asString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function parseTabs(raw: unknown[]): PinnedTab[] {
+  return raw
+    .filter((tab): tab is PinnedTab => typeof (tab as PinnedTab)?.url === 'string')
+    .map((tab) => ({ url: tab.url, title: asString(tab.title) }));
+}
+
+function parseGroup(raw: unknown, index: number): PinnedTabGroup {
+  const group = raw as Partial<PinnedTabGroup>;
+  if (!group?.id) {
+    throw new Error(`${PINNED_TABS_PATH}: group ${index} is missing an "id"`);
+  }
+  if (!Array.isArray(group.tabs)) {
+    throw new Error(`${PINNED_TABS_PATH}: group "${group.id}" is missing a "tabs" array`);
+  }
+  return {
+    id: group.id,
+    name: asString(group.name) || group.id,
+    createdAt: asString(group.createdAt),
+    tabs: parseTabs(group.tabs),
+  };
+}
+
 export function parsePinnedTabs(content: string): PinnedTabsConfig {
   let parsed: unknown;
   try {
@@ -41,17 +80,29 @@ export function parsePinnedTabs(content: string): PinnedTabsConfig {
   } catch {
     throw new Error(`${PINNED_TABS_PATH} is not valid JSON`);
   }
-  const tabs = (parsed as { tabs?: unknown })?.tabs;
-  if (!Array.isArray(tabs)) {
-    throw new Error(`${PINNED_TABS_PATH} is missing a "tabs" array`);
+  const root = parsed as { groups?: unknown; tabs?: unknown; updatedAt?: unknown };
+  const updatedAt = asString(root?.updatedAt);
+
+  // The first release stored a single unnamed `tabs` array. Fold it into one group so
+  // files written by that version keep working.
+  if (root?.groups === undefined && Array.isArray(root?.tabs)) {
+    return {
+      groups: [
+        {
+          id: LEGACY_GROUP_ID,
+          name: LEGACY_GROUP_NAME,
+          createdAt: updatedAt,
+          tabs: parseTabs(root.tabs),
+        },
+      ],
+      updatedAt,
+    };
   }
-  const updatedAt = (parsed as { updatedAt?: unknown }).updatedAt;
-  return {
-    tabs: tabs
-      .filter((tab): tab is PinnedTab => typeof (tab as PinnedTab)?.url === 'string')
-      .map((tab) => ({ url: tab.url, title: typeof tab.title === 'string' ? tab.title : '' })),
-    updatedAt: typeof updatedAt === 'string' ? updatedAt : '',
-  };
+
+  if (!Array.isArray(root?.groups)) {
+    throw new Error(`${PINNED_TABS_PATH} is missing a "groups" array`);
+  }
+  return { groups: root.groups.map(parseGroup), updatedAt };
 }
 
 export function serializePinnedTabs(config: PinnedTabsConfig): string {
@@ -65,9 +116,30 @@ export function toPinnedTabs(tabs: { url?: string; title?: string }[]): PinnedTa
     .map((tab) => ({ url: tab.url, title: tab.title ?? '' }));
 }
 
-/** Stored tabs that are safe to open and not already present in the window. */
-export function tabsToOpen(stored: PinnedTab[], openUrls: string[]): PinnedTab[] {
-  const seen = new Set(openUrls.map(normalizeUrl));
+export function findGroup(config: PinnedTabsConfig, groupId: string): PinnedTabGroup {
+  const group = config.groups.find((candidate) => candidate.id === groupId);
+  if (!group) throw new Error(`Tab group "${groupId}" no longer exists in ${PINNED_TABS_PATH}`);
+  return group;
+}
+
+/** Replaces the group carrying the same id, or appends it when it is new. */
+export function putGroup(
+  config: PinnedTabsConfig,
+  group: PinnedTabGroup,
+  updatedAt: string,
+): PinnedTabsConfig {
+  const exists = config.groups.some((candidate) => candidate.id === group.id);
+  return {
+    groups: exists
+      ? config.groups.map((candidate) => (candidate.id === group.id ? group : candidate))
+      : [...config.groups, group],
+    updatedAt,
+  };
+}
+
+/** Group tabs that are safe to open and not pinned in the window yet. */
+export function tabsToOpen(stored: PinnedTab[], pinnedUrls: string[]): PinnedTab[] {
+  const seen = new Set(pinnedUrls.map(normalizeUrl));
   const result: PinnedTab[] = [];
   for (const tab of stored) {
     if (!isOpenableUrl(tab.url)) continue;
@@ -77,4 +149,34 @@ export function tabsToOpen(stored: PinnedTab[], openUrls: string[]): PinnedTab[]
     result.push(tab);
   }
   return result;
+}
+
+/**
+ * Pinned tabs of the window that the group does not contain. Loading a group makes the
+ * window's pinned set match it, so these get unpinned — never closed, so nothing is lost.
+ */
+export function tabsToUnpin<T extends { url?: string }>(pinned: T[], stored: PinnedTab[]): T[] {
+  const wanted = new Set(stored.map((tab) => normalizeUrl(tab.url)));
+  return pinned.filter((tab) => !wanted.has(normalizeUrl(tab.url ?? '')));
+}
+
+/**
+ * Best guess at which group a window is running, from its pinned tabs alone. Used when the
+ * extension has no record of the last load — window ids do not survive a browser restart.
+ * Ties keep the earlier group so the answer is stable.
+ */
+export function matchGroup(groups: PinnedTabGroup[], pinnedUrls: string[]): string | null {
+  const open = new Set(pinnedUrls.map(normalizeUrl));
+  let bestId: string | null = null;
+  let bestScore = 0;
+  for (const group of groups) {
+    if (group.tabs.length === 0) continue;
+    const hits = group.tabs.filter((tab) => open.has(normalizeUrl(tab.url))).length;
+    const score = hits / group.tabs.length;
+    if (score > bestScore) {
+      bestScore = score;
+      bestId = group.id;
+    }
+  }
+  return bestScore > GROUP_MATCH_THRESHOLD ? bestId : null;
 }

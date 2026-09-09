@@ -1,41 +1,91 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { PINNED_TABS_PATH } from '../background/pinned-tabs';
 
-type Status = 'idle' | 'loading' | 'saving' | 'error';
-
-const plural = (count: number) => `${count} pinned tab${count === 1 ? '' : 's'}`;
+interface GroupSummary {
+  id: string;
+  name: string;
+  createdAt: string;
+  tabCount: number;
+}
 
 interface PinnedTabsPanelProps {
   repo: string;
 }
 
-export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
-  const [status, setStatus] = useState<Status>('idle');
-  const [message, setMessage] = useState<string | null>(null);
+const formatCreatedAt = (createdAt: string) => {
+  const date = new Date(createdAt);
+  return Number.isNaN(date.getTime())
+    ? 'unknown date'
+    : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+};
 
-  const run = (type: 'LOAD_PINNED_TABS' | 'SAVE_PINNED_TABS') => {
-    setStatus(type === 'LOAD_PINNED_TABS' ? 'loading' : 'saving');
-    setMessage(null);
-    chrome.runtime.sendMessage({ type }, (response) => {
-      const error = chrome.runtime.lastError?.message || response?.error;
-      if (error) {
-        setMessage(error);
-        setStatus('error');
-        return;
-      }
-      const count = response?.count ?? 0;
-      setMessage(
-        type === 'LOAD_PINNED_TABS'
-          ? count === 0
-            ? 'Already up to date'
-            : `Opened ${plural(count)}`
-          : `Saved ${plural(count)}`,
-      );
-      setStatus('idle');
+const plural = (count: number) => `${count} tab${count === 1 ? '' : 's'}`;
+
+export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
+  const [groups, setGroups] = useState<GroupSummary[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [newName, setNewName] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const send = (message: Record<string, unknown>): Promise<any> =>
+    new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        const failure = chrome.runtime.lastError?.message || response?.error;
+        if (failure) reject(new Error(failure));
+        else resolve(response);
+      });
     });
+
+  const refresh = async () => {
+    const response = await send({ type: 'LIST_PINNED_TAB_GROUPS' });
+    setGroups(response.groups);
+    setActiveId(response.activeId);
   };
 
-  const busy = status === 'loading' || status === 'saving';
+  // The popup is short-lived, so the group list is fetched once when it opens.
+  useEffect(() => {
+    refresh().catch((e: Error) => setError(e.message));
+  }, []);
+
+  const run = async (label: string, action: () => Promise<string>) => {
+    setBusy(label);
+    setError(null);
+    setMessage(null);
+    try {
+      setMessage(await action());
+      await refresh();
+    } catch (e: any) {
+      setError(e.message || 'Unknown error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const load = (group: GroupSummary) =>
+    run(`load:${group.id}`, async () => {
+      const { opened, unpinned } = await send({
+        type: 'LOAD_PINNED_TAB_GROUP',
+        groupId: group.id,
+      });
+      if (opened === 0 && unpinned === 0) return `${group.name} is already loaded`;
+      const parts = [opened && `pinned ${plural(opened)}`, unpinned && `unpinned ${unpinned}`];
+      return `${group.name}: ${parts.filter(Boolean).join(', ')}`;
+    });
+
+  const update = (group: GroupSummary) =>
+    run(`save:${group.id}`, async () => {
+      const { count } = await send({ type: 'SAVE_PINNED_TAB_GROUP', groupId: group.id });
+      return `Updated ${group.name} with ${plural(count)}`;
+    });
+
+  const saveAsNew = () =>
+    run('save:new', async () => {
+      const { count, name } = await send({ type: 'SAVE_PINNED_TAB_GROUP', name: newName });
+      setNewName('');
+      return `Saved ${name} with ${plural(count)}`;
+    });
 
   return (
     <section class="space-y-2">
@@ -48,34 +98,83 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
           {PINNED_TABS_PATH}
         </span>
       </div>
-      <div class="p-3 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)] space-y-2">
-        <div class="flex gap-2">
-          <button
-            type="button"
-            onClick={() => run('LOAD_PINNED_TABS')}
-            disabled={busy}
-            class="flex-1 py-1.5 px-3 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {status === 'loading' ? 'Loading...' : 'Load'}
-          </button>
-          <button
-            type="button"
-            onClick={() => run('SAVE_PINNED_TABS')}
-            disabled={busy}
-            class="flex-1 py-1.5 px-3 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {status === 'saving' ? 'Saving...' : 'Save current'}
-          </button>
-        </div>
-        {message &&
-          (status === 'error' ? (
-            <div class="text-[10px] text-red-400 p-2 bg-red-950/30 rounded border border-red-900/50 break-words">
-              {message}
+
+      <div class="space-y-1">
+        {groups.length === 0 && !error && (
+          <p class="text-[10px] text-[var(--los-fg-dim)] px-1">
+            No tab groups yet — pin some tabs and save them below.
+          </p>
+        )}
+        {groups.map((group) => {
+          const active = group.id === activeId;
+          return (
+            <div
+              key={group.id}
+              class={`p-2 rounded border ${active ? 'border-[var(--los-accent)] bg-[var(--los-bg-hover)]' : 'border-[var(--los-border)] bg-[var(--los-bg-hover)]'}`}
+            >
+              <div class="flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="text-xs text-[var(--los-fg)] truncate">
+                    {active && <span class="text-[var(--los-accent)]">● </span>}
+                    {group.name}
+                  </div>
+                  <div class="text-[10px] text-[var(--los-fg-dim)]">
+                    {plural(group.tabCount)} · {formatCreatedAt(group.createdAt)}
+                  </div>
+                </div>
+                <div class="flex gap-1 shrink-0">
+                  {active ? (
+                    <button
+                      type="button"
+                      onClick={() => update(group)}
+                      disabled={!!busy}
+                      class="py-1 px-2 bg-[var(--los-accent)] text-black font-bold text-[10px] rounded hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {busy === `save:${group.id}` ? 'Saving...' : 'Update'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => load(group)}
+                      disabled={!!busy}
+                      class="py-1 px-2 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-[10px] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {busy === `load:${group.id}` ? 'Loading...' : 'Load'}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-          ) : (
-            <div class="text-[10px] text-[var(--los-success)]">{message}</div>
-          ))}
+          );
+        })}
       </div>
+
+      <div class="flex gap-1">
+        <input
+          type="text"
+          value={newName}
+          onInput={(e) => setNewName((e.target as HTMLInputElement).value)}
+          placeholder="New group name..."
+          disabled={!!busy}
+          class="flex-1 min-w-0 bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded px-2 py-1 text-[10px] text-[var(--los-fg)] focus:border-[var(--los-accent)] focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={saveAsNew}
+          disabled={!!busy || !newName.trim()}
+          class="py-1 px-2 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-[10px] rounded transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {busy === 'save:new' ? 'Saving...' : 'Save current'}
+        </button>
+      </div>
+
+      {error ? (
+        <div class="text-[10px] text-red-400 p-2 bg-red-950/30 rounded border border-red-900/50 break-words">
+          {error}
+        </div>
+      ) : (
+        message && <div class="text-[10px] text-[var(--los-success)]">{message}</div>
+      )}
     </section>
   );
 }

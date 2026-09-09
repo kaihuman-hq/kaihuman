@@ -8,24 +8,45 @@ The official browser extension for Lifosy, designed to enhance your web experien
 - **Save to Knowledge Base**: Add selected text or snippets directly to your knowledge base.
 - **Quick Dump Notes**: Rapidly create notes without navigating away from your current tab.
 - **Context Menu Integration**: Conveniently access Lifosy features directly from the browser's context menu.
-- **Pinned Tabs Sync**: Save the pinned tabs of the current window to your repo, and restore them on any machine.
+- **Pinned Tabs Sync**: Save named groups of pinned tabs to your repo, and load any of them into the current window on any machine.
 
 ## Pinned Tabs
 
-The **Pinned Tabs** section of the popup keeps your pinned tabs in the active repo at
-`.kh/browser.pinnedtabs.json`:
+The **Pinned Tabs** section of the popup stores named groups of pinned tabs in the active repo
+at `.kh/browser.pinnedtabs.json`. Each group is listed with its name, tab count and creation
+date; the group the current window is running is marked and shows **Update** instead of **Load**.
 
-- **Save current** — overwrites the file with the pinned tabs of the current window.
-  The file is a snapshot, so unpinning a tab and saving again removes it.
-- **Load** — opens every stored tab as a pinned tab in the current window, skipping URLs
-  that are already open. Loading twice is a no-op. Only `http`/`https` entries are opened.
+- **Load** — makes the window's pinned tabs match the group: opens what is missing and
+  **unpins** (never closes) pinned tabs the group does not contain, so switching between groups
+  leaves a clean window and nothing is lost. Loading the same group twice is a no-op.
+- **Update** — writes the window's current pinned tabs back into the loaded group, keeping its
+  id, name and creation date. This is how you add or remove a tab from a saved group.
+- **Save current** — types a name and stores the window's pinned tabs as a new group.
+
+Only `http`/`https` entries are ever opened; any other scheme in the file is dropped.
 
 ```json
 {
-  "tabs": [{ "url": "https://example.com/", "title": "Example" }],
-  "updatedAt": "2026-09-03T10:00:00.000Z"
+  "groups": [
+    {
+      "id": "6f1c…",
+      "name": "Work",
+      "createdAt": "2026-09-03T10:00:00.000Z",
+      "tabs": [{ "url": "https://example.com/", "title": "Example" }]
+    }
+  ],
+  "updatedAt": "2026-09-09T08:00:00.000Z"
 }
 ```
+
+### How the loaded group is detected
+
+The extension remembers which group each window loaded in `chrome.storage.session`, which Chrome
+clears on restart — the same lifetime as the window ids it is keyed by, so a remembered entry can
+never point at the wrong group. After a restart, or in a window the extension has not loaded into,
+it falls back to matching the window's pinned tabs against each group and picks the one with more
+than half its tabs present. That combination keeps **Update** pointed at the right group both after
+you edit a pinned tab and after you restart the browser.
 
 Reading the URL of every tab requires the `tabs` permission, which Chrome surfaces as
 "Read your browsing history" when the extension is installed or updated.
