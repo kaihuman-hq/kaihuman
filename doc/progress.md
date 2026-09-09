@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-09-09 — Pinned tab groups: rename and delete
+
+- **Rename** edits a group's name in place from the popup row, keeping its id, tabs and
+  `createdAt`. It reuses `putGroup`, so no new write path was needed.
+- **Delete** removes the group from `.kh/browser.pinnedtabs.json` behind an inline two-step
+  confirmation — the row turns into "Delete this group?" rather than firing on one click,
+  since the write is destructive and lands in the repo. Deleting only forgets the entry; the
+  window keeps whatever it currently has pinned.
+- Deleting the group a window was running needs no extra cleanup: the session-stored active
+  group is already validated against the group list before use, so it falls straight through
+  to `matchGroup` on the next read.
+- **New pure helpers**: `removeGroup` (throws, naming the group, when it is already gone) and
+  `normalizeGroupName`, which now backs both "save as new" and rename so the two cannot drift
+  on whitespace or empty-name handling. Tests grew from 34 to 37 cases.
+
 ## 2026-09-09 — Pinned tabs: multiple named groups per repo
 
 - **Feature**: `.kh/browser.pinnedtabs.json` now holds *many* named groups instead of one

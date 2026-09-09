@@ -116,10 +116,21 @@ export function toPinnedTabs(tabs: { url?: string; title?: string }[]): PinnedTa
     .map((tab) => ({ url: tab.url, title: tab.title ?? '' }));
 }
 
+function missingGroup(groupId: string): Error {
+  return new Error(`Tab group "${groupId}" no longer exists in ${PINNED_TABS_PATH}`);
+}
+
 export function findGroup(config: PinnedTabsConfig, groupId: string): PinnedTabGroup {
   const group = config.groups.find((candidate) => candidate.id === groupId);
-  if (!group) throw new Error(`Tab group "${groupId}" no longer exists in ${PINNED_TABS_PATH}`);
+  if (!group) throw missingGroup(groupId);
   return group;
+}
+
+/** Shared by saving a new group and renaming an existing one. */
+export function normalizeGroupName(name: string | undefined): string {
+  const trimmed = (name ?? '').trim();
+  if (!trimmed) throw new Error('Give the tab group a name');
+  return trimmed;
 }
 
 /** Replaces the group carrying the same id, or appends it when it is new. */
@@ -135,6 +146,16 @@ export function putGroup(
       : [...config.groups, group],
     updatedAt,
   };
+}
+
+export function removeGroup(
+  config: PinnedTabsConfig,
+  groupId: string,
+  updatedAt: string,
+): PinnedTabsConfig {
+  const groups = config.groups.filter((group) => group.id !== groupId);
+  if (groups.length === config.groups.length) throw missingGroup(groupId);
+  return { groups, updatedAt };
 }
 
 /** Group tabs that are safe to open and not pinned in the window yet. */

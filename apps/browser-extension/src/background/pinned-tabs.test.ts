@@ -3,11 +3,13 @@ import {
   findGroup,
   isOpenableUrl,
   matchGroup,
+  normalizeGroupName,
   PINNED_TABS_PATH,
   type PinnedTabGroup,
   type PinnedTabsConfig,
   parsePinnedTabs,
   putGroup,
+  removeGroup,
   serializePinnedTabs,
   tabsToOpen,
   tabsToUnpin,
@@ -176,6 +178,33 @@ describe('putGroup', () => {
   it('appends a group that does not exist yet', () => {
     const after = putGroup(config(group('g1', [])), group('g2', []), 'now');
     expect(after.groups.map((g) => g.id)).toEqual(['g1', 'g2']);
+  });
+});
+
+describe('removeGroup', () => {
+  it('drops the group and leaves the others alone', () => {
+    const before = config(group('g1', []), group('g2', []));
+    const after = removeGroup(before, 'g1', 'now');
+    expect(after.groups.map((g) => g.id)).toEqual(['g2']);
+    expect(after.updatedAt).toBe('now');
+  });
+
+  it('throws when the group is already gone', () => {
+    expect(() => removeGroup(config(group('g1', [])), 'g2', 'now')).toThrow(
+      `Tab group "g2" no longer exists in ${PINNED_TABS_PATH}`,
+    );
+  });
+});
+
+describe('normalizeGroupName', () => {
+  it('trims surrounding whitespace', () => {
+    expect(normalizeGroupName('  Work  ')).toBe('Work');
+  });
+
+  it('rejects empty, whitespace-only and missing names', () => {
+    expect(() => normalizeGroupName('')).toThrow('Give the tab group a name');
+    expect(() => normalizeGroupName('   ')).toThrow('Give the tab group a name');
+    expect(() => normalizeGroupName(undefined)).toThrow('Give the tab group a name');
   });
 });
 

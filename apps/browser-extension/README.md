@@ -22,6 +22,9 @@ date; the group the current window is running is marked and shows **Update** ins
 - **Update** — writes the window's current pinned tabs back into the loaded group, keeping its
   id, name and creation date. This is how you add or remove a tab from a saved group.
 - **Save current** — types a name and stores the window's pinned tabs as a new group.
+- **Rename** — edits the group's name in place, keeping its tabs and creation date.
+- **Delete** — forgets the group after an inline confirmation. It only removes the entry from
+  the repo; whatever is pinned in the window stays pinned.
 
 Only `http`/`https` entries are ever opened; any other scheme in the file is dropped.
 

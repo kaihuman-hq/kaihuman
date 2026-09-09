@@ -2,11 +2,13 @@ import { type Message } from '../types';
 import {
   findGroup,
   matchGroup,
+  normalizeGroupName,
   PINNED_TABS_PATH,
   type PinnedTabGroup,
   type PinnedTabsConfig,
   parsePinnedTabs,
   putGroup,
+  removeGroup,
   serializePinnedTabs,
   tabsToOpen,
   tabsToUnpin,
@@ -247,14 +249,27 @@ async function savePinnedTabGroup(
   if (groupId) {
     group = { ...findGroup(config, groupId), tabs };
   } else {
-    const trimmed = (name || '').trim();
-    if (!trimmed) throw new Error('Give the tab group a name before saving it');
-    group = { id: crypto.randomUUID(), name: trimmed, createdAt: now, tabs };
+    group = { id: crypto.randomUUID(), name: normalizeGroupName(name), createdAt: now, tabs };
   }
 
   await writeConfig(token, repo, putGroup(config, group, now), sha);
   if (windowId !== undefined) await rememberActiveGroup(windowId, group.id);
   return { count: tabs.length, name: group.name };
+}
+
+async function renamePinnedTabGroup(token: string, repo: string, groupId: string, name: string) {
+  const { config, sha } = await readConfig(token, repo);
+  const group = { ...findGroup(config, groupId), name: normalizeGroupName(name) };
+  await writeConfig(token, repo, putGroup(config, group, new Date().toISOString()), sha);
+  return { name: group.name };
+}
+
+/** Only forgets the group; the window keeps whatever it currently has pinned. */
+async function deletePinnedTabGroup(token: string, repo: string, groupId: string) {
+  const { config, sha } = await readConfig(token, repo);
+  const { name } = findGroup(config, groupId);
+  await writeConfig(token, repo, removeGroup(config, groupId, new Date().toISOString()), sha);
+  return { name };
 }
 
 // Message Handling
@@ -357,7 +372,9 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
   if (
     message.type === 'LIST_PINNED_TAB_GROUPS' ||
     message.type === 'LOAD_PINNED_TAB_GROUP' ||
-    message.type === 'SAVE_PINNED_TAB_GROUP'
+    message.type === 'SAVE_PINNED_TAB_GROUP' ||
+    message.type === 'RENAME_PINNED_TAB_GROUP' ||
+    message.type === 'DELETE_PINNED_TAB_GROUP'
   ) {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
       const token = data.lifeos_token;
@@ -374,10 +391,20 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
             success: true,
             ...(await loadPinnedTabGroup(token, repo, message.groupId)),
           });
-        } else {
+        } else if (message.type === 'SAVE_PINNED_TAB_GROUP') {
           sendResponse({
             success: true,
             ...(await savePinnedTabGroup(token, repo, message.groupId, message.name)),
+          });
+        } else if (message.type === 'RENAME_PINNED_TAB_GROUP') {
+          sendResponse({
+            success: true,
+            ...(await renamePinnedTabGroup(token, repo, message.groupId, message.name)),
+          });
+        } else {
+          sendResponse({
+            success: true,
+            ...(await deletePinnedTabGroup(token, repo, message.groupId)),
           });
         }
       } catch (error: any) {

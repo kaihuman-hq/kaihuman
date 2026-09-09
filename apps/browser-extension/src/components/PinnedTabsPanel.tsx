@@ -25,6 +25,8 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
+  const [editing, setEditing] = useState<{ id: string; mode: 'rename' | 'delete' } | null>(null);
+  const [draftName, setDraftName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +82,29 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
       return `Updated ${group.name} with ${plural(count)}`;
     });
 
+  const rename = (group: GroupSummary) =>
+    run(`rename:${group.id}`, async () => {
+      const { name } = await send({
+        type: 'RENAME_PINNED_TAB_GROUP',
+        groupId: group.id,
+        name: draftName,
+      });
+      setEditing(null);
+      return `Renamed to ${name}`;
+    });
+
+  const remove = (group: GroupSummary) =>
+    run(`delete:${group.id}`, async () => {
+      const { name } = await send({ type: 'DELETE_PINNED_TAB_GROUP', groupId: group.id });
+      setEditing(null);
+      return `Deleted ${name}`;
+    });
+
+  const startRename = (group: GroupSummary) => {
+    setDraftName(group.name);
+    setEditing({ id: group.id, mode: 'rename' });
+  };
+
   const saveAsNew = () =>
     run('save:new', async () => {
       const { count, name } = await send({ type: 'SAVE_PINNED_TAB_GROUP', name: newName });
@@ -107,43 +132,123 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
         )}
         {groups.map((group) => {
           const active = group.id === activeId;
+          const edit = editing?.id === group.id ? editing.mode : null;
           return (
             <div
               key={group.id}
-              class={`p-2 rounded border ${active ? 'border-[var(--los-accent)] bg-[var(--los-bg-hover)]' : 'border-[var(--los-border)] bg-[var(--los-bg-hover)]'}`}
+              class={`p-2 rounded border bg-[var(--los-bg-hover)] ${active ? 'border-[var(--los-accent)]' : 'border-[var(--los-border)]'}`}
             >
-              <div class="flex items-center justify-between gap-2">
-                <div class="min-w-0">
-                  <div class="text-xs text-[var(--los-fg)] truncate">
-                    {active && <span class="text-[var(--los-accent)]">● </span>}
-                    {group.name}
-                  </div>
-                  <div class="text-[10px] text-[var(--los-fg-dim)]">
-                    {plural(group.tabCount)} · {formatCreatedAt(group.createdAt)}
-                  </div>
+              {edit === 'rename' ? (
+                <div class="flex gap-1">
+                  <input
+                    type="text"
+                    value={draftName}
+                    onInput={(e) => setDraftName((e.target as HTMLInputElement).value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') rename(group);
+                      if (e.key === 'Escape') setEditing(null);
+                    }}
+                    disabled={!!busy}
+                    autofocus
+                    class="flex-1 min-w-0 bg-[var(--los-bg)] border border-[var(--los-accent)] rounded px-2 py-1 text-[10px] text-[var(--los-fg)] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => rename(group)}
+                    disabled={!!busy || !draftName.trim()}
+                    class="py-1 px-2 bg-[var(--los-accent)] text-black font-bold text-[10px] rounded hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {busy === `rename:${group.id}` ? '...' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(null)}
+                    disabled={!!busy}
+                    class="py-1 px-2 text-[var(--los-fg-dim)] hover:text-[var(--los-fg)] text-[10px] transition-colors"
+                  >
+                    Cancel
+                  </button>
                 </div>
-                <div class="flex gap-1 shrink-0">
-                  {active ? (
-                    <button
-                      type="button"
-                      onClick={() => update(group)}
-                      disabled={!!busy}
-                      class="py-1 px-2 bg-[var(--los-accent)] text-black font-bold text-[10px] rounded hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {busy === `save:${group.id}` ? 'Saving...' : 'Update'}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => load(group)}
-                      disabled={!!busy}
-                      class="py-1 px-2 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-[10px] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {busy === `load:${group.id}` ? 'Loading...' : 'Load'}
-                    </button>
-                  )}
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="text-xs text-[var(--los-fg)] truncate min-w-0">
+                      {active && <span class="text-[var(--los-accent)]">● </span>}
+                      {group.name}
+                    </div>
+                    {active ? (
+                      <button
+                        type="button"
+                        onClick={() => update(group)}
+                        disabled={!!busy}
+                        class="shrink-0 py-1 px-2 bg-[var(--los-accent)] text-black font-bold text-[10px] rounded hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {busy === `save:${group.id}` ? 'Saving...' : 'Update'}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => load(group)}
+                        disabled={!!busy}
+                        class="shrink-0 py-1 px-2 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-[10px] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {busy === `load:${group.id}` ? 'Loading...' : 'Load'}
+                      </button>
+                    )}
+                  </div>
+                  <div class="flex items-center justify-between gap-2 mt-0.5">
+                    {edit === 'delete' ? (
+                      <>
+                        <span class="text-[10px] text-red-400">Delete this group?</span>
+                        <div class="flex gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => remove(group)}
+                            disabled={!!busy}
+                            class="text-[10px] text-red-400 hover:text-red-300 font-bold transition-colors disabled:opacity-50"
+                          >
+                            {busy === `delete:${group.id}` ? 'Deleting...' : 'Delete'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditing(null)}
+                            disabled={!!busy}
+                            class="text-[10px] text-[var(--los-fg-dim)] hover:text-[var(--los-fg)] transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span class="text-[10px] text-[var(--los-fg-dim)] truncate">
+                          {plural(group.tabCount)} · {formatCreatedAt(group.createdAt)}
+                        </span>
+                        <div class="flex gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => startRename(group)}
+                            disabled={!!busy}
+                            title="Rename group"
+                            class="text-[10px] text-[var(--los-fg-dim)] hover:text-[var(--los-accent)] transition-colors disabled:opacity-50"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditing({ id: group.id, mode: 'delete' })}
+                            disabled={!!busy}
+                            title="Delete group"
+                            class="text-[10px] text-[var(--los-fg-dim)] hover:text-red-400 transition-colors disabled:opacity-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
