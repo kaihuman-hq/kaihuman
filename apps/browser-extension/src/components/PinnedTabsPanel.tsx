@@ -192,7 +192,7 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
                         type="button"
                         onClick={() => update(group)}
                         disabled={!!busy}
-                        class="shrink-0 py-1 px-2 bg-[var(--los-accent)] text-black font-bold text-[10px] rounded hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="shrink-0 py-2 px-4 bg-[var(--los-accent)] text-black font-bold text-xs rounded hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {busy === `save:${group.id}` ? 'Saving...' : 'Update'}
                       </button>
@@ -201,7 +201,7 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
                         type="button"
                         onClick={() => load(group)}
                         disabled={!!busy}
-                        class="shrink-0 py-1 px-2 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-[10px] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="shrink-0 py-2 px-4 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] font-bold text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {busy === `load:${group.id}` ? 'Loading...' : 'Load'}
                       </button>

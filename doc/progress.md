@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-09-12 — Bigger Load button for pinned tab groups
+
+- The per-group **Load** button was a 10px label in `py-1 px-2`, a click target small enough
+  to be fiddly in the 350px popup. It is now `py-2 px-4` at `text-xs`, bold, roughly doubling
+  the hit area.
+- **Update** (the same slot on the group the window is currently running) got the identical
+  size, so rows do not change height between the active group and the rest.
+
 ## 2026-09-09 — Fix "message port closed" on rename; reorder tab groups
 
 - **Bug**: renaming a group failed with *"The message port closed before a response was
