@@ -13,7 +13,13 @@ A personal life-OS built on GitHub — notes, dashboards, habits, and tasks, all
 ## Prerequisites
 
 - [Rust](https://rustup.rs/) (stable)
-- [Node.js](https://nodejs.org/) LTS + [pnpm](https://pnpm.io/)
+- [Node.js](https://nodejs.org/) LTS + [pnpm](https://pnpm.io/) **12.4.1**, the version
+  pinned in `packageManager`. Install it before the first `pnpm install` — `corepack enable`
+  fetches the pinned binary, or `npm install -g pnpm@12.4.1`. Letting an older pnpm
+  provision 12.4.1 for you does not work: the bootstrap runs
+  `pnpm add pnpm@12.4.1 --allow-build=@pnpm/exe`, but the `preinstall`/`postinstall` scripts
+  belong to the `pnpm` package rather than to `@pnpm/exe`, so a pnpm that enforces build
+  approval refuses them and the install dies with `ERR_PNPM_IGNORED_BUILDS`.
 - `git` on `$PATH` (used by the CLI for repo sync)
 - Optional: `claude`, `copilot`, or `gemini` CLI on `$PATH` for AI features
 
