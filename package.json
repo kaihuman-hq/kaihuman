@@ -20,7 +20,7 @@
     "fake-indexeddb": "^6.0.0",
     "jsdom": "^29.1.1",
     "playwright": "^1.56.1",
-    "turbo": "^2.9.18",
+    "turbo": "^2.10.12",
     "typescript": "5.9.2"
   },
   "packageManager": "pnpm@12.4.1",

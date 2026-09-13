@@ -176,7 +176,7 @@ importers:
         specifier: ^1.56.1
         version: 1.56.1
       turbo:
-        specifier: ^2.9.18
+        specifier: ^2.10.12
         version: 2.10.12
       typescript:
         specifier: 5.9.2
