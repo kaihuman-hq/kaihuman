@@ -1,5 +1,29 @@
 # Progress
 
+## 2026-09-13 — pnpm 12
+
+`packageManager` moves from pnpm 10.28.0 to 12.4.1, and two things had to move
+with it.
+
+- **`onlyBuiltDependencies` → `allowBuilds`.** pnpm 11 removed the allowlist
+  form. The replacement asks for an explicit `true`/`false` per dependency, and
+  an unanswered build script now fails the install rather than being silently
+  skipped. `@biomejs/biome`, `esbuild` and `sharp` all become `true`, so
+  nothing that used to build stopped building.
+- **turbo floor `^2.7.4` → `^2.9.18`** (resolving to 2.10.12). pnpm 12 writes
+  the pinned package manager into the lockfile as a second YAML document
+  holding `packageManagerDependencies` and the `@pnpm/exe.*` platform binaries.
+  The locked turbo 2.8.x cannot read that: `deserializing from YAML containing
+  more than one document is not supported`, after which it carries on with
+  change detection and `turbo prune` degraded. It is a warning, never a
+  failure, so it would have rotted unnoticed.
+
+The dependency graph itself is untouched — no resolution moved.
+
+Checks: `turbo build` 6 of 6; `pnpm check` (lint + check-types) 8 of 8 from a
+cold cache; `pnpm format` 5 of 5. The workflows read the pnpm version from
+`packageManager`, so `template-deploy-to-cloudflare.yaml` needed no edit.
+
 ## 2026-09-09 — Fix "message port closed" on rename; reorder tab groups
 
 - **Bug**: renaming a group failed with *"The message port closed before a response was

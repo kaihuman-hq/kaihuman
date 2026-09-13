@@ -2,7 +2,10 @@ packages:
   - apps/*
   - packages/*
 
-onlyBuiltDependencies:
-  - '@biomejs/biome'
-  - esbuild
-  - sharp
+# pnpm 11 removed the `onlyBuiltDependencies` allowlist in favour of an explicit
+# yes/no per dependency. Every package that was on the old allowlist is `true`;
+# anything new that ships a build script has to be answered before it can run.
+allowBuilds:
+  '@biomejs/biome': true
+  esbuild: true
+  sharp: true
