@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-09-13 — pnpm 12: install it before the first `pnpm install`
+
+The pin alone is not enough, and the README prerequisites now say so. pnpm 12.4.1 cannot
+be provisioned by an older pnpm: the bootstrap runs
+`pnpm add pnpm@12.4.1 --allow-build=@pnpm/exe`, but the `preinstall`/`postinstall`
+scripts belong to the `pnpm` package rather than to `@pnpm/exe`, so the allowance misses
+the thing that actually builds. A pnpm that enforces build approval then refuses it and
+the install dies with `ERR_PNPM_IGNORED_BUILDS` — reproduced verbatim against pnpm 10.11.0.
+
+Verified working: `corepack enable` (fetches the pinned binary directly, no `pnpm add`
+step) and `npm install -g pnpm@12.4.1`.
+
 ## 2026-09-13 — pnpm 12
 
 `packageManager` moves from pnpm 10.28.0 to 12.4.1, and two things had to move
