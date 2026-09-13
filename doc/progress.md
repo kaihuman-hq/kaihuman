@@ -36,6 +36,22 @@ Checks: `turbo build` 6 of 6; `pnpm check` (lint + check-types) 8 of 8 from a
 cold cache; `pnpm format` 5 of 5. The workflows read the pnpm version from
 `packageManager`, so `template-deploy-to-cloudflare.yaml` needed no edit.
 
+## 2026-09-13 — Pinned tab groups: edit mode, full-height Load button
+
+- **Load / Update** now fills the row: a fixed 96px wide button stretched to the card's content
+  height (44px inside the card's `p-2`), instead of a 10px label in `py-1 px-2`. Verified in a
+  headless render of the popup at its real 350px width.
+- **Edit mode**: an Edit/Done toggle in the section header. By default a group row is only its
+  name and that button. Rename, Delete, ↑/↓ and the `3 tabs · Sep 1, 2026` line are rendered
+  only in edit mode, where the Load/Update button is not — the two sets never compete for the
+  same row. Leaving edit mode also drops a half-finished rename or delete confirmation.
+  **Save current** stays visible in both modes, since it creates a group rather than editing one.
+- The delete confirmation moved from a second line inside the row to replacing the row, like the
+  rename field already did; at 350px a name plus "Delete?" plus two buttons did not fit.
+- **Tests**: 55 (was 51) — the first component tests in this app, rendering the panel against a
+  stubbed `chrome.runtime` and asserting what each mode shows. `vitest.config.ts` gained explicit
+  `esbuild.jsx` settings because vitest does not read `tsconfig.app.json`'s preact JSX config.
+
 ## 2026-09-09 — Fix "message port closed" on rename; reorder tab groups
 
 - **Bug**: renaming a group failed with *"The message port closed before a response was
