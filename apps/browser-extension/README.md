@@ -13,8 +13,11 @@ The official browser extension for Lifosy, designed to enhance your web experien
 ## Pinned Tabs
 
 The **Pinned Tabs** section of the popup stores named groups of pinned tabs in the active repo
-at `.kh/browser.pinnedtabs.json`. Each group is listed with its name, tab count and creation
-date; the group the current window is running is marked and shows **Update** instead of **Load**.
+at `.kh/browser.pinnedtabs.json`. By default each group is one row: its name and a single large
+button, so loading a group is one quick click. The group the current window is running is marked
+and shows **Update** instead of **Load**. **Edit** in the section header swaps those buttons for
+the management controls and reveals each group's tab count and creation date; **Done** leaves
+edit mode.
 
 - **Load** — makes the window's pinned tabs match the group: opens what is missing and
   **unpins** (never closes) pinned tabs the group does not contain, so switching between groups
@@ -22,10 +25,10 @@ date; the group the current window is running is marked and shows **Update** ins
 - **Update** — writes the window's current pinned tabs back into the loaded group, keeping its
   id, name and creation date. This is how you add or remove a tab from a saved group.
 - **Save current** — types a name and stores the window's pinned tabs as a new group.
-- **Rename** — edits the group's name in place, keeping its tabs and creation date.
-- **↑ / ↓** — reorders the group in the list; the order is stored in the repo file.
-- **Delete** — forgets the group after an inline confirmation. It only removes the entry from
-  the repo; whatever is pinned in the window stays pinned.
+- **Rename** *(edit mode)* — edits the group's name in place, keeping its tabs and creation date.
+- **↑ / ↓** *(edit mode)* — reorders the group in the list; the order is stored in the repo file.
+- **Delete** *(edit mode)* — forgets the group after an inline confirmation. It only removes the
+  entry from the repo; whatever is pinned in the window stays pinned.
 
 Only `http`/`https` entries are ever opened; any other scheme in the file is dropped.
 
