@@ -18,9 +18,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@cascivo/charts": "^0.3.4",
-    "@cascivo/editor": "^0.2.6",
-    "@cascivo/themes": "^0.2.7",
+    "@cascivo/charts": "^1.2.0",
+    "@cascivo/editor": "^1.2.0",
+    "@cascivo/themes": "^1.0.0",
     "@lifosy/core": "workspace:*",
     "@lifosy/ui": "workspace:*",
     "@preact/signals": "^2.0.1",
