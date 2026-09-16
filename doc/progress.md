@@ -1,5 +1,40 @@
 # Progress
 
+## 2026-09-16 — cascivo 1.3.0: the editor gutter stops drifting
+
+`@cascivo/{charts,core,editor,react}` 1.2.0 → 1.3.0, `@cascivo/tokens` 1.1.0 → 1.1.1
+(`@cascivo/i18n` follows transitively). `@cascivo/themes` is already at its
+latest, 1.0.0.
+
+The fix is in `CodeEditor`'s gutter. Until 1.2.0 the line numbers were a
+separate flex column next to the scrolling `<pre>`, kept in step by JS
+scroll-sync — which is what drifted. 1.3.0 folds them into the highlight
+layer's own CSS grid, as a `position: sticky` first column over a
+`--cascivo-editor-gutter-width` backdrop, so the browser keeps them aligned
+and there is nothing left to sync. The current-line highlight splits in two
+(`currentLine` plus a `currentLineGutter` band) and now tracks soft-wrapped
+rows via `grid-row`, not just a `1lh` transform.
+
+The public API does not move: the only `index.d.ts` change is a doc comment on
+the gutter ref. `Editor` (`packages/ui`) and `CodeMirrorEditor`
+(`apps/console`) carried no workaround for the old behaviour, so neither
+needed an edit — both drive the same `applyEdit` / `onValueChange` /
+`onSave` seam as before.
+
+One wrinkle in landing it: pnpm 12 defaults `minimumReleaseAge` to 1440
+minutes and the 1.3.0 tarballs were minutes old, so a cold-cache
+`pnpm install` refused the lockfile with `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`
+(reproduced against a fresh `XDG_CACHE_HOME` — the verification result is
+cached globally, so a warm machine passes and hides it). `pnpm-workspace.yaml`
+therefore carries a `minimumReleaseAgeExclude` list pinning those six exact
+versions. It is dead weight once they age past the cutoff, on 2026-09-17 —
+delete it then.
+
+Checks: `tsc --noEmit` clean in `@lifosy/ui` and `@lifosy/app-console`; biome
+clean in both; console vitest 63 of 63, plus the two cascivo spike suites
+(5 of 5) that mount the real `CodeEditor` under Preact; `@lifosy/ui` and
+console builds both green.
+
 ## 2026-09-16 — `apps/cli` gains a `fix` script
 
 `fix` is `cargo fmt`, so the crate now takes part in the repo-wide `fix` task
