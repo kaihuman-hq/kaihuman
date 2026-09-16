@@ -7,6 +7,7 @@
     "dev": "cargo run",
     "lint": "cargo fmt --check && cargo clippy",
     "format": "cargo fmt",
+    "fix": "cargo fmt",
     "test": "cargo test"
   }
 }

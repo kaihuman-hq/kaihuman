@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-09-16 — `apps/cli` gains a `fix` script
+
+`fix` is `cargo fmt`, so the crate now takes part in the repo-wide `fix` task
+instead of being skipped by it. The Rust toolchain has no equivalent of biome's
+`--unsafe` lint fixes, so this is formatting only; `cargo clippy --fix` is a
+different proposition and is not wired up.
+
+This restores the symmetry with the JS packages across both entry points:
+
+| | JS packages | `apps/cli` |
+|---|---|---|
+| `pnpm run lint` on drift | fails | fails |
+| `pnpm run verify` on drift | `fix` repairs it, passes | `fix` repairs it, passes |
+
+Before this, `verify` failed on unformatted Rust, because `fix` skipped the
+crate and `lint`'s `cargo fmt --check` was the first step to see it. Verified
+both ways against a deliberately unformatted function: standalone `lint` still
+exits 1 and names the line, while `verify` exits 0 having rewritten the file.
+
+Note that a `verify` run which repairs drift leaves the repair in the working
+tree — the same as it has always done for the JS packages. Commit it.
+
 ## 2026-09-16 — `lint` checks Rust formatting
 
 `apps/cli`'s `lint` is now `cargo fmt --check && cargo clippy`. `fmt --check`
@@ -12,13 +34,9 @@ own rewrites and exits 0. Together with the `rust-toolchain.toml` pin, the
 check is meaningful: without a pinned rustfmt it would fail on contributors
 whose stable formats differently.
 
-**`pnpm run verify` now fails on unformatted Rust rather than silently
-reformatting it.** The JS packages are not equivalent here: verify runs `fix`
-before `lint`, so biome repairs their formatting in-place first, but `apps/cli`
-has no `fix` script, so `lint` is the first thing to see the Rust. Run
-`pnpm run format` to repair, then re-run. Giving `apps/cli` a `fix` script of
-`cargo fmt` would restore the symmetry; not done, because failing loudly on
-drift is the behaviour that was asked for.
+Standalone `pnpm run lint` therefore fails on unformatted Rust. Inside
+`pnpm run verify` it does not, because the `fix` step repairs it first — see
+the entry above.
 
 ## 2026-09-16 — `cargo fmt` failures stop being swallowed
 
