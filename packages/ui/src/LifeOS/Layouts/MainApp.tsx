@@ -64,6 +64,7 @@ import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
 import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
 import { HabitTrackerWidget } from '../Organisms/Widgets/HabitTrackerWidget';
+import { PromptsWidget } from '../Organisms/Widgets/PromptsWidget';
 import type { ReadItLaterItem } from '../Organisms/Widgets/ReadItLaterLogic';
 import { ReadItLaterWidget } from '../Organisms/Widgets/ReadItLaterWidget';
 import { RssFeedManager, RssWidget } from '../Organisms/Widgets/RssWidget';
@@ -722,6 +723,7 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.events.csv')) ext = '.events.csv';
       else if (lowerPath.endsWith('.habit.csv')) ext = '.habit.csv';
       else if (lowerPath.endsWith('.todos.md')) ext = '.todos.md';
+      else if (lowerPath.endsWith('.prompts.md')) ext = '.prompts.md';
       else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
       else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
@@ -917,6 +919,24 @@ abbreviations: undefined
       );
     }
 
+    if (tile.extension === '.prompts.md' && tile.rawContent) {
+      return (
+        <PromptsWidget
+          content={tile.rawContent}
+          mode={
+            mode === 'FOCUS'
+              ? 'FOCUS'
+              : mode === 'MOBILE_EXPANDED'
+                ? 'MOBILE_EXPANDED'
+                : mode === 'MOBILE_COLLAPSED'
+                  ? 'MOBILE_COLLAPSED'
+                  : 'SMALL'
+          }
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+
     if (tile.extension === '.stocks.csv' && tile.rawContent) {
       return (
         <StocksWidget
@@ -1027,6 +1047,7 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.events.csv')) ext = '.events.csv';
       else if (lowerPath.endsWith('.habit.csv')) ext = '.habit.csv';
       else if (lowerPath.endsWith('.todos.md')) ext = '.todos.md';
+      else if (lowerPath.endsWith('.prompts.md')) ext = '.prompts.md';
       else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
       else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
@@ -2131,6 +2152,7 @@ const FocusedTileInternal = ({
   const isDataCollection = tile.extension === '.data-collection.csv';
   const isBudget = tile.extension === '.budget.csv';
   const isActionLog = tile.extension === '.actionlog.md';
+  const isPrompts = tile.extension === '.prompts.md';
   const isStocks = tile.extension === '.stocks.csv';
   const isConsumption = tile.extension === '.consumption.csv';
   const isBoardOverview = tile.extension === '.board-overview.json';
@@ -2157,6 +2179,7 @@ const FocusedTileInternal = ({
     isDataCollection ||
     isBudget ||
     isActionLog ||
+    isPrompts ||
     isStocks ||
     isConsumption ||
     isAnyCsv || // && !!tile.rawContent;
@@ -2239,6 +2262,7 @@ const FocusedTileInternal = ({
     const _isDataCollection = tile.extension === '.data-collection.csv';
     const _isBudget = tile.extension === '.budget.csv';
     const _isActionLog = tile.extension === '.actionlog.md';
+    const _isPrompts = tile.extension === '.prompts.md';
     const _isStocks = tile.extension === '.stocks.csv';
     const _isConsumption = tile.extension === '.consumption.csv';
     const _isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv');
@@ -2254,6 +2278,7 @@ const FocusedTileInternal = ({
       _isDataCollection ||
       _isBudget ||
       _isActionLog ||
+      _isPrompts ||
       _isStocks ||
       _isConsumption ||
       _isAnyCsv;
@@ -2555,6 +2580,21 @@ const FocusedTileInternal = ({
                   </button>
                 )}
 
+                {isPrompts && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('ADD')}
+                    className={cn(
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'ADD'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+                    )}
+                  >
+                    ADD PROMPT
+                  </button>
+                )}
+
                 {isStocks && (
                   <button
                     type="button"
@@ -2717,6 +2757,14 @@ const FocusedTileInternal = ({
                   // Fixed: Keep in ADD mode to allow multiple additions
                   // if (viewMode === 'ADD') setViewMode('WIDGET');
                 }}
+              />
+            </div>
+          ) : isPrompts && (viewMode === 'WIDGET' || viewMode === 'ADD') ? (
+            <div className="flex flex-col min-h-full w-full p-8">
+              <PromptsWidget
+                content={tile.rawContent || ''}
+                mode={viewMode as any}
+                onChange={(c) => tile.onContentChange?.(c)}
               />
             </div>
           ) : isStocks && (viewMode === 'WIDGET' || viewMode === 'ADD') ? (

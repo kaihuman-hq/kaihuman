@@ -27,7 +27,7 @@ impl AuthManager {
             .context("Failed to determine config directory")?;
         let config_dir = proj_dirs.config_dir();
         fs::create_dir_all(config_dir)?;
-        
+
         Ok(Self {
             config_path: config_dir.join("auth.json"),
         })
@@ -37,7 +37,7 @@ impl AuthManager {
         if !self.config_path.exists() {
             anyhow::bail!("Not authenticated. Please run 'cli login'");
         }
-        
+
         let content = fs::read_to_string(&self.config_path)?;
         let config: AuthConfig = serde_json::from_str(&content)?;
         Ok(config.token)
@@ -47,7 +47,7 @@ impl AuthManager {
         if !self.config_path.exists() {
             return Ok(None);
         }
-        
+
         let content = fs::read_to_string(&self.config_path)?;
         let config: AuthConfig = serde_json::from_str(&content)?;
         Ok(config.active_repo)
@@ -56,19 +56,19 @@ impl AuthManager {
     pub fn is_authenticated(&self) -> bool {
         self.config_path.exists()
     }
-    
+
     pub fn set_active_repo(&self, repo: Option<String>) -> Result<()> {
         let mut config: AuthConfig = if self.config_path.exists() {
             let content = fs::read_to_string(&self.config_path)?;
             serde_json::from_str(&content)?
         } else {
-             anyhow::bail!("Not authenticated");
+            anyhow::bail!("Not authenticated");
         };
         config.active_repo = repo;
         fs::write(&self.config_path, serde_json::to_string_pretty(&config)?)?;
         Ok(())
     }
-    
+
     pub fn config_dir(&self) -> &std::path::Path {
         self.config_path.parent().expect("config_path has a parent")
     }
@@ -115,7 +115,7 @@ impl AuthManager {
             }
             res = rx => {
                 let (token, active_repo) = res.context("Failed to receive token")?;
-                
+
                 // 4. Save token
                 let config = AuthConfig { token, active_repo };
                 fs::write(&self.config_path, serde_json::to_string_pretty(&config)?)?;

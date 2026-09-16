@@ -1,5 +1,123 @@
 # Progress
 
+## 2026-09-16 — `apps/cli` gains a `fix` script
+
+`fix` is `cargo fmt`, so the crate now takes part in the repo-wide `fix` task
+instead of being skipped by it. The Rust toolchain has no equivalent of biome's
+`--unsafe` lint fixes, so this is formatting only; `cargo clippy --fix` is a
+different proposition and is not wired up.
+
+This restores the symmetry with the JS packages across both entry points:
+
+| | JS packages | `apps/cli` |
+|---|---|---|
+| `pnpm run lint` on drift | fails | fails |
+| `pnpm run verify` on drift | `fix` repairs it, passes | `fix` repairs it, passes |
+
+Before this, `verify` failed on unformatted Rust, because `fix` skipped the
+crate and `lint`'s `cargo fmt --check` was the first step to see it. Verified
+both ways against a deliberately unformatted function: standalone `lint` still
+exits 1 and names the line, while `verify` exits 0 having rewritten the file.
+
+Note that a `verify` run which repairs drift leaves the repair in the working
+tree — the same as it has always done for the JS packages. Commit it.
+
+## 2026-09-16 — `lint` checks Rust formatting
+
+`apps/cli`'s `lint` is now `cargo fmt --check && cargo clippy`. `fmt --check`
+runs first because it needs no compile, so drift is reported in well under a
+second instead of after a clippy build. It names the offending file and line:
+`Diff in apps/cli/src/main.rs:83`.
+
+This is the piece that actually catches formatting drift — `cargo fmt` on its
+own rewrites and exits 0. Together with the `rust-toolchain.toml` pin, the
+check is meaningful: without a pinned rustfmt it would fail on contributors
+whose stable formats differently.
+
+Standalone `pnpm run lint` therefore fails on unformatted Rust. Inside
+`pnpm run verify` it does not, because the `fix` step repairs it first — see
+the entry above.
+
+## 2026-09-16 — `cargo fmt` failures stop being swallowed
+
+`apps/cli`'s `format` script was `cargo fmt || true`; it is now plain
+`cargo fmt`, matching every other package, whose `format` is an unguarded
+`biome check --write`.
+
+What this does and does not buy: `cargo fmt` *writes*, so it exits 0 on
+badly-formatted code — dropping `|| true` does not make `pnpm run verify` catch
+formatting drift. What it catches is rustfmt failing outright: a parse error, a
+missing component, a toolchain that will not resolve. Verified against a file
+with an unclosed delimiter — `|| true` exits 0 and prints the error into the
+void, without it the script exits 1.
+
+Catching drift needs `cargo fmt --check` in `lint`, added in the entry above.
+
+## 2026-09-16 — pin the Rust toolchain, normalise `cargo fmt`
+
+`pnpm run verify` left nine `apps/cli/src/*.rs` files modified on every run: the
+committed Rust had drifted from `cargo fmt`, and verify's `format` step
+(`cargo fmt || true`) silently rewrote it each time. The files are now formatted,
+so a clean tree stays clean.
+
+The drift is only worth fixing alongside a pin. rustfmt's output changes between
+releases and `apps/cli` had neither a `rustfmt.toml` nor a toolchain file, so the
+formatting depended on whichever stable each contributor happened to have —
+reformatting on one machine would just be undone on the next. `apps/cli/rust-toolchain.toml`
+now pins `1.94.1` with the `rustfmt` and `clippy` components, which rustup
+resolves and fetches automatically.
+
+Formatting only; the diff is line-wrapping and `cargo test` passes unchanged.
+## 2026-09-16 — `.prompts.md`: a prompt library in one searchable file
+
+A new file type for storing reusable prompts. One file holds many prompts; each
+has a title, tags and the prompt text. Format and the full search contract are
+documented in [`doc/prompts-format.md`](prompts-format.md).
+
+The format is one H2 per prompt with tags inline on the heading line:
+
+```markdown
+## Refactor to hooks #react #refactor
+
+Convert the class component below into a function component using hooks.
+```
+
+The shape is driven by the requirement that a third-party service reading the
+raw file can search it easily. Everything identifying a prompt — its title, its
+tags, its position — sits on one line, so `grep -n '^## '` lists the whole
+library in a single pass and `grep -n '^## .*#react'` filters by tag. No index
+file, no JSON sidecar, no parser needed on the reading end. GitHub's code-search
+API only reports *which file* matched, so an index-free line-greppable layout is
+what actually makes the file searchable from outside.
+
+Considered and rejected: a markdown table (one row per prompt greps perfectly,
+but prompt bodies are multi-line and would need `<br>` and `|` escaping) and
+fenced YAML blocks (needs a YAML parser, and smuggles a non-markdown format into
+an `.md` file). Per-prompt YAML frontmatter is not an option at all — frontmatter
+is document-scoped, so one file can only carry one block.
+
+The single escaping rule: a body line starting with `## ` is written as `\## `,
+a standard markdown escape that renders literally and round-trips losslessly.
+
+- **`PromptsLogic.ts`** (`packages/ui`): `parsePrompts` / `serializePrompts` /
+  `addPrompt`. Tags use the same `#([\w-]+)` convention as `.todos.md` and
+  `.actionlog.md`, and are stripped from the title into a `tags` array on parse,
+  then re-appended on serialize — the same split `TodoLogic` does.
+- **`PromptsWidget.tsx`**: search across titles/bodies/tags, frequency-sorted
+  tag cloud filter, click-to-expand bodies, and a copy button per prompt in
+  every mode. `SMALL` lists the first 10, `FOCUS` is the full searchable view.
+- **`PromptsAddForm.tsx`**: title, comma-separated tags, prompt body. Tags typed
+  straight into the title are merged with the form's tags and deduplicated.
+- Wired into the type-dispatch sites the other widget types use: the
+  `NewFileWizard` template list, both extension ladders and the focused-tile
+  flags in `MainApp`, the compound-extension mapping in `layout.store`, and the
+  `renderFile` allowlist in the console's `Dashboard`.
+- 20 parser tests in `apps/console/src/prompts-logic.test.ts` covering multi-line
+  bodies, fenced code, CRLF, empty bodies, duplicate titles, the `\##` escape,
+  and parse/serialize round-trip idempotence.
+
+Scoped to the widget deliberately: no cross-file "Prompts" nav view, and the
+existing one-file-per-prompt `ref:` link on todos (`TodoLogic`) is untouched.
 ## 2026-09-15 — cascivo 1.x
 
 The six `@cascivo/*` packages move off 0.x: `core` 0.2.3, `react` 0.3.8,

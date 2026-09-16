@@ -13,6 +13,7 @@ export { type MenuItem, StatusBar, type StatusBarProps } from './LifeOS/Organism
 export * from './LifeOS/Organisms/Widgets/ActionLogLogic';
 export * from './LifeOS/Organisms/Widgets/ConsumptionLogic';
 export * from './LifeOS/Organisms/Widgets/ConsumptionWidget';
+export * from './LifeOS/Organisms/Widgets/PromptsLogic';
 export * from './LifeOS/Organisms/Widgets/ReadItLaterLogic';
 export * from './LifeOS/Organisms/Widgets/StocksLogic';
 export * from './LifeOS/Organisms/Widgets/StocksWidget';

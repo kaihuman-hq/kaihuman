@@ -338,6 +338,7 @@ export const Dashboard = () => {
               lowerPath.endsWith('.readitlater.json') ||
               lowerPath.endsWith('.budget.csv') ||
               lowerPath.endsWith('.actionlog.md') ||
+              lowerPath.endsWith('.prompts.md') ||
               lowerPath.endsWith('.data-collection.csv') ||
               lowerPath.endsWith('.stocks.csv') ||
               lowerPath.endsWith('.consumption.csv') ||
