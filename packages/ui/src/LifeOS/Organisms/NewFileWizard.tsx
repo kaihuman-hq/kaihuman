@@ -12,6 +12,7 @@ import {
   Kanban,
   ListTodo,
   Lock,
+  MessageSquareQuote,
   Rss,
   TrendingUp,
   X,
@@ -50,6 +51,14 @@ const TEMPLATES: Template[] = [
     icon: ClipboardList,
     extension: '.actionlog.md',
     defaultContent: '---\n---\n\n# Action Log\n\n',
+  },
+  {
+    id: 'prompts',
+    name: 'Prompts',
+    description: 'A searchable library of reusable prompts with tags',
+    icon: MessageSquareQuote,
+    extension: '.prompts.md',
+    defaultContent: '# Prompts\n',
   },
   {
     id: 'todo',

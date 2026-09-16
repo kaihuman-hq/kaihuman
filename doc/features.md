@@ -10,6 +10,7 @@
 
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
+| Prompt library (`.prompts.md`) — searchable, taggable prompts in one grep-able file | New File → Prompts | 2026-09-16 |
 | Configurable desktop bottom navbar (stored in `.kh` config) | Settings → Bottom Navbar | 2026-06-26 |
 | Demo mode (in-memory seeded data) | `/demo` + login "View demo" | 2026-06-25 |
 | Quick todo to inbox | `/quick-todo` | 2026-03-28 |

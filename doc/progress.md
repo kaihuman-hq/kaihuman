@@ -1,5 +1,56 @@
 # Progress
 
+## 2026-09-16 — `.prompts.md`: a prompt library in one searchable file
+
+A new file type for storing reusable prompts. One file holds many prompts; each
+has a title, tags and the prompt text. Format and the full search contract are
+documented in [`doc/prompts-format.md`](prompts-format.md).
+
+The format is one H2 per prompt with tags inline on the heading line:
+
+```markdown
+## Refactor to hooks #react #refactor
+
+Convert the class component below into a function component using hooks.
+```
+
+The shape is driven by the requirement that a third-party service reading the
+raw file can search it easily. Everything identifying a prompt — its title, its
+tags, its position — sits on one line, so `grep -n '^## '` lists the whole
+library in a single pass and `grep -n '^## .*#react'` filters by tag. No index
+file, no JSON sidecar, no parser needed on the reading end. GitHub's code-search
+API only reports *which file* matched, so an index-free line-greppable layout is
+what actually makes the file searchable from outside.
+
+Considered and rejected: a markdown table (one row per prompt greps perfectly,
+but prompt bodies are multi-line and would need `<br>` and `|` escaping) and
+fenced YAML blocks (needs a YAML parser, and smuggles a non-markdown format into
+an `.md` file). Per-prompt YAML frontmatter is not an option at all — frontmatter
+is document-scoped, so one file can only carry one block.
+
+The single escaping rule: a body line starting with `## ` is written as `\## `,
+a standard markdown escape that renders literally and round-trips losslessly.
+
+- **`PromptsLogic.ts`** (`packages/ui`): `parsePrompts` / `serializePrompts` /
+  `addPrompt`. Tags use the same `#([\w-]+)` convention as `.todos.md` and
+  `.actionlog.md`, and are stripped from the title into a `tags` array on parse,
+  then re-appended on serialize — the same split `TodoLogic` does.
+- **`PromptsWidget.tsx`**: search across titles/bodies/tags, frequency-sorted
+  tag cloud filter, click-to-expand bodies, and a copy button per prompt in
+  every mode. `SMALL` lists the first 10, `FOCUS` is the full searchable view.
+- **`PromptsAddForm.tsx`**: title, comma-separated tags, prompt body. Tags typed
+  straight into the title are merged with the form's tags and deduplicated.
+- Wired into the type-dispatch sites the other widget types use: the
+  `NewFileWizard` template list, both extension ladders and the focused-tile
+  flags in `MainApp`, the compound-extension mapping in `layout.store`, and the
+  `renderFile` allowlist in the console's `Dashboard`.
+- 20 parser tests in `apps/console/src/prompts-logic.test.ts` covering multi-line
+  bodies, fenced code, CRLF, empty bodies, duplicate titles, the `\##` escape,
+  and parse/serialize round-trip idempotence.
+
+Scoped to the widget deliberately: no cross-file "Prompts" nav view, and the
+existing one-file-per-prompt `ref:` link on todos (`TodoLogic`) is untouched.
+
 ## 2026-09-13 — turbo 2.10.12
 
 `turbo` moves from `^2.9.18` to `^2.10.12`. The floor was the only thing that
