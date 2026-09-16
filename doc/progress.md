@@ -1,5 +1,52 @@
 # Progress
 
+## 2026-09-15 — cascivo 1.x
+
+The six `@cascivo/*` packages move off 0.x: `core` 0.2.3, `react` 0.3.8,
+`charts` 0.3.4 and `editor` 0.2.6 → **1.2.0**; `themes` 0.2.7 → **1.0.0**;
+`tokens` 0.3.5 → **1.1.0**. `@cascivo/i18n` arrives as a new transitive
+dependency of `react`, `charts` and `editor`.
+
+Nothing this repo imports changed shape. The four wrappers in `@lifosy/ui`
+(`Button`, `Input`, `StackedBarChart`, `DonutChart`) and the two `CodeEditor`
+call sites compile and render untouched: `ButtonProps`, `InputProps`,
+`StackedRow`, `PieChartDatum`, `toStackedSeries` and `CodeEditorProps` are all
+additive across the jump (mostly new `ariaLabel`/`label` aliases and a `tooltip`
+prop on `PieChart`). The two renames 1.x does ship — `Calendar*` →
+`CalendarHeatmap*`, `Text`/`TextProps` → `ChartText`/`ChartTextProps`, and
+`BarChart`'s `xTicks`/`yTicks` → `valueAxisTicks`/`categoryAxisTicks` — land on
+exports the repo never used.
+
+The Preact bridge survives intact, which was the real risk. `@cascivo/core`
+still takes `signal`/`computed`/`effect`/`batch`/`useSignal`/`useComputed`/
+`useSignalEffect` from `@preact/signals-react` and `useSignals` from
+`@preact/signals-react/runtime`, so the alias onto `@preact/signals` plus the
+no-op `useSignals` shim still covers the whole surface. Both spike suites pass
+unchanged. The peer range tightened to `@preact/signals-react >=3.0.0`; the
+console already pins `^3.10.2`.
+
+**The one thing that did need a fix: `cascivo.reset`.** 1.x publishes a
+canonical layer order (`@cascivo/tokens/src/layers.css`) and, for the first
+time, ships content in its lowest layer — `box-sizing: border-box` on `*` and
+`body { margin: 0 }`. Cascade layers rank by first appearance, and the console's
+guard in `index.html` named only four cascivo layers, so the newcomer was being
+appended *last*: the layer Cascivo documents as "the floor" was outranking
+Tailwind's utilities and `cascivo.component`. Both the authoritative declaration
+in `apps/console/index.html` and its mirror in `apps/console/src/index.css` now
+name `cascivo.reset` first. No live regression today — the reset's two
+declarations match Preflight's, and nothing in the app uses `box-content` — but
+the next utility that fought it would have lost silently.
+
+The rest of the CSS contract is unchanged: no `--cascivo-*` token was removed
+(207 → 228, purely additive), `@cascivo/themes/dark.css` still wraps in
+`@layer cascivo.theme`, and every stylesheet entry point the repo imports still
+resolves. The brand bridge in `packages/ui/src/cascivo.css` is unlayered, so it
+keeps winning regardless.
+
+Verified: `@lifosy/ui` and `@lifosy/app-console` build, `tsc --noEmit` clean
+across the workspace, Biome clean on the console, 43 unit tests and 5 spike
+tests green.
+
 ## 2026-09-13 — turbo 2.10.12
 
 `turbo` moves from `^2.9.18` to `^2.10.12`. The floor was the only thing that

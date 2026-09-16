@@ -108,9 +108,8 @@ const store = {
       try {
         const repo = githubProfileStore.currentRepo.value;
         const blob = obfuscate(password, repo?.full_name ?? 'unknown');
-        const stored = localStorage.getItem(LS_KEY)
-          ? JSON.parse(localStorage.getItem(LS_KEY)!)
-          : {};
+        const raw = localStorage.getItem(LS_KEY);
+        const stored = raw ? JSON.parse(raw) : {};
         stored[key] = blob;
         localStorage.setItem(LS_KEY, JSON.stringify(stored));
         this._encryptedStored[key] = blob;
@@ -130,7 +129,8 @@ const store = {
     unlockedFiles.value = newUnlocked;
 
     try {
-      const stored = localStorage.getItem(LS_KEY) ? JSON.parse(localStorage.getItem(LS_KEY)!) : {};
+      const raw = localStorage.getItem(LS_KEY);
+      const stored = raw ? JSON.parse(raw) : {};
       if (stored[key]) {
         delete stored[key];
         localStorage.setItem(LS_KEY, JSON.stringify(stored));

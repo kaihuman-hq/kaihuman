@@ -549,7 +549,9 @@ const AddTaskModal = ({
               onChange={(e) => setCreateAnother(e.currentTarget.checked)}
               className="accent-[var(--los-accent)] w-4 h-4 shrink-0"
             />
-            <MonoLabel className="cursor-pointer text-[10px]">CREATE ANOTHER AFTER SAVING</MonoLabel>
+            <MonoLabel className="cursor-pointer text-[10px]">
+              CREATE ANOTHER AFTER SAVING
+            </MonoLabel>
           </label>
           <button
             type="button"

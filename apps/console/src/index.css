@@ -5,8 +5,12 @@
    `@layer cascivo.component` CSS (imported as a component dependency) above it,
    so the layer order would otherwise resolve with cascivo.component FIRST (=
    lowest priority) and Preflight would win. The guaranteed-first declaration
-   lives in `index.html`'s <head>; this mirrors it for clarity. */
-@layer theme,
+   lives in `index.html`'s <head>; this mirrors it for clarity.
+   cascivo.reset (box-sizing + body margin, shipped since @cascivo/tokens 1.x)
+   is named FIRST so it stays the floor Cascivo documents it to be; left unnamed
+   it would be appended last and outrank Tailwind's utilities. */
+@layer cascivo.reset,
+  theme,
   base,
   components,
   utilities,
