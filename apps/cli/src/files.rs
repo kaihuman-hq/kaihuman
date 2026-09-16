@@ -68,8 +68,16 @@ fn dashboard_config_from_value(val: &serde_json::Value) -> DashboardConfig {
         arr.iter()
             .filter_map(|obj| {
                 Some(DashboardWorkspace {
-                    id: obj.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    name: obj.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    id: obj
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    name: obj
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
                 })
             })
             .collect()
@@ -93,7 +101,9 @@ fn dashboard_config_from_value(val: &serde_json::Value) -> DashboardConfig {
     });
 
     let files = val.get("files").and_then(|v| v.as_array()).map(|arr| {
-        arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
+        arr.iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect()
     });
 
     DashboardConfig {
@@ -120,7 +130,10 @@ pub fn load_dashboard_config(repo_dir: &Path) -> (Option<DashboardConfig>, Strin
         let full = repo_dir.join(candidate);
         if let Ok(content) = fs::read_to_string(&full) {
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-                return (Some(dashboard_config_from_value(&val)), candidate.to_string());
+                return (
+                    Some(dashboard_config_from_value(&val)),
+                    candidate.to_string(),
+                );
             }
         }
     }
@@ -149,7 +162,11 @@ fn scan_dir(base: &Path, dir: &Path, depth: usize) -> Option<(DashboardConfig, S
     let mut subdirs = Vec::new();
     for entry in read.flatten() {
         let path = entry.path();
-        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
 
         if path.is_file() && name.ends_with("dashboard.config.json") {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -208,11 +225,19 @@ fn collect_raw(
     entries.sort_by_key(|e| e.file_name());
     for entry in entries {
         let path = entry.path();
-        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         if name.starts_with('.') {
             continue;
         }
-        let rel = path.strip_prefix(base).unwrap_or(&path).to_string_lossy().to_string();
+        let rel = path
+            .strip_prefix(base)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .to_string();
         let is_dir = path.is_dir();
         out.push((rel, is_dir));
         if is_dir {
@@ -228,12 +253,20 @@ pub fn files_from_raw(raw: &[(String, bool)], recent_files: &[String]) -> Vec<Fi
     let mut items: Vec<FileItem> = recent_files
         .iter()
         .filter(|r| raw.iter().any(|(p, _)| p == *r))
-        .map(|r| FileItem { path: r.clone(), is_dir: false, is_recent: true })
+        .map(|r| FileItem {
+            path: r.clone(),
+            is_dir: false,
+            is_recent: true,
+        })
         .collect();
 
     for (path, is_dir) in raw {
         if !recent_files.iter().any(|r| r == path) {
-            items.push(FileItem { path: path.clone(), is_dir: *is_dir, is_recent: false });
+            items.push(FileItem {
+                path: path.clone(),
+                is_dir: *is_dir,
+                is_recent: false,
+            });
         }
     }
     items
@@ -253,10 +286,17 @@ pub fn dashboard_items_from_raw(
 
     let mut add = |path: String| {
         // Normalise paths that start with "./" so they match recent_files entries.
-        let path = path.strip_prefix("./").map(|s| s.to_string()).unwrap_or(path);
+        let path = path
+            .strip_prefix("./")
+            .map(|s| s.to_string())
+            .unwrap_or(path);
         if seen.insert(path.clone()) {
             let is_recent = recent_files.iter().any(|r| r == &path);
-            items.push(FileItem { path, is_dir: false, is_recent });
+            items.push(FileItem {
+                path,
+                is_dir: false,
+                is_recent,
+            });
         }
     };
 

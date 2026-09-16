@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
-    Frame,
 };
 
 use crate::app::{App, CurrentScreen, MENU_ITEMS};
@@ -20,7 +20,11 @@ pub fn ui(f: &mut Frame, app: &App) {
 
     // Title
     let title = Paragraph::new("kaihuman CLI")
-        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+        .style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(title, chunks[0]);
 
@@ -85,7 +89,10 @@ fn render_main(f: &mut Frame, app: &App, area: Rect) {
         .iter()
         .map(|(key, label)| {
             ListItem::new(Line::from(vec![
-                Span::styled(format!(" [{}]  ", key), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" [{}]  ", key),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::raw(*label),
             ]))
         })
@@ -125,11 +132,22 @@ fn render_login(f: &mut Frame, area: Rect) {
 // ── Repo select ───────────────────────────────────────────────────────────────
 
 fn render_repo_select(f: &mut Frame, app: &App, area: Rect) {
-    let items: Vec<ListItem> =
-        app.repos.iter().map(|r| ListItem::new(r.full_name.clone())).collect();
+    let items: Vec<ListItem> = app
+        .repos
+        .iter()
+        .map(|r| ListItem::new(r.full_name.clone()))
+        .collect();
     let list = List::new(items)
-        .block(Block::default().title("Select Repository").borders(Borders::ALL))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Yellow))
+        .block(
+            Block::default()
+                .title("Select Repository")
+                .borders(Borders::ALL),
+        )
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .fg(Color::Yellow),
+        )
         .highlight_symbol(">> ");
     f.render_stateful_widget(list, area, &mut app.repo_list_state.clone());
 }
@@ -152,7 +170,10 @@ fn render_ai_response(f: &mut Frame, app: &App, area: Rect) {
     let p = Paragraph::new(app.ai_response.as_str())
         .block(
             Block::default()
-                .title(format!("{} — response (↑↓ scroll | Esc: back)", app.ai_provider.name()))
+                .title(format!(
+                    "{} — response (↑↓ scroll | Esc: back)",
+                    app.ai_provider.name()
+                ))
                 .borders(Borders::ALL),
         )
         .wrap(Wrap { trim: false })
@@ -186,12 +207,21 @@ fn render_file_browser(f: &mut Frame, app: &App, area: Rect) {
     let title = if items.is_empty() {
         "Files — syncing…".to_string()
     } else {
-        format!("Files — {} ({})", app.active_repo.as_deref().unwrap_or("?"), items.len())
+        format!(
+            "Files — {} ({})",
+            app.active_repo.as_deref().unwrap_or("?"),
+            items.len()
+        )
     };
 
     let list = List::new(items)
         .block(Block::default().title(title).borders(Borders::ALL))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::White).bg(Color::DarkGray))
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .fg(Color::White)
+                .bg(Color::DarkGray),
+        )
         .highlight_symbol(">> ");
     f.render_stateful_widget(list, area, &mut app.file_browser_state.clone());
 }
@@ -235,8 +265,11 @@ fn render_dashboard_view(f: &mut Frame, app: &App, area: Rect) {
     if let Some(ref theme) = cfg.theme {
         info_lines.push(Line::from(format!("Theme: {}", theme)));
     }
-    let info = Paragraph::new(info_lines)
-        .block(Block::default().title("Dashboard Config").borders(Borders::ALL));
+    let info = Paragraph::new(info_lines).block(
+        Block::default()
+            .title("Dashboard Config")
+            .borders(Borders::ALL),
+    );
     f.render_widget(info, split[0]);
 
     // File list
@@ -259,8 +292,17 @@ fn render_dashboard_view(f: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let file_list = List::new(items)
-        .block(Block::default().title("Files (Enter to open)").borders(Borders::ALL))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::White).bg(Color::DarkGray))
+        .block(
+            Block::default()
+                .title("Files (Enter to open)")
+                .borders(Borders::ALL),
+        )
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .fg(Color::White)
+                .bg(Color::DarkGray),
+        )
         .highlight_symbol(">> ");
     f.render_stateful_widget(file_list, split[1], &mut app.file_browser_state.clone());
 }

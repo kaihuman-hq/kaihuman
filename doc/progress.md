@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-09-16 — pin the Rust toolchain, normalise `cargo fmt`
+
+`pnpm run verify` left nine `apps/cli/src/*.rs` files modified on every run: the
+committed Rust had drifted from `cargo fmt`, and verify's `format` step
+(`cargo fmt || true`) silently rewrote it each time. The files are now formatted,
+so a clean tree stays clean.
+
+The drift is only worth fixing alongside a pin. rustfmt's output changes between
+releases and `apps/cli` had neither a `rustfmt.toml` nor a toolchain file, so the
+formatting depended on whichever stable each contributor happened to have —
+reformatting on one machine would just be undone on the next. `apps/cli/rust-toolchain.toml`
+now pins `1.94.1` with the `rustfmt` and `clippy` components, which rustup
+resolves and fetches automatically.
+
+Formatting only; the diff is line-wrapping and `cargo test` passes unchanged.
+Note `format` keeps its `|| true`, so a formatting problem still cannot fail
+verify — that is a separate decision from this one.
+
 ## 2026-09-16 — `.prompts.md`: a prompt library in one searchable file
 
 A new file type for storing reusable prompts. One file holds many prompts; each

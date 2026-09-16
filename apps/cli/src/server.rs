@@ -1,7 +1,7 @@
 use anyhow::Result;
-use warp::Filter;
-use std::process::Command;
 use serde::{Deserialize, Serialize};
+use std::process::Command;
+use warp::Filter;
 
 #[derive(Deserialize)]
 pub struct ChatRequest {
@@ -33,22 +33,26 @@ pub async fn start_server(port: u16) -> Result<()> {
         .map(|req: ChatRequest| {
             let provider = req.provider.unwrap_or_else(|| "copilot".to_string());
             let (cmd, args) = match provider.as_str() {
-                "claude" => ("claude", vec!["-p", &req.message]), 
-                "gemini" => ("gemini", vec!["-p", &req.message]), 
+                "claude" => ("claude", vec!["-p", &req.message]),
+                "gemini" => ("gemini", vec!["-p", &req.message]),
                 _ => ("copilot", vec!["-p", &req.message]), // Default to GitHub Copilot CLI
             };
 
-            let output = Command::new(cmd)
-                .args(&args)
-                .output();
+            let output = Command::new(cmd).args(&args).output();
 
             let response_text = match output {
                 Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).to_string(),
-                Ok(out) => format!("Error connecting to {}: {}", provider, String::from_utf8_lossy(&out.stderr)),
+                Ok(out) => format!(
+                    "Error connecting to {}: {}",
+                    provider,
+                    String::from_utf8_lossy(&out.stderr)
+                ),
                 Err(e) => format!("Failed to execute {} CLI: {}", provider, e),
             };
 
-            warp::reply::json(&ChatResponse { response: response_text })
+            warp::reply::json(&ChatResponse {
+                response: response_text,
+            })
         });
 
     let routes = health.or(chat).with(cors);

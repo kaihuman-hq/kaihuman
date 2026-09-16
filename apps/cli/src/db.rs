@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::path::Path;
 
 pub struct Cache {
@@ -40,9 +40,10 @@ impl Cache {
     }
 
     pub fn get_files(&self, owner: &str, repo: &str) -> Vec<(String, bool)> {
-        let Ok(mut stmt) = self.conn.prepare(
-            "SELECT path, is_dir FROM files WHERE owner=?1 AND repo=?2 ORDER BY path",
-        ) else {
+        let Ok(mut stmt) = self
+            .conn
+            .prepare("SELECT path, is_dir FROM files WHERE owner=?1 AND repo=?2 ORDER BY path")
+        else {
             return vec![];
         };
         stmt.query_map(params![owner, repo], |row| {
