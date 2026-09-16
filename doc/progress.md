@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-09-16 — `lint` checks Rust formatting
+
+`apps/cli`'s `lint` is now `cargo fmt --check && cargo clippy`. `fmt --check`
+runs first because it needs no compile, so drift is reported in well under a
+second instead of after a clippy build. It names the offending file and line:
+`Diff in apps/cli/src/main.rs:83`.
+
+This is the piece that actually catches formatting drift — `cargo fmt` on its
+own rewrites and exits 0. Together with the `rust-toolchain.toml` pin, the
+check is meaningful: without a pinned rustfmt it would fail on contributors
+whose stable formats differently.
+
+**`pnpm run verify` now fails on unformatted Rust rather than silently
+reformatting it.** The JS packages are not equivalent here: verify runs `fix`
+before `lint`, so biome repairs their formatting in-place first, but `apps/cli`
+has no `fix` script, so `lint` is the first thing to see the Rust. Run
+`pnpm run format` to repair, then re-run. Giving `apps/cli` a `fix` script of
+`cargo fmt` would restore the symmetry; not done, because failing loudly on
+drift is the behaviour that was asked for.
+
 ## 2026-09-16 — `cargo fmt` failures stop being swallowed
 
 `apps/cli`'s `format` script was `cargo fmt || true`; it is now plain
@@ -13,8 +33,7 @@ missing component, a toolchain that will not resolve. Verified against a file
 with an unclosed delimiter — `|| true` exits 0 and prints the error into the
 void, without it the script exits 1.
 
-Catching drift needs `cargo fmt --check`, which belongs in `lint` (alongside
-`cargo clippy`) rather than in `format`. Not done here.
+Catching drift needs `cargo fmt --check` in `lint`, added in the entry above.
 
 ## 2026-09-16 — pin the Rust toolchain, normalise `cargo fmt`
 

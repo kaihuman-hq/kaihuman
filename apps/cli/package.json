@@ -5,7 +5,7 @@
   "scripts": {
     "build": "cargo build --release",
     "dev": "cargo run",
-    "lint": "cargo clippy",
+    "lint": "cargo fmt --check && cargo clippy",
     "format": "cargo fmt",
     "test": "cargo test"
   }
