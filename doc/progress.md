@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-09-16 — `cargo fmt` failures stop being swallowed
+
+`apps/cli`'s `format` script was `cargo fmt || true`; it is now plain
+`cargo fmt`, matching every other package, whose `format` is an unguarded
+`biome check --write`.
+
+What this does and does not buy: `cargo fmt` *writes*, so it exits 0 on
+badly-formatted code — dropping `|| true` does not make `pnpm run verify` catch
+formatting drift. What it catches is rustfmt failing outright: a parse error, a
+missing component, a toolchain that will not resolve. Verified against a file
+with an unclosed delimiter — `|| true` exits 0 and prints the error into the
+void, without it the script exits 1.
+
+Catching drift needs `cargo fmt --check`, which belongs in `lint` (alongside
+`cargo clippy`) rather than in `format`. Not done here.
+
 ## 2026-09-16 — pin the Rust toolchain, normalise `cargo fmt`
 
 `pnpm run verify` left nine `apps/cli/src/*.rs` files modified on every run: the
@@ -15,9 +31,6 @@ now pins `1.94.1` with the `rustfmt` and `clippy` components, which rustup
 resolves and fetches automatically.
 
 Formatting only; the diff is line-wrapping and `cargo test` passes unchanged.
-Note `format` keeps its `|| true`, so a formatting problem still cannot fail
-verify — that is a separate decision from this one.
-
 ## 2026-09-16 — `.prompts.md`: a prompt library in one searchable file
 
 A new file type for storing reusable prompts. One file holds many prompts; each

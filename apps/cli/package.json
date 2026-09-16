@@ -6,7 +6,7 @@
     "build": "cargo build --release",
     "dev": "cargo run",
     "lint": "cargo clippy",
-    "format": "cargo fmt || true",
+    "format": "cargo fmt",
     "test": "cargo test"
   }
 }
