@@ -227,11 +227,11 @@ importers:
   apps/console:
     dependencies:
       '@cascivo/charts':
-        specifier: ^1.2.0
-        version: 1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^1.3.0
+        version: 1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/editor':
-        specifier: ^1.2.0
-        version: 1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^1.3.0
+        version: 1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/themes':
         specifier: ^1.0.0
         version: 1.0.0
@@ -361,23 +361,23 @@ importers:
   packages/ui:
     dependencies:
       '@cascivo/charts':
-        specifier: ^1.2.0
-        version: 1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^1.3.0
+        version: 1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/core':
-        specifier: ^1.2.0
-        version: 1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^1.3.0
+        version: 1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/editor':
-        specifier: ^1.2.0
-        version: 1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^1.3.0
+        version: 1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/react':
-        specifier: ^1.2.0
-        version: 1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^1.3.0
+        version: 1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@cascivo/themes':
         specifier: ^1.0.0
         version: 1.0.0
       '@cascivo/tokens':
-        specifier: ^1.1.0
-        version: 1.1.0
+        specifier: ^1.1.1
+        version: 1.1.1
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -1117,8 +1117,8 @@ packages:
     resolution: {integrity: sha512-VERIM64vtTP1C4mxQ5thVT9fK0apjPFobqybMtA1UdUujWka24ERHbRHFGmpbbhp73MhV+KSsHQH9C6uOTdEQA==}
     engines: {node: '>=18'}
 
-  '@cascivo/charts@1.2.0':
-    resolution: {integrity: sha512-9O9dYpOU+tysEoLWrL9eJ96k/DoJKwN7AHiOc19NSexAOW3yg94CrP2VZq0ASir6RSAFHD/x/zQaXgAik/o1sg==}
+  '@cascivo/charts@1.3.0':
+    resolution: {integrity: sha512-ZK74SLtKEmJwePaAYFurjrdeHU+JeYd4ldmQ5QYy0imEIKXy7J5dliepUInFlFMRuonh/isIxX5B/iYIpKbXUg==}
     peerDependencies:
       '@preact/signals-react': '>=3.0.0'
       '@types/react': '>=18.0.0'
@@ -1128,8 +1128,8 @@ packages:
       '@types/react':
         optional: true
 
-  '@cascivo/core@1.2.0':
-    resolution: {integrity: sha512-rgs18HWL7gdHlMheBfKWPiY0Ygi3mRD93erbWRLFA5mjvFiRctU0MCEPDfIv+MtZ91qTqDOm78c3uogyMM8bSg==}
+  '@cascivo/core@1.3.0':
+    resolution: {integrity: sha512-cWCUjayyR91S1wYWbuIw2u0NetyYisDIJP2+YOfQ2ZyBFyWOrKoqRX/DCymwfawd9pxOqXplEKIocpHO4Af6rA==}
     peerDependencies:
       '@preact/signals-react': '>=3.0.0'
       '@types/react': '>=18.0.0'
@@ -1139,8 +1139,8 @@ packages:
       '@types/react':
         optional: true
 
-  '@cascivo/editor@1.2.0':
-    resolution: {integrity: sha512-sb0rfVki8QGMMJ90XJPsklR7v5aU3xvSD9qYAZ6nDoP2thG9yPRSnojXYKi+rRZiDoObOIP32Qhmjc7adNWzgw==}
+  '@cascivo/editor@1.3.0':
+    resolution: {integrity: sha512-xxj9gXTwY/pnMuFVupVJ5Lml5FfBxscr9apH7htUE0ymn8DuPrfjUFZxmyzdtHNqG9OuhUOO0CHk6FQfF3f35Q==}
     peerDependencies:
       '@preact/signals-react': '>=3.0.0'
       '@types/react': '>=18.0.0'
@@ -1150,13 +1150,13 @@ packages:
       '@types/react':
         optional: true
 
-  '@cascivo/i18n@1.2.0':
-    resolution: {integrity: sha512-wykiZwObptFvKJhvjbVRMstcDhM+Fm4WrtkCxtLYsW4pHLeD5o/1Npy8ucEO+ek8TTQolKwF1ebrAj4NwjyP+Q==}
+  '@cascivo/i18n@1.3.0':
+    resolution: {integrity: sha512-KXBmhdD1FRND8ubhq8DLYKAKo7OepbKJHsPVagxTWL87KIcNZ0UBBwUHaYMIxUlJS1LWdTNq43OQT3UHKomfYw==}
     peerDependencies:
       '@preact/signals-react': '>=3.0.0'
 
-  '@cascivo/react@1.2.0':
-    resolution: {integrity: sha512-1O5QgmqFvnhWK68OdgPVlaHey+n8NByCgGfNqRBEAtmJeHwq4GXDRPcJ6WMr4Nu2Hb3gq8jVIT0YmD/o5gwjiQ==}
+  '@cascivo/react@1.3.0':
+    resolution: {integrity: sha512-n491KbtoEBT27atMfRoyTvRV9aBCeQsMP17TWwKRNfvp1KPb80tIguyIzlt5eb8KJdplSif3aiJ5LyyX566Mhw==}
     peerDependencies:
       '@preact/signals-react': '>=3.0.0'
       '@types/react': '>=18.0.0'
@@ -1171,6 +1171,9 @@ packages:
 
   '@cascivo/tokens@1.1.0':
     resolution: {integrity: sha512-OH435+oGwz/Dd6CzgxF+dVxV3mZdOklUF7DeFX+ToRxtSIFkjVcY5FXs48nAQYtk8cHhbwA6V88S6IXOcW6W7w==}
+
+  '@cascivo/tokens@1.1.1':
+    resolution: {integrity: sha512-K8yZJBdSzHBp0g3ShPTkIRe+zKaXhsuZcSUrZbCCn6AZboFimpiK3hJ8kMaxKfhnPquu3GFN2a6GgU1iwsh2hg==}
 
   '@crxjs/vite-plugin@2.0.0-beta.33':
     resolution: {integrity: sha512-sSVKX6d4LBfScK6QZ9Qqs94LZ25uY0yTxoe4EOVqQfYvxb7AhnVo/YCvzeT113BRzhFA3IBCmAhTUASXS2aPKw==}
@@ -6313,17 +6316,17 @@ snapshots:
     dependencies:
       fontkitten: 1.0.2
 
-  '@cascivo/charts@1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@cascivo/charts@1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@cascivo/core': 1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@cascivo/i18n': 1.2.0(@preact/signals-react@3.10.2(react@18.3.1))
+      '@cascivo/core': 1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@cascivo/i18n': 1.3.0(@preact/signals-react@3.10.2(react@18.3.1))
       '@preact/signals-react': 3.10.2(react@18.3.1)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
     optionalDependencies:
       '@types/react': 19.2.8
 
-  '@cascivo/core@1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@cascivo/core@1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@preact/signals-react': 3.10.2(react@18.3.1)
       react: 18.3.1
@@ -6331,24 +6334,24 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.8
 
-  '@cascivo/editor@1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@cascivo/editor@1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@cascivo/core': 1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@cascivo/i18n': 1.2.0(@preact/signals-react@3.10.2(react@18.3.1))
+      '@cascivo/core': 1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@cascivo/i18n': 1.3.0(@preact/signals-react@3.10.2(react@18.3.1))
       '@preact/signals-react': 3.10.2(react@18.3.1)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
     optionalDependencies:
       '@types/react': 19.2.8
 
-  '@cascivo/i18n@1.2.0(@preact/signals-react@3.10.2(react@18.3.1))':
+  '@cascivo/i18n@1.3.0(@preact/signals-react@3.10.2(react@18.3.1))':
     dependencies:
       '@preact/signals-react': 3.10.2(react@18.3.1)
 
-  '@cascivo/react@1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@cascivo/react@1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@cascivo/core': 1.2.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@cascivo/i18n': 1.2.0(@preact/signals-react@3.10.2(react@18.3.1))
+      '@cascivo/core': 1.3.0(@preact/signals-react@3.10.2(react@18.3.1))(@types/react@19.2.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@cascivo/i18n': 1.3.0(@preact/signals-react@3.10.2(react@18.3.1))
       '@cascivo/themes': 1.0.0
       '@preact/signals-react': 3.10.2(react@18.3.1)
       react: 18.3.1
@@ -6361,6 +6364,8 @@ snapshots:
       '@cascivo/tokens': 1.1.0
 
   '@cascivo/tokens@1.1.0': {}
+
+  '@cascivo/tokens@1.1.1': {}
 
   '@crxjs/vite-plugin@2.0.0-beta.33(supports-color@8.1.1)':
     dependencies:
