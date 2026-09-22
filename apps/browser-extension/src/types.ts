@@ -7,12 +7,18 @@ export interface Message {
     | 'SAVE_PINNED_TAB_GROUP'
     | 'RENAME_PINNED_TAB_GROUP'
     | 'MOVE_PINNED_TAB_GROUP'
-    | 'DELETE_PINNED_TAB_GROUP';
+    | 'DELETE_PINNED_TAB_GROUP'
+    | 'GET_BOOKMARKS'
+    | 'SEARCH_REPO'
+    | 'OPEN_URL'
+    | 'TOGGLE_COMMAND_PALETTE';
   token?: string;
   path?: string;
   note?: string;
   description?: string;
   tags?: string[];
+  query?: string;
+  url?: string;
 }
 
 export interface MessageResponse {

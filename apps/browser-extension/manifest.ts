@@ -20,6 +20,15 @@ export default defineManifest({
       "128": "icon-128.png"
     }
   },
+  commands: {
+    'toggle-command-palette': {
+      suggested_key: {
+        default: 'Ctrl+Shift+Space',
+        mac: 'Command+Shift+Space',
+      },
+      description: 'Open the Lifosy command palette',
+    },
+  },
   background: {
     service_worker: 'src/background/service-worker.ts',
     type: 'module',

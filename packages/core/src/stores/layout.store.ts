@@ -154,6 +154,7 @@ export class LayoutStore {
       const isStocks = item.path.toLowerCase().endsWith('.stocks.csv');
       const isConsumption = item.path.toLowerCase().endsWith('.consumption.csv');
       const isBoardOverview = item.path.toLowerCase().endsWith('.board-overview.json');
+      const isBookmarks = item.path.toLowerCase().endsWith('.bookmarks.json');
 
       // Use compound extension for known widget types; fall back to last segment
       let extension: string | undefined;
@@ -170,6 +171,7 @@ export class LayoutStore {
       else if (isStocks) extension = '.stocks.csv';
       else if (isConsumption) extension = '.consumption.csv';
       else if (isBoardOverview) extension = '.board-overview.json';
+      else if (isBookmarks) extension = '.bookmarks.json';
       else extension = item.path.includes('.') ? `.${item.path.split('.').pop()}` : undefined;
 
       const tile: TileDef = {
@@ -197,7 +199,8 @@ export class LayoutStore {
         isDataCollection ||
         isStocks ||
         isConsumption ||
-        isBoardOverview;
+        isBoardOverview ||
+        isBookmarks;
 
       if (isWidget && openFiles && openFiles[item.path]) {
         tile.rawContent = openFiles[item.path]?.content;

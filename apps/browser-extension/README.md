@@ -9,6 +9,8 @@ The official browser extension for Lifosy, designed to enhance your web experien
 - **Quick Dump Notes**: Rapidly create notes without navigating away from your current tab.
 - **Context Menu Integration**: Conveniently access Lifosy features directly from the browser's context menu.
 - **Pinned Tabs Sync**: Save named groups of pinned tabs to your repo, and load any of them into the current window on any machine.
+- **Bookmarks**: Your repo's bookmarks, mirrored into the browser and kept in sync in the background.
+- **Command Palette**: `Ctrl+Shift+Space` on any page to search those bookmarks — and, on request, your repo.
 
 ## Pinned Tabs
 
@@ -57,6 +59,67 @@ you edit a pinned tab and after you restart the browser.
 
 Reading the URL of every tab requires the `tabs` permission, which Chrome surfaces as
 "Read your browsing history" when the extension is installed or updated.
+
+## Bookmarks
+
+Bookmarks are maintained in the console as a **Bookmarks** file (`.bookmarks.json`) and read by
+the extension from one fixed path in the active repo: `.kh/browser.bookmarks.json`. To create it,
+pick **New File → Bookmarks** in the console, name it `browser` and put it in the `.kh` folder.
+Bookmark files anywhere else in the repo work fine in the console but are not what the extension
+mirrors.
+
+```json
+{
+  "bookmarks": [
+    {
+      "id": "6f1c…",
+      "title": "Vitest",
+      "url": "https://vitest.dev/",
+      "tags": ["testing"],
+      "createdAt": "2026-09-22T10:00:00.000Z",
+      "updatedAt": "2026-09-22T10:00:00.000Z"
+    }
+  ],
+  "updatedAt": "2026-09-22T10:00:00.000Z"
+}
+```
+
+Only `http`/`https` entries are ever shown or opened; any other scheme in the file is dropped.
+
+### Caching and sync
+
+The extension never waits on GitHub to show you a bookmark:
+
+- The list is cached in `chrome.storage.local` and served from there.
+- A cache older than 15 minutes is still served, and refreshed in the background — so an edit in
+  the repo shows up on the next use, not after a spinner.
+- An alarm syncs every 15 minutes even if you never open the palette.
+- Refreshes replay GitHub's own `ETag` as `If-None-Match`, so an unchanged file answers `304` —
+  a response GitHub does not count against your rate limit.
+- The cache records which repo it came from, so switching repos in the popup re-fetches. Logging
+  in again drops it, because a new token can mean a different account.
+
+A repo with no `.kh/browser.bookmarks.json` yet is an empty list, not an error.
+
+## Command Palette
+
+`Ctrl+Shift+Space` (`Command+Shift+Space` on macOS) opens a palette in the middle of the current
+page. Rebind it at `chrome://extensions/shortcuts`. Chrome does not run extension content scripts
+on its own pages (`chrome://…`, the New Tab page, the Web Store), so the palette cannot open
+there — switch to a normal tab.
+
+- **Type** to filter your bookmarks. This is a local search over the cache, so it costs nothing
+  and does not touch the network. A title that starts with what you typed ranks above one that
+  merely contains it, then tags, then the URL.
+- **↑ / ↓** move the selection, **⏎** opens it in a new tab, **Esc** (or a click outside) closes.
+- **⇥ Tab** searches the *repo* for what you typed — one GitHub code search, only when you ask
+  for it. GitHub's code-search endpoint has a small dedicated budget (~10 requests/minute) that
+  penalizes bursts, so the palette never searches the repo while you type. Results appear under a
+  **Repo** heading and open on GitHub. Typing again clears them, since they belong to the old
+  query.
+
+The palette renders inside a shadow root, so the page's styling cannot reach it and its styling
+cannot reach the page.
 
 ## Development
 

@@ -1,6 +1,15 @@
 import { type Message } from '../types';
 import {
+  BOOKMARKS_PATH,
+  type Bookmark,
+  type BookmarksCache,
+  isCacheStale,
+  isCacheUsable,
+  parseBookmarks,
+} from './bookmarks';
+import {
   findGroup,
+  isOpenableUrl,
   matchGroup,
   moveGroup,
   normalizeGroupName,
@@ -23,9 +32,17 @@ console.log('LifeOS Extension: Background script loaded');
 // inactivity; the alarm wakes it up periodically so the Vite HMR connection
 // stays intact during development.
 chrome.alarms.create('swKeepAlive', { periodInMinutes: 0.5 });
+
+// Bookmarks are served from the cache and refreshed behind the user's back, so the palette
+// opens instantly and a repo edit lands within one sync period.
+chrome.alarms.create('bookmarksSync', { periodInMinutes: 15 });
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'swKeepAlive') {
     // No-op: waking the worker is sufficient.
+  }
+  if (alarm.name === 'bookmarksSync') {
+    syncBookmarks().catch((e) => console.warn('LifeOS Extension: bookmark sync failed', e));
   }
 });
 
@@ -35,6 +52,21 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // surfaced as "The message port closed before a response was received".
 chrome.runtime.onConnect.addListener(() => {
   // Accepting the port is the whole job — holding it open is what keeps the worker alive.
+});
+
+// The keyboard shortcut is an extension-level command, which only the worker can hear; the
+// palette itself lives in the page, so the command is relayed to the active tab. Chrome does not
+// run content scripts on its own pages (chrome://, the New Tab page), so there the message has
+// nowhere to land and is ignored.
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== 'toggle-command-palette') return;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id === undefined) return;
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_COMMAND_PALETTE' });
+  } catch {
+    // No content script on this page (chrome://, the web store, a PDF viewer).
+  }
 });
 
 // Initialize Context Menu
@@ -181,6 +213,118 @@ async function writeConfig(token: string, repo: string, config: PinnedTabsConfig
   await githubWriteFile(token, repo, PINNED_TABS_PATH, serializePinnedTabs(config), sha);
 }
 
+async function readBookmarksCache(): Promise<BookmarksCache | undefined> {
+  const stored = await chrome.storage.local.get('bookmarksCache');
+  return stored.bookmarksCache as BookmarksCache | undefined;
+}
+
+async function credentials(): Promise<{ token?: string; repo: string }> {
+  const data = await chrome.storage.local.get(['lifeos_token', 'lifeos_repo']);
+  return {
+    token: data.lifeos_token as string | undefined,
+    repo: (data.lifeos_repo as string) || 'lifosy/monorepo',
+  };
+}
+
+/**
+ * Pulls the repo file into the cache. GitHub's own `ETag` is replayed as `If-None-Match`, so an
+ * unchanged file answers 304 — which GitHub does not bill against the rate limit.
+ */
+async function syncBookmarks(): Promise<BookmarksCache | undefined> {
+  const { token, repo } = await credentials();
+  if (!token) return undefined;
+
+  const cache = await readBookmarksCache();
+  const known = isCacheUsable(cache, repo) ? cache : undefined;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github.v3+json',
+  };
+  if (known?.etag) headers['If-None-Match'] = known.etag;
+
+  const res = await fetch(`https://api.github.com/repos/${repo}/contents/${BOOKMARKS_PATH}`, {
+    headers,
+  });
+
+  // 304: the file is byte-identical, so only the freshness stamp moves.
+  if (res.status === 304 && known) {
+    const refreshed = { ...known, fetchedAt: Date.now() };
+    await chrome.storage.local.set({ bookmarksCache: refreshed });
+    return refreshed;
+  }
+  // A repo without the file yet is a valid empty list, not an error.
+  if (res.status === 404) {
+    const empty: BookmarksCache = { repo, bookmarks: [], etag: null, fetchedAt: Date.now() };
+    await chrome.storage.local.set({ bookmarksCache: empty });
+    return empty;
+  }
+  if (!res.ok) throw new Error(`Failed to read ${BOOKMARKS_PATH}: ${res.statusText}`);
+
+  const data = await res.json();
+  const { bookmarks } = parseBookmarks(decodeBase64(data.content || ''));
+  const next: BookmarksCache = {
+    repo,
+    bookmarks,
+    etag: res.headers?.get('etag') ?? null,
+    fetchedAt: Date.now(),
+  };
+  await chrome.storage.local.set({ bookmarksCache: next });
+  return next;
+}
+
+/**
+ * Cache first: a usable cache answers immediately and a stale one is refreshed in the background,
+ * so opening the palette never waits on GitHub. Only a missing or foreign-repo cache blocks.
+ */
+async function getBookmarks(): Promise<{
+  bookmarks: Bookmark[];
+  fetchedAt: number;
+  stale: boolean;
+}> {
+  const { repo } = await credentials();
+  const cache = await readBookmarksCache();
+
+  if (isCacheUsable(cache, repo) && cache) {
+    const stale = isCacheStale(cache);
+    if (stale) {
+      // Deliberately not awaited: the caller gets the cached list now.
+      syncBookmarks().catch((e) => console.warn('LifeOS Extension: bookmark refresh failed', e));
+    }
+    return { bookmarks: cache.bookmarks, fetchedAt: cache.fetchedAt, stale };
+  }
+
+  const fetched = await syncBookmarks();
+  // No cache to fall back on, so being signed out is worth saying out loud.
+  if (!fetched) throw new Error('No token found — log in through the console');
+  return { bookmarks: fetched.bookmarks, fetchedAt: fetched.fetchedAt, stale: false };
+}
+
+/**
+ * One GitHub code-search request, run only when the user explicitly asks for it. That endpoint has
+ * its own ~10 req/min budget with a burst penalty, so the palette never calls this while typing.
+ */
+async function searchRepo(query: string) {
+  const { token, repo } = await credentials();
+  const trimmed = query.trim();
+  if (!trimmed) return { results: [] };
+
+  const headers: Record<string, string> = { Accept: 'application/vnd.github.v3+json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const q = encodeURIComponent(`${trimmed} repo:${repo}`);
+  const res = await fetch(`https://api.github.com/search/code?q=${q}&per_page=10`, { headers });
+  if (res.status === 403) throw new Error('GitHub search is rate limited — try again in a minute');
+  if (!res.ok) throw new Error(`GitHub search failed: ${res.statusText}`);
+
+  const data = await res.json();
+  const results = (data.items || []).map((item: any) => ({
+    path: item.path as string,
+    name: item.name as string,
+    url: item.html_url as string,
+  }));
+  return { results };
+}
+
 /** The window the popup belongs to, plus its pinned tabs in one round-trip. */
 async function currentWindow() {
   const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -301,6 +445,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
     }, () => {
       console.log('LifeOS Extension: Token & Repo data saved');
     });
+    // A new token can mean a different account, whose repo file is a different list.
+    chrome.storage.local.remove('bookmarksCache');
     return false;
   }
 
@@ -384,6 +530,36 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
         sendResponse({ quickNotes: [] }); // default empty gracefully
       }
     });
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'GET_BOOKMARKS') {
+    getBookmarks().then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'SEARCH_REPO') {
+    searchRepo(message.query || '').then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'OPEN_URL') {
+    // The palette lives in the page, so the url it sends is page-influenced; only schemes Chrome
+    // can safely navigate to get a tab.
+    if (!isOpenableUrl(message.url || '')) {
+      sendResponse({ error: 'Refusing to open that URL' });
+      return false;
+    }
+    chrome.tabs.create({ url: message.url, active: true }).then(
+      () => sendResponse({ success: true }),
+      (error) => sendResponse({ error: error.message }),
+    );
     return true; // Indicate async response
   }
 

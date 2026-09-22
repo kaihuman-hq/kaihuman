@@ -343,6 +343,7 @@ export const Dashboard = () => {
               lowerPath.endsWith('.stocks.csv') ||
               lowerPath.endsWith('.consumption.csv') ||
               lowerPath.endsWith('.board-overview.json') ||
+              lowerPath.endsWith('.bookmarks.json') ||
               lowerPath.endsWith('.enc');
 
             if (isWidget) {

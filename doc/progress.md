@@ -1,5 +1,71 @@
 # Progress
 
+## 2026-09-22 — bookmarks: a repo file type, a cached mirror, and a palette on a shortcut
+
+Bookmarks now live in the repo as a first-class file type and reach the browser
+through the extension's own cache, so the palette opens instantly and syncs
+behind the user's back.
+
+**Console — `.bookmarks.json`.** A new template in the New File wizard, wired the
+same way every other widget type is: `BookmarksLogic` (parse/serialize plus
+`addBookmark`, `deleteBookmark`, `filterBookmarks`, `collectTags`),
+`BookmarksWidget` for the four tile modes, and `BookmarkAddForm` behind the focus
+view's ADD BOOKMARK tab. The compound extension is registered in the three places
+that derive one from a path — `layout.store.getChildren`, and `MainApp`'s
+`dashboardTiles` and `computedActiveTile` — plus `Dashboard`'s `renderFile`
+allow-list, so the file behaves identically on the dashboard, in Files view and
+in focus mode. The file is a JSON object: `{ bookmarks: [{ id, title, url, tags,
+createdAt, updatedAt }], updatedAt }`, all timestamps ISO strings, matching its
+`browser.pinnedtabs.json` sibling.
+
+Only `http(s)` entries survive parsing, in both apps. The file is remote input
+that ends up as a clickable link and, in the extension, as a tab — a
+`javascript:` entry must never get that far. `addBookmark` also rejects a page
+already in the file, comparing canonical URLs so `https://x.com` and
+`https://x.com/` are the same page.
+
+**Extension — a cache, not a fetch.** `GET_BOOKMARKS` answers from
+`chrome.storage.local` and only blocks on GitHub when there is no usable cache;
+a cache older than 15 minutes is served anyway and refreshed in the background,
+and an alarm syncs every 15 minutes regardless. GitHub's own `ETag` is replayed as
+`If-None-Match`, so an unchanged file answers 304 — which GitHub does not bill
+against the rate limit. The cache carries the repo it came from, which is what makes a repo switch
+in the popup self-invalidating; a new token drops it outright, since that can
+mean a different account.
+
+**Extension — the palette.** `Ctrl+Shift+Space` (`Command+Shift+Space` on macOS)
+is an extension command, which only the service worker can hear, so it relays to
+the active tab and the content script toggles the palette there. The palette is
+plain DOM in a shadow root rather than a Preact island: nothing of the page's CSS
+reaches it and none of ours reaches the page. Bookmark titles are set as
+`textContent`, never markup.
+
+Searching bookmarks is local against the cached list and ranks a title prefix
+above a title substring, then tags, then the URL. Searching the repo is a
+separate, explicit act: `Tab` on the typed query fires exactly one
+`search/code` request. That endpoint's ~10 req/min budget punishes bursts, and
+the console's `SearchModal` already pays for debounce-and-retry around it, so the
+palette never calls it while typing at all. Typing again drops the previous
+query's repo results rather than showing them next to fresh bookmark matches.
+
+Opening a result goes through the worker (`OPEN_URL`), which re-checks the scheme
+before creating a tab — the palette runs in the page, so the URL it sends is
+page-influenced.
+
+Demo mode seeds `.kh/browser.bookmarks.json` on the Reading dashboard, so the
+widget is visible without a repo, and `demo.test.ts` guards that file's shape
+against the parser like it does the other widget formats.
+
+Checks: `tsc --noEmit` clean in `@lifosy/core`, `@lifosy/ui` and
+`@lifosy/app-console`, `tsc -b` clean in the extension; biome clean in all three
+packages and on every file added here; console vitest 82 of 82 (19 new, for the
+bookmarks logic), extension vitest 100 of 100 (45 new, across the cache/search
+module, the worker messages and the palette in jsdom); `@lifosy/ui`, console and
+extension builds green. `turbo` itself cannot spawn child processes in this
+sandbox ("Exec format error"), which is why the per-package scripts were run
+directly — it fails the same way on `@lifosy/config`'s `echo`.
+
+
 ## 2026-09-16 — cascivo 1.3.0: the editor gutter stops drifting
 
 `@cascivo/{charts,core,editor,react}` 1.2.0 → 1.3.0, `@cascivo/tokens` 1.1.0 → 1.1.1

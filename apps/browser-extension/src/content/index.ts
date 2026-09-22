@@ -1,3 +1,5 @@
+import type { CommandPalette } from './command-palette';
+import { createCommandPalette } from './command-palette';
 import { extractArticle } from './extract';
 
 console.log('LifeOS Extension: Content script loaded');
@@ -56,9 +58,43 @@ const observer = new MutationObserver((mutations) => {
 
 observer.observe(document.body, { attributes: true });
 
+// Built on first use so pages that never open the palette pay nothing for it.
+let palette: CommandPalette | null = null;
+
+const send = (message: Record<string, unknown>): Promise<any> =>
+  new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      const failure = chrome.runtime.lastError?.message || response?.error;
+      if (failure) reject(new Error(failure));
+      else resolve(response);
+    });
+  });
+
+function getPalette(): CommandPalette {
+  if (!palette) {
+    palette = createCommandPalette({
+      loadBookmarks: async () => (await send({ type: 'GET_BOOKMARKS' })).bookmarks,
+      searchRepo: async (query) => (await send({ type: 'SEARCH_REPO', query })).results,
+      // Content scripts cannot open tabs, and routing through the worker also puts the URL
+      // through its scheme check before anything is navigated to.
+      open: (url) => {
+        send({ type: 'OPEN_URL', url }).catch((e) =>
+          console.warn('LifeOS Extension: could not open', url, e),
+        );
+      },
+    });
+  }
+  return palette;
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'EXTRACT_ARTICLE') {
     sendResponse(extractArticle());
+    return false;
+  }
+  if (msg.type === 'TOGGLE_COMMAND_PALETTE') {
+    getPalette().toggle();
+    sendResponse({ success: true });
     return false;
   }
 });

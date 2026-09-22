@@ -55,6 +55,21 @@ describe('buildDemoSeed', () => {
     expect(f['.kh/metrics.data-collection.csv']).toMatch(/^name::created,type::auto:date;/);
     expect(f['.kh/daily.actionlog.md']).toMatch(/\n- \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} /);
 
+    // bookmarks: the shape BookmarksLogic parses, with only openable urls
+    const bookmarks = JSON.parse(f['.kh/browser.bookmarks.json'] as string);
+    expect(Array.isArray(bookmarks.bookmarks)).toBe(true);
+    expect(bookmarks.bookmarks.length).toBeGreaterThan(0);
+    for (const bookmark of bookmarks.bookmarks) {
+      expect(bookmark).toMatchObject({
+        id: expect.any(String),
+        title: expect.any(String),
+        url: expect.stringMatching(/^https?:\/\//),
+        tags: expect.any(Array),
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String),
+      });
+    }
+
     // todos: frontmatter + at least one task of each interesting marker
     const todos = f['.kh/projects.todos.md'] as string;
     expect(todos).toMatch(/^---\nmilestones:/);

@@ -50,6 +50,14 @@ import { SettingsView } from '../Organisms/SettingsView';
 import { StatusBar } from '../Organisms/StatusBar';
 import { ActionLogWidget } from '../Organisms/Widgets/ActionLogWidget';
 import { BoardOverviewWidget } from '../Organisms/Widgets/BoardOverviewWidget';
+import { BookmarkAddForm } from '../Organisms/Widgets/BookmarkAddForm';
+import {
+  addBookmark,
+  collectTags as collectBookmarkTags,
+  parseBookmarks,
+  serializeBookmarks,
+} from '../Organisms/Widgets/BookmarksLogic';
+import { BookmarksWidget } from '../Organisms/Widgets/BookmarksWidget';
 import { BudgetWidget } from '../Organisms/Widgets/BudgetWidget';
 import { ConsumptionWidget } from '../Organisms/Widgets/ConsumptionWidget';
 import { CsvTableView } from '../Organisms/Widgets/CsvTableView';
@@ -732,6 +740,7 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.stocks.csv')) ext = '.stocks.csv';
       else if (lowerPath.endsWith('.consumption.csv')) ext = '.consumption.csv';
       else if (lowerPath.endsWith('.board-overview.json')) ext = '.board-overview.json';
+      else if (lowerPath.endsWith('.bookmarks.json')) ext = '.bookmarks.json';
       else {
         const parts = entry.path.split('.');
         if (lowerPath.endsWith('.enc') && parts.length > 2) {
@@ -863,6 +872,15 @@ abbreviations: undefined
               logger.error('onAddToReadItLater prop is UNDEFINED');
             }
           }}
+        />
+      );
+    }
+    if (tile.extension?.toLowerCase() === '.bookmarks.json' && tile.rawContent) {
+      return (
+        <BookmarksWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
     }
@@ -1055,6 +1073,7 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
       else if (lowerPath.endsWith('.stocks.csv')) ext = '.stocks.csv';
       else if (lowerPath.endsWith('.consumption.csv')) ext = '.consumption.csv';
+      else if (lowerPath.endsWith('.bookmarks.json')) ext = '.bookmarks.json';
       else {
         const parts = entryPath.split('.');
         ext = parts.length > 1 ? `.${parts.slice(1).join('.').toLowerCase()}` : '';
@@ -2156,6 +2175,7 @@ const FocusedTileInternal = ({
   const isStocks = tile.extension === '.stocks.csv';
   const isConsumption = tile.extension === '.consumption.csv';
   const isBoardOverview = tile.extension === '.board-overview.json';
+  const isBookmarks = tile.extension?.toLowerCase() === '.bookmarks.json';
 
   const isGenericCsv =
     tile.extension === '.csv' &&
@@ -2183,7 +2203,8 @@ const FocusedTileInternal = ({
     isStocks ||
     isConsumption ||
     isAnyCsv || // && !!tile.rawContent;
-    isBoardOverview;
+    isBoardOverview ||
+    isBookmarks;
 
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const [viewMode, setViewMode] = useState<string>(
@@ -2266,6 +2287,7 @@ const FocusedTileInternal = ({
     const _isStocks = tile.extension === '.stocks.csv';
     const _isConsumption = tile.extension === '.consumption.csv';
     const _isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv');
+    const _isBookmarks = tile.extension?.toLowerCase() === '.bookmarks.json';
 
     const _hasWidget =
       _isTimeTracking ||
@@ -2281,7 +2303,8 @@ const FocusedTileInternal = ({
       _isPrompts ||
       _isStocks ||
       _isConsumption ||
-      _isAnyCsv;
+      _isAnyCsv ||
+      _isBookmarks;
 
     if (viewMode === 'CODE') {
       // console.log('[FocusedTileInternal] ViewMode is CODE. HasWidget:', _hasWidget, 'RawContent length:', tile.rawContent?.length);
@@ -2539,6 +2562,21 @@ const FocusedTileInternal = ({
                     )}
                   >
                     CHARTS
+                  </button>
+                )}
+
+                {isBookmarks && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('ADD')}
+                    className={cn(
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'ADD'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+                    )}
+                  >
+                    ADD BOOKMARK
                   </button>
                 )}
 
@@ -2857,6 +2895,13 @@ const FocusedTileInternal = ({
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
+              {isBookmarks && (
+                <BookmarksWidget
+                  content={tile.rawContent || ''}
+                  mode="FOCUS"
+                  onChange={(newContent) => tile.onContentChange?.(newContent)}
+                />
+              )}
               {isGenericCsv && <CsvTableView content={tile.rawContent || ''} />}
               {isBoardOverview && (
                 <BoardOverviewWidget
@@ -2870,6 +2915,23 @@ const FocusedTileInternal = ({
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="flex flex-col min-h-full w-full p-8">
               <TimeTrackingCharts data={tile.rawContent as string} />
+            </div>
+          ) : viewMode === 'ADD' && isBookmarks ? (
+            <div className="min-h-full w-full p-8 flex justify-center items-start">
+              <BookmarkAddForm
+                existingTags={collectBookmarkTags(parseBookmarks(tile.rawContent || '').bookmarks)}
+                onCancel={() => setViewMode('WIDGET')}
+                onAdd={(draft) => {
+                  try {
+                    const config = parseBookmarks(tile.rawContent || '');
+                    tile.onContentChange?.(serializeBookmarks(addBookmark(config, draft)));
+                    setViewMode('WIDGET');
+                    return undefined;
+                  } catch (e: any) {
+                    return e.message || 'Could not add the bookmark';
+                  }
+                }}
+              />
             </div>
           ) : viewMode === 'ADD' && (isEvents || isTodos || isTimezones || isDataCollection) ? (
             <div className="min-h-full w-full p-8 flex justify-center items-start">

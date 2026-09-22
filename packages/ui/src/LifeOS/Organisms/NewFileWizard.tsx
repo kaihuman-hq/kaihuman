@@ -14,6 +14,7 @@ import {
   Lock,
   MessageSquareQuote,
   Rss,
+  Star,
   TrendingUp,
   X,
   Zap,
@@ -133,6 +134,14 @@ const TEMPLATES: Template[] = [
     icon: Bookmark,
     extension: '.readitlater.json',
     defaultContent: JSON.stringify({ items: [] }, null, 2),
+  },
+  {
+    id: 'bookmarks',
+    name: 'Bookmarks',
+    description: 'Tagged, searchable bookmarks. Synced into the browser extension.',
+    icon: Star,
+    extension: '.bookmarks.json',
+    defaultContent: JSON.stringify({ bookmarks: [], updatedAt: '' }, null, 2),
   },
   {
     id: 'board-overview',
