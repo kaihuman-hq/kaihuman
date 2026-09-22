@@ -25,6 +25,8 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Sync now — fetch and push immediately, ignoring the hourly budget | popup header, palette → Actions | 2026-09-22 |
+| Guided bookmark entry — URL, title and tags editable in both the popup and the palette | popup star, palette → Bookmark this page… | 2026-09-22 |
 | Bookmark usage counts, merged additively and synced at most hourly | service worker, console widget | 2026-09-22 |
 | Sort bookmarks by least/most used, to find ones worth deleting | Bookmarks widget → LEAST USED | 2026-09-22 |
 | Recent actions — the palette's last ten opens and actions, newest first | palette → Recent | 2026-09-22 |

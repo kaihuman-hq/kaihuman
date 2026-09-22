@@ -106,10 +106,15 @@ Only `http`/`https` entries are ever shown or opened; any other scheme in the fi
 
 Two surfaces write to that same file, both committing through the GitHub API:
 
-- **The popup's star**, which opens a view where you add tags and **Save**, or **Skip** to save
-  without them.
-- **The palette → Bookmark this page**, saved in one keystroke, or **Bookmark this page with
-  tags…** if you want them. The palette stays open and confirms, so you can keep searching.
+- **The popup's star**, which opens a view with the **URL**, **title** and **tags** all editable —
+  **Save**, or **Skip tags** to save what is there without any.
+- **The palette → Bookmark this page…**, which walks you through the same three fields: URL, then
+  title, then tags. Each is prefilled and selected, so `⏎` keeps it and typing replaces it; `Esc`
+  steps back a field rather than throwing the lot away. The palette stays open and confirms, so
+  you can keep searching.
+
+Both prefill from the page but neither is stuck with it: a tracking-laden URL or a site's
+boilerplate title is worth fixing before it is saved.
 
 Both prefer the page's `<link rel="canonical">` over the address bar, so the same page saved from
 either surface lands on one URL. A page already in the file is refused rather than duplicated
@@ -143,6 +148,10 @@ an hour on its own:
   the repo shows up on the next use, not after a spinner.
 - An alarm checks hourly, and **opening the popup checks too** — but a cache still inside its hour
   is left alone, so opening the popup ten times costs nothing.
+- **Sync now** — the button in the popup header, or the palette action — ignores that budget. Asking
+  outright is not background traffic: it fetches, pushes whatever has been counted, and brings the
+  pinned-tab groups along. Reach for it when you have just changed something in the console and
+  want it here now.
 - Refreshes replay GitHub's own `ETag` as `If-None-Match`, so an unchanged file answers `304` —
   a response GitHub does not count against your rate limit.
 - The cache records which repo it came from, so switching repos in the popup re-fetches. Logging
@@ -210,8 +219,7 @@ Everything the extension can do is here, so the popup is never the only way in:
 
 | Action | What it does |
 | --- | --- |
-| Bookmark this page | Saves it with no tags |
-| Bookmark this page with tags… | Asks for tags first |
+| Bookmark this page… | Walks through URL, title and tags, each prefilled from the page |
 | Pin this page to the Knowledge Base | Saves the page text as a note to process later |
 | Add the selected text to the Knowledge Base | The context menu's clipping, from the keyboard |
 | Add a note… | Pick the dump or any quick-note file, then type; an `.actionlog.md` target takes `#tags` in the text |
@@ -219,12 +227,15 @@ Everything the extension can do is here, so the popup is never the only way in:
 | Save this window's pinned tabs as a new group… | Asks for the name |
 | Import the browser's bookmarks | Copies them into the repo file (grant access from the popup first) |
 | Switch repository… | Pick from the repositories the console shared |
+| Sync with GitHub now | Fetches and pushes immediately, ignoring the hourly budget |
 | Open the Lifosy console | |
 
-An action that needs an argument takes over the input and says so; an action ending in `…` opens a
-list instead of running. **Esc** unwinds one step at a time — out of the argument, back out of each
-list, and only then closes the palette. Deleting a tab group asks you to type `DELETE`, since it is
-otherwise one keystroke away.
+An action that needs arguments takes over the input and walks through them one at a time, with the
+breadcrumb showing which field and how far along (`Bookmark this page · Title (2/3)`) and the row
+area showing what you have answered so far. An action ending in `…` opens a list instead of
+running. **Esc** unwinds one step at a time — back a field, then out of the argument, back out of
+each list, and only then closes the palette. Deleting a tab group asks you to type `DELETE`, since
+it is otherwise one keystroke away.
 
 The palette renders inside a shadow root, so the page's styling cannot reach it and its styling
 cannot reach the page.

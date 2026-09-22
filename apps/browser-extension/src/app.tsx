@@ -18,6 +18,7 @@ export function App() {
   const [selectedNote, setSelectedNote] = useState<string>('.lifeos/dump.md');
   // The star opens a view of its own rather than growing the popup with another form.
   const [view, setView] = useState<'main' | 'bookmark'>('main');
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'failed'>('idle');
 
   useEffect(() => {
     // Check for auth token, repo, and repos
@@ -90,6 +91,17 @@ export function App() {
 
   const handleLogin = () => {
     chrome.tabs.create({ url: `${CONSOLE_URL}/extension-onboarded` }); // Or localhost if dev
+  };
+
+  // Opening the popup already checks, but only within the hourly budget. Asking outright is not
+  // background traffic, so this one ignores it.
+  const handleSyncNow = () => {
+    setSyncState('syncing');
+    chrome.runtime.sendMessage({ type: 'SYNC_NOW', force: true }, (response) => {
+      const failure = chrome.runtime.lastError?.message || response?.error;
+      setSyncState(failure ? 'failed' : 'done');
+      setTimeout(() => setSyncState('idle'), 2000);
+    });
   };
 
   const handleRepoChange = (e: any) => {
@@ -214,7 +226,23 @@ export function App() {
       <header class="flex items-center justify-between mb-4 pb-2 border-b border-[var(--los-border)]">
         <span class="font-bold text-[var(--los-accent)] tracking-tight">kaihuman</span>
         <div class="flex flex-col items-end gap-1">
-          <span class="text-xs text-[var(--los-success)] animate-pulse">● Connected</span>
+          <div class="flex items-center gap-2">
+            <button
+              onClick={handleSyncNow}
+              disabled={syncState === 'syncing'}
+              class="text-[10px] text-[var(--los-fg-dim)] hover:text-[var(--los-accent)] disabled:opacity-50 transition-colors"
+              title="Fetch from GitHub and push what has been counted, ignoring the hourly budget"
+            >
+              {syncState === 'syncing'
+                ? 'Syncing…'
+                : syncState === 'done'
+                  ? 'Synced'
+                  : syncState === 'failed'
+                    ? 'Sync failed'
+                    : '↻ Sync now'}
+            </button>
+            <span class="text-xs text-[var(--los-success)] animate-pulse">● Connected</span>
+          </div>
           {repos.length > 0 ? (
             <select
               value={activeRepo || 'lifosy/monorepo'}

@@ -143,17 +143,28 @@ async function recordBookmarkUse(id: string) {
 /**
  * The hourly check, run when the alarm fires and when the popup opens. A cache still inside its
  * hour is left alone — including its pending counts, which wait for the next one.
+ *
+ * `force` is what "Sync now" passes: asking for it outright is not background traffic, so the
+ * budget does not apply. Pinned-tab groups come along, since the point of asking is to be up to
+ * date with the repo rather than with one file of it.
  */
-async function syncIfStale() {
+async function syncIfStale(force = false) {
   const { token, repo } = await credentials();
   if (!token) return { synced: false, reason: 'no token' };
 
   const cache = await readBookmarksCache();
-  if (isCacheUsable(cache, repo) && cache && !isCacheStale(cache)) {
+  if (!force && isCacheUsable(cache, repo) && cache && !isCacheStale(cache)) {
     return { synced: false, reason: 'fresh' };
   }
-  await syncBookmarks();
-  return { synced: true };
+
+  const synced = await syncBookmarks();
+  if (force) {
+    // Best effort: a hand-broken pinnedtabs file should not take "Sync now" down with it.
+    await syncPinnedTabs().catch((e) =>
+      console.warn('LifeOS Extension: pinned tab sync failed', e),
+    );
+  }
+  return { synced: true, bookmarks: synced?.bookmarks.length ?? 0 };
 }
 
 /** How many of the palette's last actions are kept. */
@@ -934,9 +945,9 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
   }
 
   if (message.type === 'SYNC_NOW') {
-    // Opening the popup is a good moment to check GitHub, but the hourly budget still applies:
-    // a cache younger than that is left alone, counts and all.
-    syncIfStale().then(
+    // Opening the popup is a good moment to check GitHub, but the hourly budget still applies
+    // unless the user asked outright: a cache younger than that is left alone, counts and all.
+    syncIfStale(message.force === true).then(
       (result) => sendResponse({ success: true, ...result }),
       (error) => sendResponse({ error: error.message }),
     );

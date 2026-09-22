@@ -33,6 +33,7 @@ export interface Message {
   repo?: string;
   entry?: { id: string; title: string; subtitle?: string; url?: string };
   bookmarkId?: string;
+  force?: boolean;
 }
 
 export interface MessageResponse {

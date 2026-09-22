@@ -751,6 +751,24 @@ describe('usage counting', () => {
     expect(writes()).toHaveLength(0);
   });
 
+  it('syncs a fresh cache anyway when asked outright, and pushes what was counted', async () => {
+    cachedAt(Date.now());
+    await call({ type: 'RECORD_BOOKMARK_USE', bookmarkId: 'b1' });
+
+    // "Sync now" is the user asking, which is not background traffic — the budget does not apply.
+    expect(await call({ type: 'SYNC_NOW', force: true })).toMatchObject({ synced: true });
+    expect(writtenFile().bookmarks[0]).toMatchObject({ id: 'b1', useCount: 1 });
+    expect(store.bookmarkUsage.deltas).toEqual({});
+  });
+
+  // The groups come along on a forced sync, but a broken groups file must not take the
+  // bookmarks sync down with it — this fixture serves the bookmarks file for every read.
+  it('still reports success when the pinned-tab groups cannot be read', async () => {
+    cachedAt(Date.now());
+
+    expect(await call({ type: 'SYNC_NOW', force: true })).toMatchObject({ synced: true });
+  });
+
   it('holds to the hourly budget while the cache is fresh', async () => {
     cachedAt(Date.now());
     await call({ type: 'RECORD_BOOKMARK_USE', bookmarkId: 'b1' });

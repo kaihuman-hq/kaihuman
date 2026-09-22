@@ -1,5 +1,45 @@
 # Progress
 
+## 2026-09-22 — sync on demand, and a bookmark you can correct before saving
+
+**Sync now.** `SYNC_NOW` takes a `force` flag that skips the hourly budget — asking
+outright is not background traffic. It fetches, pushes whatever has been counted, and
+brings the pinned-tab groups along, since the point of asking is to be up to date with
+the repo rather than with one file of it. It is a button in the popup header and an
+action in the palette. Writing the test for it turned up a real fault: a hand-broken
+`browser.pinnedtabs.json` made the whole forced sync fail, taking the bookmarks with
+it. The groups are best-effort now.
+
+**A bookmark can be corrected before it is saved.** Both surfaces prefill from the page
+and neither is stuck with it — a tracking-laden url or a site's boilerplate title is
+worth fixing first.
+
+The popup's star view grew editable **URL** and **Title** fields above the tags, with
+**Skip tags** saving what is in them. In the palette, `prompt?: string` became
+`prompts?: PromptStep[]` and `run` now takes the values in order, which turns a single
+question into a walk: URL, then title, then tags. Each step's `initial()` prefills the
+input and selects it, so `⏎` keeps what is there and typing replaces it. The breadcrumb
+names the field and the position (`Bookmark this page · Title (2/3)`) and the row area
+lists what has been answered, so a long walk stays reviewable.
+
+`Esc` gained a step: inside a walk it goes *back a field*, restoring what was typed
+there, and only cancels from the first one. That is the whole reason to walk rather than
+ask once — a typo two fields back is fixable without starting over. The hint line says
+which of the two `Esc` will do.
+
+That made the separate "Bookmark this page with tags…" action redundant, so it is gone:
+one action, three fields, and a fast path is still one keystroke per field.
+
+Verified in Chromium as well as jsdom. The walk on a real page prefilled the canonical
+url and the document title, showed `URL (1/3)` → `Title (2/3)` → `Tags (3/3)`, listed
+the answers as they accumulated, and stepped back into the title field with the edited
+text intact. The tags label is deliberately short because it doubles as the breadcrumb's
+field name — the long version read `Tags, separated by spaces or commas (3/3)` there.
+
+Checks: `tsc -b` clean; biome clean; extension vitest 194 of 194 (8 new for the walk,
+2 for the forced sync); extension build green.
+
+
 ## 2026-09-22 — which bookmarks get used, counted locally and merged hourly
 
 **The `bookmarks` permission is optional now.** It moved to `optional_permissions`,

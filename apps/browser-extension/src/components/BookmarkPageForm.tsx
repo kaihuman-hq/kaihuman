@@ -11,6 +11,10 @@ interface BookmarkPageFormProps {
  * the service worker directly, because nothing else in the popup depends on the result.
  */
 export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps) {
+  // The page's own url and title are a starting point, not the answer: a tracking-laden url or a
+  // site's boilerplate title is worth fixing before it is saved.
+  const [url, setUrl] = useState(page?.url ?? '');
+  const [title, setTitle] = useState(page?.title ?? '');
   const [tagsInput, setTagsInput] = useState('');
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
@@ -30,8 +34,8 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
   };
 
   const save = (tags: string[]) => {
-    if (!page?.url) return;
-    send({ type: 'ADD_BOOKMARK', url: page.url, title: page.title, tags }, () => {
+    if (!url.trim()) return;
+    send({ type: 'ADD_BOOKMARK', url: url.trim(), title: title.trim(), tags }, () => {
       setStatus('success');
       // Long enough to read "Bookmarked!", short enough not to be in the way.
       setTimeout(onClose, 900);
@@ -82,13 +86,6 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
         </button>
       </div>
 
-      <div class="p-3 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)] space-y-1">
-        <div class="text-xs text-[var(--los-fg)] line-clamp-2">
-          {page?.title || 'No active tab'}
-        </div>
-        <div class="text-[10px] text-[var(--los-fg-dim)] truncate">{page?.url}</div>
-      </div>
-
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -96,6 +93,38 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
         }}
         class="flex flex-col gap-2"
       >
+        <label
+          class="block text-[10px] text-[var(--los-fg-dim)] uppercase tracking-wider font-bold"
+          for="bookmark-url"
+        >
+          URL
+        </label>
+        <input
+          id="bookmark-url"
+          type="text"
+          value={url}
+          onInput={(e) => setUrl((e.target as HTMLInputElement).value)}
+          class="w-full bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded p-2 text-xs text-[var(--los-fg)] focus:border-[var(--los-accent)] focus:ring-1 focus:ring-[var(--los-accent)] focus:outline-none transition-colors"
+          placeholder="https://example.com"
+          disabled={status === 'saving'}
+        />
+
+        <label
+          class="block text-[10px] text-[var(--los-fg-dim)] uppercase tracking-wider font-bold"
+          for="bookmark-title"
+        >
+          Title
+        </label>
+        <input
+          id="bookmark-title"
+          type="text"
+          value={title}
+          onInput={(e) => setTitle((e.target as HTMLInputElement).value)}
+          class="w-full bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded p-2 text-xs text-[var(--los-fg)] focus:border-[var(--los-accent)] focus:ring-1 focus:ring-[var(--los-accent)] focus:outline-none transition-colors"
+          placeholder="Defaults to the URL"
+          disabled={status === 'saving'}
+        />
+
         <label
           class="block text-[10px] text-[var(--los-fg-dim)] uppercase tracking-wider font-bold"
           for="bookmark-tags"
@@ -110,7 +139,7 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
           class="w-full bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded p-2 text-xs text-[var(--los-fg)] focus:border-[var(--los-accent)] focus:ring-1 focus:ring-[var(--los-accent)] focus:outline-none transition-colors"
           placeholder="e.g. dev, docs"
           disabled={status === 'saving'}
-          // biome-ignore lint/a11y/noAutofocus: the user opened this view to type tags, so landing in its only field is what they came for
+          // biome-ignore lint/a11y/noAutofocus: the user opened this view to fill it in, and tags are the field they came to add
           autoFocus
         />
 
@@ -129,7 +158,7 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
         <div class="flex gap-2">
           <button
             type="submit"
-            disabled={status === 'saving' || !page?.url}
+            disabled={status === 'saving' || !url.trim()}
             class="flex-1 py-2 px-3 bg-[var(--los-accent)] text-black hover:opacity-90 font-bold text-xs rounded transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {status === 'saving' ? 'Saving...' : status === 'success' ? 'Bookmarked!' : 'Save'}
@@ -137,11 +166,11 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
           <button
             type="button"
             onClick={() => save([])}
-            disabled={status === 'saving' || !page?.url}
+            disabled={status === 'saving' || !url.trim()}
             class="py-2 px-3 bg-[var(--los-bg-hover)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Save without tags"
           >
-            Skip
+            Skip tags
           </button>
         </div>
       </form>

@@ -83,14 +83,9 @@ const splitTags = (input: string) =>
 
 const plural = (count: number, one: string) => `${count} ${one}${count === 1 ? '' : 's'}`;
 
-const bookmarkPage = async (tags: string[]) => {
-  const { title } = await send({
-    type: 'ADD_BOOKMARK',
-    url: pageUrl(),
-    title: document.title,
-    tags,
-  });
-  return `Bookmarked “${title}”`;
+const bookmarkPage = async (url: string, title: string, tags: string[]) => {
+  const saved = await send({ type: 'ADD_BOOKMARK', url, title, tags });
+  return `Bookmarked “${saved.title}”`;
 };
 
 /** Targets for a note: the repo's quick-note files, plus the default dump. */
@@ -101,8 +96,8 @@ const noteTargets = async (): Promise<PaletteAction[]> => {
     id: `note:${path}`,
     title: path,
     // The popup picks its form the same way: an action log takes a description and tags.
-    prompt: path.endsWith('.actionlog.md') ? 'What happened? #tags' : 'Note',
-    run: async (input: string) => {
+    prompts: [{ label: path.endsWith('.actionlog.md') ? 'What happened? #tags' : 'Note' }],
+    run: async ([input = '']: string[]) => {
       if (!input.trim()) throw new Error('Nothing to add');
       if (path.endsWith('.actionlog.md')) {
         const description = input.replace(/#[\w-]+/g, '').trim();
@@ -152,8 +147,8 @@ const pinnedTabGroups = async (): Promise<PaletteAction[]> => {
       {
         id: `tabs:${group.id}:rename`,
         title: `Rename ${group.name}…`,
-        prompt: 'New name',
-        run: async (input: string) => {
+        prompts: [{ label: 'New name', initial: () => group.name }],
+        run: async ([input = '']: string[]) => {
           const { name } = await send({
             type: 'RENAME_PINNED_TAB_GROUP',
             groupId: group.id,
@@ -190,8 +185,8 @@ const pinnedTabGroups = async (): Promise<PaletteAction[]> => {
         id: `tabs:${group.id}:delete`,
         title: `Delete ${group.name}`,
         // Deleting is one keystroke away, so it asks rather than assuming.
-        prompt: `Type DELETE to forget ${group.name}`,
-        run: async (input: string) => {
+        prompts: [{ label: `Type DELETE to forget ${group.name}` }],
+        run: async ([input = '']: string[]) => {
           if (input.trim().toUpperCase() !== 'DELETE') return 'Left alone';
           const { name } = await send({ type: 'DELETE_PINNED_TAB_GROUP', groupId: group.id });
           return `Deleted ${name}`;
@@ -218,15 +213,18 @@ const repoChoices = async (): Promise<PaletteAction[]> => {
 const paletteActions = (): PaletteAction[] => [
   {
     id: 'bookmark-page',
-    title: 'Bookmark this page',
+    title: 'Bookmark this page…',
     subtitle: document.title || location.href,
-    run: () => bookmarkPage([]),
-  },
-  {
-    id: 'bookmark-page-tags',
-    title: 'Bookmark this page with tags…',
-    prompt: 'Tags, separated by spaces or commas',
-    run: (input) => bookmarkPage(splitTags(input)),
+    // The page's own url and title are only a starting point: a tracking-laden url or a
+    // site's boilerplate title is worth fixing before it is saved, so both are prefilled
+    // and editable, and ⏎ keeps what is there.
+    prompts: [
+      { label: 'URL', initial: pageUrl },
+      { label: 'Title', initial: () => document.title },
+      // Kept short: the label doubles as the breadcrumb's field name.
+      { label: 'Tags' },
+    ],
+    run: ([url = '', title = '', tags = '']: string[]) => bookmarkPage(url, title, splitTags(tags)),
   },
   {
     id: 'pin-article',
@@ -252,8 +250,8 @@ const paletteActions = (): PaletteAction[] => [
   {
     id: 'tabs-save',
     title: 'Save this window\u2019s pinned tabs as a new group…',
-    prompt: 'Group name',
-    run: async (input: string) => {
+    prompts: [{ label: 'Group name' }],
+    run: async ([input = '']: string[]) => {
       const { count, name } = await send({ type: 'SAVE_PINNED_TAB_GROUP', name: input });
       return `Saved ${name} with ${plural(count, 'tab')}`;
     },
@@ -268,6 +266,15 @@ const paletteActions = (): PaletteAction[] => [
     },
   },
   { id: 'switch-repo', title: 'Switch repository…', children: repoChoices },
+  {
+    id: 'sync-now',
+    title: 'Sync with GitHub now',
+    subtitle: 'Ignores the hourly budget and pushes what has been counted',
+    run: async () => {
+      const { synced, bookmarks } = await send({ type: 'SYNC_NOW', force: true });
+      return synced ? `Synced ${bookmarks} bookmarks` : 'Nothing to sync — log in first';
+    },
+  },
   {
     id: 'open-console',
     title: 'Open the Lifosy console',

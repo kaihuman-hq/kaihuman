@@ -14,18 +14,26 @@ export interface RepoResult {
   url: string;
 }
 
+/** One field an action collects before it runs. */
+export interface PromptStep {
+  /** Shown as the input's placeholder, and named in the breadcrumb. */
+  label: string;
+  /** Prefilled and editable — a field the user usually keeps but sometimes corrects. */
+  initial?: () => string;
+}
+
 /**
- * Something the palette can do. An action either opens a submenu (`children`), asks for a line of
- * text first (`prompt`), or just runs — resolving with the line to show afterwards.
+ * Something the palette can do. An action either opens a submenu (`children`), walks the user
+ * through `prompts` first, or just runs — resolving with the line to show afterwards.
  */
 export interface PaletteAction {
   id: string;
   title: string;
   subtitle?: string;
-  /** Placeholder for the input while the action collects its argument. */
-  prompt?: string;
+  /** Collected in order before `run`, which receives the values in the same order. */
+  prompts?: PromptStep[];
   children?: () => Promise<PaletteAction[]>;
-  run?: (input: string) => Promise<string>;
+  run?: (inputs: string[]) => Promise<string>;
 }
 
 /** What the palette last did, so it can be repeated from the top of the list. */
@@ -191,8 +199,8 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
   let searchToken = 0;
   /** Submenus the user has opened, so Esc walks back out one level at a time. */
   let trail: { title: string; actions: PaletteAction[] }[] = [];
-  /** The action waiting for its argument, while the input collects one. */
-  let pending: PaletteAction | null = null;
+  /** The action being filled in, which step it is on, and what has been collected so far. */
+  let pending: { action: PaletteAction; step: number; values: string[] } | null = null;
 
   const needle = () => input.value.trim().toLowerCase();
 
@@ -201,10 +209,10 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
     status.hidden = !text;
   };
 
-  const runAction = async (action: PaletteAction, argument: string) => {
+  const runAction = async (action: PaletteAction, inputs: string[]) => {
     setStatus(`${action.title}…`);
     try {
-      setStatus((await action.run?.(argument)) ?? null);
+      setStatus((await action.run?.(inputs)) ?? null);
       handlers.rememberRecent({ id: action.id, title: action.title, subtitle: action.subtitle });
       // The action may have changed what the list should show (a new bookmark, say).
       bookmarks = await handlers.loadBookmarks().catch(() => bookmarks);
@@ -215,7 +223,17 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
     render();
   };
 
-  /** Submenu, then prompt, then run — an action does exactly one of the three. */
+  /** Moves the input to a step, prefilling whatever that step starts from. */
+  const enterStep = (action: PaletteAction, step: number, values: string[]) => {
+    pending = { action, step, values };
+    input.value = action.prompts?.[step]?.initial?.() ?? '';
+    // Selecting it means the prefill can be replaced by typing, or kept by pressing Enter.
+    input.select();
+    selected = 0;
+    render();
+  };
+
+  /** Submenu, then prompts, then run — an action does exactly one of the three. */
   const activate = async (action: PaletteAction) => {
     if (action.children) {
       setStatus(null);
@@ -233,19 +251,29 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
       render();
       return;
     }
-    if (action.prompt && !pending) {
-      pending = action;
-      input.value = '';
-      selected = 0;
+    if (action.prompts?.length && !pending) {
       setStatus(null);
-      render();
+      enterStep(action, 0, []);
       return;
     }
-    const argument = input.value.trim();
+    if (!pending) {
+      selected = 0;
+      await runAction(action, []);
+      return;
+    }
+
+    // Mid-walk: keep this answer and move on, or run once the last one is in.
+    const values = [...pending.values, input.value.trim()];
+    const next = pending.step + 1;
+    if (next < (pending.action.prompts?.length ?? 0)) {
+      enterStep(pending.action, next, values);
+      return;
+    }
+    const { action: finished } = pending;
     pending = null;
     input.value = '';
     selected = 0;
-    await runAction(action, argument);
+    await runAction(finished, values);
   };
 
   const openUrl = (entry: RecentEntry) => {
@@ -335,11 +363,16 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
 
   const render = () => {
     const here = trail.at(-1);
-    crumb.textContent = here?.title ?? '';
-    crumb.hidden = !here;
+    const step = pending?.action.prompts?.[pending.step];
+    const steps = pending?.action.prompts?.length ?? 0;
+    // While filling an action in, the crumb says which field and how far along it is.
+    crumb.textContent = pending
+      ? `${pending.action.title.replace(/…$/, '')} · ${step?.label ?? ''} (${pending.step + 1}/${steps})`
+      : (here?.title ?? '');
+    crumb.hidden = !pending && !here;
     // Submenu titles already end in an ellipsis, which would otherwise double up here.
     input.placeholder =
-      pending?.prompt ?? (here ? `Search ${here.title.replace(/…$/, '')}…` : 'Search bookmarks…');
+      step?.label ?? (here ? `Search ${here.title.replace(/…$/, '')}…` : 'Search bookmarks…');
 
     const recent = recentRows();
     const bookmarkMatches = bookmarkRows();
@@ -383,7 +416,8 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
     if (pending) {
       const note = document.createElement('div');
       note.className = 'empty';
-      note.textContent = pending.title;
+      // What has been answered so far, so a long walk stays reviewable.
+      note.textContent = pending.values.filter(Boolean).join('  ·  ') || pending.action.title;
       rows.append(note);
     } else {
       addGroup('Recent', recent);
@@ -401,7 +435,8 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
     }
 
     const query = input.value.trim();
-    if (pending) hint.textContent = '⏎ confirm · esc cancel';
+    if (pending)
+      hint.textContent = pending.step > 0 ? '⏎ next · esc back a field' : '⏎ next · esc cancel';
     else if (here) hint.textContent = '↑↓ navigate · ⏎ select · esc back';
     else if (!query) hint.textContent = '↑↓ navigate · ⏎ select · esc close';
     else if (repoResults && repoQuery === query) hint.textContent = '⏎ select · esc close';
@@ -431,9 +466,19 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
     render();
   };
 
-  /** Esc unwinds one step at a time: the prompt, then each submenu, then the palette. */
+  /** Esc unwinds one step at a time: each field, then each submenu, then the palette. */
   const back = () => {
     if (pending) {
+      // Walking back through the fields is how a typo two steps ago gets fixed.
+      if (pending.step > 0) {
+        const values = pending.values.slice(0, -1);
+        const previous = pending.values.at(-1) ?? '';
+        pending = { action: pending.action, step: pending.step - 1, values };
+        input.value = previous;
+        input.select();
+        render();
+        return;
+      }
       pending = null;
       input.value = '';
       selected = 0;
@@ -471,7 +516,7 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (pending) void activate(pending);
+      if (pending) void activate(pending.action);
       else choose(selected);
     }
   };

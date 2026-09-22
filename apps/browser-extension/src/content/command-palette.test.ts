@@ -36,6 +36,7 @@ let rememberRecent: ReturnType<typeof vi.fn>;
 let countBookmarkUse: ReturnType<typeof vi.fn>;
 let bookmarkRun: ReturnType<typeof vi.fn>;
 let renameRun: ReturnType<typeof vi.fn>;
+let guidedRun: ReturnType<typeof vi.fn>;
 let children: ReturnType<typeof vi.fn>;
 let actions: PaletteAction[];
 
@@ -88,15 +89,31 @@ beforeEach(async () => {
   rememberRecent = vi.fn();
   countBookmarkUse = vi.fn();
   bookmarkRun = vi.fn(async () => 'Bookmarked “This page”');
-  renameRun = vi.fn(async (input: string) => `Renamed to ${input}`);
+  renameRun = vi.fn(async ([input]: string[]) => `Renamed to ${input}`);
+  guidedRun = vi.fn(async ([url]: string[]) => `Bookmarked ${url}`);
   children = vi.fn(
     async (): Promise<PaletteAction[]> => [
       { id: 'group:work:load', title: 'Load Work', run: async () => 'Work: pinned 2' },
-      { id: 'group:work:rename', title: 'Rename Work…', prompt: 'New name', run: renameRun },
+      {
+        id: 'group:work:rename',
+        title: 'Rename Work…',
+        prompts: [{ label: 'New name', initial: () => 'Work' }],
+        run: renameRun,
+      },
     ],
   );
   actions = [
     { id: 'bookmark-page', title: 'Bookmark this page', subtitle: 'A page', run: bookmarkRun },
+    {
+      id: 'bookmark-guided',
+      title: 'Bookmark this page…',
+      prompts: [
+        { label: 'URL', initial: () => 'https://page.example/' },
+        { label: 'Title', initial: () => 'The page' },
+        { label: 'Tags' },
+      ],
+      run: guidedRun,
+    },
     { id: 'tabs', title: 'Pinned tab groups…', children },
   ];
 
@@ -119,6 +136,7 @@ describe('toggle', () => {
       'Vitest guide',
       'Zulip',
       'Bookmark this page',
+      'Bookmark this page…',
       'Pinned tab groups…',
     ]);
     expect(shadow().activeElement).toBe(input());
@@ -225,7 +243,7 @@ describe('running an action', () => {
   it('runs it, shows the result, records it and stays open', async () => {
     await activateRow('Bookmark this page');
 
-    expect(bookmarkRun).toHaveBeenCalledWith('');
+    expect(bookmarkRun).toHaveBeenCalledWith([]);
     expect(statusText()).toBe('Bookmarked “This page”');
     expect(rememberRecent).toHaveBeenCalledWith({
       id: 'bookmark-page',
@@ -307,7 +325,7 @@ describe('actions that take an argument', () => {
 
     expect(renameRun).not.toHaveBeenCalled();
     expect(input().placeholder).toBe('New name');
-    expect(hintText()).toContain('⏎ confirm');
+    expect(hintText()).toContain('⏎ next');
     expect(rowTitles()).toEqual([]);
   });
 
@@ -317,7 +335,7 @@ describe('actions that take an argument', () => {
     press('Enter');
     await settle();
 
-    expect(renameRun).toHaveBeenCalledWith('Reading');
+    expect(renameRun).toHaveBeenCalledWith(['Reading']);
     expect(statusText()).toBe('Renamed to Reading');
   });
 
@@ -409,5 +427,86 @@ describe('bookmark loading', () => {
     await settle();
     expect(statusText()).toBe('No token found');
     expect(rowTitles()).toContain('Bookmark this page');
+  });
+});
+
+describe('actions that walk through several fields', () => {
+  const start = () => activateRow('Bookmark this page…');
+
+  it('opens on the first field, prefilled, and says where it is', async () => {
+    await start();
+
+    expect(guidedRun).not.toHaveBeenCalled();
+    expect(input().placeholder).toBe('URL');
+    expect(input().value).toBe('https://page.example/');
+    expect(crumbText()).toBe('Bookmark this page · URL (1/3)');
+  });
+
+  it('moves on with Enter, carrying each answer', async () => {
+    await start();
+    press('Enter');
+    expect(crumbText()).toBe('Bookmark this page · Title (2/3)');
+    expect(input().value).toBe('The page');
+
+    type('A better title');
+    press('Enter');
+    expect(crumbText()).toBe('Bookmark this page · Tags (3/3)');
+    // The last field has nothing to prefill.
+    expect(input().value).toBe('');
+
+    type('dev docs');
+    press('Enter');
+    await settle();
+
+    expect(guidedRun).toHaveBeenCalledWith(['https://page.example/', 'A better title', 'dev docs']);
+    expect(statusText()).toBe('Bookmarked https://page.example/');
+  });
+
+  it('lets a prefilled field be replaced outright', async () => {
+    await start();
+    type('https://corrected.example/');
+    press('Enter');
+    press('Enter');
+    press('Enter');
+    await settle();
+
+    expect(guidedRun.mock.calls[0]?.[0][0]).toBe('https://corrected.example/');
+  });
+
+  // A typo two fields back is the whole reason Escape steps rather than cancels.
+  it('Escape walks back a field, restoring what was typed there', async () => {
+    await start();
+    type('https://first.example/');
+    press('Enter');
+    type('Second');
+    press('Enter');
+    expect(crumbText()).toBe('Bookmark this page · Tags (3/3)');
+
+    press('Escape');
+    expect(crumbText()).toBe('Bookmark this page · Title (2/3)');
+    expect(input().value).toBe('Second');
+
+    press('Escape');
+    expect(crumbText()).toBe('Bookmark this page · URL (1/3)');
+    expect(input().value).toBe('https://first.example/');
+    expect(hintText()).toContain('esc cancel');
+  });
+
+  it('Escape on the first field cancels the whole walk', async () => {
+    await start();
+    press('Escape');
+
+    expect(guidedRun).not.toHaveBeenCalled();
+    expect(crumbText()).toBeNull();
+    expect(rowTitles()).toContain('Vitest guide');
+  });
+
+  it('shows what has been answered so far', async () => {
+    await start();
+    press('Enter');
+    type('A title');
+    press('Enter');
+
+    expect(shadow().querySelector('.empty')?.textContent).toBe('https://page.example/  ·  A title');
   });
 });
