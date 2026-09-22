@@ -10,6 +10,7 @@ import {
   normalizeBookmarkUrl,
   parseBookmarks,
   serializeBookmarks,
+  setBookmarkPinned,
   sortBookmarks,
 } from '../../../packages/ui/src/LifeOS/Organisms/Widgets/BookmarksLogic';
 
@@ -30,6 +31,7 @@ const bookmark = (
   updatedAt: NOW,
   useCount,
   lastUsedAt: '',
+  pinned: false,
 });
 
 const config = (...bookmarks: Bookmark[]): BookmarksConfig => ({ bookmarks, updatedAt: NOW });
@@ -173,6 +175,50 @@ describe('deleteBookmark', () => {
   it('leaves the list alone for an unknown id', () => {
     const next = deleteBookmark(config(bookmark('b1', 'https://a.example/')), 'nope', NOW);
     expect(next.bookmarks.map((b) => b.id)).toEqual(['b1']);
+  });
+});
+
+describe('setBookmarkPinned', () => {
+  const later = '2026-09-23T10:00:00.000Z';
+
+  it('pins one bookmark in place and stamps it and the file', () => {
+    const next = setBookmarkPinned(
+      config(bookmark('b1', 'https://a.example/'), bookmark('b2', 'https://b.example/')),
+      'b2',
+      true,
+      later,
+    );
+    expect(next.bookmarks.map((b) => [b.id, b.pinned])).toEqual([
+      ['b1', false],
+      ['b2', true],
+    ]);
+    expect(next.bookmarks[1]?.updatedAt).toBe(later);
+    expect(next.bookmarks[0]?.updatedAt).toBe(NOW);
+    expect(next.updatedAt).toBe(later);
+  });
+
+  it('unpins again', () => {
+    const pinned = setBookmarkPinned(config(bookmark('b1', 'https://a.example/')), 'b1', true);
+    expect(setBookmarkPinned(pinned, 'b1', false).bookmarks[0]?.pinned).toBe(false);
+  });
+
+  // The extension writes the same file; a console edit must not drop a pin it set, and vice versa.
+  it('survives a parse and serialize round trip', () => {
+    const pinned = setBookmarkPinned(config(bookmark('b1', 'https://a.example/')), 'b1', true);
+    expect(parseBookmarks(serializeBookmarks(pinned)).bookmarks[0]?.pinned).toBe(true);
+  });
+
+  it('reads only a literal true as pinned', () => {
+    const parsed = parseBookmarks(
+      JSON.stringify({
+        bookmarks: [
+          { id: 'b1', url: 'https://a.example/' },
+          { id: 'b2', url: 'https://b.example/', pinned: 'yes' },
+          { id: 'b3', url: 'https://c.example/', pinned: true },
+        ],
+      }),
+    );
+    expect(parsed.bookmarks.map((b) => b.pinned)).toEqual([false, false, true]);
   });
 });
 

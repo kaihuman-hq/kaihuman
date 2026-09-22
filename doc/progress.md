@@ -1,5 +1,61 @@
 # Progress
 
+## 2026-09-22 — Pinned bookmarks on the start page
+
+- **`pinned` joins the bookmark format** (`BookmarksLogic.ts` in `packages/ui`, `bookmarks.ts` in the
+  extension): optional, only a literal `true` counts. Both parsers carry it across every rewrite —
+  the extension's hourly sync rewrites the whole file from its parse, and dropping the field there
+  would silently unpin everything the console pinned. Covered by round-trip tests on both sides.
+- **Console widget**: a pin toggle next to delete on each row (focus view), filled in the accent
+  colour when pinned. `setBookmarkPinned` keeps the file's order and stamps the bookmark.
+- **Start page**: `startPageBookmarks` puts every pinned bookmark first, in file order, then the
+  twelve most recently used of the rest — a pin is never cut to fit. Each card has a pin button in
+  its corner (beside the card's own button, since a button cannot hold one). Pinning is optimistic:
+  the card moves at once, and a failed commit moves it back and says why. One pin commits at a time,
+  so two cannot race each other for the file's sha.
+- **Worker**: `SET_BOOKMARK_PINNED` takes the state to set rather than a toggle, commits through
+  `commitBookmarks` (re-read first, counted opens ride along), and answers with the committed list.
+  An id the file no longer has — deleted in the console since — is an error, not a silent no-op.
+
+Checks: extension tsc clean, vitest 219/219 (11 new); console tsc clean, vitest 94/94 (4 new), biome
+clean in ui and console; extension and ui builds green. Smoke-tested in Chromium: pinned cards lead
+the grid, and a pin whose commit fails moves back with the error shown.
+
+## 2026-09-22 — Extension start page (New Tab) + the title opens the app
+
+Follow-up to #122, both items from its review:
+
+- **The popup's `kaihuman` title opens the app** (`apps/browser-extension/src/app.tsx`): a button
+  that opens `https://app.kaihuman.com` in a tab, since a popup cannot follow a link without
+  navigating itself.
+- **Start page** (`newtab.html`, `src/newtab/`): `chrome_url_overrides.newtab` replaces Chrome's New
+  Tab page with one of ours, which is what makes the palette reachable there at all — Chrome runs no
+  content script on its own New Tab page, so the shortcut used to badge the icon and do nothing. The
+  page holds the palette (search field or the shortcut), the twelve most recently used bookmarks, and
+  a note box writing to `.lifeos/dump.md`. Bookmarks come from the existing cache, so a new tab costs
+  no GitHub request; the quick-note list is deliberately *not* fetched here, since a new tab opens far
+  too often to spend a request on it — the palette's **Add a note…** still reads it.
+- **`OPEN_URL` gained `reuse`** (`src/background/service-worker.ts`): with it the worker navigates the
+  sender's own tab (`chrome.tabs.update`) instead of creating another one, so opening a bookmark from
+  the start page takes over the blank tab rather than leaving it behind. The scheme check stays in the
+  one place it already was.
+- **The shortcut relay handles extension pages** (`openPaletteInTab`): the targeted relay reaches the
+  start page directly; while its listener is still coming up — and nothing can be injected into an
+  extension page to cover the gap — the worker broadcasts instead, and only the visible start page
+  acts on it. No more red `!` badge on a page where the palette works.
+- **Palette wiring extracted** (`src/palette/`): `command-palette.ts` moved out of `content/`, since
+  it now has two surfaces, and `palette/actions.ts` holds the `send` helper, the worker-only handlers
+  and every action that needs no page around it. The content script keeps the three that read the
+  page (bookmark, pin, clip) and spreads the rest.
+- **`recentlyUsedBookmarks`** (`src/background/bookmarks.ts`): most recently opened first, then the
+  file's own order (newest first) via a stable sort, so a repo nobody has opened a bookmark from
+  still shows something.
+
+Checks: extension `tsc -b` clean, biome clean on the new and moved files, vitest 208/208 (11 new),
+`pnpm build` green. Smoke-tested in Chromium with the unpacked build: the page renders logged out and
+logged in, the palette opens from the search field and from a relayed shortcut, and a bookmark click
+navigates the same tab without opening a second one.
+
 ## 2026-09-22 — sync on demand, and a bookmark you can correct before saving
 
 **Sync now.** `SYNC_NOW` takes a `force` flag that skips the hourly budget — asking

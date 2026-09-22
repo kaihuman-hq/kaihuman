@@ -7,7 +7,10 @@ let listener: Listener;
 let commandListener: (command: string) => unknown;
 let store: Record<string, any>;
 let sendMessage: ReturnType<typeof vi.fn>;
+let broadcast: ReturnType<typeof vi.fn>;
 let tabsCreate: ReturnType<typeof vi.fn>;
+let tabsUpdate: ReturnType<typeof vi.fn>;
+let tabsGet: ReturnType<typeof vi.fn>;
 let executeScript: ReturnType<typeof vi.fn>;
 let setBadgeText: ReturnType<typeof vi.fn>;
 let getBookmarkTree: ReturnType<typeof vi.fn>;
@@ -73,7 +76,10 @@ beforeEach(async () => {
   vi.useRealTimers();
   store = { lifeos_token: 't', lifeos_repo: 'o/r' };
   sendMessage = vi.fn(async () => ({ success: true }));
+  broadcast = vi.fn(async () => ({ success: true }));
   tabsCreate = vi.fn(async () => ({ id: 1 }));
+  tabsUpdate = vi.fn(async () => ({ id: 7 }));
+  tabsGet = vi.fn(async () => ({ id: 7, url: 'https://example.com/' }));
   executeScript = vi.fn(async () => []);
   setBadgeText = vi.fn(async () => {});
   getBookmarkTree = vi.fn(async () => [
@@ -108,6 +114,8 @@ beforeEach(async () => {
     scripting: { executeScript },
     runtime: {
       getManifest: () => ({ content_scripts: [{ js: ['assets/content-loader-abc123.js'] }] }),
+      getURL: (path: string) => `chrome-extension://abc/${path}`,
+      sendMessage: broadcast,
       onInstalled: { addListener: vi.fn() },
       onConnect: { addListener: vi.fn() },
       onMessage: {
@@ -123,7 +131,8 @@ beforeEach(async () => {
     tabs: {
       query: async () => [{ id: 7, windowId: 1 }],
       create: tabsCreate,
-      update: vi.fn(),
+      update: tabsUpdate,
+      get: tabsGet,
       sendMessage,
     },
   });
@@ -168,6 +177,7 @@ describe('GET_BOOKMARKS', () => {
         updatedAt: '2026-09-01T00:00:00.000Z',
         useCount: 0,
         lastUsedAt: '',
+        pinned: false,
       },
     ]);
     expect(store.bookmarksCache).toMatchObject({ repo: 'o/r', sha: 'sha-1', etag: ETAG });
@@ -319,6 +329,28 @@ describe('GET_BOOKMARKS', () => {
   });
 });
 
+describe('SET_BOOKMARK_PINNED', () => {
+  const writes = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT');
+  const writtenFile = () => JSON.parse(atob(JSON.parse(writes()[0]?.[1].body).content));
+
+  it('commits the pin straight away and answers with the list to show', async () => {
+    const response = await call({ type: 'SET_BOOKMARK_PINNED', bookmarkId: 'b1', pinned: true });
+
+    expect(response).toMatchObject({ success: true });
+    expect(response.bookmarks[0]).toMatchObject({ id: 'b1', pinned: true });
+    expect(writes()).toHaveLength(1);
+    expect(writtenFile().bookmarks[0]).toMatchObject({ id: 'b1', pinned: true });
+    expect(store.bookmarksCache.bookmarks[0]).toMatchObject({ id: 'b1', pinned: true });
+  });
+
+  it('says so when the bookmark is gone from the repo', async () => {
+    const response = await call({ type: 'SET_BOOKMARK_PINNED', bookmarkId: 'gone', pinned: true });
+
+    expect(response.error).toMatch(/no longer in the repo/);
+    expect(writes()).toHaveLength(0);
+  });
+});
+
 describe('ADD_BOOKMARK', () => {
   const writes = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT');
 
@@ -452,6 +484,31 @@ describe('OPEN_URL', () => {
     expect(tabsCreate).toHaveBeenCalledWith({ url: 'https://example.com/', active: true });
   });
 
+  // What the start page asks for: it is a blank tab the user is leaving anyway.
+  it('navigates the sender\u2019s own tab when it asks to reuse it', async () => {
+    const response = await new Promise<any>((resolve) => {
+      listener(
+        { type: 'OPEN_URL', url: 'https://example.com/', reuse: true },
+        { tab: { id: 7 } },
+        resolve,
+      );
+    });
+
+    expect(response).toMatchObject({ success: true });
+    expect(tabsUpdate).toHaveBeenCalledWith(7, { url: 'https://example.com/' });
+    expect(tabsCreate).not.toHaveBeenCalled();
+  });
+
+  it('opens a new tab when the sender has none to reuse', async () => {
+    expect(
+      await call({ type: 'OPEN_URL', url: 'https://example.com/', reuse: true }),
+    ).toMatchObject({
+      success: true,
+    });
+    expect(tabsCreate).toHaveBeenCalledWith({ url: 'https://example.com/', active: true });
+    expect(tabsUpdate).not.toHaveBeenCalled();
+  });
+
   it('refuses a scheme the palette must never be able to trigger', async () => {
     const refused = await new Promise<any>((resolve) => {
       listener({ type: 'OPEN_URL', url: 'javascript:alert(1)' }, {}, resolve);
@@ -504,6 +561,19 @@ describe('the palette shortcut', () => {
     await commandListener('toggle-command-palette');
 
     expect(sendMessage).toHaveBeenCalledTimes(4);
+    expect(setBadgeText).not.toHaveBeenCalledWith({ tabId: 7, text: '!' });
+  });
+
+  // The start page is an extension page: nothing can be injected into it, and it hears the
+  // broadcast instead. Badging it would say the palette does not work on a page where it does.
+  it('broadcasts instead of injecting when the tab is the extension\u2019s own page', async () => {
+    sendMessage.mockRejectedValue(NO_RECEIVER);
+    tabsGet.mockResolvedValue({ id: 7, url: 'chrome-extension://abc/newtab.html' });
+
+    await commandListener('toggle-command-palette');
+
+    expect(broadcast).toHaveBeenCalledWith({ type: 'TOGGLE_COMMAND_PALETTE' });
+    expect(executeScript).not.toHaveBeenCalled();
     expect(setBadgeText).not.toHaveBeenCalledWith({ tabId: 7, text: '!' });
   });
 

@@ -28,6 +28,8 @@ export interface Bookmark {
   useCount: number;
   /** When it was last opened, ISO, or empty if never. */
   lastUsedAt: string;
+  /** Kept at the top of the start page, ahead of the recently used ones. */
+  pinned: boolean;
 }
 
 export interface BookmarksConfig {
@@ -106,6 +108,9 @@ export function parseBookmarks(content: string): BookmarksConfig {
       updatedAt: asString(entry.updatedAt),
       useCount: asCount(entry.useCount),
       lastUsedAt: asString(entry.lastUsedAt),
+      // Carried across like the counts: every sync rewrites the file from this parse, and dropping
+      // the field here would unpin everything the console pinned.
+      pinned: entry.pinned === true,
     }));
   return { bookmarks, updatedAt: asString(root.updatedAt) };
 }
@@ -143,6 +148,7 @@ export function addBookmark(
     updatedAt: now,
     useCount: 0,
     lastUsedAt: '',
+    pinned: false,
   };
   return { bookmarks: [bookmark, ...config.bookmarks], updatedAt: now };
 }
@@ -181,6 +187,47 @@ export function searchBookmarks(bookmarks: Bookmark[], query: string, limit = 20
     .sort((a, b) => a.score - b.score || a.index - b.index)
     .slice(0, limit)
     .map((entry) => entry.bookmark);
+}
+
+/**
+ * What the start page lists: the bookmarks opened most recently, then the rest in the file's own
+ * order (newest first). The sort is stable, so a repo whose bookmarks have never been opened still
+ * shows its latest ones rather than an empty grid.
+ */
+export function recentlyUsedBookmarks(bookmarks: Bookmark[], limit = 12): Bookmark[] {
+  return [...bookmarks].sort((a, b) => b.lastUsedAt.localeCompare(a.lastUsedAt)).slice(0, limit);
+}
+
+/**
+ * The start page's grid: every pinned bookmark first, in the file's order, then the `limit` most
+ * recently used of the rest. Pins are never cut by the limit — they are the ones asked for.
+ */
+export function startPageBookmarks(bookmarks: Bookmark[], limit = 12): Bookmark[] {
+  const pinned = bookmarks.filter((bookmark) => bookmark.pinned);
+  const rest = bookmarks.filter((bookmark) => !bookmark.pinned);
+  return [...pinned, ...recentlyUsedBookmarks(rest, limit)];
+}
+
+/**
+ * Same rule as the console's `setBookmarkPinned`: the bookmark stays where it is in the file. An id
+ * the file no longer has — deleted in the console since the cache was read — is an error rather
+ * than a silent no-op, so the start page can say so.
+ */
+export function setBookmarkPinned(
+  config: BookmarksConfig,
+  id: string,
+  pinned: boolean,
+  now = new Date().toISOString(),
+): BookmarksConfig {
+  if (!config.bookmarks.some((bookmark) => bookmark.id === id)) {
+    throw new Error('That bookmark is no longer in the repo — sync and try again');
+  }
+  return {
+    bookmarks: config.bookmarks.map((bookmark) =>
+      bookmark.id === id ? { ...bookmark, pinned, updatedAt: now } : bookmark,
+    ),
+    updatedAt: now,
+  };
 }
 
 const laterOf = (a: string, b: string) => (a > b ? a : b);

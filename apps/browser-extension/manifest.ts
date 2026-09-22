@@ -20,6 +20,12 @@ export default defineManifest({
       "128": "icon-128.png"
     }
   },
+  // Chrome runs no content script on its own New Tab page, so the palette could never open
+  // there. Replacing the page with one of ours puts it back — and gives the bookmarks somewhere
+  // to live.
+  chrome_url_overrides: {
+    newtab: 'newtab.html',
+  },
   commands: {
     'toggle-command-palette': {
       suggested_key: {

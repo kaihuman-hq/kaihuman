@@ -12,9 +12,12 @@ import {
   isCacheStale,
   isCacheUsable,
   parseBookmarks,
+  recentlyUsedBookmarks,
   searchBookmarks,
   serializeBookmarks,
+  setBookmarkPinned,
   settleUsage,
+  startPageBookmarks,
 } from './bookmarks';
 
 const NOW = '2026-09-22T10:00:00.000Z';
@@ -28,6 +31,7 @@ const bookmark = (title: string, url: string, tags: string[] = []): Bookmark => 
   updatedAt: NOW,
   useCount: 0,
   lastUsedAt: '',
+  pinned: false,
 });
 
 const cache = (over: Partial<BookmarksCache> = {}): BookmarksCache => ({
@@ -67,6 +71,7 @@ describe('parseBookmarks', () => {
           // A file written before usage was tracked reads back as never opened.
           useCount: 0,
           lastUsedAt: '',
+          pinned: false,
         },
       ],
       updatedAt: NOW,
@@ -192,6 +197,117 @@ describe('isCacheStale', () => {
   it('is fresh inside the ttl and stale past it', () => {
     expect(isCacheStale(cache({ fetchedAt: 1000 }), 1000 + CACHE_TTL_MS)).toBe(false);
     expect(isCacheStale(cache({ fetchedAt: 1000 }), 1000 + CACHE_TTL_MS + 1)).toBe(true);
+  });
+});
+
+describe('recentlyUsedBookmarks', () => {
+  const used = (title: string, lastUsedAt: string): Bookmark => ({
+    ...bookmark(title, `https://${title}.example/`),
+    lastUsedAt,
+  });
+
+  it('puts the most recently opened first', () => {
+    const bookmarks = [
+      used('a', '2026-09-01T10:00:00.000Z'),
+      used('b', '2026-09-03T10:00:00.000Z'),
+      used('c', '2026-09-02T10:00:00.000Z'),
+    ];
+    expect(recentlyUsedBookmarks(bookmarks).map((b) => b.title)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('keeps the file order for bookmarks that were never opened', () => {
+    const bookmarks = [
+      used('newest', ''),
+      used('older', ''),
+      used('opened', '2026-09-01T10:00:00.000Z'),
+    ];
+    expect(recentlyUsedBookmarks(bookmarks).map((b) => b.title)).toEqual([
+      'opened',
+      'newest',
+      'older',
+    ]);
+  });
+
+  it('caps the list', () => {
+    const bookmarks = Array.from({ length: 20 }, (_, i) => used(`b${i}`, ''));
+    expect(recentlyUsedBookmarks(bookmarks)).toHaveLength(12);
+    expect(recentlyUsedBookmarks(bookmarks, 3)).toHaveLength(3);
+  });
+
+  it('leaves the input alone', () => {
+    const bookmarks = [
+      used('a', '2026-09-01T10:00:00.000Z'),
+      used('b', '2026-09-03T10:00:00.000Z'),
+    ];
+    recentlyUsedBookmarks(bookmarks);
+    expect(bookmarks.map((b) => b.title)).toEqual(['a', 'b']);
+  });
+});
+
+describe('startPageBookmarks', () => {
+  const entry = (title: string, lastUsedAt: string, pinned = false): Bookmark => ({
+    ...bookmark(title, `https://${title}.example/`),
+    lastUsedAt,
+    pinned,
+  });
+
+  it('puts every pinned bookmark first, in file order, then the recently used rest', () => {
+    const bookmarks = [
+      entry('recent', '2026-09-03T10:00:00.000Z'),
+      entry('pinned-a', '', true),
+      entry('older', '2026-09-01T10:00:00.000Z'),
+      entry('pinned-b', '2026-09-02T10:00:00.000Z', true),
+    ];
+    expect(startPageBookmarks(bookmarks).map((b) => b.title)).toEqual([
+      'pinned-a',
+      'pinned-b',
+      'recent',
+      'older',
+    ]);
+  });
+
+  it('never cuts a pin to fit the limit, and lists each bookmark once', () => {
+    const bookmarks = [
+      ...Array.from({ length: 3 }, (_, i) => entry(`pin${i}`, '', true)),
+      ...Array.from({ length: 5 }, (_, i) => entry(`b${i}`, '')),
+    ];
+    const grid = startPageBookmarks(bookmarks, 2);
+    expect(grid.map((b) => b.title)).toEqual(['pin0', 'pin1', 'pin2', 'b0', 'b1']);
+  });
+});
+
+describe('setBookmarkPinned', () => {
+  const later = '2026-09-23T10:00:00.000Z';
+  const config = (...bookmarks: Bookmark[]) => ({ bookmarks, updatedAt: NOW });
+
+  it('pins in place and stamps the bookmark and the file', () => {
+    const next = setBookmarkPinned(
+      config(bookmark('a', 'https://a.example/'), bookmark('b', 'https://b.example/')),
+      'b',
+      true,
+      later,
+    );
+    expect(next.bookmarks.map((b) => [b.id, b.pinned, b.updatedAt])).toEqual([
+      ['a', false, NOW],
+      ['b', true, later],
+    ]);
+    expect(next.updatedAt).toBe(later);
+  });
+
+  it('refuses an id the file no longer has', () => {
+    expect(() =>
+      setBookmarkPinned(config(bookmark('a', 'https://a.example/')), 'gone', true),
+    ).toThrow(/no longer in the repo/);
+  });
+
+  // Every sync rewrites the file from a parse, so a pin the console set must survive it.
+  it('survives a parse and serialize round trip, and reads only a literal true', () => {
+    const pinned = setBookmarkPinned(config(bookmark('a', 'https://a.example/')), 'a', true);
+    expect(parseBookmarks(serializeBookmarks(pinned)).bookmarks[0]?.pinned).toBe(true);
+    const odd = parseBookmarks(
+      JSON.stringify({ bookmarks: [{ id: 'x', url: 'https://x.example/', pinned: 'yes' }] }),
+    );
+    expect(odd.bookmarks[0]?.pinned).toBe(false);
   });
 });
 

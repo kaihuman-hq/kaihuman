@@ -11,6 +11,7 @@ The official browser extension for Lifosy, designed to enhance your web experien
 - **Pinned Tabs Sync**: Save named groups of pinned tabs to your repo, and load any of them into the current window on any machine.
 - **Bookmarks**: Your repo's bookmarks, mirrored into the browser and synced at most once an hour. Bookmark the current page from the popup or the palette, or import the ones this browser already has. Opens are counted so you can find the ones you never use.
 - **Command Palette**: `Ctrl+Shift+K` on any page to search those bookmarks, repeat what you did last, run any of the extension's actions — and, on request, search your repo.
+- **Start Page**: a New Tab page of your own — the bookmarks you reach for, a box for a dump note, and the palette (which Chrome's own New Tab page cannot host).
 
 ## Popup
 
@@ -18,6 +19,8 @@ The popup opens on two icon buttons — **pin this page to the Knowledge Base** 
 page** — followed by the pinned-tab groups and the note box. The star opens a view of its own where
 you can add comma-separated tags and **Save**, or **Skip** to save the page without any. That view
 also holds **Import all browser bookmarks**.
+
+The **kaihuman** title in the header opens the app at <https://app.kaihuman.com> in a new tab.
 
 Everything here is also a palette action, so none of it needs the popup.
 
@@ -93,7 +96,8 @@ mirrors.
       "url": "https://vitest.dev/",
       "tags": ["testing"],
       "createdAt": "2026-09-22T10:00:00.000Z",
-      "updatedAt": "2026-09-22T10:00:00.000Z"
+      "updatedAt": "2026-09-22T10:00:00.000Z",
+      "pinned": true
     }
   ],
   "updatedAt": "2026-09-22T10:00:00.000Z"
@@ -101,6 +105,8 @@ mirrors.
 ```
 
 Only `http`/`https` entries are ever shown or opened; any other scheme in the file is dropped.
+`pinned` is optional and only a literal `true` counts; both apps carry it across every rewrite, so
+a sync never unpins what the console pinned.
 
 ### Bookmarking the current page
 
@@ -189,8 +195,8 @@ the list is read. That separation is what makes it impossible for a sync to coun
 
 `Ctrl+Shift+K` (`Command+Shift+K` on macOS) opens a palette in the middle of the current page.
 Rebind it at `chrome://extensions/shortcuts`. Chrome does not run extension content scripts
-on its own pages (`chrome://…`, the New Tab page, the Web Store), so the palette cannot open
-there — switch to a normal tab.
+on its own pages (`chrome://…`, the Web Store), so the palette cannot open there — switch to a
+normal tab. The New Tab page used to be on that list; the start page below is the answer to it.
 
 - **Recent** holds the last ten things you did here — a bookmark you opened, a repo file, an
   action you ran — newest first, so `⏎` on a freshly opened palette repeats the last one. Repeating
@@ -230,6 +236,9 @@ Everything the extension can do is here, so the popup is never the only way in:
 | Sync with GitHub now | Fetches and pushes immediately, ignoring the hourly budget |
 | Open the Lifosy console | |
 
+The three page actions at the top — bookmark, pin, clip — need a page to read, so the palette on
+the start page starts at **Add a note…**. Everything below it is the same list.
+
 An action that needs arguments takes over the input and walks through them one at a time, with the
 breadcrumb showing which field and how far along (`Bookmark this page · Title (2/3)`) and the row
 area showing what you have answered so far. An action ending in `…` opens a list instead of
@@ -258,10 +267,41 @@ If a press still does nothing, work through these in order:
    The service worker also logs the binding it ended up with (or a warning that there is none) when
    the extension is installed or updated.
 2. **Check the page.** The palette cannot run on pages no extension may touch: `chrome://…`, the
-   New Tab page, the Chrome Web Store, the PDF viewer, `view-source:`. The toolbar icon shows a red
-   `!` badge when a press lands on one of those, and the service worker console names the URL.
+   Chrome Web Store, the PDF viewer, `view-source:`. The toolbar icon shows a red `!` badge when a
+   press lands on one of those, and the service worker console names the URL. The start page is not
+   one of them: it is a page of the extension's own, so the shortcut is relayed straight to it.
 3. **Check the service worker.** On `chrome://extensions`, "service worker" under the extension
    opens its console — the two messages above appear there.
+
+## Start Page
+
+The extension replaces Chrome's New Tab page with its own (`chrome_url_overrides.newtab`), which
+Chrome asks you to confirm the first time. It holds three things:
+
+- **Search** — opens the command palette, with the whole action list and your bookmarks in it.
+  Chrome keeps the focus in the address bar on an override page, so nothing here is focused for you
+  and typing still goes to the omnibox: press the shortcut, or click the field.
+- **Pinned & recently used** — every pinned bookmark first, in the order the repo file holds them,
+  then the twelve you opened most recently. A repo whose bookmarks have never been opened still
+  shows its latest ones instead of an empty grid. Opening one is counted exactly as it is in the
+  palette, and **takes this tab over** rather than leaving a blank start page behind.
+
+  Each card has a **pin** in its corner. Pinning moves the card to the top at once and commits
+  `"pinned": true` to the bookmark in the repo file — the same field the console's Bookmarks widget
+  sets, so a pin made in either place shows up in both. A pin is never cut to fit the twelve. If the
+  commit fails (offline, or the bookmark was deleted in the console meanwhile) the card goes back
+  and the page says why.
+- **Dump note** — writes to `.lifeos/dump.md`. Any other target is one palette action away
+  (**Add a note…**), which is also the only place that reads the repo's quick-note list: a new tab
+  is opened far too often to spend a GitHub request on it.
+
+Bookmarks come from the same cache the popup and the palette read, so a new tab costs no GitHub
+request of its own — a cache past its hour is refreshed in the background, as everywhere else.
+
+The **kaihuman** title opens the app, like the popup's.
+
+Everything on the page needs a token, so before you have logged in through the console it is a
+single **Open Console** button.
 
 ## Development
 
