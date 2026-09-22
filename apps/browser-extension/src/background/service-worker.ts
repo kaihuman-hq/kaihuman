@@ -56,28 +56,96 @@ chrome.runtime.onConnect.addListener(() => {
   // Accepting the port is the whole job — holding it open is what keeps the worker alive.
 });
 
-// The keyboard shortcut is an extension-level command, which only the worker can hear; the
-// palette itself lives in the page, so the command is relayed to the active tab. Chrome does not
-// run content scripts on its own pages (chrome://, the New Tab page), so there the message has
-// nowhere to land and is ignored.
+// Whatever the bundler named the content script, so injecting it needs no hard-coded hash.
+function contentScriptFiles(): string[] {
+  return (chrome.runtime.getManifest().content_scripts ?? []).flatMap((script) => script.js ?? []);
+}
+
+const TOGGLE_RETRIES = 10;
+const TOGGLE_RETRY_MS = 50;
+
+const togglePalette = (tabId: number) =>
+  chrome.tabs.sendMessage(tabId, { type: 'TOGGLE_COMMAND_PALETTE' });
+
+/**
+ * Relays the shortcut to the tab, injecting the content script first if it is not there.
+ *
+ * Declared content scripts only run when a page loads, so every tab that was already open when
+ * the extension was installed, reloaded or updated has none until it is reloaded — pressing the
+ * shortcut in one of those used to do nothing at all. Injecting on demand covers that without
+ * asking the user to reload anything.
+ */
+async function openPaletteInTab(tabId: number): Promise<boolean> {
+  try {
+    await togglePalette(tabId);
+    return true;
+  } catch {
+    // Nothing listening yet — fall through and inject.
+  }
+
+  const files = contentScriptFiles();
+  if (files.length === 0) return false;
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files });
+  } catch {
+    // A page no extension may touch: chrome://, the Web Store, the PDF viewer, view-source.
+    return false;
+  }
+
+  // The injected loader pulls the content script in as a module, so its message listener is only
+  // in place a tick or two later.
+  for (let attempt = 0; attempt < TOGGLE_RETRIES; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, TOGGLE_RETRY_MS));
+    try {
+      await togglePalette(tabId);
+      return true;
+    } catch {
+      // Still coming up.
+    }
+  }
+  return false;
+}
+
+/** The popup icon is the only surface a content script cannot reach, so failure shows up there. */
+async function flagPaletteFailure(tabId: number) {
+  await chrome.action.setBadgeBackgroundColor({ tabId, color: '#b91c1c' });
+  await chrome.action.setBadgeText({ tabId, text: '!' });
+}
+
+// The keyboard shortcut is an extension-level command, which only the worker can hear; the palette
+// itself lives in the page, so the command is relayed to the active tab.
 chrome.commands.onCommand.addListener(async (command) => {
   if (command !== 'toggle-command-palette') return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab?.id === undefined) return;
-  try {
-    await chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_COMMAND_PALETTE' });
-  } catch {
-    // No content script on this page (chrome://, the web store, a PDF viewer).
-  }
+
+  await chrome.action.setBadgeText({ tabId: tab.id, text: '' });
+  if (await openPaletteInTab(tab.id)) return;
+
+  console.warn(`LifeOS Extension: the palette cannot run on this page (${tab.url ?? 'unknown'})`);
+  await flagPaletteFailure(tab.id);
 });
 
 // Initialize Context Menu
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async () => {
   chrome.contextMenus.create({
     id: 'lifosy-save-knowledge',
     title: 'Add to Knowledge Base',
     contexts: ['selection'],
   });
+
+  // Chrome drops a `suggested_key` it cannot honour — because the OS, another extension or Chrome
+  // itself already owns the combination — and leaves the command unbound without saying so. Say so
+  // here, since "the shortcut does nothing" looks identical to a broken extension.
+  const commands = await chrome.commands.getAll();
+  const shortcut = commands.find((c) => c.name === 'toggle-command-palette')?.shortcut;
+  if (shortcut) {
+    console.log(`LifeOS Extension: command palette bound to ${shortcut}`);
+  } else {
+    console.warn(
+      'LifeOS Extension: no shortcut is bound to the command palette — assign one at chrome://extensions/shortcuts',
+    );
+  }
 });
 
 // Handle Context Menu Clicks

@@ -1,5 +1,59 @@
 # Progress
 
+## 2026-09-22 — the palette shortcut did nothing in tabs that were already open
+
+Reported as "loaded the extension, nothing happens on the shortcut", and the
+cause was in our relay, not in Chrome.
+
+Chrome runs a declared content script only when a page *loads*, so every tab that
+was open when the extension was installed, reloaded or updated has none. The
+relay's `chrome.tabs.sendMessage` therefore rejected with "Receiving end does not
+exist" straight into a bare `catch {}` — a press on any pre-existing tab was
+silently dropped. Since loading an unpacked extension leaves every open tab in
+exactly that state, the first press was always the broken case.
+
+`openPaletteInTab` now injects the content script with
+`chrome.scripting.executeScript` when nothing answers, then retries the relay
+while the injected module starts up (crxjs's loader pulls the real script in
+through a dynamic `import`, so the listener lands a tick or two later). The file
+list comes from `chrome.runtime.getManifest().content_scripts`, so the bundler's
+hashed filename is never hard-coded. No tab reloading needed.
+
+Silence is gone from the remaining failure too: a page no extension may touch
+(`chrome://…`, the Web Store, the PDF viewer) now flashes a red `!` on the toolbar
+icon and logs the URL, rather than looking like a broken extension.
+
+The binding itself is now self-reporting. Chrome drops a `suggested_key` it cannot
+honour — the OS, an input-method switcher or another extension already owns the
+combination — and leaves the command unbound without a word, which looks identical
+to this bug. `onInstalled` reads `chrome.commands.getAll()` and logs either the
+binding it got or a warning pointing at `chrome://extensions/shortcuts`. The
+README's new "When the shortcut does nothing" section walks the same three checks.
+
+`Ctrl+Shift+Space` is kept as the suggested default; it is worth knowing that this
+combination is a common input-method-switcher binding on Windows and Linux, and if
+the OS takes it Chrome never sees the press. The shortcuts page is one click away
+and now the logs say which case you are in.
+
+Verified in a real browser, not just in jsdom: the built extension was loaded into
+Chromium under Playwright. `chrome.commands.getAll()` reports the command bound to
+`Ctrl+Shift+Space`, so the manifest side was never the problem. Against a tab
+deliberately left without a content script (the declared `matches` narrowed to a
+domain the page is not on — the same state a tab is in after the extension
+reloads), the bare relay fails with "Could not establish connection. Receiving end
+does not exist." and no palette appears, reproducing the report exactly; with the
+new path it injects, relays on the first retry, and the palette opens focused with
+the page title on the Bookmark-this-page row. A second press closes it rather than
+stacking a second one, and injecting into a tab that already has the script does
+not duplicate the listener — crxjs's loader imports the real module, and ESM module
+caching makes the re-injection a no-op.
+
+Checks: `tsc -b` clean; biome clean on every file touched; extension vitest 123 of
+123 (the shortcut suite grew from 3 cases to 7: injection on a tab with no content
+script, the retry while the module starts, the badge on both refusal paths, and
+clearing a stale badge); extension build green.
+
+
 ## 2026-09-22 — bookmarking the current page, from the popup and the palette
 
 The bookmarks mirror was read-only; both browser surfaces can now write to it.

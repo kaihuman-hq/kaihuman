@@ -136,6 +136,27 @@ there — switch to a normal tab.
 The palette renders inside a shadow root, so the page's styling cannot reach it and its styling
 cannot reach the page.
 
+### When the shortcut does nothing
+
+The palette lives in a content script, and Chrome only runs declared content scripts when a page
+*loads*. So every tab that was already open when you installed, reloaded or updated the extension
+has no content script in it. The extension handles that by injecting the script on demand when the
+relay finds nothing listening — you do not need to reload your tabs.
+
+If a press still does nothing, work through these in order:
+
+1. **Check the binding.** Open `chrome://extensions/shortcuts`. If the row for "Open the Lifosy
+   command palette" is empty, Chrome could not honour the suggested `Ctrl+Shift+Space` — the
+   combination is already taken by the OS, an input-method switcher or another extension — and
+   silently left it unbound. Click the field and set any combination you like; `Ctrl`/`Alt` plus an
+   optional `Shift` and a letter is the safest shape. The service worker also logs the binding it
+   ended up with (or a warning that there is none) when the extension is installed or updated.
+2. **Check the page.** The palette cannot run on pages no extension may touch: `chrome://…`, the
+   New Tab page, the Chrome Web Store, the PDF viewer, `view-source:`. The toolbar icon shows a red
+   `!` badge when a press lands on one of those, and the service worker console names the URL.
+3. **Check the service worker.** On `chrome://extensions`, "service worker" under the extension
+   opens its console — the two messages above appear there.
+
 ## Development
 
 The extension is built with TypeScript, Preact, and Vite, using Tailwind CSS for styling.

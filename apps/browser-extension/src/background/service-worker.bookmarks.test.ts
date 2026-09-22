@@ -8,6 +8,8 @@ let commandListener: (command: string) => unknown;
 let store: Record<string, any>;
 let sendMessage: ReturnType<typeof vi.fn>;
 let tabsCreate: ReturnType<typeof vi.fn>;
+let executeScript: ReturnType<typeof vi.fn>;
+let setBadgeText: ReturnType<typeof vi.fn>;
 let fetchMock: ReturnType<typeof vi.fn>;
 
 const BOOKMARKS_FILE = {
@@ -71,6 +73,8 @@ beforeEach(async () => {
   store = { lifeos_token: 't', lifeos_repo: 'o/r' };
   sendMessage = vi.fn(async () => ({ success: true }));
   tabsCreate = vi.fn(async () => ({ id: 1 }));
+  executeScript = vi.fn(async () => []);
+  setBadgeText = vi.fn(async () => {});
   fetchMock = vi.fn(okFile);
 
   vi.stubGlobal('chrome', {
@@ -83,7 +87,10 @@ beforeEach(async () => {
       },
     },
     contextMenus: { create: vi.fn(), onClicked: { addListener: vi.fn() } },
+    action: { setBadgeText, setBadgeBackgroundColor: vi.fn(async () => {}) },
+    scripting: { executeScript },
     runtime: {
+      getManifest: () => ({ content_scripts: [{ js: ['assets/content-loader-abc123.js'] }] }),
       onInstalled: { addListener: vi.fn() },
       onConnect: { addListener: vi.fn() },
       onMessage: {
@@ -420,10 +427,13 @@ describe('OPEN_URL', () => {
 });
 
 describe('the palette shortcut', () => {
+  const NO_RECEIVER = new Error('Could not establish connection. Receiving end does not exist.');
+
   it('relays the command to the active tab', async () => {
     await commandListener('toggle-command-palette');
 
     expect(sendMessage).toHaveBeenCalledWith(7, { type: 'TOGGLE_COMMAND_PALETTE' });
+    expect(executeScript).not.toHaveBeenCalled();
   });
 
   it('ignores other commands', async () => {
@@ -432,9 +442,56 @@ describe('the palette shortcut', () => {
     expect(sendMessage).not.toHaveBeenCalled();
   });
 
-  it('survives a page with no content script', async () => {
-    sendMessage.mockRejectedValue(new Error('Receiving end does not exist'));
+  // Every tab that was already open when the extension was loaded is in this state: declared
+  // content scripts only run on page load, so the relay has nothing to talk to yet.
+  it('injects the content script when the tab has none, then relays again', async () => {
+    sendMessage.mockRejectedValueOnce(NO_RECEIVER);
 
-    await expect(commandListener('toggle-command-palette')).resolves.toBeUndefined();
+    await commandListener('toggle-command-palette');
+
+    expect(executeScript).toHaveBeenCalledWith({
+      target: { tabId: 7 },
+      // Taken from the manifest, so the bundler's hashed filename is never hard-coded.
+      files: ['assets/content-loader-abc123.js'],
+    });
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(setBadgeText).not.toHaveBeenCalledWith({ tabId: 7, text: '!' });
+  });
+
+  it('keeps retrying while the injected module is still starting up', async () => {
+    sendMessage
+      .mockRejectedValueOnce(NO_RECEIVER)
+      .mockRejectedValueOnce(NO_RECEIVER)
+      .mockRejectedValueOnce(NO_RECEIVER)
+      .mockResolvedValue({ success: true });
+
+    await commandListener('toggle-command-palette');
+
+    expect(sendMessage).toHaveBeenCalledTimes(4);
+    expect(setBadgeText).not.toHaveBeenCalledWith({ tabId: 7, text: '!' });
+  });
+
+  it('badges the icon when the page refuses injection', async () => {
+    sendMessage.mockRejectedValue(NO_RECEIVER);
+    executeScript.mockRejectedValue(new Error('Cannot access a chrome:// URL'));
+
+    await commandListener('toggle-command-palette');
+
+    expect(setBadgeText).toHaveBeenCalledWith({ tabId: 7, text: '!' });
+  });
+
+  it('badges the icon when injection works but the script never answers', async () => {
+    sendMessage.mockRejectedValue(NO_RECEIVER);
+
+    await commandListener('toggle-command-palette');
+
+    expect(executeScript).toHaveBeenCalledTimes(1);
+    expect(setBadgeText).toHaveBeenCalledWith({ tabId: 7, text: '!' });
+  });
+
+  it('clears a stale failure badge before trying again', async () => {
+    await commandListener('toggle-command-palette');
+
+    expect(setBadgeText).toHaveBeenCalledWith({ tabId: 7, text: '' });
   });
 });
