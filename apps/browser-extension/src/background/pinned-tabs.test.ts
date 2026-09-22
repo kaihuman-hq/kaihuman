@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   findGroup,
   isOpenableUrl,
+  isPinnedTabsCacheStale,
+  isPinnedTabsCacheUsable,
   matchGroup,
   moveGroup,
   normalizeGroupName,
+  PINNED_TABS_CACHE_TTL_MS,
   PINNED_TABS_PATH,
   type PinnedTabGroup,
+  type PinnedTabsCache,
   type PinnedTabsConfig,
   parsePinnedTabs,
   putGroup,
@@ -314,5 +318,37 @@ describe('matchGroup', () => {
   it('keeps the earlier group on a tie so the answer is stable', () => {
     const tied = [group('first', ['https://a.com']), group('second', ['https://a.com'])];
     expect(matchGroup(tied, ['https://a.com/'])).toBe('first');
+  });
+});
+
+const cache = (over: Partial<PinnedTabsCache> = {}): PinnedTabsCache => ({
+  repo: 'o/r',
+  config: config(),
+  sha: 'sha-1',
+  etag: 'W/"etag-1"',
+  fetchedAt: 1000,
+  ...over,
+});
+
+describe('isPinnedTabsCacheUsable', () => {
+  it('accepts a cache taken from the same repo', () => {
+    expect(isPinnedTabsCacheUsable(cache(), 'o/r')).toBe(true);
+  });
+
+  it('rejects a missing cache, another repo, or one with no groups array', () => {
+    expect(isPinnedTabsCacheUsable(undefined, 'o/r')).toBe(false);
+    expect(isPinnedTabsCacheUsable(cache({ repo: 'other/repo' }), 'o/r')).toBe(false);
+    expect(isPinnedTabsCacheUsable(cache({ config: {} as PinnedTabsConfig }), 'o/r')).toBe(false);
+  });
+});
+
+describe('isPinnedTabsCacheStale', () => {
+  it('is fresh inside the ttl and stale past it', () => {
+    expect(
+      isPinnedTabsCacheStale(cache({ fetchedAt: 1000 }), 1000 + PINNED_TABS_CACHE_TTL_MS),
+    ).toBe(false);
+    expect(
+      isPinnedTabsCacheStale(cache({ fetchedAt: 1000 }), 1000 + PINNED_TABS_CACHE_TTL_MS + 1),
+    ).toBe(true);
   });
 });

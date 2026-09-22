@@ -24,6 +24,34 @@ export interface PinnedTabsConfig {
   updatedAt: string;
 }
 
+/** How long a cached copy is listed without a refresh. */
+export const PINNED_TABS_CACHE_TTL_MS = 15 * 60 * 1000;
+
+/**
+ * What lives in `chrome.storage.local` under `pinnedTabsCache`.
+ *
+ * Reads are served from here; writes always re-read the file, because committing against a `sha`
+ * this cache happened to be holding would overwrite whatever changed in the meantime.
+ */
+export interface PinnedTabsCache {
+  repo: string;
+  config: PinnedTabsConfig;
+  /** Blob sha of the cached content, which a write commits against. */
+  sha: string | null;
+  /** The `ETag` GitHub answered with, replayed so an unchanged file costs only a 304. */
+  etag: string | null;
+  fetchedAt: number;
+}
+
+/** A cache from another repo is useless — the groups live in that repo's file. */
+export function isPinnedTabsCacheUsable(cache: PinnedTabsCache | undefined, repo: string): boolean {
+  return !!cache && cache.repo === repo && Array.isArray(cache.config?.groups);
+}
+
+export function isPinnedTabsCacheStale(cache: PinnedTabsCache, now = Date.now()): boolean {
+  return now - cache.fetchedAt > PINNED_TABS_CACHE_TTL_MS;
+}
+
 /**
  * The repo file is remote input, so only allow schemes Chrome can safely navigate
  * to — `javascript:` or `file:` entries must never be turned into a tab.

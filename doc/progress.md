@@ -1,5 +1,346 @@
 # Progress
 
+## 2026-09-22 — sync on demand, and a bookmark you can correct before saving
+
+**Sync now.** `SYNC_NOW` takes a `force` flag that skips the hourly budget — asking
+outright is not background traffic. It fetches, pushes whatever has been counted, and
+brings the pinned-tab groups along, since the point of asking is to be up to date with
+the repo rather than with one file of it. It is a button in the popup header and an
+action in the palette. Writing the test for it turned up a real fault: a hand-broken
+`browser.pinnedtabs.json` made the whole forced sync fail, taking the bookmarks with
+it. The groups are best-effort now.
+
+**A bookmark can be corrected before it is saved.** Both surfaces prefill from the page
+and neither is stuck with it — a tracking-laden url or a site's boilerplate title is
+worth fixing first.
+
+The popup's star view grew editable **URL** and **Title** fields above the tags, with
+**Skip tags** saving what is in them. In the palette, `prompt?: string` became
+`prompts?: PromptStep[]` and `run` now takes the values in order, which turns a single
+question into a walk: URL, then title, then tags. Each step's `initial()` prefills the
+input and selects it, so `⏎` keeps what is there and typing replaces it. The breadcrumb
+names the field and the position (`Bookmark this page · Title (2/3)`) and the row area
+lists what has been answered, so a long walk stays reviewable.
+
+`Esc` gained a step: inside a walk it goes *back a field*, restoring what was typed
+there, and only cancels from the first one. That is the whole reason to walk rather than
+ask once — a typo two fields back is fixable without starting over. The hint line says
+which of the two `Esc` will do.
+
+That made the separate "Bookmark this page with tags…" action redundant, so it is gone:
+one action, three fields, and a fast path is still one keystroke per field.
+
+Verified in Chromium as well as jsdom. The walk on a real page prefilled the canonical
+url and the document title, showed `URL (1/3)` → `Title (2/3)` → `Tags (3/3)`, listed
+the answers as they accumulated, and stepped back into the title field with the edited
+text intact. The tags label is deliberately short because it doubles as the breadcrumb's
+field name — the long version read `Tags, separated by spaces or commas (3/3)` there.
+
+Checks: `tsc -b` clean; biome clean; extension vitest 194 of 194 (8 new for the walk,
+2 for the forced sync); extension build green.
+
+
+## 2026-09-22 — which bookmarks get used, counted locally and merged hourly
+
+**The `bookmarks` permission is optional now.** It moved to `optional_permissions`,
+so nobody who never imports has to grant "Read and change your bookmarks" on
+install. The popup asks with `chrome.permissions.request` when the button is
+pressed, and the import refuses with a message pointing there until it is granted
+— `chrome.permissions.request` needs a user gesture in an extension page, which a
+message from the palette is not, so the popup is the only surface that can ask.
+
+**Usage counting.** Every bookmark carries a `useCount` and a `lastUsedAt`, and the
+console's widget sorts by least used, marks never-opened ones and says "opened 12×,
+last 3 Sep" on each row — which is the point: finding what is safe to delete.
+
+The sync follows the shape proposed, with one correction worth stating. Taking
+"GitHub is the leading system" literally would mean a fetch *replaces* the counts,
+which discards everything counted since the last sync and makes two machines clobber
+each other. So GitHub leads on everything that identifies a bookmark — which ones
+exist, title, url, tags — and counts are additive instead:
+
+1. Fetch. GitHub's list replaces the cache wholesale, so a console edit or delete
+   wins.
+2. Add the deltas to what GitHub holds; `lastUsedAt` takes the later of the two. A
+   delta for a bookmark GitHub no longer has is dropped with it.
+3. Push, but only when there is something to push: an hour with nothing opened costs
+   one conditional GET and no commit.
+4. Settle by *subtracting* the pushed deltas rather than clearing them, so an open
+   counted while the commit was in flight is not lost.
+
+The cache holds GitHub's numbers and never a locally adjusted copy; deltas are added
+when the list is read. Keeping the two apart is what makes double counting
+impossible, and it is what the "reads are stable" test pins down.
+
+**The hourly budget.** `CACHE_TTL_MS` is 60 minutes and the `repoSync` alarm matches.
+Opening the popup sends `SYNC_NOW`, which checks GitHub only if the cache is past its
+hour — so opening it ten times costs nothing. Explicit actions (saving a bookmark,
+importing, any pinned-tab group change) still commit immediately, and those commits
+carry the pending counts along for free rather than waiting for the hour.
+
+One trap this change had to avoid: `parseBookmarks` rebuilds every entry field by
+field, in both apps. Without carrying the two new fields across, the console
+rewriting the file — adding or deleting a bookmark — would have silently wiped
+everything the extension had counted. Both parsers carry them now, a file written
+before this reads back as never opened, and a console round-trip test pins it.
+
+Verified in Chromium under Playwright as well as jsdom: `bookmarks` is not granted at
+install; three counted opens on top of GitHub's 5 and 0 read back as 7 and 1, the same
+on a second read, with the cache still holding 5 and 0 and the deltas held separately;
+`SYNC_NOW` inside the hour answers `{ synced: false, reason: 'fresh' }` without
+touching the network; and the import without the permission answers "Allow access to
+your browser bookmarks from the popup first".
+
+Checks: `tsc` clean in both apps; biome clean; extension vitest 186 of 186 (21 new,
+across the merge rules and the sync cycle), console vitest 90 of 90 (8 new, for the
+carried fields and the sort); extension and console builds green.
+
+
+## 2026-09-22 — the palette does everything the popup does, and remembers what you did
+
+Six changes, all on the extension side bar the first.
+
+**The deep link names its repository.** `consoleFileUrl` now appends
+`?repo=owner/name`, and the console honours it: `Dashboard` reads the parameter at
+first render — before `MainApp`'s URL sync can rewrite the location — selects that
+repository once the list is in, then strips the parameter so a later repo switch is
+not undone by a stale link. `ProtectedRoute` keeps the query string alongside the
+path in `lifeos_redirect`, or the repository would be lost on the way through
+login. A hit found while the extension points at one repo no longer opens the
+console's other repo's file of the same name.
+
+**Pinned-tab groups are cached like bookmarks.** Same shape, same 15-minute TTL,
+same ETag replay, and one `repoSync` alarm now refreshes both. Listing and loading
+take the cached copy; saving, renaming, reordering and deleting always re-read
+first, because a commit goes against the `sha` the file had a moment ago and
+committing against a cached one would overwrite whatever changed since.
+`githubWriteFile` hands back the new blob sha so a write refreshes the cache
+without a second round-trip.
+
+**The browser's own bookmarks can be imported.** `flattenChromeBookmarks` walks
+`chrome.bookmarks.getTree()` depth-first; a bookmark inside a folder the user made
+carries that folder's name as its tag, while the built-in roots do not become tags.
+The import reuses the same `addBookmark` rules, so pages already in the file are
+skipped rather than duplicated and a second run is a no-op, and the imported block
+is appended so the existing list stays on top. One commit, whatever the count. This
+needs the `bookmarks` permission, which Chrome surfaces as "Read and change your
+bookmarks" on update.
+
+**The palette grew actions, submenus and arguments.** A `PaletteAction` either opens
+a list (`children`), asks for a line of text (`prompt`), or runs. That covers
+everything the popup and the context menu can do: notes into the dump or any
+quick-note file, action-log entries with `#tags` picked out of the text, clipping
+the selection, every pinned-tab group operation, switching repository, the import,
+and opening the console. Esc unwinds one step at a time — out of the argument, back
+out of each list, then closed. Deleting a tab group asks for `DELETE` first, since
+it is otherwise one keystroke away.
+
+**Recent actions.** The worker keeps the last ten things the palette did, newest
+first, one entry per id, in `chrome.storage.local`. Anything with a url is reopened;
+an action is replayed by id, so a recent survives the action list being rebuilt.
+They sit above the bookmarks, which makes `⏎` on a freshly opened palette repeat the
+last thing rather than doing something new.
+
+**The popup opens on two icons.** Pin-to-Knowledge-Base and bookmark, as small icon
+buttons over the page title, with the read-it-later card and the old inline bookmark
+form gone. The star opens a view of its own: tags and **Save**, or **Skip** to save
+without them, plus **Import all browser bookmarks**.
+
+Verified in Chromium under Playwright as well as in jsdom: the palette lists recents
+above bookmarks above the ten actions; a submenu shows its crumb and swaps `esc
+close` for `esc back`; Esc leaves a submenu without closing the palette; an argument
+prompt takes over the input and Esc restores the rows; and running an action records
+it in `recentActions`. That run also caught a cosmetic bug — a submenu whose title
+already ends in an ellipsis rendered "Search Switch repository……" — now fixed and
+pinned by a test.
+
+Checks: `tsc -b` clean in the extension and `tsc --noEmit` clean in the console;
+biome clean on every file touched; extension vitest 165 of 165 (35 new, across the
+flattener, both caches, the import, recents, repo switching and the palette's new
+modes); extension and console builds green.
+
+
+## 2026-09-22 — a letter-key shortcut, and repo hits that open in the console
+
+Two follow-ups on the palette.
+
+**`Ctrl+Shift+K`** (`Command+Shift+K` on macOS) replaces `Ctrl+Shift+Space`.
+Chromium binds either — `chrome.commands.getAll()` confirms the new one, as it
+confirmed the old — but `Ctrl+Shift+Space` is a common input-method-switcher chord
+on Windows and Linux, and when the OS claims it Chrome never sees the press and no
+code can help. A letter key sidesteps that whole class of conflict. Chrome does not
+use `Ctrl+Shift+K` itself (its DevTools console is `Ctrl+Shift+J`).
+
+**Repo hits open in the console, not on GitHub.** `searchRepo` mapped
+`item.html_url`; it now builds `https://app.kaihuman.com/files/<path>` through a new
+`consoleFileUrl`. That is the console's own deep link: `parseUrlState` in `MainApp`
+reads `/files/<path>` and opens the file, which is exactly what `WikiView`'s edit
+handler already routes to. Each segment is percent-encoded with the slashes left as
+separators, matching what the console decodes on the other side — a round-trip test
+pins that down, since the console decodes the whole remainder after `/files/` in one
+go. The base URL moved into `src/console.ts`, which `app.tsx`'s login link now shares
+rather than repeating the literal.
+
+Worth knowing: the deep link carries the path only, so the file opens in whichever
+repo the console currently has selected. Searching one repo in the extension while
+the console sits on another opens the wrong repo's file — the console has no repo
+parameter to pass yet, so this is a real limitation, and the README says so.
+
+Checks: `tsc -b` clean; biome clean; extension vitest 127 of 127 (4 new for the deep
+link, including the encoding round-trip); extension build green; and the built
+extension loaded into Chromium under Playwright reports the command bound to
+`Ctrl+Shift+K`.
+
+
+## 2026-09-22 — the palette shortcut did nothing in tabs that were already open
+
+Reported as "loaded the extension, nothing happens on the shortcut", and the
+cause was in our relay, not in Chrome.
+
+Chrome runs a declared content script only when a page *loads*, so every tab that
+was open when the extension was installed, reloaded or updated has none. The
+relay's `chrome.tabs.sendMessage` therefore rejected with "Receiving end does not
+exist" straight into a bare `catch {}` — a press on any pre-existing tab was
+silently dropped. Since loading an unpacked extension leaves every open tab in
+exactly that state, the first press was always the broken case.
+
+`openPaletteInTab` now injects the content script with
+`chrome.scripting.executeScript` when nothing answers, then retries the relay
+while the injected module starts up (crxjs's loader pulls the real script in
+through a dynamic `import`, so the listener lands a tick or two later). The file
+list comes from `chrome.runtime.getManifest().content_scripts`, so the bundler's
+hashed filename is never hard-coded. No tab reloading needed.
+
+Silence is gone from the remaining failure too: a page no extension may touch
+(`chrome://…`, the Web Store, the PDF viewer) now flashes a red `!` on the toolbar
+icon and logs the URL, rather than looking like a broken extension.
+
+The binding itself is now self-reporting. Chrome drops a `suggested_key` it cannot
+honour — the OS, an input-method switcher or another extension already owns the
+combination — and leaves the command unbound without a word, which looks identical
+to this bug. `onInstalled` reads `chrome.commands.getAll()` and logs either the
+binding it got or a warning pointing at `chrome://extensions/shortcuts`. The
+README's new "When the shortcut does nothing" section walks the same three checks.
+
+`Ctrl+Shift+Space` is kept as the suggested default; it is worth knowing that this
+combination is a common input-method-switcher binding on Windows and Linux, and if
+the OS takes it Chrome never sees the press. The shortcuts page is one click away
+and now the logs say which case you are in.
+
+Verified in a real browser, not just in jsdom: the built extension was loaded into
+Chromium under Playwright. `chrome.commands.getAll()` reports the command bound to
+`Ctrl+Shift+Space`, so the manifest side was never the problem. Against a tab
+deliberately left without a content script (the declared `matches` narrowed to a
+domain the page is not on — the same state a tab is in after the extension
+reloads), the bare relay fails with "Could not establish connection. Receiving end
+does not exist." and no palette appears, reproducing the report exactly; with the
+new path it injects, relays on the first retry, and the palette opens focused with
+the page title on the Bookmark-this-page row. A second press closes it rather than
+stacking a second one, and injecting into a tab that already has the script does
+not duplicate the listener — crxjs's loader imports the real module, and ESM module
+caching makes the re-injection a no-op.
+
+Checks: `tsc -b` clean; biome clean on every file touched; extension vitest 123 of
+123 (the shortcut suite grew from 3 cases to 7: injection on a tab with no content
+script, the retry while the module starts, the badge on both refusal paths, and
+clearing a stale badge); extension build green.
+
+
+## 2026-09-22 — bookmarking the current page, from the popup and the palette
+
+The bookmarks mirror was read-only; both browser surfaces can now write to it.
+
+`ADD_BOOKMARK` reads `.kh/browser.bookmarks.json`, prepends the page and commits
+through the Contents API with the sha it just read, so the write is not a blind
+overwrite. The extension's `addBookmark` mirrors the console's rules — openable
+url, no duplicate page compared canonically, newest first — because both write
+the same file. The result goes straight into the cache with `etag: null`, so the
+new entry is visible immediately and the next sync does a full read.
+
+**Popup → Bookmarks → Bookmark this page**, with optional comma-separated tags,
+next to the existing Read It Later block. **Palette → Actions → Bookmark this
+page**, no tags, for a one-keystroke save. The action is listed *below* the
+bookmark rows on purpose: `⏎` on a freshly opened palette should open what you
+were looking for, not write a file. Typing `bookmark` filters everything else
+away and brings it to the top. On success the palette stays open, shows the
+confirmation and reloads its list — the write is the feedback, closing would hide
+it.
+
+Both surfaces prefer the page's `<link rel="canonical">` over the address bar,
+matching what Read It Later already does, so one page saved from either surface
+lands on one URL.
+
+Checks: `tsc -b` clean in the extension; biome clean on every file touched;
+extension vitest 119 of 119 (19 new — the write path against a stubbed Contents
+API, and the action row in jsdom); extension build green.
+
+
+## 2026-09-22 — bookmarks: a repo file type, a cached mirror, and a palette on a shortcut
+
+Bookmarks now live in the repo as a first-class file type and reach the browser
+through the extension's own cache, so the palette opens instantly and syncs
+behind the user's back.
+
+**Console — `.bookmarks.json`.** A new template in the New File wizard, wired the
+same way every other widget type is: `BookmarksLogic` (parse/serialize plus
+`addBookmark`, `deleteBookmark`, `filterBookmarks`, `collectTags`),
+`BookmarksWidget` for the four tile modes, and `BookmarkAddForm` behind the focus
+view's ADD BOOKMARK tab. The compound extension is registered in the three places
+that derive one from a path — `layout.store.getChildren`, and `MainApp`'s
+`dashboardTiles` and `computedActiveTile` — plus `Dashboard`'s `renderFile`
+allow-list, so the file behaves identically on the dashboard, in Files view and
+in focus mode. The file is a JSON object: `{ bookmarks: [{ id, title, url, tags,
+createdAt, updatedAt }], updatedAt }`, all timestamps ISO strings, matching its
+`browser.pinnedtabs.json` sibling.
+
+Only `http(s)` entries survive parsing, in both apps. The file is remote input
+that ends up as a clickable link and, in the extension, as a tab — a
+`javascript:` entry must never get that far. `addBookmark` also rejects a page
+already in the file, comparing canonical URLs so `https://x.com` and
+`https://x.com/` are the same page.
+
+**Extension — a cache, not a fetch.** `GET_BOOKMARKS` answers from
+`chrome.storage.local` and only blocks on GitHub when there is no usable cache;
+a cache older than 15 minutes is served anyway and refreshed in the background,
+and an alarm syncs every 15 minutes regardless. GitHub's own `ETag` is replayed as
+`If-None-Match`, so an unchanged file answers 304 — which GitHub does not bill
+against the rate limit. The cache carries the repo it came from, which is what makes a repo switch
+in the popup self-invalidating; a new token drops it outright, since that can
+mean a different account.
+
+**Extension — the palette.** `Ctrl+Shift+Space` (`Command+Shift+Space` on macOS)
+is an extension command, which only the service worker can hear, so it relays to
+the active tab and the content script toggles the palette there. The palette is
+plain DOM in a shadow root rather than a Preact island: nothing of the page's CSS
+reaches it and none of ours reaches the page. Bookmark titles are set as
+`textContent`, never markup.
+
+Searching bookmarks is local against the cached list and ranks a title prefix
+above a title substring, then tags, then the URL. Searching the repo is a
+separate, explicit act: `Tab` on the typed query fires exactly one
+`search/code` request. That endpoint's ~10 req/min budget punishes bursts, and
+the console's `SearchModal` already pays for debounce-and-retry around it, so the
+palette never calls it while typing at all. Typing again drops the previous
+query's repo results rather than showing them next to fresh bookmark matches.
+
+Opening a result goes through the worker (`OPEN_URL`), which re-checks the scheme
+before creating a tab — the palette runs in the page, so the URL it sends is
+page-influenced.
+
+Demo mode seeds `.kh/browser.bookmarks.json` on the Reading dashboard, so the
+widget is visible without a repo, and `demo.test.ts` guards that file's shape
+against the parser like it does the other widget formats.
+
+Checks: `tsc --noEmit` clean in `@lifosy/core`, `@lifosy/ui` and
+`@lifosy/app-console`, `tsc -b` clean in the extension; biome clean in all three
+packages and on every file added here; console vitest 82 of 82 (19 new, for the
+bookmarks logic), extension vitest 100 of 100 (45 new, across the cache/search
+module, the worker messages and the palette in jsdom); `@lifosy/ui`, console and
+extension builds green. `turbo` itself cannot spawn child processes in this
+sandbox ("Exec format error"), which is why the per-package scripts were run
+directly — it fails the same way on `@lifosy/config`'s `echo`.
+
+
 ## 2026-09-16 — cascivo 1.3.0: the editor gutter stops drifting
 
 `@cascivo/{charts,core,editor,react}` 1.2.0 → 1.3.0, `@cascivo/tokens` 1.1.0 → 1.1.1

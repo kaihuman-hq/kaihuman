@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'preact/hooks';
+import { CONSOLE_URL } from './console';
 import { ActionLogForm } from './components/ActionLogForm';
+import { BookmarkPageForm } from './components/BookmarkPageForm';
+import { QuickActions } from './components/QuickActions';
 import { PinnedTabsPanel } from './components/PinnedTabsPanel';
 import './index.css';
 
@@ -13,6 +16,9 @@ export function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [quickNotes, setQuickNotes] = useState<string[]>([]);
   const [selectedNote, setSelectedNote] = useState<string>('.lifeos/dump.md');
+  // The star opens a view of its own rather than growing the popup with another form.
+  const [view, setView] = useState<'main' | 'bookmark'>('main');
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'failed'>('idle');
 
   useEffect(() => {
     // Check for auth token, repo, and repos
@@ -67,6 +73,14 @@ export function App() {
       }
     });
 
+    // Opening the popup is the other moment the extension checks GitHub. The worker still holds
+    // to its hourly budget, so this is a no-op on a cache that is still fresh.
+    chrome.runtime.sendMessage({ type: 'SYNC_NOW' }, () => {
+      if (chrome.runtime.lastError) {
+        console.warn('LifeOS Extension: sync check failed', chrome.runtime.lastError.message);
+      }
+    });
+
     // Fetch quick notes
     chrome.runtime.sendMessage({ type: 'FETCH_QUICK_NOTES' }, (response) => {
       if (response && response.quickNotes) {
@@ -76,7 +90,18 @@ export function App() {
   }, []);
 
   const handleLogin = () => {
-    chrome.tabs.create({ url: 'https://app.kaihuman.com/extension-onboarded' }); // Or localhost if dev
+    chrome.tabs.create({ url: `${CONSOLE_URL}/extension-onboarded` }); // Or localhost if dev
+  };
+
+  // Opening the popup already checks, but only within the hourly budget. Asking outright is not
+  // background traffic, so this one ignores it.
+  const handleSyncNow = () => {
+    setSyncState('syncing');
+    chrome.runtime.sendMessage({ type: 'SYNC_NOW', force: true }, (response) => {
+      const failure = chrome.runtime.lastError?.message || response?.error;
+      setSyncState(failure ? 'failed' : 'done');
+      setTimeout(() => setSyncState('idle'), 2000);
+    });
   };
 
   const handleRepoChange = (e: any) => {
@@ -184,12 +209,40 @@ export function App() {
     );
   }
 
+  if (view === 'bookmark') {
+    return (
+      <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
+        <BookmarkPageForm
+          page={activeTab}
+          repo={activeRepo || 'lifosy/monorepo'}
+          onClose={() => setView('main')}
+        />
+      </div>
+    );
+  }
+
   return (
     <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
       <header class="flex items-center justify-between mb-4 pb-2 border-b border-[var(--los-border)]">
         <span class="font-bold text-[var(--los-accent)] tracking-tight">kaihuman</span>
         <div class="flex flex-col items-end gap-1">
-          <span class="text-xs text-[var(--los-success)] animate-pulse">● Connected</span>
+          <div class="flex items-center gap-2">
+            <button
+              onClick={handleSyncNow}
+              disabled={syncState === 'syncing'}
+              class="text-[10px] text-[var(--los-fg-dim)] hover:text-[var(--los-accent)] disabled:opacity-50 transition-colors"
+              title="Fetch from GitHub and push what has been counted, ignoring the hourly budget"
+            >
+              {syncState === 'syncing'
+                ? 'Syncing…'
+                : syncState === 'done'
+                  ? 'Synced'
+                  : syncState === 'failed'
+                    ? 'Sync failed'
+                    : '↻ Sync now'}
+            </button>
+            <span class="text-xs text-[var(--los-success)] animate-pulse">● Connected</span>
+          </div>
           {repos.length > 0 ? (
             <select
               value={activeRepo || 'lifosy/monorepo'}
@@ -209,20 +262,18 @@ export function App() {
       </header>
 
       <div class="space-y-6 flex-1">
-        {/* Read It Later Section */}
-        <section class="space-y-2">
-          <h2 class="text-sm font-bold text-[var(--los-fg-dim)]">Read It Later</h2>
-          <div class="p-3 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]">
-            <div class="text-xs text-[var(--los-fg-dim)] line-clamp-2 mb-2">{activeTab?.title || 'No active tab'}</div>
-            <button
-              onClick={handleReadItLater}
-              disabled={status === 'saving'}
-              class="w-full py-1.5 px-3 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-xs rounded transition-colors flex items-center justify-center gap-2"
-            >
-              {status === 'saving' ? 'Saving...' : status === 'success' ? 'Saved!' : 'Pin to Knowledge Base'}
-            </button>
+        <QuickActions
+          pageTitle={activeTab?.title || ''}
+          onPin={handleReadItLater}
+          onBookmark={() => setView('bookmark')}
+          status={status}
+        />
+
+        {status === 'error' && errorMessage && (
+          <div class="text-[10px] text-red-400 p-2 bg-red-950/30 rounded border border-red-900/50 break-words">
+            {errorMessage}
           </div>
-        </section>
+        )}
 
         <PinnedTabsPanel repo={activeRepo || 'lifosy/monorepo'} />
 

@@ -20,6 +20,15 @@ export default defineManifest({
       "128": "icon-128.png"
     }
   },
+  commands: {
+    'toggle-command-palette': {
+      suggested_key: {
+        default: 'Ctrl+Shift+K',
+        mac: 'Command+Shift+K',
+      },
+      description: 'Open the Lifosy command palette',
+    },
+  },
   background: {
     service_worker: 'src/background/service-worker.ts',
     type: 'module',
@@ -31,5 +40,8 @@ export default defineManifest({
     },
   ],
   permissions: ['contextMenus', 'storage', 'activeTab', 'scripting', 'alarms', 'tabs'],
+  // Reading the browser's own bookmarks is only needed for the import, so it is asked for from the
+  // popup when the user runs it rather than warned about on install.
+  optional_permissions: ['bookmarks'],
   host_permissions: ['<all_urls>'],
 })

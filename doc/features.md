@@ -10,6 +10,7 @@
 
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
+| Bookmarks (`.bookmarks.json`) — tagged, searchable bookmarks; mirrored into the browser extension | New File → Bookmarks | 2026-09-22 |
 | Prompt library (`.prompts.md`) — searchable, taggable prompts in one grep-able file | New File → Prompts | 2026-09-16 |
 | Configurable desktop bottom navbar (stored in `.kh` config) | Settings → Bottom Navbar | 2026-06-26 |
 | Demo mode (in-memory seeded data) | `/demo` + login "View demo" | 2026-06-25 |
@@ -24,6 +25,17 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Sync now — fetch and push immediately, ignoring the hourly budget | popup header, palette → Actions | 2026-09-22 |
+| Guided bookmark entry — URL, title and tags editable in both the popup and the palette | popup star, palette → Bookmark this page… | 2026-09-22 |
+| Bookmark usage counts, merged additively and synced at most hourly | service worker, console widget | 2026-09-22 |
+| Sort bookmarks by least/most used, to find ones worth deleting | Bookmarks widget → LEAST USED | 2026-09-22 |
+| Recent actions — the palette's last ten opens and actions, newest first | palette → Recent | 2026-09-22 |
+| Every popup/context-menu action as a palette action (notes, clippings, pinned-tab groups, repo switch) | palette → Actions | 2026-09-22 |
+| Import this browser's bookmarks into the repo file, tagged by folder | popup star → Import, palette → Actions | 2026-09-22 |
+| Pinned-tab groups cached and synced in the background, like bookmarks | service worker | 2026-09-22 |
+| Bookmark the current page (popup star opens a tags view with Save/Skip; palette action) | popup, palette | 2026-09-22 |
+| Command palette on `Ctrl+Shift+K` — searches cached bookmarks locally; repo code search on `Tab`, opening hits in the console | any page (content script) | 2026-09-22 |
+| Bookmarks mirror with background sync (cached from `.kh/browser.bookmarks.json`) | service worker | 2026-09-22 |
 | Edit mode for pinned-tab groups (rename/reorder/delete behind an Edit toggle; one large Load button otherwise) | popup → Pinned Tabs | 2026-09-13 |
 | Named pinned-tab groups (save/load/update/rename/reorder/delete via `.kh/browser.pinnedtabs.json`) | popup → Pinned Tabs | 2026-09-09 |
 | Pinned tabs sync (save/restore Chrome pinned tabs via `.kh/browser.pinnedtabs.json`) | popup → Pinned Tabs | 2026-09-03 |
