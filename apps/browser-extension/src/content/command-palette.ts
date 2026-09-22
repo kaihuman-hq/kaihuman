@@ -3,7 +3,7 @@
  *
  * Bookmarks are searched locally against the cached list, so typing costs nothing. The repo search
  * hits GitHub's code-search endpoint, which has a small dedicated budget, so it runs only when the
- * user presses Tab — never while typing.
+ * user presses Tab — never while typing. Everything the popup can do is also here, as an action.
  */
 import type { Bookmark } from '../background/bookmarks';
 import { searchBookmarks } from '../background/bookmarks';
@@ -14,12 +14,36 @@ export interface RepoResult {
   url: string;
 }
 
+/**
+ * Something the palette can do. An action either opens a submenu (`children`), asks for a line of
+ * text first (`prompt`), or just runs — resolving with the line to show afterwards.
+ */
+export interface PaletteAction {
+  id: string;
+  title: string;
+  subtitle?: string;
+  /** Placeholder for the input while the action collects its argument. */
+  prompt?: string;
+  children?: () => Promise<PaletteAction[]>;
+  run?: (input: string) => Promise<string>;
+}
+
+/** What the palette last did, so it can be repeated from the top of the list. */
+export interface RecentEntry {
+  id: string;
+  title: string;
+  subtitle?: string;
+  /** Set for anything that was opened; actions are replayed by `id` instead. */
+  url?: string;
+}
+
 export interface PaletteHandlers {
   loadBookmarks: () => Promise<Bookmark[]>;
   searchRepo: (query: string) => Promise<RepoResult[]>;
   open: (url: string) => void;
-  /** Saves the page the palette is open on; resolves with a line to show the user. */
-  bookmarkPage: () => Promise<string>;
+  actions: () => PaletteAction[];
+  loadRecents: () => Promise<RecentEntry[]>;
+  rememberRecent: (entry: RecentEntry) => void;
 }
 
 export interface CommandPalette {
@@ -33,8 +57,6 @@ interface Row {
   subtitle: string;
   activate: () => void;
 }
-
-const BOOKMARK_PAGE_ACTION = 'Bookmark this page';
 
 export const PALETTE_HOST_ID = 'lifosy-command-palette';
 
@@ -64,6 +86,14 @@ const STYLES = `
     border: 1px solid #2a2a2a;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
   }
+  .crumb {
+    padding: 8px 16px 0;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #7dd3a7;
+  }
+  .crumb[hidden] { display: none; }
   input {
     all: unset;
     box-sizing: border-box;
@@ -118,6 +148,8 @@ const STYLES = `
   }
 `;
 
+const matches = (text: string, needle: string) => text.toLowerCase().includes(needle);
+
 export function createCommandPalette(handlers: PaletteHandlers): CommandPalette {
   const host = document.createElement('div');
   host.id = PALETTE_HOST_ID;
@@ -130,9 +162,11 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
   backdrop.className = 'backdrop';
   const panel = document.createElement('div');
   panel.className = 'panel';
+  const crumb = document.createElement('div');
+  crumb.className = 'crumb';
+  crumb.hidden = true;
   const input = document.createElement('input');
   input.type = 'text';
-  input.placeholder = 'Search bookmarks…';
   const status = document.createElement('div');
   status.className = 'status';
   status.hidden = true;
@@ -141,65 +175,175 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
   const hint = document.createElement('div');
   hint.className = 'hint';
 
-  panel.append(input, status, rows, hint);
+  panel.append(crumb, input, status, rows, hint);
   backdrop.append(panel);
   shadow.append(style, backdrop);
 
   let open = false;
   let bookmarks: Bookmark[] = [];
+  let recents: RecentEntry[] = [];
   let repoResults: RepoResult[] | null = null;
   let repoQuery = '';
   let selected = 0;
   /** Guards against a slow repo search landing after the query moved on. */
   let searchToken = 0;
+  /** Submenus the user has opened, so Esc walks back out one level at a time. */
+  let trail: { title: string; actions: PaletteAction[] }[] = [];
+  /** The action waiting for its argument, while the input collects one. */
+  let pending: PaletteAction | null = null;
 
-  /** The action is offered on an empty query and while the user is typing its name. */
-  const actionRows = (): Row[] => {
-    const needle = input.value.trim().toLowerCase();
-    if (needle && !BOOKMARK_PAGE_ACTION.toLowerCase().includes(needle)) return [];
-    return [
-      {
-        title: BOOKMARK_PAGE_ACTION,
-        subtitle: document.title || location.href,
-        activate: () => void savePage(),
-      },
-    ];
-  };
-
-  const bookmarkRows = (): Row[] =>
-    searchBookmarks(bookmarks, input.value).map((bookmark) => ({
-      title: bookmark.title,
-      subtitle: bookmark.tags.length
-        ? `${bookmark.url}  ${bookmark.tags.map((tag) => `#${tag}`).join(' ')}`
-        : bookmark.url,
-      activate: () => {
-        handlers.open(bookmark.url);
-        close();
-      },
-    }));
-
-  const repoRows = (): Row[] =>
-    (repoResults ?? []).map((result) => ({
-      title: result.name,
-      subtitle: result.path,
-      activate: () => {
-        handlers.open(result.url);
-        close();
-      },
-    }));
-
-  const allRows = (): Row[] => [...bookmarkRows(), ...repoRows(), ...actionRows()];
+  const needle = () => input.value.trim().toLowerCase();
 
   const setStatus = (text: string | null) => {
     status.textContent = text ?? '';
     status.hidden = !text;
   };
 
+  const runAction = async (action: PaletteAction, argument: string) => {
+    setStatus(`${action.title}…`);
+    try {
+      setStatus((await action.run?.(argument)) ?? null);
+      handlers.rememberRecent({ id: action.id, title: action.title, subtitle: action.subtitle });
+      // The action may have changed what the list should show (a new bookmark, say).
+      bookmarks = await handlers.loadBookmarks().catch(() => bookmarks);
+      recents = await handlers.loadRecents().catch(() => recents);
+    } catch (e: any) {
+      setStatus(e?.message || `${action.title} failed`);
+    }
+    render();
+  };
+
+  /** Submenu, then prompt, then run — an action does exactly one of the three. */
+  const activate = async (action: PaletteAction) => {
+    if (action.children) {
+      setStatus(null);
+      let children: PaletteAction[];
+      try {
+        children = await action.children();
+      } catch (e: any) {
+        setStatus(e?.message || `${action.title} failed`);
+        render();
+        return;
+      }
+      trail = [...trail, { title: action.title, actions: children }];
+      input.value = '';
+      selected = 0;
+      render();
+      return;
+    }
+    if (action.prompt && !pending) {
+      pending = action;
+      input.value = '';
+      selected = 0;
+      setStatus(null);
+      render();
+      return;
+    }
+    const argument = input.value.trim();
+    pending = null;
+    input.value = '';
+    selected = 0;
+    await runAction(action, argument);
+  };
+
+  const openUrl = (entry: RecentEntry) => {
+    handlers.rememberRecent(entry);
+    if (entry.url) handlers.open(entry.url);
+    close();
+  };
+
+  const actionRow = (action: PaletteAction): Row => ({
+    title: action.title,
+    subtitle: action.subtitle ?? '',
+    activate: () => void activate(action),
+  });
+
+  const recentRows = (): Row[] => {
+    if (trail.length > 0) return [];
+    return recents
+      .filter((entry) => matches(entry.title, needle()) || matches(entry.subtitle ?? '', needle()))
+      .map((entry) => ({
+        title: entry.title,
+        subtitle: entry.subtitle ?? '',
+        activate: () => {
+          if (entry.url) {
+            openUrl(entry);
+            return;
+          }
+          // An action is replayed by id, so a recent survives the action list being rebuilt.
+          const action = handlers.actions().find((candidate) => candidate.id === entry.id);
+          if (action) void activate(action);
+          else setStatus('That action is no longer available');
+        },
+      }));
+  };
+
+  const bookmarkRows = (): Row[] => {
+    if (trail.length > 0) return [];
+    return searchBookmarks(bookmarks, input.value).map((bookmark) => ({
+      title: bookmark.title,
+      subtitle: bookmark.tags.length
+        ? `${bookmark.url}  ${bookmark.tags.map((tag) => `#${tag}`).join(' ')}`
+        : bookmark.url,
+      activate: () =>
+        openUrl({
+          id: `bookmark:${bookmark.id}`,
+          title: bookmark.title,
+          subtitle: bookmark.url,
+          url: bookmark.url,
+        }),
+    }));
+  };
+
+  const repoRows = (): Row[] => {
+    if (trail.length > 0) return [];
+    return (repoResults ?? []).map((result) => ({
+      title: result.name,
+      subtitle: result.path,
+      activate: () =>
+        openUrl({
+          id: `repo:${result.path}`,
+          title: result.name,
+          subtitle: result.path,
+          url: result.url,
+        }),
+    }));
+  };
+
+  /** In a submenu it is that menu's entries; at the top level, the actions that match. */
+  const actionRows = (): Row[] => {
+    const here = trail.at(-1);
+    if (here) {
+      return here.actions
+        .filter(
+          (action) => matches(action.title, needle()) || matches(action.subtitle ?? '', needle()),
+        )
+        .map(actionRow);
+    }
+    return handlers
+      .actions()
+      .filter((action) => !needle() || matches(action.title, needle()))
+      .map(actionRow);
+  };
+
+  const allRows = (): Row[] =>
+    pending ? [] : [...recentRows(), ...bookmarkRows(), ...repoRows(), ...actionRows()];
+
   const render = () => {
-    const actions = actionRows();
+    const here = trail.at(-1);
+    crumb.textContent = here?.title ?? '';
+    crumb.hidden = !here;
+    // Submenu titles already end in an ellipsis, which would otherwise double up here.
+    input.placeholder =
+      pending?.prompt ?? (here ? `Search ${here.title.replace(/…$/, '')}…` : 'Search bookmarks…');
+
+    const recent = recentRows();
     const bookmarkMatches = bookmarkRows();
     const repoMatches = repoRows();
-    const total = actions.length + bookmarkMatches.length + repoMatches.length;
+    const actions = actionRows();
+    const total = pending
+      ? 0
+      : recent.length + bookmarkMatches.length + repoMatches.length + actions.length;
     if (selected >= total) selected = Math.max(0, total - 1);
 
     rows.replaceChildren();
@@ -218,7 +362,7 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
         element.dataset.selected = String(position === selected);
         const title = document.createElement('div');
         title.className = 'title';
-        // Bookmark titles come from the repo file, so they are set as text, never as markup.
+        // Titles come from the repo file and the page, so they are set as text, never as markup.
         title.textContent = row.title;
         const subtitle = document.createElement('div');
         subtitle.className = 'subtitle';
@@ -232,20 +376,30 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
       }
     };
 
-    addGroup('Bookmarks', bookmarkMatches);
-    addGroup('Repo', repoMatches);
-    if (bookmarkMatches.length + repoMatches.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'empty';
-      empty.textContent = bookmarks.length
-        ? 'No bookmark matches.'
-        : 'No bookmarks cached yet — open the console to sync.';
-      rows.append(empty);
+    if (pending) {
+      const note = document.createElement('div');
+      note.className = 'empty';
+      note.textContent = pending.title;
+      rows.append(note);
+    } else {
+      addGroup('Recent', recent);
+      addGroup('Bookmarks', bookmarkMatches);
+      addGroup('Repo', repoMatches);
+      if (!here && bookmarkMatches.length + repoMatches.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = bookmarks.length
+          ? 'No bookmark matches.'
+          : 'No bookmarks cached yet — open the console to sync.';
+        rows.append(empty);
+      }
+      addGroup(here ? here.title : 'Actions', actions);
     }
-    addGroup('Actions', actions);
 
     const query = input.value.trim();
-    if (!query) hint.textContent = '↑↓ navigate · ⏎ select · esc close';
+    if (pending) hint.textContent = '⏎ confirm · esc cancel';
+    else if (here) hint.textContent = '↑↓ navigate · ⏎ select · esc back';
+    else if (!query) hint.textContent = '↑↓ navigate · ⏎ select · esc close';
     else if (repoResults && repoQuery === query) hint.textContent = '⏎ select · esc close';
     else hint.textContent = `⇥ tab search repo for “${query}” · ⏎ select · esc close`;
   };
@@ -254,19 +408,8 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
     allRows()[position]?.activate();
   };
 
-  /** Stays open on purpose: the confirmation, and the new entry in the list, are the feedback. */
-  const savePage = async () => {
-    setStatus('Bookmarking this page…');
-    try {
-      setStatus(await handlers.bookmarkPage());
-      bookmarks = await handlers.loadBookmarks();
-    } catch (e: any) {
-      setStatus(e?.message || 'Could not bookmark this page');
-    }
-    render();
-  };
-
   const runRepoSearch = async () => {
+    if (pending || trail.length > 0) return;
     const query = input.value.trim();
     if (!query) return;
     const token = ++searchToken;
@@ -284,10 +427,29 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
     render();
   };
 
+  /** Esc unwinds one step at a time: the prompt, then each submenu, then the palette. */
+  const back = () => {
+    if (pending) {
+      pending = null;
+      input.value = '';
+      selected = 0;
+      render();
+      return;
+    }
+    if (trail.length > 0) {
+      trail = trail.slice(0, -1);
+      input.value = '';
+      selected = 0;
+      render();
+      return;
+    }
+    close();
+  };
+
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.preventDefault();
-      close();
+      back();
       return;
     }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -305,7 +467,8 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      choose(selected);
+      if (pending) void activate(pending);
+      else choose(selected);
     }
   };
 
@@ -334,16 +497,22 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
     input.value = '';
     repoResults = null;
     repoQuery = '';
+    trail = [];
+    pending = null;
     selected = 0;
     setStatus(null);
     render();
     input.focus();
 
-    try {
-      bookmarks = await handlers.loadBookmarks();
-    } catch (e: any) {
-      setStatus(e?.message || 'Could not load bookmarks');
-    }
+    const [loadedBookmarks, loadedRecents] = await Promise.all([
+      handlers.loadBookmarks().catch((e: any) => {
+        setStatus(e?.message || 'Could not load bookmarks');
+        return [] as Bookmark[];
+      }),
+      handlers.loadRecents().catch(() => [] as RecentEntry[]),
+    ]);
+    bookmarks = loadedBookmarks;
+    recents = loadedRecents;
     if (open) render();
   };
 

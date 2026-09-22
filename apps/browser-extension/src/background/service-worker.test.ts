@@ -34,9 +34,14 @@ beforeEach(async () => {
       },
     },
     storage: {
+      // The worker reads storage both ways: with a callback, and as a promise.
       local: {
-        get: (_k: any, cb: any) => cb({ lifeos_token: 't', lifeos_repo: 'o/r' }),
-        set: vi.fn(),
+        get: (_k: any, cb?: any) => {
+          const data = { lifeos_token: 't', lifeos_repo: 'o/r' };
+          return cb ? cb(data) : Promise.resolve(data);
+        },
+        set: vi.fn(async () => {}),
+        remove: vi.fn(async () => {}),
       },
       session: { get: async () => ({}), set: async () => {} },
     },

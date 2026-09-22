@@ -32,9 +32,11 @@ const ProtectedRoute = ({ component: Component, ...props }: any) => {
 
   if (!authStore.isAuthenticated.value) {
     if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      // Keep the query string too: a deep link's ?repo= would otherwise be dropped on the way
+      // through login, and the file would open in whichever repo was selected last.
       const path = window.location.pathname;
       if (path !== '/' && !window.location.search.includes('access_token')) {
-        localStorage.setItem('lifeos_redirect', path);
+        localStorage.setItem('lifeos_redirect', `${path}${window.location.search}`);
       }
       return <Login />;
     }

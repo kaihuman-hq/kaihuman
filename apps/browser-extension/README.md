@@ -9,8 +9,17 @@ The official browser extension for Lifosy, designed to enhance your web experien
 - **Quick Dump Notes**: Rapidly create notes without navigating away from your current tab.
 - **Context Menu Integration**: Conveniently access Lifosy features directly from the browser's context menu.
 - **Pinned Tabs Sync**: Save named groups of pinned tabs to your repo, and load any of them into the current window on any machine.
-- **Bookmarks**: Your repo's bookmarks, mirrored into the browser and kept in sync in the background. Bookmark the current page from the popup or the palette.
-- **Command Palette**: `Ctrl+Shift+K` on any page to search those bookmarks — and, on request, your repo.
+- **Bookmarks**: Your repo's bookmarks, mirrored into the browser and kept in sync in the background. Bookmark the current page from the popup or the palette, or import the ones this browser already has.
+- **Command Palette**: `Ctrl+Shift+K` on any page to search those bookmarks, repeat what you did last, run any of the extension's actions — and, on request, search your repo.
+
+## Popup
+
+The popup opens on two icon buttons — **pin this page to the Knowledge Base** and **bookmark this
+page** — followed by the pinned-tab groups and the note box. The star opens a view of its own where
+you can add comma-separated tags and **Save**, or **Skip** to save the page without any. That view
+also holds **Import all browser bookmarks**.
+
+Everything here is also a palette action, so none of it needs the popup.
 
 ## Pinned Tabs
 
@@ -60,6 +69,13 @@ you edit a pinned tab and after you restart the browser.
 Reading the URL of every tab requires the `tabs` permission, which Chrome surfaces as
 "Read your browsing history" when the extension is installed or updated.
 
+### Caching
+
+Groups are cached and refreshed the same way bookmarks are (see below), so the popup lists them
+without waiting on GitHub. Saving, renaming, reordering and deleting always re-read the file first:
+a commit goes against the `sha` the file had a moment ago, and committing against a cached one
+would overwrite whatever changed in the repo since.
+
 ## Bookmarks
 
 Bookmarks are maintained in the console as a **Bookmarks** file (`.bookmarks.json`) and read by
@@ -90,14 +106,27 @@ Only `http`/`https` entries are ever shown or opened; any other scheme in the fi
 
 Two surfaces write to that same file, both committing through the GitHub API:
 
-- **Popup → Bookmarks → Bookmark this page**, with optional comma-separated tags.
-- **The palette → Actions → Bookmark this page**, with no tags — for when you want it saved in
-  one keystroke. The palette stays open and confirms, so you can keep searching.
+- **The popup's star**, which opens a view where you add tags and **Save**, or **Skip** to save
+  without them.
+- **The palette → Bookmark this page**, saved in one keystroke, or **Bookmark this page with
+  tags…** if you want them. The palette stays open and confirms, so you can keep searching.
 
 Both prefer the page's `<link rel="canonical">` over the address bar, so the same page saved from
 either surface lands on one URL. A page already in the file is refused rather than duplicated
 (compared canonically, so `https://x.com` and `https://x.com/` are the same page), and the new
 entry goes straight into the cache — no waiting for the next sync to see it.
+
+### Importing this browser's bookmarks
+
+**Import all browser bookmarks** — in the popup's bookmark view, or as a palette action — copies
+every `http(s)` bookmark this browser holds into the repo file in a single commit. A bookmark
+inside a folder you made carries that folder's name as its tag; the browser's own roots
+("Bookmarks bar", "Other bookmarks") are not turned into tags, since they say nothing.
+
+Pages already in the file are skipped rather than duplicated, so running it twice is safe, and the
+imported block is appended so whatever the file already had stays where it was. Reading the
+browser's bookmarks needs the `bookmarks` permission, which Chrome surfaces as "Read and change
+your bookmarks".
 
 ### Caching and sync
 
@@ -121,12 +150,16 @@ Rebind it at `chrome://extensions/shortcuts`. Chrome does not run extension cont
 on its own pages (`chrome://…`, the New Tab page, the Web Store), so the palette cannot open
 there — switch to a normal tab.
 
+- **Recent** holds the last ten things you did here — a bookmark you opened, a repo file, an
+  action you ran — newest first, so `⏎` on a freshly opened palette repeats the last one. Repeating
+  something moves it back to the top rather than listing it twice.
 - **Type** to filter your bookmarks. This is a local search over the cache, so it costs nothing
   and does not touch the network. A title that starts with what you typed ranks above one that
   merely contains it, then tags, then the URL.
 - **↑ / ↓** move the selection, **⏎** opens it in a new tab, **Esc** (or a click outside) closes.
-- **Actions** hold **Bookmark this page**, listed below your bookmarks so `⏎` on an open palette
-  opens a bookmark rather than writing one. Type `bookmark` to bring it to the top.
+- **Actions** are everything the popup and the context menu can do, listed below your bookmarks so
+  `⏎` opens what you were looking for rather than writing something. Type part of an action's name
+  to bring it to the top.
 - **⇥ Tab** searches the *repo* for what you typed — one GitHub code search, only when you ask
   for it. GitHub's code-search endpoint has a small dedicated budget (~10 requests/minute) that
   penalizes bursts, so the palette never searches the repo while you type. Results appear under a
@@ -134,9 +167,31 @@ there — switch to a normal tab.
   the same deep link the console uses internally — rather than on GitHub. Typing again clears them,
   since they belong to the old query.
 
-  The link carries the path only, so the file opens in whichever repo the console has selected. If
-  you search one repo in the extension while the console is on another, switch the console's repo
-  to see the file.
+  The link names the repository too, so a hit found while the extension points at one repo opens
+  that repo's file and not the console's other one — the console selects it and drops the
+  parameter again.
+
+### Actions
+
+Everything the extension can do is here, so the popup is never the only way in:
+
+| Action | What it does |
+| --- | --- |
+| Bookmark this page | Saves it with no tags |
+| Bookmark this page with tags… | Asks for tags first |
+| Pin this page to the Knowledge Base | Saves the page text as a note to process later |
+| Add the selected text to the Knowledge Base | The context menu's clipping, from the keyboard |
+| Add a note… | Pick the dump or any quick-note file, then type; an `.actionlog.md` target takes `#tags` in the text |
+| Pinned tab groups… | Pick a group, then load, update, rename, reorder or delete it |
+| Save this window's pinned tabs as a new group… | Asks for the name |
+| Import the browser's bookmarks | Copies them into the repo file |
+| Switch repository… | Pick from the repositories the console shared |
+| Open the Lifosy console | |
+
+An action that needs an argument takes over the input and says so; an action ending in `…` opens a
+list instead of running. **Esc** unwinds one step at a time — out of the argument, back out of each
+list, and only then closes the palette. Deleting a tab group asks you to type `DELETE`, since it is
+otherwise one keystroke away.
 
 The palette renders inside a shadow root, so the page's styling cannot reach it and its styling
 cannot reach the page.

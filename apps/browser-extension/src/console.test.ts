@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { CONSOLE_URL, consoleFileUrl } from './console';
 
 describe('consoleFileUrl', () => {
+  it('carries the repository when one is given', () => {
+    expect(consoleFileUrl('a/b.md', 'owner/name')).toBe(
+      `${CONSOLE_URL}/files/a/b.md?repo=owner%2Fname`,
+    );
+  });
+
+  it('omits the parameter when no repository is given', () => {
+    expect(consoleFileUrl('a/b.md')).toBe(`${CONSOLE_URL}/files/a/b.md`);
+  });
+
+  it('hands the repository back intact through URLSearchParams, as the console reads it', () => {
+    const url = new URL(consoleFileUrl('a/b.md', 'owner/name'));
+    expect(url.searchParams.get('repo')).toBe('owner/name');
+  });
+
   it('points at the console route that opens a file', () => {
     expect(consoleFileUrl('.kh/projects.todos.md')).toBe(
       `${CONSOLE_URL}/files/.kh/projects.todos.md`,

@@ -10,6 +10,7 @@ let sendMessage: ReturnType<typeof vi.fn>;
 let tabsCreate: ReturnType<typeof vi.fn>;
 let executeScript: ReturnType<typeof vi.fn>;
 let setBadgeText: ReturnType<typeof vi.fn>;
+let getBookmarkTree: ReturnType<typeof vi.fn>;
 let fetchMock: ReturnType<typeof vi.fn>;
 
 const BOOKMARKS_FILE = {
@@ -75,6 +76,20 @@ beforeEach(async () => {
   tabsCreate = vi.fn(async () => ({ id: 1 }));
   executeScript = vi.fn(async () => []);
   setBadgeText = vi.fn(async () => {});
+  getBookmarkTree = vi.fn(async () => [
+    {
+      title: '',
+      children: [
+        {
+          title: 'Bookmarks bar',
+          children: [
+            { title: 'Zulip', url: 'https://zulip.example/' },
+            { title: 'Dev', children: [{ title: 'Biome', url: 'https://biomejs.dev/' }] },
+          ],
+        },
+      ],
+    },
+  ]);
   fetchMock = vi.fn(okFile);
 
   vi.stubGlobal('chrome', {
@@ -88,6 +103,7 @@ beforeEach(async () => {
     },
     contextMenus: { create: vi.fn(), onClicked: { addListener: vi.fn() } },
     action: { setBadgeText, setBadgeBackgroundColor: vi.fn(async () => {}) },
+    bookmarks: { getTree: getBookmarkTree },
     scripting: { executeScript },
     runtime: {
       getManifest: () => ({ content_scripts: [{ js: ['assets/content-loader-abc123.js'] }] }),
@@ -390,7 +406,9 @@ describe('SEARCH_REPO', () => {
       {
         path: 'apps/console/vite.config.ts',
         name: 'vite.config.ts',
-        url: 'https://app.kaihuman.com/files/apps/console/vite.config.ts',
+        // The repo rides along so the console opens this repo's file, not the one it happens
+        // to have selected.
+        url: 'https://app.kaihuman.com/files/apps/console/vite.config.ts?repo=o%2Fr',
       },
     ]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -498,5 +516,139 @@ describe('the palette shortcut', () => {
     await commandListener('toggle-command-palette');
 
     expect(setBadgeText).toHaveBeenCalledWith({ tabId: 7, text: '' });
+  });
+});
+
+describe('IMPORT_CHROME_BOOKMARKS', () => {
+  const writes = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT');
+  const writtenFile = () => JSON.parse(atob(JSON.parse(writes()[0]?.[1].body).content));
+
+  it('copies the browser\u2019s bookmarks into the repo file in one commit', async () => {
+    const response = await call({ type: 'IMPORT_CHROME_BOOKMARKS' });
+
+    expect(response).toMatchObject({ success: true, imported: 2, skipped: 0, total: 2 });
+    expect(writes()).toHaveLength(1);
+  });
+
+  it('appends them in browser order, leaving what the file already had on top', async () => {
+    await call({ type: 'IMPORT_CHROME_BOOKMARKS' });
+
+    expect(writtenFile().bookmarks.map((b: any) => b.title)).toEqual(['Vitest', 'Zulip', 'Biome']);
+  });
+
+  it('tags a bookmark with the folder it came from', async () => {
+    await call({ type: 'IMPORT_CHROME_BOOKMARKS' });
+
+    const imported = writtenFile().bookmarks.slice(1);
+    expect(imported.find((b: any) => b.url === 'https://biomejs.dev/').tags).toEqual(['Dev']);
+    expect(imported.find((b: any) => b.url === 'https://zulip.example/').tags).toEqual([]);
+  });
+
+  it('skips pages already in the file, so a second run is safe', async () => {
+    // The seeded file already holds https://vitest.dev/.
+    getBookmarkTree.mockResolvedValue([
+      {
+        title: '',
+        children: [
+          { title: 'Bookmarks bar', children: [{ title: 'Vitest', url: 'https://vitest.dev/' }] },
+        ],
+      },
+    ]);
+
+    const response = await call({ type: 'IMPORT_CHROME_BOOKMARKS' });
+
+    expect(response).toMatchObject({ imported: 0, skipped: 1 });
+    expect(writtenFile().bookmarks.map((b: any) => b.title)).toEqual(['Vitest']);
+  });
+
+  it('drops entries the browser must not navigate to', async () => {
+    getBookmarkTree.mockResolvedValue([
+      {
+        title: '',
+        children: [
+          {
+            title: 'Bookmarks bar',
+            children: [
+              { title: 'Evil', url: 'javascript:alert(1)' },
+              { title: 'Fine', url: 'https://fine.example/' },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const response = await call({ type: 'IMPORT_CHROME_BOOKMARKS' });
+
+    expect(response).toMatchObject({ imported: 1, skipped: 1 });
+    expect(writtenFile().bookmarks.map((b: any) => b.title)).toEqual(['Vitest', 'Fine']);
+  });
+
+  it('puts the result straight into the cache', async () => {
+    await call({ type: 'IMPORT_CHROME_BOOKMARKS' });
+
+    expect(store.bookmarksCache.bookmarks).toHaveLength(3);
+    expect(store.bookmarksCache).toMatchObject({ repo: 'o/r', etag: null });
+  });
+});
+
+describe('recent actions', () => {
+  it('starts empty', async () => {
+    expect(await call({ type: 'GET_RECENTS' })).toMatchObject({ success: true, recents: [] });
+  });
+
+  it('keeps the newest first', async () => {
+    await call({ type: 'ADD_RECENT', entry: { id: 'a', title: 'A' } });
+    await call({ type: 'ADD_RECENT', entry: { id: 'b', title: 'B' } });
+
+    const { recents } = await call({ type: 'GET_RECENTS' });
+    expect(recents.map((r: any) => r.id)).toEqual(['b', 'a']);
+  });
+
+  it('moves a repeat back to the top instead of duplicating it', async () => {
+    await call({ type: 'ADD_RECENT', entry: { id: 'a', title: 'A' } });
+    await call({ type: 'ADD_RECENT', entry: { id: 'b', title: 'B' } });
+    await call({ type: 'ADD_RECENT', entry: { id: 'a', title: 'A' } });
+
+    const { recents } = await call({ type: 'GET_RECENTS' });
+    expect(recents.map((r: any) => r.id)).toEqual(['a', 'b']);
+  });
+
+  it('keeps only the last ten', async () => {
+    for (let i = 0; i < 13; i++) {
+      await call({ type: 'ADD_RECENT', entry: { id: `a${i}`, title: `A${i}` } });
+    }
+
+    const { recents } = await call({ type: 'GET_RECENTS' });
+    expect(recents).toHaveLength(10);
+    expect(recents[0].id).toBe('a12');
+    expect(recents.at(-1).id).toBe('a3');
+  });
+
+  it('ignores an entry with nothing to show', async () => {
+    await call({ type: 'ADD_RECENT', entry: { id: '', title: '' } });
+    expect((await call({ type: 'GET_RECENTS' })).recents).toEqual([]);
+  });
+});
+
+describe('repository switching', () => {
+  it('reports the current repo and the ones the console shared', async () => {
+    store.lifeos_repos = [{ full_name: 'o/r' }, { full_name: 'other/repo' }];
+
+    expect(await call({ type: 'GET_REPOS' })).toMatchObject({
+      repo: 'o/r',
+      repos: [{ full_name: 'o/r' }, { full_name: 'other/repo' }],
+    });
+  });
+
+  it('switches the repo, which the caches notice by themselves', async () => {
+    store.bookmarksCache = { repo: 'o/r', bookmarks: [], etag: null, fetchedAt: Date.now() };
+
+    await call({ type: 'SET_REPO', repo: 'other/repo' });
+    expect(store.lifeos_repo).toBe('other/repo');
+
+    // The stale cache is from the old repo, so the next read fetches rather than serving it.
+    const response = await call({ type: 'GET_BOOKMARKS' });
+    expect(response.bookmarks.map((b: any) => b.title)).toEqual(['Vitest']);
+    expect(store.bookmarksCache.repo).toBe('other/repo');
   });
 });

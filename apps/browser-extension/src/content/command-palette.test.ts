@@ -4,6 +4,8 @@ import {
   type CommandPalette,
   createCommandPalette,
   PALETTE_HOST_ID,
+  type PaletteAction,
+  type RecentEntry,
   type RepoResult,
 } from './command-palette';
 
@@ -27,7 +29,12 @@ let palette: CommandPalette;
 let open: ReturnType<typeof vi.fn>;
 let searchRepo: ReturnType<typeof vi.fn>;
 let loadBookmarks: ReturnType<typeof vi.fn>;
-let bookmarkPage: ReturnType<typeof vi.fn>;
+let loadRecents: ReturnType<typeof vi.fn>;
+let rememberRecent: ReturnType<typeof vi.fn>;
+let bookmarkRun: ReturnType<typeof vi.fn>;
+let renameRun: ReturnType<typeof vi.fn>;
+let children: ReturnType<typeof vi.fn>;
+let actions: PaletteAction[];
 
 const shadow = () => {
   const host = document.getElementById(PALETTE_HOST_ID);
@@ -38,6 +45,7 @@ const shadow = () => {
 const input = () => shadow().querySelector('input') as HTMLInputElement;
 const rowTitles = () =>
   Array.from(shadow().querySelectorAll('.row .title')).map((r) => r.textContent);
+const groupLabels = () => Array.from(shadow().querySelectorAll('.group')).map((g) => g.textContent);
 const selectedTitle = () =>
   shadow().querySelector('.row[data-selected="true"] .title')?.textContent ?? null;
 const statusText = () => {
@@ -45,150 +53,284 @@ const statusText = () => {
   return status.hidden ? null : status.textContent;
 };
 const hintText = () => shadow().querySelector('.hint')?.textContent ?? '';
+const crumbText = () => {
+  const crumb = shadow().querySelector('.crumb') as HTMLElement;
+  return crumb.hidden ? null : crumb.textContent;
+};
 
 const type = (value: string) => {
   input().value = value;
   input().dispatchEvent(new Event('input'));
 };
-
-const press = (key: string) => {
+const press = (key: string) =>
   input().dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
-};
 
-/** The palette loads bookmarks asynchronously; let that promise settle. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** Walks down to the row with this title and activates it. */
+const activateRow = async (title: string) => {
+  const index = rowTitles().indexOf(title);
+  if (index === -1) throw new Error(`no row titled ${title}, have: ${rowTitles().join(', ')}`);
+  const row = shadow().querySelectorAll('.row')[index] as HTMLElement;
+  row.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  await settle();
+};
 
 beforeEach(async () => {
   document.body.replaceChildren();
   open = vi.fn();
   searchRepo = vi.fn(async (): Promise<RepoResult[]> => []);
   loadBookmarks = vi.fn(async () => BOOKMARKS);
-  bookmarkPage = vi.fn(async () => 'Bookmarked “This page”');
+  loadRecents = vi.fn(async (): Promise<RecentEntry[]> => []);
+  rememberRecent = vi.fn();
+  bookmarkRun = vi.fn(async () => 'Bookmarked “This page”');
+  renameRun = vi.fn(async (input: string) => `Renamed to ${input}`);
+  children = vi.fn(
+    async (): Promise<PaletteAction[]> => [
+      { id: 'group:work:load', title: 'Load Work', run: async () => 'Work: pinned 2' },
+      { id: 'group:work:rename', title: 'Rename Work…', prompt: 'New name', run: renameRun },
+    ],
+  );
+  actions = [
+    { id: 'bookmark-page', title: 'Bookmark this page', subtitle: 'A page', run: bookmarkRun },
+    { id: 'tabs', title: 'Pinned tab groups…', children },
+  ];
+
   palette = createCommandPalette({
     loadBookmarks: loadBookmarks as any,
     searchRepo: searchRepo as any,
     open: open as any,
-    bookmarkPage: bookmarkPage as any,
+    actions: () => actions,
+    loadRecents: loadRecents as any,
+    rememberRecent: rememberRecent as any,
   });
   palette.toggle();
   await settle();
 });
 
 describe('toggle', () => {
-  it('mounts the palette with every bookmark and focuses the input', () => {
-    expect(rowTitles()).toEqual(['Vitest guide', 'Zulip', 'Bookmark this page']);
+  it('mounts with the bookmarks and the actions, and focuses the input', () => {
+    expect(rowTitles()).toEqual([
+      'Vitest guide',
+      'Zulip',
+      'Bookmark this page',
+      'Pinned tab groups…',
+    ]);
     expect(shadow().activeElement).toBe(input());
   });
 
-  it('unmounts on a second toggle and remounts on a third', () => {
-    palette.toggle();
+  it('closes on Escape and on a second toggle', () => {
+    press('Escape');
     expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
     palette.toggle();
     expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
-  });
-
-  it('closes on Escape', () => {
-    press('Escape');
+    palette.toggle();
     expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
   });
 });
 
 describe('bookmark search', () => {
-  it('filters locally without touching the repo search', () => {
+  it('filters bookmarks and actions locally, without touching the repo search', () => {
     type('zul');
     expect(rowTitles()).toEqual(['Zulip']);
     expect(searchRepo).not.toHaveBeenCalled();
   });
 
-  it('reports when nothing matches', () => {
-    type('nothing here');
-    expect(rowTitles()).toEqual([]);
-    expect(shadow().querySelector('.empty')?.textContent).toContain('No bookmark matches');
-  });
-
-  it('moves the selection with the arrow keys and wraps around', () => {
-    expect(selectedTitle()).toBe('Vitest guide');
-    press('ArrowDown');
-    expect(selectedTitle()).toBe('Zulip');
-    press('ArrowDown');
-    expect(selectedTitle()).toBe('Bookmark this page');
-    press('ArrowDown');
-    expect(selectedTitle()).toBe('Vitest guide');
-    press('ArrowUp');
-    expect(selectedTitle()).toBe('Bookmark this page');
-  });
-
-  it('opens the selected bookmark on Enter and closes', () => {
-    press('ArrowDown');
+  it('opens the selected bookmark on Enter, records it and closes', () => {
     press('Enter');
-    expect(open).toHaveBeenCalledWith('https://zulip.example/');
-    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
-  });
-
-  it('opens a bookmark that is clicked', () => {
-    const row = shadow().querySelectorAll('.row')[0] as HTMLElement;
-    row.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     expect(open).toHaveBeenCalledWith('https://vitest.dev/guide');
+    expect(rememberRecent).toHaveBeenCalledWith({
+      id: 'bookmark:Vitest guide',
+      title: 'Vitest guide',
+      subtitle: 'https://vitest.dev/guide',
+      url: 'https://vitest.dev/guide',
+    });
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
   });
 });
 
-describe('bookmark this page', () => {
-  it('ranks below the bookmarks, so Enter on an open palette opens rather than writes', () => {
-    expect(rowTitles().at(-1)).toBe('Bookmark this page');
-    expect(selectedTitle()).toBe('Vitest guide');
-  });
-
-  it('shows the page title as the row subtitle', () => {
-    document.title = 'A page worth keeping';
+describe('recent actions', () => {
+  it('lists them first, above the bookmarks', async () => {
+    loadRecents.mockResolvedValue([
+      {
+        id: 'bookmark:Zulip',
+        title: 'Zulip',
+        subtitle: 'https://zulip.example/',
+        url: 'https://zulip.example/',
+      },
+    ]);
     palette.toggle();
     palette.toggle();
-    expect(shadow().querySelectorAll('.row .subtitle')[2]?.textContent).toBe(
-      'A page worth keeping',
-    );
-  });
-
-  it('stays offered while the user types its name, and goes away otherwise', () => {
-    type('bookmark this');
-    expect(rowTitles()).toEqual(['Bookmark this page']);
-    type('zul');
-    expect(rowTitles()).toEqual(['Zulip']);
-  });
-
-  it('saves the page, confirms it and reloads the list without closing', async () => {
-    press('ArrowUp');
-    press('Enter');
     await settle();
 
-    expect(bookmarkPage).toHaveBeenCalledTimes(1);
-    expect(statusText()).toBe('Bookmarked “This page”');
-    // Two loads: the one on open, and the refresh after saving.
-    expect(loadBookmarks).toHaveBeenCalledTimes(2);
-    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+    expect(groupLabels()).toEqual(['Recent', 'Bookmarks', 'Actions']);
+    expect(rowTitles()[0]).toBe('Zulip');
+    expect(selectedTitle()).toBe('Zulip');
   });
 
-  it('shows a rejected save instead of failing silently', async () => {
-    bookmarkPage.mockRejectedValue(new Error('That page is already bookmarked'));
-    press('ArrowUp');
-    press('Enter');
+  it('opens a recent that has a url', async () => {
+    loadRecents.mockResolvedValue([
+      { id: 'bookmark:Zulip', title: 'Zulip', url: 'https://zulip.example/' },
+    ]);
+    palette.toggle();
+    palette.toggle();
     await settle();
 
-    expect(statusText()).toBe('That page is already bookmarked');
-    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+    press('Enter');
+    expect(open).toHaveBeenCalledWith('https://zulip.example/');
   });
 
-  it('does not open a tab when it runs', async () => {
-    press('ArrowUp');
-    press('Enter');
+  it('replays a recent action by id', async () => {
+    loadRecents.mockResolvedValue([{ id: 'bookmark-page', title: 'Bookmark this page' }]);
+    palette.toggle();
+    palette.toggle();
     await settle();
 
+    press('Enter');
+    await settle();
+    expect(bookmarkRun).toHaveBeenCalledTimes(1);
     expect(open).not.toHaveBeenCalled();
+  });
+
+  it('says so when a recorded action no longer exists', async () => {
+    loadRecents.mockResolvedValue([{ id: 'gone', title: 'Something removed' }]);
+    palette.toggle();
+    palette.toggle();
+    await settle();
+
+    press('Enter');
+    await settle();
+    expect(statusText()).toContain('no longer available');
+  });
+
+  it('filters with the query like everything else', async () => {
+    loadRecents.mockResolvedValue([{ id: 'bookmark-page', title: 'Bookmark this page' }]);
+    palette.toggle();
+    palette.toggle();
+    await settle();
+
+    type('zul');
+    expect(groupLabels()).toEqual(['Bookmarks']);
+  });
+});
+
+describe('running an action', () => {
+  it('runs it, shows the result, records it and stays open', async () => {
+    await activateRow('Bookmark this page');
+
+    expect(bookmarkRun).toHaveBeenCalledWith('');
+    expect(statusText()).toBe('Bookmarked “This page”');
+    expect(rememberRecent).toHaveBeenCalledWith({
+      id: 'bookmark-page',
+      title: 'Bookmark this page',
+      subtitle: 'A page',
+    });
+    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+  });
+
+  it('shows a rejected action instead of failing silently', async () => {
+    bookmarkRun.mockRejectedValue(new Error('That page is already bookmarked'));
+    await activateRow('Bookmark this page');
+    expect(statusText()).toBe('That page is already bookmarked');
+  });
+
+  it('reloads the bookmarks afterwards, so a new one shows up', async () => {
+    await activateRow('Bookmark this page');
+    // Once on open, once after the action.
+    expect(loadBookmarks).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('submenus', () => {
+  it('replaces the list with the children and shows where you are', async () => {
+    await activateRow('Pinned tab groups…');
+
+    expect(children).toHaveBeenCalledTimes(1);
+    expect(crumbText()).toBe('Pinned tab groups…');
+    expect(rowTitles()).toEqual(['Load Work', 'Rename Work…']);
+    // Bookmarks are out of the way while inside a submenu.
+    expect(groupLabels()).toEqual(['Pinned tab groups…']);
+  });
+
+  it('runs a child action', async () => {
+    await activateRow('Pinned tab groups…');
+    await activateRow('Load Work');
+    expect(statusText()).toBe('Work: pinned 2');
+  });
+
+  it('does not double the ellipsis a submenu title already ends with', async () => {
+    await activateRow('Pinned tab groups…');
+    expect(input().placeholder).toBe('Search Pinned tab groups…');
+  });
+
+  it('filters the children by the query', async () => {
+    await activateRow('Pinned tab groups…');
+    type('rename');
+    expect(rowTitles()).toEqual(['Rename Work…']);
+  });
+
+  it('Escape steps back out rather than closing the palette', async () => {
+    await activateRow('Pinned tab groups…');
+    press('Escape');
+
+    expect(crumbText()).toBeNull();
+    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+    expect(rowTitles()).toContain('Vitest guide');
+
+    press('Escape');
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('surfaces a submenu that cannot be loaded', async () => {
+    children.mockRejectedValue(new Error('No token found'));
+    await activateRow('Pinned tab groups…');
+    expect(statusText()).toBe('No token found');
+    expect(crumbText()).toBeNull();
+  });
+});
+
+describe('actions that take an argument', () => {
+  const enterPrompt = async () => {
+    await activateRow('Pinned tab groups…');
+    await activateRow('Rename Work…');
+  };
+
+  it('asks for the argument instead of running straight away', async () => {
+    await enterPrompt();
+
+    expect(renameRun).not.toHaveBeenCalled();
+    expect(input().placeholder).toBe('New name');
+    expect(hintText()).toContain('⏎ confirm');
+    expect(rowTitles()).toEqual([]);
+  });
+
+  it('runs with what was typed', async () => {
+    await enterPrompt();
+    type('Reading');
+    press('Enter');
+    await settle();
+
+    expect(renameRun).toHaveBeenCalledWith('Reading');
+    expect(statusText()).toBe('Renamed to Reading');
+  });
+
+  it('Escape cancels the prompt and goes back to the submenu', async () => {
+    await enterPrompt();
+    press('Escape');
+
+    expect(renameRun).not.toHaveBeenCalled();
+    expect(rowTitles()).toEqual(['Load Work', 'Rename Work…']);
   });
 });
 
 describe('repo search', () => {
   it('only runs on Tab, and only for the typed query', async () => {
     searchRepo.mockResolvedValue([
-      { path: 'apps/console/vite.config.ts', name: 'vite.config.ts', url: 'https://github.test/1' },
+      {
+        path: 'apps/console/vite.config.ts',
+        name: 'vite.config.ts',
+        url: 'https://console.test/1',
+      },
     ]);
     type('vite');
     expect(searchRepo).not.toHaveBeenCalled();
@@ -196,44 +338,35 @@ describe('repo search', () => {
     press('Tab');
     await settle();
 
-    expect(searchRepo).toHaveBeenCalledTimes(1);
-    expect(searchRepo).toHaveBeenCalledWith('vite');
+    expect(searchRepo).toHaveBeenCalledExactlyOnceWith('vite');
     expect(rowTitles()).toContain('vite.config.ts');
   });
 
-  it('offers the repo search in the hint until it has run', async () => {
-    type('vite');
-    expect(hintText()).toContain('tab search repo');
+  it('opens a repo hit and records it', async () => {
+    searchRepo.mockResolvedValue([{ path: 'a/b.ts', name: 'b.ts', url: 'https://console.test/b' }]);
+    type('nothing here');
     press('Tab');
     await settle();
-    expect(hintText()).not.toContain('tab search repo');
+
+    await activateRow('b.ts');
+    expect(open).toHaveBeenCalledWith('https://console.test/b');
+    expect(rememberRecent).toHaveBeenCalledWith({
+      id: 'repo:a/b.ts',
+      title: 'b.ts',
+      subtitle: 'a/b.ts',
+      url: 'https://console.test/b',
+    });
   });
 
-  it('does nothing on Tab with an empty query', async () => {
+  it('does not search the repo from inside a submenu', async () => {
+    await activateRow('Pinned tab groups…');
+    type('anything');
     press('Tab');
     await settle();
     expect(searchRepo).not.toHaveBeenCalled();
   });
 
-  it('opens a repo result on Enter', async () => {
-    searchRepo.mockResolvedValue([{ path: 'a/b.ts', name: 'b.ts', url: 'https://github.test/b' }]);
-    type('nothing here');
-    press('Tab');
-    await settle();
-
-    expect(rowTitles()).toEqual(['b.ts']);
-    press('Enter');
-    expect(open).toHaveBeenCalledWith('https://github.test/b');
-  });
-
-  it('says so when the repo has no matches', async () => {
-    type('vite');
-    press('Tab');
-    await settle();
-    expect(statusText()).toContain('No repo matches');
-  });
-
-  it('surfaces a rate limit instead of failing silently', async () => {
+  it('surfaces a rate limit', async () => {
     searchRepo.mockRejectedValue(new Error('GitHub search is rate limited'));
     type('vite');
     press('Tab');
@@ -242,7 +375,7 @@ describe('repo search', () => {
   });
 
   it('drops stale repo results once the query changes', async () => {
-    searchRepo.mockResolvedValue([{ path: 'a/b.ts', name: 'b.ts', url: 'https://github.test/b' }]);
+    searchRepo.mockResolvedValue([{ path: 'a/b.ts', name: 'b.ts', url: 'https://console.test/b' }]);
     type('vite');
     press('Tab');
     await settle();
@@ -262,11 +395,12 @@ describe('bookmark loading', () => {
     expect(shadow().querySelector('.empty')?.textContent).toContain('No bookmarks cached');
   });
 
-  it('surfaces a load failure', async () => {
+  it('surfaces a load failure but still offers the actions', async () => {
     palette.toggle();
     loadBookmarks.mockRejectedValue(new Error('No token found'));
     palette.toggle();
     await settle();
     expect(statusText()).toBe('No token found');
+    expect(rowTitles()).toContain('Bookmark this page');
   });
 });

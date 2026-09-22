@@ -35,10 +35,35 @@ export const Dashboard = () => {
   const repo = githubProfileStore.currentRepo.value;
   const repos = githubProfileStore.repos.value;
 
+  // A deep link may name the repository its path belongs to — the browser extension's palette
+  // sends one. Read it at first render, before MainApp's URL sync can rewrite the location.
+  const [linkedRepo, setLinkedRepo] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('repo'),
+  );
+
   // 1. Fetch Repos on Mount
   useEffect(() => {
     githubProfileStore.fetchRepos();
   }, []);
+
+  // 1b. Select that repository once the list is in, then drop the parameter so a later repo
+  // switch is not undone by a stale link.
+  useEffect(() => {
+    if (!linkedRepo || repos.length === 0) return;
+
+    const match = repos.find((r) => r.full_name === linkedRepo);
+    if (!match) {
+      logger.warn(`Deep link names a repository you cannot see: ${linkedRepo}`);
+    } else if (match.full_name !== repo?.full_name) {
+      logger.info(`Deep link selects repository ${match.full_name}`);
+      githubProfileStore.selectRepo(match);
+    }
+
+    setLinkedRepo(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('repo');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [linkedRepo, repos, repo?.full_name]);
 
   // 2. Refresh Tree when Repo changes
   useEffect(() => {

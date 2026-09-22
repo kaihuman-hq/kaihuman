@@ -1,5 +1,69 @@
 # Progress
 
+## 2026-09-22 — the palette does everything the popup does, and remembers what you did
+
+Six changes, all on the extension side bar the first.
+
+**The deep link names its repository.** `consoleFileUrl` now appends
+`?repo=owner/name`, and the console honours it: `Dashboard` reads the parameter at
+first render — before `MainApp`'s URL sync can rewrite the location — selects that
+repository once the list is in, then strips the parameter so a later repo switch is
+not undone by a stale link. `ProtectedRoute` keeps the query string alongside the
+path in `lifeos_redirect`, or the repository would be lost on the way through
+login. A hit found while the extension points at one repo no longer opens the
+console's other repo's file of the same name.
+
+**Pinned-tab groups are cached like bookmarks.** Same shape, same 15-minute TTL,
+same ETag replay, and one `repoSync` alarm now refreshes both. Listing and loading
+take the cached copy; saving, renaming, reordering and deleting always re-read
+first, because a commit goes against the `sha` the file had a moment ago and
+committing against a cached one would overwrite whatever changed since.
+`githubWriteFile` hands back the new blob sha so a write refreshes the cache
+without a second round-trip.
+
+**The browser's own bookmarks can be imported.** `flattenChromeBookmarks` walks
+`chrome.bookmarks.getTree()` depth-first; a bookmark inside a folder the user made
+carries that folder's name as its tag, while the built-in roots do not become tags.
+The import reuses the same `addBookmark` rules, so pages already in the file are
+skipped rather than duplicated and a second run is a no-op, and the imported block
+is appended so the existing list stays on top. One commit, whatever the count. This
+needs the `bookmarks` permission, which Chrome surfaces as "Read and change your
+bookmarks" on update.
+
+**The palette grew actions, submenus and arguments.** A `PaletteAction` either opens
+a list (`children`), asks for a line of text (`prompt`), or runs. That covers
+everything the popup and the context menu can do: notes into the dump or any
+quick-note file, action-log entries with `#tags` picked out of the text, clipping
+the selection, every pinned-tab group operation, switching repository, the import,
+and opening the console. Esc unwinds one step at a time — out of the argument, back
+out of each list, then closed. Deleting a tab group asks for `DELETE` first, since
+it is otherwise one keystroke away.
+
+**Recent actions.** The worker keeps the last ten things the palette did, newest
+first, one entry per id, in `chrome.storage.local`. Anything with a url is reopened;
+an action is replayed by id, so a recent survives the action list being rebuilt.
+They sit above the bookmarks, which makes `⏎` on a freshly opened palette repeat the
+last thing rather than doing something new.
+
+**The popup opens on two icons.** Pin-to-Knowledge-Base and bookmark, as small icon
+buttons over the page title, with the read-it-later card and the old inline bookmark
+form gone. The star opens a view of its own: tags and **Save**, or **Skip** to save
+without them, plus **Import all browser bookmarks**.
+
+Verified in Chromium under Playwright as well as in jsdom: the palette lists recents
+above bookmarks above the ten actions; a submenu shows its crumb and swaps `esc
+close` for `esc back`; Esc leaves a submenu without closing the palette; an argument
+prompt takes over the input and Esc restores the rows; and running an action records
+it in `recentActions`. That run also caught a cosmetic bug — a submenu whose title
+already ends in an ellipsis rendered "Search Switch repository……" — now fixed and
+pinned by a test.
+
+Checks: `tsc -b` clean in the extension and `tsc --noEmit` clean in the console;
+biome clean on every file touched; extension vitest 165 of 165 (35 new, across the
+flattener, both caches, the import, recents, repo switching and the palette's new
+modes); extension and console builds green.
+
+
 ## 2026-09-22 — a letter-key shortcut, and repo hits that open in the console
 
 Two follow-ups on the palette.

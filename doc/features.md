@@ -25,7 +25,11 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
-| Bookmark the current page (popup form with tags; palette action) | popup → Bookmarks, palette → Actions | 2026-09-22 |
+| Recent actions — the palette's last ten opens and actions, newest first | palette → Recent | 2026-09-22 |
+| Every popup/context-menu action as a palette action (notes, clippings, pinned-tab groups, repo switch) | palette → Actions | 2026-09-22 |
+| Import this browser's bookmarks into the repo file, tagged by folder | popup star → Import, palette → Actions | 2026-09-22 |
+| Pinned-tab groups cached and synced in the background, like bookmarks | service worker | 2026-09-22 |
+| Bookmark the current page (popup star opens a tags view with Save/Skip; palette action) | popup, palette | 2026-09-22 |
 | Command palette on `Ctrl+Shift+K` — searches cached bookmarks locally; repo code search on `Tab`, opening hits in the console | any page (content script) | 2026-09-22 |
 | Bookmarks mirror with background sync (cached from `.kh/browser.bookmarks.json`) | service worker | 2026-09-22 |
 | Edit mode for pinned-tab groups (rename/reorder/delete behind an Edit toggle; one large Load button otherwise) | popup → Pinned Tabs | 2026-09-13 |

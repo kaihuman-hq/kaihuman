@@ -10,6 +10,12 @@ export interface Message {
     | 'DELETE_PINNED_TAB_GROUP'
     | 'GET_BOOKMARKS'
     | 'ADD_BOOKMARK'
+    | 'IMPORT_CHROME_BOOKMARKS'
+    | 'GET_RECENTS'
+    | 'ADD_RECENT'
+    | 'GET_REPOS'
+    | 'SET_REPO'
+    | 'SAVE_SELECTION'
     | 'SEARCH_REPO'
     | 'OPEN_URL'
     | 'TOGGLE_COMMAND_PALETTE';
@@ -21,6 +27,9 @@ export interface Message {
   query?: string;
   url?: string;
   title?: string;
+  text?: string;
+  repo?: string;
+  entry?: { id: string; title: string; subtitle?: string; url?: string };
 }
 
 export interface MessageResponse {

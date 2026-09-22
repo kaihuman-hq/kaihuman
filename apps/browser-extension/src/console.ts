@@ -6,12 +6,15 @@ export const CONSOLE_URL = 'https://app.kaihuman.com';
  *
  * The console routes `/files/<path>` with every segment percent-encoded and the slashes left
  * as separators — see `parseUrlState` in packages/ui/src/LifeOS/Layouts/MainApp.tsx, which
- * decodes the whole remainder after `/files/`.
+ * decodes the whole remainder after `/files/`. `repo` names the repository the path belongs to,
+ * so a hit found while the extension points at one repo does not open the console's other repo's
+ * file of the same name; the console selects it and drops the parameter again.
  */
-export function consoleFileUrl(path: string): string {
+export function consoleFileUrl(path: string, repo?: string): string {
   const encoded = path
     .split('/')
     .map((segment) => encodeURIComponent(segment))
     .join('/');
-  return `${CONSOLE_URL}/files/${encoded}`;
+  const query = repo ? `?${new URLSearchParams({ repo }).toString()}` : '';
+  return `${CONSOLE_URL}/files/${encoded}${query}`;
 }

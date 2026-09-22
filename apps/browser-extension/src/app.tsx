@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { CONSOLE_URL } from './console';
 import { ActionLogForm } from './components/ActionLogForm';
 import { BookmarkPageForm } from './components/BookmarkPageForm';
+import { QuickActions } from './components/QuickActions';
 import { PinnedTabsPanel } from './components/PinnedTabsPanel';
 import './index.css';
 
@@ -15,6 +16,8 @@ export function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [quickNotes, setQuickNotes] = useState<string[]>([]);
   const [selectedNote, setSelectedNote] = useState<string>('.lifeos/dump.md');
+  // The star opens a view of its own rather than growing the popup with another form.
+  const [view, setView] = useState<'main' | 'bookmark'>('main');
 
   useEffect(() => {
     // Check for auth token, repo, and repos
@@ -186,6 +189,18 @@ export function App() {
     );
   }
 
+  if (view === 'bookmark') {
+    return (
+      <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
+        <BookmarkPageForm
+          page={activeTab}
+          repo={activeRepo || 'lifosy/monorepo'}
+          onClose={() => setView('main')}
+        />
+      </div>
+    );
+  }
+
   return (
     <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
       <header class="flex items-center justify-between mb-4 pb-2 border-b border-[var(--los-border)]">
@@ -211,22 +226,18 @@ export function App() {
       </header>
 
       <div class="space-y-6 flex-1">
-        {/* Read It Later Section */}
-        <section class="space-y-2">
-          <h2 class="text-sm font-bold text-[var(--los-fg-dim)]">Read It Later</h2>
-          <div class="p-3 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]">
-            <div class="text-xs text-[var(--los-fg-dim)] line-clamp-2 mb-2">{activeTab?.title || 'No active tab'}</div>
-            <button
-              onClick={handleReadItLater}
-              disabled={status === 'saving'}
-              class="w-full py-1.5 px-3 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-xs rounded transition-colors flex items-center justify-center gap-2"
-            >
-              {status === 'saving' ? 'Saving...' : status === 'success' ? 'Saved!' : 'Pin to Knowledge Base'}
-            </button>
-          </div>
-        </section>
+        <QuickActions
+          pageTitle={activeTab?.title || ''}
+          onPin={handleReadItLater}
+          onBookmark={() => setView('bookmark')}
+          status={status}
+        />
 
-        <BookmarkPageForm page={activeTab} repo={activeRepo || 'lifosy/monorepo'} />
+        {status === 'error' && errorMessage && (
+          <div class="text-[10px] text-red-400 p-2 bg-red-950/30 rounded border border-red-900/50 break-words">
+            {errorMessage}
+          </div>
+        )}
 
         <PinnedTabsPanel repo={activeRepo || 'lifosy/monorepo'} />
 
