@@ -12,6 +12,7 @@ import {
   isCacheStale,
   isCacheUsable,
   parseBookmarks,
+  recentlyUsedBookmarks,
   searchBookmarks,
   serializeBookmarks,
   settleUsage,
@@ -192,6 +193,50 @@ describe('isCacheStale', () => {
   it('is fresh inside the ttl and stale past it', () => {
     expect(isCacheStale(cache({ fetchedAt: 1000 }), 1000 + CACHE_TTL_MS)).toBe(false);
     expect(isCacheStale(cache({ fetchedAt: 1000 }), 1000 + CACHE_TTL_MS + 1)).toBe(true);
+  });
+});
+
+describe('recentlyUsedBookmarks', () => {
+  const used = (title: string, lastUsedAt: string): Bookmark => ({
+    ...bookmark(title, `https://${title}.example/`),
+    lastUsedAt,
+  });
+
+  it('puts the most recently opened first', () => {
+    const bookmarks = [
+      used('a', '2026-09-01T10:00:00.000Z'),
+      used('b', '2026-09-03T10:00:00.000Z'),
+      used('c', '2026-09-02T10:00:00.000Z'),
+    ];
+    expect(recentlyUsedBookmarks(bookmarks).map((b) => b.title)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('keeps the file order for bookmarks that were never opened', () => {
+    const bookmarks = [
+      used('newest', ''),
+      used('older', ''),
+      used('opened', '2026-09-01T10:00:00.000Z'),
+    ];
+    expect(recentlyUsedBookmarks(bookmarks).map((b) => b.title)).toEqual([
+      'opened',
+      'newest',
+      'older',
+    ]);
+  });
+
+  it('caps the list', () => {
+    const bookmarks = Array.from({ length: 20 }, (_, i) => used(`b${i}`, ''));
+    expect(recentlyUsedBookmarks(bookmarks)).toHaveLength(12);
+    expect(recentlyUsedBookmarks(bookmarks, 3)).toHaveLength(3);
+  });
+
+  it('leaves the input alone', () => {
+    const bookmarks = [
+      used('a', '2026-09-01T10:00:00.000Z'),
+      used('b', '2026-09-03T10:00:00.000Z'),
+    ];
+    recentlyUsedBookmarks(bookmarks);
+    expect(bookmarks.map((b) => b.title)).toEqual(['a', 'b']);
   });
 });
 

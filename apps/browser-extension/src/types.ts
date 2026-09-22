@@ -34,6 +34,8 @@ export interface Message {
   entry?: { id: string; title: string; subtitle?: string; url?: string };
   bookmarkId?: string;
   force?: boolean;
+  /** `OPEN_URL`: navigate the sender's own tab rather than opening another one. */
+  reuse?: boolean;
 }
 
 export interface MessageResponse {

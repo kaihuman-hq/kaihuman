@@ -183,6 +183,15 @@ export function searchBookmarks(bookmarks: Bookmark[], query: string, limit = 20
     .map((entry) => entry.bookmark);
 }
 
+/**
+ * What the start page lists: the bookmarks opened most recently, then the rest in the file's own
+ * order (newest first). The sort is stable, so a repo whose bookmarks have never been opened still
+ * shows its latest ones rather than an empty grid.
+ */
+export function recentlyUsedBookmarks(bookmarks: Bookmark[], limit = 12): Bookmark[] {
+  return [...bookmarks].sort((a, b) => b.lastUsedAt.localeCompare(a.lastUsedAt)).slice(0, limit);
+}
+
 const laterOf = (a: string, b: string) => (a > b ? a : b);
 
 /**

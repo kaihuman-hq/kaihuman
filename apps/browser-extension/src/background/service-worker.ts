@@ -76,6 +76,12 @@ function contentScriptFiles(): string[] {
   return (chrome.runtime.getManifest().content_scripts ?? []).flatMap((script) => script.js ?? []);
 }
 
+/** Whether the tab is showing a page of this extension's own — the start page, in practice. */
+async function isExtensionPage(tabId: number): Promise<boolean> {
+  const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+  return tab?.url?.startsWith(chrome.runtime.getURL('')) ?? false;
+}
+
 const TOGGLE_RETRIES = 10;
 const TOGGLE_RETRY_MS = 50;
 
@@ -96,6 +102,13 @@ async function openPaletteInTab(tabId: number): Promise<boolean> {
     return true;
   } catch {
     // Nothing listening yet — fall through and inject.
+  }
+
+  // The start page is one of ours, and nothing may be injected into an extension page. It answers
+  // a broadcast instead, which every open start page hears and only the visible one acts on.
+  if (await isExtensionPage(tabId)) {
+    await chrome.runtime.sendMessage({ type: 'TOGGLE_COMMAND_PALETTE' }).catch(() => {});
+    return true;
   }
 
   const files = contentScriptFiles();
@@ -818,7 +831,7 @@ async function deletePinnedTabGroup(token: string, repo: string, groupId: string
 }
 
 // Message Handling
-chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: Message | any, sender, sendResponse) => {
   if (message.type === 'AUTH_TOKEN_UPDATE' && message.token) {
     console.log('LifeOS Extension: Received token update');
     chrome.storage.local.set({
@@ -1023,7 +1036,14 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
       sendResponse({ error: 'Refusing to open that URL' });
       return false;
     }
-    chrome.tabs.create({ url: message.url, active: true }).then(
+    // `reuse` is what the start page asks for: that tab is blank and about to be left behind, so
+    // the page it opens takes it over instead of stacking a second tab next to it.
+    const reuseTabId = message.reuse ? sender.tab?.id : undefined;
+    const navigating =
+      reuseTabId === undefined
+        ? chrome.tabs.create({ url: message.url, active: true })
+        : chrome.tabs.update(reuseTabId, { url: message.url });
+    navigating.then(
       () => sendResponse({ success: true }),
       (error) => sendResponse({ error: error.message }),
     );

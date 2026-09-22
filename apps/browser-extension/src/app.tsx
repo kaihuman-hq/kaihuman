@@ -93,6 +93,11 @@ export function App() {
     chrome.tabs.create({ url: `${CONSOLE_URL}/extension-onboarded` }); // Or localhost if dev
   };
 
+  // A popup cannot follow a link without navigating itself, so the title opens the app in a tab.
+  const handleOpenConsole = () => {
+    chrome.tabs.create({ url: CONSOLE_URL });
+  };
+
   // Opening the popup already checks, but only within the hourly budget. Asking outright is not
   // background traffic, so this one ignores it.
   const handleSyncNow = () => {
@@ -224,7 +229,14 @@ export function App() {
   return (
     <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
       <header class="flex items-center justify-between mb-4 pb-2 border-b border-[var(--los-border)]">
-        <span class="font-bold text-[var(--los-accent)] tracking-tight">kaihuman</span>
+        <button
+          type="button"
+          onClick={handleOpenConsole}
+          class="font-bold text-[var(--los-accent)] tracking-tight hover:underline"
+          title={`Open ${CONSOLE_URL}`}
+        >
+          kaihuman
+        </button>
         <div class="flex flex-col items-end gap-1">
           <div class="flex items-center gap-2">
             <button

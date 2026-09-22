@@ -25,6 +25,9 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Start page — kaihuman's own New Tab page: palette, recently used bookmarks, dump note | New Tab (`chrome_url_overrides`) | 2026-09-22 |
+| Command palette on the New Tab page, which Chrome's own page cannot host | start page | 2026-09-22 |
+| The **kaihuman** title opens app.kaihuman.com | popup header, start page header | 2026-09-22 |
 | Sync now — fetch and push immediately, ignoring the hourly budget | popup header, palette → Actions | 2026-09-22 |
 | Guided bookmark entry — URL, title and tags editable in both the popup and the palette | popup star, palette → Bookmark this page… | 2026-09-22 |
 | Bookmark usage counts, merged additively and synced at most hourly | service worker, console widget | 2026-09-22 |
