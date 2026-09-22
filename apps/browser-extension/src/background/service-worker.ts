@@ -1,4 +1,5 @@
 import { type Message } from '../types';
+import { consoleFileUrl } from '../console';
 import {
   addBookmark,
   BOOKMARKS_PATH,
@@ -407,10 +408,12 @@ async function searchRepo(query: string) {
   if (!res.ok) throw new Error(`GitHub search failed: ${res.statusText}`);
 
   const data = await res.json();
+  // Opening the file in the console beats opening it on GitHub: it is where the file is
+  // actually worked on, and its widgets know the file's type.
   const results = (data.items || []).map((item: any) => ({
     path: item.path as string,
     name: item.name as string,
-    url: item.html_url as string,
+    url: consoleFileUrl(item.path as string),
   }));
   return { results };
 }

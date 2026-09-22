@@ -1,5 +1,37 @@
 # Progress
 
+## 2026-09-22 — a letter-key shortcut, and repo hits that open in the console
+
+Two follow-ups on the palette.
+
+**`Ctrl+Shift+K`** (`Command+Shift+K` on macOS) replaces `Ctrl+Shift+Space`.
+Chromium binds either — `chrome.commands.getAll()` confirms the new one, as it
+confirmed the old — but `Ctrl+Shift+Space` is a common input-method-switcher chord
+on Windows and Linux, and when the OS claims it Chrome never sees the press and no
+code can help. A letter key sidesteps that whole class of conflict. Chrome does not
+use `Ctrl+Shift+K` itself (its DevTools console is `Ctrl+Shift+J`).
+
+**Repo hits open in the console, not on GitHub.** `searchRepo` mapped
+`item.html_url`; it now builds `https://app.kaihuman.com/files/<path>` through a new
+`consoleFileUrl`. That is the console's own deep link: `parseUrlState` in `MainApp`
+reads `/files/<path>` and opens the file, which is exactly what `WikiView`'s edit
+handler already routes to. Each segment is percent-encoded with the slashes left as
+separators, matching what the console decodes on the other side — a round-trip test
+pins that down, since the console decodes the whole remainder after `/files/` in one
+go. The base URL moved into `src/console.ts`, which `app.tsx`'s login link now shares
+rather than repeating the literal.
+
+Worth knowing: the deep link carries the path only, so the file opens in whichever
+repo the console currently has selected. Searching one repo in the extension while
+the console sits on another opens the wrong repo's file — the console has no repo
+parameter to pass yet, so this is a real limitation, and the README says so.
+
+Checks: `tsc -b` clean; biome clean; extension vitest 127 of 127 (4 new for the deep
+link, including the encoding round-trip); extension build green; and the built
+extension loaded into Chromium under Playwright reports the command bound to
+`Ctrl+Shift+K`.
+
+
 ## 2026-09-22 — the palette shortcut did nothing in tabs that were already open
 
 Reported as "loaded the extension, nothing happens on the shortcut", and the

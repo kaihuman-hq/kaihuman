@@ -372,7 +372,7 @@ describe('ADD_BOOKMARK', () => {
 describe('SEARCH_REPO', () => {
   const codeSearch = (items: any[]) => ({ ok: true, status: 200, json: async () => ({ items }) });
 
-  it('scopes one code-search request to the active repo and maps the hits', async () => {
+  it('scopes one code-search request to the active repo and maps the hits to console links', async () => {
     fetchMock.mockResolvedValue(
       codeSearch([
         {
@@ -385,8 +385,13 @@ describe('SEARCH_REPO', () => {
 
     const response = await call({ type: 'SEARCH_REPO', query: 'defineConfig' });
 
+    // The hit opens in the console, not on GitHub — that is where the file is worked on.
     expect(response.results).toEqual([
-      { path: 'apps/console/vite.config.ts', name: 'vite.config.ts', url: 'https://github.test/1' },
+      {
+        path: 'apps/console/vite.config.ts',
+        name: 'vite.config.ts',
+        url: 'https://app.kaihuman.com/files/apps/console/vite.config.ts',
+      },
     ]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(

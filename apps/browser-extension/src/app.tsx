@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import { CONSOLE_URL } from './console';
 import { ActionLogForm } from './components/ActionLogForm';
 import { BookmarkPageForm } from './components/BookmarkPageForm';
 import { PinnedTabsPanel } from './components/PinnedTabsPanel';
@@ -77,7 +78,7 @@ export function App() {
   }, []);
 
   const handleLogin = () => {
-    chrome.tabs.create({ url: 'https://app.kaihuman.com/extension-onboarded' }); // Or localhost if dev
+    chrome.tabs.create({ url: `${CONSOLE_URL}/extension-onboarded` }); // Or localhost if dev
   };
 
   const handleRepoChange = (e: any) => {

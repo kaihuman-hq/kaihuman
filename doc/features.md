@@ -26,7 +26,7 @@
 | Feature | Location | Added |
 |---------|----------|-------|
 | Bookmark the current page (popup form with tags; palette action) | popup → Bookmarks, palette → Actions | 2026-09-22 |
-| Command palette on `Ctrl+Shift+Space` — searches cached bookmarks locally, repo code search on `Tab` | any page (content script) | 2026-09-22 |
+| Command palette on `Ctrl+Shift+K` — searches cached bookmarks locally; repo code search on `Tab`, opening hits in the console | any page (content script) | 2026-09-22 |
 | Bookmarks mirror with background sync (cached from `.kh/browser.bookmarks.json`) | service worker | 2026-09-22 |
 | Edit mode for pinned-tab groups (rename/reorder/delete behind an Edit toggle; one large Load button otherwise) | popup → Pinned Tabs | 2026-09-13 |
 | Named pinned-tab groups (save/load/update/rename/reorder/delete via `.kh/browser.pinnedtabs.json`) | popup → Pinned Tabs | 2026-09-09 |

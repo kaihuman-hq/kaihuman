@@ -23,8 +23,8 @@ export default defineManifest({
   commands: {
     'toggle-command-palette': {
       suggested_key: {
-        default: 'Ctrl+Shift+Space',
-        mac: 'Command+Shift+Space',
+        default: 'Ctrl+Shift+K',
+        mac: 'Command+Shift+K',
       },
       description: 'Open the Lifosy command palette',
     },

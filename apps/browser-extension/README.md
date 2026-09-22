@@ -10,7 +10,7 @@ The official browser extension for Lifosy, designed to enhance your web experien
 - **Context Menu Integration**: Conveniently access Lifosy features directly from the browser's context menu.
 - **Pinned Tabs Sync**: Save named groups of pinned tabs to your repo, and load any of them into the current window on any machine.
 - **Bookmarks**: Your repo's bookmarks, mirrored into the browser and kept in sync in the background. Bookmark the current page from the popup or the palette.
-- **Command Palette**: `Ctrl+Shift+Space` on any page to search those bookmarks — and, on request, your repo.
+- **Command Palette**: `Ctrl+Shift+K` on any page to search those bookmarks — and, on request, your repo.
 
 ## Pinned Tabs
 
@@ -116,8 +116,8 @@ A repo with no `.kh/browser.bookmarks.json` yet is an empty list, not an error.
 
 ## Command Palette
 
-`Ctrl+Shift+Space` (`Command+Shift+Space` on macOS) opens a palette in the middle of the current
-page. Rebind it at `chrome://extensions/shortcuts`. Chrome does not run extension content scripts
+`Ctrl+Shift+K` (`Command+Shift+K` on macOS) opens a palette in the middle of the current page.
+Rebind it at `chrome://extensions/shortcuts`. Chrome does not run extension content scripts
 on its own pages (`chrome://…`, the New Tab page, the Web Store), so the palette cannot open
 there — switch to a normal tab.
 
@@ -130,8 +130,13 @@ there — switch to a normal tab.
 - **⇥ Tab** searches the *repo* for what you typed — one GitHub code search, only when you ask
   for it. GitHub's code-search endpoint has a small dedicated budget (~10 requests/minute) that
   penalizes bursts, so the palette never searches the repo while you type. Results appear under a
-  **Repo** heading and open on GitHub. Typing again clears them, since they belong to the old
-  query.
+  **Repo** heading, and `⏎` opens the file in the console — `https://app.kaihuman.com/files/<path>`,
+  the same deep link the console uses internally — rather than on GitHub. Typing again clears them,
+  since they belong to the old query.
+
+  The link carries the path only, so the file opens in whichever repo the console has selected. If
+  you search one repo in the extension while the console is on another, switch the console's repo
+  to see the file.
 
 The palette renders inside a shadow root, so the page's styling cannot reach it and its styling
 cannot reach the page.
@@ -146,11 +151,13 @@ relay finds nothing listening — you do not need to reload your tabs.
 If a press still does nothing, work through these in order:
 
 1. **Check the binding.** Open `chrome://extensions/shortcuts`. If the row for "Open the Lifosy
-   command palette" is empty, Chrome could not honour the suggested `Ctrl+Shift+Space` — the
-   combination is already taken by the OS, an input-method switcher or another extension — and
-   silently left it unbound. Click the field and set any combination you like; `Ctrl`/`Alt` plus an
-   optional `Shift` and a letter is the safest shape. The service worker also logs the binding it
-   ended up with (or a warning that there is none) when the extension is installed or updated.
+   command palette" is empty, Chrome could not honour the suggested `Ctrl+Shift+K` — the
+   combination is already taken by the OS or another extension — and silently left it unbound.
+   Click the field and set any combination you like; `Ctrl`/`Alt` plus an optional `Shift` and a
+   letter is the safest shape, and combinations involving `Space` are worth avoiding because
+   input-method switchers on Windows and Linux commonly claim them before Chrome sees the press.
+   The service worker also logs the binding it ended up with (or a warning that there is none) when
+   the extension is installed or updated.
 2. **Check the page.** The palette cannot run on pages no extension may touch: `chrome://…`, the
    New Tab page, the Chrome Web Store, the PDF viewer, `view-source:`. The toolbar icon shows a red
    `!` badge when a press lands on one of those, and the service worker console names the URL.
