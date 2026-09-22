@@ -6,7 +6,7 @@ import { StartPage } from './StartPage';
 
 const NOW = '2026-09-22T10:00:00.000Z';
 
-const bookmark = (title: string, lastUsedAt: string): Bookmark => ({
+const bookmark = (title: string, lastUsedAt: string, pinned = false): Bookmark => ({
   id: title,
   title,
   url: `https://${title}.example/page`,
@@ -15,12 +15,12 @@ const bookmark = (title: string, lastUsedAt: string): Bookmark => ({
   updatedAt: NOW,
   useCount: 0,
   lastUsedAt,
+  pinned,
 });
 
-const BOOKMARKS = [
-  bookmark('older', '2026-09-01T10:00:00.000Z'),
-  bookmark('newer', '2026-09-03T10:00:00.000Z'),
-];
+let BOOKMARKS: Bookmark[];
+/** What the worker says to a pin; a string is answered as an error. */
+let pinReply: string | null;
 
 type Listener = (
   message: unknown,
@@ -45,8 +45,16 @@ const waitFor = async (condition: () => boolean) => {
   throw new Error('Timed out waiting for the start page to settle');
 };
 
-const reply = (message: { type?: string }) => {
+const reply = (message: { type?: string; bookmarkId?: string; pinned?: boolean }) => {
   if (message.type === 'GET_BOOKMARKS') return { bookmarks: BOOKMARKS };
+  if (message.type === 'SET_BOOKMARK_PINNED') {
+    if (pinReply) return { error: pinReply };
+    return {
+      bookmarks: BOOKMARKS.map((b) =>
+        b.id === message.bookmarkId ? { ...b, pinned: message.pinned === true } : b,
+      ),
+    };
+  }
   if (message.type === 'GET_RECENTS') return { recents: [] };
   return { success: true };
 };
@@ -66,7 +74,23 @@ const mount = async (settled: () => boolean) => {
   await waitFor(settled);
 };
 
+const cardTitles = () =>
+  [...host.querySelectorAll('li button span:first-child')].map((span) => span.textContent);
+
+const pinButton = (title: string) => {
+  const button = host.querySelector<HTMLButtonElement>(
+    `button[aria-label="Pin ${title}"], button[aria-label="Unpin ${title}"]`,
+  );
+  if (!button) throw new Error(`No pin button for "${title}"`);
+  return button;
+};
+
 beforeEach(() => {
+  BOOKMARKS = [
+    bookmark('older', '2026-09-01T10:00:00.000Z'),
+    bookmark('newer', '2026-09-03T10:00:00.000Z'),
+  ];
+  pinReply = null;
   store = { lifeos_token: 'token', lifeos_repo: 'owner/repo' };
   sent = [];
   listeners = [];
@@ -118,11 +142,61 @@ describe('StartPage', () => {
   it('lists the bookmarks used most recently first', async () => {
     await mount(() => host.textContent?.includes('newer') ?? false);
 
-    const titles = [...host.querySelectorAll('li button span:first-child')].map(
-      (span) => span.textContent,
-    );
-    expect(titles).toEqual(['newer', 'older']);
+    expect(cardTitles()).toEqual(['newer', 'older']);
     expect(host.textContent).toContain('newer.example');
+  });
+
+  it('puts a pinned bookmark first, whatever was used since', async () => {
+    BOOKMARKS = [
+      bookmark('older', '2026-09-01T10:00:00.000Z', true),
+      bookmark('newer', '2026-09-03T10:00:00.000Z'),
+    ];
+    await mount(() => host.textContent?.includes('newer') ?? false);
+
+    expect(cardTitles()).toEqual(['older', 'newer']);
+    expect(pinButton('older').getAttribute('aria-pressed')).toBe('true');
+    expect(pinButton('newer').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('pins from the card, moving it to the top and committing the pin', async () => {
+    await mount(() => host.textContent?.includes('newer') ?? false);
+
+    pinButton('older').click();
+    await waitFor(() => cardTitles()[0] === 'older');
+
+    expect(sent.find((message) => message.type === 'SET_BOOKMARK_PINNED')).toEqual({
+      type: 'SET_BOOKMARK_PINNED',
+      bookmarkId: 'older',
+      pinned: true,
+    });
+    await waitFor(() => pinButton('older').getAttribute('aria-pressed') === 'true');
+    // The pin is not an open: nothing was counted and the tab stays put.
+    expect(sent.some((message) => message.type === 'RECORD_BOOKMARK_USE')).toBe(false);
+    expect(sent.some((message) => message.type === 'OPEN_URL')).toBe(false);
+  });
+
+  it('unpins from the card', async () => {
+    BOOKMARKS = [bookmark('older', '', true), bookmark('newer', '2026-09-03T10:00:00.000Z')];
+    await mount(() => host.textContent?.includes('newer') ?? false);
+
+    pinButton('older').click();
+    await waitFor(() => cardTitles()[0] === 'newer');
+
+    expect(sent.find((message) => message.type === 'SET_BOOKMARK_PINNED')).toMatchObject({
+      bookmarkId: 'older',
+      pinned: false,
+    });
+  });
+
+  it('puts the card back and says why when the pin cannot be saved', async () => {
+    pinReply = 'That bookmark is no longer in the repo — sync and try again';
+    await mount(() => host.textContent?.includes('newer') ?? false);
+
+    pinButton('older').click();
+    await waitFor(() => host.textContent?.includes('no longer in the repo') ?? false);
+
+    expect(cardTitles()).toEqual(['newer', 'older']);
+    expect(pinButton('older').getAttribute('aria-pressed')).toBe('false');
   });
 
   it('counts the open and takes this tab over for the bookmark', async () => {

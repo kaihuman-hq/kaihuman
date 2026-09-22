@@ -177,6 +177,7 @@ describe('GET_BOOKMARKS', () => {
         updatedAt: '2026-09-01T00:00:00.000Z',
         useCount: 0,
         lastUsedAt: '',
+        pinned: false,
       },
     ]);
     expect(store.bookmarksCache).toMatchObject({ repo: 'o/r', sha: 'sha-1', etag: ETAG });
@@ -325,6 +326,28 @@ describe('GET_BOOKMARKS', () => {
     await settle();
 
     expect(store.bookmarksCache).toBeUndefined();
+  });
+});
+
+describe('SET_BOOKMARK_PINNED', () => {
+  const writes = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT');
+  const writtenFile = () => JSON.parse(atob(JSON.parse(writes()[0]?.[1].body).content));
+
+  it('commits the pin straight away and answers with the list to show', async () => {
+    const response = await call({ type: 'SET_BOOKMARK_PINNED', bookmarkId: 'b1', pinned: true });
+
+    expect(response).toMatchObject({ success: true });
+    expect(response.bookmarks[0]).toMatchObject({ id: 'b1', pinned: true });
+    expect(writes()).toHaveLength(1);
+    expect(writtenFile().bookmarks[0]).toMatchObject({ id: 'b1', pinned: true });
+    expect(store.bookmarksCache.bookmarks[0]).toMatchObject({ id: 'b1', pinned: true });
+  });
+
+  it('says so when the bookmark is gone from the repo', async () => {
+    const response = await call({ type: 'SET_BOOKMARK_PINNED', bookmarkId: 'gone', pinned: true });
+
+    expect(response.error).toMatch(/no longer in the repo/);
+    expect(writes()).toHaveLength(0);
   });
 });
 

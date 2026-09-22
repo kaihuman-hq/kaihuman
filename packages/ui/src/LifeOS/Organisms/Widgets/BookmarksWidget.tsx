@@ -1,4 +1,4 @@
-import { ExternalLink, Star, Trash2 } from 'lucide-preact';
+import { ExternalLink, Pin, Star, Trash2 } from 'lucide-preact';
 import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
@@ -10,6 +10,7 @@ import {
   filterBookmarks,
   parseBookmarks,
   serializeBookmarks,
+  setBookmarkPinned,
   sortBookmarks,
 } from './BookmarksLogic';
 import { CompactList, CompactWidgetLayout } from './CompactWidgetLayout';
@@ -42,6 +43,10 @@ export const BookmarksWidget = ({
 
   const handleDelete = (id: string) => {
     onChange?.(serializeBookmarks(deleteBookmark(config, id)));
+  };
+
+  const handleTogglePin = (bookmark: Bookmark) => {
+    onChange?.(serializeBookmarks(setBookmarkPinned(config, bookmark.id, !bookmark.pinned)));
   };
 
   if (config.bookmarks.length === 0) {
@@ -172,6 +177,7 @@ export const BookmarksWidget = ({
             <BookmarkRow
               key={bookmark.id}
               bookmark={bookmark}
+              onTogglePin={() => handleTogglePin(bookmark)}
               onDelete={() => handleDelete(bookmark.id)}
             />
           ))
@@ -193,7 +199,15 @@ const formatUsage = (bookmark: Bookmark) => {
   return when ? `${times}, last ${when}` : times;
 };
 
-const BookmarkRow = ({ bookmark, onDelete }: { bookmark: Bookmark; onDelete?: () => void }) => {
+const BookmarkRow = ({
+  bookmark,
+  onTogglePin,
+  onDelete,
+}: {
+  bookmark: Bookmark;
+  onTogglePin?: () => void;
+  onDelete?: () => void;
+}) => {
   const created = formatCreatedAt(bookmark.createdAt);
 
   return (
@@ -238,6 +252,25 @@ const BookmarkRow = ({ bookmark, onDelete }: { bookmark: Bookmark; onDelete?: ()
         >
           <ExternalLink className="w-4 h-4" />
         </a>
+        {onTogglePin && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePin();
+            }}
+            title={bookmark.pinned ? 'Unpin from the start page' : 'Pin to the start page'}
+            aria-pressed={bookmark.pinned}
+            className={cn(
+              'p-1.5 transition-colors',
+              bookmark.pinned
+                ? 'text-[var(--los-accent)] hover:text-[var(--los-fg)]'
+                : 'text-[var(--los-muted)] hover:text-[var(--los-accent)]',
+            )}
+          >
+            <Pin className="w-4 h-4" fill={bookmark.pinned ? 'currentColor' : 'none'} />
+          </button>
+        )}
         {onDelete && (
           <button
             type="button"

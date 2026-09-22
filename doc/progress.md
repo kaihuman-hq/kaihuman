@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-09-22 — Pinned bookmarks on the start page
+
+- **`pinned` joins the bookmark format** (`BookmarksLogic.ts` in `packages/ui`, `bookmarks.ts` in the
+  extension): optional, only a literal `true` counts. Both parsers carry it across every rewrite —
+  the extension's hourly sync rewrites the whole file from its parse, and dropping the field there
+  would silently unpin everything the console pinned. Covered by round-trip tests on both sides.
+- **Console widget**: a pin toggle next to delete on each row (focus view), filled in the accent
+  colour when pinned. `setBookmarkPinned` keeps the file's order and stamps the bookmark.
+- **Start page**: `startPageBookmarks` puts every pinned bookmark first, in file order, then the
+  twelve most recently used of the rest — a pin is never cut to fit. Each card has a pin button in
+  its corner (beside the card's own button, since a button cannot hold one). Pinning is optimistic:
+  the card moves at once, and a failed commit moves it back and says why. One pin commits at a time,
+  so two cannot race each other for the file's sha.
+- **Worker**: `SET_BOOKMARK_PINNED` takes the state to set rather than a toggle, commits through
+  `commitBookmarks` (re-read first, counted opens ride along), and answers with the committed list.
+  An id the file no longer has — deleted in the console since — is an error, not a silent no-op.
+
+Checks: extension tsc clean, vitest 219/219 (11 new); console tsc clean, vitest 94/94 (4 new), biome
+clean in ui and console; extension and ui builds green. Smoke-tested in Chromium: pinned cards lead
+the grid, and a pin whose commit fails moves back with the error shown.
+
 ## 2026-09-22 — Extension start page (New Tab) + the title opens the app
 
 Follow-up to #122, both items from its review:

@@ -20,6 +20,8 @@ export interface Bookmark {
   useCount: number;
   /** When it was last opened, ISO, or empty if never. */
   lastUsedAt: string;
+  /** Kept at the top of the extension's start page, ahead of the recently used ones. */
+  pinned: boolean;
 }
 
 export interface BookmarksConfig {
@@ -77,6 +79,7 @@ export const parseBookmarks = (content: string): BookmarksConfig => {
         updatedAt: asString(entry.updatedAt),
         useCount: asCount(entry.useCount),
         lastUsedAt: asString(entry.lastUsedAt),
+        pinned: entry.pinned === true,
       }));
     return { bookmarks, updatedAt: asString(parsed?.updatedAt) };
   } catch (e) {
@@ -114,6 +117,7 @@ export const addBookmark = (
     updatedAt: now,
     useCount: 0,
     lastUsedAt: '',
+    pinned: false,
   };
   return { bookmarks: [bookmark, ...config.bookmarks], updatedAt: now };
 };
@@ -124,6 +128,19 @@ export const deleteBookmark = (
   now = new Date().toISOString(),
 ): BookmarksConfig => ({
   bookmarks: config.bookmarks.filter((bookmark) => bookmark.id !== id),
+  updatedAt: now,
+});
+
+/** Pins or unpins one bookmark in place, so the file keeps its order. */
+export const setBookmarkPinned = (
+  config: BookmarksConfig,
+  id: string,
+  pinned: boolean,
+  now = new Date().toISOString(),
+): BookmarksConfig => ({
+  bookmarks: config.bookmarks.map((bookmark) =>
+    bookmark.id === id ? { ...bookmark, pinned, updatedAt: now } : bookmark,
+  ),
   updatedAt: now,
 });
 

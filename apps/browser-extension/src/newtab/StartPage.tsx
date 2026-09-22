@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { type Bookmark, recentlyUsedBookmarks } from '../background/bookmarks';
+import { type Bookmark, startPageBookmarks } from '../background/bookmarks';
 import { CONSOLE_URL } from '../console';
 import { repoActions, send, workerHandlers } from '../palette/actions';
 import { type CommandPalette, createCommandPalette } from '../palette/command-palette';
@@ -44,6 +44,9 @@ export function StartPage() {
   const [repo, setRepo] = useState(DEFAULT_REPO);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [bookmarksError, setBookmarksError] = useState<string | null>(null);
+  // One pin commit at a time: two in flight would race each other for the file's sha.
+  const [pinning, setPinning] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [noteStatus, setNoteStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [noteError, setNoteError] = useState<string | null>(null);
@@ -106,6 +109,36 @@ export function StartPage() {
     openInThisTab(bookmark.url);
   };
 
+  /**
+   * Moves the card at once and commits behind it; a failure puts it back and says why. The worker
+   * answers with the committed list, which also brings in anything the console changed since.
+   */
+  const togglePin = async (bookmark: Bookmark) => {
+    const pinned = !bookmark.pinned;
+    const setPinnedLocally = (value: boolean) =>
+      setBookmarks((list) =>
+        list.map((candidate) =>
+          candidate.id === bookmark.id ? { ...candidate, pinned: value } : candidate,
+        ),
+      );
+    setPinning(true);
+    setPinError(null);
+    setPinnedLocally(pinned);
+    try {
+      const response = await send({
+        type: 'SET_BOOKMARK_PINNED',
+        bookmarkId: bookmark.id,
+        pinned,
+      });
+      setBookmarks(response.bookmarks);
+    } catch (e: any) {
+      setPinnedLocally(!pinned);
+      setPinError(e.message || 'Could not save the pin');
+    } finally {
+      setPinning(false);
+    }
+  };
+
   const addNote = async () => {
     if (!note.trim()) return;
     setNoteStatus('saving');
@@ -146,7 +179,7 @@ export function StartPage() {
     );
   }
 
-  const recent = recentlyUsedBookmarks(bookmarks);
+  const grid = startPageBookmarks(bookmarks);
 
   return (
     <div class="life-os-root min-h-screen bg-[var(--los-bg)] text-[var(--los-fg)] font-mono p-6">
@@ -170,27 +203,64 @@ export function StartPage() {
         </button>
 
         <section class="flex flex-col gap-3">
-          <h2 class="text-xs uppercase tracking-wider text-[var(--los-muted)]">Recently used</h2>
+          <h2 class="text-xs uppercase tracking-wider text-[var(--los-muted)]">
+            Pinned &amp; recently used
+          </h2>
+          {pinError && <p class="text-xs text-red-400 break-words">{pinError}</p>}
           {bookmarksError ? (
             <p class="text-xs text-red-400">{bookmarksError}</p>
-          ) : recent.length === 0 ? (
+          ) : grid.length === 0 ? (
             <p class="text-xs text-[var(--los-muted)]">
               No bookmarks yet — bookmark a page from the popup or the palette.
             </p>
           ) : (
             <ul class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {recent.map((bookmark) => (
-                <li key={bookmark.id}>
+              {grid.map((bookmark) => (
+                // The pin sits beside the card rather than inside it: a button cannot hold a button.
+                <li key={bookmark.id} class="relative">
                   <button
                     type="button"
                     onClick={() => openBookmark(bookmark)}
-                    class="w-full h-full flex flex-col gap-1 rounded border border-[var(--los-border)] p-3 text-left hover:border-[var(--los-accent)] transition-colors"
+                    class={`w-full h-full flex flex-col gap-1 rounded border p-3 pr-9 text-left hover:border-[var(--los-accent)] transition-colors ${
+                      bookmark.pinned ? 'border-[var(--los-accent)]' : 'border-[var(--los-border)]'
+                    }`}
                     title={bookmark.url}
                   >
                     <span class="text-sm truncate">{bookmark.title}</span>
                     <span class="text-[10px] text-[var(--los-muted)] truncate">
                       {hostOf(bookmark.url)}
                     </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void togglePin(bookmark)}
+                    disabled={pinning}
+                    aria-pressed={bookmark.pinned}
+                    aria-label={
+                      bookmark.pinned ? `Unpin ${bookmark.title}` : `Pin ${bookmark.title}`
+                    }
+                    title={bookmark.pinned ? 'Unpin' : 'Pin to the top'}
+                    class={`absolute top-2 right-2 p-1 rounded transition-colors disabled:opacity-50 ${
+                      bookmark.pinned
+                        ? 'text-[var(--los-accent)] hover:text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-accent)]'
+                    }`}
+                  >
+                    {/* lucide "pin" */}
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill={bookmark.pinned ? 'currentColor' : 'none'}
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 17v5" />
+                      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+                    </svg>
                   </button>
                 </li>
               ))}

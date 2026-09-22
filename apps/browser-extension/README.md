@@ -96,7 +96,8 @@ mirrors.
       "url": "https://vitest.dev/",
       "tags": ["testing"],
       "createdAt": "2026-09-22T10:00:00.000Z",
-      "updatedAt": "2026-09-22T10:00:00.000Z"
+      "updatedAt": "2026-09-22T10:00:00.000Z",
+      "pinned": true
     }
   ],
   "updatedAt": "2026-09-22T10:00:00.000Z"
@@ -104,6 +105,8 @@ mirrors.
 ```
 
 Only `http`/`https` entries are ever shown or opened; any other scheme in the file is dropped.
+`pinned` is optional and only a literal `true` counts; both apps carry it across every rewrite, so
+a sync never unpins what the console pinned.
 
 ### Bookmarking the current page
 
@@ -278,10 +281,16 @@ Chrome asks you to confirm the first time. It holds three things:
 - **Search** — opens the command palette, with the whole action list and your bookmarks in it.
   Chrome keeps the focus in the address bar on an override page, so nothing here is focused for you
   and typing still goes to the omnibox: press the shortcut, or click the field.
-- **Recently used** — the twelve bookmarks you opened most recently, newest first, then the rest in
-  the order the repo file holds them. So a repo whose bookmarks have never been opened still shows
-  its latest ones instead of an empty grid. Opening one is counted exactly as it is in the palette,
-  and **takes this tab over** rather than leaving a blank start page behind.
+- **Pinned & recently used** — every pinned bookmark first, in the order the repo file holds them,
+  then the twelve you opened most recently. A repo whose bookmarks have never been opened still
+  shows its latest ones instead of an empty grid. Opening one is counted exactly as it is in the
+  palette, and **takes this tab over** rather than leaving a blank start page behind.
+
+  Each card has a **pin** in its corner. Pinning moves the card to the top at once and commits
+  `"pinned": true` to the bookmark in the repo file — the same field the console's Bookmarks widget
+  sets, so a pin made in either place shows up in both. A pin is never cut to fit the twelve. If the
+  commit fails (offline, or the bookmark was deleted in the console meanwhile) the card goes back
+  and the page says why.
 - **Dump note** — writes to `.lifeos/dump.md`. Any other target is one palette action away
   (**Add a note…**), which is also the only place that reads the repo's quick-note list: a new tab
   is opened far too often to spend a GitHub request on it.

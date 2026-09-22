@@ -16,6 +16,7 @@ import {
   isCacheUsable,
   parseBookmarks,
   serializeBookmarks,
+  setBookmarkPinned,
   settleUsage,
 } from './bookmarks';
 import {
@@ -651,6 +652,13 @@ async function commitBookmarks(
   return next;
 }
 
+/** Pinning is the user's own edit, so it commits straight away rather than waiting for the hour. */
+async function pinBookmark(id: string, pinned: boolean) {
+  const next = await commitBookmarks((config) => setBookmarkPinned(config, id, pinned));
+  // commitBookmarks has already folded the counted opens in, so this is what the page should show.
+  return { bookmarks: next.bookmarks };
+}
+
 async function bookmarkPage(draft: BookmarkDraft) {
   const next = await commitBookmarks((config) => addBookmark(config, draft));
   return { title: next.bookmarks[0]?.title ?? draft.url };
@@ -943,6 +951,14 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       title: message.title || '',
       tags: message.tags || [],
     }).then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'SET_BOOKMARK_PINNED') {
+    pinBookmark(message.bookmarkId || '', message.pinned === true).then(
       (result) => sendResponse({ success: true, ...result }),
       (error) => sendResponse({ error: error.message }),
     );

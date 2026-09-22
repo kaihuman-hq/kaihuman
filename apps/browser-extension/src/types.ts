@@ -12,6 +12,7 @@ export interface Message {
     | 'ADD_BOOKMARK'
     | 'IMPORT_CHROME_BOOKMARKS'
     | 'RECORD_BOOKMARK_USE'
+    | 'SET_BOOKMARK_PINNED'
     | 'SYNC_NOW'
     | 'GET_RECENTS'
     | 'ADD_RECENT'
@@ -33,6 +34,8 @@ export interface Message {
   repo?: string;
   entry?: { id: string; title: string; subtitle?: string; url?: string };
   bookmarkId?: string;
+  /** `SET_BOOKMARK_PINNED`: the state to set, not a toggle, so a double click cannot undo itself. */
+  pinned?: boolean;
   force?: boolean;
   /** `OPEN_URL`: navigate the sender's own tab rather than opening another one. */
   reuse?: boolean;
