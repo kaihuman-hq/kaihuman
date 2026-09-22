@@ -27,6 +27,7 @@ let palette: CommandPalette;
 let open: ReturnType<typeof vi.fn>;
 let searchRepo: ReturnType<typeof vi.fn>;
 let loadBookmarks: ReturnType<typeof vi.fn>;
+let bookmarkPage: ReturnType<typeof vi.fn>;
 
 const shadow = () => {
   const host = document.getElementById(PALETTE_HOST_ID);
@@ -62,10 +63,12 @@ beforeEach(async () => {
   open = vi.fn();
   searchRepo = vi.fn(async (): Promise<RepoResult[]> => []);
   loadBookmarks = vi.fn(async () => BOOKMARKS);
+  bookmarkPage = vi.fn(async () => 'Bookmarked “This page”');
   palette = createCommandPalette({
     loadBookmarks: loadBookmarks as any,
     searchRepo: searchRepo as any,
     open: open as any,
+    bookmarkPage: bookmarkPage as any,
   });
   palette.toggle();
   await settle();
@@ -73,7 +76,7 @@ beforeEach(async () => {
 
 describe('toggle', () => {
   it('mounts the palette with every bookmark and focuses the input', () => {
-    expect(rowTitles()).toEqual(['Vitest guide', 'Zulip']);
+    expect(rowTitles()).toEqual(['Vitest guide', 'Zulip', 'Bookmark this page']);
     expect(shadow().activeElement).toBe(input());
   });
 
@@ -108,9 +111,11 @@ describe('bookmark search', () => {
     press('ArrowDown');
     expect(selectedTitle()).toBe('Zulip');
     press('ArrowDown');
+    expect(selectedTitle()).toBe('Bookmark this page');
+    press('ArrowDown');
     expect(selectedTitle()).toBe('Vitest guide');
     press('ArrowUp');
-    expect(selectedTitle()).toBe('Zulip');
+    expect(selectedTitle()).toBe('Bookmark this page');
   });
 
   it('opens the selected bookmark on Enter and closes', () => {
@@ -124,6 +129,59 @@ describe('bookmark search', () => {
     const row = shadow().querySelectorAll('.row')[0] as HTMLElement;
     row.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     expect(open).toHaveBeenCalledWith('https://vitest.dev/guide');
+  });
+});
+
+describe('bookmark this page', () => {
+  it('ranks below the bookmarks, so Enter on an open palette opens rather than writes', () => {
+    expect(rowTitles().at(-1)).toBe('Bookmark this page');
+    expect(selectedTitle()).toBe('Vitest guide');
+  });
+
+  it('shows the page title as the row subtitle', () => {
+    document.title = 'A page worth keeping';
+    palette.toggle();
+    palette.toggle();
+    expect(shadow().querySelectorAll('.row .subtitle')[2]?.textContent).toBe(
+      'A page worth keeping',
+    );
+  });
+
+  it('stays offered while the user types its name, and goes away otherwise', () => {
+    type('bookmark this');
+    expect(rowTitles()).toEqual(['Bookmark this page']);
+    type('zul');
+    expect(rowTitles()).toEqual(['Zulip']);
+  });
+
+  it('saves the page, confirms it and reloads the list without closing', async () => {
+    press('ArrowUp');
+    press('Enter');
+    await settle();
+
+    expect(bookmarkPage).toHaveBeenCalledTimes(1);
+    expect(statusText()).toBe('Bookmarked “This page”');
+    // Two loads: the one on open, and the refresh after saving.
+    expect(loadBookmarks).toHaveBeenCalledTimes(2);
+    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+  });
+
+  it('shows a rejected save instead of failing silently', async () => {
+    bookmarkPage.mockRejectedValue(new Error('That page is already bookmarked'));
+    press('ArrowUp');
+    press('Enter');
+    await settle();
+
+    expect(statusText()).toBe('That page is already bookmarked');
+    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+  });
+
+  it('does not open a tab when it runs', async () => {
+    press('ArrowUp');
+    press('Enter');
+    await settle();
+
+    expect(open).not.toHaveBeenCalled();
   });
 });
 

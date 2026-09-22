@@ -5,7 +5,7 @@
  * is the contract between the two apps — see
  * packages/ui/src/LifeOS/Organisms/Widgets/BookmarksLogic.ts.
  */
-import { isOpenableUrl } from './pinned-tabs';
+import { isOpenableUrl, normalizeUrl } from './pinned-tabs';
 
 /** Repo file the extension mirrors. The console can keep bookmark files anywhere; this is the
  * one the extension reads, exactly like `.kh/browser.pinnedtabs.json` for pinned tabs. */
@@ -73,6 +73,41 @@ export function parseBookmarks(content: string): BookmarksConfig {
       updatedAt: asString(entry.updatedAt),
     }));
   return { bookmarks, updatedAt: asString(root.updatedAt) };
+}
+
+export function serializeBookmarks(config: BookmarksConfig): string {
+  return `${JSON.stringify(config, null, 2)}\n`;
+}
+
+export interface BookmarkDraft {
+  title: string;
+  url: string;
+  tags: string[];
+}
+
+/**
+ * Same rules as the console's `addBookmark`: an openable url, no duplicate page, newest first.
+ * Duplicates are compared canonically, so `https://x.com` and `https://x.com/` are one page.
+ */
+export function addBookmark(
+  config: BookmarksConfig,
+  draft: BookmarkDraft,
+  now = new Date().toISOString(),
+): BookmarksConfig {
+  const url = normalizeUrl(draft.url.trim());
+  if (!isOpenableUrl(url)) throw new Error('Only http(s) pages can be bookmarked');
+  if (config.bookmarks.some((bookmark) => normalizeUrl(bookmark.url) === url)) {
+    throw new Error('That page is already bookmarked');
+  }
+  const bookmark: Bookmark = {
+    id: crypto.randomUUID(),
+    title: draft.title.trim() || url,
+    url,
+    tags: draft.tags.map((tag) => tag.trim().replace(/^#/, '')).filter(Boolean),
+    createdAt: now,
+    updatedAt: now,
+  };
+  return { bookmarks: [bookmark, ...config.bookmarks], updatedAt: now };
 }
 
 /** A cache from another repo is useless — the bookmarks live in the repo file. */

@@ -9,6 +9,7 @@ export interface Message {
     | 'MOVE_PINNED_TAB_GROUP'
     | 'DELETE_PINNED_TAB_GROUP'
     | 'GET_BOOKMARKS'
+    | 'ADD_BOOKMARK'
     | 'SEARCH_REPO'
     | 'OPEN_URL'
     | 'TOGGLE_COMMAND_PALETTE';
@@ -19,6 +20,7 @@ export interface Message {
   tags?: string[];
   query?: string;
   url?: string;
+  title?: string;
 }
 
 export interface MessageResponse {

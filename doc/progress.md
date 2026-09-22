@@ -1,5 +1,34 @@
 # Progress
 
+## 2026-09-22 — bookmarking the current page, from the popup and the palette
+
+The bookmarks mirror was read-only; both browser surfaces can now write to it.
+
+`ADD_BOOKMARK` reads `.kh/browser.bookmarks.json`, prepends the page and commits
+through the Contents API with the sha it just read, so the write is not a blind
+overwrite. The extension's `addBookmark` mirrors the console's rules — openable
+url, no duplicate page compared canonically, newest first — because both write
+the same file. The result goes straight into the cache with `etag: null`, so the
+new entry is visible immediately and the next sync does a full read.
+
+**Popup → Bookmarks → Bookmark this page**, with optional comma-separated tags,
+next to the existing Read It Later block. **Palette → Actions → Bookmark this
+page**, no tags, for a one-keystroke save. The action is listed *below* the
+bookmark rows on purpose: `⏎` on a freshly opened palette should open what you
+were looking for, not write a file. Typing `bookmark` filters everything else
+away and brings it to the top. On success the palette stays open, shows the
+confirmation and reloads its list — the write is the feedback, closing would hide
+it.
+
+Both surfaces prefer the page's `<link rel="canonical">` over the address bar,
+matching what Read It Later already does, so one page saved from either surface
+lands on one URL.
+
+Checks: `tsc -b` clean in the extension; biome clean on every file touched;
+extension vitest 119 of 119 (19 new — the write path against a stubbed Contents
+API, and the action row in jsdom); extension build green.
+
+
 ## 2026-09-22 — bookmarks: a repo file type, a cached mirror, and a palette on a shortcut
 
 Bookmarks now live in the repo as a first-class file type and reach the browser

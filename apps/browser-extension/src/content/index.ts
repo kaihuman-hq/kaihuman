@@ -82,6 +82,17 @@ function getPalette(): CommandPalette {
           console.warn('LifeOS Extension: could not open', url, e),
         );
       },
+      bookmarkPage: async () => {
+        // The canonical link is what the popup's Read It Later uses too, so the same page
+        // bookmarked from either surface lands on one url.
+        const canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href;
+        const { title } = await send({
+          type: 'ADD_BOOKMARK',
+          url: canonical || location.href,
+          title: document.title,
+        });
+        return `Bookmarked “${title}”`;
+      },
     });
   }
   return palette;

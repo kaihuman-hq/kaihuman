@@ -9,7 +9,7 @@ The official browser extension for Lifosy, designed to enhance your web experien
 - **Quick Dump Notes**: Rapidly create notes without navigating away from your current tab.
 - **Context Menu Integration**: Conveniently access Lifosy features directly from the browser's context menu.
 - **Pinned Tabs Sync**: Save named groups of pinned tabs to your repo, and load any of them into the current window on any machine.
-- **Bookmarks**: Your repo's bookmarks, mirrored into the browser and kept in sync in the background.
+- **Bookmarks**: Your repo's bookmarks, mirrored into the browser and kept in sync in the background. Bookmark the current page from the popup or the palette.
 - **Command Palette**: `Ctrl+Shift+Space` on any page to search those bookmarks — and, on request, your repo.
 
 ## Pinned Tabs
@@ -86,6 +86,19 @@ mirrors.
 
 Only `http`/`https` entries are ever shown or opened; any other scheme in the file is dropped.
 
+### Bookmarking the current page
+
+Two surfaces write to that same file, both committing through the GitHub API:
+
+- **Popup → Bookmarks → Bookmark this page**, with optional comma-separated tags.
+- **The palette → Actions → Bookmark this page**, with no tags — for when you want it saved in
+  one keystroke. The palette stays open and confirms, so you can keep searching.
+
+Both prefer the page's `<link rel="canonical">` over the address bar, so the same page saved from
+either surface lands on one URL. A page already in the file is refused rather than duplicated
+(compared canonically, so `https://x.com` and `https://x.com/` are the same page), and the new
+entry goes straight into the cache — no waiting for the next sync to see it.
+
 ### Caching and sync
 
 The extension never waits on GitHub to show you a bookmark:
@@ -112,6 +125,8 @@ there — switch to a normal tab.
   and does not touch the network. A title that starts with what you typed ranks above one that
   merely contains it, then tags, then the URL.
 - **↑ / ↓** move the selection, **⏎** opens it in a new tab, **Esc** (or a click outside) closes.
+- **Actions** hold **Bookmark this page**, listed below your bookmarks so `⏎` on an open palette
+  opens a bookmark rather than writing one. Type `bookmark` to bring it to the top.
 - **⇥ Tab** searches the *repo* for what you typed — one GitHub code search, only when you ask
   for it. GitHub's code-search endpoint has a small dedicated budget (~10 requests/minute) that
   penalizes bursts, so the palette never searches the repo while you type. Results appear under a

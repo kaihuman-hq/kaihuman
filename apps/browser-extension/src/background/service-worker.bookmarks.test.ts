@@ -283,6 +283,85 @@ describe('GET_BOOKMARKS', () => {
   });
 });
 
+describe('ADD_BOOKMARK', () => {
+  const writes = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT');
+
+  const writtenFile = () => JSON.parse(atob(JSON.parse(writes()[0]?.[1].body).content));
+
+  it('prepends the page to the repo file and keeps the existing entries', async () => {
+    const response = await call({
+      type: 'ADD_BOOKMARK',
+      url: 'https://example.com/post',
+      title: 'A post',
+      tags: ['reading'],
+    });
+
+    expect(response).toMatchObject({ success: true, title: 'A post' });
+    const file = writtenFile();
+    expect(file.bookmarks.map((b: any) => b.title)).toEqual(['A post', 'Vitest']);
+    expect(file.bookmarks[0]).toMatchObject({ url: 'https://example.com/post', tags: ['reading'] });
+  });
+
+  it('sends the existing sha so the write is not a blind overwrite', async () => {
+    await call({ type: 'ADD_BOOKMARK', url: 'https://example.com/post', title: 'A post' });
+
+    expect(JSON.parse(writes()[0]?.[1].body).sha).toBe('sha-1');
+  });
+
+  it('puts the new bookmark straight into the cache, with no etag to replay', async () => {
+    await call({ type: 'ADD_BOOKMARK', url: 'https://example.com/post', title: 'A post' });
+
+    expect(store.bookmarksCache).toMatchObject({ repo: 'o/r', etag: null });
+    expect(store.bookmarksCache.bookmarks.map((b: any) => b.title)).toEqual(['A post', 'Vitest']);
+  });
+
+  it('refuses a page that is already bookmarked, and writes nothing', async () => {
+    await expect(
+      call({ type: 'ADD_BOOKMARK', url: 'https://vitest.dev', title: 'Vitest again' }),
+    ).resolves.toMatchObject({ error: expect.stringContaining('already bookmarked') });
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('refuses a scheme the browser must not navigate to', async () => {
+    await expect(
+      call({ type: 'ADD_BOOKMARK', url: 'javascript:alert(1)', title: 'Bad' }),
+    ).resolves.toMatchObject({ error: expect.stringContaining('http(s)') });
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('starts a new file when the repo has none yet', async () => {
+    fetchMock.mockImplementation(async (_url: string, init?: any) =>
+      init?.method === 'PUT'
+        ? { ok: true, status: 200, json: async () => ({}) }
+        : { ok: false, status: 404, statusText: 'Not Found' },
+    );
+
+    await call({ type: 'ADD_BOOKMARK', url: 'https://example.com/post', title: 'A post' });
+
+    expect(writtenFile().bookmarks.map((b: any) => b.title)).toEqual(['A post']);
+    expect(JSON.parse(writes()[0]?.[1].body).sha).toBeUndefined();
+  });
+
+  it('reports a failed write instead of leaving a wrong cache behind', async () => {
+    fetchMock.mockImplementation(async (_url: string, init?: any) =>
+      init?.method === 'PUT' ? { ok: false, status: 409, statusText: 'Conflict' } : okFile(),
+    );
+
+    await expect(
+      call({ type: 'ADD_BOOKMARK', url: 'https://example.com/post', title: 'A post' }),
+    ).resolves.toMatchObject({ error: expect.stringContaining('Failed to write') });
+    expect(store.bookmarksCache).toBeUndefined();
+  });
+
+  it('needs a token', async () => {
+    delete store.lifeos_token;
+
+    await expect(
+      call({ type: 'ADD_BOOKMARK', url: 'https://example.com/post', title: 'A post' }),
+    ).resolves.toMatchObject({ error: 'No token found' });
+  });
+});
+
 describe('SEARCH_REPO', () => {
   const codeSearch = (items: any[]) => ({ ok: true, status: 200, json: async () => ({ items }) });
 

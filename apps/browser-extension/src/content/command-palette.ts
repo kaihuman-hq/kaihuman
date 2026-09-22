@@ -18,6 +18,8 @@ export interface PaletteHandlers {
   loadBookmarks: () => Promise<Bookmark[]>;
   searchRepo: (query: string) => Promise<RepoResult[]>;
   open: (url: string) => void;
+  /** Saves the page the palette is open on; resolves with a line to show the user. */
+  bookmarkPage: () => Promise<string>;
 }
 
 export interface CommandPalette {
@@ -29,8 +31,10 @@ export interface CommandPalette {
 interface Row {
   title: string;
   subtitle: string;
-  url: string;
+  activate: () => void;
 }
+
+const BOOKMARK_PAGE_ACTION = 'Bookmark this page';
 
 export const PALETTE_HOST_ID = 'lifosy-command-palette';
 
@@ -149,23 +153,42 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
   /** Guards against a slow repo search landing after the query moved on. */
   let searchToken = 0;
 
+  /** The action is offered on an empty query and while the user is typing its name. */
+  const actionRows = (): Row[] => {
+    const needle = input.value.trim().toLowerCase();
+    if (needle && !BOOKMARK_PAGE_ACTION.toLowerCase().includes(needle)) return [];
+    return [
+      {
+        title: BOOKMARK_PAGE_ACTION,
+        subtitle: document.title || location.href,
+        activate: () => void savePage(),
+      },
+    ];
+  };
+
   const bookmarkRows = (): Row[] =>
     searchBookmarks(bookmarks, input.value).map((bookmark) => ({
       title: bookmark.title,
       subtitle: bookmark.tags.length
         ? `${bookmark.url}  ${bookmark.tags.map((tag) => `#${tag}`).join(' ')}`
         : bookmark.url,
-      url: bookmark.url,
+      activate: () => {
+        handlers.open(bookmark.url);
+        close();
+      },
     }));
 
   const repoRows = (): Row[] =>
     (repoResults ?? []).map((result) => ({
       title: result.name,
       subtitle: result.path,
-      url: result.url,
+      activate: () => {
+        handlers.open(result.url);
+        close();
+      },
     }));
 
-  const allRows = (): Row[] => [...bookmarkRows(), ...repoRows()];
+  const allRows = (): Row[] => [...bookmarkRows(), ...repoRows(), ...actionRows()];
 
   const setStatus = (text: string | null) => {
     status.textContent = text ?? '';
@@ -173,20 +196,13 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
   };
 
   const render = () => {
+    const actions = actionRows();
     const bookmarkMatches = bookmarkRows();
     const repoMatches = repoRows();
-    const total = bookmarkMatches.length + repoMatches.length;
+    const total = actions.length + bookmarkMatches.length + repoMatches.length;
     if (selected >= total) selected = Math.max(0, total - 1);
 
     rows.replaceChildren();
-    if (total === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'empty';
-      empty.textContent = bookmarks.length
-        ? 'No bookmark matches.'
-        : 'No bookmarks cached yet — open the console to sync.';
-      rows.append(empty);
-    }
 
     let index = 0;
     const addGroup = (label: string, groupRows: Row[]) => {
@@ -218,18 +234,36 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
 
     addGroup('Bookmarks', bookmarkMatches);
     addGroup('Repo', repoMatches);
+    if (bookmarkMatches.length + repoMatches.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = bookmarks.length
+        ? 'No bookmark matches.'
+        : 'No bookmarks cached yet — open the console to sync.';
+      rows.append(empty);
+    }
+    addGroup('Actions', actions);
 
     const query = input.value.trim();
-    if (!query) hint.textContent = '↑↓ navigate · ⏎ open · esc close';
-    else if (repoResults && repoQuery === query) hint.textContent = `⏎ open · esc close`;
-    else hint.textContent = `⇥ tab search repo for “${query}” · ⏎ open · esc close`;
+    if (!query) hint.textContent = '↑↓ navigate · ⏎ select · esc close';
+    else if (repoResults && repoQuery === query) hint.textContent = '⏎ select · esc close';
+    else hint.textContent = `⇥ tab search repo for “${query}” · ⏎ select · esc close`;
   };
 
   const choose = (position: number) => {
-    const row = allRows()[position];
-    if (!row) return;
-    handlers.open(row.url);
-    close();
+    allRows()[position]?.activate();
+  };
+
+  /** Stays open on purpose: the confirmation, and the new entry in the list, are the feedback. */
+  const savePage = async () => {
+    setStatus('Bookmarking this page…');
+    try {
+      setStatus(await handlers.bookmarkPage());
+      bookmarks = await handlers.loadBookmarks();
+    } catch (e: any) {
+      setStatus(e?.message || 'Could not bookmark this page');
+    }
+    render();
   };
 
   const runRepoSearch = async () => {

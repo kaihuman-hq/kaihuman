@@ -1,11 +1,13 @@
 import { type Message } from '../types';
 import {
+  addBookmark,
   BOOKMARKS_PATH,
   type Bookmark,
   type BookmarksCache,
   isCacheStale,
   isCacheUsable,
   parseBookmarks,
+  serializeBookmarks,
 } from './bookmarks';
 import {
   findGroup,
@@ -300,6 +302,26 @@ async function getBookmarks(): Promise<{
 }
 
 /**
+ * Writes the page into the repo file and puts the result straight into the cache, so the palette
+ * and the popup show it without waiting for the next sync.
+ */
+async function bookmarkPage(draft: { url: string; title: string; tags: string[] }) {
+  const { token, repo } = await credentials();
+  if (!token) throw new Error('No token found');
+
+  const file = await githubReadFile(token, repo, BOOKMARKS_PATH);
+  const config = file ? parseBookmarks(file.content) : { bookmarks: [], updatedAt: '' };
+  const next = addBookmark(config, draft);
+  await githubWriteFile(token, repo, BOOKMARKS_PATH, serializeBookmarks(next), file?.sha);
+
+  // The write invalidates whatever ETag we held, so the next sync does a full read.
+  await chrome.storage.local.set({
+    bookmarksCache: { repo, bookmarks: next.bookmarks, etag: null, fetchedAt: Date.now() },
+  });
+  return { title: next.bookmarks[0]?.title ?? draft.url };
+}
+
+/**
  * One GitHub code-search request, run only when the user explicitly asks for it. That endpoint has
  * its own ~10 req/min budget with a burst penalty, so the palette never calls this while typing.
  */
@@ -535,6 +557,18 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
 
   if (message.type === 'GET_BOOKMARKS') {
     getBookmarks().then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'ADD_BOOKMARK') {
+    bookmarkPage({
+      url: message.url || '',
+      title: message.title || '',
+      tags: message.tags || [],
+    }).then(
       (result) => sendResponse({ success: true, ...result }),
       (error) => sendResponse({ error: error.message }),
     );

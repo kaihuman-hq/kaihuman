@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { ActionLogForm } from './components/ActionLogForm';
+import { BookmarkPageForm } from './components/BookmarkPageForm';
 import { PinnedTabsPanel } from './components/PinnedTabsPanel';
 import './index.css';
 
@@ -223,6 +224,8 @@ export function App() {
             </button>
           </div>
         </section>
+
+        <BookmarkPageForm page={activeTab} repo={activeRepo || 'lifosy/monorepo'} />
 
         <PinnedTabsPanel repo={activeRepo || 'lifosy/monorepo'} />
 

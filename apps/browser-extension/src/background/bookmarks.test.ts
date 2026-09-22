@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addBookmark,
   BOOKMARKS_PATH,
   type Bookmark,
   type BookmarksCache,
@@ -8,6 +9,7 @@ import {
   isCacheUsable,
   parseBookmarks,
   searchBookmarks,
+  serializeBookmarks,
 } from './bookmarks';
 
 const NOW = '2026-09-22T10:00:00.000Z';
@@ -90,6 +92,62 @@ describe('parseBookmarks', () => {
       JSON.stringify({ bookmarks: [{ id: 'b1', url: 'https://example.com/' }] }),
     );
     expect(parsed.bookmarks[0]).toMatchObject({ title: 'https://example.com/', tags: [] });
+  });
+});
+
+describe('addBookmark', () => {
+  const config = (...bookmarks: Bookmark[]) => ({ bookmarks, updatedAt: NOW });
+
+  it('prepends the page, canonicalises the url and stamps both timestamps', () => {
+    const next = addBookmark(
+      config(bookmark('Old', 'https://old.example/')),
+      { title: '  Vitest  ', url: ' https://vitest.dev ', tags: [' #testing ', ''] },
+      NOW,
+    );
+
+    expect(next.bookmarks[0]).toMatchObject({
+      title: 'Vitest',
+      url: 'https://vitest.dev/',
+      tags: ['testing'],
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    expect(next.bookmarks).toHaveLength(2);
+    expect(next.updatedAt).toBe(NOW);
+  });
+
+  it('uses the url as the title when the page has none', () => {
+    const next = addBookmark(
+      config(),
+      { title: '   ', url: 'https://example.com/', tags: [] },
+      NOW,
+    );
+    expect(next.bookmarks[0]?.title).toBe('https://example.com/');
+  });
+
+  it('refuses a page the browser must not navigate to', () => {
+    expect(() =>
+      addBookmark(config(), { title: 'Bad', url: 'javascript:alert(1)', tags: [] }, NOW),
+    ).toThrow('http(s)');
+  });
+
+  it('refuses a page already bookmarked, ignoring url canonicalisation', () => {
+    expect(() =>
+      addBookmark(
+        config(bookmark('Example', 'https://example.com/')),
+        { title: 'Example', url: 'https://example.com', tags: [] },
+        NOW,
+      ),
+    ).toThrow('already bookmarked');
+  });
+
+  it('round-trips through serialize and parse', () => {
+    const next = addBookmark(
+      config(),
+      { title: 'Vitest', url: 'https://vitest.dev/', tags: [] },
+      NOW,
+    );
+    expect(parseBookmarks(serializeBookmarks(next))).toEqual(next);
   });
 });
 
