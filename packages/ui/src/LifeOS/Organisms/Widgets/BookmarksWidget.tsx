@@ -4,11 +4,13 @@ import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
 import {
   type Bookmark,
+  type BookmarkSort,
   collectTags,
   deleteBookmark,
   filterBookmarks,
   parseBookmarks,
   serializeBookmarks,
+  sortBookmarks,
 } from './BookmarksLogic';
 import { CompactList, CompactWidgetLayout } from './CompactWidgetLayout';
 
@@ -30,11 +32,12 @@ export const BookmarksWidget = ({
   const config = useMemo(() => parseBookmarks(content), [content]);
   const [query, setQuery] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [sort, setSort] = useState<BookmarkSort>('NEWEST');
 
   const tags = useMemo(() => collectTags(config.bookmarks), [config.bookmarks]);
   const visible = useMemo(
-    () => filterBookmarks(config.bookmarks, query, activeTag ?? undefined),
-    [config.bookmarks, query, activeTag],
+    () => sortBookmarks(filterBookmarks(config.bookmarks, query, activeTag ?? undefined), sort),
+    [config.bookmarks, query, activeTag, sort],
   );
 
   const handleDelete = (id: string) => {
@@ -115,6 +118,29 @@ export const BookmarksWidget = ({
             {visible.length}/{config.bookmarks.length}
           </MonoText>
         </div>
+        <div className="flex items-center gap-1">
+          {(
+            [
+              ['NEWEST', 'NEWEST'],
+              ['LEAST_USED', 'LEAST USED'],
+              ['MOST_USED', 'MOST USED'],
+            ] as [BookmarkSort, string][]
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setSort(value)}
+              className={cn(
+                'text-[10px] font-mono px-1.5 py-0.5 border transition-colors',
+                sort === value
+                  ? 'border-[var(--los-accent)] text-[var(--los-accent)]'
+                  : 'border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {tags.map((tag) => (
@@ -160,6 +186,13 @@ const formatCreatedAt = (createdAt: string) => {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString();
 };
 
+const formatUsage = (bookmark: Bookmark) => {
+  if (bookmark.useCount === 0) return 'never opened';
+  const when = formatCreatedAt(bookmark.lastUsedAt);
+  const times = `opened ${bookmark.useCount}\u00d7`;
+  return when ? `${times}, last ${when}` : times;
+};
+
 const BookmarkRow = ({ bookmark, onDelete }: { bookmark: Bookmark; onDelete?: () => void }) => {
   const created = formatCreatedAt(bookmark.createdAt);
 
@@ -180,6 +213,9 @@ const BookmarkRow = ({ bookmark, onDelete }: { bookmark: Bookmark; onDelete?: ()
         <div className="flex flex-wrap gap-2 text-[10px] text-[var(--los-muted)] mt-0.5">
           <span className="truncate max-w-[220px]">{bookmark.url}</span>
           {created && <span>{created}</span>}
+          <span className={bookmark.useCount === 0 ? 'text-[var(--los-accent)]' : undefined}>
+            {formatUsage(bookmark)}
+          </span>
           {bookmark.tags.map((tag) => (
             <span
               key={tag}

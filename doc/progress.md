@@ -1,5 +1,61 @@
 # Progress
 
+## 2026-09-22 — which bookmarks get used, counted locally and merged hourly
+
+**The `bookmarks` permission is optional now.** It moved to `optional_permissions`,
+so nobody who never imports has to grant "Read and change your bookmarks" on
+install. The popup asks with `chrome.permissions.request` when the button is
+pressed, and the import refuses with a message pointing there until it is granted
+— `chrome.permissions.request` needs a user gesture in an extension page, which a
+message from the palette is not, so the popup is the only surface that can ask.
+
+**Usage counting.** Every bookmark carries a `useCount` and a `lastUsedAt`, and the
+console's widget sorts by least used, marks never-opened ones and says "opened 12×,
+last 3 Sep" on each row — which is the point: finding what is safe to delete.
+
+The sync follows the shape proposed, with one correction worth stating. Taking
+"GitHub is the leading system" literally would mean a fetch *replaces* the counts,
+which discards everything counted since the last sync and makes two machines clobber
+each other. So GitHub leads on everything that identifies a bookmark — which ones
+exist, title, url, tags — and counts are additive instead:
+
+1. Fetch. GitHub's list replaces the cache wholesale, so a console edit or delete
+   wins.
+2. Add the deltas to what GitHub holds; `lastUsedAt` takes the later of the two. A
+   delta for a bookmark GitHub no longer has is dropped with it.
+3. Push, but only when there is something to push: an hour with nothing opened costs
+   one conditional GET and no commit.
+4. Settle by *subtracting* the pushed deltas rather than clearing them, so an open
+   counted while the commit was in flight is not lost.
+
+The cache holds GitHub's numbers and never a locally adjusted copy; deltas are added
+when the list is read. Keeping the two apart is what makes double counting
+impossible, and it is what the "reads are stable" test pins down.
+
+**The hourly budget.** `CACHE_TTL_MS` is 60 minutes and the `repoSync` alarm matches.
+Opening the popup sends `SYNC_NOW`, which checks GitHub only if the cache is past its
+hour — so opening it ten times costs nothing. Explicit actions (saving a bookmark,
+importing, any pinned-tab group change) still commit immediately, and those commits
+carry the pending counts along for free rather than waiting for the hour.
+
+One trap this change had to avoid: `parseBookmarks` rebuilds every entry field by
+field, in both apps. Without carrying the two new fields across, the console
+rewriting the file — adding or deleting a bookmark — would have silently wiped
+everything the extension had counted. Both parsers carry them now, a file written
+before this reads back as never opened, and a console round-trip test pins it.
+
+Verified in Chromium under Playwright as well as jsdom: `bookmarks` is not granted at
+install; three counted opens on top of GitHub's 5 and 0 read back as 7 and 1, the same
+on a second read, with the cache still holding 5 and 0 and the deltas held separately;
+`SYNC_NOW` inside the hour answers `{ synced: false, reason: 'fresh' }` without
+touching the network; and the import without the permission answers "Allow access to
+your browser bookmarks from the popup first".
+
+Checks: `tsc` clean in both apps; biome clean; extension vitest 186 of 186 (21 new,
+across the merge rules and the sync cycle), console vitest 90 of 90 (8 new, for the
+carried fields and the sort); extension and console builds green.
+
+
 ## 2026-09-22 — the palette does everything the popup does, and remembers what you did
 
 Six changes, all on the extension side bar the first.

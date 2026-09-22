@@ -104,6 +104,7 @@ beforeEach(async () => {
     contextMenus: { create: vi.fn(), onClicked: { addListener: vi.fn() } },
     action: { setBadgeText, setBadgeBackgroundColor: vi.fn(async () => {}) },
     bookmarks: { getTree: getBookmarkTree },
+    permissions: { contains: vi.fn(async () => true), request: vi.fn(async () => true) },
     scripting: { executeScript },
     runtime: {
       getManifest: () => ({ content_scripts: [{ js: ['assets/content-loader-abc123.js'] }] }),
@@ -165,9 +166,11 @@ describe('GET_BOOKMARKS', () => {
         tags: ['testing'],
         createdAt: '2026-09-01T00:00:00.000Z',
         updatedAt: '2026-09-01T00:00:00.000Z',
+        useCount: 0,
+        lastUsedAt: '',
       },
     ]);
-    expect(store.bookmarksCache).toMatchObject({ repo: 'o/r', etag: ETAG });
+    expect(store.bookmarksCache).toMatchObject({ repo: 'o/r', sha: 'sha-1', etag: ETAG });
     expect(fileRequests()).toHaveLength(1);
   });
 
@@ -184,6 +187,7 @@ describe('GET_BOOKMARKS', () => {
           updatedAt: '',
         },
       ],
+      sha: 'sha-1',
       etag: ETAG,
       fetchedAt: Date.now(),
     };
@@ -208,6 +212,7 @@ describe('GET_BOOKMARKS', () => {
           updatedAt: '',
         },
       ],
+      sha: 'sha-1',
       etag: 'W/"old-etag"',
       fetchedAt: Date.now() - CACHE_TTL_MS - 1,
     };
@@ -236,6 +241,7 @@ describe('GET_BOOKMARKS', () => {
           updatedAt: '',
         },
       ],
+      sha: 'sha-x',
       etag: 'W/"etag-x"',
       fetchedAt: Date.now(),
     };
@@ -259,6 +265,7 @@ describe('GET_BOOKMARKS', () => {
           updatedAt: '',
         },
       ],
+      sha: 'sha-1',
       etag: ETAG,
       fetchedAt: Date.now() - CACHE_TTL_MS - 1,
     };
@@ -297,7 +304,13 @@ describe('GET_BOOKMARKS', () => {
   });
 
   it('drops the cache when a new token arrives, since the account may differ', async () => {
-    store.bookmarksCache = { repo: 'o/r', bookmarks: [], etag: ETAG, fetchedAt: Date.now() };
+    store.bookmarksCache = {
+      repo: 'o/r',
+      bookmarks: [],
+      sha: 'sha-1',
+      etag: ETAG,
+      fetchedAt: Date.now(),
+    };
 
     listener({ type: 'AUTH_TOKEN_UPDATE', token: 'new', repo: 'o/r' }, {}, () => {});
     await settle();
@@ -641,7 +654,13 @@ describe('repository switching', () => {
   });
 
   it('switches the repo, which the caches notice by themselves', async () => {
-    store.bookmarksCache = { repo: 'o/r', bookmarks: [], etag: null, fetchedAt: Date.now() };
+    store.bookmarksCache = {
+      repo: 'o/r',
+      bookmarks: [],
+      sha: null,
+      etag: null,
+      fetchedAt: Date.now(),
+    };
 
     await call({ type: 'SET_REPO', repo: 'other/repo' });
     expect(store.lifeos_repo).toBe('other/repo');
@@ -650,5 +669,134 @@ describe('repository switching', () => {
     const response = await call({ type: 'GET_BOOKMARKS' });
     expect(response.bookmarks.map((b: any) => b.title)).toEqual(['Vitest']);
     expect(store.bookmarksCache.repo).toBe('other/repo');
+  });
+});
+
+describe('usage counting', () => {
+  const writes = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT');
+  const writtenFile = () => JSON.parse(atob(JSON.parse(writes()[0]?.[1].body).content));
+
+  const cachedAt = (fetchedAt: number) => {
+    store.bookmarksCache = {
+      repo: 'o/r',
+      bookmarks: [
+        {
+          id: 'b1',
+          title: 'Vitest',
+          url: 'https://vitest.dev/',
+          tags: [],
+          createdAt: '',
+          updatedAt: '',
+          useCount: 2,
+          lastUsedAt: '',
+        },
+      ],
+      sha: 'sha-1',
+      etag: ETAG,
+      fetchedAt,
+    };
+  };
+
+  it('counts an open locally, without touching GitHub', async () => {
+    cachedAt(Date.now());
+
+    expect(await call({ type: 'RECORD_BOOKMARK_USE', bookmarkId: 'b1' })).toMatchObject({
+      success: true,
+      pending: 1,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(store.bookmarkUsage.deltas.b1.count).toBe(1);
+  });
+
+  it('adds what was counted to the list it hands out', async () => {
+    cachedAt(Date.now());
+    await call({ type: 'RECORD_BOOKMARK_USE', bookmarkId: 'b1' });
+    await call({ type: 'RECORD_BOOKMARK_USE', bookmarkId: 'b1' });
+
+    const { bookmarks } = await call({ type: 'GET_BOOKMARKS' });
+
+    // Two counted on top of the two GitHub already knew about.
+    expect(bookmarks[0].useCount).toBe(4);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('leaves the cache holding GitHub\u2019s number, so nothing is counted twice', async () => {
+    cachedAt(Date.now());
+    await call({ type: 'RECORD_BOOKMARK_USE', bookmarkId: 'b1' });
+
+    await call({ type: 'GET_BOOKMARKS' });
+    await call({ type: 'GET_BOOKMARKS' });
+
+    expect(store.bookmarksCache.bookmarks[0].useCount).toBe(2);
+    expect((await call({ type: 'GET_BOOKMARKS' })).bookmarks[0].useCount).toBe(3);
+  });
+
+  it('pushes the counts on the next sync, on top of what GitHub holds', async () => {
+    cachedAt(Date.now() - CACHE_TTL_MS - 1);
+    await call({ type: 'RECORD_BOOKMARK_USE', bookmarkId: 'b1' });
+
+    await call({ type: 'SYNC_NOW' });
+
+    // The seeded remote file has useCount 0, so the delta lands on that, not on the cache's 2.
+    expect(writtenFile().bookmarks[0]).toMatchObject({ id: 'b1', useCount: 1 });
+    expect(store.bookmarkUsage.deltas).toEqual({});
+    expect(store.bookmarksCache.bookmarks[0].useCount).toBe(1);
+  });
+
+  it('commits nothing when an hour passes with nothing opened', async () => {
+    cachedAt(Date.now() - CACHE_TTL_MS - 1);
+
+    await call({ type: 'SYNC_NOW' });
+
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('holds to the hourly budget while the cache is fresh', async () => {
+    cachedAt(Date.now());
+    await call({ type: 'RECORD_BOOKMARK_USE', bookmarkId: 'b1' });
+
+    expect(await call({ type: 'SYNC_NOW' })).toMatchObject({ synced: false, reason: 'fresh' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    // The count is not lost, it is simply waiting for the next hour.
+    expect(store.bookmarkUsage.deltas.b1.count).toBe(1);
+  });
+
+  it('lets a commit carry the counts along, since it is going out anyway', async () => {
+    cachedAt(Date.now());
+    await call({ type: 'RECORD_BOOKMARK_USE', bookmarkId: 'b1' });
+
+    await call({ type: 'ADD_BOOKMARK', url: 'https://example.com/post', title: 'A post' });
+
+    expect(writtenFile().bookmarks.find((b: any) => b.id === 'b1').useCount).toBe(1);
+    expect(store.bookmarkUsage.deltas).toEqual({});
+  });
+
+  it('drops a count for a bookmark deleted in the console', async () => {
+    cachedAt(Date.now() - CACHE_TTL_MS - 1);
+    await call({ type: 'RECORD_BOOKMARK_USE', bookmarkId: 'gone' });
+
+    await call({ type: 'SYNC_NOW' });
+
+    // GitHub leads on which bookmarks exist, so there is nothing to push.
+    expect(writes()).toHaveLength(0);
+    expect(store.bookmarksCache.bookmarks.map((b: any) => b.id)).toEqual(['b1']);
+  });
+
+  it('ignores counts left over from another repo', async () => {
+    cachedAt(Date.now());
+    store.bookmarkUsage = { repo: 'other/repo', deltas: { b1: { count: 9, lastUsedAt: '' } } };
+
+    expect((await call({ type: 'GET_BOOKMARKS' })).bookmarks[0].useCount).toBe(2);
+  });
+});
+
+describe('the optional bookmarks permission', () => {
+  it('refuses the import until it is granted, pointing at the popup', async () => {
+    (chrome as any).permissions.contains = vi.fn(async () => false);
+
+    await expect(call({ type: 'IMPORT_CHROME_BOOKMARKS' })).resolves.toMatchObject({
+      error: expect.stringContaining('popup'),
+    });
+    expect(getBookmarkTree).not.toHaveBeenCalled();
   });
 });

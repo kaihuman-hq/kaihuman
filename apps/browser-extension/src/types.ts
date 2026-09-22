@@ -11,6 +11,8 @@ export interface Message {
     | 'GET_BOOKMARKS'
     | 'ADD_BOOKMARK'
     | 'IMPORT_CHROME_BOOKMARKS'
+    | 'RECORD_BOOKMARK_USE'
+    | 'SYNC_NOW'
     | 'GET_RECENTS'
     | 'ADD_RECENT'
     | 'GET_REPOS'
@@ -30,6 +32,7 @@ export interface Message {
   text?: string;
   repo?: string;
   entry?: { id: string; title: string; subtitle?: string; url?: string };
+  bookmarkId?: string;
 }
 
 export interface MessageResponse {

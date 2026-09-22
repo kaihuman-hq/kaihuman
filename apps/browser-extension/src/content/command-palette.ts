@@ -44,6 +44,8 @@ export interface PaletteHandlers {
   actions: () => PaletteAction[];
   loadRecents: () => Promise<RecentEntry[]>;
   rememberRecent: (entry: RecentEntry) => void;
+  /** Counts one open of a bookmark, so unused ones can be found later. */
+  countBookmarkUse: (id: string) => void;
 }
 
 export interface CommandPalette {
@@ -285,13 +287,15 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
       subtitle: bookmark.tags.length
         ? `${bookmark.url}  ${bookmark.tags.map((tag) => `#${tag}`).join(' ')}`
         : bookmark.url,
-      activate: () =>
+      activate: () => {
+        handlers.countBookmarkUse(bookmark.id);
         openUrl({
           id: `bookmark:${bookmark.id}`,
           title: bookmark.title,
           subtitle: bookmark.url,
           url: bookmark.url,
-        }),
+        });
+      },
     }));
   };
 

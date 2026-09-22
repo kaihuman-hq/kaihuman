@@ -9,7 +9,7 @@ The official browser extension for Lifosy, designed to enhance your web experien
 - **Quick Dump Notes**: Rapidly create notes without navigating away from your current tab.
 - **Context Menu Integration**: Conveniently access Lifosy features directly from the browser's context menu.
 - **Pinned Tabs Sync**: Save named groups of pinned tabs to your repo, and load any of them into the current window on any machine.
-- **Bookmarks**: Your repo's bookmarks, mirrored into the browser and kept in sync in the background. Bookmark the current page from the popup or the palette, or import the ones this browser already has.
+- **Bookmarks**: Your repo's bookmarks, mirrored into the browser and synced at most once an hour. Bookmark the current page from the popup or the palette, or import the ones this browser already has. Opens are counted so you can find the ones you never use.
 - **Command Palette**: `Ctrl+Shift+K` on any page to search those bookmarks, repeat what you did last, run any of the extension's actions — and, on request, search your repo.
 
 ## Popup
@@ -124,24 +124,57 @@ inside a folder you made carries that folder's name as its tag; the browser's ow
 ("Bookmarks bar", "Other bookmarks") are not turned into tags, since they say nothing.
 
 Pages already in the file are skipped rather than duplicated, so running it twice is safe, and the
-imported block is appended so whatever the file already had stays where it was. Reading the
-browser's bookmarks needs the `bookmarks` permission, which Chrome surfaces as "Read and change
-your bookmarks".
+imported block is appended so whatever the file already had stays where it was.
+
+Reading the browser's bookmarks needs the `bookmarks` permission, which is **optional**: the
+extension does not ask for it on install, so nobody who never imports has to grant "Read and change
+your bookmarks". The popup asks the first time you press the button. That is also why the import
+has to start there — `chrome.permissions.request` needs a user gesture in an extension page, which
+a message from the palette is not, so the palette's version of the action points you at the popup
+until the permission is granted.
 
 ### Caching and sync
 
-The extension never waits on GitHub to show you a bookmark:
+The extension never waits on GitHub to show you a bookmark, and it talks to GitHub at most once
+an hour on its own:
 
 - The list is cached in `chrome.storage.local` and served from there.
-- A cache older than 15 minutes is still served, and refreshed in the background — so an edit in
+- A cache older than an hour is still served, and refreshed in the background — so an edit in
   the repo shows up on the next use, not after a spinner.
-- An alarm syncs every 15 minutes even if you never open the palette.
+- An alarm checks hourly, and **opening the popup checks too** — but a cache still inside its hour
+  is left alone, so opening the popup ten times costs nothing.
 - Refreshes replay GitHub's own `ETag` as `If-None-Match`, so an unchanged file answers `304` —
   a response GitHub does not count against your rate limit.
 - The cache records which repo it came from, so switching repos in the popup re-fetches. Logging
   in again drops it, because a new token can mean a different account.
 
 A repo with no `.kh/browser.bookmarks.json` yet is an empty list, not an error.
+
+Saving a bookmark, importing, or any pinned-tab group change is *your* action, not a background
+one, so it commits straight away rather than waiting for the hour.
+
+### Which bookmarks you actually use
+
+Every bookmark carries a `useCount` and a `lastUsedAt`, so the console's widget can sort by
+**least used** and show you what is safe to delete. Opening one from the palette costs no GitHub
+request at all: the open is counted locally, as a *delta* on top of whatever the file holds, and
+the deltas ride along with the next sync or the next commit.
+
+The merge, when a sync does happen, is deliberate about who wins:
+
+1. **Fetch first.** GitHub's file replaces the cached list wholesale, so a bookmark edited or
+   deleted in the console wins — the extension never pushes a stale copy over it.
+2. **Add the counts.** A delta is *added* to the count GitHub holds rather than replacing it, and
+   `lastUsedAt` takes the later of the two. Two machines counting at the same time therefore sum
+   instead of overwriting each other, and a delta for a bookmark that GitHub no longer has is
+   dropped along with it.
+3. **Push back**, but only when there is something to push. An hour in which you opened nothing
+   costs one conditional `GET` and no commit.
+4. **Settle.** The pushed deltas are *subtracted* rather than cleared, so an open counted while the
+   commit was in flight survives for the next round.
+
+The cache always holds GitHub's numbers, never locally adjusted ones — the deltas are added when
+the list is read. That separation is what makes it impossible for a sync to count anything twice.
 
 ## Command Palette
 
@@ -184,7 +217,7 @@ Everything the extension can do is here, so the popup is never the only way in:
 | Add a note… | Pick the dump or any quick-note file, then type; an `.actionlog.md` target takes `#tags` in the text |
 | Pinned tab groups… | Pick a group, then load, update, rename, reorder or delete it |
 | Save this window's pinned tabs as a new group… | Asks for the name |
-| Import the browser's bookmarks | Copies them into the repo file |
+| Import the browser's bookmarks | Copies them into the repo file (grant access from the popup first) |
 | Switch repository… | Pick from the repositories the console shared |
 | Open the Lifosy console | |
 

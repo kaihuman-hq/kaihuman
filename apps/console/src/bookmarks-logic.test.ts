@@ -10,17 +10,26 @@ import {
   normalizeBookmarkUrl,
   parseBookmarks,
   serializeBookmarks,
+  sortBookmarks,
 } from '../../../packages/ui/src/LifeOS/Organisms/Widgets/BookmarksLogic';
 
 const NOW = '2026-09-22T10:00:00.000Z';
 
-const bookmark = (id: string, url: string, tags: string[] = [], title = id): Bookmark => ({
+const bookmark = (
+  id: string,
+  url: string,
+  tags: string[] = [],
+  title = id,
+  useCount = 0,
+): Bookmark => ({
   id,
   title,
   url,
   tags,
   createdAt: NOW,
   updatedAt: NOW,
+  useCount,
+  lastUsedAt: '',
 });
 
 const config = (...bookmarks: Bookmark[]): BookmarksConfig => ({ bookmarks, updatedAt: NOW });
@@ -122,6 +131,8 @@ describe('addBookmark', () => {
       tags: ['dev'],
       createdAt: NOW,
       updatedAt: NOW,
+      useCount: 0,
+      lastUsedAt: '',
     });
     expect(next.updatedAt).toBe(NOW);
   });
@@ -195,5 +206,87 @@ describe('filterBookmarks', () => {
   it('narrows to a tag, combined with the query', () => {
     expect(filterBookmarks(bookmarks, '', 'work').map((b) => b.id)).toEqual(['b2']);
     expect(filterBookmarks(bookmarks, 'vitest', 'work')).toEqual([]);
+  });
+});
+
+describe('usage fields', () => {
+  // The extension counts opens into the same file. Parsing rebuilds each entry, so a console
+  // edit would wipe those counts if they were not carried across.
+  it('keeps the counts a sync wrote when the console rewrites the file', () => {
+    const content = JSON.stringify({
+      bookmarks: [
+        {
+          id: 'b1',
+          title: 'Example',
+          url: 'https://example.com/',
+          tags: [],
+          createdAt: NOW,
+          updatedAt: NOW,
+          useCount: 7,
+          lastUsedAt: NOW,
+        },
+      ],
+      updatedAt: NOW,
+    });
+
+    const reparsed = parseBookmarks(serializeBookmarks(parseBookmarks(content)));
+
+    expect(reparsed.bookmarks[0]).toMatchObject({ useCount: 7, lastUsedAt: NOW });
+  });
+
+  it('reads a file written before usage was tracked as never opened', () => {
+    const parsed = parseBookmarks(
+      JSON.stringify({ bookmarks: [{ id: 'b1', url: 'https://example.com/' }] }),
+    );
+
+    expect(parsed.bookmarks[0]).toMatchObject({ useCount: 0, lastUsedAt: '' });
+  });
+
+  it('ignores a count that is not a sensible number', () => {
+    const parsed = parseBookmarks(
+      JSON.stringify({
+        bookmarks: [
+          { id: 'b1', url: 'https://a.example/', useCount: -2 },
+          { id: 'b2', url: 'https://b.example/', useCount: 'many' },
+        ],
+      }),
+    );
+
+    expect(parsed.bookmarks.map((b) => b.useCount)).toEqual([0, 0]);
+  });
+});
+
+describe('sortBookmarks', () => {
+  const bookmarks = [
+    bookmark('b1', 'https://a.example/', [], 'A', 5),
+    bookmark('b2', 'https://b.example/', [], 'B', 0),
+    bookmark('b3', 'https://c.example/', [], 'C', 2),
+  ];
+
+  it('leaves the file order alone for NEWEST', () => {
+    expect(sortBookmarks(bookmarks, 'NEWEST')).toBe(bookmarks);
+  });
+
+  it('puts the never-opened ones first for LEAST_USED', () => {
+    expect(sortBookmarks(bookmarks, 'LEAST_USED').map((b) => b.id)).toEqual(['b2', 'b3', 'b1']);
+  });
+
+  it('puts the most-opened ones first for MOST_USED', () => {
+    expect(sortBookmarks(bookmarks, 'MOST_USED').map((b) => b.id)).toEqual(['b1', 'b3', 'b2']);
+  });
+
+  it('keeps the file order for ties, so the list does not jump about', () => {
+    const tied = [
+      bookmark('b1', 'https://a.example/', [], 'A', 1),
+      bookmark('b2', 'https://b.example/', [], 'B', 1),
+    ];
+
+    expect(sortBookmarks(tied, 'LEAST_USED').map((b) => b.id)).toEqual(['b1', 'b2']);
+    expect(sortBookmarks(tied, 'MOST_USED').map((b) => b.id)).toEqual(['b1', 'b2']);
+  });
+
+  it('does not change the list it was given', () => {
+    sortBookmarks(bookmarks, 'LEAST_USED');
+    expect(bookmarks.map((b) => b.id)).toEqual(['b1', 'b2', 'b3']);
   });
 });

@@ -297,6 +297,11 @@ function getPalette(): CommandPalette {
           console.warn('LifeOS Extension: could not record', entry, e),
         );
       },
+      countBookmarkUse: (bookmarkId) => {
+        send({ type: 'RECORD_BOOKMARK_USE', bookmarkId }).catch((e) =>
+          console.warn('LifeOS Extension: could not count use of', bookmarkId, e),
+        );
+      },
     });
   }
   return palette;

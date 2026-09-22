@@ -11,8 +11,11 @@ import { isOpenableUrl, normalizeUrl } from './pinned-tabs';
  * one the extension reads, exactly like `.kh/browser.pinnedtabs.json` for pinned tabs. */
 export const BOOKMARKS_PATH = '.kh/browser.bookmarks.json';
 
-/** How long a cached copy is served without a refresh. */
-export const CACHE_TTL_MS = 15 * 60 * 1000;
+/**
+ * How long a cached copy is served without a refresh — and so, in practice, how often the
+ * extension talks to GitHub on its own. Usage is counted locally between syncs.
+ */
+export const CACHE_TTL_MS = 60 * 60 * 1000;
 
 export interface Bookmark {
   id: string;
@@ -21,6 +24,10 @@ export interface Bookmark {
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  /** How often this bookmark has been opened from the extension. */
+  useCount: number;
+  /** When it was last opened, ISO, or empty if never. */
+  lastUsedAt: string;
 }
 
 export interface BookmarksConfig {
@@ -28,17 +35,43 @@ export interface BookmarksConfig {
   updatedAt: string;
 }
 
-/** What lives in `chrome.storage.local` under `bookmarksCache`. */
+/**
+ * What lives in `chrome.storage.local` under `bookmarksCache`.
+ *
+ * This holds GitHub's state as last fetched, never a locally adjusted copy — usage counted since
+ * then lives in `BookmarkUsage` and is added on read. Keeping the two apart is what makes the
+ * hourly sync unable to count anything twice.
+ */
 export interface BookmarksCache {
   repo: string;
   bookmarks: Bookmark[];
+  /** Blob sha of the cached content, which a write commits against. */
+  sha: string | null;
   /** The `ETag` GitHub answered with, replayed so an unchanged file costs only a 304. */
   etag: string | null;
   fetchedAt: number;
 }
 
+/** Opens counted since the last push, per bookmark id. */
+export interface UsageDelta {
+  count: number;
+  lastUsedAt: string;
+}
+
+/** What lives in `chrome.storage.local` under `bookmarkUsage`. */
+export interface BookmarkUsage {
+  repo: string;
+  deltas: Record<string, UsageDelta>;
+}
+
+export const EMPTY_USAGE = (repo: string): BookmarkUsage => ({ repo, deltas: {} });
+
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function asCount(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
 
 function asTags(value: unknown): string[] {
@@ -71,6 +104,8 @@ export function parseBookmarks(content: string): BookmarksConfig {
       tags: asTags(entry.tags),
       createdAt: asString(entry.createdAt),
       updatedAt: asString(entry.updatedAt),
+      useCount: asCount(entry.useCount),
+      lastUsedAt: asString(entry.lastUsedAt),
     }));
   return { bookmarks, updatedAt: asString(root.updatedAt) };
 }
@@ -106,6 +141,8 @@ export function addBookmark(
     tags: draft.tags.map((tag) => tag.trim().replace(/^#/, '')).filter(Boolean),
     createdAt: now,
     updatedAt: now,
+    useCount: 0,
+    lastUsedAt: '',
   };
   return { bookmarks: [bookmark, ...config.bookmarks], updatedAt: now };
 }
@@ -144,4 +181,66 @@ export function searchBookmarks(bookmarks: Bookmark[], query: string, limit = 20
     .sort((a, b) => a.score - b.score || a.index - b.index)
     .slice(0, limit)
     .map((entry) => entry.bookmark);
+}
+
+const laterOf = (a: string, b: string) => (a > b ? a : b);
+
+/**
+ * GitHub's list with locally counted opens added on top.
+ *
+ * GitHub leads on everything that identifies a bookmark — which ones exist, their title, url and
+ * tags — so an edit or a delete made in the console wins. Counts are the exception: they are
+ * additive, so a delta is added to whatever GitHub holds rather than replacing it. Two machines
+ * counting at once therefore sum instead of clobbering each other, and a delta for a bookmark
+ * GitHub no longer has is dropped with it.
+ */
+export function applyUsage(bookmarks: Bookmark[], usage: BookmarkUsage | undefined): Bookmark[] {
+  const deltas = usage?.deltas;
+  if (!deltas || Object.keys(deltas).length === 0) return bookmarks;
+  return bookmarks.map((bookmark) => {
+    const delta = deltas[bookmark.id];
+    if (!delta) return bookmark;
+    return {
+      ...bookmark,
+      useCount: bookmark.useCount + delta.count,
+      lastUsedAt: laterOf(bookmark.lastUsedAt, delta.lastUsedAt),
+    };
+  });
+}
+
+/** True when any delta belongs to a bookmark that still exists, i.e. there is something to push. */
+export function hasUsageToPush(bookmarks: Bookmark[], usage: BookmarkUsage | undefined): boolean {
+  const deltas = usage?.deltas;
+  if (!deltas) return false;
+  return bookmarks.some((bookmark) => (deltas[bookmark.id]?.count ?? 0) > 0);
+}
+
+/** One more open of `id`, on top of whatever has not been pushed yet. */
+export function countUse(
+  usage: BookmarkUsage,
+  id: string,
+  now = new Date().toISOString(),
+): BookmarkUsage {
+  const previous = usage.deltas[id];
+  return {
+    repo: usage.repo,
+    deltas: {
+      ...usage.deltas,
+      [id]: { count: (previous?.count ?? 0) + 1, lastUsedAt: now },
+    },
+  };
+}
+
+/**
+ * Removes the deltas a push has just committed, leaving anything counted while it was in flight.
+ * Subtracting rather than clearing is what keeps an open during the request from being lost.
+ */
+export function settleUsage(usage: BookmarkUsage, pushed: BookmarkUsage): BookmarkUsage {
+  const deltas: Record<string, UsageDelta> = {};
+  for (const [id, delta] of Object.entries(usage.deltas)) {
+    const sent = pushed.deltas[id]?.count ?? 0;
+    const count = delta.count - sent;
+    if (count > 0) deltas[id] = { count, lastUsedAt: delta.lastUsedAt };
+  }
+  return { repo: usage.repo, deltas };
 }

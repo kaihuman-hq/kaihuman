@@ -72,6 +72,14 @@ export function App() {
       }
     });
 
+    // Opening the popup is the other moment the extension checks GitHub. The worker still holds
+    // to its hourly budget, so this is a no-op on a cache that is still fresh.
+    chrome.runtime.sendMessage({ type: 'SYNC_NOW' }, () => {
+      if (chrome.runtime.lastError) {
+        console.warn('LifeOS Extension: sync check failed', chrome.runtime.lastError.message);
+      }
+    });
+
     // Fetch quick notes
     chrome.runtime.sendMessage({ type: 'FETCH_QUICK_NOTES' }, (response) => {
       if (response && response.quickNotes) {

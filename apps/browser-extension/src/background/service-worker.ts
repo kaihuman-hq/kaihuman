@@ -3,14 +3,20 @@ import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
 import {
   addBookmark,
+  applyUsage,
   BOOKMARKS_PATH,
   type Bookmark,
   type BookmarkDraft,
   type BookmarksCache,
+  type BookmarkUsage,
+  countUse,
+  EMPTY_USAGE,
+  hasUsageToPush,
   isCacheStale,
   isCacheUsable,
   parseBookmarks,
   serializeBookmarks,
+  settleUsage,
 } from './bookmarks';
 import {
   findGroup,
@@ -42,8 +48,10 @@ console.log('LifeOS Extension: Background script loaded');
 chrome.alarms.create('swKeepAlive', { periodInMinutes: 0.5 });
 
 // Bookmarks and pinned-tab groups are served from their caches and refreshed behind the user's
-// back, so the palette and the popup open instantly and a repo edit lands within one sync period.
-chrome.alarms.create('repoSync', { periodInMinutes: 15 });
+// back, so the palette and the popup open instantly. Once an hour is the whole budget the extension
+// spends on GitHub by itself; opening the popup checks too, and what happens in between — which
+// bookmarks get opened — is counted locally and pushed with the next sync.
+chrome.alarms.create('repoSync', { periodInMinutes: 60 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'swKeepAlive') {
@@ -111,6 +119,41 @@ async function openPaletteInTab(tabId: number): Promise<boolean> {
     }
   }
   return false;
+}
+
+async function readUsage(repo: string): Promise<BookmarkUsage> {
+  const stored = await chrome.storage.local.get('bookmarkUsage');
+  const usage = stored.bookmarkUsage as BookmarkUsage | undefined;
+  // Counts belong to one repo's file; another repo's are meaningless here.
+  return usage && usage.repo === repo && usage.deltas ? usage : EMPTY_USAGE(repo);
+}
+
+/**
+ * Counts one open, locally. Nothing is sent now: the delta rides along with the next sync or the
+ * next commit, which is what keeps opening bookmarks off the GitHub API entirely.
+ */
+async function recordBookmarkUse(id: string) {
+  const { repo } = await credentials();
+  if (!id) return { counted: false };
+  const usage = countUse(await readUsage(repo), id);
+  await chrome.storage.local.set({ bookmarkUsage: usage });
+  return { counted: true, pending: usage.deltas[id]?.count ?? 0 };
+}
+
+/**
+ * The hourly check, run when the alarm fires and when the popup opens. A cache still inside its
+ * hour is left alone — including its pending counts, which wait for the next one.
+ */
+async function syncIfStale() {
+  const { token, repo } = await credentials();
+  if (!token) return { synced: false, reason: 'no token' };
+
+  const cache = await readBookmarksCache();
+  if (isCacheUsable(cache, repo) && cache && !isCacheStale(cache)) {
+    return { synced: false, reason: 'fresh' };
+  }
+  await syncBookmarks();
+  return { synced: true };
 }
 
 /** How many of the palette's last actions are kept. */
@@ -417,8 +460,16 @@ async function credentials(): Promise<{ token?: string; repo: string }> {
 }
 
 /**
- * Pulls the repo file into the cache. GitHub's own `ETag` is replayed as `If-None-Match`, so an
- * unchanged file answers 304 — which GitHub does not bill against the rate limit.
+ * Brings the cache in line with GitHub, then pushes back anything counted since the last sync.
+ *
+ * GitHub leads: its list replaces the cache wholesale, so an edit or a delete made in the console
+ * wins. Use counts are the exception — they are added to what GitHub holds rather than replacing
+ * it, so two machines counting at once sum instead of clobbering each other. The push only happens
+ * when there is something to push, so an hour in which nothing was opened costs one conditional GET
+ * and no commit.
+ *
+ * GitHub's own `ETag` is replayed as `If-None-Match`, so an unchanged file answers 304 — which
+ * GitHub does not bill against the rate limit.
  */
 async function syncBookmarks(): Promise<BookmarksCache | undefined> {
   const { token, repo } = await credentials();
@@ -436,30 +487,67 @@ async function syncBookmarks(): Promise<BookmarksCache | undefined> {
     headers,
   });
 
-  // 304: the file is byte-identical, so only the freshness stamp moves.
+  let next: BookmarksCache;
+  // 304: the file is byte-identical to what the cache holds, so that is already GitHub's state.
   if (res.status === 304 && known) {
-    const refreshed = { ...known, fetchedAt: Date.now() };
-    await chrome.storage.local.set({ bookmarksCache: refreshed });
-    return refreshed;
+    next = { ...known, fetchedAt: Date.now() };
+  } else if (res.status === 404) {
+    // A repo without the file yet is a valid empty list, not an error.
+    next = { repo, bookmarks: [], sha: null, etag: null, fetchedAt: Date.now() };
+  } else if (!res.ok) {
+    throw new Error(`Failed to read ${BOOKMARKS_PATH}: ${res.statusText}`);
+  } else {
+    const data = await res.json();
+    next = {
+      repo,
+      bookmarks: parseBookmarks(decodeBase64(data.content || '')).bookmarks,
+      sha: data.sha ?? null,
+      etag: res.headers?.get('etag') ?? null,
+      fetchedAt: Date.now(),
+    };
   }
-  // A repo without the file yet is a valid empty list, not an error.
-  if (res.status === 404) {
-    const empty: BookmarksCache = { repo, bookmarks: [], etag: null, fetchedAt: Date.now() };
-    await chrome.storage.local.set({ bookmarksCache: empty });
-    return empty;
-  }
-  if (!res.ok) throw new Error(`Failed to read ${BOOKMARKS_PATH}: ${res.statusText}`);
 
-  const data = await res.json();
-  const { bookmarks } = parseBookmarks(decodeBase64(data.content || ''));
-  const next: BookmarksCache = {
+  await chrome.storage.local.set({ bookmarksCache: next });
+  return pushUsage(token, repo, next);
+}
+
+/**
+ * Commits the counted opens on top of the state just fetched, and leaves the cache holding what
+ * GitHub now has. The pushed deltas are subtracted rather than cleared, so an open that happened
+ * while the request was in flight survives for the next sync.
+ */
+async function pushUsage(
+  token: string,
+  repo: string,
+  fetched: BookmarksCache,
+): Promise<BookmarksCache> {
+  const usage = await readUsage(repo);
+  if (!hasUsageToPush(fetched.bookmarks, usage)) return fetched;
+
+  const bookmarks = applyUsage(fetched.bookmarks, usage);
+  const newSha = await githubWriteFile(
+    token,
+    repo,
+    BOOKMARKS_PATH,
+    serializeBookmarks({ bookmarks, updatedAt: new Date().toISOString() }),
+    // The sha comes from the same GET that produced `fetched`, so it is the one to commit against.
+    fetched.sha ?? undefined,
+  );
+
+  const pushed: BookmarksCache = {
     repo,
     bookmarks,
-    etag: res.headers?.get('etag') ?? null,
+    sha: newSha,
+    // The commit invalidates whatever ETag we were holding.
+    etag: null,
     fetchedAt: Date.now(),
   };
-  await chrome.storage.local.set({ bookmarksCache: next });
-  return next;
+  await chrome.storage.local.set({
+    bookmarksCache: pushed,
+    // Re-read rather than reusing `usage`: an open may have been counted mid-request.
+    bookmarkUsage: settleUsage(await readUsage(repo), usage),
+  });
+  return pushed;
 }
 
 /**
@@ -480,13 +568,21 @@ async function getBookmarks(): Promise<{
       // Deliberately not awaited: the caller gets the cached list now.
       syncBookmarks().catch((e) => console.warn('LifeOS Extension: bookmark refresh failed', e));
     }
-    return { bookmarks: cache.bookmarks, fetchedAt: cache.fetchedAt, stale };
+    return {
+      bookmarks: applyUsage(cache.bookmarks, await readUsage(repo)),
+      fetchedAt: cache.fetchedAt,
+      stale,
+    };
   }
 
   const fetched = await syncBookmarks();
   // No cache to fall back on, so being signed out is worth saying out loud.
   if (!fetched) throw new Error('No token found — log in through the console');
-  return { bookmarks: fetched.bookmarks, fetchedAt: fetched.fetchedAt, stale: false };
+  return {
+    bookmarks: applyUsage(fetched.bookmarks, await readUsage(repo)),
+    fetchedAt: fetched.fetchedAt,
+    stale: false,
+  };
 }
 
 /**
@@ -510,12 +606,23 @@ async function commitBookmarks(
 
   const file = await githubReadFile(token, repo, BOOKMARKS_PATH);
   const config = file ? parseBookmarks(file.content) : { bookmarks: [], updatedAt: '' };
-  const next = change(config);
-  await githubWriteFile(token, repo, BOOKMARKS_PATH, serializeBookmarks(next), file?.sha);
+  const changed = change(config);
 
-  // The write invalidates whatever ETag we held, so the next sync does a full read.
+  // This commit is going out anyway, so the counted opens ride along for free.
+  const usage = await readUsage(repo);
+  const next = { ...changed, bookmarks: applyUsage(changed.bookmarks, usage) };
+  const sha = await githubWriteFile(
+    token,
+    repo,
+    BOOKMARKS_PATH,
+    serializeBookmarks(next),
+    file?.sha,
+  );
+
   await chrome.storage.local.set({
-    bookmarksCache: { repo, bookmarks: next.bookmarks, etag: null, fetchedAt: Date.now() },
+    // The write invalidates whatever ETag we held, so the next sync does a full read.
+    bookmarksCache: { repo, bookmarks: next.bookmarks, sha, etag: null, fetchedAt: Date.now() },
+    bookmarkUsage: settleUsage(await readUsage(repo), usage),
   });
   return next;
 }
@@ -531,6 +638,12 @@ async function bookmarkPage(draft: BookmarkDraft) {
  * appended so whatever the file already had stays where it was.
  */
 async function importChromeBookmarks() {
+  // The permission is optional and granted from the popup, which is the only surface that can ask:
+  // `chrome.permissions.request` needs a user gesture in an extension page, which a message from
+  // the palette is not.
+  if (!(await chrome.permissions.contains({ permissions: ['bookmarks'] }))) {
+    throw new Error('Allow access to your browser bookmarks from the popup first');
+  }
   const tree = (await chrome.bookmarks.getTree()) as ChromeBookmarkNode[];
   const drafts = flattenChromeBookmarks(tree);
 
@@ -806,6 +919,24 @@ chrome.runtime.onMessage.addListener((message: Message | any, _sender, sendRespo
       title: message.title || '',
       tags: message.tags || [],
     }).then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'RECORD_BOOKMARK_USE') {
+    recordBookmarkUse(message.bookmarkId || '').then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'SYNC_NOW') {
+    // Opening the popup is a good moment to check GitHub, but the hourly budget still applies:
+    // a cache younger than that is left alone, counts and all.
+    syncIfStale().then(
       (result) => sendResponse({ success: true, ...result }),
       (error) => sendResponse({ error: error.message }),
     );

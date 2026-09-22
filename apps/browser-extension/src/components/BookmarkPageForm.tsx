@@ -43,11 +43,31 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
     .map((tag) => tag.trim())
     .filter(Boolean);
 
-  const importAll = () =>
+  /**
+   * The popup is the only place that can ask: `chrome.permissions.request` needs a user gesture in
+   * an extension page, so the palette's version of this action can only tell you to come here.
+   */
+  const importAll = async () => {
+    setStatus('saving');
+    setMessage(null);
+    let granted = false;
+    try {
+      granted = await chrome.permissions.request({ permissions: ['bookmarks'] });
+    } catch (e: any) {
+      setMessage(e?.message || 'Could not ask for access to your bookmarks');
+      setStatus('error');
+      return;
+    }
+    if (!granted) {
+      setMessage('Access to your browser bookmarks is needed to import them');
+      setStatus('error');
+      return;
+    }
     send({ type: 'IMPORT_CHROME_BOOKMARKS' }, (response) => {
       setStatus('success');
       setMessage(`Imported ${response.imported}, skipped ${response.skipped}`);
     });
+  };
 
   return (
     <div class="flex flex-col gap-3">
@@ -137,7 +157,7 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
         </button>
         <p class="text-[10px] text-[var(--los-fg-dim)] leading-relaxed">
           Copies this browser's bookmarks into {repo}, tagged by folder. Pages already saved are
-          skipped, so running it twice is safe.
+          skipped, so running it twice is safe. Asks for access to your bookmarks the first time.
         </p>
       </div>
     </div>

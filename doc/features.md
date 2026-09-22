@@ -25,6 +25,8 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Bookmark usage counts, merged additively and synced at most hourly | service worker, console widget | 2026-09-22 |
+| Sort bookmarks by least/most used, to find ones worth deleting | Bookmarks widget → LEAST USED | 2026-09-22 |
 | Recent actions — the palette's last ten opens and actions, newest first | palette → Recent | 2026-09-22 |
 | Every popup/context-menu action as a palette action (notes, clippings, pinned-tab groups, repo switch) | palette → Actions | 2026-09-22 |
 | Import this browser's bookmarks into the repo file, tagged by folder | popup star → Import, palette → Actions | 2026-09-22 |

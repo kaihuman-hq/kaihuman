@@ -39,6 +39,9 @@ export default defineManifest({
       js: ['src/content/index.ts'],
     },
   ],
-  permissions: ['contextMenus', 'storage', 'activeTab', 'scripting', 'alarms', 'tabs', 'bookmarks'],
+  permissions: ['contextMenus', 'storage', 'activeTab', 'scripting', 'alarms', 'tabs'],
+  // Reading the browser's own bookmarks is only needed for the import, so it is asked for from the
+  // popup when the user runs it rather than warned about on install.
+  optional_permissions: ['bookmarks'],
   host_permissions: ['<all_urls>'],
 })

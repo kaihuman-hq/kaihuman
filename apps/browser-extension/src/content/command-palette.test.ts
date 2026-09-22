@@ -18,6 +18,8 @@ const bookmark = (title: string, url: string, tags: string[] = []): Bookmark => 
   tags,
   createdAt: NOW,
   updatedAt: NOW,
+  useCount: 0,
+  lastUsedAt: '',
 });
 
 const BOOKMARKS = [
@@ -31,6 +33,7 @@ let searchRepo: ReturnType<typeof vi.fn>;
 let loadBookmarks: ReturnType<typeof vi.fn>;
 let loadRecents: ReturnType<typeof vi.fn>;
 let rememberRecent: ReturnType<typeof vi.fn>;
+let countBookmarkUse: ReturnType<typeof vi.fn>;
 let bookmarkRun: ReturnType<typeof vi.fn>;
 let renameRun: ReturnType<typeof vi.fn>;
 let children: ReturnType<typeof vi.fn>;
@@ -83,6 +86,7 @@ beforeEach(async () => {
   loadBookmarks = vi.fn(async () => BOOKMARKS);
   loadRecents = vi.fn(async (): Promise<RecentEntry[]> => []);
   rememberRecent = vi.fn();
+  countBookmarkUse = vi.fn();
   bookmarkRun = vi.fn(async () => 'Bookmarked “This page”');
   renameRun = vi.fn(async (input: string) => `Renamed to ${input}`);
   children = vi.fn(
@@ -103,6 +107,7 @@ beforeEach(async () => {
     actions: () => actions,
     loadRecents: loadRecents as any,
     rememberRecent: rememberRecent as any,
+    countBookmarkUse: countBookmarkUse as any,
   });
   palette.toggle();
   await settle();
@@ -136,9 +141,11 @@ describe('bookmark search', () => {
     expect(searchRepo).not.toHaveBeenCalled();
   });
 
-  it('opens the selected bookmark on Enter, records it and closes', () => {
+  it('opens the selected bookmark on Enter, records it, counts it and closes', () => {
     press('Enter');
     expect(open).toHaveBeenCalledWith('https://vitest.dev/guide');
+    // The count is what makes an unused bookmark findable later.
+    expect(countBookmarkUse).toHaveBeenCalledWith('Vitest guide');
     expect(rememberRecent).toHaveBeenCalledWith({
       id: 'bookmark:Vitest guide',
       title: 'Vitest guide',

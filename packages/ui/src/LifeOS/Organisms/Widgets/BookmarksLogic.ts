@@ -16,6 +16,10 @@ export interface Bookmark {
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  /** How often the browser extension has opened this bookmark. */
+  useCount: number;
+  /** When it was last opened, ISO, or empty if never. */
+  lastUsedAt: string;
 }
 
 export interface BookmarksConfig {
@@ -29,6 +33,9 @@ const asString = (value: unknown): string => (typeof value === 'string' ? value 
 
 const asTags = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((tag): tag is string => typeof tag === 'string') : [];
+
+const asCount = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 
 /**
  * Bookmarks are opened as links by the console and the extension, so only http(s) is
@@ -68,6 +75,8 @@ export const parseBookmarks = (content: string): BookmarksConfig => {
         tags: asTags(entry.tags),
         createdAt: asString(entry.createdAt),
         updatedAt: asString(entry.updatedAt),
+        useCount: asCount(entry.useCount),
+        lastUsedAt: asString(entry.lastUsedAt),
       }));
     return { bookmarks, updatedAt: asString(parsed?.updatedAt) };
   } catch (e) {
@@ -103,6 +112,8 @@ export const addBookmark = (
     tags: draft.tags.map((tag) => tag.trim()).filter(Boolean),
     createdAt: now,
     updatedAt: now,
+    useCount: 0,
+    lastUsedAt: '',
   };
   return { bookmarks: [bookmark, ...config.bookmarks], updatedAt: now };
 };
@@ -131,4 +142,19 @@ export const filterBookmarks = (bookmarks: Bookmark[], query: string, tag?: stri
       bookmark.tags.some((t) => t.toLowerCase().includes(needle))
     );
   });
+};
+
+export type BookmarkSort = 'NEWEST' | 'LEAST_USED' | 'MOST_USED';
+
+/**
+ * Sorting for reviewing a list: least-used first is the one that answers "what can I delete?".
+ * Ties keep the file's own order, so the answer is stable between renders.
+ */
+export const sortBookmarks = (bookmarks: Bookmark[], sort: BookmarkSort): Bookmark[] => {
+  if (sort === 'NEWEST') return bookmarks;
+  const direction = sort === 'LEAST_USED' ? 1 : -1;
+  return bookmarks
+    .map((bookmark, index) => ({ bookmark, index }))
+    .sort((a, b) => (a.bookmark.useCount - b.bookmark.useCount) * direction || a.index - b.index)
+    .map((entry) => entry.bookmark);
 };
