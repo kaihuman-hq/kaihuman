@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-09-23 — Desktop palette, phase 0: the Tauri spike
+
+- **`apps/desktop-palette-spike`**: a throwaway Tauri v2 app, and not a pnpm package, so the
+  repo's build never needs the WebKitGTK headers. One resident daemon keeps the webview hidden;
+  `toggle`/`show`/`hide`/`quit` are one line on a Unix socket in `$XDG_RUNTIME_DIR`, carrying the
+  sender's clock so the palette reports command-to-pixels latency. Three modes:
+  - `layer`: a full-output gtk-layer-shell overlay with the card centered by CSS.
+  - `layer-card`: an unanchored overlay that the compositor centers.
+  - `float`: a plain window placed by compositor rules.
+- **Tried under headless Sway 1.9 with software rendering; not yet on Hyprland.**
+  - Both layer modes center over a tiled terminal, take the keyboard, and on Esc hand focus back.
+  - Warm opens take 31–36 ms in a release build.
+  - The client binary itself costs ~30 ms to start, because it loads the full Tauri library set.
+  - wtype's fresh virtual keyboards drop the first key in GTK and close the float mode through a
+    focus-out.
+  - PSS is roughly 112 + 237 + 22 MB under software rendering.
+- The README has the Fedora build steps, a Hyprland 0.55 Lua config, and the ten-point checklist to
+  run on the real machine.
+
+Checks: `cargo test` 4/4, `cargo clippy --all-targets` and `cargo fmt --check` clean.
+
 ## 2026-09-23 — Native palette plan revised for Hyprland
 
 - `doc/native-command-palette.md` is rewritten for Fedora with Hyprland, a tiling compositor, and

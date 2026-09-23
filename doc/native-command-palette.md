@@ -81,6 +81,9 @@ as the fallback if the WebKitGTK + layer-shell combination turns out unreliable.
 
 ### Phase 0 — spike (1–2 days, throwaway) → decides A or B
 
+Built in `apps/desktop-palette-spike`; see its README for the checklist and the results so far
+(headless Sway; Hyprland still to run).
+
 1. Build a minimal Tauri v2 app: one 620×420 undecorated, transparent, non-resizable window with an
    input field.
 2. Build it as a layer surface (A) and as a floating window with rules (B).
