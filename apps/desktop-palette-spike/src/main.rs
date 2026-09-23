@@ -9,11 +9,12 @@
 #[cfg(target_os = "linux")]
 mod layer;
 
-use std::io::{BufRead, BufReader, Write};
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::PathBuf;
+use std::io::{BufRead, BufReader};
+use std::os::unix::net::UnixListener;
 use std::sync::{Mutex, OnceLock};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::Instant;
+
+use desktop_palette_spike::{Command, Delivery, now_ms, parse_request, send, socket_path};
 
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
@@ -47,41 +48,6 @@ impl Mode {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Command {
-    Toggle,
-    Show,
-    Hide,
-    Quit,
-    /// Start the daemon without showing anything, e.g. from `exec-once`.
-    Daemon,
-}
-
-impl Command {
-    fn parse(value: &str) -> Result<Self, String> {
-        match value {
-            "toggle" => Ok(Self::Toggle),
-            "show" => Ok(Self::Show),
-            "hide" => Ok(Self::Hide),
-            "quit" => Ok(Self::Quit),
-            "daemon" => Ok(Self::Daemon),
-            other => Err(format!(
-                "unknown command {other:?}; expected toggle, show, hide, quit or daemon"
-            )),
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Toggle => "toggle",
-            Self::Show => "show",
-            Self::Hide => "hide",
-            Self::Quit => "quit",
-            Self::Daemon => "daemon",
-        }
-    }
-}
-
 #[derive(Debug)]
 struct Options {
     command: Command,
@@ -111,22 +77,6 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Options, String>
         }
     }
     Ok(options)
-}
-
-/// Milliseconds since the epoch: the one clock both the client and the daemon can read.
-fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_millis() as u64)
-        .unwrap_or(0)
-}
-
-fn socket_path() -> PathBuf {
-    // XDG_RUNTIME_DIR is per-user and mode 0700, so no other user can drive the palette.
-    let dir = std::env::var_os("XDG_RUNTIME_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir);
-    dir.join("lifosy-palette-spike.sock")
 }
 
 /// What the daemon was started with; read by the webview and by `show`.
@@ -212,15 +162,11 @@ fn serve(listener: UnixListener, app: AppHandle) {
         if BufReader::new(stream).read_line(&mut line).is_err() {
             continue;
         }
-        let mut parts = line.split_whitespace();
-        let command = parts.next().map(Command::parse);
-        let sent_at = parts
-            .next()
-            .and_then(|t| t.parse().ok())
-            .unwrap_or_else(now_ms);
-        match command {
-            Some(Ok(command)) => dispatch(&app, command, sent_at),
-            Some(Err(error)) => eprintln!("ignoring request: {error}"),
+        match parse_request(&line) {
+            Some((Ok(command), sent_at)) => {
+                dispatch(&app, command, sent_at.unwrap_or_else(now_ms));
+            }
+            Some((Err(error), _)) => eprintln!("ignoring request: {error}"),
             None => {}
         }
     }
@@ -306,7 +252,10 @@ fn build_palette(app: &AppHandle, mode: Mode) -> Result<WebviewWindow, Box<dyn s
         // A floating toplevel loses focus when the user clicks elsewhere; that dismisses it,
         // like any launcher. A layer surface with exclusive keyboard never loses focus.
         tauri::WindowEvent::Focused(focused) => {
-            eprintln!("palette {}", if *focused { "focused" } else { "lost focus" });
+            eprintln!(
+                "palette {}",
+                if *focused { "focused" } else { "lost focus" }
+            );
             if !focused && mode == Mode::Float {
                 let _ = for_events.hide();
             }
@@ -372,20 +321,22 @@ fn main() {
         }
     };
 
-    let path = socket_path();
-    // Fast path: a daemon is running, so hand it the command and get out of the way.
-    if let Ok(mut stream) = UnixStream::connect(&path) {
-        let line = format!("{} {}\n", options.command.as_str(), now_ms());
-        if let Err(error) = stream.write_all(line.as_bytes()) {
+    // A daemon is running: hand it the command and get out of the way. This binary loads all of
+    // WebKitGTK to do so; `lifosy-palette-toggle` is the cheap way in.
+    match send(options.command, now_ms()) {
+        Ok(Delivery::Sent) => return,
+        Ok(Delivery::NoDaemon) if options.command.starts_daemon() => {}
+        Ok(Delivery::NoDaemon) => {
+            eprintln!("the palette daemon is not running");
+            return;
+        }
+        Err(error) => {
             eprintln!("could not reach the palette daemon: {error}");
             std::process::exit(1);
         }
-        return;
     }
-    if matches!(options.command, Command::Hide | Command::Quit) {
-        eprintln!("the palette daemon is not running");
-        return;
-    }
+
+    let path = socket_path();
 
     // Nothing answered, so whatever file is there is left over from a daemon that died.
     let _ = std::fs::remove_file(&path);
@@ -440,18 +391,5 @@ mod tests {
         );
         assert!(args(&["open"]).unwrap_err().contains("toggle"));
         assert!(args(&["--mode"]).is_err());
-    }
-
-    #[test]
-    fn commands_round_trip_through_the_socket_line() {
-        for command in [
-            Command::Toggle,
-            Command::Show,
-            Command::Hide,
-            Command::Quit,
-            Command::Daemon,
-        ] {
-            assert_eq!(Command::parse(command.as_str()), Ok(command));
-        }
     }
 }

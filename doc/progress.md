@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-09-23 — Desktop palette: phase 0 passed on Hyprland, tiny toggle client
+
+- Every point of the spike's checklist passed on Hyprland (Fedora) in the default `layer` mode, with
+  no compositor rules. The decision is recorded in `doc/native-command-palette.md`: a full-output
+  layer surface.
+- **`lifosy-palette-toggle`**: a second binary that links only the socket protocol. The protocol
+  moved to a Tauri-free `src/lib.rs`. The client needs only libc and libgcc, is 366 KB, and takes
+  4–9 ms per call against ~30 ms for the Tauri binary. With no daemon running it starts
+  `lifosy-palette-spike` from its own directory. Request parsing now accepts a bare
+  `toggle` line, so `nc -U` works too.
+
+Checks: `cargo test` 7/7 (4 new protocol tests in place of the one they replace), clippy and fmt
+clean; `ldd` confirms the client links no GTK or WebKit. Tried under headless Sway: cold start
+spawns the daemon, warm calls take 4–9 ms, and `quit` removes the socket.
+
 ## 2026-09-23 — Desktop palette, phase 0: the Tauri spike
 
 - **`apps/desktop-palette-spike`**: a throwaway Tauri v2 app, and not a pnpm package, so the

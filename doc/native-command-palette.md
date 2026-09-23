@@ -1,6 +1,6 @@
 # Native command palette for the desktop — study and plan
 
-Status: research only, nothing implemented. Revised 2026-09-23 for the actual setup: Fedora with
+Status: phase 0 done and passed on Hyprland (2026-09-23); phase 1 is next. Revised 2026-09-23 for the actual setup: Fedora with
 **Hyprland**, a tiling Wayland compositor. The palette must also behave on other tiling compositors.
 You bind the shortcut yourself.
 
@@ -81,8 +81,13 @@ as the fallback if the WebKitGTK + layer-shell combination turns out unreliable.
 
 ### Phase 0 — spike (1–2 days, throwaway) → decides A or B
 
-Built in `apps/desktop-palette-spike`; see its README for the checklist and the results so far
-(headless Sway; Hyprland still to run).
+**Done.** Built in `apps/desktop-palette-spike`. Every check passed on Hyprland with the default
+full-output layer surface, and the decision is **A (layer-shell)**. It led to two changes for
+phase 2:
+- A tiny client binary, `lifosy-palette-toggle`, is what the key runs. It sends one line over a
+  Unix socket and links only libc, 4–9 ms per call. The Tauri binary took ~30 ms per call because
+  it loads WebKitGTK.
+- The single-instance plugin is replaced by that socket (below).
 
 1. Build a minimal Tauri v2 app: one 620×420 undecorated, transparent, non-resizable window with an
    input field.
@@ -108,10 +113,13 @@ Built in `apps/desktop-palette-spike`; see its README for the checklist and the 
 
 ### Phase 2 — `apps/desktop-palette` (Tauri v2, Preact frontend)
 
-1. **Process model.** One resident process, started by `exec-once = lifosy-palette daemon` or a
-   systemd user unit. Use `tauri-plugin-single-instance`: running `lifosy-palette toggle` again hands
-   its arguments to the running instance, which shows or hides the palette. This needs no D-Bus
-   service or socket of our own.
+1. **Process model.** Take this from the spike.
+   - One resident daemon, started from Hyprland's autostart or a systemd user unit.
+   - It listens on `$XDG_RUNTIME_DIR/lifosy-palette.sock`.
+   - The key runs the tiny `lifosy-palette-toggle` client, which starts the daemon if none is
+     running.
+   - No single-instance plugin: it would put the Tauri binary's startup cost back on every key
+     press.
 2. **Window.** A layer surface (or a floating window if phase 0 picks B). It is created once and
    then shown and hidden, since the compositor centers it again each time it is mapped. It closes on
    Esc and after opening a result.

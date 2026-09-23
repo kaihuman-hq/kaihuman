@@ -15,9 +15,12 @@ compile it, and that needs the WebKitGTK headers.
 
 - `lifosy-palette-spike daemon` starts one resident process that keeps the webview loaded but
   hidden. Opening the palette is then only showing a window, never a cold start.
-- Every other call (`toggle`, `show`, `hide`, `quit`) connects to
+- **`lifosy-palette-toggle [toggle|show|hide|quit]` is what you bind to a key.** It connects to
   `$XDG_RUNTIME_DIR/lifosy-palette-spike.sock`, writes one line and exits.
-- If no daemon is running, `toggle` and `show` start one.
+  - It links only libc: 4–9 ms per call, where the full binary took ~30 ms.
+  - If no daemon is running, `toggle` and `show` start `lifosy-palette-spike` from the same
+    directory, and it opens the palette itself.
+- `lifosy-palette-spike toggle` and the other commands still work too, just slower.
 - `--mode` picks how the window reaches the screen. It is read when the daemon starts, so run
   `quit` before switching modes.
 
@@ -42,7 +45,8 @@ cargo build --release
 cargo test
 ```
 
-The binary is `target/release/lifosy-palette-spike`.
+Both binaries land in `target/release/`: `lifosy-palette-spike` (the daemon) and
+`lifosy-palette-toggle` (the client). Keep them in the same directory.
 
 ## Hyprland config
 
@@ -52,7 +56,7 @@ Hyprland 0.55 and later use a Lua config:
 hl.on("hyprland.start", function()
     hl.exec_cmd("~/path/to/lifosy-palette-spike daemon")          -- add --mode … to try another
 end)
-hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("~/path/to/lifosy-palette-spike toggle"))
+hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("~/path/to/lifosy-palette-toggle"))
 
 -- Only for --mode float. app_id is the binary name; confirm with `hyprctl clients`.
 hl.window_rule({
@@ -83,7 +87,14 @@ and `windowrule` lines. Check the 0.54 wiki for the exact rule names.
 | 9 | Never an invisible or empty palette in 50 toggles | if one happens, retry with `--force-commit` |
 | 10 | Memory | `grep Pss /proc/$(pgrep -f 'lifosy-palette-spike daemon')/smaps_rollup`, plus the WebKit processes |
 
-## Results so far: headless Sway 1.9, software rendering (not Hyprland)
+## Result on Hyprland (Fedora, 2026-09-23)
+
+You ran the checklist on your own Hyprland machine: **everything passed**. That run used the default
+`layer` mode, without the Lua rules; `layer` needs none, which is the point.
+**Decision: phase 2 uses the full-output layer surface**, driven over the socket by a tiny client.
+`float` stays documented as the fallback for compositors without layer-shell.
+
+## Earlier results: headless Sway 1.9, software rendering
 
 These runs were in the dev container: Sway with the headless backend and pixman rendering, a
 `foot` terminal tiled full-screen behind the palette, and keys sent with `wtype`. Sway implements
@@ -102,13 +113,10 @@ specific to Hyprland is still open.
 
 Findings:
 
-- **The client is slow to start.** It takes ~30 ms because it is the full Tauri binary, which loads
-  about 130 shared libraries just to write one line to a socket. Phase 2 should ship a tiny separate
-  client. Until then you can bind
-  `printf 'toggle\n' | nc -U "$XDG_RUNTIME_DIR/lifosy-palette-spike.sock"`. It took 4 ms here with
-  OpenBSD `nc -N`; Fedora's `nc` is nmap-ncat, which needs no `-N`. That line has no timestamp, so
-  the daemon measures from when it receives it. Warm key-to-pixels is about 60–80 ms today, or
-  ~40 ms through `nc`.
+- **The client was slow to start.** It took ~30 ms because it was the full Tauri binary, which
+  loads about 130 shared libraries just to write one line to a socket. Fixed by
+  `lifosy-palette-toggle` (4–9 ms). `printf 'toggle\n' | nc -U …` works as well; a line without a
+  timestamp is timed from when the daemon receives it.
 - **wtype drops the first key.** Each `wtype` run creates a new virtual keyboard, and GTK drops the
   first key it sends. The terminal did not drop it. With a short pause first (`wtype -s 600 …`)
   every key arrives. A physical keyboard does not change device per key, so this is a test
