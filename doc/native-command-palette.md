@@ -81,7 +81,8 @@ as the fallback if the WebKitGTK + layer-shell combination turns out unreliable.
 
 ### Phase 0 — spike (1–2 days, throwaway) → decides A or B
 
-**Done.** Built in `apps/desktop-palette-spike`. Every check passed on Hyprland with the default
+**Done.** Built as `apps/desktop-palette-spike`, removed once phase 2 had taken over its window
+code. Every check passed on Hyprland with the default
 full-output layer surface, and the decision is **A (layer-shell)**. It led to two changes for
 phase 2:
 - A tiny client binary, `lifosy-palette-toggle`, is what the key runs. It sends one line over a

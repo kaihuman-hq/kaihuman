@@ -126,7 +126,9 @@ pub fn token() -> Result<String, String> {
     }
     match keyring_entry()?.get_password() {
         Ok(token) => Ok(token),
-        Err(keyring::Error::NoEntry) => Err("Not logged in — run `lifosy-palette login`".into()),
+        Err(keyring::Error::NoEntry) => Err(
+            "Not logged in — run “Log in with the Lifosy console” or `lifosy-palette login`".into(),
+        ),
         Err(error) => Err(format!(
             "Could not read the token from the keyring ({error}). Is a Secret Service \
              (gnome-keyring, KeePassXC) running?"

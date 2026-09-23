@@ -2,8 +2,8 @@
 //!
 //! A layer surface sits above the tiled layout, is never tiled itself, and is placed by the
 //! compositor on the focused output — what launchers use on Hyprland, Sway, river, niri and KDE.
-//! GNOME does not implement the protocol. Chosen in phase 0 (apps/desktop-palette-spike), where it
-//! passed every check on Hyprland.
+//! GNOME does not implement the protocol. Chosen in phase 0, where it passed every check on
+//! Hyprland (doc/native-command-palette.md).
 
 use gtk_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 

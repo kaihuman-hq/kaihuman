@@ -7,6 +7,7 @@
 
 mod bookmarks;
 mod config;
+mod console_login;
 mod github;
 #[cfg(target_os = "linux")]
 mod layer;
@@ -24,15 +25,18 @@ const LABEL: &str = "palette";
 
 const USAGE: &str = "\
 usage: lifosy-palette [toggle|show|hide|quit|daemon]
-       lifosy-palette login [--repo owner/name]
+       lifosy-palette login [--paste] [--repo owner/name]
        lifosy-palette logout
+
+`login` opens the console in your browser and takes the token from there; `--paste` asks for one
+instead (or reads it from a pipe).
 
 Bind `lifosy-palette-toggle` to a key; it starts the daemon when none is running.";
 
 #[derive(Debug, PartialEq)]
 enum Cli {
     Palette(Command),
-    Login { repo: Option<String> },
+    Login { repo: Option<String>, paste: bool },
     Logout,
 }
 
@@ -43,10 +47,11 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Cli, String> {
     };
     let cli = match first.as_str() {
         "login" => {
-            let mut repo = None;
+            let (mut repo, mut paste) = (None, false);
             while let Some(arg) = args.next() {
                 match arg.as_str() {
                     "--repo" => repo = Some(args.next().ok_or("--repo needs owner/name")?),
+                    "--paste" => paste = true,
                     other => return Err(format!("unexpected {other:?}\n\n{USAGE}")),
                 }
             }
@@ -55,7 +60,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Cli, String> {
             {
                 return Err(format!("{repo} is not an owner/name repository"));
             }
-            return Ok(Cli::Login { repo });
+            return Ok(Cli::Login { repo, paste });
         }
         "logout" => Cli::Logout,
         "-h" | "--help" => return Err(USAGE.to_string()),
@@ -89,18 +94,54 @@ fn read_token() -> Result<String, String> {
     Ok(token)
 }
 
-/// Checks the token against the repository before storing anything.
-fn login(repo: Option<String>) -> Result<(), String> {
+/// Opens the console's `/auth/cli` page and waits for it to hand the token back.
+fn console_grant() -> Result<console_login::Grant, String> {
+    let pending = console_login::Pending::start()?;
+    let url = pending.authorize_url()?;
+    requests::open_in_browser(&url)?;
+    eprintln!("Waiting for the console in your browser… (or open {url})");
+    pending.wait(console_login::TIMEOUT)
+}
+
+/// Checks the token against the repository before storing anything. The repository is, in order:
+/// the one asked for, the one the console had selected, the one in use.
+async fn store_login(
+    token: String,
+    requested: Option<String>,
+    from_console: Option<String>,
+) -> Result<String, String> {
     let mut settings = config::Settings::load();
-    let repo = repo.unwrap_or_else(|| settings.repo());
-    let token = read_token()?;
-    let client = github::Client::new(token.clone(), repo.clone());
-    tauri::async_runtime::block_on(client.can_read_repo())?;
+    let repo = requested
+        .or(from_console.filter(|repo| config::is_repo_name(repo)))
+        .unwrap_or_else(|| settings.repo());
+    github::Client::new(token.clone(), repo.clone())
+        .can_read_repo()
+        .await?;
     config::store_token(&token)?;
     settings.use_repo(&repo);
     settings.save()?;
-    println!("Logged in; the palette now works on {repo}.");
+    Ok(format!("Logged in; the palette now works on {repo}."))
+}
+
+fn login(repo: Option<String>, paste: bool) -> Result<(), String> {
+    let (token, from_console) = if paste {
+        (read_token()?, None)
+    } else {
+        let grant = console_grant()?;
+        (grant.token, grant.repo)
+    };
+    let message = tauri::async_runtime::block_on(store_login(token, repo, from_console))?;
+    println!("{message}");
     Ok(())
+}
+
+/// Best effort: the overlay is hidden while the browser has the screen, so the outcome of a
+/// palette login goes to the notification daemon (mako, dunst, swaync…) if there is one.
+fn notify(message: &str) {
+    let _ = std::process::Command::new("notify-send")
+        .args(["--app-name=lifosy-palette", "Lifosy palette", message])
+        .spawn()
+        .map(|mut child| std::thread::spawn(move || child.wait()));
 }
 
 fn palette(app: &AppHandle) -> Option<WebviewWindow> {
@@ -173,6 +214,24 @@ async fn palette_request(request: serde_json::Value) -> Result<serde_json::Value
     requests::handle(request).await
 }
 
+/// "Log in with the Lifosy console": hides the overlay so the browser can be used, then logs in
+/// exactly as `lifosy-palette login` does.
+#[tauri::command]
+async fn console_login(app: AppHandle) -> Result<String, String> {
+    hide(&app);
+    let outcome = async {
+        let grant = tauri::async_runtime::spawn_blocking(console_grant)
+            .await
+            .map_err(|error| error.to_string())??;
+        store_login(grant.token, None, grant.repo).await
+    }
+    .await;
+    notify(match &outcome {
+        Ok(message) | Err(message) => message,
+    });
+    outcome
+}
+
 /// The palette closed itself (Esc, a click outside, or after opening something).
 #[tauri::command]
 fn hide_palette(app: AppHandle) {
@@ -236,6 +295,7 @@ fn run_daemon(first: Command, listener: UnixListener) {
     let app = tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             palette_request,
+            console_login,
             hide_palette,
             webview_ready
         ])
@@ -268,8 +328,8 @@ fn main() {
         }
     };
     let command = match cli {
-        Cli::Login { repo } => {
-            if let Err(error) = login(repo) {
+        Cli::Login { repo, paste } => {
+            if let Err(error) = login(repo, paste) {
                 eprintln!("{error}");
                 std::process::exit(1);
             }
@@ -338,11 +398,18 @@ mod tests {
 
     #[test]
     fn reads_login_with_an_optional_repository() {
-        assert_eq!(args(&["login"]), Ok(Cli::Login { repo: None }));
         assert_eq!(
-            args(&["login", "--repo", "o/r"]),
+            args(&["login"]),
             Ok(Cli::Login {
-                repo: Some("o/r".into())
+                repo: None,
+                paste: false
+            })
+        );
+        assert_eq!(
+            args(&["login", "--paste", "--repo", "o/r"]),
+            Ok(Cli::Login {
+                repo: Some("o/r".into()),
+                paste: true
             })
         );
         assert!(args(&["login", "--repo"]).is_err());

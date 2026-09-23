@@ -145,7 +145,8 @@ async fn fetch_quick_notes() -> Result<Value, String> {
     Ok(json!({ "quickNotes": quick_notes }))
 }
 
-fn open_url(url: &str) -> Result<Value, String> {
+/// Hands an http(s) URL to the default browser.
+pub fn open_in_browser(url: &str) -> Result<(), String> {
     if !bookmarks::is_openable_url(url) {
         return Err("Refusing to open that URL".into());
     }
@@ -157,6 +158,11 @@ fn open_url(url: &str) -> Result<Value, String> {
         .map_err(|error| format!("Could not run xdg-open: {error}"))?;
     // Reaped in the background so the palette can close at once.
     std::thread::spawn(move || child.wait());
+    Ok(())
+}
+
+fn open_url(url: &str) -> Result<Value, String> {
+    open_in_browser(url)?;
     Ok(json!({}))
 }
 

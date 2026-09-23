@@ -1,6 +1,0 @@
-# Pins the toolchain so `cargo fmt` is reproducible: rustfmt's output changes
-# between releases, and without a pin a contributor on a different stable would
-# reformat files the previous one had just formatted.
-[toolchain]
-channel = "1.94.1"
-components = ["rustfmt", "clippy"]

@@ -28,7 +28,16 @@ const palette = createCommandPalette(
         .send({ type: 'OPEN_URL', url })
         .catch((error) => console.warn('could not open', url, error));
     },
-    actions: () => repoActions(port).filter((action) => !BROWSER_ONLY.has(action.id)),
+    actions: () => [
+      ...repoActions(port).filter((action) => !BROWSER_ONLY.has(action.id)),
+      {
+        id: 'console-login',
+        title: 'Log in with the Lifosy console',
+        subtitle: 'Opens the console in your browser and takes the token from there',
+        // The daemon hides the overlay for the browser and reports the outcome as a notification.
+        run: () => invoke<string>('console_login'),
+      },
+    ],
   },
   {
     placement: 'center',

@@ -1,5 +1,30 @@
 # Progress
 
+## 2026-09-23 — Desktop palette: log in through the console; spike removed
+
+- **`apps/desktop-palette-spike` deleted.** The palette passed on Hyprland, and phase 2 carries
+  everything the spike proved.
+- **Console login**, reusing the console's existing `/auth/cli` page, which the CLI already uses,
+  so the console is unchanged.
+  - `src-tauri/src/console_login.rs` listens on `127.0.0.1` on a random port and opens
+    `/auth/cli?port=…&state=…` with 128 random bits of state.
+  - It serves requests until `/callback` arrives with that state: stray requests get a 404, a
+    forged state a 400, and it gives up after five minutes.
+  - The token is checked against the repository and kept in the Secret Service. The repository is
+    the one from `--repo`, else the console's, else the current one.
+- **Entry points:**
+  - `lifosy-palette login` now uses the console; `--paste` keeps the typed or piped way.
+  - The palette's desktop-only action **Log in with the Lifosy console** hides the overlay for the
+    browser and reports the outcome with `notify-send`.
+  - The "Not logged in" message points to both.
+
+Checks: Rust tests 29/29, among them a loopback test with a stray request, a forged state and the
+real grant, and the timeout. Clippy, fmt, tsc and biome are clean. Tried end to end under
+`dbus-run-session` with a real gnome-keyring and a fake `xdg-open` playing the console's redirect:
+- `login` stored the token, `secret-tool` read it back, and `logout` removed it;
+- in headless Sway, the palette action logged in and the reopened palette loaded bookmarks with
+  the stored token.
+
 ## 2026-09-23 — Desktop palette, phase 2: `apps/desktop-palette`
 
 - **The app**: a Vite UI that mounts `@lifosy/palette`, and a Tauri v2 daemon with two binaries.

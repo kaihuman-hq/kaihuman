@@ -7,7 +7,7 @@ instead of the extension's service worker.
 
 Built for Wayland compositors with `wlr-layer-shell`: Hyprland, Sway, river, niri, KDE. On GNOME or
 X11 it falls back to an ordinary window. See `doc/native-command-palette.md` for why it works this
-way, and `apps/desktop-palette-spike` for the phase 0 test it builds on.
+way.
 
 ## What it can do
 
@@ -45,14 +45,31 @@ runs the Rust tests.
 
 ## Log in
 
+Either way below takes the token from the Lifosy console, the same way the CLI's login does:
+
+- **From the palette:** run **Log in with the Lifosy console**.
+- **From a terminal:** run `lifosy-palette login`.
+
+Both open `app.kaihuman.com/auth/cli` in your browser. Once you are logged in there, which is usually
+already the case, the page hands the token to the palette and the tab closes itself. From the
+palette, the overlay steps aside for the browser, and a notification (mako, dunst…) says how it
+went.
+
 ```sh
-lifosy-palette login --repo owner/name     # prompts for the token without echoing it
-pass github/palette | lifosy-palette login  # or pipe it in
+lifosy-palette login                          # through the console, as above
+lifosy-palette login --repo owner/name        # …and work on this repository
+lifosy-palette login --paste                  # type a token instead (not echoed)
+pass github/palette | lifosy-palette login --paste
 lifosy-palette logout
 ```
 
-- The token needs read/write access to the repository's contents. `login` checks that it can read
-  the repository before storing anything.
+- **How the token arrives:** the console redirects the browser to
+  `http://localhost:<port>/callback?token=…&state=…`. The palette listens only on `127.0.0.1`, on a
+  random port, for five minutes, and accepts only the random `state` it sent.
+- **One catch, inherited from the CLI's flow:** that callback URL, token included, ends up in the
+  browser's history.
+- **Before anything is stored**, the token is checked against the repository. The repository is the
+  one given with `--repo`, else the one selected in the console, else the one in use.
 - It is stored in the **Secret Service** (gnome-keyring, or KeePassXC with Secret Service turned on)
   and never written to a file. Hyprland does not start one for you, so start one from your config,
   for example `gnome-keyring-daemon --start --components=secrets`.
@@ -98,7 +115,7 @@ For development and tests, `LIFOSY_GITHUB_TOKEN` takes the place of the keyring 
 
 ## Troubleshooting
 
-- **"Not logged in"** in the palette's status line: run `lifosy-palette login`.
+- **"Not logged in"** in the palette's status line: run **Log in with the Lifosy console**, or `lifosy-palette login`.
 - **Keyring errors:** no Secret Service is running (see Log in).
 - **It opens as a normal, tiled window:** the compositor has no layer-shell (GNOME), or GTK picked
   X11. The daemon sets `GDK_BACKEND=wayland` when `WAYLAND_DISPLAY` is set; check that it is.
