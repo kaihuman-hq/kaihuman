@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-09-23 — Desktop palette, phase 1: `@lifosy/palette`
+
+- **New package `packages/palette`** (`@lifosy/palette`), consumed from source like `@lifosy/core`.
+  It holds `command-palette.ts`, `web-search.ts` and the shared actions, moved from the extension
+  with `git mv`, plus the `Bookmark` type and `searchBookmarks`. Tests moved with them.
+- **`ActionPort` and `PaletteProtocol`** (`src/protocol.ts`) replace the direct
+  `chrome.runtime.sendMessage`.
+  - Each request name lists its fields and the response fields the palette reads. This is the
+    contract the desktop app will implement.
+  - `repoActions(port)` and `portHandlers(port)`, formerly `workerHandlers()`, take the port.
+  - The old `as` casts on responses are gone.
+- **Extension**: `src/palette/port.ts` holds `send` and `workerPort`. `console.ts` and
+  `background/bookmarks.ts` re-export `CONSOLE_URL`, `Bookmark` and `searchBookmarks`, so the rest
+  of the extension is unchanged.
+- **Root devDependencies**: `vitest` and `@biomejs/biome`, as CLAUDE.md asks, so the new package can
+  run its tests and lint.
+
+Checks: palette tsc clean, vitest 53/53 (9 new for the actions against a fake port), biome clean;
+extension `tsc -b` and `vite build` clean, vitest 184/184. `turbo run` cannot spawn tasks in this
+container ("Exec format error", also for untouched packages), so each script was run directly.
+
 ## 2026-09-23 — Desktop palette: phase 0 passed on Hyprland, tiny toggle client
 
 - Every point of the spike's checklist passed on Hyprland (Fedora) in the default `layer` mode, with

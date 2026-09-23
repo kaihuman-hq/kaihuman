@@ -1,8 +1,13 @@
+import {
+  type CommandPalette,
+  createCommandPalette,
+  portHandlers,
+  repoActions,
+} from '@lifosy/palette';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { type Bookmark, startPageBookmarks } from '../background/bookmarks';
 import { CONSOLE_URL } from '../console';
-import { repoActions, send, workerHandlers } from '../palette/actions';
-import { type CommandPalette, createCommandPalette } from '../palette/command-palette';
+import { send, workerPort } from '../palette/port';
 
 /** Where the note box writes. Any other target is one palette action away ("Add a note…"), which
  * is also the only place that reads the repo's quick-note list — a new tab is opened far too often
@@ -70,10 +75,10 @@ export function StartPage() {
   const palette = () => {
     if (!paletteRef.current) {
       paletteRef.current = createCommandPalette({
-        ...workerHandlers(),
+        ...portHandlers(workerPort),
         // This tab is a blank start page, so a hit takes it over rather than leaving it behind.
         open: openInThisTab,
-        actions: repoActions,
+        actions: () => repoActions(workerPort),
       });
     }
     return paletteRef.current;

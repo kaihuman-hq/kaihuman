@@ -1,7 +1,7 @@
+import { PALETTE_HOST_ID } from '@lifosy/palette';
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Bookmark } from '../background/bookmarks';
-import { PALETTE_HOST_ID } from '../palette/command-palette';
 import { StartPage } from './StartPage';
 
 const NOW = '2026-09-22T10:00:00.000Z';

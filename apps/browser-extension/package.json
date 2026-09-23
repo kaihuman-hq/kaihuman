@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@lifosy/palette": "workspace:*",
     "preact": "^10.27.2"
   },
   "devDependencies": {

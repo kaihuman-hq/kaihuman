@@ -1,6 +1,6 @@
 # Native command palette for the desktop — study and plan
 
-Status: phase 0 done and passed on Hyprland (2026-09-23); phase 1 is next. Revised 2026-09-23 for the actual setup: Fedora with
+Status: phase 0 passed on Hyprland and phase 1 is done (2026-09-23); phase 2 is next. Revised 2026-09-23 for the actual setup: Fedora with
 **Hyprland**, a tiling Wayland compositor. The palette must also behave on other tiling compositors.
 You bind the shortcut yourself.
 
@@ -110,6 +110,14 @@ phase 2:
 2. Replace the `chrome.runtime.sendMessage` in `actions.ts` with an `ActionPort` interface. The
    extension implements it with messaging.
 3. Verify: the extension's tests and build pass unchanged.
+
+**Done.** `@lifosy/palette` holds the palette, web search, the bookmark type and search, and the
+shared actions (`repoActions(port)`, `portHandlers(port)`).
+- `src/protocol.ts` is the contract phase 2 implements: `PaletteProtocol` maps each request name to
+  its fields and the response fields the palette reads.
+- The extension's `ActionPort` (`src/palette/port.ts`) forwards requests to its service worker.
+- The desktop app answers the same names from Rust. A backend that cannot serve a request (pinned
+  tab groups before native messaging) rejects it, and the palette shows the message.
 
 ### Phase 2 — `apps/desktop-palette` (Tauri v2, Preact frontend)
 

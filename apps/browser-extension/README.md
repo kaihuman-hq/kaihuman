@@ -212,7 +212,7 @@ normal tab. The New Tab page used to be on that list; the start page below is th
   Amazon and Reddit. `⏎` opens that engine's results page in a new tab; nothing is fetched by the
   extension itself, it only builds the URL. So when nothing else matches, typing and pressing `⏎`
   is a Google search. The searches you run land in **Recent** like any other open. Another engine
-  is one entry in `SEARCH_ENGINES` (`src/palette/web-search.ts`): an id, a name and a function from
+  is one entry in `SEARCH_ENGINES` (`packages/palette/src/web-search.ts`): an id, a name and a function from
   the query to its results URL.
 - **⇥ Tab** searches the *repo* for what you typed — one GitHub code search, only when you ask
   for it. GitHub's code-search endpoint has a small dedicated budget (~10 requests/minute) that

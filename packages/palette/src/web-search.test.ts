@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SEARCH_ENGINES } from './web-search';
+import { SEARCH_ENGINES } from './web-search.js';
 
 const urlFor = (id: string, query: string) =>
   SEARCH_ENGINES.find((engine) => engine.id === id)?.url(query);

@@ -6,9 +6,8 @@
  * user presses Tab — never while typing. Any query can also be sent to a web search engine, which is
  * only a matter of opening its results page. Everything the popup can do is also here, as an action.
  */
-import type { Bookmark } from '../background/bookmarks';
-import { searchBookmarks } from '../background/bookmarks';
-import { SEARCH_ENGINES } from './web-search';
+import { type Bookmark, searchBookmarks } from './bookmarks.js';
+import { SEARCH_ENGINES } from './web-search.js';
 
 export interface RepoResult {
   path: string;

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Bookmark } from '../background/bookmarks';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import type { Bookmark } from './bookmarks.js';
 import {
   type CommandPalette,
   createCommandPalette,
@@ -7,7 +7,7 @@ import {
   type PaletteAction,
   type RecentEntry,
   type RepoResult,
-} from './command-palette';
+} from './command-palette.js';
 
 const NOW = '2026-09-22T10:00:00.000Z';
 
@@ -20,6 +20,7 @@ const bookmark = (title: string, url: string, tags: string[] = []): Bookmark => 
   updatedAt: NOW,
   useCount: 0,
   lastUsedAt: '',
+  pinned: false,
 });
 
 const BOOKMARKS = [
@@ -34,10 +35,10 @@ let loadBookmarks: ReturnType<typeof vi.fn>;
 let loadRecents: ReturnType<typeof vi.fn>;
 let rememberRecent: ReturnType<typeof vi.fn>;
 let countBookmarkUse: ReturnType<typeof vi.fn>;
-let bookmarkRun: ReturnType<typeof vi.fn>;
-let renameRun: ReturnType<typeof vi.fn>;
-let guidedRun: ReturnType<typeof vi.fn>;
-let children: ReturnType<typeof vi.fn>;
+let bookmarkRun: Mock<(inputs: string[]) => Promise<string>>;
+let renameRun: Mock<(inputs: string[]) => Promise<string>>;
+let guidedRun: Mock<(inputs: string[]) => Promise<string>>;
+let children: Mock<() => Promise<PaletteAction[]>>;
 let actions: PaletteAction[];
 
 const shadow = () => {
