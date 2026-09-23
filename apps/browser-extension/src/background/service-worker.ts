@@ -3,7 +3,9 @@ import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
 import {
   buildRawNote,
+  imagesEnabled,
   KB_ASSET_DIR,
+  KB_IMAGES_SETTING,
   KB_RAW_DIR,
   localizeImages,
   selectionText,
@@ -1137,7 +1139,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   }
 
   if (message.type === 'PIN_ARTICLE') {
-    chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
+    chrome.storage.local.get(['lifeos_token', 'lifeos_repo', KB_IMAGES_SETTING], async (data: any) => {
       const token = data.lifeos_token;
       const repo = data.lifeos_repo || 'lifosy/monorepo';
       if (!token) {
@@ -1152,7 +1154,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
           images?: string[];
         };
         const stamp = `${Date.now()}-${urlToSlug(url)}`;
-        const body = await localizeImages(text, images ?? [], `${KB_ASSET_DIR}/${stamp}`, (path, base64) =>
+        const toStore = imagesEnabled(data[KB_IMAGES_SETTING]) ? (images ?? []) : [];
+        const body = await localizeImages(text, toStore, `${KB_ASSET_DIR}/${stamp}`, (path, base64) =>
           githubPutBase64(token, repo, path, base64),
         );
         const date = new Date().toISOString().slice(0, 10);

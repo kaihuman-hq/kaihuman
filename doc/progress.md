@@ -23,7 +23,9 @@ ingest / query / lint), the `.kh/` knowledge base already had the layers but not
 - **Extension capture**: pinned pages are converted to Markdown from their main content (article /
   main, without nav, footers, share and comment blocks) instead of `innerText`; up to 10 images
   (≤ 2 MB each) are downloaded to `.kh/assets/<stamp>/` and linked from the repo root, so the links
-  survive the move to `raw/processed/`. Selection clips become their own `.kh/raw/` notes rather
+  survive the move to `raw/processed/`. A popup checkbox, "Save page images with pinned pages"
+  (`kb_download_images` in extension storage, on by default), turns the downloads off; the palette's
+  pin follows the same setting. Selection clips become their own `.kh/raw/` notes rather
   than going to the legacy `.lifeos/clippings.md`, so ingest sees them.
 - **Wiki view**: `[[wikilinks]]` are clickable (by filename, slug or frontmatter title; missing
   pages shown in red), a "Linked from" backlinks list, the page's type and tags, a tag filter in

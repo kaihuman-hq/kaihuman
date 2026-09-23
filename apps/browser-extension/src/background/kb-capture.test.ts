@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildRawNote,
+  imagesEnabled,
   localizeImages,
   MAX_IMAGE_BYTES,
   selectionText,
@@ -86,5 +87,13 @@ describe('localizeImages', () => {
     expect(out).toBe(md);
     expect(upload).not.toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+describe('imagesEnabled', () => {
+  it('is on unless the toggle was explicitly turned off', () => {
+    expect(imagesEnabled(undefined)).toBe(true);
+    expect(imagesEnabled(true)).toBe(true);
+    expect(imagesEnabled(false)).toBe(false);
   });
 });

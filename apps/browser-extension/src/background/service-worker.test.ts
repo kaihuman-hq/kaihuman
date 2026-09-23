@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type Listener = (msg: any, sender: any, sendResponse: (r: any) => void) => unknown;
 let listener: Listener;
 let connectListener: (() => void) | undefined;
+let storedExtras: Record<string, unknown> = {};
 
 const file = {
   content: btoa(
@@ -16,6 +17,7 @@ const file = {
 
 beforeEach(async () => {
   vi.resetModules();
+  storedExtras = {};
   vi.stubGlobal('chrome', {
     alarms: { create: vi.fn(), onAlarm: { addListener: vi.fn() } },
     commands: { onCommand: { addListener: vi.fn() } },
@@ -37,7 +39,7 @@ beforeEach(async () => {
       // The worker reads storage both ways: with a callback, and as a promise.
       local: {
         get: (_k: any, cb?: any) => {
-          const data = { lifeos_token: 't', lifeos_repo: 'o/r' };
+          const data = { lifeos_token: 't', lifeos_repo: 'o/r', ...storedExtras };
           return cb ? cb(data) : Promise.resolve(data);
         },
         set: vi.fn(async () => {}),
@@ -187,5 +189,26 @@ describe('knowledge base captures', () => {
     expect(asset.path).toMatch(/^\.kh\/assets\/\d+-post\/1\.png$/);
     expect(note.path).toMatch(/^\.kh\/raw\/\d+-post\.md$/);
     expect(note.body).toContain(`![x](/${asset.path})`);
+  });
+
+  it('keeps remote image links when image downloads are turned off', async () => {
+    storedExtras = { kb_download_images: false };
+    (fetch as any).mockImplementation(async (_url: string, init?: any) =>
+      init?.method === 'PUT'
+        ? { ok: true, status: 201, json: async () => ({}) }
+        : { ok: false, status: 404, statusText: 'Not Found', json: async () => ({}) },
+    );
+    const res = await call({
+      type: 'PIN_ARTICLE',
+      title: 'Post',
+      url: 'https://e.com/post',
+      text: '![x](https://e.com/i.png)',
+      images: ['https://e.com/i.png'],
+    });
+    expect(res).toEqual({ success: true });
+    const written = puts();
+    expect(written).toHaveLength(1);
+    expect(written[0].body).toContain('![x](https://e.com/i.png)');
+    expect((fetch as any).mock.calls.some(([u]: any[]) => u === 'https://e.com/i.png')).toBe(false);
   });
 });

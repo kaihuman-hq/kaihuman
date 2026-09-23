@@ -7,6 +7,12 @@ export const KB_RAW_DIR = '.kh/raw';
 export const KB_ASSET_DIR = '.kh/assets';
 export const MAX_IMAGES = 10;
 export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+// Storage key for the popup toggle; images are downloaded unless it is explicitly turned off.
+export const KB_IMAGES_SETTING = 'kb_download_images';
+
+export function imagesEnabled(stored: unknown): boolean {
+  return stored !== false;
+}
 
 const IMAGE_EXT: Record<string, string> = {
   'image/png': 'png',

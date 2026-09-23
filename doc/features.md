@@ -27,7 +27,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
-| Pin to Knowledge Base saves the page as Markdown with its images in `.kh/assets/` | popup, palette | 2026-09-23 |
+| Pin to Knowledge Base saves the page as Markdown with its images in `.kh/assets/` (popup toggle turns image downloads off) | popup, palette | 2026-09-23 |
 | Selected-text clips go to `.kh/raw/` as their own notes | context menu, palette | 2026-09-23 |
 | Web search from the command palette — Google, DuckDuckGo, Ecosia, Amazon, Reddit, by URL only | command palette (pages and start page) | 2026-09-23 |
 | Pinned tab groups on the start page — compact cards above the bookmarks; a click loads the group | start page | 2026-09-23 |

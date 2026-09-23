@@ -4,6 +4,7 @@ import { ActionLogForm } from './components/ActionLogForm';
 import { BookmarkPageForm } from './components/BookmarkPageForm';
 import { QuickActions } from './components/QuickActions';
 import { PinnedTabsPanel } from './components/PinnedTabsPanel';
+import { imagesEnabled, KB_IMAGES_SETTING } from './background/kb-capture';
 import './index.css';
 
 export function App() {
@@ -18,9 +19,14 @@ export function App() {
   const [selectedNote, setSelectedNote] = useState<string>('.lifeos/dump.md');
   // The star opens a view of its own rather than growing the popup with another form.
   const [view, setView] = useState<'main' | 'bookmark'>('main');
+  const [downloadImages, setDownloadImages] = useState(true);
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'failed'>('idle');
 
   useEffect(() => {
+    chrome.storage.local.get([KB_IMAGES_SETTING], (result) => {
+      setDownloadImages(imagesEnabled(result[KB_IMAGES_SETTING]));
+    });
+
     // Check for auth token, repo, and repos
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', 'lifeos_repos'], (result) => {
       const storedToken = (result.lifeos_token as string) || null;
@@ -287,6 +293,18 @@ export function App() {
           onBookmark={() => setView('bookmark')}
           status={status}
         />
+        <label class="flex items-center gap-2 text-[10px] text-[var(--los-fg-dim)] font-mono cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={downloadImages}
+            onChange={(e) => {
+              const enabled = (e.target as HTMLInputElement).checked;
+              setDownloadImages(enabled);
+              chrome.storage.local.set({ [KB_IMAGES_SETTING]: enabled });
+            }}
+          />
+          Save page images with pinned pages
+        </label>
 
         {status === 'error' && errorMessage && (
           <div class="text-[10px] text-red-400 p-2 bg-red-950/30 rounded border border-red-900/50 break-words">
