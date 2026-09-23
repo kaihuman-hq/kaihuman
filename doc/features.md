@@ -25,6 +25,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Pinned tab groups on the start page — compact cards above the bookmarks; a click loads the group | start page | 2026-09-23 |
 | Pinned bookmarks — always first on the start page; pin/unpin from its cards or the console widget | start page cards, Bookmarks widget | 2026-09-22 |
 | Start page — kaihuman's own New Tab page: palette, recently used bookmarks, dump note | New Tab (`chrome_url_overrides`) | 2026-09-22 |
 | Command palette on the New Tab page, which Chrome's own page cannot host | start page | 2026-09-22 |

@@ -276,11 +276,16 @@ If a press still does nothing, work through these in order:
 ## Start Page
 
 The extension replaces Chrome's New Tab page with its own (`chrome_url_overrides.newtab`), which
-Chrome asks you to confirm the first time. It holds three things:
+Chrome asks you to confirm the first time. It holds four things:
 
 - **Search** — opens the command palette, with the whole action list and your bookmarks in it.
   Chrome keeps the focus in the address bar on an override page, so nothing here is focused for you
   and typing still goes to the omnibox: press the shortcut, or click the field.
+- **Pinned tabs** — the saved pinned-tab groups, the same list the popup's **Pinned Tabs** panel
+  shows, as compact cards in the bookmark grid. The group this window is running is outlined in the
+  accent colour. Clicking a card loads it exactly as the popup's **Load** does — pins what is
+  missing, unpins what the group does not have — and leaves the start page where it is. Saving,
+  renaming and reordering groups stay in the popup and the palette.
 - **Pinned & recently used** — every pinned bookmark first, in the order the repo file holds them,
   then the twelve you opened most recently. A repo whose bookmarks have never been opened still
   shows its latest ones instead of an empty grid. Opening one is counted exactly as it is in the
@@ -295,7 +300,7 @@ Chrome asks you to confirm the first time. It holds three things:
   (**Add a note…**), which is also the only place that reads the repo's quick-note list: a new tab
   is opened far too often to spend a GitHub request on it.
 
-Bookmarks come from the same cache the popup and the palette read, so a new tab costs no GitHub
+Bookmarks and tab groups come from the same caches the popup and the palette read, so a new tab costs no GitHub
 request of its own — a cache past its hour is refreshed in the background, as everywhere else.
 
 The **kaihuman** title opens the app, like the popup's.

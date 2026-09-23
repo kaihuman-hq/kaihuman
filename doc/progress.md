@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-09-23 — Pinned tabs on the start page
+
+- **Start page** (`apps/browser-extension/src/newtab/StartPage.tsx`): a **Pinned tabs** section
+  above **Pinned & recently used**, listing the saved groups from `LIST_PINNED_TAB_GROUPS`, the
+  same message and cache the popup's panel reads. Cards use the bookmark grid (2 / 3 columns) but
+  are a single short row: name, then the tab count. The window's active group is outlined in the
+  accent colour; clicking a card sends `LOAD_PINNED_TAB_GROUP` and refreshes the list, one load at a
+  time. Errors show under the heading.
+
+Checks: extension tsc clean, vitest 221/221 (2 new), biome clean.
+
 ## 2026-09-22 — Pinned bookmarks on the start page
 
 - **`pinned` joins the bookmark format** (`BookmarksLogic.ts` in `packages/ui`, `bookmarks.ts` in the
