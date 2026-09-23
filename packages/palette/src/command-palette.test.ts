@@ -164,6 +164,63 @@ describe('toggle', () => {
   });
 });
 
+describe('open', () => {
+  it('opens a closed palette and leaves an open one open', async () => {
+    palette.close();
+    palette.open();
+    await settle();
+    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+    palette.open();
+    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+    expect(shadow().activeElement).toBe(input());
+  });
+});
+
+describe('options', () => {
+  const handlers = () => ({
+    loadBookmarks: async () => BOOKMARKS,
+    searchRepo: async () => [],
+    open: () => {},
+    actions: () => [],
+    loadRecents: async () => [],
+    rememberRecent: () => {},
+    countBookmarkUse: () => {},
+  });
+
+  beforeEach(() => palette.destroy());
+
+  it('hangs the panel from the top unless asked to center it', async () => {
+    const backdrop = () => shadow().querySelector('.backdrop') as HTMLElement;
+    const top = createCommandPalette(handlers());
+    top.open();
+    expect(backdrop().dataset.placement).toBe('top');
+    top.destroy();
+
+    const centered = createCommandPalette(handlers(), { placement: 'center' });
+    centered.open();
+    expect(backdrop().dataset.placement).toBe('center');
+    centered.destroy();
+  });
+
+  it('reports every close once — Esc, and after opening a bookmark', async () => {
+    const onClose = vi.fn();
+    const desktop = createCommandPalette(handlers(), { onClose });
+    desktop.open();
+    await settle();
+    press('Escape');
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    desktop.close();
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    desktop.open();
+    await settle();
+    press('Enter');
+    expect(onClose).toHaveBeenCalledTimes(2);
+    desktop.destroy();
+  });
+});
+
 describe('bookmark search', () => {
   it('filters bookmarks and actions locally, without touching the repo search', () => {
     type('zul');
@@ -425,9 +482,23 @@ describe('repo search', () => {
 });
 
 describe('web search', () => {
-  it('offers every engine for the query, below the bookmarks and above the actions', () => {
+  it('runs a matching action on Enter rather than searching the web for its name', async () => {
+    type('bookmark this');
+    press('Enter');
+    await settle();
+    expect(bookmarkRun).toHaveBeenCalledTimes(1);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('searches the web on Enter when nothing else matches', () => {
+    type('rust async book');
+    press('Enter');
+    expect(open).toHaveBeenCalledWith('https://www.google.com/search?q=rust+async+book');
+  });
+
+  it('offers every engine for the query, below the actions', () => {
     type('bookmark');
-    expect(groupLabels()).toEqual(['Web', 'Actions']);
+    expect(groupLabels()).toEqual(['Actions', 'Web']);
     expect(groupRows('Web')).toEqual([
       'Search Google for “bookmark”',
       'Search DuckDuckGo for “bookmark”',

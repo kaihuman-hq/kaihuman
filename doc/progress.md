@@ -1,5 +1,52 @@
 # Progress
 
+## 2026-09-23 — Desktop palette, phase 2: `apps/desktop-palette`
+
+- **The app**: a Vite UI that mounts `@lifosy/palette`, and a Tauri v2 daemon with two binaries.
+  - It keeps phase 0's model: a full-output wlr-layer-shell overlay with keyboard mode exclusive, a
+    Unix socket, and the libc-only `lifosy-palette-toggle` that starts the daemon when needed.
+  - It falls back to an ordinary window when the compositor has no layer-shell.
+- **Backend** (`src-tauri/src/requests.rs`): `PaletteProtocol` answered in Rust, with the requests
+  as a serde enum tagged by `type`.
+  - Bookmarks come from `.kh/browser.bookmarks.json`, parsed like the extension (only http(s)
+    entries). They are cached in `$XDG_CACHE_HOME/lifosy` for an hour; a stale cache is refreshed
+    in the background with `If-None-Match`.
+  - Code search opens the console deep link. Quick-note targets come from the dashboard config.
+  - `DUMP_NOTE` and `ADD_ACTION_LOG` use the extension's line formats and placement. Paths that
+    climb out of the repo are refused.
+  - Recents live in `$XDG_STATE_HOME`, `GET_REPOS` and `SET_REPO` in `palette.json`, and
+    `SYNC_NOW` refreshes the bookmarks.
+  - `OPEN_URL` runs `xdg-open` for http(s) only.
+  - Browser-only requests reject with a message, and their actions are hidden on the desktop.
+- **`lifosy-palette login [--repo o/r]`**: the token is read without echo (or piped), checked with
+  `GET /repos/o/r`, and stored in the Secret Service. `logout` removes it. `LIFOSY_GITHUB_TOKEN`
+  and `LIFOSY_GITHUB_API` exist for tests.
+- **`@lifosy/palette`** gains three things:
+  - `open()`;
+  - `PaletteOptions.onClose`, called once per close;
+  - `placement: 'center'`, a fixed-height centered panel.
+- **Fix, also in the extension**: the **Web** group moved below **Actions**. It had been above
+  them, so typing an action's name and pressing Enter searched Google instead of running the action.
+  With nothing else matching, Enter still searches the web.
+- **CSP**: Tauri adds nonces to the page's CSP, which makes browsers ignore `'unsafe-inline'`, so
+  the palette's shadow-root `<style>` was blocked. `dangerousDisableAssetCspModification:
+  ["style-src"]` keeps the policy as written.
+- **Root devDependencies**: `vite`, for the new app's UI build.
+
+Checks: Rust tests 24/24, clippy and fmt clean; the toggle client links only libc and libgcc.
+Palette vitest 58/58, extension 184/184; tsc and biome clean. Tried end to end under headless
+Sway, against a mock GitHub and a fake `xdg-open`:
+- the overlay is centered and dimmed over a tiled terminal, and loads bookmarks with the
+  `javascript:` entry dropped;
+- Enter on a bookmark runs `xdg-open` and hides the overlay;
+- a note is PUT to `.lifeos/dump.md`;
+- web search and Tab repo search open the right URLs;
+- switching repository writes `palette.json`;
+- a second sync sends `If-None-Match` and gets a 304;
+- toggling hands focus back to the terminal.
+
+`login` was checked up to the keyring: the container has no Secret Service.
+
 ## 2026-09-23 — Desktop palette, phase 1: `@lifosy/palette`
 
 - **New package `packages/palette`** (`@lifosy/palette`), consumed from source like `@lifosy/core`.

@@ -209,7 +209,8 @@ normal tab. The New Tab page used to be on that list; the start page below is th
   `⏎` opens what you were looking for rather than writing something. Type part of an action's name
   to bring it to the top.
 - **Web** lists one row per search engine for what you typed — Google, DuckDuckGo, Ecosia,
-  Amazon and Reddit. `⏎` opens that engine's results page in a new tab; nothing is fetched by the
+  Amazon and Reddit — below everything else, so typing an action's name still runs the action.
+  `⏎` opens that engine's results page in a new tab; nothing is fetched by the
   extension itself, it only builds the URL. So when nothing else matches, typing and pressing `⏎`
   is a Google search. The searches you run land in **Recent** like any other open. Another engine
   is one entry in `SEARCH_ENGINES` (`packages/palette/src/web-search.ts`): an id, a name and a function from

@@ -57,7 +57,19 @@ export interface PaletteHandlers {
   countBookmarkUse: (id: string) => void;
 }
 
+export interface PaletteOptions {
+  /**
+   * `top` (the default) hangs the panel below the top edge, like a browser's own palettes;
+   * `center` centers a fixed-height panel, for a desktop overlay that should not jump as it filters.
+   */
+  placement?: 'top' | 'center';
+  /** Runs whenever the palette closes — Esc, a click outside, or after opening something. */
+  onClose?: () => void;
+}
+
 export interface CommandPalette {
+  /** Opens the palette, or only refocuses its input if it is already open. */
+  open: () => void;
   toggle: () => void;
   close: () => void;
   destroy: () => void;
@@ -96,6 +108,13 @@ const STYLES = `
     background: #0d0d0d;
     border: 1px solid #2a2a2a;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  }
+  .backdrop[data-placement="center"] {
+    align-items: center;
+    padding-top: 0;
+  }
+  .backdrop[data-placement="center"] .panel {
+    height: min(420px, 70vh);
   }
   .crumb {
     padding: 8px 16px 0;
@@ -161,7 +180,10 @@ const STYLES = `
 
 const matches = (text: string, needle: string) => text.toLowerCase().includes(needle);
 
-export function createCommandPalette(handlers: PaletteHandlers): CommandPalette {
+export function createCommandPalette(
+  handlers: PaletteHandlers,
+  options: PaletteOptions = {},
+): CommandPalette {
   const host = document.createElement('div');
   host.id = PALETTE_HOST_ID;
   const shadow = host.attachShadow({ mode: 'open' });
@@ -171,6 +193,7 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
 
   const backdrop = document.createElement('div');
   backdrop.className = 'backdrop';
+  backdrop.dataset.placement = options.placement ?? 'top';
   const panel = document.createElement('div');
   panel.className = 'panel';
   const crumb = document.createElement('div');
@@ -379,7 +402,7 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
   const allRows = (): Row[] =>
     pending
       ? []
-      : [...recentRows(), ...bookmarkRows(), ...repoRows(), ...webRows(), ...actionRows()];
+      : [...recentRows(), ...bookmarkRows(), ...repoRows(), ...actionRows(), ...webRows()];
 
   const render = () => {
     const here = trail.at(-1);
@@ -453,8 +476,10 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
           : 'No bookmarks cached yet — open the console to sync.';
         rows.append(empty);
       }
-      addGroup('Web', web);
       addGroup(here ? here.title : 'Actions', actions);
+      // Last, so typing an action's name and pressing Enter runs it; with nothing else matching,
+      // the first row is a web search.
+      addGroup('Web', web);
     }
 
     const query = input.value.trim();
@@ -559,8 +584,10 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
   });
 
   function close() {
+    const wasOpen = open;
     open = false;
     host.remove();
+    if (wasOpen) options.onClose?.();
   }
 
   const show = async () => {
@@ -589,6 +616,10 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
   };
 
   return {
+    open: () => {
+      if (open) input.focus();
+      else void show();
+    },
     toggle: () => {
       if (open) close();
       else void show();

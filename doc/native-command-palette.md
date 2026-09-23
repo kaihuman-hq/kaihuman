@@ -1,6 +1,6 @@
 # Native command palette for the desktop — study and plan
 
-Status: phase 0 passed on Hyprland and phase 1 is done (2026-09-23); phase 2 is next. Revised 2026-09-23 for the actual setup: Fedora with
+Status: phases 0–2 are done (2026-09-23); `apps/desktop-palette` is the app. Phase 3 is optional. Revised 2026-09-23 for the actual setup: Fedora with
 **Hyprland**, a tiling Wayland compositor. The palette must also behave on other tiling compositors.
 You bind the shortcut yourself.
 
@@ -149,6 +149,17 @@ shared actions (`repoActions(port)`, `portHandlers(port)`).
    Avoid AppImage: its GTK hook forces X11, and Wayland crashes have been reported.
 8. **Verify.** Vitest for the shared logic, Rust unit tests for the GitHub client, and the phase 0
    checklist after each Hyprland update.
+
+**Done** in `apps/desktop-palette`; its README covers building, `login`, the Hyprland binding and
+what the desktop can and cannot do. Where it differs from the list above:
+- **URLs** open through a plain `xdg-open` rather than `tauri-plugin-opener`, which spares a plugin
+  and a capability for one call.
+- **Settings** live in `palette.json`: the repository and the ones used before. There is no theme
+  setting yet.
+- **No RPM yet**: `pnpm run build:desktop` and copying the two binaries is the install.
+- **Browser-only actions** (pinned tab groups, importing the browser's bookmarks) are hidden on the
+  desktop, and their requests reject with a message.
+- **Opening a bookmark is not counted** on the desktop yet; the extension still counts its own.
 
 ### Phase 3 — optional: talk to Chrome through native messaging
 
