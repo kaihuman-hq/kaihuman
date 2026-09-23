@@ -1,5 +1,32 @@
 # Progress
 
+## 2026-09-23 — Console login hands the token over by POST, not in a URL
+
+The console's `/auth/cli` used to redirect to `http://localhost:<port>/callback?token=…`, which put
+the token into the browser's history. That affected both the CLI and the desktop palette.
+
+- **Console**: `src/lib/cli-callback.ts` builds a hidden form with `token`, `state` and `repo` and
+  POSTs it to `http://localhost:<port>/callback`. The port must be a number from 1 to 65535, since
+  it ends up in the form's action. `AuthCli.tsx` uses it in place of the redirect.
+- **CLI** (`apps/cli/src/auth.rs`): the callback route takes a POSTed form, with the body capped
+  at 16 KB, or the old query.
+- **Desktop palette** (`console_login.rs`): reads the request's headers and body, capped at 16 KB,
+  and takes a POSTed form or the old GET query.
+- Old and new sides work in any combination, so the console and the local programs can be updated
+  in any order. The leak ends when the new console is deployed.
+
+Checks:
+- console vitest 97/97 (3 new), tsc clean after building `@lifosy/ui`;
+- CLI tests 3/3 (new, with `warp::test`), no new clippy warnings;
+- desktop Rust tests 27/27, among them loopback POST, legacy GET and oversize tests, each run three
+  times; biome clean.
+
+Tried end to end in Chromium 141 through Playwright. `app.kaihuman.com/auth/cli` was intercepted
+and served a page running the console's real `submitCliCallback`, compiled from source. It posted
+to a real `lifosy-palette login`, which checked the state, validated the token against a mock
+GitHub and stored it in gnome-keyring. The https page's form to `http://localhost` went through
+without a warning, and no history entry contains the token.
+
 ## 2026-09-23 — Desktop palette: log in through the console; spike removed
 
 - **`apps/desktop-palette-spike` deleted.** The palette passed on Hyprland, and phase 2 carries

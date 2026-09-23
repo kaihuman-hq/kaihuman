@@ -63,11 +63,12 @@ pass github/palette | lifosy-palette login --paste
 lifosy-palette logout
 ```
 
-- **How the token arrives:** the console redirects the browser to
-  `http://localhost:<port>/callback?token=…&state=…`. The palette listens only on `127.0.0.1`, on a
-  random port, for five minutes, and accepts only the random `state` it sent.
-- **One catch, inherited from the CLI's flow:** that callback URL, token included, ends up in the
-  browser's history.
+- **How the token arrives:** the console posts a form with `token`, `state` and `repo` to
+  `http://localhost:<port>/callback`. It is a POST, so the token is in the request body, never in a
+  URL, and so never in the browser's history.
+- The palette listens only on `127.0.0.1`, on a random port, for five minutes, and accepts only the
+  random `state` it sent.
+- The query-string redirect of older console builds is still read.
 - **Before anything is stored**, the token is checked against the repository. The repository is the
   one given with `--repo`, else the one selected in the console, else the one in use.
 - It is stored in the **Secret Service** (gnome-keyring, or KeePassXC with Secret Service turned on)

@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -85,20 +86,18 @@ impl AuthManager {
         let tx = Arc::new(std::sync::Mutex::new(Some(tx)));
 
         // 1. Setup local server to receive callback
-        let callback = warp::path("callback")
-            .and(warp::query::<std::collections::HashMap<String, String>>())
-            .map(move |params: std::collections::HashMap<String, String>| {
-                if let Some(token) = params.get("token") {
-                    let repo = params.get("repo").cloned();
+        let callback = callback_params().map(move |params: HashMap<String, String>| {
+            match grant_from(&params) {
+                Some((token, repo)) => {
                     if let Some(tx) = tx.lock().unwrap().take() {
                         // We send both token and repo over the channel
-                        let _ = tx.send((token.clone(), repo));
+                        let _ = tx.send((token, repo));
                     }
                     warp::reply::html("<h1>Login successful!</h1><p>You can close this tab and return to the terminal.</p><script>window.close()</script>")
-                } else {
-                    warp::reply::html("<h1>Login failed</h1><p>No token received.</p>")
                 }
-            });
+                None => warp::reply::html("<h1>Login failed</h1><p>No token received.</p>"),
+            }
+        });
 
         // We need the port to tell the console where to redirect.
         let (addr, server) = warp::serve(callback).bind_ephemeral(([127, 0, 0, 1], 0));
@@ -122,5 +121,74 @@ impl AuthManager {
                 Ok(())
             }
         }
+    }
+}
+
+/// The console's `/auth/cli` page answers `GET /callback` with the parameters in the body of a
+/// form POST, so the token never sits in a URL and the browser's history. The query form of older
+/// console builds is still read, so the CLI and the console can be updated in either order.
+fn callback_params()
+-> impl Filter<Extract = (HashMap<String, String>,), Error = warp::Rejection> + Clone {
+    let posted = warp::post()
+        .and(warp::body::content_length_limit(16 * 1024))
+        .and(warp::body::form());
+    let queried = warp::get().and(warp::query::<HashMap<String, String>>());
+    warp::path("callback")
+        .and(warp::path::end())
+        .and(posted.or(queried).unify())
+}
+
+/// The token, and the repository selected in the console if it sent one.
+fn grant_from(params: &HashMap<String, String>) -> Option<(String, Option<String>)> {
+    let token = params.get("token").filter(|token| !token.is_empty())?;
+    let repo = params.get("repo").filter(|repo| !repo.is_empty()).cloned();
+    Some((token.clone(), repo))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn reads_the_token_from_a_posted_form() {
+        let params = warp::test::request()
+            .method("POST")
+            .path("/callback")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body("token=gho_secret&state=&repo=o%2Fr")
+            .filter(&callback_params())
+            .await
+            .unwrap();
+        assert_eq!(
+            grant_from(&params),
+            Some(("gho_secret".to_string(), Some("o/r".to_string())))
+        );
+    }
+
+    #[tokio::test]
+    async fn still_reads_the_query_of_older_consoles() {
+        let params = warp::test::request()
+            .path("/callback?token=t&state=&repo=")
+            .filter(&callback_params())
+            .await
+            .unwrap();
+        assert_eq!(grant_from(&params), Some(("t".to_string(), None)));
+    }
+
+    #[tokio::test]
+    async fn ignores_other_paths_and_empty_tokens() {
+        assert!(
+            warp::test::request()
+                .path("/callback/extra?token=t")
+                .filter(&callback_params())
+                .await
+                .is_err()
+        );
+        let params = warp::test::request()
+            .path("/callback?token=")
+            .filter(&callback_params())
+            .await
+            .unwrap();
+        assert_eq!(grant_from(&params), None);
     }
 }

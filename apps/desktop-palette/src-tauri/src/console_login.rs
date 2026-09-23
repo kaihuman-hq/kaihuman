@@ -1,9 +1,10 @@
 //! Logging in through the console, the way the CLI does (apps/cli/src/auth.rs).
 //!
-//! The console's `/auth/cli` page, once you are logged in there, redirects the browser to
-//! `http://localhost:<port>/callback?token=…&state=…&repo=…`. The palette listens on that port on
-//! the loopback interface only, for one grant carrying the `state` it sent, and gives up after a
-//! few minutes.
+//! The console's `/auth/cli` page, once you are logged in there, posts a form with `token`, `state`
+//! and `repo` to `http://localhost:<port>/callback` — a POST, so the token stays out of the
+//! browser's history. The palette listens on that port on the loopback interface only, for one
+//! grant carrying the `state` it sent, and gives up after a few minutes. Older console builds
+//! redirected with the same fields in the query; that is still read.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -93,19 +94,22 @@ enum Callback {
     Unrelated,
 }
 
-/// Reads `GET /callback?… HTTP/1.1`.
-fn parse_request_line(line: &str, expected_state: &str) -> Callback {
-    let Some(target) = line
-        .strip_prefix("GET ")
-        .and_then(|rest| rest.split(' ').next())
-    else {
-        return Callback::Unrelated;
-    };
-    let Some(query) = target.strip_prefix("/callback?") else {
-        return Callback::Unrelated;
+/// A posted form is small; anything bigger is not the console's.
+const MAX_BODY: usize = 16 * 1024;
+
+/// Reads the callback's fields: from the body of `POST /callback`, or from the query of
+/// `GET /callback?…`.
+fn parse_request(method: &str, target: &str, body: &[u8], expected_state: &str) -> Callback {
+    let fields = match (method, target) {
+        ("POST", "/callback") => body,
+        ("GET", _) => match target.strip_prefix("/callback?") {
+            Some(query) => query.as_bytes(),
+            None => return Callback::Unrelated,
+        },
+        _ => return Callback::Unrelated,
     };
     let (mut token, mut state, mut repo) = (None, None, None);
-    for (key, value) in url::form_urlencoded::parse(query.as_bytes()) {
+    for (key, value) in url::form_urlencoded::parse(fields) {
         match key.as_ref() {
             "token" => token = Some(value.into_owned()),
             "state" => state = Some(value.into_owned()),
@@ -139,12 +143,42 @@ fn respond(mut stream: TcpStream, status: &str, message: &str) {
     );
 }
 
+/// The request line's method and target, the headers' `Content-Length`, then that many bytes.
+fn read_request(stream: &TcpStream) -> Option<(String, String, Vec<u8>)> {
+    let mut reader = BufReader::new(stream);
+    let mut line = String::new();
+    reader.read_line(&mut line).ok()?;
+    let mut parts = line.split_whitespace();
+    let (method, target) = (parts.next()?.to_string(), parts.next()?.to_string());
+
+    let mut length = 0;
+    loop {
+        let mut header = String::new();
+        if reader.read_line(&mut header).ok()? == 0 || header.trim_end().is_empty() {
+            break;
+        }
+        if let Some((name, value)) = header.split_once(':')
+            && name.eq_ignore_ascii_case("content-length")
+        {
+            length = value.trim().parse().ok()?;
+        }
+    }
+    if length > MAX_BODY {
+        return None;
+    }
+    let mut body = vec![0; length];
+    reader.read_exact(&mut body).ok()?;
+    Some((method, target, body))
+}
+
 fn serve(stream: TcpStream, expected_state: &str) -> Option<Grant> {
     let _ = stream.set_nonblocking(false);
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
-    let mut line = String::new();
-    BufReader::new(&stream).read_line(&mut line).ok()?;
-    match parse_request_line(line.trim_end(), expected_state) {
+    let Some((method, target, body)) = read_request(&stream) else {
+        respond(stream, "400 Bad Request", "That request could not be read.");
+        return None;
+    };
+    match parse_request(&method, &target, &body, expected_state) {
         Callback::Grant(grant) => {
             respond(
                 stream,
@@ -183,8 +217,10 @@ mod tests {
     #[test]
     fn reads_the_grant_the_console_redirects_with() {
         assert_eq!(
-            parse_request_line(
-                "GET /callback?token=gho_abc&state=s1&repo=o%2Fr HTTP/1.1",
+            parse_request(
+                "POST",
+                "/callback",
+                b"token=gho_abc&state=s1&repo=o%2Fr",
                 "s1"
             ),
             Callback::Grant(Grant {
@@ -193,7 +229,7 @@ mod tests {
             })
         );
         assert_eq!(
-            parse_request_line("GET /callback?token=t&state=s1&repo= HTTP/1.1", "s1"),
+            parse_request("GET", "/callback?token=t&state=s1&repo=", b"", "s1"),
             Callback::Grant(Grant {
                 token: "t".into(),
                 repo: None,
@@ -203,22 +239,24 @@ mod tests {
 
     #[test]
     fn refuses_a_callback_it_did_not_ask_for() {
-        let line = "GET /callback?token=t&state=other HTTP/1.1";
-        assert_eq!(parse_request_line(line, "s1"), Callback::WrongState);
         assert_eq!(
-            parse_request_line("GET /callback?token=t HTTP/1.1", "s1"),
+            parse_request("POST", "/callback", b"token=t&state=other", "s1"),
             Callback::WrongState
         );
         assert_eq!(
-            parse_request_line("GET /callback?state=s1 HTTP/1.1", "s1"),
+            parse_request("GET", "/callback?token=t", b"", "s1"),
+            Callback::WrongState
+        );
+        assert_eq!(
+            parse_request("POST", "/callback", b"state=s1", "s1"),
             Callback::NoToken
         );
         assert_eq!(
-            parse_request_line("GET /favicon.ico HTTP/1.1", "s1"),
+            parse_request("GET", "/favicon.ico", b"", "s1"),
             Callback::Unrelated
         );
         assert_eq!(
-            parse_request_line("POST /callback?token=t&state=s1 HTTP/1.1", "s1"),
+            parse_request("POST", "/elsewhere", b"token=t&state=s1", "s1"),
             Callback::Unrelated
         );
     }
@@ -230,37 +268,96 @@ mod tests {
         assert_ne!(a, b);
     }
 
-    fn get(port: u16, path: &str) -> String {
+    fn exchange(port: u16, request: &str) -> String {
         let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-        write!(stream, "GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n").unwrap();
+        stream.write_all(request.as_bytes()).unwrap();
         let mut response = String::new();
         stream.read_to_string(&mut response).unwrap();
         response
+    }
+
+    fn get(port: u16, path: &str) -> String {
+        exchange(
+            port,
+            &format!("GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n"),
+        )
+    }
+
+    /// What a browser sends when the console's form submits.
+    fn post(port: u16, body: &str) -> String {
+        exchange(
+            port,
+            &format!(
+                "POST /callback HTTP/1.1\r\nHost: localhost:{port}\r\n\
+                 Content-Type: application/x-www-form-urlencoded\r\n\
+                 Content-Length: {}\r\n\r\n{body}",
+                body.len()
+            ),
+        )
+    }
+
+    fn port_and_state(url: &str) -> (u16, String) {
+        let port = url
+            .split("port=")
+            .nth(1)
+            .unwrap()
+            .split('&')
+            .next()
+            .unwrap();
+        let state = url.split("state=").nth(1).unwrap();
+        (port.parse().unwrap(), state.to_string())
+    }
+
+    #[test]
+    fn still_takes_the_redirect_of_older_consoles() {
+        let pending = Pending::start().unwrap();
+        let (port, state) = port_and_state(&pending.authorize_url().unwrap());
+        let browser =
+            std::thread::spawn(move || get(port, &format!("/callback?token=t&state={state}")));
+        let grant = pending.wait(Duration::from_secs(10)).unwrap();
+        assert_eq!(
+            grant,
+            Grant {
+                token: "t".into(),
+                repo: None
+            }
+        );
+        assert!(browser.join().unwrap().starts_with("HTTP/1.1 200"));
+    }
+
+    #[test]
+    fn refuses_a_body_too_big_to_be_the_console_form() {
+        let pending = Pending::start().unwrap();
+        let (port, state) = port_and_state(&pending.authorize_url().unwrap());
+        let browser = std::thread::spawn(move || {
+            // Declared, not sent: the length alone must get it refused.
+            let refused = exchange(
+                port,
+                &format!(
+                    "POST /callback HTTP/1.1\r\nContent-Length: {}\r\n\r\ntoken=t",
+                    MAX_BODY + 1
+                ),
+            );
+            let accepted = post(port, &format!("token=t&state={state}"));
+            (refused, accepted)
+        });
+        pending.wait(Duration::from_secs(10)).unwrap();
+        let (refused, accepted) = browser.join().unwrap();
+        assert!(refused.starts_with("HTTP/1.1 400"));
+        assert!(accepted.starts_with("HTTP/1.1 200"));
     }
 
     #[test]
     fn waits_past_stray_requests_for_the_matching_grant() {
         let pending = Pending::start().unwrap();
         let url = pending.authorize_url().unwrap();
-        let port: u16 = url
-            .split("port=")
-            .nth(1)
-            .unwrap()
-            .split('&')
-            .next()
-            .unwrap()
-            .parse()
-            .unwrap();
-        let state = url.split("state=").nth(1).unwrap().to_string();
+        let (port, state) = port_and_state(&url);
         assert!(url.starts_with("https://app.kaihuman.com/auth/cli?port="));
 
         let browser = std::thread::spawn(move || {
             let stray = get(port, "/favicon.ico");
-            let forged = get(port, "/callback?token=evil&state=nope");
-            let real = get(
-                port,
-                &format!("/callback?token=good&state={state}&repo=o%2Fr"),
-            );
+            let forged = post(port, "token=evil&state=nope");
+            let real = post(port, &format!("token=good&state={state}&repo=o%2Fr"));
             (stray, forged, real)
         });
         let grant = pending.wait(Duration::from_secs(10)).unwrap();

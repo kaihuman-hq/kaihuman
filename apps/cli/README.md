@@ -48,5 +48,5 @@ When you launch the Lifosy CLI, it opens an interactive interface built with `ra
 When you press `l` to log in:
 1. The CLI spawns a lightweight local HTTP callback server.
 2. It automatically opens your default web browser to the Lifosy Console authentication page.
-3. Once authorized, the web console redirects back to your local server, securely passing your GitHub token and active repository.
+3. Once authorized, the web console posts a form to your local server carrying your GitHub token and active repository. It is a POST, so the token never appears in a URL or in the browser's history. The server still accepts the query-string redirect that older console builds sent.
 4. Your token and selected repository are saved locally in your system's configuration directory (e.g., `~/.config/com.lifosy.cli/auth.json`), keeping you logged in for future sessions!
