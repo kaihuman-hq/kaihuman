@@ -1,5 +1,38 @@
 # Progress
 
+## 2026-09-23 — Palette prefix modes: prompts, translate, repos (from omarchy)
+
+Follow-up to the desktop palette ([#124](https://github.com/lifosy/monorepo/pull/124)): three menus
+from the omarchy dotfiles — `omarchy-show-prompts`, `translate_manager.py` and
+`omarchy-show-repos` — now live in `@lifosy/palette`, so the desktop overlay and the browser
+extension both have them.
+
+- **Prefix modes** (`PaletteMode` in `command-palette.ts`): typing `x:` switches the input into a
+  mode's own list, with a breadcrumb; Esc or Backspace on an empty input leaves it. A mode either
+  *loads* its entries once and filters them locally, or *submits* on ⏎ only, for answers that cost a
+  request. Entries open a URL, copy text (a new `copy` handler per surface), or list children on ⇥ /
+  →. The empty palette's hint lists the prefixes.
+- **`p:` prompts**: every `.prompts.md` on the repository's default branch (one tree listing, one
+  read per file; cached five minutes, stale-while-refresh), parsed by the palette with the
+  `doc/prompts-format.md` rules. ⏎ copies the body. Replaces omarchy's hard-coded path in a local
+  clone.
+- **`t:` translate**: DeepL, as `translate_manager.py`'s API mode — into EN-US and DE, dropping the
+  language the text is already in (so German goes to English); `t: fr: …` asks for one language.
+  Typed text outside any mode is offered as "Translate “…”". The key is set with the new
+  **Set the DeepL API key…** action (extension storage; desktop keyring, or `DEEPL_AUTH_KEY`). The
+  offline Argos mode is not carried over.
+- **`r:` repos**: `GET /user/repos`, most recently pushed first; ⇥ lists the same GitHub sub pages
+  omarchy offers. The desktop also reads omarchy's `~/.config/eee/counts` and lists those first —
+  the browser has no such file.
+- **Protocol**: `LIST_PROMPT_FILES`, `TRANSLATE`, `SET_TRANSLATION_KEY`, `LIST_GITHUB_REPOS`,
+  answered by the extension's service worker (`background/palette-modes.ts`) and the desktop's Rust
+  backend (`prompts.rs`, `translate.rs`, `repos.rs`). The desktop copies through a `copy_text`
+  command (`wl-copy`); the extension through `navigator.clipboard`, with an `execCommand` fallback.
+
+Checks: palette tsc and biome clean, vitest 88/88 (30 new); extension tsc and build green, vitest
+212/212 (12 new); desktop `cargo test` 34 passed (7 new), clippy and fmt clean; the built desktop UI
+driven in Chromium with a stubbed Tauri bridge through `p:`, `t:` and `r:`.
+
 ## 2026-09-23 — Knowledge base: closing the gaps with the LLM-wiki pattern
 
 Measured against Karpathy's "LLM wiki" gist (raw sources → LLM-maintained wiki → schema, with

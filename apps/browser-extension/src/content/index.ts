@@ -1,7 +1,9 @@
 import {
   type CommandPalette,
+  copyToClipboard,
   createCommandPalette,
   type PaletteAction,
+  paletteModes,
   portHandlers,
   repoActions,
   splitTags,
@@ -132,6 +134,8 @@ function getPalette(): CommandPalette {
         );
       },
       actions: paletteActions,
+      modes: paletteModes(workerPort),
+      copy: copyToClipboard,
     });
   }
   return palette;

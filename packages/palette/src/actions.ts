@@ -6,8 +6,10 @@
  * around them — bookmarking it, pinning it, clipping a selection — stay with the content script,
  * since nothing else has such a page.
  */
-import type { PaletteAction, PaletteHandlers } from './command-palette.js';
+import type { ModeItem, PaletteAction, PaletteHandlers, PaletteMode } from './command-palette.js';
+import { parsePrompts } from './prompts.js';
 import type { ActionPort } from './protocol.js';
+import { parseTranslationQuery, usefulTranslations } from './translate.js';
 
 /** The Lifosy console — where a repo file is opened, rather than on GitHub. */
 export const CONSOLE_URL = 'https://app.kaihuman.com';
@@ -174,6 +176,16 @@ export const repoActions = (port: ActionPort): PaletteAction[] => [
     },
   },
   {
+    id: 'set-translation-key',
+    title: 'Set the DeepL API key…',
+    subtitle: 'For t: translations — free keys at deepl.com/pro-api; empty forgets the key',
+    prompts: [{ label: 'DeepL API key' }],
+    run: async ([key = '']: string[]) => {
+      await port.send({ type: 'SET_TRANSLATION_KEY', key: key.trim() });
+      return key.trim() ? 'Saved the DeepL API key' : 'Forgot the DeepL API key';
+    },
+  },
+  {
     id: 'open-console',
     title: 'Open the Lifosy console',
     run: async () => {
@@ -183,8 +195,95 @@ export const repoActions = (port: ActionPort): PaletteAction[] => [
   },
 ];
 
-/** The handlers that only talk to the backend; `actions` and `open` differ per surface. */
-export const portHandlers = (port: ActionPort): Omit<PaletteHandlers, 'actions' | 'open'> => ({
+/** A repository's pages on GitHub, offered with ⇥ on a repository in the `r:` mode. */
+export const GITHUB_REPO_VIEWS: readonly { title: string; path: string }[] = [
+  { title: 'Issues', path: '/issues' },
+  { title: 'Pull requests', path: '/pulls' },
+  { title: 'Actions', path: '/actions' },
+  { title: 'Releases', path: '/releases' },
+  { title: 'Discussions', path: '/discussions' },
+  { title: 'Commits', path: '/commits/HEAD' },
+  { title: 'Branches', path: '/branches' },
+  { title: 'Tags', path: '/tags' },
+  { title: 'Wiki', path: '/wiki' },
+  { title: 'Projects', path: '/projects' },
+  { title: 'Insights', path: '/pulse' },
+  { title: 'Settings', path: '/settings' },
+];
+
+const promptItems = async (port: ActionPort): Promise<ModeItem[]> => {
+  const { files } = await port.send({ type: 'LIST_PROMPT_FILES' });
+  if (!files.length) throw new Error('No .prompts.md files in this repository yet');
+  return files.flatMap((file) =>
+    parsePrompts(file.content).map((prompt, index) => ({
+      id: `prompt:${file.path}:${index}`,
+      title: prompt.title,
+      subtitle: [
+        ...prompt.tags.map((tag) => `#${tag}`),
+        prompt.body.split('\n').find((line) => line.trim()) ?? '',
+      ].join(' '),
+      keywords: [...prompt.tags, prompt.body].join(' '),
+      copy: prompt.body,
+    })),
+  );
+};
+
+const translationItems = async (port: ActionPort, query: string): Promise<ModeItem[]> => {
+  const { text, targets } = parseTranslationQuery(query);
+  if (!text) return [];
+  const { translations } = await port.send({ type: 'TRANSLATE', text, targets });
+  return usefulTranslations(translations).map((translation) => ({
+    id: `translation:${translation.target}`,
+    title: translation.text,
+    subtitle: `${translation.detectedSource} → ${translation.target} · ⏎ copies`,
+    copy: translation.text,
+  }));
+};
+
+const githubRepoItems = async (port: ActionPort): Promise<ModeItem[]> => {
+  const { repos } = await port.send({ type: 'LIST_GITHUB_REPOS' });
+  return repos.map((repo) => {
+    const url = `https://github.com/${repo.fullName}`;
+    return {
+      id: `github:${repo.fullName}`,
+      title: repo.fullName,
+      subtitle: repo.description ?? '',
+      url,
+      children: GITHUB_REPO_VIEWS.map((view) => ({
+        id: `github:${repo.fullName}${view.path}`,
+        title: `${repo.fullName} · ${view.title}`,
+        url: `${url}${view.path}`,
+      })),
+    };
+  });
+};
+
+/** The prefix modes every surface offers: `p:` prompts, `t:` translate, `r:` GitHub repositories. */
+export const paletteModes = (port: ActionPort): PaletteMode[] => [
+  {
+    prefix: 'p',
+    title: 'Prompts',
+    placeholder: 'Search prompts — ⏎ copies one',
+    load: () => promptItems(port),
+  },
+  {
+    prefix: 't',
+    title: 'Translate',
+    placeholder: 'Text to translate — “fr: …” for one language',
+    submit: (query) => translationItems(port, query),
+  },
+  {
+    prefix: 'r',
+    title: 'Repos',
+    placeholder: 'Search GitHub repositories — ⇥ for issues, pull requests…',
+    load: () => githubRepoItems(port),
+  },
+];
+
+/** The handlers that only talk to the backend; the rest differ per surface. */
+export const portHandlers = (
+  port: ActionPort,
+): Omit<PaletteHandlers, 'actions' | 'open' | 'copy' | 'modes'> => ({
   loadBookmarks: async () => (await port.send({ type: 'GET_BOOKMARKS' })).bookmarks,
   searchRepo: async (query) => (await port.send({ type: 'SEARCH_REPO', query })).results,
   loadRecents: async () => (await port.send({ type: 'GET_RECENTS' })).recents,

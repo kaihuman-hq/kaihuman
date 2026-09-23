@@ -21,6 +21,10 @@ export interface Message {
     | 'SAVE_SELECTION'
     | 'SEARCH_REPO'
     | 'OPEN_URL'
+    | 'LIST_PROMPT_FILES'
+    | 'TRANSLATE'
+    | 'SET_TRANSLATION_KEY'
+    | 'LIST_GITHUB_REPOS'
     | 'TOGGLE_COMMAND_PALETTE';
   token?: string;
   path?: string;
@@ -39,6 +43,10 @@ export interface Message {
   force?: boolean;
   /** `OPEN_URL`: navigate the sender's own tab rather than opening another one. */
   reuse?: boolean;
+  /** `TRANSLATE`: the DeepL target languages. */
+  targets?: string[];
+  /** `SET_TRANSLATION_KEY`: the DeepL API key; empty forgets it. */
+  key?: string;
 }
 
 export interface MessageResponse {

@@ -18,11 +18,25 @@ way.
 | ⇥ Tab: GitHub code search in the repo, opened in the console | ✓ |
 | Add a note… (dump, quick-note files, `.actionlog.md` with `#tags`) | ✓ |
 | Recent, Switch repository…, Sync with GitHub now, Open the Lifosy console | ✓ |
+| `p:` prompts from the repo's `.prompts.md` files, ⏎ copies | ✓ (with `wl-copy`) |
+| `t:` translate with DeepL into EN-US and DE (`t: fr: …` for one language), ⏎ copies | ✓ (key from `DEEPL_AUTH_KEY` or the keyring) |
+| `r:` GitHub repositories, ⇥ for issues, pull requests, actions… | ✓, and omarchy's `~/.config/eee/counts` ranks the ones you open most first |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |
 | Counting how often a bookmark is opened | — the extension counts; the desktop does not yet |
 
 Links open with `xdg-open`, so they go to your default browser (`xdg-settings set
-default-web-browser …`).
+default-web-browser …`). Copying runs `wl-copy`, so install `wl-clipboard`.
+
+The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-repos` and
+`translate_manager.py`; see the extension's README ("Prefix modes") for how each one behaves.
+
+- **`p:`** reads every `.prompts.md` on the repository's default branch — for example
+  `Resources/ai/useful-prompts.prompts.md` — through GitHub rather than a local clone.
+- **`t:`** needs a DeepL key: run **Set the DeepL API key…** (stored in the Secret Service, next to
+  the token), or export `DEEPL_AUTH_KEY` as for omarchy's script.
+- **`r:`** reads `$EEE_COUNTS_FILE` or `~/.config/eee/counts` (`owner/repo count` per line), lists
+  those repositories by count, then the rest of your GitHub repositories. Without a login or a
+  network, the counted ones still show.
 
 ## Build and install (Fedora)
 
@@ -109,6 +123,7 @@ to change its animation.
 | --- | --- |
 | `$XDG_CONFIG_HOME/lifosy/palette.json` | the current repository and the ones you have used |
 | `$XDG_CACHE_HOME/lifosy/bookmarks.json` | GitHub's bookmarks file as last fetched, with its ETag |
+| `$XDG_CACHE_HOME/lifosy/prompts.json` | the repository's `.prompts.md` files as last fetched (five minutes) |
 | `$XDG_STATE_HOME/lifosy/recents.json` | the palette's last ten actions |
 
 For development and tests, `LIFOSY_GITHUB_TOKEN` takes the place of the keyring and

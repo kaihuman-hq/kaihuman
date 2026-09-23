@@ -3,8 +3,11 @@ import type { Bookmark } from './bookmarks.js';
 import {
   type CommandPalette,
   createCommandPalette,
+  filterModeItems,
+  type ModeItem,
   PALETTE_HOST_ID,
   type PaletteAction,
+  type PaletteMode,
   type RecentEntry,
   type RepoResult,
 } from './command-palette.js';
@@ -40,6 +43,30 @@ let renameRun: Mock<(inputs: string[]) => Promise<string>>;
 let guidedRun: Mock<(inputs: string[]) => Promise<string>>;
 let children: Mock<() => Promise<PaletteAction[]>>;
 let actions: PaletteAction[];
+let copy: Mock<(text: string) => Promise<void>>;
+let loadPrompts: Mock<() => Promise<ModeItem[]>>;
+let translate: Mock<(query: string) => Promise<ModeItem[]>>;
+let modes: PaletteMode[];
+
+const PROMPTS: ModeItem[] = [
+  {
+    id: 'p1',
+    title: 'Commit message',
+    subtitle: '#git',
+    keywords: 'staged diff',
+    copy: 'Write it',
+  },
+  { id: 'p2', title: 'Refactor to hooks', subtitle: '#react', copy: 'Convert it' },
+  {
+    id: 'r1',
+    title: 'o/repo',
+    url: 'https://github.com/o/repo',
+    children: [
+      { id: 'r1:issues', title: 'o/repo · Issues', url: 'https://github.com/o/repo/issues' },
+      { id: 'r1:pulls', title: 'o/repo · Pull requests', url: 'https://github.com/o/repo/pulls' },
+    ],
+  },
+];
 
 const shadow = () => {
   const host = document.getElementById(PALETTE_HOST_ID);
@@ -129,6 +156,17 @@ beforeEach(async () => {
     { id: 'tabs', title: 'Pinned tab groups…', children },
   ];
 
+  copy = vi.fn(async () => {});
+  loadPrompts = vi.fn(async () => PROMPTS);
+  translate = vi.fn(async (query: string) => [
+    { id: 't:en', title: `EN ${query}`, copy: `EN ${query}` },
+    { id: 't:fr', title: `FR ${query}`, copy: `FR ${query}` },
+  ]);
+  modes = [
+    { prefix: 'p', title: 'Prompts', placeholder: 'Search prompts', load: loadPrompts },
+    { prefix: 't', title: 'Translate', placeholder: 'Text to translate', submit: translate },
+  ];
+
   palette = createCommandPalette({
     loadBookmarks: loadBookmarks as any,
     searchRepo: searchRepo as any,
@@ -137,6 +175,8 @@ beforeEach(async () => {
     loadRecents: loadRecents as any,
     rememberRecent: rememberRecent as any,
     countBookmarkUse: countBookmarkUse as any,
+    modes,
+    copy: copy as any,
   });
   palette.toggle();
   await settle();
@@ -185,6 +225,8 @@ describe('options', () => {
     loadRecents: async () => [],
     rememberRecent: () => {},
     countBookmarkUse: () => {},
+    modes: [],
+    copy: async () => {},
   });
 
   beforeEach(() => palette.destroy());
@@ -224,7 +266,7 @@ describe('options', () => {
 describe('bookmark search', () => {
   it('filters bookmarks and actions locally, without touching the repo search', () => {
     type('zul');
-    expect(groupLabels()).toEqual(['Bookmarks', 'Web']);
+    expect(groupLabels()).toEqual(['Bookmarks', 'Web', 'Translate']);
     expect(groupRows('Bookmarks')).toEqual(['Zulip']);
     expect(searchRepo).not.toHaveBeenCalled();
   });
@@ -305,7 +347,7 @@ describe('recent actions', () => {
     await settle();
 
     type('zul');
-    expect(groupLabels()).toEqual(['Bookmarks', 'Web']);
+    expect(groupLabels()).toEqual(['Bookmarks', 'Web', 'Translate']);
   });
 });
 
@@ -477,7 +519,7 @@ describe('repo search', () => {
     expect(rowTitles()).toContain('b.ts');
 
     type('zul');
-    expect(groupLabels()).toEqual(['Bookmarks', 'Web']);
+    expect(groupLabels()).toEqual(['Bookmarks', 'Web', 'Translate']);
   });
 });
 
@@ -498,7 +540,7 @@ describe('web search', () => {
 
   it('offers every engine for the query, below the actions', () => {
     type('bookmark');
-    expect(groupLabels()).toEqual(['Actions', 'Web']);
+    expect(groupLabels()).toEqual(['Actions', 'Web', 'Translate']);
     expect(groupRows('Web')).toEqual([
       'Search Google for “bookmark”',
       'Search DuckDuckGo for “bookmark”',
@@ -630,5 +672,180 @@ describe('actions that walk through several fields', () => {
     press('Enter');
 
     expect(shadow().querySelector('.empty')?.textContent).toBe('https://page.example/  ·  A title');
+  });
+});
+
+describe('filterModeItems', () => {
+  it('needs every word somewhere, and ranks items whose title has them all first', () => {
+    const items: ModeItem[] = [
+      { id: 'a', title: 'Review', keywords: 'commit message' },
+      { id: 'b', title: 'Commit message' },
+      { id: 'c', title: 'Commit', subtitle: 'unrelated' },
+    ];
+    expect(filterModeItems(items, 'commit message').map((item) => item.id)).toEqual(['b', 'a']);
+    expect(filterModeItems(items, '  ').map((item) => item.id)).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('prefix modes', () => {
+  it('enters a mode on its prefix, loads it once, and filters as you type', async () => {
+    type('p:');
+    await settle();
+
+    expect(crumbText()).toBe('Prompts');
+    expect(input().value).toBe('');
+    expect(input().placeholder).toBe('Search prompts');
+    expect(groupLabels()).toEqual(['Prompts']);
+    expect(rowTitles()).toEqual(['Commit message', 'Refactor to hooks', 'o/repo']);
+
+    type('staged');
+    expect(rowTitles()).toEqual(['Commit message']);
+    type('nothing like it');
+    expect(shadow().querySelector('.empty')?.textContent).toBe('No matches.');
+    expect(loadPrompts).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the space typed right after the prefix', async () => {
+    type('p:');
+    await settle();
+    type(' hooks');
+    expect(input().value).toBe('hooks');
+  });
+
+  it('keeps what follows the prefix as the query', async () => {
+    type('p: hooks');
+    await settle();
+    expect(input().value).toBe('hooks');
+    expect(rowTitles()).toEqual(['Refactor to hooks']);
+  });
+
+  it('copies the chosen entry and closes', async () => {
+    type('p:');
+    await settle();
+    press('Enter');
+    await settle();
+    expect(copy).toHaveBeenCalledWith('Write it');
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('stays open and says so when copying fails', async () => {
+    copy.mockRejectedValueOnce(new Error('No clipboard here'));
+    type('p:');
+    await settle();
+    press('Enter');
+    await settle();
+    expect(statusText()).toBe('No clipboard here');
+    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+  });
+
+  it('shows a load failure', async () => {
+    loadPrompts.mockRejectedValueOnce(new Error('No .prompts.md files'));
+    type('p:');
+    await settle();
+    expect(statusText()).toBe('No .prompts.md files');
+  });
+
+  it('opens a child list on Tab and walks back out with Escape, then leaves the mode', async () => {
+    type('p: repo');
+    await settle();
+    expect(hintText()).toContain('⇥ more');
+    press('Tab');
+
+    expect(crumbText()).toBe('Prompts › o/repo');
+    expect(rowTitles()).toEqual(['o/repo · Issues', 'o/repo · Pull requests']);
+    type('pull');
+    await activateRow('o/repo · Pull requests');
+    expect(open).toHaveBeenCalledWith('https://github.com/o/repo/pulls');
+    expect(rememberRecent).toHaveBeenCalledWith({
+      id: 'r1:pulls',
+      title: 'o/repo · Pull requests',
+      subtitle: undefined,
+      url: 'https://github.com/o/repo/pulls',
+    });
+  });
+
+  it('Escape goes from the child list to the mode, and from the mode to the top', async () => {
+    type('p: repo');
+    await settle();
+    press('ArrowRight');
+    expect(crumbText()).toBe('Prompts › o/repo');
+    press('Escape');
+    expect(crumbText()).toBe('Prompts');
+    press('Escape');
+    expect(crumbText()).toBeNull();
+    expect(rowTitles()).toContain('Vitest guide');
+  });
+
+  it('Backspace on an empty input leaves the mode and gives the prefix back', async () => {
+    type('p:');
+    await settle();
+    press('Backspace');
+    expect(crumbText()).toBeNull();
+    expect(input().value).toBe('p:');
+  });
+
+  it('does not treat an unknown prefix or a url as a mode', () => {
+    type('x: thing');
+    expect(crumbText()).toBeNull();
+    type('https://vitest.dev');
+    expect(crumbText()).toBeNull();
+  });
+
+  it('submits only on Enter, then Enter copies the selected answer', async () => {
+    type('t: Guten Morgen');
+    await settle();
+    // Text typed with the prefix is submitted at once — it was typed to be translated.
+    expect(translate).toHaveBeenCalledWith('Guten Morgen');
+    expect(rowTitles()).toEqual(['EN Guten Morgen', 'FR Guten Morgen']);
+
+    type('Guten Abend');
+    expect(rowTitles()).toEqual([]);
+    expect(hintText()).toContain('⏎ translate');
+    expect(translate).toHaveBeenCalledTimes(1);
+
+    press('Enter');
+    await settle();
+    expect(translate).toHaveBeenLastCalledWith('Guten Abend');
+    press('ArrowDown');
+    press('Enter');
+    await settle();
+    expect(copy).toHaveBeenCalledWith('FR Guten Abend');
+  });
+
+  it('drops an answer that arrives after the text changed', async () => {
+    let finish: (items: ModeItem[]) => void = () => {};
+    translate.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    type('t: one');
+    type('two');
+    finish([{ id: 'late', title: 'late', copy: 'late' }]);
+    await settle();
+    expect(rowTitles()).toEqual([]);
+  });
+
+  it('offers typed text to a mode that submits, and switches into it', async () => {
+    type('Guten Morgen');
+    expect(groupRows('Translate')).toEqual(['Translate “Guten Morgen”']);
+
+    await activateRow('Translate “Guten Morgen”');
+    expect(crumbText()).toBe('Translate');
+    expect(translate).toHaveBeenCalledWith('Guten Morgen');
+  });
+
+  it('lists the prefixes in the hint of an empty palette', () => {
+    expect(hintText()).toContain('p: prompts · t: translate');
+  });
+
+  it('starts outside any mode each time it opens', async () => {
+    type('p:');
+    await settle();
+    palette.close();
+    palette.open();
+    await settle();
+    expect(crumbText()).toBeNull();
   });
 });

@@ -9,6 +9,7 @@ pub const DEFAULT_REPO: &str = "lifosy/monorepo";
 
 const KEYRING_SERVICE: &str = "lifosy-palette";
 const KEYRING_USER: &str = "github-token";
+const KEYRING_DEEPL_USER: &str = "deepl-api-key";
 
 /// `$XDG_<kind>_HOME/lifosy`, falling back to the spec's default under `$HOME`.
 fn xdg_dir(variable: &str, fallback: &str) -> PathBuf {
@@ -27,6 +28,10 @@ pub fn config_file() -> PathBuf {
 
 pub fn bookmarks_cache_file() -> PathBuf {
     xdg_dir("XDG_CACHE_HOME", ".cache").join("bookmarks.json")
+}
+
+pub fn prompts_cache_file() -> PathBuf {
+    xdg_dir("XDG_CACHE_HOME", ".cache").join("prompts.json")
 }
 
 pub fn recents_file() -> PathBuf {
@@ -108,8 +113,8 @@ pub fn is_repo_name(value: &str) -> bool {
     matches!(value.split_once('/'), Some((owner, name)) if valid(owner) && valid(name))
 }
 
-fn keyring_entry() -> Result<keyring::Entry, String> {
-    keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
+fn keyring_entry(user: &str) -> Result<keyring::Entry, String> {
+    keyring::Entry::new(KEYRING_SERVICE, user)
         .map_err(|error| format!("the keyring is unavailable: {error}"))
 }
 
@@ -124,7 +129,7 @@ pub fn token() -> Result<String, String> {
     {
         return Ok(token);
     }
-    match keyring_entry()?.get_password() {
+    match keyring_entry(KEYRING_USER)?.get_password() {
         Ok(token) => Ok(token),
         Err(keyring::Error::NoEntry) => Err(
             "Not logged in — run “Log in with the Lifosy console” or `lifosy-palette login`".into(),
@@ -137,19 +142,59 @@ pub fn token() -> Result<String, String> {
 }
 
 pub fn store_token(token: &str) -> Result<(), String> {
-    keyring_entry()?.set_password(token).map_err(|error| {
-        format!(
-            "Could not store the token in the keyring ({error}). Is a Secret Service \
+    keyring_entry(KEYRING_USER)?
+        .set_password(token)
+        .map_err(|error| {
+            format!(
+                "Could not store the token in the keyring ({error}). Is a Secret Service \
                  (gnome-keyring, KeePassXC) running?"
-        )
-    })
+            )
+        })
 }
 
 pub fn forget_token() -> Result<(), String> {
-    match keyring_entry()?.delete_credential() {
+    match keyring_entry(KEYRING_USER)?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(error) => Err(format!("could not remove the token: {error}")),
     }
+}
+
+/// The DeepL key from `DEEPL_AUTH_KEY` if set (the variable omarchy's translate script reads),
+/// else from the Secret Service, where “Set the DeepL API key…” puts it.
+pub fn deepl_key() -> Result<String, String> {
+    if let Some(key) = std::env::var("DEEPL_AUTH_KEY")
+        .ok()
+        .filter(|key| !key.is_empty())
+    {
+        return Ok(key);
+    }
+    match keyring_entry(KEYRING_DEEPL_USER)?.get_password() {
+        Ok(key) => Ok(key),
+        Err(keyring::Error::NoEntry) => {
+            Err("No DeepL API key yet — run “Set the DeepL API key…” first".into())
+        }
+        Err(error) => Err(format!(
+            "Could not read the DeepL key from the keyring ({error}). Is a Secret Service running?"
+        )),
+    }
+}
+
+/// Stores the DeepL key; an empty one forgets it.
+pub fn store_deepl_key(key: &str) -> Result<(), String> {
+    let entry = keyring_entry(KEYRING_DEEPL_USER)?;
+    let outcome = if key.is_empty() {
+        match entry.delete_credential() {
+            Err(keyring::Error::NoEntry) => Ok(()),
+            other => other,
+        }
+    } else {
+        entry.set_password(key)
+    };
+    outcome.map_err(|error| {
+        format!(
+            "Could not store the DeepL key in the keyring ({error}). Is a Secret Service running?"
+        )
+    })
 }
 
 #[cfg(test)]

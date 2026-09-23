@@ -5,6 +5,9 @@
  * hits GitHub's code-search endpoint, which has a small dedicated budget, so it runs only when the
  * user presses Tab — never while typing. Any query can also be sent to a web search engine, which is
  * only a matter of opening its results page. Everything the popup can do is also here, as an action.
+ *
+ * A short prefix switches the input into a mode with a list of its own — `p:` searches prompts,
+ * `t:` translates — which Esc (or Backspace on an empty input) leaves again.
  */
 import { type Bookmark, searchBookmarks } from './bookmarks.js';
 import { SEARCH_ENGINES } from './web-search.js';
@@ -46,6 +49,39 @@ export interface RecentEntry {
   url?: string;
 }
 
+/** One entry a mode lists. Choosing it opens `url`, or else copies `copy` to the clipboard. */
+export interface ModeItem {
+  id: string;
+  title: string;
+  subtitle?: string;
+  /** Searched along with the title and subtitle, but not shown — a prompt's body, say. */
+  keywords?: string;
+  url?: string;
+  copy?: string;
+  /** More entries about this one (a repository's issues, pull requests…), listed on ⇥ or →. */
+  children?: ModeItem[];
+}
+
+/** A list of its own behind a prefix: typing `p:` enters the mode whose `prefix` is `p`. */
+export type PaletteMode = {
+  prefix: string;
+  /** Named in the breadcrumb, and as the verb in the hint of a mode that submits. */
+  title: string;
+  placeholder: string;
+} & (
+  | {
+      /** Everything the mode offers, loaded on entering it and filtered locally as you type. */
+      load: () => Promise<ModeItem[]>;
+    }
+  | {
+      /**
+       * Asked on ⏎ with what is typed — for modes whose every answer costs a request. The palette
+       * also offers it for any text typed outside the mode.
+       */
+      submit: (query: string) => Promise<ModeItem[]>;
+    }
+);
+
 export interface PaletteHandlers {
   loadBookmarks: () => Promise<Bookmark[]>;
   searchRepo: (query: string) => Promise<RepoResult[]>;
@@ -55,6 +91,9 @@ export interface PaletteHandlers {
   rememberRecent: (entry: RecentEntry) => void;
   /** Counts one open of a bookmark, so unused ones can be found later. */
   countBookmarkUse: (id: string) => void;
+  modes: readonly PaletteMode[];
+  /** Puts text on the clipboard; rejects with a message to show if it cannot. */
+  copy: (text: string) => Promise<void>;
 }
 
 export interface PaletteOptions {
@@ -180,6 +219,34 @@ const STYLES = `
 
 const matches = (text: string, needle: string) => text.toLowerCase().includes(needle);
 
+/** Enough to scroll through; a prompt library of hundreds is found by typing, not scrolling. */
+const MODE_ROW_LIMIT = 50;
+
+/**
+ * Every word of the query somewhere in the item, so `commit git` finds "Commit message #git".
+ * Items whose title holds every word come first; otherwise the list keeps its own order.
+ */
+export function filterModeItems(items: readonly ModeItem[], query: string): ModeItem[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [...items];
+  const inTitle: ModeItem[] = [];
+  const elsewhere: ModeItem[] = [];
+  for (const item of items) {
+    const title = item.title.toLowerCase();
+    const text = `${title} ${item.subtitle ?? ''} ${item.keywords ?? ''}`.toLowerCase();
+    if (words.every((word) => title.includes(word))) inTitle.push(item);
+    else if (words.every((word) => text.includes(word))) elsewhere.push(item);
+  }
+  return [...inTitle, ...elsewhere];
+}
+
+/** `p: query` → the mode `p` and `query`, for any prefix a mode claims. */
+const modePrefix = (value: string, modes: readonly PaletteMode[]) => {
+  const match = /^(\w+):\s*/.exec(value);
+  const mode = match && modes.find((candidate) => candidate.prefix === match[1]);
+  return mode && match ? { mode, rest: value.slice(match[0].length) } : null;
+};
+
 export function createCommandPalette(
   handlers: PaletteHandlers,
   options: PaletteOptions = {},
@@ -225,6 +292,19 @@ export function createCommandPalette(
   let trail: { title: string; actions: PaletteAction[] }[] = [];
   /** The action being filled in, which step it is on, and what has been collected so far. */
   let pending: { action: PaletteAction; step: number; values: string[] } | null = null;
+  /**
+   * The prefix mode the input is in and what it lists: `items` is null until they are loaded, or,
+   * in a mode that submits, until ⏎ answers the query in `answered`. `parent` is the entry whose
+   * children are shown.
+   */
+  let mode: {
+    mode: PaletteMode;
+    items: ModeItem[] | null;
+    answered: string;
+    parent: ModeItem | null;
+  } | null = null;
+  /** Guards against a slow submit landing after the query moved on, like `searchToken`. */
+  let submitToken = 0;
 
   const needle = () => input.value.trim().toLowerCase();
 
@@ -304,6 +384,112 @@ export function createCommandPalette(
     handlers.rememberRecent(entry);
     if (entry.url) handlers.open(entry.url);
     close();
+  };
+
+  /** Loads a listing mode's entries, unless the user has left the mode by the time they arrive. */
+  const loadMode = async (entered: NonNullable<typeof mode>, load: () => Promise<ModeItem[]>) => {
+    setStatus(`Loading ${entered.mode.title.toLowerCase()}…`);
+    try {
+      const items = await load();
+      if (mode !== entered) return;
+      entered.items = items;
+      setStatus(null);
+    } catch (e: any) {
+      if (mode !== entered) return;
+      setStatus(e?.message || `Could not load ${entered.mode.title.toLowerCase()}`);
+    }
+    render();
+  };
+
+  const submitMode = async () => {
+    const current = mode;
+    const query = input.value.trim();
+    if (!current || !('submit' in current.mode) || !query) return;
+    const token = ++submitToken;
+    setStatus(`${current.mode.title}…`);
+    try {
+      const items = await current.mode.submit(query);
+      if (token !== submitToken || mode !== current) return;
+      current.items = items;
+      current.answered = query;
+      selected = 0;
+      setStatus(items.length ? null : 'Nothing came back');
+    } catch (e: any) {
+      if (token !== submitToken || mode !== current) return;
+      setStatus(e?.message || `${current.mode.title} failed`);
+    }
+    render();
+  };
+
+  /** Switches into `next` with `rest` in the input; a submitting mode given text submits it. */
+  const enterMode = (next: PaletteMode, rest: string) => {
+    mode = { mode: next, items: null, answered: '', parent: null };
+    input.value = rest;
+    trail = [];
+    selected = 0;
+    submitToken++;
+    setStatus(null);
+    render();
+    if ('load' in next) void loadMode(mode, next.load);
+    else if (rest.trim()) void submitMode();
+  };
+
+  /** What the mode lists right now: the parent's children, or its own entries, filtered. */
+  const modeItems = (): ModeItem[] => {
+    if (!mode) return [];
+    if (mode.parent) return filterModeItems(mode.parent.children ?? [], input.value);
+    if (!mode.items) return [];
+    // A submitted answer is already for exactly what is typed; filtering it would hide it.
+    return 'load' in mode.mode ? filterModeItems(mode.items, input.value) : mode.items;
+  };
+
+  const showChildren = (item: ModeItem | undefined) => {
+    if (!mode || !item?.children?.length) return false;
+    mode.parent = item;
+    input.value = '';
+    selected = 0;
+    render();
+    return true;
+  };
+
+  const chooseItem = async (item: ModeItem) => {
+    if (item.url) {
+      openUrl({ id: item.id, title: item.title, subtitle: item.subtitle, url: item.url });
+      return;
+    }
+    if (item.copy !== undefined) {
+      try {
+        await handlers.copy(item.copy);
+        close();
+      } catch (e: any) {
+        setStatus(e?.message || 'Could not copy that');
+        render();
+      }
+      return;
+    }
+    showChildren(item);
+  };
+
+  const modeRows = (): Row[] =>
+    modeItems()
+      .slice(0, MODE_ROW_LIMIT)
+      .map((item) => ({
+        title: item.title,
+        subtitle: item.subtitle ?? '',
+        activate: () => void chooseItem(item),
+      }));
+
+  /** Whatever is typed, offered to each mode that submits — "Translate “Guten Morgen”". */
+  const submitOfferRows = (): Row[] => {
+    const query = input.value.trim();
+    if (trail.length > 0 || !query) return [];
+    return handlers.modes
+      .filter((candidate) => 'submit' in candidate)
+      .map((candidate) => ({
+        title: `${candidate.title} “${query}”`,
+        subtitle: `or type ${candidate.prefix}: first`,
+        activate: () => enterMode(candidate, query),
+      }));
   };
 
   const actionRow = (action: PaletteAction): Row => ({
@@ -399,33 +585,56 @@ export function createCommandPalette(
       .map(actionRow);
   };
 
-  const allRows = (): Row[] =>
-    pending
-      ? []
-      : [...recentRows(), ...bookmarkRows(), ...repoRows(), ...actionRows(), ...webRows()];
+  const allRows = (): Row[] => {
+    if (pending) return [];
+    if (mode) return modeRows();
+    return [
+      ...recentRows(),
+      ...bookmarkRows(),
+      ...repoRows(),
+      ...actionRows(),
+      ...webRows(),
+      ...submitOfferRows(),
+    ];
+  };
 
   const render = () => {
     const here = trail.at(-1);
     const step = pending?.action.prompts?.[pending.step];
     const steps = pending?.action.prompts?.length ?? 0;
     // While filling an action in, the crumb says which field and how far along it is.
-    crumb.textContent = pending
-      ? `${pending.action.title.replace(/…$/, '')} · ${step?.label ?? ''} (${pending.step + 1}/${steps})`
-      : (here?.title ?? '');
-    crumb.hidden = !pending && !here;
+    if (pending)
+      crumb.textContent = `${pending.action.title.replace(/…$/, '')} · ${step?.label ?? ''} (${pending.step + 1}/${steps})`;
+    else if (mode)
+      crumb.textContent = mode.parent
+        ? `${mode.mode.title} › ${mode.parent.title}`
+        : mode.mode.title;
+    else crumb.textContent = here?.title ?? '';
+    crumb.hidden = !pending && !here && !mode;
     // Submenu titles already end in an ellipsis, which would otherwise double up here.
-    input.placeholder =
-      step?.label ??
-      (here ? `Search ${here.title.replace(/…$/, '')}…` : 'Search bookmarks or the web…');
+    if (step) input.placeholder = step.label;
+    else if (mode)
+      input.placeholder = mode.parent ? `Search ${mode.parent.title}…` : mode.mode.placeholder;
+    else if (here) input.placeholder = `Search ${here.title.replace(/…$/, '')}…`;
+    else input.placeholder = 'Search bookmarks or the web…';
 
     const recent = recentRows();
     const bookmarkMatches = bookmarkRows();
     const repoMatches = repoRows();
     const web = webRows();
+    const offers = submitOfferRows();
     const actions = actionRows();
-    const total = pending
-      ? 0
-      : recent.length + bookmarkMatches.length + repoMatches.length + web.length + actions.length;
+    const listed = modeRows();
+    let total = 0;
+    if (mode) total = listed.length;
+    else if (!pending)
+      total =
+        recent.length +
+        bookmarkMatches.length +
+        repoMatches.length +
+        web.length +
+        offers.length +
+        actions.length;
     if (selected >= total) selected = Math.max(0, total - 1);
 
     rows.replaceChildren();
@@ -457,36 +666,53 @@ export function createCommandPalette(
         rows.append(element);
       }
     };
-
-    if (pending) {
+    const addNote = (text: string) => {
       const note = document.createElement('div');
       note.className = 'empty';
-      // What has been answered so far, so a long walk stays reviewable.
-      note.textContent = pending.values.filter(Boolean).join('  ·  ') || pending.action.title;
+      note.textContent = text;
       rows.append(note);
+    };
+
+    if (pending) {
+      // What has been answered so far, so a long walk stays reviewable.
+      addNote(pending.values.filter(Boolean).join('  ·  ') || pending.action.title);
+    } else if (mode) {
+      addGroup(mode.parent?.title ?? mode.mode.title, listed);
+      if (listed.length === 0 && (mode.items || mode.parent)) addNote('No matches.');
     } else {
       addGroup('Recent', recent);
       addGroup('Bookmarks', bookmarkMatches);
       addGroup('Repo', repoMatches);
       if (!here && bookmarkMatches.length + repoMatches.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'empty';
-        empty.textContent = bookmarks.length
-          ? 'No bookmark matches.'
-          : 'No bookmarks cached yet — open the console to sync.';
-        rows.append(empty);
+        addNote(
+          bookmarks.length
+            ? 'No bookmark matches.'
+            : 'No bookmarks cached yet — open the console to sync.',
+        );
       }
       addGroup(here ? here.title : 'Actions', actions);
       // Last, so typing an action's name and pressing Enter runs it; with nothing else matching,
       // the first row is a web search.
       addGroup('Web', web);
+      addGroup('Translate', offers);
     }
 
     const query = input.value.trim();
+    const prefixes = handlers.modes
+      .map((candidate) => `${candidate.prefix}: ${candidate.title.toLowerCase()}`)
+      .join(' · ');
     if (pending)
       hint.textContent = pending.step > 0 ? '⏎ next · esc back a field' : '⏎ next · esc cancel';
-    else if (here) hint.textContent = '↑↓ navigate · ⏎ select · esc back';
-    else if (!query) hint.textContent = '↑↓ navigate · ⏎ select · esc close';
+    else if (mode) {
+      const submits = 'submit' in mode.mode && !mode.parent;
+      const unanswered = submits && (!mode.items || mode.answered !== query);
+      const more = modeItems()[selected]?.children?.length ? ' · ⇥ more' : '';
+      hint.textContent = unanswered
+        ? `⏎ ${mode.mode.title.toLowerCase()} · esc back`
+        : `↑↓ navigate · ⏎ select${more} · esc back`;
+    } else if (here) hint.textContent = '↑↓ navigate · ⏎ select · esc back';
+    else if (!query)
+      hint.textContent = `↑↓ navigate · ⏎ select${prefixes ? ` · ${prefixes}` : ''} · esc close`;
     else if (repoResults && repoQuery === query) hint.textContent = '⏎ select · esc close';
     else hint.textContent = `⇥ tab search repo for “${query}” · ⏎ select · esc close`;
   };
@@ -496,7 +722,7 @@ export function createCommandPalette(
   };
 
   const runRepoSearch = async () => {
-    if (pending || trail.length > 0) return;
+    if (pending || trail.length > 0 || mode) return;
     const query = input.value.trim();
     if (!query) return;
     const token = ++searchToken;
@@ -533,6 +759,16 @@ export function createCommandPalette(
       render();
       return;
     }
+    if (mode) {
+      if (mode.parent) mode.parent = null;
+      else mode = null;
+      submitToken++;
+      input.value = '';
+      selected = 0;
+      setStatus(null);
+      render();
+      return;
+    }
     if (trail.length > 0) {
       trail = trail.slice(0, -1);
       input.value = '';
@@ -557,7 +793,28 @@ export function createCommandPalette(
       render();
       return;
     }
-    if (e.key === 'Tab') {
+    if (mode && !input.value) {
+      // Backspace on an empty input takes the mode off again, as if its prefix were plain text:
+      // the prefix comes back, and one more Backspace starts eating it.
+      if (e.key === 'Backspace' && !mode.parent) {
+        e.preventDefault();
+        const { prefix } = mode.mode;
+        back();
+        input.value = `${prefix}:`;
+        return;
+      }
+      if ((e.key === 'Backspace' || e.key === 'ArrowLeft') && mode.parent) {
+        e.preventDefault();
+        back();
+        return;
+      }
+    }
+    const atEnd = input.selectionStart === input.value.length;
+    if (e.key === 'Tab' || (e.key === 'ArrowRight' && mode && atEnd)) {
+      if (mode) {
+        if (showChildren(modeItems()[selected]) || e.key === 'Tab') e.preventDefault();
+        return;
+      }
       e.preventDefault();
       runRepoSearch();
       return;
@@ -565,12 +822,39 @@ export function createCommandPalette(
     if (e.key === 'Enter') {
       e.preventDefault();
       if (pending) void activate(pending.action);
+      else if (
+        mode &&
+        'submit' in mode.mode &&
+        !mode.parent &&
+        mode.answered !== input.value.trim()
+      )
+        void submitMode();
       else choose(selected);
     }
   };
 
   input.addEventListener('keydown', onKeyDown);
   input.addEventListener('input', () => {
+    const prefixed =
+      !mode && !pending && trail.length === 0 && modePrefix(input.value, handlers.modes);
+    if (prefixed) {
+      enterMode(prefixed.mode, prefixed.rest);
+      return;
+    }
+    if (mode) {
+      // The space typed after the prefix (`p: `) belongs to the prefix, not the query.
+      if (/^\s/.test(input.value)) input.value = input.value.trimStart();
+      selected = 0;
+      // A submitted answer belongs to the text it was asked for; an edit asks again on ⏎.
+      if ('submit' in mode.mode && !mode.parent) {
+        mode.items = null;
+        mode.answered = '';
+        submitToken++;
+        setStatus(null);
+      }
+      render();
+      return;
+    }
     // Results from the previous query would be misleading next to new bookmark matches.
     repoResults = null;
     repoQuery = '';
@@ -598,6 +882,8 @@ export function createCommandPalette(
     repoQuery = '';
     trail = [];
     pending = null;
+    mode = null;
+    submitToken++;
     selected = 0;
     setStatus(null);
     render();

@@ -1,6 +1,8 @@
 import {
   type CommandPalette,
+  copyToClipboard,
   createCommandPalette,
+  paletteModes,
   portHandlers,
   repoActions,
 } from '@lifosy/palette';
@@ -79,6 +81,8 @@ export function StartPage() {
         // This tab is a blank start page, so a hit takes it over rather than leaving it behind.
         open: openInThisTab,
         actions: () => repoActions(workerPort),
+        modes: paletteModes(workerPort),
+        copy: copyToClipboard,
       });
     }
     return paletteRef.current;

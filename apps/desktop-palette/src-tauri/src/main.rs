@@ -11,10 +11,13 @@ mod console_login;
 mod github;
 #[cfg(target_os = "linux")]
 mod layer;
+mod prompts;
 mod recents;
+mod repos;
 mod requests;
+mod translate;
 
-use std::io::{BufRead, BufReader, IsTerminal};
+use std::io::{BufRead, BufReader, IsTerminal, Write};
 use std::os::unix::net::UnixListener;
 use std::sync::Mutex;
 
@@ -232,6 +235,27 @@ async fn console_login(app: AppHandle) -> Result<String, String> {
     outcome
 }
 
+/// Copies with `wl-copy`, which stays behind to serve the clipboard once the overlay is hidden —
+/// the webview's own clipboard goes away with its focus.
+#[tauri::command]
+fn copy_text(text: String) -> Result<(), String> {
+    let mut child = std::process::Command::new("wl-copy")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .spawn()
+        .map_err(|error| format!("Could not run wl-copy ({error}) — is wl-clipboard installed?"))?;
+    let written = child
+        .stdin
+        .take()
+        .map(|mut stdin| stdin.write_all(text.as_bytes()));
+    // Reaped in the background, like xdg-open, so the palette can close at once.
+    std::thread::spawn(move || child.wait());
+    match written {
+        Some(Ok(())) => Ok(()),
+        _ => Err("Could not hand the text to wl-copy".into()),
+    }
+}
+
 /// The palette closed itself (Esc, a click outside, or after opening something).
 #[tauri::command]
 fn hide_palette(app: AppHandle) {
@@ -296,6 +320,7 @@ fn run_daemon(first: Command, listener: UnixListener) {
         .invoke_handler(tauri::generate_handler![
             palette_request,
             console_login,
+            copy_text,
             hide_palette,
             webview_ready
         ])

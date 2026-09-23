@@ -7,6 +7,7 @@
  */
 import type { Bookmark } from './bookmarks.js';
 import type { RecentEntry, RepoResult } from './command-palette.js';
+import type { Translation } from './translate.js';
 
 type NoFields = Record<never, never>;
 
@@ -60,6 +61,23 @@ export interface PaletteProtocol {
   SYNC_NOW: { request: { force: boolean }; response: { synced: boolean; bookmarks?: number } };
   /** `reuse` takes over the asking tab (a blank start page) instead of opening another. */
   OPEN_URL: { request: { url: string; reuse?: boolean }; response: NoFields };
+  /** Every `.prompts.md` file in the repository, raw; the palette parses them itself. */
+  LIST_PROMPT_FILES: {
+    request: NoFields;
+    response: { files: { path: string; content: string }[] };
+  };
+  /** One translation per target, through DeepL; fails when no API key is set. */
+  TRANSLATE: {
+    request: { text: string; targets: string[] };
+    response: { translations: Translation[] };
+  };
+  /** Stores the DeepL API key where the backend keeps secrets; an empty key forgets it. */
+  SET_TRANSLATION_KEY: { request: { key: string }; response: NoFields };
+  /** GitHub repositories to open, most relevant first — the order is the backend's. */
+  LIST_GITHUB_REPOS: {
+    request: NoFields;
+    response: { repos: { fullName: string; description?: string }[] };
+  };
 }
 
 export type PaletteRequestType = keyof PaletteProtocol;

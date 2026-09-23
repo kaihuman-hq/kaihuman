@@ -212,3 +212,49 @@ describe('knowledge base captures', () => {
     expect((fetch as any).mock.calls.some(([u]: any[]) => u === 'https://e.com/i.png')).toBe(false);
   });
 });
+
+describe('palette mode messages', () => {
+  it('asks for a DeepL key before translating anything', async () => {
+    expect(await call({ type: 'TRANSLATE', text: 'Hallo', targets: ['EN-US'] })).toEqual({
+      error: 'No DeepL API key yet — run “Set the DeepL API key…” first',
+    });
+  });
+
+  it('translates with the stored key', async () => {
+    storedExtras = { deepl_key: 'k:fx' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ translations: [{ text: 'Hello', detected_source_language: 'DE' }] }),
+      })),
+    );
+    expect(await call({ type: 'TRANSLATE', text: 'Hallo', targets: ['EN-US'] })).toEqual({
+      success: true,
+      translations: [{ target: 'EN-US', text: 'Hello', detectedSource: 'DE' }],
+    });
+  });
+
+  it('stores the key, and forgets it when given none', async () => {
+    await call({ type: 'SET_TRANSLATION_KEY', key: ' k:fx ' });
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({ deepl_key: 'k:fx' });
+    await call({ type: 'SET_TRANSLATION_KEY', key: '' });
+    expect(chrome.storage.local.remove).toHaveBeenCalledWith('deepl_key');
+  });
+
+  it('answers prompt files from a cache for the same repository', async () => {
+    storedExtras = {
+      promptsCache: {
+        repo: 'o/r',
+        files: [{ path: 'a.prompts.md', content: '## A' }],
+        fetchedAt: Date.now(),
+      },
+    };
+    expect(await call({ type: 'LIST_PROMPT_FILES' })).toEqual({
+      success: true,
+      files: [{ path: 'a.prompts.md', content: '## A' }],
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

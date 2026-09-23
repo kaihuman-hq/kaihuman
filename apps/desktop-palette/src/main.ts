@@ -4,7 +4,13 @@
  * The daemon maps the overlay and says `palette:show`; the palette closes itself (Esc, a click
  * outside, after opening something), and each close asks the daemon to hide the overlay again.
  */
-import { type ActionPort, createCommandPalette, portHandlers, repoActions } from '@lifosy/palette';
+import {
+  type ActionPort,
+  createCommandPalette,
+  paletteModes,
+  portHandlers,
+  repoActions,
+} from '@lifosy/palette';
 
 /** Actions that act on browser tabs or the browser's bookmarks, which only the extension can do. */
 const BROWSER_ONLY = new Set(['tabs', 'tabs-save', 'import-chrome-bookmarks']);
@@ -38,6 +44,12 @@ const palette = createCommandPalette(
         run: () => invoke<string>('console_login'),
       },
     ],
+    modes: paletteModes(port),
+    copy: async (text) => {
+      await invoke('copy_text', { text }).catch((error: unknown) => {
+        throw new Error(String(error));
+      });
+    },
   },
   {
     placement: 'center',

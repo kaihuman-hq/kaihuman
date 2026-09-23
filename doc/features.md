@@ -29,6 +29,7 @@
 |---------|----------|-------|
 | Pin to Knowledge Base saves the page as Markdown with its images in `.kh/assets/` (popup toggle turns image downloads off) | popup, palette | 2026-09-23 |
 | Selected-text clips go to `.kh/raw/` as their own notes | context menu, palette | 2026-09-23 |
+| Palette prefix modes: `p:` prompts from the repo's `.prompts.md` files (⏎ copies), `t:` DeepL translation into EN/DE (typed text is offered too), `r:` GitHub repositories with ⇥ for issues, PRs… | command palette (pages and start page) | 2026-09-23 |
 | Web search from the command palette — Google, DuckDuckGo, Ecosia, Amazon, Reddit, by URL only | command palette (pages and start page) | 2026-09-23 |
 | Pinned tab groups on the start page — compact cards above the bookmarks; a click loads the group | start page | 2026-09-23 |
 | Pinned bookmarks — always first on the start page; pin/unpin from its cards or the console widget | start page cards, Bookmarks widget | 2026-09-22 |
@@ -62,6 +63,7 @@
 |---------|----------|-------|
 | The command palette as a desktop overlay, centered on the focused monitor (wlr-layer-shell: Hyprland, Sway, KDE…) | `lifosy-palette-toggle` bound to a key | 2026-09-23 |
 | Bookmarks, web search, repo search, notes and action log, recents, repository switch — shared with the extension via `@lifosy/palette` | desktop palette | 2026-09-23 |
+| `p:` prompts, `t:` translate, `r:` repos — omarchy's prompt, translate and repo menus in the palette; copies with `wl-copy`, and `r:` ranks omarchy's `~/.config/eee/counts` first | desktop palette | 2026-09-23 |
 | `lifosy-palette login`: token checked against the repo, kept in the Secret Service | CLI | 2026-09-23 |
 
 ## CLI (`apps/cli`)

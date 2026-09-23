@@ -226,6 +226,23 @@ normal tab. The New Tab page used to be on that list; the start page below is th
   that repo's file and not the console's other one — the console selects it and drops the
   parameter again.
 
+### Prefix modes
+
+A prefix at the start of the input switches the palette into a list of its own. The breadcrumb
+names the mode; **Esc**, or **Backspace** on an empty input, leaves it again. The empty palette's
+hint line lists the prefixes.
+
+| Prefix | Lists | ⏎ | Source |
+| --- | --- | --- | --- |
+| `p:` | Prompts, filtered as you type (every word must appear in the title, tags or text) | copies the prompt's text and closes | every `.prompts.md` in the repository (`doc/prompts-format.md`), cached for five minutes |
+| `t:` | Translations of what you typed into English (US) and German, minus the language the text is already in; `t: fr: …` asks for one language | the first ⏎ translates, the next copies the selected translation | DeepL, one request per language — never while typing |
+| `r:` | Your GitHub repositories, most recently pushed first | opens the repository; **⇥** (or **→**) lists its issues, pull requests, actions, releases… | `GET /user/repos` with the extension's token |
+
+Any text typed outside a mode is also offered as **Translate “…”**, the last row (**↑** from the top
+row reaches it). Translation needs a DeepL API key — free ones at
+[deepl.com/pro-api](https://www.deepl.com/pro-api) — set with the **Set the DeepL API key…** action;
+it is kept in the extension's local storage.
+
 ### Actions
 
 Everything the extension can do is here, so the popup is never the only way in:
@@ -241,6 +258,7 @@ Everything the extension can do is here, so the popup is never the only way in:
 | Import the browser's bookmarks | Copies them into the repo file (grant access from the popup first) |
 | Switch repository… | Pick from the repositories the console shared |
 | Sync with GitHub now | Fetches and pushes immediately, ignoring the hourly budget |
+| Set the DeepL API key… | For `t:` translations; an empty key forgets it |
 | Open the Lifosy console | |
 
 The three page actions at the top — bookmark, pin, clip — need a page to read, so the palette on

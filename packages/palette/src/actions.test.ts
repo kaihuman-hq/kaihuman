@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { portHandlers, repoActions, splitTags } from './actions.js';
-import type { PaletteAction } from './command-palette.js';
+import {
+  GITHUB_REPO_VIEWS,
+  paletteModes,
+  portHandlers,
+  repoActions,
+  splitTags,
+} from './actions.js';
+import type { PaletteAction, PaletteMode } from './command-palette.js';
 import type { ActionPort, PaletteProtocol, PaletteRequestType } from './protocol.js';
 
 type Answers = { [K in PaletteRequestType]?: PaletteProtocol[K]['response'] };
@@ -114,5 +120,101 @@ describe('portHandlers', () => {
       type: 'SEARCH_REPO',
       query: 'b',
     });
+  });
+});
+
+const mode = (prefix: string) => {
+  const found = paletteModes(fakePort).find((candidate) => candidate.prefix === prefix);
+  if (!found) throw new Error(`no mode ${prefix}`);
+  return found;
+};
+const load = (found: PaletteMode) => {
+  if (!('load' in found)) throw new Error(`${found.prefix} does not load`);
+  return found.load();
+};
+const submit = (found: PaletteMode, query: string) => {
+  if (!('submit' in found)) throw new Error(`${found.prefix} does not submit`);
+  return found.submit(query);
+};
+
+describe('paletteModes', () => {
+  it('lists the prompts of every prompts file, copying the body', async () => {
+    answers.LIST_PROMPT_FILES = {
+      files: [
+        { path: 'a.prompts.md', content: '## Commit #git\n\nWrite it.\nThen stop.' },
+        { path: 'b/c.prompts.md', content: '## Review\nLook closely.' },
+      ],
+    };
+    const items = await load(mode('p'));
+    expect(items).toEqual([
+      {
+        id: 'prompt:a.prompts.md:0',
+        title: 'Commit',
+        subtitle: '#git Write it.',
+        keywords: 'git Write it.\nThen stop.',
+        copy: 'Write it.\nThen stop.',
+      },
+      {
+        id: 'prompt:b/c.prompts.md:0',
+        title: 'Review',
+        subtitle: 'Look closely.',
+        keywords: 'Look closely.',
+        copy: 'Look closely.',
+      },
+    ]);
+  });
+
+  it('says so when the repository has no prompts file', async () => {
+    answers.LIST_PROMPT_FILES = { files: [] };
+    await expect(load(mode('p'))).rejects.toThrow('No .prompts.md files');
+  });
+
+  it('translates into the default targets and drops the one the text is already in', async () => {
+    answers.TRANSLATE = {
+      translations: [
+        { target: 'EN-US', text: 'Good morning', detectedSource: 'DE' },
+        { target: 'DE', text: 'Guten Morgen', detectedSource: 'DE' },
+      ],
+    };
+    const items = await submit(mode('t'), 'Guten Morgen');
+    expect(sent.at(-1)).toEqual({
+      type: 'TRANSLATE',
+      text: 'Guten Morgen',
+      targets: ['EN-US', 'DE'],
+    });
+    expect(items).toEqual([
+      {
+        id: 'translation:EN-US',
+        title: 'Good morning',
+        subtitle: 'DE → EN-US · ⏎ copies',
+        copy: 'Good morning',
+      },
+    ]);
+  });
+
+  it('asks for one language when the text names it', async () => {
+    answers.TRANSLATE = { translations: [] };
+    await submit(mode('t'), 'fr: good morning');
+    expect(sent.at(-1)).toEqual({ type: 'TRANSLATE', text: 'good morning', targets: ['FR'] });
+  });
+
+  it('lists repositories with their GitHub pages as children', async () => {
+    answers.LIST_GITHUB_REPOS = { repos: [{ fullName: 'o/r', description: 'A repo' }] };
+    const [repo] = await load(mode('r'));
+    expect(repo).toMatchObject({ title: 'o/r', subtitle: 'A repo', url: 'https://github.com/o/r' });
+    expect(repo?.children).toHaveLength(GITHUB_REPO_VIEWS.length);
+    expect(repo?.children?.[0]).toEqual({
+      id: 'github:o/r/issues',
+      title: 'o/r · Issues',
+      url: 'https://github.com/o/r/issues',
+    });
+  });
+
+  it('stores or forgets the DeepL key', async () => {
+    answers.SET_TRANSLATION_KEY = {};
+    const setKey = action(repoActions(fakePort), 'set-translation-key');
+    expect(await setKey.run?.([' abc:fx '])).toBe('Saved the DeepL API key');
+    expect(sent.at(-1)).toEqual({ type: 'SET_TRANSLATION_KEY', key: 'abc:fx' });
+    expect(await setKey.run?.([''])).toBe('Forgot the DeepL API key');
   });
 });

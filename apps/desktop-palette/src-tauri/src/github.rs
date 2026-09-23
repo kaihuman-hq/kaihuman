@@ -21,16 +21,21 @@ const COMPONENT: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'(')
     .remove(b')');
 
-/// Deep link that opens a repo file in the console, like the extension's `consoleFileUrl`.
-pub fn console_file_url(path: &str, repo: &str) -> String {
+/// `a b/c#1.md` → `a%20b/c%231.md`: each segment encoded, the slashes kept.
+pub fn encode_path(path: &str) -> String {
     let encoded: Vec<String> = path
         .split('/')
         .map(|segment| utf8_percent_encode(segment, COMPONENT).to_string())
         .collect();
+    encoded.join("/")
+}
+
+/// Deep link that opens a repo file in the console, like the extension's `consoleFileUrl`.
+pub fn console_file_url(path: &str, repo: &str) -> String {
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair("repo", repo)
         .finish();
-    format!("{CONSOLE_URL}/files/{}?{query}", encoded.join("/"))
+    format!("{CONSOLE_URL}/files/{}?{query}", encode_path(path))
 }
 
 pub struct Client {
@@ -68,6 +73,28 @@ struct SearchResponse {
 struct SearchItem {
     path: String,
     name: String,
+}
+
+#[derive(Deserialize)]
+struct TreeResponse {
+    #[serde(default)]
+    tree: Vec<TreeEntry>,
+}
+
+/// One path in a recursive tree listing; `kind` is `blob` for a file.
+#[derive(Debug, Deserialize)]
+pub struct TreeEntry {
+    pub path: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+}
+
+/// A repository from `/user/repos`.
+#[derive(Debug, Deserialize)]
+pub struct UserRepo {
+    pub full_name: String,
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 pub struct SearchHit {
@@ -182,6 +209,48 @@ impl Client {
                     .collect())
             }
         }
+    }
+
+    /// Every path on the default branch, in one recursive listing.
+    pub async fn tree(&self) -> Result<Vec<TreeEntry>, String> {
+        let url = format!(
+            "{}/repos/{}/git/trees/HEAD?recursive=1",
+            self.api, self.repo
+        );
+        let response = self
+            .request(reqwest::Method::GET, &url)
+            .send()
+            .await
+            .map_err(network_error)?;
+        match response.status() {
+            // An empty repository has no HEAD to list.
+            StatusCode::NOT_FOUND | StatusCode::CONFLICT => Ok(Vec::new()),
+            status if !status.is_success() => {
+                Err(format!("Could not list {}: {status}", self.repo))
+            }
+            _ => Ok(response
+                .json::<TreeResponse>()
+                .await
+                .map_err(network_error)?
+                .tree),
+        }
+    }
+
+    /// The repositories the token can see, most recently pushed first.
+    pub async fn user_repos(&self) -> Result<Vec<UserRepo>, String> {
+        let response = self
+            .request(reqwest::Method::GET, &format!("{}/user/repos", self.api))
+            .query(&[("per_page", "100"), ("sort", "pushed")])
+            .send()
+            .await
+            .map_err(network_error)?;
+        if !response.status().is_success() {
+            return Err(format!(
+                "Could not list your repositories: {}",
+                response.status()
+            ));
+        }
+        response.json().await.map_err(network_error)
     }
 
     /// Whether the token can read the repository — what `login` checks before storing it.

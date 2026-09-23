@@ -2,6 +2,13 @@ import { type Message } from '../types';
 import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
 import {
+  fetchPromptFiles,
+  isPromptsCacheStale,
+  listGithubRepos,
+  type PromptsCache,
+  translateWithDeepl,
+} from './palette-modes';
+import {
   buildRawNote,
   imagesEnabled,
   KB_ASSET_DIR,
@@ -750,6 +757,47 @@ async function searchRepo(query: string) {
   return { results };
 }
 
+const NOT_LOGGED_IN = 'Not logged in — open the Lifosy console to connect the extension';
+
+async function refreshPrompts(token: string, repo: string): Promise<PromptsCache> {
+  const files = await fetchPromptFiles(token, repo);
+  const cache: PromptsCache = { repo, files, fetchedAt: Date.now() };
+  await chrome.storage.local.set({ promptsCache: cache });
+  return cache;
+}
+
+/** Cache first, like the bookmarks: a stale cache still answers and is refreshed behind it. */
+async function listPromptFiles() {
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const stored = await chrome.storage.local.get('promptsCache');
+  const cache = stored.promptsCache as PromptsCache | undefined;
+  if (cache?.repo !== repo) return { files: (await refreshPrompts(token, repo)).files };
+  if (isPromptsCacheStale(cache, Date.now())) {
+    refreshPrompts(token, repo).catch((e) =>
+      console.warn('LifeOS Extension: prompt refresh failed', e),
+    );
+  }
+  return { files: cache.files };
+}
+
+async function translate(text: string, targets: string[]) {
+  const { deepl_key: key } = await chrome.storage.local.get('deepl_key');
+  if (!key) throw new Error('No DeepL API key yet — run “Set the DeepL API key…” first');
+  return { translations: await translateWithDeepl(key as string, text, targets) };
+}
+
+async function setTranslationKey(key: string) {
+  if (key) await chrome.storage.local.set({ deepl_key: key });
+  else await chrome.storage.local.remove('deepl_key');
+}
+
+async function githubRepos() {
+  const { token } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  return { repos: await listGithubRepos(token) };
+}
+
 /** The window the popup belongs to, plus its pinned tabs in one round-trip. */
 async function currentWindow() {
   const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -1060,6 +1108,38 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'SEARCH_REPO') {
     searchRepo(message.query || '').then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'LIST_PROMPT_FILES') {
+    listPromptFiles().then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'TRANSLATE') {
+    translate(message.text || '', message.targets || []).then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'SET_TRANSLATION_KEY') {
+    setTranslationKey((message.key || '').trim()).then(
+      () => sendResponse({ success: true }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'LIST_GITHUB_REPOS') {
+    githubRepos().then(
       (result) => sendResponse({ success: true, ...result }),
       (error) => sendResponse({ error: error.message }),
     );

@@ -7,9 +7,12 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::bookmarks::{self, BOOKMARKS_PATH, Cache};
-use crate::config::{self, Settings, bookmarks_cache_file, is_repo_name, read_json, write_json};
+use crate::config::{
+    self, Settings, bookmarks_cache_file, is_repo_name, prompts_cache_file, read_json, write_json,
+};
 use crate::github::{Client, Read};
 use crate::recents::{self, RecentEntry};
+use crate::{prompts, repos, translate};
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -48,6 +51,15 @@ pub enum Request {
     OpenUrl {
         url: String,
     },
+    ListPromptFiles,
+    Translate {
+        text: String,
+        targets: Vec<String>,
+    },
+    SetTranslationKey {
+        key: String,
+    },
+    ListGithubRepos,
     /// Pinned tab groups and importing the browser's bookmarks: only the extension can do these.
     #[serde(other)]
     BrowserOnly,
@@ -143,6 +155,55 @@ async fn fetch_quick_notes() -> Result<Value, String> {
         _ => Vec::new(),
     };
     Ok(json!({ "quickNotes": quick_notes }))
+}
+
+async fn refresh_prompts(client: &Client) -> Result<prompts::Cache, String> {
+    let cache = prompts::Cache {
+        repo: client.repo().to_string(),
+        files: prompts::fetch(client).await?,
+        fetched_at: now_ms(),
+    };
+    write_json(&prompts_cache_file(), &cache)?;
+    Ok(cache)
+}
+
+/// Cache first, like the bookmarks: a stale cache still answers and is refreshed behind it.
+async fn list_prompt_files() -> Result<Value, String> {
+    let client = client()?;
+    let cache = read_json::<prompts::Cache>(&prompts_cache_file())
+        .filter(|cache| cache.is_for(client.repo()));
+    let files = match cache {
+        Some(cache) => {
+            if cache.is_stale(now_ms()) {
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = refresh_prompts(&client).await {
+                        eprintln!("prompt refresh failed: {error}");
+                    }
+                });
+            }
+            cache.files
+        }
+        None => refresh_prompts(&client).await?.files,
+    };
+    Ok(json!({ "files": files }))
+}
+
+/// The counts file ranks what it knows; GitHub adds the rest. Either alone is enough, so the
+/// counted repositories still show when not logged in or offline.
+async fn list_github_repos() -> Result<Value, String> {
+    let counts = std::fs::read_to_string(repos::counts_file())
+        .map(|text| repos::parse_counts(&text))
+        .unwrap_or_default();
+    let github = match client() {
+        Ok(client) => client.user_repos().await,
+        Err(error) => Err(error),
+    };
+    let github = match github {
+        Ok(github) => github,
+        Err(_) if !counts.is_empty() => Vec::new(),
+        Err(error) => return Err(error),
+    };
+    Ok(json!({ "repos": repos::ranked(counts, github) }))
 }
 
 /// Hands an http(s) URL to the default browser.
@@ -246,6 +307,17 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             Ok(json!({ "synced": true, "bookmarks": cache.bookmarks.len() }))
         }
         Request::OpenUrl { url } => open_url(&url),
+        Request::ListPromptFiles => list_prompt_files().await,
+        Request::Translate { text, targets } => {
+            let key = config::deepl_key()?;
+            let translations = translate::translate(&key, text.trim(), &targets).await?;
+            Ok(json!({ "translations": translations }))
+        }
+        Request::SetTranslationKey { key } => {
+            config::store_deepl_key(key.trim())?;
+            Ok(json!({}))
+        }
+        Request::ListGithubRepos => list_github_repos().await,
         Request::BrowserOnly => Err(format!(
             "{kind} needs the browser extension — the desktop palette cannot do that yet"
         )),
@@ -287,6 +359,25 @@ mod tests {
             Request::OpenUrl {
                 url: "https://x.example/".into()
             }
+        );
+        assert_eq!(
+            parse(json!({ "type": "LIST_PROMPT_FILES" })),
+            Request::ListPromptFiles
+        );
+        assert_eq!(
+            parse(json!({ "type": "TRANSLATE", "text": "Hallo", "targets": ["EN-US", "DE"] })),
+            Request::Translate {
+                text: "Hallo".into(),
+                targets: vec!["EN-US".into(), "DE".into()],
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "SET_TRANSLATION_KEY", "key": "k:fx" })),
+            Request::SetTranslationKey { key: "k:fx".into() }
+        );
+        assert_eq!(
+            parse(json!({ "type": "LIST_GITHUB_REPOS" })),
+            Request::ListGithubRepos
         );
     }
 
