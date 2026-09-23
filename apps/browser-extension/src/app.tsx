@@ -1,16 +1,14 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
+import { CONSOLE_URL } from './console';
 import { ActionLogForm } from './components/ActionLogForm';
 import { BookmarkPageForm } from './components/BookmarkPageForm';
-import { PinnedTabsPanel } from './components/PinnedTabsPanel';
 import { QuickActions } from './components/QuickActions';
-import { CONSOLE_URL } from './console';
+import { PinnedTabsPanel } from './components/PinnedTabsPanel';
 import './index.css';
 
 export function App() {
   const [token, setToken] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<{ title: string; url: string; tabId: number } | null>(
-    null,
-  );
+  const [activeTab, setActiveTab] = useState<{ title: string; url: string; tabId: number } | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [dumpNote, setDumpNote] = useState('');
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
@@ -39,29 +37,26 @@ export function App() {
           headers: {
             Authorization: `Bearer ${storedToken}`,
             Accept: 'application/vnd.github.v3+json',
-          },
+          }
         })
-          .then((res) => {
+          .then(res => {
             if (!res.ok) throw new Error('Failed to fetch repos');
             return res.json();
           })
-          .then((data) => {
+          .then(data => {
             const fetchedRepos = data.map((r: any) => ({ full_name: r.full_name }));
             setRepos(fetchedRepos);
 
             chrome.storage.local.set({ lifeos_repos: fetchedRepos });
 
             // If current active repo is not in the list, default to the first one
-            if (
-              fetchedRepos.length > 0 &&
-              !fetchedRepos.some((r: any) => r.full_name === storedRepo)
-            ) {
+            if (fetchedRepos.length > 0 && !fetchedRepos.some((r: any) => r.full_name === storedRepo)) {
               const newDefault = fetchedRepos[0].full_name;
               setActiveRepo(newDefault);
               chrome.storage.local.set({ lifeos_repo: newDefault });
             }
           })
-          .catch((err) => {
+          .catch(err => {
             console.error('Error fetching repos:', err);
           });
       }
@@ -157,21 +152,18 @@ export function App() {
     setStatus('saving');
     try {
       setErrorMessage(null);
-      chrome.runtime.sendMessage(
-        { type: 'DUMP_NOTE', note: dumpNote, path: selectedNote },
-        (response) => {
-          if (chrome.runtime.lastError || (response && response.error)) {
-            const err = chrome.runtime.lastError?.message || response?.error || 'Unknown error';
-            console.error('Error saving dump note:', err);
-            setErrorMessage(err);
-            setStatus('error');
-          } else {
-            setDumpNote('');
-            setStatus('success');
-            setTimeout(() => setStatus('idle'), 2000);
-          }
-        },
-      );
+      chrome.runtime.sendMessage({ type: 'DUMP_NOTE', note: dumpNote, path: selectedNote }, (response) => {
+        if (chrome.runtime.lastError || (response && response.error)) {
+          const err = chrome.runtime.lastError?.message || response?.error || 'Unknown error';
+          console.error('Error saving dump note:', err);
+          setErrorMessage(err);
+          setStatus('error');
+        } else {
+          setDumpNote('');
+          setStatus('success');
+          setTimeout(() => setStatus('idle'), 2000);
+        }
+      });
     } catch (e: any) {
       console.error(e);
       setErrorMessage(e.message || 'Unknown error');
@@ -184,25 +176,22 @@ export function App() {
     setStatus('saving');
     try {
       setErrorMessage(null);
-      chrome.runtime.sendMessage(
-        {
-          type: 'ADD_ACTION_LOG',
-          description: desc,
-          tags: tags,
-          path: selectedNote,
-        },
-        (response) => {
-          if (chrome.runtime.lastError || (response && response.error)) {
-            const err = chrome.runtime.lastError?.message || response?.error || 'Unknown error';
-            console.error('Error saving action log:', err);
-            setErrorMessage(err);
-            setStatus('error');
-          } else {
-            setStatus('success');
-            setTimeout(() => setStatus('idle'), 2000);
-          }
-        },
-      );
+      chrome.runtime.sendMessage({
+        type: 'ADD_ACTION_LOG',
+        description: desc,
+        tags: tags,
+        path: selectedNote
+      }, (response) => {
+        if (chrome.runtime.lastError || (response && response.error)) {
+          const err = chrome.runtime.lastError?.message || response?.error || 'Unknown error';
+          console.error('Error saving action log:', err);
+          setErrorMessage(err);
+          setStatus('error');
+        } else {
+          setStatus('success');
+          setTimeout(() => setStatus('idle'), 2000);
+        }
+      });
     } catch (e: any) {
       console.error(e);
       setErrorMessage(e.message || 'Unknown error');
@@ -214,9 +203,7 @@ export function App() {
     return (
       <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-6 flex flex-col items-center justify-center space-y-4 font-mono">
         <div class="text-xl font-bold tracking-tight">kaihuman</div>
-        <p class="text-center text-[var(--los-fg-dim)] text-sm">
-          Please login to the console to use the extension.
-        </p>
+        <p class="text-center text-[var(--los-fg-dim)] text-sm">Please login to the console to use the extension.</p>
         <button
           onClick={handleLogin}
           class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold rounded hover:opacity-90 transition-opacity"
@@ -274,20 +261,14 @@ export function App() {
               onChange={handleRepoChange}
               class="text-[10px] text-[var(--los-fg)] font-mono bg-[var(--los-bg)] border border-[var(--los-border)] rounded px-1 py-0.5 max-w-[150px] truncate focus:outline-none focus:border-[var(--los-accent)] cursor-pointer"
             >
-              {repos.map((r) => (
-                <option
-                  key={r.full_name}
-                  value={r.full_name}
-                  class="bg-[var(--los-bg)] text-[var(--los-fg)]"
-                >
+              {repos.map(r => (
+                <option key={r.full_name} value={r.full_name} class="bg-[var(--los-bg)] text-[var(--los-fg)]">
                   {r.full_name}
                 </option>
               ))}
             </select>
           ) : (
-            activeRepo && (
-              <span class="text-[10px] text-[var(--los-fg-dim)] font-mono">{activeRepo}</span>
-            )
+            activeRepo && <span class="text-[10px] text-[var(--los-fg-dim)] font-mono">{activeRepo}</span>
           )}
         </div>
       </header>
@@ -319,27 +300,24 @@ export function App() {
                 class="text-[10px] text-[var(--los-fg-dim)] font-mono bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded px-1 py-0.5 max-w-[150px] truncate focus:outline-none focus:border-[var(--los-accent)] cursor-pointer"
                 title={`${activeRepo || 'lifosy/monorepo'}/${selectedNote}`}
               >
-                <option value=".lifeos/dump.md" class="bg-[var(--los-bg)]">
-                  .lifeos/dump.md
-                </option>
+                <option value=".lifeos/dump.md" class="bg-[var(--los-bg)]">.lifeos/dump.md</option>
                 {quickNotes.map((q) => (
-                  <option key={q} value={q} class="bg-[var(--los-bg)]">
-                    {q}
-                  </option>
+                  <option key={q} value={q} class="bg-[var(--los-bg)]">{q}</option>
                 ))}
               </select>
             ) : (
-              <span
-                class="text-[10px] text-[var(--los-fg-dim)] line-clamp-1 break-all px-2 py-0.5 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]"
-                title={`${activeRepo || 'lifosy/monorepo'}/${selectedNote}`}
-              >
+              <span class="text-[10px] text-[var(--los-fg-dim)] line-clamp-1 break-all px-2 py-0.5 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]" title={`${activeRepo || 'lifosy/monorepo'}/${selectedNote}`}>
                 {selectedNote}
               </span>
             )}
           </div>
 
           {selectedNote.endsWith('.actionlog.md') ? (
-            <ActionLogForm onAdd={handleActionLog} status={status} errorMessage={errorMessage} />
+            <ActionLogForm
+              onAdd={handleActionLog}
+              status={status}
+              errorMessage={errorMessage}
+            />
           ) : (
             <>
               <textarea
