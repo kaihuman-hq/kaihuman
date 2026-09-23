@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-09-23 — Desktop palette reads the DeepL key from `~/.config/envvars/deepl.env`
+
+The daemon is started once, by the first toggle or by the compositor, so a key only in an
+interactive shell never reached it. It now reads the omarchy env file itself, on every
+translation, so editing the key takes effect without a restart:
+
+1. `DEEPL_AUTH_KEY` in the environment, as before;
+2. `$XDG_CONFIG_HOME/envvars/deepl.env` — `DEEPL_AUTH_KEY` or `DEEPL_API_KEY`, parsed like a
+   shell would read it (`export`, quotes, comments, last assignment wins), never executed;
+3. the Secret Service, as before. The "no key" message now names the file.
+
+Checks: desktop `cargo test` 36 passed (1 new), clippy and fmt clean.
+
 ## 2026-09-23 — Translation history in the palette's `t:` mode
 
 - `t:` with nothing typed lists the last 20 translated texts, newest first; ⏎ (or a click) puts one

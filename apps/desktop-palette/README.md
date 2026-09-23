@@ -19,7 +19,7 @@ way.
 | Add a note… (dump, quick-note files, `.actionlog.md` with `#tags`) | ✓ |
 | Recent, Switch repository…, Sync with GitHub now, Open the Lifosy console | ✓ |
 | `p:` prompts from the repo's `.prompts.md` files, ⏎ copies | ✓ (with `wl-copy`) |
-| `t:` translate with DeepL into EN-US and DE (`t: fr: …` for one language), ⏎ copies | ✓ (key from `DEEPL_AUTH_KEY` or the keyring) |
+| `t:` translate with DeepL into EN-US and DE (`t: fr: …` for one language), ⏎ copies | ✓ (key from `DEEPL_AUTH_KEY`, `~/.config/envvars/deepl.env` or the keyring) |
 | `r:` GitHub repositories, ⇥ for issues, pull requests, actions… | ✓, and omarchy's `~/.config/eee/counts` ranks the ones you open most first |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |
 | Counting how often a bookmark is opened | — the extension counts; the desktop does not yet |
@@ -32,8 +32,14 @@ The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-re
 
 - **`p:`** reads every `.prompts.md` on the repository's default branch — for example
   `Resources/ai/useful-prompts.prompts.md` — through GitHub rather than a local clone.
-- **`t:`** needs a DeepL key: run **Set the DeepL API key…** (stored in the Secret Service, next to
-  the token), or export `DEEPL_AUTH_KEY` as for omarchy's script.
+- **`t:`** needs a DeepL key. It is looked up on every translation, first match wins:
+  1. `DEEPL_AUTH_KEY` in the daemon's environment;
+  2. `~/.config/envvars/deepl.env` (`$XDG_CONFIG_HOME/envvars/deepl.env`), the omarchy env file —
+     a `DEEPL_AUTH_KEY=…` (or `DEEPL_API_KEY=…`) line, `export` and quotes allowed;
+  3. the Secret Service, where **Set the DeepL API key…** stores it.
+
+  Because the file is read at translation time, editing it needs no daemon restart, and the
+  toggle does not need to load anything.
 - **`r:`** reads `$EEE_COUNTS_FILE` or `~/.config/eee/counts` (`owner/repo count` per line), lists
   those repositories by count, then the rest of your GitHub repositories. Without a login or a
   network, the counted ones still show.

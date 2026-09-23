@@ -11,15 +11,50 @@ const KEYRING_SERVICE: &str = "lifosy-palette";
 const KEYRING_USER: &str = "github-token";
 const KEYRING_DEEPL_USER: &str = "deepl-api-key";
 
-/// `$XDG_<kind>_HOME/lifosy`, falling back to the spec's default under `$HOME`.
-fn xdg_dir(variable: &str, fallback: &str) -> PathBuf {
-    let base = std::env::var_os(variable)
+/// `$XDG_<kind>_HOME`, falling back to the spec's default under `$HOME`.
+fn xdg_base(variable: &str, fallback: &str) -> PathBuf {
+    std::env::var_os(variable)
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
         .unwrap_or_else(|| {
             PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(fallback)
-        });
-    base.join("lifosy")
+        })
+}
+
+/// `$XDG_<kind>_HOME/lifosy`.
+fn xdg_dir(variable: &str, fallback: &str) -> PathBuf {
+    xdg_base(variable, fallback).join("lifosy")
+}
+
+/// Where the omarchy dotfiles keep one shell env file per secret, sourced by the scripts that need
+/// it (and edited with `ee`).
+pub fn deepl_env_file() -> PathBuf {
+    xdg_base("XDG_CONFIG_HOME", ".config").join("envvars/deepl.env")
+}
+
+/// The DeepL key variables an env file may set, in order of preference.
+const DEEPL_KEY_NAMES: [&str; 2] = ["DEEPL_AUTH_KEY", "DEEPL_API_KEY"];
+
+/// What a shell would get from sourcing `text` for the first of `names` it sets: `NAME=value`
+/// lines, `export` optional, the value optionally quoted. A later assignment wins, as in a shell.
+pub fn env_file_value(text: &str, names: &[&str]) -> Option<String> {
+    let assignments: Vec<(&str, &str)> = text
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.starts_with('#'))
+        .map(|line| line.strip_prefix("export ").unwrap_or(line))
+        .filter_map(|line| line.split_once('='))
+        .map(|(name, value)| (name.trim(), value.trim()))
+        .collect();
+    names.iter().find_map(|wanted| {
+        let (_, raw) = assignments.iter().rev().find(|(name, _)| name == wanted)?;
+        let value = match raw.chars().next() {
+            Some(quote @ ('"' | '\'')) => raw[1..].split(quote).next().unwrap_or_default(),
+            // Unquoted, a ` #` starts a comment.
+            _ => raw.split(" #").next().unwrap_or_default().trim(),
+        };
+        (!value.is_empty()).then(|| value.to_string())
+    })
 }
 
 pub fn config_file() -> PathBuf {
@@ -163,8 +198,9 @@ pub fn forget_token() -> Result<(), String> {
     }
 }
 
-/// The DeepL key from `DEEPL_AUTH_KEY` if set (the variable omarchy's translate script reads),
-/// else from the Secret Service, where “Set the DeepL API key…” puts it.
+/// The DeepL key, looked up on every translation so an edited file needs no daemon restart:
+/// `DEEPL_AUTH_KEY` in the environment, else `~/.config/envvars/deepl.env`, else the Secret
+/// Service, where “Set the DeepL API key…” puts it.
 pub fn deepl_key() -> Result<String, String> {
     if let Some(key) = std::env::var("DEEPL_AUTH_KEY")
         .ok()
@@ -172,11 +208,19 @@ pub fn deepl_key() -> Result<String, String> {
     {
         return Ok(key);
     }
+    let env_file = deepl_env_file();
+    if let Some(key) = std::fs::read_to_string(&env_file)
+        .ok()
+        .and_then(|text| env_file_value(&text, &DEEPL_KEY_NAMES))
+    {
+        return Ok(key);
+    }
     match keyring_entry(KEYRING_DEEPL_USER)?.get_password() {
         Ok(key) => Ok(key),
-        Err(keyring::Error::NoEntry) => {
-            Err("No DeepL API key yet — run “Set the DeepL API key…” first".into())
-        }
+        Err(keyring::Error::NoEntry) => Err(format!(
+            "No DeepL API key yet — put DEEPL_AUTH_KEY=… in {}, or run “Set the DeepL API key…”",
+            env_file.display()
+        )),
         Err(error) => Err(format!(
             "Could not read the DeepL key from the keyring ({error}). Is a Secret Service running?"
         )),
@@ -204,6 +248,40 @@ pub fn store_deepl_key(key: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_an_env_file_like_a_shell_would() {
+        let names = ["DEEPL_AUTH_KEY", "DEEPL_API_KEY"];
+        assert_eq!(
+            env_file_value("DEEPL_AUTH_KEY=abc:fx\n", &names).as_deref(),
+            Some("abc:fx")
+        );
+        assert_eq!(
+            env_file_value("# key\nexport DEEPL_AUTH_KEY=\"a b:fx\"  # note\n", &names).as_deref(),
+            Some("a b:fx")
+        );
+        assert_eq!(
+            env_file_value(
+                "DEEPL_API_KEY='x' \nDEEPL_AUTH_KEY=old\nDEEPL_AUTH_KEY=new # c",
+                &names
+            )
+            .as_deref(),
+            Some("new")
+        );
+        assert_eq!(
+            env_file_value("DEEPL_API_KEY=only", &names).as_deref(),
+            Some("only")
+        );
+        for none in [
+            "",
+            "# DEEPL_AUTH_KEY=x",
+            "DEEPL_AUTH_KEY=",
+            "OTHER=x",
+            "DEEPL_AUTH_KEYS=x",
+        ] {
+            assert_eq!(env_file_value(none, &names), None, "{none:?}");
+        }
+    }
 
     #[test]
     fn accepts_owner_slash_name_only() {
