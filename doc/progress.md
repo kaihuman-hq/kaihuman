@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-09-23 — Native palette plan revised for Hyprland
+
+- `doc/native-command-palette.md` is rewritten for Fedora with Hyprland, a tiling compositor, and
+  with the shortcut left to the user's own config. The palette becomes a layer-shell overlay (Tauri
+  plus gtk-layer-shell), which the compositor centers on the focused monitor. The fallback is a
+  floating window with compositor rules.
+  - Dropped: the GNOME Shell extension and the mutter centering setting.
+  - Added: running a Secret Service yourself, because Hyprland does not start one.
+  - The single-instance plugin replaces the custom D-Bus service.
+  - A dmenu-style pipe mode is an optional last phase.
+
 ## 2026-09-23 — Study: a native command palette for the desktop
 
 - `doc/native-command-palette.md`: research and a phased plan for a palette that opens in the

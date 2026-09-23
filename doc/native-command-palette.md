@@ -1,133 +1,164 @@
 # Native command palette for the desktop — study and plan
 
-Status: research only, nothing implemented. Written 2026-09-23 for Fedora with GNOME on Wayland.
-Everything below comes from documentation and issue trackers. None of it was tried on a Fedora
-machine, so each phase starts with a spike that checks the risky assumptions first.
+Status: research only, nothing implemented. Revised 2026-09-23 for the actual setup: Fedora with
+**Hyprland**, a tiling Wayland compositor. The palette must also behave on other tiling compositors.
+You bind the shortcut yourself.
+
+Everything below comes from documentation, issue trackers and similar projects. None of it was tried
+on a Hyprland machine, so phase 0 is a spike that checks the risky parts first.
 
 ## Goal
 
-A global shortcut opens the palette at the **center of the current monitor**, from any app, not only
-from Chrome. It has the same content as the extension's palette: bookmarks, repo search, web search,
-notes, and (through the extension) pinned tab groups.
+Your own app, `lifosy-palette`. Running `lifosy-palette toggle` opens a palette **centered on the
+focused monitor**, over whatever is tiled there, with the keyboard in its input. It has the same
+content as the extension's palette: bookmarks, repo search, web search and notes. Pinned tab groups
+come later, through the extension.
 
-## What constrains the design on Fedora
+## What changes compared with the GNOME version
 
-- **Wayland only.** Fedora 44 ships GNOME 50, which removed the X11 session. X11 apps still run
-  through XWayland, but X11 key grabs there only fire while an X11 window has focus.
-- **An app cannot register a global shortcut itself.**
-  - `tauri-plugin-global-shortcut` (v2.3.x, on the `global-hotkey` crate) is X11-only on Linux.
-    Wayland support through the portal is an open, unmerged PR (`global-hotkey` #162, #172).
-  - GNOME has had the XDG `GlobalShortcuts` portal since GNOME 48. On GNOME 50 an app that is not a
-    Flatpak must first register an app id (`host.portal.Registry.Register`). Electron and Chromium
-    currently fail at that step (electron#51875).
-  - What does work: a **custom keyboard shortcut in GNOME Settings** that runs a command. GNOME
-    Shell handles that key itself. Ulauncher, Albert and Vicinae all rely on this.
-- **An app cannot position its own window.** Wayland has no protocol for it. In Tauri,
-  `center()`, `set_position()` and `always_on_top` silently do nothing on Wayland (tauri#10775,
-  #14913). Centering is the compositor's decision. On GNOME:
-  `gsettings set org.gnome.mutter center-new-windows true` centers *new* windows on the active
-  monitor. So the window must be created again, or at least unmapped and remapped, each time the
-  palette opens.
-- **No layer-shell on GNOME.** `wlr-layer-shell` is what rofi 2.0, fuzzel, wofi, tofi, walker and
-  anyrun need, and mutter does not implement it. rofi exits with "requires layer shell"; `rofi -x11`
-  starts but gets no keyboard input. dmenu is X11-only. **So the dmenu family is not an option on
-  GNOME.** It would only work on KDE or Sway.
-- **Focus-stealing prevention.** Mutter focuses a new window only when it comes with a valid
-  `XDG_ACTIVATION_TOKEN`. Otherwise the user gets an "*App* is ready" notification and the palette
-  opens without focus. GNOME's own blog names "launched from a custom shortcut" as a case that hits
-  this. **This is the biggest risk for any option that is not a GNOME Shell extension.**
+| Topic | GNOME (earlier draft) | Hyprland |
+| --- | --- | --- |
+| Hotkey | GNOME custom shortcut; portal broken on GNOME 50 | Yours: `bind = SUPER, SPACE, exec, lifosy-palette toggle` (Lua config since Hyprland 0.55) |
+| Centering | mutter's `center-new-windows`, recreate the window every time | **layer-shell**: a surface with no anchors is centered by the compositor. Or a floating window with a `center` rule |
+| Tiling | not a concern | a normal window would be **tiled**; it must be a layer surface or a floating window |
+| Focus stealing | biggest risk | small: a layer surface with exclusive keyboard mode takes the keyboard |
+| GNOME Shell extension (old phase 3) | fallback for focus | **dropped** |
+| dmenu family (rofi 2, fuzzel, wofi, walker) | do not run on GNOME | run fine. Not chosen, since you want your own app, but useful as a comparison |
+| Token storage | gnome-keyring always running | **no Secret Service by default**; you have to run one (gnome-keyring or KeePassXC) |
+| Opening URLs | GNOME's default apps | `xdg-open` reads `mimeapps.list`; set the default browser with `xdg-settings` |
 
-## Options compared
+## Two ways to put a Tauri window on top of a tiling layout
 
-| Option | Global key | Centered and focused | Reuses our TS | Weight | Effort |
-| --- | --- | --- | --- | --- | --- |
-| **Tauri v2 daemon + GNOME custom shortcut** | shortcut runs a CLI | mutter setting; focus is a risk | high (Preact UI and palette logic) | ~80–150 MB (estimate) | medium |
-| GTK4 app (GJS/TS or Rust) | shortcut runs a CLI | best without an extension (GApplication forwards the token) | logic only, UI rewritten | low | medium–high |
-| GNOME Shell extension (GJS + TS types) | native keybinding | exact center, guaranteed focus | logic only, no DOM | tiny | medium; breaks between GNOME versions |
-| Vicinae (existing launcher) + our TS extension | its GNOME extension | good | high (React/TS extensions) | low–medium | **low**, but a young project from a personal COPR |
-| rofi / fuzzel / dmenu + script | shortcut runs a CLI | **does not run on GNOME** | script only | tiny | low (KDE/Sway only) |
-| Electron | portal broken on GNOME 50; shortcut | same as Tauri | highest | high | low–medium |
+### A. Layer-shell surface (recommended; what launchers do)
 
-## Is Tauri the right choice?
+`wlr-layer-shell` lets a client say "I am an overlay on the top layer". Anchoring on no edges means
+the compositor centers the surface. Leaving the output unset means the compositor picks the focused
+monitor. With keyboard mode *exclusive* the surface takes the keyboard until it closes.
 
-**Yes, as the app that draws the palette, but not for its shortcut or window placement.** The UI is
-a web page we already have: `command-palette.ts` and `web-search.ts` make no `chrome.*` calls, and
-`actions.ts` only needs its `send()` replaced. Tauri keeps that code at a fraction of Electron's size
-and runs fine on Fedora (WebKitGTK 4.1). The parts Tauri cannot do on Wayland are covered by GNOME:
-the custom shortcut provides the hotkey, `center-new-windows` provides the placement, and a small
-Shell extension can take over if focus proves unreliable.
+The same code then works on Hyprland, Sway, river, niri, KDE and COSMIC, with no window rules and
+nothing to configure except the key.
+
+**Tauri has no built-in support for this.** The Linux window underneath Tauri is a GTK3 window,
+and people apply `gtk-layer-shell` (Rust crate `gtk-layer-shell`) to it. Wield
+([Tauri + layer-shell command palette](https://github.com/DhanushSantosh/Wield/pull/10)) does exactly
+this. It reports these problems on Hyprland:
+
+- The window must be set up as a layer surface *before* it is shown. In Tauri that means creating
+  it hidden (`visible: false`) and calling `gtk_layer_init_for_window` on `window.gtk_window()`
+  first.
+- `resizable: true` broke transparency on Hyprland 0.56.2, so keep it `false`.
+- Set a namespace of your own (`lifosy-palette`). The default `gtk-layer-shell` namespace can pick
+  up layer rules meant for other tools.
+- Exclusive keyboard mode means a click outside does not close the palette. Only Esc does, unless
+  you handle it with the *on-demand* mode plus closing on focus loss.
+
+### B. Normal window made to float with compositor rules (fallback)
+
+A plain Tauri window, with the class set to `lifosy-palette`, plus a rule in your config: float,
+center, pin, stay focused, no animations. This takes no special code. The downsides:
+
+- Every compositor needs its own rules (Hyprland rules, Sway's `for_window`, and so on).
+- The rule syntax changes: Hyprland moved from `windowrulev2` to Lua `hl.window_rule()` in 0.55.
+
+The phase 0 spike builds both A and B. A is kept if it behaves; B is the fallback we ship.
+
+## Is Tauri still the right choice?
+
+**Yes, and more so than on GNOME.**
+
+- Hyprland is the compositor that works *with* launcher-style overlays, so the Wayland limits that
+  made Tauri awkward on GNOME mostly disappear.
+- The remaining gap is layer-shell, and it is a known, small integration (option A above).
+- Tauri keeps the Preact UI and palette logic we already have. `command-palette.ts` and
+  `web-search.ts` make no `chrome.*` calls, and `actions.ts` only needs its `send()` replaced.
+
+The only real alternative is GTK4 with `gtk4-layer-shell` in Rust (as
+[hyprlaunch](https://github.com/azzuriel/hyprlaunch) does). It has better native support for
+layer-shell, but the UI would be written again and the TypeScript logic could not be reused. Keep it
+as the fallback if the WebKitGTK + layer-shell combination turns out unreliable.
 
 ## Plan
 
-### Phase 0 — spike (1–2 days, throwaway) → decides go or no-go
+### Phase 0 — spike (1–2 days, throwaway) → decides A or B
 
-1. Build a minimal Tauri v2 app that is one undecorated 620×420 window with an input field.
-2. Add a GNOME custom shortcut (`Super+Space`) that runs `lifosy-palette toggle`.
-3. Verify, on GNOME 49 and 50, with one and with two monitors:
-   - The window opens centered on the monitor the pointer or focus is on.
-   - The input has keyboard focus immediately, with no "is ready" notification.
-   - It opens in under 150 ms while the daemon is running.
-4. If focus fails, try forwarding `XDG_ACTIVATION_TOKEN` from the CLI to the daemon. If that fails
-   too, go to phase 3 early.
+1. Build a minimal Tauri v2 app: one 620×420 undecorated, transparent, non-resizable window with an
+   input field.
+2. Build it as a layer surface (A) and as a floating window with rules (B).
+3. Bind `lifosy-palette toggle` in `hyprland.conf` yourself.
+4. Verify:
+   - It opens centered on the *focused* monitor with two monitors, including a monitor with scaling.
+   - It opens above a fullscreen window.
+   - Typing goes into the input straight away.
+   - Esc closes it and gives focus back to the previous window.
+   - It opens in under 100 ms with the daemon running.
+   - Transparency and rounded corners render correctly (WebKitGTK; test NVIDIA if you have one).
+5. Test a Wayland build only. Force `GDK_BACKEND=wayland`, since some Tauri bundles fall back to
+   X11.
 
 ### Phase 1 — share the palette (extension-only refactor, shippable by itself)
 
-1. Move `command-palette.ts`, `web-search.ts` and the bookmark search into
-   `packages/palette`, with their tests.
+1. Move `command-palette.ts`, `web-search.ts` and the bookmark search into `packages/palette`, with
+   their tests.
 2. Replace the `chrome.runtime.sendMessage` in `actions.ts` with an `ActionPort` interface. The
    extension implements it with messaging.
 3. Verify: the extension's tests and build pass unchanged.
 
 ### Phase 2 — `apps/desktop-palette` (Tauri v2, Preact frontend)
 
-1. **Process model.** A daemon runs as a systemd user unit (`lifosy-palette.service`) and keeps the
-   webview warm. The CLI `lifosy-palette toggle` talks to the daemon over D-Bus
-   (`com.lifosy.Palette`) and passes the activation token along.
-2. **Window.** Undecorated, no taskbar entry. It is created (or remapped) on every toggle so mutter
-   centers it, and it closes on Esc or when it loses focus.
+1. **Process model.** One resident process, started by `exec-once = lifosy-palette daemon` or a
+   systemd user unit. Use `tauri-plugin-single-instance`: running `lifosy-palette toggle` again hands
+   its arguments to the running instance, which shows or hides the palette. This needs no D-Bus
+   service or socket of our own.
+2. **Window.** A layer surface (or a floating window if phase 0 picks B). It is created once and
+   then shown and hidden, since the compositor centers it again each time it is mapped. It closes on
+   Esc and after opening a result.
 3. **ActionPort for the desktop.** Commands go through Tauri `invoke` to Rust.
-   - The GitHub REST calls (bookmarks file, code search, note commits) move to `reqwest` in Rust, so
-     there is no CORS and the token stays out of the webview.
-   - The bookmark cache lives in `~/.cache/lifosy/`, with the same hour-long budget as the
+   - The GitHub REST calls (bookmarks file, code search, note commits) move to `reqwest`, so there
+     is no CORS and the token stays out of the webview.
+   - The bookmark cache lives in `$XDG_CACHE_HOME/lifosy/`, with the same hour-long budget as the
      extension.
-4. **Token.** Stored in the Secret Service (gnome-keyring) with the `keyring` crate. It is set once
-   with `lifosy-palette login` (paste a token, or a later device-flow login). It is never written
-   to disk in plain text.
-5. **Opening URLs.** Use `tauri-plugin-opener` (xdg-open), so bookmarks and web searches open in
-   the default browser.
-6. **Setup script.** `lifosy-palette install` writes the gsettings custom keybinding, sets
-   `center-new-windows`, and enables the user unit.
-7. **Packaging.** RPM from the Tauri bundler. Avoid AppImage (reported Wayland crashes) and Flatpak
-   (the single-instance plugin's D-Bus naming has caused Flathub rejections).
-8. **Verify.** Vitest for the shared logic, Rust unit tests for the GitHub client, and a manual
-   checklist from phase 0 on each GNOME release.
+4. **Token.** Stored in the Secret Service with the `keyring` crate, and set once with
+   `lifosy-palette login`.
+   - On Hyprland you must run a Secret Service yourself, for example `gnome-keyring-daemon` from
+     `exec-once` or KeePassXC with its Secret Service integration.
+   - If none is running, the palette says so and exits. It does not fall back to a plain-text file.
+5. **Opening URLs.** Use `tauri-plugin-opener` (xdg-open). Bookmarks and web searches open in your
+   default browser, and Hyprland focuses that browser's window.
+6. **Config.** A small `$XDG_CONFIG_HOME/lifosy/palette.toml` for the repo and theme. The shortcut
+   stays in your compositor config and is documented, not installed.
+7. **Packaging.** An RPM from the Tauri bundler, or a plain `cargo install` for your own machine.
+   Avoid AppImage: its GTK hook forces X11, and Wayland crashes have been reported.
+8. **Verify.** Vitest for the shared logic, Rust unit tests for the GitHub client, and the phase 0
+   checklist after each Hyprland update.
 
-### Phase 3 — only if focus or centering is unreliable: a tiny GNOME Shell extension
-
-About 50 lines of GJS. It owns the keybinding (`Main.wm.addKeybinding`), calls the daemon over
-D-Bus, and then activates and centers the palette window on the monitor under the pointer. This is
-the pattern Vicinae uses. The cost is re-testing it on every GNOME major version.
-
-### Phase 4 — optional: talk to Chrome through native messaging
+### Phase 3 — optional: talk to Chrome through native messaging
 
 A native messaging host (`~/.config/google-chrome/NativeMessagingHosts/com.lifosy.palette.json`)
-lets the desktop palette load pinned tab groups and open a URL in the current Chrome window.
+lets the desktop palette list and load pinned tab groups and open a URL in the current Chrome
+window.
 
 - Chrome must start the connection (`connectNative` from the service worker); the host then relays
-  to the daemon over a Unix socket.
+  to the daemon over a Unix socket in `$XDG_RUNTIME_DIR`.
 - This does not work with Flatpak Chrome without extra sandbox setup.
 
-## The lower-effort alternative
+### Phase 4 — optional: a pipe mode like dmenu
 
-If owning an app is not the point, use **Vicinae** (COPR `scottames/vicinae`) together with its GNOME
-extension, and write a Vicinae TypeScript extension that imports `packages/palette`. That gives
-centering and focus on GNOME today, for about a week of work. The cost is depending on a young
-project and a personal COPR.
+Once there is an app, `lifosy-palette --dmenu` (read choices from stdin, print the pick to stdout)
+costs little. With it the palette can replace fuzzel or wofi in your own scripts.
 
 ## Risks to re-check
 
-- The GlobalShortcuts portal on GNOME 50 and later, and Tauri's portal PR. Once they work, the
-  custom shortcut can become an in-app setting.
-- Fedora 45 / GNOME 51 is due around October 2026. Re-run the phase 0 checklist on it.
-- WebKitGTK rendering and NVIDIA quirks. Keep `WEBKIT_DISABLE_DMABUF_RENDERER=1` ready as a
-  workaround.
+- The WebKitGTK + gtk-layer-shell combination is used by few projects. If phase 0 shows rendering or
+  input bugs, use option B, or fall back to GTK4 + gtk4-layer-shell in Rust.
+- Hyprland changes quickly: the move to a Lua config, and rule-name changes. Pin the rules you rely
+  on in the README and re-run the checklist after each update.
+- WebKitGTK and NVIDIA quirks. Keep `WEBKIT_DISABLE_DMABUF_RENDERER=1` ready as a workaround.
+- Nothing starts a Secret Service on Hyprland by default. That is the most likely "works on my
+  machine" failure.
+
+## If this ever has to run on GNOME
+
+GNOME has no layer-shell. There the palette falls back to option B, with mutter's
+`center-new-windows` setting doing the centering and a custom shortcut calling
+`lifosy-palette toggle`. Focus-stealing prevention may show an "is ready" notification instead of
+focusing the window. A small GNOME Shell extension would be needed to guarantee focus.
