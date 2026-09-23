@@ -9,6 +9,7 @@ A personal life-OS built on GitHub — notes, dashboards, habits, and tasks, all
 | `apps/cli` | Rust + Ratatui | Terminal UI — notes, file browser, AI prompt, dashboard |
 | `apps/console` | Preact + Vite | Web dashboard (files, kanban, analytics) |
 | `apps/browser-extension` | Preact + CRXJS | Browser extension |
+| `apps/kb-mcp` | Node + MCP SDK | MCP server over the `.kh/` knowledge base |
 
 ## Prerequisites
 

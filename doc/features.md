@@ -10,6 +10,8 @@
 
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
+| Wiki view: clickable `[[wikilinks]]`, backlinks, page type and tags, tag filter, repo-stored images | `/wiki` | 2026-09-23 |
+| Knowledge base commands: `/kb-ask --save` files answers, new `/kb-digest` for personal data, interactive `/kb-ingest`, `/kb-lint` stale claims and suggestions | `/knowledge` → Commands | 2026-09-23 |
 | Bookmarks (`.bookmarks.json`) — tagged, searchable bookmarks; mirrored into the browser extension | New File → Bookmarks | 2026-09-22 |
 | Prompt library (`.prompts.md`) — searchable, taggable prompts in one grep-able file | New File → Prompts | 2026-09-16 |
 | Configurable desktop bottom navbar (stored in `.kh` config) | Settings → Bottom Navbar | 2026-06-26 |
@@ -25,6 +27,8 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Pin to Knowledge Base saves the page as Markdown with its images in `.kh/assets/` | popup, palette | 2026-09-23 |
+| Selected-text clips go to `.kh/raw/` as their own notes | context menu, palette | 2026-09-23 |
 | Pinned bookmarks — always first on the start page; pin/unpin from its cards or the console widget | start page cards, Bookmarks widget | 2026-09-22 |
 | Start page — kaihuman's own New Tab page: palette, recently used bookmarks, dump note | New Tab (`chrome_url_overrides`) | 2026-09-22 |
 | Command palette on the New Tab page, which Chrome's own page cannot host | start page | 2026-09-22 |
@@ -43,6 +47,12 @@
 | Edit mode for pinned-tab groups (rename/reorder/delete behind an Edit toggle; one large Load button otherwise) | popup → Pinned Tabs | 2026-09-13 |
 | Named pinned-tab groups (save/load/update/rename/reorder/delete via `.kh/browser.pinnedtabs.json`) | popup → Pinned Tabs | 2026-09-09 |
 | Pinned tabs sync (save/restore Chrome pinned tabs via `.kh/browser.pinnedtabs.json`) | popup → Pinned Tabs | 2026-09-03 |
+
+## Knowledge base MCP server (`apps/kb-mcp`)
+
+| Feature | Location | Added |
+|---------|----------|-------|
+| stdio MCP server: `kb_search`, `kb_read`, `kb_list`, `kb_index`, `kb_log`, `kb_add_raw` over a local clone | `lifosy-kb-mcp --repo <path>` | 2026-09-23 |
 
 ## CLI (`apps/cli`)
 

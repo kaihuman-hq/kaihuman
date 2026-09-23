@@ -383,6 +383,7 @@ export const WikiView = ({ rootPath = '', onEdit }: WikiViewProps) => {
                     return path ? (
                       <a
                         href={`#${path}`}
+                        className="text-[#58a6ff] hover:underline"
                         onClick={(e: MouseEvent) => {
                           e.preventDefault();
                           setActiveFile(path);

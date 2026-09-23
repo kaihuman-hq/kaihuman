@@ -1,5 +1,41 @@
 # Progress
 
+## 2026-09-23 — Knowledge base: closing the gaps with the LLM-wiki pattern
+
+Measured against Karpathy's "LLM wiki" gist (raw sources → LLM-maintained wiki → schema, with
+ingest / query / lint), the `.kh/` knowledge base already had the layers but not the compounding.
+
+- **`/kb-ask --save`** files an answer as a `type: question` wiki page, links it from the pages it
+  cites, adds it to the index and logs it. Without the flag the command offers to file any answer
+  that compares or connects pages.
+- **`/kb-digest [period]`** (new) reads the tracked personal data — action logs, `dump.md`, todos,
+  habit / data-collection / consumption / events CSVs, read-later and bookmarks — read-only, and
+  writes a `tags: [digest, personal]` raw source for the period (default: since the last digest).
+- **Conventions**: one log heading format, `## [YYYY-MM-DD] <op> | <title>`, used by every command;
+  five page types (`source`, `entity`, `concept`, `topic`, `question`) with `type` and `sources`
+  frontmatter, in `CLAUDE.md`, the schema template and the seeded index. `CLAUDE.md` is upgraded in
+  existing repos with the skills; `schema.md` stays the user's and only new repos get the new one.
+- **`/kb-ingest`** now discusses each source (takeaways, planned page changes, contradictions) and
+  waits before writing; `--batch` keeps the unattended run, a filename ingests one source. It writes
+  a `source` page per file and marks contradictions instead of overwriting.
+- **`/kb-lint`** adds stale claims, missing pages, frontmatter checks and data gaps, and ends with
+  questions and sources worth pursuing.
+- **Extension capture**: pinned pages are converted to Markdown from their main content (article /
+  main, without nav, footers, share and comment blocks) instead of `innerText`; up to 10 images
+  (≤ 2 MB each) are downloaded to `.kh/assets/<stamp>/` and linked from the repo root, so the links
+  survive the move to `raw/processed/`. Selection clips become their own `.kh/raw/` notes rather
+  than going to the legacy `.lifeos/clippings.md`, so ingest sees them.
+- **Wiki view**: `[[wikilinks]]` are clickable (by filename, slug or frontmatter title; missing
+  pages shown in red), a "Linked from" backlinks list, the page's type and tags, a tag filter in
+  the sidebar, and repo-stored images loaded with the token.
+- **`apps/kb-mcp`** (new): a stdio MCP server over a local clone — `kb_search`, `kb_read` (with
+  backlinks), `kb_list`, `kb_index`, `kb_log`, `kb_add_raw` — so Claude Code or any MCP client can
+  use the knowledge base as a tool.
+- KB skills bumped to 1.6.0, so opening the Knowledge Base page upgrades existing repos.
+
+Checks: console tsc clean, vitest 116/116 (22 new), biome clean in console and ui; ui build green;
+extension tsc + build green, vitest 233/233 (14 new); kb-mcp build, tsc and biome clean, vitest 42/42.
+
 ## 2026-09-22 — Pinned bookmarks on the start page
 
 - **`pinned` joins the bookmark format** (`BookmarksLogic.ts` in `packages/ui`, `bookmarks.ts` in the

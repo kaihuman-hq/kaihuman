@@ -15,3 +15,13 @@
 - [ ] Git commit from editor (stage + commit changed file)
 - [ ] Multi-repo dashboard (switch between repos without re-syncing all)
 - [ ] AI chat history (persist conversations per repo)
+
+## Knowledge base (LLM-wiki pattern)
+
+- [x] File `/kb-ask` answers back into the wiki (`--save`)
+- [x] `/kb-digest` — personal data as a raw source
+- [x] Shared log format and page types in `CLAUDE.md` and the schema
+- [x] Markdown page capture with images; selection clips into `.kh/raw/`
+- [x] Interactive `/kb-ingest`; `/kb-lint` stale claims and research suggestions
+- [x] Wiki view: wikilinks, backlinks, tags
+- [x] MCP server over the knowledge base (`apps/kb-mcp`)
