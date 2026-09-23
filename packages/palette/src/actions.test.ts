@@ -7,10 +7,12 @@ import {
   dumpMode,
   formatStamp,
   GITHUB_REPO_VIEWS,
+  githubSearchUrl,
   paletteModes,
   portHandlers,
   repoActions,
   splitTags,
+  tsugaUrl,
 } from './actions.js';
 import type { PaletteAction, PaletteMode } from './command-palette.js';
 import type { ActionPort, PaletteProtocol, PaletteRequestType } from './protocol.js';
@@ -239,6 +241,49 @@ describe('paletteModes', () => {
     });
   });
 
+  it('searches a repository: >g lists it, then issues or pull requests, then asks the term', async () => {
+    answers.LIST_GITHUB_REPOS = { repos: [{ fullName: 'o/r', description: 'A repo' }] };
+    const [repo] = await load(mode('g'));
+    // No url of its own, so ⏎ on the repository lists what to search in it.
+    expect(repo).toMatchObject({ title: 'o/r', subtitle: 'A repo' });
+    expect(repo?.url).toBeUndefined();
+    expect(repo?.children?.map((child) => child.title)).toEqual(['Issues', 'Pull requests']);
+    const pulls = repo?.children?.[1]?.action;
+    expect(pulls?.prompts).toEqual([{ label: 'Search term' }]);
+    expect(pulls?.opens?.([' flaky test '])).toEqual({
+      id: 'github-search:o/r/pulls:flaky test',
+      title: 'Pull requests “flaky test”',
+      subtitle: 'o/r',
+      url: 'https://github.com/o/r/pulls?q=is%3Apr+flaky+test',
+    });
+  });
+
+  it('builds GitHub search links, and the plain list without a term', () => {
+    expect(githubSearchUrl('o/r', 'issues', 'login bug')).toBe(
+      'https://github.com/o/r/issues?q=is%3Aissue+login+bug',
+    );
+    expect(githubSearchUrl('o/r', 'issues', '  ')).toBe('https://github.com/o/r/issues');
+  });
+
+  it('opens Tsuga from >l, with the term in quotes when there is one', () => {
+    const logs = mode('l');
+    if (!('link' in logs)) throw new Error('l is not a link');
+    expect(logs.link('')).toMatchObject({ title: 'Tsuga logs', url: tsugaUrl('') });
+    expect(logs.link('search term')).toMatchObject({
+      title: 'Tsuga logs “search term”',
+      url: tsugaUrl('search term'),
+    });
+  });
+
+  it('builds exactly the Tsuga links the team uses', () => {
+    expect(tsugaUrl('')).toBe(
+      'https://app.tsuga.com/explorer?query=context.cloud.camunda.io%2Fowner-team%3Aconsole+&extraColumns=%5B%22file%22%2C%22fn%22%2C%22service%22%5D&clusterIds=8v5j-x2k0n-dzk4',
+    );
+    expect(tsugaUrl(' search term ')).toBe(
+      'https://app.tsuga.com/explorer?query=context.cloud.camunda.io%2Fowner-team%3Aconsole+AND+%22search+term%22&extraColumns=%5B%22file%22%2C%22fn%22%2C%22service%22%5D&clusterIds=8v5j-x2k0n-dzk4',
+    );
+  });
+
   it('stores or forgets the DeepL key', async () => {
     answers.SET_TRANSLATION_KEY = {};
     const setKey = action(repoActions(fakePort), 'set-translation-key');
@@ -373,7 +418,8 @@ describe('claudeUsageMode', () => {
 });
 
 describe('commandsMode', () => {
-  const FILE = '## List a folder #files\n```sh\nls -la $1\n```\n\n## Wi-Fi on\nnmcli radio wifi on';
+  const FILE =
+    '## List a folder #files\n```sh\nls -la {{folder}}\n```\n\n## Wi-Fi on\nnmcli radio wifi on';
   const load = async (canRun: boolean) => {
     answers.LIST_COMMAND_FILES = { files: [{ path: 'ops.commands.md', content: FILE }] };
     const mode = commandsMode(fakePort, { canRun });
@@ -384,8 +430,8 @@ describe('commandsMode', () => {
   it('is >x, and lists each command with its tags and first line', async () => {
     const [list, wifi] = await load(true);
     expect(commandsMode(fakePort, { canRun: true }).prefix).toBe('x');
-    expect(list).toMatchObject({ title: 'List a folder', subtitle: '#files ls -la $1' });
-    expect(list?.action?.prompts).toEqual([{ label: 'Value for $1' }]);
+    expect(list).toMatchObject({ title: 'List a folder', subtitle: '#files ls -la {{folder}}' });
+    expect(list?.action?.prompts).toEqual([{ label: 'folder' }]);
     expect(wifi?.action?.prompts).toEqual([]);
   });
 

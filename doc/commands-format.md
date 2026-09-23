@@ -10,7 +10,12 @@ command palette (`>x`) also runs them.
 ## List a folder #files
 With hidden files.
 ```sh
-ls -la $1
+ls -la {{folder}}
+```
+
+## Free a port #network
+```sh
+sudo kill -9 `sudo lsof -t -i:{{port}}`
 ```
 
 ## Wi-Fi on #network
@@ -18,7 +23,7 @@ nmcli radio wifi on
 
 ## Top words in a column #text
 ```sh
-awk '{print \$1}' $1 | sort | uniq -c | sort -rn | head -$2
+awk '{print $1}' {{file}} | sort | uniq -c | sort -rn | head -{{count}}
 ```
 ````
 
@@ -31,22 +36,26 @@ without a code block is its text, whole. An entry with neither is skipped.
 
 ## Parameters
 
-- `$1` … `$9` are parameters. The palette asks for each in turn (`Value for $1`, …), up to the
-  highest one used — `echo $2` still asks for `$1`. The console gives each a field.
-- Values go in **as typed**, like typing them in a terminal: `-la /tmp` for `ls $1` gives
-  `ls -la /tmp`. Quote in the command (`"$1"`) when a value may contain spaces.
-- `\$1` is a literal `$1` — for awk, shell functions and the like. It is not asked for, and the
-  backslash is removed.
-- `$0`, `$HOME` and every other `$` are left alone.
+- `{{name}}` is a parameter, named by a letter or `_` followed by letters, digits, `_` or `-`;
+  spaces inside the braces are allowed (`{{ port }}`). The palette asks for each by its name, in the
+  order they first appear, and once per name — `cp {{file}} {{file}}.bak` asks for `file` once.
+  The console gives each a field.
+- Values go in **as typed**, like typing them in a terminal: `-la /tmp` for `ls {{folder}}` gives
+  `ls -la /tmp`. Quote in the command (`"{{folder}}"`) when a value may contain spaces.
+- Every `$` is the shell's: `$1`, `\$1`, `$HOME` and awk's `$1` run exactly as written.
+- Braces that are not a name are left alone, so Go templates such as
+  `docker inspect -f '{{.State.Status}}'` or `{{json .Names}}` need no escaping.
+- Until 2026-09-23 parameters were `$1`…`$9`, with `\$1` as a literal `$1`. Those are plain shell
+  now: rewrite `ls $1` as `ls {{folder}}`, and `\$1` as the `$1` it meant.
 
 ## In the apps
 
 - **Console**: New File → Commands. Search, tag filter, a field per parameter with a live preview,
-  and Copy (parameters not filled in stay `$n`). **ADD COMMAND** appends one in a `sh` block.
+  and Copy (parameters not filled in stay `{{name}}`). **ADD COMMAND** appends one in a `sh` block.
   Implementation: `packages/ui/src/LifeOS/Organisms/Widgets/CommandsLogic.ts` and
   `CommandsWidget.tsx`.
 - **Palette `>x`** (desktop and extension): every `.commands.md` in the repository, searched by
-  title, tags, command and note. ⏎ asks for the parameters — the command is shown while you type —
+  title, tags, command and note. ⏎ asks for the parameters by name — the command is shown while you type —
   then offers **Copy** (first, so a hasty ⏎ never runs anything), **Run in terminal** and **Run in
   the background**, with the finished command listed in full below them. The extension only copies.
   Implementation: `packages/palette/src/commands.ts`; running is

@@ -40,14 +40,14 @@ const CopyButton = ({
 );
 
 /**
- * The command library. In focus, each command with parameters gets a field per `$n` and copies
+ * The command library. In focus, each command with parameters gets a field per `{{name}}` and copies
  * with them filled in; running commands is the desktop palette's job (`>x`), since a browser
  * cannot.
  */
 export const CommandsWidget = ({ content, mode, onChange }: CommandsWidgetProps) => {
   const [search, setSearch] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [values, setValues] = useState<Record<number, string[]>>({});
+  const [values, setValues] = useState<Record<number, Record<string, string>>>({});
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const commands = useMemo(() => parseCommands(content), [content]);
@@ -85,12 +85,8 @@ export const CommandsWidget = ({ content, mode, onChange }: CommandsWidgetProps)
     setTimeout(() => setCopiedIndex((current) => (current === index ? null : current)), 1500);
   };
 
-  const setValue = (index: number, position: number, value: string) =>
-    setValues((all) => {
-      const next = [...(all[index] ?? [])];
-      next[position] = value;
-      return { ...all, [index]: next };
-    });
+  const setValue = (index: number, name: string, value: string) =>
+    setValues((all) => ({ ...all, [index]: { ...all[index], [name]: value } }));
 
   if (mode === 'ADD') {
     return (
@@ -116,7 +112,7 @@ export const CommandsWidget = ({ content, mode, onChange }: CommandsWidgetProps)
     );
   }
 
-  // Outside focus there are no parameter fields, so a command copies as written, `$1` and all.
+  // Outside focus there are no parameter fields, so a command copies as written, `{{name}}` and all.
   const compactList = (limit: number) =>
     commands.slice(0, limit).map((entry, index) => (
       <div
@@ -208,14 +204,12 @@ export const CommandsWidget = ({ content, mode, onChange }: CommandsWidgetProps)
       <div className="flex flex-col gap-4">
         {filtered.map(({ entry, index }) => {
           const parameters = commandParameters(entry.command);
-          const typed = values[index] ?? [];
-          // A parameter not typed yet stays `$n`, so the preview (and a copy) shows what is missing.
+          const typed = values[index] ?? {};
+          // A parameter not typed yet stays `{{name}}`, so the preview (and a copy) shows what is
+          // missing.
           const filled = fillCommand(
             entry.command,
-            Array.from(
-              { length: parameters },
-              (_, position) => typed[position] || `$${position + 1}`,
-            ),
+            Object.fromEntries(Object.entries(typed).filter(([, value]) => value)),
           );
           return (
             <div
@@ -242,21 +236,19 @@ export const CommandsWidget = ({ content, mode, onChange }: CommandsWidgetProps)
                   {entry.note}
                 </MonoText>
               )}
-              {parameters > 0 && (
+              {parameters.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {Array.from({ length: parameters }, (_, n) => `$${n + 1}`).map(
-                    (name, position) => (
-                      <input
-                        key={name}
-                        type="text"
-                        aria-label={`Value for ${name}`}
-                        value={typed[position] ?? ''}
-                        onInput={(e) => setValue(index, position, e.currentTarget.value)}
-                        placeholder={name}
-                        className="flex-1 min-w-[8rem] bg-transparent border border-[var(--los-border)] focus:border-[var(--los-accent)] px-2 py-1 text-[11px] font-mono text-[var(--los-fg)] focus:outline-none"
-                      />
-                    ),
-                  )}
+                  {parameters.map((name) => (
+                    <input
+                      key={name}
+                      type="text"
+                      aria-label={`Value for ${name}`}
+                      value={typed[name] ?? ''}
+                      onInput={(e) => setValue(index, name, e.currentTarget.value)}
+                      placeholder={name}
+                      className="flex-1 min-w-[8rem] bg-transparent border border-[var(--los-border)] focus:border-[var(--los-accent)] px-2 py-1 text-[11px] font-mono text-[var(--los-fg)] focus:outline-none"
+                    />
+                  ))}
                 </div>
               )}
               <pre className="text-[11px] font-mono text-[var(--los-fg)] whitespace-pre-wrap break-words bg-[var(--los-bg)] border border-[var(--los-border)] p-2">

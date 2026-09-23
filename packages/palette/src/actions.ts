@@ -271,6 +271,60 @@ const githubRepoItems = async (port: ActionPort): Promise<ModeItem[]> => {
   });
 };
 
+/** What `>g` searches in a repository, as GitHub's own search filters name them. */
+const GITHUB_SEARCHES = [
+  { path: 'issues', title: 'Issues', filter: 'is:issue' },
+  { path: 'pulls', title: 'Pull requests', filter: 'is:pr' },
+] as const;
+
+/** The repository's issues or pull requests matching `term`; with no term, the plain list. */
+export const githubSearchUrl = (repo: string, path: 'issues' | 'pulls', term: string) => {
+  const base = `https://github.com/${repo}/${path}`;
+  const filter = GITHUB_SEARCHES.find((search) => search.path === path)?.filter;
+  return term.trim() ? `${base}?${new URLSearchParams({ q: `${filter} ${term.trim()}` })}` : base;
+};
+
+/** Choosing a repository lists what to search in it; choosing one of those asks for the term. */
+const githubSearchItems = async (port: ActionPort): Promise<ModeItem[]> => {
+  const { repos } = await port.send({ type: 'LIST_GITHUB_REPOS' });
+  return repos.map((repo) => ({
+    id: `github-search:${repo.fullName}`,
+    title: repo.fullName,
+    subtitle: repo.description ?? '',
+    children: GITHUB_SEARCHES.map((search) => ({
+      id: `github-search:${repo.fullName}/${search.path}`,
+      title: search.title,
+      subtitle: `Search the ${search.title.toLowerCase()} of ${repo.fullName}`,
+      action: {
+        id: `github-search:${repo.fullName}/${search.path}`,
+        title: `${repo.fullName} · ${search.title}`,
+        prompts: [{ label: 'Search term' }],
+        opens: ([term = '']: string[]) => ({
+          id: `github-search:${repo.fullName}/${search.path}:${term.trim()}`,
+          title: term.trim() ? `${search.title} “${term.trim()}”` : search.title,
+          subtitle: repo.fullName,
+          url: githubSearchUrl(repo.fullName, search.path, term),
+        }),
+      },
+    })),
+  }));
+};
+
+/** The console team's logs in Tsuga, which `>l` opens. */
+const TSUGA_EXPLORER_URL = 'https://app.tsuga.com/explorer';
+const TSUGA_TEAM_QUERY = 'context.cloud.camunda.io/owner-team:console';
+
+/** The explorer on the team's logs, narrowed to `term` when there is one. */
+export const tsugaUrl = (term: string) => {
+  const params = new URLSearchParams({
+    // Tsuga's own link for the team ends its query in a space; kept, so both match exactly.
+    query: term.trim() ? `${TSUGA_TEAM_QUERY} AND "${term.trim()}"` : `${TSUGA_TEAM_QUERY} `,
+    extraColumns: JSON.stringify(['file', 'fn', 'service']),
+    clusterIds: '8v5j-x2k0n-dzk4',
+  });
+  return `${TSUGA_EXPLORER_URL}?${params}`;
+};
+
 const pad = (value: number) => String(value).padStart(2, '0');
 
 /** `2026-09-23 10:30`, in local time. */
@@ -387,9 +441,16 @@ const commandItems = async (port: ActionPort, canRun: boolean): Promise<ModeItem
           title: entry.title,
           subtitle: entry.command,
           recent: false as const,
-          prompts: Array.from({ length: parameters }, (_, n) => ({ label: `Value for $${n + 1}` })),
+          prompts: parameters.map((name) => ({ label: name })),
           choices: (values: string[]) =>
-            commandChoices(port, fillCommand(entry.command, values), canRun),
+            commandChoices(
+              port,
+              fillCommand(
+                entry.command,
+                Object.fromEntries(parameters.map((name, n) => [name, values[n] ?? ''])),
+              ),
+              canRun,
+            ),
         },
       };
     }),
@@ -397,16 +458,16 @@ const commandItems = async (port: ActionPort, canRun: boolean): Promise<ModeItem
 };
 
 /**
- * `>x` — the repository's `.commands.md` files: ⏎ asks for each `$1`…`$9`, then offers to copy
+ * `>x` — the repository's `.commands.md` files: ⏎ asks for each `{{name}}`, then offers to copy
  * the filled-in command or, where the surface can (`canRun`, the desktop), to run it.
  */
 export const commandsMode = (port: ActionPort, { canRun }: { canRun: boolean }): PaletteMode => ({
   prefix: 'x',
   title: 'Commands',
-  placeholder: 'Search commands — ⏎ asks for its $1, $2…',
+  placeholder: 'Search commands — ⏎ asks for its {{parameters}}',
   description: canRun
-    ? 'Commands from the repository’s .commands.md files — fill in $1, $2…, then copy or run (terminal or background)'
-    : 'Commands from the repository’s .commands.md files — fill in $1, $2…, then copy (the desktop palette can also run them)',
+    ? 'Commands from the repository’s .commands.md files — fill in each {{parameter}}, then copy or run (terminal or background)'
+    : 'Commands from the repository’s .commands.md files — fill in each {{parameter}}, then copy (the desktop palette can also run them)',
   load: () => commandItems(port, canRun),
 });
 
@@ -470,7 +531,10 @@ export const claudeUsageMode = (port: ActionPort): PaletteMode => ({
   },
 });
 
-/** The prefix modes every surface offers: `>p` prompts, `>t` translate, `>r` GitHub repositories. */
+/**
+ * The prefix modes every surface offers: `>p` prompts, `>t` translate, `>r` GitHub repositories,
+ * `>g` a search in one of them, `>l` logs in Tsuga.
+ */
 export const paletteModes = (port: ActionPort): PaletteMode[] => [
   {
     prefix: 'p',
@@ -494,6 +558,27 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
     placeholder: 'Search GitHub repositories — ⇥ for issues, pull requests…',
     description: 'Open one of your GitHub repositories — ⇥ for its issues, pull requests, actions…',
     load: () => githubRepoItems(port),
+  },
+  {
+    prefix: 'g',
+    title: 'GitHub search',
+    placeholder: 'Search GitHub repositories — ⏎ then issues or pull requests',
+    description:
+      'Search a GitHub repository: pick it, then issues or pull requests, then type the search term',
+    load: () => githubSearchItems(port),
+  },
+  {
+    prefix: 'l',
+    title: 'Logs',
+    placeholder: 'Search the console team’s logs in Tsuga — ⏎ opens them',
+    description:
+      'The console team’s logs in Tsuga’s explorer, filtered by what is typed — nothing typed opens them all',
+    link: (term) => ({
+      id: `tsuga:${term}`,
+      title: term ? `Tsuga logs “${term}”` : 'Tsuga logs',
+      subtitle: 'owner-team:console',
+      url: tsugaUrl(term),
+    }),
   },
 ];
 

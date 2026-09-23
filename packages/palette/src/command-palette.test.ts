@@ -1331,7 +1331,7 @@ describe('actions that end in choices', () => {
             id: 'ls',
             title: 'List a folder',
             recent: false,
-            prompts: [{ label: 'Value for $1' }],
+            prompts: [{ label: 'folder' }],
             choices: ([value = '']: string[]) => [
               { id: 'copy', title: 'Copy', group: 'Choose', copy: `ls ${value}` },
               {
@@ -1403,12 +1403,95 @@ describe('filling in an action', () => {
     actions.push({
       id: 'cmd',
       title: 'List',
-      subtitle: 'ls -la $1',
-      prompts: [{ label: 'Value for $1' }],
+      subtitle: 'ls -la {{folder}}',
+      prompts: [{ label: 'folder' }],
       run: async () => '',
     });
     type('List');
     await activateRow('List');
-    expect(shadow().querySelector('.empty')?.textContent).toBe('ls -la $1');
+    expect(shadow().querySelector('.empty')?.textContent).toBe('ls -la {{folder}}');
+  });
+});
+
+describe('modes that link to what is typed', () => {
+  beforeEach(async () => {
+    modes.push({
+      prefix: 'l',
+      title: 'Logs',
+      placeholder: 'Search logs',
+      description: 'Open the logs',
+      link: (term) => ({
+        id: `logs:${term}`,
+        title: term ? `Logs “${term}”` : 'Logs',
+        url: `https://logs.example/?q=${term}`,
+      }),
+    });
+    type('>l');
+    await settle();
+  });
+
+  it('opens the page for nothing typed', async () => {
+    expect(rowTitles()).toEqual(['Logs']);
+    press('Enter');
+    await settle();
+    expect(open).toHaveBeenCalledWith('https://logs.example/?q=');
+  });
+
+  it('follows the input, and opens the page for what is typed', async () => {
+    type('  timeout ');
+    expect(rowTitles()).toEqual(['Logs “timeout”']);
+    press('Enter');
+    await settle();
+    expect(open).toHaveBeenCalledWith('https://logs.example/?q=timeout');
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+});
+
+describe('mode entries whose children run an action', () => {
+  beforeEach(async () => {
+    modes.push({
+      prefix: 'g',
+      title: 'GitHub search',
+      placeholder: 'Search',
+      description: 'Search a repository',
+      load: async () => [
+        {
+          id: 'o/r',
+          title: 'o/r',
+          children: [
+            {
+              id: 'o/r/issues',
+              title: 'Issues',
+              action: {
+                id: 'o/r/issues',
+                title: 'o/r · Issues',
+                prompts: [{ label: 'Search term' }],
+                opens: ([term = '']: string[]) => ({
+                  id: `issues:${term}`,
+                  title: `Issues “${term}”`,
+                  url: `https://github.com/o/r/issues?q=${term}`,
+                }),
+              },
+            },
+            { id: 'o/r/pulls', title: 'Pull requests' },
+          ],
+        },
+      ],
+    });
+    type('>g');
+    await settle();
+  });
+
+  it('lists the children on ⏎, then asks for the field and opens the answer', async () => {
+    press('Enter');
+    await settle();
+    expect(rowTitles()).toEqual(['Issues', 'Pull requests']);
+    press('Enter');
+    await settle();
+    expect(crumbText()).toBe('o/r · Issues · Search term (1/1)');
+    type('login');
+    press('Enter');
+    await settle();
+    expect(open).toHaveBeenCalledWith('https://github.com/o/r/issues?q=login');
   });
 });
