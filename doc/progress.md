@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-09-23 — Start page: today view, trackers, read later, clocks, capture targets, sync status
+
+- **Worker** (`background/today.ts`): a `todayCache` of the repo's `.todos.md`, `.events.csv`,
+  `.habit.csv`, `.timetracking.csv`, `.timezones.json` and `.readitlater.json` files, plus the
+  action log paths. One tree listing replayed with its `ETag`, a read only for blobs whose sha
+  changed; refreshed by the hourly `repoSync` alarm and by **Sync now**, served cache-first.
+- **Messages**: `GET_TODAY` (the summary the page draws), `GET_SYNC_STATUS`, `TODAY_CHECK_IN`,
+  `TODAY_TOGGLE_TIMER`, `READ_LATER_DONE`, `READ_LATER_ADD`, `ADD_TODO`. Each write re-reads the
+  file, commits on top of it and answers with the new summary; a message may only write a file the
+  page shows, of the kind the action is for.
+- **Formats** mirror the console widgets: habit check-in and time-tracking start/stop serialize
+  as `HabitTrackerLogic`/`TimeTrackingLogic` do; a todo is appended (`- [ ] text #tags` +
+  `::created::`) rather than the file re-serialized.
+- **Start page**: Coming up / Doing cards, Trackers, Read later, world clocks (ticking every 30 s),
+  a Note / Todo / Log switch on the capture box, and the sync status under the repo name.
+- **Palette** (content script): **Read later: this page**.
+
 ## 2026-09-23 — Palette: `{{name}}` command parameters, `>g` GitHub search, `>l` Tsuga logs
 
 - **Commands** (`.commands.md`): parameters are `{{name}}`, asked for by name (`port`) in the
