@@ -1,8 +1,8 @@
-//! Claude, for the palette's `c:` and `u:` modes — ports of omarchy's `omarchy-claude-code` and
+//! Claude, for the palette's `>c` and `>u` modes — ports of omarchy's `omarchy-claude-code` and
 //! `omarchy-claude-usage`.
 //!
-//! `c:` lists repositories from the history omarchy's `eee` keeps; the palette builds the
-//! claude.ai link itself. `u:` reads each account's Claude Code credentials, refreshes an expired
+//! `>c` lists repositories from the history omarchy's `eee` keeps; the palette builds the
+//! claude.ai link itself. `>u` reads each account's Claude Code credentials, refreshes an expired
 //! token the way Claude Code does (writing the new one back, so `claude` keeps working), and
 //! fetches the usage endpoint. The palette formats what comes back.
 

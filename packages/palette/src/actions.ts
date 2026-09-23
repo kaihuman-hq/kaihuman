@@ -186,7 +186,7 @@ export const repoActions = (port: ActionPort): PaletteAction[] => [
   {
     id: 'set-translation-key',
     title: 'Set the DeepL API key…',
-    subtitle: 'For t: translations — free keys at deepl.com/pro-api; empty forgets the key',
+    subtitle: 'For >t translations — free keys at deepl.com/pro-api; empty forgets the key',
     prompts: [{ label: 'DeepL API key' }],
     run: async ([key = '']: string[]) => {
       await port.send({ type: 'SET_TRANSLATION_KEY', key: key.trim() });
@@ -203,7 +203,7 @@ export const repoActions = (port: ActionPort): PaletteAction[] => [
   },
 ];
 
-/** A repository's pages on GitHub, offered with ⇥ on a repository in the `r:` mode. */
+/** A repository's pages on GitHub, offered with ⇥ on a repository in the `>r` mode. */
 export const GITHUB_REPO_VIEWS: readonly { title: string; path: string }[] = [
   { title: 'Issues', path: '/issues' },
   { title: 'Pull requests', path: '/pulls' },
@@ -326,7 +326,7 @@ const dumpItems = async (port: ActionPort): Promise<ModeItem[]> => {
 };
 
 /**
- * `d:` — a scratch text editor with a history, for the desktop: dumps are local files, which the
+ * `>d` — a scratch text editor with a history, for the desktop: dumps are local files, which the
  * browser has no place for.
  */
 export const dumpMode = (port: ActionPort): PaletteMode => ({
@@ -338,7 +338,7 @@ export const dumpMode = (port: ActionPort): PaletteMode => ({
   load: () => dumpItems(port),
 });
 
-/** Where `c:` sends a prompt: a new Claude Code session on claude.ai. */
+/** Where `>c` sends a prompt: a new Claude Code session on claude.ai. */
 export const CLAUDE_CODE_URL = 'https://claude.ai/code';
 
 /**
@@ -374,7 +374,7 @@ const claudeCodeItems = async (port: ActionPort): Promise<ModeItem[]> => {
   }));
 };
 
-/** `c:` — a new Claude Code session in the browser, for a repository and a prompt. Desktop only. */
+/** `>c` — a new Claude Code session in the browser, for a repository and a prompt. Desktop only. */
 export const claudeCodeMode = (port: ActionPort): PaletteMode => ({
   prefix: 'c',
   title: 'Claude Code',
@@ -384,7 +384,7 @@ export const claudeCodeMode = (port: ActionPort): PaletteMode => ({
   load: () => claudeCodeItems(port),
 });
 
-/** `u:` — Claude usage for each configured account. Desktop only: it reads the local credentials. */
+/** `>u` — Claude usage for each configured account. Desktop only: it reads the local credentials. */
 export const claudeUsageMode = (port: ActionPort): PaletteMode => ({
   prefix: 'u',
   title: 'Claude usage',
@@ -398,7 +398,7 @@ export const claudeUsageMode = (port: ActionPort): PaletteMode => ({
   },
 });
 
-/** The prefix modes every surface offers: `p:` prompts, `t:` translate, `r:` GitHub repositories. */
+/** The prefix modes every surface offers: `>p` prompts, `>t` translate, `>r` GitHub repositories. */
 export const paletteModes = (port: ActionPort): PaletteMode[] => [
   {
     prefix: 'p',
@@ -412,7 +412,7 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
     title: 'Translate',
     placeholder: 'Text to translate — “fr: …” for one language',
     description:
-      'DeepL into English and German, “t: fr: …” for one language; with nothing typed, the last 20 texts',
+      'DeepL into English and German, “>t fr: …” for one language; with nothing typed, the last 20 texts',
     submit: (query) => translationItems(port, query),
     history: async () => (await port.send({ type: 'GET_TRANSLATION_HISTORY' })).texts,
   },

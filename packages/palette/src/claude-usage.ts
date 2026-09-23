@@ -1,5 +1,5 @@
 /**
- * The `u:` mode's rows: Claude usage as Anthropic's OAuth usage endpoint reports it — the numbers
+ * The `>u` mode's rows: Claude usage as Anthropic's OAuth usage endpoint reports it — the numbers
  * the claude.ai usage page and Claude Code's `/usage` show. A port of the formatting in omarchy's
  * `omarchy-claude-usage`; the desktop backend only fetches.
  */

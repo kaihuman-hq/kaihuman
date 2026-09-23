@@ -1,4 +1,4 @@
-//! The repository's `.prompts.md` files, for the palette's `p:` mode.
+//! The repository's `.prompts.md` files, for the palette's `>p` mode.
 //!
 //! The palette parses them itself (packages/palette/src/prompts.ts); the desktop only finds and
 //! fetches them, the way the extension's service worker does, and keeps them in a cache.

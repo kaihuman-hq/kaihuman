@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-09-23 — Prefixes become `>p`, and `>b` lists bookmarks only
+
+- **`>` and a letter** replace `p:`-style prefixes everywhere: `>p`, `>t`, `>r`, and on the desktop
+  `>d`, `>c`, `>u`. The mode switches as soon as the letter is typed (`>p`), or with text after a
+  space (`>p commit`); a longer word (`>prompt`) and the old `p:` stay plain search text.
+  Backspace on an empty input gives `>p` back. The hint line, the `?` help and the
+  "or type >t first" offer use the new form. `?` help and the `fr:` language prefix inside `>t`
+  are unchanged.
+- **`>b`** — bookmarks only, on both surfaces: no recents, actions, web search or translate offer,
+  ranked by the main search's rules (title prefix, title, tags, URL) and opened the same way
+  (counted, remembered, closed). It is built into the palette, since the bookmarks live there.
+
+Checks: palette tsc and biome clean, vitest 148/148 (7 new); extension tsc and vitest; desktop
+tsc, build and `cargo test`.
+
 ## 2026-09-23 — `c:` Claude Code and `u:` Claude usage in the desktop palette
 
 Two more omarchy scripts move into the desktop palette.

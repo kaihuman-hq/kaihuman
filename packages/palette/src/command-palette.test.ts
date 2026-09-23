@@ -705,7 +705,7 @@ describe('filterModeItems', () => {
 
 describe('prefix modes', () => {
   it('enters a mode on its prefix, loads it once, and filters as you type', async () => {
-    type('p:');
+    type('>p');
     await settle();
 
     expect(crumbText()).toBe('Prompts');
@@ -722,21 +722,21 @@ describe('prefix modes', () => {
   });
 
   it('drops the space typed right after the prefix', async () => {
-    type('p:');
+    type('>p');
     await settle();
     type(' hooks');
     expect(input().value).toBe('hooks');
   });
 
   it('keeps what follows the prefix as the query', async () => {
-    type('p: hooks');
+    type('>p hooks');
     await settle();
     expect(input().value).toBe('hooks');
     expect(rowTitles()).toEqual(['Refactor to hooks']);
   });
 
   it('copies the chosen entry and closes', async () => {
-    type('p:');
+    type('>p');
     await settle();
     press('Enter');
     await settle();
@@ -746,7 +746,7 @@ describe('prefix modes', () => {
 
   it('stays open and says so when copying fails', async () => {
     copy.mockRejectedValueOnce(new Error('No clipboard here'));
-    type('p:');
+    type('>p');
     await settle();
     press('Enter');
     await settle();
@@ -756,13 +756,13 @@ describe('prefix modes', () => {
 
   it('shows a load failure', async () => {
     loadPrompts.mockRejectedValueOnce(new Error('No .prompts.md files'));
-    type('p:');
+    type('>p');
     await settle();
     expect(statusText()).toBe('No .prompts.md files');
   });
 
   it('opens a child list on Tab and walks back out with Escape, then leaves the mode', async () => {
-    type('p: repo');
+    type('>p repo');
     await settle();
     expect(hintText()).toContain('⇥ more');
     press('Tab');
@@ -781,7 +781,7 @@ describe('prefix modes', () => {
   });
 
   it('Escape goes from the child list to the mode, and from the mode to the top', async () => {
-    type('p: repo');
+    type('>p repo');
     await settle();
     press('ArrowRight');
     expect(crumbText()).toBe('Prompts › o/repo');
@@ -793,22 +793,22 @@ describe('prefix modes', () => {
   });
 
   it('Backspace on an empty input leaves the mode and gives the prefix back', async () => {
-    type('p:');
+    type('>p');
     await settle();
     press('Backspace');
     expect(crumbText()).toBeNull();
-    expect(input().value).toBe('p:');
+    expect(input().value).toBe('>p');
   });
 
   it('does not treat an unknown prefix or a url as a mode', () => {
-    type('x: thing');
+    type('>x thing');
     expect(crumbText()).toBeNull();
     type('https://vitest.dev');
     expect(crumbText()).toBeNull();
   });
 
   it('submits only on Enter, then Enter copies the selected answer', async () => {
-    type('t: Guten Morgen');
+    type('>t Guten Morgen');
     await settle();
     // Text typed with the prefix is submitted at once — it was typed to be translated.
     expect(translate).toHaveBeenCalledWith('Guten Morgen');
@@ -836,7 +836,7 @@ describe('prefix modes', () => {
           finish = resolve;
         }),
     );
-    type('t: one');
+    type('>t one');
     type('two');
     finish([{ id: 'late', title: 'late', copy: 'late' }]);
     await settle();
@@ -853,11 +853,11 @@ describe('prefix modes', () => {
   });
 
   it('lists the prefixes in the hint of an empty palette', () => {
-    expect(hintText()).toContain('p: prompts · t: translate');
+    expect(hintText()).toContain('>p prompts · >t translate');
   });
 
   it('starts outside any mode each time it opens', async () => {
-    type('p:');
+    type('>p');
     await settle();
     palette.close();
     palette.open();
@@ -869,7 +869,7 @@ describe('prefix modes', () => {
 describe('submit history', () => {
   it('lists earlier queries while nothing is typed, and hides them once something is', async () => {
     history.mockResolvedValue(['Guten Morgen', 'fr: good night']);
-    type('t:');
+    type('>t');
     await settle();
 
     expect(groupLabels()).toEqual(['Recent']);
@@ -884,7 +884,7 @@ describe('submit history', () => {
 
   it('submits the chosen one again, with ⏎ as with a click', async () => {
     history.mockResolvedValue(['Guten Morgen', 'fr: good night']);
-    type('t:');
+    type('>t');
     await settle();
     press('ArrowDown');
     press('Enter');
@@ -896,13 +896,13 @@ describe('submit history', () => {
   });
 
   it('reads the history again after a submit, so the new query is there next time', async () => {
-    type('t: Hallo');
+    type('>t Hallo');
     await settle();
     expect(history).toHaveBeenCalledTimes(2);
   });
 
   it('does not submit an empty input', async () => {
-    type('t:');
+    type('>t');
     await settle();
     press('Enter');
     await settle();
@@ -911,7 +911,7 @@ describe('submit history', () => {
 
   it('shows no history when there is none to read', async () => {
     history.mockRejectedValue(new Error('offline'));
-    type('t:');
+    type('>t');
     await settle();
     expect(rowTitles()).toEqual([]);
     expect(statusText()).toBeNull();
@@ -950,7 +950,7 @@ describe('the editor', () => {
       description: 'Scratch text',
       load: loadDumps,
     });
-    type('d:');
+    type('>d');
     await settle();
     press('Enter');
     await settle();
@@ -1095,34 +1095,42 @@ describe('help', () => {
       'Searching and keys',
       'Actions — ⏎ runs one',
     ]);
-    expect(groupRows('Prefixes — ⏎ switches to one')).toEqual(['p:  Prompts', 't:  Translate']);
+    expect(groupRows('Prefixes — ⏎ switches to one')).toEqual([
+      '>b  Bookmarks',
+      '>p  Prompts',
+      '>t  Translate',
+    ]);
     expect(groupRows('Actions — ⏎ runs one')).toEqual([
       'Bookmark this page',
       'Bookmark this page…',
       'Pinned tab groups…',
     ]);
     expect(rowTitles()).toContain('⇥  Search the repo');
-    expect(shadow().querySelector('.row .subtitle')?.textContent).toBe('Find a prompt');
+    expect(shadow().querySelectorAll('.row .subtitle')[1]?.textContent).toBe('Find a prompt');
   });
 
   it('is offered in the empty palette’s hint', () => {
-    expect(hintText()).toContain('? help · p: prompts');
+    expect(hintText()).toContain('? help · >b bookmarks · >p prompts');
   });
 
   it('filters, keeping each section under its heading', async () => {
     type('? translate');
     await settle();
     expect(input().value).toBe('translate');
-    expect(rowTitles()).toEqual(['t:  Translate']);
+    expect(rowTitles()).toEqual(['>t  Translate']);
 
     type('bookmark');
-    expect(groupLabels()).toEqual(['Searching and keys', 'Actions — ⏎ runs one']);
+    expect(groupLabels()).toEqual([
+      'Prefixes — ⏎ switches to one',
+      'Searching and keys',
+      'Actions — ⏎ runs one',
+    ]);
   });
 
   it('switches to the chosen prefix', async () => {
     type('?');
     await settle();
-    await activateRow('p:  Prompts');
+    await activateRow('>p  Prompts');
     await settle();
     expect(crumbText()).toBe('Prompts');
     expect(rowTitles()).toEqual(['Commit message', 'Refactor to hooks', 'o/repo']);
@@ -1207,7 +1215,7 @@ describe('mode entries that run an action', () => {
         },
       ],
     });
-    type('c:');
+    type('>c');
     await settle();
     press('Enter');
     await settle();
@@ -1235,5 +1243,72 @@ describe('mode entries that run an action', () => {
     await settle();
     expect(open).not.toHaveBeenCalled();
     expect(statusText()).toBe('Type a prompt');
+  });
+});
+
+describe('the > prefix', () => {
+  it('switches as soon as the letter is typed', async () => {
+    type('>');
+    expect(crumbText()).toBeNull();
+    type('>p');
+    await settle();
+    expect(crumbText()).toBe('Prompts');
+  });
+
+  it('leaves a longer word alone, and the old colon form too', () => {
+    type('>prompt');
+    expect(crumbText()).toBeNull();
+    type('p: hooks');
+    expect(crumbText()).toBeNull();
+  });
+
+  it('offers typed text to a submitting mode under its new prefix', () => {
+    type('Guten Morgen');
+    expect(shadow().textContent).toContain('or type >t first');
+  });
+});
+
+describe('>b', () => {
+  it('lists only bookmarks, ranked as the main search ranks them', async () => {
+    type('>b');
+    await settle();
+    expect(crumbText()).toBe('Bookmarks');
+    expect(groupLabels()).toEqual(['Bookmarks']);
+    expect(rowTitles()).toEqual(['Vitest guide', 'Zulip']);
+
+    type('chat');
+    expect(rowTitles()).toEqual(['Zulip']);
+    expect(shadow().querySelector('.row .subtitle')?.textContent).toBe(
+      'https://zulip.example/  #chat',
+    );
+  });
+
+  it('shows no actions, web search or translate offer for what is typed', async () => {
+    type('>b bookmark');
+    await settle();
+    expect(groupLabels()).toEqual([]);
+    expect(shadow().querySelector('.empty')?.textContent).toBe('No matches.');
+  });
+
+  it('opens a bookmark as the main list does: counted, remembered, closed', async () => {
+    type('>b zul');
+    await settle();
+    press('Enter');
+    expect(open).toHaveBeenCalledWith('https://zulip.example/');
+    expect(countBookmarkUse).toHaveBeenCalledWith('Zulip');
+    expect(rememberRecent).toHaveBeenCalledWith({
+      id: 'bookmark:Zulip',
+      title: 'Zulip',
+      subtitle: 'https://zulip.example/',
+      url: 'https://zulip.example/',
+    });
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('gives >b back on Backspace', async () => {
+    type('>b');
+    await settle();
+    press('Backspace');
+    expect(input().value).toBe('>b');
   });
 });

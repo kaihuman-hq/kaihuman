@@ -18,12 +18,13 @@ way.
 | ⇥ Tab: GitHub code search in the repo, opened in the console | ✓ |
 | Add a note… (dump, quick-note files, `.actionlog.md` with `#tags`) | ✓ |
 | Recent, Switch repository…, Sync with GitHub now, Open the Lifosy console | ✓ |
-| `p:` prompts from the repo's `.prompts.md` files, ⏎ copies | ✓ (with `wl-copy`) |
-| `t:` translate with DeepL into EN-US and DE (`t: fr: …` for one language), ⏎ copies | ✓ (key from `DEEPL_AUTH_KEY`, `~/.config/envvars/deepl.env` or the keyring) |
-| `d:` dumps — a scratch editor for pasting and copying, the last 25 kept, ⌃S saves one as a file | ✓ desktop only |
-| `c:` Claude Code — pick a repo, type a prompt, ⏎ opens a new session on claude.ai | ✓ desktop only |
-| `u:` Claude usage — rate limits, pace, resets and spend per account | ✓ desktop only |
-| `r:` GitHub repositories, ⇥ for issues, pull requests, actions… | ✓, and omarchy's `~/.config/eee/counts` ranks the ones you open most first |
+| `>b` bookmarks only, without actions or web search | ✓ |
+| `>p` prompts from the repo's `.prompts.md` files, ⏎ copies | ✓ (with `wl-copy`) |
+| `>t` translate with DeepL into EN-US and DE (`>t fr: …` for one language), ⏎ copies | ✓ (key from `DEEPL_AUTH_KEY`, `~/.config/envvars/deepl.env` or the keyring) |
+| `>d` dumps — a scratch editor for pasting and copying, the last 25 kept, ⌃S saves one as a file | ✓ desktop only |
+| `>c` Claude Code — pick a repo, type a prompt, ⏎ opens a new session on claude.ai | ✓ desktop only |
+| `>u` Claude usage — rate limits, pace, resets and spend per account | ✓ desktop only |
+| `>r` GitHub repositories, ⇥ for issues, pull requests, actions… | ✓, and omarchy's `~/.config/eee/counts` ranks the ones you open most first |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |
 | Counting how often a bookmark is opened | — the extension counts; the desktop does not yet |
 
@@ -35,9 +36,9 @@ Type `?` for the help: every prefix, how searching and the keys work, and every 
 The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-repos` and
 `translate_manager.py`; see the extension's README ("Prefix modes") for how each one behaves.
 
-- **`p:`** reads every `.prompts.md` on the repository's default branch — for example
+- **`>p`** reads every `.prompts.md` on the repository's default branch — for example
   `Resources/ai/useful-prompts.prompts.md` — through GitHub rather than a local clone.
-- **`t:`** needs a DeepL key. It is looked up on every translation, first match wins:
+- **`>t`** needs a DeepL key. It is looked up on every translation, first match wins:
   1. `DEEPL_AUTH_KEY` in the daemon's environment;
   2. `~/.config/envvars/deepl.env` (`$XDG_CONFIG_HOME/envvars/deepl.env`), the omarchy env file —
      a `DEEPL_AUTH_KEY=…` (or `DEEPL_API_KEY=…`) line, `export` and quotes allowed;
@@ -45,7 +46,7 @@ The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-re
 
   Because the file is read at translation time, editing it needs no daemon restart, and the
   toggle does not need to load anything.
-- **`d:`** is a scratch editor for text you only need for a moment. **New dump** (the first row)
+- **`>d`** is a scratch editor for text you only need for a moment. **New dump** (the first row)
   opens an empty editor in the palette; the rows below are earlier dumps, most recently edited
   first, searchable by their text — ⏎ opens one.
   - Saved as you type (after a short pause, and on leaving). Clearing a dump deletes it; opening
@@ -55,17 +56,17 @@ The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-re
     created, an existing file is never overwritten.
   - Plain files in `$XDG_DATA_HOME/lifosy/dumps/`, local only; past 25, the least recently edited
     one is removed.
-- **`c:`** (from `omarchy-claude-code`) lists the repositories in `$EEE_HISTORY_FILE` or
+- **`>c`** (from `omarchy-claude-code`) lists the repositories in `$EEE_HISTORY_FILE` or
   `~/.config/eee/history`, most recent first. ⏎ asks for the prompt; ⏎ again opens
   `https://claude.ai/code?prompt=…&repo=owner/name&branch=main` and closes the palette. The
   session lands in **Recent**, so it can be started again from there.
-- **`u:`** (from `omarchy-claude-usage`) reads the accounts in `$OMARCHY_CLAUDE_USAGE_CONF` or
+- **`>u`** (from `omarchy-claude-usage`) reads the accounts in `$OMARCHY_CLAUDE_USAGE_CONF` or
   `~/.config/omarchy/claude-usage.conf` (`name = /path/to/.claude` per line; without the file,
   `~/.claude`) and shows each account's usage: every rate-limit window with its percentage, a bar,
   the pace (how much of the window has passed) and when it resets, then spend or extra credits.
   An expired OAuth token is refreshed as Claude Code does it and written back to that account's
   `.credentials.json` (mode 600), so `claude` keeps working. ⏎ opens claude.ai's usage page.
-- **`r:`** reads `$EEE_COUNTS_FILE` or `~/.config/eee/counts` (`owner/repo count` per line), lists
+- **`>r`** reads `$EEE_COUNTS_FILE` or `~/.config/eee/counts` (`owner/repo count` per line), lists
   those repositories by count, then the rest of your GitHub repositories. Without a login or a
   network, the counted ones still show.
 
@@ -156,8 +157,8 @@ to change its animation.
 | `$XDG_CACHE_HOME/lifosy/bookmarks.json` | GitHub's bookmarks file as last fetched, with its ETag |
 | `$XDG_CACHE_HOME/lifosy/prompts.json` | the repository's `.prompts.md` files as last fetched (five minutes) |
 | `$XDG_STATE_HOME/lifosy/recents.json` | the palette's last ten actions |
-| `$XDG_DATA_HOME/lifosy/dumps/*.txt` | the `d:` dumps, the last 25 |
-| `$XDG_STATE_HOME/lifosy/translations.json` | the last 20 texts translated with `t:` |
+| `$XDG_DATA_HOME/lifosy/dumps/*.txt` | the `>d` dumps, the last 25 |
+| `$XDG_STATE_HOME/lifosy/translations.json` | the last 20 texts translated with `>t` |
 
 For development and tests, `LIFOSY_GITHUB_TOKEN` takes the place of the keyring and
 `LIFOSY_GITHUB_API` points the backend at a stand-in for `https://api.github.com`.

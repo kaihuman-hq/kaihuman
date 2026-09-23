@@ -1,5 +1,5 @@
 /**
- * What the palette's translate mode (`t:`) asks for, and which answers it keeps.
+ * What the palette's translate mode (`>t`) asks for, and which answers it keeps.
  *
  * Translation is DeepL's: the backend holds the API key and sends one request per target language,
  * so the palette only ever translates on ⏎ — never while typing.
@@ -19,7 +19,7 @@ const DEEPL_TARGETS = new Set(
   ).split(' '),
 );
 
-/** How many translated texts the `t:` mode keeps to offer again. */
+/** How many translated texts the `>t` mode keeps to offer again. */
 export const TRANSLATION_HISTORY_LIMIT = 20;
 
 /** Newest first, each text once, capped — translating a text again moves it back to the top. */

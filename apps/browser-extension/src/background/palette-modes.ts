@@ -1,6 +1,6 @@
 /**
- * What the palette's prefix modes ask the service worker for: the repository's prompt files (`p:`),
- * DeepL translations (`t:`) and the user's GitHub repositories (`r:`).
+ * What the palette's prefix modes ask the service worker for: the repository's prompt files (`>p`),
+ * DeepL translations (`>t`) and the user's GitHub repositories (`>r`).
  *
  * The desktop palette answers the same requests from Rust (apps/desktop-palette/src-tauri), so the
  * two stay in step: same files, same endpoints, same error messages.

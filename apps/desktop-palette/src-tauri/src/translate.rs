@@ -1,4 +1,4 @@
-//! DeepL translations for the palette's `t:` mode, as the extension's service worker makes them.
+//! DeepL translations for the palette's `>t` mode, as the extension's service worker makes them.
 
 use serde::{Deserialize, Serialize};
 

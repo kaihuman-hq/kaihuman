@@ -89,7 +89,7 @@ export interface PaletteProtocol {
   SAVE_DUMP: { request: { id?: string; text: string }; response: { id?: string } };
   /** Desktop only: writes the text to `path` (`~/` allowed), never over an existing file. */
   EXPORT_DUMP: { request: { path: string; text: string }; response: { path: string } };
-  /** Desktop only: repositories for `c:`, most recently used first (omarchy's `eee` history). */
+  /** Desktop only: repositories for `>c`, most recently used first (omarchy's `eee` history). */
   LIST_CLAUDE_CODE_REPOS: { request: NoFields; response: { repos: string[] } };
   /**
    * Desktop only: Claude usage per configured account — the usage endpoint's answer, or why there

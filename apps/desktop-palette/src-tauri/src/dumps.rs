@@ -1,4 +1,4 @@
-//! Dumps: scratch texts for the palette's `d:` editor, one plain file each, the last 25 kept.
+//! Dumps: scratch texts for the palette's `>d` editor, one plain file each, the last 25 kept.
 //!
 //! They live on this machine only — `$XDG_DATA_HOME/lifosy/dumps/<id>.txt` — and never go to
 //! GitHub. The id is the creation time in milliseconds, which also names the file.

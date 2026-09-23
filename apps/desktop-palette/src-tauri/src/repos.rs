@@ -1,4 +1,4 @@
-//! GitHub repositories for the palette's `r:` mode.
+//! GitHub repositories for the palette's `>r` mode.
 //!
 //! Like the extension, the desktop lists the repositories the token can see. It also reads the
 //! counts file omarchy's `eee` keeps of the repositories you open most, and lists those first —

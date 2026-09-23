@@ -6,8 +6,9 @@
  * user presses Tab — never while typing. Any query can also be sent to a web search engine, which is
  * only a matter of opening its results page. Everything the popup can do is also here, as an action.
  *
- * A short prefix switches the input into a mode with a list of its own — `p:` searches prompts,
- * `t:` translates — which Esc (or Backspace on an empty input) leaves again.
+ * A short prefix switches the input into a mode with a list of its own — `>p` searches prompts,
+ * `>t` translates, `>b` only bookmarks — which Esc (or Backspace on an empty input) leaves again.
+ * `?` lists them all.
  */
 import { type Bookmark, searchBookmarks } from './bookmarks.js';
 import { SEARCH_ENGINES } from './web-search.js';
@@ -90,7 +91,7 @@ export interface ModeItem {
   group?: string;
 }
 
-/** A list of its own behind a prefix: typing `p:` enters the mode whose `prefix` is `p`. */
+/** A list of its own behind a prefix: typing `>p` enters the mode whose `prefix` is `p`. */
 export type PaletteMode = {
   prefix: string;
   /** Named in the breadcrumb, and as the verb in the hint of a mode that submits. */
@@ -312,9 +313,15 @@ export function filterModeItems(items: readonly ModeItem[], query: string): Mode
   return [...inTitle, ...elsewhere];
 }
 
-/** `p: query` → the mode `p` and `query`, for any prefix a mode claims. */
+/** Typed before a mode's letter: `>p`. */
+const MODE_MARK = '>';
+
+/**
+ * `>p query` → the mode `p` and `query`, for any prefix a mode claims. The prefix must end there,
+ * so `>p` switches as soon as the letter is typed while `>prompt` stays plain text.
+ */
 const modePrefix = (value: string, modes: readonly PaletteMode[]) => {
-  const match = /^(\w+):\s*/.exec(value);
+  const match = /^>(\w+)(?:\s+|$)/.exec(value);
   const mode = match && modes.find((candidate) => candidate.prefix === match[1]);
   return mode && match ? { mode, rest: value.slice(match[0].length) } : null;
 };
@@ -561,6 +568,14 @@ export function createCommandPalette(
   const modeItems = (): ModeItem[] => {
     if (!mode) return [];
     if (mode.parent) return filterModeItems(mode.parent.children ?? [], input.value);
+    if (mode.mode === bookmarksMode) {
+      return searchBookmarks(bookmarks, input.value, MODE_ROW_LIMIT).map((bookmark) => ({
+        id: `bookmark:${bookmark.id}`,
+        title: bookmark.title,
+        subtitle: bookmarkSubtitle(bookmark),
+        choose: () => openBookmark(bookmark),
+      }));
+    }
     if (!mode.items) return [];
     // The help keeps its sections in order rather than ranking matches across them.
     if (mode.mode === helpMode)
@@ -632,14 +647,42 @@ export function createCommandPalette(
             activate: () => void chooseItem(item),
           }));
 
+  /** Counts the open and remembers it, as a bookmark opened from anywhere in the palette is. */
+  const openBookmark = (bookmark: Bookmark) => {
+    handlers.countBookmarkUse(bookmark.id);
+    openUrl({
+      id: `bookmark:${bookmark.id}`,
+      title: bookmark.title,
+      subtitle: bookmark.url,
+      url: bookmark.url,
+    });
+  };
+
+  const bookmarkSubtitle = (bookmark: Bookmark) =>
+    bookmark.tags.length
+      ? `${bookmark.url}  ${bookmark.tags.map((tag) => `#${tag}`).join(' ')}`
+      : bookmark.url;
+
+  /** `>b`: the bookmarks alone, ranked as the main search ranks them (see `modeItems`). */
+  const bookmarksMode: PaletteMode = {
+    prefix: 'b',
+    title: 'Bookmarks',
+    placeholder: 'Search bookmarks only',
+    description: 'Only your bookmarks, by title, tags and URL — without actions or web search',
+    load: async () => [],
+  };
+
+  /** Every mode on this surface: the palette's own first, then the surface's. */
+  const allModes = () => [bookmarksMode, ...handlers.modes];
+
   /**
    * `?`: everything the palette can do, for this surface — its prefixes, what searching does, the
    * keys and its actions. Built from `handlers`, so it never lists what is not there.
    */
   const helpItems = (): ModeItem[] => [
-    ...handlers.modes.map((candidate) => ({
+    ...allModes().map((candidate) => ({
       id: `help:mode:${candidate.prefix}`,
-      title: `${candidate.prefix}:  ${candidate.title}`,
+      title: `${MODE_MARK}${candidate.prefix}  ${candidate.title}`,
       subtitle: candidate.description,
       group: 'Prefixes — ⏎ switches to one',
       choose: () => enterMode(candidate, ''),
@@ -669,7 +712,7 @@ export function createCommandPalette(
 
   /** How the mode's prefix is typed, so Backspace can give it back. */
   const typedPrefix = (candidate: PaletteMode) =>
-    candidate === helpMode ? HELP_PREFIX : `${candidate.prefix}:`;
+    candidate === helpMode ? HELP_PREFIX : `${MODE_MARK}${candidate.prefix}`;
 
   /** Whatever is typed, offered to each mode that submits — "Translate “Guten Morgen”". */
   const submitOfferRows = (): Row[] => {
@@ -679,7 +722,7 @@ export function createCommandPalette(
       .filter((candidate) => 'submit' in candidate)
       .map((candidate) => ({
         title: `${candidate.title} “${query}”`,
-        subtitle: `or type ${candidate.prefix}: first`,
+        subtitle: `or type ${MODE_MARK}${candidate.prefix} first`,
         activate: () => enterMode(candidate, query),
       }));
   };
@@ -714,18 +757,8 @@ export function createCommandPalette(
     if (trail.length > 0) return [];
     return searchBookmarks(bookmarks, input.value).map((bookmark) => ({
       title: bookmark.title,
-      subtitle: bookmark.tags.length
-        ? `${bookmark.url}  ${bookmark.tags.map((tag) => `#${tag}`).join(' ')}`
-        : bookmark.url,
-      activate: () => {
-        handlers.countBookmarkUse(bookmark.id);
-        openUrl({
-          id: `bookmark:${bookmark.id}`,
-          title: bookmark.title,
-          subtitle: bookmark.url,
-          url: bookmark.url,
-        });
-      },
+      subtitle: bookmarkSubtitle(bookmark),
+      activate: () => openBookmark(bookmark),
     }));
   };
 
@@ -1009,7 +1042,9 @@ export function createCommandPalette(
     const query = input.value.trim();
     const prefixes = [
       `${HELP_PREFIX} help`,
-      ...handlers.modes.map((candidate) => `${candidate.prefix}: ${candidate.title.toLowerCase()}`),
+      ...allModes().map(
+        (candidate) => `${MODE_MARK}${candidate.prefix} ${candidate.title.toLowerCase()}`,
+      ),
     ].join(' · ');
     if (pending)
       hint.textContent = pending.step > 0 ? '⏎ next · esc back a field' : '⏎ next · esc cancel';
@@ -1157,8 +1192,7 @@ export function createCommandPalette(
   });
   input.addEventListener('input', () => {
     if (editor) return;
-    const prefixed =
-      !mode && !pending && trail.length === 0 && modePrefix(input.value, handlers.modes);
+    const prefixed = !mode && !pending && trail.length === 0 && modePrefix(input.value, allModes());
     if (prefixed) {
       enterMode(prefixed.mode, prefixed.rest);
       return;
@@ -1168,7 +1202,7 @@ export function createCommandPalette(
       return;
     }
     if (mode) {
-      // The space typed after the prefix (`p: `) belongs to the prefix, not the query.
+      // The space typed after the prefix (`>p `) belongs to the prefix, not the query.
       if (/^\s/.test(input.value)) input.value = input.value.trimStart();
       selected = 0;
       // A submitted answer belongs to the text it was asked for; an edit asks again on ⏎.

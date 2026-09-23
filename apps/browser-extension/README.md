@@ -231,21 +231,23 @@ normal tab. The New Tab page used to be on that list; the start page below is th
 Type **`?`** to see everything the palette can do here: each prefix with what it is for (⏎
 switches to it), how searching and the keys work, and every action (⏎ runs it). Type after the
 `?` to search the help. It is built from what this palette actually offers, so the desktop's help
-lists `d:` and its own actions, and the extension's lists the browser-only ones.
+lists `>d` and its own actions, and the extension's lists the browser-only ones.
 
 ### Prefix modes
 
-A prefix at the start of the input switches the palette into a list of its own. The breadcrumb
+`>` and a letter at the start of the input switch the palette into a list of its own — `>p` as
+soon as the `p` is typed, while a longer word (`>prompt`) stays plain search text. The breadcrumb
 names the mode; **Esc**, or **Backspace** on an empty input, leaves it again. The empty palette's
 hint line lists the prefixes.
 
 | Prefix | Lists | ⏎ | Source |
 | --- | --- | --- | --- |
-| `p:` | Prompts, filtered as you type (every word must appear in the title, tags or text) | copies the prompt's text and closes | every `.prompts.md` in the repository (`doc/prompts-format.md`), cached for five minutes |
-| `t:` | Translations of what you typed into English (US) and German, minus the language the text is already in; `t: fr: …` asks for one language | the first ⏎ translates, the next copies the selected translation | DeepL, one request per language — never while typing |
-| `r:` | Your GitHub repositories, most recently pushed first | opens the repository; **⇥** (or **→**) lists its issues, pull requests, actions, releases… | `GET /user/repos` with the extension's token |
+| `>b` | Your bookmarks only, ranked as the main search ranks them — no actions, web search or translate offer | opens the bookmark (counted, and kept in Recent) | the cached bookmarks |
+| `>p` | Prompts, filtered as you type (every word must appear in the title, tags or text) | copies the prompt's text and closes | every `.prompts.md` in the repository (`doc/prompts-format.md`), cached for five minutes |
+| `>t` | Translations of what you typed into English (US) and German, minus the language the text is already in; `>t fr: …` asks for one language | the first ⏎ translates, the next copies the selected translation | DeepL, one request per language — never while typing |
+| `>r` | Your GitHub repositories, most recently pushed first | opens the repository; **⇥** (or **→**) lists its issues, pull requests, actions, releases… | `GET /user/repos` with the extension's token |
 
-With nothing typed, `t:` lists the last 20 texts you translated, newest first — **⏎** translates
+With nothing typed, `>t` lists the last 20 texts you translated, newest first — **⏎** translates
 one again (kept as typed, so `fr: …` asks for French again). Translating a text again moves it to
 the top rather than listing it twice.
 
@@ -269,7 +271,7 @@ Everything the extension can do is here, so the popup is never the only way in:
 | Import the browser's bookmarks | Copies them into the repo file (grant access from the popup first) |
 | Switch repository… | Pick from the repositories the console shared |
 | Sync with GitHub now | Fetches and pushes immediately, ignoring the hourly budget |
-| Set the DeepL API key… | For `t:` translations; an empty key forgets it |
+| Set the DeepL API key… | For `>t` translations; an empty key forgets it |
 | Open the Lifosy console | |
 
 The three page actions at the top — bookmark, pin, clip — need a page to read, so the palette on
