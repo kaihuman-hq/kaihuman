@@ -278,6 +278,7 @@ dependencies = [
  "crossterm",
  "directories",
  "futures-util",
+ "getrandom 0.2.17",
  "ratatui",
  "reqwest",
  "rusqlite",

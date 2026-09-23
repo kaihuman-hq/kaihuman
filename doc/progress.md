@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-09-23 — CLI login checks the console's `state`
+
+- **The gap:** `apps/cli` sent no `state` to `/auth/cli` and took any callback carrying a token. Any
+  website open in the browser could post its own token to the waiting CLI and log it in to the
+  attacker's account.
+- **The fix:** it now picks 128 random bits with `getrandom` (already in the lockfile) and adds them
+  to the console URL. It takes only a callback carrying that `state`.
+  - A missing, empty or wrong `state` gets a 400 and leaves the one-shot channel untouched, so the
+    CLI keeps waiting for its own login.
+  - The route moved into `callback_route` so it can be tested.
+- **Console:** unchanged. `/auth/cli` has always sent the `state` it was given back, in the old
+  redirect and in the new form, so the fix works with the console that is deployed now.
+
+Checks: CLI tests 6/6, 3 new: a forged state, an empty or missing state, and a route test where a
+forged post gets a 400 without ending the login and the real one then completes it. No clippy
+warnings in `auth.rs`; the CLI's other warnings are unchanged.
+
 ## 2026-09-23 — Console login hands the token over by POST, not in a URL
 
 The console's `/auth/cli` used to redirect to `http://localhost:<port>/callback?token=…`, which put
