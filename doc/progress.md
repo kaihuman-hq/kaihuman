@@ -1,5 +1,184 @@
 # Progress
 
+## 2026-09-23 — `.commands.md`: a command library, run from the desktop palette (`>x`)
+
+- **Format** (`doc/commands-format.md`): `.prompts.md`'s grammar, the command being an entry's
+  first fenced code block (or its text). `$1`…`$9` are parameters, filled in as typed; `\$1` is a
+  literal `$1`.
+- **Console**: New File → Commands; a Commands widget with search, tag filter, a field per
+  parameter, a live preview (unfilled parameters stay `$n`) and Copy; ADD COMMAND appends one in a
+  `sh` block. `CommandsLogic.ts` reuses PromptsLogic for reading and writing. Storybook story added.
+- **Palette `>x`**: every `.commands.md` in the repository. ⏎ asks for each parameter with the
+  command shown, then lists **Copy** (first, so a hasty ⏎ never runs), **Run in terminal**, **Run in
+  the background**, and the finished command in full. The extension offers Copy only.
+- **Desktop** (`commands.rs`): `RUN_COMMAND` runs `bash -c` from `$HOME` — in `ghostty -e` with the
+  command passed as an argument (no quoting of its own), showing `$ command`, the output and the
+  exit status until a key is pressed; or in the background, with a notification of how it ended.
+  `LIST_COMMAND_FILES` shares the prompts' fetch and cache code, parameterised by suffix, on both
+  backends (caches `commands.json` / `commandsCache`).
+- **Palette core**: an action may end in `choices` (listed like a mode's entries), `closes` the
+  palette after running, and opt out of Recent (`recent: false`); a pending action's subtitle shows
+  under its first field.
+
+Checks: palette tsc and biome clean, vitest 164/164 (16 new); extension tsc, vitest 216/216 (2
+new); console tsc, vitest 123/123 (4 new); ui build green, biome clean on the touched files;
+desktop `cargo test` 51 passed (4 new, including running bash for the notification text and the
+terminal script's argument passing), clippy and fmt clean. `>x` driven in the built desktop UI and
+the widget in Storybook, both in Chromium. Not run: a real ghostty window.
+
+## 2026-09-23 — The palette's hint names the prefixes by letter only
+
+The empty palette's hint wrapped to two lines on the desktop with eight prefixes. It now reads
+`? help · >b >p >t >r >d >c >u`, and `?` says what each one is.
+
+Checks: palette vitest 148/148, biome clean; checked in the built desktop UI.
+
+## 2026-09-23 — Prefixes become `>p`, and `>b` lists bookmarks only
+
+- **`>` and a letter** replace `p:`-style prefixes everywhere: `>p`, `>t`, `>r`, and on the desktop
+  `>d`, `>c`, `>u`. The mode switches as soon as the letter is typed (`>p`), or with text after a
+  space (`>p commit`); a longer word (`>prompt`) and the old `p:` stay plain search text.
+  Backspace on an empty input gives `>p` back. The hint line, the `?` help and the
+  "or type >t first" offer use the new form. `?` help and the `fr:` language prefix inside `>t`
+  are unchanged.
+- **`>b`** — bookmarks only, on both surfaces: no recents, actions, web search or translate offer,
+  ranked by the main search's rules (title prefix, title, tags, URL) and opened the same way
+  (counted, remembered, closed). It is built into the palette, since the bookmarks live there.
+
+Checks: palette tsc and biome clean, vitest 148/148 (7 new); extension tsc and vitest; desktop
+tsc, build and `cargo test`.
+
+## 2026-09-23 — `c:` Claude Code and `u:` Claude usage in the desktop palette
+
+Two more omarchy scripts move into the desktop palette.
+
+- **`c:`** (`omarchy-claude-code`): the repositories in `~/.config/eee/history`
+  (`$EEE_HISTORY_FILE`), most recent first, once each. ⏎ asks for the prompt in the input; ⏎ again
+  opens `claude.ai/code?prompt=…&repo=…&branch=main` — encoded as the script does, `+` for spaces
+  and the repo's slash kept — closes the palette and keeps it in **Recent**.
+- **`u:`** (`omarchy-claude-usage`): per account from `~/.config/omarchy/claude-usage.conf`
+  (default `~/.claude`), the OAuth usage endpoint's windows — the fullest first, with %, a bar, pace
+  and reset time — then spend or extra credits, under a heading with the plan tier. One account
+  failing shows its reason without hiding the others. An expired token is refreshed with Claude
+  Code's client id and written back atomically with mode 600. ⏎ opens claude.ai's usage page.
+- **Split**: Rust (`claude.rs`) reads the files, refreshes and fetches (`LIST_CLAUDE_CODE_REPOS`,
+  `GET_CLAUDE_USAGE`); the palette formats (`claude-usage.ts`), so the numbers are tested in TS.
+- **Palette core**: a `ModeItem` may carry an `action` (its prompts asked in the input), and an
+  action may `opens` a page from its answers instead of `run` — opened, remembered as a recent,
+  palette closed. The help's action rows now use `action` too. Row titles keep their spaces, so
+  the usage meters line up.
+
+Checks: palette tsc and biome clean, vitest 141/141 (15 new, also run with TZ set to
+America/Los_Angeles and Asia/Kolkata); extension tsc and vitest 214/214; desktop `cargo test` 47
+passed (6 new), clippy and fmt clean; `c:` and `u:` driven in the built desktop UI in Chromium
+with a stubbed Tauri bridge.
+
+## 2026-09-23 — `?` help in the command palette
+
+- **`?`** at the start of the input opens **Help**, in three sections: the prefixes with a
+  description each (⏎ switches to that mode), searching and keys (type to search, ⇥ repo search,
+  web search, ↑↓⏎, ⇥/→, Esc, Backspace), and every action (⏎ runs it, prompts and submenus
+  included). Typing after the `?` searches it, keeping each section under its heading; Backspace
+  on an empty input gives the `?` back, as with any prefix. The empty palette's hint starts with
+  `? help`.
+- **Built from the handlers**, so each surface's help is exact: the desktop lists `d:` and
+  "Log in with the Lifosy console", the extension its page and tab-group actions. `PaletteMode`
+  gains a required `description`, so a new mode cannot arrive without its help line.
+- **Palette core**: `ModeItem` gains `choose` (a custom action) and `group` (consecutive entries
+  under one heading); help subtitles wrap instead of being cut off.
+- **Fix**: ↑↓ now scrolls the selected row into view. Before, the selection could move below the
+  visible rows of any long list — the help made it obvious.
+
+Checks: palette tsc and biome clean, vitest 126/126 (10 new); extension tsc green, vitest 214/214;
+desktop UI built and driven in Chromium with a stubbed Tauri bridge (`?`, scroll to the last
+action, `? dump` → ⏎ switches to `d:`).
+
+## 2026-09-23 — `d:` dumps: a scratch editor in the desktop palette
+
+For text that only needs somewhere to sit for a moment — paste it, edit it, copy it on.
+
+- **`d:`** lists **New dump**, then the last 25 dumps (most recently edited first, searched by
+  their text). ⏎ opens one in an editor that takes the palette's list area.
+- **Saving** happens as you type (400 ms after the last key, and on Esc or close), only when the
+  text changed, one save at a time and in order — across dumps too, so reopening one while its
+  save is on its way cannot write stale text. Clearing a dump deletes it; an untouched new dump is
+  never created.
+- **Keys**: Esc back to the list, ⌃⏎ copies everything and closes, ⌃S asks for a path (prefilled
+  `~/Documents/dump-<date>.txt`) and writes a copy — directories created, existing files never
+  overwritten.
+- **Palette core**: a `ModeItem` may carry `edit`, an `EditableText` (title, text, `save`,
+  optional `saveAs`) the palette opens in its editor; any mode can use it.
+- **Desktop only**: `LIST_DUMPS`, `SAVE_DUMP`, `EXPORT_DUMP` in Rust (`dumps.rs`); files are
+  `$XDG_DATA_HOME/lifosy/dumps/<created-ms>.txt`, ids are digits only, and the 26th least recently
+  edited is removed on save. The extension does not offer `d:`.
+
+Checks: palette tsc and biome clean, vitest 116/116 (18 new); desktop `cargo test` 41 passed (5
+new), clippy and fmt clean; the built desktop UI driven in Chromium with a stubbed Tauri bridge
+through new dump → type → autosave → ⌃S → Esc → list → ⌃⏎.
+
+## 2026-09-23 — Desktop palette reads the DeepL key from `~/.config/envvars/deepl.env`
+
+The daemon is started once, by the first toggle or by the compositor, so a key only in an
+interactive shell never reached it. It now reads the omarchy env file itself, on every
+translation, so editing the key takes effect without a restart:
+
+1. `DEEPL_AUTH_KEY` in the environment, as before;
+2. `$XDG_CONFIG_HOME/envvars/deepl.env` — `DEEPL_AUTH_KEY` or `DEEPL_API_KEY`, parsed like a
+   shell would read it (`export`, quotes, comments, last assignment wins), never executed;
+3. the Secret Service, as before. The "no key" message now names the file.
+
+Checks: desktop `cargo test` 36 passed (1 new), clippy and fmt clean.
+
+## 2026-09-23 — Translation history in the palette's `t:` mode
+
+- `t:` with nothing typed lists the last 20 translated texts, newest first; ⏎ (or a click) puts one
+  back in the input and translates it again. Texts are kept as typed, so `fr: …` asks for French
+  again; translating a text again moves it to the top instead of listing it twice.
+- Recorded after a successful translation only; a failure to record never hides the answer.
+- Generic: a submitting `PaletteMode` may declare `history()`, read on entering the mode and again
+  after each submit. The list rule is `withTranslationText` (`packages/palette/src/translate.ts`),
+  mirrored in Rust.
+- Persisted by each backend through two new requests, `GET_TRANSLATION_HISTORY` and
+  `ADD_TRANSLATION_HISTORY`: extension local storage (`translationHistory`) and the desktop's
+  `$XDG_STATE_HOME/lifosy/translations.json`.
+
+Checks: palette tsc and biome clean, vitest 98/98 (10 new); extension tsc and build green, vitest
+214/214 (2 new); desktop `cargo test` 35 passed (1 new), clippy and fmt clean; history listed and
+re-submitted in the built desktop UI in Chromium with a stubbed Tauri bridge.
+
+## 2026-09-23 — Palette prefix modes: prompts, translate, repos (from omarchy)
+
+Follow-up to the desktop palette ([#124](https://github.com/lifosy/monorepo/pull/124)): three menus
+from the omarchy dotfiles — `omarchy-show-prompts`, `translate_manager.py` and
+`omarchy-show-repos` — now live in `@lifosy/palette`, so the desktop overlay and the browser
+extension both have them.
+
+- **Prefix modes** (`PaletteMode` in `command-palette.ts`): typing `x:` switches the input into a
+  mode's own list, with a breadcrumb; Esc or Backspace on an empty input leaves it. A mode either
+  *loads* its entries once and filters them locally, or *submits* on ⏎ only, for answers that cost a
+  request. Entries open a URL, copy text (a new `copy` handler per surface), or list children on ⇥ /
+  →. The empty palette's hint lists the prefixes.
+- **`p:` prompts**: every `.prompts.md` on the repository's default branch (one tree listing, one
+  read per file; cached five minutes, stale-while-refresh), parsed by the palette with the
+  `doc/prompts-format.md` rules. ⏎ copies the body. Replaces omarchy's hard-coded path in a local
+  clone.
+- **`t:` translate**: DeepL, as `translate_manager.py`'s API mode — into EN-US and DE, dropping the
+  language the text is already in (so German goes to English); `t: fr: …` asks for one language.
+  Typed text outside any mode is offered as "Translate “…”". The key is set with the new
+  **Set the DeepL API key…** action (extension storage; desktop keyring, or `DEEPL_AUTH_KEY`). The
+  offline Argos mode is not carried over.
+- **`r:` repos**: `GET /user/repos`, most recently pushed first; ⇥ lists the same GitHub sub pages
+  omarchy offers. The desktop also reads omarchy's `~/.config/eee/counts` and lists those first —
+  the browser has no such file.
+- **Protocol**: `LIST_PROMPT_FILES`, `TRANSLATE`, `SET_TRANSLATION_KEY`, `LIST_GITHUB_REPOS`,
+  answered by the extension's service worker (`background/palette-modes.ts`) and the desktop's Rust
+  backend (`prompts.rs`, `translate.rs`, `repos.rs`). The desktop copies through a `copy_text`
+  command (`wl-copy`); the extension through `navigator.clipboard`, with an `execCommand` fallback.
+
+Checks: palette tsc and biome clean, vitest 88/88 (30 new); extension tsc and build green, vitest
+212/212 (12 new); desktop `cargo test` 34 passed (7 new), clippy and fmt clean; the built desktop UI
+driven in Chromium with a stubbed Tauri bridge through `p:`, `t:` and `r:`.
+
 ## 2026-09-23 — Knowledge base: closing the gaps with the LLM-wiki pattern
 
 Measured against Karpathy's "LLM wiki" gist (raw sources → LLM-maintained wiki → schema, with

@@ -1,6 +1,9 @@
 import {
   type CommandPalette,
+  commandsMode,
+  copyToClipboard,
   createCommandPalette,
+  paletteModes,
   portHandlers,
   repoActions,
 } from '@lifosy/palette';
@@ -79,6 +82,9 @@ export function StartPage() {
         // This tab is a blank start page, so a hit takes it over rather than leaving it behind.
         open: openInThisTab,
         actions: () => repoActions(workerPort),
+        // The browser cannot run commands, so `>x` only copies them.
+        modes: [...paletteModes(workerPort), commandsMode(workerPort, { canRun: false })],
+        copy: copyToClipboard,
       });
     }
     return paletteRef.current;

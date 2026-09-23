@@ -3,8 +3,12 @@ import type { Bookmark } from './bookmarks.js';
 import {
   type CommandPalette,
   createCommandPalette,
+  type EditableText,
+  filterModeItems,
+  type ModeItem,
   PALETTE_HOST_ID,
   type PaletteAction,
+  type PaletteMode,
   type RecentEntry,
   type RepoResult,
 } from './command-palette.js';
@@ -40,6 +44,31 @@ let renameRun: Mock<(inputs: string[]) => Promise<string>>;
 let guidedRun: Mock<(inputs: string[]) => Promise<string>>;
 let children: Mock<() => Promise<PaletteAction[]>>;
 let actions: PaletteAction[];
+let copy: Mock<(text: string) => Promise<void>>;
+let loadPrompts: Mock<() => Promise<ModeItem[]>>;
+let translate: Mock<(query: string) => Promise<ModeItem[]>>;
+let history: Mock<() => Promise<string[]>>;
+let modes: PaletteMode[];
+
+const PROMPTS: ModeItem[] = [
+  {
+    id: 'p1',
+    title: 'Commit message',
+    subtitle: '#git',
+    keywords: 'staged diff',
+    copy: 'Write it',
+  },
+  { id: 'p2', title: 'Refactor to hooks', subtitle: '#react', copy: 'Convert it' },
+  {
+    id: 'r1',
+    title: 'o/repo',
+    url: 'https://github.com/o/repo',
+    children: [
+      { id: 'r1:issues', title: 'o/repo · Issues', url: 'https://github.com/o/repo/issues' },
+      { id: 'r1:pulls', title: 'o/repo · Pull requests', url: 'https://github.com/o/repo/pulls' },
+    ],
+  },
+];
 
 const shadow = () => {
   const host = document.getElementById(PALETTE_HOST_ID);
@@ -129,6 +158,31 @@ beforeEach(async () => {
     { id: 'tabs', title: 'Pinned tab groups…', children },
   ];
 
+  copy = vi.fn(async () => {});
+  loadPrompts = vi.fn(async () => PROMPTS);
+  translate = vi.fn(async (query: string) => [
+    { id: 't:en', title: `EN ${query}`, copy: `EN ${query}` },
+    { id: 't:fr', title: `FR ${query}`, copy: `FR ${query}` },
+  ]);
+  history = vi.fn(async () => [] as string[]);
+  modes = [
+    {
+      prefix: 'p',
+      title: 'Prompts',
+      placeholder: 'Search prompts',
+      description: 'Find a prompt',
+      load: loadPrompts,
+    },
+    {
+      prefix: 't',
+      title: 'Translate',
+      description: 'Translate text',
+      placeholder: 'Text to translate',
+      submit: translate,
+      history,
+    },
+  ];
+
   palette = createCommandPalette({
     loadBookmarks: loadBookmarks as any,
     searchRepo: searchRepo as any,
@@ -137,6 +191,8 @@ beforeEach(async () => {
     loadRecents: loadRecents as any,
     rememberRecent: rememberRecent as any,
     countBookmarkUse: countBookmarkUse as any,
+    modes,
+    copy: copy as any,
   });
   palette.toggle();
   await settle();
@@ -185,6 +241,8 @@ describe('options', () => {
     loadRecents: async () => [],
     rememberRecent: () => {},
     countBookmarkUse: () => {},
+    modes: [],
+    copy: async () => {},
   });
 
   beforeEach(() => palette.destroy());
@@ -224,7 +282,7 @@ describe('options', () => {
 describe('bookmark search', () => {
   it('filters bookmarks and actions locally, without touching the repo search', () => {
     type('zul');
-    expect(groupLabels()).toEqual(['Bookmarks', 'Web']);
+    expect(groupLabels()).toEqual(['Bookmarks', 'Web', 'Translate']);
     expect(groupRows('Bookmarks')).toEqual(['Zulip']);
     expect(searchRepo).not.toHaveBeenCalled();
   });
@@ -305,7 +363,7 @@ describe('recent actions', () => {
     await settle();
 
     type('zul');
-    expect(groupLabels()).toEqual(['Bookmarks', 'Web']);
+    expect(groupLabels()).toEqual(['Bookmarks', 'Web', 'Translate']);
   });
 });
 
@@ -477,7 +535,7 @@ describe('repo search', () => {
     expect(rowTitles()).toContain('b.ts');
 
     type('zul');
-    expect(groupLabels()).toEqual(['Bookmarks', 'Web']);
+    expect(groupLabels()).toEqual(['Bookmarks', 'Web', 'Translate']);
   });
 });
 
@@ -498,7 +556,7 @@ describe('web search', () => {
 
   it('offers every engine for the query, below the actions', () => {
     type('bookmark');
-    expect(groupLabels()).toEqual(['Actions', 'Web']);
+    expect(groupLabels()).toEqual(['Actions', 'Web', 'Translate']);
     expect(groupRows('Web')).toEqual([
       'Search Google for “bookmark”',
       'Search DuckDuckGo for “bookmark”',
@@ -630,5 +688,727 @@ describe('actions that walk through several fields', () => {
     press('Enter');
 
     expect(shadow().querySelector('.empty')?.textContent).toBe('https://page.example/  ·  A title');
+  });
+});
+
+describe('filterModeItems', () => {
+  it('needs every word somewhere, and ranks items whose title has them all first', () => {
+    const items: ModeItem[] = [
+      { id: 'a', title: 'Review', keywords: 'commit message' },
+      { id: 'b', title: 'Commit message' },
+      { id: 'c', title: 'Commit', subtitle: 'unrelated' },
+    ];
+    expect(filterModeItems(items, 'commit message').map((item) => item.id)).toEqual(['b', 'a']);
+    expect(filterModeItems(items, '  ').map((item) => item.id)).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('prefix modes', () => {
+  it('enters a mode on its prefix, loads it once, and filters as you type', async () => {
+    type('>p');
+    await settle();
+
+    expect(crumbText()).toBe('Prompts');
+    expect(input().value).toBe('');
+    expect(input().placeholder).toBe('Search prompts');
+    expect(groupLabels()).toEqual(['Prompts']);
+    expect(rowTitles()).toEqual(['Commit message', 'Refactor to hooks', 'o/repo']);
+
+    type('staged');
+    expect(rowTitles()).toEqual(['Commit message']);
+    type('nothing like it');
+    expect(shadow().querySelector('.empty')?.textContent).toBe('No matches.');
+    expect(loadPrompts).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the space typed right after the prefix', async () => {
+    type('>p');
+    await settle();
+    type(' hooks');
+    expect(input().value).toBe('hooks');
+  });
+
+  it('keeps what follows the prefix as the query', async () => {
+    type('>p hooks');
+    await settle();
+    expect(input().value).toBe('hooks');
+    expect(rowTitles()).toEqual(['Refactor to hooks']);
+  });
+
+  it('copies the chosen entry and closes', async () => {
+    type('>p');
+    await settle();
+    press('Enter');
+    await settle();
+    expect(copy).toHaveBeenCalledWith('Write it');
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('stays open and says so when copying fails', async () => {
+    copy.mockRejectedValueOnce(new Error('No clipboard here'));
+    type('>p');
+    await settle();
+    press('Enter');
+    await settle();
+    expect(statusText()).toBe('No clipboard here');
+    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+  });
+
+  it('shows a load failure', async () => {
+    loadPrompts.mockRejectedValueOnce(new Error('No .prompts.md files'));
+    type('>p');
+    await settle();
+    expect(statusText()).toBe('No .prompts.md files');
+  });
+
+  it('opens a child list on Tab and walks back out with Escape, then leaves the mode', async () => {
+    type('>p repo');
+    await settle();
+    expect(hintText()).toContain('⇥ more');
+    press('Tab');
+
+    expect(crumbText()).toBe('Prompts › o/repo');
+    expect(rowTitles()).toEqual(['o/repo · Issues', 'o/repo · Pull requests']);
+    type('pull');
+    await activateRow('o/repo · Pull requests');
+    expect(open).toHaveBeenCalledWith('https://github.com/o/repo/pulls');
+    expect(rememberRecent).toHaveBeenCalledWith({
+      id: 'r1:pulls',
+      title: 'o/repo · Pull requests',
+      subtitle: undefined,
+      url: 'https://github.com/o/repo/pulls',
+    });
+  });
+
+  it('Escape goes from the child list to the mode, and from the mode to the top', async () => {
+    type('>p repo');
+    await settle();
+    press('ArrowRight');
+    expect(crumbText()).toBe('Prompts › o/repo');
+    press('Escape');
+    expect(crumbText()).toBe('Prompts');
+    press('Escape');
+    expect(crumbText()).toBeNull();
+    expect(rowTitles()).toContain('Vitest guide');
+  });
+
+  it('Backspace on an empty input leaves the mode and gives the prefix back', async () => {
+    type('>p');
+    await settle();
+    press('Backspace');
+    expect(crumbText()).toBeNull();
+    expect(input().value).toBe('>p');
+  });
+
+  it('does not treat an unknown prefix or a url as a mode', () => {
+    type('>x thing');
+    expect(crumbText()).toBeNull();
+    type('https://vitest.dev');
+    expect(crumbText()).toBeNull();
+  });
+
+  it('submits only on Enter, then Enter copies the selected answer', async () => {
+    type('>t Guten Morgen');
+    await settle();
+    // Text typed with the prefix is submitted at once — it was typed to be translated.
+    expect(translate).toHaveBeenCalledWith('Guten Morgen');
+    expect(rowTitles()).toEqual(['EN Guten Morgen', 'FR Guten Morgen']);
+
+    type('Guten Abend');
+    expect(rowTitles()).toEqual([]);
+    expect(hintText()).toContain('⏎ translate');
+    expect(translate).toHaveBeenCalledTimes(1);
+
+    press('Enter');
+    await settle();
+    expect(translate).toHaveBeenLastCalledWith('Guten Abend');
+    press('ArrowDown');
+    press('Enter');
+    await settle();
+    expect(copy).toHaveBeenCalledWith('FR Guten Abend');
+  });
+
+  it('drops an answer that arrives after the text changed', async () => {
+    let finish: (items: ModeItem[]) => void = () => {};
+    translate.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    type('>t one');
+    type('two');
+    finish([{ id: 'late', title: 'late', copy: 'late' }]);
+    await settle();
+    expect(rowTitles()).toEqual([]);
+  });
+
+  it('offers typed text to a mode that submits, and switches into it', async () => {
+    type('Guten Morgen');
+    expect(groupRows('Translate')).toEqual(['Translate “Guten Morgen”']);
+
+    await activateRow('Translate “Guten Morgen”');
+    expect(crumbText()).toBe('Translate');
+    expect(translate).toHaveBeenCalledWith('Guten Morgen');
+  });
+
+  it('lists the prefixes in the hint of an empty palette', () => {
+    expect(hintText()).toBe('↑↓ navigate · ⏎ select · ? help · >b >p >t · esc close');
+  });
+
+  it('starts outside any mode each time it opens', async () => {
+    type('>p');
+    await settle();
+    palette.close();
+    palette.open();
+    await settle();
+    expect(crumbText()).toBeNull();
+  });
+});
+
+describe('submit history', () => {
+  it('lists earlier queries while nothing is typed, and hides them once something is', async () => {
+    history.mockResolvedValue(['Guten Morgen', 'fr: good night']);
+    type('>t');
+    await settle();
+
+    expect(groupLabels()).toEqual(['Recent']);
+    expect(rowTitles()).toEqual(['Guten Morgen', 'fr: good night']);
+    expect(hintText()).toContain('⏎ translate again');
+
+    type('Hallo');
+    expect(rowTitles()).toEqual([]);
+    type('');
+    expect(rowTitles()).toEqual(['Guten Morgen', 'fr: good night']);
+  });
+
+  it('submits the chosen one again, with ⏎ as with a click', async () => {
+    history.mockResolvedValue(['Guten Morgen', 'fr: good night']);
+    type('>t');
+    await settle();
+    press('ArrowDown');
+    press('Enter');
+    await settle();
+
+    expect(translate).toHaveBeenCalledWith('fr: good night');
+    expect(input().value).toBe('fr: good night');
+    expect(rowTitles()).toEqual(['EN fr: good night', 'FR fr: good night']);
+  });
+
+  it('reads the history again after a submit, so the new query is there next time', async () => {
+    type('>t Hallo');
+    await settle();
+    expect(history).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not submit an empty input', async () => {
+    type('>t');
+    await settle();
+    press('Enter');
+    await settle();
+    expect(translate).not.toHaveBeenCalled();
+  });
+
+  it('shows no history when there is none to read', async () => {
+    history.mockRejectedValue(new Error('offline'));
+    type('>t');
+    await settle();
+    expect(rowTitles()).toEqual([]);
+    expect(statusText()).toBeNull();
+  });
+});
+
+describe('the editor', () => {
+  let save: Mock<(text: string) => Promise<void>>;
+  let saveAs: Mock<(path: string, text: string) => Promise<string>>;
+  let loadDumps: Mock<() => Promise<ModeItem[]>>;
+
+  const editorArea = () => shadow().querySelector('.editor') as HTMLTextAreaElement;
+  const edit = (value: string) => {
+    editorArea().value = value;
+    editorArea().dispatchEvent(new Event('input'));
+  };
+  const pressInEditor = (key: string, init: KeyboardEventInit = {}) =>
+    editorArea().dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }),
+    );
+  const doc = (text: string): EditableText => ({
+    title: 'Notes',
+    text,
+    save,
+    saveAs: { suggestedPath: () => '~/Documents/dump.txt', save: saveAs },
+  });
+
+  beforeEach(async () => {
+    save = vi.fn(async () => {});
+    saveAs = vi.fn(async (path: string) => `/home/me/${path.slice(2)}`);
+    loadDumps = vi.fn(async () => [{ id: 'd1', title: 'Notes', edit: () => doc('hello') }]);
+    modes.push({
+      prefix: 'd',
+      title: 'Dump',
+      placeholder: 'Search dumps',
+      description: 'Scratch text',
+      load: loadDumps,
+    });
+    type('>d');
+    await settle();
+    press('Enter');
+    await settle();
+  });
+
+  it('opens the chosen entry in place of the list, with its text', () => {
+    expect(editorArea().hidden).toBe(false);
+    expect(editorArea().value).toBe('hello');
+    expect(shadow().querySelector('.rows')?.hasAttribute('hidden')).toBe(true);
+    expect(input().hidden).toBe(true);
+    expect(crumbText()).toBe('Dump › Notes');
+    expect(hintText()).toContain('⌃S save as file');
+    expect(shadow().activeElement).toBe(editorArea());
+  });
+
+  it('saves a pause after typing, once', async () => {
+    vi.useFakeTimers();
+    try {
+      edit('hello w');
+      edit('hello world');
+      expect(save).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(400);
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(save).toHaveBeenCalledWith('hello world');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('saves on Escape, goes back to the list and loads it again', async () => {
+    edit('hello there');
+    pressInEditor('Escape');
+    await settle();
+    await settle();
+
+    expect(save).toHaveBeenCalledWith('hello there');
+    expect(editorArea().hidden).toBe(true);
+    expect(crumbText()).toBe('Dump');
+    expect(loadDumps).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not save text that did not change', async () => {
+    pressInEditor('Escape');
+    await settle();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('lands saves in order, one after the other', async () => {
+    const order: string[] = [];
+    let release: () => void = () => {};
+    save.mockImplementationOnce(
+      (text) =>
+        new Promise<void>((resolve) => {
+          release = () => {
+            order.push(text);
+            resolve();
+          };
+        }),
+    );
+    save.mockImplementation(async (text) => {
+      order.push(text);
+    });
+    edit('one');
+    pressInEditor('Escape');
+    press('Enter');
+    await settle();
+    edit('two');
+    pressInEditor('Escape');
+    await settle();
+    expect(order).toEqual([]);
+    release();
+    await settle();
+    await settle();
+    expect(order).toEqual(['one', 'two']);
+  });
+
+  it('saves as a file on ⌃S, at the path typed over the suggestion', async () => {
+    edit('keep me');
+    pressInEditor('s', { ctrlKey: true });
+    expect(input().hidden).toBe(false);
+    expect(input().value).toBe('~/Documents/dump.txt');
+    expect(crumbText()).toBe('Dump › Notes · Save as');
+
+    type('~/Documents/keep.txt');
+    press('Enter');
+    await settle();
+    expect(saveAs).toHaveBeenCalledWith('~/Documents/keep.txt', 'keep me');
+    expect(statusText()).toBe('Saved to /home/me/Documents/keep.txt');
+    expect(input().hidden).toBe(true);
+    expect(shadow().activeElement).toBe(editorArea());
+  });
+
+  it('Escape in the path goes back to the text without saving', () => {
+    pressInEditor('s', { ctrlKey: true });
+    press('Escape');
+    expect(saveAs).not.toHaveBeenCalled();
+    expect(editorArea().hidden).toBe(false);
+  });
+
+  it('shows why a save as failed', async () => {
+    saveAs.mockRejectedValueOnce(new Error('/x already exists'));
+    pressInEditor('s', { ctrlKey: true });
+    press('Enter');
+    await settle();
+    expect(statusText()).toBe('/x already exists');
+  });
+
+  it('copies everything on ⌃⏎, saves, and closes', async () => {
+    edit('copy me');
+    pressInEditor('Enter', { ctrlKey: true });
+    await settle();
+    expect(copy).toHaveBeenCalledWith('copy me');
+    expect(save).toHaveBeenCalledWith('copy me');
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('saves when the palette closes with the editor open', async () => {
+    edit('unsaved');
+    palette.close();
+    await settle();
+    expect(save).toHaveBeenCalledWith('unsaved');
+  });
+
+  it('opens on the list again, not in the editor', async () => {
+    palette.close();
+    palette.open();
+    await settle();
+    expect(editorArea().hidden).toBe(true);
+    expect(crumbText()).toBeNull();
+  });
+});
+
+describe('help', () => {
+  it('opens on ? and lists the prefixes, searching and keys, and the actions', async () => {
+    type('?');
+    await settle();
+
+    expect(crumbText()).toBe('Help');
+    expect(input().value).toBe('');
+    expect(groupLabels()).toEqual([
+      'Prefixes — ⏎ switches to one',
+      'Searching and keys',
+      'Actions — ⏎ runs one',
+    ]);
+    expect(groupRows('Prefixes — ⏎ switches to one')).toEqual([
+      '>b  Bookmarks',
+      '>p  Prompts',
+      '>t  Translate',
+    ]);
+    expect(groupRows('Actions — ⏎ runs one')).toEqual([
+      'Bookmark this page',
+      'Bookmark this page…',
+      'Pinned tab groups…',
+    ]);
+    expect(rowTitles()).toContain('⇥  Search the repo');
+    expect(shadow().querySelectorAll('.row .subtitle')[1]?.textContent).toBe('Find a prompt');
+  });
+
+  it('is offered in the empty palette’s hint', () => {
+    expect(hintText()).toContain('? help · >b >p');
+  });
+
+  it('filters, keeping each section under its heading', async () => {
+    type('? translate');
+    await settle();
+    expect(input().value).toBe('translate');
+    expect(rowTitles()).toEqual(['>t  Translate']);
+
+    type('bookmark');
+    expect(groupLabels()).toEqual([
+      'Prefixes — ⏎ switches to one',
+      'Searching and keys',
+      'Actions — ⏎ runs one',
+    ]);
+  });
+
+  it('switches to the chosen prefix', async () => {
+    type('?');
+    await settle();
+    await activateRow('>p  Prompts');
+    await settle();
+    expect(crumbText()).toBe('Prompts');
+    expect(rowTitles()).toEqual(['Commit message', 'Refactor to hooks', 'o/repo']);
+  });
+
+  it('runs the chosen action as if picked from the list', async () => {
+    type('?');
+    await settle();
+    await activateRow('Bookmark this page');
+    await settle();
+    expect(bookmarkRun).toHaveBeenCalledTimes(1);
+    expect(crumbText()).toBeNull();
+  });
+
+  it('walks an action through its fields', async () => {
+    type('?');
+    await settle();
+    await activateRow('Bookmark this page…');
+    expect(crumbText()).toBe('Bookmark this page · URL (1/3)');
+  });
+
+  it('gives the ? back on Backspace, like any prefix', async () => {
+    type('?');
+    await settle();
+    press('Backspace');
+    expect(crumbText()).toBeNull();
+    expect(input().value).toBe('?');
+  });
+
+  it('is only a prefix at the start', () => {
+    type('what?');
+    expect(crumbText()).toBeNull();
+  });
+});
+
+describe('long lists', () => {
+  it('wraps the help’s descriptions and nothing else', async () => {
+    const rowsElement = () => shadow().querySelector('.rows') as HTMLElement;
+    expect(rowsElement().dataset.wrap).toBe('false');
+    type('?');
+    await settle();
+    expect(rowsElement().dataset.wrap).toBe('true');
+  });
+
+  it('scrolls the selected row into view as the selection moves', () => {
+    const scrolled: string[] = [];
+    const prototype = HTMLElement.prototype as any;
+    prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this.querySelector('.title')?.textContent ?? '');
+    };
+    try {
+      press('ArrowDown');
+      expect(scrolled.at(-1)).toBe('Zulip');
+    } finally {
+      delete prototype.scrollIntoView;
+    }
+  });
+});
+
+describe('mode entries that run an action', () => {
+  const opens = vi.fn(([prompt = '']: string[]) => {
+    if (!prompt) throw new Error('Type a prompt');
+    return {
+      id: `cc:${prompt}`,
+      title: `CC: ${prompt}`,
+      url: `https://claude.ai/code?p=${prompt}`,
+    };
+  });
+
+  beforeEach(async () => {
+    opens.mockClear();
+    modes.push({
+      prefix: 'c',
+      title: 'Claude Code',
+      placeholder: 'Search',
+      description: 'Start a session',
+      load: async () => [
+        {
+          id: 'repo',
+          title: 'o/r',
+          action: { id: 'cc', title: 'Claude Code: o/r', prompts: [{ label: 'Prompt' }], opens },
+        },
+      ],
+    });
+    type('>c');
+    await settle();
+    press('Enter');
+    await settle();
+  });
+
+  it('asks for the action’s fields in the input, outside the mode', () => {
+    expect(crumbText()).toBe('Claude Code: o/r · Prompt (1/1)');
+  });
+
+  it('opens where the answers lead, remembers it like a bookmark, and closes', async () => {
+    type('add tests');
+    press('Enter');
+    await settle();
+    expect(open).toHaveBeenCalledWith('https://claude.ai/code?p=add tests');
+    expect(rememberRecent).toHaveBeenCalledWith({
+      id: 'cc:add tests',
+      title: 'CC: add tests',
+      url: 'https://claude.ai/code?p=add tests',
+    });
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('stays open and says why when the answers are refused', async () => {
+    press('Enter');
+    await settle();
+    expect(open).not.toHaveBeenCalled();
+    expect(statusText()).toBe('Type a prompt');
+  });
+});
+
+describe('the > prefix', () => {
+  it('switches as soon as the letter is typed', async () => {
+    type('>');
+    expect(crumbText()).toBeNull();
+    type('>p');
+    await settle();
+    expect(crumbText()).toBe('Prompts');
+  });
+
+  it('leaves a longer word alone, and the old colon form too', () => {
+    type('>prompt');
+    expect(crumbText()).toBeNull();
+    type('p: hooks');
+    expect(crumbText()).toBeNull();
+  });
+
+  it('offers typed text to a submitting mode under its new prefix', () => {
+    type('Guten Morgen');
+    expect(shadow().textContent).toContain('or type >t first');
+  });
+});
+
+describe('>b', () => {
+  it('lists only bookmarks, ranked as the main search ranks them', async () => {
+    type('>b');
+    await settle();
+    expect(crumbText()).toBe('Bookmarks');
+    expect(groupLabels()).toEqual(['Bookmarks']);
+    expect(rowTitles()).toEqual(['Vitest guide', 'Zulip']);
+
+    type('chat');
+    expect(rowTitles()).toEqual(['Zulip']);
+    expect(shadow().querySelector('.row .subtitle')?.textContent).toBe(
+      'https://zulip.example/  #chat',
+    );
+  });
+
+  it('shows no actions, web search or translate offer for what is typed', async () => {
+    type('>b bookmark');
+    await settle();
+    expect(groupLabels()).toEqual([]);
+    expect(shadow().querySelector('.empty')?.textContent).toBe('No matches.');
+  });
+
+  it('opens a bookmark as the main list does: counted, remembered, closed', async () => {
+    type('>b zul');
+    await settle();
+    press('Enter');
+    expect(open).toHaveBeenCalledWith('https://zulip.example/');
+    expect(countBookmarkUse).toHaveBeenCalledWith('Zulip');
+    expect(rememberRecent).toHaveBeenCalledWith({
+      id: 'bookmark:Zulip',
+      title: 'Zulip',
+      subtitle: 'https://zulip.example/',
+      url: 'https://zulip.example/',
+    });
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('gives >b back on Backspace', async () => {
+    type('>b');
+    await settle();
+    press('Backspace');
+    expect(input().value).toBe('>b');
+  });
+});
+
+describe('actions that end in choices', () => {
+  const runCommand = vi.fn(async () => 'Running');
+
+  beforeEach(async () => {
+    runCommand.mockClear();
+    modes.push({
+      prefix: 'x',
+      title: 'Commands',
+      placeholder: 'Search commands',
+      description: 'Commands',
+      load: async () => [
+        {
+          id: 'ls',
+          title: 'List a folder',
+          action: {
+            id: 'ls',
+            title: 'List a folder',
+            recent: false,
+            prompts: [{ label: 'Value for $1' }],
+            choices: ([value = '']: string[]) => [
+              { id: 'copy', title: 'Copy', group: 'Choose', copy: `ls ${value}` },
+              {
+                id: 'run',
+                title: 'Run in terminal',
+                group: 'Choose',
+                action: {
+                  id: 'run',
+                  title: 'Run in terminal',
+                  closes: true,
+                  recent: false,
+                  run: runCommand,
+                },
+              },
+              { id: 'text', title: `ls ${value}`, group: 'The command', copy: `ls ${value}` },
+            ],
+          },
+        },
+      ],
+    });
+    type('>x');
+    await settle();
+    press('Enter');
+    await settle();
+    type('/tmp');
+    press('Enter');
+    await settle();
+  });
+
+  it('lists the choices with the filled-in command below them', () => {
+    expect(crumbText()).toBe('List a folder');
+    expect(groupLabels()).toEqual(['Choose', 'The command']);
+    expect(rowTitles()).toEqual(['Copy', 'Run in terminal', 'ls /tmp']);
+    expect(selectedTitle()).toBe('Copy');
+  });
+
+  it('copies on ⏎ and closes', async () => {
+    press('Enter');
+    await settle();
+    expect(copy).toHaveBeenCalledWith('ls /tmp');
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('runs a chosen action, closes, and keeps it out of Recent', async () => {
+    await activateRow('Run in terminal');
+    await settle();
+    expect(runCommand).toHaveBeenCalledTimes(1);
+    expect(rememberRecent).not.toHaveBeenCalled();
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('stays open and says why when running fails', async () => {
+    runCommand.mockRejectedValueOnce(new Error('ghostty is not installed'));
+    await activateRow('Run in terminal');
+    await settle();
+    expect(statusText()).toBe('ghostty is not installed');
+    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+  });
+
+  it('leaves the choices with Escape, and Backspace gives no prefix back', () => {
+    press('Backspace');
+    expect(crumbText()).toBeNull();
+    expect(input().value).toBe('');
+  });
+});
+
+describe('filling in an action', () => {
+  it('shows the action’s subtitle while its first field is empty', async () => {
+    actions.push({
+      id: 'cmd',
+      title: 'List',
+      subtitle: 'ls -la $1',
+      prompts: [{ label: 'Value for $1' }],
+      run: async () => '',
+    });
+    type('List');
+    await activateRow('List');
+    expect(shadow().querySelector('.empty')?.textContent).toBe('ls -la $1');
   });
 });

@@ -9,16 +9,52 @@ pub const DEFAULT_REPO: &str = "lifosy/monorepo";
 
 const KEYRING_SERVICE: &str = "lifosy-palette";
 const KEYRING_USER: &str = "github-token";
+const KEYRING_DEEPL_USER: &str = "deepl-api-key";
 
-/// `$XDG_<kind>_HOME/lifosy`, falling back to the spec's default under `$HOME`.
-fn xdg_dir(variable: &str, fallback: &str) -> PathBuf {
-    let base = std::env::var_os(variable)
+/// `$XDG_<kind>_HOME`, falling back to the spec's default under `$HOME`.
+fn xdg_base(variable: &str, fallback: &str) -> PathBuf {
+    std::env::var_os(variable)
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
         .unwrap_or_else(|| {
             PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(fallback)
-        });
-    base.join("lifosy")
+        })
+}
+
+/// `$XDG_<kind>_HOME/lifosy`.
+fn xdg_dir(variable: &str, fallback: &str) -> PathBuf {
+    xdg_base(variable, fallback).join("lifosy")
+}
+
+/// Where the omarchy dotfiles keep one shell env file per secret, sourced by the scripts that need
+/// it (and edited with `ee`).
+pub fn deepl_env_file() -> PathBuf {
+    xdg_base("XDG_CONFIG_HOME", ".config").join("envvars/deepl.env")
+}
+
+/// The DeepL key variables an env file may set, in order of preference.
+const DEEPL_KEY_NAMES: [&str; 2] = ["DEEPL_AUTH_KEY", "DEEPL_API_KEY"];
+
+/// What a shell would get from sourcing `text` for the first of `names` it sets: `NAME=value`
+/// lines, `export` optional, the value optionally quoted. A later assignment wins, as in a shell.
+pub fn env_file_value(text: &str, names: &[&str]) -> Option<String> {
+    let assignments: Vec<(&str, &str)> = text
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.starts_with('#'))
+        .map(|line| line.strip_prefix("export ").unwrap_or(line))
+        .filter_map(|line| line.split_once('='))
+        .map(|(name, value)| (name.trim(), value.trim()))
+        .collect();
+    names.iter().find_map(|wanted| {
+        let (_, raw) = assignments.iter().rev().find(|(name, _)| name == wanted)?;
+        let value = match raw.chars().next() {
+            Some(quote @ ('"' | '\'')) => raw[1..].split(quote).next().unwrap_or_default(),
+            // Unquoted, a ` #` starts a comment.
+            _ => raw.split(" #").next().unwrap_or_default().trim(),
+        };
+        (!value.is_empty()).then(|| value.to_string())
+    })
 }
 
 pub fn config_file() -> PathBuf {
@@ -29,8 +65,24 @@ pub fn bookmarks_cache_file() -> PathBuf {
     xdg_dir("XDG_CACHE_HOME", ".cache").join("bookmarks.json")
 }
 
+pub fn dumps_dir() -> PathBuf {
+    xdg_dir("XDG_DATA_HOME", ".local/share").join("dumps")
+}
+
+pub fn commands_cache_file() -> PathBuf {
+    xdg_dir("XDG_CACHE_HOME", ".cache").join("commands.json")
+}
+
+pub fn prompts_cache_file() -> PathBuf {
+    xdg_dir("XDG_CACHE_HOME", ".cache").join("prompts.json")
+}
+
 pub fn recents_file() -> PathBuf {
     xdg_dir("XDG_STATE_HOME", ".local/state").join("recents.json")
+}
+
+pub fn translation_history_file() -> PathBuf {
+    xdg_dir("XDG_STATE_HOME", ".local/state").join("translations.json")
 }
 
 /// Reads a JSON file written by `write_json`; a missing or unreadable file is `None`.
@@ -108,8 +160,8 @@ pub fn is_repo_name(value: &str) -> bool {
     matches!(value.split_once('/'), Some((owner, name)) if valid(owner) && valid(name))
 }
 
-fn keyring_entry() -> Result<keyring::Entry, String> {
-    keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
+fn keyring_entry(user: &str) -> Result<keyring::Entry, String> {
+    keyring::Entry::new(KEYRING_SERVICE, user)
         .map_err(|error| format!("the keyring is unavailable: {error}"))
 }
 
@@ -124,7 +176,7 @@ pub fn token() -> Result<String, String> {
     {
         return Ok(token);
     }
-    match keyring_entry()?.get_password() {
+    match keyring_entry(KEYRING_USER)?.get_password() {
         Ok(token) => Ok(token),
         Err(keyring::Error::NoEntry) => Err(
             "Not logged in — run “Log in with the Lifosy console” or `lifosy-palette login`".into(),
@@ -137,24 +189,107 @@ pub fn token() -> Result<String, String> {
 }
 
 pub fn store_token(token: &str) -> Result<(), String> {
-    keyring_entry()?.set_password(token).map_err(|error| {
-        format!(
-            "Could not store the token in the keyring ({error}). Is a Secret Service \
+    keyring_entry(KEYRING_USER)?
+        .set_password(token)
+        .map_err(|error| {
+            format!(
+                "Could not store the token in the keyring ({error}). Is a Secret Service \
                  (gnome-keyring, KeePassXC) running?"
-        )
-    })
+            )
+        })
 }
 
 pub fn forget_token() -> Result<(), String> {
-    match keyring_entry()?.delete_credential() {
+    match keyring_entry(KEYRING_USER)?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(error) => Err(format!("could not remove the token: {error}")),
     }
 }
 
+/// The DeepL key, looked up on every translation so an edited file needs no daemon restart:
+/// `DEEPL_AUTH_KEY` in the environment, else `~/.config/envvars/deepl.env`, else the Secret
+/// Service, where “Set the DeepL API key…” puts it.
+pub fn deepl_key() -> Result<String, String> {
+    if let Some(key) = std::env::var("DEEPL_AUTH_KEY")
+        .ok()
+        .filter(|key| !key.is_empty())
+    {
+        return Ok(key);
+    }
+    let env_file = deepl_env_file();
+    if let Some(key) = std::fs::read_to_string(&env_file)
+        .ok()
+        .and_then(|text| env_file_value(&text, &DEEPL_KEY_NAMES))
+    {
+        return Ok(key);
+    }
+    match keyring_entry(KEYRING_DEEPL_USER)?.get_password() {
+        Ok(key) => Ok(key),
+        Err(keyring::Error::NoEntry) => Err(format!(
+            "No DeepL API key yet — put DEEPL_AUTH_KEY=… in {}, or run “Set the DeepL API key…”",
+            env_file.display()
+        )),
+        Err(error) => Err(format!(
+            "Could not read the DeepL key from the keyring ({error}). Is a Secret Service running?"
+        )),
+    }
+}
+
+/// Stores the DeepL key; an empty one forgets it.
+pub fn store_deepl_key(key: &str) -> Result<(), String> {
+    let entry = keyring_entry(KEYRING_DEEPL_USER)?;
+    let outcome = if key.is_empty() {
+        match entry.delete_credential() {
+            Err(keyring::Error::NoEntry) => Ok(()),
+            other => other,
+        }
+    } else {
+        entry.set_password(key)
+    };
+    outcome.map_err(|error| {
+        format!(
+            "Could not store the DeepL key in the keyring ({error}). Is a Secret Service running?"
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_an_env_file_like_a_shell_would() {
+        let names = ["DEEPL_AUTH_KEY", "DEEPL_API_KEY"];
+        assert_eq!(
+            env_file_value("DEEPL_AUTH_KEY=abc:fx\n", &names).as_deref(),
+            Some("abc:fx")
+        );
+        assert_eq!(
+            env_file_value("# key\nexport DEEPL_AUTH_KEY=\"a b:fx\"  # note\n", &names).as_deref(),
+            Some("a b:fx")
+        );
+        assert_eq!(
+            env_file_value(
+                "DEEPL_API_KEY='x' \nDEEPL_AUTH_KEY=old\nDEEPL_AUTH_KEY=new # c",
+                &names
+            )
+            .as_deref(),
+            Some("new")
+        );
+        assert_eq!(
+            env_file_value("DEEPL_API_KEY=only", &names).as_deref(),
+            Some("only")
+        );
+        for none in [
+            "",
+            "# DEEPL_AUTH_KEY=x",
+            "DEEPL_AUTH_KEY=",
+            "OTHER=x",
+            "DEEPL_AUTH_KEYS=x",
+        ] {
+            assert_eq!(env_file_value(none, &names), None, "{none:?}");
+        }
+    }
 
     #[test]
     fn accepts_owner_slash_name_only() {

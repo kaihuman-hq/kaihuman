@@ -1,7 +1,10 @@
 import {
   type CommandPalette,
+  commandsMode,
+  copyToClipboard,
   createCommandPalette,
   type PaletteAction,
+  paletteModes,
   portHandlers,
   repoActions,
   splitTags,
@@ -132,6 +135,9 @@ function getPalette(): CommandPalette {
         );
       },
       actions: paletteActions,
+      // The browser cannot run commands, so `>x` only copies them.
+      modes: [...paletteModes(workerPort), commandsMode(workerPort, { canRun: false })],
+      copy: copyToClipboard,
     });
   }
   return palette;

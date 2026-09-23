@@ -59,6 +59,7 @@ import {
 } from '../Organisms/Widgets/BookmarksLogic';
 import { BookmarksWidget } from '../Organisms/Widgets/BookmarksWidget';
 import { BudgetWidget } from '../Organisms/Widgets/BudgetWidget';
+import { CommandsWidget } from '../Organisms/Widgets/CommandsWidget';
 import { ConsumptionWidget } from '../Organisms/Widgets/ConsumptionWidget';
 import { CsvTableView } from '../Organisms/Widgets/CsvTableView';
 import { DataCollectionAddForm } from '../Organisms/Widgets/DataCollectionAddForm';
@@ -732,6 +733,7 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.habit.csv')) ext = '.habit.csv';
       else if (lowerPath.endsWith('.todos.md')) ext = '.todos.md';
       else if (lowerPath.endsWith('.prompts.md')) ext = '.prompts.md';
+      else if (lowerPath.endsWith('.commands.md')) ext = '.commands.md';
       else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
       else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
@@ -955,6 +957,24 @@ abbreviations: undefined
       );
     }
 
+    if (tile.extension === '.commands.md' && tile.rawContent) {
+      return (
+        <CommandsWidget
+          content={tile.rawContent}
+          mode={
+            mode === 'FOCUS'
+              ? 'FOCUS'
+              : mode === 'MOBILE_EXPANDED'
+                ? 'MOBILE_EXPANDED'
+                : mode === 'MOBILE_COLLAPSED'
+                  ? 'MOBILE_COLLAPSED'
+                  : 'SMALL'
+          }
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+
     if (tile.extension === '.stocks.csv' && tile.rawContent) {
       return (
         <StocksWidget
@@ -1066,6 +1086,7 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.habit.csv')) ext = '.habit.csv';
       else if (lowerPath.endsWith('.todos.md')) ext = '.todos.md';
       else if (lowerPath.endsWith('.prompts.md')) ext = '.prompts.md';
+      else if (lowerPath.endsWith('.commands.md')) ext = '.commands.md';
       else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
       else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
@@ -2172,6 +2193,7 @@ const FocusedTileInternal = ({
   const isBudget = tile.extension === '.budget.csv';
   const isActionLog = tile.extension === '.actionlog.md';
   const isPrompts = tile.extension === '.prompts.md';
+  const isCommands = tile.extension === '.commands.md';
   const isStocks = tile.extension === '.stocks.csv';
   const isConsumption = tile.extension === '.consumption.csv';
   const isBoardOverview = tile.extension === '.board-overview.json';
@@ -2200,6 +2222,7 @@ const FocusedTileInternal = ({
     isBudget ||
     isActionLog ||
     isPrompts ||
+    isCommands ||
     isStocks ||
     isConsumption ||
     isAnyCsv || // && !!tile.rawContent;
@@ -2284,6 +2307,7 @@ const FocusedTileInternal = ({
     const _isBudget = tile.extension === '.budget.csv';
     const _isActionLog = tile.extension === '.actionlog.md';
     const _isPrompts = tile.extension === '.prompts.md';
+    const _isCommands = tile.extension === '.commands.md';
     const _isStocks = tile.extension === '.stocks.csv';
     const _isConsumption = tile.extension === '.consumption.csv';
     const _isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv');
@@ -2301,6 +2325,7 @@ const FocusedTileInternal = ({
       _isBudget ||
       _isActionLog ||
       _isPrompts ||
+      _isCommands ||
       _isStocks ||
       _isConsumption ||
       _isAnyCsv ||
@@ -2633,6 +2658,21 @@ const FocusedTileInternal = ({
                   </button>
                 )}
 
+                {isCommands && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('ADD')}
+                    className={cn(
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'ADD'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+                    )}
+                  >
+                    ADD COMMAND
+                  </button>
+                )}
+
                 {isStocks && (
                   <button
                     type="button"
@@ -2802,6 +2842,14 @@ const FocusedTileInternal = ({
               <PromptsWidget
                 content={tile.rawContent || ''}
                 mode={viewMode as any}
+                onChange={(c) => tile.onContentChange?.(c)}
+              />
+            </div>
+          ) : isCommands && (viewMode === 'WIDGET' || viewMode === 'ADD') ? (
+            <div className="flex flex-col min-h-full w-full p-8">
+              <CommandsWidget
+                content={tile.rawContent || ''}
+                mode={viewMode === 'ADD' ? 'ADD' : 'FOCUS'}
                 onChange={(c) => tile.onContentChange?.(c)}
               />
             </div>

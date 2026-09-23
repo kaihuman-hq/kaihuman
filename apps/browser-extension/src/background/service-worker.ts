@@ -1,6 +1,14 @@
+import { withTranslationText } from '@lifosy/palette';
 import { type Message } from '../types';
 import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
+import {
+  fetchPromptFiles,
+  isPromptsCacheStale,
+  listGithubRepos,
+  type PromptsCache,
+  translateWithDeepl,
+} from './palette-modes';
 import {
   buildRawNote,
   imagesEnabled,
@@ -750,6 +758,70 @@ async function searchRepo(query: string) {
   return { results };
 }
 
+const NOT_LOGGED_IN = 'Not logged in — open the Lifosy console to connect the extension';
+
+/** Prompt files for `>p`, command files for `>x` — found, fetched and cached the same way. */
+const REPO_FILE_KINDS = {
+  prompts: { suffix: '.prompts.md', cacheKey: 'promptsCache' },
+  commands: { suffix: '.commands.md', cacheKey: 'commandsCache' },
+} as const;
+
+async function refreshRepoFiles(
+  kind: keyof typeof REPO_FILE_KINDS,
+  token: string,
+  repo: string,
+): Promise<PromptsCache> {
+  const { suffix, cacheKey } = REPO_FILE_KINDS[kind];
+  const files = await fetchPromptFiles(token, repo, suffix);
+  const cache: PromptsCache = { repo, files, fetchedAt: Date.now() };
+  await chrome.storage.local.set({ [cacheKey]: cache });
+  return cache;
+}
+
+/** Cache first, like the bookmarks: a stale cache still answers and is refreshed behind it. */
+async function listRepoFiles(kind: keyof typeof REPO_FILE_KINDS) {
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const { cacheKey } = REPO_FILE_KINDS[kind];
+  const stored = await chrome.storage.local.get(cacheKey);
+  const cache = stored[cacheKey] as PromptsCache | undefined;
+  if (cache?.repo !== repo) return { files: (await refreshRepoFiles(kind, token, repo)).files };
+  if (isPromptsCacheStale(cache, Date.now())) {
+    refreshRepoFiles(kind, token, repo).catch((e) =>
+      console.warn(`LifeOS Extension: ${kind} refresh failed`, e),
+    );
+  }
+  return { files: cache.files };
+}
+
+async function translate(text: string, targets: string[]) {
+  const { deepl_key: key } = await chrome.storage.local.get('deepl_key');
+  if (!key) throw new Error('No DeepL API key yet — run “Set the DeepL API key…” first');
+  return { translations: await translateWithDeepl(key as string, text, targets) };
+}
+
+async function readTranslationHistory(): Promise<string[]> {
+  const stored = await chrome.storage.local.get('translationHistory');
+  return (stored.translationHistory as string[] | undefined) ?? [];
+}
+
+async function rememberTranslation(text: string): Promise<string[]> {
+  const texts = withTranslationText(await readTranslationHistory(), text);
+  await chrome.storage.local.set({ translationHistory: texts });
+  return texts;
+}
+
+async function setTranslationKey(key: string) {
+  if (key) await chrome.storage.local.set({ deepl_key: key });
+  else await chrome.storage.local.remove('deepl_key');
+}
+
+async function githubRepos() {
+  const { token } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  return { repos: await listGithubRepos(token) };
+}
+
 /** The window the popup belongs to, plus its pinned tabs in one round-trip. */
 async function currentWindow() {
   const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -1060,6 +1132,54 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'SEARCH_REPO') {
     searchRepo(message.query || '').then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'LIST_PROMPT_FILES' || message.type === 'LIST_COMMAND_FILES') {
+    listRepoFiles(message.type === 'LIST_PROMPT_FILES' ? 'prompts' : 'commands').then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'TRANSLATE') {
+    translate(message.text || '', message.targets || []).then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'GET_TRANSLATION_HISTORY') {
+    readTranslationHistory().then(
+      (texts) => sendResponse({ success: true, texts }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'ADD_TRANSLATION_HISTORY') {
+    rememberTranslation(message.text || '').then(
+      (texts) => sendResponse({ success: true, texts }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'SET_TRANSLATION_KEY') {
+    setTranslationKey((message.key || '').trim()).then(
+      () => sendResponse({ success: true }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'LIST_GITHUB_REPOS') {
+    githubRepos().then(
       (result) => sendResponse({ success: true, ...result }),
       (error) => sendResponse({ error: error.message }),
     );

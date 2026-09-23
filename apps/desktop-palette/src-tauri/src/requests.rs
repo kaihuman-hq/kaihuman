@@ -3,13 +3,19 @@
 //! Each request arrives as the JSON the palette sent; the answer is the JSON it reads back, or an
 //! error message the palette shows as it is.
 
+use std::path::PathBuf;
+
 use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::bookmarks::{self, BOOKMARKS_PATH, Cache};
-use crate::config::{self, Settings, bookmarks_cache_file, is_repo_name, read_json, write_json};
+use crate::config::{
+    self, Settings, bookmarks_cache_file, commands_cache_file, is_repo_name, prompts_cache_file,
+    read_json, write_json,
+};
 use crate::github::{Client, Read};
 use crate::recents::{self, RecentEntry};
+use crate::{claude, commands, dumps, prompts, repos, translate};
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -47,6 +53,37 @@ pub enum Request {
     },
     OpenUrl {
         url: String,
+    },
+    ListPromptFiles,
+    ListCommandFiles,
+    RunCommand {
+        command: String,
+        #[serde(rename = "where")]
+        place: commands::Where,
+    },
+    Translate {
+        text: String,
+        targets: Vec<String>,
+    },
+    GetTranslationHistory,
+    AddTranslationHistory {
+        text: String,
+    },
+    SetTranslationKey {
+        key: String,
+    },
+    ListGithubRepos,
+    ListClaudeCodeRepos,
+    GetClaudeUsage,
+    ListDumps,
+    SaveDump {
+        #[serde(default)]
+        id: Option<String>,
+        text: String,
+    },
+    ExportDump {
+        path: String,
+        text: String,
     },
     /// Pinned tab groups and importing the browser's bookmarks: only the extension can do these.
     #[serde(other)]
@@ -143,6 +180,64 @@ async fn fetch_quick_notes() -> Result<Value, String> {
         _ => Vec::new(),
     };
     Ok(json!({ "quickNotes": quick_notes }))
+}
+
+async fn refresh_repo_files(
+    client: &Client,
+    suffix: &str,
+    cache_file: &PathBuf,
+) -> Result<prompts::Cache, String> {
+    let cache = prompts::Cache {
+        repo: client.repo().to_string(),
+        files: prompts::fetch(client, suffix).await?,
+        fetched_at: now_ms(),
+    };
+    write_json(cache_file, &cache)?;
+    Ok(cache)
+}
+
+/// The repository's `.prompts.md` (`>p`) or `.commands.md` (`>x`) files. Cache first, like the
+/// bookmarks: a stale cache still answers and is refreshed behind it.
+async fn list_repo_files(suffix: &'static str, cache_file: PathBuf) -> Result<Value, String> {
+    let client = client()?;
+    let cache =
+        read_json::<prompts::Cache>(&cache_file).filter(|cache| cache.is_for(client.repo()));
+    let files = match cache {
+        Some(cache) => {
+            if cache.is_stale(now_ms()) {
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = refresh_repo_files(&client, suffix, &cache_file).await {
+                        eprintln!("{suffix} refresh failed: {error}");
+                    }
+                });
+            }
+            cache.files
+        }
+        None => {
+            refresh_repo_files(&client, suffix, &cache_file)
+                .await?
+                .files
+        }
+    };
+    Ok(json!({ "files": files }))
+}
+
+/// The counts file ranks what it knows; GitHub adds the rest. Either alone is enough, so the
+/// counted repositories still show when not logged in or offline.
+async fn list_github_repos() -> Result<Value, String> {
+    let counts = std::fs::read_to_string(repos::counts_file())
+        .map(|text| repos::parse_counts(&text))
+        .unwrap_or_default();
+    let github = match client() {
+        Ok(client) => client.user_repos().await,
+        Err(error) => Err(error),
+    };
+    let github = match github {
+        Ok(github) => github,
+        Err(_) if !counts.is_empty() => Vec::new(),
+        Err(error) => return Err(error),
+    };
+    Ok(json!({ "repos": repos::ranked(counts, github) }))
 }
 
 /// Hands an http(s) URL to the default browser.
@@ -246,6 +341,40 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             Ok(json!({ "synced": true, "bookmarks": cache.bookmarks.len() }))
         }
         Request::OpenUrl { url } => open_url(&url),
+        Request::ListPromptFiles => list_repo_files(".prompts.md", prompts_cache_file()).await,
+        Request::ListCommandFiles => list_repo_files(".commands.md", commands_cache_file()).await,
+        Request::RunCommand { command, place } => {
+            commands::run(&command, place)?;
+            Ok(json!({}))
+        }
+        Request::Translate { text, targets } => {
+            let key = config::deepl_key()?;
+            let translations = translate::translate(&key, text.trim(), &targets).await?;
+            Ok(json!({ "translations": translations }))
+        }
+        Request::GetTranslationHistory => Ok(json!({ "texts": translate::history() })),
+        Request::AddTranslationHistory { text } => {
+            Ok(json!({ "texts": translate::remember(&text)? }))
+        }
+        Request::SetTranslationKey { key } => {
+            config::store_deepl_key(key.trim())?;
+            Ok(json!({}))
+        }
+        Request::ListGithubRepos => list_github_repos().await,
+        Request::ListClaudeCodeRepos => Ok(json!({ "repos": claude::code_repos()? })),
+        Request::GetClaudeUsage => Ok(claude::usage().await),
+        Request::ListDumps => Ok(json!({ "dumps": dumps::list(&config::dumps_dir()) })),
+        Request::SaveDump { id, text } => {
+            match dumps::save(&config::dumps_dir(), id.as_deref(), &text, now_ms())? {
+                Some(id) => Ok(json!({ "id": id })),
+                None => Ok(json!({})),
+            }
+        }
+        Request::ExportDump { path, text } => {
+            let home = PathBuf::from(std::env::var_os("HOME").unwrap_or_default());
+            let written = dumps::export(path.trim(), &text, &home)?;
+            Ok(json!({ "path": written.display().to_string() }))
+        }
         Request::BrowserOnly => Err(format!(
             "{kind} needs the browser extension — the desktop palette cannot do that yet"
         )),
@@ -286,6 +415,81 @@ mod tests {
             parse(json!({ "type": "OPEN_URL", "url": "https://x.example/", "reuse": true })),
             Request::OpenUrl {
                 url: "https://x.example/".into()
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "LIST_PROMPT_FILES" })),
+            Request::ListPromptFiles
+        );
+        assert_eq!(
+            parse(json!({ "type": "TRANSLATE", "text": "Hallo", "targets": ["EN-US", "DE"] })),
+            Request::Translate {
+                text: "Hallo".into(),
+                targets: vec!["EN-US".into(), "DE".into()],
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "GET_TRANSLATION_HISTORY" })),
+            Request::GetTranslationHistory
+        );
+        assert_eq!(
+            parse(json!({ "type": "ADD_TRANSLATION_HISTORY", "text": "fr: hi" })),
+            Request::AddTranslationHistory {
+                text: "fr: hi".into()
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "SET_TRANSLATION_KEY", "key": "k:fx" })),
+            Request::SetTranslationKey { key: "k:fx".into() }
+        );
+        assert_eq!(
+            parse(json!({ "type": "LIST_GITHUB_REPOS" })),
+            Request::ListGithubRepos
+        );
+        assert_eq!(
+            parse(json!({ "type": "LIST_COMMAND_FILES" })),
+            Request::ListCommandFiles
+        );
+        assert_eq!(
+            parse(json!({ "type": "RUN_COMMAND", "command": "ls /tmp", "where": "terminal" })),
+            Request::RunCommand {
+                command: "ls /tmp".into(),
+                place: commands::Where::Terminal
+            }
+        );
+        assert!(
+            serde_json::from_value::<Request>(
+                json!({ "type": "RUN_COMMAND", "command": "ls", "where": "anywhere" })
+            )
+            .is_err()
+        );
+        assert_eq!(
+            parse(json!({ "type": "LIST_CLAUDE_CODE_REPOS" })),
+            Request::ListClaudeCodeRepos
+        );
+        assert_eq!(
+            parse(json!({ "type": "GET_CLAUDE_USAGE" })),
+            Request::GetClaudeUsage
+        );
+        assert_eq!(
+            parse(json!({ "type": "SAVE_DUMP", "text": "x" })),
+            Request::SaveDump {
+                id: None,
+                text: "x".into()
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "SAVE_DUMP", "id": "12", "text": "" })),
+            Request::SaveDump {
+                id: Some("12".into()),
+                text: String::new()
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "EXPORT_DUMP", "path": "~/a.txt", "text": "x" })),
+            Request::ExportDump {
+                path: "~/a.txt".into(),
+                text: "x".into()
             }
         );
     }

@@ -6,7 +6,9 @@
  * response lists only the fields the palette reads — a backend may send more.
  */
 import type { Bookmark } from './bookmarks.js';
+import type { ClaudeUsage } from './claude-usage.js';
 import type { RecentEntry, RepoResult } from './command-palette.js';
+import type { Translation } from './translate.js';
 
 type NoFields = Record<never, never>;
 
@@ -60,6 +62,61 @@ export interface PaletteProtocol {
   SYNC_NOW: { request: { force: boolean }; response: { synced: boolean; bookmarks?: number } };
   /** `reuse` takes over the asking tab (a blank start page) instead of opening another. */
   OPEN_URL: { request: { url: string; reuse?: boolean }; response: NoFields };
+  /** Every `.prompts.md` file in the repository, raw; the palette parses them itself. */
+  LIST_PROMPT_FILES: {
+    request: NoFields;
+    response: { files: { path: string; content: string }[] };
+  };
+  /** Every `.commands.md` file in the repository, raw, as `LIST_PROMPT_FILES` lists prompts. */
+  LIST_COMMAND_FILES: {
+    request: NoFields;
+    response: { files: { path: string; content: string }[] };
+  };
+  /**
+   * Desktop only: runs a filled-in command with bash — in a ghostty window that stays open until a
+   * key is pressed, or in the background with a notification when it ends.
+   */
+  RUN_COMMAND: {
+    request: { command: string; where: 'terminal' | 'background' };
+    response: NoFields;
+  };
+  /** One translation per target, through DeepL; fails when no API key is set. */
+  TRANSLATE: {
+    request: { text: string; targets: string[] };
+    response: { translations: Translation[] };
+  };
+  /** The last texts translated, newest first — see `withTranslationText`. */
+  GET_TRANSLATION_HISTORY: { request: NoFields; response: { texts: string[] } };
+  ADD_TRANSLATION_HISTORY: { request: { text: string }; response: { texts: string[] } };
+  /** Stores the DeepL API key where the backend keeps secrets; an empty key forgets it. */
+  SET_TRANSLATION_KEY: { request: { key: string }; response: NoFields };
+  /** Desktop only: the local dump files, most recently edited first. */
+  LIST_DUMPS: {
+    request: NoFields;
+    response: { dumps: { id: string; text: string; updatedAt: number }[] };
+  };
+  /**
+   * Desktop only: writes a dump, creating one when `id` is missing. Empty text deletes it, and
+   * the response then has no `id`.
+   */
+  SAVE_DUMP: { request: { id?: string; text: string }; response: { id?: string } };
+  /** Desktop only: writes the text to `path` (`~/` allowed), never over an existing file. */
+  EXPORT_DUMP: { request: { path: string; text: string }; response: { path: string } };
+  /** Desktop only: repositories for `>c`, most recently used first (omarchy's `eee` history). */
+  LIST_CLAUDE_CODE_REPOS: { request: NoFields; response: { repos: string[] } };
+  /**
+   * Desktop only: Claude usage per configured account — the usage endpoint's answer, or why there
+   * is none.
+   */
+  GET_CLAUDE_USAGE: {
+    request: NoFields;
+    response: { accounts: { name: string; usage?: ClaudeUsage; error?: string }[] };
+  };
+  /** GitHub repositories to open, most relevant first — the order is the backend's. */
+  LIST_GITHUB_REPOS: {
+    request: NoFields;
+    response: { repos: { fullName: string; description?: string }[] };
+  };
 }
 
 export type PaletteRequestType = keyof PaletteProtocol;

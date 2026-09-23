@@ -212,3 +212,86 @@ describe('knowledge base captures', () => {
     expect((fetch as any).mock.calls.some(([u]: any[]) => u === 'https://e.com/i.png')).toBe(false);
   });
 });
+
+describe('palette mode messages', () => {
+  it('asks for a DeepL key before translating anything', async () => {
+    expect(await call({ type: 'TRANSLATE', text: 'Hallo', targets: ['EN-US'] })).toEqual({
+      error: 'No DeepL API key yet — run “Set the DeepL API key…” first',
+    });
+  });
+
+  it('translates with the stored key', async () => {
+    storedExtras = { deepl_key: 'k:fx' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ translations: [{ text: 'Hello', detected_source_language: 'DE' }] }),
+      })),
+    );
+    expect(await call({ type: 'TRANSLATE', text: 'Hallo', targets: ['EN-US'] })).toEqual({
+      success: true,
+      translations: [{ target: 'EN-US', text: 'Hello', detectedSource: 'DE' }],
+    });
+  });
+
+  it('stores the key, and forgets it when given none', async () => {
+    await call({ type: 'SET_TRANSLATION_KEY', key: ' k:fx ' });
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({ deepl_key: 'k:fx' });
+    await call({ type: 'SET_TRANSLATION_KEY', key: '' });
+    expect(chrome.storage.local.remove).toHaveBeenCalledWith('deepl_key');
+  });
+
+  it('keeps the translation history newest first, once each', async () => {
+    storedExtras = { translationHistory: ['a', 'b'] };
+    expect(await call({ type: 'GET_TRANSLATION_HISTORY' })).toEqual({
+      success: true,
+      texts: ['a', 'b'],
+    });
+    expect(await call({ type: 'ADD_TRANSLATION_HISTORY', text: 'b' })).toEqual({
+      success: true,
+      texts: ['b', 'a'],
+    });
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({ translationHistory: ['b', 'a'] });
+  });
+
+  it('starts with an empty translation history', async () => {
+    expect(await call({ type: 'GET_TRANSLATION_HISTORY' })).toEqual({ success: true, texts: [] });
+  });
+
+  it('answers command files from their own cache', async () => {
+    storedExtras = {
+      promptsCache: {
+        repo: 'o/r',
+        files: [{ path: 'a.prompts.md', content: '## A' }],
+        fetchedAt: Date.now(),
+      },
+      commandsCache: {
+        repo: 'o/r',
+        files: [{ path: 'ops.commands.md', content: '## Up\nuptime' }],
+        fetchedAt: Date.now(),
+      },
+    };
+    expect(await call({ type: 'LIST_COMMAND_FILES' })).toEqual({
+      success: true,
+      files: [{ path: 'ops.commands.md', content: '## Up\nuptime' }],
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('answers prompt files from a cache for the same repository', async () => {
+    storedExtras = {
+      promptsCache: {
+        repo: 'o/r',
+        files: [{ path: 'a.prompts.md', content: '## A' }],
+        fetchedAt: Date.now(),
+      },
+    };
+    expect(await call({ type: 'LIST_PROMPT_FILES' })).toEqual({
+      success: true,
+      files: [{ path: 'a.prompts.md', content: '## A' }],
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
