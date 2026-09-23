@@ -1,6 +1,7 @@
 import { authStore, githubProfileStore } from '@lifosy/core';
 import { Button } from '@lifosy/ui';
 import { useEffect, useState } from 'preact/hooks';
+import { submitCliCallback } from '../lib/cli-callback';
 
 export function AuthCli() {
   const [status, setStatus] = useState<'checking' | 'authenticated' | 'redirecting' | 'error'>(
@@ -30,16 +31,16 @@ export function AuthCli() {
       const port = params.get('port') || '3000'; // Default to 3000 if not provided, but CLI should provide it
       const state = params.get('state');
 
-      // 3. Redirect back to CLI
+      // 3. Hand the token to the waiting program, by POST so it stays out of the history
       if (authStore.token.value) {
         setStatus('redirecting');
-        const token = authStore.token.value;
-        const activeRepo = githubProfileStore.currentRepo.value?.full_name || '';
-        const redirectUrl = `http://localhost:${port}/callback?token=${token}&state=${state || ''}&repo=${encodeURIComponent(activeRepo)}`;
-
         try {
-          // We use window.location.href to redirect to the local CLI server
-          window.location.href = redirectUrl;
+          submitCliCallback(document, {
+            port,
+            token: authStore.token.value,
+            state: state || '',
+            repo: githubProfileStore.currentRepo.value?.full_name || '',
+          });
         } catch (e: any) {
           setStatus('error');
           setErrorMsg(e.message);

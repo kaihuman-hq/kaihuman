@@ -29,6 +29,8 @@
 |---------|----------|-------|
 | Pin to Knowledge Base saves the page as Markdown with its images in `.kh/assets/` | popup, palette | 2026-09-23 |
 | Selected-text clips go to `.kh/raw/` as their own notes | context menu, palette | 2026-09-23 |
+| Web search from the command palette — Google, DuckDuckGo, Ecosia, Amazon, Reddit, by URL only | command palette (pages and start page) | 2026-09-23 |
+| Pinned tab groups on the start page — compact cards above the bookmarks; a click loads the group | start page | 2026-09-23 |
 | Pinned bookmarks — always first on the start page; pin/unpin from its cards or the console widget | start page cards, Bookmarks widget | 2026-09-22 |
 | Start page — kaihuman's own New Tab page: palette, recently used bookmarks, dump note | New Tab (`chrome_url_overrides`) | 2026-09-22 |
 | Command palette on the New Tab page, which Chrome's own page cannot host | start page | 2026-09-22 |
@@ -53,6 +55,14 @@
 | Feature | Location | Added |
 |---------|----------|-------|
 | stdio MCP server: `kb_search`, `kb_read`, `kb_list`, `kb_index`, `kb_log`, `kb_add_raw` over a local clone | `lifosy-kb-mcp --repo <path>` | 2026-09-23 |
+
+## Desktop palette (`apps/desktop-palette`)
+
+| Feature | Location | Added |
+|---------|----------|-------|
+| The command palette as a desktop overlay, centered on the focused monitor (wlr-layer-shell: Hyprland, Sway, KDE…) | `lifosy-palette-toggle` bound to a key | 2026-09-23 |
+| Bookmarks, web search, repo search, notes and action log, recents, repository switch — shared with the extension via `@lifosy/palette` | desktop palette | 2026-09-23 |
+| `lifosy-palette login`: token checked against the repo, kept in the Secret Service | CLI | 2026-09-23 |
 
 ## CLI (`apps/cli`)
 

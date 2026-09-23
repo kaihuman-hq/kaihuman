@@ -5,7 +5,12 @@
  * is the contract between the two apps — see
  * packages/ui/src/LifeOS/Organisms/Widgets/BookmarksLogic.ts.
  */
+import type { Bookmark } from '@lifosy/palette';
 import { isOpenableUrl, normalizeUrl } from './pinned-tabs';
+
+// The shape and the search are shared with the desktop palette; re-exported so the rest of the
+// extension keeps importing bookmarks from one place.
+export { type Bookmark, searchBookmarks } from '@lifosy/palette';
 
 /** Repo file the extension mirrors. The console can keep bookmark files anywhere; this is the
  * one the extension reads, exactly like `.kh/browser.pinnedtabs.json` for pinned tabs. */
@@ -16,21 +21,6 @@ export const BOOKMARKS_PATH = '.kh/browser.bookmarks.json';
  * extension talks to GitHub on its own. Usage is counted locally between syncs.
  */
 export const CACHE_TTL_MS = 60 * 60 * 1000;
-
-export interface Bookmark {
-  id: string;
-  title: string;
-  url: string;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-  /** How often this bookmark has been opened from the extension. */
-  useCount: number;
-  /** When it was last opened, ISO, or empty if never. */
-  lastUsedAt: string;
-  /** Kept at the top of the start page, ahead of the recently used ones. */
-  pinned: boolean;
-}
 
 export interface BookmarksConfig {
   bookmarks: Bookmark[];
@@ -160,33 +150,6 @@ export function isCacheUsable(cache: BookmarksCache | undefined, repo: string): 
 
 export function isCacheStale(cache: BookmarksCache, now = Date.now()): boolean {
   return now - cache.fetchedAt > CACHE_TTL_MS;
-}
-
-/**
- * Ranks a title prefix above a title substring, then tags, then the url, so the page you
- * half-remember the name of comes first. Matching is case-insensitive; an empty query keeps the
- * file's own order (newest first, as the console writes it).
- */
-export function searchBookmarks(bookmarks: Bookmark[], query: string, limit = 20): Bookmark[] {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return bookmarks.slice(0, limit);
-
-  const scored: { bookmark: Bookmark; score: number; index: number }[] = [];
-  bookmarks.forEach((bookmark, index) => {
-    const title = bookmark.title.toLowerCase();
-    let score: number;
-    if (title.startsWith(needle)) score = 0;
-    else if (title.includes(needle)) score = 1;
-    else if (bookmark.tags.some((tag) => tag.toLowerCase().includes(needle))) score = 2;
-    else if (bookmark.url.toLowerCase().includes(needle)) score = 3;
-    else return;
-    scored.push({ bookmark, score, index });
-  });
-
-  return scored
-    .sort((a, b) => a.score - b.score || a.index - b.index)
-    .slice(0, limit)
-    .map((entry) => entry.bookmark);
 }
 
 /**
