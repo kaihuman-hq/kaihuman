@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-09-23 — The palette's hint names the prefixes by letter only
+
+The empty palette's hint wrapped to two lines on the desktop with eight prefixes. It now reads
+`? help · >b >p >t >r >d >c >u`, and `?` says what each one is.
+
+Checks: palette vitest 148/148, biome clean; checked in the built desktop UI.
+
 ## 2026-09-23 — Prefixes become `>p`, and `>b` lists bookmarks only
 
 - **`>` and a letter** replace `p:`-style prefixes everywhere: `>p`, `>t`, `>r`, and on the desktop

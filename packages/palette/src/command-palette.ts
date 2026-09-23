@@ -1040,12 +1040,10 @@ export function createCommandPalette(
     });
 
     const query = input.value.trim();
-    const prefixes = [
-      `${HELP_PREFIX} help`,
-      ...allModes().map(
-        (candidate) => `${MODE_MARK}${candidate.prefix} ${candidate.title.toLowerCase()}`,
-      ),
-    ].join(' · ');
+    // Letters only, to fit one line; `?` names what each one is.
+    const prefixes = `${HELP_PREFIX} help · ${allModes()
+      .map((candidate) => `${MODE_MARK}${candidate.prefix}`)
+      .join(' ')}`;
     if (pending)
       hint.textContent = pending.step > 0 ? '⏎ next · esc back a field' : '⏎ next · esc cancel';
     else if (mode) {
@@ -1057,8 +1055,7 @@ export function createCommandPalette(
       else if (unanswered) hint.textContent = `⏎ ${mode.mode.title.toLowerCase()} · esc back`;
       else hint.textContent = `↑↓ navigate · ⏎ select${more} · esc back`;
     } else if (here) hint.textContent = '↑↓ navigate · ⏎ select · esc back';
-    else if (!query)
-      hint.textContent = `↑↓ navigate · ⏎ select${prefixes ? ` · ${prefixes}` : ''} · esc close`;
+    else if (!query) hint.textContent = `↑↓ navigate · ⏎ select · ${prefixes} · esc close`;
     else if (repoResults && repoQuery === query) hint.textContent = '⏎ select · esc close';
     else hint.textContent = `⇥ tab search repo for “${query}” · ⏎ select · esc close`;
   };

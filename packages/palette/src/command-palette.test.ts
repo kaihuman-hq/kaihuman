@@ -853,7 +853,7 @@ describe('prefix modes', () => {
   });
 
   it('lists the prefixes in the hint of an empty palette', () => {
-    expect(hintText()).toContain('>p prompts · >t translate');
+    expect(hintText()).toBe('↑↓ navigate · ⏎ select · ? help · >b >p >t · esc close');
   });
 
   it('starts outside any mode each time it opens', async () => {
@@ -1110,7 +1110,7 @@ describe('help', () => {
   });
 
   it('is offered in the empty palette’s hint', () => {
-    expect(hintText()).toContain('? help · >b bookmarks · >p prompts');
+    expect(hintText()).toContain('? help · >b >p');
   });
 
   it('filters, keeping each section under its heading', async () => {
