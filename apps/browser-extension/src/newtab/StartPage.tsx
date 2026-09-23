@@ -235,7 +235,7 @@ export function StartPage() {
           onClick={() => palette().toggle()}
           class="w-full flex items-center justify-between gap-4 rounded border border-[var(--los-border)] px-4 py-3 text-left text-sm text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-fg)] transition-colors"
         >
-          Search bookmarks, the repo, and every action…
+          Search bookmarks, the repo, the web, and every action…
           <kbd class="text-xs border border-[var(--los-border)] rounded px-1.5 py-0.5">
             {isMac() ? '⌘⇧K' : 'Ctrl+Shift+K'}
           </kbd>

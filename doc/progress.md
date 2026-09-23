@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-09-23 — Web search in the command palette
+
+- **`src/palette/web-search.ts`**: `SEARCH_ENGINES`, a list of `{ id, name, url(query) }` —
+  Google, DuckDuckGo, Ecosia, Amazon (`amazon.com`), Reddit. No API: each entry only builds the
+  results-page URL, with the query encoded by `URLSearchParams`. Adding an engine is one entry.
+- **Palette**: a **Web** group between Repo and Actions, one row per engine once something is
+  typed (never inside a submenu or while an action asks for input). Opening a row goes through the
+  same `open` handler as bookmarks — so the worker's scheme check applies and the start page reuses
+  its tab — and lands in Recent as `Engine: query`. The placeholder and the start page's search
+  field mention the web.
+
+Checks: extension tsc clean, vitest 228/228 (7 new), biome clean on the touched files.
+
 ## 2026-09-23 — Pinned tabs on the start page
 
 - **Start page** (`apps/browser-extension/src/newtab/StartPage.tsx`): a **Pinned tabs** section

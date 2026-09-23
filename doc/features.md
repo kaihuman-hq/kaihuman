@@ -25,6 +25,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Web search from the command palette — Google, DuckDuckGo, Ecosia, Amazon, Reddit, by URL only | command palette (pages and start page) | 2026-09-23 |
 | Pinned tab groups on the start page — compact cards above the bookmarks; a click loads the group | start page | 2026-09-23 |
 | Pinned bookmarks — always first on the start page; pin/unpin from its cards or the console widget | start page cards, Bookmarks widget | 2026-09-22 |
 | Start page — kaihuman's own New Tab page: palette, recently used bookmarks, dump note | New Tab (`chrome_url_overrides`) | 2026-09-22 |

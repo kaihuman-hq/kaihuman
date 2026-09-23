@@ -17,7 +17,9 @@ function extractToken() {
     if (token) {
       let repos = [];
       if (reposRaw) {
-        try { repos = JSON.parse(reposRaw); } catch (e) { }
+        try {
+          repos = JSON.parse(reposRaw);
+        } catch (e) {}
       }
       console.log('LifeOS Extension: Token found, sending to background');
       chrome.runtime.sendMessage({ type: 'AUTH_TOKEN_UPDATE', token, repo, repos });
@@ -45,10 +47,12 @@ window.addEventListener('lifosy-auth-update', (event: any) => {
 const observer = new MutationObserver((mutations) => {
   let shouldExtract = false;
   for (const mutation of mutations) {
-    if (mutation.type === 'attributes' &&
+    if (
+      mutation.type === 'attributes' &&
       (mutation.attributeName === 'data-lifosy-auth' ||
         mutation.attributeName === 'data-lifosy-repo' ||
-        mutation.attributeName === 'data-lifosy-repos')) {
+        mutation.attributeName === 'data-lifosy-repos')
+    ) {
       shouldExtract = true;
     }
   }

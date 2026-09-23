@@ -1,6 +1,5 @@
-import { type Message } from '../types';
 import { consoleFileUrl } from '../console';
-import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
+import type { Message } from '../types';
 import {
   addBookmark,
   applyUsage,
@@ -19,6 +18,7 @@ import {
   setBookmarkPinned,
   settleUsage,
 } from './bookmarks';
+import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
 import {
   findGroup,
   isOpenableUrl,
@@ -258,7 +258,13 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 // Add comprehensive GitHub API helper
-async function githubUpsertFile(token: string, repoUrl: string, filePath: string, newContentLines: string, position: 'top' | 'bottom' = 'bottom') {
+async function githubUpsertFile(
+  token: string,
+  repoUrl: string,
+  filePath: string,
+  newContentLines: string,
+  position: 'top' | 'bottom' = 'bottom',
+) {
   const url = `https://api.github.com/repos/${repoUrl}/contents/${filePath}`;
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -283,7 +289,9 @@ async function githubUpsertFile(token: string, repoUrl: string, filePath: string
     }
 
     const updatedContent = currentContent
-      ? (position === 'top' ? `${newContentLines}\n\n${currentContent}` : `${currentContent}\n\n${newContentLines}`)
+      ? position === 'top'
+        ? `${newContentLines}\n\n${currentContent}`
+        : `${currentContent}\n\n${newContentLines}`
       : newContentLines;
 
     // Encode base64
@@ -842,13 +850,16 @@ async function deletePinnedTabGroup(token: string, repo: string, groupId: string
 chrome.runtime.onMessage.addListener((message: Message | any, sender, sendResponse) => {
   if (message.type === 'AUTH_TOKEN_UPDATE' && message.token) {
     console.log('LifeOS Extension: Received token update');
-    chrome.storage.local.set({
-      lifeos_token: message.token,
-      lifeos_repo: message.repo,
-      lifeos_repos: message.repos || []
-    }, () => {
-      console.log('LifeOS Extension: Token & Repo data saved');
-    });
+    chrome.storage.local.set(
+      {
+        lifeos_token: message.token,
+        lifeos_repo: message.repo,
+        lifeos_repos: message.repos || [],
+      },
+      () => {
+        console.log('LifeOS Extension: Token & Repo data saved');
+      },
+    );
     // A new token can mean a different account, whose repo file is a different list.
     chrome.storage.local.remove('bookmarksCache');
     return false;
@@ -1148,7 +1159,10 @@ function urlToSlug(url: string): string {
     const { hostname, pathname } = new URL(url);
     const last = pathname.replace(/\/$/, '').split('/').pop() || '';
     const base = last || hostname.replace(/^www\./, '');
-    return base.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40);
+    return base
+      .replace(/[^a-z0-9]+/gi, '-')
+      .toLowerCase()
+      .slice(0, 40);
   } catch {
     return 'article';
   }

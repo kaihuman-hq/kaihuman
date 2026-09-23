@@ -49,6 +49,17 @@ const shadow = () => {
 const input = () => shadow().querySelector('input') as HTMLInputElement;
 const rowTitles = () =>
   Array.from(shadow().querySelectorAll('.row .title')).map((r) => r.textContent);
+/** The rows under one group heading, in order. */
+const groupRows = (label: string) => {
+  const titles: string[] = [];
+  let inside = false;
+  for (const element of Array.from(shadow().querySelector('.rows')?.children ?? [])) {
+    if (element.classList.contains('group')) inside = element.textContent === label;
+    else if (inside && element.classList.contains('row'))
+      titles.push(element.querySelector('.title')?.textContent ?? '');
+  }
+  return titles;
+};
 const groupLabels = () => Array.from(shadow().querySelectorAll('.group')).map((g) => g.textContent);
 const selectedTitle = () =>
   shadow().querySelector('.row[data-selected="true"] .title')?.textContent ?? null;
@@ -155,7 +166,8 @@ describe('toggle', () => {
 describe('bookmark search', () => {
   it('filters bookmarks and actions locally, without touching the repo search', () => {
     type('zul');
-    expect(rowTitles()).toEqual(['Zulip']);
+    expect(groupLabels()).toEqual(['Bookmarks', 'Web']);
+    expect(groupRows('Bookmarks')).toEqual(['Zulip']);
     expect(searchRepo).not.toHaveBeenCalled();
   });
 
@@ -235,7 +247,7 @@ describe('recent actions', () => {
     await settle();
 
     type('zul');
-    expect(groupLabels()).toEqual(['Bookmarks']);
+    expect(groupLabels()).toEqual(['Bookmarks', 'Web']);
   });
 });
 
@@ -407,7 +419,45 @@ describe('repo search', () => {
     expect(rowTitles()).toContain('b.ts');
 
     type('zul');
-    expect(rowTitles()).toEqual(['Zulip']);
+    expect(groupLabels()).toEqual(['Bookmarks', 'Web']);
+  });
+});
+
+describe('web search', () => {
+  it('offers every engine for the query, below the bookmarks and above the actions', () => {
+    type('bookmark');
+    expect(groupLabels()).toEqual(['Web', 'Actions']);
+    expect(groupRows('Web')).toEqual([
+      'Search Google for “bookmark”',
+      'Search DuckDuckGo for “bookmark”',
+      'Search Ecosia for “bookmark”',
+      'Search Amazon for “bookmark”',
+      'Search Reddit for “bookmark”',
+    ]);
+  });
+
+  it('shows nothing to search for until something is typed', () => {
+    expect(groupLabels()).not.toContain('Web');
+  });
+
+  it('opens the engine’s results page with the query encoded, and records it', async () => {
+    type('c++ & rust');
+    await activateRow('Search DuckDuckGo for “c++ & rust”');
+
+    expect(open).toHaveBeenCalledWith('https://duckduckgo.com/?q=c%2B%2B+%26+rust');
+    expect(rememberRecent).toHaveBeenCalledWith({
+      id: 'web:duckduckgo:c++ & rust',
+      title: 'DuckDuckGo: c++ & rust',
+      subtitle: 'https://duckduckgo.com/?q=c%2B%2B+%26+rust',
+      url: 'https://duckduckgo.com/?q=c%2B%2B+%26+rust',
+    });
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('is not offered inside a submenu', async () => {
+    await activateRow('Pinned tab groups…');
+    type('work');
+    expect(groupLabels()).not.toContain('Web');
   });
 });
 

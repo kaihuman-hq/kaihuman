@@ -14,7 +14,10 @@ export function ActionLogForm({ onAdd, status, errorMessage }: ActionLogFormProp
     e.preventDefault();
     if (!description.trim()) return;
 
-    const tags = tagsInput.split(',').map(t => t.trim()).filter(t => !!t);
+    const tags = tagsInput
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => !!t);
     onAdd(description, tags);
 
     // Reset form on success will be handled by parent or here if we want immediate feedback
