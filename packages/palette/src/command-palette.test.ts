@@ -166,10 +166,17 @@ beforeEach(async () => {
   ]);
   history = vi.fn(async () => [] as string[]);
   modes = [
-    { prefix: 'p', title: 'Prompts', placeholder: 'Search prompts', load: loadPrompts },
+    {
+      prefix: 'p',
+      title: 'Prompts',
+      placeholder: 'Search prompts',
+      description: 'Find a prompt',
+      load: loadPrompts,
+    },
     {
       prefix: 't',
       title: 'Translate',
+      description: 'Translate text',
       placeholder: 'Text to translate',
       submit: translate,
       history,
@@ -936,7 +943,13 @@ describe('the editor', () => {
     save = vi.fn(async () => {});
     saveAs = vi.fn(async (path: string) => `/home/me/${path.slice(2)}`);
     loadDumps = vi.fn(async () => [{ id: 'd1', title: 'Notes', edit: () => doc('hello') }]);
-    modes.push({ prefix: 'd', title: 'Dump', placeholder: 'Search dumps', load: loadDumps });
+    modes.push({
+      prefix: 'd',
+      title: 'Dump',
+      placeholder: 'Search dumps',
+      description: 'Scratch text',
+      load: loadDumps,
+    });
     type('d:');
     await settle();
     press('Enter');
@@ -1067,5 +1080,104 @@ describe('the editor', () => {
     await settle();
     expect(editorArea().hidden).toBe(true);
     expect(crumbText()).toBeNull();
+  });
+});
+
+describe('help', () => {
+  it('opens on ? and lists the prefixes, searching and keys, and the actions', async () => {
+    type('?');
+    await settle();
+
+    expect(crumbText()).toBe('Help');
+    expect(input().value).toBe('');
+    expect(groupLabels()).toEqual([
+      'Prefixes — ⏎ switches to one',
+      'Searching and keys',
+      'Actions — ⏎ runs one',
+    ]);
+    expect(groupRows('Prefixes — ⏎ switches to one')).toEqual(['p:  Prompts', 't:  Translate']);
+    expect(groupRows('Actions — ⏎ runs one')).toEqual([
+      'Bookmark this page',
+      'Bookmark this page…',
+      'Pinned tab groups…',
+    ]);
+    expect(rowTitles()).toContain('⇥  Search the repo');
+    expect(shadow().querySelector('.row .subtitle')?.textContent).toBe('Find a prompt');
+  });
+
+  it('is offered in the empty palette’s hint', () => {
+    expect(hintText()).toContain('? help · p: prompts');
+  });
+
+  it('filters, keeping each section under its heading', async () => {
+    type('? translate');
+    await settle();
+    expect(input().value).toBe('translate');
+    expect(rowTitles()).toEqual(['t:  Translate']);
+
+    type('bookmark');
+    expect(groupLabels()).toEqual(['Searching and keys', 'Actions — ⏎ runs one']);
+  });
+
+  it('switches to the chosen prefix', async () => {
+    type('?');
+    await settle();
+    await activateRow('p:  Prompts');
+    await settle();
+    expect(crumbText()).toBe('Prompts');
+    expect(rowTitles()).toEqual(['Commit message', 'Refactor to hooks', 'o/repo']);
+  });
+
+  it('runs the chosen action as if picked from the list', async () => {
+    type('?');
+    await settle();
+    await activateRow('Bookmark this page');
+    await settle();
+    expect(bookmarkRun).toHaveBeenCalledTimes(1);
+    expect(crumbText()).toBeNull();
+  });
+
+  it('walks an action through its fields', async () => {
+    type('?');
+    await settle();
+    await activateRow('Bookmark this page…');
+    expect(crumbText()).toBe('Bookmark this page · URL (1/3)');
+  });
+
+  it('gives the ? back on Backspace, like any prefix', async () => {
+    type('?');
+    await settle();
+    press('Backspace');
+    expect(crumbText()).toBeNull();
+    expect(input().value).toBe('?');
+  });
+
+  it('is only a prefix at the start', () => {
+    type('what?');
+    expect(crumbText()).toBeNull();
+  });
+});
+
+describe('long lists', () => {
+  it('wraps the help’s descriptions and nothing else', async () => {
+    const rowsElement = () => shadow().querySelector('.rows') as HTMLElement;
+    expect(rowsElement().dataset.wrap).toBe('false');
+    type('?');
+    await settle();
+    expect(rowsElement().dataset.wrap).toBe('true');
+  });
+
+  it('scrolls the selected row into view as the selection moves', () => {
+    const scrolled: string[] = [];
+    const prototype = HTMLElement.prototype as any;
+    prototype.scrollIntoView = function (this: HTMLElement) {
+      scrolled.push(this.querySelector('.title')?.textContent ?? '');
+    };
+    try {
+      press('ArrowDown');
+      expect(scrolled.at(-1)).toBe('Zulip');
+    } finally {
+      delete prototype.scrollIntoView;
+    }
   });
 });

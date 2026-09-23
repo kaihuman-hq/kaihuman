@@ -331,6 +331,8 @@ export const dumpMode = (port: ActionPort): PaletteMode => ({
   prefix: 'd',
   title: 'Dump',
   placeholder: 'Search dumps — ⏎ opens one',
+  description:
+    'A scratch editor for pasting and copying, the last 25 kept — ⌃⏎ copies all, ⌃S saves a copy as a file',
   load: () => dumpItems(port),
 });
 
@@ -340,12 +342,15 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
     prefix: 'p',
     title: 'Prompts',
     placeholder: 'Search prompts — ⏎ copies one',
+    description: 'The prompts in the repository’s .prompts.md files — ⏎ copies one',
     load: () => promptItems(port),
   },
   {
     prefix: 't',
     title: 'Translate',
     placeholder: 'Text to translate — “fr: …” for one language',
+    description:
+      'DeepL into English and German, “t: fr: …” for one language; with nothing typed, the last 20 texts',
     submit: (query) => translationItems(port, query),
     history: async () => (await port.send({ type: 'GET_TRANSLATION_HISTORY' })).texts,
   },
@@ -353,6 +358,7 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
     prefix: 'r',
     title: 'Repos',
     placeholder: 'Search GitHub repositories — ⇥ for issues, pull requests…',
+    description: 'Open one of your GitHub repositories — ⇥ for its issues, pull requests, actions…',
     load: () => githubRepoItems(port),
   },
 ];

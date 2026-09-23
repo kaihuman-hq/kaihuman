@@ -226,6 +226,13 @@ normal tab. The New Tab page used to be on that list; the start page below is th
   that repo's file and not the console's other one — the console selects it and drops the
   parameter again.
 
+### Help
+
+Type **`?`** to see everything the palette can do here: each prefix with what it is for (⏎
+switches to it), how searching and the keys work, and every action (⏎ runs it). Type after the
+`?` to search the help. It is built from what this palette actually offers, so the desktop's help
+lists `d:` and its own actions, and the extension's lists the browser-only ones.
+
 ### Prefix modes
 
 A prefix at the start of the input switches the palette into a list of its own. The breadcrumb

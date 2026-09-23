@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-09-23 — `?` help in the command palette
+
+- **`?`** at the start of the input opens **Help**, in three sections: the prefixes with a
+  description each (⏎ switches to that mode), searching and keys (type to search, ⇥ repo search,
+  web search, ↑↓⏎, ⇥/→, Esc, Backspace), and every action (⏎ runs it, prompts and submenus
+  included). Typing after the `?` searches it, keeping each section under its heading; Backspace
+  on an empty input gives the `?` back, as with any prefix. The empty palette's hint starts with
+  `? help`.
+- **Built from the handlers**, so each surface's help is exact: the desktop lists `d:` and
+  "Log in with the Lifosy console", the extension its page and tab-group actions. `PaletteMode`
+  gains a required `description`, so a new mode cannot arrive without its help line.
+- **Palette core**: `ModeItem` gains `choose` (a custom action) and `group` (consecutive entries
+  under one heading); help subtitles wrap instead of being cut off.
+- **Fix**: ↑↓ now scrolls the selected row into view. Before, the selection could move below the
+  visible rows of any long list — the help made it obvious.
+
+Checks: palette tsc and biome clean, vitest 126/126 (10 new); extension tsc green, vitest 214/214;
+desktop UI built and driven in Chromium with a stubbed Tauri bridge (`?`, scroll to the last
+action, `? dump` → ⏎ switches to `d:`).
+
 ## 2026-09-23 — `d:` dumps: a scratch editor in the desktop palette
 
 For text that only needs somewhere to sit for a moment — paste it, edit it, copy it on.

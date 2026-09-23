@@ -77,6 +77,10 @@ export interface ModeItem {
   /** More entries about this one (a repository's issues, pull requests…), listed on ⇥ or →. */
   children?: ModeItem[];
   edit?: () => EditableText;
+  /** Anything else choosing it should do — the help's entries switch modes and run actions. */
+  choose?: () => void;
+  /** Consecutive entries with the same group are listed under it as one heading. */
+  group?: string;
 }
 
 /** A list of its own behind a prefix: typing `p:` enters the mode whose `prefix` is `p`. */
@@ -85,6 +89,8 @@ export type PaletteMode = {
   /** Named in the breadcrumb, and as the verb in the hint of a mode that submits. */
   title: string;
   placeholder: string;
+  /** What the mode is for and how to use it, as the help (`?`) lists it. */
+  description: string;
 } & (
   | {
       /** Everything the mode offers, loaded on entering it and filtered locally as you type. */
@@ -242,6 +248,7 @@ const STYLES = `
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .rows[data-wrap="true"] .subtitle { white-space: normal; }
   .empty { padding: 16px; color: #6b6b6b; }
   .hint {
     padding: 8px 16px;
@@ -252,6 +259,26 @@ const STYLES = `
 `;
 
 const matches = (text: string, needle: string) => text.toLowerCase().includes(needle);
+
+/** Typed at the start of the input, opens the help. */
+const HELP_PREFIX = '?';
+
+/** What the help says about searching and keys, whatever the surface. */
+const HELP_TOPICS: readonly [string, string][] = [
+  ['Type to search', 'Bookmarks by title, tags and URL; recent items first, actions below them'],
+  [
+    '⇥  Search the repo',
+    'One GitHub code search for what you typed, only when you press Tab; files open in the console',
+  ],
+  [
+    'Search the web',
+    `Anything typed is offered to ${SEARCH_ENGINES.map((engine) => engine.name).join(', ')} — ⏎ with nothing else matching searches the first`,
+  ],
+  ['↑ ↓  ⏎', 'Move through the list and choose; mouse clicks work too'],
+  ['⇥ or →', 'Open the entries under the selected one — a repository’s pages, say'],
+  ['Esc', 'Back one step: a field, a list, a mode — then close the palette'],
+  ['Backspace on an empty input', 'Leaves the current mode and gives its prefix back'],
+];
 
 /** Typing pauses this long before the editor saves, so a paste or a burst of keys is one save. */
 const EDITOR_SAVE_DELAY_MS = 400;
@@ -515,6 +542,9 @@ export function createCommandPalette(
     if (!mode) return [];
     if (mode.parent) return filterModeItems(mode.parent.children ?? [], input.value);
     if (!mode.items) return [];
+    // The help keeps its sections in order rather than ranking matches across them.
+    if (mode.mode === helpMode)
+      return mode.items.filter((item) => filterModeItems([item], input.value).length > 0);
     // A submitted answer is already for exactly what is typed; filtering it would hide it.
     return 'load' in mode.mode ? filterModeItems(mode.items, input.value) : mode.items;
   };
@@ -529,6 +559,10 @@ export function createCommandPalette(
   };
 
   const chooseItem = async (item: ModeItem) => {
+    if (item.choose) {
+      item.choose();
+      return;
+    }
     if (item.edit) {
       openEditor(item.edit());
       return;
@@ -568,6 +602,51 @@ export function createCommandPalette(
             subtitle: item.subtitle ?? '',
             activate: () => void chooseItem(item),
           }));
+
+  /**
+   * `?`: everything the palette can do, for this surface — its prefixes, what searching does, the
+   * keys and its actions. Built from `handlers`, so it never lists what is not there.
+   */
+  const helpItems = (): ModeItem[] => [
+    ...handlers.modes.map((candidate) => ({
+      id: `help:mode:${candidate.prefix}`,
+      title: `${candidate.prefix}:  ${candidate.title}`,
+      subtitle: candidate.description,
+      group: 'Prefixes — ⏎ switches to one',
+      choose: () => enterMode(candidate, ''),
+    })),
+    ...HELP_TOPICS.map(([title, subtitle], index) => ({
+      id: `help:topic:${index}`,
+      title,
+      subtitle,
+      group: 'Searching and keys',
+    })),
+    ...handlers.actions().map((action) => ({
+      id: `help:action:${action.id}`,
+      title: action.title,
+      subtitle: action.subtitle,
+      group: 'Actions — ⏎ runs one',
+      choose: () => {
+        mode = null;
+        input.value = '';
+        selected = 0;
+        void activate(action);
+        render();
+      },
+    })),
+  ];
+
+  const helpMode: PaletteMode = {
+    prefix: HELP_PREFIX,
+    title: 'Help',
+    placeholder: 'Search the help',
+    description: 'This list',
+    load: async () => helpItems(),
+  };
+
+  /** How the mode's prefix is typed, so Backspace can give it back. */
+  const typedPrefix = (candidate: PaletteMode) =>
+    candidate === helpMode ? HELP_PREFIX : `${candidate.prefix}:`;
 
   /** Whatever is typed, offered to each mode that submits — "Translate “Guten Morgen”". */
   const submitOfferRows = (): Row[] => {
@@ -825,6 +904,8 @@ export function createCommandPalette(
     if (selected >= total) selected = Math.max(0, total - 1);
 
     rows.replaceChildren();
+    // The help's descriptions are the point of it, so they wrap instead of being cut short.
+    rows.dataset.wrap = String(mode?.mode === helpMode);
 
     let index = 0;
     const addGroup = (label: string, groupRows: Row[]) => {
@@ -864,7 +945,20 @@ export function createCommandPalette(
       // What has been answered so far, so a long walk stays reviewable.
       addNote(pending.values.filter(Boolean).join('  ·  ') || pending.action.title);
     } else if (mode) {
-      addGroup(showsHistory() ? 'Recent' : (mode.parent?.title ?? mode.mode.title), listed);
+      if (showsHistory()) addGroup('Recent', listed);
+      else {
+        // Entries that name a group are listed under it; the rest under the mode's own title.
+        const label = (item: ModeItem | undefined) =>
+          item?.group ?? mode?.parent?.title ?? mode?.mode.title ?? '';
+        const items = modeItems();
+        let start = 0;
+        listed.forEach((_, index) => {
+          if (index + 1 === listed.length || label(items[index + 1]) !== label(items[index])) {
+            addGroup(label(items[start]), listed.slice(start, index + 1));
+            start = index + 1;
+          }
+        });
+      }
       if (listed.length === 0 && (mode.items || mode.parent)) addNote('No matches.');
     } else {
       addGroup('Recent', recent);
@@ -884,10 +978,16 @@ export function createCommandPalette(
       addGroup('Translate', offers);
     }
 
+    // Arrowing past the visible rows would otherwise leave the selection out of sight.
+    rows.querySelector<HTMLElement>('.row[data-selected="true"]')?.scrollIntoView?.({
+      block: 'nearest',
+    });
+
     const query = input.value.trim();
-    const prefixes = handlers.modes
-      .map((candidate) => `${candidate.prefix}: ${candidate.title.toLowerCase()}`)
-      .join(' · ');
+    const prefixes = [
+      `${HELP_PREFIX} help`,
+      ...handlers.modes.map((candidate) => `${candidate.prefix}: ${candidate.title.toLowerCase()}`),
+    ].join(' · ');
     if (pending)
       hint.textContent = pending.step > 0 ? '⏎ next · esc back a field' : '⏎ next · esc cancel';
     else if (mode) {
@@ -986,9 +1086,9 @@ export function createCommandPalette(
       // the prefix comes back, and one more Backspace starts eating it.
       if (e.key === 'Backspace' && !mode.parent) {
         e.preventDefault();
-        const { prefix } = mode.mode;
+        const typed = typedPrefix(mode.mode);
         back();
-        input.value = `${prefix}:`;
+        input.value = typed;
         return;
       }
       if ((e.key === 'Backspace' || e.key === 'ArrowLeft') && mode.parent) {
@@ -1038,6 +1138,10 @@ export function createCommandPalette(
       !mode && !pending && trail.length === 0 && modePrefix(input.value, handlers.modes);
     if (prefixed) {
       enterMode(prefixed.mode, prefixed.rest);
+      return;
+    }
+    if (!mode && !pending && trail.length === 0 && input.value.startsWith(HELP_PREFIX)) {
+      enterMode(helpMode, input.value.slice(HELP_PREFIX.length).trimStart());
       return;
     }
     if (mode) {

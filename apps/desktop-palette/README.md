@@ -28,6 +28,8 @@ way.
 Links open with `xdg-open`, so they go to your default browser (`xdg-settings set
 default-web-browser …`). Copying runs `wl-copy`, so install `wl-clipboard`.
 
+Type `?` for the help: every prefix, how searching and the keys work, and every action.
+
 The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-repos` and
 `translate_manager.py`; see the extension's README ("Prefix modes") for how each one behaves.
 
