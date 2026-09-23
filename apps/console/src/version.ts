@@ -2,8 +2,8 @@
 // Do not edit manually
 
 export const VERSION = {
-  version: '0.1.66',
-  buildTime: '2026-09-22T17:31:23.905Z',
-  gitHash: '42b2046',
-  full: 'v0.1.66-42b2046'
+  version: '0.1.67',
+  buildTime: '2026-09-23T06:40:18.322Z',
+  gitHash: 'f1bdb7d',
+  full: 'v0.1.67-f1bdb7d'
 } as const;
