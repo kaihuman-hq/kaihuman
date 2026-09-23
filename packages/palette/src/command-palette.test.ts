@@ -3,6 +3,7 @@ import type { Bookmark } from './bookmarks.js';
 import {
   type CommandPalette,
   createCommandPalette,
+  type EditableText,
   filterModeItems,
   type ModeItem,
   PALETTE_HOST_ID,
@@ -907,5 +908,164 @@ describe('submit history', () => {
     await settle();
     expect(rowTitles()).toEqual([]);
     expect(statusText()).toBeNull();
+  });
+});
+
+describe('the editor', () => {
+  let save: Mock<(text: string) => Promise<void>>;
+  let saveAs: Mock<(path: string, text: string) => Promise<string>>;
+  let loadDumps: Mock<() => Promise<ModeItem[]>>;
+
+  const editorArea = () => shadow().querySelector('.editor') as HTMLTextAreaElement;
+  const edit = (value: string) => {
+    editorArea().value = value;
+    editorArea().dispatchEvent(new Event('input'));
+  };
+  const pressInEditor = (key: string, init: KeyboardEventInit = {}) =>
+    editorArea().dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }),
+    );
+  const doc = (text: string): EditableText => ({
+    title: 'Notes',
+    text,
+    save,
+    saveAs: { suggestedPath: () => '~/Documents/dump.txt', save: saveAs },
+  });
+
+  beforeEach(async () => {
+    save = vi.fn(async () => {});
+    saveAs = vi.fn(async (path: string) => `/home/me/${path.slice(2)}`);
+    loadDumps = vi.fn(async () => [{ id: 'd1', title: 'Notes', edit: () => doc('hello') }]);
+    modes.push({ prefix: 'd', title: 'Dump', placeholder: 'Search dumps', load: loadDumps });
+    type('d:');
+    await settle();
+    press('Enter');
+    await settle();
+  });
+
+  it('opens the chosen entry in place of the list, with its text', () => {
+    expect(editorArea().hidden).toBe(false);
+    expect(editorArea().value).toBe('hello');
+    expect(shadow().querySelector('.rows')?.hasAttribute('hidden')).toBe(true);
+    expect(input().hidden).toBe(true);
+    expect(crumbText()).toBe('Dump › Notes');
+    expect(hintText()).toContain('⌃S save as file');
+    expect(shadow().activeElement).toBe(editorArea());
+  });
+
+  it('saves a pause after typing, once', async () => {
+    vi.useFakeTimers();
+    try {
+      edit('hello w');
+      edit('hello world');
+      expect(save).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(400);
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(save).toHaveBeenCalledWith('hello world');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('saves on Escape, goes back to the list and loads it again', async () => {
+    edit('hello there');
+    pressInEditor('Escape');
+    await settle();
+    await settle();
+
+    expect(save).toHaveBeenCalledWith('hello there');
+    expect(editorArea().hidden).toBe(true);
+    expect(crumbText()).toBe('Dump');
+    expect(loadDumps).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not save text that did not change', async () => {
+    pressInEditor('Escape');
+    await settle();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('lands saves in order, one after the other', async () => {
+    const order: string[] = [];
+    let release: () => void = () => {};
+    save.mockImplementationOnce(
+      (text) =>
+        new Promise<void>((resolve) => {
+          release = () => {
+            order.push(text);
+            resolve();
+          };
+        }),
+    );
+    save.mockImplementation(async (text) => {
+      order.push(text);
+    });
+    edit('one');
+    pressInEditor('Escape');
+    press('Enter');
+    await settle();
+    edit('two');
+    pressInEditor('Escape');
+    await settle();
+    expect(order).toEqual([]);
+    release();
+    await settle();
+    await settle();
+    expect(order).toEqual(['one', 'two']);
+  });
+
+  it('saves as a file on ⌃S, at the path typed over the suggestion', async () => {
+    edit('keep me');
+    pressInEditor('s', { ctrlKey: true });
+    expect(input().hidden).toBe(false);
+    expect(input().value).toBe('~/Documents/dump.txt');
+    expect(crumbText()).toBe('Dump › Notes · Save as');
+
+    type('~/Documents/keep.txt');
+    press('Enter');
+    await settle();
+    expect(saveAs).toHaveBeenCalledWith('~/Documents/keep.txt', 'keep me');
+    expect(statusText()).toBe('Saved to /home/me/Documents/keep.txt');
+    expect(input().hidden).toBe(true);
+    expect(shadow().activeElement).toBe(editorArea());
+  });
+
+  it('Escape in the path goes back to the text without saving', () => {
+    pressInEditor('s', { ctrlKey: true });
+    press('Escape');
+    expect(saveAs).not.toHaveBeenCalled();
+    expect(editorArea().hidden).toBe(false);
+  });
+
+  it('shows why a save as failed', async () => {
+    saveAs.mockRejectedValueOnce(new Error('/x already exists'));
+    pressInEditor('s', { ctrlKey: true });
+    press('Enter');
+    await settle();
+    expect(statusText()).toBe('/x already exists');
+  });
+
+  it('copies everything on ⌃⏎, saves, and closes', async () => {
+    edit('copy me');
+    pressInEditor('Enter', { ctrlKey: true });
+    await settle();
+    expect(copy).toHaveBeenCalledWith('copy me');
+    expect(save).toHaveBeenCalledWith('copy me');
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('saves when the palette closes with the editor open', async () => {
+    edit('unsaved');
+    palette.close();
+    await settle();
+    expect(save).toHaveBeenCalledWith('unsaved');
+  });
+
+  it('opens on the list again, not in the editor', async () => {
+    palette.close();
+    palette.open();
+    await settle();
+    expect(editorArea().hidden).toBe(true);
+    expect(crumbText()).toBeNull();
   });
 });

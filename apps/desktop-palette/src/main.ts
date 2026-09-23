@@ -7,6 +7,7 @@
 import {
   type ActionPort,
   createCommandPalette,
+  dumpMode,
   paletteModes,
   portHandlers,
   repoActions,
@@ -44,7 +45,8 @@ const palette = createCommandPalette(
         run: () => invoke<string>('console_login'),
       },
     ],
-    modes: paletteModes(port),
+    // `d:` keeps its dumps as local files, which only the desktop has.
+    modes: [...paletteModes(port), dumpMode(port)],
     copy: async (text) => {
       await invoke('copy_text', { text }).catch((error: unknown) => {
         throw new Error(String(error));

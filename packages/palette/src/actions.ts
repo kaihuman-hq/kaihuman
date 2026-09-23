@@ -6,7 +6,13 @@
  * around them — bookmarking it, pinning it, clipping a selection — stay with the content script,
  * since nothing else has such a page.
  */
-import type { ModeItem, PaletteAction, PaletteHandlers, PaletteMode } from './command-palette.js';
+import type {
+  EditableText,
+  ModeItem,
+  PaletteAction,
+  PaletteHandlers,
+  PaletteMode,
+} from './command-palette.js';
 import { parsePrompts } from './prompts.js';
 import type { ActionPort } from './protocol.js';
 import { parseTranslationQuery, usefulTranslations } from './translate.js';
@@ -261,6 +267,72 @@ const githubRepoItems = async (port: ActionPort): Promise<ModeItem[]> => {
     };
   });
 };
+
+const pad = (value: number) => String(value).padStart(2, '0');
+
+/** `2026-09-23 10:30`, in local time. */
+export const formatStamp = (date: Date) =>
+  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+  `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+/** A dump's first non-empty line, as its title. */
+const dumpTitle = (text: string) => {
+  const line =
+    text
+      .split('\n')
+      .find((candidate) => candidate.trim())
+      ?.trim() ?? '';
+  return line.length > 60 ? `${line.slice(0, 59)}…` : line || '(blank)';
+};
+
+/** An open dump. A new one gets its id from the first save, so it is only created once typed in. */
+const dumpEditor = (port: ActionPort, dump?: { id: string; text: string }): EditableText => {
+  let id = dump?.id;
+  return {
+    title: dump ? dumpTitle(dump.text) : 'New dump',
+    text: dump?.text ?? '',
+    save: async (text) => {
+      ({ id } = await port.send({ type: 'SAVE_DUMP', ...(id ? { id } : {}), text }));
+    },
+    saveAs: {
+      suggestedPath: () => `~/Documents/dump-${formatStamp(new Date()).replace(/[ :]/g, '-')}.txt`,
+      save: async (path, text) => (await port.send({ type: 'EXPORT_DUMP', path, text })).path,
+    },
+  };
+};
+
+const dumpItems = async (port: ActionPort): Promise<ModeItem[]> => {
+  const { dumps } = await port.send({ type: 'LIST_DUMPS' });
+  return [
+    {
+      id: 'dump:new',
+      title: 'New dump',
+      subtitle: 'Paste, edit, copy — saved as you type, the last 25 kept',
+      edit: () => dumpEditor(port),
+    },
+    ...dumps.map((dump) => {
+      const lines = dump.text.split('\n').length;
+      return {
+        id: `dump:${dump.id}`,
+        title: dumpTitle(dump.text),
+        subtitle: `${formatStamp(new Date(dump.updatedAt))} · ${plural(lines, 'line')}`,
+        keywords: dump.text,
+        edit: () => dumpEditor(port, dump),
+      };
+    }),
+  ];
+};
+
+/**
+ * `d:` — a scratch text editor with a history, for the desktop: dumps are local files, which the
+ * browser has no place for.
+ */
+export const dumpMode = (port: ActionPort): PaletteMode => ({
+  prefix: 'd',
+  title: 'Dump',
+  placeholder: 'Search dumps — ⏎ opens one',
+  load: () => dumpItems(port),
+});
 
 /** The prefix modes every surface offers: `p:` prompts, `t:` translate, `r:` GitHub repositories. */
 export const paletteModes = (port: ActionPort): PaletteMode[] => [

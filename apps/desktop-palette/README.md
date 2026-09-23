@@ -20,6 +20,7 @@ way.
 | Recent, Switch repository…, Sync with GitHub now, Open the Lifosy console | ✓ |
 | `p:` prompts from the repo's `.prompts.md` files, ⏎ copies | ✓ (with `wl-copy`) |
 | `t:` translate with DeepL into EN-US and DE (`t: fr: …` for one language), ⏎ copies | ✓ (key from `DEEPL_AUTH_KEY`, `~/.config/envvars/deepl.env` or the keyring) |
+| `d:` dumps — a scratch editor for pasting and copying, the last 25 kept, ⌃S saves one as a file | ✓ desktop only |
 | `r:` GitHub repositories, ⇥ for issues, pull requests, actions… | ✓, and omarchy's `~/.config/eee/counts` ranks the ones you open most first |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |
 | Counting how often a bookmark is opened | — the extension counts; the desktop does not yet |
@@ -40,6 +41,16 @@ The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-re
 
   Because the file is read at translation time, editing it needs no daemon restart, and the
   toggle does not need to load anything.
+- **`d:`** is a scratch editor for text you only need for a moment. **New dump** (the first row)
+  opens an empty editor in the palette; the rows below are earlier dumps, most recently edited
+  first, searchable by their text — ⏎ opens one.
+  - Saved as you type (after a short pause, and on leaving). Clearing a dump deletes it; opening
+    **New dump** and leaving it empty creates nothing.
+  - **Esc** goes back to the list, **⌃⏎** copies all of it and closes, **⌃S** asks for a path
+    (prefilled `~/Documents/dump-<date>.txt`) and writes a copy there — missing directories are
+    created, an existing file is never overwritten.
+  - Plain files in `$XDG_DATA_HOME/lifosy/dumps/`, local only; past 25, the least recently edited
+    one is removed.
 - **`r:`** reads `$EEE_COUNTS_FILE` or `~/.config/eee/counts` (`owner/repo count` per line), lists
   those repositories by count, then the rest of your GitHub repositories. Without a login or a
   network, the counted ones still show.
@@ -131,6 +142,7 @@ to change its animation.
 | `$XDG_CACHE_HOME/lifosy/bookmarks.json` | GitHub's bookmarks file as last fetched, with its ETag |
 | `$XDG_CACHE_HOME/lifosy/prompts.json` | the repository's `.prompts.md` files as last fetched (five minutes) |
 | `$XDG_STATE_HOME/lifosy/recents.json` | the palette's last ten actions |
+| `$XDG_DATA_HOME/lifosy/dumps/*.txt` | the `d:` dumps, the last 25 |
 | `$XDG_STATE_HOME/lifosy/translations.json` | the last 20 texts translated with `t:` |
 
 For development and tests, `LIFOSY_GITHUB_TOKEN` takes the place of the keyring and

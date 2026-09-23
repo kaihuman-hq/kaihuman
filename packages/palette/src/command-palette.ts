@@ -49,7 +49,23 @@ export interface RecentEntry {
   url?: string;
 }
 
-/** One entry a mode lists. Choosing it opens `url`, or else copies `copy` to the clipboard. */
+/**
+ * Text the palette opens in an editor of its own — a dump. It is saved as it is typed, one `save`
+ * at a time, and only when it changed.
+ */
+export interface EditableText {
+  /** Named in the breadcrumb. */
+  title: string;
+  text: string;
+  save: (text: string) => Promise<void>;
+  /** Offered on ⌃S: writes the text to a path the user types, and resolves with where it went. */
+  saveAs?: { suggestedPath: () => string; save: (path: string, text: string) => Promise<string> };
+}
+
+/**
+ * One entry a mode lists. Choosing it opens `edit` in the editor, else opens `url`, else copies
+ * `copy` to the clipboard.
+ */
 export interface ModeItem {
   id: string;
   title: string;
@@ -60,6 +76,7 @@ export interface ModeItem {
   copy?: string;
   /** More entries about this one (a repository's issues, pull requests…), listed on ⇥ or →. */
   children?: ModeItem[];
+  edit?: () => EditableText;
 }
 
 /** A list of its own behind a prefix: typing `p:` enters the mode whose `prefix` is `p`. */
@@ -183,6 +200,21 @@ const STYLES = `
   }
   .status[hidden] { display: none; }
   .rows { overflow-y: auto; }
+  .rows[hidden], input[hidden], .editor[hidden] { display: none; }
+  .editor {
+    all: unset;
+    display: block;
+    box-sizing: border-box;
+    flex: 1;
+    min-height: 240px;
+    width: 100%;
+    padding: 12px 16px;
+    font: inherit;
+    color: #f5f5f5;
+    white-space: pre-wrap;
+    overflow-y: auto;
+    border-bottom: 1px solid #2a2a2a;
+  }
   .group {
     padding: 8px 16px 4px;
     font-size: 10px;
@@ -220,6 +252,9 @@ const STYLES = `
 `;
 
 const matches = (text: string, needle: string) => text.toLowerCase().includes(needle);
+
+/** Typing pauses this long before the editor saves, so a paste or a burst of keys is one save. */
+const EDITOR_SAVE_DELAY_MS = 400;
 
 /** Enough to scroll through; a prompt library of hundreds is found by typing, not scrolling. */
 const MODE_ROW_LIMIT = 50;
@@ -278,7 +313,12 @@ export function createCommandPalette(
   const hint = document.createElement('div');
   hint.className = 'hint';
 
-  panel.append(crumb, input, status, rows, hint);
+  const editorArea = document.createElement('textarea');
+  editorArea.className = 'editor';
+  editorArea.spellcheck = false;
+  editorArea.hidden = true;
+
+  panel.append(crumb, input, status, editorArea, rows, hint);
   backdrop.append(panel);
   shadow.append(style, backdrop);
 
@@ -308,6 +348,17 @@ export function createCommandPalette(
   } | null = null;
   /** Guards against a slow submit landing after the query moved on, like `searchToken`. */
   let submitToken = 0;
+  /**
+   * The text open in the editor: `saved` is what was last handed to `save`, `savingAs` whether the
+   * input is asking for a path.
+   */
+  let editor: { doc: EditableText; saved: string; savingAs: boolean } | null = null;
+  /**
+   * Every save, chained so they land in order — across editors too, since a dump can be reopened
+   * while its last save is still on its way.
+   */
+  let saving: Promise<void> = Promise.resolve();
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
   const needle = () => input.value.trim().toLowerCase();
 
@@ -478,6 +529,10 @@ export function createCommandPalette(
   };
 
   const chooseItem = async (item: ModeItem) => {
+    if (item.edit) {
+      openEditor(item.edit());
+      return;
+    }
     if (item.url) {
       openUrl({ id: item.id, title: item.title, subtitle: item.subtitle, url: item.url });
       return;
@@ -633,7 +688,104 @@ export function createCommandPalette(
     ];
   };
 
+  /** Saves what changed since the last save, after any save still running. */
+  const flushEditor = () => {
+    clearTimeout(saveTimer);
+    const current = editor;
+    if (!current) return saving;
+    const text = editorArea.value;
+    if (text !== current.saved) {
+      current.saved = text;
+      saving = saving
+        .then(() => current.doc.save(text))
+        .catch((e: any) => setStatus(e?.message || 'Could not save'));
+    }
+    return saving;
+  };
+
+  function openEditor(doc: EditableText) {
+    editor = { doc, saved: doc.text, savingAs: false };
+    editorArea.value = doc.text;
+    setStatus(null);
+    render();
+    editorArea.focus();
+    editorArea.setSelectionRange(doc.text.length, doc.text.length);
+  }
+
+  /** Back to the mode's list, which is loaded again so it shows what was just saved. */
+  const closeEditor = () => {
+    const saved = flushEditor();
+    editor = null;
+    input.value = '';
+    selected = 0;
+    render();
+    input.focus();
+    const current = mode;
+    if (current && 'load' in current.mode) {
+      const { load } = current.mode;
+      void saved.then(() => loadMode(current, load));
+    }
+  };
+
+  const onEditorKeyDown = (e: KeyboardEvent) => {
+    if (!editor) return;
+    const withModifier = e.ctrlKey || e.metaKey;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeEditor();
+    } else if (withModifier && e.key.toLowerCase() === 's' && editor.doc.saveAs) {
+      e.preventDefault();
+      editor.savingAs = true;
+      input.value = editor.doc.saveAs.suggestedPath();
+      render();
+      input.focus();
+      input.select();
+    } else if (withModifier && e.key === 'Enter') {
+      e.preventDefault();
+      const text = editorArea.value;
+      void handlers.copy(text).then(
+        () => {
+          void flushEditor();
+          close();
+        },
+        (error: any) => {
+          setStatus(error?.message || 'Could not copy that');
+          render();
+        },
+      );
+    }
+  };
+
+  /** The input, while the editor asks for a path to save to. */
+  const onSaveAsKeyDown = (e: KeyboardEvent, current: NonNullable<typeof editor>) => {
+    if (e.key !== 'Escape' && e.key !== 'Enter') return;
+    e.preventDefault();
+    const path = input.value.trim();
+    current.savingAs = false;
+    render();
+    editorArea.focus();
+    if (e.key === 'Escape' || !path || !current.doc.saveAs) return;
+    setStatus(`Saving to ${path}…`);
+    current.doc.saveAs.save(path, editorArea.value).then(
+      (written) => setStatus(`Saved to ${written}`),
+      (error: any) => setStatus(error?.message || `Could not save to ${path}`),
+    );
+  };
+
   const render = () => {
+    editorArea.hidden = !editor;
+    rows.hidden = !!editor;
+    input.hidden = !!editor && !editor.savingAs;
+    if (editor && mode) {
+      crumb.hidden = false;
+      crumb.textContent = `${mode.mode.title} › ${editor.doc.title}${editor.savingAs ? ' · Save as' : ''}`;
+      input.placeholder = 'Path to save to';
+      hint.textContent = editor.savingAs
+        ? '⏎ save · esc back to the text'
+        : `${editor.doc.saveAs ? '⌃S save as file · ' : ''}⌃⏎ copy all · esc back — saved as you type`;
+      return;
+    }
+
     const here = trail.at(-1);
     const step = pending?.action.prompts?.[pending.step];
     const steps = pending?.action.prompts?.length ?? 0;
@@ -870,8 +1022,18 @@ export function createCommandPalette(
     }
   };
 
-  input.addEventListener('keydown', onKeyDown);
+  const onInputKeyDown = (e: KeyboardEvent) => {
+    if (editor?.savingAs) onSaveAsKeyDown(e, editor);
+    else onKeyDown(e);
+  };
+  input.addEventListener('keydown', onInputKeyDown);
+  editorArea.addEventListener('keydown', onEditorKeyDown);
+  editorArea.addEventListener('input', () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => void flushEditor(), EDITOR_SAVE_DELAY_MS);
+  });
   input.addEventListener('input', () => {
+    if (editor) return;
     const prefixed =
       !mode && !pending && trail.length === 0 && modePrefix(input.value, handlers.modes);
     if (prefixed) {
@@ -905,6 +1067,8 @@ export function createCommandPalette(
   });
 
   function close() {
+    void flushEditor();
+    editor = null;
     const wasOpen = open;
     open = false;
     host.remove();
@@ -920,6 +1084,7 @@ export function createCommandPalette(
     trail = [];
     pending = null;
     mode = null;
+    editor = null;
     submitToken++;
     selected = 0;
     setStatus(null);
@@ -950,7 +1115,8 @@ export function createCommandPalette(
     close,
     destroy: () => {
       close();
-      input.removeEventListener('keydown', onKeyDown);
+      input.removeEventListener('keydown', onInputKeyDown);
+      editorArea.removeEventListener('keydown', onEditorKeyDown);
     },
   };
 }

@@ -3,6 +3,8 @@
 //! Each request arrives as the JSON the palette sent; the answer is the JSON it reads back, or an
 //! error message the palette shows as it is.
 
+use std::path::PathBuf;
+
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -12,7 +14,7 @@ use crate::config::{
 };
 use crate::github::{Client, Read};
 use crate::recents::{self, RecentEntry};
-use crate::{prompts, repos, translate};
+use crate::{dumps, prompts, repos, translate};
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -64,6 +66,16 @@ pub enum Request {
         key: String,
     },
     ListGithubRepos,
+    ListDumps,
+    SaveDump {
+        #[serde(default)]
+        id: Option<String>,
+        text: String,
+    },
+    ExportDump {
+        path: String,
+        text: String,
+    },
     /// Pinned tab groups and importing the browser's bookmarks: only the extension can do these.
     #[serde(other)]
     BrowserOnly,
@@ -326,6 +338,18 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             Ok(json!({}))
         }
         Request::ListGithubRepos => list_github_repos().await,
+        Request::ListDumps => Ok(json!({ "dumps": dumps::list(&config::dumps_dir()) })),
+        Request::SaveDump { id, text } => {
+            match dumps::save(&config::dumps_dir(), id.as_deref(), &text, now_ms())? {
+                Some(id) => Ok(json!({ "id": id })),
+                None => Ok(json!({})),
+            }
+        }
+        Request::ExportDump { path, text } => {
+            let home = PathBuf::from(std::env::var_os("HOME").unwrap_or_default());
+            let written = dumps::export(path.trim(), &text, &home)?;
+            Ok(json!({ "path": written.display().to_string() }))
+        }
         Request::BrowserOnly => Err(format!(
             "{kind} needs the browser extension — the desktop palette cannot do that yet"
         )),
@@ -396,6 +420,27 @@ mod tests {
         assert_eq!(
             parse(json!({ "type": "LIST_GITHUB_REPOS" })),
             Request::ListGithubRepos
+        );
+        assert_eq!(
+            parse(json!({ "type": "SAVE_DUMP", "text": "x" })),
+            Request::SaveDump {
+                id: None,
+                text: "x".into()
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "SAVE_DUMP", "id": "12", "text": "" })),
+            Request::SaveDump {
+                id: Some("12".into()),
+                text: String::new()
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "EXPORT_DUMP", "path": "~/a.txt", "text": "x" })),
+            Request::ExportDump {
+                path: "~/a.txt".into(),
+                text: "x".into()
+            }
         );
     }
 

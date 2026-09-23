@@ -76,6 +76,18 @@ export interface PaletteProtocol {
   ADD_TRANSLATION_HISTORY: { request: { text: string }; response: { texts: string[] } };
   /** Stores the DeepL API key where the backend keeps secrets; an empty key forgets it. */
   SET_TRANSLATION_KEY: { request: { key: string }; response: NoFields };
+  /** Desktop only: the local dump files, most recently edited first. */
+  LIST_DUMPS: {
+    request: NoFields;
+    response: { dumps: { id: string; text: string; updatedAt: number }[] };
+  };
+  /**
+   * Desktop only: writes a dump, creating one when `id` is missing. Empty text deletes it, and
+   * the response then has no `id`.
+   */
+  SAVE_DUMP: { request: { id?: string; text: string }; response: { id?: string } };
+  /** Desktop only: writes the text to `path` (`~/` allowed), never over an existing file. */
+  EXPORT_DUMP: { request: { path: string; text: string }; response: { path: string } };
   /** GitHub repositories to open, most relevant first — the order is the backend's. */
   LIST_GITHUB_REPOS: {
     request: NoFields;

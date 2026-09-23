@@ -8,6 +8,7 @@
 mod bookmarks;
 mod config;
 mod console_login;
+mod dumps;
 mod github;
 #[cfg(target_os = "linux")]
 mod layer;

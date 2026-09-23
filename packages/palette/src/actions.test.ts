@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  dumpMode,
+  formatStamp,
   GITHUB_REPO_VIEWS,
   paletteModes,
   portHandlers,
@@ -239,5 +241,83 @@ describe('paletteModes', () => {
     expect(await setKey.run?.([' abc:fx '])).toBe('Saved the DeepL API key');
     expect(sent.at(-1)).toEqual({ type: 'SET_TRANSLATION_KEY', key: 'abc:fx' });
     expect(await setKey.run?.([''])).toBe('Forgot the DeepL API key');
+  });
+});
+
+describe('dumpMode', () => {
+  const load = async () => {
+    const mode = dumpMode(fakePort);
+    if (!('load' in mode)) throw new Error('d does not load');
+    return mode.load();
+  };
+
+  it('is the d: prefix', () => {
+    expect(dumpMode(fakePort).prefix).toBe('d');
+  });
+
+  it('lists a new dump first, then the saved ones by their first line', async () => {
+    const updatedAt = new Date(2026, 8, 23, 10, 30).getTime();
+    answers.LIST_DUMPS = {
+      dumps: [{ id: '1', text: '\n  first line  \nsecond', updatedAt }],
+    };
+    const [fresh, saved] = await load();
+    expect(fresh).toMatchObject({ id: 'dump:new', title: 'New dump' });
+    expect(saved).toMatchObject({
+      id: 'dump:1',
+      title: 'first line',
+      subtitle: '2026-09-23 10:30 · 3 lines',
+      keywords: '\n  first line  \nsecond',
+    });
+    expect(saved?.edit?.()).toMatchObject({
+      title: 'first line',
+      text: '\n  first line  \nsecond',
+    });
+  });
+
+  it('shortens a long first line', async () => {
+    answers.LIST_DUMPS = { dumps: [{ id: '1', text: 'x'.repeat(80), updatedAt: 0 }] };
+    const [, saved] = await load();
+    expect(saved?.title).toBe(`${'x'.repeat(59)}…`);
+  });
+
+  it('creates a new dump on its first save and keeps writing to it', async () => {
+    answers.LIST_DUMPS = { dumps: [] };
+    answers.SAVE_DUMP = { id: '42' };
+    const [fresh] = await load();
+    const editor = fresh?.edit?.();
+    await editor?.save('a');
+    await editor?.save('ab');
+    expect(sent.slice(-2)).toEqual([
+      { type: 'SAVE_DUMP', text: 'a' },
+      { type: 'SAVE_DUMP', id: '42', text: 'ab' },
+    ]);
+  });
+
+  it('starts over with a new file once emptied, which deleted the old one', async () => {
+    answers.LIST_DUMPS = { dumps: [{ id: '7', text: 'x', updatedAt: 0 }] };
+    const [, saved] = await load();
+    const editor = saved?.edit?.();
+    answers.SAVE_DUMP = {};
+    await editor?.save('');
+    answers.SAVE_DUMP = { id: '8' };
+    await editor?.save('again');
+    expect(sent.slice(-2)).toEqual([
+      { type: 'SAVE_DUMP', id: '7', text: '' },
+      { type: 'SAVE_DUMP', text: 'again' },
+    ]);
+  });
+
+  it('suggests a dated file in ~/Documents and exports there', async () => {
+    answers.LIST_DUMPS = { dumps: [] };
+    answers.EXPORT_DUMP = { path: '/home/me/Documents/x.txt' };
+    const [fresh] = await load();
+    const saveAs = fresh?.edit?.().saveAs;
+    expect(saveAs?.suggestedPath()).toMatch(/^~\/Documents\/dump-\d{4}-\d\d-\d\d-\d\d-\d\d\.txt$/);
+    expect(await saveAs?.save('~/Documents/x.txt', 'text')).toBe('/home/me/Documents/x.txt');
+    expect(sent.at(-1)).toEqual({ type: 'EXPORT_DUMP', path: '~/Documents/x.txt', text: 'text' });
+  });
+
+  it('formats stamps in local time', () => {
+    expect(formatStamp(new Date(2026, 0, 2, 3, 4))).toBe('2026-01-02 03:04');
   });
 });

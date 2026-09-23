@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-09-23 — `d:` dumps: a scratch editor in the desktop palette
+
+For text that only needs somewhere to sit for a moment — paste it, edit it, copy it on.
+
+- **`d:`** lists **New dump**, then the last 25 dumps (most recently edited first, searched by
+  their text). ⏎ opens one in an editor that takes the palette's list area.
+- **Saving** happens as you type (400 ms after the last key, and on Esc or close), only when the
+  text changed, one save at a time and in order — across dumps too, so reopening one while its
+  save is on its way cannot write stale text. Clearing a dump deletes it; an untouched new dump is
+  never created.
+- **Keys**: Esc back to the list, ⌃⏎ copies everything and closes, ⌃S asks for a path (prefilled
+  `~/Documents/dump-<date>.txt`) and writes a copy — directories created, existing files never
+  overwritten.
+- **Palette core**: a `ModeItem` may carry `edit`, an `EditableText` (title, text, `save`,
+  optional `saveAs`) the palette opens in its editor; any mode can use it.
+- **Desktop only**: `LIST_DUMPS`, `SAVE_DUMP`, `EXPORT_DUMP` in Rust (`dumps.rs`); files are
+  `$XDG_DATA_HOME/lifosy/dumps/<created-ms>.txt`, ids are digits only, and the 26th least recently
+  edited is removed on save. The extension does not offer `d:`.
+
+Checks: palette tsc and biome clean, vitest 116/116 (18 new); desktop `cargo test` 41 passed (5
+new), clippy and fmt clean; the built desktop UI driven in Chromium with a stubbed Tauri bridge
+through new dump → type → autosave → ⌃S → Esc → list → ⌃⏎.
+
 ## 2026-09-23 — Desktop palette reads the DeepL key from `~/.config/envvars/deepl.env`
 
 The daemon is started once, by the first toggle or by the compositor, so a key only in an
