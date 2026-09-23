@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type Listener = (msg: any, sender: any, sendResponse: (r: any) => void) => unknown;
 let listener: Listener;
 let connectListener: (() => void) | undefined;
+let storedExtras: Record<string, unknown> = {};
 
 const file = {
   content: btoa(
@@ -16,6 +17,7 @@ const file = {
 
 beforeEach(async () => {
   vi.resetModules();
+  storedExtras = {};
   vi.stubGlobal('chrome', {
     alarms: { create: vi.fn(), onAlarm: { addListener: vi.fn() } },
     commands: { onCommand: { addListener: vi.fn() } },
@@ -37,7 +39,7 @@ beforeEach(async () => {
       // The worker reads storage both ways: with a callback, and as a promise.
       local: {
         get: (_k: any, cb?: any) => {
-          const data = { lifeos_token: 't', lifeos_repo: 'o/r' };
+          const data = { lifeos_token: 't', lifeos_repo: 'o/r', ...storedExtras };
           return cb ? cb(data) : Promise.resolve(data);
         },
         set: vi.fn(async () => {}),
@@ -128,5 +130,85 @@ describe('pinned tab group messages', () => {
     expect(await call({ type: 'SAVE_PINNED_TAB_GROUP', name: 'New' })).toMatchObject({
       success: true,
     });
+  });
+});
+
+describe('knowledge base captures', () => {
+  const puts = () =>
+    (fetch as any).mock.calls
+      .filter(([, init]: any[]) => init?.method === 'PUT')
+      .map(([url, init]: any[]) => ({
+        path: String(url).split('/contents/')[1],
+        body: new TextDecoder().decode(
+          Uint8Array.from(atob(JSON.parse(init.body).content), (c) => c.charCodeAt(0)),
+        ),
+      }));
+
+  it('saves a selection as its own raw note instead of the legacy clippings file', async () => {
+    (fetch as any).mockImplementation(async (_url: string, init?: any) =>
+      init?.method === 'PUT'
+        ? { ok: true, status: 201, json: async () => ({}) }
+        : { ok: false, status: 404, statusText: 'Not Found', json: async () => ({}) },
+    );
+    const res = await call({
+      type: 'SAVE_SELECTION',
+      text: 'a quote',
+      url: 'https://e.com/p',
+      title: 'Page',
+    });
+    expect(res).toEqual({ success: true });
+    const [put] = puts();
+    expect(put.path).toMatch(/^\.kh\/raw\/\d+-page\.md$/);
+    expect(put.body).toContain('processed: false');
+    expect(put.body).toContain('tags: [clipping]');
+    expect(put.body).toContain('> a quote');
+  });
+
+  it('pins an article with its images stored under .kh/assets', async () => {
+    (fetch as any).mockImplementation(async (url: string, init?: any) => {
+      if (url === 'https://e.com/i.png') {
+        return {
+          ok: true,
+          headers: new Headers({ 'content-type': 'image/png' }),
+          arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+        };
+      }
+      return init?.method === 'PUT'
+        ? { ok: true, status: 201, json: async () => ({}) }
+        : { ok: false, status: 404, statusText: 'Not Found', json: async () => ({}) };
+    });
+    const res = await call({
+      type: 'PIN_ARTICLE',
+      title: 'Post',
+      url: 'https://e.com/post',
+      text: '# Post\n\n![x](https://e.com/i.png)',
+      images: ['https://e.com/i.png'],
+    });
+    expect(res).toEqual({ success: true });
+    const [asset, note] = puts();
+    expect(asset.path).toMatch(/^\.kh\/assets\/\d+-post\/1\.png$/);
+    expect(note.path).toMatch(/^\.kh\/raw\/\d+-post\.md$/);
+    expect(note.body).toContain(`![x](/${asset.path})`);
+  });
+
+  it('keeps remote image links when image downloads are turned off', async () => {
+    storedExtras = { kb_download_images: false };
+    (fetch as any).mockImplementation(async (_url: string, init?: any) =>
+      init?.method === 'PUT'
+        ? { ok: true, status: 201, json: async () => ({}) }
+        : { ok: false, status: 404, statusText: 'Not Found', json: async () => ({}) },
+    );
+    const res = await call({
+      type: 'PIN_ARTICLE',
+      title: 'Post',
+      url: 'https://e.com/post',
+      text: '![x](https://e.com/i.png)',
+      images: ['https://e.com/i.png'],
+    });
+    expect(res).toEqual({ success: true });
+    const written = puts();
+    expect(written).toHaveLength(1);
+    expect(written[0].body).toContain('![x](https://e.com/i.png)');
+    expect((fetch as any).mock.calls.some(([u]: any[]) => u === 'https://e.com/i.png')).toBe(false);
   });
 });

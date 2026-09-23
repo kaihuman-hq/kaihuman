@@ -4,6 +4,7 @@ import { ActionLogForm } from './components/ActionLogForm';
 import { BookmarkPageForm } from './components/BookmarkPageForm';
 import { QuickActions } from './components/QuickActions';
 import { PinnedTabsPanel } from './components/PinnedTabsPanel';
+import { imagesEnabled, KB_IMAGES_SETTING } from './background/kb-capture';
 import './index.css';
 
 export function App() {
@@ -18,9 +19,14 @@ export function App() {
   const [selectedNote, setSelectedNote] = useState<string>('.lifeos/dump.md');
   // The star opens a view of its own rather than growing the popup with another form.
   const [view, setView] = useState<'main' | 'bookmark'>('main');
+  const [downloadImages, setDownloadImages] = useState(true);
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'failed'>('idle');
 
   useEffect(() => {
+    chrome.storage.local.get([KB_IMAGES_SETTING], (result) => {
+      setDownloadImages(imagesEnabled(result[KB_IMAGES_SETTING]));
+    });
+
     // Check for auth token, repo, and repos
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', 'lifeos_repos'], (result) => {
       const storedToken = (result.lifeos_token as string) || null;
@@ -120,18 +126,25 @@ export function App() {
     setStatus('saving');
     setErrorMessage(null);
     try {
-      const [result] = await chrome.scripting.executeScript({
-        target: { tabId: activeTab.tabId },
-        func: () => ({
-          title: document.title,
-          url:
-            (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.href ||
-            window.location.href,
-          text: (document.body?.innerText ?? '').trim(),
-        }),
-      });
-      if (!result?.result) throw new Error('Cannot read page content — restricted page?');
-      chrome.runtime.sendMessage({ type: 'PIN_ARTICLE', ...result.result }, (response) => {
+      // The content script converts the page to Markdown; tabs opened before the extension was
+      // installed have no content script, so those fall back to plain text.
+      const article = await chrome.tabs
+        .sendMessage(activeTab.tabId, { type: 'EXTRACT_ARTICLE' })
+        .catch(async () => {
+          const [result] = await chrome.scripting.executeScript({
+            target: { tabId: activeTab.tabId },
+            func: () => ({
+              title: document.title,
+              url: '',
+              text: (document.body?.innerText ?? '').trim(),
+              images: [],
+            }),
+          });
+          return result?.result;
+        });
+      if (!article) throw new Error('Cannot read page content — restricted page?');
+      const pinned = { ...article, url: article.url || activeTab.url };
+      chrome.runtime.sendMessage({ type: 'PIN_ARTICLE', ...pinned }, (response) => {
         if (chrome.runtime.lastError || response?.error) {
           const err = chrome.runtime.lastError?.message || response?.error || 'Unknown error';
           setErrorMessage(err);
@@ -280,6 +293,18 @@ export function App() {
           onBookmark={() => setView('bookmark')}
           status={status}
         />
+        <label class="flex items-center gap-2 text-[10px] text-[var(--los-fg-dim)] font-mono cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={downloadImages}
+            onChange={(e) => {
+              const enabled = (e.target as HTMLInputElement).checked;
+              setDownloadImages(enabled);
+              chrome.storage.local.set({ [KB_IMAGES_SETTING]: enabled });
+            }}
+          />
+          Save page images with pinned pages
+        </label>
 
         {status === 'error' && errorMessage && (
           <div class="text-[10px] text-red-400 p-2 bg-red-950/30 rounded border border-red-900/50 break-words">
