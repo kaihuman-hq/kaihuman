@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-09-23 — Study: a native command palette for the desktop
+
+- `doc/native-command-palette.md`: research and a phased plan for a palette that opens in the
+  center of the screen from any app on Fedora with GNOME on Wayland. Tauri v2 draws the palette and
+  reuses the extension's code. A GNOME custom shortcut provides the hotkey, the mutter setting
+  `center-new-windows` provides the placement, and a small Shell extension is the fallback if focus
+  fails. The dmenu family (rofi, fuzzel, wofi) was ruled out because GNOME has no layer-shell.
+  Nothing implemented.
+
 ## 2026-09-23 — Web search in the command palette
 
 - **`src/palette/web-search.ts`**: `SEARCH_ENGINES`, a list of `{ id, name, url(query) }` —
