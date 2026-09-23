@@ -66,7 +66,7 @@ const TEMPLATES: Template[] = [
     id: 'commands',
     name: 'Commands',
     description:
-      'Shell commands with $1, $2… parameters — copy them, or run them from the desktop palette',
+      'Shell commands with {{name}} parameters — copy them, or run them from the desktop palette',
     icon: Terminal,
     extension: '.commands.md',
     defaultContent: '# Commands\n',

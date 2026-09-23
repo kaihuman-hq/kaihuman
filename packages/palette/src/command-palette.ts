@@ -122,6 +122,10 @@ export type PaletteMode = {
       /** Earlier queries, newest first, listed while the input is empty; ⏎ submits one again. */
       history?: () => Promise<string[]>;
     }
+  | {
+      /** The one entry for what is typed, even nothing — a search page to open, say. */
+      link: (query: string) => ModeItem;
+    }
 );
 
 export interface PaletteHandlers {
@@ -578,7 +582,7 @@ export function createCommandPalette(
     setStatus(null);
     render();
     if ('load' in next) void loadMode(mode, next.load);
-    else {
+    else if ('submit' in next) {
       void loadHistory(mode);
       if (rest.trim()) void submitMode();
     }
@@ -597,6 +601,7 @@ export function createCommandPalette(
   const modeItems = (): ModeItem[] => {
     if (!mode) return [];
     if (mode.parent) return filterModeItems(mode.parent.children ?? [], input.value);
+    if ('link' in mode.mode) return [mode.mode.link(input.value.trim())];
     if (mode.mode === bookmarksMode) {
       return searchBookmarks(bookmarks, input.value, MODE_ROW_LIMIT).map((bookmark) => ({
         id: `bookmark:${bookmark.id}`,
@@ -1031,7 +1036,7 @@ export function createCommandPalette(
 
     if (pending) {
       // What has been answered so far, so a long walk stays reviewable.
-      // Before any answer, the subtitle says what is being filled in — a command's `$1`, say.
+      // Before any answer, the subtitle says what is being filled in — a command's `{{port}}`, say.
       addNote(
         pending.values.filter(Boolean).join('  ·  ') ||
           pending.action.subtitle ||

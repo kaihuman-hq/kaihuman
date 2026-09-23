@@ -2,9 +2,9 @@
  * The commands a `.commands.md` file holds, and filling in their parameters.
  *
  * The grammar is `.prompts.md`'s — one `## Title #tags` per entry — and the command is the entry's
- * first fenced code block, or its whole text when it has none. `$1`…`$9` are parameters asked for
- * in the palette; `\$1` is a literal `$1` (for awk and the like). See doc/commands-format.md; the
- * console's reading of the same file is packages/ui/src/LifeOS/Organisms/Widgets/CommandsLogic.ts.
+ * first fenced code block, or its whole text when it has none. `{{port}}` is a parameter, asked for
+ * by name in the palette; every `$` is the shell's. See doc/commands-format.md; the console's
+ * reading of the same file is packages/ui/src/LifeOS/Organisms/Widgets/CommandsLogic.ts.
  */
 import { parsePrompts } from './prompts.js';
 
@@ -17,7 +17,8 @@ export interface Command {
 }
 
 const FENCE = /```[^\n]*\n([\s\S]*?)\n?```/;
-const PARAMETER = /(\\?)\$([1-9])/g;
+/** `{{port}}` or `{{ port }}` — a name, so Go templates like docker's `{{.Name}}` are left alone. */
+const PARAMETER = /\{\{\s*([A-Za-z_][\w-]*)\s*\}\}/g;
 
 export function parseCommands(content: string): Command[] {
   return parsePrompts(content)
@@ -34,18 +35,12 @@ export function parseCommands(content: string): Command[] {
     .filter((entry) => entry.command);
 }
 
-/** How many values the command asks for: its highest `$n`, since `$2` alone still needs a `$1`. */
-export function commandParameters(command: string): number {
-  let highest = 0;
-  for (const [, escaped, digit] of command.matchAll(PARAMETER)) {
-    if (!escaped) highest = Math.max(highest, Number(digit));
-  }
-  return highest;
+/** The parameters' names, each once, in the order they first appear. */
+export function commandParameters(command: string): string[] {
+  return [...new Set(Array.from(command.matchAll(PARAMETER), ([, name]) => name ?? ''))];
 }
 
-/** Each `$n` replaced by the n-th value as typed; each `\$n` becomes a plain `$n`. */
-export function fillCommand(command: string, values: readonly string[]): string {
-  return command.replace(PARAMETER, (_, escaped: string, digit: string) =>
-    escaped ? `$${digit}` : (values[Number(digit) - 1] ?? ''),
-  );
+/** Each `{{name}}` replaced by its value as typed; one without a value stays as written. */
+export function fillCommand(command: string, values: Readonly<Record<string, string>>): string {
+  return command.replace(PARAMETER, (placeholder, name: string) => values[name] ?? placeholder);
 }

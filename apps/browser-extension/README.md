@@ -245,8 +245,10 @@ hint line lists the prefixes.
 | `>b` | Your bookmarks only, ranked as the main search ranks them — no actions, web search or translate offer | opens the bookmark (counted, and kept in Recent) | the cached bookmarks |
 | `>p` | Prompts, filtered as you type (every word must appear in the title, tags or text) | copies the prompt's text and closes | every `.prompts.md` in the repository (`doc/prompts-format.md`), cached for five minutes |
 | `>t` | Translations of what you typed into English (US) and German, minus the language the text is already in; `>t fr: …` asks for one language | the first ⏎ translates, the next copies the selected translation | DeepL, one request per language — never while typing |
-| `>x` | Commands from the repository's `.commands.md` files (`doc/commands-format.md`) | asks for each `$1`, `$2`…, then copies the filled-in command — running it is the desktop palette's | every `.commands.md` in the repository, cached for five minutes |
+| `>x` | Commands from the repository's `.commands.md` files (`doc/commands-format.md`) | asks for each `{{name}}`, then copies the filled-in command — running it is the desktop palette's | every `.commands.md` in the repository, cached for five minutes |
 | `>r` | Your GitHub repositories, most recently pushed first | opens the repository; **⇥** (or **→**) lists its issues, pull requests, actions, releases… | `GET /user/repos` with the extension's token |
+| `>g` | The same repositories, to search one | lists **Issues** and **Pull requests**; ⏎ on one asks for the search term, then opens GitHub's search there (`is:issue …` / `is:pr …`, any state) — no term opens the plain list | `GET /user/repos` with the extension's token |
+| `>l` | One row: the console team's logs in Tsuga, for what is typed | opens Tsuga's explorer on `owner-team:console`, `AND "…"` the typed text when there is any | a link only, no request |
 
 With nothing typed, `>t` lists the last 20 texts you translated, newest first — **⏎** translates
 one again (kept as typed, so `fr: …` asks for French again). Translating a text again moves it to

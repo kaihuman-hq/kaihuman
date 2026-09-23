@@ -21,11 +21,13 @@ way.
 | `>b` bookmarks only, without actions or web search | ✓ |
 | `>p` prompts from the repo's `.prompts.md` files, ⏎ copies | ✓ (with `wl-copy`) |
 | `>t` translate with DeepL into EN-US and DE (`>t fr: …` for one language), ⏎ copies | ✓ (key from `DEEPL_AUTH_KEY`, `~/.config/envvars/deepl.env` or the keyring) |
-| `>x` commands from the repo's `.commands.md` files — fill in `$1`, `$2`…, then copy, run in ghostty, or run in the background | ✓ (running: desktop only) |
+| `>x` commands from the repo's `.commands.md` files — fill in each `{{name}}`, then copy, run in ghostty, or run in the background | ✓ (running: desktop only) |
 | `>d` dumps — a scratch editor for pasting and copying, the last 25 kept, ⌃S saves one as a file | ✓ desktop only |
 | `>c` Claude Code — pick a repo, type a prompt, ⏎ opens a new session on claude.ai | ✓ desktop only |
 | `>u` Claude usage — rate limits, pace, resets and spend per account | ✓ desktop only |
 | `>r` GitHub repositories, ⇥ for issues, pull requests, actions… | ✓, and omarchy's `~/.config/eee/counts` ranks the ones you open most first |
+| `>g` GitHub search — pick a repository, then issues or pull requests, then type the search term | ✓, repositories ranked as in `>r` |
+| `>l` logs — the console team's logs in Tsuga's explorer, filtered by what is typed | ✓ |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |
 | Counting how often a bookmark is opened | — the extension counts; the desktop does not yet |
 
@@ -48,7 +50,7 @@ The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-re
   Because the file is read at translation time, editing it needs no daemon restart, and the
   toggle does not need to load anything.
 - **`>x`** lists the commands in the repository's `.commands.md` files (format:
-  `doc/commands-format.md`). ⏎ asks for each `$1`, `$2`… — values go in as typed — then offers
+  `doc/commands-format.md`). ⏎ asks for each `{{name}}` — values go in as typed — then offers
   **Copy**, **Run in terminal** (a `ghostty` window that stays open until a key is pressed) and
   **Run in the background** (a notification says how it ended), with the finished command shown in
   full. Nothing runs until Run is chosen. Commands run with `bash -c` from your home directory.

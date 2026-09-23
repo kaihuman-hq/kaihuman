@@ -9,7 +9,7 @@ describe('parseCommands', () => {
       '## List a folder #files',
       'Shows hidden files too.',
       '```sh',
-      'ls -la $1',
+      'ls -la {{folder}}',
       '```',
       '```sh',
       'not this one',
@@ -19,7 +19,7 @@ describe('parseCommands', () => {
       {
         title: 'List a folder',
         tags: ['files'],
-        command: 'ls -la $1',
+        command: 'ls -la {{folder}}',
         note: 'Shows hidden files too.\n\n```sh\nnot this one\n```',
       },
     ]);
@@ -32,26 +32,46 @@ describe('parseCommands', () => {
   });
 
   it('keeps a multi-line command whole', () => {
-    const [entry] = parseCommands('## Two\n```\ncd $1\ngit pull\n```');
-    expect(entry?.command).toBe('cd $1\ngit pull');
+    const [entry] = parseCommands('## Two\n```\ncd {{repo}}\ngit pull\n```');
+    expect(entry?.command).toBe('cd {{repo}}\ngit pull');
   });
 });
 
 describe('commandParameters', () => {
-  it('counts up to the highest $n and ignores escaped ones', () => {
-    expect(commandParameters('ls $1')).toBe(1);
-    expect(commandParameters('cp $1 $2 && echo $1')).toBe(2);
-    expect(commandParameters('echo $2')).toBe(2);
-    expect(commandParameters("awk '{print \\$1}' $1")).toBe(1);
-    expect(commandParameters('echo $HOME $0')).toBe(0);
+  it('lists each {{name}} once, in the order they first appear', () => {
+    expect(commandParameters('ls {{folder}}')).toEqual(['folder']);
+    expect(commandParameters('cp {{from}} {{ to }} && echo {{from}}')).toEqual(['from', 'to']);
+  });
+
+  it('leaves every $ to the shell, escaped or not', () => {
+    // The command from the bug report: `\$1` used to be read as an escape and never asked for.
+    expect(commandParameters('sudo kill -9 `sudo lsof -t -i:\\$1`')).toEqual([]);
+    expect(commandParameters("awk '{print $1}' $HOME $0")).toEqual([]);
+  });
+
+  it('ignores Go templates, which are not names', () => {
+    expect(commandParameters("docker inspect -f '{{.State.Status}}' {{container}}")).toEqual([
+      'container',
+    ]);
+    expect(commandParameters("docker ps --format '{{json .Names}}'")).toEqual([]);
   });
 });
 
 describe('fillCommand', () => {
-  it('puts the values in as typed and unescapes \\$n', () => {
-    expect(fillCommand('ls $1', ['-la /tmp'])).toBe('ls -la /tmp');
-    expect(fillCommand('cp $1 $2 && echo $1', ['a', 'b'])).toBe('cp a b && echo a');
-    expect(fillCommand("awk '{print \\$1}' $1", ['f.txt'])).toBe("awk '{print $1}' f.txt");
-    expect(fillCommand('echo $2', [])).toBe('echo ');
+  it('puts the values in as typed, wherever each name is used', () => {
+    expect(fillCommand('sudo kill -9 `sudo lsof -t -i:{{port}}`', { port: '3000' })).toBe(
+      'sudo kill -9 `sudo lsof -t -i:3000`',
+    );
+    expect(fillCommand('ls {{folder}}', { folder: '-la /tmp' })).toBe('ls -la /tmp');
+    expect(fillCommand('cp {{from}} {{ to }} && echo {{from}}', { from: 'a', to: 'b' })).toBe(
+      'cp a b && echo a',
+    );
+  });
+
+  it('keeps $ as written and a name without a value as its placeholder', () => {
+    expect(fillCommand("awk '{print $1}' {{file}}", { file: 'f.txt' })).toBe(
+      "awk '{print $1}' f.txt",
+    );
+    expect(fillCommand('echo {{a}} {{b}}', { a: '' })).toBe('echo  {{b}}');
   });
 });

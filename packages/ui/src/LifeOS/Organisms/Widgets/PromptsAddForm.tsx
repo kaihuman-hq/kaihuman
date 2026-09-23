@@ -83,14 +83,14 @@ export const PromptsAddForm = ({ onAdd, onCancel, noun = 'prompt' }: PromptsAddF
             for="prompts-body"
             className="block text-[10px] text-[var(--los-muted)] mb-1 uppercase tracking-wider"
           >
-            {isCommand ? 'Command — $1, $2… are asked for; \\$1 stays literal' : 'Prompt'}
+            {isCommand ? 'Command — {{name}} is asked for; every $ is the shell’s' : 'Prompt'}
           </label>
           <textarea
             id="prompts-body"
             value={body}
             onInput={(e) => setBody(e.currentTarget.value)}
             className="w-full bg-[var(--los-bg)] border border-[var(--los-border)] p-2 text-xs text-[var(--los-fg)] outline-none focus:border-[var(--los-accent)] transition-colors min-h-[160px] font-mono"
-            placeholder={isCommand ? 'ls -la $1' : 'The prompt text...'}
+            placeholder={isCommand ? 'ls -la {{folder}}' : 'The prompt text...'}
           />
         </div>
 

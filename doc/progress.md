@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-09-23 — Palette: `{{name}}` command parameters, `>g` GitHub search, `>l` Tsuga logs
+
+- **Commands** (`.commands.md`): parameters are `{{name}}`, asked for by name (`port`) in the
+  palette and given a named field in the console, once per name in order of first use. Every `$` is
+  now the shell's, which fixes `` sudo kill -9 `sudo lsof -t -i:\$1` ``: `\$1` was the escape for a
+  literal `$1`, so nothing was asked for. Names only, so docker's `{{.Name}}` stays as written.
+  `$1`…`$9` are no longer parameters — rewrite them as `{{…}}` (doc/commands-format.md).
+- **`>g`** (both surfaces): the `>r` repositories; ⏎ lists Issues and Pull requests, ⏎ on one asks
+  for the search term and opens `github.com/<repo>/issues?q=is:issue <term>` (or `pulls`, `is:pr`);
+  no term opens the plain list. Remembered in Recent like any opened page.
+- **`>l`** (both surfaces): one row for what is typed, opening Tsuga's explorer on
+  `owner-team:console`, with `AND "<term>"` when there is one — the two links match the team's
+  own exactly. (`>t` stays Translate.)
+- **Palette core**: a third kind of mode, `link(query)`, whose one entry follows the input.
+
 ## 2026-09-23 — `.commands.md`: a command library, run from the desktop palette (`>x`)
 
 - **Format** (`doc/commands-format.md`): `.prompts.md`'s grammar, the command being an entry's

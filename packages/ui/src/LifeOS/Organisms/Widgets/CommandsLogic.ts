@@ -3,7 +3,7 @@
  *
  * The grammar is `.prompts.md`'s — one `## Title #tags` per entry — so reading and writing reuse
  * PromptsLogic. An entry's command is its first fenced code block, or its whole text when it has
- * none; `$1`…`$9` are parameters, and `\$1` is a literal `$1`. See doc/commands-format.md.
+ * none; `{{port}}` is a parameter, and every `$` is the shell's. See doc/commands-format.md.
  *
  * The command palette reads the same file (packages/palette/src/commands.ts); keep the two in step.
  */
@@ -18,7 +18,8 @@ export interface CommandEntry {
 }
 
 const FENCE = /```[^\n]*\n([\s\S]*?)\n?```/;
-const PARAMETER = /(\\?)\$([1-9])/g;
+/** `{{port}}` or `{{ port }}` — a name, so Go templates like docker's `{{.Name}}` are left alone. */
+const PARAMETER = /\{\{\s*([A-Za-z_][\w-]*)\s*\}\}/g;
 
 export const parseCommands = (content: string): CommandEntry[] =>
   parsePrompts(content)
@@ -34,20 +35,14 @@ export const parseCommands = (content: string): CommandEntry[] =>
     })
     .filter((entry) => entry.command);
 
-/** How many values the command asks for: its highest `$n`, since `$2` alone still needs a `$1`. */
-export const commandParameters = (command: string): number => {
-  let highest = 0;
-  for (const [, escaped, digit] of command.matchAll(PARAMETER)) {
-    if (!escaped) highest = Math.max(highest, Number(digit));
-  }
-  return highest;
-};
+/** The parameters' names, each once, in the order they first appear. */
+export const commandParameters = (command: string): string[] => [
+  ...new Set(Array.from(command.matchAll(PARAMETER), ([, name]) => name ?? '')),
+];
 
-/** Each `$n` replaced by the n-th value as typed; each `\$n` becomes a plain `$n`. */
-export const fillCommand = (command: string, values: readonly string[]): string =>
-  command.replace(PARAMETER, (_, escaped: string, digit: string) =>
-    escaped ? `$${digit}` : (values[Number(digit) - 1] ?? ''),
-  );
+/** Each `{{name}}` replaced by its value as typed; one without a value stays as written. */
+export const fillCommand = (command: string, values: Readonly<Record<string, string>>): string =>
+  command.replace(PARAMETER, (placeholder, name: string) => values[name] ?? placeholder);
 
 /** Appends an entry, the command in a `sh` code block under its note; the file is rewritten whole. */
 export const addCommand = (

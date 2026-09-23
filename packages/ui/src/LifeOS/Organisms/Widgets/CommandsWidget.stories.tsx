@@ -16,7 +16,7 @@ const SAMPLE = `# Commands
 ## List a folder #files
 With hidden files.
 \`\`\`sh
-ls -la $1
+ls -la {{folder}}
 \`\`\`
 
 ## Wi-Fi on #network
@@ -24,12 +24,12 @@ nmcli radio wifi on
 
 ## Connect to a network #network
 \`\`\`sh
-nmcli connection up $1
+nmcli connection up {{network}}
 \`\`\`
 
 ## Top words in a column #text
 \`\`\`sh
-awk '{print \\$1}' $1 | sort | uniq -c | sort -rn | head -$2
+awk '{print $1}' {{file}} | sort | uniq -c | sort -rn | head -{{count}}
 \`\`\`
 `;
 

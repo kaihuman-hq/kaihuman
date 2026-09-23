@@ -13,7 +13,7 @@
 | Wiki view: clickable `[[wikilinks]]`, backlinks, page type and tags, tag filter, repo-stored images | `/wiki` | 2026-09-23 |
 | Knowledge base commands: `/kb-ask --save` files answers, new `/kb-digest` for personal data, interactive `/kb-ingest`, `/kb-lint` stale claims and suggestions | `/knowledge` → Commands | 2026-09-23 |
 | Bookmarks (`.bookmarks.json`) — tagged, searchable bookmarks; mirrored into the browser extension | New File → Bookmarks | 2026-09-22 |
-| Command library (`.commands.md`) — shell commands with `$1`… parameters, a field per parameter and copy; run from the desktop palette (`>x`) | New File → Commands | 2026-09-23 |
+| Command library (`.commands.md`) — shell commands with `{{name}}` parameters, a field per parameter and copy; run from the desktop palette (`>x`) | New File → Commands | 2026-09-23 |
 | Prompt library (`.prompts.md`) — searchable, taggable prompts in one grep-able file | New File → Prompts | 2026-09-16 |
 | Configurable desktop bottom navbar (stored in `.kh` config) | Settings → Bottom Navbar | 2026-06-26 |
 | Demo mode (in-memory seeded data) | `/demo` + login "View demo" | 2026-06-25 |
@@ -30,6 +30,7 @@
 |---------|----------|-------|
 | Pin to Knowledge Base saves the page as Markdown with its images in `.kh/assets/` (popup toggle turns image downloads off) | popup, palette | 2026-09-23 |
 | Selected-text clips go to `.kh/raw/` as their own notes | context menu, palette | 2026-09-23 |
+| `>g` GitHub search (repository, then issues or pull requests, then the term) and `>l` the console team's logs in Tsuga | command palette, desktop palette | 2026-09-23 |
 | `>x` commands from `.commands.md` — fill in parameters, then copy (extension) or copy / run in ghostty / run in the background (desktop) | command palette, desktop palette | 2026-09-23 |
 | Prefixes are `>` plus a letter (`>p`, `>t`…); `>b` lists bookmarks only | command palette, desktop palette | 2026-09-23 |
 | Palette prefix modes: `>p` prompts from the repo's `.prompts.md` files (⏎ copies), `>t` DeepL translation into EN/DE (typed text is offered too; the last 20 texts are kept to translate again), `>r` GitHub repositories with ⇥ for issues, PRs… | command palette (pages and start page) | 2026-09-23 |
