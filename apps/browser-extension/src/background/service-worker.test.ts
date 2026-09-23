@@ -260,6 +260,26 @@ describe('palette mode messages', () => {
     expect(await call({ type: 'GET_TRANSLATION_HISTORY' })).toEqual({ success: true, texts: [] });
   });
 
+  it('answers command files from their own cache', async () => {
+    storedExtras = {
+      promptsCache: {
+        repo: 'o/r',
+        files: [{ path: 'a.prompts.md', content: '## A' }],
+        fetchedAt: Date.now(),
+      },
+      commandsCache: {
+        repo: 'o/r',
+        files: [{ path: 'ops.commands.md', content: '## Up\nuptime' }],
+        fetchedAt: Date.now(),
+      },
+    };
+    expect(await call({ type: 'LIST_COMMAND_FILES' })).toEqual({
+      success: true,
+      files: [{ path: 'ops.commands.md', content: '## Up\nuptime' }],
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('answers prompt files from a cache for the same repository', async () => {
     storedExtras = {
       promptsCache: {

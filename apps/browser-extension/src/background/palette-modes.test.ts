@@ -31,6 +31,20 @@ describe('promptFilePaths', () => {
   });
 });
 
+describe('promptFilePaths for commands', () => {
+  it('finds the files ending in the suffix asked for', () => {
+    expect(
+      promptFilePaths(
+        [
+          { path: 'ops.commands.md', type: 'blob' },
+          { path: 'a.prompts.md', type: 'blob' },
+        ],
+        '.commands.md',
+      ),
+    ).toEqual(['ops.commands.md']);
+  });
+});
+
 describe('fetchPromptFiles', () => {
   it('lists the tree once, then reads each prompts file raw with its path encoded', async () => {
     const fetchMock = vi.fn(async (url: string) =>

@@ -1,5 +1,31 @@
 # Progress
 
+## 2026-09-23 — `.commands.md`: a command library, run from the desktop palette (`>x`)
+
+- **Format** (`doc/commands-format.md`): `.prompts.md`'s grammar, the command being an entry's
+  first fenced code block (or its text). `$1`…`$9` are parameters, filled in as typed; `\$1` is a
+  literal `$1`.
+- **Console**: New File → Commands; a Commands widget with search, tag filter, a field per
+  parameter, a live preview (unfilled parameters stay `$n`) and Copy; ADD COMMAND appends one in a
+  `sh` block. `CommandsLogic.ts` reuses PromptsLogic for reading and writing. Storybook story added.
+- **Palette `>x`**: every `.commands.md` in the repository. ⏎ asks for each parameter with the
+  command shown, then lists **Copy** (first, so a hasty ⏎ never runs), **Run in terminal**, **Run in
+  the background**, and the finished command in full. The extension offers Copy only.
+- **Desktop** (`commands.rs`): `RUN_COMMAND` runs `bash -c` from `$HOME` — in `ghostty -e` with the
+  command passed as an argument (no quoting of its own), showing `$ command`, the output and the
+  exit status until a key is pressed; or in the background, with a notification of how it ended.
+  `LIST_COMMAND_FILES` shares the prompts' fetch and cache code, parameterised by suffix, on both
+  backends (caches `commands.json` / `commandsCache`).
+- **Palette core**: an action may end in `choices` (listed like a mode's entries), `closes` the
+  palette after running, and opt out of Recent (`recent: false`); a pending action's subtitle shows
+  under its first field.
+
+Checks: palette tsc and biome clean, vitest 164/164 (16 new); extension tsc, vitest 216/216 (2
+new); console tsc, vitest 123/123 (4 new); ui build green, biome clean on the touched files;
+desktop `cargo test` 51 passed (4 new, including running bash for the notification text and the
+terminal script's argument passing), clippy and fmt clean. `>x` driven in the built desktop UI and
+the widget in Storybook, both in Chromium. Not run: a real ghostty window.
+
 ## 2026-09-23 — The palette's hint names the prefixes by letter only
 
 The empty palette's hint wrapped to two lines on the desktop with eight prefixes. It now reads

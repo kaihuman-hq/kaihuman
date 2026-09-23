@@ -1312,3 +1312,103 @@ describe('>b', () => {
     expect(input().value).toBe('>b');
   });
 });
+
+describe('actions that end in choices', () => {
+  const runCommand = vi.fn(async () => 'Running');
+
+  beforeEach(async () => {
+    runCommand.mockClear();
+    modes.push({
+      prefix: 'x',
+      title: 'Commands',
+      placeholder: 'Search commands',
+      description: 'Commands',
+      load: async () => [
+        {
+          id: 'ls',
+          title: 'List a folder',
+          action: {
+            id: 'ls',
+            title: 'List a folder',
+            recent: false,
+            prompts: [{ label: 'Value for $1' }],
+            choices: ([value = '']: string[]) => [
+              { id: 'copy', title: 'Copy', group: 'Choose', copy: `ls ${value}` },
+              {
+                id: 'run',
+                title: 'Run in terminal',
+                group: 'Choose',
+                action: {
+                  id: 'run',
+                  title: 'Run in terminal',
+                  closes: true,
+                  recent: false,
+                  run: runCommand,
+                },
+              },
+              { id: 'text', title: `ls ${value}`, group: 'The command', copy: `ls ${value}` },
+            ],
+          },
+        },
+      ],
+    });
+    type('>x');
+    await settle();
+    press('Enter');
+    await settle();
+    type('/tmp');
+    press('Enter');
+    await settle();
+  });
+
+  it('lists the choices with the filled-in command below them', () => {
+    expect(crumbText()).toBe('List a folder');
+    expect(groupLabels()).toEqual(['Choose', 'The command']);
+    expect(rowTitles()).toEqual(['Copy', 'Run in terminal', 'ls /tmp']);
+    expect(selectedTitle()).toBe('Copy');
+  });
+
+  it('copies on ⏎ and closes', async () => {
+    press('Enter');
+    await settle();
+    expect(copy).toHaveBeenCalledWith('ls /tmp');
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('runs a chosen action, closes, and keeps it out of Recent', async () => {
+    await activateRow('Run in terminal');
+    await settle();
+    expect(runCommand).toHaveBeenCalledTimes(1);
+    expect(rememberRecent).not.toHaveBeenCalled();
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('stays open and says why when running fails', async () => {
+    runCommand.mockRejectedValueOnce(new Error('ghostty is not installed'));
+    await activateRow('Run in terminal');
+    await settle();
+    expect(statusText()).toBe('ghostty is not installed');
+    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+  });
+
+  it('leaves the choices with Escape, and Backspace gives no prefix back', () => {
+    press('Backspace');
+    expect(crumbText()).toBeNull();
+    expect(input().value).toBe('');
+  });
+});
+
+describe('filling in an action', () => {
+  it('shows the action’s subtitle while its first field is empty', async () => {
+    actions.push({
+      id: 'cmd',
+      title: 'List',
+      subtitle: 'ls -la $1',
+      prompts: [{ label: 'Value for $1' }],
+      run: async () => '',
+    });
+    type('List');
+    await activateRow('List');
+    expect(shadow().querySelector('.empty')?.textContent).toBe('ls -la $1');
+  });
+});

@@ -67,6 +67,19 @@ export interface PaletteProtocol {
     request: NoFields;
     response: { files: { path: string; content: string }[] };
   };
+  /** Every `.commands.md` file in the repository, raw, as `LIST_PROMPT_FILES` lists prompts. */
+  LIST_COMMAND_FILES: {
+    request: NoFields;
+    response: { files: { path: string; content: string }[] };
+  };
+  /**
+   * Desktop only: runs a filled-in command with bash — in a ghostty window that stays open until a
+   * key is pressed, or in the background with a notification when it ends.
+   */
+  RUN_COMMAND: {
+    request: { command: string; where: 'terminal' | 'background' };
+    response: NoFields;
+  };
   /** One translation per target, through DeepL; fails when no API key is set. */
   TRANSLATE: {
     request: { text: string; targets: string[] };

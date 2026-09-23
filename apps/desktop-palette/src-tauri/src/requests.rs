@@ -10,11 +10,12 @@ use serde_json::{Value, json};
 
 use crate::bookmarks::{self, BOOKMARKS_PATH, Cache};
 use crate::config::{
-    self, Settings, bookmarks_cache_file, is_repo_name, prompts_cache_file, read_json, write_json,
+    self, Settings, bookmarks_cache_file, commands_cache_file, is_repo_name, prompts_cache_file,
+    read_json, write_json,
 };
 use crate::github::{Client, Read};
 use crate::recents::{self, RecentEntry};
-use crate::{claude, dumps, prompts, repos, translate};
+use crate::{claude, commands, dumps, prompts, repos, translate};
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -54,6 +55,12 @@ pub enum Request {
         url: String,
     },
     ListPromptFiles,
+    ListCommandFiles,
+    RunCommand {
+        command: String,
+        #[serde(rename = "where")]
+        place: commands::Where,
+    },
     Translate {
         text: String,
         targets: Vec<String>,
@@ -175,33 +182,42 @@ async fn fetch_quick_notes() -> Result<Value, String> {
     Ok(json!({ "quickNotes": quick_notes }))
 }
 
-async fn refresh_prompts(client: &Client) -> Result<prompts::Cache, String> {
+async fn refresh_repo_files(
+    client: &Client,
+    suffix: &str,
+    cache_file: &PathBuf,
+) -> Result<prompts::Cache, String> {
     let cache = prompts::Cache {
         repo: client.repo().to_string(),
-        files: prompts::fetch(client).await?,
+        files: prompts::fetch(client, suffix).await?,
         fetched_at: now_ms(),
     };
-    write_json(&prompts_cache_file(), &cache)?;
+    write_json(cache_file, &cache)?;
     Ok(cache)
 }
 
-/// Cache first, like the bookmarks: a stale cache still answers and is refreshed behind it.
-async fn list_prompt_files() -> Result<Value, String> {
+/// The repository's `.prompts.md` (`>p`) or `.commands.md` (`>x`) files. Cache first, like the
+/// bookmarks: a stale cache still answers and is refreshed behind it.
+async fn list_repo_files(suffix: &'static str, cache_file: PathBuf) -> Result<Value, String> {
     let client = client()?;
-    let cache = read_json::<prompts::Cache>(&prompts_cache_file())
-        .filter(|cache| cache.is_for(client.repo()));
+    let cache =
+        read_json::<prompts::Cache>(&cache_file).filter(|cache| cache.is_for(client.repo()));
     let files = match cache {
         Some(cache) => {
             if cache.is_stale(now_ms()) {
                 tauri::async_runtime::spawn(async move {
-                    if let Err(error) = refresh_prompts(&client).await {
-                        eprintln!("prompt refresh failed: {error}");
+                    if let Err(error) = refresh_repo_files(&client, suffix, &cache_file).await {
+                        eprintln!("{suffix} refresh failed: {error}");
                     }
                 });
             }
             cache.files
         }
-        None => refresh_prompts(&client).await?.files,
+        None => {
+            refresh_repo_files(&client, suffix, &cache_file)
+                .await?
+                .files
+        }
     };
     Ok(json!({ "files": files }))
 }
@@ -325,7 +341,12 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             Ok(json!({ "synced": true, "bookmarks": cache.bookmarks.len() }))
         }
         Request::OpenUrl { url } => open_url(&url),
-        Request::ListPromptFiles => list_prompt_files().await,
+        Request::ListPromptFiles => list_repo_files(".prompts.md", prompts_cache_file()).await,
+        Request::ListCommandFiles => list_repo_files(".commands.md", commands_cache_file()).await,
+        Request::RunCommand { command, place } => {
+            commands::run(&command, place)?;
+            Ok(json!({}))
+        }
         Request::Translate { text, targets } => {
             let key = config::deepl_key()?;
             let translations = translate::translate(&key, text.trim(), &targets).await?;
@@ -424,6 +445,23 @@ mod tests {
         assert_eq!(
             parse(json!({ "type": "LIST_GITHUB_REPOS" })),
             Request::ListGithubRepos
+        );
+        assert_eq!(
+            parse(json!({ "type": "LIST_COMMAND_FILES" })),
+            Request::ListCommandFiles
+        );
+        assert_eq!(
+            parse(json!({ "type": "RUN_COMMAND", "command": "ls /tmp", "where": "terminal" })),
+            Request::RunCommand {
+                command: "ls /tmp".into(),
+                place: commands::Where::Terminal
+            }
+        );
+        assert!(
+            serde_json::from_value::<Request>(
+                json!({ "type": "RUN_COMMAND", "command": "ls", "where": "anywhere" })
+            )
+            .is_err()
         );
         assert_eq!(
             parse(json!({ "type": "LIST_CLAUDE_CODE_REPOS" })),

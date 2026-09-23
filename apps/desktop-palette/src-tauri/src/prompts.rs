@@ -36,18 +36,18 @@ impl Cache {
     }
 }
 
-/// Every `.prompts.md` blob in a tree listing.
-pub fn prompt_file_paths(tree: &[TreeEntry]) -> Vec<String> {
+/// Every blob in a tree listing whose name ends in `suffix` (`.prompts.md`, `.commands.md`).
+pub fn prompt_file_paths(tree: &[TreeEntry], suffix: &str) -> Vec<String> {
     tree.iter()
-        .filter(|entry| entry.kind == "blob" && entry.path.to_lowercase().ends_with(".prompts.md"))
+        .filter(|entry| entry.kind == "blob" && entry.path.to_lowercase().ends_with(suffix))
         .map(|entry| entry.path.clone())
         .collect()
 }
 
 /// One tree listing to find the files, then one read per file.
-pub async fn fetch(client: &Client) -> Result<Vec<PromptFile>, String> {
+pub async fn fetch(client: &Client, suffix: &str) -> Result<Vec<PromptFile>, String> {
     let mut files = Vec::new();
-    for path in prompt_file_paths(&client.tree().await?) {
+    for path in prompt_file_paths(&client.tree().await?, suffix) {
         if let Read::Found { content, .. } = client.read(&encode_path(&path), None).await? {
             files.push(PromptFile { path, content });
         }
@@ -75,8 +75,16 @@ mod tests {
             entry("dir.prompts.md", "tree"),
         ];
         assert_eq!(
-            prompt_file_paths(&tree),
+            prompt_file_paths(&tree, ".prompts.md"),
             vec!["ai/useful.prompts.md", "ai/Other.PROMPTS.md"]
+        );
+        let tree = [
+            entry("ops.commands.md", "blob"),
+            entry("a.prompts.md", "blob"),
+        ];
+        assert_eq!(
+            prompt_file_paths(&tree, ".commands.md"),
+            vec!["ops.commands.md"]
         );
     }
 

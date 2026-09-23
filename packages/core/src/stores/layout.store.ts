@@ -150,6 +150,7 @@ export class LayoutStore {
       const isBudget = item.path.toLowerCase().endsWith('.budget.csv');
       const isActionLog = item.path.toLowerCase().endsWith('.actionlog.md');
       const isPrompts = item.path.toLowerCase().endsWith('.prompts.md');
+      const isCommands = item.path.toLowerCase().endsWith('.commands.md');
       const isDataCollection = item.path.toLowerCase().endsWith('.data-collection.csv');
       const isStocks = item.path.toLowerCase().endsWith('.stocks.csv');
       const isConsumption = item.path.toLowerCase().endsWith('.consumption.csv');
@@ -167,6 +168,7 @@ export class LayoutStore {
       else if (isBudget) extension = '.budget.csv';
       else if (isActionLog) extension = '.actionlog.md';
       else if (isPrompts) extension = '.prompts.md';
+      else if (isCommands) extension = '.commands.md';
       else if (isDataCollection) extension = '.data-collection.csv';
       else if (isStocks) extension = '.stocks.csv';
       else if (isConsumption) extension = '.consumption.csv';

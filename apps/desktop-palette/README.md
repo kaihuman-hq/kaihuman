@@ -21,6 +21,7 @@ way.
 | `>b` bookmarks only, without actions or web search | ✓ |
 | `>p` prompts from the repo's `.prompts.md` files, ⏎ copies | ✓ (with `wl-copy`) |
 | `>t` translate with DeepL into EN-US and DE (`>t fr: …` for one language), ⏎ copies | ✓ (key from `DEEPL_AUTH_KEY`, `~/.config/envvars/deepl.env` or the keyring) |
+| `>x` commands from the repo's `.commands.md` files — fill in `$1`, `$2`…, then copy, run in ghostty, or run in the background | ✓ (running: desktop only) |
 | `>d` dumps — a scratch editor for pasting and copying, the last 25 kept, ⌃S saves one as a file | ✓ desktop only |
 | `>c` Claude Code — pick a repo, type a prompt, ⏎ opens a new session on claude.ai | ✓ desktop only |
 | `>u` Claude usage — rate limits, pace, resets and spend per account | ✓ desktop only |
@@ -46,6 +47,11 @@ The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-re
 
   Because the file is read at translation time, editing it needs no daemon restart, and the
   toggle does not need to load anything.
+- **`>x`** lists the commands in the repository's `.commands.md` files (format:
+  `doc/commands-format.md`). ⏎ asks for each `$1`, `$2`… — values go in as typed — then offers
+  **Copy**, **Run in terminal** (a `ghostty` window that stays open until a key is pressed) and
+  **Run in the background** (a notification says how it ended), with the finished command shown in
+  full. Nothing runs until Run is chosen. Commands run with `bash -c` from your home directory.
 - **`>d`** is a scratch editor for text you only need for a moment. **New dump** (the first row)
   opens an empty editor in the palette; the rows below are earlier dumps, most recently edited
   first, searchable by their text — ⏎ opens one.
@@ -155,6 +161,7 @@ to change its animation.
 | --- | --- |
 | `$XDG_CONFIG_HOME/lifosy/palette.json` | the current repository and the ones you have used |
 | `$XDG_CACHE_HOME/lifosy/bookmarks.json` | GitHub's bookmarks file as last fetched, with its ETag |
+| `$XDG_CACHE_HOME/lifosy/commands.json` | the repository's `.commands.md` files as last fetched (five minutes) |
 | `$XDG_CACHE_HOME/lifosy/prompts.json` | the repository's `.prompts.md` files as last fetched (five minutes) |
 | `$XDG_STATE_HOME/lifosy/recents.json` | the palette's last ten actions |
 | `$XDG_DATA_HOME/lifosy/dumps/*.txt` | the `>d` dumps, the last 25 |

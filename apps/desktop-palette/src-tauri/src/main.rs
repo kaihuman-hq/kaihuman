@@ -7,6 +7,7 @@
 
 mod bookmarks;
 mod claude;
+mod commands;
 mod config;
 mod console_login;
 mod dumps;

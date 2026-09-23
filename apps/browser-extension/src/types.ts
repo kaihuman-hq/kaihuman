@@ -22,6 +22,7 @@ export interface Message {
     | 'SEARCH_REPO'
     | 'OPEN_URL'
     | 'LIST_PROMPT_FILES'
+    | 'LIST_COMMAND_FILES'
     | 'TRANSLATE'
     | 'GET_TRANSLATION_HISTORY'
     | 'ADD_TRANSLATION_HISTORY'

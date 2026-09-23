@@ -1,5 +1,6 @@
 import {
   type CommandPalette,
+  commandsMode,
   copyToClipboard,
   createCommandPalette,
   type PaletteAction,
@@ -134,7 +135,8 @@ function getPalette(): CommandPalette {
         );
       },
       actions: paletteActions,
-      modes: paletteModes(workerPort),
+      // The browser cannot run commands, so `>x` only copies them.
+      modes: [...paletteModes(workerPort), commandsMode(workerPort, { canRun: false })],
       copy: copyToClipboard,
     });
   }

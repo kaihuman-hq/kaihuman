@@ -1,6 +1,6 @@
 /**
- * What the palette's prefix modes ask the service worker for: the repository's prompt files (`>p`),
- * DeepL translations (`>t`) and the user's GitHub repositories (`>r`).
+ * What the palette's prefix modes ask the service worker for: the repository's prompt and command
+ * files (`>p`, `>x`), DeepL translations (`>t`) and the user's GitHub repositories (`>r`).
  *
  * The desktop palette answers the same requests from Rust (apps/desktop-palette/src-tauri), so the
  * two stay in step: same files, same endpoints, same error messages.
@@ -36,15 +36,25 @@ const githubHeaders = (token: string, accept = 'application/vnd.github+json') =>
 /** `a b/c#1.md` → `a%20b/c%231.md`: each segment encoded, the slashes kept. */
 const encodePath = (path: string) => path.split('/').map(encodeURIComponent).join('/');
 
-/** Every `.prompts.md` in the repository's default branch, from one tree listing. */
-export function promptFilePaths(tree: { path: string; type: string }[]): string[] {
+/** Every file ending in `suffix` on the repository's default branch, from one tree listing. */
+export function promptFilePaths(
+  tree: { path: string; type: string }[],
+  suffix = '.prompts.md',
+): string[] {
   return tree
-    .filter((entry) => entry.type === 'blob' && entry.path.toLowerCase().endsWith('.prompts.md'))
+    .filter((entry) => entry.type === 'blob' && entry.path.toLowerCase().endsWith(suffix))
     .map((entry) => entry.path);
 }
 
-/** One recursive tree listing to find the files, then one raw read per file. */
-export async function fetchPromptFiles(token: string, repo: string): Promise<PromptFile[]> {
+/**
+ * One recursive tree listing to find the files, then one raw read per file — `.prompts.md` by
+ * default, `.commands.md` for `>x`.
+ */
+export async function fetchPromptFiles(
+  token: string,
+  repo: string,
+  suffix = '.prompts.md',
+): Promise<PromptFile[]> {
   const treeResponse = await fetch(
     `https://api.github.com/repos/${repo}/git/trees/HEAD?recursive=1`,
     { headers: githubHeaders(token) },
@@ -55,7 +65,7 @@ export async function fetchPromptFiles(token: string, repo: string): Promise<Pro
   const { tree = [] } = await treeResponse.json();
 
   return Promise.all(
-    promptFilePaths(tree).map(async (path) => {
+    promptFilePaths(tree, suffix).map(async (path) => {
       const response = await fetch(
         `https://api.github.com/repos/${repo}/contents/${encodePath(path)}`,
         { headers: githubHeaders(token, 'application/vnd.github.raw+json') },

@@ -44,6 +44,15 @@ export interface PaletteAction {
    * so Recent repeats it — and the palette closes. Throwing refuses the answers.
    */
   opens?: (inputs: string[]) => RecentEntry;
+  /**
+   * In place of `run`: the choices the answers lead to — run a filled-in command, or copy it —
+   * listed like a mode's entries, where Esc leaves them.
+   */
+  choices?: (inputs: string[]) => ModeItem[];
+  /** Closes the palette once `run` succeeds, for actions that hand over to another window. */
+  closes?: boolean;
+  /** `false` keeps it out of Recent — for actions built from answers, which Recent cannot replay. */
+  recent?: false;
 }
 
 /** What the palette last did, so it can be repeated from the top of the list. */
@@ -422,10 +431,30 @@ export function createCommandPalette(
       openUrl(entry);
       return;
     }
+    if (action.choices) {
+      const choices = action.choices(inputs);
+      enterMode(
+        {
+          prefix: '',
+          title: action.title,
+          placeholder: 'Choose',
+          description: '',
+          load: async () => choices,
+        },
+        '',
+      );
+      return;
+    }
     setStatus(`${action.title}…`);
     try {
       setStatus((await action.run?.(inputs)) ?? null);
-      handlers.rememberRecent({ id: action.id, title: action.title, subtitle: action.subtitle });
+      if (action.recent !== false) {
+        handlers.rememberRecent({ id: action.id, title: action.title, subtitle: action.subtitle });
+      }
+      if (action.closes) {
+        close();
+        return;
+      }
       // The action may have changed what the list should show (a new bookmark, say).
       bookmarks = await handlers.loadBookmarks().catch(() => bookmarks);
       recents = await handlers.loadRecents().catch(() => recents);
@@ -712,7 +741,10 @@ export function createCommandPalette(
 
   /** How the mode's prefix is typed, so Backspace can give it back. */
   const typedPrefix = (candidate: PaletteMode) =>
-    candidate === helpMode ? HELP_PREFIX : `${MODE_MARK}${candidate.prefix}`;
+    candidate === helpMode
+      ? HELP_PREFIX
+      : // An action's choices have no prefix to give back.
+        candidate.prefix && `${MODE_MARK}${candidate.prefix}`;
 
   /** Whatever is typed, offered to each mode that submits — "Translate “Guten Morgen”". */
   const submitOfferRows = (): Row[] => {
@@ -999,7 +1031,12 @@ export function createCommandPalette(
 
     if (pending) {
       // What has been answered so far, so a long walk stays reviewable.
-      addNote(pending.values.filter(Boolean).join('  ·  ') || pending.action.title);
+      // Before any answer, the subtitle says what is being filled in — a command's `$1`, say.
+      addNote(
+        pending.values.filter(Boolean).join('  ·  ') ||
+          pending.action.subtitle ||
+          pending.action.title,
+      );
     } else if (mode) {
       if (showsHistory()) addGroup('Recent', listed);
       else {

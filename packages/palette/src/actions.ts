@@ -15,6 +15,7 @@ import type {
   PaletteHandlers,
   PaletteMode,
 } from './command-palette.js';
+import { commandParameters, fillCommand, parseCommands } from './commands.js';
 import { parsePrompts } from './prompts.js';
 import type { ActionPort } from './protocol.js';
 import { parseTranslationQuery, usefulTranslations } from './translate.js';
@@ -336,6 +337,77 @@ export const dumpMode = (port: ActionPort): PaletteMode => ({
   description:
     'A scratch editor for pasting and copying, the last 25 kept — ⌃⏎ copies all, ⌃S saves a copy as a file',
   load: () => dumpItems(port),
+});
+
+/**
+ * What can be done with a filled-in command. Copying comes first, so a quick second ⏎ copies rather
+ * than runs; the command itself is listed in full below, so what runs is always in sight.
+ */
+const commandChoices = (port: ActionPort, command: string, canRun: boolean): ModeItem[] => {
+  const run = (where: 'terminal' | 'background', title: string, done: string): ModeItem => ({
+    id: `command:${where}`,
+    title,
+    group: 'Choose',
+    action: {
+      id: `command:${where}`,
+      title,
+      recent: false,
+      closes: true,
+      run: async () => {
+        await port.send({ type: 'RUN_COMMAND', command, where });
+        return done;
+      },
+    },
+  });
+  return [
+    { id: 'command:copy', title: 'Copy', group: 'Choose', copy: command },
+    ...(canRun
+      ? [
+          run('terminal', 'Run in terminal', 'Running in ghostty'),
+          run('background', 'Run in the background', 'Running — a notification says how it ended'),
+        ]
+      : []),
+    { id: 'command:text', title: command, group: 'The command', copy: command },
+  ];
+};
+
+const commandItems = async (port: ActionPort, canRun: boolean): Promise<ModeItem[]> => {
+  const { files } = await port.send({ type: 'LIST_COMMAND_FILES' });
+  if (!files.length) throw new Error('No .commands.md files in this repository yet');
+  return files.flatMap((file) =>
+    parseCommands(file.content).map((entry, index) => {
+      const parameters = commandParameters(entry.command);
+      return {
+        id: `command:${file.path}:${index}`,
+        title: entry.title,
+        subtitle: [...entry.tags.map((tag) => `#${tag}`), entry.command.split('\n')[0]].join(' '),
+        keywords: [...entry.tags, entry.command, entry.note].join(' '),
+        action: {
+          id: `command:${file.path}:${index}`,
+          title: entry.title,
+          subtitle: entry.command,
+          recent: false as const,
+          prompts: Array.from({ length: parameters }, (_, n) => ({ label: `Value for $${n + 1}` })),
+          choices: (values: string[]) =>
+            commandChoices(port, fillCommand(entry.command, values), canRun),
+        },
+      };
+    }),
+  );
+};
+
+/**
+ * `>x` — the repository's `.commands.md` files: ⏎ asks for each `$1`…`$9`, then offers to copy
+ * the filled-in command or, where the surface can (`canRun`, the desktop), to run it.
+ */
+export const commandsMode = (port: ActionPort, { canRun }: { canRun: boolean }): PaletteMode => ({
+  prefix: 'x',
+  title: 'Commands',
+  placeholder: 'Search commands — ⏎ asks for its $1, $2…',
+  description: canRun
+    ? 'Commands from the repository’s .commands.md files — fill in $1, $2…, then copy or run (terminal or background)'
+    : 'Commands from the repository’s .commands.md files — fill in $1, $2…, then copy (the desktop palette can also run them)',
+  load: () => commandItems(port, canRun),
 });
 
 /** Where `>c` sends a prompt: a new Claude Code session on claude.ai. */

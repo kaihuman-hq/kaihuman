@@ -15,6 +15,7 @@ import {
   MessageSquareQuote,
   Rss,
   Star,
+  Terminal,
   TrendingUp,
   X,
   Zap,
@@ -60,6 +61,15 @@ const TEMPLATES: Template[] = [
     icon: MessageSquareQuote,
     extension: '.prompts.md',
     defaultContent: '# Prompts\n',
+  },
+  {
+    id: 'commands',
+    name: 'Commands',
+    description:
+      'Shell commands with $1, $2… parameters — copy them, or run them from the desktop palette',
+    icon: Terminal,
+    extension: '.commands.md',
+    defaultContent: '# Commands\n',
   },
   {
     id: 'todo',

@@ -69,6 +69,10 @@ pub fn dumps_dir() -> PathBuf {
     xdg_dir("XDG_DATA_HOME", ".local/share").join("dumps")
 }
 
+pub fn commands_cache_file() -> PathBuf {
+    xdg_dir("XDG_CACHE_HOME", ".cache").join("commands.json")
+}
+
 pub fn prompts_cache_file() -> PathBuf {
     xdg_dir("XDG_CACHE_HOME", ".cache").join("prompts.json")
 }

@@ -3,6 +3,7 @@ import {
   claudeCodeMode,
   claudeCodeUrl,
   claudeUsageMode,
+  commandsMode,
   dumpMode,
   formatStamp,
   GITHUB_REPO_VIEWS,
@@ -368,5 +369,58 @@ describe('claudeUsageMode', () => {
     expect(mode.prefix).toBe('u');
     expect(rows.map((row) => row.group)).toEqual(['default', 'work']);
     expect(rows[1]?.title).toBe('Could not load usage');
+  });
+});
+
+describe('commandsMode', () => {
+  const FILE = '## List a folder #files\n```sh\nls -la $1\n```\n\n## Wi-Fi on\nnmcli radio wifi on';
+  const load = async (canRun: boolean) => {
+    answers.LIST_COMMAND_FILES = { files: [{ path: 'ops.commands.md', content: FILE }] };
+    const mode = commandsMode(fakePort, { canRun });
+    if (!('load' in mode)) throw new Error('x does not load');
+    return mode.load();
+  };
+
+  it('is >x, and lists each command with its tags and first line', async () => {
+    const [list, wifi] = await load(true);
+    expect(commandsMode(fakePort, { canRun: true }).prefix).toBe('x');
+    expect(list).toMatchObject({ title: 'List a folder', subtitle: '#files ls -la $1' });
+    expect(list?.action?.prompts).toEqual([{ label: 'Value for $1' }]);
+    expect(wifi?.action?.prompts).toEqual([]);
+  });
+
+  it('fills the values in and offers copy first, then running, then the command itself', async () => {
+    const [list] = await load(true);
+    const choices = list?.action?.choices?.(['/tmp']) ?? [];
+    expect(choices.map((choice) => choice.title)).toEqual([
+      'Copy',
+      'Run in terminal',
+      'Run in the background',
+      'ls -la /tmp',
+    ]);
+    expect(choices[0]?.copy).toBe('ls -la /tmp');
+    expect(choices[3]).toMatchObject({ group: 'The command', copy: 'ls -la /tmp' });
+  });
+
+  it('runs through the backend, closing the palette and staying out of Recent', async () => {
+    answers.RUN_COMMAND = {};
+    const [list] = await load(true);
+    const terminal = list?.action?.choices?.(['/tmp'])[1]?.action;
+    expect(terminal).toMatchObject({ closes: true, recent: false });
+    expect(await terminal?.run?.([])).toBe('Running in ghostty');
+    expect(sent.at(-1)).toEqual({ type: 'RUN_COMMAND', command: 'ls -la /tmp', where: 'terminal' });
+  });
+
+  it('only copies where it cannot run', async () => {
+    const [list] = await load(false);
+    const titles = list?.action?.choices?.(['x']).map((choice) => choice.title);
+    expect(titles).toEqual(['Copy', 'ls -la x']);
+  });
+
+  it('says so when the repository has no commands file', async () => {
+    answers.LIST_COMMAND_FILES = { files: [] };
+    const mode = commandsMode(fakePort, { canRun: true });
+    if (!('load' in mode)) throw new Error('x does not load');
+    await expect(mode.load()).rejects.toThrow('No .commands.md files');
   });
 });

@@ -364,6 +364,7 @@ export const Dashboard = () => {
               lowerPath.endsWith('.budget.csv') ||
               lowerPath.endsWith('.actionlog.md') ||
               lowerPath.endsWith('.prompts.md') ||
+              lowerPath.endsWith('.commands.md') ||
               lowerPath.endsWith('.data-collection.csv') ||
               lowerPath.endsWith('.stocks.csv') ||
               lowerPath.endsWith('.consumption.csv') ||
