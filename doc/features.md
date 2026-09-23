@@ -63,6 +63,7 @@
 |---------|----------|-------|
 | The command palette as a desktop overlay, centered on the focused monitor (wlr-layer-shell: Hyprland, Sway, KDE…) | `lifosy-palette-toggle` bound to a key | 2026-09-23 |
 | Bookmarks, web search, repo search, notes and action log, recents, repository switch — shared with the extension via `@lifosy/palette` | desktop palette | 2026-09-23 |
+| `c:` Claude Code (new session on claude.ai for a repo from omarchy's `eee` history) and `u:` Claude usage (rate limits, pace, resets, spend per account) — from omarchy | desktop palette | 2026-09-23 |
 | `?` help — every prefix with its description, searching and keys, and every action; searchable, ⏎ switches mode or runs the action | desktop palette, command palette | 2026-09-23 |
 | `d:` dumps — a scratch text editor in the palette with the last 25 kept as local files; ⌃⏎ copies all, ⌃S saves a copy to a path | desktop palette | 2026-09-23 |
 | `p:` prompts, `t:` translate, `r:` repos — omarchy's prompt, translate and repo menus in the palette; copies with `wl-copy`, and `r:` ranks omarchy's `~/.config/eee/counts` first | desktop palette | 2026-09-23 |

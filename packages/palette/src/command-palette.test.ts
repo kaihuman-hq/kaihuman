@@ -1181,3 +1181,59 @@ describe('long lists', () => {
     }
   });
 });
+
+describe('mode entries that run an action', () => {
+  const opens = vi.fn(([prompt = '']: string[]) => {
+    if (!prompt) throw new Error('Type a prompt');
+    return {
+      id: `cc:${prompt}`,
+      title: `CC: ${prompt}`,
+      url: `https://claude.ai/code?p=${prompt}`,
+    };
+  });
+
+  beforeEach(async () => {
+    opens.mockClear();
+    modes.push({
+      prefix: 'c',
+      title: 'Claude Code',
+      placeholder: 'Search',
+      description: 'Start a session',
+      load: async () => [
+        {
+          id: 'repo',
+          title: 'o/r',
+          action: { id: 'cc', title: 'Claude Code: o/r', prompts: [{ label: 'Prompt' }], opens },
+        },
+      ],
+    });
+    type('c:');
+    await settle();
+    press('Enter');
+    await settle();
+  });
+
+  it('asks for the action’s fields in the input, outside the mode', () => {
+    expect(crumbText()).toBe('Claude Code: o/r · Prompt (1/1)');
+  });
+
+  it('opens where the answers lead, remembers it like a bookmark, and closes', async () => {
+    type('add tests');
+    press('Enter');
+    await settle();
+    expect(open).toHaveBeenCalledWith('https://claude.ai/code?p=add tests');
+    expect(rememberRecent).toHaveBeenCalledWith({
+      id: 'cc:add tests',
+      title: 'CC: add tests',
+      url: 'https://claude.ai/code?p=add tests',
+    });
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('stays open and says why when the answers are refused', async () => {
+    press('Enter');
+    await settle();
+    expect(open).not.toHaveBeenCalled();
+    expect(statusText()).toBe('Type a prompt');
+  });
+});

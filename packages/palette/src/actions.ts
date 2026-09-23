@@ -6,6 +6,8 @@
  * around them — bookmarking it, pinning it, clipping a selection — stay with the content script,
  * since nothing else has such a page.
  */
+
+import { usageRows } from './claude-usage.js';
 import type {
   EditableText,
   ModeItem,
@@ -334,6 +336,66 @@ export const dumpMode = (port: ActionPort): PaletteMode => ({
   description:
     'A scratch editor for pasting and copying, the last 25 kept — ⌃⏎ copies all, ⌃S saves a copy as a file',
   load: () => dumpItems(port),
+});
+
+/** Where `c:` sends a prompt: a new Claude Code session on claude.ai. */
+export const CLAUDE_CODE_URL = 'https://claude.ai/code';
+
+/**
+ * The new-session link for `repo`, encoded as omarchy's script encodes it: spaces in the prompt as
+ * `+`, the repository's slash kept.
+ */
+export const claudeCodeUrl = (repo: string, prompt: string, branch = 'main') => {
+  const plus = (value: string) => encodeURIComponent(value).replace(/%20/g, '+');
+  const repoPath = repo.split('/').map(encodeURIComponent).join('/');
+  return `${CLAUDE_CODE_URL}?prompt=${plus(prompt)}&repo=${repoPath}&branch=${plus(branch)}`;
+};
+
+const claudeCodeItems = async (port: ActionPort): Promise<ModeItem[]> => {
+  const { repos } = await port.send({ type: 'LIST_CLAUDE_CODE_REPOS' });
+  return repos.map((repo) => ({
+    id: `claude-code:${repo}`,
+    title: repo,
+    subtitle: '⏎ then type the prompt',
+    action: {
+      id: `claude-code:${repo}`,
+      title: `Claude Code: ${repo}`,
+      prompts: [{ label: 'Prompt' }],
+      opens: ([prompt = '']: string[]) => {
+        if (!prompt.trim()) throw new Error('Type a prompt for Claude Code');
+        return {
+          id: `claude-code:${repo}:${prompt.trim()}`,
+          title: `Claude Code: ${prompt.trim()}`,
+          subtitle: repo,
+          url: claudeCodeUrl(repo, prompt.trim()),
+        };
+      },
+    },
+  }));
+};
+
+/** `c:` — a new Claude Code session in the browser, for a repository and a prompt. Desktop only. */
+export const claudeCodeMode = (port: ActionPort): PaletteMode => ({
+  prefix: 'c',
+  title: 'Claude Code',
+  placeholder: 'Search repositories — ⏎ then type the prompt',
+  description:
+    'Start a Claude Code session in the browser: pick a repository, type the prompt, ⏎ opens claude.ai/code',
+  load: () => claudeCodeItems(port),
+});
+
+/** `u:` — Claude usage for each configured account. Desktop only: it reads the local credentials. */
+export const claudeUsageMode = (port: ActionPort): PaletteMode => ({
+  prefix: 'u',
+  title: 'Claude usage',
+  placeholder: 'Filter usage — ⏎ opens the usage page',
+  description:
+    'Claude rate limits and spend per account, with pace and reset times — as the claude.ai usage page shows them',
+  load: async () => {
+    const { accounts } = await port.send({ type: 'GET_CLAUDE_USAGE' });
+    const now = new Date();
+    return accounts.flatMap((account) => usageRows(account.name, account, now));
+  },
 });
 
 /** The prefix modes every surface offers: `p:` prompts, `t:` translate, `r:` GitHub repositories. */

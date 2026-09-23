@@ -6,6 +6,7 @@
 //! focused output, which the compositor places above the tiled layout (see `layer.rs`).
 
 mod bookmarks;
+mod claude;
 mod config;
 mod console_login;
 mod dumps;

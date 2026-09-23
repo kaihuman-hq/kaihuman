@@ -6,6 +6,7 @@
  * response lists only the fields the palette reads — a backend may send more.
  */
 import type { Bookmark } from './bookmarks.js';
+import type { ClaudeUsage } from './claude-usage.js';
 import type { RecentEntry, RepoResult } from './command-palette.js';
 import type { Translation } from './translate.js';
 
@@ -88,6 +89,16 @@ export interface PaletteProtocol {
   SAVE_DUMP: { request: { id?: string; text: string }; response: { id?: string } };
   /** Desktop only: writes the text to `path` (`~/` allowed), never over an existing file. */
   EXPORT_DUMP: { request: { path: string; text: string }; response: { path: string } };
+  /** Desktop only: repositories for `c:`, most recently used first (omarchy's `eee` history). */
+  LIST_CLAUDE_CODE_REPOS: { request: NoFields; response: { repos: string[] } };
+  /**
+   * Desktop only: Claude usage per configured account — the usage endpoint's answer, or why there
+   * is none.
+   */
+  GET_CLAUDE_USAGE: {
+    request: NoFields;
+    response: { accounts: { name: string; usage?: ClaudeUsage; error?: string }[] };
+  };
   /** GitHub repositories to open, most relevant first — the order is the backend's. */
   LIST_GITHUB_REPOS: {
     request: NoFields;

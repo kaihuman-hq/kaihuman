@@ -38,6 +38,11 @@ export interface PaletteAction {
   prompts?: PromptStep[];
   children?: () => Promise<PaletteAction[]>;
   run?: (inputs: string[]) => Promise<string>;
+  /**
+   * In place of `run`: the page the answers lead to. It is opened and remembered like a bookmark —
+   * so Recent repeats it — and the palette closes. Throwing refuses the answers.
+   */
+  opens?: (inputs: string[]) => RecentEntry;
 }
 
 /** What the palette last did, so it can be repeated from the top of the list. */
@@ -77,7 +82,9 @@ export interface ModeItem {
   /** More entries about this one (a repository's issues, pull requests…), listed on ⇥ or →. */
   children?: ModeItem[];
   edit?: () => EditableText;
-  /** Anything else choosing it should do — the help's entries switch modes and run actions. */
+  /** Run as if picked from the actions — its prompts asked in the input first. */
+  action?: PaletteAction;
+  /** Anything else choosing it should do — the help's entries switch modes. */
   choose?: () => void;
   /** Consecutive entries with the same group are listed under it as one heading. */
   group?: string;
@@ -240,7 +247,8 @@ const STYLES = `
     background: #171717;
     border-left-color: #7dd3a7;
   }
-  .row .title { color: #f5f5f5; }
+  /* Kept, so the padding that lines up the usage meters survives; long titles still wrap. */
+  .row .title { color: #f5f5f5; white-space: pre-wrap; }
   .row .subtitle {
     font-size: 11px;
     color: #8a8a8a;
@@ -395,6 +403,18 @@ export function createCommandPalette(
   };
 
   const runAction = async (action: PaletteAction, inputs: string[]) => {
+    if (action.opens) {
+      let entry: RecentEntry;
+      try {
+        entry = action.opens(inputs);
+      } catch (e: any) {
+        setStatus(e?.message || `${action.title} failed`);
+        render();
+        return;
+      }
+      openUrl(entry);
+      return;
+    }
     setStatus(`${action.title}…`);
     try {
       setStatus((await action.run?.(inputs)) ?? null);
@@ -563,6 +583,15 @@ export function createCommandPalette(
       item.choose();
       return;
     }
+    if (item.action) {
+      // The action takes over the input, so the mode steps aside for it.
+      mode = null;
+      input.value = '';
+      selected = 0;
+      void activate(item.action);
+      render();
+      return;
+    }
     if (item.edit) {
       openEditor(item.edit());
       return;
@@ -626,13 +655,7 @@ export function createCommandPalette(
       title: action.title,
       subtitle: action.subtitle,
       group: 'Actions — ⏎ runs one',
-      choose: () => {
-        mode = null;
-        input.value = '';
-        selected = 0;
-        void activate(action);
-        render();
-      },
+      action,
     })),
   ];
 

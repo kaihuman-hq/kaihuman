@@ -1,5 +1,30 @@
 # Progress
 
+## 2026-09-23 — `c:` Claude Code and `u:` Claude usage in the desktop palette
+
+Two more omarchy scripts move into the desktop palette.
+
+- **`c:`** (`omarchy-claude-code`): the repositories in `~/.config/eee/history`
+  (`$EEE_HISTORY_FILE`), most recent first, once each. ⏎ asks for the prompt in the input; ⏎ again
+  opens `claude.ai/code?prompt=…&repo=…&branch=main` — encoded as the script does, `+` for spaces
+  and the repo's slash kept — closes the palette and keeps it in **Recent**.
+- **`u:`** (`omarchy-claude-usage`): per account from `~/.config/omarchy/claude-usage.conf`
+  (default `~/.claude`), the OAuth usage endpoint's windows — the fullest first, with %, a bar, pace
+  and reset time — then spend or extra credits, under a heading with the plan tier. One account
+  failing shows its reason without hiding the others. An expired token is refreshed with Claude
+  Code's client id and written back atomically with mode 600. ⏎ opens claude.ai's usage page.
+- **Split**: Rust (`claude.rs`) reads the files, refreshes and fetches (`LIST_CLAUDE_CODE_REPOS`,
+  `GET_CLAUDE_USAGE`); the palette formats (`claude-usage.ts`), so the numbers are tested in TS.
+- **Palette core**: a `ModeItem` may carry an `action` (its prompts asked in the input), and an
+  action may `opens` a page from its answers instead of `run` — opened, remembered as a recent,
+  palette closed. The help's action rows now use `action` too. Row titles keep their spaces, so
+  the usage meters line up.
+
+Checks: palette tsc and biome clean, vitest 141/141 (15 new, also run with TZ set to
+America/Los_Angeles and Asia/Kolkata); extension tsc and vitest 214/214; desktop `cargo test` 47
+passed (6 new), clippy and fmt clean; `c:` and `u:` driven in the built desktop UI in Chromium
+with a stubbed Tauri bridge.
+
 ## 2026-09-23 — `?` help in the command palette
 
 - **`?`** at the start of the input opens **Help**, in three sections: the prefixes with a

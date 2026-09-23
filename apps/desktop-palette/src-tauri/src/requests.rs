@@ -14,7 +14,7 @@ use crate::config::{
 };
 use crate::github::{Client, Read};
 use crate::recents::{self, RecentEntry};
-use crate::{dumps, prompts, repos, translate};
+use crate::{claude, dumps, prompts, repos, translate};
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -66,6 +66,8 @@ pub enum Request {
         key: String,
     },
     ListGithubRepos,
+    ListClaudeCodeRepos,
+    GetClaudeUsage,
     ListDumps,
     SaveDump {
         #[serde(default)]
@@ -338,6 +340,8 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             Ok(json!({}))
         }
         Request::ListGithubRepos => list_github_repos().await,
+        Request::ListClaudeCodeRepos => Ok(json!({ "repos": claude::code_repos()? })),
+        Request::GetClaudeUsage => Ok(claude::usage().await),
         Request::ListDumps => Ok(json!({ "dumps": dumps::list(&config::dumps_dir()) })),
         Request::SaveDump { id, text } => {
             match dumps::save(&config::dumps_dir(), id.as_deref(), &text, now_ms())? {
@@ -420,6 +424,14 @@ mod tests {
         assert_eq!(
             parse(json!({ "type": "LIST_GITHUB_REPOS" })),
             Request::ListGithubRepos
+        );
+        assert_eq!(
+            parse(json!({ "type": "LIST_CLAUDE_CODE_REPOS" })),
+            Request::ListClaudeCodeRepos
+        );
+        assert_eq!(
+            parse(json!({ "type": "GET_CLAUDE_USAGE" })),
+            Request::GetClaudeUsage
         );
         assert_eq!(
             parse(json!({ "type": "SAVE_DUMP", "text": "x" })),

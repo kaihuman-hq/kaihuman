@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  claudeCodeMode,
+  claudeCodeUrl,
+  claudeUsageMode,
   dumpMode,
   formatStamp,
   GITHUB_REPO_VIEWS,
@@ -319,5 +322,51 @@ describe('dumpMode', () => {
 
   it('formats stamps in local time', () => {
     expect(formatStamp(new Date(2026, 0, 2, 3, 4))).toBe('2026-01-02 03:04');
+  });
+});
+
+describe('claudeCodeMode', () => {
+  const load = async () => {
+    const mode = claudeCodeMode(fakePort);
+    if (!('load' in mode)) throw new Error('c does not load');
+    return mode.load();
+  };
+
+  it('encodes the link as omarchy does: + for spaces, the repo slash kept', () => {
+    expect(claudeCodeUrl('o/r', 'fix the bug & ship')).toBe(
+      'https://claude.ai/code?prompt=fix+the+bug+%26+ship&repo=o/r&branch=main',
+    );
+  });
+
+  it('lists the repositories, each asking for a prompt and then opening Claude Code', async () => {
+    answers.LIST_CLAUDE_CODE_REPOS = { repos: ['o/r'] };
+    const [item] = await load();
+    expect(claudeCodeMode(fakePort).prefix).toBe('c');
+    expect(item).toMatchObject({ id: 'claude-code:o/r', title: 'o/r' });
+    expect(item?.action?.prompts).toEqual([{ label: 'Prompt' }]);
+    expect(item?.action?.opens?.([' add tests '])).toEqual({
+      id: 'claude-code:o/r:add tests',
+      title: 'Claude Code: add tests',
+      subtitle: 'o/r',
+      url: 'https://claude.ai/code?prompt=add+tests&repo=o/r&branch=main',
+    });
+    expect(() => item?.action?.opens?.(['  '])).toThrow('Type a prompt');
+  });
+});
+
+describe('claudeUsageMode', () => {
+  it('lists each account’s rows, under its own heading', async () => {
+    answers.GET_CLAUDE_USAGE = {
+      accounts: [
+        { name: 'default', usage: { five_hour: { utilization: 5 } } },
+        { name: 'work', error: 'no credentials' },
+      ],
+    };
+    const mode = claudeUsageMode(fakePort);
+    if (!('load' in mode)) throw new Error('u does not load');
+    const rows = await mode.load();
+    expect(mode.prefix).toBe('u');
+    expect(rows.map((row) => row.group)).toEqual(['default', 'work']);
+    expect(rows[1]?.title).toBe('Could not load usage');
   });
 });

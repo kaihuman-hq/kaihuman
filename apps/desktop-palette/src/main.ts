@@ -6,6 +6,8 @@
  */
 import {
   type ActionPort,
+  claudeCodeMode,
+  claudeUsageMode,
   createCommandPalette,
   dumpMode,
   paletteModes,
@@ -45,8 +47,9 @@ const palette = createCommandPalette(
         run: () => invoke<string>('console_login'),
       },
     ],
-    // `d:` keeps its dumps as local files, which only the desktop has.
-    modes: [...paletteModes(port), dumpMode(port)],
+    // These read local files — dumps, omarchy's repo history, Claude's credentials — which only
+    // the desktop has.
+    modes: [...paletteModes(port), dumpMode(port), claudeCodeMode(port), claudeUsageMode(port)],
     copy: async (text) => {
       await invoke('copy_text', { text }).catch((error: unknown) => {
         throw new Error(String(error));
