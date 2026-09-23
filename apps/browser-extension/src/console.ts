@@ -1,5 +1,7 @@
-/** The Lifosy console — where a repo file is opened, rather than on GitHub. */
-export const CONSOLE_URL = 'https://app.kaihuman.com';
+import { CONSOLE_URL } from '@lifosy/palette';
+
+// Defined with the shared palette, whose "Open the Lifosy console" action needs it too.
+export { CONSOLE_URL };
 
 /**
  * Deep link that opens a repo file in the console.

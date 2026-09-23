@@ -1,5 +1,222 @@
 # Progress
 
+## 2026-09-23 — CLI login checks the console's `state`
+
+- **The gap:** `apps/cli` sent no `state` to `/auth/cli` and took any callback carrying a token. Any
+  website open in the browser could post its own token to the waiting CLI and log it in to the
+  attacker's account.
+- **The fix:** it now picks 128 random bits with `getrandom` (already in the lockfile) and adds them
+  to the console URL. It takes only a callback carrying that `state`.
+  - A missing, empty or wrong `state` gets a 400 and leaves the one-shot channel untouched, so the
+    CLI keeps waiting for its own login.
+  - The route moved into `callback_route` so it can be tested.
+- **Console:** unchanged. `/auth/cli` has always sent the `state` it was given back, in the old
+  redirect and in the new form, so the fix works with the console that is deployed now.
+
+Checks: CLI tests 6/6, 3 new: a forged state, an empty or missing state, and a route test where a
+forged post gets a 400 without ending the login and the real one then completes it. No clippy
+warnings in `auth.rs`; the CLI's other warnings are unchanged.
+
+## 2026-09-23 — Console login hands the token over by POST, not in a URL
+
+The console's `/auth/cli` used to redirect to `http://localhost:<port>/callback?token=…`, which put
+the token into the browser's history. That affected both the CLI and the desktop palette.
+
+- **Console**: `src/lib/cli-callback.ts` builds a hidden form with `token`, `state` and `repo` and
+  POSTs it to `http://localhost:<port>/callback`. The port must be a number from 1 to 65535, since
+  it ends up in the form's action. `AuthCli.tsx` uses it in place of the redirect.
+- **CLI** (`apps/cli/src/auth.rs`): the callback route takes a POSTed form, with the body capped
+  at 16 KB, or the old query.
+- **Desktop palette** (`console_login.rs`): reads the request's headers and body, capped at 16 KB,
+  and takes a POSTed form or the old GET query.
+- Old and new sides work in any combination, so the console and the local programs can be updated
+  in any order. The leak ends when the new console is deployed.
+
+Checks:
+- console vitest 97/97 (3 new), tsc clean after building `@lifosy/ui`;
+- CLI tests 3/3 (new, with `warp::test`), no new clippy warnings;
+- desktop Rust tests 27/27, among them loopback POST, legacy GET and oversize tests, each run three
+  times; biome clean.
+
+Tried end to end in Chromium 141 through Playwright. `app.kaihuman.com/auth/cli` was intercepted
+and served a page running the console's real `submitCliCallback`, compiled from source. It posted
+to a real `lifosy-palette login`, which checked the state, validated the token against a mock
+GitHub and stored it in gnome-keyring. The https page's form to `http://localhost` went through
+without a warning, and no history entry contains the token.
+
+## 2026-09-23 — Desktop palette: log in through the console; spike removed
+
+- **`apps/desktop-palette-spike` deleted.** The palette passed on Hyprland, and phase 2 carries
+  everything the spike proved.
+- **Console login**, reusing the console's existing `/auth/cli` page, which the CLI already uses,
+  so the console is unchanged.
+  - `src-tauri/src/console_login.rs` listens on `127.0.0.1` on a random port and opens
+    `/auth/cli?port=…&state=…` with 128 random bits of state.
+  - It serves requests until `/callback` arrives with that state: stray requests get a 404, a
+    forged state a 400, and it gives up after five minutes.
+  - The token is checked against the repository and kept in the Secret Service. The repository is
+    the one from `--repo`, else the console's, else the current one.
+- **Entry points:**
+  - `lifosy-palette login` now uses the console; `--paste` keeps the typed or piped way.
+  - The palette's desktop-only action **Log in with the Lifosy console** hides the overlay for the
+    browser and reports the outcome with `notify-send`.
+  - The "Not logged in" message points to both.
+
+Checks: Rust tests 29/29, among them a loopback test with a stray request, a forged state and the
+real grant, and the timeout. Clippy, fmt, tsc and biome are clean. Tried end to end under
+`dbus-run-session` with a real gnome-keyring and a fake `xdg-open` playing the console's redirect:
+- `login` stored the token, `secret-tool` read it back, and `logout` removed it;
+- in headless Sway, the palette action logged in and the reopened palette loaded bookmarks with
+  the stored token.
+
+## 2026-09-23 — Desktop palette, phase 2: `apps/desktop-palette`
+
+- **The app**: a Vite UI that mounts `@lifosy/palette`, and a Tauri v2 daemon with two binaries.
+  - It keeps phase 0's model: a full-output wlr-layer-shell overlay with keyboard mode exclusive, a
+    Unix socket, and the libc-only `lifosy-palette-toggle` that starts the daemon when needed.
+  - It falls back to an ordinary window when the compositor has no layer-shell.
+- **Backend** (`src-tauri/src/requests.rs`): `PaletteProtocol` answered in Rust, with the requests
+  as a serde enum tagged by `type`.
+  - Bookmarks come from `.kh/browser.bookmarks.json`, parsed like the extension (only http(s)
+    entries). They are cached in `$XDG_CACHE_HOME/lifosy` for an hour; a stale cache is refreshed
+    in the background with `If-None-Match`.
+  - Code search opens the console deep link. Quick-note targets come from the dashboard config.
+  - `DUMP_NOTE` and `ADD_ACTION_LOG` use the extension's line formats and placement. Paths that
+    climb out of the repo are refused.
+  - Recents live in `$XDG_STATE_HOME`, `GET_REPOS` and `SET_REPO` in `palette.json`, and
+    `SYNC_NOW` refreshes the bookmarks.
+  - `OPEN_URL` runs `xdg-open` for http(s) only.
+  - Browser-only requests reject with a message, and their actions are hidden on the desktop.
+- **`lifosy-palette login [--repo o/r]`**: the token is read without echo (or piped), checked with
+  `GET /repos/o/r`, and stored in the Secret Service. `logout` removes it. `LIFOSY_GITHUB_TOKEN`
+  and `LIFOSY_GITHUB_API` exist for tests.
+- **`@lifosy/palette`** gains three things:
+  - `open()`;
+  - `PaletteOptions.onClose`, called once per close;
+  - `placement: 'center'`, a fixed-height centered panel.
+- **Fix, also in the extension**: the **Web** group moved below **Actions**. It had been above
+  them, so typing an action's name and pressing Enter searched Google instead of running the action.
+  With nothing else matching, Enter still searches the web.
+- **CSP**: Tauri adds nonces to the page's CSP, which makes browsers ignore `'unsafe-inline'`, so
+  the palette's shadow-root `<style>` was blocked. `dangerousDisableAssetCspModification:
+  ["style-src"]` keeps the policy as written.
+- **Root devDependencies**: `vite`, for the new app's UI build.
+
+Checks: Rust tests 24/24, clippy and fmt clean; the toggle client links only libc and libgcc.
+Palette vitest 58/58, extension 184/184; tsc and biome clean. Tried end to end under headless
+Sway, against a mock GitHub and a fake `xdg-open`:
+- the overlay is centered and dimmed over a tiled terminal, and loads bookmarks with the
+  `javascript:` entry dropped;
+- Enter on a bookmark runs `xdg-open` and hides the overlay;
+- a note is PUT to `.lifeos/dump.md`;
+- web search and Tab repo search open the right URLs;
+- switching repository writes `palette.json`;
+- a second sync sends `If-None-Match` and gets a 304;
+- toggling hands focus back to the terminal.
+
+`login` was checked up to the keyring: the container has no Secret Service.
+
+## 2026-09-23 — Desktop palette, phase 1: `@lifosy/palette`
+
+- **New package `packages/palette`** (`@lifosy/palette`), consumed from source like `@lifosy/core`.
+  It holds `command-palette.ts`, `web-search.ts` and the shared actions, moved from the extension
+  with `git mv`, plus the `Bookmark` type and `searchBookmarks`. Tests moved with them.
+- **`ActionPort` and `PaletteProtocol`** (`src/protocol.ts`) replace the direct
+  `chrome.runtime.sendMessage`.
+  - Each request name lists its fields and the response fields the palette reads. This is the
+    contract the desktop app will implement.
+  - `repoActions(port)` and `portHandlers(port)`, formerly `workerHandlers()`, take the port.
+  - The old `as` casts on responses are gone.
+- **Extension**: `src/palette/port.ts` holds `send` and `workerPort`. `console.ts` and
+  `background/bookmarks.ts` re-export `CONSOLE_URL`, `Bookmark` and `searchBookmarks`, so the rest
+  of the extension is unchanged.
+- **Root devDependencies**: `vitest` and `@biomejs/biome`, as CLAUDE.md asks, so the new package can
+  run its tests and lint.
+
+Checks: palette tsc clean, vitest 53/53 (9 new for the actions against a fake port), biome clean;
+extension `tsc -b` and `vite build` clean, vitest 184/184. `turbo run` cannot spawn tasks in this
+container ("Exec format error", also for untouched packages), so each script was run directly.
+
+## 2026-09-23 — Desktop palette: phase 0 passed on Hyprland, tiny toggle client
+
+- Every point of the spike's checklist passed on Hyprland (Fedora) in the default `layer` mode, with
+  no compositor rules. The decision is recorded in `doc/native-command-palette.md`: a full-output
+  layer surface.
+- **`lifosy-palette-toggle`**: a second binary that links only the socket protocol. The protocol
+  moved to a Tauri-free `src/lib.rs`. The client needs only libc and libgcc, is 366 KB, and takes
+  4–9 ms per call against ~30 ms for the Tauri binary. With no daemon running it starts
+  `lifosy-palette-spike` from its own directory. Request parsing now accepts a bare
+  `toggle` line, so `nc -U` works too.
+
+Checks: `cargo test` 7/7 (4 new protocol tests in place of the one they replace), clippy and fmt
+clean; `ldd` confirms the client links no GTK or WebKit. Tried under headless Sway: cold start
+spawns the daemon, warm calls take 4–9 ms, and `quit` removes the socket.
+
+## 2026-09-23 — Desktop palette, phase 0: the Tauri spike
+
+- **`apps/desktop-palette-spike`**: a throwaway Tauri v2 app, and not a pnpm package, so the
+  repo's build never needs the WebKitGTK headers. One resident daemon keeps the webview hidden;
+  `toggle`/`show`/`hide`/`quit` are one line on a Unix socket in `$XDG_RUNTIME_DIR`, carrying the
+  sender's clock so the palette reports command-to-pixels latency. Three modes:
+  - `layer`: a full-output gtk-layer-shell overlay with the card centered by CSS.
+  - `layer-card`: an unanchored overlay that the compositor centers.
+  - `float`: a plain window placed by compositor rules.
+- **Tried under headless Sway 1.9 with software rendering; not yet on Hyprland.**
+  - Both layer modes center over a tiled terminal, take the keyboard, and on Esc hand focus back.
+  - Warm opens take 31–36 ms in a release build.
+  - The client binary itself costs ~30 ms to start, because it loads the full Tauri library set.
+  - wtype's fresh virtual keyboards drop the first key in GTK and close the float mode through a
+    focus-out.
+  - PSS is roughly 112 + 237 + 22 MB under software rendering.
+- The README has the Fedora build steps, a Hyprland 0.55 Lua config, and the ten-point checklist to
+  run on the real machine.
+
+Checks: `cargo test` 4/4, `cargo clippy --all-targets` and `cargo fmt --check` clean.
+
+## 2026-09-23 — Native palette plan revised for Hyprland
+
+- `doc/native-command-palette.md` is rewritten for Fedora with Hyprland, a tiling compositor, and
+  with the shortcut left to the user's own config. The palette becomes a layer-shell overlay (Tauri
+  plus gtk-layer-shell), which the compositor centers on the focused monitor. The fallback is a
+  floating window with compositor rules.
+  - Dropped: the GNOME Shell extension and the mutter centering setting.
+  - Added: running a Secret Service yourself, because Hyprland does not start one.
+  - The single-instance plugin replaces the custom D-Bus service.
+  - A dmenu-style pipe mode is an optional last phase.
+
+## 2026-09-23 — Study: a native command palette for the desktop
+
+- `doc/native-command-palette.md`: research and a phased plan for a palette that opens in the
+  center of the screen from any app on Fedora with GNOME on Wayland. Tauri v2 draws the palette and
+  reuses the extension's code. A GNOME custom shortcut provides the hotkey, the mutter setting
+  `center-new-windows` provides the placement, and a small Shell extension is the fallback if focus
+  fails. The dmenu family (rofi, fuzzel, wofi) was ruled out because GNOME has no layer-shell.
+  Nothing implemented.
+
+## 2026-09-23 — Web search in the command palette
+
+- **`src/palette/web-search.ts`**: `SEARCH_ENGINES`, a list of `{ id, name, url(query) }` —
+  Google, DuckDuckGo, Ecosia, Amazon (`amazon.com`), Reddit. No API: each entry only builds the
+  results-page URL, with the query encoded by `URLSearchParams`. Adding an engine is one entry.
+- **Palette**: a **Web** group between Repo and Actions, one row per engine once something is
+  typed (never inside a submenu or while an action asks for input). Opening a row goes through the
+  same `open` handler as bookmarks — so the worker's scheme check applies and the start page reuses
+  its tab — and lands in Recent as `Engine: query`. The placeholder and the start page's search
+  field mention the web.
+
+Checks: extension tsc clean, vitest 228/228 (7 new), biome clean on the touched files.
+
+## 2026-09-23 — Pinned tabs on the start page
+
+- **Start page** (`apps/browser-extension/src/newtab/StartPage.tsx`): a **Pinned tabs** section
+  above **Pinned & recently used**, listing the saved groups from `LIST_PINNED_TAB_GROUPS`, the
+  same message and cache the popup's panel reads. Cards use the bookmark grid (2 / 3 columns) but
+  are a single short row: name, then the tab count. The window's active group is outlined in the
+  accent colour; clicking a card sends `LOAD_PINNED_TAB_GROUP` and refreshes the list, one load at a
+  time. Errors show under the heading.
+
+Checks: extension tsc clean, vitest 221/221 (2 new), biome clean.
+
 ## 2026-09-22 — Pinned bookmarks on the start page
 
 - **`pinned` joins the bookmark format** (`BookmarksLogic.ts` in `packages/ui`, `bookmarks.ts` in the

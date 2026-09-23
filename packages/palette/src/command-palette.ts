@@ -3,10 +3,11 @@
  *
  * Bookmarks are searched locally against the cached list, so typing costs nothing. The repo search
  * hits GitHub's code-search endpoint, which has a small dedicated budget, so it runs only when the
- * user presses Tab — never while typing. Everything the popup can do is also here, as an action.
+ * user presses Tab — never while typing. Any query can also be sent to a web search engine, which is
+ * only a matter of opening its results page. Everything the popup can do is also here, as an action.
  */
-import type { Bookmark } from '../background/bookmarks';
-import { searchBookmarks } from '../background/bookmarks';
+import { type Bookmark, searchBookmarks } from './bookmarks.js';
+import { SEARCH_ENGINES } from './web-search.js';
 
 export interface RepoResult {
   path: string;
@@ -56,7 +57,19 @@ export interface PaletteHandlers {
   countBookmarkUse: (id: string) => void;
 }
 
+export interface PaletteOptions {
+  /**
+   * `top` (the default) hangs the panel below the top edge, like a browser's own palettes;
+   * `center` centers a fixed-height panel, for a desktop overlay that should not jump as it filters.
+   */
+  placement?: 'top' | 'center';
+  /** Runs whenever the palette closes — Esc, a click outside, or after opening something. */
+  onClose?: () => void;
+}
+
 export interface CommandPalette {
+  /** Opens the palette, or only refocuses its input if it is already open. */
+  open: () => void;
   toggle: () => void;
   close: () => void;
   destroy: () => void;
@@ -95,6 +108,13 @@ const STYLES = `
     background: #0d0d0d;
     border: 1px solid #2a2a2a;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  }
+  .backdrop[data-placement="center"] {
+    align-items: center;
+    padding-top: 0;
+  }
+  .backdrop[data-placement="center"] .panel {
+    height: min(420px, 70vh);
   }
   .crumb {
     padding: 8px 16px 0;
@@ -160,7 +180,10 @@ const STYLES = `
 
 const matches = (text: string, needle: string) => text.toLowerCase().includes(needle);
 
-export function createCommandPalette(handlers: PaletteHandlers): CommandPalette {
+export function createCommandPalette(
+  handlers: PaletteHandlers,
+  options: PaletteOptions = {},
+): CommandPalette {
   const host = document.createElement('div');
   host.id = PALETTE_HOST_ID;
   const shadow = host.attachShadow({ mode: 'open' });
@@ -170,6 +193,7 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
 
   const backdrop = document.createElement('div');
   backdrop.className = 'backdrop';
+  backdrop.dataset.placement = options.placement ?? 'top';
   const panel = document.createElement('div');
   panel.className = 'panel';
   const crumb = document.createElement('div');
@@ -342,6 +366,23 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
     }));
   };
 
+  /** One row per engine for whatever is typed; opening one is opening its results page. */
+  const webRows = (): Row[] => {
+    const query = input.value.trim();
+    if (trail.length > 0 || !query) return [];
+    return SEARCH_ENGINES.map((engine) => ({
+      title: `Search ${engine.name} for “${query}”`,
+      subtitle: engine.url(query),
+      activate: () =>
+        openUrl({
+          id: `web:${engine.id}:${query}`,
+          title: `${engine.name}: ${query}`,
+          subtitle: engine.url(query),
+          url: engine.url(query),
+        }),
+    }));
+  };
+
   /** In a submenu it is that menu's entries; at the top level, the actions that match. */
   const actionRows = (): Row[] => {
     const here = trail.at(-1);
@@ -359,7 +400,9 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
   };
 
   const allRows = (): Row[] =>
-    pending ? [] : [...recentRows(), ...bookmarkRows(), ...repoRows(), ...actionRows()];
+    pending
+      ? []
+      : [...recentRows(), ...bookmarkRows(), ...repoRows(), ...actionRows(), ...webRows()];
 
   const render = () => {
     const here = trail.at(-1);
@@ -372,15 +415,17 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
     crumb.hidden = !pending && !here;
     // Submenu titles already end in an ellipsis, which would otherwise double up here.
     input.placeholder =
-      step?.label ?? (here ? `Search ${here.title.replace(/…$/, '')}…` : 'Search bookmarks…');
+      step?.label ??
+      (here ? `Search ${here.title.replace(/…$/, '')}…` : 'Search bookmarks or the web…');
 
     const recent = recentRows();
     const bookmarkMatches = bookmarkRows();
     const repoMatches = repoRows();
+    const web = webRows();
     const actions = actionRows();
     const total = pending
       ? 0
-      : recent.length + bookmarkMatches.length + repoMatches.length + actions.length;
+      : recent.length + bookmarkMatches.length + repoMatches.length + web.length + actions.length;
     if (selected >= total) selected = Math.max(0, total - 1);
 
     rows.replaceChildren();
@@ -432,6 +477,9 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
         rows.append(empty);
       }
       addGroup(here ? here.title : 'Actions', actions);
+      // Last, so typing an action's name and pressing Enter runs it; with nothing else matching,
+      // the first row is a web search.
+      addGroup('Web', web);
     }
 
     const query = input.value.trim();
@@ -536,8 +584,10 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
   });
 
   function close() {
+    const wasOpen = open;
     open = false;
     host.remove();
+    if (wasOpen) options.onClose?.();
   }
 
   const show = async () => {
@@ -566,6 +616,10 @@ export function createCommandPalette(handlers: PaletteHandlers): CommandPalette 
   };
 
   return {
+    open: () => {
+      if (open) input.focus();
+      else void show();
+    },
     toggle: () => {
       if (open) close();
       else void show();

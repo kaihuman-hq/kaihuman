@@ -19,5 +19,6 @@ futures-util = "0.3.31"
 tui-textarea = "0.7.0"
 copypasta = "0.10.1"
 base64 = "0.22.1"
+getrandom = "0.2"
 chrono = "0.4.43"
 rusqlite = { version = "0.32", features = ["bundled"] }

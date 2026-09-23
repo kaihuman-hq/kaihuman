@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Bookmark } from '../background/bookmarks';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import type { Bookmark } from './bookmarks.js';
 import {
   type CommandPalette,
   createCommandPalette,
@@ -7,7 +7,7 @@ import {
   type PaletteAction,
   type RecentEntry,
   type RepoResult,
-} from './command-palette';
+} from './command-palette.js';
 
 const NOW = '2026-09-22T10:00:00.000Z';
 
@@ -20,6 +20,7 @@ const bookmark = (title: string, url: string, tags: string[] = []): Bookmark => 
   updatedAt: NOW,
   useCount: 0,
   lastUsedAt: '',
+  pinned: false,
 });
 
 const BOOKMARKS = [
@@ -34,10 +35,10 @@ let loadBookmarks: ReturnType<typeof vi.fn>;
 let loadRecents: ReturnType<typeof vi.fn>;
 let rememberRecent: ReturnType<typeof vi.fn>;
 let countBookmarkUse: ReturnType<typeof vi.fn>;
-let bookmarkRun: ReturnType<typeof vi.fn>;
-let renameRun: ReturnType<typeof vi.fn>;
-let guidedRun: ReturnType<typeof vi.fn>;
-let children: ReturnType<typeof vi.fn>;
+let bookmarkRun: Mock<(inputs: string[]) => Promise<string>>;
+let renameRun: Mock<(inputs: string[]) => Promise<string>>;
+let guidedRun: Mock<(inputs: string[]) => Promise<string>>;
+let children: Mock<() => Promise<PaletteAction[]>>;
 let actions: PaletteAction[];
 
 const shadow = () => {
@@ -49,6 +50,17 @@ const shadow = () => {
 const input = () => shadow().querySelector('input') as HTMLInputElement;
 const rowTitles = () =>
   Array.from(shadow().querySelectorAll('.row .title')).map((r) => r.textContent);
+/** The rows under one group heading, in order. */
+const groupRows = (label: string) => {
+  const titles: string[] = [];
+  let inside = false;
+  for (const element of Array.from(shadow().querySelector('.rows')?.children ?? [])) {
+    if (element.classList.contains('group')) inside = element.textContent === label;
+    else if (inside && element.classList.contains('row'))
+      titles.push(element.querySelector('.title')?.textContent ?? '');
+  }
+  return titles;
+};
 const groupLabels = () => Array.from(shadow().querySelectorAll('.group')).map((g) => g.textContent);
 const selectedTitle = () =>
   shadow().querySelector('.row[data-selected="true"] .title')?.textContent ?? null;
@@ -152,10 +164,68 @@ describe('toggle', () => {
   });
 });
 
+describe('open', () => {
+  it('opens a closed palette and leaves an open one open', async () => {
+    palette.close();
+    palette.open();
+    await settle();
+    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+    palette.open();
+    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+    expect(shadow().activeElement).toBe(input());
+  });
+});
+
+describe('options', () => {
+  const handlers = () => ({
+    loadBookmarks: async () => BOOKMARKS,
+    searchRepo: async () => [],
+    open: () => {},
+    actions: () => [],
+    loadRecents: async () => [],
+    rememberRecent: () => {},
+    countBookmarkUse: () => {},
+  });
+
+  beforeEach(() => palette.destroy());
+
+  it('hangs the panel from the top unless asked to center it', async () => {
+    const backdrop = () => shadow().querySelector('.backdrop') as HTMLElement;
+    const top = createCommandPalette(handlers());
+    top.open();
+    expect(backdrop().dataset.placement).toBe('top');
+    top.destroy();
+
+    const centered = createCommandPalette(handlers(), { placement: 'center' });
+    centered.open();
+    expect(backdrop().dataset.placement).toBe('center');
+    centered.destroy();
+  });
+
+  it('reports every close once — Esc, and after opening a bookmark', async () => {
+    const onClose = vi.fn();
+    const desktop = createCommandPalette(handlers(), { onClose });
+    desktop.open();
+    await settle();
+    press('Escape');
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    desktop.close();
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    desktop.open();
+    await settle();
+    press('Enter');
+    expect(onClose).toHaveBeenCalledTimes(2);
+    desktop.destroy();
+  });
+});
+
 describe('bookmark search', () => {
   it('filters bookmarks and actions locally, without touching the repo search', () => {
     type('zul');
-    expect(rowTitles()).toEqual(['Zulip']);
+    expect(groupLabels()).toEqual(['Bookmarks', 'Web']);
+    expect(groupRows('Bookmarks')).toEqual(['Zulip']);
     expect(searchRepo).not.toHaveBeenCalled();
   });
 
@@ -235,7 +305,7 @@ describe('recent actions', () => {
     await settle();
 
     type('zul');
-    expect(groupLabels()).toEqual(['Bookmarks']);
+    expect(groupLabels()).toEqual(['Bookmarks', 'Web']);
   });
 });
 
@@ -407,7 +477,59 @@ describe('repo search', () => {
     expect(rowTitles()).toContain('b.ts');
 
     type('zul');
-    expect(rowTitles()).toEqual(['Zulip']);
+    expect(groupLabels()).toEqual(['Bookmarks', 'Web']);
+  });
+});
+
+describe('web search', () => {
+  it('runs a matching action on Enter rather than searching the web for its name', async () => {
+    type('bookmark this');
+    press('Enter');
+    await settle();
+    expect(bookmarkRun).toHaveBeenCalledTimes(1);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('searches the web on Enter when nothing else matches', () => {
+    type('rust async book');
+    press('Enter');
+    expect(open).toHaveBeenCalledWith('https://www.google.com/search?q=rust+async+book');
+  });
+
+  it('offers every engine for the query, below the actions', () => {
+    type('bookmark');
+    expect(groupLabels()).toEqual(['Actions', 'Web']);
+    expect(groupRows('Web')).toEqual([
+      'Search Google for “bookmark”',
+      'Search DuckDuckGo for “bookmark”',
+      'Search Ecosia for “bookmark”',
+      'Search Amazon for “bookmark”',
+      'Search Reddit for “bookmark”',
+    ]);
+  });
+
+  it('shows nothing to search for until something is typed', () => {
+    expect(groupLabels()).not.toContain('Web');
+  });
+
+  it('opens the engine’s results page with the query encoded, and records it', async () => {
+    type('c++ & rust');
+    await activateRow('Search DuckDuckGo for “c++ & rust”');
+
+    expect(open).toHaveBeenCalledWith('https://duckduckgo.com/?q=c%2B%2B+%26+rust');
+    expect(rememberRecent).toHaveBeenCalledWith({
+      id: 'web:duckduckgo:c++ & rust',
+      title: 'DuckDuckGo: c++ & rust',
+      subtitle: 'https://duckduckgo.com/?q=c%2B%2B+%26+rust',
+      url: 'https://duckduckgo.com/?q=c%2B%2B+%26+rust',
+    });
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+
+  it('is not offered inside a submenu', async () => {
+    await activateRow('Pinned tab groups…');
+    type('work');
+    expect(groupLabels()).not.toContain('Web');
   });
 });
 

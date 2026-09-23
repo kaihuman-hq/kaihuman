@@ -1,8 +1,13 @@
+import {
+  type CommandPalette,
+  createCommandPalette,
+  portHandlers,
+  repoActions,
+} from '@lifosy/palette';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { type Bookmark, startPageBookmarks } from '../background/bookmarks';
 import { CONSOLE_URL } from '../console';
-import { repoActions, send, workerHandlers } from '../palette/actions';
-import { type CommandPalette, createCommandPalette } from '../palette/command-palette';
+import { send, workerPort } from '../palette/port';
 
 /** Where the note box writes. Any other target is one palette action away ("Add a note…"), which
  * is also the only place that reads the repo's quick-note list — a new tab is opened far too often
@@ -10,6 +15,15 @@ import { type CommandPalette, createCommandPalette } from '../palette/command-pa
 const DUMP_PATH = '.lifeos/dump.md';
 
 const DEFAULT_REPO = 'lifosy/monorepo';
+
+/** What the worker lists for each saved group of pinned tabs — the popup's view of them too. */
+interface TabGroupSummary {
+  id: string;
+  name: string;
+  tabCount: number;
+}
+
+const plural = (count: number) => `${count} tab${count === 1 ? '' : 's'}`;
 
 const isMac = () => navigator.userAgent.includes('Mac');
 
@@ -47,6 +61,11 @@ export function StartPage() {
   // One pin commit at a time: two in flight would race each other for the file's sha.
   const [pinning, setPinning] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
+  const [tabGroups, setTabGroups] = useState<TabGroupSummary[]>([]);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [tabGroupsError, setTabGroupsError] = useState<string | null>(null);
+  // One load at a time: two would each unpin what the other just pinned.
+  const [loadingGroupId, setLoadingGroupId] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [noteStatus, setNoteStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [noteError, setNoteError] = useState<string | null>(null);
@@ -56,14 +75,23 @@ export function StartPage() {
   const palette = () => {
     if (!paletteRef.current) {
       paletteRef.current = createCommandPalette({
-        ...workerHandlers(),
+        ...portHandlers(workerPort),
         // This tab is a blank start page, so a hit takes it over rather than leaving it behind.
         open: openInThisTab,
-        actions: repoActions,
+        actions: () => repoActions(workerPort),
       });
     }
     return paletteRef.current;
   };
+
+  const refreshTabGroups = () =>
+    send({ type: 'LIST_PINNED_TAB_GROUPS' }).then(
+      (response) => {
+        setTabGroups(response.groups);
+        setActiveGroupId(response.activeId);
+      },
+      (e: Error) => setTabGroupsError(e.message),
+    );
 
   useEffect(() => {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], (result) => {
@@ -76,6 +104,8 @@ export function StartPage() {
         (response) => setBookmarks(response.bookmarks),
         (e: Error) => setBookmarksError(e.message),
       );
+      // Also served from a cache, so listing the groups costs no GitHub request either.
+      void refreshTabGroups();
     });
   }, []);
 
@@ -139,6 +169,20 @@ export function StartPage() {
     }
   };
 
+  /** Pins the group's tabs in this window beside the start page, which stays where it is. */
+  const loadTabGroup = async (group: TabGroupSummary) => {
+    setLoadingGroupId(group.id);
+    setTabGroupsError(null);
+    try {
+      await send({ type: 'LOAD_PINNED_TAB_GROUP', groupId: group.id });
+      await refreshTabGroups();
+    } catch (e: any) {
+      setTabGroupsError(e.message || `Could not load ${group.name}`);
+    } finally {
+      setLoadingGroupId(null);
+    }
+  };
+
   const addNote = async () => {
     if (!note.trim()) return;
     setNoteStatus('saving');
@@ -196,11 +240,52 @@ export function StartPage() {
           onClick={() => palette().toggle()}
           class="w-full flex items-center justify-between gap-4 rounded border border-[var(--los-border)] px-4 py-3 text-left text-sm text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-fg)] transition-colors"
         >
-          Search bookmarks, the repo, and every action…
+          Search bookmarks, the repo, the web, and every action…
           <kbd class="text-xs border border-[var(--los-border)] rounded px-1.5 py-0.5">
             {isMac() ? '⌘⇧K' : 'Ctrl+Shift+K'}
           </kbd>
         </button>
+
+        <section class="flex flex-col gap-3">
+          <h2 class="text-xs uppercase tracking-wider text-[var(--los-muted)]">Pinned tabs</h2>
+          {tabGroupsError && <p class="text-xs text-red-400 break-words">{tabGroupsError}</p>}
+          {tabGroups.length === 0 ? (
+            !tabGroupsError && (
+              <p class="text-xs text-[var(--los-muted)]">
+                No tab groups yet — pin some tabs and save them from the popup.
+              </p>
+            )
+          ) : (
+            <ul aria-label="Pinned tab groups" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {tabGroups.map((group) => {
+                const active = group.id === activeGroupId;
+                return (
+                  <li key={group.id}>
+                    <button
+                      type="button"
+                      onClick={() => void loadTabGroup(group)}
+                      disabled={loadingGroupId !== null}
+                      aria-current={active}
+                      title={
+                        active
+                          ? `${group.name} is loaded — click to restore its pinned tabs`
+                          : `Pin the tabs of ${group.name} in this window`
+                      }
+                      class={`w-full flex items-baseline justify-between gap-2 rounded border px-3 py-1.5 text-left hover:border-[var(--los-accent)] transition-colors disabled:opacity-50 ${
+                        active ? 'border-[var(--los-accent)]' : 'border-[var(--los-border)]'
+                      }`}
+                    >
+                      <span class="text-sm truncate">{group.name}</span>
+                      <span class="shrink-0 text-[10px] text-[var(--los-muted)]">
+                        {loadingGroupId === group.id ? 'Loading…' : plural(group.tabCount)}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
 
         <section class="flex flex-col gap-3">
           <h2 class="text-xs uppercase tracking-wider text-[var(--los-muted)]">
@@ -214,7 +299,7 @@ export function StartPage() {
               No bookmarks yet — bookmark a page from the popup or the palette.
             </p>
           ) : (
-            <ul class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <ul aria-label="Bookmarks" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {grid.map((bookmark) => (
                 // The pin sits beside the card rather than inside it: a button cannot hold a button.
                 <li key={bookmark.id} class="relative">

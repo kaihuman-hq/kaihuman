@@ -1,7 +1,7 @@
+import { PALETTE_HOST_ID } from '@lifosy/palette';
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Bookmark } from '../background/bookmarks';
-import { PALETTE_HOST_ID } from '../palette/command-palette';
 import { StartPage } from './StartPage';
 
 const NOW = '2026-09-22T10:00:00.000Z';
@@ -19,6 +19,8 @@ const bookmark = (title: string, lastUsedAt: string, pinned = false): Bookmark =
 });
 
 let BOOKMARKS: Bookmark[];
+let GROUPS: { id: string; name: string; createdAt: string; tabCount: number }[];
+let activeGroup: string | null;
 /** What the worker says to a pin; a string is answered as an error. */
 let pinReply: string | null;
 
@@ -55,6 +57,11 @@ const reply = (message: { type?: string; bookmarkId?: string; pinned?: boolean }
       ),
     };
   }
+  if (message.type === 'LIST_PINNED_TAB_GROUPS') return { groups: GROUPS, activeId: activeGroup };
+  if (message.type === 'LOAD_PINNED_TAB_GROUP') {
+    activeGroup = (message as { groupId: string }).groupId;
+    return { opened: 1, unpinned: 0, name: 'Work' };
+  }
   if (message.type === 'GET_RECENTS') return { recents: [] };
   return { success: true };
 };
@@ -75,7 +82,9 @@ const mount = async (settled: () => boolean) => {
 };
 
 const cardTitles = () =>
-  [...host.querySelectorAll('li button span:first-child')].map((span) => span.textContent);
+  [...host.querySelectorAll('ul[aria-label="Bookmarks"] li button span:first-child')].map(
+    (span) => span.textContent,
+  );
 
 const pinButton = (title: string) => {
   const button = host.querySelector<HTMLButtonElement>(
@@ -90,6 +99,11 @@ beforeEach(() => {
     bookmark('older', '2026-09-01T10:00:00.000Z'),
     bookmark('newer', '2026-09-03T10:00:00.000Z'),
   ];
+  GROUPS = [
+    { id: 'work', name: 'Work', createdAt: NOW, tabCount: 3 },
+    { id: 'home', name: 'Home', createdAt: NOW, tabCount: 1 },
+  ];
+  activeGroup = 'home';
   pinReply = null;
   store = { lifeos_token: 'token', lifeos_repo: 'owner/repo' };
   sent = [];
@@ -214,6 +228,37 @@ describe('StartPage', () => {
       url: 'https://newer.example/page',
       reuse: true,
     });
+  });
+
+  it('lists the pinned tab groups above the bookmarks, marking the loaded one', async () => {
+    await mount(() => host.textContent?.includes('Work') ?? false);
+
+    const groups = host.querySelector('ul[aria-label="Pinned tab groups"]');
+    expect(groups?.textContent).toContain('3 tabs');
+    expect(groups?.textContent).toContain('1 tab');
+    const headings = [...host.querySelectorAll('h2')].map((h) => h.textContent);
+    expect(headings.indexOf('Pinned tabs')).toBeLessThan(
+      headings.indexOf('Pinned & recently used'),
+    );
+    const current = groups?.querySelectorAll('button[aria-current="true"]');
+    expect([...(current ?? [])].map((b) => b.textContent)).toEqual(['Home1 tab']);
+  });
+
+  it('loads a tab group from its card and marks it loaded', async () => {
+    await mount(() => host.textContent?.includes('Work') ?? false);
+
+    click('Work');
+    await waitFor(
+      () =>
+        host.querySelector('button[aria-current="true"]')?.textContent?.includes('Work') ?? false,
+    );
+
+    expect(sent.find((message) => message.type === 'LOAD_PINNED_TAB_GROUP')).toEqual({
+      type: 'LOAD_PINNED_TAB_GROUP',
+      groupId: 'work',
+    });
+    // The start page stays: loading pins tabs beside it rather than navigating away.
+    expect(sent.some((message) => message.type === 'OPEN_URL')).toBe(false);
   });
 
   it('writes the note box to the dump file and clears it', async () => {
