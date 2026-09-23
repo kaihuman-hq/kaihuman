@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-09-23 — Translation history in the palette's `t:` mode
+
+- `t:` with nothing typed lists the last 20 translated texts, newest first; ⏎ (or a click) puts one
+  back in the input and translates it again. Texts are kept as typed, so `fr: …` asks for French
+  again; translating a text again moves it to the top instead of listing it twice.
+- Recorded after a successful translation only; a failure to record never hides the answer.
+- Generic: a submitting `PaletteMode` may declare `history()`, read on entering the mode and again
+  after each submit. The list rule is `withTranslationText` (`packages/palette/src/translate.ts`),
+  mirrored in Rust.
+- Persisted by each backend through two new requests, `GET_TRANSLATION_HISTORY` and
+  `ADD_TRANSLATION_HISTORY`: extension local storage (`translationHistory`) and the desktop's
+  `$XDG_STATE_HOME/lifosy/translations.json`.
+
+Checks: palette tsc and biome clean, vitest 98/98 (10 new); extension tsc and build green, vitest
+214/214 (2 new); desktop `cargo test` 35 passed (1 new), clippy and fmt clean; history listed and
+re-submitted in the built desktop UI in Chromium with a stubbed Tauri bridge.
+
 ## 2026-09-23 — Palette prefix modes: prompts, translate, repos (from omarchy)
 
 Follow-up to the desktop palette ([#124](https://github.com/lifosy/monorepo/pull/124)): three menus

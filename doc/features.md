@@ -29,7 +29,7 @@
 |---------|----------|-------|
 | Pin to Knowledge Base saves the page as Markdown with its images in `.kh/assets/` (popup toggle turns image downloads off) | popup, palette | 2026-09-23 |
 | Selected-text clips go to `.kh/raw/` as their own notes | context menu, palette | 2026-09-23 |
-| Palette prefix modes: `p:` prompts from the repo's `.prompts.md` files (⏎ copies), `t:` DeepL translation into EN/DE (typed text is offered too), `r:` GitHub repositories with ⇥ for issues, PRs… | command palette (pages and start page) | 2026-09-23 |
+| Palette prefix modes: `p:` prompts from the repo's `.prompts.md` files (⏎ copies), `t:` DeepL translation into EN/DE (typed text is offered too; the last 20 texts are kept to translate again), `r:` GitHub repositories with ⇥ for issues, PRs… | command palette (pages and start page) | 2026-09-23 |
 | Web search from the command palette — Google, DuckDuckGo, Ecosia, Amazon, Reddit, by URL only | command palette (pages and start page) | 2026-09-23 |
 | Pinned tab groups on the start page — compact cards above the bookmarks; a click loads the group | start page | 2026-09-23 |
 | Pinned bookmarks — always first on the start page; pin/unpin from its cards or the console widget | start page cards, Bookmarks widget | 2026-09-22 |

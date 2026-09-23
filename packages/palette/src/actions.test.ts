@@ -176,8 +176,9 @@ describe('paletteModes', () => {
         { target: 'DE', text: 'Guten Morgen', detectedSource: 'DE' },
       ],
     };
+    answers.ADD_TRANSLATION_HISTORY = { texts: ['Guten Morgen'] };
     const items = await submit(mode('t'), 'Guten Morgen');
-    expect(sent.at(-1)).toEqual({
+    expect(sent.at(-2)).toEqual({
       type: 'TRANSLATE',
       text: 'Guten Morgen',
       targets: ['EN-US', 'DE'],
@@ -194,8 +195,30 @@ describe('paletteModes', () => {
 
   it('asks for one language when the text names it', async () => {
     answers.TRANSLATE = { translations: [] };
+    answers.ADD_TRANSLATION_HISTORY = { texts: [] };
     await submit(mode('t'), 'fr: good morning');
-    expect(sent.at(-1)).toEqual({ type: 'TRANSLATE', text: 'good morning', targets: ['FR'] });
+    expect(sent.at(-2)).toEqual({ type: 'TRANSLATE', text: 'good morning', targets: ['FR'] });
+    // Remembered as typed, so choosing it again asks for French again.
+    expect(sent.at(-1)).toEqual({ type: 'ADD_TRANSLATION_HISTORY', text: 'fr: good morning' });
+  });
+
+  it('still answers when the history cannot be written', async () => {
+    answers.TRANSLATE = {
+      translations: [{ target: 'DE', text: 'Hallo', detectedSource: 'EN' }],
+    };
+    expect(await submit(mode('t'), 'Hello')).toHaveLength(1);
+  });
+
+  it('does not remember a translation that failed', async () => {
+    await expect(submit(mode('t'), 'Hello')).rejects.toThrow('no answer for TRANSLATE');
+    expect(sent.map((request) => request.type)).toEqual(['TRANSLATE']);
+  });
+
+  it('reads the translation history from the backend', async () => {
+    answers.GET_TRANSLATION_HISTORY = { texts: ['b', 'a'] };
+    const translate = mode('t');
+    if (!('submit' in translate)) throw new Error('t does not submit');
+    expect(await translate.history?.()).toEqual(['b', 'a']);
   });
 
   it('lists repositories with their GitHub pages as children', async () => {

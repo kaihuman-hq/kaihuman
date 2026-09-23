@@ -79,6 +79,8 @@ export type PaletteMode = {
        * also offers it for any text typed outside the mode.
        */
       submit: (query: string) => Promise<ModeItem[]>;
+      /** Earlier queries, newest first, listed while the input is empty; ⏎ submits one again. */
+      history?: () => Promise<string[]>;
     }
 );
 
@@ -295,13 +297,14 @@ export function createCommandPalette(
   /**
    * The prefix mode the input is in and what it lists: `items` is null until they are loaded, or,
    * in a mode that submits, until ⏎ answers the query in `answered`. `parent` is the entry whose
-   * children are shown.
+   * children are shown. `history` is what a submitting mode answered before.
    */
   let mode: {
     mode: PaletteMode;
     items: ModeItem[] | null;
     answered: string;
     parent: ModeItem | null;
+    history: string[];
   } | null = null;
   /** Guards against a slow submit landing after the query moved on, like `searchToken`. */
   let submitToken = 0;
@@ -401,6 +404,15 @@ export function createCommandPalette(
     render();
   };
 
+  /** Reads a submitting mode's history; a failure only means there is none to show. */
+  const loadHistory = async (entered: NonNullable<typeof mode>) => {
+    if (!('submit' in entered.mode) || !entered.mode.history) return;
+    const history = await entered.mode.history().catch(() => entered.history);
+    if (mode !== entered) return;
+    entered.history = history;
+    render();
+  };
+
   const submitMode = async () => {
     const current = mode;
     const query = input.value.trim();
@@ -414,6 +426,7 @@ export function createCommandPalette(
       current.answered = query;
       selected = 0;
       setStatus(items.length ? null : 'Nothing came back');
+      void loadHistory(current);
     } catch (e: any) {
       if (token !== submitToken || mode !== current) return;
       setStatus(e?.message || `${current.mode.title} failed`);
@@ -423,7 +436,7 @@ export function createCommandPalette(
 
   /** Switches into `next` with `rest` in the input; a submitting mode given text submits it. */
   const enterMode = (next: PaletteMode, rest: string) => {
-    mode = { mode: next, items: null, answered: '', parent: null };
+    mode = { mode: next, items: null, answered: '', parent: null, history: [] };
     input.value = rest;
     trail = [];
     selected = 0;
@@ -431,8 +444,20 @@ export function createCommandPalette(
     setStatus(null);
     render();
     if ('load' in next) void loadMode(mode, next.load);
-    else if (rest.trim()) void submitMode();
+    else {
+      void loadHistory(mode);
+      if (rest.trim()) void submitMode();
+    }
   };
+
+  /** A submitting mode with nothing typed and nothing answered lists what it answered before. */
+  const showsHistory = () =>
+    !!mode &&
+    'submit' in mode.mode &&
+    !mode.parent &&
+    !mode.items &&
+    !input.value.trim() &&
+    mode.history.length > 0;
 
   /** What the mode lists right now: the parent's children, or its own entries, filtered. */
   const modeItems = (): ModeItem[] => {
@@ -471,13 +496,23 @@ export function createCommandPalette(
   };
 
   const modeRows = (): Row[] =>
-    modeItems()
-      .slice(0, MODE_ROW_LIMIT)
-      .map((item) => ({
-        title: item.title,
-        subtitle: item.subtitle ?? '',
-        activate: () => void chooseItem(item),
-      }));
+    showsHistory()
+      ? (mode?.history ?? []).map((text) => ({
+          title: text,
+          subtitle: `⏎ ${mode?.mode.title.toLowerCase()} again`,
+          activate: () => {
+            input.value = text;
+            render();
+            void submitMode();
+          },
+        }))
+      : modeItems()
+          .slice(0, MODE_ROW_LIMIT)
+          .map((item) => ({
+            title: item.title,
+            subtitle: item.subtitle ?? '',
+            activate: () => void chooseItem(item),
+          }));
 
   /** Whatever is typed, offered to each mode that submits — "Translate “Guten Morgen”". */
   const submitOfferRows = (): Row[] => {
@@ -677,7 +712,7 @@ export function createCommandPalette(
       // What has been answered so far, so a long walk stays reviewable.
       addNote(pending.values.filter(Boolean).join('  ·  ') || pending.action.title);
     } else if (mode) {
-      addGroup(mode.parent?.title ?? mode.mode.title, listed);
+      addGroup(showsHistory() ? 'Recent' : (mode.parent?.title ?? mode.mode.title), listed);
       if (listed.length === 0 && (mode.items || mode.parent)) addNote('No matches.');
     } else {
       addGroup('Recent', recent);
@@ -707,9 +742,10 @@ export function createCommandPalette(
       const submits = 'submit' in mode.mode && !mode.parent;
       const unanswered = submits && (!mode.items || mode.answered !== query);
       const more = modeItems()[selected]?.children?.length ? ' · ⇥ more' : '';
-      hint.textContent = unanswered
-        ? `⏎ ${mode.mode.title.toLowerCase()} · esc back`
-        : `↑↓ navigate · ⏎ select${more} · esc back`;
+      if (showsHistory())
+        hint.textContent = `↑↓ navigate · ⏎ ${mode.mode.title.toLowerCase()} again · esc back`;
+      else if (unanswered) hint.textContent = `⏎ ${mode.mode.title.toLowerCase()} · esc back`;
+      else hint.textContent = `↑↓ navigate · ⏎ select${more} · esc back`;
     } else if (here) hint.textContent = '↑↓ navigate · ⏎ select · esc back';
     else if (!query)
       hint.textContent = `↑↓ navigate · ⏎ select${prefixes ? ` · ${prefixes}` : ''} · esc close`;
@@ -826,6 +862,7 @@ export function createCommandPalette(
         mode &&
         'submit' in mode.mode &&
         !mode.parent &&
+        input.value.trim() &&
         mode.answered !== input.value.trim()
       )
         void submitMode();

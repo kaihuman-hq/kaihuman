@@ -2,6 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::config::{read_json, translation_history_file, write_json};
+
+/// `TRANSLATION_HISTORY_LIMIT` in packages/palette/src/translate.ts.
+const HISTORY_LIMIT: usize = 20;
+
 /// `Translation` in packages/palette/src/translate.ts.
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,6 +26,28 @@ struct Response {
 struct Item {
     text: String,
     detected_source_language: String,
+}
+
+pub fn history() -> Vec<String> {
+    read_json(&translation_history_file()).unwrap_or_default()
+}
+
+/// Newest first, each text once, capped — `withTranslationText` in the palette package.
+pub fn with_text(history: Vec<String>, text: &str) -> Vec<String> {
+    let text = text.trim();
+    if text.is_empty() {
+        return history;
+    }
+    std::iter::once(text.to_string())
+        .chain(history.into_iter().filter(|earlier| earlier != text))
+        .take(HISTORY_LIMIT)
+        .collect()
+}
+
+pub fn remember(text: &str) -> Result<Vec<String>, String> {
+    let texts = with_text(history(), text);
+    write_json(&translation_history_file(), &texts)?;
+    Ok(texts)
 }
 
 /// DeepL's free keys end in `:fx` and only work against the free endpoint.
@@ -89,6 +116,19 @@ pub async fn translate(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn keeps_the_last_twenty_texts_newest_first_once_each() {
+        let history = vec!["a".to_string(), "b".to_string()];
+        assert_eq!(with_text(history.clone(), " b "), vec!["b", "a"]);
+        assert_eq!(with_text(history, "  "), vec!["a", "b"]);
+
+        let full: Vec<String> = (0..HISTORY_LIMIT).map(|i| format!("t{i}")).collect();
+        let next = with_text(full, "new");
+        assert_eq!(next.len(), 20);
+        assert_eq!(next[0], "new");
+        assert!(!next.contains(&"t19".to_string()));
+    }
 
     #[test]
     fn sends_free_keys_to_the_free_endpoint() {

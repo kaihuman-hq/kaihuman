@@ -19,6 +19,19 @@ const DEEPL_TARGETS = new Set(
   ).split(' '),
 );
 
+/** How many translated texts the `t:` mode keeps to offer again. */
+export const TRANSLATION_HISTORY_LIMIT = 20;
+
+/** Newest first, each text once, capped — translating a text again moves it back to the top. */
+export function withTranslationText(history: readonly string[], text: string): string[] {
+  const trimmed = text.trim();
+  if (!trimmed) return [...history];
+  return [trimmed, ...history.filter((earlier) => earlier !== trimmed)].slice(
+    0,
+    TRANSLATION_HISTORY_LIMIT,
+  );
+}
+
 export interface Translation {
   /** The language asked for, as sent (`EN-US`). */
   target: string;

@@ -232,6 +232,10 @@ const translationItems = async (port: ActionPort, query: string): Promise<ModeIt
   const { text, targets } = parseTranslationQuery(query);
   if (!text) return [];
   const { translations } = await port.send({ type: 'TRANSLATE', text, targets });
+  // Kept as typed, `fr:` and all, so choosing it again asks for the same languages.
+  await port
+    .send({ type: 'ADD_TRANSLATION_HISTORY', text: query.trim() })
+    .catch((e) => console.warn('LifeOS palette: could not remember the translation', e));
   return usefulTranslations(translations).map((translation) => ({
     id: `translation:${translation.target}`,
     title: translation.text,
@@ -271,6 +275,7 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
     title: 'Translate',
     placeholder: 'Text to translate — “fr: …” for one language',
     submit: (query) => translationItems(port, query),
+    history: async () => (await port.send({ type: 'GET_TRANSLATION_HISTORY' })).texts,
   },
   {
     prefix: 'r',

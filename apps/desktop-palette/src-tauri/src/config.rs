@@ -38,6 +38,10 @@ pub fn recents_file() -> PathBuf {
     xdg_dir("XDG_STATE_HOME", ".local/state").join("recents.json")
 }
 
+pub fn translation_history_file() -> PathBuf {
+    xdg_dir("XDG_STATE_HOME", ".local/state").join("translations.json")
+}
+
 /// Reads a JSON file written by `write_json`; a missing or unreadable file is `None`.
 pub fn read_json<T: for<'de> Deserialize<'de>>(path: &PathBuf) -> Option<T> {
     let text = std::fs::read_to_string(path).ok()?;

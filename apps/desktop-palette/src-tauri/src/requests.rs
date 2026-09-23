@@ -56,6 +56,10 @@ pub enum Request {
         text: String,
         targets: Vec<String>,
     },
+    GetTranslationHistory,
+    AddTranslationHistory {
+        text: String,
+    },
     SetTranslationKey {
         key: String,
     },
@@ -313,6 +317,10 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             let translations = translate::translate(&key, text.trim(), &targets).await?;
             Ok(json!({ "translations": translations }))
         }
+        Request::GetTranslationHistory => Ok(json!({ "texts": translate::history() })),
+        Request::AddTranslationHistory { text } => {
+            Ok(json!({ "texts": translate::remember(&text)? }))
+        }
         Request::SetTranslationKey { key } => {
             config::store_deepl_key(key.trim())?;
             Ok(json!({}))
@@ -369,6 +377,16 @@ mod tests {
             Request::Translate {
                 text: "Hallo".into(),
                 targets: vec!["EN-US".into(), "DE".into()],
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "GET_TRANSLATION_HISTORY" })),
+            Request::GetTranslationHistory
+        );
+        assert_eq!(
+            parse(json!({ "type": "ADD_TRANSLATION_HISTORY", "text": "fr: hi" })),
+            Request::AddTranslationHistory {
+                text: "fr: hi".into()
             }
         );
         assert_eq!(

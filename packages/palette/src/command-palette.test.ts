@@ -46,6 +46,7 @@ let actions: PaletteAction[];
 let copy: Mock<(text: string) => Promise<void>>;
 let loadPrompts: Mock<() => Promise<ModeItem[]>>;
 let translate: Mock<(query: string) => Promise<ModeItem[]>>;
+let history: Mock<() => Promise<string[]>>;
 let modes: PaletteMode[];
 
 const PROMPTS: ModeItem[] = [
@@ -162,9 +163,16 @@ beforeEach(async () => {
     { id: 't:en', title: `EN ${query}`, copy: `EN ${query}` },
     { id: 't:fr', title: `FR ${query}`, copy: `FR ${query}` },
   ]);
+  history = vi.fn(async () => [] as string[]);
   modes = [
     { prefix: 'p', title: 'Prompts', placeholder: 'Search prompts', load: loadPrompts },
-    { prefix: 't', title: 'Translate', placeholder: 'Text to translate', submit: translate },
+    {
+      prefix: 't',
+      title: 'Translate',
+      placeholder: 'Text to translate',
+      submit: translate,
+      history,
+    },
   ];
 
   palette = createCommandPalette({
@@ -847,5 +855,57 @@ describe('prefix modes', () => {
     palette.open();
     await settle();
     expect(crumbText()).toBeNull();
+  });
+});
+
+describe('submit history', () => {
+  it('lists earlier queries while nothing is typed, and hides them once something is', async () => {
+    history.mockResolvedValue(['Guten Morgen', 'fr: good night']);
+    type('t:');
+    await settle();
+
+    expect(groupLabels()).toEqual(['Recent']);
+    expect(rowTitles()).toEqual(['Guten Morgen', 'fr: good night']);
+    expect(hintText()).toContain('⏎ translate again');
+
+    type('Hallo');
+    expect(rowTitles()).toEqual([]);
+    type('');
+    expect(rowTitles()).toEqual(['Guten Morgen', 'fr: good night']);
+  });
+
+  it('submits the chosen one again, with ⏎ as with a click', async () => {
+    history.mockResolvedValue(['Guten Morgen', 'fr: good night']);
+    type('t:');
+    await settle();
+    press('ArrowDown');
+    press('Enter');
+    await settle();
+
+    expect(translate).toHaveBeenCalledWith('fr: good night');
+    expect(input().value).toBe('fr: good night');
+    expect(rowTitles()).toEqual(['EN fr: good night', 'FR fr: good night']);
+  });
+
+  it('reads the history again after a submit, so the new query is there next time', async () => {
+    type('t: Hallo');
+    await settle();
+    expect(history).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not submit an empty input', async () => {
+    type('t:');
+    await settle();
+    press('Enter');
+    await settle();
+    expect(translate).not.toHaveBeenCalled();
+  });
+
+  it('shows no history when there is none to read', async () => {
+    history.mockRejectedValue(new Error('offline'));
+    type('t:');
+    await settle();
+    expect(rowTitles()).toEqual([]);
+    expect(statusText()).toBeNull();
   });
 });

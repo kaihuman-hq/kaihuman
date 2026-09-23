@@ -1,3 +1,4 @@
+import { withTranslationText } from '@lifosy/palette';
 import { type Message } from '../types';
 import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
@@ -787,6 +788,17 @@ async function translate(text: string, targets: string[]) {
   return { translations: await translateWithDeepl(key as string, text, targets) };
 }
 
+async function readTranslationHistory(): Promise<string[]> {
+  const stored = await chrome.storage.local.get('translationHistory');
+  return (stored.translationHistory as string[] | undefined) ?? [];
+}
+
+async function rememberTranslation(text: string): Promise<string[]> {
+  const texts = withTranslationText(await readTranslationHistory(), text);
+  await chrome.storage.local.set({ translationHistory: texts });
+  return texts;
+}
+
 async function setTranslationKey(key: string) {
   if (key) await chrome.storage.local.set({ deepl_key: key });
   else await chrome.storage.local.remove('deepl_key');
@@ -1125,6 +1137,22 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'TRANSLATE') {
     translate(message.text || '', message.targets || []).then(
       (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'GET_TRANSLATION_HISTORY') {
+    readTranslationHistory().then(
+      (texts) => sendResponse({ success: true, texts }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'ADD_TRANSLATION_HISTORY') {
+    rememberTranslation(message.text || '').then(
+      (texts) => sendResponse({ success: true, texts }),
       (error) => sendResponse({ error: error.message }),
     );
     return true; // Indicate async response

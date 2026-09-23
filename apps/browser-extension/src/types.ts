@@ -23,6 +23,8 @@ export interface Message {
     | 'OPEN_URL'
     | 'LIST_PROMPT_FILES'
     | 'TRANSLATE'
+    | 'GET_TRANSLATION_HISTORY'
+    | 'ADD_TRANSLATION_HISTORY'
     | 'SET_TRANSLATION_KEY'
     | 'LIST_GITHUB_REPOS'
     | 'TOGGLE_COMMAND_PALETTE';

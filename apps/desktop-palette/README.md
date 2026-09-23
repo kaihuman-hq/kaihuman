@@ -125,6 +125,7 @@ to change its animation.
 | `$XDG_CACHE_HOME/lifosy/bookmarks.json` | GitHub's bookmarks file as last fetched, with its ETag |
 | `$XDG_CACHE_HOME/lifosy/prompts.json` | the repository's `.prompts.md` files as last fetched (five minutes) |
 | `$XDG_STATE_HOME/lifosy/recents.json` | the palette's last ten actions |
+| `$XDG_STATE_HOME/lifosy/translations.json` | the last 20 texts translated with `t:` |
 
 For development and tests, `LIFOSY_GITHUB_TOKEN` takes the place of the keyring and
 `LIFOSY_GITHUB_API` points the backend at a stand-in for `https://api.github.com`.

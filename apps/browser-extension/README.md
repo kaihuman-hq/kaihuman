@@ -238,6 +238,10 @@ hint line lists the prefixes.
 | `t:` | Translations of what you typed into English (US) and German, minus the language the text is already in; `t: fr: …` asks for one language | the first ⏎ translates, the next copies the selected translation | DeepL, one request per language — never while typing |
 | `r:` | Your GitHub repositories, most recently pushed first | opens the repository; **⇥** (or **→**) lists its issues, pull requests, actions, releases… | `GET /user/repos` with the extension's token |
 
+With nothing typed, `t:` lists the last 20 texts you translated, newest first — **⏎** translates
+one again (kept as typed, so `fr: …` asks for French again). Translating a text again moves it to
+the top rather than listing it twice.
+
 Any text typed outside a mode is also offered as **Translate “…”**, the last row (**↑** from the top
 row reaches it). Translation needs a DeepL API key — free ones at
 [deepl.com/pro-api](https://www.deepl.com/pro-api) — set with the **Set the DeepL API key…** action;

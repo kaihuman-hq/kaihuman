@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { parseTranslationQuery, TRANSLATION_TARGETS, usefulTranslations } from './translate.js';
+import {
+  parseTranslationQuery,
+  TRANSLATION_HISTORY_LIMIT,
+  TRANSLATION_TARGETS,
+  usefulTranslations,
+  withTranslationText,
+} from './translate.js';
 
 describe('parseTranslationQuery', () => {
   it('sends plain text into every default target', () => {
@@ -37,5 +43,21 @@ describe('usefulTranslations', () => {
 
   it('keeps a same-language answer when it is all there is', () => {
     expect(usefulTranslations([into('EN-GB', 'EN')])).toEqual([into('EN-GB', 'EN')]);
+  });
+});
+
+describe('withTranslationText', () => {
+  it('puts the newest first, once, trimmed', () => {
+    expect(withTranslationText(['a', 'b'], ' b ')).toEqual(['b', 'a']);
+    expect(withTranslationText(['a'], '   ')).toEqual(['a']);
+  });
+
+  it('keeps the last twenty', () => {
+    const full = Array.from({ length: TRANSLATION_HISTORY_LIMIT }, (_, i) => `t${i}`);
+    const next = withTranslationText(full, 'new');
+    expect(TRANSLATION_HISTORY_LIMIT).toBe(20);
+    expect(next).toHaveLength(20);
+    expect(next[0]).toBe('new');
+    expect(next).not.toContain('t19');
   });
 });

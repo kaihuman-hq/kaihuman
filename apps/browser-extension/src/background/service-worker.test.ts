@@ -243,6 +243,23 @@ describe('palette mode messages', () => {
     expect(chrome.storage.local.remove).toHaveBeenCalledWith('deepl_key');
   });
 
+  it('keeps the translation history newest first, once each', async () => {
+    storedExtras = { translationHistory: ['a', 'b'] };
+    expect(await call({ type: 'GET_TRANSLATION_HISTORY' })).toEqual({
+      success: true,
+      texts: ['a', 'b'],
+    });
+    expect(await call({ type: 'ADD_TRANSLATION_HISTORY', text: 'b' })).toEqual({
+      success: true,
+      texts: ['b', 'a'],
+    });
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({ translationHistory: ['b', 'a'] });
+  });
+
+  it('starts with an empty translation history', async () => {
+    expect(await call({ type: 'GET_TRANSLATION_HISTORY' })).toEqual({ success: true, texts: [] });
+  });
+
   it('answers prompt files from a cache for the same repository', async () => {
     storedExtras = {
       promptsCache: {

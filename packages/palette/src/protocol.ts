@@ -71,6 +71,9 @@ export interface PaletteProtocol {
     request: { text: string; targets: string[] };
     response: { translations: Translation[] };
   };
+  /** The last texts translated, newest first — see `withTranslationText`. */
+  GET_TRANSLATION_HISTORY: { request: NoFields; response: { texts: string[] } };
+  ADD_TRANSLATION_HISTORY: { request: { text: string }; response: { texts: string[] } };
   /** Stores the DeepL API key where the backend keeps secrets; an empty key forgets it. */
   SET_TRANSLATION_KEY: { request: { key: string }; response: NoFields };
   /** GitHub repositories to open, most relevant first — the order is the backend's. */
