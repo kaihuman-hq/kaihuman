@@ -2,6 +2,15 @@ import { type Message } from '../types';
 import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
 import {
+  buildRawNote,
+  KB_ASSET_DIR,
+  KB_RAW_DIR,
+  localizeImages,
+  selectionText,
+  slugify,
+  urlToSlug,
+} from './kb-capture';
+import {
   addBookmark,
   applyUsage,
   BOOKMARKS_PATH,
@@ -358,6 +367,16 @@ async function githubWriteFile(
   // The commit response carries the new blob sha, so the cache can be refreshed without a re-read.
   const written = await res.json().catch(() => null);
   return written?.content?.sha ?? null;
+}
+
+/** Creates a file from already-encoded bytes, e.g. an image downloaded for the knowledge base. */
+async function githubPutBase64(token: string, repoUrl: string, filePath: string, base64: string) {
+  const res = await fetch(`https://api.github.com/repos/${repoUrl}/contents/${filePath}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
+    body: JSON.stringify({ message: `Add ${filePath} via Extension`, content: base64 }),
+  });
+  if (!res.ok) throw new Error(`Failed to write ${filePath}: ${res.statusText}`);
 }
 
 const EMPTY_CONFIG: PinnedTabsConfig = { groups: [], updatedAt: '' };
@@ -1126,14 +1145,19 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
         return;
       }
       try {
-        const { title, url, text } = message as { title: string; url: string; text: string };
+        const { title, url, text, images } = message as {
+          title: string;
+          url: string;
+          text: string;
+          images?: string[];
+        };
+        const stamp = `${Date.now()}-${urlToSlug(url)}`;
+        const body = await localizeImages(text, images ?? [], `${KB_ASSET_DIR}/${stamp}`, (path, base64) =>
+          githubPutBase64(token, repo, path, base64),
+        );
         const date = new Date().toISOString().slice(0, 10);
-        const slug = urlToSlug(url);
-        const path = `.kh/raw/${Date.now()}-${slug}.md`;
-        const escapedTitle = title.replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"');
-        const safeUrl = url.replace(/'/g, "''");
-        const content = `---\ntitle: "${escapedTitle}"\nurl: '${safeUrl}'\ndate: ${date}\nprocessed: false\ntags: [general]\n---\n\n${text}`;
-        await githubUpsertFile(token, repo, path, content);
+        const content = buildRawNote({ title, url, text: body, tags: ['general'], date });
+        await githubUpsertFile(token, repo, `${KB_RAW_DIR}/${stamp}.md`, content);
         sendResponse({ success: true });
       } catch (error: any) {
         sendResponse({ error: error.message });
@@ -1143,22 +1167,19 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   }
 });
 
-function urlToSlug(url: string): string {
-  try {
-    const { hostname, pathname } = new URL(url);
-    const last = pathname.replace(/\/$/, '').split('/').pop() || '';
-    const base = last || hostname.replace(/^www\./, '');
-    return base.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40);
-  } catch {
-    return 'article';
-  }
-}
-
 async function saveToKnowledgeBase(text: string, url: string, pageTitle: string) {
   const { token, repo } = await credentials();
   if (!token) throw new Error('No token found');
   if (!text.trim()) throw new Error('Select some text first');
 
-  const formatted = `### ${pageTitle}\n[Source](${url})\n\n> ${text.trim()}`;
-  await githubUpsertFile(token, repo, '.lifeos/clippings.md', formatted, 'top');
+  const date = new Date().toISOString().slice(0, 10);
+  const content = buildRawNote({
+    title: `Clipping: ${pageTitle || url}`,
+    url,
+    text: selectionText(text, url, pageTitle),
+    tags: ['clipping'],
+    date,
+  });
+  const path = `${KB_RAW_DIR}/${Date.now()}-${slugify(pageTitle, 'clipping')}.md`;
+  await githubUpsertFile(token, repo, path, content);
 }

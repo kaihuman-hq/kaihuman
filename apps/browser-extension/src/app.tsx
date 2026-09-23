@@ -120,18 +120,25 @@ export function App() {
     setStatus('saving');
     setErrorMessage(null);
     try {
-      const [result] = await chrome.scripting.executeScript({
-        target: { tabId: activeTab.tabId },
-        func: () => ({
-          title: document.title,
-          url:
-            (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.href ||
-            window.location.href,
-          text: (document.body?.innerText ?? '').trim(),
-        }),
-      });
-      if (!result?.result) throw new Error('Cannot read page content — restricted page?');
-      chrome.runtime.sendMessage({ type: 'PIN_ARTICLE', ...result.result }, (response) => {
+      // The content script converts the page to Markdown; tabs opened before the extension was
+      // installed have no content script, so those fall back to plain text.
+      const article = await chrome.tabs
+        .sendMessage(activeTab.tabId, { type: 'EXTRACT_ARTICLE' })
+        .catch(async () => {
+          const [result] = await chrome.scripting.executeScript({
+            target: { tabId: activeTab.tabId },
+            func: () => ({
+              title: document.title,
+              url: '',
+              text: (document.body?.innerText ?? '').trim(),
+              images: [],
+            }),
+          });
+          return result?.result;
+        });
+      if (!article) throw new Error('Cannot read page content — restricted page?');
+      const pinned = { ...article, url: article.url || activeTab.url };
+      chrome.runtime.sendMessage({ type: 'PIN_ARTICLE', ...pinned }, (response) => {
         if (chrome.runtime.lastError || response?.error) {
           const err = chrome.runtime.lastError?.message || response?.error || 'Unknown error';
           setErrorMessage(err);
