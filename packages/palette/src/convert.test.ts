@@ -162,3 +162,22 @@ describe('units', () => {
     expect(item).toMatchObject({ copy: '3.1069 mi', subtitle: '5 km in mi', group: 'Units' });
   });
 });
+
+describe('pixels', () => {
+  it('turns a length into pixels at 80, 150 and 300 dpi', () => {
+    expect(values('10 cm to px')).toEqual(['315 px', '591 px', '1181 px']);
+    expect(values('2 in in px')).toEqual(['160 px', '300 px', '600 px']);
+    expect(conversionItems('10 cm to px')[2]?.subtitle).toBe('10 cm to px at 300 dpi');
+  });
+
+  it('turns pixels into cm, or the length unit named, at each resolution', () => {
+    expect(values('1000 px')).toEqual(['31.75 cm', '16.933 cm', '8.4667 cm']);
+    expect(values('600 px to in')).toEqual(['7.5 in', '4 in', '2 in']);
+  });
+
+  it('leaves out pixels for what is not a length', () => {
+    expect(values('5 kg to px')).toEqual([]);
+    expect(values('100 px to kg')).toEqual([]);
+    expect(values('10 cm')).not.toContain('315 px');
+  });
+});

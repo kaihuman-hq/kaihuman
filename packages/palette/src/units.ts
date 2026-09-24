@@ -1,6 +1,7 @@
 /**
- * Metric ⇄ US customary: `5 km`, `180 cm`, `5'11"`, `10 lb`, `350 °F`, `2 cups`, `60 mph` —
- * into the other system, or into one unit named after `to` / `in` (`5 km in ft`).
+ * Metric ⇄ US customary — `5 km`, `180 cm`, `5'11"`, `10 lb`, `350 °F`, `2 cups`, `60 mph` — into
+ * the other system, or into one unit named after `to` / `in` (`5 km in ft`); and lengths ⇄ pixels
+ * at the print resolutions in `DPIS` (`10 cm to px`, `1000 px`).
  */
 import type { ModeItem } from './command-palette.js';
 
@@ -389,6 +390,34 @@ const result = (value: number, unit: Unit, asked: string): ModeItem => {
   return { id: `unit:${unit.symbol}`, title: shown, subtitle: asked, copy: shown };
 };
 
+/** The resolutions a length is turned into pixels at, and pixels back into a length. */
+export const DPIS = [80, 150, 300] as const;
+
+const isPixels = (text: string) => /^(?:px|pixels?)$/i.test(text.trim());
+
+const METERS_PER_INCH = 0.0254;
+
+/**
+ * `10 cm to px` in pixels at each of `DPIS`; `1000 px` in cm (or the length unit after `to`/`in`)
+ * at each of them.
+ */
+const pixelItems = (text: string, value: number, unit: string, target?: string): ModeItem[] => {
+  if (isPixels(unit)) {
+    const to = target === undefined ? unitNamed('cm') : unitNamed(target);
+    if (!to || to.dimension !== 'length') return [];
+    return DPIS.map((dpi) => {
+      const shown = `${formatted(((value / dpi) * METERS_PER_INCH) / to.factor)} ${to.symbol}`;
+      return { id: `unit:px:${dpi}`, title: shown, subtitle: `${text} at ${dpi} dpi`, copy: shown };
+    });
+  }
+  const from = unitNamed(unit);
+  if (target === undefined || !isPixels(target) || from?.dimension !== 'length') return [];
+  return DPIS.map((dpi) => {
+    const shown = `${Math.round(((value * from.factor) / METERS_PER_INCH) * dpi)} px`;
+    return { id: `unit:px:${dpi}`, title: shown, subtitle: `${text} at ${dpi} dpi`, copy: shown };
+  });
+};
+
 /** `5 km` in miles and yards, `5 km in ft` in feet alone, `5'11"` in cm and m. */
 export const unitItems = (text: string): ModeItem[] => {
   const height = FEET_INCHES.exec(text);
@@ -399,9 +428,12 @@ export const unitItems = (text: string): ModeItem[] => {
   }
   const match = QUANTITY.exec(text);
   if (!match) return [];
+  const value = amount(match[1] ?? '');
+  if (isPixels(match[2] ?? '') || (match[3] !== undefined && isPixels(match[3]))) {
+    return pixelItems(text, value, match[2] ?? '', match[3]);
+  }
   const from = unitNamed(match[2] ?? '');
   if (!from) return [];
-  const value = amount(match[1] ?? '');
   if (match[3] !== undefined) {
     const to = unitNamed(match[3]);
     if (!to || to.dimension !== from.dimension || to === from) return [];

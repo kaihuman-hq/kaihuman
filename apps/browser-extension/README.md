@@ -316,7 +316,8 @@ volume (`ml cl dl l` ⇄ `tsp tbsp fl oz cup pt qt gal`, US measures), area (`cm
 `in² ft² yd² acres mi²`), speed (`m/s km/h` ⇄ `mph`) and temperature (`°C K` ⇄ `°F`). A quantity
 goes into the other system's closest unit — `5 km` into miles, `180 cm` into inches and
 `5 ft 10.9 in`; `to` or `in` names the unit instead: `5 km in ft`, `3 m to cm`. A decimal comma
-works too (`1,5 kg`).
+works too (`1,5 kg`). **Pixels**: `10 cm to px` (any length unit) gives the pixels at 80, 150 and
+300 dpi; `1000 px` gives the length in cm at each of them, `1000 px to in` in inches.
 
 With nothing typed, every mode but `>t`, `>u`, `>a` and `>k` lists the last 10 entries you chose in it first,
 under **Recent** — the prompts you copied in `>p`, the repositories you opened in `>r`, the terms

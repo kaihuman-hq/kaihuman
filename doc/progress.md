@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-09-24 — Palette: lengths ⇄ pixels
+
+- `10 cm to px` (any length unit) shows the pixels at 80, 150 and 300 dpi (`DPIS` in
+  `packages/palette/src/units.ts`); `1000 px` shows cm at each, `1000 px to in` inches. Pixels
+  only come up when `px` is typed, so `10 cm` alone still converts to inches.
+
 ## 2026-09-24 — Palette: metric ⇄ US units
 
 - **Units** (`packages/palette/src/units.ts`), in the main search's Convert group and in `>k`:
