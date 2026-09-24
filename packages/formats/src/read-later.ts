@@ -16,8 +16,9 @@ export const DEFAULT_CONFIG: ReadItLaterConfig = {
   items: [],
 };
 
-export const parseReadItLater = (content: string): ReadItLaterConfig => {
-  if (!content.trim()) return { items: [] };
+// `undefined` too: the console hands a widget its file's content before the file has loaded.
+export const parseReadItLater = (content: string | undefined): ReadItLaterConfig => {
+  if (!content?.trim()) return { items: [] };
   try {
     const parsed = JSON.parse(content);
     return {
@@ -66,6 +67,12 @@ export const deleteAllRead = (config: ReadItLaterConfig): ReadItLaterConfig => {
   const items = config.items.filter((item) => item.status !== 'read');
   return { ...config, items };
 };
+
+/** Every item gone, unread ones included. */
+export const deleteAll = (config: ReadItLaterConfig): ReadItLaterConfig => ({
+  ...config,
+  items: [],
+});
 
 /**
  * The list about to be changed. Unlike `parseReadItLater`, a file that is not valid JSON throws

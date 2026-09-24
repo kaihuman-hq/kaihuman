@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-09-24 — Read it later: clear the whole list
+
+- **Console**: the Read it later widget's reading list has a **CLEAR ALL** button; it asks for
+  confirmation, naming how many unread and read items go, then empties the list (`deleteAll` in
+  `packages/formats/src/read-later.ts`). The Archive tab's **DELETE ALL** still removes only read
+  items.
+- **Fix**: opening a read-later file crashed the console (`Cannot read properties of undefined`)
+  since `parseReadItLater` gained an empty-file check: the console hands a widget `undefined`
+  until its file has loaded. It reads that as an empty list again.
+
 ## 2026-09-24 — Palette: recent entries per prefix, cached `>u` usage
 
 - **Recent per prefix** (both palettes): every mode keeps the last 10 entries chosen in it and,

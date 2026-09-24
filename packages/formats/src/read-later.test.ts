@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addReadLaterEntry } from './entries.js';
-import { markReadItLaterRead, parseReadItLater } from './read-later.js';
+import { deleteAll, deleteAllRead, markReadItLaterRead, parseReadItLater } from './read-later.js';
 
 const JSON_LIST = JSON.stringify({
   items: [
@@ -10,8 +10,15 @@ const JSON_LIST = JSON.stringify({
 });
 
 describe('read it later', () => {
-  it('reads an empty file as an empty list', () => {
+  it('deletes the read items, or every item', () => {
+    const config = parseReadItLater(JSON_LIST);
+    expect(deleteAllRead(config).items.map((item) => item.id)).toEqual(['a']);
+    expect(deleteAll(config).items).toEqual([]);
+  });
+
+  it('reads an empty file, or one not loaded yet, as an empty list', () => {
     expect(parseReadItLater('')).toEqual({ items: [] });
+    expect(parseReadItLater(undefined)).toEqual({ items: [] });
   });
 
   it('marks an item read, keeping the rest', () => {
