@@ -1,4 +1,4 @@
-export const KB_SKILL_VERSION = '1.6.0';
+export const KB_SKILL_VERSION = '1.7.0';
 
 // One heading per operation keeps the log greppable: `grep '^## \[' .kh/log.md | tail -5`.
 export const KB_LOG_FORMAT = '## [YYYY-MM-DD] <op> | <title>';
@@ -36,6 +36,10 @@ Ingest raw sources into the knowledge base wiki.
    9. Append to \`.kh/log.md\`: \`## [YYYY-MM-DD] ingest | SOURCE TITLE\`, followed by a bullet list of
       the pages created and updated
    10. Update the source's frontmatter to \`processed: true\` and move it to \`.kh/raw/processed/\`
+   11. Append the source to the monthly journal \`.kh/journal/YYYY-MM.md\` (month from its \`date\`,
+       fallback today). If the file is new, start it with a single \`# YYYY-MM\` heading. Append, in
+       chronological order, a \`## [YYYY-MM-DD HH:MM] <source title>\` section with the source body
+       verbatim. The journal is the human-readable log of what came in; the wiki is the synthesis.
 5. Commit changes with a meaningful message
 
 ## Moving a processed file
@@ -67,6 +71,7 @@ wiki is checked against.
 - A \`source\` page per ingested file, plus updated entity, concept and topic pages in \`.kh/wiki/\`
 - Updated \`.kh/index.kb.md\` with new entries
 - One \`ingest\` entry per source in \`.kh/log.md\`
+- Each source appended verbatim to the monthly journal \`.kh/journal/YYYY-MM.md\`
 - Ingested files moved to \`.kh/raw/processed/\` with \`processed: true\` in frontmatter
 
 ## After ingestion
@@ -373,6 +378,60 @@ gh api "repos/$REPO/contents/.kh/raw/$TIMESTAMP-$SLUG.md" \
 Confirm with the path that was written.
 `;
 
+export const KB_AGENT_CAPTURE_SKILL = `# /kb-agent-capture
+
+Capture a note into \`.kh/raw/\` by **driving the \`kh-capture\` native window**
+(native-sdk automation server) as an agent action — open it, type the note,
+submit, and assert success. The same flow serves as the native app's end-to-end
+acceptance test: it is how an agent both operates and verifies the GUI.
+
+> For plain, reliable capture that doesn't need the GUI, prefer
+> \`cli capture "<text>"\` — simpler and offline-safe. Use this when the point is
+> to exercise or verify the native app through automation.
+
+## Status
+
+Experimental. Requires the \`kh-capture\` native app (native-sdk) built with
+automation enabled. Steps marked VERIFY need confirming against
+\`native automate --help\` — the exact input-dispatch subcommand isn't pinned in
+the public docs. If any step is uncertain or fails, fall back to \`cli capture\`.
+
+## Prerequisites
+
+1. \`cli\` logged in once — the app reuses \`~/.config/cli/auth.json\`
+   (run \`cli\`, press \`l\` then \`s\`).
+2. Build with automation: \`native build -Dautomation=true\` → \`zig-out/bin/kh-capture\`.
+
+## Steps
+
+All \`native automate\` commands run from the native app's directory.
+
+1. Launch \`zig-out/bin/kh-capture &\` if no window is up.
+2. \`native automate wait\` — block until the window is ready.
+3. \`native automate snapshot\` — confirm the text input and Save button:
+   \`native automate assert 'role=button name="Save"'\`.
+4. Type the note into the autofocused input.
+   **VERIFY**: confirm the subcommand via \`native automate --help\`
+   (assumed \`native automate type "<text>"\`).
+5. Submit: \`native automate widget-click canvas <n>\` on the Save button (index
+   from the snapshot), or dispatch Enter.
+6. Verify: on a good push the app sets status \`captured ✓\` and auto-closes.
+   \`native automate assert 'name~="captured"'\`, or re-snapshot and confirm the
+   window closed.
+7. (Optional) Confirm \`.kh/raw/<ts>-<slug>.md\` landed on GitHub.
+
+## Fallback — always works
+
+\`\`\`bash
+cli capture "the note text"
+\`\`\`
+
+Offline-safe: spools locally and pushes with retry. If the automation drive
+fails for any reason, use this and report that automation was unavailable. The
+native app also spools into the CLI's spool dir on failure, so a note captured
+by either path is never lost.
+`;
+
 export const KB_CLAUDE_MD = `# Knowledge Base
 
 This repo is a personal knowledge base. Claude maintains the wiki; the user curates sources and
@@ -384,24 +443,27 @@ asks questions.
 .kh/
   raw/          # Sources: pinned articles, clippings, notes, digests (frontmatter: processed: false → true)
   raw/processed # Sources already ingested
+  journal/      # Human-readable monthly log — one YYYY-MM.md, each source verbatim
   assets/       # Images downloaded with sources, linked as /.kh/assets/...
   wiki/         # Compiled knowledge pages with backlinks
   schema.md     # Domain definition and page format rules
   index.kb.md   # Master index of all wiki pages
   log.md        # Append-only history of every operation
 .claude/commands/
-  kb-ingest.md  # /kb-ingest — compile raw sources into wiki pages
+  kb-ingest.md  # /kb-ingest — compile raw sources into wiki pages + journal
   kb-index.md   # /kb-index  — build search index from wiki pages
   kb-lint.md    # /kb-lint   — audit, repair and suggest what to research next
   kb-ask.md     # /kb-ask    — answer questions from wiki, filing good answers back
   kb-digest.md  # /kb-digest — summarise tracked personal data into a raw source
+  kb-agent-capture.md  # /kb-agent-capture — capture via the native app's automation server
 \`\`\`
 
 ## Workflow
 
 1. Sources land in \`.kh/raw/\` with \`processed: false\` — from the browser extension, the console's
    "Add note", \`/kb-session\`, or \`/kb-digest\`
-2. Run \`/kb-ingest\` to compile them into \`.kh/wiki/\` pages and move them to \`.kh/raw/processed/\`
+2. Run \`/kb-ingest\` to compile them into \`.kh/wiki/\` pages, append each verbatim to the monthly
+   journal \`.kh/journal/YYYY-MM.md\`, and move them to \`.kh/raw/processed/\`
 3. Run \`/kb-index\` to rebuild \`.kh/search.kb.json\` from all wiki pages
 4. Run \`/kb-ask <question>\` to query the knowledge base; file useful answers with \`--save\`
 5. Run \`/kb-lint\` periodically to fix contradictions, stale claims, orphans and gaps
@@ -523,6 +585,7 @@ export function getScaffoldFiles(): Record<string, string> {
       '# Knowledge Base Index\n\nStart by reading the schema in `.kh/schema.md` to understand the structure.\n\n## Topics\n\n## Entities\n\n## Concepts\n\n## Sources\n\n## Questions\n',
     '.kh/log.md': '# Knowledge Base Log\n\nProcessing and audit history.\n',
     '.kh/raw/.gitkeep': '',
+    '.kh/journal/.gitkeep': '',
     '.kh/wiki/.gitkeep': '',
     '.claude/commands/kb-ingest.md': KB_INGEST_SKILL,
     '.claude/commands/kb-index.md': KB_INDEX_SKILL,
@@ -530,6 +593,7 @@ export function getScaffoldFiles(): Record<string, string> {
     '.claude/commands/kb-ask.md': KB_ASK_SKILL,
     '.claude/commands/kb-session.md': KB_SESSION_SKILL,
     '.claude/commands/kb-digest.md': KB_DIGEST_SKILL,
+    '.claude/commands/kb-agent-capture.md': KB_AGENT_CAPTURE_SKILL,
     'CLAUDE.md': KB_CLAUDE_MD,
   };
 }
@@ -543,6 +607,7 @@ export function getSkillOnlyFiles(): Record<string, string> {
     '.claude/commands/kb-ask.md': KB_ASK_SKILL,
     '.claude/commands/kb-session.md': KB_SESSION_SKILL,
     '.claude/commands/kb-digest.md': KB_DIGEST_SKILL,
+    '.claude/commands/kb-agent-capture.md': KB_AGENT_CAPTURE_SKILL,
     'CLAUDE.md': KB_CLAUDE_MD,
   };
 }

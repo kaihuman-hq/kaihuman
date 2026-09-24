@@ -1402,6 +1402,128 @@ cold cache; `pnpm format` 5 of 5. The workflows read the pnpm version from
   to `http`/`https`; a `javascript:` or `file:` entry committed to the repo is dropped
   rather than navigated to.
 
+## 2026-07-18 — `/kb-agent-capture`: agent-driven capture, auto-scaffolded into the KB repo
+
+The payoff of the native-sdk automation server, delivered through the **same
+scaffold mechanism as the other `/kb-*` commands** so it lives in the user's KB
+repo (not this one) and auto-updates on version bump.
+
+- **kb-skills.ts → v2.1.0**: new `KB_AGENT_CAPTURE_SKILL` added to both
+  `getScaffoldFiles` and `getSkillOnlyFiles` as
+  `.claude/commands/kb-agent-capture.md`, so `updateSkillsIfNeeded` writes it into
+  every initialised KB repo. Teaches a Claude session to capture by *driving the
+  `kh-capture` window* via the automation server (`native automate
+  wait/assert/snapshot/widget-click`) — open, type, submit, assert `captured ✓` —
+  framed as both an agent action and the app's end-to-end acceptance test.
+  Self-contained; falls back to `cli capture`. Tests + KBCommandsModal +
+  Cheatsheet Slash-Commands tab updated to match.
+- **`apps/kh-capture-native/scripts/agent-capture.sh`**: the local reference
+  driver / acceptance-test harness for the app, degrading gracefully to
+  `cli capture` on any missing/failed automate step (each call `timeout`-guarded).
+- Removed the earlier hand-placed `.claude/skills/kb-agent-capture/SKILL.md`
+  (single source of truth is now the scaffold).
+- Experimental: depends on the app compiling with `native build -Dautomation=true`;
+  input-dispatch subcommand + assertion regex flagged `VERIFY(api)`.
+
+## 2026-07-18 — Native-sdk capture app: self-contained (drop the `cli` dependency)
+
+Next step for the native-sdk experiment: make it stand alone instead of shelling
+out to `cli capture`.
+
+- **Direct GitHub API** (`src/main.zig` rewritten): `initEffects` reads the CLI's
+  `~/.config/cli/auth.json` via `fx.readFile` (path resolved from `$HOME` /
+  `$XDG_CONFIG_HOME`, token + `active_repo` extracted with a small allocator-free
+  JSON scanner); submit builds the OKF markdown + base64 JSON body and PUTs it to
+  the contents API via `fx.fetch`. Capture builders (slug, `std.time.epoch` date,
+  base64) are plain Zig std.
+- **Offline interop**: on a failed push the note is written as markdown into the
+  **CLI's own spool dir** (`fx.writeFile`), so `cli capture`'s existing flush
+  picks it up next run — the two capture paths rescue each other; nothing is lost.
+- **app.zon**: dropped `command` (no more spawn); added placeholder `net`/`fs`
+  permissions (VERIFY — the docs don't publish exact strings for network/file
+  effects).
+- **README**: rewritten for the self-contained architecture; documents enabling
+  the **automation server** (`native build -Dautomation=true` + `native automate`)
+  as the differentiator, and refreshed the `VERIFY(api)` reconciliation table.
+- Still doc-derived / not compiled here; the previous `fx.spawn` thin-shell
+  variant remains in git history.
+
+## 2026-07-18 — Experiment: native-sdk capture app (`apps/kh-capture-native`)
+
+Stage 2, running in parallel with the shipped `cli capture` + wofi overlay — a
+place to evaluate [native-sdk](https://native-sdk.dev) (Zig core).
+
+- **Thin GUI over the tested CLI**: a native-sdk window (`src/app.native` markup +
+  `src/main.zig` Zig core) that, on submit, spawns `cli capture <text>` via the
+  `spawn` effect. The Rust CLI keeps ownership of auth + offline spool + retry, so
+  the app inherits offline-safety and duplicates no push logic. Manifest in
+  `app.zon`; always-on-top/float/center delegated to Hyprland window rules.
+- **Honest status**: doc-derived, **not compiled** against a live toolchain (no
+  Zig/native CLI in the environment). Uncertain symbol names are flagged inline
+  with `VERIFY(api)` and tabulated in the app README with a one-command way to
+  reconcile against `native init --template zig-core`.
+- No workspace impact: Zig-core app has no `package.json`, so pnpm/turbo ignore
+  it. Documented upgrade path: drop the CLI dependency by calling the GitHub API
+  via `fx.fetch` + reading `auth.json` via `fx.readFile`; the automation server is
+  the reason to prefer native-sdk over Tauri if it graduates.
+
+## 2026-07-18 — Desktop quick-capture: `cli capture` + Hyprland overlay (offline-safe)
+
+Stage 1 of OS-level capture on Linux/Hyprland — reuses the CLI's auth + push
+instead of a new app (on Wayland the compositor owns the hotkey, so a native
+framework wouldn't have helped the hard part anyway).
+
+- **`cli capture` subcommand** (`apps/cli/src/capture.rs`, wired in `main.rs`):
+  resolves text from args → piped stdin → `$EDITOR`. **Spools every capture to a
+  local file _before_ pushing**, so an offline/failed push never loses a thought;
+  the next capture flushes the whole spool to `.kh/raw/`, oldest first, with
+  retry + backoff.
+- **github.rs refactor**: extracted `build_kb_note(text) -> (filename, content)`
+  (freezes capture-time timestamp/date so offline captures keep their real time)
+  and a generic `put_file`; `create_kb_note` now composes them (TUI `k` behaviour
+  unchanged).
+- **Overlay** (`apps/cli/scripts/`): `kh-capture` (wofi → fuzzel → zenity, returns
+  typed text and pipes to `cli capture`), `hyprland-kh-capture.conf` (`Super+K`
+  bind + optional floating-terminal multi-line variant with window rules), and a
+  `README.md` setup guide.
+- Docs: README (subcommands, desktop-capture section, spool dir), documentation.md
+  (`cli capture` usage), Cheatsheet Quick-Capture tab.
+
+## 2026-07-18 — Knowledge base: capture-everywhere + journal-as-derived-artifact + cheatsheet
+
+Reworked the knowledge base around low-friction capture and an auditable,
+re-buildable wiki. Concept summary in the "How it works" section of the
+Cheatsheet page (`/cheatsheet`).
+
+- **Pipeline (KB skills → v2.0.0, `apps/console/src/lib/kb-skills.ts`)**:
+  - `/kb-ingest` now appends every capture **verbatim** to a monthly journal
+    `.kh/journal/YYYY-MM.md` (single `# YYYY-MM` heading, one
+    `## [YYYY-MM-DD HH:MM] Title` section per capture) in addition to compiling
+    the deduplicated wiki. The journal is the human-readable log; the wiki is the
+    synthesized view.
+  - **Raw captures are immutable**; ingestion only flips `processed` and copies
+    the body into the journal — a bad compile is recoverable from git.
+  - **Provenance**: every wiki page carries a `## Sources` section linking claims
+    back to their journal entry / raw file. `/kb-lint` now flags missing sources
+    and topic drift (near-duplicate pages).
+  - **Canonical Topics** list in `schema.md` steers ingest toward merging rather
+    than fragmenting. Schema frontmatter is OKF-aligned (`type` field on captures
+    and wiki pages). Added `.kh/journal/.gitkeep` to the scaffold; refreshed
+    `CLAUDE.md` template and documented running ingest/index on a routine.
+- **Capture everywhere** (all write to `.kh/raw/` with `type` frontmatter):
+  - CLI: new `k` — "New knowledge note" menu item + `create_kb_note`
+    (`apps/cli/src/github.rs`, `app.rs`) writing an OKF-aligned file to
+    `.kh/raw/`, zero required structure.
+  - Console: `/quick-knowledge` page (`QuickKnowledgePage.tsx`) + PWA manifest +
+    home-screen shortcut (QUICK_ROUTES, vite `shortcuts`). Free-text only; the
+    first line becomes the title.
+  - Extension `PIN_ARTICLE` and console `addRawNote` now stamp `type:`
+    (`article` / `note`); `/kb-session` stamps `type: session`.
+- **Cheatsheet page** (`CheatsheetPage.tsx`, `/cheatsheet`): tabbed reference —
+  Knowledge Base (how the wiki works, required), Quick Capture, CLI Keys, Slash
+  Commands. Reachable from the Magic Menu (`onCheatsheetClick` plumbed through
+  `packages/ui/.../MainApp.tsx`).
+
 ## 2026-07-12 — Fix persistent cmd+k search CORS failures by cutting request volume
 
 - **Root cause (confirmed)**: `SearchModal.tsx` fired two concurrent

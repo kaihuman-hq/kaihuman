@@ -35,6 +35,8 @@ cargo run
 # Run with a subcommand
 cargo run -- server          # start local AI proxy on :4000
 cargo run -- server --port 3000
+cargo run -- capture "TIL ..."   # capture a knowledge note to .kh/raw/ (offline-safe)
+echo "note" | cargo run -- capture   # …or pipe it in (used by the desktop overlay)
 
 # Build a release binary
 cargo build --release
@@ -52,6 +54,7 @@ The CLI opens a browser window to authenticate via GitHub OAuth. After that it d
 | `l` | Login (GitHub OAuth) |
 | `s` | Select active repository |
 | `n` | Add a quick note to active repo |
+| `k` | Add a knowledge note to `.kh/raw/` (compiled by `/kb-ingest`) |
 | `a` | AI prompt — pipe to Claude / Copilot / Gemini |
 | `f` | File browser (syncs repo first) |
 | `d` | Dashboard config view (syncs repo first) |
@@ -62,6 +65,12 @@ The CLI opens a browser window to authenticate via GitHub OAuth. After that it d
 **File editor:** `Ctrl+S` saves · `Esc` closes
 
 See [`doc/documentation.md`](doc/documentation.md) for full key-binding reference.
+
+### Desktop quick-capture (Hyprland / wlroots)
+
+A `Super+K` overlay that captures a thought straight into `.kh/raw/` via
+`cli capture` (spooled locally, offline-safe). See
+[`apps/cli/scripts/README.md`](apps/cli/scripts/README.md) for setup.
 
 ## Web console — quick start
 
@@ -96,5 +105,6 @@ pnpm turbo test           # run tests
 ~/.config/com/lifosy/cli/
   auth.json            # GitHub token + active repo
   recent_files.json    # Last 20 opened files (relative repo paths)
+  spool/               # Pending knowledge captures awaiting push (offline queue)
   repos/<owner>/<repo> # Shallow git clone of active repo
 ```

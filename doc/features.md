@@ -20,6 +20,9 @@
 | Bookmarks (`.bookmarks.json`) — tagged, searchable bookmarks; mirrored into the browser extension | New File → Bookmarks | 2026-09-22 |
 | Command library (`.commands.md`) — shell commands with `{{name}}` parameters, a field per parameter and copy; run from the desktop palette (`>x`) | New File → Commands | 2026-09-23 |
 | Prompt library (`.prompts.md`) — searchable, taggable prompts in one grep-able file | New File → Prompts | 2026-09-16 |
+| Cheatsheet (tabbed reference: KB how-to, capture, CLI keys, slash commands) | `/cheatsheet` | 2026-07-18 |
+| Quick Knowledge capture (free-text → `.kh/raw/`) | `/quick-knowledge` | 2026-07-18 |
+| KB journal — monthly `.kh/journal/YYYY-MM.md` from `/kb-ingest` | `.kh/journal/` | 2026-07-18 |
 | Configurable desktop bottom navbar (stored in `.kh` config) | Settings → Bottom Navbar | 2026-06-26 |
 | Demo mode (in-memory seeded data) | `/demo` + login "View demo" | 2026-06-25 |
 | Quick todo to inbox | `/quick-todo` | 2026-03-28 |
@@ -93,6 +96,11 @@
 |---------|-----|-------|
 | GitHub OAuth login | `l` | Initial |
 | Quick note to active repo | `n` | Initial |
+| Knowledge note to `.kh/raw/` | `k` | 2026-07-18 |
+| Headless knowledge capture (offline-safe spool) | `cli capture` | 2026-07-18 |
+| Desktop quick-capture overlay (Hyprland `Super+K`) | `scripts/kh-capture` | 2026-07-18 |
+| Native-sdk capture app (experimental, Zig core, direct GitHub API + auth.json reuse) | `apps/kh-capture-native` | 2026-07-18 |
+| Agent-driven capture command (drives native app via automation server; auto-scaffolded to KB repo) | `/kb-agent-capture` | 2026-07-18 |
 | Select active repository | `s` | Initial |
 | Local AI server proxy | `cargo run -- server` | Initial |
 | AI prompt (Claude / Copilot / Gemini) | `a` | 2026-03-19 |

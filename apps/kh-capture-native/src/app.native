@@ -1,0 +1,17 @@
+<column gap="12" padding="16">
+  <text>Capture to knowledge base</text>
+
+  <input
+    placeholder="Something you learned… (Enter to save)"
+    text="{draft}"
+    on-input="draft_edit"
+    on-submit="submit"
+    autofocus="true"
+  />
+
+  <row gap="8" cross="center">
+    <button variant="primary" on-press="submit" disabled="{busy}">Save</button>
+    <button variant="ghost" on-press="dismiss">Dismiss</button>
+    <text grow="1">{status}</text>
+  </row>
+</column>

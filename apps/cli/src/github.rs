@@ -16,6 +16,33 @@ pub struct ContentResponse {
     pub content: String,
 }
 
+/// Build the `(filename, file-content)` for a knowledge capture. Frozen at call
+/// time so an offline capture keeps its real timestamp and date when it is
+/// finally pushed. The remote path is `.kh/raw/<filename>`.
+pub fn build_kb_note(text: &str) -> (String, String) {
+    let now = chrono::Utc::now();
+    let timestamp = now.timestamp_millis();
+    let date = now.format("%Y-%m-%d").to_string();
+
+    let first_line = text.lines().find(|l| !l.trim().is_empty()).unwrap_or("note").trim();
+    let slug: String = {
+        let s: String = first_line
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+            .collect();
+        let s = s.trim_matches('-').chars().take(40).collect::<String>();
+        if s.is_empty() { "note".to_string() } else { s }
+    };
+    let title = first_line.replace('"', "'").chars().take(80).collect::<String>();
+
+    let filename = format!("{}-{}.md", timestamp, slug);
+    let content = format!(
+        "---\ntitle: \"{}\"\nurl: ''\ndate: {}\nprocessed: false\ntags: [general]\n---\n\n{}\n",
+        title, date, text
+    );
+    (filename, content)
+}
+
 pub struct GithubClient {
     client: reqwest::Client,
 }
@@ -73,6 +100,45 @@ impl GithubClient {
         }
 
         Ok(())
+    }
+
+    /// Create a file at `path` via the GitHub contents API (create-only, no SHA).
+    pub async fn put_file(
+        &self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+        content: &str,
+        message: &str,
+    ) -> Result<()> {
+        let url = format!("https://api.github.com/repos/{}/{}/contents/{}", owner, repo, path);
+        let encoded_content = BASE64_STANDARD.encode(content);
+
+        #[derive(Serialize)]
+        struct PutBody {
+            message: String,
+            content: String,
+        }
+
+        let body = PutBody { message: message.to_string(), content: encoded_content };
+
+        let res = self.client.put(&url).json(&body).send().await?;
+
+        if !res.status().is_success() {
+            bail!("PUT {} failed: {}", path, res.status());
+        }
+
+        Ok(())
+    }
+
+    /// Write a knowledge capture to `.kh/raw/` as an immutable, OKF-aligned markdown
+    /// file. Zero required structure — the whole text is the body; a title and slug
+    /// are derived from the first line. `/kb-ingest` later folds it into the journal
+    /// and wiki.
+    pub async fn create_kb_note(&self, owner: &str, repo: &str, text: &str) -> Result<()> {
+        let (filename, content) = build_kb_note(text);
+        let path = format!(".kh/raw/{}", filename);
+        self.put_file(owner, repo, &path, &content, "note: add knowledge capture via CLI").await
     }
 
     pub async fn append_to_inbox(&self, owner: &str, repo: &str, text: &str) -> Result<()> {

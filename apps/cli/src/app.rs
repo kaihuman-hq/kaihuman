@@ -31,6 +31,7 @@ pub enum CurrentScreen {
 
 pub const MENU_ITEMS: &[(&str, &str)] = &[
     ("n", "New quick note"),
+    ("k", "New knowledge note  [→ .kh/raw/]"),
     ("s", "Select active repository"),
     ("a", "AI prompt  [Claude / Copilot / Gemini]"),
     ("f", "File browser"),
@@ -94,6 +95,9 @@ pub struct App<'a> {
     pub repos: Vec<Repository>,
     pub repo_list_state: ListState,
     pub note_textarea: TextArea<'a>,
+    /// When true, the active note-input screen writes to `.kh/raw/` (knowledge
+    /// capture) instead of the quick-note path.
+    pub note_is_kb: bool,
     pub should_quit: bool,
     pub trigger_login: bool,
     pub active_repo: Option<String>,
@@ -171,6 +175,7 @@ impl<'a> App<'a> {
             repos: Vec::new(),
             repo_list_state: ListState::default(),
             note_textarea,
+            note_is_kb: false,
             should_quit: false,
             trigger_login: false,
             active_repo,
@@ -437,8 +442,16 @@ impl<'a> App<'a> {
                 self.open_note_input();
             }
 
-            // s — Select repo
+            // k — New knowledge note (→ .kh/raw/)
             1 => {
+                if !self.ensure_authenticated(terminal).await? {
+                    return Ok(());
+                }
+                self.open_kb_note_input();
+            }
+
+            // s — Select repo
+            2 => {
                 if !self.ensure_authenticated(terminal).await? {
                     return Ok(());
                 }
@@ -455,13 +468,13 @@ impl<'a> App<'a> {
             }
 
             // a — AI prompt
-            2 => {
+            3 => {
                 self.current_screen = CurrentScreen::AiPrompt;
                 self.update_ai_prompt_title();
             }
 
             // f — File browser
-            3 => {
+            4 => {
                 if !self.ensure_authenticated(terminal).await? {
                     return Ok(());
                 }
@@ -469,7 +482,7 @@ impl<'a> App<'a> {
             }
 
             // d — Dashboard
-            4 => {
+            5 => {
                 if !self.ensure_authenticated(terminal).await? {
                     return Ok(());
                 }
@@ -477,7 +490,7 @@ impl<'a> App<'a> {
             }
 
             // l — Login
-            5 => {
+            6 => {
                 self.current_screen = CurrentScreen::Login;
                 terminal.draw(|f| ui::ui(f, self))?;
                 if self.auth_manager.login().await.is_ok() {
@@ -624,12 +637,27 @@ impl<'a> App<'a> {
     // ── Note input ────────────────────────────────────────────────────────────
 
     fn open_note_input(&mut self) {
+        self.note_is_kb = false;
         self.note_textarea = TextArea::default();
         self.note_textarea.set_block(
             ratatui::widgets::Block::default()
                 .borders(ratatui::widgets::Borders::ALL)
                 .title(format!(
                     "Note → {}  (Enter: save | Esc: cancel)",
+                    self.active_repo.as_deref().unwrap_or("?")
+                )),
+        );
+        self.current_screen = CurrentScreen::NoteInput;
+    }
+
+    fn open_kb_note_input(&mut self) {
+        self.note_is_kb = true;
+        self.note_textarea = TextArea::default();
+        self.note_textarea.set_block(
+            ratatui::widgets::Block::default()
+                .borders(ratatui::widgets::Borders::ALL)
+                .title(format!(
+                    "Knowledge → {} .kh/raw/  (Enter: save | Esc: cancel)",
                     self.active_repo.as_deref().unwrap_or("?")
                 )),
         );
@@ -649,7 +677,12 @@ impl<'a> App<'a> {
                         let mut parts = ar.split('/');
                         let owner = parts.next().unwrap_or("");
                         let repo = parts.next().unwrap_or("");
-                        if let Err(e) = client.create_quicknote(owner, repo, &text).await {
+                        let result = if self.note_is_kb {
+                            client.create_kb_note(owner, repo, &text).await
+                        } else {
+                            client.create_quicknote(owner, repo, &text).await
+                        };
+                        if let Err(e) = result {
                             let _ =
                                 std::fs::write("error.log", format!("Error saving note: {:?}", e));
                         }

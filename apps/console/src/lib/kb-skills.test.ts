@@ -46,6 +46,7 @@ describe('getScaffoldFiles', () => {
     expect(files).toHaveProperty('.kh/index.kb.md');
     expect(files).toHaveProperty('.kh/log.md');
     expect(files).toHaveProperty('.kh/raw/.gitkeep');
+    expect(files).toHaveProperty('.kh/journal/.gitkeep');
     expect(files).toHaveProperty('.kh/wiki/.gitkeep');
     expect(files).toHaveProperty('.claude/commands/kb-ingest.md', KB_INGEST_SKILL);
     expect(files).toHaveProperty('.claude/commands/kb-index.md');
@@ -53,6 +54,7 @@ describe('getScaffoldFiles', () => {
     expect(files).toHaveProperty('.claude/commands/kb-ask.md', KB_ASK_SKILL);
     expect(files).toHaveProperty('.claude/commands/kb-session.md', KB_SESSION_SKILL);
     expect(files).toHaveProperty('.claude/commands/kb-digest.md', KB_DIGEST_SKILL);
+    expect(files).toHaveProperty('.claude/commands/kb-agent-capture.md');
     expect(files).toHaveProperty('CLAUDE.md', KB_CLAUDE_MD);
   });
 
@@ -115,9 +117,9 @@ describe('command behaviour', () => {
 });
 
 describe('getSkillOnlyFiles', () => {
-  it('contains exactly the skill version file, six command files, and CLAUDE.md', () => {
+  it('contains exactly the skill version file, seven command files, and CLAUDE.md', () => {
     const files = getSkillOnlyFiles();
-    expect(Object.keys(files)).toHaveLength(8);
+    expect(Object.keys(files)).toHaveLength(9);
     expect(files).toHaveProperty('.kh/.skill-version', KB_SKILL_VERSION);
     expect(files).toHaveProperty('.claude/commands/kb-ingest.md');
     expect(files).toHaveProperty('.claude/commands/kb-index.md');
@@ -125,6 +127,7 @@ describe('getSkillOnlyFiles', () => {
     expect(files).toHaveProperty('.claude/commands/kb-ask.md');
     expect(files).toHaveProperty('.claude/commands/kb-session.md');
     expect(files).toHaveProperty('.claude/commands/kb-digest.md');
+    expect(files).toHaveProperty('.claude/commands/kb-agent-capture.md');
     expect(files).toHaveProperty('CLAUDE.md', KB_CLAUDE_MD);
   });
 
