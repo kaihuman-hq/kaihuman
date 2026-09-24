@@ -28,7 +28,14 @@ export interface Message {
     | 'ADD_TRANSLATION_HISTORY'
     | 'SET_TRANSLATION_KEY'
     | 'LIST_GITHUB_REPOS'
-    | 'TOGGLE_COMMAND_PALETTE';
+    | 'TOGGLE_COMMAND_PALETTE'
+    | 'GET_TODAY'
+    | 'GET_SYNC_STATUS'
+    | 'TODAY_CHECK_IN'
+    | 'TODAY_TOGGLE_TIMER'
+    | 'READ_LATER_DONE'
+    | 'READ_LATER_ADD'
+    | 'ADD_TODO';
   token?: string;
   path?: string;
   note?: string;
@@ -50,6 +57,8 @@ export interface Message {
   targets?: string[];
   /** `SET_TRANSLATION_KEY`: the DeepL API key; empty forgets it. */
   key?: string;
+  /** `READ_LATER_DONE`: the item to mark read. */
+  id?: string;
 }
 
 export interface MessageResponse {

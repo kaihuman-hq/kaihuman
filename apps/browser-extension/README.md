@@ -11,7 +11,7 @@ The official browser extension for Lifosy, designed to enhance your web experien
 - **Pinned Tabs Sync**: Save named groups of pinned tabs to your repo, and load any of them into the current window on any machine.
 - **Bookmarks**: Your repo's bookmarks, mirrored into the browser and synced at most once an hour. Bookmark the current page from the popup or the palette, or import the ones this browser already has. Opens are counted so you can find the ones you never use.
 - **Command Palette**: `Ctrl+Shift+K` on any page to search those bookmarks, repeat what you did last, run any of the extension's actions — and, on request, search your repo.
-- **Start Page**: a New Tab page of your own — the bookmarks you reach for, a box for a dump note, and the palette (which Chrome's own New Tab page cannot host).
+- **Start Page**: a New Tab page of your own — what is coming up and in progress, habit and time trackers, the read-later queue, world clocks, the bookmarks you reach for, a box for a note, todo or log entry, and the palette (which Chrome's own New Tab page cannot host).
 
 ## Popup
 
@@ -266,6 +266,7 @@ Everything the extension can do is here, so the popup is never the only way in:
 | Action | What it does |
 | --- | --- |
 | Bookmark this page… | Walks through URL, title and tags, each prefilled from the page |
+| Read later: this page | Adds it to the repo's `.readitlater.json` list (a new `reading.readitlater.json` if there is none) |
 | Pin this page to the Knowledge Base | Saves the page text as a note to process later |
 | Add the selected text to the Knowledge Base | The context menu's clipping, from the keyboard |
 | Add a note… | Pick the dump or any quick-note file, then type; an `.actionlog.md` target takes `#tags` in the text |
@@ -277,7 +278,7 @@ Everything the extension can do is here, so the popup is never the only way in:
 | Set the DeepL API key… | For `>t` translations; an empty key forgets it |
 | Open the Lifosy console | |
 
-The three page actions at the top — bookmark, pin, clip — need a page to read, so the palette on
+The four page actions at the top — bookmark, read later, pin, clip — need a page to read, so the palette on
 the start page starts at **Add a note…**. Everything below it is the same list.
 
 An action that needs arguments takes over the input and walks through them one at a time, with the
@@ -317,11 +318,26 @@ If a press still does nothing, work through these in order:
 ## Start Page
 
 The extension replaces Chrome's New Tab page with its own (`chrome_url_overrides.newtab`), which
-Chrome asks you to confirm the first time. It holds four things:
+Chrome asks you to confirm the first time. It holds:
 
+- **Sync status** — under the repo name: how old the cached data is (`synced 12 min ago`), how
+  many bookmark opens are still waiting to be pushed, and **sync**, which does what the palette's
+  **Sync with GitHub now** does and reloads the page's data.
 - **Search** — opens the command palette, with the whole action list and your bookmarks in it.
   Chrome keeps the focus in the address bar on an override page, so nothing here is focused for you
   and typing still goes to the omnibox: press the shortcut, or click the field.
+- **World clocks** — every zone in the repo's `.timezones.json` files, labelled by its first city.
+- **Coming up** — the next seven days of `.events.csv` (birthdays in their next year, a multi-day
+  event while it runs) and the next milestone due in a `.todos.md`, with its open todos.
+- **Doing** — every in-progress (`[>]`) todo, open todos whose milestone is past due (in red), and
+  how many are waiting in the inbox (`<app folder>/inbox.todos.md`). Every line opens its file in
+  the console.
+- **Trackers** — a card per `.habit.csv` (click to check in for today; shows the streak) and per
+  `.timetracking.csv` (click to clock in or out; shows today's total, ticking while it runs). Both
+  write the file exactly as the console's widgets do.
+- **Read later** — the three oldest unread items of the `.readitlater.json` files; a click opens
+  the page, **✓ read** marks it read. Pages get onto the list with the palette's **Read later: this
+  page**.
 - **Pinned tabs** — the saved pinned-tab groups, the same list the popup's **Pinned Tabs** panel
   shows, as compact cards in the bookmark grid. The group this window is running is outlined in the
   accent colour. Clicking a card loads it exactly as the popup's **Load** does — pins what is
@@ -337,12 +353,20 @@ Chrome asks you to confirm the first time. It holds four things:
   sets, so a pin made in either place shows up in both. A pin is never cut to fit the twelve. If the
   commit fails (offline, or the bookmark was deleted in the console meanwhile) the card goes back
   and the page says why.
-- **Dump note** — writes to `.lifeos/dump.md`. Any other target is one palette action away
-  (**Add a note…**), which is also the only place that reads the repo's quick-note list: a new tab
-  is opened far too often to spend a GitHub request on it.
+- **Note / Todo / Log** — one box, three targets: a note goes to `.lifeos/dump.md`, a todo is
+  appended to the inbox the console's quick-todo page uses (`#tags` move to the end), and a log
+  entry goes to the repo's action log (the app folder's first `.actionlog.md`), `#tags` and all.
+  Other note targets are one palette action away (**Add a note…**), which is also the only place
+  that reads the repo's quick-note list: a new tab is opened far too often to spend a GitHub
+  request on it.
 
 Bookmarks and tab groups come from the same caches the popup and the palette read, so a new tab costs no GitHub
-request of its own — a cache past its hour is refreshed in the background, as everywhere else.
+request of its own — a cache past its hour is refreshed in the background, as everywhere else. The
+rest comes from one more cache, refreshed on the same hourly alarm: one listing of the repo's tree,
+replayed with its `ETag` so an unchanged repo answers 304, and a read only of the event, todo,
+habit, time-tracking, timezone and read-later files whose content changed since. A section with no
+file behind it is not shown. Each click that writes (check-in, clock, read, todo) re-reads its file
+first and commits on top of it, so an edit made in the console since the last sync is kept.
 
 The **kaihuman** title opens the app, like the popup's.
 

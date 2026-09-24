@@ -2,6 +2,7 @@ import { PALETTE_HOST_ID } from '@lifosy/palette';
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Bookmark } from '../background/bookmarks';
+import type { TodaySummary } from '../background/today';
 import { StartPage } from './StartPage';
 
 const NOW = '2026-09-22T10:00:00.000Z';
@@ -23,6 +24,20 @@ let GROUPS: { id: string; name: string; createdAt: string; tabCount: number }[];
 let activeGroup: string | null;
 /** What the worker says to a pin; a string is answered as an error. */
 let pinReply: string | null;
+let TODAY: TodaySummary | undefined;
+
+const emptyToday = (): TodaySummary => ({
+  events: [],
+  inProgress: [],
+  overdue: [],
+  inbox: { path: '.kh/inbox.todos.md', count: 0 },
+  readLater: [],
+  habits: [],
+  timers: [],
+  clocks: [],
+  actionLogPath: '.kh/daily.actionlog.md',
+  fetchedAt: 0,
+});
 
 type Listener = (
   message: unknown,
@@ -63,6 +78,20 @@ const reply = (message: { type?: string; bookmarkId?: string; pinned?: boolean }
     return { opened: 1, unpinned: 0, name: 'Work' };
   }
   if (message.type === 'GET_RECENTS') return { recents: [] };
+  if (message.type === 'GET_TODAY') return TODAY ? { today: TODAY } : { error: 'offline' };
+  if (message.type === 'GET_SYNC_STATUS')
+    return { syncedAt: Date.now() - 12.5 * 60_000, pendingOpens: 2 };
+  if (message.type === 'TODAY_CHECK_IN' && TODAY) {
+    TODAY = {
+      ...TODAY,
+      habits: TODAY.habits.map((h) => ({ ...h, checkedToday: true, streak: h.streak + 1 })),
+    };
+    return { today: TODAY };
+  }
+  if (message.type === 'ADD_TODO' && TODAY) {
+    TODAY = { ...TODAY, inbox: { ...TODAY.inbox, count: TODAY.inbox.count + 1 } };
+    return { today: TODAY };
+  }
   return { success: true };
 };
 
@@ -105,6 +134,7 @@ beforeEach(() => {
   ];
   activeGroup = 'home';
   pinReply = null;
+  TODAY = undefined;
   store = { lifeos_token: 'token', lifeos_repo: 'owner/repo' };
   sent = [];
   listeners = [];
@@ -277,6 +307,158 @@ describe('StartPage', () => {
       note: 'remember this',
     });
     await waitFor(() => textarea.value === '');
+  });
+
+  it('shows what is coming up, in progress, the trackers, read later and the clocks', async () => {
+    TODAY = {
+      ...emptyToday(),
+      events: [
+        {
+          name: 'Offsite',
+          type: 'general',
+          date: '2026-09-25',
+          daysUntil: 2,
+          path: 'e.events.csv',
+        },
+        { name: 'Anna', type: 'birthday', date: '2026-09-24', daysUntil: 1, path: 'e.events.csv' },
+      ],
+      milestone: {
+        name: 'Launch',
+        dueDate: '2026-09-30',
+        daysUntil: 7,
+        open: 2,
+        path: 'p.todos.md',
+      },
+      inProgress: [{ text: 'Implement demo mode', path: 'p.todos.md' }],
+      overdue: [{ text: 'Fix alpha', path: 'p.todos.md', milestone: 'Alpha' }],
+      inbox: { path: '.kh/inbox.todos.md', count: 3 },
+      habits: [{ path: '.kh/health.habit.csv', name: 'health', checkedToday: false, streak: 4 }],
+      timers: [
+        { path: '.kh/work.timetracking.csv', name: 'work', running: false, closedMinutes: 125 },
+      ],
+      readLater: [
+        {
+          id: 'r1',
+          url: 'https://read.example/',
+          name: 'Long read',
+          createdAt: 0,
+          path: 'r.readitlater.json',
+        },
+      ],
+      clocks: [{ zone: 'Asia/Tokyo', label: 'Tokyo' }],
+    };
+    await mount(() => host.textContent?.includes('Implement demo mode') ?? false);
+
+    const text = host.textContent ?? '';
+    expect(text).toContain('in 2 days');
+    expect(text).toContain("Anna's birthday");
+    expect(text).toContain('Launch');
+    expect(text).toContain('3 in the inbox');
+    expect(text).toContain('! Fix alpha');
+    expect(text).toContain('4d streak');
+    expect(text).toContain('2h 05m');
+    expect(text).toContain('Long read');
+    expect(host.querySelector('ul[aria-label="World clocks"]')?.textContent).toMatch(
+      /Tokyo \d\d:\d\d/,
+    );
+
+    click('Implement demo mode');
+    await waitFor(() => sent.some((message) => message.type === 'OPEN_URL'));
+    expect(sent.find((message) => message.type === 'OPEN_URL')).toEqual({
+      type: 'OPEN_URL',
+      url: 'https://app.kaihuman.com/files/p.todos.md?repo=owner%2Frepo',
+      reuse: true,
+    });
+  });
+
+  it('checks a habit in from its card', async () => {
+    TODAY = {
+      ...emptyToday(),
+      habits: [{ path: '.kh/health.habit.csv', name: 'health', checkedToday: false, streak: 4 }],
+    };
+    await mount(() => host.textContent?.includes('4d streak') ?? false);
+
+    click('health');
+    await waitFor(() => host.textContent?.includes('5d streak') ?? false);
+
+    expect(sent.find((message) => message.type === 'TODAY_CHECK_IN')).toEqual({
+      type: 'TODAY_CHECK_IN',
+      path: '.kh/health.habit.csv',
+    });
+  });
+
+  it('marks a read-later item read', async () => {
+    TODAY = {
+      ...emptyToday(),
+      readLater: [
+        {
+          id: 'r1',
+          url: 'https://read.example/',
+          name: 'Long read',
+          createdAt: 0,
+          path: 'r.readitlater.json',
+        },
+      ],
+    };
+    await mount(() => host.textContent?.includes('Long read') ?? false);
+
+    (
+      host.querySelector('button[aria-label="Mark Long read as read"]') as HTMLButtonElement
+    ).click();
+    await waitFor(() => sent.some((message) => message.type === 'READ_LATER_DONE'));
+
+    expect(sent.find((message) => message.type === 'READ_LATER_DONE')).toEqual({
+      type: 'READ_LATER_DONE',
+      path: 'r.readitlater.json',
+      id: 'r1',
+    });
+  });
+
+  it('turns the note box into a todo for the inbox or an action log entry', async () => {
+    TODAY = emptyToday();
+    await mount(() => host.textContent?.includes('newer') ?? false);
+    const textarea = host.querySelector('textarea') as HTMLTextAreaElement;
+    const type = async (value: string) => {
+      textarea.value = value;
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      await tick();
+    };
+
+    click('Todo');
+    await waitFor(() => host.textContent?.includes('.kh/inbox.todos.md') ?? false);
+    await type('Buy milk #home');
+    click('Add todo');
+    await waitFor(() => sent.some((message) => message.type === 'ADD_TODO'));
+    expect(sent.find((message) => message.type === 'ADD_TODO')).toEqual({
+      type: 'ADD_TODO',
+      text: 'Buy milk #home',
+    });
+    await waitFor(() => textarea.value === '');
+
+    click('Log');
+    await waitFor(() => host.textContent?.includes('.kh/daily.actionlog.md') ?? false);
+    await type('Shipped it #work #milestone');
+    click('Log it');
+    await waitFor(() => sent.some((message) => message.type === 'ADD_ACTION_LOG'));
+    expect(sent.find((message) => message.type === 'ADD_ACTION_LOG')).toEqual({
+      type: 'ADD_ACTION_LOG',
+      path: '.kh/daily.actionlog.md',
+      description: 'Shipped it',
+      tags: ['work', 'milestone'],
+    });
+  });
+
+  it('says how fresh the data is and syncs on request', async () => {
+    await mount(() => host.textContent?.includes('synced 12 min ago') ?? false);
+    expect(host.textContent).toContain('2 opens to push');
+
+    const before = sent.filter((message) => message.type === 'GET_BOOKMARKS').length;
+    click('sync');
+    await waitFor(() => sent.filter((message) => message.type === 'GET_BOOKMARKS').length > before);
+    expect(sent.find((message) => message.type === 'SYNC_NOW')).toEqual({
+      type: 'SYNC_NOW',
+      force: true,
+    });
   });
 
   it('opens the palette when the worker relays the shortcut', async () => {

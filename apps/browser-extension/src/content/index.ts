@@ -102,6 +102,15 @@ const paletteActions = (): PaletteAction[] => [
     run: ([url = '', title = '', tags = '']: string[]) => bookmarkPage(url, title, splitTags(tags)),
   },
   {
+    id: 'read-later',
+    title: 'Read later: this page',
+    subtitle: 'Adds it to the repo’s read-later list, which the start page shows',
+    run: async () => {
+      await send({ type: 'READ_LATER_ADD', url: pageUrl(), title: document.title });
+      return `Saved “${document.title || pageUrl()}” for later`;
+    },
+  },
+  {
     id: 'pin-article',
     title: 'Pin this page to the Knowledge Base',
     subtitle: 'Saves the page text as a note to process later',

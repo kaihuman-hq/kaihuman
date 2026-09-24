@@ -58,6 +58,22 @@ import {
   tabsToUnpin,
   toPinnedTabs,
 } from './pinned-tabs';
+import {
+  addReadLater,
+  appendTodo,
+  buildToday,
+  checkInHabit,
+  fetchToday,
+  inboxPath,
+  isTodayCacheStale,
+  isTodayCacheUsable,
+  localDate,
+  markRead,
+  readLaterPath,
+  type TodayCache,
+  toggleTimer,
+  withFile,
+} from './today';
 
 console.log('LifeOS Extension: Background script loaded');
 
@@ -80,6 +96,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'repoSync') {
     syncBookmarks().catch((e) => console.warn('LifeOS Extension: bookmark sync failed', e));
     syncPinnedTabs().catch((e) => console.warn('LifeOS Extension: pinned tab sync failed', e));
+    syncToday().catch((e) => console.warn('LifeOS Extension: start page sync failed', e));
   }
 });
 
@@ -196,6 +213,7 @@ async function syncIfStale(force = false) {
     await syncPinnedTabs().catch((e) =>
       console.warn('LifeOS Extension: pinned tab sync failed', e),
     );
+    await syncToday().catch((e) => console.warn('LifeOS Extension: start page sync failed', e));
   }
   return { synced: true, bookmarks: synced?.bookmarks.length ?? 0 };
 }
@@ -931,6 +949,94 @@ async function deletePinnedTabGroup(token: string, repo: string, groupId: string
   return { name };
 }
 
+async function readTodayCache(): Promise<TodayCache | undefined> {
+  const stored = await chrome.storage.local.get('todayCache');
+  return stored.todayCache as TodayCache | undefined;
+}
+
+/** The start page's files, on the same hourly budget as the bookmarks. */
+async function syncToday(): Promise<TodayCache | undefined> {
+  const { token, repo } = await credentials();
+  if (!token) return undefined;
+  const next = await fetchToday(token, repo, await readTodayCache());
+  await chrome.storage.local.set({ todayCache: next });
+  return next;
+}
+
+/** Cache first, like the bookmarks: a new tab never waits on GitHub unless there is no cache. */
+async function getToday() {
+  const { repo } = await credentials();
+  let cache = await readTodayCache();
+  if (isTodayCacheUsable(cache, repo) && cache) {
+    if (isTodayCacheStale(cache)) {
+      syncToday().catch((e) => console.warn('LifeOS Extension: start page refresh failed', e));
+    }
+  } else {
+    cache = await syncToday();
+    if (!cache) throw new Error(NOT_LOGGED_IN);
+  }
+  return { today: buildToday(cache, new Date()) };
+}
+
+/**
+ * Commits one change to one of the start page's files and answers with the updated summary. The
+ * file is re-read first, as every other write here does, so an edit made in the console since the
+ * last sync is built on rather than overwritten.
+ */
+async function commitTodayFile(
+  path: { path: string; suffix: string } | ((cache: TodayCache) => string),
+  change: (content: string) => string,
+) {
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  let cache = await readTodayCache();
+  if (!isTodayCacheUsable(cache, repo) || !cache) cache = await syncToday();
+  if (!cache) throw new Error(NOT_LOGGED_IN);
+
+  const target = typeof path === 'function' ? path(cache) : path.path;
+  // Only a file the page shows, of the kind the action is for, may be written from a message: a
+  // habit check-in rewrites the whole file, which would wreck a todo list.
+  if (
+    typeof path !== 'function' &&
+    (!target.toLowerCase().endsWith(path.suffix) ||
+      !cache.files.some((file) => file.path === target))
+  ) {
+    throw new Error(`${target} is not one of the start page's ${path.suffix} files`);
+  }
+  const file = await githubReadFile(token, repo, target);
+  const content = change(file?.content ?? '');
+  const sha = await githubWriteFile(token, repo, target, content, file?.sha);
+
+  const next = withFile(cache, { path: target, sha: sha ?? '', content });
+  await chrome.storage.local.set({ todayCache: next });
+  return { today: buildToday(next, new Date()) };
+}
+
+/** How fresh the start page's data is, and what is still waiting to be pushed. */
+async function syncStatus() {
+  const { repo } = await credentials();
+  const bookmarks = await readBookmarksCache();
+  const today = await readTodayCache();
+  const fetched = [
+    isCacheUsable(bookmarks, repo) ? bookmarks?.fetchedAt : undefined,
+    isTodayCacheUsable(today, repo) ? today?.fetchedAt : undefined,
+  ].filter((at): at is number => typeof at === 'number');
+  const usage = await readUsage(repo);
+  return {
+    // The oldest of the caches is what the page can vouch for.
+    syncedAt: fetched.length ? Math.min(...fetched) : null,
+    pendingOpens: Object.values(usage.deltas).reduce((sum, delta) => sum + delta.count, 0),
+  };
+}
+
+const answer = (work: Promise<object>, sendResponse: (response: unknown) => void) => {
+  work.then(
+    (result) => sendResponse({ success: true, ...result }),
+    (error) => sendResponse({ error: error.message }),
+  );
+  return true; // Indicate async response
+};
+
 // Message Handling
 chrome.runtime.onMessage.addListener((message: Message | any, sender, sendResponse) => {
   if (message.type === 'AUTH_TOKEN_UPDATE' && message.token) {
@@ -944,6 +1050,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     });
     // A new token can mean a different account, whose repo file is a different list.
     chrome.storage.local.remove('bookmarksCache');
+    chrome.storage.local.remove('todayCache');
     return false;
   }
 
@@ -1256,6 +1363,60 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       }
     });
     return true; // Indicate async response
+  }
+
+  if (message.type === 'GET_TODAY') return answer(getToday(), sendResponse);
+
+  if (message.type === 'GET_SYNC_STATUS') return answer(syncStatus(), sendResponse);
+
+  if (message.type === 'TODAY_CHECK_IN') {
+    const date = localDate(new Date());
+    return answer(
+      commitTodayFile({ path: message.path || '', suffix: '.habit.csv' }, (csv) =>
+        checkInHabit(csv, date)),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'TODAY_TOGGLE_TIMER') {
+    const now = new Date();
+    return answer(
+      commitTodayFile({ path: message.path || '', suffix: '.timetracking.csv' }, (csv) =>
+        toggleTimer(csv, now),
+      ),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'READ_LATER_DONE') {
+    return answer(
+      commitTodayFile({ path: message.path || '', suffix: '.readitlater.json' }, (json) =>
+        markRead(json, message.id || '', Date.now()),
+      ),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'READ_LATER_ADD') {
+    if (!isOpenableUrl(message.url || '')) {
+      sendResponse({ error: 'Only web pages can be saved for later' });
+      return false;
+    }
+    const page = { url: message.url, title: message.title || '' };
+    return answer(
+      commitTodayFile(readLaterPath, (json) =>
+        addReadLater(json, page, Date.now(), crypto.randomUUID()),
+      ),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'ADD_TODO') {
+    const created = new Date().toISOString();
+    return answer(
+      commitTodayFile(inboxPath, (md) => appendTodo(md, message.text || '', created)),
+      sendResponse,
+    );
   }
 
   if (message.type === 'PIN_ARTICLE') {

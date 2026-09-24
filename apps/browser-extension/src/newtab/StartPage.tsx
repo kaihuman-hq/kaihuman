@@ -6,11 +6,14 @@ import {
   paletteModes,
   portHandlers,
   repoActions,
+  splitTags,
 } from '@lifosy/palette';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { type Bookmark, startPageBookmarks } from '../background/bookmarks';
-import { CONSOLE_URL } from '../console';
+import { DEFAULT_ACTION_LOG_PATH, type TodaySummary } from '../background/today';
+import { CONSOLE_URL, consoleFileUrl } from '../console';
 import { send, workerPort } from '../palette/port';
+import { Clocks, SyncStatus, TodaySection } from './Today';
 
 /** Where the note box writes. Any other target is one palette action away ("Add a note…"), which
  * is also the only place that reads the repo's quick-note list — a new tab is opened far too often
@@ -18,6 +21,18 @@ import { send, workerPort } from '../palette/port';
 const DUMP_PATH = '.lifeos/dump.md';
 
 const DEFAULT_REPO = 'lifosy/monorepo';
+
+/** What the capture box writes: a note to the dump, a todo to the inbox, or an action log entry. */
+type CaptureKind = 'note' | 'todo' | 'log';
+
+const CAPTURE: Record<CaptureKind, { label: string; placeholder: string; submit: string }> = {
+  note: { label: 'Note', placeholder: 'Something to write down…', submit: 'Add note' },
+  todo: { label: 'Todo', placeholder: 'Something to do… #tags', submit: 'Add todo' },
+  log: { label: 'Log', placeholder: 'What happened? #tags', submit: 'Log it' },
+};
+
+/** The clocks and a running timer only show minutes, so ticking faster would redraw for nothing. */
+const TICK_MS = 30_000;
 
 /** What the worker lists for each saved group of pinned tabs — the popup's view of them too. */
 interface TabGroupSummary {
@@ -72,6 +87,18 @@ export function StartPage() {
   const [note, setNote] = useState('');
   const [noteStatus, setNoteStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [noteError, setNoteError] = useState<string | null>(null);
+  const [capture, setCapture] = useState<CaptureKind>('note');
+  const [today, setToday] = useState<TodaySummary | null>(null);
+  const [todayError, setTodayError] = useState<string | null>(null);
+  // One commit at a time, as with the pins: two would race each other for the file's sha.
+  const [busyPath, setBusyPath] = useState<string | null>(null);
+  const [sync, setSync] = useState<{ syncedAt: number | null; pendingOpens: number }>({
+    syncedAt: null,
+    pendingOpens: 0,
+  });
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
 
   // Built on first use, like the content script's, so a tab nobody searches from pays nothing.
   const paletteRef = useRef<CommandPalette | null>(null);
@@ -99,20 +126,43 @@ export function StartPage() {
       (e: Error) => setTabGroupsError(e.message),
     );
 
+  const refreshSyncStatus = () =>
+    send({ type: 'GET_SYNC_STATUS' }).then(
+      (response) =>
+        setSync({ syncedAt: response.syncedAt ?? null, pendingOpens: response.pendingOpens ?? 0 }),
+      (e: Error) => console.warn('LifeOS Extension: could not read the sync status', e),
+    );
+
+  // Every read here is served from a cache the worker refreshes in the background when its hour
+  // is up, so opening a tab costs no GitHub request.
+  const loadAll = () => {
+    const loads = [
+      send({ type: 'GET_BOOKMARKS' }).then(
+        (response) => setBookmarks(response.bookmarks),
+        (e: Error) => setBookmarksError(e.message),
+      ),
+      refreshTabGroups(),
+      send({ type: 'GET_TODAY' }).then(
+        (response) => {
+          setToday(response.today);
+          setTodayError(null);
+        },
+        (e: Error) => setTodayError(e.message),
+      ),
+    ];
+    // Asked last, so it reports on whatever the loads above just fetched.
+    return Promise.all(loads).then(refreshSyncStatus);
+  };
+
   useEffect(() => {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], (result) => {
       const storedToken = (result.lifeos_token as string) || null;
       setToken(storedToken);
       setRepo((result.lifeos_repo as string) || DEFAULT_REPO);
-      if (!storedToken) return;
-      // Served from the cache, which refreshes itself in the background when the hour is up.
-      send({ type: 'GET_BOOKMARKS' }).then(
-        (response) => setBookmarks(response.bookmarks),
-        (e: Error) => setBookmarksError(e.message),
-      );
-      // Also served from a cache, so listing the groups costs no GitHub request either.
-      void refreshTabGroups();
+      if (storedToken) void loadAll();
     });
+    const timer = setInterval(() => setNow(new Date()), TICK_MS);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -189,12 +239,61 @@ export function StartPage() {
     }
   };
 
+  const syncNow = async () => {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      await send({ type: 'SYNC_NOW', force: true });
+      await loadAll();
+    } catch (e: any) {
+      setSyncError(e.message || 'Sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  /** Commits one tracker or read-later change; the worker answers with the updated summary. */
+  const commitToday = async (busy: string, message: object) => {
+    setBusyPath(busy);
+    setTodayError(null);
+    try {
+      const response = await send(message);
+      setToday(response.today);
+    } catch (e: any) {
+      setTodayError(e.message || 'Could not save that');
+    } finally {
+      setBusyPath(null);
+    }
+  };
+
+  const openFile = (path: string) => openInThisTab(consoleFileUrl(path, repo));
+
+  const captureTarget =
+    capture === 'note'
+      ? DUMP_PATH
+      : capture === 'todo'
+        ? (today?.inbox.path ?? 'inbox.todos.md')
+        : (today?.actionLogPath ?? DEFAULT_ACTION_LOG_PATH);
+
   const addNote = async () => {
     if (!note.trim()) return;
     setNoteStatus('saving');
     setNoteError(null);
     try {
-      await send({ type: 'DUMP_NOTE', path: DUMP_PATH, note });
+      if (capture === 'note') {
+        await send({ type: 'DUMP_NOTE', path: DUMP_PATH, note });
+      } else if (capture === 'todo') {
+        const response = await send({ type: 'ADD_TODO', text: note });
+        setToday(response.today);
+      } else {
+        // Without a summary yet the worker falls back on its own default log.
+        await send({
+          type: 'ADD_ACTION_LOG',
+          path: today?.actionLogPath,
+          description: note.replace(/#[\w-]+/g, '').trim(),
+          tags: splitTags(note.match(/#[\w-]+/g)?.join(' ') ?? ''),
+        });
+      }
       setNote('');
       setNoteStatus('success');
       setTimeout(() => setNoteStatus('idle'), 2000);
@@ -236,8 +335,18 @@ export function StartPage() {
       <div class="mx-auto w-full max-w-3xl flex flex-col gap-8">
         <header class="flex items-baseline justify-between gap-4 border-b border-[var(--los-border)] pb-3">
           {title}
-          <span class="text-xs text-[var(--los-muted)] truncate" title={repo}>
-            {repo}
+          <span class="flex flex-col items-end gap-0.5 min-w-0">
+            <span class="text-xs text-[var(--los-muted)] truncate max-w-full" title={repo}>
+              {repo}
+            </span>
+            <SyncStatus
+              syncedAt={sync.syncedAt}
+              pendingOpens={sync.pendingOpens}
+              syncing={syncing}
+              error={syncError}
+              now={now}
+              onSync={() => void syncNow()}
+            />
           </span>
         </header>
 
@@ -251,6 +360,25 @@ export function StartPage() {
             {isMac() ? '⌘⇧K' : 'Ctrl+Shift+K'}
           </kbd>
         </button>
+
+        {todayError && <p class="text-xs text-red-400 break-words">{todayError}</p>}
+        {today && (
+          <>
+            <Clocks clocks={today.clocks} now={now} />
+            <TodaySection
+              today={today}
+              now={now}
+              busyPath={busyPath}
+              onOpenFile={openFile}
+              onOpenUrl={openInThisTab}
+              onCheckIn={(path) => void commitToday(path, { type: 'TODAY_CHECK_IN', path })}
+              onToggleTimer={(path) => void commitToday(path, { type: 'TODAY_TOGGLE_TIMER', path })}
+              onReadDone={(path, id) =>
+                void commitToday(`${path}#${id}`, { type: 'READ_LATER_DONE', path, id })
+              }
+            />
+          </>
+        )}
 
         <section class="flex flex-col gap-3">
           <h2 class="text-xs uppercase tracking-wider text-[var(--los-muted)]">Pinned tabs</h2>
@@ -361,16 +489,40 @@ export function StartPage() {
 
         <section class="flex flex-col gap-3">
           <div class="flex items-baseline justify-between gap-4">
-            <h2 class="text-xs uppercase tracking-wider text-[var(--los-muted)]">Dump note</h2>
-            <span class="text-[10px] text-[var(--los-muted)]" title={`${repo}/${DUMP_PATH}`}>
-              {DUMP_PATH}
+            <fieldset class="flex gap-3">
+              <legend class="sr-only">Capture as</legend>
+              {(Object.keys(CAPTURE) as CaptureKind[]).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => {
+                    setCapture(kind);
+                    // "Added!" belongs to the last target, not the one just picked.
+                    setNoteStatus('idle');
+                  }}
+                  aria-pressed={capture === kind}
+                  class={`text-xs uppercase tracking-wider transition-colors ${
+                    capture === kind
+                      ? 'text-[var(--los-accent)]'
+                      : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]'
+                  }`}
+                >
+                  {CAPTURE[kind].label}
+                </button>
+              ))}
+            </fieldset>
+            <span
+              class="text-[10px] text-[var(--los-muted)] truncate"
+              title={`${repo}/${captureTarget}`}
+            >
+              {captureTarget}
             </span>
           </div>
           <textarea
             value={note}
             onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)}
             class="w-full min-h-[120px] rounded border border-[var(--los-border)] bg-transparent p-3 text-sm focus:border-[var(--los-accent)] focus:outline-none resize-y"
-            placeholder="Something to write down…"
+            placeholder={CAPTURE[capture].placeholder}
           />
           {noteStatus === 'error' && noteError && (
             <p class="text-xs text-red-400 break-words">{noteError}</p>
@@ -381,7 +533,11 @@ export function StartPage() {
             disabled={noteStatus === 'saving' || !note.trim()}
             class="self-start px-4 py-2 rounded bg-[var(--los-accent)] text-black text-xs font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {noteStatus === 'saving' ? 'Saving…' : noteStatus === 'success' ? 'Added!' : 'Add note'}
+            {noteStatus === 'saving'
+              ? 'Saving…'
+              : noteStatus === 'success'
+                ? 'Added!'
+                : CAPTURE[capture].submit}
           </button>
         </section>
       </div>
