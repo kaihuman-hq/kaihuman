@@ -5,6 +5,7 @@ import {
   claudeUsageMode,
   commandsMode,
   dumpMode,
+  fileChoices,
   formatStamp,
   GITHUB_REPO_VIEWS,
   githubSearchUrl,
@@ -145,7 +146,75 @@ const submit = (found: PaletteMode, query: string) => {
   return found.submit(query);
 };
 
+describe('fileChoices', () => {
+  const todos = { path: 'work/inbox.todos.md', name: 'inbox.todos.md', url: 'https://x/inbox' };
+
+  it('offers nothing for a file no widget adds to, so it simply opens', () => {
+    expect(fileChoices(fakePort, { path: 'a/b.ts', name: 'b.ts', url: 'https://x/b' })).toEqual([]);
+  });
+
+  it('opens the file in the console, or adds an entry over the version read', async () => {
+    const [open, add] = fileChoices(fakePort, todos);
+    expect(open).toMatchObject({
+      title: 'Open inbox.todos.md in Kaihuman',
+      url: 'https://x/inbox',
+    });
+    expect(add?.title).toBe('Add a todo…');
+    expect(add?.action?.prompts).toEqual([{ label: 'What needs to be done? #tags' }]);
+
+    answers.READ_ENTRY_FILE = { content: '- [ ] Old\n', sha: 'v1' };
+    answers.WRITE_ENTRY_FILE = {};
+    expect(await add?.action?.run?.(['Call the bank #admin'])).toBe(
+      'Added a todo to work/inbox.todos.md',
+    );
+    expect(sent[0]).toEqual({ type: 'READ_ENTRY_FILE', path: 'work/inbox.todos.md' });
+    expect(sent[1]).toMatchObject({
+      type: 'WRITE_ENTRY_FILE',
+      path: 'work/inbox.todos.md',
+      sha: 'v1',
+    });
+    expect((sent[1] as { content?: string }).content).toMatch(
+      /^- \[ \] Old\n- \[ \] Call the bank #admin\n::created:: /,
+    );
+  });
+
+  it('creates a file that is not there yet, and writes nothing when the answer does not fit', async () => {
+    const [, add] = fileChoices(fakePort, { path: 'x.events.csv', name: 'x', url: 'https://x' });
+    answers.READ_ENTRY_FILE = { content: '' };
+    answers.WRITE_ENTRY_FILE = {};
+    await add?.action?.run?.(['Trip', 'general', '2026-10-01', '']);
+    expect(sent[1]).toEqual({
+      type: 'WRITE_ENTRY_FILE',
+      path: 'x.events.csv',
+      content: 'name;type;start iso date;end iso date\nTrip;general;2026-10-01;2026-10-01\n',
+    });
+
+    sent = [];
+    await expect(add?.action?.run?.(['', 'general', '2026-10-01', ''])).rejects.toThrow(
+      'needs a name',
+    );
+    expect(sent.map((request) => request.type)).toEqual(['READ_ENTRY_FILE']);
+  });
+});
+
 describe('paletteModes', () => {
+  it('>f lists the files widgets add to, each leading to its choices', async () => {
+    answers.LIST_ENTRY_FILES = {
+      files: [{ path: 'a/b.actionlog.md', name: 'b.actionlog.md', url: 'https://x/b' }],
+    };
+    const [item] = await load(mode('f'));
+    expect(item).toMatchObject({ title: 'b.actionlog.md', subtitle: 'a/b.actionlog.md' });
+    expect(item?.action?.choices?.([]).map((choice) => choice.title)).toEqual([
+      'Open b.actionlog.md in Kaihuman',
+      'Add an action…',
+    ]);
+  });
+
+  it('>f says so when there are no such files', async () => {
+    answers.LIST_ENTRY_FILES = { files: [] };
+    await expect(load(mode('f'))).rejects.toThrow('No todo lists');
+  });
+
   it('lists the prompts of every prompts file, copying the body', async () => {
     answers.LIST_PROMPT_FILES = {
       files: [

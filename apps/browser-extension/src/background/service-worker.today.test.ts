@@ -245,3 +245,58 @@ describe('GET_SYNC_STATUS', () => {
     expect((await call({ type: 'GET_SYNC_STATUS' })).syncedAt).toBeNull();
   });
 });
+
+describe('the palette’s widget entries', () => {
+  it('lists the files it can add to, with their console links', async () => {
+    remote['notes/plain.md'] = 'x';
+    remote['family.events.csv'] = '';
+    const response = await call({ type: 'LIST_ENTRY_FILES' });
+    expect(response.files.map((file: any) => file.path)).toEqual([
+      '.kh/inbox.todos.md',
+      'family.events.csv',
+    ]);
+    expect(response.files[0]).toMatchObject({
+      name: 'inbox.todos.md',
+      url: expect.stringContaining('/files/.kh/inbox.todos.md?repo=o%2Fr'),
+    });
+  });
+
+  it('reads a file with its version, and a missing one as empty', async () => {
+    expect(await call({ type: 'READ_ENTRY_FILE', path: '.kh/inbox.todos.md' })).toMatchObject({
+      content: '- [ ] existing\n',
+      sha: 'sha-.kh/inbox.todos.md',
+    });
+    const missing = await call({ type: 'READ_ENTRY_FILE', path: 'new.events.csv' });
+    expect(missing).toMatchObject({ success: true, content: '' });
+    expect(missing.sha).toBeUndefined();
+  });
+
+  it('writes over the version read and keeps the start page’s cache in step', async () => {
+    seedCache();
+    const content = '- [ ] existing\n- [ ] added\n';
+    const response = await call({
+      type: 'WRITE_ENTRY_FILE',
+      path: '.kh/inbox.todos.md',
+      content,
+      sha: 'sha-.kh/inbox.todos.md',
+    });
+    expect(response.success).toBe(true);
+    expect(remote['.kh/inbox.todos.md']).toBe(content);
+    expect(JSON.parse(writes()[0]?.[1].body).sha).toBe('sha-.kh/inbox.todos.md');
+    expect(store.todayCache.files.find((f: any) => f.path === '.kh/inbox.todos.md')).toEqual({
+      path: '.kh/inbox.todos.md',
+      sha: 'new-sha',
+      content,
+    });
+  });
+
+  it('refuses any other file, or a path out of the repository', async () => {
+    for (const path of ['secret.md', '../x.todos.md', '/x.todos.md', 'a//x.todos.md']) {
+      expect((await call({ type: 'READ_ENTRY_FILE', path })).error).toContain('Refusing');
+      expect((await call({ type: 'WRITE_ENTRY_FILE', path, content: 'x' })).error).toContain(
+        'Refusing',
+      );
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

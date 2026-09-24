@@ -14,8 +14,10 @@ import type {
   PaletteAction,
   PaletteHandlers,
   PaletteMode,
+  RepoResult,
 } from './command-palette.js';
 import { commandParameters, fillCommand, parseCommands } from './commands.js';
+import { type EntryKind, entryKindOf } from './entries.js';
 import { parsePrompts } from './prompts.js';
 import type { ActionPort } from './protocol.js';
 import { parseTranslationQuery, usefulTranslations } from './translate.js';
@@ -532,8 +534,68 @@ export const claudeUsageMode = (port: ActionPort): PaletteMode => ({
 });
 
 /**
+ * Reads the file, adds the entry and writes it back over the version read — a change made in the
+ * console meanwhile fails the write rather than being overwritten.
+ */
+const addEntry = async (port: ActionPort, path: string, kind: EntryKind, answers: string[]) => {
+  const { content, sha } = await port.send({ type: 'READ_ENTRY_FILE', path });
+  const next = kind.add(content, answers, new Date());
+  await port.send({ type: 'WRITE_ENTRY_FILE', path, content: next, ...(sha ? { sha } : {}) });
+};
+
+/**
+ * What can be done with a repo file whose widget can add to it: open it in the console, or add an
+ * entry as the widget's Add form would. None for any other file, which is simply opened.
+ */
+export const fileChoices = (port: ActionPort, file: RepoResult): ModeItem[] => {
+  const kind = entryKindOf(file.path);
+  if (!kind) return [];
+  return [
+    {
+      id: `repo:${file.path}`,
+      title: `Open ${file.name} in Kaihuman`,
+      subtitle: file.path,
+      url: file.url,
+    },
+    {
+      id: `entry:${file.path}`,
+      title: `Add ${kind.entry}…`,
+      subtitle: file.path,
+      action: {
+        id: `entry:${file.path}`,
+        title: `Add ${kind.entry} to ${file.name}`,
+        subtitle: file.path,
+        prompts: kind.prompts,
+        // Recent replays actions by id from the top-level list, which this is not in.
+        recent: false,
+        run: async (answers) => {
+          await addEntry(port, file.path, kind, answers);
+          return `Added ${kind.entry} to ${file.path}`;
+        },
+      },
+    },
+  ];
+};
+
+const entryFileItems = async (port: ActionPort): Promise<ModeItem[]> => {
+  const { files } = await port.send({ type: 'LIST_ENTRY_FILES' });
+  if (!files.length) throw new Error('No todo lists, action logs, events, prompts or commands yet');
+  return files.map((file) => ({
+    id: `entry-file:${file.path}`,
+    title: file.name,
+    subtitle: file.path,
+    action: {
+      id: `entry-file:${file.path}`,
+      title: file.name,
+      recent: false as const,
+      choices: () => fileChoices(port, file),
+    },
+  }));
+};
+
+/**
  * The prefix modes every surface offers: `>p` prompts, `>t` translate, `>r` GitHub repositories,
- * `>g` a search in one of them, `>l` logs in Tsuga.
+ * `>g` a search in one of them, `>l` logs in Tsuga, `>f` the files widgets add to.
  */
 export const paletteModes = (port: ActionPort): PaletteMode[] => [
   {
@@ -580,6 +642,14 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
       url: tsugaUrl(term),
     }),
   },
+  {
+    prefix: 'f',
+    title: 'Files',
+    placeholder: 'Search todo lists, logs, events… — ⏎ opens or adds',
+    description:
+      'The repository’s todo lists, action logs, events, prompts and commands — ⏎ opens one in Kaihuman or adds an entry, as its widget does',
+    load: () => entryFileItems(port),
+  },
 ];
 
 /** The handlers that only talk to the backend; the rest differ per surface. */
@@ -588,6 +658,7 @@ export const portHandlers = (
 ): Omit<PaletteHandlers, 'actions' | 'open' | 'copy' | 'modes'> => ({
   loadBookmarks: async () => (await port.send({ type: 'GET_BOOKMARKS' })).bookmarks,
   searchRepo: async (query) => (await port.send({ type: 'SEARCH_REPO', query })).results,
+  fileChoices: (file) => fileChoices(port, file),
   loadRecents: async () => (await port.send({ type: 'GET_RECENTS' })).recents,
   rememberRecent: (entry) => {
     port

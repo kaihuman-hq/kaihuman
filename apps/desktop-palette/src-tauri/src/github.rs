@@ -164,9 +164,26 @@ impl Client {
             Read::Found { content, sha, .. } => (content, Some(sha)),
             Read::Missing | Read::NotModified => (String::new(), None),
         };
+        self.write(
+            path,
+            &with_lines(&current, lines, at_top),
+            sha.as_deref(),
+            &format!("Append to {path} via the desktop palette"),
+        )
+        .await
+    }
+
+    /// Replaces `path` over the version `sha` names, or creates it when there is none.
+    pub async fn write(
+        &self,
+        path: &str,
+        content: &str,
+        sha: Option<&str>,
+        message: &str,
+    ) -> Result<(), String> {
         let body = serde_json::json!({
-            "message": format!("Append to {path} via the desktop palette"),
-            "content": STANDARD.encode(with_lines(&current, lines, at_top)),
+            "message": message,
+            "content": STANDARD.encode(content),
             "sha": sha,
         });
         let response = self
@@ -175,10 +192,12 @@ impl Client {
             .send()
             .await
             .map_err(network_error)?;
-        if !response.status().is_success() {
-            return Err(format!("Failed to update {path}: {}", response.status()));
+        match response.status() {
+            // GitHub's answer when `sha` is no longer the file's version.
+            StatusCode::CONFLICT => Err(format!("{path} changed since it was read — try again")),
+            status if !status.is_success() => Err(format!("Failed to update {path}: {status}")),
+            _ => Ok(()),
         }
-        Ok(())
     }
 
     /// One code search. GitHub gives this endpoint its own small budget, so the palette only

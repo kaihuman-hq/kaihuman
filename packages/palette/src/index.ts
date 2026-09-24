@@ -4,6 +4,7 @@ export * from './claude-usage.js';
 export * from './clipboard.js';
 export * from './command-palette.js';
 export * from './commands.js';
+export * from './entries.js';
 export * from './prompts.js';
 export * from './protocol.js';
 export * from './translate.js';

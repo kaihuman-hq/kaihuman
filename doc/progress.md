@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-09-24 — Palette: add entries to widget files (`>f`), as the console's Add forms do
+
+- **Flow** (both palettes): ⏎ on a repo file whose widget has an Add form now lists **Open …
+  in Kaihuman** and **Add a todo…** / an action / an event / a prompt / a command, instead of
+  opening it at once. Files come from the ⇥ repo search or the new **`>f`** mode, which lists them
+  all. Any other file still opens straight away.
+- **Formats** (`packages/palette/src/entries.ts`): `.todos.md` (`- [ ] text #tags` +
+  `::created::`), `.actionlog.md` (`- YYYY-MM-DD HH:mm:ss text #tags`), `.events.csv`
+  (`name;type;start;end`, header for a new file, one-day birthdays), `.prompts.md` and
+  `.commands.md` (`## Title #tags` sections, the command in a `sh` block). Each only appends, so the
+  file is otherwise left as it was. The start page's `appendTodo` moved here.
+- **Protocol**: `LIST_ENTRY_FILES`, `READ_ENTRY_FILE`, `WRITE_ENTRY_FILE`. The palette reads the
+  file, adds the entry and writes over the `sha` it read, so a change made in the console
+  meanwhile fails the write instead of being lost. Both backends only touch files with those
+  endings inside the repository (`ENTRY_SUFFIXES`, mirrored in `src-tauri/src/entries.rs`).
+- **Extension**: a write to a file the start page shows updates its cache too.
+- **Desktop**: `github::Client::write`, which `add_lines` now uses; a 409 says the file changed.
+- **Not covered yet**: bookmarks, timezones, budget, data collection, stocks and other widgets whose
+  Add form needs a picker or computed columns.
+
 ## 2026-09-23 — Start page: today view, trackers, read later, clocks, capture targets, sync status
 
 - **Worker** (`background/today.ts`): a `todayCache` of the repo's `.todos.md`, `.events.csv`,

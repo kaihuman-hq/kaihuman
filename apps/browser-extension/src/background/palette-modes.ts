@@ -5,7 +5,7 @@
  * The desktop palette answers the same requests from Rust (apps/desktop-palette/src-tauri), so the
  * two stay in step: same files, same endpoints, same error messages.
  */
-import type { Translation } from '@lifosy/palette';
+import { ENTRY_SUFFIXES, entryKindOf, type Translation } from '@lifosy/palette';
 
 export interface PromptFile {
   path: string;
@@ -34,7 +34,7 @@ const githubHeaders = (token: string, accept = 'application/vnd.github+json') =>
 });
 
 /** `a b/c#1.md` → `a%20b/c%231.md`: each segment encoded, the slashes kept. */
-const encodePath = (path: string) => path.split('/').map(encodeURIComponent).join('/');
+export const encodePath = (path: string) => path.split('/').map(encodeURIComponent).join('/');
 
 /** Every file ending in `suffix` on the repository's default branch, from one tree listing. */
 export function promptFilePaths(
@@ -46,6 +46,33 @@ export function promptFilePaths(
     .map((entry) => entry.path);
 }
 
+/** Every path on the default branch, in one recursive listing; none for an empty repository. */
+async function fetchTree(token: string, repo: string): Promise<{ path: string; type: string }[]> {
+  const response = await fetch(`https://api.github.com/repos/${repo}/git/trees/HEAD?recursive=1`, {
+    headers: githubHeaders(token),
+  });
+  // An empty repository has no HEAD to list.
+  if (response.status === 404 || response.status === 409) return [];
+  if (!response.ok) throw new Error(`Could not list ${repo}: ${response.status}`);
+  const { tree = [] } = await response.json();
+  return tree;
+}
+
+/** The files the palette can add entries to (`>f`), sorted by path. */
+export async function fetchEntryFilePaths(token: string, repo: string): Promise<string[]> {
+  const tree = await fetchTree(token, repo);
+  return ENTRY_SUFFIXES.flatMap((suffix) => promptFilePaths(tree, suffix)).sort();
+}
+
+/**
+ * Whether a path the palette sent may be read or written: a file of a kind the palette adds to,
+ * inside the repository. The palette runs in web pages, so the path is page-influenced.
+ */
+export const isEntryFilePath = (path: string) =>
+  !!entryKindOf(path) &&
+  !path.startsWith('/') &&
+  path.split('/').every((part) => part !== '' && part !== '.' && part !== '..');
+
 /**
  * One recursive tree listing to find the files, then one raw read per file — `.prompts.md` by
  * default, `.commands.md` for `>x`.
@@ -55,17 +82,8 @@ export async function fetchPromptFiles(
   repo: string,
   suffix = '.prompts.md',
 ): Promise<PromptFile[]> {
-  const treeResponse = await fetch(
-    `https://api.github.com/repos/${repo}/git/trees/HEAD?recursive=1`,
-    { headers: githubHeaders(token) },
-  );
-  // An empty repository has no HEAD to list.
-  if (treeResponse.status === 404 || treeResponse.status === 409) return [];
-  if (!treeResponse.ok) throw new Error(`Could not list ${repo}: ${treeResponse.status}`);
-  const { tree = [] } = await treeResponse.json();
-
   return Promise.all(
-    promptFilePaths(tree, suffix).map(async (path) => {
+    promptFilePaths(await fetchTree(token, repo), suffix).map(async (path) => {
       const response = await fetch(
         `https://api.github.com/repos/${repo}/contents/${encodePath(path)}`,
         { headers: githubHeaders(token, 'application/vnd.github.raw+json') },

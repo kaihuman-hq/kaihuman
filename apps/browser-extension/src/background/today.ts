@@ -285,21 +285,8 @@ export function parseTodoLines(md: string): TodoLine[] {
 
 const isOpen = (todo: TodoLine) => todo.status === 'backlog' || todo.status === 'in-progress';
 
-/**
- * Appends a backlog todo in the console's own format. `#tags` typed into the text are moved to the
- * end, where the console writes them.
- */
-export function appendTodo(content: string, input: string, created: string): string {
-  const tags = input.match(/#[\w-]+/g) ?? [];
-  const text = input
-    .replace(/#[\w-]+/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!text) throw new Error('Nothing to add');
-  const line = `- [ ] ${text}${tags.length ? ` ${tags.join(' ')}` : ''}\n::created:: ${created}\n`;
-  if (!content) return line;
-  return `${content.endsWith('\n') ? content : `${content}\n`}${line}`;
-}
+// Shared with the palette, which adds todos to any `.todos.md` the same way.
+export { appendTodo } from '@lifosy/palette';
 
 // ─── Habits (.habit.csv) ────────────────────────────────────────────────────
 

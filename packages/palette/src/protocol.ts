@@ -112,6 +112,21 @@ export interface PaletteProtocol {
     request: NoFields;
     response: { accounts: { name: string; usage?: ClaudeUsage; error?: string }[] };
   };
+  /**
+   * The repository's files the palette can add entries to — those ending in one of
+   * `ENTRY_SUFFIXES` — each with its console link, as `SEARCH_REPO` lists a hit.
+   */
+  LIST_ENTRY_FILES: { request: NoFields; response: { files: RepoResult[] } };
+  /**
+   * One of those files and the version read; a file not there yet reads as empty, with no `sha`.
+   * Backends refuse any path that does not end in one of `ENTRY_SUFFIXES`.
+   */
+  READ_ENTRY_FILE: { request: { path: string }; response: { content: string; sha?: string } };
+  /** Replaces the file over the version `sha` names, so a change made since the read fails. */
+  WRITE_ENTRY_FILE: {
+    request: { path: string; content: string; sha?: string };
+    response: NoFields;
+  };
   /** GitHub repositories to open, most relevant first — the order is the backend's. */
   LIST_GITHUB_REPOS: {
     request: NoFields;

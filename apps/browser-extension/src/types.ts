@@ -23,6 +23,9 @@ export interface Message {
     | 'OPEN_URL'
     | 'LIST_PROMPT_FILES'
     | 'LIST_COMMAND_FILES'
+    | 'LIST_ENTRY_FILES'
+    | 'READ_ENTRY_FILE'
+    | 'WRITE_ENTRY_FILE'
     | 'TRANSLATE'
     | 'GET_TRANSLATION_HISTORY'
     | 'ADD_TRANSLATION_HISTORY'
@@ -59,6 +62,10 @@ export interface Message {
   key?: string;
   /** `READ_LATER_DONE`: the item to mark read. */
   id?: string;
+  /** `WRITE_ENTRY_FILE`: the file's new text. */
+  content?: string;
+  /** `WRITE_ENTRY_FILE`: the version the text was built on. */
+  sha?: string;
 }
 
 export interface MessageResponse {

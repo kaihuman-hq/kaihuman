@@ -13,9 +13,9 @@ use crate::config::{
     self, Settings, bookmarks_cache_file, commands_cache_file, is_repo_name, prompts_cache_file,
     read_json, write_json,
 };
-use crate::github::{Client, Read};
+use crate::github::{Client, Read, console_file_url, encode_path};
 use crate::recents::{self, RecentEntry};
-use crate::{claude, commands, dumps, prompts, repos, translate};
+use crate::{claude, commands, dumps, entries, prompts, repos, translate};
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -71,6 +71,16 @@ pub enum Request {
     },
     SetTranslationKey {
         key: String,
+    },
+    ListEntryFiles,
+    ReadEntryFile {
+        path: String,
+    },
+    WriteEntryFile {
+        path: String,
+        content: String,
+        #[serde(default)]
+        sha: Option<String>,
     },
     ListGithubRepos,
     ListClaudeCodeRepos,
@@ -222,6 +232,42 @@ async fn list_repo_files(suffix: &'static str, cache_file: PathBuf) -> Result<Va
     Ok(json!({ "files": files }))
 }
 
+/// The files `>f` lists, each with its console link, as a repo search lists its hits.
+async fn list_entry_files() -> Result<Value, String> {
+    let client = client()?;
+    let files: Vec<Value> = entries::entry_file_paths(&client.tree().await?)
+        .into_iter()
+        .map(|path| {
+            let name = path.rsplit('/').next().unwrap_or(&path).to_string();
+            let url = console_file_url(&path, client.repo());
+            json!({ "path": path, "name": name, "url": url })
+        })
+        .collect();
+    Ok(json!({ "files": files }))
+}
+
+/// A file not there yet reads as empty, with no version to write over.
+async fn read_entry_file(path: &str) -> Result<Value, String> {
+    if !entries::is_entry_path(path) {
+        return Err(format!("Refusing to read {path}"));
+    }
+    match client()?.read(&encode_path(path), None).await? {
+        Read::Found { content, sha, .. } => Ok(json!({ "content": content, "sha": sha })),
+        Read::Missing | Read::NotModified => Ok(json!({ "content": "" })),
+    }
+}
+
+async fn write_entry_file(path: &str, content: &str, sha: Option<&str>) -> Result<Value, String> {
+    if !entries::is_entry_path(path) {
+        return Err(format!("Refusing to write {path}"));
+    }
+    let message = format!("Add to {path} via the desktop palette");
+    client()?
+        .write(&encode_path(path), content, sha, &message)
+        .await?;
+    Ok(json!({}))
+}
+
 /// The counts file ranks what it knows; GitHub adds the rest. Either alone is enough, so the
 /// counted repositories still show when not logged in or offline.
 async fn list_github_repos() -> Result<Value, String> {
@@ -360,6 +406,11 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             config::store_deepl_key(key.trim())?;
             Ok(json!({}))
         }
+        Request::ListEntryFiles => list_entry_files().await,
+        Request::ReadEntryFile { path } => read_entry_file(&path).await,
+        Request::WriteEntryFile { path, content, sha } => {
+            write_entry_file(&path, &content, sha.as_deref()).await
+        }
         Request::ListGithubRepos => list_github_repos().await,
         Request::ListClaudeCodeRepos => Ok(json!({ "repos": claude::code_repos()? })),
         Request::GetClaudeUsage => Ok(claude::usage().await),
@@ -492,6 +543,50 @@ mod tests {
                 text: "x".into()
             }
         );
+    }
+
+    #[test]
+    fn reads_widget_entry_requests() {
+        assert_eq!(
+            parse(json!({ "type": "LIST_ENTRY_FILES" })),
+            Request::ListEntryFiles
+        );
+        assert_eq!(
+            parse(json!({ "type": "READ_ENTRY_FILE", "path": "a.todos.md" })),
+            Request::ReadEntryFile {
+                path: "a.todos.md".into()
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "WRITE_ENTRY_FILE", "path": "a.todos.md", "content": "x" })),
+            Request::WriteEntryFile {
+                path: "a.todos.md".into(),
+                content: "x".into(),
+                sha: None
+            }
+        );
+        assert_eq!(
+            parse(
+                json!({ "type": "WRITE_ENTRY_FILE", "path": "a.todos.md", "content": "x", "sha": "v1" })
+            ),
+            Request::WriteEntryFile {
+                path: "a.todos.md".into(),
+                content: "x".into(),
+                sha: Some("v1".into())
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn refuses_entry_files_the_palette_does_not_add_to() {
+        let error = handle(json!({ "type": "READ_ENTRY_FILE", "path": "../secret.todos.md" }))
+            .await
+            .unwrap_err();
+        assert_eq!(error, "Refusing to read ../secret.todos.md");
+        let error = handle(json!({ "type": "WRITE_ENTRY_FILE", "path": "a.md", "content": "x" }))
+            .await
+            .unwrap_err();
+        assert_eq!(error, "Refusing to write a.md");
     }
 
     #[test]

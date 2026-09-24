@@ -11,6 +11,7 @@ mod commands;
 mod config;
 mod console_login;
 mod dumps;
+mod entries;
 mod github;
 #[cfg(target_os = "linux")]
 mod layer;

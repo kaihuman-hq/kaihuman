@@ -131,6 +131,11 @@ export type PaletteMode = {
 export interface PaletteHandlers {
   loadBookmarks: () => Promise<Bookmark[]>;
   searchRepo: (query: string) => Promise<RepoResult[]>;
+  /**
+   * What else a repo hit offers besides opening it — adding a todo to a `.todos.md`, say. With
+   * none, choosing the hit opens it straight away.
+   */
+  fileChoices?: (file: RepoResult) => ModeItem[];
   open: (url: string) => void;
   actions: () => PaletteAction[];
   loadRecents: () => Promise<RecentEntry[]>;
@@ -290,7 +295,7 @@ const HELP_TOPICS: readonly [string, string][] = [
   ['Type to search', 'Bookmarks by title, tags and URL; recent items first, actions below them'],
   [
     '⇥  Search the repo',
-    'One GitHub code search for what you typed, only when you press Tab; files open in the console',
+    'One GitHub code search for what you typed, only when you press Tab; files open in the console, and ⏎ on a todo list, log or the like also offers to add an entry',
   ],
   [
     'Search the web',
@@ -804,13 +809,22 @@ export function createCommandPalette(
     return (repoResults ?? []).map((result) => ({
       title: result.name,
       subtitle: result.path,
-      activate: () =>
+      activate: () => {
+        const choices = handlers.fileChoices?.(result) ?? [];
+        if (choices.length) {
+          void runAction(
+            { id: `repo:${result.path}`, title: result.name, choices: () => choices },
+            [],
+          );
+          return;
+        }
         openUrl({
           id: `repo:${result.path}`,
           title: result.name,
           subtitle: result.path,
           url: result.url,
-        }),
+        });
+      },
     }));
   };
 

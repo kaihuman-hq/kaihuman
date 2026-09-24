@@ -3,7 +3,10 @@ import { type Message } from '../types';
 import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
 import {
+  encodePath,
+  fetchEntryFilePaths,
   fetchPromptFiles,
+  isEntryFilePath,
   isPromptsCacheStale,
   listGithubRepos,
   type PromptsCache,
@@ -1012,6 +1015,42 @@ async function commitTodayFile(
   return { today: buildToday(next, new Date()) };
 }
 
+/** The files `>f` lists, each with its console link, as a repo search lists its hits. */
+async function listEntryFiles() {
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const paths = await fetchEntryFilePaths(token, repo);
+  return {
+    files: paths.map((path) => ({
+      path,
+      name: path.split('/').at(-1) ?? path,
+      url: consoleFileUrl(path, repo),
+    })),
+  };
+}
+
+async function readEntryFile(path: string) {
+  if (!isEntryFilePath(path)) throw new Error(`Refusing to read ${path}`);
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  return (await githubReadFile(token, repo, encodePath(path))) ?? { content: '' };
+}
+
+/** Writes over the version read; the start page's cache takes the new text if it shows the file. */
+async function writeEntryFile(path: string, content: string, sha?: string) {
+  if (!isEntryFilePath(path)) throw new Error(`Refusing to write ${path}`);
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const written = await githubWriteFile(token, repo, encodePath(path), content, sha);
+  const cache = await readTodayCache();
+  if (cache && isTodayCacheUsable(cache, repo) && cache.files.some((file) => file.path === path)) {
+    await chrome.storage.local.set({
+      todayCache: withFile(cache, { path, sha: written ?? '', content }),
+    });
+  }
+  return {};
+}
+
 /** How fresh the start page's data is, and what is still waiting to be pushed. */
 async function syncStatus() {
   const { repo } = await credentials();
@@ -1251,6 +1290,19 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       (error) => sendResponse({ error: error.message }),
     );
     return true; // Indicate async response
+  }
+
+  if (message.type === 'LIST_ENTRY_FILES') return answer(listEntryFiles(), sendResponse);
+
+  if (message.type === 'READ_ENTRY_FILE') {
+    return answer(readEntryFile(message.path || ''), sendResponse);
+  }
+
+  if (message.type === 'WRITE_ENTRY_FILE') {
+    return answer(
+      writeEntryFile(message.path || '', message.content ?? '', message.sha),
+      sendResponse,
+    );
   }
 
   if (message.type === 'TRANSLATE') {

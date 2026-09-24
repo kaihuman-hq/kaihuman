@@ -226,6 +226,11 @@ normal tab. The New Tab page used to be on that list; the start page below is th
   that repo's file and not the console's other one — the console selects it and drops the
   parameter again.
 
+  A hit the console shows as a widget you can add to — a `.todos.md`, `.actionlog.md`,
+  `.events.csv`, `.prompts.md` or `.commands.md` — does not open straight away: `⏎` offers
+  **Open … in Kaihuman** and **Add a todo…** (an action, an event…). `>f` lists those files
+  without a search; see **Adding to a widget's file** below.
+
 ### Help
 
 Type **`?`** to see everything the palette can do here: each prefix with what it is for (⏎
@@ -249,6 +254,7 @@ hint line lists the prefixes.
 | `>r` | Your GitHub repositories, most recently pushed first | opens the repository; **⇥** (or **→**) lists its issues, pull requests, actions, releases… | `GET /user/repos` with the extension's token |
 | `>g` | The same repositories, to search one | lists **Issues** and **Pull requests**; ⏎ on one asks for the search term, then opens GitHub's search there (`is:issue …` / `is:pr …`, any state) — no term opens the plain list | `GET /user/repos` with the extension's token |
 | `>l` | One row: the console team's logs in Tsuga, for what is typed | opens Tsuga's explorer on `owner-team:console`, `AND "…"` the typed text when there is any | a link only, no request |
+| `>f` | The repository's files a widget can add to — todo lists, action logs, events, prompts, commands | offers **Open … in Kaihuman** or **Add a todo…** (an action, an event…) | one tree listing per visit |
 
 With nothing typed, `>t` lists the last 20 texts you translated, newest first — **⏎** translates
 one again (kept as typed, so `fr: …` asks for French again). Translating a text again moves it to
@@ -258,6 +264,24 @@ Any text typed outside a mode is also offered as **Translate “…”**, the la
 row reaches it). Translation needs a DeepL API key — free ones at
 [deepl.com/pro-api](https://www.deepl.com/pro-api) — set with the **Set the DeepL API key…** action;
 it is kept in the extension's local storage.
+
+### Adding to a widget's file
+
+The console's widgets have an **Add** form for their files; the palette adds the same entries,
+from any page. Choose a file from `>f` or a repo search, then **Add …**, and answer the fields:
+
+| File | Fields | What is added |
+| --- | --- | --- |
+| `.todos.md` | the todo, `#tags` anywhere in it | `- [ ] text #tags` with its `::created::` line, at the end |
+| `.actionlog.md` | what happened, `#tags` anywhere in it | `- YYYY-MM-DD HH:mm:ss text #tags` (local time), at the end |
+| `.events.csv` | name, type (`general` prefilled, or `birthday`), start date (today prefilled), end date (empty: the same day; a birthday is always one day) | a `name;type;start;end` row; a new file gets the header first |
+| `.prompts.md` | title with `#tags`, the prompt | a `## Title #tags` section at the end |
+| `.commands.md` | title with `#tags`, the command (`{{name}}` for a parameter) | a `## Title #tags` section with the command in a `sh` block |
+
+The entry is appended, so the rest of the file stays exactly as it was. The file is read, the
+entry added in the palette (`packages/palette/src/entries.ts`), and written back over the version
+read — if the file changed in between, the write fails and nothing is lost; try again. The worker
+only reads and writes files with these endings, inside the repository.
 
 ### Actions
 

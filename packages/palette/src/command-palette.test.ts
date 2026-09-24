@@ -511,6 +511,70 @@ describe('repo search', () => {
     });
   });
 
+  it('offers what else a hit can do before opening it, when there is something', async () => {
+    const addRun = vi.fn(async ([text]: string[]) => `Added ${text}`);
+    const fileChoices = vi.fn((file: RepoResult): ModeItem[] =>
+      file.path.endsWith('.todos.md')
+        ? [
+            { id: 'open', title: `Open ${file.name} in Kaihuman`, url: file.url },
+            {
+              id: 'add',
+              title: 'Add a todo…',
+              action: {
+                id: 'add',
+                title: 'Add a todo',
+                prompts: [{ label: 'Todo' }],
+                recent: false,
+                run: addRun,
+              },
+            },
+          ]
+        : [],
+    );
+    palette.destroy();
+    palette = createCommandPalette({
+      loadBookmarks: loadBookmarks as any,
+      searchRepo: searchRepo as any,
+      fileChoices,
+      open: open as any,
+      actions: () => actions,
+      loadRecents: loadRecents as any,
+      rememberRecent: rememberRecent as any,
+      countBookmarkUse: countBookmarkUse as any,
+      modes,
+      copy: copy as any,
+    });
+    palette.toggle();
+    await settle();
+    searchRepo.mockResolvedValue([
+      { path: 'a/inbox.todos.md', name: 'inbox.todos.md', url: 'https://console.test/inbox' },
+      { path: 'a/b.ts', name: 'b.ts', url: 'https://console.test/b' },
+    ]);
+    type('inbox');
+    press('Tab');
+    await settle();
+
+    await activateRow('inbox.todos.md');
+    expect(open).not.toHaveBeenCalled();
+    expect(crumbText()).toBe('inbox.todos.md');
+    expect(rowTitles()).toEqual(['Open inbox.todos.md in Kaihuman', 'Add a todo…']);
+
+    await activateRow('Add a todo…');
+    type('Call the bank');
+    press('Enter');
+    await settle();
+    expect(addRun).toHaveBeenCalledExactlyOnceWith(['Call the bank']);
+    expect(statusText()).toBe('Added Call the bank');
+    expect(rememberRecent).not.toHaveBeenCalled();
+
+    // A file with nothing to add to opens straight away, as before.
+    type('inbox');
+    press('Tab');
+    await settle();
+    await activateRow('b.ts');
+    expect(open).toHaveBeenCalledWith('https://console.test/b');
+  });
+
   it('does not search the repo from inside a submenu', async () => {
     await activateRow('Pinned tab groups…');
     type('anything');
