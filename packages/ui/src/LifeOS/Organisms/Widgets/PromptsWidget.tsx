@@ -1,10 +1,10 @@
+import { addPromptEntry, parsePrompts } from '@lifosy/formats';
 import { Check, Copy } from 'lucide-preact';
 import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
 import { CompactWidgetLayout } from './CompactWidgetLayout';
 import { PromptsAddForm } from './PromptsAddForm';
-import { addPrompt, parsePrompts, serializePrompts } from './PromptsLogic';
 
 export interface PromptsWidgetProps {
   content: string;
@@ -86,7 +86,7 @@ export const PromptsWidget = ({ content, mode, onChange }: PromptsWidgetProps) =
   };
 
   const handleAdd = (title: string, tags: string[], body: string) => {
-    onChange?.(serializePrompts(addPrompt(prompts, title, tags, body)));
+    onChange?.(addPromptEntry(content, { title, tags, body }));
   };
 
   if (mode === 'ADD') {

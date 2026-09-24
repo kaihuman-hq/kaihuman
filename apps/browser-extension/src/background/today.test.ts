@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   addReadLater,
-  appendTodo,
   buildToday,
   checkInHabit,
   DEFAULT_ACTION_LOG_PATH,
@@ -99,14 +98,6 @@ describe('todos', () => {
       path: '.kh/inbox.todos.md',
       count: 2,
     });
-  });
-
-  it('appends a todo in the console format, tags last, leaving the file as it was', () => {
-    expect(appendTodo(md, 'Call #admin the bank', '2026-09-23T08:00:00.000Z')).toBe(
-      `${md}\n- [ ] Call the bank #admin\n::created:: 2026-09-23T08:00:00.000Z\n`,
-    );
-    expect(appendTodo('', 'First', 'T')).toBe('- [ ] First\n::created:: T\n');
-    expect(() => appendTodo(md, '  #only-a-tag ', 'T')).toThrow('Nothing to add');
   });
 });
 

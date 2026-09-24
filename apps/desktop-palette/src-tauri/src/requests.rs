@@ -38,11 +38,6 @@ pub enum Request {
         path: String,
         note: String,
     },
-    AddActionLog {
-        path: String,
-        description: String,
-        tags: Vec<String>,
-    },
     GetRepos,
     SetRepo {
         repo: String,
@@ -103,19 +98,6 @@ pub enum Request {
 /// Notes are written inside the repo, never to a path that climbs out of it.
 fn is_note_path(path: &str) -> bool {
     !path.starts_with('/') && path.split('/').all(|part| !part.is_empty() && part != "..")
-}
-
-/// `- YYYY-MM-DD HH:MM:SS description #tag #tag`, as the extension writes an action log.
-pub fn action_log_line(timestamp: &str, description: &str, tags: &[String]) -> String {
-    let mut line = format!("- {timestamp} {}", description.trim());
-    for tag in tags
-        .iter()
-        .map(|tag| tag.trim())
-        .filter(|tag| !tag.is_empty())
-    {
-        line.push_str(&format!(" #{tag}"));
-    }
-    line
 }
 
 fn client() -> Result<Client, String> {
@@ -344,19 +326,6 @@ pub async fn handle(request: Value) -> Result<Value, String> {
                 .await?;
             Ok(json!({}))
         }
-        Request::AddActionLog {
-            path,
-            description,
-            tags,
-        } => {
-            if !is_note_path(&path) {
-                return Err(format!("Refusing to write to {path}"));
-            }
-            let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-            let line = action_log_line(&timestamp, &description, &tags);
-            client()?.add_lines(&path, &line, false).await?;
-            Ok(json!({}))
-        }
         Request::GetRepos => {
             let settings = Settings::load();
             let repos: Vec<Value> = settings
@@ -450,16 +419,6 @@ mod tests {
             parse(json!({ "type": "RECORD_BOOKMARK_USE", "bookmarkId": "b1" })),
             Request::RecordBookmarkUse {
                 _bookmark_id: "b1".into()
-            }
-        );
-        assert_eq!(
-            parse(
-                json!({ "type": "ADD_ACTION_LOG", "path": "a.actionlog.md", "description": "d", "tags": ["t"] })
-            ),
-            Request::AddActionLog {
-                path: "a.actionlog.md".into(),
-                description: "d".into(),
-                tags: vec!["t".into()],
             }
         );
         assert_eq!(
@@ -629,14 +588,5 @@ mod tests {
         for bad in ["/etc/x.md", "../x.md", "a/../../x.md", "a//b.md", ""] {
             assert!(!is_note_path(bad), "{bad} should be refused");
         }
-    }
-
-    #[test]
-    fn formats_an_action_log_line_like_the_extension() {
-        let tags = vec!["work".to_string(), " ".to_string(), "deep".to_string()];
-        assert_eq!(
-            action_log_line("2026-09-23 10:00:00", " Shipped it ", &tags),
-            "- 2026-09-23 10:00:00 Shipped it #work #deep"
-        );
     }
 }

@@ -43,6 +43,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@lifosy/core": "workspace:*",
+    "@lifosy/formats": "workspace:*",
     "@preact/signals": "^2.0.1",
     "clsx": "^2.1.0",
     "framer-motion": "^12.26.2",

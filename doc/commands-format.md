@@ -52,13 +52,13 @@ without a code block is its text, whole. An entry with neither is skipped.
 
 - **Console**: New File → Commands. Search, tag filter, a field per parameter with a live preview,
   and Copy (parameters not filled in stay `{{name}}`). **ADD COMMAND** appends one in a `sh` block.
-  Implementation: `packages/ui/src/LifeOS/Organisms/Widgets/CommandsLogic.ts` and
-  `CommandsWidget.tsx`.
+  Implementation: `packages/formats/src/commands.ts` (shared by every app) and
+  `packages/ui/src/LifeOS/Organisms/Widgets/CommandsWidget.tsx`.
 - **Palette `>x`** (desktop and extension): every `.commands.md` in the repository, searched by
   title, tags, command and note. ⏎ asks for the parameters by name — the command is shown while you type —
   then offers **Copy** (first, so a hasty ⏎ never runs anything), **Run in terminal** and **Run in
   the background**, with the finished command listed in full below them. The extension only copies.
-  Implementation: `packages/palette/src/commands.ts`; running is
+  Implementation: `packages/formats/src/commands.ts` and `packages/palette/src/actions.ts`; running is
   `apps/desktop-palette/src-tauri/src/commands.rs`.
 
 ## Running (desktop only)

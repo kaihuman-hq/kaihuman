@@ -321,6 +321,7 @@ export const addTodo = (
   tags: string[] = [],
   milestoneId?: string,
   prompt?: TodoPrompt,
+  now = new Date(),
 ): TodoData => {
   const item: TodoItem = {
     id: `item-${data.items.length}`,
@@ -329,8 +330,8 @@ export const addTodo = (
     tags,
     milestoneId,
     prompt,
-    createdAt: new Date().toISOString(),
-    updatedAt: Date.now(),
+    createdAt: now.toISOString(),
+    updatedAt: now.getTime(),
   };
   return { ...data, items: [...data.items, item] };
 };

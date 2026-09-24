@@ -1,7 +1,7 @@
+import type { Milestone, TodoPrompt } from '@lifosy/formats';
 import { useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../../Atoms/Typography';
-import type { Milestone, TodoPrompt } from './TodoLogic';
 
 export interface PromptRef {
   prompt: TodoPrompt;

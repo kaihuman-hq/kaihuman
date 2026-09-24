@@ -1,10 +1,4 @@
 import { githubFileStore } from '@lifosy/core';
-import { ArrowLeft, BarChart2 } from 'lucide-preact';
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { cn } from '../../utils';
-import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
-import { DonutChart } from '../Charts/DonutChart';
-import { StackedBarChart, type StackedBarData } from '../Charts/StackedBarChart';
 import {
   type Milestone,
   parseTodos,
@@ -12,7 +6,13 @@ import {
   type TodoData,
   type TodoItem,
   type TodoStatus,
-} from '../Organisms/Widgets/TodoLogic';
+} from '@lifosy/formats';
+import { ArrowLeft, BarChart2 } from 'lucide-preact';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { cn } from '../../utils';
+import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
+import { DonutChart } from '../Charts/DonutChart';
+import { StackedBarChart, type StackedBarData } from '../Charts/StackedBarChart';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

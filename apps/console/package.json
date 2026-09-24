@@ -22,6 +22,7 @@
     "@cascivo/editor": "^1.3.0",
     "@cascivo/themes": "^1.0.0",
     "@lifosy/core": "workspace:*",
+    "@lifosy/formats": "workspace:*",
     "@lifosy/ui": "workspace:*",
     "@preact/signals": "^2.0.1",
     "@preact/signals-react": "^3.10.2",

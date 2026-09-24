@@ -70,17 +70,22 @@ describe('repoActions', () => {
     });
   });
 
-  it('splits an action-log entry into a description and its tags', async () => {
+  it('adds to a widget file the way its widget does, over the version read', async () => {
     answers.FETCH_QUICK_NOTES = { quickNotes: ['log.actionlog.md'] };
-    answers.ADD_ACTION_LOG = {};
+    answers.READ_ENTRY_FILE = { content: '', sha: 'v1' };
+    answers.WRITE_ENTRY_FILE = {};
     const targets = (await action(repoActions(fakePort), 'note').children?.()) ?? [];
-    await action(targets, 'note:log.actionlog.md').run?.(['Shipped the palette #work #extension']);
-    expect(sent.at(-1)).toEqual({
-      type: 'ADD_ACTION_LOG',
+    const target = action(targets, 'note:log.actionlog.md');
+    expect(target.prompts).toEqual([{ label: 'What happened? #tags' }]);
+    await target.run?.(['Shipped the palette #work']);
+    expect(sent.at(-1)).toMatchObject({
+      type: 'WRITE_ENTRY_FILE',
       path: 'log.actionlog.md',
-      description: 'Shipped the palette',
-      tags: ['work', 'extension'],
+      sha: 'v1',
     });
+    expect((sent.at(-1) as { content?: string }).content).toMatch(
+      /\n- \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} Shipped the palette #work$/,
+    );
   });
 
   it('refuses an empty note without asking the backend', async () => {
@@ -174,7 +179,7 @@ describe('fileChoices', () => {
       sha: 'v1',
     });
     expect((sent[1] as { content?: string }).content).toMatch(
-      /^- \[ \] Old\n- \[ \] Call the bank #admin\n::created:: /,
+      /^- \[ \] Old\n- \[ \] Call the bank #admin\n::updated:: \d+ ::created:: /,
     );
   });
 

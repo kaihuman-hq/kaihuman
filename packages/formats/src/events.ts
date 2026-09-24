@@ -20,14 +20,7 @@ export interface UpcomingEvent {
   durationLabel: string; // e.g., "in 5 days", "Tomorrow", "Today"
 }
 
-import { Logger } from '@lifosy/core';
-
-const logger = new Logger('EventsLogic');
-
 export const parseEvents = (csv: string): EventsData => {
-  // Debug Logging
-  logger.debug(`Parsing CSV length: ${csv ? csv.length : 0}`);
-
   if (!csv) return { entries: [] };
   const lines = csv.trim().split(/\r?\n/);
   const entries: EventEntry[] = [];
@@ -55,7 +48,6 @@ export const parseEvents = (csv: string): EventsData => {
       endDate: (end || start).trim(), // Fallback to start if end missing
     });
   }
-  logger.debug(`Parsed entries: ${entries.length}`);
   return { entries };
 };
 

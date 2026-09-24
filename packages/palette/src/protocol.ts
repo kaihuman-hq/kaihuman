@@ -29,10 +29,6 @@ export interface PaletteProtocol {
   /** The quick-note files the repo's dashboard config lists; none when it has no such config. */
   FETCH_QUICK_NOTES: { request: NoFields; response: { quickNotes?: string[] } };
   DUMP_NOTE: { request: { path: string; note: string }; response: NoFields };
-  ADD_ACTION_LOG: {
-    request: { path: string; description: string; tags: string[] };
-    response: NoFields;
-  };
   LIST_PINNED_TAB_GROUPS: {
     request: NoFields;
     response: { groups: PinnedTabGroupSummary[]; activeId: string | null };

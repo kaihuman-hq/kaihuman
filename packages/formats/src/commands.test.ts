@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  addCommand,
-  commandParameters,
-  fillCommand,
-  parseCommands,
-} from '../../../packages/ui/src/LifeOS/Organisms/Widgets/CommandsLogic';
+import { addCommand, commandParameters, fillCommand, parseCommands } from './commands.js';
 
 describe('parseCommands', () => {
   it('takes the first code block as the command, or the whole text without one', () => {

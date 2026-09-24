@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-09-24 — `@lifosy/formats`: one implementation for adding widget entries, in every app
+
+- **New package** `packages/formats` (no dependencies): the todo, action log, events, prompts and
+  commands formats moved here from `packages/ui/src/LifeOS/Organisms/Widgets/*Logic.ts` (history
+  kept), with their tests from `apps/console` and the palette.
+- **One add per format** (`src/entries.ts`): `addTodoEntry`, `addActionLogEntry`, `addEventEntry`,
+  `addPromptEntry`, `addCommandEntry` — file text in, file text out, the widget's parse and
+  serialize in between. They take `#tags` typed into the text, and refuse what the file cannot hold
+  (no text, a `;` in an event name, dates not `YYYY-MM-DD`, an end before the start).
+- **Every app uses them**: the console's Add forms (MainApp todos and events, Action Log widget and
+  view, Kanban, Prompts, Commands) and quick-add pages; the extension's popup and start page
+  (`ADD_ACTION_LOG`, `ADD_TODO`); both palettes (`>f`, repo-search hits, **Add a note…** on a
+  widget file).
+- **Palette** reads prompts and commands through the package too; its own copies of the parsers
+  are gone.
+- **Behaviour changes**: the start page, popup and palettes now write entries exactly as the
+  console does — a todo gets the `::updated::` stamp, and the file is re-serialized in the widget's
+  format rather than only appended to. `ADD_ACTION_LOG` in the extension only writes
+  `.actionlog.md` files inside the repository.
+- **Desktop**: `ADD_ACTION_LOG` and its Rust formatter (`action_log_line`, and with it `chrono`)
+  are gone; the palette writes action logs through `READ_ENTRY_FILE`/`WRITE_ENTRY_FILE`.
+
 ## 2026-09-24 — Palette: add entries to widget files (`>f`), as the console's Add forms do
 
 - **Flow** (both palettes): ⏎ on a repo file whose widget has an Add form now lists **Open …

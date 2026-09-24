@@ -1,8 +1,8 @@
+import { type EventsData, getUpcomingEvents, parseEvents } from '@lifosy/formats';
 import { Calendar, Gift } from 'lucide-preact';
 import { useMemo } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
-import { type EventsData, getUpcomingEvents, parseEvents } from './EventsLogic';
 
 export interface EventsWidgetProps {
   content: string;

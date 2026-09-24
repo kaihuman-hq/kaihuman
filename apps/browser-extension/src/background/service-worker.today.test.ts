@@ -186,14 +186,36 @@ describe('writes from the start page', () => {
     expect(writes()).toHaveLength(0);
   });
 
-  it('appends a todo to the inbox, keeping what was there', async () => {
+  it('adds a todo to the inbox as the console does, keeping what was there', async () => {
     seedCache();
     const response = await call({ type: 'ADD_TODO', text: 'Buy milk #home' });
 
     expect(response.today.inbox.count).toBe(2);
     expect(remote['.kh/inbox.todos.md']).toMatch(
-      /^- \[ \] existing\n- \[ \] Buy milk #home\n::created:: \S+\n$/,
+      /^- \[ \] existing\n- \[ \] Buy milk #home\n::updated:: \d+ ::created:: \S+\n$/,
     );
+  });
+
+  it('adds an action log entry as the console does, over the version read', async () => {
+    remote['.lifeos/dump.actionlog.md'] = '---\n---\n\n# Action Log\n\n- 2026-09-23 10:00:00 Old';
+    const response = await call({
+      type: 'ADD_ACTION_LOG',
+      description: 'Shipped it',
+      tags: ['work'],
+    });
+    expect(response.success).toBe(true);
+    expect(remote['.lifeos/dump.actionlog.md']).toMatch(
+      /^---\n---\n\n# Action Log\n\n- 2026-09-23 10:00:00 Old\n- \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} Shipped it #work$/,
+    );
+    expect(JSON.parse(writes()[0]?.[1].body).sha).toBe('sha-.lifeos/dump.actionlog.md');
+  });
+
+  it('only adds action log entries to action logs', async () => {
+    for (const path of ['README.md', '../x.actionlog.md', '.kh/inbox.todos.md']) {
+      const response = await call({ type: 'ADD_ACTION_LOG', path, description: 'x', tags: [] });
+      expect(response.error).toContain('Refusing');
+    }
+    expect(writes()).toHaveLength(0);
   });
 
   it('saves a page for later in a new list when the repo has none', async () => {

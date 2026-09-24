@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  addPrompt,
-  type Prompt,
-  parsePrompts,
-  serializePrompts,
-} from '../../../packages/ui/src/LifeOS/Organisms/Widgets/PromptsLogic';
+import { addPrompt, type Prompt, parsePrompts, serializePrompts } from './prompts.js';
 
 describe('parsePrompts', () => {
   it('returns an empty list for empty or heading-less content', () => {

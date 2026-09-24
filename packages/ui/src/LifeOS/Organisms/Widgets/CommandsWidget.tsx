@@ -1,8 +1,8 @@
+import { addCommandEntry, commandParameters, fillCommand, parseCommands } from '@lifosy/formats';
 import { Check, Copy } from 'lucide-preact';
 import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
-import { addCommand, commandParameters, fillCommand, parseCommands } from './CommandsLogic';
 import { CompactWidgetLayout } from './CompactWidgetLayout';
 import { PromptsAddForm } from './PromptsAddForm';
 
@@ -93,7 +93,9 @@ export const CommandsWidget = ({ content, mode, onChange }: CommandsWidgetProps)
       <div className="w-full min-h-full p-4">
         <PromptsAddForm
           noun="command"
-          onAdd={(title, tags, command) => onChange?.(addCommand(content, title, tags, command))}
+          onAdd={(title, tags, command) =>
+            onChange?.(addCommandEntry(content, { title, tags, command }))
+          }
         />
       </div>
     );

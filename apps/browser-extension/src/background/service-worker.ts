@@ -1,3 +1,4 @@
+import { addActionLogEntry, addTodoEntry } from '@lifosy/formats';
 import { withTranslationText } from '@lifosy/palette';
 import { type Message } from '../types';
 import { consoleFileUrl } from '../console';
@@ -63,9 +64,9 @@ import {
 } from './pinned-tabs';
 import {
   addReadLater,
-  appendTodo,
   buildToday,
   checkInHabit,
+  DEFAULT_ACTION_LOG_PATH,
   fetchToday,
   inboxPath,
   isTodayCacheStale,
@@ -1015,6 +1016,23 @@ async function commitTodayFile(
   return { today: buildToday(next, new Date()) };
 }
 
+/**
+ * An action log entry from the popup or the start page, written as the console's Action Log widget
+ * writes it, over the version read.
+ */
+async function addActionLog(path: string, description: string, tags: string[]) {
+  // The whole file is rewritten, so only an action log may be.
+  if (!path.toLowerCase().endsWith('.actionlog.md') || !isEntryFilePath(path)) {
+    throw new Error(`Refusing to write to ${path}`);
+  }
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const file = await githubReadFile(token, repo, encodePath(path));
+  const content = addActionLogEntry(file?.content ?? '', { description, tags });
+  await githubWriteFile(token, repo, encodePath(path), content, file?.sha);
+  return {};
+}
+
 /** The files `>f` lists, each with its console link, as a repo search lists its hits. */
 async function listEntryFiles() {
   const { token, repo } = await credentials();
@@ -1113,35 +1131,14 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   }
 
   if (message.type === 'ADD_ACTION_LOG') {
-    chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
-      const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'lifosy/monorepo';
-      if (!token) {
-        sendResponse({ error: 'No token found' });
-        return;
-      }
-      try {
-        const targetPath = message.path || '.lifeos/dump.actionlog.md';
-
-        // Generate timestamp YYYY-MM-DD HH:mm:ss
-        const now = new Date();
-        const pad = (n: number) => n.toString().padStart(2, '0');
-        const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-
-        // Format description and tags
-        let contentStr = `- ${timestamp} ${message.description?.trim() || ''}`;
-        if (message.tags && message.tags.length > 0) {
-          const tagsStr = message.tags.map((t: string) => `#${t.trim()}`).join(' ');
-          contentStr += ` ${tagsStr}`;
-        }
-
-        await githubUpsertFile(token, repo, targetPath, contentStr, 'bottom');
-        sendResponse({ success: true });
-      } catch (error: any) {
-        sendResponse({ error: error.message });
-      }
-    });
-    return true; // Indicate async response
+    return answer(
+      addActionLog(
+        message.path || DEFAULT_ACTION_LOG_PATH,
+        message.description || '',
+        message.tags || [],
+      ),
+      sendResponse,
+    );
   }
 
   if (message.type === 'FETCH_QUICK_NOTES') {
@@ -1464,9 +1461,9 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   }
 
   if (message.type === 'ADD_TODO') {
-    const created = new Date().toISOString();
+    const now = new Date();
     return answer(
-      commitTodayFile(inboxPath, (md) => appendTodo(md, message.text || '', created)),
+      commitTodayFile(inboxPath, (md) => addTodoEntry(md, { text: message.text || '' }, now)),
       sendResponse,
     );
   }

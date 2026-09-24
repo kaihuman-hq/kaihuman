@@ -2,10 +2,11 @@
  * The start page's view of the repo's own data: events, todos, habits, time tracking, world clocks
  * and the read-it-later list.
  *
- * The file formats are the console widgets' (packages/ui/src/LifeOS/Organisms/Widgets/*Logic.ts).
- * Only the part the start page needs is mirrored here, and every write touches the file as little
- * as it can — a todo is appended rather than the whole file re-serialized — so nothing the console
- * wrote is lost to a parser that knows less than the console's.
+ * The file formats are the console widgets' (packages/ui/src/LifeOS/Organisms/Widgets/*Logic.ts,
+ * and packages/formats for the files every app adds entries to). Only the part the start page needs
+ * to read is mirrored here. A todo is added with the shared `addTodoEntry`; the other writes touch
+ * their file as little as they can, so nothing the console wrote is lost to a parser that knows
+ * less than the console's.
  */
 
 import { CACHE_TTL_MS } from './bookmarks';
@@ -284,9 +285,6 @@ export function parseTodoLines(md: string): TodoLine[] {
 }
 
 const isOpen = (todo: TodoLine) => todo.status === 'backlog' || todo.status === 'in-progress';
-
-// Shared with the palette, which adds todos to any `.todos.md` the same way.
-export { appendTodo } from '@lifosy/palette';
 
 // ─── Habits (.habit.csv) ────────────────────────────────────────────────────
 

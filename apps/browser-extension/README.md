@@ -272,16 +272,22 @@ from any page. Choose a file from `>f` or a repo search, then **Add …**, and a
 
 | File | Fields | What is added |
 | --- | --- | --- |
-| `.todos.md` | the todo, `#tags` anywhere in it | `- [ ] text #tags` with its `::created::` line, at the end |
+| `.todos.md` | the todo, `#tags` anywhere in it | `- [ ] text #tags` with its `::updated:: ::created::` line, at the end |
 | `.actionlog.md` | what happened, `#tags` anywhere in it | `- YYYY-MM-DD HH:mm:ss text #tags` (local time), at the end |
 | `.events.csv` | name, type (`general` prefilled, or `birthday`), start date (today prefilled), end date (empty: the same day; a birthday is always one day) | a `name;type;start;end` row; a new file gets the header first |
 | `.prompts.md` | title with `#tags`, the prompt | a `## Title #tags` section at the end |
 | `.commands.md` | title with `#tags`, the command (`{{name}}` for a parameter) | a `## Title #tags` section with the command in a `sh` block |
 
-The entry is appended, so the rest of the file stays exactly as it was. The file is read, the
-entry added in the palette (`packages/palette/src/entries.ts`), and written back over the version
-read — if the file changed in between, the write fails and nothing is lost; try again. The worker
-only reads and writes files with these endings, inside the repository.
+Every app adds entries with the same functions — `addTodoEntry`, `addActionLogEntry`,
+`addEventEntry`, `addPromptEntry`, `addCommandEntry` in `packages/formats/src/entries.ts` — which
+the console's Add forms and quick-add pages, the popup, the start page and both palettes all call.
+A change to a format there reaches every app. Like the console, they parse the file and write it
+back in the widget's format, so a file is tidied up (a legacy todo list migrated, say) the first
+time an entry is added to it from anywhere.
+
+The file is read, the entry added in the palette, and written back over the version read — if the
+file changed in between, the write fails and nothing is lost; try again. The worker only reads
+and writes files with these endings, inside the repository.
 
 ### Actions
 
@@ -378,8 +384,9 @@ Chrome asks you to confirm the first time. It holds:
   commit fails (offline, or the bookmark was deleted in the console meanwhile) the card goes back
   and the page says why.
 - **Note / Todo / Log** — one box, three targets: a note goes to `.lifeos/dump.md`, a todo is
-  appended to the inbox the console's quick-todo page uses (`#tags` move to the end), and a log
-  entry goes to the repo's action log (the app folder's first `.actionlog.md`), `#tags` and all.
+  added to the inbox the console's quick-todo page uses (`#tags` move to the end), and a log
+  entry goes to the repo's action log (the app folder's first `.actionlog.md`), `#tags` and all —
+  both written by the same shared functions as the console's own (`packages/formats`).
   Other note targets are one palette action away (**Add a note…**), which is also the only place
   that reads the repo's quick-note list: a new tab is opened far too often to spend a GitHub
   request on it.

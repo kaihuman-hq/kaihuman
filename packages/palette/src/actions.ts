@@ -7,6 +7,7 @@
  * since nothing else has such a page.
  */
 
+import { commandParameters, fillCommand, parseCommands, parsePrompts } from '@lifosy/formats';
 import { usageRows } from './claude-usage.js';
 import type {
   EditableText,
@@ -16,9 +17,7 @@ import type {
   PaletteMode,
   RepoResult,
 } from './command-palette.js';
-import { commandParameters, fillCommand, parseCommands } from './commands.js';
 import { type EntryKind, entryKindOf } from './entries.js';
-import { parsePrompts } from './prompts.js';
 import type { ActionPort } from './protocol.js';
 import { parseTranslationQuery, usefulTranslations } from './translate.js';
 
@@ -33,31 +32,38 @@ export const splitTags = (input: string) =>
 
 export const plural = (count: number, one: string) => `${count} ${one}${count === 1 ? '' : 's'}`;
 
+/**
+ * Reads the file, adds the entry and writes it back over the version read — a change made in the
+ * console meanwhile fails the write rather than being overwritten.
+ */
+const addEntry = async (port: ActionPort, path: string, kind: EntryKind, answers: string[]) => {
+  const { content, sha } = await port.send({ type: 'READ_ENTRY_FILE', path });
+  const next = kind.add(content, answers, new Date());
+  await port.send({ type: 'WRITE_ENTRY_FILE', path, content: next, ...(sha ? { sha } : {}) });
+};
+
 /** Targets for a note: the repo's quick-note files, plus the default dump. */
 const noteTargets = async (port: ActionPort): Promise<PaletteAction[]> => {
   const { quickNotes } = await port.send({ type: 'FETCH_QUICK_NOTES' });
   const paths = ['.lifeos/dump.md', ...(quickNotes ?? [])];
-  return Array.from(new Set(paths)).map((path) => ({
-    id: `note:${path}`,
-    title: path,
-    // The popup picks its form the same way: an action log takes a description and tags.
-    prompts: [{ label: path.endsWith('.actionlog.md') ? 'What happened? #tags' : 'Note' }],
-    run: async ([input = '']: string[]) => {
-      if (!input.trim()) throw new Error('Nothing to add');
-      if (path.endsWith('.actionlog.md')) {
-        const description = input.replace(/#[\w-]+/g, '').trim();
-        await port.send({
-          type: 'ADD_ACTION_LOG',
-          path,
-          description,
-          tags: splitTags(input.match(/#[\w-]+/g)?.join(' ') ?? ''),
-        });
-      } else {
-        await port.send({ type: 'DUMP_NOTE', path, note: input });
-      }
-      return `Added to ${path}`;
-    },
-  }));
+  return Array.from(new Set(paths)).map((path) => {
+    // A widget's file — an action log, a todo list — takes an entry the way its widget adds one.
+    const kind = entryKindOf(path);
+    return {
+      id: `note:${path}`,
+      title: path,
+      prompts: kind?.prompts ?? [{ label: 'Note' }],
+      run: async (answers: string[]) => {
+        if (kind) await addEntry(port, path, kind, answers);
+        else {
+          const note = answers[0] ?? '';
+          if (!note.trim()) throw new Error('Nothing to add');
+          await port.send({ type: 'DUMP_NOTE', path, note });
+        }
+        return `Added to ${path}`;
+      },
+    };
+  });
 };
 
 /** Each saved group, with everything the popup can do to it. */
@@ -532,16 +538,6 @@ export const claudeUsageMode = (port: ActionPort): PaletteMode => ({
     return accounts.flatMap((account) => usageRows(account.name, account, now));
   },
 });
-
-/**
- * Reads the file, adds the entry and writes it back over the version read — a change made in the
- * console meanwhile fails the write rather than being overwritten.
- */
-const addEntry = async (port: ActionPort, path: string, kind: EntryKind, answers: string[]) => {
-  const { content, sha } = await port.send({ type: 'READ_ENTRY_FILE', path });
-  const next = kind.add(content, answers, new Date());
-  await port.send({ type: 'WRITE_ENTRY_FILE', path, content: next, ...(sha ? { sha } : {}) });
-};
 
 /**
  * What can be done with a repo file whose widget can add to it: open it in the console, or add an

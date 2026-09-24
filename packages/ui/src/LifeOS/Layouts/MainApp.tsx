@@ -18,6 +18,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { githubFileStore, githubProfileStore, Logger, layoutStore } from '@lifosy/core';
+import { addEventEntry, addTodoEntry, parseTodos } from '@lifosy/formats';
 import {
   Edit,
   FileText,
@@ -70,7 +71,6 @@ import {
 } from '../Organisms/Widgets/DataCollectionLogic';
 import { DataCollectionWidget } from '../Organisms/Widgets/DataCollectionWidget';
 import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
-import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
 import { HabitTrackerWidget } from '../Organisms/Widgets/HabitTrackerWidget';
 import { PromptsWidget } from '../Organisms/Widgets/PromptsWidget';
@@ -84,7 +84,6 @@ import { TimezoneAddForm } from '../Organisms/Widgets/TimezoneAddForm';
 import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
 import { TimezoneWidget } from '../Organisms/Widgets/TimezoneWidget';
 import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
-import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import { TodoWidget } from '../Organisms/Widgets/TodoWidget';
 import { AIPanel } from '../Templates/AIPanel';
 import type { DashboardConfig, DashboardEntry } from '../types';
@@ -2237,10 +2236,7 @@ const FocusedTileInternal = ({
   const [showHistory, setShowHistory] = useState(false);
 
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
-  const parsedTodoData = useMemo(
-    () => TodoLogic.parseTodos(tile.rawContent || ''),
-    [tile.rawContent],
-  );
+  const parsedTodoData = useMemo(() => parseTodos(tile.rawContent || ''), [tile.rawContent]);
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const todoTags = useMemo(() => {
     const tags = new Set<string>();
@@ -2987,10 +2983,7 @@ const FocusedTileInternal = ({
                 <EventAddForm
                   onCancel={() => setViewMode('WIDGET')}
                   onAdd={(entry) => {
-                    const data = EventsLogic.parseEvents(tile.rawContent || '');
-                    data.entries.push(entry);
-                    const newContent = EventsLogic.serializeEvents(data);
-                    tile.onContentChange?.(newContent);
+                    tile.onContentChange?.(addEventEntry(tile.rawContent || '', entry));
                     setViewMode('WIDGET');
                   }}
                 />
@@ -3002,15 +2995,12 @@ const FocusedTileInternal = ({
                   todosFilePath={String(tile.id)}
                   onCancel={() => setViewMode('WIDGET')}
                   onAdd={async (text, tags, milestoneId, promptRef) => {
-                    const data = TodoLogic.parseTodos(tile.rawContent || '');
-                    const newData = TodoLogic.addTodo(
-                      data,
+                    const newContent = addTodoEntry(tile.rawContent || '', {
                       text,
                       tags,
                       milestoneId,
-                      promptRef?.prompt,
-                    );
-                    const newContent = TodoLogic.serializeTodos(newData);
+                      prompt: promptRef?.prompt,
+                    });
                     // Update store directly and await save before creating the prompt
                     // file — running both concurrently causes a 409 Conflict on GitHub.
                     githubFileStore.updateFileContent(String(tile.id), newContent);
