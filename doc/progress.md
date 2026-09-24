@@ -9,6 +9,11 @@
   HTTP/2, which has no status text. The error now carries the status code and GitHub's own
   message, and a 404 on a write (GitHub's answer when a token may not write) says to check the
   token's write access.
+- **Fix**: saving for later (and the start page's other writes) failed with `422 "sha" wasn't
+  supplied` when GitHub read a file the synced tree lists back as 404: the write then went out as
+  a new file. It now falls back to the synced copy's sha and content — if that is stale, GitHub
+  answers 409 rather than the list being overwritten. Reads that feed a write also skip the
+  browser's HTTP cache (GitHub marks them cacheable for a minute).
 
 ## 2026-09-24 — Read it later: clear the whole list
 

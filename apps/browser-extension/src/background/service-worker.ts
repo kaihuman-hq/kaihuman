@@ -411,8 +411,10 @@ async function githubReadFile(
   repoUrl: string,
   filePath: string,
 ): Promise<{ content: string; sha: string } | null> {
+  // GitHub marks these cacheable for a minute; a read that feeds a write must not see an old one.
   const res = await fetch(`https://api.github.com/repos/${repoUrl}/contents/${filePath}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
+    cache: 'no-store',
   });
   if (res.status === 404) return null;
   if (!res.ok) throw await githubFailure(res, `Failed to read ${filePath}`);
@@ -1048,7 +1050,11 @@ async function commitTodayFile(
   ) {
     throw new Error(`${target} is not one of the start page's ${path.suffix} files`);
   }
-  const file = await githubReadFile(token, repo, target);
+  // A file the tree listed can still read back as 404; writing it as new would lack the sha
+  // GitHub needs. The synced copy has it, and a stale one fails as a conflict, not an overwrite.
+  const file =
+    (await githubReadFile(token, repo, target)) ??
+    cache.files.find((known) => known.path === target);
   const content = change(file?.content ?? '');
   const sha = await githubWriteFile(token, repo, target, content, file?.sha);
 
