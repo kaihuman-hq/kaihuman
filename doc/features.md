@@ -32,7 +32,7 @@
 | Start page "today" view: upcoming events and milestone, in-progress/overdue todos and inbox count, habit check-in and time-tracking clock cards, read-later queue, world clocks — from one hourly cache | start page | 2026-09-23 |
 | Start page capture box writes a note, an inbox todo or an action log entry | start page | 2026-09-23 |
 | Sync status (age of the cached data, opens waiting to be pushed) with a sync button | start page header | 2026-09-23 |
-| Read later: this page — adds the page to the repo's `.readitlater.json` | command palette | 2026-09-23 |
+| Read later: this page — adds the page to the repo's `.readitlater.json` | command palette, popup clock icon | 2026-09-23 |
 | Pin to Knowledge Base saves the page as Markdown with its images in `.kh/assets/` (popup toggle turns image downloads off) | popup, palette | 2026-09-23 |
 | Selected-text clips go to `.kh/raw/` as their own notes | context menu, palette | 2026-09-23 |
 | Recent per prefix: each palette mode lists the last 10 entries chosen in it first | command palette, desktop palette | 2026-09-24 |

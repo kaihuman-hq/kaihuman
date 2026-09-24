@@ -160,6 +160,25 @@ export function App() {
     }
   };
 
+  // Only the link and title go to the read-later list, so unlike pinning there is no page to read.
+  const handleSaveForLater = () => {
+    if (!token || !activeTab) return;
+    setStatus('saving');
+    setErrorMessage(null);
+    chrome.runtime.sendMessage(
+      { type: 'READ_LATER_ADD', url: activeTab.url, title: activeTab.title },
+      (response) => {
+        if (chrome.runtime.lastError || response?.error) {
+          setErrorMessage(chrome.runtime.lastError?.message || response?.error || 'Unknown error');
+          setStatus('error');
+        } else {
+          setStatus('success');
+          setTimeout(() => setStatus('idle'), 2000);
+        }
+      },
+    );
+  };
+
   const handleDumpNote = async () => {
     if (!token || !dumpNote.trim()) return;
     setStatus('saving');
@@ -291,6 +310,7 @@ export function App() {
           pageTitle={activeTab?.title || ''}
           onPin={handleReadItLater}
           onBookmark={() => setView('bookmark')}
+          onReadLater={handleSaveForLater}
           status={status}
         />
         <label class="flex items-center gap-2 text-[10px] text-[var(--los-fg-dim)] font-mono cursor-pointer select-none">

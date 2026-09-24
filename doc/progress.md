@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-09-24 — Popup: read it later button
+
+- **Browser extension popup**: a clock icon next to the pin and star adds the current tab to the
+  repo's `.readitlater.json` (the same `READ_LATER_ADD` message the palette's *Read later: this
+  page* sends). Unlike pinning, it stores only the link and title.
+
 ## 2026-09-24 — Read it later: clear the whole list
 
 - **Console**: the Read it later widget's reading list has a **CLEAR ALL** button; it asks for
