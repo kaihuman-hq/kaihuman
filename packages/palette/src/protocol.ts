@@ -20,6 +20,31 @@ export interface PinnedTabGroupSummary {
   tabCount: number;
 }
 
+/** What `>w` lists: pull requests to review, what is assigned, and your PRs whose checks fail. */
+export type GithubWorkFilter = 'review-requested' | 'assigned' | 'failing';
+
+/**
+ * The GitHub issue search behind each filter. The backends run them (the desktop's Rust mirrors
+ * this table), so the palette can only ask for these, never for a search of its own.
+ */
+export const GITHUB_WORK_QUERIES: Record<GithubWorkFilter, string> = {
+  'review-requested': 'is:open is:pr archived:false review-requested:@me',
+  assigned: 'is:open archived:false assignee:@me',
+  failing: 'is:open is:pr archived:false author:@me status:failure',
+};
+
+/** One issue or pull request from a `LIST_GITHUB_WORK` search. */
+export interface GithubWorkItem {
+  /** `owner/name`. */
+  repo: string;
+  number: number;
+  title: string;
+  url: string;
+  pullRequest: boolean;
+  /** ISO 8601. */
+  updatedAt: string;
+}
+
 export interface PaletteProtocol {
   GET_BOOKMARKS: { request: NoFields; response: { bookmarks: Bookmark[] } };
   SEARCH_REPO: { request: { query: string }; response: { results: RepoResult[] } };
@@ -139,6 +164,14 @@ export interface PaletteProtocol {
    * has none; the palette parses it itself. A backend may answer from a cache.
    */
   GET_PALETTE_SETTINGS: { request: NoFields; response: { content: string | null } };
+  /**
+   * Open issues and pull requests that wait on the user — see `GITHUB_WORK_QUERIES` — most
+   * recently updated first.
+   */
+  LIST_GITHUB_WORK: {
+    request: { filter: GithubWorkFilter };
+    response: { items: GithubWorkItem[] };
+  };
   /** GitHub repositories to open, most relevant first — the order is the backend's. */
   LIST_GITHUB_REPOS: {
     request: NoFields;

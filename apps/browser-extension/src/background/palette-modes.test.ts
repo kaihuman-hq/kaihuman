@@ -2,10 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   deeplEndpoint,
   fetchPromptFiles,
+  isGithubWorkFilter,
   isPromptsCacheStale,
   listGithubRepos,
   PROMPTS_CACHE_TTL_MS,
   promptFilePaths,
+  searchGithubWork,
   translateWithDeepl,
 } from './palette-modes';
 
@@ -121,5 +123,72 @@ describe('listGithubRepos', () => {
       { fullName: 'o/b', description: 'B' },
       { fullName: 'o/a' },
     ]);
+  });
+});
+
+describe('searchGithubWork', () => {
+  it('runs the filter’s issue search and reads each hit', async () => {
+    const fetchMock = vi.fn(async () =>
+      respond(200, {
+        items: [
+          {
+            number: 7,
+            title: 'Fix the sync',
+            html_url: 'https://github.com/o/r/pull/7',
+            repository_url: 'https://api.github.com/repos/o/r',
+            updated_at: '2026-09-24T08:00:00Z',
+            pull_request: {},
+          },
+          {
+            number: 8,
+            title: 'Crash on start',
+            html_url: 'https://github.com/o/r/issues/8',
+            repository_url: 'https://api.github.com/repos/o/r',
+            updated_at: '2026-09-23T08:00:00Z',
+          },
+        ],
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await searchGithubWork('t', 'review-requested')).toEqual([
+      {
+        repo: 'o/r',
+        number: 7,
+        title: 'Fix the sync',
+        url: 'https://github.com/o/r/pull/7',
+        pullRequest: true,
+        updatedAt: '2026-09-24T08:00:00Z',
+      },
+      {
+        repo: 'o/r',
+        number: 8,
+        title: 'Crash on start',
+        url: 'https://github.com/o/r/issues/8',
+        pullRequest: false,
+        updatedAt: '2026-09-23T08:00:00Z',
+      },
+    ]);
+    const url = new URL(String((fetchMock.mock.calls[0] as unknown[] | undefined)?.[0]));
+    expect(url.pathname).toBe('/search/issues');
+    expect(url.searchParams.get('q')).toBe('is:open is:pr archived:false review-requested:@me');
+    expect(url.searchParams.get('sort')).toBe('updated');
+  });
+
+  it('says when GitHub rate limits the search', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => respond(403, {})),
+    );
+    await expect(searchGithubWork('t', 'failing')).rejects.toThrow('rate limited');
+  });
+});
+
+describe('isGithubWorkFilter', () => {
+  it('accepts only the known filters', () => {
+    expect(isGithubWorkFilter('assigned')).toBe(true);
+    expect(isGithubWorkFilter('toString')).toBe(false);
+    expect(isGithubWorkFilter('is:open repo:secret')).toBe(false);
+    expect(isGithubWorkFilter(undefined)).toBe(false);
   });
 });

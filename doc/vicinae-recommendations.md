@@ -3,7 +3,7 @@
 [Vicinae](https://github.com/vicinaehq/vicinae) is a Raycast-like launcher for Linux with a store of
 community extensions. This note looks at its extension list (Sep 2026) and asks which ideas fit the
 Lifosy palettes: the browser extension's and the desktop one on Omarchy/Hyprland. None of this is
-implemented; it is input for `doc/roadmap.md`.
+implemented unless its heading says done; it is input for `doc/roadmap.md`.
 
 ## What the list covers
 
@@ -31,7 +31,7 @@ YouTube), `>n` npm, `>r` / `>g` GitHub.
 
 Ordered by value for the effort. The first group needs no new surfaces or permissions.
 
-### 1. Converters that work offline, on both surfaces
+### 1. Converters that work offline, on both surfaces — done
 
 Color (`#ff8800` ⇄ `rgb()` ⇄ `hsl()`), number bases (`0x1f` ⇄ `31` ⇄ `0b11111`), case
 (`camelCase`, `snake_case`, `kebab-case`, Title), timestamps (epoch ⇄ ISO, in the local zone), a
@@ -42,7 +42,7 @@ them:
 - behind prefixes, for example `>k` case and `>#` symbols. The prefixes that are left are getting
   scarce (see 6).
 
-### 2. GitHub work that needs you
+### 2. GitHub work that needs you — done (`>w`)
 
 The extension already has a GitHub token and `>r` / `>g`. A `>`-mode for review requests, PRs
 assigned to you, and failing checks on your PRs would be one search request
@@ -69,14 +69,12 @@ the Wikipedia engine only open a page. An optional `results` endpoint in a tool'
 (JSON: title, subtitle, URL) would let a tool list hits, as `>g` does. That only works for APIs
 with CORS or through the service worker / Rust backend, so keep it opt-in per tool.
 
-### 6. More room for prefixes
+### 6. More room for prefixes — done
 
-`b p t r g f x d c u a` plus `l e m n i` leave few letters, and a longer prefix is shadowed as soon
-as its first letter is a mode (`>le` never gets past `>l`). Before adding many modes, consider one
-of these:
-- only enter a mode on a space (`>le `), so multi-letter prefixes work;
-- let the settings widget warn when a tool prefix starts with another prefix, as `toolProblem`
-  already does for taken prefixes.
+`b p t r g f x d c u a` plus `l e m n i` left few letters, and a longer prefix was shadowed as soon
+as its first letter was a mode (`>le` never got past `>l`). Now a prefix is entered as it is typed
+unless a longer prefix starts with it; then it waits for a space (`>l ` next to `>le`), and the
+hint says so.
 
 ### 7. Secrets: a separate decision
 

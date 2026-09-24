@@ -69,6 +69,9 @@ export const BUILT_IN_PALETTE_PREFIXES: readonly string[] = [
   'c',
   'u',
   'a',
+  'w',
+  'k',
+  's',
 ];
 
 /** What the palettes offer with no settings file. */

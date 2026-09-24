@@ -641,6 +641,23 @@ describe('web search', () => {
     ]);
   });
 
+  it('converts a sum, a color or a timestamp above the web search, and ⏎ copies it', async () => {
+    type('12*7');
+    expect(groupRows('Convert')).toEqual(['84']);
+    expect(groupLabels().indexOf('Convert')).toBeLessThan(groupLabels().indexOf('Web'));
+    press('Enter');
+    await settle();
+    expect(copy).toHaveBeenCalledWith('84');
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('converts nothing for plain text or a plain number', () => {
+    type('rust book');
+    expect(groupLabels()).not.toContain('Convert');
+    type('2024');
+    expect(groupLabels()).not.toContain('Convert');
+  });
+
   it('shows nothing to search for until something is typed', () => {
     expect(groupLabels()).not.toContain('Web');
   });
@@ -766,6 +783,40 @@ describe('settings', () => {
     await reopenWith({ searchEngines: [], assistants: [], tools: [] });
     type('>a');
     expect(crumbText()).toBeNull();
+  });
+
+  it('waits for a space after a prefix that a longer one starts with', async () => {
+    await reopenWith({
+      searchEngines: [],
+      assistants: [],
+      tools: [kibana, { ...kibana, prefix: 'ki', name: 'Kibana infra' }],
+    });
+    type('>k');
+    expect(crumbText()).toBeNull();
+    expect(hintText()).toContain('space enters >k Kibana');
+    type('>k ');
+    expect(crumbText()).toContain('Kibana');
+    expect(crumbText()).not.toContain('infra');
+  });
+
+  it('enters the longer prefix as soon as it is typed', async () => {
+    await reopenWith({
+      searchEngines: [],
+      assistants: [],
+      tools: [kibana, { ...kibana, prefix: 'ki', name: 'Kibana infra' }],
+    });
+    type('>ki');
+    expect(crumbText()).toContain('Kibana infra');
+  });
+
+  it('enters a prefix no other one starts with right away', async () => {
+    await reopenWith({
+      searchEngines: [],
+      assistants: [],
+      tools: [kibana, { ...kibana, prefix: 'ki', name: 'Kibana infra' }],
+    });
+    type('>p');
+    expect(crumbText()).toContain('Prompts');
   });
 
   it('keeps the tools listed in the help', async () => {

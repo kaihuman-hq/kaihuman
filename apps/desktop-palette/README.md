@@ -31,6 +31,10 @@ way.
 | `>e` LEO dictionary, `>m` Google Maps, `>n` npm, `>i` IMDb — default link tools like `>l` | ✓ |
 | `>l` logs — Tsuga's log explorer, searching for what is typed; more link tools from `.kh/command-palette.settings.json` (see the extension's README, "Palette settings") | ✓ (settings cached in `$XDG_CACHE_HOME/lifosy/palette-settings.json` for five minutes) |
 | Recent: each prefix lists the last 10 entries chosen in it first (kept in `$XDG_STATE_HOME/lifosy/mode-recents.json`) | ✓ |
+| `>w` GitHub work — review requests, what is assigned to you, your PRs with failing checks | ✓ |
+| `>k` convert — colors, number bases, arithmetic, timestamps, letter case, Lorem ipsum; also offered inline for a color, sum, `0x…` or timestamp typed into the main search | ✓ (copying with `wl-copy`) |
+| `>s` symbols, emoji and kaomoji by name, ⏎ copies | ✓ |
+| A prefix that a longer one starts with (`>l` next to `>le`) is entered after a space | ✓ |
 | `>f` files — todo lists, action logs, events, prompts, commands: open one in Kaihuman or add an entry as its widget does (also from ⇥ repo-search hits) | ✓ |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |
 | Counting how often a bookmark is opened | — the extension counts; the desktop does not yet |

@@ -11,6 +11,7 @@
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
 | Command palette settings (`.kh/command-palette.settings.json`) — search engines and `>`-prefixed link tools with parameters, added, removed and reordered in a widget | New File → Command Palette Settings | 2026-09-24 |
+| `>w` GitHub work (review requests, assigned, your PRs with failing checks), `>k` conversions (colors, number bases, arithmetic, timestamps, case, Lorem ipsum; inline in the main search for colors, sums and timestamps), `>s` symbols, emoji and kaomoji; a prefix that a longer one starts with is entered after a space | command palette, desktop palette | 2026-09-24 |
 | `>a` ask AI — the typed question to ChatGPT, Claude, Gemini, GitHub Copilot or Perplexity (configurable assistants, also in the settings widget); default link tools `>e` LEO, `>m` Google Maps, `>n` npm, `>i` IMDb | command palette, desktop palette, Command Palette Settings widget | 2026-09-24 |
 | Read it later: **CLEAR ALL** empties the reading list after a confirmation | Read it later widget | 2026-09-24 |
 | Wiki view: clickable `[[wikilinks]]`, backlinks, page type and tags, tag filter, repo-stored images | `/wiki` | 2026-09-23 |

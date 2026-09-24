@@ -13,7 +13,7 @@ use crate::config::{
     self, Settings, bookmarks_cache_file, claude_usage_cache_file, commands_cache_file,
     is_repo_name, palette_settings_cache_file, prompts_cache_file, read_json, write_json,
 };
-use crate::github::{Client, Read, console_file_url, encode_path};
+use crate::github::{Client, Read, WorkFilter, console_file_url, encode_path};
 use crate::recents::{self, RecentEntry};
 use crate::{claude, commands, dumps, entries, palette_settings, prompts, repos, translate};
 
@@ -85,6 +85,9 @@ pub enum Request {
         sha: Option<String>,
     },
     ListGithubRepos,
+    ListGithubWork {
+        filter: WorkFilter,
+    },
     GetPaletteSettings,
     ListClaudeCodeRepos,
     GetClaudeUsage {
@@ -459,6 +462,7 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             write_entry_file(&path, &content, sha.as_deref()).await
         }
         Request::ListGithubRepos => list_github_repos().await,
+        Request::ListGithubWork { filter } => Ok(json!({ "items": client()?.work(filter).await? })),
         Request::GetPaletteSettings => get_palette_settings().await,
         Request::ListClaudeCodeRepos => Ok(json!({ "repos": claude::code_repos()? })),
         Request::GetClaudeUsage { cached } => claude_usage(cached).await,
@@ -534,6 +538,18 @@ mod tests {
         assert_eq!(
             parse(json!({ "type": "LIST_GITHUB_REPOS" })),
             Request::ListGithubRepos
+        );
+        assert_eq!(
+            parse(json!({ "type": "LIST_GITHUB_WORK", "filter": "review-requested" })),
+            Request::ListGithubWork {
+                filter: WorkFilter::ReviewRequested
+            }
+        );
+        assert!(
+            serde_json::from_value::<Request>(
+                json!({ "type": "LIST_GITHUB_WORK", "filter": "is:open repo:secret" })
+            )
+            .is_err()
         );
         assert_eq!(
             parse(json!({ "type": "GET_PALETTE_SETTINGS" })),

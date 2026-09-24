@@ -16,7 +16,7 @@ const engine = (name: string) => {
 };
 
 const tool = (over: Partial<PaletteToolSetting> = {}): PaletteToolSetting => ({
-  prefix: 'k',
+  prefix: 'j',
   name: 'Kibana',
   url: 'https://kibana.example.com/app?q={query}',
   params: [],
@@ -173,7 +173,7 @@ describe('paletteSettingsProblems', () => {
     ).toEqual([
       'Bad: the URL must start with https:// or http://',
       'An assistant needs a name',
-      'Again: >k is already taken by a tool above',
+      'Again: >j is already taken by a tool above',
       'Own: >t is one of the palette’s own prefixes',
     ]);
   });

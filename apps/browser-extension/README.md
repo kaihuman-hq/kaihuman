@@ -208,6 +208,9 @@ normal tab. The New Tab page used to be on that list; the start page below is th
 - **Actions** are everything the popup and the context menu can do, listed below your bookmarks so
   `⏎` opens what you were looking for rather than writing something. Type part of an action's name
   to bring it to the top.
+- **Convert** shows what a color, a sum, a `0x`/`0b`/`0o` number or a timestamp you typed
+  converts to — `12*7` gives `84`, `#ff8800` its `rgb()` and `hsl()` — above **Web**, so `⏎`
+  copies the result. Plain numbers and text are left to the web search; `>k` converts those too.
 - **Web** lists one row per search engine for what you typed — by default Google, DuckDuckGo,
   Ecosia, Amazon, Amazon.de, Reddit, Bing, Brave Search, Startpage, Wikipedia, YouTube, GitHub,
   Stack Overflow, Yahoo and Qwant — below everything else, so typing an action's name still
@@ -269,9 +272,10 @@ each link. Edits are saved with **Save**.
 - **Order** is the palette's order; the first engine is the one `⏎` searches.
 - A list the file leaves out is the default one; an empty list stays empty.
 - A tool's **prefix** is lowercase letters or digits, and cannot be one of the palette's own
-  (`b p t r g f x d c u a`). A prefix is entered as soon as it is typed, so `>le` is never reached
-  while `>l` exists — keep tool prefixes to one letter, or to ones no other prefix starts. An entry that breaks a rule — no name, a URL that is not http(s), a
-  prefix taken — is left out, and the widget says which and why.
+  (`b p t r g f x d c u a w k s`). It may be longer than one letter and may start like another
+  one: with `>l` and `>le`, `>le` is entered as it is typed and `>l` once a space follows it (see
+  **Prefix modes**). An entry that breaks a rule — no name, a URL that is not http(s), a prefix
+  taken — is left out, and the widget says which and why.
 - The file is cached like the prompts: a change reaches the palette within five minutes.
 
 ### Help
@@ -284,9 +288,11 @@ lists `>d` and its own actions, and the extension's lists the browser-only ones.
 ### Prefix modes
 
 `>` and a letter at the start of the input switch the palette into a list of its own — `>p` as
-soon as the `p` is typed, while a longer word (`>prompt`) stays plain search text. The breadcrumb
-names the mode; **Esc**, or **Backspace** on an empty input, leaves it again. The empty palette's
-hint line lists the prefixes.
+soon as the `p` is typed, while a longer word (`>prompt`) stays plain search text. A prefix that a
+longer one starts with waits for a space: with tools `>l` and `>le`, typing `>l` shows “space
+enters >l …” in the hint, `>l ` enters it, and `>le` is entered as soon as the `e` is typed. The
+breadcrumb names the mode; **Esc**, or **Backspace** on an empty input, leaves it again. The empty
+palette's hint line lists the prefixes.
 
 | Prefix | Lists | ⏎ | Source |
 | --- | --- | --- | --- |
@@ -299,9 +305,12 @@ hint line lists the prefixes.
 | `>a` | One row per AI assistant for the question typed — by default ChatGPT, Claude, Gemini, GitHub Copilot and Perplexity (see **Palette settings**) | opens a new chat with the question filled in, and copies the question: Gemini and Copilot do not read it from the link, so paste it there | a link only, no request |
 | `>l` | One row: Tsuga logs, for what is typed (a default tool — see **Palette settings**) | opens Tsuga's explorer searching for the typed text | a link only, no request |
 | `>e` `>m` `>n` `>i` | One row: LEO's German ⇄ English dictionary, Google Maps, npm, IMDb — for what is typed (default tools) | opens the page for the typed text | a link only, no request |
+| `>w` | What waits on you on GitHub: pull requests requesting your review, issues and pull requests assigned to you, your pull requests with failing checks — grouped in that order, each once | opens it on GitHub | three `GET /search/issues` with the extension's token, on entering the mode |
+| `>k` | Conversions of what you type: colors (`#ff8800`, `rgb()`, `hsl()`), number bases (`0x1f`, `0b101`, `0o17`, `42`), arithmetic (`12*7`, `2^10`, `(3+4)%5`), timestamps (`1790208000`, `2026-09-24T10:00Z`), letter case for any other text, `lorem` / `lorem 5` for filler text | copies the result | none — worked out in the palette |
+| `>s` | Symbols, emoji and kaomoji by name — arrows, math, currency, typography, keys, marks | copies it | none |
 | `>f` | The repository's files a widget can add to — todo lists, action logs, events, prompts, commands | offers **Open … in Kaihuman** or **Add a todo…** (an action, an event…) | one tree listing per visit |
 
-With nothing typed, every mode but `>t`, `>u` and `>a` lists the last 10 entries you chose in it first,
+With nothing typed, every mode but `>t`, `>u`, `>a` and `>k` lists the last 10 entries you chose in it first,
 under **Recent** — the prompts you copied in `>p`, the repositories you opened in `>r`, the terms
 you searched in `>l`. Choosing an entry again moves it back to the top; an entry that has since
 gone from the repository drops out. They are kept per prefix in the extension's local storage.

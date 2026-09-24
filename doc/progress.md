@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-09-24 — Palette: converters, `>w` GitHub work, prefixes that share a start
+
+- **Converters** (`packages/palette/src/convert.ts`, both surfaces, no requests): a color
+  (`#hex`, `rgb()`, `hsl()`), a `0x`/`0b`/`0o` number, arithmetic (own parser — `+ - * / % ^`,
+  parentheses, no `eval`) or a timestamp typed into the main search shows a **Convert** group above
+  Web; ⏎ copies. `>k` converts anything: plain integers into other bases, letter case for text,
+  `lorem [n]` for filler.
+- **`>s` symbols** (`symbols.ts`): arrows, math, currency, typography, keys, marks, emoji and
+  kaomoji by name; ⏎ copies.
+- **`>w` GitHub work**: pull requests waiting for your review, issues and pull requests assigned to
+  you, and your pull requests with failing checks, grouped and each listed once. New request
+  `LIST_GITHUB_WORK { filter }`; the backends (service worker, Rust `Client::work`) run the fixed
+  issue search for the filter (`GITHUB_WORK_QUERIES`) and refuse any other.
+- **Prefixes**: a prefix is entered as it is typed unless a longer one starts with it; then it
+  waits for a space (`>l ` next to `>le`), and the hint says so.
+- `w k s` join the palette's own prefixes, so a tool cannot take them.
+
 ## 2026-09-24 — Palette: `>a` asks an AI, more default link tools
 
 - **`>a`** (both surfaces): the typed question, one row per assistant — ChatGPT, Claude, Gemini,
