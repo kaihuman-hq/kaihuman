@@ -1,9 +1,23 @@
-import { withTranslationText } from '@lifosy/palette';
+import {
+  addActionLogEntry,
+  addReadLaterEntry,
+  addTodoEntry,
+  checkIn,
+  localDate,
+  markReadItLaterRead,
+  parseTimeTracking,
+  serializeTimeTracking,
+  toggleStartStop,
+} from '@lifosy/formats';
+import { withModeRecent, withTranslationText } from '@lifosy/palette';
 import { type Message } from '../types';
 import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
 import {
+  encodePath,
+  fetchEntryFilePaths,
   fetchPromptFiles,
+  isEntryFilePath,
   isPromptsCacheStale,
   listGithubRepos,
   type PromptsCache,
@@ -59,19 +73,14 @@ import {
   toPinnedTabs,
 } from './pinned-tabs';
 import {
-  addReadLater,
-  appendTodo,
   buildToday,
-  checkInHabit,
+  DEFAULT_ACTION_LOG_PATH,
   fetchToday,
   inboxPath,
   isTodayCacheStale,
   isTodayCacheUsable,
-  localDate,
-  markRead,
   readLaterPath,
   type TodayCache,
-  toggleTimer,
   withFile,
 } from './today';
 
@@ -226,6 +235,26 @@ export interface RecentEntry {
   title: string;
   subtitle?: string;
   url?: string;
+}
+
+/** Each prefix mode's recently chosen ids, newest first, keyed by the mode's prefix. */
+async function readModeRecents(): Promise<Record<string, string[]>> {
+  const stored = await chrome.storage.local.get('modeRecents');
+  const recents = stored.modeRecents as Record<string, string[]> | undefined;
+  return recents && typeof recents === 'object' ? recents : {};
+}
+
+async function modeRecents(prefix: string) {
+  const ids = (await readModeRecents())[prefix];
+  return { ids: Array.isArray(ids) ? ids : [] };
+}
+
+async function rememberModeRecent(prefix: string, id: string) {
+  if (!prefix || !id) throw new Error('A mode recent needs a prefix and an id');
+  const all = await readModeRecents();
+  const ids = withModeRecent(all[prefix] ?? [], id);
+  await chrome.storage.local.set({ modeRecents: { ...all, [prefix]: ids } });
+  return { ids };
 }
 
 async function readRecents(): Promise<RecentEntry[]> {
@@ -1012,6 +1041,59 @@ async function commitTodayFile(
   return { today: buildToday(next, new Date()) };
 }
 
+/**
+ * An action log entry from the popup or the start page, written as the console's Action Log widget
+ * writes it, over the version read.
+ */
+async function addActionLog(path: string, description: string, tags: string[]) {
+  // The whole file is rewritten, so only an action log may be.
+  if (!path.toLowerCase().endsWith('.actionlog.md') || !isEntryFilePath(path)) {
+    throw new Error(`Refusing to write to ${path}`);
+  }
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const file = await githubReadFile(token, repo, encodePath(path));
+  const content = addActionLogEntry(file?.content ?? '', { description, tags });
+  await githubWriteFile(token, repo, encodePath(path), content, file?.sha);
+  return {};
+}
+
+/** The files `>f` lists, each with its console link, as a repo search lists its hits. */
+async function listEntryFiles() {
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const paths = await fetchEntryFilePaths(token, repo);
+  return {
+    files: paths.map((path) => ({
+      path,
+      name: path.split('/').at(-1) ?? path,
+      url: consoleFileUrl(path, repo),
+    })),
+  };
+}
+
+async function readEntryFile(path: string) {
+  if (!isEntryFilePath(path)) throw new Error(`Refusing to read ${path}`);
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  return (await githubReadFile(token, repo, encodePath(path))) ?? { content: '' };
+}
+
+/** Writes over the version read; the start page's cache takes the new text if it shows the file. */
+async function writeEntryFile(path: string, content: string, sha?: string) {
+  if (!isEntryFilePath(path)) throw new Error(`Refusing to write ${path}`);
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const written = await githubWriteFile(token, repo, encodePath(path), content, sha);
+  const cache = await readTodayCache();
+  if (cache && isTodayCacheUsable(cache, repo) && cache.files.some((file) => file.path === path)) {
+    await chrome.storage.local.set({
+      todayCache: withFile(cache, { path, sha: written ?? '', content }),
+    });
+  }
+  return {};
+}
+
 /** How fresh the start page's data is, and what is still waiting to be pushed. */
 async function syncStatus() {
   const { repo } = await credentials();
@@ -1074,35 +1156,14 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   }
 
   if (message.type === 'ADD_ACTION_LOG') {
-    chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
-      const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'lifosy/monorepo';
-      if (!token) {
-        sendResponse({ error: 'No token found' });
-        return;
-      }
-      try {
-        const targetPath = message.path || '.lifeos/dump.actionlog.md';
-
-        // Generate timestamp YYYY-MM-DD HH:mm:ss
-        const now = new Date();
-        const pad = (n: number) => n.toString().padStart(2, '0');
-        const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-
-        // Format description and tags
-        let contentStr = `- ${timestamp} ${message.description?.trim() || ''}`;
-        if (message.tags && message.tags.length > 0) {
-          const tagsStr = message.tags.map((t: string) => `#${t.trim()}`).join(' ');
-          contentStr += ` ${tagsStr}`;
-        }
-
-        await githubUpsertFile(token, repo, targetPath, contentStr, 'bottom');
-        sendResponse({ success: true });
-      } catch (error: any) {
-        sendResponse({ error: error.message });
-      }
-    });
-    return true; // Indicate async response
+    return answer(
+      addActionLog(
+        message.path || DEFAULT_ACTION_LOG_PATH,
+        message.description || '',
+        message.tags || [],
+      ),
+      sendResponse,
+    );
   }
 
   if (message.type === 'FETCH_QUICK_NOTES') {
@@ -1199,6 +1260,14 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     return true; // Indicate async response
   }
 
+  if (message.type === 'GET_MODE_RECENTS') {
+    return answer(modeRecents(message.prefix || ''), sendResponse);
+  }
+
+  if (message.type === 'ADD_MODE_RECENT') {
+    return answer(rememberModeRecent(message.prefix || '', message.id || ''), sendResponse);
+  }
+
   if (message.type === 'GET_REPOS') {
     chrome.storage.local.get(['lifeos_repo', 'lifeos_repos']).then(
       (data) =>
@@ -1251,6 +1320,19 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       (error) => sendResponse({ error: error.message }),
     );
     return true; // Indicate async response
+  }
+
+  if (message.type === 'LIST_ENTRY_FILES') return answer(listEntryFiles(), sendResponse);
+
+  if (message.type === 'READ_ENTRY_FILE') {
+    return answer(readEntryFile(message.path || ''), sendResponse);
+  }
+
+  if (message.type === 'WRITE_ENTRY_FILE') {
+    return answer(
+      writeEntryFile(message.path || '', message.content ?? '', message.sha),
+      sendResponse,
+    );
   }
 
   if (message.type === 'TRANSLATE') {
@@ -1373,7 +1455,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     const date = localDate(new Date());
     return answer(
       commitTodayFile({ path: message.path || '', suffix: '.habit.csv' }, (csv) =>
-        checkInHabit(csv, date)),
+        checkIn(csv, date)),
       sendResponse,
     );
   }
@@ -1382,7 +1464,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     const now = new Date();
     return answer(
       commitTodayFile({ path: message.path || '', suffix: '.timetracking.csv' }, (csv) =>
-        toggleTimer(csv, now),
+        serializeTimeTracking(toggleStartStop(parseTimeTracking(csv), now)),
       ),
       sendResponse,
     );
@@ -1391,7 +1473,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'READ_LATER_DONE') {
     return answer(
       commitTodayFile({ path: message.path || '', suffix: '.readitlater.json' }, (json) =>
-        markRead(json, message.id || '', Date.now()),
+        markReadItLaterRead(json, message.id || ''),
       ),
       sendResponse,
     );
@@ -1405,16 +1487,16 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     const page = { url: message.url, title: message.title || '' };
     return answer(
       commitTodayFile(readLaterPath, (json) =>
-        addReadLater(json, page, Date.now(), crypto.randomUUID()),
+        addReadLaterEntry(json, page, crypto.randomUUID()),
       ),
       sendResponse,
     );
   }
 
   if (message.type === 'ADD_TODO') {
-    const created = new Date().toISOString();
+    const now = new Date();
     return answer(
-      commitTodayFile(inboxPath, (md) => appendTodo(md, message.text || '', created)),
+      commitTodayFile(inboxPath, (md) => addTodoEntry(md, { text: message.text || '' }, now)),
       sendResponse,
     );
   }

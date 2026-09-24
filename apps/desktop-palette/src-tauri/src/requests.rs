@@ -10,12 +10,12 @@ use serde_json::{Value, json};
 
 use crate::bookmarks::{self, BOOKMARKS_PATH, Cache};
 use crate::config::{
-    self, Settings, bookmarks_cache_file, commands_cache_file, is_repo_name, prompts_cache_file,
-    read_json, write_json,
+    self, Settings, bookmarks_cache_file, claude_usage_cache_file, commands_cache_file,
+    is_repo_name, prompts_cache_file, read_json, write_json,
 };
-use crate::github::{Client, Read};
+use crate::github::{Client, Read, console_file_url, encode_path};
 use crate::recents::{self, RecentEntry};
-use crate::{claude, commands, dumps, prompts, repos, translate};
+use crate::{claude, commands, dumps, entries, prompts, repos, translate};
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -26,6 +26,13 @@ pub enum Request {
         query: String,
     },
     GetRecents,
+    GetModeRecents {
+        prefix: String,
+    },
+    AddModeRecent {
+        prefix: String,
+        id: String,
+    },
     AddRecent {
         entry: RecentEntry,
     },
@@ -37,11 +44,6 @@ pub enum Request {
     DumpNote {
         path: String,
         note: String,
-    },
-    AddActionLog {
-        path: String,
-        description: String,
-        tags: Vec<String>,
     },
     GetRepos,
     SetRepo {
@@ -72,9 +74,22 @@ pub enum Request {
     SetTranslationKey {
         key: String,
     },
+    ListEntryFiles,
+    ReadEntryFile {
+        path: String,
+    },
+    WriteEntryFile {
+        path: String,
+        content: String,
+        #[serde(default)]
+        sha: Option<String>,
+    },
     ListGithubRepos,
     ListClaudeCodeRepos,
-    GetClaudeUsage,
+    GetClaudeUsage {
+        #[serde(default)]
+        cached: bool,
+    },
     ListDumps,
     SaveDump {
         #[serde(default)]
@@ -93,19 +108,6 @@ pub enum Request {
 /// Notes are written inside the repo, never to a path that climbs out of it.
 fn is_note_path(path: &str) -> bool {
     !path.starts_with('/') && path.split('/').all(|part| !part.is_empty() && part != "..")
-}
-
-/// `- YYYY-MM-DD HH:MM:SS description #tag #tag`, as the extension writes an action log.
-pub fn action_log_line(timestamp: &str, description: &str, tags: &[String]) -> String {
-    let mut line = format!("- {timestamp} {}", description.trim());
-    for tag in tags
-        .iter()
-        .map(|tag| tag.trim())
-        .filter(|tag| !tag.is_empty())
-    {
-        line.push_str(&format!(" #{tag}"));
-    }
-    line
 }
 
 fn client() -> Result<Client, String> {
@@ -222,6 +224,66 @@ async fn list_repo_files(suffix: &'static str, cache_file: PathBuf) -> Result<Va
     Ok(json!({ "files": files }))
 }
 
+/// The files `>f` lists, each with its console link, as a repo search lists its hits.
+async fn list_entry_files() -> Result<Value, String> {
+    let client = client()?;
+    let files: Vec<Value> = entries::entry_file_paths(&client.tree().await?)
+        .into_iter()
+        .map(|path| {
+            let name = path.rsplit('/').next().unwrap_or(&path).to_string();
+            let url = console_file_url(&path, client.repo());
+            json!({ "path": path, "name": name, "url": url })
+        })
+        .collect();
+    Ok(json!({ "files": files }))
+}
+
+/// A file not there yet reads as empty, with no version to write over.
+async fn read_entry_file(path: &str) -> Result<Value, String> {
+    if !entries::is_entry_path(path) {
+        return Err(format!("Refusing to read {path}"));
+    }
+    match client()?.read(&encode_path(path), None).await? {
+        Read::Found { content, sha, .. } => Ok(json!({ "content": content, "sha": sha })),
+        Read::Missing | Read::NotModified => Ok(json!({ "content": "" })),
+    }
+}
+
+async fn write_entry_file(path: &str, content: &str, sha: Option<&str>) -> Result<Value, String> {
+    if !entries::is_entry_path(path) {
+        return Err(format!("Refusing to write {path}"));
+    }
+    let message = format!("Add to {path} via the desktop palette");
+    client()?
+        .write(&encode_path(path), content, sha, &message)
+        .await?;
+    Ok(json!({}))
+}
+
+/// `cached` answers from the last fetch alone; otherwise the endpoint is asked and an answer with
+/// usage in it replaces the cache. Failing to write the cache never hides the usage.
+async fn claude_usage(cached: bool) -> Result<Value, String> {
+    let file = claude_usage_cache_file();
+    if cached {
+        return Ok(match read_json::<claude::UsageCache>(&file) {
+            Some(cache) => json!({ "accounts": cache.accounts, "fetchedAt": cache.fetched_at }),
+            None => json!({ "accounts": [] }),
+        });
+    }
+    let answer = claude::usage().await;
+    let fetched_at = now_ms();
+    if claude::has_usage(&answer) {
+        let cache = claude::UsageCache {
+            accounts: answer["accounts"].clone(),
+            fetched_at,
+        };
+        if let Err(error) = write_json(&file, &cache) {
+            eprintln!("could not cache the Claude usage: {error}");
+        }
+    }
+    Ok(json!({ "accounts": answer["accounts"], "fetchedAt": fetched_at }))
+}
+
 /// The counts file ranks what it knows; GitHub adds the rest. Either alone is enough, so the
 /// counted repositories still show when not logged in or offline.
 async fn list_github_repos() -> Result<Value, String> {
@@ -285,6 +347,10 @@ pub async fn handle(request: Value) -> Result<Value, String> {
         }
         Request::GetRecents => Ok(json!({ "recents": recents::load() })),
         Request::AddRecent { entry } => Ok(json!({ "recents": recents::remember(entry)? })),
+        Request::GetModeRecents { prefix } => Ok(json!({ "ids": recents::load_mode(&prefix) })),
+        Request::AddModeRecent { prefix, id } => {
+            Ok(json!({ "ids": recents::remember_mode(&prefix, &id)? }))
+        }
         // Use counts are pushed back to the repo by the extension only; the desktop does not
         // count yet, so a use is acknowledged and dropped.
         Request::RecordBookmarkUse { .. } => Ok(json!({})),
@@ -296,19 +362,6 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             client()?
                 .add_lines(&path, &format!("- {}", note.trim()), true)
                 .await?;
-            Ok(json!({}))
-        }
-        Request::AddActionLog {
-            path,
-            description,
-            tags,
-        } => {
-            if !is_note_path(&path) {
-                return Err(format!("Refusing to write to {path}"));
-            }
-            let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-            let line = action_log_line(&timestamp, &description, &tags);
-            client()?.add_lines(&path, &line, false).await?;
             Ok(json!({}))
         }
         Request::GetRepos => {
@@ -360,9 +413,14 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             config::store_deepl_key(key.trim())?;
             Ok(json!({}))
         }
+        Request::ListEntryFiles => list_entry_files().await,
+        Request::ReadEntryFile { path } => read_entry_file(&path).await,
+        Request::WriteEntryFile { path, content, sha } => {
+            write_entry_file(&path, &content, sha.as_deref()).await
+        }
         Request::ListGithubRepos => list_github_repos().await,
         Request::ListClaudeCodeRepos => Ok(json!({ "repos": claude::code_repos()? })),
-        Request::GetClaudeUsage => Ok(claude::usage().await),
+        Request::GetClaudeUsage { cached } => claude_usage(cached).await,
         Request::ListDumps => Ok(json!({ "dumps": dumps::list(&config::dumps_dir()) })),
         Request::SaveDump { id, text } => {
             match dumps::save(&config::dumps_dir(), id.as_deref(), &text, now_ms())? {
@@ -399,16 +457,6 @@ mod tests {
             parse(json!({ "type": "RECORD_BOOKMARK_USE", "bookmarkId": "b1" })),
             Request::RecordBookmarkUse {
                 _bookmark_id: "b1".into()
-            }
-        );
-        assert_eq!(
-            parse(
-                json!({ "type": "ADD_ACTION_LOG", "path": "a.actionlog.md", "description": "d", "tags": ["t"] })
-            ),
-            Request::AddActionLog {
-                path: "a.actionlog.md".into(),
-                description: "d".into(),
-                tags: vec!["t".into()],
             }
         );
         assert_eq!(
@@ -469,7 +517,18 @@ mod tests {
         );
         assert_eq!(
             parse(json!({ "type": "GET_CLAUDE_USAGE" })),
-            Request::GetClaudeUsage
+            Request::GetClaudeUsage { cached: false }
+        );
+        assert_eq!(
+            parse(json!({ "type": "GET_CLAUDE_USAGE", "cached": true })),
+            Request::GetClaudeUsage { cached: true }
+        );
+        assert_eq!(
+            parse(json!({ "type": "ADD_MODE_RECENT", "prefix": "p", "id": "x" })),
+            Request::AddModeRecent {
+                prefix: "p".into(),
+                id: "x".into()
+            }
         );
         assert_eq!(
             parse(json!({ "type": "SAVE_DUMP", "text": "x" })),
@@ -492,6 +551,50 @@ mod tests {
                 text: "x".into()
             }
         );
+    }
+
+    #[test]
+    fn reads_widget_entry_requests() {
+        assert_eq!(
+            parse(json!({ "type": "LIST_ENTRY_FILES" })),
+            Request::ListEntryFiles
+        );
+        assert_eq!(
+            parse(json!({ "type": "READ_ENTRY_FILE", "path": "a.todos.md" })),
+            Request::ReadEntryFile {
+                path: "a.todos.md".into()
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "WRITE_ENTRY_FILE", "path": "a.todos.md", "content": "x" })),
+            Request::WriteEntryFile {
+                path: "a.todos.md".into(),
+                content: "x".into(),
+                sha: None
+            }
+        );
+        assert_eq!(
+            parse(
+                json!({ "type": "WRITE_ENTRY_FILE", "path": "a.todos.md", "content": "x", "sha": "v1" })
+            ),
+            Request::WriteEntryFile {
+                path: "a.todos.md".into(),
+                content: "x".into(),
+                sha: Some("v1".into())
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn refuses_entry_files_the_palette_does_not_add_to() {
+        let error = handle(json!({ "type": "READ_ENTRY_FILE", "path": "../secret.todos.md" }))
+            .await
+            .unwrap_err();
+        assert_eq!(error, "Refusing to read ../secret.todos.md");
+        let error = handle(json!({ "type": "WRITE_ENTRY_FILE", "path": "a.md", "content": "x" }))
+            .await
+            .unwrap_err();
+        assert_eq!(error, "Refusing to write a.md");
     }
 
     #[test]
@@ -534,14 +637,5 @@ mod tests {
         for bad in ["/etc/x.md", "../x.md", "a/../../x.md", "a//b.md", ""] {
             assert!(!is_note_path(bad), "{bad} should be refused");
         }
-    }
-
-    #[test]
-    fn formats_an_action_log_line_like_the_extension() {
-        let tags = vec!["work".to_string(), " ".to_string(), "deep".to_string()];
-        assert_eq!(
-            action_log_line("2026-09-23 10:00:00", " Shipped it ", &tags),
-            "- 2026-09-23 10:00:00 Shipped it #work #deep"
-        );
     }
 }

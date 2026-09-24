@@ -226,6 +226,11 @@ normal tab. The New Tab page used to be on that list; the start page below is th
   that repo's file and not the console's other one — the console selects it and drops the
   parameter again.
 
+  A hit the console shows as a widget you can add to — a `.todos.md`, `.actionlog.md`,
+  `.events.csv`, `.prompts.md` or `.commands.md` — does not open straight away: `⏎` offers
+  **Open … in Kaihuman** and **Add a todo…** (an action, an event…). `>f` lists those files
+  without a search; see **Adding to a widget's file** below.
+
 ### Help
 
 Type **`?`** to see everything the palette can do here: each prefix with what it is for (⏎
@@ -249,6 +254,12 @@ hint line lists the prefixes.
 | `>r` | Your GitHub repositories, most recently pushed first | opens the repository; **⇥** (or **→**) lists its issues, pull requests, actions, releases… | `GET /user/repos` with the extension's token |
 | `>g` | The same repositories, to search one | lists **Issues** and **Pull requests**; ⏎ on one asks for the search term, then opens GitHub's search there (`is:issue …` / `is:pr …`, any state) — no term opens the plain list | `GET /user/repos` with the extension's token |
 | `>l` | One row: the console team's logs in Tsuga, for what is typed | opens Tsuga's explorer on `owner-team:console`, `AND "…"` the typed text when there is any | a link only, no request |
+| `>f` | The repository's files a widget can add to — todo lists, action logs, events, prompts, commands | offers **Open … in Kaihuman** or **Add a todo…** (an action, an event…) | one tree listing per visit |
+
+With nothing typed, every mode but `>t` and `>u` lists the last 10 entries you chose in it first,
+under **Recent** — the prompts you copied in `>p`, the repositories you opened in `>r`, the terms
+you searched in `>l`. Choosing an entry again moves it back to the top; an entry that has since
+gone from the repository drops out. They are kept per prefix in the extension's local storage.
 
 With nothing typed, `>t` lists the last 20 texts you translated, newest first — **⏎** translates
 one again (kept as typed, so `fr: …` asks for French again). Translating a text again moves it to
@@ -258,6 +269,30 @@ Any text typed outside a mode is also offered as **Translate “…”**, the la
 row reaches it). Translation needs a DeepL API key — free ones at
 [deepl.com/pro-api](https://www.deepl.com/pro-api) — set with the **Set the DeepL API key…** action;
 it is kept in the extension's local storage.
+
+### Adding to a widget's file
+
+The console's widgets have an **Add** form for their files; the palette adds the same entries,
+from any page. Choose a file from `>f` or a repo search, then **Add …**, and answer the fields:
+
+| File | Fields | What is added |
+| --- | --- | --- |
+| `.todos.md` | the todo, `#tags` anywhere in it | `- [ ] text #tags` with its `::updated:: ::created::` line, at the end |
+| `.actionlog.md` | what happened, `#tags` anywhere in it | `- YYYY-MM-DD HH:mm:ss text #tags` (local time), at the end |
+| `.events.csv` | name, type (`general` prefilled, or `birthday`), start date (today prefilled), end date (empty: the same day; a birthday is always one day) | a `name;type;start;end` row; a new file gets the header first |
+| `.prompts.md` | title with `#tags`, the prompt | a `## Title #tags` section at the end |
+| `.commands.md` | title with `#tags`, the command (`{{name}}` for a parameter) | a `## Title #tags` section with the command in a `sh` block |
+
+Every app adds entries with the same functions — `addTodoEntry`, `addActionLogEntry`,
+`addEventEntry`, `addPromptEntry`, `addCommandEntry` in `packages/formats/src/entries.ts` — which
+the console's Add forms and quick-add pages, the popup, the start page and both palettes all call.
+A change to a format there reaches every app. Like the console, they parse the file and write it
+back in the widget's format, so a file is tidied up (a legacy todo list migrated, say) the first
+time an entry is added to it from anywhere.
+
+The file is read, the entry added in the palette, and written back over the version read — if the
+file changed in between, the write fails and nothing is lost; try again. The worker only reads
+and writes files with these endings, inside the repository.
 
 ### Actions
 
@@ -354,8 +389,9 @@ Chrome asks you to confirm the first time. It holds:
   commit fails (offline, or the bookmark was deleted in the console meanwhile) the card goes back
   and the page says why.
 - **Note / Todo / Log** — one box, three targets: a note goes to `.lifeos/dump.md`, a todo is
-  appended to the inbox the console's quick-todo page uses (`#tags` move to the end), and a log
-  entry goes to the repo's action log (the app folder's first `.actionlog.md`), `#tags` and all.
+  added to the inbox the console's quick-todo page uses (`#tags` move to the end), and a log
+  entry goes to the repo's action log (the app folder's first `.actionlog.md`), `#tags` and all —
+  both written by the same shared functions as the console's own (`packages/formats`).
   Other note targets are one palette action away (**Add a note…**), which is also the only place
   that reads the repo's quick-note list: a new tab is opened far too often to spend a GitHub
   request on it.

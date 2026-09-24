@@ -713,6 +713,27 @@ describe('recent actions', () => {
   });
 });
 
+describe('recent entries per palette mode', () => {
+  it('keeps each prefix’s own ten, newest first, a repeat moved back to the top', async () => {
+    expect(await call({ type: 'GET_MODE_RECENTS', prefix: 'p' })).toMatchObject({ ids: [] });
+    for (let i = 0; i < 12; i++) await call({ type: 'ADD_MODE_RECENT', prefix: 'p', id: `p${i}` });
+    await call({ type: 'ADD_MODE_RECENT', prefix: 'p', id: 'p5' });
+    await call({ type: 'ADD_MODE_RECENT', prefix: 'x', id: 'x1' });
+
+    const { ids } = await call({ type: 'GET_MODE_RECENTS', prefix: 'p' });
+    expect(ids).toHaveLength(10);
+    expect(ids.slice(0, 3)).toEqual(['p5', 'p11', 'p10']);
+    expect(ids.filter((id: string) => id === 'p5')).toHaveLength(1);
+    expect((await call({ type: 'GET_MODE_RECENTS', prefix: 'x' })).ids).toEqual(['x1']);
+  });
+
+  it('refuses an entry without a prefix or an id', async () => {
+    expect((await call({ type: 'ADD_MODE_RECENT', prefix: 'p', id: '' })).error).toContain(
+      'needs a prefix and an id',
+    );
+  });
+});
+
 describe('repository switching', () => {
   it('reports the current repo and the ones the console shared', async () => {
     store.lifeos_repos = [{ full_name: 'o/r' }, { full_name: 'other/repo' }];

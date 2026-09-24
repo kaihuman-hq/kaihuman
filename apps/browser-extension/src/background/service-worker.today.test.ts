@@ -186,14 +186,36 @@ describe('writes from the start page', () => {
     expect(writes()).toHaveLength(0);
   });
 
-  it('appends a todo to the inbox, keeping what was there', async () => {
+  it('adds a todo to the inbox as the console does, keeping what was there', async () => {
     seedCache();
     const response = await call({ type: 'ADD_TODO', text: 'Buy milk #home' });
 
     expect(response.today.inbox.count).toBe(2);
     expect(remote['.kh/inbox.todos.md']).toMatch(
-      /^- \[ \] existing\n- \[ \] Buy milk #home\n::created:: \S+\n$/,
+      /^- \[ \] existing\n- \[ \] Buy milk #home\n::updated:: \d+ ::created:: \S+\n$/,
     );
+  });
+
+  it('adds an action log entry as the console does, over the version read', async () => {
+    remote['.lifeos/dump.actionlog.md'] = '---\n---\n\n# Action Log\n\n- 2026-09-23 10:00:00 Old';
+    const response = await call({
+      type: 'ADD_ACTION_LOG',
+      description: 'Shipped it',
+      tags: ['work'],
+    });
+    expect(response.success).toBe(true);
+    expect(remote['.lifeos/dump.actionlog.md']).toMatch(
+      /^---\n---\n\n# Action Log\n\n- 2026-09-23 10:00:00 Old\n- \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} Shipped it #work$/,
+    );
+    expect(JSON.parse(writes()[0]?.[1].body).sha).toBe('sha-.lifeos/dump.actionlog.md');
+  });
+
+  it('only adds action log entries to action logs', async () => {
+    for (const path of ['README.md', '../x.actionlog.md', '.kh/inbox.todos.md']) {
+      const response = await call({ type: 'ADD_ACTION_LOG', path, description: 'x', tags: [] });
+      expect(response.error).toContain('Refusing');
+    }
+    expect(writes()).toHaveLength(0);
   });
 
   it('saves a page for later in a new list when the repo has none', async () => {
@@ -243,5 +265,60 @@ describe('GET_SYNC_STATUS', () => {
   it('says nothing was synced for another repo’s caches', async () => {
     seedCache({ repo: 'other/repo' });
     expect((await call({ type: 'GET_SYNC_STATUS' })).syncedAt).toBeNull();
+  });
+});
+
+describe('the palette’s widget entries', () => {
+  it('lists the files it can add to, with their console links', async () => {
+    remote['notes/plain.md'] = 'x';
+    remote['family.events.csv'] = '';
+    const response = await call({ type: 'LIST_ENTRY_FILES' });
+    expect(response.files.map((file: any) => file.path)).toEqual([
+      '.kh/inbox.todos.md',
+      'family.events.csv',
+    ]);
+    expect(response.files[0]).toMatchObject({
+      name: 'inbox.todos.md',
+      url: expect.stringContaining('/files/.kh/inbox.todos.md?repo=o%2Fr'),
+    });
+  });
+
+  it('reads a file with its version, and a missing one as empty', async () => {
+    expect(await call({ type: 'READ_ENTRY_FILE', path: '.kh/inbox.todos.md' })).toMatchObject({
+      content: '- [ ] existing\n',
+      sha: 'sha-.kh/inbox.todos.md',
+    });
+    const missing = await call({ type: 'READ_ENTRY_FILE', path: 'new.events.csv' });
+    expect(missing).toMatchObject({ success: true, content: '' });
+    expect(missing.sha).toBeUndefined();
+  });
+
+  it('writes over the version read and keeps the start page’s cache in step', async () => {
+    seedCache();
+    const content = '- [ ] existing\n- [ ] added\n';
+    const response = await call({
+      type: 'WRITE_ENTRY_FILE',
+      path: '.kh/inbox.todos.md',
+      content,
+      sha: 'sha-.kh/inbox.todos.md',
+    });
+    expect(response.success).toBe(true);
+    expect(remote['.kh/inbox.todos.md']).toBe(content);
+    expect(JSON.parse(writes()[0]?.[1].body).sha).toBe('sha-.kh/inbox.todos.md');
+    expect(store.todayCache.files.find((f: any) => f.path === '.kh/inbox.todos.md')).toEqual({
+      path: '.kh/inbox.todos.md',
+      sha: 'new-sha',
+      content,
+    });
+  });
+
+  it('refuses any other file, or a path out of the repository', async () => {
+    for (const path of ['secret.md', '../x.todos.md', '/x.todos.md', 'a//x.todos.md']) {
+      expect((await call({ type: 'READ_ENTRY_FILE', path })).error).toContain('Refusing');
+      expect((await call({ type: 'WRITE_ENTRY_FILE', path, content: 'x' })).error).toContain(
+        'Refusing',
+      );
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

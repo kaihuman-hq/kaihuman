@@ -1,5 +1,97 @@
 # Progress
 
+## 2026-09-24 — Read it later: clear the whole list
+
+- **Console**: the Read it later widget's reading list has a **CLEAR ALL** button; it asks for
+  confirmation, naming how many unread and read items go, then empties the list (`deleteAll` in
+  `packages/formats/src/read-later.ts`). The Archive tab's **DELETE ALL** still removes only read
+  items.
+- **Fix**: opening a read-later file crashed the console (`Cannot read properties of undefined`)
+  since `parseReadItLater` gained an empty-file check: the console hands a widget `undefined`
+  until its file has loaded. It reads that as an empty list again.
+
+## 2026-09-24 — Palette: recent entries per prefix, cached `>u` usage
+
+- **Recent per prefix** (both palettes): every mode keeps the last 10 entries chosen in it and,
+  while nothing is typed, lists them first under **Recent** — prompts copied in `>p`, commands in
+  `>x`, repositories in `>r`/`>g`/`>c`, files in `>f`, dumps in `>d`, bookmarks in `>b`; a link
+  mode (`>l`) keeps the terms searched. Listing an entry's children is not a use; opening one is.
+  `>t` keeps its own 20-text history; `>u` opts out (`recents: false`).
+- **Protocol**: `GET_MODE_RECENTS` / `ADD_MODE_RECENT`, kept by the extension in
+  `chrome.storage.local.modeRecents` and by the desktop in `$XDG_STATE_HOME/lifosy/mode-recents.json`;
+  `withModeRecent` (palette) and `with_mode_recent` (Rust) keep the same ten.
+- **`>u` cached** (desktop): `GET_CLAUDE_USAGE { cached: true }` answers from
+  `$XDG_CACHE_HOME/lifosy/claude-usage.json`; a fetch with any usage in it replaces the cache. The
+  mode shows the cache at once with a status row — its age and a dot: green under 15 min, yellow
+  up to 60, red beyond — and syncs in the background only when it is 5 min old or older, swapping
+  in the fresh rows (“Usage synced just now”). A failed sync keeps the cached rows and says why.
+  With no cache yet, the first load waits for the endpoint.
+- **Palette core**: a loading mode may `refresh` behind what it loaded; a mode entry may carry a
+  `tone` (good / warn / bad), drawn as a coloured dot before its title.
+
+## 2026-09-24 — Start page reads and writes through `@lifosy/formats`
+
+- **Moved** from `packages/ui` into `packages/formats` (history kept): the habit, time-tracking,
+  timezone and read-later formats. `packages/formats` now holds every format the start page touches.
+- **Start page** (`background/today.ts`): its own todo, milestone, event, habit, time-tracking,
+  clock and read-later parsers are gone; it parses with `parseTodos`, `parseEvents`,
+  `getUpcomingEvents`, `parseHabitData`/`calculateStats`, `parseTimeTracking`, `parseTimezones` and
+  `parseReadItLater`, and keeps only what it shows (the 7-day window, today's closed minutes, clock
+  labels, unread items). Its writes use `checkIn`, `toggleStartStop`, `markReadItLaterRead` and
+  `addReadLaterEntry` — the console's own.
+- **Shared functions gained a clock** where the start page needs one: `now` on `toggleStartStop`,
+  `calculateStats`, `getUpcomingEvents` and `markAsRead`.
+- **Fixes in the shared code**: `getUpcomingEvents` rounds day counts instead of ceiling them, so an
+  event after the clocks go back is no longer a day further away; an empty read-later file reads as
+  empty without a warning; `markReadItLaterRead` and `addReadLaterEntry` refuse to write over a
+  list that is not valid JSON (the console's widget still reads such a list as empty).
+- **Behaviour now matching the console**: a habit check-in drops `date;` rows that were not
+  reached; a read-later write keeps only `items`; an event row with fewer than four columns is
+  skipped.
+- `packages/ui/src/utils/date.ts` removed — its only user moved.
+
+## 2026-09-24 — `@lifosy/formats`: one implementation for adding widget entries, in every app
+
+- **New package** `packages/formats` (no dependencies): the todo, action log, events, prompts and
+  commands formats moved here from `packages/ui/src/LifeOS/Organisms/Widgets/*Logic.ts` (history
+  kept), with their tests from `apps/console` and the palette.
+- **One add per format** (`src/entries.ts`): `addTodoEntry`, `addActionLogEntry`, `addEventEntry`,
+  `addPromptEntry`, `addCommandEntry` — file text in, file text out, the widget's parse and
+  serialize in between. They take `#tags` typed into the text, and refuse what the file cannot hold
+  (no text, a `;` in an event name, dates not `YYYY-MM-DD`, an end before the start).
+- **Every app uses them**: the console's Add forms (MainApp todos and events, Action Log widget and
+  view, Kanban, Prompts, Commands) and quick-add pages; the extension's popup and start page
+  (`ADD_ACTION_LOG`, `ADD_TODO`); both palettes (`>f`, repo-search hits, **Add a note…** on a
+  widget file).
+- **Palette** reads prompts and commands through the package too; its own copies of the parsers
+  are gone.
+- **Behaviour changes**: the start page, popup and palettes now write entries exactly as the
+  console does — a todo gets the `::updated::` stamp, and the file is re-serialized in the widget's
+  format rather than only appended to. `ADD_ACTION_LOG` in the extension only writes
+  `.actionlog.md` files inside the repository.
+- **Desktop**: `ADD_ACTION_LOG` and its Rust formatter (`action_log_line`, and with it `chrono`)
+  are gone; the palette writes action logs through `READ_ENTRY_FILE`/`WRITE_ENTRY_FILE`.
+
+## 2026-09-24 — Palette: add entries to widget files (`>f`), as the console's Add forms do
+
+- **Flow** (both palettes): ⏎ on a repo file whose widget has an Add form now lists **Open …
+  in Kaihuman** and **Add a todo…** / an action / an event / a prompt / a command, instead of
+  opening it at once. Files come from the ⇥ repo search or the new **`>f`** mode, which lists them
+  all. Any other file still opens straight away.
+- **Formats** (`packages/palette/src/entries.ts`): `.todos.md` (`- [ ] text #tags` +
+  `::created::`), `.actionlog.md` (`- YYYY-MM-DD HH:mm:ss text #tags`), `.events.csv`
+  (`name;type;start;end`, header for a new file, one-day birthdays), `.prompts.md` and
+  `.commands.md` (`## Title #tags` sections, the command in a `sh` block). Each only appends, so the
+  file is otherwise left as it was. The start page's `appendTodo` moved here.
+- **Protocol**: `LIST_ENTRY_FILES`, `READ_ENTRY_FILE`, `WRITE_ENTRY_FILE`. The palette reads the
+  file, adds the entry and writes over the `sha` it read, so a change made in the console
+  meanwhile fails the write instead of being lost. Both backends only touch files with those
+  endings inside the repository (`ENTRY_SUFFIXES`, mirrored in `src-tauri/src/entries.rs`).
+- **Extension**: a write to a file the start page shows updates its cache too.
+- **Desktop**: `github::Client::write`, which `add_lines` now uses; a 409 says the file changed.
+- **Not covered yet**: bookmarks, timezones, budget, data collection, stocks and other widgets whose
+  Add form needs a picker or computed columns.
+
 ## 2026-09-23 — Start page: today view, trackers, read later, clocks, capture targets, sync status
 
 - **Worker** (`background/today.ts`): a `todayCache` of the repo's `.todos.md`, `.events.csv`,

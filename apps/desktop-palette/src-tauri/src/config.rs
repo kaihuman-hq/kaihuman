@@ -81,6 +81,14 @@ pub fn recents_file() -> PathBuf {
     xdg_dir("XDG_STATE_HOME", ".local/state").join("recents.json")
 }
 
+pub fn mode_recents_file() -> PathBuf {
+    xdg_dir("XDG_STATE_HOME", ".local/state").join("mode-recents.json")
+}
+
+pub fn claude_usage_cache_file() -> PathBuf {
+    xdg_dir("XDG_CACHE_HOME", ".cache").join("claude-usage.json")
+}
+
 pub fn translation_history_file() -> PathBuf {
     xdg_dir("XDG_STATE_HOME", ".local/state").join("translations.json")
 }

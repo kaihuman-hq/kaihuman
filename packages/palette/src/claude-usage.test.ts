@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   CLAUDE_USAGE_URL,
   formatMoney,
+  usageAge,
+  usageAgeTone,
   usageBar,
+  usageNeedsSync,
   usagePace,
   usageReset,
   usageRows,
@@ -129,5 +132,29 @@ describe('usageRows', () => {
       subtitle: 'no credentials in ~/.claude',
       group: 'me',
     });
+  });
+});
+
+describe('the cached usage’s age', () => {
+  const NOW = Date.UTC(2026, 8, 24, 12);
+  const ago = (minutes: number) => NOW - minutes * 60 * 1000;
+
+  it('syncs only once the cache is 5 minutes old', () => {
+    expect(usageNeedsSync(ago(4.9), NOW)).toBe(false);
+    expect(usageNeedsSync(ago(5), NOW)).toBe(true);
+  });
+
+  it('says how old it is', () => {
+    expect(usageAge(ago(0.5), NOW)).toBe('just now');
+    expect(usageAge(ago(12), NOW)).toBe('12 min ago');
+    expect(usageAge(ago(125), NOW)).toBe('2h 5m ago');
+    expect(usageAge(ago(3 * 24 * 60), NOW)).toBe('3 days ago');
+  });
+
+  it('is green under 15 minutes, yellow up to an hour, red beyond', () => {
+    expect(usageAgeTone(ago(14), NOW)).toBe('good');
+    expect(usageAgeTone(ago(15), NOW)).toBe('warn');
+    expect(usageAgeTone(ago(60), NOW)).toBe('warn');
+    expect(usageAgeTone(ago(61), NOW)).toBe('bad');
   });
 });

@@ -8,6 +8,7 @@
 
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::config::is_repo_name;
@@ -210,6 +211,24 @@ pub async fn usage() -> Value {
     json!({ "accounts": accounts })
 }
 
+/// The last usage fetched with any usage in it, which `>u` shows before it syncs.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageCache {
+    pub accounts: Value,
+    pub fetched_at: u64,
+}
+
+/// Whether a fetch is worth caching: one where every account failed would only hide the last good
+/// numbers.
+pub fn has_usage(answer: &Value) -> bool {
+    answer["accounts"].as_array().is_some_and(|accounts| {
+        accounts
+            .iter()
+            .any(|account| account.get("usage").is_some())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,5 +307,16 @@ mod tests {
     fn expands_the_home_directory() {
         assert_eq!(expand_home("~/.claude"), home().join(".claude"));
         assert_eq!(expand_home("/abs"), PathBuf::from("/abs"));
+    }
+
+    #[test]
+    fn caches_only_an_answer_with_usage_in_it() {
+        assert!(has_usage(
+            &json!({ "accounts": [{ "name": "a", "error": "x" }, { "name": "b", "usage": {} }] })
+        ));
+        assert!(!has_usage(
+            &json!({ "accounts": [{ "name": "a", "error": "x" }] })
+        ));
+        assert!(!has_usage(&json!({ "accounts": [] })));
     }
 }

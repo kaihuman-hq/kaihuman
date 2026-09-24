@@ -1,7 +1,7 @@
+import type { EventEntry } from '@lifosy/formats';
 import { useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader } from '../../Atoms/Typography';
-import type { EventEntry } from './EventsLogic';
 
 interface EventAddFormProps {
   onAdd: (entry: EventEntry) => void;

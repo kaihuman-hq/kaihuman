@@ -24,10 +24,12 @@ way.
 | `>x` commands from the repo's `.commands.md` files — fill in each `{{name}}`, then copy, run in ghostty, or run in the background | ✓ (running: desktop only) |
 | `>d` dumps — a scratch editor for pasting and copying, the last 25 kept, ⌃S saves one as a file | ✓ desktop only |
 | `>c` Claude Code — pick a repo, type a prompt, ⏎ opens a new session on claude.ai | ✓ desktop only |
-| `>u` Claude usage — rate limits, pace, resets and spend per account | ✓ desktop only |
+| `>u` Claude usage — rate limits, pace, resets and spend per account; the last fetch shows at once with its age (green under 15 min, yellow up to an hour, red beyond), synced in the background once 5 min old | ✓ desktop only |
 | `>r` GitHub repositories, ⇥ for issues, pull requests, actions… | ✓, and omarchy's `~/.config/eee/counts` ranks the ones you open most first |
 | `>g` GitHub search — pick a repository, then issues or pull requests, then type the search term | ✓, repositories ranked as in `>r` |
 | `>l` logs — the console team's logs in Tsuga's explorer, filtered by what is typed | ✓ |
+| Recent: each prefix lists the last 10 entries chosen in it first (kept in `$XDG_STATE_HOME/lifosy/mode-recents.json`) | ✓ |
+| `>f` files — todo lists, action logs, events, prompts, commands: open one in Kaihuman or add an entry as its widget does (also from ⇥ repo-search hits) | ✓ |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |
 | Counting how often a bookmark is opened | — the extension counts; the desktop does not yet |
 

@@ -66,9 +66,9 @@ titles, bodies and tags, a frequency-sorted tag cloud to filter by tag, a click
 to expand a prompt's body, and a copy button per prompt. **ADD PROMPT** appends
 a new one.
 
-Implementation: `packages/ui/src/LifeOS/Organisms/Widgets/PromptsLogic.ts`
-(parse/serialize) and `PromptsWidget.tsx` (UI). Parser tests live in
-`apps/console/src/prompts-logic.test.ts`.
+Implementation: `packages/formats/src/prompts.ts` (parse/serialize, shared by the console and
+both command palettes) and `packages/ui/src/LifeOS/Organisms/Widgets/PromptsWidget.tsx` (UI).
+Parser tests live in `packages/formats/src/prompts.test.ts`.
 
 ## Known edges
 

@@ -24,15 +24,14 @@ export interface PaletteProtocol {
   GET_BOOKMARKS: { request: NoFields; response: { bookmarks: Bookmark[] } };
   SEARCH_REPO: { request: { query: string }; response: { results: RepoResult[] } };
   GET_RECENTS: { request: NoFields; response: { recents: RecentEntry[] } };
+  /** The ids last chosen in one prefix mode, newest first — see `withModeRecent`. */
+  GET_MODE_RECENTS: { request: { prefix: string }; response: { ids: string[] } };
+  ADD_MODE_RECENT: { request: { prefix: string; id: string }; response: { ids: string[] } };
   ADD_RECENT: { request: { entry: RecentEntry }; response: { recents: RecentEntry[] } };
   RECORD_BOOKMARK_USE: { request: { bookmarkId: string }; response: NoFields };
   /** The quick-note files the repo's dashboard config lists; none when it has no such config. */
   FETCH_QUICK_NOTES: { request: NoFields; response: { quickNotes?: string[] } };
   DUMP_NOTE: { request: { path: string; note: string }; response: NoFields };
-  ADD_ACTION_LOG: {
-    request: { path: string; description: string; tags: string[] };
-    response: NoFields;
-  };
   LIST_PINNED_TAB_GROUPS: {
     request: NoFields;
     response: { groups: PinnedTabGroupSummary[]; activeId: string | null };
@@ -109,8 +108,31 @@ export interface PaletteProtocol {
    * is none.
    */
   GET_CLAUDE_USAGE: {
-    request: NoFields;
-    response: { accounts: { name: string; usage?: ClaudeUsage; error?: string }[] };
+    /**
+     * `cached` answers from the last fetch alone — no accounts and no `fetchedAt` when there has
+     * been none; otherwise the endpoint is asked, and a fetch with any usage in it is cached.
+     */
+    request: { cached?: boolean };
+    response: {
+      accounts: { name: string; usage?: ClaudeUsage; error?: string }[];
+      /** When the answer was fetched, in ms since the epoch. */
+      fetchedAt?: number;
+    };
+  };
+  /**
+   * The repository's files the palette can add entries to — those ending in one of
+   * `ENTRY_SUFFIXES` — each with its console link, as `SEARCH_REPO` lists a hit.
+   */
+  LIST_ENTRY_FILES: { request: NoFields; response: { files: RepoResult[] } };
+  /**
+   * One of those files and the version read; a file not there yet reads as empty, with no `sha`.
+   * Backends refuse any path that does not end in one of `ENTRY_SUFFIXES`.
+   */
+  READ_ENTRY_FILE: { request: { path: string }; response: { content: string; sha?: string } };
+  /** Replaces the file over the version `sha` names, so a change made since the read fails. */
+  WRITE_ENTRY_FILE: {
+    request: { path: string; content: string; sha?: string };
+    response: NoFields;
   };
   /** GitHub repositories to open, most relevant first — the order is the backend's. */
   LIST_GITHUB_REPOS: {

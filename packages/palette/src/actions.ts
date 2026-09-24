@@ -7,17 +7,18 @@
  * since nothing else has such a page.
  */
 
-import { usageRows } from './claude-usage.js';
+import { commandParameters, fillCommand, parseCommands, parsePrompts } from '@lifosy/formats';
+import { usageNeedsSync, usageRows, usageStatusRow } from './claude-usage.js';
 import type {
   EditableText,
   ModeItem,
   PaletteAction,
   PaletteHandlers,
   PaletteMode,
+  RepoResult,
 } from './command-palette.js';
-import { commandParameters, fillCommand, parseCommands } from './commands.js';
-import { parsePrompts } from './prompts.js';
-import type { ActionPort } from './protocol.js';
+import { type EntryKind, entryKindOf } from './entries.js';
+import type { ActionPort, PaletteResponse } from './protocol.js';
 import { parseTranslationQuery, usefulTranslations } from './translate.js';
 
 /** The Lifosy console — where a repo file is opened, rather than on GitHub. */
@@ -31,31 +32,38 @@ export const splitTags = (input: string) =>
 
 export const plural = (count: number, one: string) => `${count} ${one}${count === 1 ? '' : 's'}`;
 
+/**
+ * Reads the file, adds the entry and writes it back over the version read — a change made in the
+ * console meanwhile fails the write rather than being overwritten.
+ */
+const addEntry = async (port: ActionPort, path: string, kind: EntryKind, answers: string[]) => {
+  const { content, sha } = await port.send({ type: 'READ_ENTRY_FILE', path });
+  const next = kind.add(content, answers, new Date());
+  await port.send({ type: 'WRITE_ENTRY_FILE', path, content: next, ...(sha ? { sha } : {}) });
+};
+
 /** Targets for a note: the repo's quick-note files, plus the default dump. */
 const noteTargets = async (port: ActionPort): Promise<PaletteAction[]> => {
   const { quickNotes } = await port.send({ type: 'FETCH_QUICK_NOTES' });
   const paths = ['.lifeos/dump.md', ...(quickNotes ?? [])];
-  return Array.from(new Set(paths)).map((path) => ({
-    id: `note:${path}`,
-    title: path,
-    // The popup picks its form the same way: an action log takes a description and tags.
-    prompts: [{ label: path.endsWith('.actionlog.md') ? 'What happened? #tags' : 'Note' }],
-    run: async ([input = '']: string[]) => {
-      if (!input.trim()) throw new Error('Nothing to add');
-      if (path.endsWith('.actionlog.md')) {
-        const description = input.replace(/#[\w-]+/g, '').trim();
-        await port.send({
-          type: 'ADD_ACTION_LOG',
-          path,
-          description,
-          tags: splitTags(input.match(/#[\w-]+/g)?.join(' ') ?? ''),
-        });
-      } else {
-        await port.send({ type: 'DUMP_NOTE', path, note: input });
-      }
-      return `Added to ${path}`;
-    },
-  }));
+  return Array.from(new Set(paths)).map((path) => {
+    // A widget's file — an action log, a todo list — takes an entry the way its widget adds one.
+    const kind = entryKindOf(path);
+    return {
+      id: `note:${path}`,
+      title: path,
+      prompts: kind?.prompts ?? [{ label: 'Note' }],
+      run: async (answers: string[]) => {
+        if (kind) await addEntry(port, path, kind, answers);
+        else {
+          const note = answers[0] ?? '';
+          if (!note.trim()) throw new Error('Nothing to add');
+          await port.send({ type: 'DUMP_NOTE', path, note });
+        }
+        return `Added to ${path}`;
+      },
+    };
+  });
 };
 
 /** Each saved group, with everything the popup can do to it. */
@@ -517,23 +525,130 @@ export const claudeCodeMode = (port: ActionPort): PaletteMode => ({
   load: () => claudeCodeItems(port),
 });
 
-/** `>u` — Claude usage for each configured account. Desktop only: it reads the local credentials. */
-export const claudeUsageMode = (port: ActionPort): PaletteMode => ({
-  prefix: 'u',
-  title: 'Claude usage',
-  placeholder: 'Filter usage — ⏎ opens the usage page',
-  description:
-    'Claude rate limits and spend per account, with pace and reset times — as the claude.ai usage page shows them',
-  load: async () => {
-    const { accounts } = await port.send({ type: 'GET_CLAUDE_USAGE' });
-    const now = new Date();
-    return accounts.flatMap((account) => usageRows(account.name, account, now));
-  },
-});
+type UsageAnswer = PaletteResponse<'GET_CLAUDE_USAGE'>;
+
+const usageAccountRows = (answer: UsageAnswer, now: Date) =>
+  answer.accounts.flatMap((account) => usageRows(account.name, account, now));
+
+/**
+ * `>u` — Claude usage for each configured account. Desktop only: it reads the local credentials.
+ *
+ * The last fetch is cached by the backend and shown at once, its age on the first row; a cache 5
+ * minutes old or older is synced behind it, and the fresh rows replace it when they arrive.
+ */
+export const claudeUsageMode = (port: ActionPort): PaletteMode => {
+  /** What the last load showed, so a sync that fails leaves it in place. */
+  let shown: (UsageAnswer & { fetchedAt: number }) | null = null;
+
+  return {
+    prefix: 'u',
+    title: 'Claude usage',
+    placeholder: 'Filter usage — ⏎ opens the usage page',
+    description:
+      'Claude rate limits and spend per account, with pace and reset times — as the claude.ai usage page shows them; cached, synced in the background once 5 min old',
+    // The rows are a status view; choosing one only opens the usage page.
+    recents: false,
+    load: async () => {
+      const now = new Date();
+      const cached = await port.send({ type: 'GET_CLAUDE_USAGE', cached: true });
+      if (cached.fetchedAt === undefined) {
+        // Nothing cached yet: this once, the palette waits for the endpoint.
+        const fresh = await port.send({ type: 'GET_CLAUDE_USAGE' });
+        const fetchedAt = fresh.fetchedAt ?? now.getTime();
+        shown = null;
+        return [
+          usageStatusRow(fetchedAt, now.getTime(), 'synced'),
+          ...usageAccountRows(fresh, now),
+        ];
+      }
+      shown = { ...cached, fetchedAt: cached.fetchedAt };
+      const state = usageNeedsSync(shown.fetchedAt, now.getTime()) ? 'syncing' : 'cached';
+      return [
+        usageStatusRow(shown.fetchedAt, now.getTime(), state),
+        ...usageAccountRows(shown, now),
+      ];
+    },
+    refresh: () => {
+      const base = shown;
+      if (!base || !usageNeedsSync(base.fetchedAt, Date.now())) return null;
+      return (async () => {
+        let failed: string;
+        try {
+          const fresh = await port.send({ type: 'GET_CLAUDE_USAGE' });
+          const now = new Date();
+          if (fresh.accounts.some((account) => account.usage)) {
+            return [
+              usageStatusRow(fresh.fetchedAt ?? now.getTime(), now.getTime(), 'synced'),
+              ...usageAccountRows(fresh, now),
+            ];
+          }
+          failed = fresh.accounts.find((account) => account.error)?.error ?? 'no usage came back';
+        } catch (e: any) {
+          failed = e?.message || 'the usage endpoint did not answer';
+        }
+        const now = new Date();
+        return [
+          usageStatusRow(base.fetchedAt, now.getTime(), { failed }),
+          ...usageAccountRows(base, now),
+        ];
+      })();
+    },
+  };
+};
+
+/**
+ * What can be done with a repo file whose widget can add to it: open it in the console, or add an
+ * entry as the widget's Add form would. None for any other file, which is simply opened.
+ */
+export const fileChoices = (port: ActionPort, file: RepoResult): ModeItem[] => {
+  const kind = entryKindOf(file.path);
+  if (!kind) return [];
+  return [
+    {
+      id: `repo:${file.path}`,
+      title: `Open ${file.name} in Kaihuman`,
+      subtitle: file.path,
+      url: file.url,
+    },
+    {
+      id: `entry:${file.path}`,
+      title: `Add ${kind.entry}…`,
+      subtitle: file.path,
+      action: {
+        id: `entry:${file.path}`,
+        title: `Add ${kind.entry} to ${file.name}`,
+        subtitle: file.path,
+        prompts: kind.prompts,
+        // Recent replays actions by id from the top-level list, which this is not in.
+        recent: false,
+        run: async (answers) => {
+          await addEntry(port, file.path, kind, answers);
+          return `Added ${kind.entry} to ${file.path}`;
+        },
+      },
+    },
+  ];
+};
+
+const entryFileItems = async (port: ActionPort): Promise<ModeItem[]> => {
+  const { files } = await port.send({ type: 'LIST_ENTRY_FILES' });
+  if (!files.length) throw new Error('No todo lists, action logs, events, prompts or commands yet');
+  return files.map((file) => ({
+    id: `entry-file:${file.path}`,
+    title: file.name,
+    subtitle: file.path,
+    action: {
+      id: `entry-file:${file.path}`,
+      title: file.name,
+      recent: false as const,
+      choices: () => fileChoices(port, file),
+    },
+  }));
+};
 
 /**
  * The prefix modes every surface offers: `>p` prompts, `>t` translate, `>r` GitHub repositories,
- * `>g` a search in one of them, `>l` logs in Tsuga.
+ * `>g` a search in one of them, `>l` logs in Tsuga, `>f` the files widgets add to.
  */
 export const paletteModes = (port: ActionPort): PaletteMode[] => [
   {
@@ -580,6 +695,14 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
       url: tsugaUrl(term),
     }),
   },
+  {
+    prefix: 'f',
+    title: 'Files',
+    placeholder: 'Search todo lists, logs, events… — ⏎ opens or adds',
+    description:
+      'The repository’s todo lists, action logs, events, prompts and commands — ⏎ opens one in Kaihuman or adds an entry, as its widget does',
+    load: () => entryFileItems(port),
+  },
 ];
 
 /** The handlers that only talk to the backend; the rest differ per surface. */
@@ -588,11 +711,18 @@ export const portHandlers = (
 ): Omit<PaletteHandlers, 'actions' | 'open' | 'copy' | 'modes'> => ({
   loadBookmarks: async () => (await port.send({ type: 'GET_BOOKMARKS' })).bookmarks,
   searchRepo: async (query) => (await port.send({ type: 'SEARCH_REPO', query })).results,
+  fileChoices: (file) => fileChoices(port, file),
   loadRecents: async () => (await port.send({ type: 'GET_RECENTS' })).recents,
   rememberRecent: (entry) => {
     port
       .send({ type: 'ADD_RECENT', entry })
       .catch((e) => console.warn('LifeOS palette: could not record', entry, e));
+  },
+  loadModeRecents: async (prefix) => (await port.send({ type: 'GET_MODE_RECENTS', prefix })).ids,
+  rememberModeRecent: (prefix, id) => {
+    port
+      .send({ type: 'ADD_MODE_RECENT', prefix, id })
+      .catch((e) => console.warn('LifeOS palette: could not record', prefix, id, e));
   },
   countBookmarkUse: (bookmarkId) => {
     port

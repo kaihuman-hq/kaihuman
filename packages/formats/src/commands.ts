@@ -2,12 +2,12 @@
  * Logic for the Commands Widget (.commands.md)
  *
  * The grammar is `.prompts.md`'s — one `## Title #tags` per entry — so reading and writing reuse
- * PromptsLogic. An entry's command is its first fenced code block, or its whole text when it has
+ * the prompts format. An entry's command is its first fenced code block, or its whole text when it has
  * none; `{{port}}` is a parameter, and every `$` is the shell's. See doc/commands-format.md.
  *
- * The command palette reads the same file (packages/palette/src/commands.ts); keep the two in step.
+ * The console and both command palettes read and write the file through this module.
  */
-import { addPrompt, parsePrompts, serializePrompts } from './PromptsLogic';
+import { addPrompt, parsePrompts, serializePrompts } from './prompts.js';
 
 export interface CommandEntry {
   title: string;

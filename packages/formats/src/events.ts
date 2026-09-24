@@ -20,14 +20,7 @@ export interface UpcomingEvent {
   durationLabel: string; // e.g., "in 5 days", "Tomorrow", "Today"
 }
 
-import { Logger } from '@lifosy/core';
-
-const logger = new Logger('EventsLogic');
-
 export const parseEvents = (csv: string): EventsData => {
-  // Debug Logging
-  logger.debug(`Parsing CSV length: ${csv ? csv.length : 0}`);
-
   if (!csv) return { entries: [] };
   const lines = csv.trim().split(/\r?\n/);
   const entries: EventEntry[] = [];
@@ -55,7 +48,6 @@ export const parseEvents = (csv: string): EventsData => {
       endDate: (end || start).trim(), // Fallback to start if end missing
     });
   }
-  logger.debug(`Parsed entries: ${entries.length}`);
   return { entries };
 };
 
@@ -67,8 +59,12 @@ export const serializeEvents = (data: EventsData): string => {
   return csv;
 };
 
-export const getUpcomingEvents = (data: EventsData, limit = 8): UpcomingEvent[] => {
-  const now = new Date();
+export const getUpcomingEvents = (
+  data: EventsData,
+  limit = 8,
+  at = new Date(),
+): UpcomingEvent[] => {
+  const now = new Date(at);
   now.setHours(0, 0, 0, 0); // Normalize to start of day
   const year = now.getFullYear();
 
@@ -128,7 +124,8 @@ export const getUpcomingEvents = (data: EventsData, limit = 8): UpcomingEvent[] 
     }
 
     const diffTime = nextDate.getTime() - now.getTime();
-    const daysUntil = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    // Rounded, not ceiled: a day that gains an hour when clocks go back is still one day.
+    const daysUntil = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
     let label = '';
     if (daysUntil === 0) label = 'TODAY';

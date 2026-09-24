@@ -1,8 +1,10 @@
 //! What the palette last did, so it can be repeated from the top of the list.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
-use crate::config::{read_json, recents_file, write_json};
+use crate::config::{mode_recents_file, read_json, recents_file, write_json};
 
 /// How many entries are kept, as in the extension.
 const LIMIT: usize = 10;
@@ -40,6 +42,37 @@ pub fn remember(entry: RecentEntry) -> Result<Vec<RecentEntry>, String> {
     Ok(recents)
 }
 
+/// Each prefix mode's recently chosen ids, newest first — `withModeRecent` in
+/// packages/palette/src/command-palette.ts, which keeps as many.
+pub fn with_mode_recent(ids: Vec<String>, id: &str) -> Vec<String> {
+    if id.is_empty() {
+        return ids;
+    }
+    std::iter::once(id.to_string())
+        .chain(ids.into_iter().filter(|known| known != id))
+        .take(LIMIT)
+        .collect()
+}
+
+fn load_all_modes() -> BTreeMap<String, Vec<String>> {
+    read_json(&mode_recents_file()).unwrap_or_default()
+}
+
+pub fn load_mode(prefix: &str) -> Vec<String> {
+    load_all_modes().remove(prefix).unwrap_or_default()
+}
+
+pub fn remember_mode(prefix: &str, id: &str) -> Result<Vec<String>, String> {
+    if prefix.is_empty() || id.is_empty() {
+        return Err("A mode recent needs a prefix and an id".into());
+    }
+    let mut all = load_all_modes();
+    let ids = with_mode_recent(all.remove(prefix).unwrap_or_default(), id);
+    all.insert(prefix.to_string(), ids.clone());
+    write_json(&mode_recents_file(), &all)?;
+    Ok(ids)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -71,5 +104,18 @@ mod tests {
     fn ignores_entries_without_an_id_or_title() {
         let recents = vec![entry("a")];
         assert_eq!(with_entry(recents.clone(), entry("")), recents);
+    }
+
+    #[test]
+    fn keeps_each_modes_ten_newest_first() {
+        let ids: Vec<String> = (0..10).map(|i| i.to_string()).collect();
+        let next = with_mode_recent(ids, "5");
+        assert_eq!(next.len(), 10);
+        assert_eq!(next[0], "5");
+        assert_eq!(next.iter().filter(|id| *id == "5").count(), 1);
+        let next = with_mode_recent(next, "new");
+        assert_eq!(next[0], "new");
+        assert!(!next.contains(&"9".to_string()));
+        assert_eq!(with_mode_recent(next.clone(), ""), next);
     }
 }

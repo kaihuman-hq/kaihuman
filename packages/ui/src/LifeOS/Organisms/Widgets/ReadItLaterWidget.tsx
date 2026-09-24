@@ -1,9 +1,5 @@
-import { Archive, Check, ExternalLink, RefreshCw, RotateCcw, Trash2 } from 'lucide-preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
-import { cn } from '../../../utils';
-import { MonoHeader, MonoText } from '../../Atoms/Typography';
-import { CompactList, CompactWidgetLayout } from './CompactWidgetLayout';
 import {
+  deleteAll,
   deleteAllRead,
   deleteItem,
   markAsNew,
@@ -11,7 +7,12 @@ import {
   parseReadItLater,
   type ReadItLaterItem,
   serializeReadItLater,
-} from './ReadItLaterLogic';
+} from '@lifosy/formats';
+import { Archive, Check, ExternalLink, RefreshCw, RotateCcw, Trash2 } from 'lucide-preact';
+import { useEffect, useMemo, useState } from 'preact/hooks';
+import { cn } from '../../../utils';
+import { MonoHeader, MonoText } from '../../Atoms/Typography';
+import { CompactList, CompactWidgetLayout } from './CompactWidgetLayout';
 
 interface ReadItLaterWidgetProps {
   content: string;
@@ -101,6 +102,17 @@ export const ReadItLaterWidget = ({
 
       const newConfig = deleteAllRead(config);
       onChange(serializeReadItLater(newConfig));
+    }
+  };
+
+  const handleClearAll = () => {
+    if (!onChange) return;
+    const counts = `${newItems.length} unread and ${readItems.length} read`;
+    if (confirm(`Clear the whole reading list — ${counts} items? This cannot be undone.`)) {
+      mergedItems.forEach((i) => {
+        readItLaterService.deleteItem(i.id);
+      });
+      onChange(serializeReadItLater(deleteAll(config)));
     }
   };
 
@@ -228,6 +240,16 @@ export const ReadItLaterWidget = ({
         <MonoText className="text-[var(--los-muted)] text-xs">
           READING LIST ({newItems.length})
         </MonoText>
+        {mergedItems.length > 0 && onChange && (
+          <button
+            type="button"
+            onClick={handleClearAll}
+            className="flex items-center gap-2 text-xs text-red-500 hover:text-red-400 font-mono px-2 py-1 rounded hover:bg-red-500/10 transition-colors"
+          >
+            <Trash2 className="w-3 h-3" />
+            CLEAR ALL
+          </button>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto divide-y divide-[var(--los-border)]">
         {newItems.length === 0 ? (

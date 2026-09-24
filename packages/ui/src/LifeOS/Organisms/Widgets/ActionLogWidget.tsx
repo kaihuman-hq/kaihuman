@@ -1,8 +1,8 @@
+import { addActionLogEntry, parseActionLog } from '@lifosy/formats';
 import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../../Atoms/Typography';
 import { ActionLogAddForm } from './ActionLogAddForm';
-import { appendAction, parseActionLog, serializeActionLog } from './ActionLogLogic';
 import { CompactWidgetLayout } from './CompactWidgetLayout';
 
 export interface ActionLogWidgetProps {
@@ -105,8 +105,7 @@ export const ActionLogWidget = ({ content, mode, onChange }: ActionLogWidgetProp
   }, [sortedEntries]);
 
   const handleAdd = (desc: string, tags: string[]) => {
-    const newData = appendAction(data, desc, tags);
-    onChange?.(serializeActionLog(newData));
+    onChange?.(addActionLogEntry(content, { description: desc, tags }));
   };
 
   if (mode === 'ADD') {

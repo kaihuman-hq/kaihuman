@@ -1,7 +1,7 @@
+import { AVAILABLE_TIMEZONES, type TimezoneEntry } from '@lifosy/formats';
 import { Plus, Search } from 'lucide-preact';
 import { useMemo, useState } from 'preact/hooks';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
-import { AVAILABLE_TIMEZONES, type TimezoneEntry } from './TimezoneLogic';
 
 export interface TimezoneAddFormProps {
   onAdd: (entry: TimezoneEntry) => void;

@@ -5,6 +5,7 @@ import {
   claudeUsageMode,
   commandsMode,
   dumpMode,
+  fileChoices,
   formatStamp,
   GITHUB_REPO_VIEWS,
   githubSearchUrl,
@@ -69,17 +70,22 @@ describe('repoActions', () => {
     });
   });
 
-  it('splits an action-log entry into a description and its tags', async () => {
+  it('adds to a widget file the way its widget does, over the version read', async () => {
     answers.FETCH_QUICK_NOTES = { quickNotes: ['log.actionlog.md'] };
-    answers.ADD_ACTION_LOG = {};
+    answers.READ_ENTRY_FILE = { content: '', sha: 'v1' };
+    answers.WRITE_ENTRY_FILE = {};
     const targets = (await action(repoActions(fakePort), 'note').children?.()) ?? [];
-    await action(targets, 'note:log.actionlog.md').run?.(['Shipped the palette #work #extension']);
-    expect(sent.at(-1)).toEqual({
-      type: 'ADD_ACTION_LOG',
+    const target = action(targets, 'note:log.actionlog.md');
+    expect(target.prompts).toEqual([{ label: 'What happened? #tags' }]);
+    await target.run?.(['Shipped the palette #work']);
+    expect(sent.at(-1)).toMatchObject({
+      type: 'WRITE_ENTRY_FILE',
       path: 'log.actionlog.md',
-      description: 'Shipped the palette',
-      tags: ['work', 'extension'],
+      sha: 'v1',
     });
+    expect((sent.at(-1) as { content?: string }).content).toMatch(
+      /\n- \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} Shipped the palette #work$/,
+    );
   });
 
   it('refuses an empty note without asking the backend', async () => {
@@ -145,7 +151,75 @@ const submit = (found: PaletteMode, query: string) => {
   return found.submit(query);
 };
 
+describe('fileChoices', () => {
+  const todos = { path: 'work/inbox.todos.md', name: 'inbox.todos.md', url: 'https://x/inbox' };
+
+  it('offers nothing for a file no widget adds to, so it simply opens', () => {
+    expect(fileChoices(fakePort, { path: 'a/b.ts', name: 'b.ts', url: 'https://x/b' })).toEqual([]);
+  });
+
+  it('opens the file in the console, or adds an entry over the version read', async () => {
+    const [open, add] = fileChoices(fakePort, todos);
+    expect(open).toMatchObject({
+      title: 'Open inbox.todos.md in Kaihuman',
+      url: 'https://x/inbox',
+    });
+    expect(add?.title).toBe('Add a todo…');
+    expect(add?.action?.prompts).toEqual([{ label: 'What needs to be done? #tags' }]);
+
+    answers.READ_ENTRY_FILE = { content: '- [ ] Old\n', sha: 'v1' };
+    answers.WRITE_ENTRY_FILE = {};
+    expect(await add?.action?.run?.(['Call the bank #admin'])).toBe(
+      'Added a todo to work/inbox.todos.md',
+    );
+    expect(sent[0]).toEqual({ type: 'READ_ENTRY_FILE', path: 'work/inbox.todos.md' });
+    expect(sent[1]).toMatchObject({
+      type: 'WRITE_ENTRY_FILE',
+      path: 'work/inbox.todos.md',
+      sha: 'v1',
+    });
+    expect((sent[1] as { content?: string }).content).toMatch(
+      /^- \[ \] Old\n- \[ \] Call the bank #admin\n::updated:: \d+ ::created:: /,
+    );
+  });
+
+  it('creates a file that is not there yet, and writes nothing when the answer does not fit', async () => {
+    const [, add] = fileChoices(fakePort, { path: 'x.events.csv', name: 'x', url: 'https://x' });
+    answers.READ_ENTRY_FILE = { content: '' };
+    answers.WRITE_ENTRY_FILE = {};
+    await add?.action?.run?.(['Trip', 'general', '2026-10-01', '']);
+    expect(sent[1]).toEqual({
+      type: 'WRITE_ENTRY_FILE',
+      path: 'x.events.csv',
+      content: 'name;type;start iso date;end iso date\nTrip;general;2026-10-01;2026-10-01\n',
+    });
+
+    sent = [];
+    await expect(add?.action?.run?.(['', 'general', '2026-10-01', ''])).rejects.toThrow(
+      'needs a name',
+    );
+    expect(sent.map((request) => request.type)).toEqual(['READ_ENTRY_FILE']);
+  });
+});
+
 describe('paletteModes', () => {
+  it('>f lists the files widgets add to, each leading to its choices', async () => {
+    answers.LIST_ENTRY_FILES = {
+      files: [{ path: 'a/b.actionlog.md', name: 'b.actionlog.md', url: 'https://x/b' }],
+    };
+    const [item] = await load(mode('f'));
+    expect(item).toMatchObject({ title: 'b.actionlog.md', subtitle: 'a/b.actionlog.md' });
+    expect(item?.action?.choices?.([]).map((choice) => choice.title)).toEqual([
+      'Open b.actionlog.md in Kaihuman',
+      'Add an action…',
+    ]);
+  });
+
+  it('>f says so when there are no such files', async () => {
+    answers.LIST_ENTRY_FILES = { files: [] };
+    await expect(load(mode('f'))).rejects.toThrow('No todo lists');
+  });
+
   it('lists the prompts of every prompts file, copying the body', async () => {
     answers.LIST_PROMPT_FILES = {
       files: [
@@ -401,19 +475,87 @@ describe('claudeCodeMode', () => {
 });
 
 describe('claudeUsageMode', () => {
-  it('lists each account’s rows, under its own heading', async () => {
-    answers.GET_CLAUDE_USAGE = {
-      accounts: [
-        { name: 'default', usage: { five_hour: { utilization: 5 } } },
-        { name: 'work', error: 'no credentials' },
-      ],
+  const MINUTE = 60 * 1000;
+  const accounts = [
+    { name: 'default', usage: { five_hour: { utilization: 5 } } },
+    { name: 'work', error: 'no credentials' },
+  ];
+
+  /** Answers the cache from `cache` and a fetch from `fresh`, recording which was asked. */
+  const usagePort = (
+    cache: { accounts: typeof accounts; fetchedAt?: number },
+    fresh: () => Promise<{ accounts: typeof accounts; fetchedAt?: number }>,
+  ) => {
+    const asked: string[] = [];
+    const port: ActionPort = {
+      send: async (request) => {
+        const cached = (request as { cached?: boolean }).cached;
+        asked.push(cached ? 'cache' : 'fetch');
+        return (cached ? cache : await fresh()) as never;
+      },
     };
-    const mode = claudeUsageMode(fakePort);
+    const mode = claudeUsageMode(port);
     if (!('load' in mode)) throw new Error('u does not load');
+    return { mode, asked };
+  };
+
+  it('fetches when nothing is cached, then lists each account under its own heading', async () => {
+    const { mode, asked } = usagePort({ accounts: [] }, async () => ({
+      accounts,
+      fetchedAt: Date.now(),
+    }));
     const rows = await mode.load();
-    expect(mode.prefix).toBe('u');
-    expect(rows.map((row) => row.group)).toEqual(['default', 'work']);
-    expect(rows[1]?.title).toBe('Could not load usage');
+    expect(asked).toEqual(['cache', 'fetch']);
+    expect(rows[0]).toMatchObject({ title: 'Usage synced just now', tone: 'good' });
+    expect(rows.slice(1).map((row) => row.group)).toEqual(['default', 'work']);
+    expect(rows[2]?.title).toBe('Could not load usage');
+    expect(mode.recents).toBe(false);
+  });
+
+  it('shows a cache younger than 5 minutes as it is, without syncing', async () => {
+    const { mode, asked } = usagePort(
+      { accounts, fetchedAt: Date.now() - 3 * MINUTE },
+      async () => ({ accounts }),
+    );
+    const rows = await mode.load();
+    expect(rows[0]).toMatchObject({
+      title: 'Cached usage from 3 min ago',
+      subtitle: 'Fresh — synced again once it is 5 min old',
+      tone: 'good',
+    });
+    expect(mode.refresh?.()).toBeNull();
+    expect(asked).toEqual(['cache']);
+  });
+
+  it('shows an older cache first, then the synced usage in its place', async () => {
+    const { mode } = usagePort({ accounts, fetchedAt: Date.now() - 30 * MINUTE }, async () => ({
+      accounts,
+      fetchedAt: Date.now(),
+    }));
+    const rows = await mode.load();
+    expect(rows[0]).toMatchObject({
+      title: 'Cached usage from 30 min ago',
+      subtitle: 'Syncing in the background…',
+      tone: 'warn',
+    });
+    const synced = await mode.refresh?.();
+    expect(synced?.[0]).toMatchObject({ title: 'Usage synced just now', tone: 'good' });
+    expect(synced?.length).toBe(rows.length);
+  });
+
+  it('keeps the cached usage when the sync fails, and says why', async () => {
+    const { mode } = usagePort({ accounts, fetchedAt: Date.now() - 2 * 60 * MINUTE }, async () => {
+      throw new Error('offline');
+    });
+    const rows = await mode.load();
+    expect(rows[0]?.tone).toBe('bad');
+    const after = await mode.refresh?.();
+    expect(after?.[0]).toMatchObject({
+      title: 'Cached usage from 2h 0m ago',
+      subtitle: 'Sync failed: offline',
+      tone: 'bad',
+    });
+    expect(after?.slice(1)).toEqual(rows.slice(1));
   });
 });
 

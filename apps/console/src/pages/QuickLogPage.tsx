@@ -1,5 +1,6 @@
 import { githubFileStore } from '@lifosy/core';
-import { appendAction, parseActionLog, StatusBar, serializeActionLog } from '@lifosy/ui';
+import { addActionLogEntry } from '@lifosy/formats';
+import { StatusBar } from '@lifosy/ui';
 import { ArrowLeft } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
@@ -51,9 +52,10 @@ export const QuickLogPage = () => {
         .split(/[\s,]+/)
         .map((t) => t.replace(/^#/, '').toLowerCase())
         .filter(Boolean);
-      const data = parseActionLog(existingFile?.content ?? '');
-      const newData = appendAction(data, trimmed, parsedTags);
-      const serialized = serializeActionLog(newData);
+      const serialized = addActionLogEntry(existingFile?.content ?? '', {
+        description: trimmed,
+        tags: parsedTags,
+      });
       if (existingFile) {
         githubFileStore.updateFileContent(path, serialized);
         await githubFileStore.saveFile(path);

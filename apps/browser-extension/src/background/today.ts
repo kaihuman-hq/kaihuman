@@ -2,12 +2,24 @@
  * The start page's view of the repo's own data: events, todos, habits, time tracking, world clocks
  * and the read-it-later list.
  *
- * The file formats are the console widgets' (packages/ui/src/LifeOS/Organisms/Widgets/*Logic.ts).
- * Only the part the start page needs is mirrored here, and every write touches the file as little
- * as it can — a todo is appended rather than the whole file re-serialized — so nothing the console
- * wrote is lost to a parser that knows less than the console's.
+ * Every file is read and written with the console widgets' own code (packages/formats); this module
+ * only decides what the start page shows from it.
  */
 
+import {
+  calculateStats,
+  getUpcomingEvents,
+  isCheckedIn,
+  localDate,
+  parseEvents,
+  parseHabitData,
+  parseReadItLater,
+  parseTimeTracking,
+  parseTimezones,
+  parseTodos,
+  type ReadItLaterItem,
+  type TodoItem,
+} from '@lifosy/formats';
 import { CACHE_TTL_MS } from './bookmarks';
 
 /** Files whose content the start page reads. Action logs are only written to, so only listed. */
@@ -142,14 +154,6 @@ export function withFile(cache: TodayCache, file: TodayFile): TodayCache {
 
 // ─── Dates ──────────────────────────────────────────────────────────────────
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
-/** The local calendar day — the console's widgets all count days in local time. */
-export const localDate = (d: Date) =>
-  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-
-export const localTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-
 const parseLocalDate = (iso: string): Date | null => {
   const [y, m, d] = iso.split('-').map(Number);
   if (!y || !m || !d) return null;
@@ -190,198 +194,23 @@ export interface UpcomingEvent {
 export const EVENTS_HORIZON_DAYS = 7;
 
 export function upcomingEvents(path: string, csv: string, now: Date): UpcomingEvent[] {
-  const upcoming: UpcomingEvent[] = [];
-  for (const line of csv.trim().split(/\r?\n/)) {
-    const [name, type, start, end] = line.split(';').map((part) => part.trim());
-    if (!name || !type || !start || line.toLowerCase().startsWith('name;')) continue;
-    const kind = type.toLowerCase();
-    const startDate = parseLocalDate(start);
-    if (!startDate) continue;
-
-    let next = startDate;
-    if (kind === 'birthday') {
-      next = new Date(now.getFullYear(), startDate.getMonth(), startDate.getDate());
-      if (daysBetween(now, next) < 0) next.setFullYear(now.getFullYear() + 1);
-    } else {
-      // A multi-day event still running today is still worth seeing.
-      const endDate = parseLocalDate(end || start) ?? startDate;
-      if (daysBetween(now, endDate) < 0) continue;
-    }
-
-    const daysUntil = Math.max(0, daysBetween(now, next));
-    if (daysUntil > EVENTS_HORIZON_DAYS) continue;
-    upcoming.push({ name, type: kind, date: localDate(next), daysUntil, path });
-  }
-  return upcoming;
+  return getUpcomingEvents(parseEvents(csv), Number.POSITIVE_INFINITY, now)
+    .filter((upcoming) => upcoming.daysUntil <= EVENTS_HORIZON_DAYS)
+    .map(({ entry, date, daysUntil }) => ({
+      name: entry.name,
+      type: entry.type,
+      date: localDate(date),
+      // A multi-day event that started before today is still running: it is on today.
+      daysUntil: Math.max(0, daysUntil),
+      path,
+    }));
 }
 
 // ─── Todos (.todos.md) ──────────────────────────────────────────────────────
 
-export interface TodoLine {
-  text: string;
-  status: 'backlog' | 'in-progress' | 'done' | 'rejected';
-  milestoneId?: string;
-}
-
-export interface Milestone {
-  id: string;
-  name: string;
-  dueDate?: string;
-}
-
-const MARKER_TO_STATUS: Record<string, TodoLine['status']> = {
-  ' ': 'backlog',
-  '>': 'in-progress',
-  x: 'done',
-  X: 'done',
-  '-': 'rejected',
-};
-
-/** The front matter's milestones; the console writes them in exactly this shape. */
-export function parseMilestones(md: string): Milestone[] {
-  if (!md.startsWith('---')) return [];
-  const close = md.indexOf('\n---', 3);
-  if (close === -1) return [];
-  const milestones: Milestone[] = [];
-  let current: Partial<Milestone> | null = null;
-  const flush = () => {
-    if (current?.id && current.name) milestones.push(current as Milestone);
-  };
-  for (const line of md.slice(3, close).split('\n')) {
-    const id = line.match(/^\s{2}-\s+id:\s*(.+)/)?.[1];
-    if (id) {
-      flush();
-      current = { id: id.trim() };
-      continue;
-    }
-    const name = line.match(/^\s{4}name:\s*(.+)/)?.[1];
-    if (name && current) current.name = name.trim();
-    const due = line.match(/^\s{4}dueDate:\s*(.+)/)?.[1];
-    if (due && current) current.dueDate = due.trim();
-  }
-  flush();
-  return milestones;
-}
-
-export function parseTodoLines(md: string): TodoLine[] {
-  const todos: TodoLine[] = [];
-  for (const line of md.split(/\r?\n/)) {
-    const match = line.match(/^\s*[-*]\s+\[([^\]]*)\]\s+(.*)/);
-    if (!match) continue;
-    let milestoneId: string | undefined;
-    const text = (match[2] ?? '')
-      .replace(/^\d{4}-\d{2}-\d{2}T\S+Z\s+/, '')
-      .replace(/#[\w-]+/g, '')
-      .replace(/!([\w-]+)/g, (_, id: string) => {
-        milestoneId = id;
-        return '';
-      })
-      .replace(/\s+/g, ' ')
-      .trim();
-    todos.push({ text, status: MARKER_TO_STATUS[match[1] ?? ' '] ?? 'backlog', milestoneId });
-  }
-  return todos;
-}
-
-const isOpen = (todo: TodoLine) => todo.status === 'backlog' || todo.status === 'in-progress';
-
-/**
- * Appends a backlog todo in the console's own format. `#tags` typed into the text are moved to the
- * end, where the console writes them.
- */
-export function appendTodo(content: string, input: string, created: string): string {
-  const tags = input.match(/#[\w-]+/g) ?? [];
-  const text = input
-    .replace(/#[\w-]+/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!text) throw new Error('Nothing to add');
-  const line = `- [ ] ${text}${tags.length ? ` ${tags.join(' ')}` : ''}\n::created:: ${created}\n`;
-  if (!content) return line;
-  return `${content.endsWith('\n') ? content : `${content}\n`}${line}`;
-}
-
-// ─── Habits (.habit.csv) ────────────────────────────────────────────────────
-
-const HABIT_HEADER = 'iso date;goal reached';
-
-const reachedDates = (csv: string) =>
-  new Set(
-    csv
-      .split(/\r?\n/)
-      .map((line) => line.split(';'))
-      .filter(([date, reached]) => date && /^\d{4}-/.test(date) && reached?.trim() === 'x')
-      .map(([date]) => (date ?? '').trim()),
-  );
-
-/** Days in a row the goal was reached, counting back from today — or from yesterday, not yet lost. */
-export function habitStreak(csv: string, now: Date): number {
-  const reached = reachedDates(csv);
-  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (!reached.has(localDate(day))) day.setDate(day.getDate() - 1);
-  let streak = 0;
-  while (reached.has(localDate(day))) {
-    streak++;
-    day.setDate(day.getDate() - 1);
-  }
-  return streak;
-}
-
-export const isCheckedIn = (csv: string, date: string) => reachedDates(csv).has(date);
-
-/** Marks `date` reached and writes the file the way the console's habit widget does. */
-export function checkInHabit(csv: string, date: string): string {
-  const entries = new Map<string, boolean>();
-  for (const line of csv.trim().split(/\r?\n/)) {
-    const [day, reached] = line.split(';');
-    if (!day || reached === undefined || line.includes('iso date')) continue;
-    entries.set(day.trim(), reached.trim() === 'x');
-  }
-  entries.set(date, true);
-  const lines = [...entries]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([day, reached]) => `${day};${reached ? 'x' : ''}`);
-  return [HABIT_HEADER, ...lines].join('\n');
-}
+const isOpen = (todo: TodoItem) => todo.status === 'backlog' || todo.status === 'in-progress';
 
 // ─── Time tracking (.timetracking.csv) ──────────────────────────────────────
-
-interface Interval {
-  start: string;
-  end?: string;
-}
-
-interface DayEntry {
-  date: string;
-  intervals: Interval[];
-}
-
-function parseTimeTracking(csv: string): DayEntry[] {
-  const entries: DayEntry[] = [];
-  for (const raw of csv.trim().split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line || line.toLowerCase().startsWith('iso')) continue;
-    const [date, times] = line.split(';');
-    if (!date || !times) continue;
-    const stamps = times.split(',').filter((t) => t.trim() !== '');
-    const intervals: Interval[] = [];
-    for (let i = 0; i < stamps.length; i += 2) {
-      intervals.push({ start: stamps[i] as string, end: stamps[i + 1] });
-    }
-    entries.push({ date, intervals });
-  }
-  return entries;
-}
-
-function serializeTimeTracking(entries: DayEntry[]): string {
-  const rows = [...entries]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .map((entry) => {
-      const times = entry.intervals.flatMap((i) => (i.end ? [i.start, i.end] : [i.start]));
-      return `${entry.date};${times.join(',')}\n`;
-    });
-  return `iso date;time\n${rows.join('')}`;
-}
 
 export interface TimerState {
   running: boolean;
@@ -392,7 +221,7 @@ export interface TimerState {
 }
 
 export function timerState(csv: string, now: Date): TimerState {
-  const today = parseTimeTracking(csv).find((entry) => entry.date === localDate(now));
+  const today = parseTimeTracking(csv).entries.find((entry) => entry.date === localDate(now));
   if (!today) return { running: false, closedMinutes: 0 };
   let closedMinutes = 0;
   for (const interval of today.intervals) {
@@ -405,22 +234,6 @@ export function timerState(csv: string, now: Date): TimerState {
     : { running: false, closedMinutes };
 }
 
-/** Starts or stops today's timer, exactly as the console's start/stop button does. */
-export function toggleTimer(csv: string, now: Date): string {
-  const entries = parseTimeTracking(csv);
-  const date = localDate(now);
-  const hm = localTime(now);
-  const today = entries.find((entry) => entry.date === date);
-  if (!today) {
-    entries.push({ date, intervals: [{ start: hm }] });
-  } else {
-    const last = today.intervals.at(-1);
-    if (last && !last.end) last.end = hm;
-    else today.intervals.push({ start: hm });
-  }
-  return serializeTimeTracking(entries);
-}
-
 // ─── World clocks (.timezones.json) ─────────────────────────────────────────
 
 export interface Clock {
@@ -429,81 +242,22 @@ export interface Clock {
   label: string;
 }
 
-export function parseClocks(json: string): Clock[] {
-  try {
-    const data = JSON.parse(json) as { timezones?: { name?: unknown; cities?: unknown }[] };
-    if (!Array.isArray(data.timezones)) return [];
-    return data.timezones.flatMap((entry) => {
-      if (typeof entry.name !== 'string' || !entry.name) return [];
-      const cities = Array.isArray(entry.cities) ? entry.cities : [];
-      const city = typeof cities[0] === 'string' ? cities[0] : '';
-      return [{ zone: entry.name, label: city || entry.name.split('/').pop() || entry.name }];
-    });
-  } catch {
-    return [];
-  }
+/** One clock per zone in the list, labelled by its first city. */
+export function worldClocks(json: string): Clock[] {
+  return parseTimezones(json).timezones.flatMap((entry) => {
+    if (typeof entry.name !== 'string' || !entry.name) return [];
+    const city =
+      Array.isArray(entry.cities) && typeof entry.cities[0] === 'string' ? entry.cities[0] : '';
+    return [{ zone: entry.name, label: city || entry.name.split('/').pop() || entry.name }];
+  });
 }
 
 // ─── Read it later (.readitlater.json) ──────────────────────────────────────
 
-export interface ReadLaterItem {
-  id: string;
-  url: string;
-  name: string;
-  status: 'new' | 'read';
-  tags: string[];
-  createdAt: number;
-  updatedAt: number;
-}
-
-function parseReadLater(json: string): { items: ReadLaterItem[] } & Record<string, unknown> {
-  if (!json.trim()) return { items: [] };
-  const data = JSON.parse(json);
-  return { ...data, items: Array.isArray(data?.items) ? data.items : [] };
-}
-
-export function unreadItems(json: string): ReadLaterItem[] {
-  try {
-    return parseReadLater(json).items.filter(
-      (item) => item?.status === 'new' && typeof item.url === 'string',
-    );
-  } catch {
-    return [];
-  }
-}
-
-export function markRead(json: string, id: string, now: number): string {
-  const data = parseReadLater(json);
-  if (!data.items.some((item) => item.id === id)) {
-    throw new Error('That item is no longer on the list');
-  }
-  const items = data.items.map((item) =>
-    item.id === id ? { ...item, status: 'read' as const, updatedAt: now } : item,
+export const unreadItems = (json: string): ReadItLaterItem[] =>
+  parseReadItLater(json).items.filter(
+    (item) => item?.status === 'new' && typeof item.url === 'string',
   );
-  return JSON.stringify({ ...data, items }, null, 2);
-}
-
-export function addReadLater(
-  json: string,
-  page: { url: string; title: string },
-  now: number,
-  id: string,
-): string {
-  const data = parseReadLater(json);
-  if (data.items.some((item) => item.url === page.url && item.status === 'new')) {
-    throw new Error('Already on the read-later list');
-  }
-  const item: ReadLaterItem = {
-    id,
-    url: page.url,
-    name: page.title.trim() || page.url,
-    status: 'new',
-    tags: [],
-    createdAt: now,
-    updatedAt: now,
-  };
-  return JSON.stringify({ ...data, items: [...data.items, item] }, null, 2);
-}
 
 // ─── The summary the start page shows ───────────────────────────────────────
 
@@ -514,7 +268,7 @@ export interface TodaySummary {
   overdue: { text: string; path: string; milestone: string }[];
   milestone?: { name: string; dueDate: string; daysUntil: number; open: number; path: string };
   inbox: { path: string; count: number };
-  readLater: (Pick<ReadLaterItem, 'id' | 'url' | 'name' | 'createdAt'> & { path: string })[];
+  readLater: (Pick<ReadItLaterItem, 'id' | 'url' | 'name' | 'createdAt'> & { path: string })[];
   habits: { path: string; name: string; checkedToday: boolean; streak: number }[];
   timers: ({ path: string; name: string } & TimerState)[];
   clocks: Clock[];
@@ -561,14 +315,14 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
     if (lower.endsWith('.events.csv')) {
       summary.events.push(...upcomingEvents(path, content, now));
     } else if (lower.endsWith('.todos.md')) {
-      const todos = parseTodoLines(content);
+      const { items: todos, milestones } = parseTodos(content);
       if (path === summary.inbox.path) {
         summary.inbox.count = todos.filter((todo) => todo.status === 'backlog').length;
       }
       for (const todo of todos) {
         if (todo.status === 'in-progress') summary.inProgress.push({ text: todo.text, path });
       }
-      for (const milestone of parseMilestones(content)) {
+      for (const milestone of milestones) {
         if (!milestone.dueDate) continue;
         const open = todos.filter((todo) => todo.milestoneId === milestone.id && isOpen(todo));
         if (milestone.dueDate < today) {
@@ -591,12 +345,12 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
         path,
         name: fileLabel(path),
         checkedToday: isCheckedIn(content, today),
-        streak: habitStreak(content, now),
+        streak: calculateStats(parseHabitData(content), now).currentStreak,
       });
     } else if (lower.endsWith('.timetracking.csv')) {
       summary.timers.push({ path, name: fileLabel(path), ...timerState(content, now) });
     } else if (lower.endsWith('.timezones.json')) {
-      summary.clocks.push(...parseClocks(content));
+      summary.clocks.push(...worldClocks(content));
     } else if (lower.endsWith('.readitlater.json')) {
       for (const item of unreadItems(content)) {
         const { id, url, name, createdAt } = item;
