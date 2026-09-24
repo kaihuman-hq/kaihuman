@@ -79,6 +79,16 @@ export function usagePace(key: string, resetsAt: string | undefined, now: Date):
   return clamp(((length - remaining) / length) * 100);
 }
 
+/**
+ * How much of the calendar month has passed, in percent, in local time — the pace of the monthly
+ * spend and extra-credit budgets, which always run for the full month.
+ */
+export function monthPace(now: Date): number {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
+  return clamp(((now.getTime() - start) / (end - start)) * 100);
+}
+
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -168,7 +178,7 @@ export function usageRows(
     rows.push(
       row(
         'spend',
-        meter('Monthly spend', spend.percent ?? 0, null),
+        meter('Monthly spend', spend.percent ?? 0, monthPace(now)),
         `${money(spend.used)} of ${money(spend.limit)}${severity}`,
       ),
     );
@@ -178,7 +188,7 @@ export function usageRows(
     rows.push(
       row(
         'extra',
-        meter('Extra credits', extra.utilization ?? 0, null),
+        meter('Extra credits', extra.utilization ?? 0, monthPace(now)),
         `${formatMoney(extra.used_credits ?? 0, places, currency)} of ${formatMoney(extra.monthly_limit ?? 0, places, currency)}`,
       ),
     );

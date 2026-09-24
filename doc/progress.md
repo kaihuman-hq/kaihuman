@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-09-24 — `>u`: pace for monthly budgets
+
+- **Monthly spend** and **Extra credits** rows now show a pace too: how much of the calendar month
+  has passed, in local time (`monthPace` in `packages/palette/src/claude-usage.ts`), since those
+  budgets always run for the full month. Before, only windows with a `resets_at` had one.
+
 ## 2026-09-24 — Palette: `>q` knowledge capture
 
 Follow-up to the knowledge-capture work (`cli capture`, `/quick-knowledge`): the browser and desktop
