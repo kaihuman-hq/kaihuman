@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-09-24 — Palette settings: more default search engines, a plain Tsuga default
+
+- **Default engines**: Bing, Brave Search, Startpage, Wikipedia, YouTube, GitHub and Stack Overflow
+  join the defaults, after the ones the palettes had.
+- **Default `>l` Tsuga logs**: now just Tsuga's explorer searching for what is typed — no team
+  filter, extra columns or cluster id. Anything team-specific belongs in
+  `.kh/command-palette.settings.json`.
+
 ## 2026-09-24 — Command palette settings: search engines and link tools from the repository
 
 - **Settings file**: `.kh/command-palette.settings.json` sets the palettes' web search engines and

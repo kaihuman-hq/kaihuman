@@ -14,7 +14,7 @@ way.
 | In the palette | Desktop |
 | --- | --- |
 | Bookmarks from `.kh/browser.bookmarks.json`, searched as you type | ✓ (cached for an hour, refreshed in the background) |
-| Web search: Google, DuckDuckGo, Ecosia, Amazon, Amazon.de, Reddit — or the engines in `.kh/command-palette.settings.json` | ✓ |
+| Web search: Google, DuckDuckGo, Ecosia, Amazon, Amazon.de, Reddit, Bing, Brave Search, Startpage, Wikipedia, YouTube, GitHub, Stack Overflow — or the engines in `.kh/command-palette.settings.json` | ✓ |
 | ⇥ Tab: GitHub code search in the repo, opened in the console | ✓ |
 | Add a note… (dump, quick-note files, `.actionlog.md` with `#tags`) | ✓ |
 | Recent, Switch repository…, Sync with GitHub now, Open the Lifosy console | ✓ |
@@ -27,7 +27,7 @@ way.
 | `>u` Claude usage — rate limits, pace, resets and spend per account; the last fetch shows at once with its age (green under 15 min, yellow up to an hour, red beyond), synced in the background once 5 min old | ✓ desktop only |
 | `>r` GitHub repositories, ⇥ for issues, pull requests, actions… | ✓, and omarchy's `~/.config/eee/counts` ranks the ones you open most first |
 | `>g` GitHub search — pick a repository, then issues or pull requests, then type the search term | ✓, repositories ranked as in `>r` |
-| `>l` logs — the console team's logs in Tsuga's explorer, filtered by what is typed; more link tools from `.kh/command-palette.settings.json` (see the extension's README, "Palette settings") | ✓ (settings cached in `$XDG_CACHE_HOME/lifosy/palette-settings.json` for five minutes) |
+| `>l` logs — Tsuga's log explorer, searching for what is typed; more link tools from `.kh/command-palette.settings.json` (see the extension's README, "Palette settings") | ✓ (settings cached in `$XDG_CACHE_HOME/lifosy/palette-settings.json` for five minutes) |
 | Recent: each prefix lists the last 10 entries chosen in it first (kept in `$XDG_STATE_HOME/lifosy/mode-recents.json`) | ✓ |
 | `>f` files — todo lists, action logs, events, prompts, commands: open one in Kaihuman or add an entry as its widget does (also from ⇥ repo-search hits) | ✓ |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |

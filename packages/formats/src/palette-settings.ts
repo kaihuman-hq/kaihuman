@@ -20,7 +20,7 @@ export interface LinkParam {
   value: string;
   /**
    * Used instead of `value` when nothing is typed — for a value that only makes sense with a term,
-   * like Tsuga's `… AND "{query}"`. Without it, `{query}` simply becomes empty.
+   * like `level:error AND "{query}"`. Without it, `{query}` simply becomes empty.
    */
   empty?: string;
 }
@@ -62,9 +62,7 @@ export const BUILT_IN_PALETTE_PREFIXES: readonly string[] = [
   'u',
 ];
 
-const TSUGA_TEAM_QUERY = 'context.cloud.camunda.io/owner-team:console';
-
-/** What the palettes offer with no settings file — the engines and tools they always had. */
+/** What the palettes offer with no settings file. */
 export const DEFAULT_PALETTE_SETTINGS: CommandPaletteSettings = {
   searchEngines: [
     { name: 'Google', url: 'https://www.google.com/search?q={query}', params: [] },
@@ -73,23 +71,21 @@ export const DEFAULT_PALETTE_SETTINGS: CommandPaletteSettings = {
     { name: 'Amazon', url: 'https://www.amazon.com/s?k={query}', params: [] },
     { name: 'Amazon.de', url: 'https://www.amazon.de/s?k={query}', params: [] },
     { name: 'Reddit', url: 'https://www.reddit.com/search/?q={query}', params: [] },
+    { name: 'Bing', url: 'https://www.bing.com/search?q={query}', params: [] },
+    { name: 'Brave Search', url: 'https://search.brave.com/search?q={query}', params: [] },
+    { name: 'Startpage', url: 'https://www.startpage.com/do/search?q={query}', params: [] },
+    { name: 'Wikipedia', url: 'https://en.wikipedia.org/w/index.php?search={query}', params: [] },
+    { name: 'YouTube', url: 'https://www.youtube.com/results?search_query={query}', params: [] },
+    { name: 'GitHub', url: 'https://github.com/search?q={query}', params: [] },
+    { name: 'Stack Overflow', url: 'https://stackoverflow.com/search?q={query}', params: [] },
   ],
   tools: [
     {
       prefix: 'l',
       name: 'Tsuga logs',
-      description: 'The console team’s logs in Tsuga’s explorer, filtered by what is typed',
+      description: 'Tsuga’s log explorer, searching for what is typed',
       url: 'https://app.tsuga.com/explorer',
-      params: [
-        {
-          key: 'query',
-          value: `${TSUGA_TEAM_QUERY} AND "{query}"`,
-          // Tsuga's own link for the team ends its query in a space; kept, so both match exactly.
-          empty: `${TSUGA_TEAM_QUERY} `,
-        },
-        { key: 'extraColumns', value: JSON.stringify(['file', 'fn', 'service']) },
-        { key: 'clusterIds', value: '8v5j-x2k0n-dzk4' },
-      ],
+      params: [{ key: 'query', value: '{query}' }],
     },
   ],
 };

@@ -209,7 +209,8 @@ normal tab. The New Tab page used to be on that list; the start page below is th
   `⏎` opens what you were looking for rather than writing something. Type part of an action's name
   to bring it to the top.
 - **Web** lists one row per search engine for what you typed — by default Google, DuckDuckGo,
-  Ecosia, Amazon, Amazon.de and Reddit — below everything else, so typing an action's name still
+  Ecosia, Amazon, Amazon.de, Reddit, Bing, Brave Search, Startpage, Wikipedia, YouTube, GitHub and
+  Stack Overflow — below everything else, so typing an action's name still
   runs the action. `⏎` opens that engine's results page in a new tab; nothing is fetched by the
   extension itself, it only builds the URL. So when nothing else matches, typing and pressing `⏎`
   searches the first engine. The searches you run land in **Recent** like any other open. Which
@@ -247,16 +248,10 @@ reorder, add parameters — with a preview of each link. Edits are saved with **
     {
       "prefix": "l",
       "name": "Tsuga logs",
-      "description": "The console team’s logs in Tsuga’s explorer, filtered by what is typed",
+      "description": "Errors in Tsuga’s log explorer, filtered by what is typed",
       "url": "https://app.tsuga.com/explorer",
       "params": [
-        {
-          "key": "query",
-          "value": "context.cloud.camunda.io/owner-team:console AND \"{query}\"",
-          "empty": "context.cloud.camunda.io/owner-team:console "
-        },
-        { "key": "extraColumns", "value": "[\"file\",\"fn\",\"service\"]" },
-        { "key": "clusterIds", "value": "8v5j-x2k0n-dzk4" }
+        { "key": "query", "value": "level:error AND \"{query}\"", "empty": "level:error" }
       ]
     }
   ]
@@ -295,7 +290,7 @@ hint line lists the prefixes.
 | `>x` | Commands from the repository's `.commands.md` files (`doc/commands-format.md`) | asks for each `{{name}}`, then copies the filled-in command — running it is the desktop palette's | every `.commands.md` in the repository, cached for five minutes |
 | `>r` | Your GitHub repositories, most recently pushed first | opens the repository; **⇥** (or **→**) lists its issues, pull requests, actions, releases… | `GET /user/repos` with the extension's token |
 | `>g` | The same repositories, to search one | lists **Issues** and **Pull requests**; ⏎ on one asks for the search term, then opens GitHub's search there (`is:issue …` / `is:pr …`, any state) — no term opens the plain list | `GET /user/repos` with the extension's token |
-| `>l` | One row: the console team's logs in Tsuga, for what is typed (a default tool — see **Palette settings**) | opens Tsuga's explorer on `owner-team:console`, `AND "…"` the typed text when there is any | a link only, no request |
+| `>l` | One row: Tsuga logs, for what is typed (a default tool — see **Palette settings**) | opens Tsuga's explorer searching for the typed text | a link only, no request |
 | `>f` | The repository's files a widget can add to — todo lists, action logs, events, prompts, commands | offers **Open … in Kaihuman** or **Add a todo…** (an action, an event…) | one tree listing per visit |
 
 With nothing typed, every mode but `>t` and `>u` lists the last 10 entries you chose in it first,

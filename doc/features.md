@@ -39,11 +39,11 @@
 | Recent per prefix: each palette mode lists the last 10 entries chosen in it first | command palette, desktop palette | 2026-09-24 |
 | One shared way to add todos, action log entries, events, prompts and commands (`packages/formats`), used by the console, popup, start page and palettes alike | all apps | 2026-09-24 |
 | Widget entries from the palette: ⏎ on a todo list, action log, events, prompts or commands file (from `>f` or ⇥ repo search) offers **Open in Kaihuman** or **Add …**, written as the console widget's Add form writes it | command palette, desktop palette | 2026-09-24 |
-| `>g` GitHub search (repository, then issues or pull requests, then the term) and `>l` the console team's logs in Tsuga | command palette, desktop palette | 2026-09-23 |
+| `>g` GitHub search (repository, then issues or pull requests, then the term) and `>l` Tsuga logs | command palette, desktop palette | 2026-09-23 |
 | `>x` commands from `.commands.md` — fill in parameters, then copy (extension) or copy / run in ghostty / run in the background (desktop) | command palette, desktop palette | 2026-09-23 |
 | Prefixes are `>` plus a letter (`>p`, `>t`…); `>b` lists bookmarks only | command palette, desktop palette | 2026-09-23 |
 | Palette prefix modes: `>p` prompts from the repo's `.prompts.md` files (⏎ copies), `>t` DeepL translation into EN/DE (typed text is offered too; the last 20 texts are kept to translate again), `>r` GitHub repositories with ⇥ for issues, PRs… | command palette (pages and start page) | 2026-09-23 |
-| Web search from the command palette — Google, DuckDuckGo, Ecosia, Amazon, Amazon.de, Reddit by default, by URL only; engines and link tools configurable in `.kh/command-palette.settings.json` (2026-09-24) | command palette (pages and start page), desktop palette | 2026-09-23 |
+| Web search from the command palette — Google, DuckDuckGo, Ecosia, Amazon, Amazon.de, Reddit, Bing, Brave Search, Startpage, Wikipedia, YouTube, GitHub, Stack Overflow by default, by URL only; engines and link tools configurable in `.kh/command-palette.settings.json` (2026-09-24) | command palette (pages and start page), desktop palette | 2026-09-23 |
 | Pinned tab groups on the start page — compact cards above the bookmarks; a click loads the group | start page | 2026-09-23 |
 | Pinned bookmarks — always first on the start page; pin/unpin from its cards or the console widget | start page cards, Bookmarks widget | 2026-09-22 |
 | Start page — kaihuman's own New Tab page: palette, recently used bookmarks, dump note | New Tab (`chrome_url_overrides`) | 2026-09-22 |

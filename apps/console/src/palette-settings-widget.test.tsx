@@ -63,7 +63,7 @@ describe('CommandPaletteSettingsWidget', () => {
   it('sums the engines and tools up on the dashboard', () => {
     mount(DEFAULTS, 'SMALL');
     expect(host.textContent).toContain(
-      'Google · DuckDuckGo · Ecosia · Amazon · Amazon.de · Reddit',
+      'Google · DuckDuckGo · Ecosia · Amazon · Amazon.de · Reddit · Bing · Brave Search · Startpage · Wikipedia · YouTube · GitHub · Stack Overflow',
     );
     expect(host.textContent).toContain('>l Tsuga logs');
   });
@@ -82,6 +82,13 @@ describe('CommandPaletteSettingsWidget', () => {
       'Amazon.de',
       'Ecosia',
       'Amazon',
+      'Bing',
+      'Brave Search',
+      'Startpage',
+      'Wikipedia',
+      'YouTube',
+      'GitHub',
+      'Stack Overflow',
     ]);
   });
 

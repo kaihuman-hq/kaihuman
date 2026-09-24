@@ -32,6 +32,13 @@ describe('buildLinkUrl', () => {
     expect(url('Amazon')).toBe('https://www.amazon.com/s?k=rust+book');
     expect(url('Amazon.de')).toBe('https://www.amazon.de/s?k=rust+book');
     expect(url('Reddit')).toBe('https://www.reddit.com/search/?q=rust+book');
+    expect(url('Bing')).toBe('https://www.bing.com/search?q=rust+book');
+    expect(url('Brave Search')).toBe('https://search.brave.com/search?q=rust+book');
+    expect(url('Startpage')).toBe('https://www.startpage.com/do/search?q=rust+book');
+    expect(url('Wikipedia')).toBe('https://en.wikipedia.org/w/index.php?search=rust+book');
+    expect(url('YouTube')).toBe('https://www.youtube.com/results?search_query=rust+book');
+    expect(url('GitHub')).toBe('https://github.com/search?q=rust+book');
+    expect(url('Stack Overflow')).toBe('https://stackoverflow.com/search?q=rust+book');
   });
 
   it('encodes characters that would otherwise change the url', () => {
@@ -40,14 +47,12 @@ describe('buildLinkUrl', () => {
     expect(url.hash).toBe('');
   });
 
-  it('builds exactly the Tsuga links the team uses', () => {
+  it('builds the default Tsuga link from what is typed alone', () => {
     const [tsuga] = DEFAULT_PALETTE_SETTINGS.tools;
     if (!tsuga) throw new Error('No Tsuga tool');
-    expect(buildLinkUrl(tsuga, '')).toBe(
-      'https://app.tsuga.com/explorer?query=context.cloud.camunda.io%2Fowner-team%3Aconsole+&extraColumns=%5B%22file%22%2C%22fn%22%2C%22service%22%5D&clusterIds=8v5j-x2k0n-dzk4',
-    );
+    expect(buildLinkUrl(tsuga, '')).toBe('https://app.tsuga.com/explorer?query=');
     expect(buildLinkUrl(tsuga, ' search term ')).toBe(
-      'https://app.tsuga.com/explorer?query=context.cloud.camunda.io%2Fowner-team%3Aconsole+AND+%22search+term%22&extraColumns=%5B%22file%22%2C%22fn%22%2C%22service%22%5D&clusterIds=8v5j-x2k0n-dzk4',
+      'https://app.tsuga.com/explorer?query=search+term',
     );
   });
 
@@ -87,7 +92,7 @@ describe('readPaletteSettings', () => {
 
   it('does not share the defaults with its caller', () => {
     readPaletteSettings('').settings.searchEngines.pop();
-    expect(DEFAULT_PALETTE_SETTINGS.searchEngines).toHaveLength(6);
+    expect(DEFAULT_PALETTE_SETTINGS.searchEngines).toHaveLength(13);
   });
 });
 

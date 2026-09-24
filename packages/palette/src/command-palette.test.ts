@@ -629,6 +629,13 @@ describe('web search', () => {
       'Search Amazon for “bookmark”',
       'Search Amazon.de for “bookmark”',
       'Search Reddit for “bookmark”',
+      'Search Bing for “bookmark”',
+      'Search Brave Search for “bookmark”',
+      'Search Startpage for “bookmark”',
+      'Search Wikipedia for “bookmark”',
+      'Search YouTube for “bookmark”',
+      'Search GitHub for “bookmark”',
+      'Search Stack Overflow for “bookmark”',
     ]);
   });
 
