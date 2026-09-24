@@ -1,10 +1,10 @@
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{backend::Backend, Terminal};
+use ratatui::widgets::ListState;
+use ratatui::{Terminal, backend::Backend};
 use std::io;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tui_textarea::TextArea;
-use ratatui::widgets::ListState;
 
 use crate::auth::AuthManager;
 use crate::db::Cache;
@@ -79,7 +79,10 @@ impl AiProvider {
 pub enum SyncStatus {
     Idle,
     Syncing,
-    Done { path: PathBuf, files: Vec<(String, bool)> },
+    Done {
+        path: PathBuf,
+        files: Vec<(String, bool)>,
+    },
     Error(String),
 }
 
@@ -244,7 +247,9 @@ impl<'a> App<'a> {
                     let repo_path = self.local_repo_path.clone();
                     let output = {
                         let mut c = tokio::process::Command::new(&cmd);
-                        c.arg("-p").arg(&full_prompt).stdin(std::process::Stdio::null());
+                        c.arg("-p")
+                            .arg(&full_prompt)
+                            .stdin(std::process::Stdio::null());
                         if let Some(ref p) = repo_path {
                             c.current_dir(p);
                         }
@@ -267,10 +272,9 @@ impl<'a> App<'a> {
             // ── Kick off pending git commit+push ─────────────────────────────
             if self.push_pending {
                 self.push_pending = false;
-                if let (Some(path), Some(repo_dir)) = (
-                    self.file_editor_path.clone(),
-                    self.local_repo_path.clone(),
-                ) {
+                if let (Some(path), Some(repo_dir)) =
+                    (self.file_editor_path.clone(), self.local_repo_path.clone())
+                {
                     let result_slot = Arc::clone(&self.push_result);
                     self.status_message = "↺ Pushing…".to_string();
                     tokio::spawn(async move {
@@ -308,9 +312,7 @@ impl<'a> App<'a> {
                         }
 
                         match self.current_screen.clone() {
-                            CurrentScreen::Main => {
-                                self.handle_main_input(terminal, key).await?
-                            }
+                            CurrentScreen::Main => self.handle_main_input(terminal, key).await?,
                             CurrentScreen::Login => {}
                             CurrentScreen::RepoSelect => self.handle_repo_select_input(key),
                             CurrentScreen::NoteInput => self.handle_note_input(key).await,
@@ -318,9 +320,7 @@ impl<'a> App<'a> {
                             CurrentScreen::AiResponse => self.handle_ai_response_input(key),
                             CurrentScreen::FileBrowser => self.handle_file_browser_input(key),
                             CurrentScreen::FileEditor => self.handle_file_editor_input(key),
-                            CurrentScreen::DashboardView => {
-                                self.handle_dashboard_view_input(key)
-                            }
+                            CurrentScreen::DashboardView => self.handle_dashboard_view_input(key),
                         }
                     }
                 }
@@ -423,7 +423,9 @@ impl<'a> App<'a> {
     }
 
     fn menu_key_to_index(c: char) -> Option<usize> {
-        MENU_ITEMS.iter().position(|(k, _)| k.chars().next() == Some(c))
+        MENU_ITEMS
+            .iter()
+            .position(|(k, _)| k.chars().next() == Some(c))
     }
 
     async fn activate_menu_item<B: Backend>(
@@ -583,12 +585,14 @@ impl<'a> App<'a> {
             match crate::git::sync_repo(&config_dir, &owner, &repo_name, &token).await {
                 Ok(path) => {
                     let path_bg = path.clone();
-                    let raw_files = tokio::task::spawn_blocking(move || {
-                        crate::files::walk_raw_files(&path_bg)
-                    })
-                    .await
-                    .unwrap_or_default();
-                    *status.lock().unwrap() = SyncStatus::Done { path, files: raw_files };
+                    let raw_files =
+                        tokio::task::spawn_blocking(move || crate::files::walk_raw_files(&path_bg))
+                            .await
+                            .unwrap_or_default();
+                    *status.lock().unwrap() = SyncStatus::Done {
+                        path,
+                        files: raw_files,
+                    };
                 }
                 Err(e) => {
                     *status.lock().unwrap() = SyncStatus::Error(e.to_string());
@@ -679,10 +683,8 @@ impl<'a> App<'a> {
                             client.create_quicknote(owner, repo, &text).await
                         };
                         if let Err(e) = result {
-                            let _ = std::fs::write(
-                                "error.log",
-                                format!("Error saving note: {:?}", e),
-                            );
+                            let _ =
+                                std::fs::write("error.log", format!("Error saving note: {:?}", e));
                         }
                     }
                     self.current_screen = CurrentScreen::Main;

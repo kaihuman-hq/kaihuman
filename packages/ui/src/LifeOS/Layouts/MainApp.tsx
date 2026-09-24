@@ -18,6 +18,14 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { githubFileStore, githubProfileStore, Logger, layoutStore } from '@lifosy/core';
+import type { ReadItLaterItem } from '@lifosy/formats';
+import {
+  addEventEntry,
+  addTodoEntry,
+  parseTimezones,
+  parseTodos,
+  serializeTimezones,
+} from '@lifosy/formats';
 import {
   Edit,
   FileText,
@@ -50,7 +58,17 @@ import { SettingsView } from '../Organisms/SettingsView';
 import { StatusBar } from '../Organisms/StatusBar';
 import { ActionLogWidget } from '../Organisms/Widgets/ActionLogWidget';
 import { BoardOverviewWidget } from '../Organisms/Widgets/BoardOverviewWidget';
+import { BookmarkAddForm } from '../Organisms/Widgets/BookmarkAddForm';
+import {
+  addBookmark,
+  collectTags as collectBookmarkTags,
+  parseBookmarks,
+  serializeBookmarks,
+} from '../Organisms/Widgets/BookmarksLogic';
+import { BookmarksWidget } from '../Organisms/Widgets/BookmarksWidget';
 import { BudgetWidget } from '../Organisms/Widgets/BudgetWidget';
+import { CommandPaletteSettingsWidget } from '../Organisms/Widgets/CommandPaletteSettingsWidget';
+import { CommandsWidget } from '../Organisms/Widgets/CommandsWidget';
 import { ConsumptionWidget } from '../Organisms/Widgets/ConsumptionWidget';
 import { CsvTableView } from '../Organisms/Widgets/CsvTableView';
 import { DataCollectionAddForm } from '../Organisms/Widgets/DataCollectionAddForm';
@@ -61,20 +79,17 @@ import {
 } from '../Organisms/Widgets/DataCollectionLogic';
 import { DataCollectionWidget } from '../Organisms/Widgets/DataCollectionWidget';
 import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
-import * as EventsLogic from '../Organisms/Widgets/EventsLogic';
 import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
 import { HabitTrackerWidget } from '../Organisms/Widgets/HabitTrackerWidget';
-import type { ReadItLaterItem } from '../Organisms/Widgets/ReadItLaterLogic';
+import { PromptsWidget } from '../Organisms/Widgets/PromptsWidget';
 import { ReadItLaterWidget } from '../Organisms/Widgets/ReadItLaterWidget';
 import { RssFeedManager, RssWidget } from '../Organisms/Widgets/RssWidget';
 import { StocksWidget } from '../Organisms/Widgets/StocksWidget';
 import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
 import { TimeTrackingWidget } from '../Organisms/Widgets/TimeTrackingWidget';
 import { TimezoneAddForm } from '../Organisms/Widgets/TimezoneAddForm';
-import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
 import { TimezoneWidget } from '../Organisms/Widgets/TimezoneWidget';
 import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
-import * as TodoLogic from '../Organisms/Widgets/TodoLogic';
 import { TodoWidget } from '../Organisms/Widgets/TodoWidget';
 import { AIPanel } from '../Templates/AIPanel';
 import type { DashboardConfig, DashboardEntry } from '../types';
@@ -724,6 +739,8 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.events.csv')) ext = '.events.csv';
       else if (lowerPath.endsWith('.habit.csv')) ext = '.habit.csv';
       else if (lowerPath.endsWith('.todos.md')) ext = '.todos.md';
+      else if (lowerPath.endsWith('.prompts.md')) ext = '.prompts.md';
+      else if (lowerPath.endsWith('.commands.md')) ext = '.commands.md';
       else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
       else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
@@ -732,6 +749,9 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.stocks.csv')) ext = '.stocks.csv';
       else if (lowerPath.endsWith('.consumption.csv')) ext = '.consumption.csv';
       else if (lowerPath.endsWith('.board-overview.json')) ext = '.board-overview.json';
+      else if (lowerPath.endsWith('.bookmarks.json')) ext = '.bookmarks.json';
+      else if (lowerPath.endsWith('command-palette.settings.json'))
+        ext = 'command-palette.settings.json';
       else {
         const parts = entry.path.split('.');
         if (lowerPath.endsWith('.enc') && parts.length > 2) {
@@ -866,6 +886,15 @@ abbreviations: undefined
         />
       );
     }
+    if (tile.extension?.toLowerCase() === '.bookmarks.json' && tile.rawContent) {
+      return (
+        <BookmarksWidget
+          content={tile.rawContent}
+          mode={mode}
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
       return (
         <ReadItLaterWidget
@@ -904,6 +933,58 @@ abbreviations: undefined
     if (tile.extension === '.actionlog.md' && tile.rawContent) {
       return (
         <ActionLogWidget
+          content={tile.rawContent}
+          mode={
+            mode === 'FOCUS'
+              ? 'FOCUS'
+              : mode === 'MOBILE_EXPANDED'
+                ? 'MOBILE_EXPANDED'
+                : mode === 'MOBILE_COLLAPSED'
+                  ? 'MOBILE_COLLAPSED'
+                  : 'SMALL'
+          }
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+
+    if (tile.extension === '.prompts.md' && tile.rawContent) {
+      return (
+        <PromptsWidget
+          content={tile.rawContent}
+          mode={
+            mode === 'FOCUS'
+              ? 'FOCUS'
+              : mode === 'MOBILE_EXPANDED'
+                ? 'MOBILE_EXPANDED'
+                : mode === 'MOBILE_COLLAPSED'
+                  ? 'MOBILE_COLLAPSED'
+                  : 'SMALL'
+          }
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+
+    if (tile.extension === 'command-palette.settings.json' && tile.rawContent) {
+      return (
+        <CommandPaletteSettingsWidget
+          content={tile.rawContent}
+          mode={
+            mode === 'MOBILE_EXPANDED'
+              ? 'MOBILE_EXPANDED'
+              : mode === 'MOBILE_COLLAPSED'
+                ? 'MOBILE_COLLAPSED'
+                : 'SMALL'
+          }
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+
+    if (tile.extension === '.commands.md' && tile.rawContent) {
+      return (
+        <CommandsWidget
           content={tile.rawContent}
           mode={
             mode === 'FOCUS'
@@ -1029,6 +1110,8 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.events.csv')) ext = '.events.csv';
       else if (lowerPath.endsWith('.habit.csv')) ext = '.habit.csv';
       else if (lowerPath.endsWith('.todos.md')) ext = '.todos.md';
+      else if (lowerPath.endsWith('.prompts.md')) ext = '.prompts.md';
+      else if (lowerPath.endsWith('.commands.md')) ext = '.commands.md';
       else if (lowerPath.endsWith('.timezones.json')) ext = '.timezones.json';
       else if (lowerPath.endsWith('.rss.json')) ext = '.rss.json';
       else if (lowerPath.endsWith('.data-collection.csv')) ext = '.data-collection.csv';
@@ -1036,6 +1119,9 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.actionlog.md')) ext = '.actionlog.md';
       else if (lowerPath.endsWith('.stocks.csv')) ext = '.stocks.csv';
       else if (lowerPath.endsWith('.consumption.csv')) ext = '.consumption.csv';
+      else if (lowerPath.endsWith('.bookmarks.json')) ext = '.bookmarks.json';
+      else if (lowerPath.endsWith('command-palette.settings.json'))
+        ext = 'command-palette.settings.json';
       else {
         const parts = entryPath.split('.');
         ext = parts.length > 1 ? `.${parts.slice(1).join('.').toLowerCase()}` : '';
@@ -2136,9 +2222,13 @@ const FocusedTileInternal = ({
   const isDataCollection = tile.extension === '.data-collection.csv';
   const isBudget = tile.extension === '.budget.csv';
   const isActionLog = tile.extension === '.actionlog.md';
+  const isPrompts = tile.extension === '.prompts.md';
+  const isCommands = tile.extension === '.commands.md';
+  const isPaletteSettings = tile.extension === 'command-palette.settings.json';
   const isStocks = tile.extension === '.stocks.csv';
   const isConsumption = tile.extension === '.consumption.csv';
   const isBoardOverview = tile.extension === '.board-overview.json';
+  const isBookmarks = tile.extension?.toLowerCase() === '.bookmarks.json';
 
   const isGenericCsv =
     tile.extension === '.csv' &&
@@ -2162,10 +2252,14 @@ const FocusedTileInternal = ({
     isDataCollection ||
     isBudget ||
     isActionLog ||
+    isPrompts ||
+    isCommands ||
+    isPaletteSettings ||
     isStocks ||
     isConsumption ||
     isAnyCsv || // && !!tile.rawContent;
-    isBoardOverview;
+    isBoardOverview ||
+    isBookmarks;
 
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const [viewMode, setViewMode] = useState<string>(
@@ -2175,10 +2269,7 @@ const FocusedTileInternal = ({
   const [showHistory, setShowHistory] = useState(false);
 
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
-  const parsedTodoData = useMemo(
-    () => TodoLogic.parseTodos(tile.rawContent || ''),
-    [tile.rawContent],
-  );
+  const parsedTodoData = useMemo(() => parseTodos(tile.rawContent || ''), [tile.rawContent]);
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const todoTags = useMemo(() => {
     const tags = new Set<string>();
@@ -2244,9 +2335,12 @@ const FocusedTileInternal = ({
     const _isDataCollection = tile.extension === '.data-collection.csv';
     const _isBudget = tile.extension === '.budget.csv';
     const _isActionLog = tile.extension === '.actionlog.md';
+    const _isPrompts = tile.extension === '.prompts.md';
+    const _isCommands = tile.extension === '.commands.md';
     const _isStocks = tile.extension === '.stocks.csv';
     const _isConsumption = tile.extension === '.consumption.csv';
     const _isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv');
+    const _isBookmarks = tile.extension?.toLowerCase() === '.bookmarks.json';
 
     const _hasWidget =
       _isTimeTracking ||
@@ -2259,9 +2353,12 @@ const FocusedTileInternal = ({
       _isDataCollection ||
       _isBudget ||
       _isActionLog ||
+      _isPrompts ||
+      _isCommands ||
       _isStocks ||
       _isConsumption ||
-      _isAnyCsv;
+      _isAnyCsv ||
+      _isBookmarks;
 
     if (viewMode === 'CODE') {
       // console.log('[FocusedTileInternal] ViewMode is CODE. HasWidget:', _hasWidget, 'RawContent length:', tile.rawContent?.length);
@@ -2522,6 +2619,21 @@ const FocusedTileInternal = ({
                   </button>
                 )}
 
+                {isBookmarks && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('ADD')}
+                    className={cn(
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'ADD'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+                    )}
+                  >
+                    ADD BOOKMARK
+                  </button>
+                )}
+
                 {(isEvents || isTodos || isTimezones || isDataCollection) && (
                   <button
                     type="button"
@@ -2557,6 +2669,36 @@ const FocusedTileInternal = ({
                     )}
                   >
                     ADD ACTION
+                  </button>
+                )}
+
+                {isPrompts && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('ADD')}
+                    className={cn(
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'ADD'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+                    )}
+                  >
+                    ADD PROMPT
+                  </button>
+                )}
+
+                {isCommands && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('ADD')}
+                    className={cn(
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'ADD'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+                    )}
+                  >
+                    ADD COMMAND
                   </button>
                 )}
 
@@ -2724,6 +2866,30 @@ const FocusedTileInternal = ({
                 }}
               />
             </div>
+          ) : isPrompts && (viewMode === 'WIDGET' || viewMode === 'ADD') ? (
+            <div className="flex flex-col min-h-full w-full p-8">
+              <PromptsWidget
+                content={tile.rawContent || ''}
+                mode={viewMode as any}
+                onChange={(c) => tile.onContentChange?.(c)}
+              />
+            </div>
+          ) : isPaletteSettings && viewMode === 'WIDGET' ? (
+            <div className="flex flex-col min-h-full w-full">
+              <CommandPaletteSettingsWidget
+                content={tile.rawContent || ''}
+                mode="FOCUS"
+                onChange={(c) => tile.onContentChange?.(c)}
+              />
+            </div>
+          ) : isCommands && (viewMode === 'WIDGET' || viewMode === 'ADD') ? (
+            <div className="flex flex-col min-h-full w-full p-8">
+              <CommandsWidget
+                content={tile.rawContent || ''}
+                mode={viewMode === 'ADD' ? 'ADD' : 'FOCUS'}
+                onChange={(c) => tile.onContentChange?.(c)}
+              />
+            </div>
           ) : isStocks && (viewMode === 'WIDGET' || viewMode === 'ADD') ? (
             <div className="flex flex-col min-h-full w-full">
               <StocksWidget
@@ -2814,6 +2980,13 @@ const FocusedTileInternal = ({
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
+              {isBookmarks && (
+                <BookmarksWidget
+                  content={tile.rawContent || ''}
+                  mode="FOCUS"
+                  onChange={(newContent) => tile.onContentChange?.(newContent)}
+                />
+              )}
               {isGenericCsv && <CsvTableView content={tile.rawContent || ''} />}
               {isBoardOverview && (
                 <BoardOverviewWidget
@@ -2828,16 +3001,30 @@ const FocusedTileInternal = ({
             <div className="flex flex-col min-h-full w-full p-8">
               <TimeTrackingCharts data={tile.rawContent as string} />
             </div>
+          ) : viewMode === 'ADD' && isBookmarks ? (
+            <div className="min-h-full w-full p-8 flex justify-center items-start">
+              <BookmarkAddForm
+                existingTags={collectBookmarkTags(parseBookmarks(tile.rawContent || '').bookmarks)}
+                onCancel={() => setViewMode('WIDGET')}
+                onAdd={(draft) => {
+                  try {
+                    const config = parseBookmarks(tile.rawContent || '');
+                    tile.onContentChange?.(serializeBookmarks(addBookmark(config, draft)));
+                    setViewMode('WIDGET');
+                    return undefined;
+                  } catch (e: any) {
+                    return e.message || 'Could not add the bookmark';
+                  }
+                }}
+              />
+            </div>
           ) : viewMode === 'ADD' && (isEvents || isTodos || isTimezones || isDataCollection) ? (
             <div className="min-h-full w-full p-8 flex justify-center items-start">
               {isEvents && (
                 <EventAddForm
                   onCancel={() => setViewMode('WIDGET')}
                   onAdd={(entry) => {
-                    const data = EventsLogic.parseEvents(tile.rawContent || '');
-                    data.entries.push(entry);
-                    const newContent = EventsLogic.serializeEvents(data);
-                    tile.onContentChange?.(newContent);
+                    tile.onContentChange?.(addEventEntry(tile.rawContent || '', entry));
                     setViewMode('WIDGET');
                   }}
                 />
@@ -2849,15 +3036,12 @@ const FocusedTileInternal = ({
                   todosFilePath={String(tile.id)}
                   onCancel={() => setViewMode('WIDGET')}
                   onAdd={async (text, tags, milestoneId, promptRef) => {
-                    const data = TodoLogic.parseTodos(tile.rawContent || '');
-                    const newData = TodoLogic.addTodo(
-                      data,
+                    const newContent = addTodoEntry(tile.rawContent || '', {
                       text,
                       tags,
                       milestoneId,
-                      promptRef?.prompt,
-                    );
-                    const newContent = TodoLogic.serializeTodos(newData);
+                      prompt: promptRef?.prompt,
+                    });
                     // Update store directly and await save before creating the prompt
                     // file — running both concurrently causes a 409 Conflict on GitHub.
                     githubFileStore.updateFileContent(String(tile.id), newContent);
@@ -2878,9 +3062,9 @@ const FocusedTileInternal = ({
                 <TimezoneAddForm
                   onCancel={() => setViewMode('WIDGET')}
                   onAdd={(entry) => {
-                    const data = TimezoneLogic.parseTimezones(tile.rawContent || '');
+                    const data = parseTimezones(tile.rawContent || '');
                     data.timezones.push(entry);
-                    const newContent = TimezoneLogic.serializeTimezones(data);
+                    const newContent = serializeTimezones(data);
                     tile.onContentChange?.(newContent);
                     setViewMode('WIDGET');
                   }}

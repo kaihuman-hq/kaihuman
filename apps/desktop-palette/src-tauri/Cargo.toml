@@ -1,0 +1,45 @@
+[package]
+name = "desktop-palette"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "The Lifosy command palette as a desktop overlay (wlr-layer-shell), toggled from a key."
+
+[lib]
+# Only the socket protocol: the toggle client links this and nothing heavier.
+name = "desktop_palette"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lifosy-palette"
+path = "src/main.rs"
+
+[[bin]]
+name = "lifosy-palette-toggle"
+path = "src/bin/lifosy-palette-toggle.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+base64 = "0.22"
+url = "2"
+percent-encoding = "2"
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
+rpassword = "7"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

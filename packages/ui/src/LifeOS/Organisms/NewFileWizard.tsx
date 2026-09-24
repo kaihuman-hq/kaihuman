@@ -1,4 +1,5 @@
 import { encrypt, Logger, passwordStore } from '@lifosy/core';
+import { DEFAULT_PALETTE_SETTINGS, serializePaletteSettings } from '@lifosy/formats';
 import {
   Activity,
   AlertTriangle,
@@ -6,13 +7,17 @@ import {
   Bookmark,
   Calendar,
   ClipboardList,
+  Command,
   Database,
   FileText,
   Globe,
   Kanban,
   ListTodo,
   Lock,
+  MessageSquareQuote,
   Rss,
+  Star,
+  Terminal,
   TrendingUp,
   X,
   Zap,
@@ -32,6 +37,9 @@ interface Template {
   icon: any;
   extension: string;
   defaultContent: string;
+  /** For a file read from one place: filled in when the template is picked, still editable. */
+  suggestedFilename?: string;
+  suggestedFolder?: string;
 }
 
 const TEMPLATES: Template[] = [
@@ -50,6 +58,23 @@ const TEMPLATES: Template[] = [
     icon: ClipboardList,
     extension: '.actionlog.md',
     defaultContent: '---\n---\n\n# Action Log\n\n',
+  },
+  {
+    id: 'prompts',
+    name: 'Prompts',
+    description: 'A searchable library of reusable prompts with tags',
+    icon: MessageSquareQuote,
+    extension: '.prompts.md',
+    defaultContent: '# Prompts\n',
+  },
+  {
+    id: 'commands',
+    name: 'Commands',
+    description:
+      'Shell commands with {{name}} parameters — copy them, or run them from the desktop palette',
+    icon: Terminal,
+    extension: '.commands.md',
+    defaultContent: '# Commands\n',
   },
   {
     id: 'todo',
@@ -124,6 +149,25 @@ const TEMPLATES: Template[] = [
     icon: Bookmark,
     extension: '.readitlater.json',
     defaultContent: JSON.stringify({ items: [] }, null, 2),
+  },
+  {
+    id: 'bookmarks',
+    name: 'Bookmarks',
+    description: 'Tagged, searchable bookmarks. Synced into the browser extension.',
+    icon: Star,
+    extension: '.bookmarks.json',
+    defaultContent: JSON.stringify({ bookmarks: [], updatedAt: '' }, null, 2),
+  },
+  {
+    id: 'command-palette-settings',
+    name: 'Command Palette Settings',
+    description:
+      'Search engines and link tools (like >l Tsuga logs) for the extension and desktop palettes. Read from .kh/command-palette.settings.json.',
+    icon: Command,
+    extension: '.settings.json',
+    defaultContent: serializePaletteSettings(DEFAULT_PALETTE_SETTINGS),
+    suggestedFilename: 'command-palette',
+    suggestedFolder: '.kh',
   },
   {
     id: 'board-overview',
@@ -318,6 +362,9 @@ export const NewFileWizard = ({
                     key={t.id}
                     onClick={() => {
                       setSelectedTemplate(t);
+                      if (t.suggestedFilename && !filename) setFilename(t.suggestedFilename);
+                      if (t.suggestedFolder && !selectedFolder)
+                        setSelectedFolder(t.suggestedFolder);
                       setStep('LOCATION');
                     }}
                     className="flex flex-col items-start gap-4 p-4 border border-[var(--los-border)] hover:border-[var(--los-accent)] hover:bg-[var(--los-accent)]/5 transition-all text-left group"

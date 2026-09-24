@@ -12,7 +12,13 @@ pub async fn sync_repo(config_dir: &Path, owner: &str, repo: &str, token: &str) 
     if repo_dir.join(".git").exists() {
         // Repo already cloned — pull latest
         let output = Command::new("git")
-            .args(["-C", repo_dir.to_str().unwrap_or(""), "pull", "--ff-only", "--quiet"])
+            .args([
+                "-C",
+                repo_dir.to_str().unwrap_or(""),
+                "pull",
+                "--ff-only",
+                "--quiet",
+            ])
             .output()
             .await
             .context("Failed to run git pull")?;

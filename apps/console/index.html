@@ -14,8 +14,12 @@
        @layer rule the browser sees. The bundler hoists Cascivo's component CSS
        (pulled in as a component dependency) above the same declaration in
        index.css, so declaring it here — inline in <head>, before the bundled
-       stylesheet — is the only place guaranteed to win. -->
-  <style>@layer theme, base, components, utilities, cascivo.tokens, cascivo.base, cascivo.theme, cascivo.component;</style>
+       stylesheet — is the only place guaranteed to win.
+       cascivo.reset (box-sizing + body margin, shipped since @cascivo/tokens
+       1.x) is named FIRST so it stays the floor Cascivo documents it to be;
+       left unnamed it would be appended last and outrank Tailwind's
+       utilities. -->
+  <style>@layer cascivo.reset, theme, base, components, utilities, cascivo.tokens, cascivo.base, cascivo.theme, cascivo.component;</style>
 </head>
 
 <body>

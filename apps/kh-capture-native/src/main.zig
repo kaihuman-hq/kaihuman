@@ -224,7 +224,7 @@ fn buildCapture(model: *Model, text: []const u8) void {
     var md_buf: [1024]u8 = undefined;
     const md = std.fmt.bufPrint(
         &md_buf,
-        "---\ntype: note\ntitle: \"{s}\"\nurl: ''\ndate: {s}\nprocessed: false\ntags: [general]\n---\n\n{s}\n",
+        "---\ntitle: \"{s}\"\nurl: ''\ndate: {s}\nprocessed: false\ntags: [general]\n---\n\n{s}\n",
         .{ title, date, text },
     ) catch text;
     model.md_body.set(md);

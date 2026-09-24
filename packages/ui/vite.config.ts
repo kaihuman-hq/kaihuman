@@ -34,6 +34,7 @@ export default defineConfig({
         'clsx',
         'tailwind-merge',
         '@lifosy/core',
+        '@lifosy/formats',
         '@preact/signals',
         '@preact/signals-react',
         '@preact/signals-react/runtime',

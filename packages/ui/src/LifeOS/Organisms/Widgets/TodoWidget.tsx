@@ -1,4 +1,19 @@
 import {
+  getVisibleTodos,
+  type Milestone,
+  migrateLegacyFormat,
+  NEXT_STATUS,
+  parseTodos,
+  STATUS_LABELS,
+  serializeTodos,
+  setMilestone,
+  setPrompt,
+  setStatus,
+  type TodoData,
+  type TodoItem,
+  type TodoStatus,
+} from '@lifosy/formats';
+import {
   AlertTriangle,
   Check,
   CheckCircle2,
@@ -19,21 +34,6 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
 import { CompactList, CompactWidgetLayout } from './CompactWidgetLayout';
-import {
-  getVisibleTodos,
-  type Milestone,
-  migrateLegacyFormat,
-  NEXT_STATUS,
-  parseTodos,
-  STATUS_LABELS,
-  serializeTodos,
-  setMilestone,
-  setPrompt,
-  setStatus,
-  type TodoData,
-  type TodoItem,
-  type TodoStatus,
-} from './TodoLogic';
 
 export interface TodoWidgetProps {
   content: string;

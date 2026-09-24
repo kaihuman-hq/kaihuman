@@ -17,13 +17,17 @@
     "verify": "pnpm run fix && pnpm run build && pnpm run lint && pnpm run format && pnpm run check-types"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.3.11",
+    "@types/node": "^24.10.1",
     "fake-indexeddb": "^6.0.0",
     "jsdom": "^29.1.1",
     "playwright": "^1.56.1",
-    "turbo": "^2.7.4",
-    "typescript": "5.9.2"
+    "turbo": "^2.10.12",
+    "typescript": "5.9.2",
+    "vite": "^7.3.1",
+    "vitest": "^4.1.4"
   },
-  "packageManager": "pnpm@10.28.0",
+  "packageManager": "pnpm@12.4.1",
   "engines": {
     "node": ">=18"
   }

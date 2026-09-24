@@ -164,7 +164,7 @@ const CaptureTab = () => (
       />
       <CmdRow
         cmd="Browser extension"
-        label="Pin the current article to the inbox with one click (type: article)."
+        label="Pin the current article to the inbox with one click; images saved to .kh/assets/."
       />
     </Section>
     <Section title="Home-screen shortcuts">
@@ -221,12 +221,16 @@ const CommandsTab = () => (
         label="Rebuild .kh/search.kb.json (inverted keyword index) from all wiki pages. Run after every ingest."
       />
       <CmdRow
-        cmd="/kb-ask <question>"
-        label="Answer a question from the wiki using the search index, with citations."
+        cmd="/kb-ask <question> [--save]"
+        label="Answer from the wiki with citations; --save files the answer back as a question page."
       />
       <CmdRow
         cmd="/kb-lint"
-        label="Audit and repair: orphans, dead links, missing sources, topic drift, index drift."
+        label="Audit and repair: contradictions, stale claims, orphans, dead links, gaps — and suggest what to research next."
+      />
+      <CmdRow
+        cmd="/kb-digest [period]"
+        label="Summarize the repo's tracked personal data (habits, todos, action log…) into a raw source for ingestion."
       />
       <CmdRow
         cmd="/kb-session"

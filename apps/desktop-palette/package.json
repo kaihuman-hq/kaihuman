@@ -1,0 +1,16 @@
+{
+  "name": "desktop-palette",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "check-types": "tsc --noEmit",
+    "lint": "biome check .",
+    "build:desktop": "vite build && cargo build --release --manifest-path src-tauri/Cargo.toml",
+    "test:desktop": "vite build && cargo test --manifest-path src-tauri/Cargo.toml"
+  },
+  "dependencies": {
+    "@lifosy/palette": "workspace:*"
+  }
+}

@@ -8,9 +8,9 @@ interface KBCommandsModalProps {
 const COMMANDS = [
   {
     name: '/kb-ingest',
-    description: 'Compile raw articles into wiki pages.',
+    description: 'Compile raw sources into wiki pages, discussing each one with you.',
     detail:
-      'Reads files from .kh/raw/, extracts key concepts, creates or updates .kh/wiki/ pages with backlinks, updates .kh/index.kb.md, appends notes to .kh/log.md, then moves each file to .kh/raw/processed/. Run /kb-index afterwards.',
+      'Goes through .kh/raw/ one source at a time: shows key takeaways, planned page changes and contradictions, and waits for your input. Then writes a source page, updates entity, concept and topic pages with backlinks, updates .kh/index.kb.md, logs to .kh/log.md and moves the file to .kh/raw/processed/. Pass a filename to ingest one source, or --batch to skip the discussion. Run /kb-index afterwards.',
   },
   {
     name: '/kb-index',
@@ -20,15 +20,21 @@ const COMMANDS = [
   },
   {
     name: '/kb-lint',
-    description: 'Audit and repair the knowledge base.',
+    description: 'Audit and repair the knowledge base, and suggest what to research next.',
     detail:
-      'Checks for contradictions, orphaned pages, dead links, missing cross-references, and index drift. Auto-repairs where possible. Appends an audit/repair summary to .kh/log.md.',
+      'Checks for contradictions, stale claims, orphaned pages, dead links, missing pages and cross-references, invalid frontmatter, and index drift. Auto-repairs where possible and ends with questions and sources worth pursuing. Appends a summary to .kh/log.md.',
   },
   {
-    name: '/kb-ask <question>',
+    name: '/kb-ask <question> [--save]',
     description: 'Answer a question using the knowledge base.',
     detail:
-      'If .kh/search.kb.json exists, tokenizes the question and ranks wiki pages by keyword match count, then reads the top 5. Falls back to .kh/index.kb.md if the index is missing. Returns an answer with citations.',
+      'If .kh/search.kb.json exists, tokenizes the question and ranks wiki pages by keyword match count, then reads the top 5. Falls back to .kh/index.kb.md if the index is missing. Returns an answer with citations. With --save (or when you accept the offer), files the answer as a question page in .kh/wiki/ so it builds on itself.',
+  },
+  {
+    name: '/kb-digest [period]',
+    description: 'Summarise your tracked personal data into a raw source.',
+    detail:
+      'Reads action logs, notes, todos, habits, measurements, consumption and events for the period (default: since the last digest) without changing them, and writes .kh/raw/<date>-digest-<period>.md tagged personal. Accepts YYYY-MM-DD..YYYY-MM-DD or an ISO week like 2026-W38. Run /kb-ingest afterwards.',
   },
   {
     name: '/kb-session',
@@ -72,8 +78,9 @@ export function KBCommandsModal({ isOpen, onClose }: KBCommandsModalProps) {
             <p class="font-bold text-[var(--los-fg)] mb-1">General flow</p>
             <ol class="list-decimal list-inside space-y-1">
               <li>
-                Articles land in <code class="text-[var(--los-accent)]">.kh/raw/</code> via the
-                browser extension or the "Add note" button.
+                Sources land in <code class="text-[var(--los-accent)]">.kh/raw/</code> via the
+                browser extension, the "Add note" button, or{' '}
+                <code class="text-[var(--los-accent)]">/kb-digest</code> for your own tracked data.
               </li>
               <li>
                 Run <code class="text-[var(--los-accent)]">/kb-ingest</code> to compile inbox
@@ -89,7 +96,8 @@ export function KBCommandsModal({ isOpen, onClose }: KBCommandsModalProps) {
               </li>
               <li>
                 Run <code class="text-[var(--los-accent)]">/kb-ask</code> to query the knowledge
-                base by question.
+                base by question; add <code class="text-[var(--los-accent)]">--save</code> to keep
+                the answer as a wiki page.
               </li>
               <li>
                 Run <code class="text-[var(--los-accent)]">/kb-session</code> at end of session to

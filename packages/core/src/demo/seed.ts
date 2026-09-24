@@ -239,6 +239,44 @@ function dataCollection(now: Date): string {
   return `${lines.join('\n')}\n`;
 }
 
+function bookmarks(now: Date): string {
+  // useCount is what the browser extension syncs back, and what makes "least used" worth sorting
+  // by — one never-opened entry so the demo shows what a candidate for deletion looks like.
+  const bookmark = (
+    id: number,
+    url: string,
+    title: string,
+    tags: string[],
+    dayOff: number,
+    useCount: number,
+  ) => {
+    const createdAt = addDays(now, dayOff).toISOString();
+    return {
+      id: `bm-${id}`,
+      title,
+      url,
+      tags,
+      createdAt,
+      updatedAt: createdAt,
+      useCount,
+      lastUsedAt: useCount > 0 ? addDays(now, Math.max(dayOff, -2)).toISOString() : '',
+    };
+  };
+  return `${JSON.stringify(
+    {
+      bookmarks: [
+        bookmark(1, 'https://vitest.dev/guide/', 'Vitest Guide', ['testing', 'dev'], -1, 12),
+        bookmark(2, 'https://biomejs.dev/linter/rules/', 'Biome lint rules', ['dev'], -4, 3),
+        bookmark(3, 'https://turborepo.dev/docs', 'Turborepo docs', ['dev', 'monorepo'], -9, 1),
+        bookmark(4, 'https://news.ycombinator.com/', 'Hacker News', ['reading'], -20, 0),
+      ],
+      updatedAt: now.toISOString(),
+    },
+    null,
+    2,
+  )}\n`;
+}
+
 function readItLater(now: Date): string {
   const ts = now.getTime();
   const item = (
@@ -378,6 +416,7 @@ function dashboardConfig(): DashboardConfig {
     { path: '.kh/utilities.consumption.csv', dashboard: 'finance' },
     { path: '.kh/metrics.data-collection.csv', dashboard: 'finance' },
     { path: '.kh/reading.readitlater.json', dashboard: 'reading' },
+    { path: '.kh/browser.bookmarks.json', dashboard: 'reading' },
     { path: '.kh/news.rss.json', dashboard: 'reading' },
   ];
   return {
@@ -449,6 +488,7 @@ export function buildDemoSeed(now: Date = new Date()): DemoSeed {
     '.kh/utilities.consumption.csv': consumption(now),
     '.kh/metrics.data-collection.csv': dataCollection(now),
     '.kh/reading.readitlater.json': readItLater(now),
+    '.kh/browser.bookmarks.json': bookmarks(now),
     '.kh/news.rss.json': rss(),
     'README.md': README,
     'notes/welcome.md': WELCOME,

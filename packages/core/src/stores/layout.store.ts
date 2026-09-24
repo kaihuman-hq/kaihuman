@@ -149,10 +149,14 @@ export class LayoutStore {
       const isReadItLater = item.path.toLowerCase().endsWith('.readitlater.json');
       const isBudget = item.path.toLowerCase().endsWith('.budget.csv');
       const isActionLog = item.path.toLowerCase().endsWith('.actionlog.md');
+      const isPrompts = item.path.toLowerCase().endsWith('.prompts.md');
+      const isCommands = item.path.toLowerCase().endsWith('.commands.md');
+      const isPaletteSettings = item.path.toLowerCase().endsWith('command-palette.settings.json');
       const isDataCollection = item.path.toLowerCase().endsWith('.data-collection.csv');
       const isStocks = item.path.toLowerCase().endsWith('.stocks.csv');
       const isConsumption = item.path.toLowerCase().endsWith('.consumption.csv');
       const isBoardOverview = item.path.toLowerCase().endsWith('.board-overview.json');
+      const isBookmarks = item.path.toLowerCase().endsWith('.bookmarks.json');
 
       // Use compound extension for known widget types; fall back to last segment
       let extension: string | undefined;
@@ -164,10 +168,14 @@ export class LayoutStore {
       else if (isReadItLater) extension = '.readitlater.json';
       else if (isBudget) extension = '.budget.csv';
       else if (isActionLog) extension = '.actionlog.md';
+      else if (isPrompts) extension = '.prompts.md';
+      else if (isCommands) extension = '.commands.md';
+      else if (isPaletteSettings) extension = 'command-palette.settings.json';
       else if (isDataCollection) extension = '.data-collection.csv';
       else if (isStocks) extension = '.stocks.csv';
       else if (isConsumption) extension = '.consumption.csv';
       else if (isBoardOverview) extension = '.board-overview.json';
+      else if (isBookmarks) extension = '.bookmarks.json';
       else extension = item.path.includes('.') ? `.${item.path.split('.').pop()}` : undefined;
 
       const tile: TileDef = {
@@ -195,7 +203,8 @@ export class LayoutStore {
         isDataCollection ||
         isStocks ||
         isConsumption ||
-        isBoardOverview;
+        isBoardOverview ||
+        isBookmarks;
 
       if (isWidget && openFiles && openFiles[item.path]) {
         tile.rawContent = openFiles[item.path]?.content;

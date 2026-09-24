@@ -1,5 +1,21 @@
 import { githubFileStore, layoutStore } from '@lifosy/core';
 import {
+  addMilestone,
+  addTodoEntry,
+  getUpcomingMilestone,
+  type Milestone,
+  parseTodos,
+  removeMilestone,
+  STATUS_LABELS,
+  serializeTodos,
+  setMilestone,
+  setStatus,
+  type TodoData,
+  type TodoItem,
+  type TodoStatus,
+  updateTodoText,
+} from '@lifosy/formats';
+import {
   ArrowLeft,
   BarChart2,
   CalendarDays,
@@ -20,22 +36,6 @@ import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
-import {
-  addMilestone,
-  addTodo,
-  getUpcomingMilestone,
-  type Milestone,
-  parseTodos,
-  removeMilestone,
-  STATUS_LABELS,
-  serializeTodos,
-  setMilestone,
-  setStatus,
-  type TodoData,
-  type TodoItem,
-  type TodoStatus,
-  updateTodoText,
-} from '../Organisms/Widgets/TodoLogic';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -549,7 +549,9 @@ const AddTaskModal = ({
               onChange={(e) => setCreateAnother(e.currentTarget.checked)}
               className="accent-[var(--los-accent)] w-4 h-4 shrink-0"
             />
-            <MonoLabel className="cursor-pointer text-[10px]">CREATE ANOTHER AFTER SAVING</MonoLabel>
+            <MonoLabel className="cursor-pointer text-[10px]">
+              CREATE ANOTHER AFTER SAVING
+            </MonoLabel>
           </label>
           <button
             type="button"
@@ -1283,10 +1285,8 @@ export const KanbanBoard = ({
   ) => {
     const file = openFiles[filePath];
     if (!file) return;
-    const data = parseTodos(file.content);
     const prompt = promptRefFile ? { lines: [], refFile: promptRefFile } : undefined;
-    const newData = addTodo(data, text, tags, undefined, prompt);
-    githubFileStore.updateFileContent(filePath, serializeTodos(newData));
+    githubFileStore.updateFileContent(filePath, addTodoEntry(file.content, { text, tags, prompt }));
     await githubFileStore.saveFile(filePath);
   };
 

@@ -1,5 +1,6 @@
 import { githubFileStore } from '@lifosy/core';
-import { addTodo, parseTodos, StatusBar, serializeTodos } from '@lifosy/ui';
+import { addTodoEntry } from '@lifosy/formats';
+import { StatusBar } from '@lifosy/ui';
 import { ArrowLeft } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
@@ -55,9 +56,7 @@ export const QuickTodoPage = () => {
         .split(/[\s,]+/)
         .map((t) => t.replace(/^#/, '').trim().toLowerCase())
         .filter(Boolean);
-      const data = parseTodos(baseContent);
-      const newData = addTodo(data, trimmed, parsedTags);
-      const serialized = serializeTodos(newData);
+      const serialized = addTodoEntry(baseContent, { text: trimmed, tags: parsedTags });
 
       if (existingFile) {
         githubFileStore.updateFileContent(path, serialized);

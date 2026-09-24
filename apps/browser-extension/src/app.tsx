@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'preact/hooks';
+import { CONSOLE_URL } from './console';
 import { ActionLogForm } from './components/ActionLogForm';
+import { BookmarkPageForm } from './components/BookmarkPageForm';
+import { QuickActions } from './components/QuickActions';
+import { PinnedTabsPanel } from './components/PinnedTabsPanel';
+import { imagesEnabled, KB_IMAGES_SETTING } from './background/kb-capture';
 import './index.css';
 
 export function App() {
@@ -12,8 +17,16 @@ export function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [quickNotes, setQuickNotes] = useState<string[]>([]);
   const [selectedNote, setSelectedNote] = useState<string>('.lifeos/dump.md');
+  // The star opens a view of its own rather than growing the popup with another form.
+  const [view, setView] = useState<'main' | 'bookmark'>('main');
+  const [downloadImages, setDownloadImages] = useState(true);
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'failed'>('idle');
 
   useEffect(() => {
+    chrome.storage.local.get([KB_IMAGES_SETTING], (result) => {
+      setDownloadImages(imagesEnabled(result[KB_IMAGES_SETTING]));
+    });
+
     // Check for auth token, repo, and repos
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', 'lifeos_repos'], (result) => {
       const storedToken = (result.lifeos_token as string) || null;
@@ -66,6 +79,14 @@ export function App() {
       }
     });
 
+    // Opening the popup is the other moment the extension checks GitHub. The worker still holds
+    // to its hourly budget, so this is a no-op on a cache that is still fresh.
+    chrome.runtime.sendMessage({ type: 'SYNC_NOW' }, () => {
+      if (chrome.runtime.lastError) {
+        console.warn('LifeOS Extension: sync check failed', chrome.runtime.lastError.message);
+      }
+    });
+
     // Fetch quick notes
     chrome.runtime.sendMessage({ type: 'FETCH_QUICK_NOTES' }, (response) => {
       if (response && response.quickNotes) {
@@ -75,7 +96,23 @@ export function App() {
   }, []);
 
   const handleLogin = () => {
-    chrome.tabs.create({ url: 'https://app.kaihuman.com/extension-onboarded' }); // Or localhost if dev
+    chrome.tabs.create({ url: `${CONSOLE_URL}/extension-onboarded` }); // Or localhost if dev
+  };
+
+  // A popup cannot follow a link without navigating itself, so the title opens the app in a tab.
+  const handleOpenConsole = () => {
+    chrome.tabs.create({ url: CONSOLE_URL });
+  };
+
+  // Opening the popup already checks, but only within the hourly budget. Asking outright is not
+  // background traffic, so this one ignores it.
+  const handleSyncNow = () => {
+    setSyncState('syncing');
+    chrome.runtime.sendMessage({ type: 'SYNC_NOW', force: true }, (response) => {
+      const failure = chrome.runtime.lastError?.message || response?.error;
+      setSyncState(failure ? 'failed' : 'done');
+      setTimeout(() => setSyncState('idle'), 2000);
+    });
   };
 
   const handleRepoChange = (e: any) => {
@@ -89,18 +126,25 @@ export function App() {
     setStatus('saving');
     setErrorMessage(null);
     try {
-      const [result] = await chrome.scripting.executeScript({
-        target: { tabId: activeTab.tabId },
-        func: () => ({
-          title: document.title,
-          url:
-            (document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null)?.href ||
-            window.location.href,
-          text: (document.body?.innerText ?? '').trim(),
-        }),
-      });
-      if (!result?.result) throw new Error('Cannot read page content — restricted page?');
-      chrome.runtime.sendMessage({ type: 'PIN_ARTICLE', ...result.result }, (response) => {
+      // The content script converts the page to Markdown; tabs opened before the extension was
+      // installed have no content script, so those fall back to plain text.
+      const article = await chrome.tabs
+        .sendMessage(activeTab.tabId, { type: 'EXTRACT_ARTICLE' })
+        .catch(async () => {
+          const [result] = await chrome.scripting.executeScript({
+            target: { tabId: activeTab.tabId },
+            func: () => ({
+              title: document.title,
+              url: '',
+              text: (document.body?.innerText ?? '').trim(),
+              images: [],
+            }),
+          });
+          return result?.result;
+        });
+      if (!article) throw new Error('Cannot read page content — restricted page?');
+      const pinned = { ...article, url: article.url || activeTab.url };
+      chrome.runtime.sendMessage({ type: 'PIN_ARTICLE', ...pinned }, (response) => {
         if (chrome.runtime.lastError || response?.error) {
           const err = chrome.runtime.lastError?.message || response?.error || 'Unknown error';
           setErrorMessage(err);
@@ -114,6 +158,25 @@ export function App() {
       setErrorMessage(e.message || 'Unknown error');
       setStatus('error');
     }
+  };
+
+  // Only the link and title go to the read-later list, so unlike pinning there is no page to read.
+  const handleSaveForLater = () => {
+    if (!token || !activeTab) return;
+    setStatus('saving');
+    setErrorMessage(null);
+    chrome.runtime.sendMessage(
+      { type: 'READ_LATER_ADD', url: activeTab.url, title: activeTab.title },
+      (response) => {
+        if (chrome.runtime.lastError || response?.error) {
+          setErrorMessage(chrome.runtime.lastError?.message || response?.error || 'Unknown error');
+          setStatus('error');
+        } else {
+          setStatus('success');
+          setTimeout(() => setStatus('idle'), 2000);
+        }
+      },
+    );
   };
 
   const handleDumpNote = async () => {
@@ -183,12 +246,47 @@ export function App() {
     );
   }
 
+  if (view === 'bookmark') {
+    return (
+      <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
+        <BookmarkPageForm
+          page={activeTab}
+          repo={activeRepo || 'lifosy/monorepo'}
+          onClose={() => setView('main')}
+        />
+      </div>
+    );
+  }
+
   return (
     <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
       <header class="flex items-center justify-between mb-4 pb-2 border-b border-[var(--los-border)]">
-        <span class="font-bold text-[var(--los-accent)] tracking-tight">kaihuman</span>
+        <button
+          type="button"
+          onClick={handleOpenConsole}
+          class="font-bold text-[var(--los-accent)] tracking-tight hover:underline"
+          title={`Open ${CONSOLE_URL}`}
+        >
+          kaihuman
+        </button>
         <div class="flex flex-col items-end gap-1">
-          <span class="text-xs text-[var(--los-success)] animate-pulse">● Connected</span>
+          <div class="flex items-center gap-2">
+            <button
+              onClick={handleSyncNow}
+              disabled={syncState === 'syncing'}
+              class="text-[10px] text-[var(--los-fg-dim)] hover:text-[var(--los-accent)] disabled:opacity-50 transition-colors"
+              title="Fetch from GitHub and push what has been counted, ignoring the hourly budget"
+            >
+              {syncState === 'syncing'
+                ? 'Syncing…'
+                : syncState === 'done'
+                  ? 'Synced'
+                  : syncState === 'failed'
+                    ? 'Sync failed'
+                    : '↻ Sync now'}
+            </button>
+            <span class="text-xs text-[var(--los-success)] animate-pulse">● Connected</span>
+          </div>
           {repos.length > 0 ? (
             <select
               value={activeRepo || 'lifosy/monorepo'}
@@ -208,20 +306,33 @@ export function App() {
       </header>
 
       <div class="space-y-6 flex-1">
-        {/* Read It Later Section */}
-        <section class="space-y-2">
-          <h2 class="text-sm font-bold text-[var(--los-fg-dim)]">Read It Later</h2>
-          <div class="p-3 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]">
-            <div class="text-xs text-[var(--los-fg-dim)] line-clamp-2 mb-2">{activeTab?.title || 'No active tab'}</div>
-            <button
-              onClick={handleReadItLater}
-              disabled={status === 'saving'}
-              class="w-full py-1.5 px-3 bg-[var(--los-bg)] hover:bg-[var(--los-border)] text-[var(--los-fg)] border border-[var(--los-border)] text-xs rounded transition-colors flex items-center justify-center gap-2"
-            >
-              {status === 'saving' ? 'Saving...' : status === 'success' ? 'Saved!' : 'Pin to Knowledge Base'}
-            </button>
+        <QuickActions
+          pageTitle={activeTab?.title || ''}
+          onPin={handleReadItLater}
+          onBookmark={() => setView('bookmark')}
+          onReadLater={handleSaveForLater}
+          status={status}
+        />
+        <label class="flex items-center gap-2 text-[10px] text-[var(--los-fg-dim)] font-mono cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={downloadImages}
+            onChange={(e) => {
+              const enabled = (e.target as HTMLInputElement).checked;
+              setDownloadImages(enabled);
+              chrome.storage.local.set({ [KB_IMAGES_SETTING]: enabled });
+            }}
+          />
+          Save page images with pinned pages
+        </label>
+
+        {status === 'error' && errorMessage && (
+          <div class="text-[10px] text-red-400 p-2 bg-red-950/30 rounded border border-red-900/50 break-words">
+            {errorMessage}
           </div>
-        </section>
+        )}
+
+        <PinnedTabsPanel repo={activeRepo || 'lifosy/monorepo'} />
 
         {/* Dump Note Section */}
         <section class="space-y-2 flex flex-col flex-1">

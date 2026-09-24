@@ -1,16 +1,16 @@
 import { githubFileStore, layoutStore } from '@lifosy/core';
+import {
+  type ActionLogEntry,
+  type ActionLogFile,
+  addActionLogEntry,
+  parseActionLog,
+  serializeActionLog,
+} from '@lifosy/formats';
 import { ArrowLeft, Plus, Search, Tag, X } from 'lucide-preact';
 import { Fragment } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
-import {
-  type ActionLogEntry,
-  type ActionLogFile,
-  appendAction,
-  parseActionLog,
-  serializeActionLog,
-} from '../Organisms/Widgets/ActionLogLogic';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -384,9 +384,7 @@ export const ActionLogView = ({ onNavigateBack }: ActionLogViewProps) => {
   // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleAddEntry = async (filePath: string, description: string, tags: string[]) => {
     const existingFile = githubFileStore.openFiles.peek()[filePath];
-    const data = parseActionLog(existingFile?.content ?? '');
-    const newData = appendAction(data, description, tags);
-    const serialized = serializeActionLog(newData);
+    const serialized = addActionLogEntry(existingFile?.content ?? '', { description, tags });
     if (existingFile) {
       githubFileStore.updateFileContent(filePath, serialized);
       await githubFileStore.saveFile(filePath);

@@ -1,9 +1,9 @@
 import { githubFileStore, layoutStore } from '@lifosy/core';
+import { parseTodos, type TodoStatus } from '@lifosy/formats';
 import { CheckCircle2, Circle, Clock, ExternalLink, PlayCircle, XCircle } from 'lucide-preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../../Atoms/Typography';
-import { parseTodos, type TodoStatus } from './TodoLogic';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 

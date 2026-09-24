@@ -132,3 +132,27 @@ The CLI understands this structure:
 ```
 
 `files` lists primary files always shown at the top of the dashboard view.
+
+## Knowledge base MCP server (`apps/kb-mcp`)
+
+A stdio MCP server that exposes a repo's `.kh/` knowledge base (falls back to `.lifeos/`) to Claude
+Code or any MCP client. It works on a local clone — for example the CLI's
+`~/.config/com/lifosy/cli/repos/<owner>/<repo>`.
+
+```sh
+pnpm --filter @lifosy/kb-mcp build
+claude mcp add lifosy-kb -- node /path/to/monorepo/apps/kb-mcp/dist/index.js --repo /path/to/clone
+```
+
+The repo path comes from `--repo`, then `KB_REPO_PATH`, then the current directory.
+
+| Tool | Does |
+|------|------|
+| `kb_search {query, limit?}` | Ranks wiki pages (title, tags, `search.kb.json`, body) |
+| `kb_read {page}` | A page by filename, slug or title, with its backlinks |
+| `kb_list {type?, tag?}` | Pages with title, type, tags and updated date |
+| `kb_index` | `index.kb.md` |
+| `kb_log {limit?}` | Parsed `log.md` entries, newest first |
+| `kb_add_raw {title, text, url?, tags?}` | Writes a new `raw/<epoch>-<slug>.md` source; nothing else is written |
+
+See `apps/kb-mcp/README.md` for a `.mcp.json` snippet.
