@@ -232,6 +232,30 @@ describe('writes from the start page', () => {
     expect(JSON.parse(remote['.kh/reading.readitlater.json'] ?? '').items).toHaveLength(1);
   });
 
+  it('says why GitHub refused to save a page for later', async () => {
+    seedCache();
+    const read = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation(async (url: string, init?: any) =>
+      init?.method === 'PUT'
+        ? {
+            ok: false,
+            status: 404,
+            statusText: '',
+            json: async () => ({ message: 'Not Found' }),
+          }
+        : read?.(url, init),
+    );
+    const response = await call({
+      type: 'READ_LATER_ADD',
+      url: 'https://example.com/a',
+      title: 'An article',
+    });
+
+    expect(response.error).toBe(
+      'Failed to write .kh/reading.readitlater.json: 404 Not Found — check that the token may write to this repository',
+    );
+  });
+
   it('only saves web pages for later', async () => {
     seedCache();
     const response = await call({ type: 'READ_LATER_ADD', url: 'javascript:alert(1)' });

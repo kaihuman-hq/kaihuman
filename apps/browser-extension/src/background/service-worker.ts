@@ -388,6 +388,22 @@ function encodeBase64(value: string): string {
   return btoa(binary);
 }
 
+/**
+ * GitHub answers over HTTP/2, which has no status text, so the reason has to come from the body.
+ * It also answers 404 rather than 403 when a token may not write to a repo it can see.
+ */
+async function githubFailure(res: Response, action: string): Promise<Error> {
+  const body = await Promise.resolve()
+    .then(() => res.json())
+    .catch(() => null);
+  const reason = (body as { message?: string } | null)?.message || res.statusText;
+  const hint =
+    res.status === 404 && action.startsWith('Failed to write')
+      ? ' — check that the token may write to this repository'
+      : '';
+  return new Error(`${action}: ${res.status}${reason ? ` ${reason}` : ''}${hint}`);
+}
+
 // Unlike githubUpsertFile this replaces the file wholesale, which is what a
 // snapshot-style JSON document needs.
 async function githubReadFile(
@@ -399,7 +415,7 @@ async function githubReadFile(
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
   });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Failed to read ${filePath}: ${res.statusText}`);
+  if (!res.ok) throw await githubFailure(res, `Failed to read ${filePath}`);
   const data = await res.json();
   return { content: decodeBase64(data.content || ''), sha: data.sha };
 }
@@ -420,7 +436,7 @@ async function githubWriteFile(
       sha,
     }),
   });
-  if (!res.ok) throw new Error(`Failed to write ${filePath}: ${res.statusText}`);
+  if (!res.ok) throw await githubFailure(res, `Failed to write ${filePath}`);
   // The commit response carries the new blob sha, so the cache can be refreshed without a re-read.
   const written = await res.json().catch(() => null);
   return written?.content?.sha ?? null;
@@ -433,7 +449,7 @@ async function githubPutBase64(token: string, repoUrl: string, filePath: string,
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
     body: JSON.stringify({ message: `Add ${filePath} via Extension`, content: base64 }),
   });
-  if (!res.ok) throw new Error(`Failed to write ${filePath}: ${res.statusText}`);
+  if (!res.ok) throw await githubFailure(res, `Failed to write ${filePath}`);
 }
 
 const EMPTY_CONFIG: PinnedTabsConfig = { groups: [], updatedAt: '' };

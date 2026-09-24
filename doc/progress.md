@@ -5,6 +5,10 @@
 - **Browser extension popup**: a clock icon next to the pin and star adds the current tab to the
   repo's `.readitlater.json` (the same `READ_LATER_ADD` message the palette's *Read later: this
   page* sends). Unlike pinning, it stores only the link and title.
+- **Fix**: GitHub read/write failures said only `Failed to write <path>:` — GitHub answers over
+  HTTP/2, which has no status text. The error now carries the status code and GitHub's own
+  message, and a 404 on a write (GitHub's answer when a token may not write) says to check the
+  token's write access.
 
 ## 2026-09-24 — Read it later: clear the whole list
 
