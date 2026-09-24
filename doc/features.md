@@ -10,6 +10,7 @@
 
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
+| Read it later: **CLEAR ALL** empties the reading list after a confirmation | Read it later widget | 2026-09-24 |
 | Wiki view: clickable `[[wikilinks]]`, backlinks, page type and tags, tag filter, repo-stored images | `/wiki` | 2026-09-23 |
 | Knowledge base commands: `/kb-ask --save` files answers, new `/kb-digest` for personal data, interactive `/kb-ingest`, `/kb-lint` stale claims and suggestions | `/knowledge` → Commands | 2026-09-23 |
 | Bookmarks (`.bookmarks.json`) — tagged, searchable bookmarks; mirrored into the browser extension | New File → Bookmarks | 2026-09-22 |
