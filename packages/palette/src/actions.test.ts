@@ -147,11 +147,13 @@ describe('portHandlers', () => {
           { name: 'Amazon.de', url: 'https://www.amazon.de/s?k={query}' },
           { name: 'Bad', url: 'javascript:x' },
         ],
+        assistants: [],
         tools: [],
       }),
     };
     expect(await handlers.loadSettings?.()).toEqual({
       searchEngines: [{ name: 'Amazon.de', url: 'https://www.amazon.de/s?k={query}', params: [] }],
+      assistants: [],
       tools: [],
     });
   });

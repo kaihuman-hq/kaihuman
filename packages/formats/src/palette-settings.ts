@@ -1,6 +1,7 @@
 /**
  * The command palettes' settings (`.kh/command-palette.settings.json`): which web search engines
- * the palette offers for anything typed, and the link tools behind a prefix — `>l` for logs, say.
+ * the palette offers for anything typed, the AI assistants `>a` asks, and the link tools behind a
+ * prefix — `>l` for logs, say.
  *
  * Both are links built from what is typed, so neither needs code: `{query}` in a URL or a parameter
  * value is replaced by the text. The order in the file is the order in the palette, and the first
@@ -32,6 +33,12 @@ export interface SearchEngineSetting {
   params: LinkParam[];
 }
 
+/**
+ * An AI assistant `>a` offers the typed question to: its new-chat page, with `{query}` where the
+ * question goes.
+ */
+export type AssistantSetting = SearchEngineSetting;
+
 /** A link behind a prefix: typing `>l term` offers the link built from `term`. */
 export interface PaletteToolSetting {
   /** Typed after `>`; letters and digits only. */
@@ -45,6 +52,7 @@ export interface PaletteToolSetting {
 
 export interface CommandPaletteSettings {
   searchEngines: SearchEngineSetting[];
+  assistants: AssistantSetting[];
   tools: PaletteToolSetting[];
 }
 
@@ -60,6 +68,7 @@ export const BUILT_IN_PALETTE_PREFIXES: readonly string[] = [
   'd',
   'c',
   'u',
+  'a',
 ];
 
 /** What the palettes offer with no settings file. */
@@ -78,6 +87,17 @@ export const DEFAULT_PALETTE_SETTINGS: CommandPaletteSettings = {
     { name: 'YouTube', url: 'https://www.youtube.com/results?search_query={query}', params: [] },
     { name: 'GitHub', url: 'https://github.com/search?q={query}', params: [] },
     { name: 'Stack Overflow', url: 'https://stackoverflow.com/search?q={query}', params: [] },
+    { name: 'Yahoo', url: 'https://search.yahoo.com/search?p={query}', params: [] },
+    { name: 'Qwant', url: 'https://www.qwant.com/?q={query}', params: [] },
+  ],
+  assistants: [
+    { name: 'ChatGPT', url: 'https://chatgpt.com/?q={query}', params: [] },
+    { name: 'Claude', url: 'https://claude.ai/new?q={query}', params: [] },
+    // Gemini and Copilot open an empty chat — neither reads the question from the link — so the
+    // palette also copies the question, to paste there.
+    { name: 'Gemini', url: 'https://gemini.google.com/app?q={query}', params: [] },
+    { name: 'GitHub Copilot', url: 'https://github.com/copilot?q={query}', params: [] },
+    { name: 'Perplexity', url: 'https://www.perplexity.ai/search?q={query}', params: [] },
   ],
   tools: [
     {
@@ -86,6 +106,34 @@ export const DEFAULT_PALETTE_SETTINGS: CommandPaletteSettings = {
       description: 'Tsuga’s log explorer, searching for what is typed',
       url: 'https://app.tsuga.com/explorer',
       params: [{ key: 'query', value: '{query}' }],
+    },
+    {
+      prefix: 'e',
+      name: 'LEO',
+      description: 'LEO’s German ⇄ English dictionary, for what is typed',
+      url: 'https://dict.leo.org/german-english/{query}',
+      params: [],
+    },
+    {
+      prefix: 'm',
+      name: 'Google Maps',
+      description: 'Google Maps, searching for a place or an address',
+      url: 'https://www.google.com/maps/search/{query}',
+      params: [],
+    },
+    {
+      prefix: 'n',
+      name: 'npm',
+      description: 'Packages on npm',
+      url: 'https://www.npmjs.com/search?q={query}',
+      params: [],
+    },
+    {
+      prefix: 'i',
+      name: 'IMDb',
+      description: 'Films, series and people on IMDb',
+      url: 'https://www.imdb.com/find/?q={query}',
+      params: [],
     },
   ],
 };
@@ -96,7 +144,13 @@ const encodeQuery = (query: string) => new URLSearchParams([['', query]]).toStri
 /** The link for `query` (trimmed): `{query}` filled in everywhere, the parameters appended. */
 export const buildLinkUrl = (link: Pick<SearchEngineSetting, 'url' | 'params'>, query: string) => {
   const term = query.trim();
-  const url = link.url.replaceAll(QUERY_PLACEHOLDER, encodeQuery(term));
+  // A `+` in a path is a plus, not a space, so the path gets `%20` and the query string the form's `+`.
+  const split = link.url.indexOf('?');
+  const [path, search] =
+    split < 0 ? [link.url, ''] : [link.url.slice(0, split), link.url.slice(split)];
+  const url =
+    path.replaceAll(QUERY_PLACEHOLDER, encodeURIComponent(term)) +
+    search.replaceAll(QUERY_PLACEHOLDER, encodeQuery(term));
   if (!link.params.length) return url;
   const params = new URLSearchParams(
     link.params.map((param): [string, string] => [
@@ -120,9 +174,12 @@ const isWebUrl = (template: string) => {
 
 const PREFIX_PATTERN = /^[a-z0-9]+$/;
 
-/** Why an engine cannot be used, or null when it can. */
-export const searchEngineProblem = (engine: SearchEngineSetting): string | null => {
-  if (!engine.name.trim()) return 'A search engine needs a name';
+/** Why an engine (or an assistant — `kind` says which) cannot be used, or null when it can. */
+export const searchEngineProblem = (
+  engine: SearchEngineSetting,
+  kind = 'A search engine',
+): string | null => {
+  if (!engine.name.trim()) return `${kind} needs a name`;
   if (!isWebUrl(engine.url)) return `${engine.name}: the URL must start with https:// or http://`;
   if (engine.params.some((param) => !param.key.trim()))
     return `${engine.name}: a parameter has no name`;
@@ -153,7 +210,8 @@ export const toolProblem = (
 /** Every reason an entry will be left out, in file order — for the widget to show. */
 export const paletteSettingsProblems = (settings: CommandPaletteSettings): string[] =>
   [
-    ...settings.searchEngines.map(searchEngineProblem),
+    ...settings.searchEngines.map((engine) => searchEngineProblem(engine)),
+    ...settings.assistants.map((assistant) => searchEngineProblem(assistant, 'An assistant')),
     ...settings.tools.map((tool, index) => toolProblem(tool, settings.tools.slice(0, index))),
   ].filter((problem): problem is string => problem !== null);
 
@@ -196,16 +254,22 @@ export const readPaletteSettings = (
         )
       : null;
   const engines = list('searchEngines');
+  const assistants = list('assistants');
   const tools = list('tools');
+  const links = (entries: Record<string, unknown>[]) =>
+    entries.map((entry) => ({
+      name: text(entry.name),
+      url: text(entry.url),
+      params: readParams(entry.params),
+    }));
   return {
     settings: {
       searchEngines: engines
-        ? engines.map((engine) => ({
-            name: text(engine.name),
-            url: text(engine.url),
-            params: readParams(engine.params),
-          }))
+        ? links(engines)
         : structuredClone(DEFAULT_PALETTE_SETTINGS.searchEngines),
+      assistants: assistants
+        ? links(assistants)
+        : structuredClone(DEFAULT_PALETTE_SETTINGS.assistants),
       tools: tools
         ? tools.map((tool) => ({
             prefix: text(tool.prefix),
@@ -227,6 +291,7 @@ export const usablePaletteSettings = (
   if (error) console.warn(`[palette-settings] ${error}; using the defaults`);
   return {
     searchEngines: settings.searchEngines.filter((engine) => !searchEngineProblem(engine)),
+    assistants: settings.assistants.filter((assistant) => !searchEngineProblem(assistant)),
     tools: settings.tools.filter(
       (tool, index) => !toolProblem(tool, settings.tools.slice(0, index)),
     ),

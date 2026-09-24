@@ -172,9 +172,116 @@ const SectionHeader = ({ title, note }: { title: string; note: string }) => (
   </div>
 );
 
+/** Buttons that add back each default the list no longer has (matched by URL). */
+const MissingDefaults = <T extends { name: string; url: string }>({
+  links,
+  defaults,
+  onAdd,
+}: {
+  links: readonly T[];
+  defaults: readonly T[];
+  onAdd: (link: T) => void;
+}) => (
+  <>
+    {defaults
+      .filter((link) => !links.some((candidate) => candidate.url === link.url))
+      .map((link) => (
+        <button
+          key={link.url}
+          type="button"
+          title={link.url}
+          onClick={() => onAdd(structuredClone(link))}
+          className={TEXT_BUTTON_CLASS}
+        >
+          <Plus size={11} /> {link.name}
+        </button>
+      ))}
+  </>
+);
+
+/** A list of named links — the search engines or the assistants — to add to, edit and reorder. */
+const LinkListSection = ({
+  title,
+  note,
+  noun,
+  placeholder,
+  links,
+  defaults,
+  onChange,
+}: {
+  title: string;
+  note: string;
+  /** Names the list's entries in labels — "Search engine name". */
+  noun: string;
+  placeholder: string;
+  links: SearchEngineSetting[];
+  defaults: readonly SearchEngineSetting[];
+  onChange: (links: SearchEngineSetting[]) => void;
+}) => (
+  <section className="flex flex-col gap-3">
+    <SectionHeader title={title} note={note} />
+    {links.map((link, index) => (
+      <div
+        // biome-ignore lint/suspicious/noArrayIndexKey: the name is being edited, so only the place identifies an entry
+        key={index}
+        className="flex flex-col gap-1 border-b border-[var(--los-border)] pb-3"
+      >
+        <div className="flex gap-1 items-center">
+          <input
+            value={link.name}
+            placeholder="Name"
+            aria-label={`${noun} name`}
+            onInput={(e) =>
+              onChange(replaced(links, index, { ...link, name: e.currentTarget.value }))
+            }
+            className={cn(INPUT_CLASS, 'w-32')}
+          />
+          <input
+            value={link.url}
+            placeholder={placeholder}
+            aria-label={`${noun} URL`}
+            onInput={(e) =>
+              onChange(replaced(links, index, { ...link, url: e.currentTarget.value }))
+            }
+            className={cn(INPUT_CLASS, 'flex-1')}
+          />
+          <RowControls
+            index={index}
+            count={links.length}
+            label={link.name || `this ${noun.toLowerCase()}`}
+            onMove={(offset) => onChange(moved(links, index, offset))}
+            onDelete={() => onChange(without(links, index))}
+          />
+        </div>
+        {link.params.length > 0 && (
+          <ParamsEditor
+            params={link.params}
+            onChange={(params) => onChange(replaced(links, index, { ...link, params }))}
+          />
+        )}
+        <Preview link={link} />
+      </div>
+    ))}
+    <div className="flex gap-2 flex-wrap">
+      <button
+        type="button"
+        onClick={() => onChange([...links, { name: '', url: '', params: [] }])}
+        className={TEXT_BUTTON_CLASS}
+      >
+        <Plus size={11} /> {noun}
+      </button>
+      <MissingDefaults
+        links={links}
+        defaults={defaults}
+        onAdd={(link) => onChange([...links, link])}
+      />
+    </div>
+  </section>
+);
+
 /**
  * The command palettes' settings: the web search engines, in the order the palette offers them,
- * and the link tools behind a prefix (`>l` Tsuga logs). Edits stay a draft until saved, since the
+ * the AI assistants `>a` asks, and the link tools behind a prefix (`>l` Tsuga logs). Edits stay a draft until saved, since the
  * console writes every change straight to GitHub.
  */
 export const CommandPaletteSettingsWidget = ({
@@ -195,19 +302,17 @@ export const CommandPaletteSettingsWidget = ({
     setDraft(next);
     setDirty(true);
   };
-  const setEngines = (searchEngines: SearchEngineSetting[]) => edit({ ...draft, searchEngines });
   const setTools = (tools: PaletteToolSetting[]) => edit({ ...draft, tools });
 
   const problems = useMemo(() => paletteSettingsProblems(draft), [draft]);
-  const missingDefaults = DEFAULT_PALETTE_SETTINGS.searchEngines.filter(
-    (engine) => !draft.searchEngines.some((candidate) => candidate.url === engine.url),
-  );
 
   if (mode === 'MOBILE_COLLAPSED') {
     return (
       <div className="flex flex-col items-center justify-center h-full w-full p-4 text-center">
         <MonoHeader className="text-5xl font-bold text-[var(--los-fg)] mb-1">
-          {read.settings.searchEngines.length + read.settings.tools.length}
+          {read.settings.searchEngines.length +
+            read.settings.assistants.length +
+            read.settings.tools.length}
         </MonoHeader>
         <MonoText className="text-[10px] text-[var(--los-muted)] uppercase tracking-widest">
           PALETTE LINKS
@@ -226,6 +331,14 @@ export const CommandPaletteSettingsWidget = ({
           </MonoText>
           <MonoText className="text-xs">
             {read.settings.searchEngines.map((engine) => engine.name).join(' · ') || 'None'}
+          </MonoText>
+        </div>
+        <div className="flex flex-col gap-1">
+          <MonoText className="text-[9px] text-[var(--los-muted)] uppercase">
+            AI assistants (&gt;a)
+          </MonoText>
+          <MonoText className="text-xs">
+            {read.settings.assistants.map((assistant) => assistant.name).join(' · ') || 'None'}
           </MonoText>
         </div>
         <div className="flex flex-col gap-1">
@@ -316,83 +429,25 @@ export const CommandPaletteSettingsWidget = ({
         </div>
       )}
 
-      <section className="flex flex-col gap-3">
-        <SectionHeader
-          title="SEARCH ENGINES"
-          note="Offered for anything typed, in this order — ⏎ with nothing else matching searches the first. {query} in the URL is what is typed."
-        />
-        {draft.searchEngines.map((engine, index) => (
-          <div
-            // biome-ignore lint/suspicious/noArrayIndexKey: the name is being edited, so only the place identifies an entry
-            key={index}
-            className="flex flex-col gap-1 border-b border-[var(--los-border)] pb-3"
-          >
-            <div className="flex gap-1 items-center">
-              <input
-                value={engine.name}
-                placeholder="Name"
-                aria-label="Search engine name"
-                onInput={(e) =>
-                  setEngines(
-                    replaced(draft.searchEngines, index, {
-                      ...engine,
-                      name: e.currentTarget.value,
-                    }),
-                  )
-                }
-                className={cn(INPUT_CLASS, 'w-32')}
-              />
-              <input
-                value={engine.url}
-                placeholder="https://example.com/search?q={query}"
-                aria-label="Search engine URL"
-                onInput={(e) =>
-                  setEngines(
-                    replaced(draft.searchEngines, index, { ...engine, url: e.currentTarget.value }),
-                  )
-                }
-                className={cn(INPUT_CLASS, 'flex-1')}
-              />
-              <RowControls
-                index={index}
-                count={draft.searchEngines.length}
-                label={engine.name || 'this engine'}
-                onMove={(offset) => setEngines(moved(draft.searchEngines, index, offset))}
-                onDelete={() => setEngines(without(draft.searchEngines, index))}
-              />
-            </div>
-            {engine.params.length > 0 && (
-              <ParamsEditor
-                params={engine.params}
-                onChange={(params) =>
-                  setEngines(replaced(draft.searchEngines, index, { ...engine, params }))
-                }
-              />
-            )}
-            <Preview link={engine} />
-          </div>
-        ))}
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setEngines([...draft.searchEngines, { name: '', url: '', params: [] }])}
-            className={TEXT_BUTTON_CLASS}
-          >
-            <Plus size={11} /> Search engine
-          </button>
-          {missingDefaults.map((engine) => (
-            <button
-              key={engine.url}
-              type="button"
-              title={engine.url}
-              onClick={() => setEngines([...draft.searchEngines, structuredClone(engine)])}
-              className={TEXT_BUTTON_CLASS}
-            >
-              <Plus size={11} /> {engine.name}
-            </button>
-          ))}
-        </div>
-      </section>
+      <LinkListSection
+        title="SEARCH ENGINES"
+        note="Offered for anything typed, in this order — ⏎ with nothing else matching searches the first. {query} in the URL is what is typed."
+        noun="Search engine"
+        placeholder="https://example.com/search?q={query}"
+        links={draft.searchEngines}
+        defaults={DEFAULT_PALETTE_SETTINGS.searchEngines}
+        onChange={(searchEngines) => edit({ ...draft, searchEngines })}
+      />
+
+      <LinkListSection
+        title="AI ASSISTANTS"
+        note="What >a offers a question to, in this order. {query} in the URL is the question; the palette also copies it, for assistants that open an empty chat."
+        noun="Assistant"
+        placeholder="https://example.com/chat?q={query}"
+        links={draft.assistants}
+        defaults={DEFAULT_PALETTE_SETTINGS.assistants}
+        onChange={(assistants) => edit({ ...draft, assistants })}
+      />
 
       <section className="flex flex-col gap-3">
         <SectionHeader
@@ -467,7 +522,7 @@ export const CommandPaletteSettingsWidget = ({
             <Preview link={tool} />
           </div>
         ))}
-        <div>
+        <div className="flex gap-2 flex-wrap">
           <button
             type="button"
             onClick={() =>
@@ -477,6 +532,11 @@ export const CommandPaletteSettingsWidget = ({
           >
             <Plus size={11} /> Tool
           </button>
+          <MissingDefaults
+            links={draft.tools}
+            defaults={DEFAULT_PALETTE_SETTINGS.tools}
+            onAdd={(tool) => setTools([...draft.tools, tool])}
+          />
         </div>
       </section>
     </div>

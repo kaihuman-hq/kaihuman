@@ -39,6 +39,8 @@ describe('buildLinkUrl', () => {
     expect(url('YouTube')).toBe('https://www.youtube.com/results?search_query=rust+book');
     expect(url('GitHub')).toBe('https://github.com/search?q=rust+book');
     expect(url('Stack Overflow')).toBe('https://stackoverflow.com/search?q=rust+book');
+    expect(url('Yahoo')).toBe('https://search.yahoo.com/search?p=rust+book');
+    expect(url('Qwant')).toBe('https://www.qwant.com/?q=rust+book');
   });
 
   it('encodes characters that would otherwise change the url', () => {
@@ -53,6 +55,30 @@ describe('buildLinkUrl', () => {
     expect(buildLinkUrl(tsuga, '')).toBe('https://app.tsuga.com/explorer?query=');
     expect(buildLinkUrl(tsuga, ' search term ')).toBe(
       'https://app.tsuga.com/explorer?query=search+term',
+    );
+  });
+
+  it('asks the default assistants the question', () => {
+    const ask = (name: string) => {
+      const assistant = DEFAULT_PALETTE_SETTINGS.assistants.find((a) => a.name === name);
+      if (!assistant) throw new Error(`No assistant ${name}`);
+      return buildLinkUrl(assistant, 'why is the sky blue?');
+    };
+    expect(ask('ChatGPT')).toBe('https://chatgpt.com/?q=why+is+the+sky+blue%3F');
+    expect(ask('Claude')).toBe('https://claude.ai/new?q=why+is+the+sky+blue%3F');
+    expect(ask('Gemini')).toBe('https://gemini.google.com/app?q=why+is+the+sky+blue%3F');
+    expect(ask('GitHub Copilot')).toBe('https://github.com/copilot?q=why+is+the+sky+blue%3F');
+    expect(ask('Perplexity')).toBe('https://www.perplexity.ai/search?q=why+is+the+sky+blue%3F');
+  });
+
+  it('puts the term in a path with %20, since a + there is a plus', () => {
+    const leo = DEFAULT_PALETTE_SETTINGS.tools.find((candidate) => candidate.prefix === 'e');
+    if (!leo) throw new Error('No LEO tool');
+    expect(buildLinkUrl(leo, 'guten Morgen')).toBe(
+      'https://dict.leo.org/german-english/guten%20Morgen',
+    );
+    expect(buildLinkUrl({ url: 'https://x.test/{query}/?q={query}', params: [] }, 'a+b c')).toBe(
+      'https://x.test/a%2Bb%20c/?q=a%2Bb+c',
     );
   });
 
@@ -75,6 +101,7 @@ describe('readPaletteSettings', () => {
   it('keeps a list the file empties empty, and defaults one it leaves out', () => {
     const { settings } = readPaletteSettings('{"searchEngines": []}');
     expect(settings.searchEngines).toEqual([]);
+    expect(settings.assistants).toEqual(DEFAULT_PALETTE_SETTINGS.assistants);
     expect(settings.tools).toEqual(DEFAULT_PALETTE_SETTINGS.tools);
   });
 
@@ -85,6 +112,7 @@ describe('readPaletteSettings', () => {
   it('reads back what it wrote, in order', () => {
     const settings = {
       searchEngines: [...DEFAULT_PALETTE_SETTINGS.searchEngines].reverse(),
+      assistants: [{ name: 'Ask', url: 'https://ask.test/?q={query}', params: [] }],
       tools: [tool({ description: 'Logs', params: [{ key: 'a', value: 'b', empty: '' }] })],
     };
     expect(readPaletteSettings(serializePaletteSettings(settings)).settings).toEqual(settings);
@@ -92,7 +120,7 @@ describe('readPaletteSettings', () => {
 
   it('does not share the defaults with its caller', () => {
     readPaletteSettings('').settings.searchEngines.pop();
-    expect(DEFAULT_PALETTE_SETTINGS.searchEngines).toHaveLength(13);
+    expect(DEFAULT_PALETTE_SETTINGS.searchEngines).toHaveLength(15);
   });
 });
 
@@ -105,6 +133,10 @@ describe('usablePaletteSettings', () => {
           { name: 'Script', url: 'javascript:alert(1)' },
           { name: '', url: 'https://x.test' },
         ],
+        assistants: [
+          { name: 'Ask', url: 'https://ask.test/?q={query}' },
+          { name: 'Local', url: 'file:///ask' },
+        ],
         tools: [
           tool(),
           tool({ name: 'Taken', prefix: 'p' }),
@@ -115,6 +147,7 @@ describe('usablePaletteSettings', () => {
       }),
     );
     expect(settings.searchEngines.map((e) => e.name)).toEqual(['Ok']);
+    expect(settings.assistants.map((a) => a.name)).toEqual(['Ask']);
     expect(settings.tools.map((t) => t.name)).toEqual(['Kibana']);
   });
 
@@ -134,10 +167,12 @@ describe('paletteSettingsProblems', () => {
     expect(
       paletteSettingsProblems({
         searchEngines: [{ name: 'Bad', url: 'ftp://x', params: [] }],
+        assistants: [{ name: '', url: 'https://ask.test/?q={query}', params: [] }],
         tools: [tool(), tool({ name: 'Again' }), tool({ name: 'Own', prefix: 't' })],
       }),
     ).toEqual([
       'Bad: the URL must start with https:// or http://',
+      'An assistant needs a name',
       'Again: >k is already taken by a tool above',
       'Own: >t is one of the palette’s own prefixes',
     ]);

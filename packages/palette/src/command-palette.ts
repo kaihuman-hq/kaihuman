@@ -143,6 +143,10 @@ export type PaletteMode = {
       /** The one entry for what is typed, even nothing — a search page to open, say. */
       link: (query: string) => ModeItem;
     }
+  | {
+      /** The entries for what is typed, in order and unfiltered — one per AI assistant, say. */
+      links: (query: string) => ModeItem[];
+    }
 );
 
 export interface PaletteHandlers {
@@ -160,8 +164,8 @@ export interface PaletteHandlers {
   /** Counts one open of a bookmark, so unused ones can be found later. */
   countBookmarkUse: (id: string) => void;
   /**
-   * The repository's search engines and link tools, loaded each time the palette opens; until
-   * they are (or without this), the defaults.
+   * The repository's search engines, AI assistants and link tools, loaded each time the palette
+   * opens; until they are (or without this), the defaults.
    */
   loadSettings?: () => Promise<CommandPaletteSettings>;
   modes: readonly PaletteMode[];
@@ -738,6 +742,7 @@ export function createCommandPalette(
     if (!mode) return [];
     if (mode.parent) return filterModeItems(mode.parent.children ?? [], input.value);
     if ('link' in mode.mode) return withRecents(mode, [mode.mode.link(input.value.trim())]);
+    if ('links' in mode.mode) return mode.mode.links(input.value.trim());
     if (mode.mode === bookmarksMode) {
       return withRecents(
         mode,
@@ -847,18 +852,55 @@ export function createCommandPalette(
     load: async () => [],
   };
 
+  /**
+   * `>a`: the question, offered to each assistant in the settings. Opening one also copies the
+   * question, since some assistants (Gemini, Copilot) open an empty chat whatever the link says.
+   */
+  const assistantsMode: PaletteMode = {
+    prefix: 'a',
+    title: 'Ask AI',
+    placeholder: 'Ask a question — ⏎ opens it in the assistant',
+    description:
+      'Opens a new chat with an AI assistant, the question filled in or on the clipboard',
+    recents: false,
+    links: (question) =>
+      settings.assistants.map((assistant) => {
+        const url = buildLinkUrl(assistant, question);
+        return {
+          id: `ai:${assistant.name.toLowerCase()}:${question}`,
+          title: question ? `Ask ${assistant.name} “${question}”` : assistant.name,
+          subtitle: url,
+          choose: () => void askAssistant(assistant.name, question, url),
+        };
+      }),
+  };
+
+  const askAssistant = async (name: string, question: string, url: string) => {
+    // A failed copy leaves the question in the link, where most assistants read it anyway.
+    if (question) await handlers.copy(question).catch(() => undefined);
+    openUrl({ id: `ai:${name.toLowerCase()}:${question}`, title: `${name}: ${question}`, url });
+  };
+
   /** A tool whose prefix a mode of the palette or the surface claims is left out. */
   const applySettings = (next: CommandPaletteSettings) => {
     settings = next;
     const claimed = new Set(
-      [bookmarksMode, ...handlers.modes].map((candidate) => candidate.prefix),
+      [bookmarksMode, assistantsMode, ...handlers.modes].map((candidate) => candidate.prefix),
     );
     toolModes = next.tools.filter((tool) => !claimed.has(tool.prefix)).map(toolMode);
   };
   applySettings(settings);
 
-  /** Every mode on this surface: the palette's own first, then the surface's, then the tools. */
-  const allModes = () => [bookmarksMode, ...handlers.modes, ...toolModes];
+  /**
+   * Every mode on this surface: the palette's own first, then the surface's, then `>a` (while
+   * there are assistants), then the tools.
+   */
+  const allModes = () => [
+    bookmarksMode,
+    ...handlers.modes,
+    ...(settings.assistants.length ? [assistantsMode] : []),
+    ...toolModes,
+  ];
 
   /**
    * `?`: everything the palette can do, for this surface — its prefixes, what searching does, the

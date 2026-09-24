@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-09-24 — Palette: `>a` asks an AI, more default link tools
+
+- **`>a`** (both surfaces): the typed question, one row per assistant — ChatGPT, Claude, Gemini,
+  GitHub Copilot and Perplexity by default. ⏎ opens a new chat with the question in the link and
+  copies it too, since Gemini's and Copilot's web chats do not read a question from the URL. The assistants are a
+  new `assistants` list in `.kh/command-palette.settings.json` (same shape as the search engines;
+  `a` joins the palette's own prefixes). Palette modes gained a `links` kind for several entries
+  per query.
+- **Default engines**: Yahoo and Qwant join them.
+- **Default tools**: `>e` LEO (German ⇄ English), `>m` Google Maps, `>n` npm, `>i` IMDb.
+- **`{query}` in a URL path** is now percent-encoded (`%20`); the query string keeps the form's `+`.
+- **Console widget**: an AI assistants section edited like the engines, and buttons to add back
+  default tools a settings file no longer has.
+- `doc/vicinae-recommendations.md`: what Vicinae's extensions suggest for the palette.
+
 ## 2026-09-24 — Palette settings: more default search engines, a plain Tsuga default
 
 - **Default engines**: Bing, Brave Search, Startpage, Wikipedia, YouTube, GitHub and Stack Overflow
