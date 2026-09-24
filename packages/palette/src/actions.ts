@@ -7,7 +7,13 @@
  * since nothing else has such a page.
  */
 
-import { commandParameters, fillCommand, parseCommands, parsePrompts } from '@lifosy/formats';
+import {
+  commandParameters,
+  fillCommand,
+  parseCommands,
+  parsePrompts,
+  usablePaletteSettings,
+} from '@lifosy/formats';
 import { usageNeedsSync, usageRows, usageStatusRow } from './claude-usage.js';
 import type {
   EditableText,
@@ -316,21 +322,6 @@ const githubSearchItems = async (port: ActionPort): Promise<ModeItem[]> => {
       },
     })),
   }));
-};
-
-/** The console team's logs in Tsuga, which `>l` opens. */
-const TSUGA_EXPLORER_URL = 'https://app.tsuga.com/explorer';
-const TSUGA_TEAM_QUERY = 'context.cloud.camunda.io/owner-team:console';
-
-/** The explorer on the team's logs, narrowed to `term` when there is one. */
-export const tsugaUrl = (term: string) => {
-  const params = new URLSearchParams({
-    // Tsuga's own link for the team ends its query in a space; kept, so both match exactly.
-    query: term.trim() ? `${TSUGA_TEAM_QUERY} AND "${term.trim()}"` : `${TSUGA_TEAM_QUERY} `,
-    extraColumns: JSON.stringify(['file', 'fn', 'service']),
-    clusterIds: '8v5j-x2k0n-dzk4',
-  });
-  return `${TSUGA_EXPLORER_URL}?${params}`;
 };
 
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -648,7 +639,8 @@ const entryFileItems = async (port: ActionPort): Promise<ModeItem[]> => {
 
 /**
  * The prefix modes every surface offers: `>p` prompts, `>t` translate, `>r` GitHub repositories,
- * `>g` a search in one of them, `>l` logs in Tsuga, `>f` the files widgets add to.
+ * `>g` a search in one of them, `>f` the files widgets add to. Link tools like `>l` come from the
+ * repository's palette settings instead (`loadSettings`).
  */
 export const paletteModes = (port: ActionPort): PaletteMode[] => [
   {
@@ -683,19 +675,6 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
     load: () => githubSearchItems(port),
   },
   {
-    prefix: 'l',
-    title: 'Logs',
-    placeholder: 'Search the console team’s logs in Tsuga — ⏎ opens them',
-    description:
-      'The console team’s logs in Tsuga’s explorer, filtered by what is typed — nothing typed opens them all',
-    link: (term) => ({
-      id: `tsuga:${term}`,
-      title: term ? `Tsuga logs “${term}”` : 'Tsuga logs',
-      subtitle: 'owner-team:console',
-      url: tsugaUrl(term),
-    }),
-  },
-  {
     prefix: 'f',
     title: 'Files',
     placeholder: 'Search todo lists, logs, events… — ⏎ opens or adds',
@@ -710,6 +689,8 @@ export const portHandlers = (
   port: ActionPort,
 ): Omit<PaletteHandlers, 'actions' | 'open' | 'copy' | 'modes'> => ({
   loadBookmarks: async () => (await port.send({ type: 'GET_BOOKMARKS' })).bookmarks,
+  loadSettings: async () =>
+    usablePaletteSettings((await port.send({ type: 'GET_PALETTE_SETTINGS' })).content),
   searchRepo: async (query) => (await port.send({ type: 'SEARCH_REPO', query })).results,
   fileChoices: (file) => fileChoices(port, file),
   loadRecents: async () => (await port.send({ type: 'GET_RECENTS' })).recents,

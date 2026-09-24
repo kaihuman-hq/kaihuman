@@ -6,4 +6,3 @@ export * from './command-palette.js';
 export * from './entries.js';
 export * from './protocol.js';
 export * from './translate.js';
-export * from './web-search.js';

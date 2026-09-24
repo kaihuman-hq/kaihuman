@@ -1,3 +1,4 @@
+import { DEFAULT_PALETTE_SETTINGS } from '@lifosy/formats';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   claudeCodeMode,
@@ -13,7 +14,6 @@ import {
   portHandlers,
   repoActions,
   splitTags,
-  tsugaUrl,
 } from './actions.js';
 import type { PaletteAction, PaletteMode } from './command-palette.js';
 import type { ActionPort, PaletteProtocol, PaletteRequestType } from './protocol.js';
@@ -133,6 +133,26 @@ describe('portHandlers', () => {
     expect(sent.find((request) => request.type === 'SEARCH_REPO')).toEqual({
       type: 'SEARCH_REPO',
       query: 'b',
+    });
+  });
+
+  it('reads the settings file, with the defaults when the repository has none', async () => {
+    const handlers = portHandlers(fakePort);
+    answers.GET_PALETTE_SETTINGS = { content: null };
+    expect(await handlers.loadSettings?.()).toEqual(DEFAULT_PALETTE_SETTINGS);
+
+    answers.GET_PALETTE_SETTINGS = {
+      content: JSON.stringify({
+        searchEngines: [
+          { name: 'Amazon.de', url: 'https://www.amazon.de/s?k={query}' },
+          { name: 'Bad', url: 'javascript:x' },
+        ],
+        tools: [],
+      }),
+    };
+    expect(await handlers.loadSettings?.()).toEqual({
+      searchEngines: [{ name: 'Amazon.de', url: 'https://www.amazon.de/s?k={query}', params: [] }],
+      tools: [],
     });
   });
 });
@@ -339,23 +359,8 @@ describe('paletteModes', () => {
     expect(githubSearchUrl('o/r', 'issues', '  ')).toBe('https://github.com/o/r/issues');
   });
 
-  it('opens Tsuga from >l, with the term in quotes when there is one', () => {
-    const logs = mode('l');
-    if (!('link' in logs)) throw new Error('l is not a link');
-    expect(logs.link('')).toMatchObject({ title: 'Tsuga logs', url: tsugaUrl('') });
-    expect(logs.link('search term')).toMatchObject({
-      title: 'Tsuga logs “search term”',
-      url: tsugaUrl('search term'),
-    });
-  });
-
-  it('builds exactly the Tsuga links the team uses', () => {
-    expect(tsugaUrl('')).toBe(
-      'https://app.tsuga.com/explorer?query=context.cloud.camunda.io%2Fowner-team%3Aconsole+&extraColumns=%5B%22file%22%2C%22fn%22%2C%22service%22%5D&clusterIds=8v5j-x2k0n-dzk4',
-    );
-    expect(tsugaUrl(' search term ')).toBe(
-      'https://app.tsuga.com/explorer?query=context.cloud.camunda.io%2Fowner-team%3Aconsole+AND+%22search+term%22&extraColumns=%5B%22file%22%2C%22fn%22%2C%22service%22%5D&clusterIds=8v5j-x2k0n-dzk4',
-    );
+  it('leaves link tools to the settings', () => {
+    expect(paletteModes(fakePort).map((candidate) => candidate.prefix)).not.toContain('l');
   });
 
   it('stores or forgets the DeepL key', async () => {

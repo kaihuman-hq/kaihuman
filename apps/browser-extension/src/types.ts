@@ -33,6 +33,7 @@ export interface Message {
     | 'ADD_TRANSLATION_HISTORY'
     | 'SET_TRANSLATION_KEY'
     | 'LIST_GITHUB_REPOS'
+    | 'GET_PALETTE_SETTINGS'
     | 'TOGGLE_COMMAND_PALETTE'
     | 'GET_TODAY'
     | 'GET_SYNC_STATUS'

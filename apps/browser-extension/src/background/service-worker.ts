@@ -5,6 +5,7 @@ import {
   checkIn,
   localDate,
   markReadItLaterRead,
+  PALETTE_SETTINGS_PATH,
   parseTimeTracking,
   serializeTimeTracking,
   toggleStartStop,
@@ -859,6 +860,38 @@ async function listRepoFiles(kind: keyof typeof REPO_FILE_KINDS) {
   return { files: cache.files };
 }
 
+interface PaletteSettingsCache {
+  repo: string;
+  /** The file as read; null when the repository has none, which means the defaults. */
+  content: string | null;
+  fetchedAt: number;
+}
+
+async function refreshPaletteSettings(token: string, repo: string) {
+  const file = await githubReadFile(token, repo, PALETTE_SETTINGS_PATH);
+  const cache: PaletteSettingsCache = { repo, content: file?.content ?? null, fetchedAt: Date.now() };
+  await chrome.storage.local.set({ paletteSettingsCache: cache });
+  return cache;
+}
+
+/**
+ * Asked every time the palette opens, so cache first like the prompts: a stale cache still answers
+ * and is refreshed behind it — a change in the console reaches the palette on a later open.
+ */
+async function paletteSettings() {
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const stored = await chrome.storage.local.get('paletteSettingsCache');
+  const cache = stored.paletteSettingsCache as PaletteSettingsCache | undefined;
+  if (cache?.repo !== repo) return { content: (await refreshPaletteSettings(token, repo)).content };
+  if (isPromptsCacheStale(cache, Date.now())) {
+    refreshPaletteSettings(token, repo).catch((e) =>
+      console.warn('LifeOS Extension: palette settings refresh failed', e),
+    );
+  }
+  return { content: cache.content };
+}
+
 async function translate(text: string, targets: string[]) {
   const { deepl_key: key } = await chrome.storage.local.get('deepl_key');
   if (!key) throw new Error('No DeepL API key yet — run “Set the DeepL API key…” first');
@@ -1388,6 +1421,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     );
     return true; // Indicate async response
   }
+
+  if (message.type === 'GET_PALETTE_SETTINGS') return answer(paletteSettings(), sendResponse);
 
   if (message.type === 'LIST_GITHUB_REPOS') {
     githubRepos().then(

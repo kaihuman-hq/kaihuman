@@ -10,8 +10,14 @@
  * `>t` translates, `>b` only bookmarks — which Esc (or Backspace on an empty input) leaves again.
  * `?` lists them all.
  */
+import {
+  buildLinkUrl,
+  type CommandPaletteSettings,
+  DEFAULT_PALETTE_SETTINGS,
+  PALETTE_SETTINGS_PATH,
+  type PaletteToolSetting,
+} from '@lifosy/formats';
 import { type Bookmark, searchBookmarks } from './bookmarks.js';
-import { SEARCH_ENGINES } from './web-search.js';
 
 export interface RepoResult {
   path: string;
@@ -153,6 +159,11 @@ export interface PaletteHandlers {
   rememberRecent: (entry: RecentEntry) => void;
   /** Counts one open of a bookmark, so unused ones can be found later. */
   countBookmarkUse: (id: string) => void;
+  /**
+   * The repository's search engines and link tools, loaded each time the palette opens; until
+   * they are (or without this), the defaults.
+   */
+  loadSettings?: () => Promise<CommandPaletteSettings>;
   modes: readonly PaletteMode[];
   /** Puts text on the clipboard; rejects with a message to show if it cannot. */
   copy: (text: string) => Promise<void>;
@@ -317,7 +328,7 @@ const matches = (text: string, needle: string) => text.toLowerCase().includes(ne
 const HELP_PREFIX = '?';
 
 /** What the help says about searching and keys, whatever the surface. */
-const HELP_TOPICS: readonly [string, string][] = [
+const helpTopics = (engines: readonly { name: string }[]): [string, string][] => [
   ['Type to search', 'Bookmarks by title, tags and URL; recent items first, actions below them'],
   [
     '⇥  Search the repo',
@@ -325,7 +336,9 @@ const HELP_TOPICS: readonly [string, string][] = [
   ],
   [
     'Search the web',
-    `Anything typed is offered to ${SEARCH_ENGINES.map((engine) => engine.name).join(', ')} — ⏎ with nothing else matching searches the first`,
+    engines.length
+      ? `Anything typed is offered to ${engines.map((engine) => engine.name).join(', ')} — ⏎ with nothing else matching searches the first`
+      : `No search engines — add some in ${PALETTE_SETTINGS_PATH}`,
   ],
   ['↑ ↓  ⏎', 'Move through the list and choose; mouse clicks work too'],
   ['⇥ or →', 'Open the entries under the selected one — a repository’s pages, say'],
@@ -374,6 +387,20 @@ const modePrefix = (value: string, modes: readonly PaletteMode[]) => {
   return mode && match ? { mode, rest: value.slice(match[0].length) } : null;
 };
 
+/** A tool from the settings as a mode: `>l term` offers the one link built from `term`. */
+export const toolMode = (tool: PaletteToolSetting): PaletteMode => ({
+  prefix: tool.prefix,
+  title: tool.name,
+  placeholder: `${tool.description || tool.name} — ⏎ opens it`,
+  description: tool.description || `Opens ${tool.name} with what is typed`,
+  link: (term) => ({
+    id: `tool:${tool.prefix}:${term}`,
+    title: term ? `${tool.name} “${term}”` : tool.name,
+    subtitle: tool.description ?? '',
+    url: buildLinkUrl(tool, term),
+  }),
+});
+
 export function createCommandPalette(
   handlers: PaletteHandlers,
   options: PaletteOptions = {},
@@ -413,6 +440,8 @@ export function createCommandPalette(
   shadow.append(style, backdrop);
 
   let open = false;
+  let settings: CommandPaletteSettings = DEFAULT_PALETTE_SETTINGS;
+  let toolModes: PaletteMode[] = [];
   let bookmarks: Bookmark[] = [];
   let recents: RecentEntry[] = [];
   let repoResults: RepoResult[] | null = null;
@@ -818,8 +847,18 @@ export function createCommandPalette(
     load: async () => [],
   };
 
-  /** Every mode on this surface: the palette's own first, then the surface's. */
-  const allModes = () => [bookmarksMode, ...handlers.modes];
+  /** A tool whose prefix a mode of the palette or the surface claims is left out. */
+  const applySettings = (next: CommandPaletteSettings) => {
+    settings = next;
+    const claimed = new Set(
+      [bookmarksMode, ...handlers.modes].map((candidate) => candidate.prefix),
+    );
+    toolModes = next.tools.filter((tool) => !claimed.has(tool.prefix)).map(toolMode);
+  };
+  applySettings(settings);
+
+  /** Every mode on this surface: the palette's own first, then the surface's, then the tools. */
+  const allModes = () => [bookmarksMode, ...handlers.modes, ...toolModes];
 
   /**
    * `?`: everything the palette can do, for this surface — its prefixes, what searching does, the
@@ -833,7 +872,7 @@ export function createCommandPalette(
       group: 'Prefixes — ⏎ switches to one',
       choose: () => enterMode(candidate, ''),
     })),
-    ...HELP_TOPICS.map(([title, subtitle], index) => ({
+    ...helpTopics(settings.searchEngines).map(([title, subtitle], index) => ({
       id: `help:topic:${index}`,
       title,
       subtitle,
@@ -939,17 +978,20 @@ export function createCommandPalette(
   const webRows = (): Row[] => {
     const query = input.value.trim();
     if (trail.length > 0 || !query) return [];
-    return SEARCH_ENGINES.map((engine) => ({
-      title: `Search ${engine.name} for “${query}”`,
-      subtitle: engine.url(query),
-      activate: () =>
-        openUrl({
-          id: `web:${engine.id}:${query}`,
-          title: `${engine.name}: ${query}`,
-          subtitle: engine.url(query),
-          url: engine.url(query),
-        }),
-    }));
+    return settings.searchEngines.map((engine) => {
+      const url = buildLinkUrl(engine, query);
+      return {
+        title: `Search ${engine.name} for “${query}”`,
+        subtitle: url,
+        activate: () =>
+          openUrl({
+            id: `web:${engine.name.toLowerCase()}:${query}`,
+            title: `${engine.name}: ${query}`,
+            url,
+            subtitle: url,
+          }),
+      };
+    });
   };
 
   /** In a submenu it is that menu's entries; at the top level, the actions that match. */
@@ -1413,15 +1455,20 @@ export function createCommandPalette(
     render();
     input.focus();
 
-    const [loadedBookmarks, loadedRecents] = await Promise.all([
+    const [loadedBookmarks, loadedRecents, loadedSettings] = await Promise.all([
       handlers.loadBookmarks().catch((e: any) => {
         setStatus(e?.message || 'Could not load bookmarks');
         return [] as Bookmark[];
       }),
       handlers.loadRecents().catch(() => [] as RecentEntry[]),
+      handlers.loadSettings?.().catch((e: any) => {
+        console.warn('LifeOS palette: could not load the settings', e);
+        return settings;
+      }),
     ]);
     bookmarks = loadedBookmarks;
     recents = loadedRecents;
+    if (loadedSettings) applySettings(loadedSettings);
     if (open) render();
   };
 

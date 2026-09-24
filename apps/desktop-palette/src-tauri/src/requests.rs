@@ -11,11 +11,11 @@ use serde_json::{Value, json};
 use crate::bookmarks::{self, BOOKMARKS_PATH, Cache};
 use crate::config::{
     self, Settings, bookmarks_cache_file, claude_usage_cache_file, commands_cache_file,
-    is_repo_name, prompts_cache_file, read_json, write_json,
+    is_repo_name, palette_settings_cache_file, prompts_cache_file, read_json, write_json,
 };
 use crate::github::{Client, Read, console_file_url, encode_path};
 use crate::recents::{self, RecentEntry};
-use crate::{claude, commands, dumps, entries, prompts, repos, translate};
+use crate::{claude, commands, dumps, entries, palette_settings, prompts, repos, translate};
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -85,6 +85,7 @@ pub enum Request {
         sha: Option<String>,
     },
     ListGithubRepos,
+    GetPaletteSettings,
     ListClaudeCodeRepos,
     GetClaudeUsage {
         #[serde(default)]
@@ -222,6 +223,45 @@ async fn list_repo_files(suffix: &'static str, cache_file: PathBuf) -> Result<Va
         }
     };
     Ok(json!({ "files": files }))
+}
+
+async fn refresh_palette_settings(client: &Client) -> Result<palette_settings::Cache, String> {
+    let content = match client
+        .read(palette_settings::PALETTE_SETTINGS_PATH, None)
+        .await?
+    {
+        Read::Found { content, .. } => Some(content),
+        Read::Missing | Read::NotModified => None,
+    };
+    let cache = palette_settings::Cache {
+        repo: client.repo().to_string(),
+        content,
+        fetched_at: now_ms(),
+    };
+    write_json(&palette_settings_cache_file(), &cache)?;
+    Ok(cache)
+}
+
+/// Asked every time the palette opens, so cache first like the prompts: a stale cache still
+/// answers and is refreshed behind it.
+async fn get_palette_settings() -> Result<Value, String> {
+    let client = client()?;
+    let cache = read_json::<palette_settings::Cache>(&palette_settings_cache_file())
+        .filter(|cache| cache.is_for(client.repo()));
+    let content = match cache {
+        Some(cache) => {
+            if cache.is_stale(now_ms()) {
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = refresh_palette_settings(&client).await {
+                        eprintln!("palette settings refresh failed: {error}");
+                    }
+                });
+            }
+            cache.content
+        }
+        None => refresh_palette_settings(&client).await?.content,
+    };
+    Ok(json!({ "content": content }))
 }
 
 /// The files `>f` lists, each with its console link, as a repo search lists its hits.
@@ -419,6 +459,7 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             write_entry_file(&path, &content, sha.as_deref()).await
         }
         Request::ListGithubRepos => list_github_repos().await,
+        Request::GetPaletteSettings => get_palette_settings().await,
         Request::ListClaudeCodeRepos => Ok(json!({ "repos": claude::code_repos()? })),
         Request::GetClaudeUsage { cached } => claude_usage(cached).await,
         Request::ListDumps => Ok(json!({ "dumps": dumps::list(&config::dumps_dir()) })),
@@ -493,6 +534,10 @@ mod tests {
         assert_eq!(
             parse(json!({ "type": "LIST_GITHUB_REPOS" })),
             Request::ListGithubRepos
+        );
+        assert_eq!(
+            parse(json!({ "type": "GET_PALETTE_SETTINGS" })),
+            Request::GetPaletteSettings
         );
         assert_eq!(
             parse(json!({ "type": "LIST_COMMAND_FILES" })),

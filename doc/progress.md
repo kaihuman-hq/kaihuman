@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-09-24 — Command palette settings: search engines and link tools from the repository
+
+- **Settings file**: `.kh/command-palette.settings.json` sets the palettes' web search engines and
+  their link tools behind a prefix (`>l`), in the order the palette shows them. Each is a URL with
+  `{query}` for what is typed, plus parameters added in order — with an optional value for when
+  nothing is typed, which is how Tsuga's `… AND "{query}"` link is expressed. Without the file, the
+  palettes use the defaults: the engines they had, plus **Amazon.de**, and `>l` Tsuga logs.
+  Format and checks live in `packages/formats/src/palette-settings.ts`.
+- **Palettes** (extension pages, start page, desktop): `loadSettings` reads it on every open
+  (`GET_PALETTE_SETTINGS`, cached for five minutes by the service worker and the Rust backend).
+  Engines and tools that break a rule — no name, a non-http(s) URL, a prefix the palette already
+  uses or one taken by an earlier tool — are left out. `SEARCH_ENGINES` and `tsugaUrl` are gone.
+- **Console**: a **Command Palette Settings** template (suggests `.kh/command-palette`) and widget —
+  a summary on the dashboard, and in focus an editor to add, remove and reorder engines and tools,
+  edit their parameters, preview each link, and see what will be left out. Edits are a draft until
+  **Save**, since the console commits every change.
+
 ## 2026-09-24 — Popup: read it later button
 
 - **Browser extension popup**: a clock icon next to the pin and star adds the current tab to the

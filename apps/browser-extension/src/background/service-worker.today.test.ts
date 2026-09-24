@@ -381,3 +381,35 @@ describe('the palette’s widget entries', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('GET_PALETTE_SETTINGS', () => {
+  const reads = () =>
+    fetchMock.mock.calls.filter(([url]) => pathOf(url) === '.kh/command-palette.settings.json');
+
+  it('answers null when the repository has no settings file', async () => {
+    expect(await call({ type: 'GET_PALETTE_SETTINGS' })).toMatchObject({ content: null });
+  });
+
+  it('answers the file, then from the cache until it is stale', async () => {
+    remote['.kh/command-palette.settings.json'] = '{"searchEngines": []}';
+    expect(await call({ type: 'GET_PALETTE_SETTINGS' })).toMatchObject({
+      content: '{"searchEngines": []}',
+    });
+    remote['.kh/command-palette.settings.json'] = '{"tools": []}';
+    expect(await call({ type: 'GET_PALETTE_SETTINGS' })).toMatchObject({
+      content: '{"searchEngines": []}',
+    });
+    expect(reads()).toHaveLength(1);
+
+    store.paletteSettingsCache.fetchedAt = 0;
+    await call({ type: 'GET_PALETTE_SETTINGS' });
+    await vi.waitFor(() => expect(store.paletteSettingsCache.content).toBe('{"tools": []}'));
+  });
+
+  it('reads again after a repository switch', async () => {
+    await call({ type: 'GET_PALETTE_SETTINGS' });
+    store.lifeos_repo = 'o/other';
+    await call({ type: 'GET_PALETTE_SETTINGS' });
+    expect(reads()).toHaveLength(2);
+  });
+});

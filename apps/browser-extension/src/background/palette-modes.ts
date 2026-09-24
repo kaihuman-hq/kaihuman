@@ -25,7 +25,7 @@ export interface PromptsCache {
  */
 export const PROMPTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
-export const isPromptsCacheStale = (cache: PromptsCache, now: number) =>
+export const isPromptsCacheStale = (cache: Pick<PromptsCache, 'fetchedAt'>, now: number) =>
   now - cache.fetchedAt > PROMPTS_CACHE_TTL_MS;
 
 const githubHeaders = (token: string, accept = 'application/vnd.github+json') => ({

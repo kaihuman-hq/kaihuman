@@ -1,3 +1,4 @@
+import type { CommandPaletteSettings, PaletteToolSetting } from '@lifosy/formats';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { Bookmark } from './bookmarks.js';
 import {
@@ -626,6 +627,7 @@ describe('web search', () => {
       'Search DuckDuckGo for “bookmark”',
       'Search Ecosia for “bookmark”',
       'Search Amazon for “bookmark”',
+      'Search Amazon.de for “bookmark”',
       'Search Reddit for “bookmark”',
     ]);
   });
@@ -652,6 +654,81 @@ describe('web search', () => {
     await activateRow('Pinned tab groups…');
     type('work');
     expect(groupLabels()).not.toContain('Web');
+  });
+});
+
+describe('settings', () => {
+  const reopenWith = async (settings: CommandPaletteSettings) => {
+    palette.destroy();
+    palette = createCommandPalette({
+      loadBookmarks: loadBookmarks as any,
+      searchRepo: searchRepo as any,
+      open: open as any,
+      actions: () => actions,
+      loadRecents: loadRecents as any,
+      rememberRecent: rememberRecent as any,
+      countBookmarkUse: countBookmarkUse as any,
+      modes,
+      copy: copy as any,
+      loadSettings: async () => settings,
+    });
+    palette.toggle();
+    await settle();
+  };
+
+  const kibana: PaletteToolSetting = {
+    prefix: 'k',
+    name: 'Kibana',
+    description: 'Search the logs',
+    url: 'https://kibana.example/app',
+    params: [{ key: 'q', value: 'level:error AND {query}', empty: 'level:error' }],
+  };
+
+  it('offers the settings’ engines in their order, the first on Enter', async () => {
+    await reopenWith({
+      searchEngines: [
+        { name: 'Amazon.de', url: 'https://www.amazon.de/s?k={query}', params: [] },
+        { name: 'Google', url: 'https://www.google.com/search?q={query}', params: [] },
+      ],
+      tools: [],
+    });
+    type('usb kabel');
+    expect(groupRows('Web')).toEqual([
+      'Search Amazon.de for “usb kabel”',
+      'Search Google for “usb kabel”',
+    ]);
+    press('Enter');
+    expect(open).toHaveBeenCalledWith('https://www.amazon.de/s?k=usb+kabel');
+  });
+
+  it('turns each tool into a prefix that opens its link', async () => {
+    await reopenWith({ searchEngines: [], tools: [kibana] });
+    type('>k');
+    expect(crumbText()).toContain('Kibana');
+    expect(rowTitles()).toEqual(['Kibana']);
+    type('timeout');
+    expect(rowTitles()).toEqual(['Kibana “timeout”']);
+    press('Enter');
+    expect(open).toHaveBeenCalledWith('https://kibana.example/app?q=level%3Aerror+AND+timeout');
+  });
+
+  it('drops the default >l tool when the settings have other tools', async () => {
+    await reopenWith({ searchEngines: [], tools: [kibana] });
+    type('>l');
+    expect(crumbText()).toBeNull();
+  });
+
+  it('leaves out a tool whose prefix a mode of the surface claims', async () => {
+    await reopenWith({ searchEngines: [], tools: [{ ...kibana, prefix: 'p' }] });
+    type('>p');
+    expect(crumbText()).toContain('Prompts');
+  });
+
+  it('keeps the tools listed in the help', async () => {
+    await reopenWith({ searchEngines: [], tools: [kibana] });
+    type('?');
+    await settle();
+    expect(rowTitles()).toContain('>k  Kibana');
   });
 });
 
@@ -917,7 +994,7 @@ describe('prefix modes', () => {
   });
 
   it('lists the prefixes in the hint of an empty palette', () => {
-    expect(hintText()).toBe('↑↓ navigate · ⏎ select · ? help · >b >p >t · esc close');
+    expect(hintText()).toBe('↑↓ navigate · ⏎ select · ? help · >b >p >t >l · esc close');
   });
 
   it('starts outside any mode each time it opens', async () => {
@@ -1163,6 +1240,8 @@ describe('help', () => {
       '>b  Bookmarks',
       '>p  Prompts',
       '>t  Translate',
+      // The default settings' tool, since this surface loads none.
+      '>l  Tsuga logs',
     ]);
     expect(groupRows('Actions — ⏎ runs one')).toEqual([
       'Bookmark this page',

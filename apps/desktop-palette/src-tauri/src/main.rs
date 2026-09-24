@@ -15,6 +15,7 @@ mod entries;
 mod github;
 #[cfg(target_os = "linux")]
 mod layer;
+mod palette_settings;
 mod prompts;
 mod recents;
 mod repos;

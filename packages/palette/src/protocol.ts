@@ -134,6 +134,11 @@ export interface PaletteProtocol {
     request: { path: string; content: string; sha?: string };
     response: NoFields;
   };
+  /**
+   * The raw `PALETTE_SETTINGS_PATH` (`.kh/command-palette.settings.json`), null when the repository
+   * has none; the palette parses it itself. A backend may answer from a cache.
+   */
+  GET_PALETTE_SETTINGS: { request: NoFields; response: { content: string | null } };
   /** GitHub repositories to open, most relevant first — the order is the backend's. */
   LIST_GITHUB_REPOS: {
     request: NoFields;
