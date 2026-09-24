@@ -166,6 +166,10 @@ const CaptureTab = () => (
         cmd="Browser extension"
         label="Pin the current article to the inbox with one click; images saved to .kh/assets/."
       />
+      <CmdRow
+        cmd="Command palette · >q"
+        label="Browser or desktop palette: >q, type, ⏎ → .kh/raw/. Any text in the main search also offers Capture “…”."
+      />
     </Section>
     <Section title="Home-screen shortcuts">
       <p>

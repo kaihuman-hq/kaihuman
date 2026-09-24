@@ -34,6 +34,11 @@ Text is resolved from CLI args, else piped stdin, else `$EDITOR`. This is the
 engine behind the Hyprland `Super+K` overlay — see
 [`apps/cli/scripts/README.md`](../apps/cli/scripts/README.md).
 
+The command palettes (browser extension and `apps/desktop-palette`) write the same kind of file
+with `>q` — or by choosing **Capture “…”** under whatever is typed into the main search. They push
+straight to GitHub with their own token and have no offline spool: a failed push shows the error
+and leaves the text in the input to try again.
+
 ## TUI Key Bindings
 
 ### Main screen

@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-09-24 — Palette: `>q` knowledge capture
+
+Follow-up to the knowledge-capture work (`cli capture`, `/quick-knowledge`): the browser and desktop
+palettes capture too.
+- **`>q` Capture** (`paletteModes`, both surfaces): ⏎ saves what is typed as
+  `.kh/raw/<epoch>-<slug>.md` — first line as the title, the whole text as the body, the same
+  frontmatter `cli capture` writes (`knowledgeNote` in `packages/palette/src/knowledge.ts`). It is a
+  submitting mode, so any text typed into the main search is also offered as **Capture “…”**. The
+  row left afterwards opens the new file in Kaihuman.
+- New request `CAPTURE_KNOWLEDGE { path, content } → { url }`. The service worker and the desktop's
+  Rust backend create the file without a `sha` (GitHub refuses to overwrite) and refuse any path but
+  a file directly in `.kh/raw/` (`isKnowledgePath` / `is_knowledge_path`).
+- `q` joins `BUILT_IN_PALETTE_PREFIXES`, so a settings tool can no longer take it.
+
 ## 2026-09-24 — Palette: lengths ⇄ pixels
 
 - `10 cm to px` (any length unit) shows the pixels at 80, 150 and 300 dpi (`DPIS` in

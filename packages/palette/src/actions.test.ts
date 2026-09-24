@@ -385,6 +385,21 @@ describe('paletteModes', () => {
     expect(await translate.history?.()).toEqual(['b', 'a']);
   });
 
+  it('captures to the knowledge base and offers to open the new file', async () => {
+    answers.CAPTURE_KNOWLEDGE = { url: 'https://app.kaihuman.com/files/x' };
+    const [item] = await submit(mode('q'), 'Read about CRDTs\nlater');
+    const request = sent.at(-1) as { type: string; path: string; content: string };
+    expect(request.type).toBe('CAPTURE_KNOWLEDGE');
+    expect(request.path).toMatch(/^\.kh\/raw\/\d+-read-about-crdts\.md$/);
+    expect(request.content).toContain('\n\nRead about CRDTs\nlater\n');
+    expect(item).toEqual({
+      id: `capture:${request.path}`,
+      title: 'Captured “Read about CRDTs”',
+      subtitle: `${request.path} · ⏎ opens it in Kaihuman`,
+      url: 'https://app.kaihuman.com/files/x',
+    });
+  });
+
   it('lists repositories with their GitHub pages as children', async () => {
     answers.LIST_GITHUB_REPOS = { repos: [{ fullName: 'o/r', description: 'A repo' }] };
     const [repo] = await load(mode('r'));

@@ -84,6 +84,10 @@ pub enum Request {
         #[serde(default)]
         sha: Option<String>,
     },
+    CaptureKnowledge {
+        path: String,
+        content: String,
+    },
     ListGithubRepos,
     ListGithubWork {
         filter: WorkFilter,
@@ -112,6 +116,35 @@ pub enum Request {
 /// Notes are written inside the repo, never to a path that climbs out of it.
 fn is_note_path(path: &str) -> bool {
     !path.starts_with('/') && path.split('/').all(|part| !part.is_empty() && part != "..")
+}
+
+/// Mirrors `isKnowledgePath`: a capture's own file, directly in the knowledge base's inbox.
+fn is_knowledge_path(path: &str) -> bool {
+    path.strip_prefix(".kh/raw/")
+        .and_then(|name| name.strip_suffix(".md"))
+        .is_some_and(|name| {
+            name.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        })
+}
+
+/// No `sha`, so GitHub refuses to write over a file that is already there.
+async fn capture_knowledge(path: &str, content: &str) -> Result<Value, String> {
+    if !is_knowledge_path(path) {
+        return Err(format!("Refusing to write {path}"));
+    }
+    let client = client()?;
+    client
+        .write(
+            path,
+            content,
+            None,
+            "Capture knowledge via the desktop palette",
+        )
+        .await?;
+    Ok(json!({ "url": console_file_url(path, client.repo()) }))
 }
 
 fn client() -> Result<Client, String> {
@@ -461,6 +494,7 @@ pub async fn handle(request: Value) -> Result<Value, String> {
         Request::WriteEntryFile { path, content, sha } => {
             write_entry_file(&path, &content, sha.as_deref()).await
         }
+        Request::CaptureKnowledge { path, content } => capture_knowledge(&path, &content).await,
         Request::ListGithubRepos => list_github_repos().await,
         Request::ListGithubWork { filter } => Ok(json!({ "items": client()?.work(filter).await? })),
         Request::GetPaletteSettings => get_palette_settings().await,
@@ -689,6 +723,38 @@ mod tests {
         for url in ["javascript:alert(1)", "file:///etc/passwd", "not a url"] {
             assert_eq!(open_url(url).unwrap_err(), "Refusing to open that URL");
         }
+    }
+
+    #[test]
+    fn captures_knowledge_only_into_the_inbox() {
+        assert_eq!(
+            parse(json!({ "type": "CAPTURE_KNOWLEDGE", "path": ".kh/raw/1-a.md", "content": "x" })),
+            Request::CaptureKnowledge {
+                path: ".kh/raw/1-a.md".into(),
+                content: "x".into()
+            }
+        );
+        assert!(is_knowledge_path(".kh/raw/1758700000000-a-thought.md"));
+        for bad in [
+            ".kh/raw/processed/1-a.md",
+            ".kh/raw/../x.md",
+            ".kh/wiki/1-a.md",
+            ".kh/raw/1-a.txt",
+            "/.kh/raw/1-a.md",
+            ".kh/raw/.md",
+            ".kh/raw/-a.md",
+        ] {
+            assert!(!is_knowledge_path(bad), "{bad} should be refused");
+        }
+    }
+
+    #[tokio::test]
+    async fn refuses_a_capture_outside_the_inbox() {
+        let error =
+            handle(json!({ "type": "CAPTURE_KNOWLEDGE", "path": "README.md", "content": "x" }))
+                .await
+                .unwrap_err();
+        assert_eq!(error, "Refusing to write README.md");
     }
 
     #[test]

@@ -10,7 +10,12 @@ import {
   serializeTimeTracking,
   toggleStartStop,
 } from '@lifosy/formats';
-import { type GithubWorkFilter, withModeRecent, withTranslationText } from '@lifosy/palette';
+import {
+  type GithubWorkFilter,
+  isKnowledgePath,
+  withModeRecent,
+  withTranslationText,
+} from '@lifosy/palette';
 import { type Message } from '../types';
 import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
@@ -1157,6 +1162,15 @@ async function writeEntryFile(path: string, content: string, sha?: string) {
   return {};
 }
 
+/** Creates the palette's capture — no `sha`, so GitHub refuses to write over an existing file. */
+async function captureKnowledge(path: string, content: string) {
+  if (!isKnowledgePath(path)) throw new Error(`Refusing to write ${path}`);
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  await githubWriteFile(token, repo, path, content);
+  return { url: consoleFileUrl(path, repo) };
+}
+
 /** How fresh the start page's data is, and what is still waiting to be pushed. */
 async function syncStatus() {
   const { repo } = await credentials();
@@ -1396,6 +1410,10 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       writeEntryFile(message.path || '', message.content ?? '', message.sha),
       sendResponse,
     );
+  }
+
+  if (message.type === 'CAPTURE_KNOWLEDGE') {
+    return answer(captureKnowledge(message.path || '', message.content ?? ''), sendResponse);
   }
 
   if (message.type === 'TRANSLATE') {

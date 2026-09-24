@@ -34,6 +34,7 @@ way.
 | `>w` GitHub work — review requests, what is assigned to you, your PRs with failing checks | ✓ |
 | `>k` convert — colors, number bases, arithmetic, timestamps, metric ⇄ US units (`5 km`, `350 °F`, `5'11"`, `5 km in ft`), lengths ⇄ pixels at 80/150/300 dpi (`10 cm to px`, `1000 px`), letter case, Lorem ipsum; also offered inline for a color, sum, `0x…`, timestamp or quantity typed into the main search | ✓ (copying with `wl-copy`) |
 | `>s` symbols, emoji and kaomoji by name, ⏎ copies | ✓ |
+| `>q` capture to the knowledge base — what is typed becomes `.kh/raw/<epoch>-<slug>.md` for `/kb-ingest`, as `cli capture` writes it; also offered as **Capture “…”** for any text in the main search | ✓ (pushes directly; no offline spool — `cli capture` has one) |
 | A prefix that a longer one starts with (`>l` next to `>le`) is entered after a space | ✓ |
 | `>f` files — todo lists, action logs, events, prompts, commands: open one in Kaihuman or add an entry as its widget does (also from ⇥ repo-search hits) | ✓ |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |
