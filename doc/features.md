@@ -11,6 +11,9 @@
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
 | Command palette settings (`.kh/command-palette.settings.json`) — search engines and `>`-prefixed link tools with parameters, added, removed and reordered in a widget | New File → Command Palette Settings | 2026-09-24 |
+| Metric ⇄ US customary units in the palette's conversions — length (and heights in feet and inches), mass, volume, area, speed, temperature; `5 km in ft` for one unit; lengths ⇄ pixels at 80, 150 and 300 dpi (`10 cm to px`, `1000 px`) | command palette, desktop palette (main search and `>k`) | 2026-09-24 |
+| `>w` GitHub work (review requests, assigned, your PRs with failing checks), `>k` conversions (colors, number bases, arithmetic, timestamps, case, Lorem ipsum; inline in the main search for colors, sums and timestamps), `>s` symbols, emoji and kaomoji; a prefix that a longer one starts with is entered after a space | command palette, desktop palette | 2026-09-24 |
+| `>a` ask AI — the typed question to ChatGPT, Claude, Gemini, GitHub Copilot or Perplexity (configurable assistants, also in the settings widget); default link tools `>e` LEO, `>m` Google Maps, `>n` npm, `>i` IMDb | command palette, desktop palette, Command Palette Settings widget | 2026-09-24 |
 | Read it later: **CLEAR ALL** empties the reading list after a confirmation | Read it later widget | 2026-09-24 |
 | Wiki view: clickable `[[wikilinks]]`, backlinks, page type and tags, tag filter, repo-stored images | `/wiki` | 2026-09-23 |
 | Knowledge base commands: `/kb-ask --save` files answers, new `/kb-digest` for personal data, interactive `/kb-ingest`, `/kb-lint` stale claims and suggestions | `/knowledge` → Commands | 2026-09-23 |
@@ -39,11 +42,11 @@
 | Recent per prefix: each palette mode lists the last 10 entries chosen in it first | command palette, desktop palette | 2026-09-24 |
 | One shared way to add todos, action log entries, events, prompts and commands (`packages/formats`), used by the console, popup, start page and palettes alike | all apps | 2026-09-24 |
 | Widget entries from the palette: ⏎ on a todo list, action log, events, prompts or commands file (from `>f` or ⇥ repo search) offers **Open in Kaihuman** or **Add …**, written as the console widget's Add form writes it | command palette, desktop palette | 2026-09-24 |
-| `>g` GitHub search (repository, then issues or pull requests, then the term) and `>l` the console team's logs in Tsuga | command palette, desktop palette | 2026-09-23 |
+| `>g` GitHub search (repository, then issues or pull requests, then the term) and `>l` Tsuga logs | command palette, desktop palette | 2026-09-23 |
 | `>x` commands from `.commands.md` — fill in parameters, then copy (extension) or copy / run in ghostty / run in the background (desktop) | command palette, desktop palette | 2026-09-23 |
 | Prefixes are `>` plus a letter (`>p`, `>t`…); `>b` lists bookmarks only | command palette, desktop palette | 2026-09-23 |
 | Palette prefix modes: `>p` prompts from the repo's `.prompts.md` files (⏎ copies), `>t` DeepL translation into EN/DE (typed text is offered too; the last 20 texts are kept to translate again), `>r` GitHub repositories with ⇥ for issues, PRs… | command palette (pages and start page) | 2026-09-23 |
-| Web search from the command palette — Google, DuckDuckGo, Ecosia, Amazon, Amazon.de, Reddit by default, by URL only; engines and link tools configurable in `.kh/command-palette.settings.json` (2026-09-24) | command palette (pages and start page), desktop palette | 2026-09-23 |
+| Web search from the command palette — Google, DuckDuckGo, Ecosia, Amazon, Amazon.de, Reddit, Bing, Brave Search, Startpage, Wikipedia, YouTube, GitHub, Stack Overflow, Yahoo, Qwant by default, by URL only; engines and link tools configurable in `.kh/command-palette.settings.json` (2026-09-24) | command palette (pages and start page), desktop palette | 2026-09-23 |
 | Pinned tab groups on the start page — compact cards above the bookmarks; a click loads the group | start page | 2026-09-23 |
 | Pinned bookmarks — always first on the start page; pin/unpin from its cards or the console widget | start page cards, Bookmarks widget | 2026-09-22 |
 | Start page — kaihuman's own New Tab page: palette, recently used bookmarks, dump note | New Tab (`chrome_url_overrides`) | 2026-09-22 |

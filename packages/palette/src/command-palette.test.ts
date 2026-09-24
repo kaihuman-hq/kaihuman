@@ -629,7 +629,33 @@ describe('web search', () => {
       'Search Amazon for “bookmark”',
       'Search Amazon.de for “bookmark”',
       'Search Reddit for “bookmark”',
+      'Search Bing for “bookmark”',
+      'Search Brave Search for “bookmark”',
+      'Search Startpage for “bookmark”',
+      'Search Wikipedia for “bookmark”',
+      'Search YouTube for “bookmark”',
+      'Search GitHub for “bookmark”',
+      'Search Stack Overflow for “bookmark”',
+      'Search Yahoo for “bookmark”',
+      'Search Qwant for “bookmark”',
     ]);
+  });
+
+  it('converts a sum, a color or a timestamp above the web search, and ⏎ copies it', async () => {
+    type('12*7');
+    expect(groupRows('Convert')).toEqual(['84']);
+    expect(groupLabels().indexOf('Convert')).toBeLessThan(groupLabels().indexOf('Web'));
+    press('Enter');
+    await settle();
+    expect(copy).toHaveBeenCalledWith('84');
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('converts nothing for plain text or a plain number', () => {
+    type('rust book');
+    expect(groupLabels()).not.toContain('Convert');
+    type('2024');
+    expect(groupLabels()).not.toContain('Convert');
   });
 
   it('shows nothing to search for until something is typed', () => {
@@ -690,6 +716,7 @@ describe('settings', () => {
         { name: 'Amazon.de', url: 'https://www.amazon.de/s?k={query}', params: [] },
         { name: 'Google', url: 'https://www.google.com/search?q={query}', params: [] },
       ],
+      assistants: [],
       tools: [],
     });
     type('usb kabel');
@@ -702,7 +729,7 @@ describe('settings', () => {
   });
 
   it('turns each tool into a prefix that opens its link', async () => {
-    await reopenWith({ searchEngines: [], tools: [kibana] });
+    await reopenWith({ searchEngines: [], assistants: [], tools: [kibana] });
     type('>k');
     expect(crumbText()).toContain('Kibana');
     expect(rowTitles()).toEqual(['Kibana']);
@@ -713,19 +740,87 @@ describe('settings', () => {
   });
 
   it('drops the default >l tool when the settings have other tools', async () => {
-    await reopenWith({ searchEngines: [], tools: [kibana] });
+    await reopenWith({ searchEngines: [], assistants: [], tools: [kibana] });
     type('>l');
     expect(crumbText()).toBeNull();
   });
 
   it('leaves out a tool whose prefix a mode of the surface claims', async () => {
-    await reopenWith({ searchEngines: [], tools: [{ ...kibana, prefix: 'p' }] });
+    await reopenWith({ searchEngines: [], assistants: [], tools: [{ ...kibana, prefix: 'p' }] });
+    type('>p');
+    expect(crumbText()).toContain('Prompts');
+  });
+
+  it('offers the question to each assistant under >a, and copies it on opening one', async () => {
+    type('>a');
+    expect(crumbText()).toContain('Ask AI');
+    expect(rowTitles()).toEqual(['ChatGPT', 'Claude', 'Gemini', 'GitHub Copilot', 'Perplexity']);
+    type('what is rust');
+    expect(rowTitles()).toEqual([
+      'Ask ChatGPT “what is rust”',
+      'Ask Claude “what is rust”',
+      'Ask Gemini “what is rust”',
+      'Ask GitHub Copilot “what is rust”',
+      'Ask Perplexity “what is rust”',
+    ]);
+    press('ArrowDown');
+    press('Enter');
+    await settle();
+    expect(copy).toHaveBeenCalledWith('what is rust');
+    expect(open).toHaveBeenCalledWith('https://claude.ai/new?q=what+is+rust');
+  });
+
+  it('still opens the assistant when the question cannot be copied', async () => {
+    copy.mockRejectedValueOnce(new Error('No clipboard'));
+    type('>a');
+    type('hi');
+    press('Enter');
+    await settle();
+    expect(open).toHaveBeenCalledWith('https://chatgpt.com/?q=hi');
+  });
+
+  it('has no >a without assistants', async () => {
+    await reopenWith({ searchEngines: [], assistants: [], tools: [] });
+    type('>a');
+    expect(crumbText()).toBeNull();
+  });
+
+  it('waits for a space after a prefix that a longer one starts with', async () => {
+    await reopenWith({
+      searchEngines: [],
+      assistants: [],
+      tools: [kibana, { ...kibana, prefix: 'ki', name: 'Kibana infra' }],
+    });
+    type('>k');
+    expect(crumbText()).toBeNull();
+    expect(hintText()).toContain('space enters >k Kibana');
+    type('>k ');
+    expect(crumbText()).toContain('Kibana');
+    expect(crumbText()).not.toContain('infra');
+  });
+
+  it('enters the longer prefix as soon as it is typed', async () => {
+    await reopenWith({
+      searchEngines: [],
+      assistants: [],
+      tools: [kibana, { ...kibana, prefix: 'ki', name: 'Kibana infra' }],
+    });
+    type('>ki');
+    expect(crumbText()).toContain('Kibana infra');
+  });
+
+  it('enters a prefix no other one starts with right away', async () => {
+    await reopenWith({
+      searchEngines: [],
+      assistants: [],
+      tools: [kibana, { ...kibana, prefix: 'ki', name: 'Kibana infra' }],
+    });
     type('>p');
     expect(crumbText()).toContain('Prompts');
   });
 
   it('keeps the tools listed in the help', async () => {
-    await reopenWith({ searchEngines: [], tools: [kibana] });
+    await reopenWith({ searchEngines: [], assistants: [], tools: [kibana] });
     type('?');
     await settle();
     expect(rowTitles()).toContain('>k  Kibana');
@@ -994,7 +1089,9 @@ describe('prefix modes', () => {
   });
 
   it('lists the prefixes in the hint of an empty palette', () => {
-    expect(hintText()).toBe('↑↓ navigate · ⏎ select · ? help · >b >p >t >l · esc close');
+    expect(hintText()).toBe(
+      '↑↓ navigate · ⏎ select · ? help · >b >p >t >a >l >e >m >n >i · esc close',
+    );
   });
 
   it('starts outside any mode each time it opens', async () => {
@@ -1240,8 +1337,13 @@ describe('help', () => {
       '>b  Bookmarks',
       '>p  Prompts',
       '>t  Translate',
-      // The default settings' tool, since this surface loads none.
+      // The default settings' assistants and tools, since this surface loads none.
+      '>a  Ask AI',
       '>l  Tsuga logs',
+      '>e  LEO',
+      '>m  Google Maps',
+      '>n  npm',
+      '>i  IMDb',
     ]);
     expect(groupRows('Actions — ⏎ runs one')).toEqual([
       'Bookmark this page',

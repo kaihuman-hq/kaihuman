@@ -18,6 +18,7 @@ import {
   type PaletteToolSetting,
 } from '@lifosy/formats';
 import { type Bookmark, searchBookmarks } from './bookmarks.js';
+import { conversionItems } from './convert.js';
 
 export interface RepoResult {
   path: string;
@@ -143,6 +144,10 @@ export type PaletteMode = {
       /** The one entry for what is typed, even nothing — a search page to open, say. */
       link: (query: string) => ModeItem;
     }
+  | {
+      /** The entries for what is typed, in order and unfiltered — one per AI assistant, say. */
+      links: (query: string) => ModeItem[];
+    }
 );
 
 export interface PaletteHandlers {
@@ -160,8 +165,8 @@ export interface PaletteHandlers {
   /** Counts one open of a bookmark, so unused ones can be found later. */
   countBookmarkUse: (id: string) => void;
   /**
-   * The repository's search engines and link tools, loaded each time the palette opens; until
-   * they are (or without this), the defaults.
+   * The repository's search engines, AI assistants and link tools, loaded each time the palette
+   * opens; until they are (or without this), the defaults.
    */
   loadSettings?: () => Promise<CommandPaletteSettings>;
   modes: readonly PaletteMode[];
@@ -381,10 +386,21 @@ const MODE_MARK = '>';
  * `>p query` → the mode `p` and `query`, for any prefix a mode claims. The prefix must end there,
  * so `>p` switches as soon as the letter is typed while `>prompt` stays plain text.
  */
+/** Whether a longer prefix starts with `prefix` — `>l` while there is `>le` — so `>l` waits. */
+const isShadowing = (prefix: string, modes: readonly PaletteMode[]) =>
+  modes.some((candidate) => candidate.prefix !== prefix && candidate.prefix.startsWith(prefix));
+
+/**
+ * The mode typed at the start of the input: entered as soon as its prefix is typed, or — when a
+ * longer prefix starts the same way (`>l` and `>le`) — once a space follows it.
+ */
 const modePrefix = (value: string, modes: readonly PaletteMode[]) => {
-  const match = /^>(\w+)(?:\s+|$)/.exec(value);
-  const mode = match && modes.find((candidate) => candidate.prefix === match[1]);
-  return mode && match ? { mode, rest: value.slice(match[0].length) } : null;
+  const match = /^>(\w+)(\s+|$)/.exec(value);
+  if (!match) return null;
+  const [typed, prefix = '', space] = match;
+  const mode = modes.find((candidate) => candidate.prefix === prefix);
+  if (!mode || (!space && isShadowing(prefix, modes))) return null;
+  return { mode, rest: value.slice(typed.length) };
 };
 
 /** A tool from the settings as a mode: `>l term` offers the one link built from `term`. */
@@ -738,6 +754,7 @@ export function createCommandPalette(
     if (!mode) return [];
     if (mode.parent) return filterModeItems(mode.parent.children ?? [], input.value);
     if ('link' in mode.mode) return withRecents(mode, [mode.mode.link(input.value.trim())]);
+    if ('links' in mode.mode) return mode.mode.links(input.value.trim());
     if (mode.mode === bookmarksMode) {
       return withRecents(
         mode,
@@ -761,6 +778,16 @@ export function createCommandPalette(
     selected = 0;
     render();
     return true;
+  };
+
+  const copyAndClose = async (text: string) => {
+    try {
+      await handlers.copy(text);
+      close();
+    } catch (e: any) {
+      setStatus(e?.message || 'Could not copy that');
+      render();
+    }
   };
 
   const chooseItem = async (item: ModeItem) => {
@@ -790,13 +817,7 @@ export function createCommandPalette(
       return;
     }
     if (item.copy !== undefined) {
-      try {
-        await handlers.copy(item.copy);
-        close();
-      } catch (e: any) {
-        setStatus(e?.message || 'Could not copy that');
-        render();
-      }
+      await copyAndClose(item.copy);
       return;
     }
     showChildren(item);
@@ -847,18 +868,55 @@ export function createCommandPalette(
     load: async () => [],
   };
 
+  /**
+   * `>a`: the question, offered to each assistant in the settings. Opening one also copies the
+   * question, since some assistants (Gemini, Copilot) open an empty chat whatever the link says.
+   */
+  const assistantsMode: PaletteMode = {
+    prefix: 'a',
+    title: 'Ask AI',
+    placeholder: 'Ask a question — ⏎ opens it in the assistant',
+    description:
+      'Opens a new chat with an AI assistant, the question filled in or on the clipboard',
+    recents: false,
+    links: (question) =>
+      settings.assistants.map((assistant) => {
+        const url = buildLinkUrl(assistant, question);
+        return {
+          id: `ai:${assistant.name.toLowerCase()}:${question}`,
+          title: question ? `Ask ${assistant.name} “${question}”` : assistant.name,
+          subtitle: url,
+          choose: () => void askAssistant(assistant.name, question, url),
+        };
+      }),
+  };
+
+  const askAssistant = async (name: string, question: string, url: string) => {
+    // A failed copy leaves the question in the link, where most assistants read it anyway.
+    if (question) await handlers.copy(question).catch(() => undefined);
+    openUrl({ id: `ai:${name.toLowerCase()}:${question}`, title: `${name}: ${question}`, url });
+  };
+
   /** A tool whose prefix a mode of the palette or the surface claims is left out. */
   const applySettings = (next: CommandPaletteSettings) => {
     settings = next;
     const claimed = new Set(
-      [bookmarksMode, ...handlers.modes].map((candidate) => candidate.prefix),
+      [bookmarksMode, assistantsMode, ...handlers.modes].map((candidate) => candidate.prefix),
     );
     toolModes = next.tools.filter((tool) => !claimed.has(tool.prefix)).map(toolMode);
   };
   applySettings(settings);
 
-  /** Every mode on this surface: the palette's own first, then the surface's, then the tools. */
-  const allModes = () => [bookmarksMode, ...handlers.modes, ...toolModes];
+  /**
+   * Every mode on this surface: the palette's own first, then the surface's, then `>a` (while
+   * there are assistants), then the tools.
+   */
+  const allModes = () => [
+    bookmarksMode,
+    ...handlers.modes,
+    ...(settings.assistants.length ? [assistantsMode] : []),
+    ...toolModes,
+  ];
 
   /**
    * `?`: everything the palette can do, for this surface — its prefixes, what searching does, the
@@ -974,6 +1032,16 @@ export function createCommandPalette(
     }));
   };
 
+  /** What is typed, converted — a color, `0x1f`, `12*7`, a timestamp; ⏎ copies the result. */
+  const convertRows = (): Row[] => {
+    if (trail.length > 0) return [];
+    return conversionItems(input.value).map((item) => ({
+      title: item.title,
+      subtitle: item.subtitle ?? '',
+      activate: () => void copyAndClose(item.copy ?? item.title),
+    }));
+  };
+
   /** One row per engine for whatever is typed; opening one is opening its results page. */
   const webRows = (): Row[] => {
     const query = input.value.trim();
@@ -1018,6 +1086,7 @@ export function createCommandPalette(
       ...bookmarkRows(),
       ...repoRows(),
       ...actionRows(),
+      ...convertRows(),
       ...webRows(),
       ...submitOfferRows(),
     ];
@@ -1143,6 +1212,7 @@ export function createCommandPalette(
     const recent = recentRows();
     const bookmarkMatches = bookmarkRows();
     const repoMatches = repoRows();
+    const converted = convertRows();
     const web = webRows();
     const offers = submitOfferRows();
     const actions = actionRows();
@@ -1154,6 +1224,7 @@ export function createCommandPalette(
         recent.length +
         bookmarkMatches.length +
         repoMatches.length +
+        converted.length +
         web.length +
         offers.length +
         actions.length;
@@ -1234,6 +1305,8 @@ export function createCommandPalette(
         );
       }
       addGroup(here ? here.title : 'Actions', actions);
+      // A conversion is what a sum or a color was typed for, so it comes before the web search.
+      addGroup('Convert', converted);
       // Last, so typing an action's name and pressing Enter runs it; with nothing else matching,
       // the first row is a web search.
       addGroup('Web', web);
@@ -1246,6 +1319,11 @@ export function createCommandPalette(
     });
 
     const query = input.value.trim();
+    // A prefix typed in full that did not enter its mode waits for a space: a longer one shares it.
+    const waitingPrefix = /^>(\w+)$/.exec(input.value)?.[1];
+    const waiting = waitingPrefix
+      ? allModes().find((candidate) => candidate.prefix === waitingPrefix)
+      : undefined;
     // Letters only, to fit one line; `?` names what each one is.
     const prefixes = `${HELP_PREFIX} help · ${allModes()
       .map((candidate) => `${MODE_MARK}${candidate.prefix}`)
@@ -1261,6 +1339,8 @@ export function createCommandPalette(
       else if (unanswered) hint.textContent = `⏎ ${mode.mode.title.toLowerCase()} · esc back`;
       else hint.textContent = `↑↓ navigate · ⏎ select${more} · esc back`;
     } else if (here) hint.textContent = '↑↓ navigate · ⏎ select · esc back';
+    else if (waiting)
+      hint.textContent = `space enters ${MODE_MARK}${waiting.prefix} ${waiting.title} · or keep typing · esc close`;
     else if (!query) hint.textContent = `↑↓ navigate · ⏎ select · ${prefixes} · esc close`;
     else if (repoResults && repoQuery === query) hint.textContent = '⏎ select · esc close';
     else hint.textContent = `⇥ tab search repo for “${query}” · ⏎ select · esc close`;

@@ -33,6 +33,7 @@ export interface Message {
     | 'ADD_TRANSLATION_HISTORY'
     | 'SET_TRANSLATION_KEY'
     | 'LIST_GITHUB_REPOS'
+    | 'LIST_GITHUB_WORK'
     | 'GET_PALETTE_SETTINGS'
     | 'TOGGLE_COMMAND_PALETTE'
     | 'GET_TODAY'
@@ -71,6 +72,8 @@ export interface Message {
   content?: string;
   /** `WRITE_ENTRY_FILE`: the version the text was built on. */
   sha?: string;
+  /** `LIST_GITHUB_WORK`: which search; checked, since it comes from the page. */
+  filter?: string;
 }
 
 export interface MessageResponse {

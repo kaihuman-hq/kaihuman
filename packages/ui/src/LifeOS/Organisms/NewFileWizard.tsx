@@ -162,7 +162,7 @@ const TEMPLATES: Template[] = [
     id: 'command-palette-settings',
     name: 'Command Palette Settings',
     description:
-      'Search engines and link tools (like >l Tsuga logs) for the extension and desktop palettes. Read from .kh/command-palette.settings.json.',
+      'Search engines, AI assistants (>a) and link tools (like >l Tsuga logs) for the extension and desktop palettes. Read from .kh/command-palette.settings.json.',
     icon: Command,
     extension: '.settings.json',
     defaultContent: serializePaletteSettings(DEFAULT_PALETTE_SETTINGS),

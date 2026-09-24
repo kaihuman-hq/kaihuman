@@ -14,7 +14,7 @@ way.
 | In the palette | Desktop |
 | --- | --- |
 | Bookmarks from `.kh/browser.bookmarks.json`, searched as you type | ✓ (cached for an hour, refreshed in the background) |
-| Web search: Google, DuckDuckGo, Ecosia, Amazon, Amazon.de, Reddit — or the engines in `.kh/command-palette.settings.json` | ✓ |
+| Web search: Google, DuckDuckGo, Ecosia, Amazon, Amazon.de, Reddit, Bing, Brave Search, Startpage, Wikipedia, YouTube, GitHub, Stack Overflow, Yahoo, Qwant — or the engines in `.kh/command-palette.settings.json` | ✓ |
 | ⇥ Tab: GitHub code search in the repo, opened in the console | ✓ |
 | Add a note… (dump, quick-note files, `.actionlog.md` with `#tags`) | ✓ |
 | Recent, Switch repository…, Sync with GitHub now, Open the Lifosy console | ✓ |
@@ -27,8 +27,14 @@ way.
 | `>u` Claude usage — rate limits, pace, resets and spend per account; the last fetch shows at once with its age (green under 15 min, yellow up to an hour, red beyond), synced in the background once 5 min old | ✓ desktop only |
 | `>r` GitHub repositories, ⇥ for issues, pull requests, actions… | ✓, and omarchy's `~/.config/eee/counts` ranks the ones you open most first |
 | `>g` GitHub search — pick a repository, then issues or pull requests, then type the search term | ✓, repositories ranked as in `>r` |
-| `>l` logs — the console team's logs in Tsuga's explorer, filtered by what is typed; more link tools from `.kh/command-palette.settings.json` (see the extension's README, "Palette settings") | ✓ (settings cached in `$XDG_CACHE_HOME/lifosy/palette-settings.json` for five minutes) |
+| `>a` ask AI — the question to ChatGPT, Claude, Gemini, GitHub Copilot or Perplexity in a new chat, also copied for the ones that do not read it from the link; assistants from `.kh/command-palette.settings.json` | ✓ (copying with `wl-copy`) |
+| `>e` LEO dictionary, `>m` Google Maps, `>n` npm, `>i` IMDb — default link tools like `>l` | ✓ |
+| `>l` logs — Tsuga's log explorer, searching for what is typed; more link tools from `.kh/command-palette.settings.json` (see the extension's README, "Palette settings") | ✓ (settings cached in `$XDG_CACHE_HOME/lifosy/palette-settings.json` for five minutes) |
 | Recent: each prefix lists the last 10 entries chosen in it first (kept in `$XDG_STATE_HOME/lifosy/mode-recents.json`) | ✓ |
+| `>w` GitHub work — review requests, what is assigned to you, your PRs with failing checks | ✓ |
+| `>k` convert — colors, number bases, arithmetic, timestamps, metric ⇄ US units (`5 km`, `350 °F`, `5'11"`, `5 km in ft`), lengths ⇄ pixels at 80/150/300 dpi (`10 cm to px`, `1000 px`), letter case, Lorem ipsum; also offered inline for a color, sum, `0x…`, timestamp or quantity typed into the main search | ✓ (copying with `wl-copy`) |
+| `>s` symbols, emoji and kaomoji by name, ⏎ copies | ✓ |
+| A prefix that a longer one starts with (`>l` next to `>le`) is entered after a space | ✓ |
 | `>f` files — todo lists, action logs, events, prompts, commands: open one in Kaihuman or add an entry as its widget does (also from ⇥ repo-search hits) | ✓ |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |
 | Counting how often a bookmark is opened | — the extension counts; the desktop does not yet |

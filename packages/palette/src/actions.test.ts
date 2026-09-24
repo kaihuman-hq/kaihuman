@@ -147,11 +147,13 @@ describe('portHandlers', () => {
           { name: 'Amazon.de', url: 'https://www.amazon.de/s?k={query}' },
           { name: 'Bad', url: 'javascript:x' },
         ],
+        assistants: [],
         tools: [],
       }),
     };
     expect(await handlers.loadSettings?.()).toEqual({
       searchEngines: [{ name: 'Amazon.de', url: 'https://www.amazon.de/s?k={query}', params: [] }],
+      assistants: [],
       tools: [],
     });
   });
@@ -223,6 +225,66 @@ describe('fileChoices', () => {
 });
 
 describe('paletteModes', () => {
+  const work = (url: string, over: object = {}) => ({
+    repo: 'o/r',
+    number: Number(url.split('/').at(-1)),
+    title: `Item ${url.split('/').at(-1)}`,
+    url,
+    pullRequest: true,
+    updatedAt: '2026-09-24T08:00:00Z',
+    ...over,
+  });
+
+  it('>w lists what waits on you on GitHub, each once, under the first search that found it', async () => {
+    const byFilter = {
+      'review-requested': [work('https://github.com/o/r/pull/1')],
+      assigned: [
+        work('https://github.com/o/r/pull/1'),
+        work('https://github.com/o/r/issues/2', { pullRequest: false }),
+      ],
+      failing: [work('https://github.com/o/r/pull/3')],
+    };
+    const port: ActionPort = {
+      send: async (request) => {
+        sent.push(request);
+        if (request.type !== 'LIST_GITHUB_WORK') throw new Error(`no answer for ${request.type}`);
+        const { filter } = request as { filter: keyof typeof byFilter };
+        return { items: byFilter[filter] } as never;
+      },
+    };
+    const found = paletteModes(port).find((candidate) => candidate.prefix === 'w');
+    if (!found) throw new Error('no mode w');
+    const items = await load(found);
+    expect(sent).toEqual([
+      { type: 'LIST_GITHUB_WORK', filter: 'review-requested' },
+      { type: 'LIST_GITHUB_WORK', filter: 'assigned' },
+      { type: 'LIST_GITHUB_WORK', filter: 'failing' },
+    ]);
+    expect(items.map((item) => [item.group, item.title, item.url])).toEqual([
+      ['Review requested', 'Item 1', 'https://github.com/o/r/pull/1'],
+      ['Assigned to you', 'Item 2', 'https://github.com/o/r/issues/2'],
+      ['Your pull requests with failing checks', 'Item 3', 'https://github.com/o/r/pull/3'],
+    ]);
+    expect(items[1]?.subtitle).toBe('o/r#2 · issue · updated 2026-09-24');
+  });
+
+  it('>w says so when nothing waits on you', async () => {
+    answers.LIST_GITHUB_WORK = { items: [] };
+    await expect(load(mode('w'))).rejects.toThrow('Nothing on GitHub is waiting on you');
+  });
+
+  it('>k converts what is typed, >s lists symbols to copy', async () => {
+    const convert = mode('k');
+    if (!('links' in convert)) throw new Error('>k lists no links');
+    expect(convert.links('0x1f').map((item) => item.copy)).toEqual(['31', '0b11111', '0o37']);
+    const symbols = await load(mode('s'));
+    expect(symbols.find((item) => item.title === '→  Right arrow')).toMatchObject({
+      copy: '→',
+      group: 'Arrows',
+    });
+    expect(symbols.find((item) => item.copy === '\u00a0')?.title).toBe('␣  Non-breaking space');
+  });
+
   it('>f lists the files widgets add to, each leading to its choices', async () => {
     answers.LIST_ENTRY_FILES = {
       files: [{ path: 'a/b.actionlog.md', name: 'b.actionlog.md', url: 'https://x/b' }],

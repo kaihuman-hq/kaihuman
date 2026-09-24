@@ -10,7 +10,7 @@ import {
   serializeTimeTracking,
   toggleStartStop,
 } from '@lifosy/formats';
-import { withModeRecent, withTranslationText } from '@lifosy/palette';
+import { type GithubWorkFilter, withModeRecent, withTranslationText } from '@lifosy/palette';
 import { type Message } from '../types';
 import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
@@ -19,9 +19,11 @@ import {
   fetchEntryFilePaths,
   fetchPromptFiles,
   isEntryFilePath,
+  isGithubWorkFilter,
   isPromptsCacheStale,
   listGithubRepos,
   type PromptsCache,
+  searchGithubWork,
   translateWithDeepl,
 } from './palette-modes';
 import {
@@ -914,6 +916,12 @@ async function setTranslationKey(key: string) {
   else await chrome.storage.local.remove('deepl_key');
 }
 
+async function githubWork(filter: GithubWorkFilter) {
+  const { token } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  return searchGithubWork(token, filter);
+}
+
 async function githubRepos() {
   const { token } = await credentials();
   if (!token) throw new Error(NOT_LOGGED_IN);
@@ -1423,6 +1431,18 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   }
 
   if (message.type === 'GET_PALETTE_SETTINGS') return answer(paletteSettings(), sendResponse);
+
+  if (message.type === 'LIST_GITHUB_WORK') {
+    if (!isGithubWorkFilter(message.filter)) {
+      sendResponse({ error: 'Unknown GitHub work filter' });
+      return false;
+    }
+    githubWork(message.filter).then(
+      (items) => sendResponse({ success: true, items }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
 
   if (message.type === 'LIST_GITHUB_REPOS') {
     githubRepos().then(

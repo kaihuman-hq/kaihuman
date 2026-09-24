@@ -5,7 +5,14 @@
  * The desktop palette answers the same requests from Rust (apps/desktop-palette/src-tauri), so the
  * two stay in step: same files, same endpoints, same error messages.
  */
-import { ENTRY_SUFFIXES, entryKindOf, type Translation } from '@lifosy/palette';
+import {
+  ENTRY_SUFFIXES,
+  entryKindOf,
+  GITHUB_WORK_QUERIES,
+  type GithubWorkFilter,
+  type GithubWorkItem,
+  type Translation,
+} from '@lifosy/palette';
 
 export interface PromptFile {
   path: string;
@@ -128,6 +135,48 @@ export async function translateWithDeepl(
       return { target, text: first.text, detectedSource: first.detected_source_language };
     }),
   );
+}
+
+/** Whether the palette's filter is one of `GITHUB_WORK_QUERIES` — it comes from the page. */
+export const isGithubWorkFilter = (filter: unknown): filter is GithubWorkFilter =>
+  typeof filter === 'string' && Object.hasOwn(GITHUB_WORK_QUERIES, filter);
+
+interface IssueSearchItem {
+  number: number;
+  title: string;
+  html_url: string;
+  repository_url: string;
+  updated_at: string;
+  pull_request?: unknown;
+}
+
+/** One issue search for `>w`, most recently updated first. */
+export async function searchGithubWork(
+  token: string,
+  filter: GithubWorkFilter,
+): Promise<GithubWorkItem[]> {
+  const query = new URLSearchParams({
+    q: GITHUB_WORK_QUERIES[filter],
+    sort: 'updated',
+    order: 'desc',
+    per_page: '30',
+  });
+  const response = await fetch(`https://api.github.com/search/issues?${query}`, {
+    headers: githubHeaders(token),
+  });
+  if (response.status === 403 || response.status === 429)
+    throw new Error('GitHub search is rate limited — try again in a minute');
+  if (!response.ok) throw new Error(`GitHub search failed: ${response.status}`);
+  const { items = [] }: { items?: IssueSearchItem[] } = await response.json();
+  return items.map((item) => ({
+    // `https://api.github.com/repos/owner/name` → `owner/name`.
+    repo: item.repository_url.split('/').slice(-2).join('/'),
+    number: item.number,
+    title: item.title,
+    url: item.html_url,
+    pullRequest: item.pull_request !== undefined,
+    updatedAt: item.updated_at,
+  }));
 }
 
 /** The repositories the token can see, most recently pushed first — GitHub's own order. */

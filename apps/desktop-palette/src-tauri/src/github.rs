@@ -4,7 +4,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use reqwest::StatusCode;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The Lifosy console — where a repo file is opened, rather than on GitHub.
 pub const CONSOLE_URL: &str = "https://app.kaihuman.com";
@@ -95,6 +95,74 @@ pub struct UserRepo {
     pub full_name: String,
     #[serde(default)]
     pub description: Option<String>,
+}
+
+/// What `>w` searches; mirrors `GITHUB_WORK_QUERIES` in packages/palette/src/protocol.ts.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum WorkFilter {
+    ReviewRequested,
+    Assigned,
+    Failing,
+}
+
+impl WorkFilter {
+    pub fn query(self) -> &'static str {
+        match self {
+            Self::ReviewRequested => "is:open is:pr archived:false review-requested:@me",
+            Self::Assigned => "is:open archived:false assignee:@me",
+            Self::Failing => "is:open is:pr archived:false author:@me status:failure",
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct IssueSearchResponse {
+    #[serde(default)]
+    items: Vec<IssueSearchItem>,
+}
+
+#[derive(Deserialize)]
+struct IssueSearchItem {
+    number: u64,
+    title: String,
+    html_url: String,
+    repository_url: String,
+    updated_at: String,
+    /// Set only on pull requests.
+    #[serde(default)]
+    pull_request: Option<serde_json::Value>,
+}
+
+/// One issue or pull request, as `GithubWorkItem` in the palette's protocol.
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkItem {
+    pub repo: String,
+    pub number: u64,
+    pub title: String,
+    pub url: String,
+    pub pull_request: bool,
+    pub updated_at: String,
+}
+
+impl From<IssueSearchItem> for WorkItem {
+    fn from(item: IssueSearchItem) -> Self {
+        // `https://api.github.com/repos/owner/name` → `owner/name`.
+        let parts: Vec<&str> = item.repository_url.rsplitn(3, '/').collect();
+        let repo = match parts.as_slice() {
+            [name, owner, _] => format!("{owner}/{name}"),
+            _ => item.repository_url.clone(),
+        };
+        Self {
+            repo,
+            number: item.number,
+            title: item.title,
+            url: item.html_url,
+            pull_request: item.pull_request.is_some(),
+            updated_at: item.updated_at,
+        }
+    }
 }
 
 pub struct SearchHit {
@@ -230,6 +298,31 @@ impl Client {
         }
     }
 
+    /// One issue search for `>w`, most recently updated first.
+    pub async fn work(&self, filter: WorkFilter) -> Result<Vec<WorkItem>, String> {
+        let response = self
+            .request(reqwest::Method::GET, &format!("{}/search/issues", self.api))
+            .query(&[
+                ("q", filter.query()),
+                ("sort", "updated"),
+                ("order", "desc"),
+                ("per_page", "30"),
+            ])
+            .send()
+            .await
+            .map_err(network_error)?;
+        match response.status() {
+            StatusCode::FORBIDDEN | StatusCode::TOO_MANY_REQUESTS => {
+                Err("GitHub search is rate limited — try again in a minute".into())
+            }
+            status if !status.is_success() => Err(format!("GitHub search failed: {status}")),
+            _ => {
+                let body: IssueSearchResponse = response.json().await.map_err(network_error)?;
+                Ok(body.items.into_iter().map(WorkItem::from).collect())
+            }
+        }
+    }
+
     /// Every path on the default branch, in one recursive listing.
     pub async fn tree(&self) -> Result<Vec<TreeEntry>, String> {
         let url = format!(
@@ -331,6 +424,52 @@ mod tests {
         assert_eq!(with_lines("", "- new", true), "- new");
         assert_eq!(with_lines("- old", "- new", true), "- new\n\n- old");
         assert_eq!(with_lines("- old", "- new", false), "- old\n\n- new");
+    }
+
+    #[test]
+    fn reads_an_issue_search_hit_as_the_palette_expects() {
+        let body: IssueSearchResponse = serde_json::from_value(serde_json::json!({
+            "items": [
+                {
+                    "number": 7,
+                    "title": "Fix the sync",
+                    "html_url": "https://github.com/o/r/pull/7",
+                    "repository_url": "https://api.github.com/repos/o/r",
+                    "updated_at": "2026-09-24T08:00:00Z",
+                    "pull_request": {}
+                },
+                {
+                    "number": 8,
+                    "title": "Crash",
+                    "html_url": "https://github.com/o/r/issues/8",
+                    "repository_url": "https://api.github.com/repos/o/r",
+                    "updated_at": "2026-09-23T08:00:00Z"
+                }
+            ]
+        }))
+        .unwrap();
+        let items: Vec<WorkItem> = body.items.into_iter().map(WorkItem::from).collect();
+        assert_eq!(
+            serde_json::to_value(&items).unwrap(),
+            serde_json::json!([
+                {
+                    "repo": "o/r",
+                    "number": 7,
+                    "title": "Fix the sync",
+                    "url": "https://github.com/o/r/pull/7",
+                    "pullRequest": true,
+                    "updatedAt": "2026-09-24T08:00:00Z"
+                },
+                {
+                    "repo": "o/r",
+                    "number": 8,
+                    "title": "Crash",
+                    "url": "https://github.com/o/r/issues/8",
+                    "pullRequest": false,
+                    "updatedAt": "2026-09-23T08:00:00Z"
+                }
+            ])
+        );
     }
 
     #[test]

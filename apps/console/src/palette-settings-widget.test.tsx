@@ -63,7 +63,7 @@ describe('CommandPaletteSettingsWidget', () => {
   it('sums the engines and tools up on the dashboard', () => {
     mount(DEFAULTS, 'SMALL');
     expect(host.textContent).toContain(
-      'Google · DuckDuckGo · Ecosia · Amazon · Amazon.de · Reddit',
+      'Google · DuckDuckGo · Ecosia · Amazon · Amazon.de · Reddit · Bing · Brave Search · Startpage · Wikipedia · YouTube · GitHub · Stack Overflow · Yahoo · Qwant',
     );
     expect(host.textContent).toContain('>l Tsuga logs');
   });
@@ -82,6 +82,15 @@ describe('CommandPaletteSettingsWidget', () => {
       'Amazon.de',
       'Ecosia',
       'Amazon',
+      'Bing',
+      'Brave Search',
+      'Startpage',
+      'Wikipedia',
+      'YouTube',
+      'GitHub',
+      'Stack Overflow',
+      'Yahoo',
+      'Qwant',
     ]);
   });
 
@@ -97,12 +106,13 @@ describe('CommandPaletteSettingsWidget', () => {
   it('adds a tool with extra parameters', () => {
     const onChange = mount(DEFAULTS, 'FOCUS');
     click('Tool');
-    typeInto(inputs('Tool prefix')[1], 'K');
-    typeInto(inputs('Tool name')[1], 'Kibana');
-    typeInto(inputs('Tool URL')[1], 'https://kibana.example/app');
-    const addParameter = [...host.querySelectorAll('button')].filter(
+    typeInto(inputs('Tool prefix').at(-1), 'K');
+    typeInto(inputs('Tool name').at(-1), 'Kibana');
+    typeInto(inputs('Tool URL').at(-1), 'https://kibana.example/app');
+    const addParameters = [...host.querySelectorAll('button')].filter(
       (candidate) => candidate.textContent?.trim() === 'Parameter',
-    )[1];
+    );
+    const addParameter = addParameters.at(-1);
     act(() => addParameter?.click());
     typeInto(inputs('Parameter name').at(-1), 'q');
     typeInto(inputs('Parameter value').at(-1), 'level:error AND {query}');
@@ -112,12 +122,44 @@ describe('CommandPaletteSettingsWidget', () => {
     );
 
     click('Save');
-    expect(saved(onChange).tools[1]).toEqual({
+    expect(saved(onChange).tools.at(-1)).toEqual({
       prefix: 'k',
       name: 'Kibana',
       url: 'https://kibana.example/app',
       params: [{ key: 'q', value: 'level:error AND {query}', empty: 'level:error' }],
     });
+  });
+
+  it('sums the assistants up on the dashboard', () => {
+    mount(DEFAULTS, 'SMALL');
+    expect(host.textContent).toContain('ChatGPT · Claude · Gemini · GitHub Copilot · Perplexity');
+  });
+
+  it('edits the assistants like the engines', () => {
+    const onChange = mount(DEFAULTS, 'FOCUS');
+    click('Remove Gemini');
+    click('Assistant');
+    typeInto(inputs('Assistant name').at(-1), 'Le Chat');
+    typeInto(inputs('Assistant URL').at(-1), 'https://chat.mistral.ai/chat?q={query}');
+    expect(host.textContent).toContain('“example” → https://chat.mistral.ai/chat?q=example');
+    click('Save');
+    expect(saved(onChange).assistants.map((assistant) => assistant.name)).toEqual([
+      'ChatGPT',
+      'Claude',
+      'GitHub Copilot',
+      'Perplexity',
+      'Le Chat',
+    ]);
+  });
+
+  it('offers the default tools the file no longer has', () => {
+    const onChange = mount(
+      serializePaletteSettings({ ...DEFAULT_PALETTE_SETTINGS, tools: [] }),
+      'FOCUS',
+    );
+    click('LEO');
+    click('Save');
+    expect(saved(onChange).tools.map((tool) => tool.prefix)).toEqual(['e']);
   });
 
   it('says which entries the palette will leave out', () => {

@@ -1,5 +1,59 @@
 # Progress
 
+## 2026-09-24 — Palette: lengths ⇄ pixels
+
+- `10 cm to px` (any length unit) shows the pixels at 80, 150 and 300 dpi (`DPIS` in
+  `packages/palette/src/units.ts`); `1000 px` shows cm at each, `1000 px to in` inches. Pixels
+  only come up when `px` is typed, so `10 cm` alone still converts to inches.
+
+## 2026-09-24 — Palette: metric ⇄ US units
+
+- **Units** (`packages/palette/src/units.ts`), in the main search's Convert group and in `>k`:
+  length, mass, volume (US measures), area, speed and temperature, each unit into the other
+  system's closest ones (`5 km` → `3.1069 mi`, `1 l` → quarts and gallons), or into the unit named
+  after `to`/`in` (`5 km in ft`). Heights read as `5'11"` or `5 ft 11 in` and a metric length
+  under 10 ft is also shown in feet and inches. Five significant digits; a decimal comma works.
+
+## 2026-09-24 — Palette: converters, `>w` GitHub work, prefixes that share a start
+
+- **Converters** (`packages/palette/src/convert.ts`, both surfaces, no requests): a color
+  (`#hex`, `rgb()`, `hsl()`), a `0x`/`0b`/`0o` number, arithmetic (own parser — `+ - * / % ^`,
+  parentheses, no `eval`) or a timestamp typed into the main search shows a **Convert** group above
+  Web; ⏎ copies. `>k` converts anything: plain integers into other bases, letter case for text,
+  `lorem [n]` for filler.
+- **`>s` symbols** (`symbols.ts`): arrows, math, currency, typography, keys, marks, emoji and
+  kaomoji by name; ⏎ copies.
+- **`>w` GitHub work**: pull requests waiting for your review, issues and pull requests assigned to
+  you, and your pull requests with failing checks, grouped and each listed once. New request
+  `LIST_GITHUB_WORK { filter }`; the backends (service worker, Rust `Client::work`) run the fixed
+  issue search for the filter (`GITHUB_WORK_QUERIES`) and refuse any other.
+- **Prefixes**: a prefix is entered as it is typed unless a longer one starts with it; then it
+  waits for a space (`>l ` next to `>le`), and the hint says so.
+- `w k s` join the palette's own prefixes, so a tool cannot take them.
+
+## 2026-09-24 — Palette: `>a` asks an AI, more default link tools
+
+- **`>a`** (both surfaces): the typed question, one row per assistant — ChatGPT, Claude, Gemini,
+  GitHub Copilot and Perplexity by default. ⏎ opens a new chat with the question in the link and
+  copies it too, since Gemini's and Copilot's web chats do not read a question from the URL. The assistants are a
+  new `assistants` list in `.kh/command-palette.settings.json` (same shape as the search engines;
+  `a` joins the palette's own prefixes). Palette modes gained a `links` kind for several entries
+  per query.
+- **Default engines**: Yahoo and Qwant join them.
+- **Default tools**: `>e` LEO (German ⇄ English), `>m` Google Maps, `>n` npm, `>i` IMDb.
+- **`{query}` in a URL path** is now percent-encoded (`%20`); the query string keeps the form's `+`.
+- **Console widget**: an AI assistants section edited like the engines, and buttons to add back
+  default tools a settings file no longer has.
+- `doc/vicinae-recommendations.md`: what Vicinae's extensions suggest for the palette.
+
+## 2026-09-24 — Palette settings: more default search engines, a plain Tsuga default
+
+- **Default engines**: Bing, Brave Search, Startpage, Wikipedia, YouTube, GitHub and Stack Overflow
+  join the defaults, after the ones the palettes had.
+- **Default `>l` Tsuga logs**: now just Tsuga's explorer searching for what is typed — no team
+  filter, extra columns or cluster id. Anything team-specific belongs in
+  `.kh/command-palette.settings.json`.
+
 ## 2026-09-24 — Command palette settings: search engines and link tools from the repository
 
 - **Settings file**: `.kh/command-palette.settings.json` sets the palettes' web search engines and

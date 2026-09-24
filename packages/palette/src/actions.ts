@@ -23,8 +23,10 @@ import type {
   PaletteMode,
   RepoResult,
 } from './command-palette.js';
+import { conversionItems } from './convert.js';
 import { type EntryKind, entryKindOf } from './entries.js';
-import type { ActionPort, PaletteResponse } from './protocol.js';
+import type { ActionPort, GithubWorkFilter, PaletteResponse } from './protocol.js';
+import { symbolItems } from './symbols.js';
 import { parseTranslationQuery, usefulTranslations } from './translate.js';
 
 /** The Lifosy console — where a repo file is opened, rather than on GitHub. */
@@ -322,6 +324,38 @@ const githubSearchItems = async (port: ActionPort): Promise<ModeItem[]> => {
       },
     })),
   }));
+};
+
+/** `>w`'s searches, in the order its groups are listed. */
+const GITHUB_WORK: { filter: GithubWorkFilter; group: string }[] = [
+  { filter: 'review-requested', group: 'Review requested' },
+  { filter: 'assigned', group: 'Assigned to you' },
+  { filter: 'failing', group: 'Your pull requests with failing checks' },
+];
+
+/** Each open issue or pull request once, under the first search that found it. */
+const githubWorkItems = async (port: ActionPort): Promise<ModeItem[]> => {
+  const answers = await Promise.all(
+    GITHUB_WORK.map((search) => port.send({ type: 'LIST_GITHUB_WORK', filter: search.filter })),
+  );
+  const seen = new Set<string>();
+  const items = GITHUB_WORK.flatMap((search, index) =>
+    (answers[index]?.items ?? []).flatMap((work): ModeItem[] => {
+      if (seen.has(work.url)) return [];
+      seen.add(work.url);
+      return [
+        {
+          id: `github-work:${work.url}`,
+          title: work.title,
+          subtitle: `${work.repo}#${work.number} · ${work.pullRequest ? 'pull request' : 'issue'} · updated ${work.updatedAt.slice(0, 10)}`,
+          url: work.url,
+          group: search.group,
+        },
+      ];
+    }),
+  );
+  if (!items.length) throw new Error('Nothing on GitHub is waiting on you');
+  return items;
 };
 
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -639,8 +673,9 @@ const entryFileItems = async (port: ActionPort): Promise<ModeItem[]> => {
 
 /**
  * The prefix modes every surface offers: `>p` prompts, `>t` translate, `>r` GitHub repositories,
- * `>g` a search in one of them, `>f` the files widgets add to. Link tools like `>l` come from the
- * repository's palette settings instead (`loadSettings`).
+ * `>g` a search in one of them, `>w` GitHub work waiting on you, `>f` the files widgets add to,
+ * `>k` conversions and `>s` symbols. Link tools like `>l` come from the repository's palette
+ * settings instead (`loadSettings`).
  */
 export const paletteModes = (port: ActionPort): PaletteMode[] => [
   {
@@ -675,12 +710,36 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
     load: () => githubSearchItems(port),
   },
   {
+    prefix: 'w',
+    title: 'GitHub work',
+    placeholder: 'Filter what waits on you on GitHub — ⏎ opens it',
+    description:
+      'Open pull requests waiting for your review, issues and pull requests assigned to you, and your pull requests with failing checks',
+    load: () => githubWorkItems(port),
+  },
+  {
     prefix: 'f',
     title: 'Files',
     placeholder: 'Search todo lists, logs, events… — ⏎ opens or adds',
     description:
       'The repository’s todo lists, action logs, events, prompts and commands — ⏎ opens one in Kaihuman or adds an entry, as its widget does',
     load: () => entryFileItems(port),
+  },
+  {
+    prefix: 'k',
+    title: 'Convert',
+    placeholder: 'A color, number, sum, date, quantity (5 km) or text — ⏎ copies',
+    description:
+      'Colors (#hex, rgb, hsl), number bases, arithmetic, timestamps, metric ⇄ US units (5 km, 350 °F, 5 km in ft), letter case and Lorem ipsum (“lorem 3”) — ⏎ copies',
+    recents: false,
+    links: (query) => conversionItems(query, true),
+  },
+  {
+    prefix: 's',
+    title: 'Symbols',
+    placeholder: 'Search arrows, math, currency, emoji, kaomoji… — ⏎ copies',
+    description: 'Symbols, emoji and kaomoji by name — ⏎ copies one',
+    load: async () => symbolItems(),
   },
 ];
 

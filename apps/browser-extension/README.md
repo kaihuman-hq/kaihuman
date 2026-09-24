@@ -208,8 +208,12 @@ normal tab. The New Tab page used to be on that list; the start page below is th
 - **Actions** are everything the popup and the context menu can do, listed below your bookmarks so
   `⏎` opens what you were looking for rather than writing something. Type part of an action's name
   to bring it to the top.
+- **Convert** shows what a color, a sum, a `0x`/`0b`/`0o` number, a timestamp or a quantity you
+  typed converts to — `12*7` gives `84`, `#ff8800` its `rgb()` and `hsl()`, `5 km` `3.1069 mi` —
+  above **Web**, so `⏎` copies the result. Plain numbers and text are left to the web search; `>k` converts those too.
 - **Web** lists one row per search engine for what you typed — by default Google, DuckDuckGo,
-  Ecosia, Amazon, Amazon.de and Reddit — below everything else, so typing an action's name still
+  Ecosia, Amazon, Amazon.de, Reddit, Bing, Brave Search, Startpage, Wikipedia, YouTube, GitHub,
+  Stack Overflow, Yahoo and Qwant — below everything else, so typing an action's name still
   runs the action. `⏎` opens that engine's results page in a new tab; nothing is fetched by the
   extension itself, it only builds the URL. So when nothing else matches, typing and pressing `⏎`
   searches the first engine. The searches you run land in **Recent** like any other open. Which
@@ -232,45 +236,46 @@ normal tab. The New Tab page used to be on that list; the start page below is th
 
 ### Palette settings
 
-The search engines and the link tools (`>l` and any you add) come from
+The search engines, the AI assistants (`>a`) and the link tools (`>l` and any you add) come from
 `.kh/command-palette.settings.json` in the repository, which the desktop palette reads too. Without
 the file, the palettes use the defaults above. Create it in the console with **New File → Command
-Palette Settings**; its widget lists the engines and tools, and in focus edits them — add, remove,
-reorder, add parameters — with a preview of each link. Edits are saved with **Save**.
+Palette Settings**; its widget lists the engines, assistants and tools, and in focus edits them —
+add, remove, reorder, add parameters, add back a default the file no longer has — with a preview of
+each link. Edits are saved with **Save**.
 
 ```json
 {
   "searchEngines": [
     { "name": "Amazon.de", "url": "https://www.amazon.de/s?k={query}", "params": [] }
   ],
+  "assistants": [
+    { "name": "ChatGPT", "url": "https://chatgpt.com/?q={query}", "params": [] }
+  ],
   "tools": [
     {
       "prefix": "l",
       "name": "Tsuga logs",
-      "description": "The console team’s logs in Tsuga’s explorer, filtered by what is typed",
+      "description": "Errors in Tsuga’s log explorer, filtered by what is typed",
       "url": "https://app.tsuga.com/explorer",
       "params": [
-        {
-          "key": "query",
-          "value": "context.cloud.camunda.io/owner-team:console AND \"{query}\"",
-          "empty": "context.cloud.camunda.io/owner-team:console "
-        },
-        { "key": "extraColumns", "value": "[\"file\",\"fn\",\"service\"]" },
-        { "key": "clusterIds", "value": "8v5j-x2k0n-dzk4" }
+        { "key": "query", "value": "level:error AND \"{query}\"", "empty": "level:error" }
       ]
     }
   ]
 }
 ```
 
-- **`{query}`** is what is typed: form-encoded in a URL, as is in a parameter value.
+- **`{query}`** is what is typed: in a URL's query string form-encoded (`a+b`), in its path
+  percent-encoded (`a%20b`, since a `+` there is a plus), and as is in a parameter value.
 - **`params`** are added to the URL in order, after any it already has. `empty` is used instead of
   `value` when nothing is typed.
 - **Order** is the palette's order; the first engine is the one `⏎` searches.
 - A list the file leaves out is the default one; an empty list stays empty.
 - A tool's **prefix** is lowercase letters or digits, and cannot be one of the palette's own
-  (`b p t r g f x d c u`). An entry that breaks a rule — no name, a URL that is not http(s), a
-  prefix taken — is left out, and the widget says which and why.
+  (`b p t r g f x d c u a w k s`). It may be longer than one letter and may start like another
+  one: with `>l` and `>le`, `>le` is entered as it is typed and `>l` once a space follows it (see
+  **Prefix modes**). An entry that breaks a rule — no name, a URL that is not http(s), a prefix
+  taken — is left out, and the widget says which and why.
 - The file is cached like the prompts: a change reaches the palette within five minutes.
 
 ### Help
@@ -283,9 +288,11 @@ lists `>d` and its own actions, and the extension's lists the browser-only ones.
 ### Prefix modes
 
 `>` and a letter at the start of the input switch the palette into a list of its own — `>p` as
-soon as the `p` is typed, while a longer word (`>prompt`) stays plain search text. The breadcrumb
-names the mode; **Esc**, or **Backspace** on an empty input, leaves it again. The empty palette's
-hint line lists the prefixes.
+soon as the `p` is typed, while a longer word (`>prompt`) stays plain search text. A prefix that a
+longer one starts with waits for a space: with tools `>l` and `>le`, typing `>l` shows “space
+enters >l …” in the hint, `>l ` enters it, and `>le` is entered as soon as the `e` is typed. The
+breadcrumb names the mode; **Esc**, or **Backspace** on an empty input, leaves it again. The empty
+palette's hint line lists the prefixes.
 
 | Prefix | Lists | ⏎ | Source |
 | --- | --- | --- | --- |
@@ -295,10 +302,24 @@ hint line lists the prefixes.
 | `>x` | Commands from the repository's `.commands.md` files (`doc/commands-format.md`) | asks for each `{{name}}`, then copies the filled-in command — running it is the desktop palette's | every `.commands.md` in the repository, cached for five minutes |
 | `>r` | Your GitHub repositories, most recently pushed first | opens the repository; **⇥** (or **→**) lists its issues, pull requests, actions, releases… | `GET /user/repos` with the extension's token |
 | `>g` | The same repositories, to search one | lists **Issues** and **Pull requests**; ⏎ on one asks for the search term, then opens GitHub's search there (`is:issue …` / `is:pr …`, any state) — no term opens the plain list | `GET /user/repos` with the extension's token |
-| `>l` | One row: the console team's logs in Tsuga, for what is typed (a default tool — see **Palette settings**) | opens Tsuga's explorer on `owner-team:console`, `AND "…"` the typed text when there is any | a link only, no request |
+| `>a` | One row per AI assistant for the question typed — by default ChatGPT, Claude, Gemini, GitHub Copilot and Perplexity (see **Palette settings**) | opens a new chat with the question filled in, and copies the question: Gemini and Copilot do not read it from the link, so paste it there | a link only, no request |
+| `>l` | One row: Tsuga logs, for what is typed (a default tool — see **Palette settings**) | opens Tsuga's explorer searching for the typed text | a link only, no request |
+| `>e` `>m` `>n` `>i` | One row: LEO's German ⇄ English dictionary, Google Maps, npm, IMDb — for what is typed (default tools) | opens the page for the typed text | a link only, no request |
+| `>w` | What waits on you on GitHub: pull requests requesting your review, issues and pull requests assigned to you, your pull requests with failing checks — grouped in that order, each once | opens it on GitHub | three `GET /search/issues` with the extension's token, on entering the mode |
+| `>k` | Conversions of what you type: colors (`#ff8800`, `rgb()`, `hsl()`), number bases (`0x1f`, `0b101`, `0o17`, `42`), arithmetic (`12*7`, `2^10`, `(3+4)%5`), timestamps (`1790208000`, `2026-09-24T10:00Z`), metric ⇄ US units (see below), letter case for any other text, `lorem` / `lorem 5` for filler text | copies the result | none — worked out in the palette |
+| `>s` | Symbols, emoji and kaomoji by name — arrows, math, currency, typography, keys, marks | copies it | none |
 | `>f` | The repository's files a widget can add to — todo lists, action logs, events, prompts, commands | offers **Open … in Kaihuman** or **Add a todo…** (an action, an event…) | one tree listing per visit |
 
-With nothing typed, every mode but `>t` and `>u` lists the last 10 entries you chose in it first,
+**Units** convert between metric and US customary: length (`mm cm m km` ⇄ `in ft yd mi`, and
+heights as `5'11"` or `5 ft 11 in`, shown back as feet and inches), mass (`mg g kg` ⇄ `oz lb`),
+volume (`ml cl dl l` ⇄ `tsp tbsp fl oz cup pt qt gal`, US measures), area (`cm² m² ha km²` ⇄
+`in² ft² yd² acres mi²`), speed (`m/s km/h` ⇄ `mph`) and temperature (`°C K` ⇄ `°F`). A quantity
+goes into the other system's closest unit — `5 km` into miles, `180 cm` into inches and
+`5 ft 10.9 in`; `to` or `in` names the unit instead: `5 km in ft`, `3 m to cm`. A decimal comma
+works too (`1,5 kg`). **Pixels**: `10 cm to px` (any length unit) gives the pixels at 80, 150 and
+300 dpi; `1000 px` gives the length in cm at each of them, `1000 px to in` in inches.
+
+With nothing typed, every mode but `>t`, `>u`, `>a` and `>k` lists the last 10 entries you chose in it first,
 under **Recent** — the prompts you copied in `>p`, the repositories you opened in `>r`, the terms
 you searched in `>l`. Choosing an entry again moves it back to the top; an entry that has since
 gone from the repository drops out. They are kept per prefix in the extension's local storage.

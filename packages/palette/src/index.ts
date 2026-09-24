@@ -3,6 +3,8 @@ export * from './bookmarks.js';
 export * from './claude-usage.js';
 export * from './clipboard.js';
 export * from './command-palette.js';
+export * from './convert.js';
 export * from './entries.js';
 export * from './protocol.js';
+export * from './symbols.js';
 export * from './translate.js';
