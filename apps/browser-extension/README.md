@@ -208,13 +208,12 @@ normal tab. The New Tab page used to be on that list; the start page below is th
 - **Actions** are everything the popup and the context menu can do, listed below your bookmarks so
   `⏎` opens what you were looking for rather than writing something. Type part of an action's name
   to bring it to the top.
-- **Web** lists one row per search engine for what you typed — Google, DuckDuckGo, Ecosia,
-  Amazon and Reddit — below everything else, so typing an action's name still runs the action.
-  `⏎` opens that engine's results page in a new tab; nothing is fetched by the
+- **Web** lists one row per search engine for what you typed — by default Google, DuckDuckGo,
+  Ecosia, Amazon, Amazon.de and Reddit — below everything else, so typing an action's name still
+  runs the action. `⏎` opens that engine's results page in a new tab; nothing is fetched by the
   extension itself, it only builds the URL. So when nothing else matches, typing and pressing `⏎`
-  is a Google search. The searches you run land in **Recent** like any other open. Another engine
-  is one entry in `SEARCH_ENGINES` (`packages/palette/src/web-search.ts`): an id, a name and a function from
-  the query to its results URL.
+  searches the first engine. The searches you run land in **Recent** like any other open. Which
+  engines, and in what order, is set in the repository — see **Palette settings** below.
 - **⇥ Tab** searches the *repo* for what you typed — one GitHub code search, only when you ask
   for it. GitHub's code-search endpoint has a small dedicated budget (~10 requests/minute) that
   penalizes bursts, so the palette never searches the repo while you type. Results appear under a
@@ -230,6 +229,49 @@ normal tab. The New Tab page used to be on that list; the start page below is th
   `.events.csv`, `.prompts.md` or `.commands.md` — does not open straight away: `⏎` offers
   **Open … in Kaihuman** and **Add a todo…** (an action, an event…). `>f` lists those files
   without a search; see **Adding to a widget's file** below.
+
+### Palette settings
+
+The search engines and the link tools (`>l` and any you add) come from
+`.kh/command-palette.settings.json` in the repository, which the desktop palette reads too. Without
+the file, the palettes use the defaults above. Create it in the console with **New File → Command
+Palette Settings**; its widget lists the engines and tools, and in focus edits them — add, remove,
+reorder, add parameters — with a preview of each link. Edits are saved with **Save**.
+
+```json
+{
+  "searchEngines": [
+    { "name": "Amazon.de", "url": "https://www.amazon.de/s?k={query}", "params": [] }
+  ],
+  "tools": [
+    {
+      "prefix": "l",
+      "name": "Tsuga logs",
+      "description": "The console team’s logs in Tsuga’s explorer, filtered by what is typed",
+      "url": "https://app.tsuga.com/explorer",
+      "params": [
+        {
+          "key": "query",
+          "value": "context.cloud.camunda.io/owner-team:console AND \"{query}\"",
+          "empty": "context.cloud.camunda.io/owner-team:console "
+        },
+        { "key": "extraColumns", "value": "[\"file\",\"fn\",\"service\"]" },
+        { "key": "clusterIds", "value": "8v5j-x2k0n-dzk4" }
+      ]
+    }
+  ]
+}
+```
+
+- **`{query}`** is what is typed: form-encoded in a URL, as is in a parameter value.
+- **`params`** are added to the URL in order, after any it already has. `empty` is used instead of
+  `value` when nothing is typed.
+- **Order** is the palette's order; the first engine is the one `⏎` searches.
+- A list the file leaves out is the default one; an empty list stays empty.
+- A tool's **prefix** is lowercase letters or digits, and cannot be one of the palette's own
+  (`b p t r g f x d c u`). An entry that breaks a rule — no name, a URL that is not http(s), a
+  prefix taken — is left out, and the widget says which and why.
+- The file is cached like the prompts: a change reaches the palette within five minutes.
 
 ### Help
 
@@ -253,7 +295,7 @@ hint line lists the prefixes.
 | `>x` | Commands from the repository's `.commands.md` files (`doc/commands-format.md`) | asks for each `{{name}}`, then copies the filled-in command — running it is the desktop palette's | every `.commands.md` in the repository, cached for five minutes |
 | `>r` | Your GitHub repositories, most recently pushed first | opens the repository; **⇥** (or **→**) lists its issues, pull requests, actions, releases… | `GET /user/repos` with the extension's token |
 | `>g` | The same repositories, to search one | lists **Issues** and **Pull requests**; ⏎ on one asks for the search term, then opens GitHub's search there (`is:issue …` / `is:pr …`, any state) — no term opens the plain list | `GET /user/repos` with the extension's token |
-| `>l` | One row: the console team's logs in Tsuga, for what is typed | opens Tsuga's explorer on `owner-team:console`, `AND "…"` the typed text when there is any | a link only, no request |
+| `>l` | One row: the console team's logs in Tsuga, for what is typed (a default tool — see **Palette settings**) | opens Tsuga's explorer on `owner-team:console`, `AND "…"` the typed text when there is any | a link only, no request |
 | `>f` | The repository's files a widget can add to — todo lists, action logs, events, prompts, commands | offers **Open … in Kaihuman** or **Add a todo…** (an action, an event…) | one tree listing per visit |
 
 With nothing typed, every mode but `>t` and `>u` lists the last 10 entries you chose in it first,

@@ -232,6 +232,65 @@ describe('writes from the start page', () => {
     expect(JSON.parse(remote['.kh/reading.readitlater.json'] ?? '').items).toHaveLength(1);
   });
 
+  it('writes over a known list when GitHub will not read it back', async () => {
+    remote['.kh/.readitlater.json'] = JSON.stringify({
+      items: [{ id: 'old', url: 'https://example.com/old', name: 'Old', status: 'new' }],
+    });
+    seedCache();
+    const serve = fetchMock.getMockImplementation();
+    // GitHub, like the real API, refuses to replace a file without its sha.
+    fetchMock.mockImplementation(async (url: string, init?: any) => {
+      if (init?.method === 'PUT' && !JSON.parse(init.body).sha) {
+        return {
+          ok: false,
+          status: 422,
+          statusText: '',
+          json: async () => ({ message: 'Invalid request. "sha" wasn\'t supplied.' }),
+        };
+      }
+      if (!init?.method && pathOf(url) === '.kh/.readitlater.json') {
+        return { ok: false, status: 404, statusText: 'Not Found' };
+      }
+      return serve?.(url, init);
+    });
+
+    const response = await call({
+      type: 'READ_LATER_ADD',
+      url: 'https://example.com/a',
+      title: 'An article',
+    });
+
+    expect(response.error).toBeUndefined();
+    expect(JSON.parse(writes()[0]?.[1].body).sha).toBe('sha-.kh/.readitlater.json');
+    expect(
+      JSON.parse(remote['.kh/.readitlater.json'] ?? '').items.map((item: any) => item.url),
+    ).toEqual(['https://example.com/old', 'https://example.com/a']);
+  });
+
+  it('says why GitHub refused to save a page for later', async () => {
+    seedCache();
+    const read = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation(async (url: string, init?: any) =>
+      init?.method === 'PUT'
+        ? {
+            ok: false,
+            status: 404,
+            statusText: '',
+            json: async () => ({ message: 'Not Found' }),
+          }
+        : read?.(url, init),
+    );
+    const response = await call({
+      type: 'READ_LATER_ADD',
+      url: 'https://example.com/a',
+      title: 'An article',
+    });
+
+    expect(response.error).toBe(
+      'Failed to write .kh/reading.readitlater.json: 404 Not Found — check that the token may write to this repository',
+    );
+  });
+
   it('only saves web pages for later', async () => {
     seedCache();
     const response = await call({ type: 'READ_LATER_ADD', url: 'javascript:alert(1)' });
@@ -320,5 +379,37 @@ describe('the palette’s widget entries', () => {
       );
     }
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET_PALETTE_SETTINGS', () => {
+  const reads = () =>
+    fetchMock.mock.calls.filter(([url]) => pathOf(url) === '.kh/command-palette.settings.json');
+
+  it('answers null when the repository has no settings file', async () => {
+    expect(await call({ type: 'GET_PALETTE_SETTINGS' })).toMatchObject({ content: null });
+  });
+
+  it('answers the file, then from the cache until it is stale', async () => {
+    remote['.kh/command-palette.settings.json'] = '{"searchEngines": []}';
+    expect(await call({ type: 'GET_PALETTE_SETTINGS' })).toMatchObject({
+      content: '{"searchEngines": []}',
+    });
+    remote['.kh/command-palette.settings.json'] = '{"tools": []}';
+    expect(await call({ type: 'GET_PALETTE_SETTINGS' })).toMatchObject({
+      content: '{"searchEngines": []}',
+    });
+    expect(reads()).toHaveLength(1);
+
+    store.paletteSettingsCache.fetchedAt = 0;
+    await call({ type: 'GET_PALETTE_SETTINGS' });
+    await vi.waitFor(() => expect(store.paletteSettingsCache.content).toBe('{"tools": []}'));
+  });
+
+  it('reads again after a repository switch', async () => {
+    await call({ type: 'GET_PALETTE_SETTINGS' });
+    store.lifeos_repo = 'o/other';
+    await call({ type: 'GET_PALETTE_SETTINGS' });
+    expect(reads()).toHaveLength(2);
   });
 });

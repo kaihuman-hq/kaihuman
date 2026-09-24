@@ -73,6 +73,10 @@ pub fn commands_cache_file() -> PathBuf {
     xdg_dir("XDG_CACHE_HOME", ".cache").join("commands.json")
 }
 
+pub fn palette_settings_cache_file() -> PathBuf {
+    xdg_dir("XDG_CACHE_HOME", ".cache").join("palette-settings.json")
+}
+
 pub fn prompts_cache_file() -> PathBuf {
     xdg_dir("XDG_CACHE_HOME", ".cache").join("prompts.json")
 }

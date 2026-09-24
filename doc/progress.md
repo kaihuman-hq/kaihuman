@@ -1,5 +1,37 @@
 # Progress
 
+## 2026-09-24 — Command palette settings: search engines and link tools from the repository
+
+- **Settings file**: `.kh/command-palette.settings.json` sets the palettes' web search engines and
+  their link tools behind a prefix (`>l`), in the order the palette shows them. Each is a URL with
+  `{query}` for what is typed, plus parameters added in order — with an optional value for when
+  nothing is typed, which is how Tsuga's `… AND "{query}"` link is expressed. Without the file, the
+  palettes use the defaults: the engines they had, plus **Amazon.de**, and `>l` Tsuga logs.
+  Format and checks live in `packages/formats/src/palette-settings.ts`.
+- **Palettes** (extension pages, start page, desktop): `loadSettings` reads it on every open
+  (`GET_PALETTE_SETTINGS`, cached for five minutes by the service worker and the Rust backend).
+  Engines and tools that break a rule — no name, a non-http(s) URL, a prefix the palette already
+  uses or one taken by an earlier tool — are left out. `SEARCH_ENGINES` and `tsugaUrl` are gone.
+- **Console**: a **Command Palette Settings** template (suggests `.kh/command-palette`) and widget —
+  a summary on the dashboard, and in focus an editor to add, remove and reorder engines and tools,
+  edit their parameters, preview each link, and see what will be left out. Edits are a draft until
+  **Save**, since the console commits every change.
+
+## 2026-09-24 — Popup: read it later button
+
+- **Browser extension popup**: a clock icon next to the pin and star adds the current tab to the
+  repo's `.readitlater.json` (the same `READ_LATER_ADD` message the palette's *Read later: this
+  page* sends). Unlike pinning, it stores only the link and title.
+- **Fix**: GitHub read/write failures said only `Failed to write <path>:` — GitHub answers over
+  HTTP/2, which has no status text. The error now carries the status code and GitHub's own
+  message, and a 404 on a write (GitHub's answer when a token may not write) says to check the
+  token's write access.
+- **Fix**: saving for later (and the start page's other writes) failed with `422 "sha" wasn't
+  supplied` when GitHub read a file the synced tree lists back as 404: the write then went out as
+  a new file. It now falls back to the synced copy's sha and content — if that is stale, GitHub
+  answers 409 rather than the list being overwritten. Reads that feed a write also skip the
+  browser's HTTP cache (GitHub marks them cacheable for a minute).
+
 ## 2026-09-24 — Read it later: clear the whole list
 
 - **Console**: the Read it later widget's reading list has a **CLEAR ALL** button; it asks for

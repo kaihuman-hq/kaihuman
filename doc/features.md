@@ -10,6 +10,7 @@
 
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
+| Command palette settings (`.kh/command-palette.settings.json`) — search engines and `>`-prefixed link tools with parameters, added, removed and reordered in a widget | New File → Command Palette Settings | 2026-09-24 |
 | Read it later: **CLEAR ALL** empties the reading list after a confirmation | Read it later widget | 2026-09-24 |
 | Wiki view: clickable `[[wikilinks]]`, backlinks, page type and tags, tag filter, repo-stored images | `/wiki` | 2026-09-23 |
 | Knowledge base commands: `/kb-ask --save` files answers, new `/kb-digest` for personal data, interactive `/kb-ingest`, `/kb-lint` stale claims and suggestions | `/knowledge` → Commands | 2026-09-23 |
@@ -32,7 +33,7 @@
 | Start page "today" view: upcoming events and milestone, in-progress/overdue todos and inbox count, habit check-in and time-tracking clock cards, read-later queue, world clocks — from one hourly cache | start page | 2026-09-23 |
 | Start page capture box writes a note, an inbox todo or an action log entry | start page | 2026-09-23 |
 | Sync status (age of the cached data, opens waiting to be pushed) with a sync button | start page header | 2026-09-23 |
-| Read later: this page — adds the page to the repo's `.readitlater.json` | command palette | 2026-09-23 |
+| Read later: this page — adds the page to the repo's `.readitlater.json` | command palette, popup clock icon | 2026-09-23 |
 | Pin to Knowledge Base saves the page as Markdown with its images in `.kh/assets/` (popup toggle turns image downloads off) | popup, palette | 2026-09-23 |
 | Selected-text clips go to `.kh/raw/` as their own notes | context menu, palette | 2026-09-23 |
 | Recent per prefix: each palette mode lists the last 10 entries chosen in it first | command palette, desktop palette | 2026-09-24 |
@@ -42,7 +43,7 @@
 | `>x` commands from `.commands.md` — fill in parameters, then copy (extension) or copy / run in ghostty / run in the background (desktop) | command palette, desktop palette | 2026-09-23 |
 | Prefixes are `>` plus a letter (`>p`, `>t`…); `>b` lists bookmarks only | command palette, desktop palette | 2026-09-23 |
 | Palette prefix modes: `>p` prompts from the repo's `.prompts.md` files (⏎ copies), `>t` DeepL translation into EN/DE (typed text is offered too; the last 20 texts are kept to translate again), `>r` GitHub repositories with ⇥ for issues, PRs… | command palette (pages and start page) | 2026-09-23 |
-| Web search from the command palette — Google, DuckDuckGo, Ecosia, Amazon, Reddit, by URL only | command palette (pages and start page) | 2026-09-23 |
+| Web search from the command palette — Google, DuckDuckGo, Ecosia, Amazon, Amazon.de, Reddit by default, by URL only; engines and link tools configurable in `.kh/command-palette.settings.json` (2026-09-24) | command palette (pages and start page), desktop palette | 2026-09-23 |
 | Pinned tab groups on the start page — compact cards above the bookmarks; a click loads the group | start page | 2026-09-23 |
 | Pinned bookmarks — always first on the start page; pin/unpin from its cards or the console widget | start page cards, Bookmarks widget | 2026-09-22 |
 | Start page — kaihuman's own New Tab page: palette, recently used bookmarks, dump note | New Tab (`chrome_url_overrides`) | 2026-09-22 |

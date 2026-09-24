@@ -151,6 +151,7 @@ export class LayoutStore {
       const isActionLog = item.path.toLowerCase().endsWith('.actionlog.md');
       const isPrompts = item.path.toLowerCase().endsWith('.prompts.md');
       const isCommands = item.path.toLowerCase().endsWith('.commands.md');
+      const isPaletteSettings = item.path.toLowerCase().endsWith('command-palette.settings.json');
       const isDataCollection = item.path.toLowerCase().endsWith('.data-collection.csv');
       const isStocks = item.path.toLowerCase().endsWith('.stocks.csv');
       const isConsumption = item.path.toLowerCase().endsWith('.consumption.csv');
@@ -169,6 +170,7 @@ export class LayoutStore {
       else if (isActionLog) extension = '.actionlog.md';
       else if (isPrompts) extension = '.prompts.md';
       else if (isCommands) extension = '.commands.md';
+      else if (isPaletteSettings) extension = 'command-palette.settings.json';
       else if (isDataCollection) extension = '.data-collection.csv';
       else if (isStocks) extension = '.stocks.csv';
       else if (isConsumption) extension = '.consumption.csv';

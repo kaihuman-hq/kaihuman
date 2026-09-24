@@ -5,6 +5,7 @@ import {
   checkIn,
   localDate,
   markReadItLaterRead,
+  PALETTE_SETTINGS_PATH,
   parseTimeTracking,
   serializeTimeTracking,
   toggleStartStop,
@@ -388,6 +389,22 @@ function encodeBase64(value: string): string {
   return btoa(binary);
 }
 
+/**
+ * GitHub answers over HTTP/2, which has no status text, so the reason has to come from the body.
+ * It also answers 404 rather than 403 when a token may not write to a repo it can see.
+ */
+async function githubFailure(res: Response, action: string): Promise<Error> {
+  const body = await Promise.resolve()
+    .then(() => res.json())
+    .catch(() => null);
+  const reason = (body as { message?: string } | null)?.message || res.statusText;
+  const hint =
+    res.status === 404 && action.startsWith('Failed to write')
+      ? ' — check that the token may write to this repository'
+      : '';
+  return new Error(`${action}: ${res.status}${reason ? ` ${reason}` : ''}${hint}`);
+}
+
 // Unlike githubUpsertFile this replaces the file wholesale, which is what a
 // snapshot-style JSON document needs.
 async function githubReadFile(
@@ -395,11 +412,13 @@ async function githubReadFile(
   repoUrl: string,
   filePath: string,
 ): Promise<{ content: string; sha: string } | null> {
+  // GitHub marks these cacheable for a minute; a read that feeds a write must not see an old one.
   const res = await fetch(`https://api.github.com/repos/${repoUrl}/contents/${filePath}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
+    cache: 'no-store',
   });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Failed to read ${filePath}: ${res.statusText}`);
+  if (!res.ok) throw await githubFailure(res, `Failed to read ${filePath}`);
   const data = await res.json();
   return { content: decodeBase64(data.content || ''), sha: data.sha };
 }
@@ -420,7 +439,7 @@ async function githubWriteFile(
       sha,
     }),
   });
-  if (!res.ok) throw new Error(`Failed to write ${filePath}: ${res.statusText}`);
+  if (!res.ok) throw await githubFailure(res, `Failed to write ${filePath}`);
   // The commit response carries the new blob sha, so the cache can be refreshed without a re-read.
   const written = await res.json().catch(() => null);
   return written?.content?.sha ?? null;
@@ -433,7 +452,7 @@ async function githubPutBase64(token: string, repoUrl: string, filePath: string,
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
     body: JSON.stringify({ message: `Add ${filePath} via Extension`, content: base64 }),
   });
-  if (!res.ok) throw new Error(`Failed to write ${filePath}: ${res.statusText}`);
+  if (!res.ok) throw await githubFailure(res, `Failed to write ${filePath}`);
 }
 
 const EMPTY_CONFIG: PinnedTabsConfig = { groups: [], updatedAt: '' };
@@ -841,6 +860,38 @@ async function listRepoFiles(kind: keyof typeof REPO_FILE_KINDS) {
   return { files: cache.files };
 }
 
+interface PaletteSettingsCache {
+  repo: string;
+  /** The file as read; null when the repository has none, which means the defaults. */
+  content: string | null;
+  fetchedAt: number;
+}
+
+async function refreshPaletteSettings(token: string, repo: string) {
+  const file = await githubReadFile(token, repo, PALETTE_SETTINGS_PATH);
+  const cache: PaletteSettingsCache = { repo, content: file?.content ?? null, fetchedAt: Date.now() };
+  await chrome.storage.local.set({ paletteSettingsCache: cache });
+  return cache;
+}
+
+/**
+ * Asked every time the palette opens, so cache first like the prompts: a stale cache still answers
+ * and is refreshed behind it — a change in the console reaches the palette on a later open.
+ */
+async function paletteSettings() {
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const stored = await chrome.storage.local.get('paletteSettingsCache');
+  const cache = stored.paletteSettingsCache as PaletteSettingsCache | undefined;
+  if (cache?.repo !== repo) return { content: (await refreshPaletteSettings(token, repo)).content };
+  if (isPromptsCacheStale(cache, Date.now())) {
+    refreshPaletteSettings(token, repo).catch((e) =>
+      console.warn('LifeOS Extension: palette settings refresh failed', e),
+    );
+  }
+  return { content: cache.content };
+}
+
 async function translate(text: string, targets: string[]) {
   const { deepl_key: key } = await chrome.storage.local.get('deepl_key');
   if (!key) throw new Error('No DeepL API key yet — run “Set the DeepL API key…” first');
@@ -1032,7 +1083,11 @@ async function commitTodayFile(
   ) {
     throw new Error(`${target} is not one of the start page's ${path.suffix} files`);
   }
-  const file = await githubReadFile(token, repo, target);
+  // A file the tree listed can still read back as 404; writing it as new would lack the sha
+  // GitHub needs. The synced copy has it, and a stale one fails as a conflict, not an overwrite.
+  const file =
+    (await githubReadFile(token, repo, target)) ??
+    cache.files.find((known) => known.path === target);
   const content = change(file?.content ?? '');
   const sha = await githubWriteFile(token, repo, target, content, file?.sha);
 
@@ -1366,6 +1421,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     );
     return true; // Indicate async response
   }
+
+  if (message.type === 'GET_PALETTE_SETTINGS') return answer(paletteSettings(), sendResponse);
 
   if (message.type === 'LIST_GITHUB_REPOS') {
     githubRepos().then(

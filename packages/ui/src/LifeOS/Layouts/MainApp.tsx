@@ -67,6 +67,7 @@ import {
 } from '../Organisms/Widgets/BookmarksLogic';
 import { BookmarksWidget } from '../Organisms/Widgets/BookmarksWidget';
 import { BudgetWidget } from '../Organisms/Widgets/BudgetWidget';
+import { CommandPaletteSettingsWidget } from '../Organisms/Widgets/CommandPaletteSettingsWidget';
 import { CommandsWidget } from '../Organisms/Widgets/CommandsWidget';
 import { ConsumptionWidget } from '../Organisms/Widgets/ConsumptionWidget';
 import { CsvTableView } from '../Organisms/Widgets/CsvTableView';
@@ -747,6 +748,8 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.consumption.csv')) ext = '.consumption.csv';
       else if (lowerPath.endsWith('.board-overview.json')) ext = '.board-overview.json';
       else if (lowerPath.endsWith('.bookmarks.json')) ext = '.bookmarks.json';
+      else if (lowerPath.endsWith('command-palette.settings.json'))
+        ext = 'command-palette.settings.json';
       else {
         const parts = entry.path.split('.');
         if (lowerPath.endsWith('.enc') && parts.length > 2) {
@@ -961,6 +964,22 @@ abbreviations: undefined
       );
     }
 
+    if (tile.extension === 'command-palette.settings.json' && tile.rawContent) {
+      return (
+        <CommandPaletteSettingsWidget
+          content={tile.rawContent}
+          mode={
+            mode === 'MOBILE_EXPANDED'
+              ? 'MOBILE_EXPANDED'
+              : mode === 'MOBILE_COLLAPSED'
+                ? 'MOBILE_COLLAPSED'
+                : 'SMALL'
+          }
+          onChange={(newContent) => tile.onContentChange?.(newContent)}
+        />
+      );
+    }
+
     if (tile.extension === '.commands.md' && tile.rawContent) {
       return (
         <CommandsWidget
@@ -1099,6 +1118,8 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.stocks.csv')) ext = '.stocks.csv';
       else if (lowerPath.endsWith('.consumption.csv')) ext = '.consumption.csv';
       else if (lowerPath.endsWith('.bookmarks.json')) ext = '.bookmarks.json';
+      else if (lowerPath.endsWith('command-palette.settings.json'))
+        ext = 'command-palette.settings.json';
       else {
         const parts = entryPath.split('.');
         ext = parts.length > 1 ? `.${parts.slice(1).join('.').toLowerCase()}` : '';
@@ -2198,6 +2219,7 @@ const FocusedTileInternal = ({
   const isActionLog = tile.extension === '.actionlog.md';
   const isPrompts = tile.extension === '.prompts.md';
   const isCommands = tile.extension === '.commands.md';
+  const isPaletteSettings = tile.extension === 'command-palette.settings.json';
   const isStocks = tile.extension === '.stocks.csv';
   const isConsumption = tile.extension === '.consumption.csv';
   const isBoardOverview = tile.extension === '.board-overview.json';
@@ -2227,6 +2249,7 @@ const FocusedTileInternal = ({
     isActionLog ||
     isPrompts ||
     isCommands ||
+    isPaletteSettings ||
     isStocks ||
     isConsumption ||
     isAnyCsv || // && !!tile.rawContent;
@@ -2843,6 +2866,14 @@ const FocusedTileInternal = ({
               <PromptsWidget
                 content={tile.rawContent || ''}
                 mode={viewMode as any}
+                onChange={(c) => tile.onContentChange?.(c)}
+              />
+            </div>
+          ) : isPaletteSettings && viewMode === 'WIDGET' ? (
+            <div className="flex flex-col min-h-full w-full">
+              <CommandPaletteSettingsWidget
+                content={tile.rawContent || ''}
+                mode="FOCUS"
                 onChange={(c) => tile.onContentChange?.(c)}
               />
             </div>

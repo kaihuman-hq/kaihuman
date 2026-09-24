@@ -370,6 +370,7 @@ export const Dashboard = () => {
               lowerPath.endsWith('.consumption.csv') ||
               lowerPath.endsWith('.board-overview.json') ||
               lowerPath.endsWith('.bookmarks.json') ||
+              lowerPath.endsWith('command-palette.settings.json') ||
               lowerPath.endsWith('.enc');
 
             if (isWidget) {
