@@ -3,7 +3,7 @@
  * the claude.ai usage page and Claude Code's `/usage` show. A port of the formatting in omarchy's
  * `omarchy-claude-usage`; the desktop backend only fetches.
  */
-import type { ModeItem } from './command-palette.js';
+import type { ModeItem, Tone } from './command-palette.js';
 
 /** Where ⏎ on a usage row goes. */
 export const CLAUDE_USAGE_URL = 'https://claude.ai/settings/usage';
@@ -185,4 +185,54 @@ export function usageRows(
   }
 
   return rows.length ? rows : [row('none', 'No usage limits reported for this account')];
+}
+
+/** A cached answer younger than this is shown as it is; an older one is synced behind it. */
+export const USAGE_SYNC_AFTER_MS = 5 * 60 * 1000;
+
+const MINUTE_MS = 60 * 1000;
+
+export const usageNeedsSync = (fetchedAt: number, now: number) =>
+  now - fetchedAt >= USAGE_SYNC_AFTER_MS;
+
+/** `just now`, `12 min ago`, `2h 5m ago`, `3 days ago`. */
+export function usageAge(fetchedAt: number, now: number): string {
+  const minutes = Math.max(0, Math.floor((now - fetchedAt) / MINUTE_MS));
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours}h ${minutes % 60}m ago`;
+  return `${Math.floor(hours / 24)} days ago`;
+}
+
+/** Green under 15 minutes, yellow up to an hour, red beyond. */
+export function usageAgeTone(fetchedAt: number, now: number): Tone {
+  const minutes = (now - fetchedAt) / MINUTE_MS;
+  if (minutes < 15) return 'good';
+  if (minutes <= 60) return 'warn';
+  return 'bad';
+}
+
+/**
+ * The first row of `>u`: how old the usage below it is, and whether it is being synced. `failed`
+ * is why the last sync did not replace it.
+ */
+export function usageStatusRow(
+  fetchedAt: number,
+  now: number,
+  state: 'cached' | 'syncing' | 'synced' | { failed: string },
+): ModeItem {
+  const age = usageAge(fetchedAt, now);
+  let subtitle: string;
+  if (state === 'synced') subtitle = 'Synced — cached for the next 5 min';
+  else if (state === 'syncing') subtitle = 'Syncing in the background…';
+  else if (state === 'cached') subtitle = 'Fresh — synced again once it is 5 min old';
+  else subtitle = `Sync failed: ${state.failed}`;
+  return {
+    id: 'usage:status',
+    title: state === 'synced' ? `Usage synced ${age}` : `Cached usage from ${age}`,
+    subtitle,
+    group: 'Usage',
+    tone: usageAgeTone(fetchedAt, now),
+  };
 }

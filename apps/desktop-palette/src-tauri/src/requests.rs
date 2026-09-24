@@ -10,8 +10,8 @@ use serde_json::{Value, json};
 
 use crate::bookmarks::{self, BOOKMARKS_PATH, Cache};
 use crate::config::{
-    self, Settings, bookmarks_cache_file, commands_cache_file, is_repo_name, prompts_cache_file,
-    read_json, write_json,
+    self, Settings, bookmarks_cache_file, claude_usage_cache_file, commands_cache_file,
+    is_repo_name, prompts_cache_file, read_json, write_json,
 };
 use crate::github::{Client, Read, console_file_url, encode_path};
 use crate::recents::{self, RecentEntry};
@@ -26,6 +26,13 @@ pub enum Request {
         query: String,
     },
     GetRecents,
+    GetModeRecents {
+        prefix: String,
+    },
+    AddModeRecent {
+        prefix: String,
+        id: String,
+    },
     AddRecent {
         entry: RecentEntry,
     },
@@ -79,7 +86,10 @@ pub enum Request {
     },
     ListGithubRepos,
     ListClaudeCodeRepos,
-    GetClaudeUsage,
+    GetClaudeUsage {
+        #[serde(default)]
+        cached: bool,
+    },
     ListDumps,
     SaveDump {
         #[serde(default)]
@@ -250,6 +260,30 @@ async fn write_entry_file(path: &str, content: &str, sha: Option<&str>) -> Resul
     Ok(json!({}))
 }
 
+/// `cached` answers from the last fetch alone; otherwise the endpoint is asked and an answer with
+/// usage in it replaces the cache. Failing to write the cache never hides the usage.
+async fn claude_usage(cached: bool) -> Result<Value, String> {
+    let file = claude_usage_cache_file();
+    if cached {
+        return Ok(match read_json::<claude::UsageCache>(&file) {
+            Some(cache) => json!({ "accounts": cache.accounts, "fetchedAt": cache.fetched_at }),
+            None => json!({ "accounts": [] }),
+        });
+    }
+    let answer = claude::usage().await;
+    let fetched_at = now_ms();
+    if claude::has_usage(&answer) {
+        let cache = claude::UsageCache {
+            accounts: answer["accounts"].clone(),
+            fetched_at,
+        };
+        if let Err(error) = write_json(&file, &cache) {
+            eprintln!("could not cache the Claude usage: {error}");
+        }
+    }
+    Ok(json!({ "accounts": answer["accounts"], "fetchedAt": fetched_at }))
+}
+
 /// The counts file ranks what it knows; GitHub adds the rest. Either alone is enough, so the
 /// counted repositories still show when not logged in or offline.
 async fn list_github_repos() -> Result<Value, String> {
@@ -313,6 +347,10 @@ pub async fn handle(request: Value) -> Result<Value, String> {
         }
         Request::GetRecents => Ok(json!({ "recents": recents::load() })),
         Request::AddRecent { entry } => Ok(json!({ "recents": recents::remember(entry)? })),
+        Request::GetModeRecents { prefix } => Ok(json!({ "ids": recents::load_mode(&prefix) })),
+        Request::AddModeRecent { prefix, id } => {
+            Ok(json!({ "ids": recents::remember_mode(&prefix, &id)? }))
+        }
         // Use counts are pushed back to the repo by the extension only; the desktop does not
         // count yet, so a use is acknowledged and dropped.
         Request::RecordBookmarkUse { .. } => Ok(json!({})),
@@ -382,7 +420,7 @@ pub async fn handle(request: Value) -> Result<Value, String> {
         }
         Request::ListGithubRepos => list_github_repos().await,
         Request::ListClaudeCodeRepos => Ok(json!({ "repos": claude::code_repos()? })),
-        Request::GetClaudeUsage => Ok(claude::usage().await),
+        Request::GetClaudeUsage { cached } => claude_usage(cached).await,
         Request::ListDumps => Ok(json!({ "dumps": dumps::list(&config::dumps_dir()) })),
         Request::SaveDump { id, text } => {
             match dumps::save(&config::dumps_dir(), id.as_deref(), &text, now_ms())? {
@@ -479,7 +517,18 @@ mod tests {
         );
         assert_eq!(
             parse(json!({ "type": "GET_CLAUDE_USAGE" })),
-            Request::GetClaudeUsage
+            Request::GetClaudeUsage { cached: false }
+        );
+        assert_eq!(
+            parse(json!({ "type": "GET_CLAUDE_USAGE", "cached": true })),
+            Request::GetClaudeUsage { cached: true }
+        );
+        assert_eq!(
+            parse(json!({ "type": "ADD_MODE_RECENT", "prefix": "p", "id": "x" })),
+            Request::AddModeRecent {
+                prefix: "p".into(),
+                id: "x".into()
+            }
         );
         assert_eq!(
             parse(json!({ "type": "SAVE_DUMP", "text": "x" })),

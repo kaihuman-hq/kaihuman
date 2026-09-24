@@ -475,19 +475,87 @@ describe('claudeCodeMode', () => {
 });
 
 describe('claudeUsageMode', () => {
-  it('lists each account’s rows, under its own heading', async () => {
-    answers.GET_CLAUDE_USAGE = {
-      accounts: [
-        { name: 'default', usage: { five_hour: { utilization: 5 } } },
-        { name: 'work', error: 'no credentials' },
-      ],
+  const MINUTE = 60 * 1000;
+  const accounts = [
+    { name: 'default', usage: { five_hour: { utilization: 5 } } },
+    { name: 'work', error: 'no credentials' },
+  ];
+
+  /** Answers the cache from `cache` and a fetch from `fresh`, recording which was asked. */
+  const usagePort = (
+    cache: { accounts: typeof accounts; fetchedAt?: number },
+    fresh: () => Promise<{ accounts: typeof accounts; fetchedAt?: number }>,
+  ) => {
+    const asked: string[] = [];
+    const port: ActionPort = {
+      send: async (request) => {
+        const cached = (request as { cached?: boolean }).cached;
+        asked.push(cached ? 'cache' : 'fetch');
+        return (cached ? cache : await fresh()) as never;
+      },
     };
-    const mode = claudeUsageMode(fakePort);
+    const mode = claudeUsageMode(port);
     if (!('load' in mode)) throw new Error('u does not load');
+    return { mode, asked };
+  };
+
+  it('fetches when nothing is cached, then lists each account under its own heading', async () => {
+    const { mode, asked } = usagePort({ accounts: [] }, async () => ({
+      accounts,
+      fetchedAt: Date.now(),
+    }));
     const rows = await mode.load();
-    expect(mode.prefix).toBe('u');
-    expect(rows.map((row) => row.group)).toEqual(['default', 'work']);
-    expect(rows[1]?.title).toBe('Could not load usage');
+    expect(asked).toEqual(['cache', 'fetch']);
+    expect(rows[0]).toMatchObject({ title: 'Usage synced just now', tone: 'good' });
+    expect(rows.slice(1).map((row) => row.group)).toEqual(['default', 'work']);
+    expect(rows[2]?.title).toBe('Could not load usage');
+    expect(mode.recents).toBe(false);
+  });
+
+  it('shows a cache younger than 5 minutes as it is, without syncing', async () => {
+    const { mode, asked } = usagePort(
+      { accounts, fetchedAt: Date.now() - 3 * MINUTE },
+      async () => ({ accounts }),
+    );
+    const rows = await mode.load();
+    expect(rows[0]).toMatchObject({
+      title: 'Cached usage from 3 min ago',
+      subtitle: 'Fresh — synced again once it is 5 min old',
+      tone: 'good',
+    });
+    expect(mode.refresh?.()).toBeNull();
+    expect(asked).toEqual(['cache']);
+  });
+
+  it('shows an older cache first, then the synced usage in its place', async () => {
+    const { mode } = usagePort({ accounts, fetchedAt: Date.now() - 30 * MINUTE }, async () => ({
+      accounts,
+      fetchedAt: Date.now(),
+    }));
+    const rows = await mode.load();
+    expect(rows[0]).toMatchObject({
+      title: 'Cached usage from 30 min ago',
+      subtitle: 'Syncing in the background…',
+      tone: 'warn',
+    });
+    const synced = await mode.refresh?.();
+    expect(synced?.[0]).toMatchObject({ title: 'Usage synced just now', tone: 'good' });
+    expect(synced?.length).toBe(rows.length);
+  });
+
+  it('keeps the cached usage when the sync fails, and says why', async () => {
+    const { mode } = usagePort({ accounts, fetchedAt: Date.now() - 2 * 60 * MINUTE }, async () => {
+      throw new Error('offline');
+    });
+    const rows = await mode.load();
+    expect(rows[0]?.tone).toBe('bad');
+    const after = await mode.refresh?.();
+    expect(after?.[0]).toMatchObject({
+      title: 'Cached usage from 2h 0m ago',
+      subtitle: 'Sync failed: offline',
+      tone: 'bad',
+    });
+    expect(after?.slice(1)).toEqual(rows.slice(1));
   });
 });
 

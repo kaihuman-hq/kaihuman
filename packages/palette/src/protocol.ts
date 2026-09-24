@@ -24,6 +24,9 @@ export interface PaletteProtocol {
   GET_BOOKMARKS: { request: NoFields; response: { bookmarks: Bookmark[] } };
   SEARCH_REPO: { request: { query: string }; response: { results: RepoResult[] } };
   GET_RECENTS: { request: NoFields; response: { recents: RecentEntry[] } };
+  /** The ids last chosen in one prefix mode, newest first — see `withModeRecent`. */
+  GET_MODE_RECENTS: { request: { prefix: string }; response: { ids: string[] } };
+  ADD_MODE_RECENT: { request: { prefix: string; id: string }; response: { ids: string[] } };
   ADD_RECENT: { request: { entry: RecentEntry }; response: { recents: RecentEntry[] } };
   RECORD_BOOKMARK_USE: { request: { bookmarkId: string }; response: NoFields };
   /** The quick-note files the repo's dashboard config lists; none when it has no such config. */
@@ -105,8 +108,16 @@ export interface PaletteProtocol {
    * is none.
    */
   GET_CLAUDE_USAGE: {
-    request: NoFields;
-    response: { accounts: { name: string; usage?: ClaudeUsage; error?: string }[] };
+    /**
+     * `cached` answers from the last fetch alone — no accounts and no `fetchedAt` when there has
+     * been none; otherwise the endpoint is asked, and a fetch with any usage in it is cached.
+     */
+    request: { cached?: boolean };
+    response: {
+      accounts: { name: string; usage?: ClaudeUsage; error?: string }[];
+      /** When the answer was fetched, in ms since the epoch. */
+      fetchedAt?: number;
+    };
   };
   /**
    * The repository's files the palette can add entries to — those ending in one of

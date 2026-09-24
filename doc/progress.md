@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-09-24 — Palette: recent entries per prefix, cached `>u` usage
+
+- **Recent per prefix** (both palettes): every mode keeps the last 10 entries chosen in it and,
+  while nothing is typed, lists them first under **Recent** — prompts copied in `>p`, commands in
+  `>x`, repositories in `>r`/`>g`/`>c`, files in `>f`, dumps in `>d`, bookmarks in `>b`; a link
+  mode (`>l`) keeps the terms searched. Listing an entry's children is not a use; opening one is.
+  `>t` keeps its own 20-text history; `>u` opts out (`recents: false`).
+- **Protocol**: `GET_MODE_RECENTS` / `ADD_MODE_RECENT`, kept by the extension in
+  `chrome.storage.local.modeRecents` and by the desktop in `$XDG_STATE_HOME/lifosy/mode-recents.json`;
+  `withModeRecent` (palette) and `with_mode_recent` (Rust) keep the same ten.
+- **`>u` cached** (desktop): `GET_CLAUDE_USAGE { cached: true }` answers from
+  `$XDG_CACHE_HOME/lifosy/claude-usage.json`; a fetch with any usage in it replaces the cache. The
+  mode shows the cache at once with a status row — its age and a dot: green under 15 min, yellow
+  up to 60, red beyond — and syncs in the background only when it is 5 min old or older, swapping
+  in the fresh rows (“Usage synced just now”). A failed sync keeps the cached rows and says why.
+  With no cache yet, the first load waits for the endpoint.
+- **Palette core**: a loading mode may `refresh` behind what it loaded; a mode entry may carry a
+  `tone` (good / warn / bad), drawn as a coloured dot before its title.
+
 ## 2026-09-24 — Start page reads and writes through `@lifosy/formats`
 
 - **Moved** from `packages/ui` into `packages/formats` (history kept): the habit, time-tracking,

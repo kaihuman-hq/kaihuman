@@ -256,6 +256,11 @@ hint line lists the prefixes.
 | `>l` | One row: the console team's logs in Tsuga, for what is typed | opens Tsuga's explorer on `owner-team:console`, `AND "…"` the typed text when there is any | a link only, no request |
 | `>f` | The repository's files a widget can add to — todo lists, action logs, events, prompts, commands | offers **Open … in Kaihuman** or **Add a todo…** (an action, an event…) | one tree listing per visit |
 
+With nothing typed, every mode but `>t` and `>u` lists the last 10 entries you chose in it first,
+under **Recent** — the prompts you copied in `>p`, the repositories you opened in `>r`, the terms
+you searched in `>l`. Choosing an entry again moves it back to the top; an entry that has since
+gone from the repository drops out. They are kept per prefix in the extension's local storage.
+
 With nothing typed, `>t` lists the last 20 texts you translated, newest first — **⏎** translates
 one again (kept as typed, so `fr: …` asks for French again). Translating a text again moves it to
 the top rather than listing it twice.

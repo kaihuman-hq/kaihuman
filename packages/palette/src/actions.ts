@@ -8,7 +8,7 @@
  */
 
 import { commandParameters, fillCommand, parseCommands, parsePrompts } from '@lifosy/formats';
-import { usageRows } from './claude-usage.js';
+import { usageNeedsSync, usageRows, usageStatusRow } from './claude-usage.js';
 import type {
   EditableText,
   ModeItem,
@@ -18,7 +18,7 @@ import type {
   RepoResult,
 } from './command-palette.js';
 import { type EntryKind, entryKindOf } from './entries.js';
-import type { ActionPort } from './protocol.js';
+import type { ActionPort, PaletteResponse } from './protocol.js';
 import { parseTranslationQuery, usefulTranslations } from './translate.js';
 
 /** The Lifosy console — where a repo file is opened, rather than on GitHub. */
@@ -525,19 +525,76 @@ export const claudeCodeMode = (port: ActionPort): PaletteMode => ({
   load: () => claudeCodeItems(port),
 });
 
-/** `>u` — Claude usage for each configured account. Desktop only: it reads the local credentials. */
-export const claudeUsageMode = (port: ActionPort): PaletteMode => ({
-  prefix: 'u',
-  title: 'Claude usage',
-  placeholder: 'Filter usage — ⏎ opens the usage page',
-  description:
-    'Claude rate limits and spend per account, with pace and reset times — as the claude.ai usage page shows them',
-  load: async () => {
-    const { accounts } = await port.send({ type: 'GET_CLAUDE_USAGE' });
-    const now = new Date();
-    return accounts.flatMap((account) => usageRows(account.name, account, now));
-  },
-});
+type UsageAnswer = PaletteResponse<'GET_CLAUDE_USAGE'>;
+
+const usageAccountRows = (answer: UsageAnswer, now: Date) =>
+  answer.accounts.flatMap((account) => usageRows(account.name, account, now));
+
+/**
+ * `>u` — Claude usage for each configured account. Desktop only: it reads the local credentials.
+ *
+ * The last fetch is cached by the backend and shown at once, its age on the first row; a cache 5
+ * minutes old or older is synced behind it, and the fresh rows replace it when they arrive.
+ */
+export const claudeUsageMode = (port: ActionPort): PaletteMode => {
+  /** What the last load showed, so a sync that fails leaves it in place. */
+  let shown: (UsageAnswer & { fetchedAt: number }) | null = null;
+
+  return {
+    prefix: 'u',
+    title: 'Claude usage',
+    placeholder: 'Filter usage — ⏎ opens the usage page',
+    description:
+      'Claude rate limits and spend per account, with pace and reset times — as the claude.ai usage page shows them; cached, synced in the background once 5 min old',
+    // The rows are a status view; choosing one only opens the usage page.
+    recents: false,
+    load: async () => {
+      const now = new Date();
+      const cached = await port.send({ type: 'GET_CLAUDE_USAGE', cached: true });
+      if (cached.fetchedAt === undefined) {
+        // Nothing cached yet: this once, the palette waits for the endpoint.
+        const fresh = await port.send({ type: 'GET_CLAUDE_USAGE' });
+        const fetchedAt = fresh.fetchedAt ?? now.getTime();
+        shown = null;
+        return [
+          usageStatusRow(fetchedAt, now.getTime(), 'synced'),
+          ...usageAccountRows(fresh, now),
+        ];
+      }
+      shown = { ...cached, fetchedAt: cached.fetchedAt };
+      const state = usageNeedsSync(shown.fetchedAt, now.getTime()) ? 'syncing' : 'cached';
+      return [
+        usageStatusRow(shown.fetchedAt, now.getTime(), state),
+        ...usageAccountRows(shown, now),
+      ];
+    },
+    refresh: () => {
+      const base = shown;
+      if (!base || !usageNeedsSync(base.fetchedAt, Date.now())) return null;
+      return (async () => {
+        let failed: string;
+        try {
+          const fresh = await port.send({ type: 'GET_CLAUDE_USAGE' });
+          const now = new Date();
+          if (fresh.accounts.some((account) => account.usage)) {
+            return [
+              usageStatusRow(fresh.fetchedAt ?? now.getTime(), now.getTime(), 'synced'),
+              ...usageAccountRows(fresh, now),
+            ];
+          }
+          failed = fresh.accounts.find((account) => account.error)?.error ?? 'no usage came back';
+        } catch (e: any) {
+          failed = e?.message || 'the usage endpoint did not answer';
+        }
+        const now = new Date();
+        return [
+          usageStatusRow(base.fetchedAt, now.getTime(), { failed }),
+          ...usageAccountRows(base, now),
+        ];
+      })();
+    },
+  };
+};
 
 /**
  * What can be done with a repo file whose widget can add to it: open it in the console, or add an
@@ -660,6 +717,12 @@ export const portHandlers = (
     port
       .send({ type: 'ADD_RECENT', entry })
       .catch((e) => console.warn('LifeOS palette: could not record', entry, e));
+  },
+  loadModeRecents: async (prefix) => (await port.send({ type: 'GET_MODE_RECENTS', prefix })).ids,
+  rememberModeRecent: (prefix, id) => {
+    port
+      .send({ type: 'ADD_MODE_RECENT', prefix, id })
+      .catch((e) => console.warn('LifeOS palette: could not record', prefix, id, e));
   },
   countBookmarkUse: (bookmarkId) => {
     port

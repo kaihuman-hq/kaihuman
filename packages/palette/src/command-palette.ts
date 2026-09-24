@@ -98,7 +98,11 @@ export interface ModeItem {
   choose?: () => void;
   /** Consecutive entries with the same group are listed under it as one heading. */
   group?: string;
+  /** A coloured mark before the title — how fresh cached data is, say. */
+  tone?: Tone;
 }
+
+export type Tone = 'good' | 'warn' | 'bad';
 
 /** A list of its own behind a prefix: typing `>p` enters the mode whose `prefix` is `p`. */
 export type PaletteMode = {
@@ -108,10 +112,17 @@ export type PaletteMode = {
   placeholder: string;
   /** What the mode is for and how to use it, as the help (`?`) lists it. */
   description: string;
+  /** `false` lists no recently chosen entries at the top — for a mode that is a status view. */
+  recents?: false;
 } & (
   | {
       /** Everything the mode offers, loaded on entering it and filtered locally as you type. */
       load: () => Promise<ModeItem[]>;
+      /**
+       * Asked once `load` has answered: newer entries to replace them with — `load` answering from
+       * a cache, this from the source — or null when there is nothing newer to fetch.
+       */
+      refresh?: () => Promise<ModeItem[]> | null;
     }
   | {
       /**
@@ -145,7 +156,17 @@ export interface PaletteHandlers {
   modes: readonly PaletteMode[];
   /** Puts text on the clipboard; rejects with a message to show if it cannot. */
   copy: (text: string) => Promise<void>;
+  /** The ids last chosen in the mode behind `prefix`, newest first (`MODE_RECENTS_LIMIT`). */
+  loadModeRecents?: (prefix: string) => Promise<string[]>;
+  rememberModeRecent?: (prefix: string, id: string) => void;
 }
+
+/** How many recently chosen entries each prefix mode keeps. */
+export const MODE_RECENTS_LIMIT = 10;
+
+/** Newest first, each id once, capped — choosing an entry again moves it back to the top. */
+export const withModeRecent = (ids: readonly string[], id: string): string[] =>
+  id ? [id, ...ids.filter((candidate) => candidate !== id)].slice(0, MODE_RECENTS_LIMIT) : [...ids];
 
 export interface PaletteOptions {
   /**
@@ -169,6 +190,7 @@ interface Row {
   title: string;
   subtitle: string;
   activate: () => void;
+  tone?: Tone;
 }
 
 export const PALETTE_HOST_ID = 'lifosy-command-palette';
@@ -276,6 +298,10 @@ const STYLES = `
     white-space: nowrap;
   }
   .rows[data-wrap="true"] .subtitle { white-space: normal; }
+  .row[data-tone] .title::before { content: "● "; }
+  .row[data-tone="good"] .title::before { color: #7dd3a7; }
+  .row[data-tone="warn"] .title::before { color: #e5c07b; }
+  .row[data-tone="bad"] .title::before { color: #e06c75; }
   .empty { padding: 16px; color: #6b6b6b; }
   .hint {
     padding: 8px 16px;
@@ -305,6 +331,10 @@ const HELP_TOPICS: readonly [string, string][] = [
   ['⇥ or →', 'Open the entries under the selected one — a repository’s pages, say'],
   ['Esc', 'Back one step: a field, a list, a mode — then close the palette'],
   ['Backspace on an empty input', 'Leaves the current mode and gives its prefix back'],
+  [
+    'Recent in a mode',
+    `Each prefix lists the last ${MODE_RECENTS_LIMIT} entries you chose in it first, while nothing is typed`,
+  ],
 ];
 
 /** Typing pauses this long before the editor saves, so a paste or a burst of keys is one save. */
@@ -405,6 +435,8 @@ export function createCommandPalette(
     answered: string;
     parent: ModeItem | null;
     history: string[];
+    /** Ids (a link mode: queries) last chosen in the mode, newest first. */
+    recents: string[];
   } | null = null;
   /** Guards against a slow submit landing after the query moved on, like `searchToken`. */
   let submitToken = 0;
@@ -540,11 +572,52 @@ export function createCommandPalette(
       if (mode !== entered) return;
       entered.items = items;
       setStatus(null);
+      void refreshMode(entered);
     } catch (e: any) {
       if (mode !== entered) return;
       setStatus(e?.message || `Could not load ${entered.mode.title.toLowerCase()}`);
     }
     render();
+  };
+
+  /** Swaps in what the mode's `refresh` brings, unless the user has left the mode meanwhile. */
+  const refreshMode = async (entered: NonNullable<typeof mode>) => {
+    const refreshing = 'load' in entered.mode ? entered.mode.refresh?.() : null;
+    if (!refreshing) return;
+    try {
+      const items = await refreshing;
+      if (mode !== entered) return;
+      entered.items = items;
+    } catch (e: any) {
+      if (mode !== entered) return;
+      setStatus(e?.message || `Could not refresh ${entered.mode.title.toLowerCase()}`);
+    }
+    render();
+  };
+
+  /** Whether the mode lists recently chosen entries: a real prefix, not the help or choices. */
+  const keepsRecents = (candidate: PaletteMode) =>
+    candidate !== helpMode && !!candidate.prefix && candidate.recents !== false;
+
+  /** Reads the mode's recent entries; a failure only means there are none to show. */
+  const loadModeRecents = async (entered: NonNullable<typeof mode>) => {
+    if (!handlers.loadModeRecents || !keepsRecents(entered.mode)) return;
+    const recents = await handlers
+      .loadModeRecents(entered.mode.prefix)
+      .catch(() => entered.recents);
+    if (mode !== entered) return;
+    entered.recents = recents;
+    render();
+  };
+
+  /** Counts a choice in the mode: its id, or for a link mode the query that built it. */
+  const rememberModeChoice = (item: ModeItem) => {
+    if (!mode || !keepsRecents(mode.mode)) return;
+    // A link mode's entry is built from the query; a recent one carries its query as its id.
+    const key =
+      'link' in mode.mode && !mode.recents.includes(item.id) ? input.value.trim() : item.id;
+    mode.recents = withModeRecent(mode.recents, key);
+    handlers.rememberModeRecent?.(mode.mode.prefix, key);
   };
 
   /** Reads a submitting mode's history; a failure only means there is none to show. */
@@ -579,13 +652,14 @@ export function createCommandPalette(
 
   /** Switches into `next` with `rest` in the input; a submitting mode given text submits it. */
   const enterMode = (next: PaletteMode, rest: string) => {
-    mode = { mode: next, items: null, answered: '', parent: null, history: [] };
+    mode = { mode: next, items: null, answered: '', parent: null, history: [], recents: [] };
     input.value = rest;
     trail = [];
     selected = 0;
     submitToken++;
     setStatus(null);
     render();
+    void loadModeRecents(mode);
     if ('load' in next) void loadMode(mode, next.load);
     else if ('submit' in next) {
       void loadHistory(mode);
@@ -602,25 +676,53 @@ export function createCommandPalette(
     !input.value.trim() &&
     mode.history.length > 0;
 
+  const bookmarkItem = (bookmark: Bookmark): ModeItem => ({
+    id: `bookmark:${bookmark.id}`,
+    title: bookmark.title,
+    subtitle: bookmarkSubtitle(bookmark),
+    choose: () => openBookmark(bookmark),
+  });
+
+  /**
+   * With nothing typed, the entries last chosen in the mode come first, under Recent — found among
+   * everything the mode offers (a link mode builds them again from their queries).
+   */
+  const withRecents = (current: NonNullable<typeof mode>, items: ModeItem[]): ModeItem[] => {
+    if (input.value.trim() || !current.recents.length) return items;
+    let known: ModeItem[];
+    if ('link' in current.mode) {
+      const { link } = current.mode;
+      known = current.recents.map((query) => ({ ...link(query), id: query }));
+    } else if (current.mode === bookmarksMode) known = bookmarks.map(bookmarkItem);
+    else known = (current.items ?? []).flatMap((item) => [item, ...(item.children ?? [])]);
+    const byId = new Map(known.map((item) => [item.id, item]));
+    const recent = current.recents.flatMap((id) => {
+      const item = byId.get(id);
+      return item ? [{ ...item, group: 'Recent' }] : [];
+    });
+    const ids = new Set(recent.map((item) => item.id));
+    return [...recent, ...items.filter((item) => !ids.has(item.id))];
+  };
+
   /** What the mode lists right now: the parent's children, or its own entries, filtered. */
   const modeItems = (): ModeItem[] => {
     if (!mode) return [];
     if (mode.parent) return filterModeItems(mode.parent.children ?? [], input.value);
-    if ('link' in mode.mode) return [mode.mode.link(input.value.trim())];
+    if ('link' in mode.mode) return withRecents(mode, [mode.mode.link(input.value.trim())]);
     if (mode.mode === bookmarksMode) {
-      return searchBookmarks(bookmarks, input.value, MODE_ROW_LIMIT).map((bookmark) => ({
-        id: `bookmark:${bookmark.id}`,
-        title: bookmark.title,
-        subtitle: bookmarkSubtitle(bookmark),
-        choose: () => openBookmark(bookmark),
-      }));
+      return withRecents(
+        mode,
+        searchBookmarks(bookmarks, input.value, MODE_ROW_LIMIT).map(bookmarkItem),
+      );
     }
     if (!mode.items) return [];
     // The help keeps its sections in order rather than ranking matches across them.
     if (mode.mode === helpMode)
       return mode.items.filter((item) => filterModeItems([item], input.value).length > 0);
     // A submitted answer is already for exactly what is typed; filtering it would hide it.
-    return 'load' in mode.mode ? filterModeItems(mode.items, input.value) : mode.items;
+    return 'load' in mode.mode
+      ? withRecents(mode, filterModeItems(mode.items, input.value))
+      : mode.items;
   };
 
   const showChildren = (item: ModeItem | undefined) => {
@@ -633,6 +735,10 @@ export function createCommandPalette(
   };
 
   const chooseItem = async (item: ModeItem) => {
+    // An entry that only lists more entries has not been used yet.
+    if (item.choose || item.action || item.edit || item.url || item.copy !== undefined) {
+      rememberModeChoice(item);
+    }
     if (item.choose) {
       item.choose();
       return;
@@ -684,6 +790,7 @@ export function createCommandPalette(
             title: item.title,
             subtitle: item.subtitle ?? '',
             activate: () => void chooseItem(item),
+            tone: item.tone,
           }));
 
   /** Counts the open and remembers it, as a bookmark opened from anywhere in the palette is. */
@@ -1026,6 +1133,7 @@ export function createCommandPalette(
         const element = document.createElement('div');
         element.className = 'row';
         element.dataset.selected = String(position === selected);
+        if (row.tone) element.dataset.tone = row.tone;
         const title = document.createElement('div');
         title.className = 'title';
         // Titles come from the repo file and the page, so they are set as text, never as markup.

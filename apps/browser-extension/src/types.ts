@@ -16,6 +16,8 @@ export interface Message {
     | 'SYNC_NOW'
     | 'GET_RECENTS'
     | 'ADD_RECENT'
+    | 'GET_MODE_RECENTS'
+    | 'ADD_MODE_RECENT'
     | 'GET_REPOS'
     | 'SET_REPO'
     | 'SAVE_SELECTION'
@@ -60,8 +62,10 @@ export interface Message {
   targets?: string[];
   /** `SET_TRANSLATION_KEY`: the DeepL API key; empty forgets it. */
   key?: string;
-  /** `READ_LATER_DONE`: the item to mark read. */
+  /** `READ_LATER_DONE`: the item to mark read; `ADD_MODE_RECENT`: the entry chosen. */
   id?: string;
+  /** `GET_MODE_RECENTS`, `ADD_MODE_RECENT`: the palette mode's prefix (`p` for `>p`). */
+  prefix?: string;
   /** `WRITE_ENTRY_FILE`: the file's new text. */
   content?: string;
   /** `WRITE_ENTRY_FILE`: the version the text was built on. */

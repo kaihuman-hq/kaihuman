@@ -9,7 +9,7 @@ import {
   serializeTimeTracking,
   toggleStartStop,
 } from '@lifosy/formats';
-import { withTranslationText } from '@lifosy/palette';
+import { withModeRecent, withTranslationText } from '@lifosy/palette';
 import { type Message } from '../types';
 import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
@@ -235,6 +235,26 @@ export interface RecentEntry {
   title: string;
   subtitle?: string;
   url?: string;
+}
+
+/** Each prefix mode's recently chosen ids, newest first, keyed by the mode's prefix. */
+async function readModeRecents(): Promise<Record<string, string[]>> {
+  const stored = await chrome.storage.local.get('modeRecents');
+  const recents = stored.modeRecents as Record<string, string[]> | undefined;
+  return recents && typeof recents === 'object' ? recents : {};
+}
+
+async function modeRecents(prefix: string) {
+  const ids = (await readModeRecents())[prefix];
+  return { ids: Array.isArray(ids) ? ids : [] };
+}
+
+async function rememberModeRecent(prefix: string, id: string) {
+  if (!prefix || !id) throw new Error('A mode recent needs a prefix and an id');
+  const all = await readModeRecents();
+  const ids = withModeRecent(all[prefix] ?? [], id);
+  await chrome.storage.local.set({ modeRecents: { ...all, [prefix]: ids } });
+  return { ids };
 }
 
 async function readRecents(): Promise<RecentEntry[]> {
@@ -1238,6 +1258,14 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       (error) => sendResponse({ error: error.message }),
     );
     return true; // Indicate async response
+  }
+
+  if (message.type === 'GET_MODE_RECENTS') {
+    return answer(modeRecents(message.prefix || ''), sendResponse);
+  }
+
+  if (message.type === 'ADD_MODE_RECENT') {
+    return answer(rememberModeRecent(message.prefix || '', message.id || ''), sendResponse);
   }
 
   if (message.type === 'GET_REPOS') {

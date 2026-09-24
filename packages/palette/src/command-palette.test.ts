@@ -1559,3 +1559,161 @@ describe('mode entries whose children run an action', () => {
     expect(open).toHaveBeenCalledWith('https://github.com/o/r/issues?q=login');
   });
 });
+
+describe('recently chosen entries in a mode', () => {
+  let stored: Record<string, string[]>;
+  let rememberModeRecent: Mock<(prefix: string, id: string) => void>;
+
+  /** A palette that keeps each mode's recents in `stored`, as a backend would. */
+  const reopen = async () => {
+    palette.destroy();
+    palette = createCommandPalette({
+      loadBookmarks: loadBookmarks as any,
+      searchRepo: searchRepo as any,
+      open: open as any,
+      actions: () => actions,
+      loadRecents: loadRecents as any,
+      rememberRecent: rememberRecent as any,
+      countBookmarkUse: countBookmarkUse as any,
+      modes,
+      copy: copy as any,
+      loadModeRecents: async (prefix) => stored[prefix] ?? [],
+      rememberModeRecent,
+    });
+    palette.toggle();
+    await settle();
+  };
+
+  beforeEach(async () => {
+    stored = {};
+    rememberModeRecent = vi.fn((prefix: string, id: string) => {
+      stored[prefix] = [id, ...(stored[prefix] ?? []).filter((known) => known !== id)];
+    });
+    modes.push({
+      prefix: 'l',
+      title: 'Logs',
+      placeholder: 'Search logs',
+      description: 'Open the logs',
+      link: (term) => ({ id: `logs:${term}`, title: term ? `Logs “${term}”` : 'Logs', url: 'u' }),
+    });
+    await reopen();
+  });
+
+  it('lists the last chosen entries first, under Recent, while nothing is typed', async () => {
+    stored.p = ['p2', 'gone'];
+    type('>p');
+    await settle();
+    expect(groupRows('Recent')).toEqual(['Refactor to hooks']);
+    expect(rowTitles()).toEqual(['Refactor to hooks', 'Commit message', 'o/repo']);
+    expect(selectedTitle()).toBe('Refactor to hooks');
+
+    type('commit');
+    expect(groupLabels()).not.toContain('Recent');
+  });
+
+  it('remembers what is chosen, and lists it first next time', async () => {
+    type('>p');
+    await settle();
+    await activateRow('Commit message');
+    expect(rememberModeRecent).toHaveBeenCalledExactlyOnceWith('p', 'p1');
+
+    rememberModeRecent.mockClear();
+    palette.toggle();
+    await settle();
+    type('>p');
+    await settle();
+    expect(groupRows('Recent')).toEqual(['Commit message']);
+    // Listing a repository's pages (⇥) is not using it; opening one of them is.
+    press('ArrowDown');
+    press('ArrowDown');
+    press('Tab');
+    expect(rememberModeRecent).not.toHaveBeenCalled();
+    press('Enter');
+    await settle();
+    expect(rememberModeRecent).toHaveBeenCalledExactlyOnceWith('p', 'r1:issues');
+  });
+
+  it('keeps a link mode’s queries and builds their entries again', async () => {
+    type('>l');
+    await settle();
+    type('timeout');
+    press('Enter');
+    await settle();
+    expect(rememberModeRecent).toHaveBeenCalledWith('l', 'timeout');
+
+    palette.toggle();
+    await settle();
+    type('>l');
+    await settle();
+    expect(rowTitles()).toEqual(['Logs “timeout”', 'Logs']);
+    expect(groupRows('Recent')).toEqual(['Logs “timeout”']);
+  });
+
+  it('lists recent bookmarks in >b', async () => {
+    stored.b = ['bookmark:Zulip'];
+    type('>b');
+    await settle();
+    expect(groupRows('Recent')).toEqual(['Zulip']);
+    expect(rowTitles()[0]).toBe('Zulip');
+  });
+
+  it('leaves a mode that opts out alone', async () => {
+    modes.push({
+      prefix: 'u',
+      title: 'Usage',
+      placeholder: '',
+      description: '',
+      recents: false,
+      load: async () => [{ id: 'u1', title: 'Usage row', url: 'u' }],
+    });
+    stored.u = ['u1'];
+    await reopen();
+    type('>u');
+    await settle();
+    expect(groupLabels()).toEqual(['Usage']);
+    await activateRow('Usage row');
+    expect(rememberModeRecent).not.toHaveBeenCalled();
+  });
+});
+
+describe('modes that refresh what they loaded', () => {
+  it('shows the loaded entries, then the refreshed ones, each with its tone', async () => {
+    let finish: (items: ModeItem[]) => void = () => {};
+    modes.push({
+      prefix: 'u',
+      title: 'Usage',
+      placeholder: '',
+      description: '',
+      load: async () => [{ id: 's', title: 'Cached 30 min ago', tone: 'warn' }],
+      refresh: () =>
+        new Promise<ModeItem[]>((resolve) => {
+          finish = resolve;
+        }),
+    });
+    type('>u');
+    await settle();
+    expect(rowTitles()).toEqual(['Cached 30 min ago']);
+    expect((shadow().querySelector('.row') as HTMLElement).dataset.tone).toBe('warn');
+
+    finish([{ id: 's', title: 'Synced just now', tone: 'good' }]);
+    await settle();
+    expect(rowTitles()).toEqual(['Synced just now']);
+    expect((shadow().querySelector('.row') as HTMLElement).dataset.tone).toBe('good');
+  });
+
+  it('asks nothing more of a mode whose refresh has nothing to fetch', async () => {
+    const load = vi.fn(async () => [{ id: 'a', title: 'A' }]);
+    modes.push({
+      prefix: 'u',
+      title: 'U',
+      placeholder: '',
+      description: '',
+      load,
+      refresh: () => null,
+    });
+    type('>u');
+    await settle();
+    expect(rowTitles()).toEqual(['A']);
+    expect(load).toHaveBeenCalledOnce();
+  });
+});
