@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CLAUDE_USAGE_URL,
   formatMoney,
+  monthPace,
   usageAge,
   usageAgeTone,
   usageBar,
@@ -33,6 +34,16 @@ describe('usagePace', () => {
   it('is unknown for windows of no fixed length, or without a reset', () => {
     expect(usagePace('something_new', inHours(1), NOW)).toBeNull();
     expect(usagePace('five_hour', undefined, NOW)).toBeNull();
+  });
+});
+
+describe('monthPace', () => {
+  it('is how much of the calendar month has passed', () => {
+    // 22.5 of September's 30 days.
+    expect(monthPace(NOW)).toBe(75);
+    expect(monthPace(new Date(2026, 1, 1))).toBe(0);
+    // Half of February's 28 days.
+    expect(monthPace(new Date(2026, 1, 15))).toBe(50);
   });
 });
 
@@ -101,6 +112,7 @@ describe('usageRows', () => {
       NOW,
     );
     expect(spend?.title).toContain('Monthly spend');
+    expect(spend?.title).toMatch(/pace 75%$/);
     expect(spend?.subtitle).toBe('$90.00 of $100.00  [warning]');
   });
 
@@ -120,6 +132,7 @@ describe('usageRows', () => {
       NOW,
     );
     expect(extra?.title).toContain('Extra credits');
+    expect(extra?.title).toMatch(/pace 75%$/);
     expect(extra?.subtitle).toBe('$2.50 of $25.00');
   });
 

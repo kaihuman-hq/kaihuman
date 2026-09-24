@@ -211,6 +211,26 @@ describe('knowledge base captures', () => {
     expect(written[0].body).toContain('![x](https://e.com/i.png)');
     expect((fetch as any).mock.calls.some(([u]: any[]) => u === 'https://e.com/i.png')).toBe(false);
   });
+  it('creates the palette’s capture and answers with its console link', async () => {
+    const path = '.kh/raw/1-a-thought.md';
+    const res = await call({ type: 'CAPTURE_KNOWLEDGE', path, content: '---\n---\n\nA thought\n' });
+    expect(res).toEqual({
+      success: true,
+      url: 'https://app.kaihuman.com/files/.kh/raw/1-a-thought.md?repo=o%2Fr',
+    });
+    const put = (fetch as any).mock.calls.find(([, init]: any[]) => init?.method === 'PUT');
+    expect(String(put[0])).toBe(`https://api.github.com/repos/o/r/contents/${path}`);
+    // No sha: GitHub refuses to overwrite a file that is already there.
+    expect(JSON.parse(put[1].body).sha).toBeUndefined();
+    expect(puts()[0].body).toContain('A thought');
+  });
+
+  it('refuses a capture outside the inbox', async () => {
+    expect(await call({ type: 'CAPTURE_KNOWLEDGE', path: 'README.md', content: 'x' })).toEqual({
+      error: 'Refusing to write README.md',
+    });
+    expect(puts()).toEqual([]);
+  });
 });
 
 describe('palette mode messages', () => {

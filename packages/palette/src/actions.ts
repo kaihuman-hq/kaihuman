@@ -25,6 +25,7 @@ import type {
 } from './command-palette.js';
 import { conversionItems } from './convert.js';
 import { type EntryKind, entryKindOf } from './entries.js';
+import { knowledgeNote } from './knowledge.js';
 import type { ActionPort, GithubWorkFilter, PaletteResponse } from './protocol.js';
 import { symbolItems } from './symbols.js';
 import { parseTranslationQuery, usefulTranslations } from './translate.js';
@@ -267,6 +268,20 @@ const translationItems = async (port: ActionPort, query: string): Promise<ModeIt
     subtitle: `${translation.detectedSource} → ${translation.target} · ⏎ copies`,
     copy: translation.text,
   }));
+};
+
+/** Saves the text to the knowledge base's inbox; the one entry left opens the new file. */
+const captureItems = async (port: ActionPort, text: string): Promise<ModeItem[]> => {
+  const { path, content } = knowledgeNote(text, new Date());
+  const { url } = await port.send({ type: 'CAPTURE_KNOWLEDGE', path, content });
+  return [
+    {
+      id: `capture:${path}`,
+      title: `Captured “${text.trim().split('\n')[0]}”`,
+      subtitle: `${path} · ⏎ opens it in Kaihuman`,
+      url,
+    },
+  ];
 };
 
 const githubRepoItems = async (port: ActionPort): Promise<ModeItem[]> => {
@@ -674,8 +689,8 @@ const entryFileItems = async (port: ActionPort): Promise<ModeItem[]> => {
 /**
  * The prefix modes every surface offers: `>p` prompts, `>t` translate, `>r` GitHub repositories,
  * `>g` a search in one of them, `>w` GitHub work waiting on you, `>f` the files widgets add to,
- * `>k` conversions and `>s` symbols. Link tools like `>l` come from the repository's palette
- * settings instead (`loadSettings`).
+ * `>q` a knowledge capture, `>k` conversions and `>s` symbols. Link tools like `>l` come from the
+ * repository's palette settings instead (`loadSettings`).
  */
 export const paletteModes = (port: ActionPort): PaletteMode[] => [
   {
@@ -724,6 +739,16 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
     description:
       'The repository’s todo lists, action logs, events, prompts and commands — ⏎ opens one in Kaihuman or adds an entry, as its widget does',
     load: () => entryFileItems(port),
+  },
+  {
+    prefix: 'q',
+    title: 'Capture',
+    placeholder: 'A thought, a link, a quote — ⏎ saves it to the knowledge base',
+    description:
+      'Saves what is typed to the knowledge base’s inbox (.kh/raw/) for /kb-ingest, as cli capture does; any text typed outside the mode is offered too',
+    // A capture is done once; there is nothing to choose again.
+    recents: false,
+    submit: (text) => captureItems(port, text),
   },
   {
     prefix: 'k',

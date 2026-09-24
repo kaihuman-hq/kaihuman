@@ -172,6 +172,11 @@ export interface PaletteProtocol {
     request: { filter: GithubWorkFilter };
     response: { items: GithubWorkItem[] };
   };
+  /**
+   * Creates a knowledge capture (see `knowledgeNote`), never over an existing file, and answers
+   * with its console link. Backends refuse any path `isKnowledgePath` does not allow.
+   */
+  CAPTURE_KNOWLEDGE: { request: { path: string; content: string }; response: { url: string } };
   /** GitHub repositories to open, most relevant first — the order is the backend's. */
   LIST_GITHUB_REPOS: {
     request: NoFields;
