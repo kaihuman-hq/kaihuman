@@ -208,9 +208,9 @@ normal tab. The New Tab page used to be on that list; the start page below is th
 - **Actions** are everything the popup and the context menu can do, listed below your bookmarks so
   `⏎` opens what you were looking for rather than writing something. Type part of an action's name
   to bring it to the top.
-- **Convert** shows what a color, a sum, a `0x`/`0b`/`0o` number or a timestamp you typed
-  converts to — `12*7` gives `84`, `#ff8800` its `rgb()` and `hsl()` — above **Web**, so `⏎`
-  copies the result. Plain numbers and text are left to the web search; `>k` converts those too.
+- **Convert** shows what a color, a sum, a `0x`/`0b`/`0o` number, a timestamp or a quantity you
+  typed converts to — `12*7` gives `84`, `#ff8800` its `rgb()` and `hsl()`, `5 km` `3.1069 mi` —
+  above **Web**, so `⏎` copies the result. Plain numbers and text are left to the web search; `>k` converts those too.
 - **Web** lists one row per search engine for what you typed — by default Google, DuckDuckGo,
   Ecosia, Amazon, Amazon.de, Reddit, Bing, Brave Search, Startpage, Wikipedia, YouTube, GitHub,
   Stack Overflow, Yahoo and Qwant — below everything else, so typing an action's name still
@@ -306,9 +306,17 @@ palette's hint line lists the prefixes.
 | `>l` | One row: Tsuga logs, for what is typed (a default tool — see **Palette settings**) | opens Tsuga's explorer searching for the typed text | a link only, no request |
 | `>e` `>m` `>n` `>i` | One row: LEO's German ⇄ English dictionary, Google Maps, npm, IMDb — for what is typed (default tools) | opens the page for the typed text | a link only, no request |
 | `>w` | What waits on you on GitHub: pull requests requesting your review, issues and pull requests assigned to you, your pull requests with failing checks — grouped in that order, each once | opens it on GitHub | three `GET /search/issues` with the extension's token, on entering the mode |
-| `>k` | Conversions of what you type: colors (`#ff8800`, `rgb()`, `hsl()`), number bases (`0x1f`, `0b101`, `0o17`, `42`), arithmetic (`12*7`, `2^10`, `(3+4)%5`), timestamps (`1790208000`, `2026-09-24T10:00Z`), letter case for any other text, `lorem` / `lorem 5` for filler text | copies the result | none — worked out in the palette |
+| `>k` | Conversions of what you type: colors (`#ff8800`, `rgb()`, `hsl()`), number bases (`0x1f`, `0b101`, `0o17`, `42`), arithmetic (`12*7`, `2^10`, `(3+4)%5`), timestamps (`1790208000`, `2026-09-24T10:00Z`), metric ⇄ US units (see below), letter case for any other text, `lorem` / `lorem 5` for filler text | copies the result | none — worked out in the palette |
 | `>s` | Symbols, emoji and kaomoji by name — arrows, math, currency, typography, keys, marks | copies it | none |
 | `>f` | The repository's files a widget can add to — todo lists, action logs, events, prompts, commands | offers **Open … in Kaihuman** or **Add a todo…** (an action, an event…) | one tree listing per visit |
+
+**Units** convert between metric and US customary: length (`mm cm m km` ⇄ `in ft yd mi`, and
+heights as `5'11"` or `5 ft 11 in`, shown back as feet and inches), mass (`mg g kg` ⇄ `oz lb`),
+volume (`ml cl dl l` ⇄ `tsp tbsp fl oz cup pt qt gal`, US measures), area (`cm² m² ha km²` ⇄
+`in² ft² yd² acres mi²`), speed (`m/s km/h` ⇄ `mph`) and temperature (`°C K` ⇄ `°F`). A quantity
+goes into the other system's closest unit — `5 km` into miles, `180 cm` into inches and
+`5 ft 10.9 in`; `to` or `in` names the unit instead: `5 km in ft`, `3 m to cm`. A decimal comma
+works too (`1,5 kg`).
 
 With nothing typed, every mode but `>t`, `>u`, `>a` and `>k` lists the last 10 entries you chose in it first,
 under **Recent** — the prompts you copied in `>p`, the repositories you opened in `>r`, the terms

@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-09-24 — Palette: metric ⇄ US units
+
+- **Units** (`packages/palette/src/units.ts`), in the main search's Convert group and in `>k`:
+  length, mass, volume (US measures), area, speed and temperature, each unit into the other
+  system's closest ones (`5 km` → `3.1069 mi`, `1 l` → quarts and gallons), or into the unit named
+  after `to`/`in` (`5 km in ft`). Heights read as `5'11"` or `5 ft 11 in` and a metric length
+  under 10 ft is also shown in feet and inches. Five significant digits; a decimal comma works.
+
 ## 2026-09-24 — Palette: converters, `>w` GitHub work, prefixes that share a start
 
 - **Converters** (`packages/palette/src/convert.ts`, both surfaces, no requests): a color

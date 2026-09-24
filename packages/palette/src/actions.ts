@@ -728,9 +728,9 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
   {
     prefix: 'k',
     title: 'Convert',
-    placeholder: 'A color, number, sum, date or text — “lorem 3” for filler — ⏎ copies',
+    placeholder: 'A color, number, sum, date, quantity (5 km) or text — ⏎ copies',
     description:
-      'Colors (#hex, rgb, hsl), number bases, arithmetic, timestamps, letter case and Lorem ipsum — ⏎ copies',
+      'Colors (#hex, rgb, hsl), number bases, arithmetic, timestamps, metric ⇄ US units (5 km, 350 °F, 5 km in ft), letter case and Lorem ipsum (“lorem 3”) — ⏎ copies',
     recents: false,
     links: (query) => conversionItems(query, true),
   },

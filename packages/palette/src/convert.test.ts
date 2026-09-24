@@ -118,3 +118,47 @@ describe('case and Lorem ipsum', () => {
     for (const item of conversionItems('#ff8800', true)) expect(item.copy).toBe(item.title);
   });
 });
+
+describe('units', () => {
+  it('converts metric into US customary', () => {
+    expect(values('5 km')).toEqual(['3.1069 mi']);
+    expect(values('1,5 kg')).toEqual(['3.3069 lb']);
+    expect(values('1 l')).toEqual(['1.0567 qt', '0.26417 gal']);
+    expect(values('100 m2')).toEqual(['1076.4 ft²']);
+    expect(values('100 km/h')).toEqual(['62.137 mph']);
+    expect(values('20 °C')).toEqual(['68 °F']);
+  });
+
+  it('converts US customary into metric', () => {
+    expect(values('10 lb')).toEqual(['4.5359 kg']);
+    expect(values('2 cups')).toEqual(['473.18 ml']);
+    expect(values('1 acre')).toEqual(['4046.9 m²', '0.40469 ha']);
+    expect(values('60 mph')).toEqual(['96.561 km/h']);
+    expect(values('350F')).toEqual(['176.67 °C']);
+    expect(values('5 in')).toEqual(['12.7 cm']);
+  });
+
+  it('tells a height in feet and inches, and reads one', () => {
+    expect(values('180 cm')).toEqual(['70.866 in', '5 ft 10.9 in']);
+    expect(values('5\'11"')).toEqual(['180.34 cm', '1.8034 m']);
+    expect(values('5 ft 11 in')).toEqual(['180.34 cm', '1.8034 m']);
+  });
+
+  it('converts into the unit named after to or in, of the same kind only', () => {
+    expect(values('5 km in ft')).toEqual(['16404 ft']);
+    expect(values('5 in in cm')).toEqual(['12.7 cm']);
+    expect(values('3 m to cm')).toEqual(['300 cm']);
+    expect(values('10 kg to mi')).toEqual([]);
+  });
+
+  it('leaves text that only looks like a quantity alone', () => {
+    expect(values('iphone 15')).toEqual([]);
+    expect(values('5k')).toEqual([]);
+    expect(values('5 in a row')).toEqual([]);
+  });
+
+  it('copies the value with its unit', () => {
+    const [item] = conversionItems('5 km');
+    expect(item).toMatchObject({ copy: '3.1069 mi', subtitle: '5 km in mi', group: 'Units' });
+  });
+});

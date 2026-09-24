@@ -1,9 +1,10 @@
 /**
- * Conversions the palette works out itself, without a request: colors, number bases, arithmetic
- * and timestamps — offered for whatever is typed — and, behind `>k`, letter case and Lorem ipsum
- * too. Choosing one copies it.
+ * Conversions the palette works out itself, without a request: colors, number bases, arithmetic,
+ * timestamps and metric ⇄ US units — offered for whatever is typed — and, behind `>k`, letter
+ * case and Lorem ipsum too. Choosing one copies it.
  */
 import type { ModeItem } from './command-palette.js';
+import { unitItems } from './units.js';
 
 type Rgb = [number, number, number];
 
@@ -274,6 +275,7 @@ export const conversionItems = (query: string, all = false): ModeItem[] => {
     ...grouped('Math', mathItems(text)),
     ...grouped('Number', numberItems(text, all)),
     ...grouped('Time', timeItems(text)),
+    ...grouped('Units', unitItems(text)),
     ...(all ? grouped('Lorem ipsum', loremItems(text)) : []),
   ];
   return read.length || !all ? read : grouped('Case', caseItems(text));
