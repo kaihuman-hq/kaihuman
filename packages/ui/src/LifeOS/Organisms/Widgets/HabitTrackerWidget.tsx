@@ -1,10 +1,10 @@
 import { Logger } from '@lifosy/core';
+import { calculateStats, checkIn, isCheckedIn, parseHabitData } from '@lifosy/formats';
 import { CalendarCheck, CheckCircle, Flame, Trophy } from 'lucide-preact';
 import { useMemo } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
 import { CompactHero, CompactWidgetLayout } from './CompactWidgetLayout';
-import { calculateStats, checkIn, isCheckedIn, parseHabitData } from './HabitTrackerLogic';
 
 const logger = new Logger('HabitTrackerWidget');
 

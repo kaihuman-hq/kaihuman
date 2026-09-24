@@ -1,8 +1,3 @@
-import { Archive, Check, ExternalLink, RefreshCw, RotateCcw, Trash2 } from 'lucide-preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
-import { cn } from '../../../utils';
-import { MonoHeader, MonoText } from '../../Atoms/Typography';
-import { CompactList, CompactWidgetLayout } from './CompactWidgetLayout';
 import {
   deleteAllRead,
   deleteItem,
@@ -11,7 +6,12 @@ import {
   parseReadItLater,
   type ReadItLaterItem,
   serializeReadItLater,
-} from './ReadItLaterLogic';
+} from '@lifosy/formats';
+import { Archive, Check, ExternalLink, RefreshCw, RotateCcw, Trash2 } from 'lucide-preact';
+import { useEffect, useMemo, useState } from 'preact/hooks';
+import { cn } from '../../../utils';
+import { MonoHeader, MonoText } from '../../Atoms/Typography';
+import { CompactList, CompactWidgetLayout } from './CompactWidgetLayout';
 
 interface ReadItLaterWidgetProps {
   content: string;

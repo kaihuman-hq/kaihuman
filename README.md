@@ -86,7 +86,7 @@ pnpm turbo test           # run tests
 |---------|-------------|
 | `packages/core` | Shared business logic, GitHub service, Preact Signals stores |
 | `packages/ui` | Shared Preact UI components |
-| `packages/formats` | The widget file formats every app adds entries with (todos, action logs, events, prompts, commands) |
+| `packages/formats` | The widget file formats every app reads and writes (todos, action logs, events, prompts, commands, habits, time tracking, timezones, read later) |
 | `packages/palette` | The command palette shared by the browser extension and the desktop app |
 | `packages/config` | Shared TypeScript / Biome / Tailwind config |
 

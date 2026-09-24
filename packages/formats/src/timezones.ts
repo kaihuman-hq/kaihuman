@@ -15,10 +15,6 @@ export interface TimezoneData {
   timezones: TimezoneEntry[];
 }
 
-import { Logger } from '@lifosy/core';
-
-const logger = new Logger('TimezoneLogic');
-
 export const parseTimezones = (json: string): TimezoneData => {
   try {
     if (!json || json.trim() === '') return { timezones: [] };
@@ -26,7 +22,7 @@ export const parseTimezones = (json: string): TimezoneData => {
     // Basic validation could go here
     return data && Array.isArray(data.timezones) ? data : { timezones: [] };
   } catch (e) {
-    logger.error('Failed to parse timezones JSON', e);
+    console.error('[timezones] Failed to parse timezones JSON', e);
     return { timezones: [] };
   }
 };

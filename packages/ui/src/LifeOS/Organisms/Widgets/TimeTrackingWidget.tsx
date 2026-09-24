@@ -1,8 +1,3 @@
-import { Pause, Play, Square } from 'lucide-preact';
-import { useMemo } from 'preact/hooks';
-import { cn } from '../../../utils';
-import { MonoHeader, MonoText } from '../../Atoms/Typography';
-import { CompactHero, CompactWidgetLayout } from './CompactWidgetLayout';
 import {
   addPause,
   calculateDurationMinutes,
@@ -12,7 +7,12 @@ import {
   serializeTimeTracking,
   type TimeTrackingData,
   toggleStartStop,
-} from './TimeTrackingLogic';
+} from '@lifosy/formats';
+import { Pause, Play, Square } from 'lucide-preact';
+import { useMemo } from 'preact/hooks';
+import { cn } from '../../../utils';
+import { MonoHeader, MonoText } from '../../Atoms/Typography';
+import { CompactHero, CompactWidgetLayout } from './CompactWidgetLayout';
 
 export interface TimeTrackingWidgetProps {
   content: string;

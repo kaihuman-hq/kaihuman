@@ -1,4 +1,14 @@
-import { addActionLogEntry, addTodoEntry } from '@lifosy/formats';
+import {
+  addActionLogEntry,
+  addReadLaterEntry,
+  addTodoEntry,
+  checkIn,
+  localDate,
+  markReadItLaterRead,
+  parseTimeTracking,
+  serializeTimeTracking,
+  toggleStartStop,
+} from '@lifosy/formats';
 import { withTranslationText } from '@lifosy/palette';
 import { type Message } from '../types';
 import { consoleFileUrl } from '../console';
@@ -63,19 +73,14 @@ import {
   toPinnedTabs,
 } from './pinned-tabs';
 import {
-  addReadLater,
   buildToday,
-  checkInHabit,
   DEFAULT_ACTION_LOG_PATH,
   fetchToday,
   inboxPath,
   isTodayCacheStale,
   isTodayCacheUsable,
-  localDate,
-  markRead,
   readLaterPath,
   type TodayCache,
-  toggleTimer,
   withFile,
 } from './today';
 
@@ -1422,7 +1427,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     const date = localDate(new Date());
     return answer(
       commitTodayFile({ path: message.path || '', suffix: '.habit.csv' }, (csv) =>
-        checkInHabit(csv, date)),
+        checkIn(csv, date)),
       sendResponse,
     );
   }
@@ -1431,7 +1436,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     const now = new Date();
     return answer(
       commitTodayFile({ path: message.path || '', suffix: '.timetracking.csv' }, (csv) =>
-        toggleTimer(csv, now),
+        serializeTimeTracking(toggleStartStop(parseTimeTracking(csv), now)),
       ),
       sendResponse,
     );
@@ -1440,7 +1445,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'READ_LATER_DONE') {
     return answer(
       commitTodayFile({ path: message.path || '', suffix: '.readitlater.json' }, (json) =>
-        markRead(json, message.id || '', Date.now()),
+        markReadItLaterRead(json, message.id || ''),
       ),
       sendResponse,
     );
@@ -1454,7 +1459,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     const page = { url: message.url, title: message.title || '' };
     return answer(
       commitTodayFile(readLaterPath, (json) =>
-        addReadLater(json, page, Date.now(), crypto.randomUUID()),
+        addReadLaterEntry(json, page, crypto.randomUUID()),
       ),
       sendResponse,
     );

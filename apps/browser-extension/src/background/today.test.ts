@@ -1,19 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  addReadLater,
   buildToday,
-  checkInHabit,
   DEFAULT_ACTION_LOG_PATH,
   fetchToday,
-  habitStreak,
-  markRead,
-  parseClocks,
-  parseMilestones,
-  parseTodoLines,
   type TodayCache,
   timerState,
-  toggleTimer,
   upcomingEvents,
+  worldClocks,
 } from './today';
 
 // Local time throughout: the console's widgets count days in the user's own timezone.
@@ -43,9 +36,9 @@ describe('upcomingEvents', () => {
   it('keeps the next seven days, a birthday in its next year and an event still running', () => {
     const events = upcomingEvents('p.events.csv', csv, NOW);
     expect(events.map((e) => [e.name, e.daysUntil, e.date])).toEqual([
-      ['Offsite', 2, '2026-09-25'],
       ['Trip', 0, '2026-09-20'],
       ['Anna', 1, '2026-09-24'],
+      ['Offsite', 2, '2026-09-25'],
     ]);
   });
 });
@@ -68,18 +61,6 @@ describe('todos', () => {
     '- [ ] Fix the alpha bug !v0',
     '- [x] Done alpha thing !v0',
   ].join('\n');
-
-  it('reads milestones and todo lines the way the console writes them', () => {
-    expect(parseMilestones(md)).toEqual([
-      { id: 'v1', name: 'Launch', dueDate: '2026-09-30' },
-      { id: 'v0', name: 'Alpha', dueDate: '2026-09-01' },
-    ]);
-    expect(parseTodoLines(md)[0]).toEqual({
-      text: 'Implement demo mode',
-      status: 'in-progress',
-      milestoneId: 'v1',
-    });
-  });
 
   it('summarises what is in progress, overdue and next due', () => {
     const today = buildToday(cache({ '.kh/projects.todos.md': md }), NOW);
@@ -110,20 +91,6 @@ describe('habits', () => {
     '2026-09-22;x',
   ].join('\n');
 
-  it('counts the streak from yesterday until today is checked in', () => {
-    expect(habitStreak(csv, NOW)).toBe(2);
-    expect(habitStreak(checkInHabit(csv, '2026-09-23'), NOW)).toBe(3);
-    expect(habitStreak('iso date;goal reached\n2026-09-10;x', NOW)).toBe(0);
-  });
-
-  it('checks in as the console does: sorted, header first, no trailing newline', () => {
-    expect(checkInHabit('iso date;goal reached\n2026-09-22;x\n2026-09-20;\n', '2026-09-21')).toBe(
-      'iso date;goal reached\n2026-09-20;\n2026-09-21;x\n2026-09-22;x',
-    );
-    // An unmarked day is marked rather than duplicated.
-    expect(checkInHabit(csv, '2026-09-20')).toContain('2026-09-20;x');
-  });
-
   it('reports each habit file with its name', () => {
     expect(buildToday(cache({ '.kh/health.habit.csv': csv }), NOW).habits).toEqual([
       { path: '.kh/health.habit.csv', name: 'health', checkedToday: false, streak: 2 },
@@ -142,15 +109,6 @@ describe('time tracking', () => {
     });
     expect(timerState('iso date;time\n', NOW)).toEqual({ running: false, closedMinutes: 0 });
   });
-
-  it('stops a running timer and starts a new day, newest first', () => {
-    expect(toggleTimer(csv, NOW)).toBe(
-      'iso date;time\n2026-09-23;08:00,12:00,12:30,10:30\n2026-09-22;08:00,17:00\n',
-    );
-    expect(toggleTimer('iso date;time\n2026-09-22;08:00,17:00\n', NOW)).toBe(
-      'iso date;time\n2026-09-23;10:30\n2026-09-22;08:00,17:00\n',
-    );
-  });
 });
 
 describe('clocks', () => {
@@ -162,11 +120,11 @@ describe('clocks', () => {
         { cities: ['nameless'] },
       ],
     });
-    expect(parseClocks(json)).toEqual([
+    expect(worldClocks(json)).toEqual([
       { zone: 'Europe/Berlin', label: 'Berlin' },
       { zone: 'Asia/Tokyo', label: 'Tokyo' },
     ]);
-    expect(parseClocks('not json')).toEqual([]);
+    expect(worldClocks('not json')).toEqual([]);
   });
 });
 
@@ -182,31 +140,6 @@ describe('read it later', () => {
   it('lists the oldest unread items first', () => {
     const today = buildToday(cache({ 'x.readitlater.json': json }), NOW);
     expect(today.readLater.map((item) => item.id)).toEqual(['c', 'a']);
-  });
-
-  it('marks an item read, keeping the rest', () => {
-    const next = JSON.parse(markRead(json, 'a', 99));
-    expect(next.items[0]).toMatchObject({ id: 'a', status: 'read', updatedAt: 99 });
-    expect(next.items).toHaveLength(3);
-    expect(() => markRead(json, 'gone', 99)).toThrow('no longer on the list');
-  });
-
-  it('adds a page once, to a new file too', () => {
-    const added = JSON.parse(addReadLater('', { url: 'https://d.example', title: ' D ' }, 5, 'd'));
-    expect(added.items).toEqual([
-      {
-        id: 'd',
-        url: 'https://d.example',
-        name: 'D',
-        status: 'new',
-        tags: [],
-        createdAt: 5,
-        updatedAt: 5,
-      },
-    ]);
-    expect(() => addReadLater(json, { url: 'https://a.example', title: 'A' }, 5, 'x')).toThrow(
-      'Already on the read-later list',
-    );
   });
 });
 

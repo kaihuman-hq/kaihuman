@@ -1,4 +1,4 @@
-import { toLocalISOString } from '../../../utils/date';
+import { localDate } from './dates.js';
 
 export interface Interval {
   start: string; // HH:MM
@@ -106,7 +106,7 @@ export const calculateDurationMinutes = (entry: DayEntry): number => {
         endMin = (endParts[0] || 0) * 60 + (endParts[1] || 0);
       }
     } else {
-      const today = toLocalISOString(new Date());
+      const today = localDate(new Date());
       if (entry.date === today) {
         const nowParts = currentHm.split(':').map(Number);
         endMin = (nowParts[0] || 0) * 60 + (nowParts[1] || 0);
@@ -131,9 +131,8 @@ export const formatDuration = (minutes: number): string => {
 /**
  * Toggles Start/Stop for Today.
  */
-export const toggleStartStop = (data: TimeTrackingData): TimeTrackingData => {
-  const today = toLocalISOString(new Date());
-  const now = new Date();
+export const toggleStartStop = (data: TimeTrackingData, now = new Date()): TimeTrackingData => {
+  const today = localDate(now);
   const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
   const newData = { ...data, entries: [...data.entries] };
@@ -170,7 +169,7 @@ export const toggleStartStop = (data: TimeTrackingData): TimeTrackingData => {
 };
 
 export const addPause = (data: TimeTrackingData, pauseMinutes: number): TimeTrackingData => {
-  const today = toLocalISOString(new Date());
+  const today = localDate(new Date());
   const newData = { ...data, entries: [...data.entries] };
   const dayEntryIndex = newData.entries.findIndex((e) => e.date === today);
 
@@ -215,7 +214,7 @@ export const addPause = (data: TimeTrackingData, pauseMinutes: number): TimeTrac
 };
 
 export const isRunning = (data: TimeTrackingData): boolean => {
-  const today = toLocalISOString(new Date());
+  const today = localDate(new Date());
   const entry = data.entries.find((e) => e.date === today);
   if (!entry) return false;
   const last = entry.intervals[entry.intervals.length - 1];
@@ -236,7 +235,7 @@ export const getChartData = (data: TimeTrackingData): ChartData => {
   // 12 months lookback ~ 365 days
   const lookback = new Date();
   lookback.setDate(lookback.getDate() - 365);
-  const lookbackDateStr = toLocalISOString(lookback);
+  const lookbackDateStr = localDate(lookback);
 
   // Sort ascending for chart
   const sorted = [...data.entries].sort((a, b) => a.date.localeCompare(b.date));

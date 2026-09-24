@@ -62,7 +62,7 @@ export const isCheckedIn = (content: string, date: string): boolean => {
   return data.entries.some((e) => e.date === date && e.reached);
 };
 
-export const calculateStats = (data: HabitData) => {
+export const calculateStats = (data: HabitData, now = new Date()) => {
   const sortedEntries = [...data.entries]
     .filter((e) => e.reached)
     .sort((a, b) => b.date.localeCompare(a.date)); // Descending order
@@ -79,7 +79,7 @@ export const calculateStats = (data: HabitData) => {
       return `${year}-${month}-${day}`;
     };
 
-    const today = new Date();
+    const today = new Date(now);
     today.setHours(0, 0, 0, 0);
     const todayIso = toLocDate(today);
 

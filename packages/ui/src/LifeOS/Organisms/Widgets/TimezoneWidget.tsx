@@ -1,14 +1,14 @@
-import { Calendar, Globe, Trash2 } from 'lucide-preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
-import { cn } from '../../../utils';
-import { MonoHeader, MonoText } from '../../Atoms/Typography';
 import {
   getCurrentTimeInZone,
   getISOWeekNumber,
   getYearProgress,
   parseTimezones,
   type TimezoneData,
-} from './TimezoneLogic';
+} from '@lifosy/formats';
+import { Calendar, Globe, Trash2 } from 'lucide-preact';
+import { useEffect, useMemo, useState } from 'preact/hooks';
+import { cn } from '../../../utils';
+import { MonoHeader, MonoText } from '../../Atoms/Typography';
 
 export interface TimezoneWidgetProps {
   content: string;

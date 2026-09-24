@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-09-24 — Start page reads and writes through `@lifosy/formats`
+
+- **Moved** from `packages/ui` into `packages/formats` (history kept): the habit, time-tracking,
+  timezone and read-later formats. `packages/formats` now holds every format the start page touches.
+- **Start page** (`background/today.ts`): its own todo, milestone, event, habit, time-tracking,
+  clock and read-later parsers are gone; it parses with `parseTodos`, `parseEvents`,
+  `getUpcomingEvents`, `parseHabitData`/`calculateStats`, `parseTimeTracking`, `parseTimezones` and
+  `parseReadItLater`, and keeps only what it shows (the 7-day window, today's closed minutes, clock
+  labels, unread items). Its writes use `checkIn`, `toggleStartStop`, `markReadItLaterRead` and
+  `addReadLaterEntry` — the console's own.
+- **Shared functions gained a clock** where the start page needs one: `now` on `toggleStartStop`,
+  `calculateStats`, `getUpcomingEvents` and `markAsRead`.
+- **Fixes in the shared code**: `getUpcomingEvents` rounds day counts instead of ceiling them, so an
+  event after the clocks go back is no longer a day further away; an empty read-later file reads as
+  empty without a warning; `markReadItLaterRead` and `addReadLaterEntry` refuse to write over a
+  list that is not valid JSON (the console's widget still reads such a list as empty).
+- **Behaviour now matching the console**: a habit check-in drops `date;` rows that were not
+  reached; a read-later write keeps only `items`; an event row with fewer than four columns is
+  skipped.
+- `packages/ui/src/utils/date.ts` removed — its only user moved.
+
 ## 2026-09-24 — `@lifosy/formats`: one implementation for adding widget entries, in every app
 
 - **New package** `packages/formats` (no dependencies): the todo, action log, events, prompts and

@@ -18,7 +18,14 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { githubFileStore, githubProfileStore, Logger, layoutStore } from '@lifosy/core';
-import { addEventEntry, addTodoEntry, parseTodos } from '@lifosy/formats';
+import type { ReadItLaterItem } from '@lifosy/formats';
+import {
+  addEventEntry,
+  addTodoEntry,
+  parseTimezones,
+  parseTodos,
+  serializeTimezones,
+} from '@lifosy/formats';
 import {
   Edit,
   FileText,
@@ -74,14 +81,12 @@ import { EventAddForm } from '../Organisms/Widgets/EventAddForm';
 import { EventsWidget } from '../Organisms/Widgets/EventsWidget';
 import { HabitTrackerWidget } from '../Organisms/Widgets/HabitTrackerWidget';
 import { PromptsWidget } from '../Organisms/Widgets/PromptsWidget';
-import type { ReadItLaterItem } from '../Organisms/Widgets/ReadItLaterLogic';
 import { ReadItLaterWidget } from '../Organisms/Widgets/ReadItLaterWidget';
 import { RssFeedManager, RssWidget } from '../Organisms/Widgets/RssWidget';
 import { StocksWidget } from '../Organisms/Widgets/StocksWidget';
 import { TimeTrackingCharts } from '../Organisms/Widgets/TimeTrackingCharts';
 import { TimeTrackingWidget } from '../Organisms/Widgets/TimeTrackingWidget';
 import { TimezoneAddForm } from '../Organisms/Widgets/TimezoneAddForm';
-import * as TimezoneLogic from '../Organisms/Widgets/TimezoneLogic';
 import { TimezoneWidget } from '../Organisms/Widgets/TimezoneWidget';
 import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
 import { TodoWidget } from '../Organisms/Widgets/TodoWidget';
@@ -3021,9 +3026,9 @@ const FocusedTileInternal = ({
                 <TimezoneAddForm
                   onCancel={() => setViewMode('WIDGET')}
                   onAdd={(entry) => {
-                    const data = TimezoneLogic.parseTimezones(tile.rawContent || '');
+                    const data = parseTimezones(tile.rawContent || '');
                     data.timezones.push(entry);
-                    const newContent = TimezoneLogic.serializeTimezones(data);
+                    const newContent = serializeTimezones(data);
                     tile.onContentChange?.(newContent);
                     setViewMode('WIDGET');
                   }}

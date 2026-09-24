@@ -10,6 +10,11 @@ import { appendAction, parseActionLog, serializeActionLog } from './action-log.j
 import { addCommand } from './commands.js';
 import { type EventEntry, parseEvents, serializeEvents } from './events.js';
 import { addPrompt, parsePrompts, serializePrompts } from './prompts.js';
+import {
+  parseReadItLaterForWrite,
+  type ReadItLaterItem,
+  serializeReadItLater,
+} from './read-later.js';
 import { addTodo, parseTodos, serializeTodos, type TodoPrompt } from './todos.js';
 
 const TAG = /#([\w-]+)/g;
@@ -113,4 +118,27 @@ export function addCommandEntry(
   if (!splitInlineTags(entry.title).text) throw new Error('A command needs a title');
   if (!entry.command.trim()) throw new Error('Nothing to add');
   return addCommand(content, entry.title, entry.tags ?? [], entry.command, entry.note);
+}
+
+/** A page at the end of a `.readitlater.json`, unless it is already there unread. */
+export function addReadLaterEntry(
+  content: string,
+  page: { url: string; title: string },
+  id: string,
+  now = Date.now(),
+): string {
+  const config = parseReadItLaterForWrite(content);
+  if (config.items.some((item) => item.url === page.url && item.status === 'new')) {
+    throw new Error('Already on the read-later list');
+  }
+  const item: ReadItLaterItem = {
+    id,
+    url: page.url,
+    name: page.title.trim() || page.url,
+    status: 'new',
+    tags: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+  return serializeReadItLater({ items: [...config.items, item] });
 }
