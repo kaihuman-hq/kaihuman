@@ -1,9 +1,10 @@
-import { ExternalLink, Pin, Star, Trash2 } from 'lucide-preact';
+import { ExternalLink, Pencil, Pin, Star, Trash2 } from 'lucide-preact';
 import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
 import {
   type Bookmark,
+  type BookmarkEdit,
   type BookmarkSort,
   collectTags,
   deleteBookmark,
@@ -12,6 +13,7 @@ import {
   serializeBookmarks,
   setBookmarkPinned,
   sortBookmarks,
+  updateBookmark,
 } from './BookmarksLogic';
 import { CompactList, CompactWidgetLayout } from './CompactWidgetLayout';
 
@@ -34,6 +36,7 @@ export const BookmarksWidget = ({
   const [query, setQuery] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [sort, setSort] = useState<BookmarkSort>('NEWEST');
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const tags = useMemo(() => collectTags(config.bookmarks), [config.bookmarks]);
   const visible = useMemo(
@@ -43,6 +46,17 @@ export const BookmarksWidget = ({
 
   const handleDelete = (id: string) => {
     onChange?.(serializeBookmarks(deleteBookmark(config, id)));
+  };
+
+  /** Returns the rejection message so the editor can show it and stay open. */
+  const handleSaveEdit = (id: string, edit: BookmarkEdit): string | undefined => {
+    try {
+      onChange?.(serializeBookmarks(updateBookmark(config, id, edit)));
+      setEditingId(null);
+      return undefined;
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    }
   };
 
   const handleTogglePin = (bookmark: Bookmark) => {
@@ -173,14 +187,24 @@ export const BookmarksWidget = ({
             <MonoText>No bookmarks match.</MonoText>
           </div>
         ) : (
-          visible.map((bookmark) => (
-            <BookmarkRow
-              key={bookmark.id}
-              bookmark={bookmark}
-              onTogglePin={() => handleTogglePin(bookmark)}
-              onDelete={() => handleDelete(bookmark.id)}
-            />
-          ))
+          visible.map((bookmark) =>
+            editingId === bookmark.id ? (
+              <BookmarkEditor
+                key={bookmark.id}
+                bookmark={bookmark}
+                onSave={(edit) => handleSaveEdit(bookmark.id, edit)}
+                onCancel={() => setEditingId(null)}
+              />
+            ) : (
+              <BookmarkRow
+                key={bookmark.id}
+                bookmark={bookmark}
+                onEdit={() => setEditingId(bookmark.id)}
+                onTogglePin={() => handleTogglePin(bookmark)}
+                onDelete={() => handleDelete(bookmark.id)}
+              />
+            ),
+          )
         )}
       </div>
     </div>
@@ -199,12 +223,80 @@ const formatUsage = (bookmark: Bookmark) => {
   return when ? `${times}, last ${when}` : times;
 };
 
+const editorInputClass =
+  'w-full bg-transparent border border-[var(--los-border)] focus:border-[var(--los-accent)] px-2 py-1 text-xs font-mono text-[var(--los-fg)] focus:outline-none';
+
+const BookmarkEditor = ({
+  bookmark,
+  onSave,
+  onCancel,
+}: {
+  bookmark: Bookmark;
+  onSave: (edit: BookmarkEdit) => string | undefined;
+  onCancel: () => void;
+}) => {
+  const [title, setTitle] = useState(bookmark.title);
+  const [url, setUrl] = useState(bookmark.url);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = (e: Event) => {
+    e.preventDefault();
+    setError(onSave({ title, url }) ?? null);
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onCancel();
+      }}
+      className="py-2 px-2 flex flex-col gap-1.5 bg-white/5"
+    >
+      <input
+        type="text"
+        aria-label="Bookmark title"
+        value={title}
+        onInput={(e) => setTitle(e.currentTarget.value)}
+        placeholder="Defaults to the URL"
+        className={editorInputClass}
+      />
+      <input
+        type="text"
+        aria-label="Bookmark URL"
+        value={url}
+        onInput={(e) => setUrl(e.currentTarget.value)}
+        placeholder="https://example.com"
+        className={editorInputClass}
+      />
+      {error && <div className="text-[10px] text-red-500 font-mono">{error}</div>}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={!url.trim()}
+          className="text-[10px] font-mono px-2 py-0.5 bg-[var(--los-accent)] text-black hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          SAVE
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-[10px] font-mono px-2 py-0.5 border border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+        >
+          CANCEL
+        </button>
+      </div>
+    </form>
+  );
+};
+
 const BookmarkRow = ({
   bookmark,
+  onEdit,
   onTogglePin,
   onDelete,
 }: {
   bookmark: Bookmark;
+  onEdit?: () => void;
   onTogglePin?: () => void;
   onDelete?: () => void;
 }) => {
@@ -252,6 +344,20 @@ const BookmarkRow = ({
         >
           <ExternalLink className="w-4 h-4" />
         </a>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            title="Edit title and link"
+            aria-label="Edit"
+            className="p-1.5 text-[var(--los-muted)] hover:text-[var(--los-fg)] transition-colors"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+        )}
         {onTogglePin && (
           <button
             type="button"
@@ -279,6 +385,7 @@ const BookmarkRow = ({
               onDelete();
             }}
             title="Delete"
+            aria-label="Delete"
             className="p-1.5 text-[var(--los-muted)] hover:text-red-500 transition-colors"
           >
             <Trash2 className="w-4 h-4" />

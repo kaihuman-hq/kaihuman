@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-09-25 — Bookmarks widget: edit title and link
+
+- Each row in the focused Bookmarks widget has an **Edit** (pencil) button next to pin and delete.
+  It opens an inline form for the title and URL; ⏎ or **SAVE** writes, Esc or **CANCEL** discards.
+  It works on the filtered list, so search, then edit or delete what matches.
+- New `updateBookmark` in `BookmarksLogic.ts`: same URL rules as adding (http(s) only, no
+  duplicate of another bookmark); keeps tags, pin state and usage counts; an empty title falls back
+  to the URL. A rejected edit shows its message inline and the form stays open.
+
 ## 2026-09-24 — `>u`: pace for monthly budgets
 
 - **Monthly spend** and **Extra credits** rows now show a pace too: how much of the calendar month
