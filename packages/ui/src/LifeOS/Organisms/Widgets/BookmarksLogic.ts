@@ -131,6 +131,36 @@ export const deleteBookmark = (
   updatedAt: now,
 });
 
+export interface BookmarkEdit {
+  title: string;
+  url: string;
+}
+
+/**
+ * Renames and/or relinks one bookmark in place, with the same url rules as `addBookmark`.
+ * Usage stats and pin state stay, since it is still the same bookmark to the user.
+ */
+export const updateBookmark = (
+  config: BookmarksConfig,
+  id: string,
+  edit: BookmarkEdit,
+  now = new Date().toISOString(),
+): BookmarksConfig => {
+  const url = normalizeBookmarkUrl(edit.url);
+  if (!isBookmarkUrl(url)) throw new Error('Enter an http(s) URL');
+  if (config.bookmarks.some((b) => b.id !== id && normalizeBookmarkUrl(b.url) === url)) {
+    throw new Error('That page is already bookmarked');
+  }
+  return {
+    bookmarks: config.bookmarks.map((bookmark) =>
+      bookmark.id === id
+        ? { ...bookmark, title: edit.title.trim() || url, url, updatedAt: now }
+        : bookmark,
+    ),
+    updatedAt: now,
+  };
+};
+
 /** Pins or unpins one bookmark in place, so the file keeps its order. */
 export const setBookmarkPinned = (
   config: BookmarksConfig,

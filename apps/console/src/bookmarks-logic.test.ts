@@ -12,6 +12,7 @@ import {
   serializeBookmarks,
   setBookmarkPinned,
   sortBookmarks,
+  updateBookmark,
 } from '../../../packages/ui/src/LifeOS/Organisms/Widgets/BookmarksLogic';
 
 const NOW = '2026-09-22T10:00:00.000Z';
@@ -175,6 +176,57 @@ describe('deleteBookmark', () => {
   it('leaves the list alone for an unknown id', () => {
     const next = deleteBookmark(config(bookmark('b1', 'https://a.example/')), 'nope', NOW);
     expect(next.bookmarks.map((b) => b.id)).toEqual(['b1']);
+  });
+});
+
+describe('updateBookmark', () => {
+  const later = '2026-09-23T10:00:00.000Z';
+  const used = { ...bookmark('b1', 'https://a.example/', ['dev'], 'A', 3), pinned: true };
+
+  it('renames and relinks in place, keeping usage, pin and tags', () => {
+    const next = updateBookmark(
+      config(used, bookmark('b2', 'https://b.example/')),
+      'b1',
+      { title: ' Renamed ', url: 'https://moved.example' },
+      later,
+    );
+    expect(next.bookmarks.map((b) => b.id)).toEqual(['b1', 'b2']);
+    expect(next.bookmarks[0]).toMatchObject({
+      title: 'Renamed',
+      url: 'https://moved.example/',
+      tags: ['dev'],
+      useCount: 3,
+      pinned: true,
+      createdAt: NOW,
+      updatedAt: later,
+    });
+    expect(next.bookmarks[1]?.updatedAt).toBe(NOW);
+    expect(next.updatedAt).toBe(later);
+  });
+
+  it('falls back to the url when the title is cleared', () => {
+    const next = updateBookmark(config(used), 'b1', { title: ' ', url: 'https://a.example/' });
+    expect(next.bookmarks[0]?.title).toBe('https://a.example/');
+  });
+
+  it('keeps its own url without calling it a duplicate', () => {
+    const next = updateBookmark(config(used), 'b1', { title: 'B', url: 'https://a.example' });
+    expect(next.bookmarks[0]?.title).toBe('B');
+  });
+
+  it('rejects urls that are not http(s)', () => {
+    expect(() =>
+      updateBookmark(config(used), 'b1', { title: 'A', url: 'javascript:alert(1)' }),
+    ).toThrow('http(s)');
+  });
+
+  it('rejects a url another bookmark already has', () => {
+    expect(() =>
+      updateBookmark(config(used, bookmark('b2', 'https://b.example/')), 'b1', {
+        title: 'A',
+        url: 'https://b.example',
+      }),
+    ).toThrow('already bookmarked');
   });
 });
 

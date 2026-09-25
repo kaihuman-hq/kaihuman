@@ -10,6 +10,7 @@
 
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
+| Bookmarks: rename, change the link or delete any entry, including in search results | Bookmarks widget → pencil / trash | 2026-09-25 |
 | Command palette settings (`.kh/command-palette.settings.json`) — search engines and `>`-prefixed link tools with parameters, added, removed and reordered in a widget | New File → Command Palette Settings | 2026-09-24 |
 | `>q` knowledge capture — what is typed becomes its own `.kh/raw/` file for `/kb-ingest`, the same file `cli capture` writes; any text in the main search also offers **Capture “…”** | command palette, desktop palette | 2026-09-24 |
 | Metric ⇄ US customary units in the palette's conversions — length (and heights in feet and inches), mass, volume, area, speed, temperature; `5 km in ft` for one unit; lengths ⇄ pixels at 80, 150 and 300 dpi (`10 cm to px`, `1000 px`) | command palette, desktop palette (main search and `>k`) | 2026-09-24 |
