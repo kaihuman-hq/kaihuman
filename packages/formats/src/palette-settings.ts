@@ -70,6 +70,7 @@ export const BUILT_IN_PALETTE_PREFIXES: readonly string[] = [
   'u',
   'a',
   'w',
+  'gw',
   'q',
   'k',
   's',

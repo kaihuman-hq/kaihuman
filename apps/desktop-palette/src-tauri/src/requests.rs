@@ -15,7 +15,7 @@ use crate::config::{
 };
 use crate::github::{Client, Read, WorkFilter, console_file_url, encode_path};
 use crate::recents::{self, RecentEntry};
-use crate::{claude, commands, dumps, entries, palette_settings, prompts, repos, translate};
+use crate::{claude, commands, dumps, entries, palette_settings, prompts, repos, translate, wifi};
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -107,6 +107,18 @@ pub enum Request {
     ExportDump {
         path: String,
         text: String,
+    },
+    ListWifi {
+        #[serde(default)]
+        rescan: bool,
+    },
+    SetWifi {
+        enabled: bool,
+    },
+    ConnectWifi {
+        ssid: String,
+        #[serde(default)]
+        password: Option<String>,
     },
     /// Pinned tab groups and importing the browser's bookmarks: only the extension can do these.
     #[serde(other)]
@@ -378,6 +390,29 @@ async fn list_github_repos() -> Result<Value, String> {
     Ok(json!({ "repos": repos::ranked(counts, github) }))
 }
 
+/// `nmcli` blocks for as long as a scan or a connection takes, so it runs off the async workers.
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+/// Networks only while the radio is on: a scan with it off fails rather than finding none.
+async fn list_wifi(rescan: bool) -> Result<Value, String> {
+    blocking(move || {
+        let enabled = wifi::enabled()?;
+        let networks = if enabled {
+            wifi::networks(rescan)?
+        } else {
+            Vec::new()
+        };
+        Ok(json!({ "enabled": enabled, "networks": networks }))
+    })
+    .await
+}
+
 /// Hands an http(s) URL to the default browser.
 pub fn open_in_browser(url: &str) -> Result<(), String> {
     if !bookmarks::is_openable_url(url) {
@@ -511,6 +546,15 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             let home = PathBuf::from(std::env::var_os("HOME").unwrap_or_default());
             let written = dumps::export(path.trim(), &text, &home)?;
             Ok(json!({ "path": written.display().to_string() }))
+        }
+        Request::ListWifi { rescan } => list_wifi(rescan).await,
+        Request::SetWifi { enabled } => {
+            blocking(move || wifi::set_enabled(enabled)).await?;
+            Ok(json!({}))
+        }
+        Request::ConnectWifi { ssid, password } => {
+            blocking(move || wifi::connect(&ssid, password.as_deref())).await?;
+            Ok(json!({}))
         }
         Request::BrowserOnly => Err(format!(
             "{kind} needs the browser extension — the desktop palette cannot do that yet"
@@ -690,6 +734,36 @@ mod tests {
             .await
             .unwrap_err();
         assert_eq!(error, "Refusing to write a.md");
+    }
+
+    #[test]
+    fn reads_wifi_requests() {
+        assert_eq!(
+            parse(json!({ "type": "LIST_WIFI" })),
+            Request::ListWifi { rescan: false }
+        );
+        assert_eq!(
+            parse(json!({ "type": "LIST_WIFI", "rescan": true })),
+            Request::ListWifi { rescan: true }
+        );
+        assert_eq!(
+            parse(json!({ "type": "SET_WIFI", "enabled": false })),
+            Request::SetWifi { enabled: false }
+        );
+        assert_eq!(
+            parse(json!({ "type": "CONNECT_WIFI", "ssid": "Home" })),
+            Request::ConnectWifi {
+                ssid: "Home".into(),
+                password: None
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "CONNECT_WIFI", "ssid": "Cafe", "password": "pw" })),
+            Request::ConnectWifi {
+                ssid: "Cafe".into(),
+                password: Some("pw".into())
+            }
+        );
     }
 
     #[test]

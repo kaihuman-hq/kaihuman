@@ -32,6 +32,8 @@ export interface PromptStep {
   label: string;
   /** Prefilled and editable — a field the user usually keeps but sometimes corrects. */
   initial?: () => string;
+  /** Typed masked, like a password, and never listed among the answers so far. */
+  secret?: boolean;
 }
 
 /**
@@ -1202,6 +1204,7 @@ export function createCommandPalette(
         : mode.mode.title;
     else crumb.textContent = here?.title ?? '';
     crumb.hidden = !pending && !here && !mode;
+    input.type = step?.secret ? 'password' : 'text';
     // Submenu titles already end in an ellipsis, which would otherwise double up here.
     if (step) input.placeholder = step.label;
     else if (mode)
@@ -1273,7 +1276,9 @@ export function createCommandPalette(
       // What has been answered so far, so a long walk stays reviewable.
       // Before any answer, the subtitle says what is being filled in — a command's `{{port}}`, say.
       addNote(
-        pending.values.filter(Boolean).join('  ·  ') ||
+        pending.values
+          .filter((value, index) => value && !pending?.action.prompts?.[index]?.secret)
+          .join('  ·  ') ||
           pending.action.subtitle ||
           pending.action.title,
       );

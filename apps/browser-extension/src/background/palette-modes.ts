@@ -150,7 +150,7 @@ interface IssueSearchItem {
   pull_request?: unknown;
 }
 
-/** One issue search for `>w`, most recently updated first. */
+/** One issue search for `>gw`, most recently updated first. */
 export async function searchGithubWork(
   token: string,
   filter: GithubWorkFilter,

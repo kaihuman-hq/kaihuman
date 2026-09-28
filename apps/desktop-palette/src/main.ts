@@ -14,6 +14,7 @@ import {
   paletteModes,
   portHandlers,
   repoActions,
+  wifiMode,
 } from '@lifosy/palette';
 
 /** Actions that act on browser tabs or the browser's bookmarks, which only the extension can do. */
@@ -48,14 +49,15 @@ const palette = createCommandPalette(
         run: () => invoke<string>('console_login'),
       },
     ],
-    // These read local files — dumps, omarchy's repo history, Claude's credentials — which only
-    // the desktop has.
+    // These read local files — dumps, omarchy's repo history, Claude's credentials — or drive the
+    // machine's Wi‑Fi, which only the desktop can.
     modes: [
       ...paletteModes(port),
       commandsMode(port, { canRun: true }),
       dumpMode(port),
       claudeCodeMode(port),
       claudeUsageMode(port),
+      wifiMode(port),
     ],
     copy: async (text) => {
       await invoke('copy_text', { text }).catch((error: unknown) => {

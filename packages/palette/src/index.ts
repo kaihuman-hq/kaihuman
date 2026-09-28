@@ -9,3 +9,4 @@ export * from './knowledge.js';
 export * from './protocol.js';
 export * from './symbols.js';
 export * from './translate.js';
+export * from './wifi.js';

@@ -393,6 +393,29 @@ describe('running an action', () => {
     // Once on open, once after the action.
     expect(loadBookmarks).toHaveBeenCalledTimes(2);
   });
+
+  it('masks a secret field and leaves it out of the answers so far', async () => {
+    const join = vi.fn(async () => 'Joined');
+    actions = [
+      {
+        id: 'join',
+        title: 'Join…',
+        prompts: [{ label: 'Password', secret: true }, { label: 'Name' }],
+        run: join,
+      },
+    ];
+    type('');
+    await activateRow('Join…');
+    expect(input().type).toBe('password');
+    type('hunter2');
+    press('Enter');
+    expect(input().type).toBe('text');
+    expect(shadow().querySelector('.empty')?.textContent).toBe('Join…');
+    type('Ada');
+    press('Enter');
+    await settle();
+    expect(join).toHaveBeenCalledWith(['hunter2', 'Ada']);
+  });
 });
 
 describe('submenus', () => {

@@ -31,7 +31,8 @@ way.
 | `>e` LEO dictionary, `>m` Google Maps, `>n` npm, `>i` IMDb — default link tools like `>l` | ✓ |
 | `>l` logs — Tsuga's log explorer, searching for what is typed; more link tools from `.kh/command-palette.settings.json` (see the extension's README, "Palette settings") | ✓ (settings cached in `$XDG_CACHE_HOME/lifosy/palette-settings.json` for five minutes) |
 | Recent: each prefix lists the last 10 entries chosen in it first (kept in `$XDG_STATE_HOME/lifosy/mode-recents.json`) | ✓ |
-| `>w` GitHub work — review requests, what is assigned to you, your PRs with failing checks | ✓ |
+| `>gw` GitHub work — review requests, what is assigned to you, your PRs with failing checks | ✓ |
+| `>w` Wi‑Fi — ⏎ on the first row turns it on or off; the networks in range follow (connected first, then by signal), and ⏎ connects, asking for the password (masked) when none is saved. The last scan shows at once, and a fresh one replaces it a few seconds later | ✓ desktop only (NetworkManager with `nmcli`) |
 | `>k` convert — colors, number bases, arithmetic, timestamps, metric ⇄ US units (`5 km`, `350 °F`, `5'11"`, `5 km in ft`), lengths ⇄ pixels at 80/150/300 dpi (`10 cm to px`, `1000 px`), letter case, Lorem ipsum; also offered inline for a color, sum, `0x…`, timestamp or quantity typed into the main search | ✓ (copying with `wl-copy`) |
 | `>s` symbols, emoji and kaomoji by name, ⏎ copies | ✓ |
 | `>q` capture to the knowledge base — what is typed becomes `.kh/raw/<epoch>-<slug>.md` for `/kb-ingest`, as `cli capture` writes it; also offered as **Capture “…”** for any text in the main search | ✓ (pushes directly; no offline spool — `cli capture` has one) |

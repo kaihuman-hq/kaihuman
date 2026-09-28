@@ -21,6 +21,7 @@ mod recents;
 mod repos;
 mod requests;
 mod translate;
+mod wifi;
 
 use std::io::{BufRead, BufReader, IsTerminal, Write};
 use std::os::unix::net::UnixListener;
