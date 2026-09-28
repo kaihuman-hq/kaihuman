@@ -105,6 +105,8 @@ export interface ModeItem {
   action?: PaletteAction;
   /** Anything else choosing it should do — the help's entries switch modes. */
   choose?: () => void;
+  /** Choosing it loads the mode's entries again, then refreshes them — a rescan, say. */
+  reloads?: true;
   /** Consecutive entries with the same group are listed under it as one heading. */
   group?: string;
   /** A coloured mark before the title — how fresh cached data is, say. */
@@ -799,6 +801,12 @@ export function createCommandPalette(
     }
     if (item.choose) {
       item.choose();
+      return;
+    }
+    if (item.reloads && mode && 'load' in mode.mode) {
+      input.value = '';
+      selected = 0;
+      void loadMode(mode, mode.mode.load);
       return;
     }
     if (item.action) {

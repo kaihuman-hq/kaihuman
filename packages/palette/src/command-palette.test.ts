@@ -1920,4 +1920,29 @@ describe('modes that refresh what they loaded', () => {
     expect(rowTitles()).toEqual(['A']);
     expect(load).toHaveBeenCalledOnce();
   });
+
+  it('loads and refreshes again, staying in the mode, when an entry reloads it', async () => {
+    let scans = 0;
+    const refresh = vi.fn(async () => [
+      { id: 'again', title: 'Scan again', reloads: true as const },
+      { id: 'n', title: `Scan ${scans}` },
+    ]);
+    const load = vi.fn(async () => {
+      scans++;
+      return [{ id: 'again', title: 'Scan again', reloads: true as const }];
+    });
+    modes.push({ prefix: 'u', title: 'U', placeholder: '', description: '', load, refresh });
+    type('>u');
+    await settle();
+    expect(rowTitles()).toEqual(['Scan again', 'Scan 1']);
+
+    type('scan');
+    press('Enter');
+    await settle();
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(input().value).toBe('');
+    expect(crumbText()).toBe('U');
+    expect(rowTitles()).toEqual(['Scan again', 'Scan 2']);
+  });
 });

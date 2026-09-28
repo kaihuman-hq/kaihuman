@@ -67,12 +67,25 @@ const networkItem = (port: ActionPort, network: WifiNetwork): ModeItem => {
   };
 };
 
+/** Scans again without leaving `>w`: the last scan shows while the new one runs. */
+const refreshItem: ModeItem = {
+  id: 'wifi:refresh',
+  title: 'Refresh networks',
+  subtitle: '⏎ scans again',
+  keywords: 'rescan scan reload',
+  reloads: true,
+};
+
 const wifiItems = (
   port: ActionPort,
   enabled: boolean,
   networks: WifiNetwork[],
   scanning: boolean,
-) => [radioItem(port, enabled, scanning), ...networks.map((network) => networkItem(port, network))];
+): ModeItem[] => [
+  radioItem(port, enabled, scanning),
+  ...(enabled ? [refreshItem] : []),
+  ...networks.map((network) => networkItem(port, network)),
+];
 
 /** `>w` — desktop only: it drives NetworkManager through `nmcli`. */
 export const wifiMode = (port: ActionPort): PaletteMode => {

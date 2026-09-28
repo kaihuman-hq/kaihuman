@@ -61,6 +61,7 @@ describe('>w', () => {
     expect(sent).toEqual([{ type: 'LIST_WIFI' }]);
     expect(items.map((entry) => [entry.title, entry.subtitle, entry.tone])).toEqual([
       ['Wi‑Fi is on', '⏎ turns it off · scanning…', 'good'],
+      ['Refresh networks', '⏎ scans again', undefined],
       ['Home', '▂▄▆█ 80% · WPA2 · saved · connected', 'good'],
       ['Cafe', '▂▄▁▁ 40% · open', undefined],
     ]);
@@ -73,7 +74,7 @@ describe('>w', () => {
     await mode.load();
     const fresh = (await mode.refresh?.()) ?? [];
     expect(sent.at(-1)).toEqual({ type: 'LIST_WIFI', rescan: true });
-    expect(fresh.map((entry) => entry.title)).toEqual(['Wi‑Fi is on', 'New']);
+    expect(fresh.map((entry) => entry.title)).toEqual(['Wi‑Fi is on', 'Refresh networks', 'New']);
     expect(fresh[0]?.subtitle).toBe('⏎ turns it off');
   });
 
@@ -81,11 +82,18 @@ describe('>w', () => {
     scans.push({ enabled: false, networks: [] });
     const mode = wifiMode(port);
     if (!('load' in mode)) throw new Error('>w does not load');
-    const [radio] = await mode.load();
+    const items = await mode.load();
+    const [radio] = items;
+    expect(items).toHaveLength(1);
     expect(mode.refresh?.()).toBeNull();
     expect(radio).toMatchObject({ title: 'Wi‑Fi is off', tone: 'bad' });
     expect(await radio?.action?.run?.([])).toMatch(/^Wi‑Fi is on/);
     expect(sent.at(-1)).toEqual({ type: 'SET_WIFI', enabled: true });
+  });
+
+  it('offers a refresh that reloads the mode, and so scans again', async () => {
+    scans.push({ enabled: true, networks: [] });
+    expect(item(await load(wifiMode(port)), 'wifi:refresh').reloads).toBe(true);
   });
 
   it('asks a new secured network for its password, masked, and sends it', async () => {

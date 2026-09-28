@@ -7,11 +7,14 @@
   or off. The networks in range follow, one row per SSID: connected first, then by signal, each
   with its bars, security, and whether a profile is saved. ⏎ connects. A secured network with no
   saved profile first asks for its password, typed masked. The last scan shows at once, and a fresh
-  one (`--rescan yes`) replaces it when it arrives.
+  one (`--rescan yes`) replaces it when it arrives. While Wi‑Fi is on, a **Refresh networks** row
+  (second) scans again without leaving `>w`.
 - New requests `LIST_WIFI { rescan? } → { enabled, networks }`, `SET_WIFI { enabled }` and
   `CONNECT_WIFI { ssid, password? }`. If a new profile fails to connect (for example, a wrong
   password), it is deleted, so the next try asks for the password again. `nmcli` takes the password
   as an argument, so it is visible in the process list while `nmcli` runs.
+- `ModeItem.reloads`: choosing such an entry loads its mode's list again and then refreshes it,
+  and the palette stays in the mode.
 - `PromptStep.secret`: that step's input is a password field, and the note that lists the answers
   so far leaves it out.
 - **GitHub work** moves from `>w` to `>gw` on both surfaces. `>g` now waits for a space, because
