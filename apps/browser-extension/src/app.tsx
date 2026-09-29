@@ -264,9 +264,10 @@ export function App() {
         <button
           type="button"
           onClick={handleOpenConsole}
-          class="font-bold text-[var(--los-accent)] tracking-tight hover:underline"
+          class="flex items-center gap-2 font-bold text-[var(--los-accent)] tracking-tight hover:underline"
           title={`Open ${CONSOLE_URL}`}
         >
+          <img src="/icon.svg" alt="" class="w-5 h-5 rounded" />
           kaihuman
         </button>
         <div class="flex flex-col items-end gap-1">
