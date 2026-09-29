@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-09-29 — New logo
+
+- The new kaihuman logo (yellow "K" on near-black) replaces the old one everywhere:
+  - **Console**: favicon (`logo.svg`), PWA icons (`pwa-192x192.png`, `pwa-512x512.png`) and a
+    new `apple-touch-icon.png` (180×180), linked from `index.html`.
+  - **Browser extension**: `icon.svg` and the toolbar/store icons (`icon-16/32/48/128.png`). The
+    logo now sits next to "kaihuman" in the popup header and on the New Tab page title.
+  - **Landing pages**: `favicon.svg` and `favicon.ico` for both sites.
+  - **Desktop palette**: the Tauri `icons/icon.png`.
+- The PNGs are rendered from the SVG. The SVG is the one supplied, minus its C2PA metadata block.
+
 ## 2026-09-25 — Bookmarks widget: edit title and link
 
 - Each row in the focused Bookmarks widget has an **Edit** (pencil) button next to pin and delete.

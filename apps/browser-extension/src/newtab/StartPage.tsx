@@ -306,9 +306,10 @@ export function StartPage() {
   const title = (
     <a
       href={CONSOLE_URL}
-      class="text-2xl font-bold tracking-tight text-[var(--los-accent)] hover:underline"
+      class="flex items-center gap-3 text-2xl font-bold tracking-tight text-[var(--los-accent)] hover:underline"
       title={`Open ${CONSOLE_URL}`}
     >
+      <img src="/icon.svg" alt="" class="w-8 h-8 rounded" />
       kaihuman
     </a>
   );
