@@ -1,4 +1,4 @@
-import { DEFAULT_PALETTE_SETTINGS } from '@lifosy/formats';
+import { type BraindumpId, DEFAULT_PALETTE_SETTINGS } from '@lifosy/formats';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   claudeCodeMode,
@@ -455,68 +455,76 @@ describe('dumpMode', () => {
     if (!('load' in mode)) throw new Error('d does not load');
     return mode.load();
   };
+  const noDumps = () => {
+    answers.LIST_BRAINDUMPS = { braindumps: [] };
+    answers.LIST_DUMPS = { dumps: [] };
+  };
 
   it('is the d: prefix', () => {
     expect(dumpMode(fakePort).prefix).toBe('d');
   });
 
-  it('lists a new dump first, then the saved ones by their first line', async () => {
+  it('lists a new braindump first, then the braindumps by their first line', async () => {
     const updatedAt = new Date(2026, 8, 23, 10, 30).getTime();
-    answers.LIST_DUMPS = {
-      dumps: [{ id: '1', text: '\n  first line  \nsecond', updatedAt }],
+    answers.LIST_BRAINDUMPS = {
+      braindumps: [
+        { id: '1' as BraindumpId, text: '\n# Plan  \nsecond', updatedAt, synced: true },
+        { id: '2' as BraindumpId, text: 'draft', updatedAt, synced: false },
+      ],
     };
-    const [fresh, saved] = await load();
-    expect(fresh).toMatchObject({ id: 'dump:new', title: 'New dump' });
-    expect(saved).toMatchObject({
-      id: 'dump:1',
-      title: 'first line',
+    answers.LIST_DUMPS = { dumps: [] };
+    const [fresh, synced, unsynced] = await load();
+    expect(fresh).toMatchObject({ id: 'braindump:new', title: 'New braindump' });
+    expect(synced).toMatchObject({
+      id: 'braindump:1',
+      title: 'Plan',
       subtitle: '2026-09-23 10:30 · 3 lines',
-      keywords: '\n  first line  \nsecond',
+      keywords: '\n# Plan  \nsecond',
     });
-    expect(saved?.edit?.()).toMatchObject({
-      title: 'first line',
-      text: '\n  first line  \nsecond',
-    });
+    expect(unsynced?.subtitle).toBe('2026-09-23 10:30 · 1 line · not synced yet');
   });
 
-  it('shortens a long first line', async () => {
-    answers.LIST_DUMPS = { dumps: [{ id: '1', text: 'x'.repeat(80), updatedAt: 0 }] };
-    const [, saved] = await load();
-    expect(saved?.title).toBe(`${'x'.repeat(59)}…`);
-  });
-
-  it('creates a new dump on its first save and keeps writing to it', async () => {
-    answers.LIST_DUMPS = { dumps: [] };
-    answers.SAVE_DUMP = { id: '42' };
-    const [fresh] = await load();
-    const editor = fresh?.edit?.();
-    await editor?.save('a');
-    await editor?.save('ab');
+  it('opens a new or an existing braindump in the window and closes the palette', async () => {
+    noDumps();
+    answers.LIST_BRAINDUMPS = {
+      braindumps: [{ id: '7' as BraindumpId, text: 'x', updatedAt: 0, synced: true }],
+    };
+    answers.OPEN_BRAINDUMP = {};
+    const [fresh, existing] = await load();
+    expect(fresh?.action?.closes).toBe(true);
+    await fresh?.action?.run?.([]);
+    await existing?.action?.run?.([]);
     expect(sent.slice(-2)).toEqual([
-      { type: 'SAVE_DUMP', text: 'a' },
-      { type: 'SAVE_DUMP', id: '42', text: 'ab' },
+      { type: 'OPEN_BRAINDUMP' },
+      { type: 'OPEN_BRAINDUMP', id: '7' },
     ]);
+    expect(existing?.action?.recent).toBe(false);
   });
 
-  it('starts over with a new file once emptied, which deleted the old one', async () => {
+  it('lists old local dumps below, under their own heading, to edit in place', async () => {
+    answers.LIST_BRAINDUMPS = { braindumps: [] };
+    answers.LIST_DUMPS = { dumps: [{ id: '3', text: 'x'.repeat(80), updatedAt: 0 }] };
+    const [, old] = await load();
+    expect(old).toMatchObject({ id: 'dump:3', group: 'Old dumps — on this machine only' });
+    expect(old?.title).toBe(`${'x'.repeat(59)}…`);
+    expect(old?.edit?.()).toMatchObject({ text: 'x'.repeat(80) });
+  });
+
+  it('clears an old dump by emptying it', async () => {
+    answers.LIST_BRAINDUMPS = { braindumps: [] };
     answers.LIST_DUMPS = { dumps: [{ id: '7', text: 'x', updatedAt: 0 }] };
-    const [, saved] = await load();
-    const editor = saved?.edit?.();
+    const [, old] = await load();
     answers.SAVE_DUMP = {};
-    await editor?.save('');
-    answers.SAVE_DUMP = { id: '8' };
-    await editor?.save('again');
-    expect(sent.slice(-2)).toEqual([
-      { type: 'SAVE_DUMP', id: '7', text: '' },
-      { type: 'SAVE_DUMP', text: 'again' },
-    ]);
+    await old?.edit?.().save('');
+    expect(sent.at(-1)).toEqual({ type: 'SAVE_DUMP', id: '7', text: '' });
   });
 
-  it('suggests a dated file in ~/Documents and exports there', async () => {
-    answers.LIST_DUMPS = { dumps: [] };
+  it('suggests a dated file in ~/Documents for an old dump and exports there', async () => {
+    answers.LIST_BRAINDUMPS = { braindumps: [] };
+    answers.LIST_DUMPS = { dumps: [{ id: '7', text: 'x', updatedAt: 0 }] };
     answers.EXPORT_DUMP = { path: '/home/me/Documents/x.txt' };
-    const [fresh] = await load();
-    const saveAs = fresh?.edit?.().saveAs;
+    const [, old] = await load();
+    const saveAs = old?.edit?.().saveAs;
     expect(saveAs?.suggestedPath()).toMatch(/^~\/Documents\/dump-\d{4}-\d\d-\d\d-\d\d-\d\d\.txt$/);
     expect(await saveAs?.save('~/Documents/x.txt', 'text')).toBe('/home/me/Documents/x.txt');
     expect(sent.at(-1)).toEqual({ type: 'EXPORT_DUMP', path: '~/Documents/x.txt', text: 'text' });

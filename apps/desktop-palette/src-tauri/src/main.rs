@@ -16,6 +16,7 @@ mod entries;
 mod github;
 #[cfg(target_os = "linux")]
 mod layer;
+mod native_host;
 mod palette_settings;
 mod prompts;
 mod recents;
@@ -32,21 +33,39 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindo
 
 const LABEL: &str = "palette";
 
+/// The braindump window (doc/braindump.md).
+const BRAINDUMP: &str = "braindump";
+
+/// What a compositor rule matches to float the braindump window (see the README), so it never
+/// changes; the window shows the braindump's own title inside.
+const BRAINDUMP_TITLE: &str = "lifosy-braindump";
+
 const USAGE: &str = "\
-usage: lifosy-palette [toggle|show|hide|quit|daemon]
+usage: lifosy-palette [toggle|show|hide|quit|daemon|braindump]
        lifosy-palette login [--paste] [--repo owner/name]
        lifosy-palette logout
+       lifosy-palette native-host install <extension id>
 
 `login` opens the console in your browser and takes the token from there; `--paste` asks for one
-instead (or reads it from a pipe).
+instead (or reads it from a pipe). `native-host install` lets the browser extension keep the same
+repository as the palette; the id is on chrome://extensions.
 
-Bind `lifosy-palette-toggle` to a key; it starts the daemon when none is running.";
+Bind `lifosy-palette-toggle` to a key, and `lifosy-palette-toggle braindump` to another for a new
+braindump; either starts the daemon when none is running.";
 
 #[derive(Debug, PartialEq)]
 enum Cli {
     Palette(Command),
-    Login { repo: Option<String>, paste: bool },
+    Login {
+        repo: Option<String>,
+        paste: bool,
+    },
     Logout,
+    InstallNativeHost {
+        extension_id: String,
+    },
+    /// Chrome started this binary for the extension, naming it as the first argument.
+    NativeHost,
 }
 
 fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Cli, String> {
@@ -72,6 +91,15 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Cli, String> {
             return Ok(Cli::Login { repo, paste });
         }
         "logout" => Cli::Logout,
+        "native-host" => match (args.next().as_deref(), args.next()) {
+            (Some("install"), Some(extension_id)) => Cli::InstallNativeHost { extension_id },
+            _ => {
+                return Err(format!(
+                    "native-host needs: install <extension id>\n\n{USAGE}"
+                ));
+            }
+        },
+        origin if origin.starts_with("chrome-extension://") => return Ok(Cli::NativeHost),
         "-h" | "--help" => return Err(USAGE.to_string()),
         other => {
             Cli::Palette(Command::parse(other).map_err(|error| format!("{error}\n\n{USAGE}"))?)
@@ -127,7 +155,7 @@ async fn store_login(
         .can_read_repo()
         .await?;
     config::store_token(&token)?;
-    settings.use_repo(&repo);
+    settings.use_repo(&repo, now_ms());
     settings.save()?;
     Ok(format!("Logged in; the palette now works on {repo}."))
 }
@@ -181,6 +209,24 @@ fn hide(app: &AppHandle) {
     }
 }
 
+/// Shows the braindump window with that braindump, or a new one. The palette is hidden first: it
+/// holds the keyboard while it is up.
+fn open_braindump(app: &AppHandle, id: Option<String>) {
+    hide(app);
+    let Some(window) = app.get_webview_window(BRAINDUMP) else {
+        eprintln!("braindump window is missing");
+        return;
+    };
+    if let Err(error) = window.show() {
+        eprintln!("could not show the braindump window: {error}");
+        return;
+    }
+    let _ = window.set_focus();
+    if let Err(error) = window.emit("braindump:open", serde_json::json!({ "id": id })) {
+        eprintln!("could not open the braindump: {error}");
+    }
+}
+
 fn toggle(app: &AppHandle) {
     let visible = palette(app)
         .and_then(|window| window.is_visible().ok())
@@ -198,6 +244,7 @@ fn dispatch(app: &AppHandle, command: Command) {
             app.exit(0);
         }
         Command::Daemon => {}
+        Command::Braindump => open_braindump(app, None),
     }
 }
 
@@ -217,9 +264,26 @@ fn serve(listener: UnixListener, app: AppHandle) {
     }
 }
 
-/// Everything the palette asks of its backend: `PaletteProtocol`, answered in `requests.rs`.
+/// Everything the palette asks of its backend: `PaletteProtocol`, answered in `requests.rs` —
+/// except opening the braindump window, which needs the app.
 #[tauri::command]
-async fn palette_request(request: serde_json::Value) -> Result<serde_json::Value, String> {
+async fn palette_request(
+    app: AppHandle,
+    request: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    if request.get("type").and_then(serde_json::Value::as_str) == Some("OPEN_BRAINDUMP") {
+        let id = request
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string);
+        if let Some(id) = &id
+            && !braindumps::is_braindump_id(id)
+        {
+            return Err(format!("{id} is not a braindump"));
+        }
+        open_braindump(&app, id);
+        return Ok(serde_json::json!({}));
+    }
     requests::handle(request).await
 }
 
@@ -270,18 +334,44 @@ fn hide_palette(app: AppHandle) {
     }
 }
 
-/// A show that arrived before the page could listen for it: the daemon's own first command.
-struct PendingShow(Mutex<bool>);
+/// The daemon's own first command, until the page it is for can listen: a show that arrived
+/// before the webview did.
+struct Pending(Mutex<Option<Command>>);
+
+impl Pending {
+    /// Takes the command if `page` is the one it waits for.
+    fn take_for(&self, page: fn(Command) -> bool) -> Option<Command> {
+        let mut slot = self.0.lock().ok()?;
+        slot.filter(|command| page(*command))
+            .and_then(|_| slot.take())
+    }
+}
 
 #[tauri::command]
-fn webview_ready(app: AppHandle, pending: tauri::State<PendingShow>) {
-    let due = pending
-        .0
-        .lock()
-        .map(|mut slot| std::mem::take(&mut *slot))
-        .unwrap_or(false);
-    if due {
+fn webview_ready(app: AppHandle, pending: tauri::State<Pending>) {
+    if pending
+        .take_for(|command| matches!(command, Command::Toggle | Command::Show))
+        .is_some()
+    {
         show(&app);
+    }
+}
+
+#[tauri::command]
+fn braindump_ready(app: AppHandle, pending: tauri::State<Pending>) {
+    if pending
+        .take_for(|command| command == Command::Braindump)
+        .is_some()
+    {
+        open_braindump(&app, None);
+    }
+}
+
+/// The braindump window hid itself (Esc, or after copying).
+#[tauri::command]
+fn hide_braindump(app: AppHandle) {
+    if let Some(window) = app.get_webview_window(BRAINDUMP) {
+        let _ = window.hide();
     }
 }
 
@@ -321,6 +411,27 @@ fn build_palette(app: &AppHandle) -> Result<WebviewWindow, Box<dyn std::error::E
     Ok(window)
 }
 
+/// A normal window, not a layer surface: while writing, other windows stay usable. It is created
+/// hidden with the daemon, so opening it is only showing it.
+fn build_braindump(app: &AppHandle) -> Result<WebviewWindow, Box<dyn std::error::Error>> {
+    let window =
+        WebviewWindowBuilder::new(app, BRAINDUMP, WebviewUrl::App("braindump.html".into()))
+            .title(BRAINDUMP_TITLE)
+            .inner_size(760.0, 520.0)
+            .visible(false)
+            .build()?;
+    let for_events = window.clone();
+    window.on_window_event(move |event| {
+        // Closing only hides it; the page then saves and syncs.
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            let _ = for_events.hide();
+            let _ = for_events.emit("braindump:hidden", ());
+        }
+    });
+    Ok(window)
+}
+
 fn run_daemon(first: Command, listener: UnixListener) {
     let app = tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -328,15 +439,15 @@ fn run_daemon(first: Command, listener: UnixListener) {
             console_login,
             copy_text,
             hide_palette,
-            webview_ready
+            webview_ready,
+            braindump_ready,
+            hide_braindump
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
             build_palette(&handle)?;
-            handle.manage(PendingShow(Mutex::new(matches!(
-                first,
-                Command::Toggle | Command::Show
-            ))));
+            build_braindump(&handle)?;
+            handle.manage(Pending(Mutex::new(Some(first))));
             std::thread::spawn(move || serve(listener, handle));
             Ok(())
         })
@@ -372,6 +483,33 @@ fn main() {
                 std::process::exit(1);
             }
             println!("Logged out.");
+            return;
+        }
+        Cli::InstallNativeHost { extension_id } => {
+            let installed = std::env::current_exe()
+                .map_err(|error| format!("could not tell where this binary is: {error}"))
+                .and_then(|binary| {
+                    native_host::install(&config::config_home(), &binary, &extension_id)
+                });
+            match installed {
+                Ok(files) => {
+                    for file in files {
+                        println!("Installed {}", file.display());
+                    }
+                    println!("Reload the extension to connect it.");
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    std::process::exit(1);
+                }
+            }
+            return;
+        }
+        Cli::NativeHost => {
+            if let Err(error) = native_host::serve(&mut std::io::stdin(), &mut std::io::stdout()) {
+                eprintln!("native messaging failed: {error}");
+                std::process::exit(1);
+            }
             return;
         }
         Cli::Palette(command) => command,
@@ -425,6 +563,22 @@ mod tests {
         assert_eq!(args(&["daemon"]), Ok(Cli::Palette(Command::Daemon)));
         assert!(args(&["show", "extra"]).is_err());
         assert!(args(&["open"]).unwrap_err().contains("expected toggle"));
+        assert_eq!(args(&["braindump"]), Ok(Cli::Palette(Command::Braindump)));
+    }
+
+    #[test]
+    fn replays_the_first_command_only_to_the_page_it_is_for() {
+        let pending = Pending(Mutex::new(Some(Command::Braindump)));
+        let palette = |command| matches!(command, Command::Toggle | Command::Show);
+        assert_eq!(pending.take_for(palette), None);
+        assert_eq!(
+            pending.take_for(|command| command == Command::Braindump),
+            Some(Command::Braindump)
+        );
+        assert_eq!(
+            pending.take_for(|command| command == Command::Braindump),
+            None
+        );
     }
 
     #[test]
@@ -446,5 +600,21 @@ mod tests {
         assert!(args(&["login", "--repo"]).is_err());
         assert!(args(&["login", "--repo", "../x"]).is_err());
         assert_eq!(args(&["logout"]), Ok(Cli::Logout));
+    }
+
+    #[test]
+    fn reads_the_native_host_commands() {
+        assert_eq!(
+            args(&["native-host", "install", "abc"]),
+            Ok(Cli::InstallNativeHost {
+                extension_id: "abc".into()
+            })
+        );
+        assert!(args(&["native-host"]).is_err());
+        // Chrome names the calling extension, and on Windows adds a window handle after it.
+        assert_eq!(
+            args(&["chrome-extension://abc/", "--parent-window=0"]),
+            Ok(Cli::NativeHost)
+        );
     }
 }

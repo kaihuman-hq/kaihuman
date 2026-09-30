@@ -16,6 +16,8 @@ pub enum Command {
     Quit,
     /// Start the daemon without showing anything, e.g. from Hyprland's autostart.
     Daemon,
+    /// Show the braindump window with a new braindump (doc/braindump.md).
+    Braindump,
 }
 
 impl Command {
@@ -26,8 +28,9 @@ impl Command {
             "hide" => Ok(Self::Hide),
             "quit" => Ok(Self::Quit),
             "daemon" => Ok(Self::Daemon),
+            "braindump" => Ok(Self::Braindump),
             other => Err(format!(
-                "unknown command {other:?}; expected toggle, show, hide, quit or daemon"
+                "unknown command {other:?}; expected toggle, show, hide, quit, daemon or braindump"
             )),
         }
     }
@@ -39,12 +42,16 @@ impl Command {
             Self::Hide => "hide",
             Self::Quit => "quit",
             Self::Daemon => "daemon",
+            Self::Braindump => "braindump",
         }
     }
 
     /// Whether a missing daemon should be started for this command rather than reported.
     pub fn starts_daemon(self) -> bool {
-        matches!(self, Self::Toggle | Self::Show | Self::Daemon)
+        matches!(
+            self,
+            Self::Toggle | Self::Show | Self::Daemon | Self::Braindump
+        )
     }
 }
 
@@ -105,6 +112,7 @@ mod tests {
             Command::Hide,
             Command::Quit,
             Command::Daemon,
+            Command::Braindump,
         ] {
             let (parsed, sent_at) = parse_request(&request_line(command, 42)).unwrap();
             assert_eq!(parsed, Ok(command));
@@ -130,6 +138,7 @@ mod tests {
     fn only_opening_commands_start_a_daemon() {
         assert!(Command::Toggle.starts_daemon());
         assert!(Command::Show.starts_daemon());
+        assert!(Command::Braindump.starts_daemon());
         assert!(!Command::Hide.starts_daemon());
         assert!(!Command::Quit.starts_daemon());
     }

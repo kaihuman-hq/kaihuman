@@ -21,6 +21,7 @@ export interface Message {
     | 'ADD_MODE_RECENT'
     | 'GET_REPOS'
     | 'SET_REPO'
+    | 'SYNC_REPO_WITH_DESKTOP'
     | 'SAVE_SELECTION'
     | 'SEARCH_REPO'
     | 'OPEN_URL'

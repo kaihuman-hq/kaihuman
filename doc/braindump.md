@@ -1,8 +1,9 @@
 # Braindumps — study and plan
 
-Status: phases 1 (the shared file format) and 2 (desktop sync) are done (2026-09-30). Revised the
-same day: the editor is a **dedicated window**, never the palette's own editor. The window has its
-own key and its own list, and the palette's `>d` lists braindumps and opens them in that window.
+Status: phases 1–3 are done (2026-09-30): the shared file format, the desktop sync, and the
+braindump window with `>d`, plus the extension and palette sharing one active repository. Phase 4
+(the new tab page) is next. The editor is a **dedicated window**, never the palette's own editor:
+it has its own key and its own list, and the palette's `>d` lists braindumps and opens them there.
 
 ## Goal
 
@@ -86,13 +87,11 @@ You suggested Chrome opening the console's editor. Here are the options side by 
 - **Window type: a normal toplevel, floated by a Hyprland rule, not a layer surface.** The palette
   is an overlay with *exclusive* keyboard focus. That is right for a 2-second launcher and wrong for
   a braindump: while writing you want to look at, copy from and click into other windows, then come
-  back. A toplevel with the class `lifosy-braindump` stays in alt-tab and focus-follows. One rule
-  makes it float, centred, at about 760×520:
-  ```lua
-  hl.window_rule({ class = "lifosy-braindump", float = true, center = true, size = { 760, 520 } })
-  ```
-  (This is option B from `native-command-palette.md`, which is the right option for *this* window.
-  The README documents the rule the same way it documents the key binding.) Layer-shell with
+  back. A toplevel stays in alt-tab and focus-follows. One rule makes it float, centred, at about
+  760×520. It matches the window's **title**, which is always `lifosy-braindump`. Both windows
+  share one process, and so one app id; the braindump window is the only toplevel of the two. The
+  README gives the rule (the syntax depends on the Hyprland version). This is option B from
+  `native-command-palette.md`, which is the right option for *this* window. Layer-shell with
   `KeyboardMode::OnDemand` is the fallback if you want no rule.
 - **One window, reused.** It is created hidden at daemon start and shown and hidden after that, like
   the palette. It shows one braindump at a time. The window itself switches between them (see
@@ -122,10 +121,10 @@ You suggested Chrome opening the console's editor. Here are the options side by 
   | ⌃N | New braindump |
   | ⌃O | The window's own list of braindumps, to switch |
   | ⌃⏎ | Copy all and hide, as in the dump editor now |
-  | ⌃⌫ on an empty text | Delete this braindump |
 
-  The window title shows the braindump's title and its sync state (`saved locally`,
-  `synced 12:04`, `offline — will retry`).
+  Clearing the text deletes the braindump, as clearing a dump did. A status line at the bottom
+  shows the braindump's title and its state (`saved here`, `synced 12:04`, or why a sync failed).
+  The window title itself stays `lifosy-braindump`, for the window rule.
 
 ## Decision 3 — saving: local first, repo shortly after
 
@@ -218,20 +217,31 @@ Each phase ships and is checked on its own.
      `@lifosy/formats`.
    - → verified: 14 new Rust tests covering each row of the table, the offline case and a conflict
      interrupted halfway (still exactly one copy); clippy and fmt clean.
-3. **Desktop window and `>d`**
-   - A second `WebviewWindowBuilder` (`braindump`, class `lifosy-braindump`, hidden, resizable) and
-     a `braindump.html` Vite input with a small TS entry (textarea, status line, the ⌃O list, keys,
-     the sync timing from decision 3).
-   - Add the label to `capabilities/default.json`. Add `Command::Braindump` and the toggle client
-     argument, and `OPEN_BRAINDUMP { id? }`, which hides the palette and shows the window.
-   - Rework `dumpMode` in `packages/palette/src/actions.ts`. `>d` lists **New braindump** and the
-     braindumps, and ⏎ opens them in the window. The old local dumps are left alone and age out
-     (`dumps.rs` stays until they are gone).
-   - Document the key binding and the window rule in the README.
-   - → verify: Rust tests for the new `Command` parsing, and `fakePort` tests for `>d`. Drive the
-     built UI in Chromium with the stubbed Tauri bridge: new → type → Esc → reopen from ⌃O and
-     from `>d` → delete. The Hyprland checklist: opens floating and centred on the focused monitor,
-     typing works at once, alt-tab away and back, Esc returns focus.
+3. **Desktop window, `>d` and one repository.** **Done.**
+   - The window's logic is `createBraindumpWindow` in `packages/palette/src/braindump-window.ts`
+     (text area, the save and sync timing from decision 3, ⌃O list, keys, status line), tested
+     with fake timers. The desktop's `braindump.html` / `src/braindump.ts` only connect it to Tauri.
+   - Rust: a second window (`braindump`, title `lifosy-braindump`, created hidden with the daemon,
+     closing only hides it), `Command::Braindump` for `lifosy-palette-toggle braindump`, and
+     `OPEN_BRAINDUMP { id? }`, which hides the palette and shows the window. A cold start replays
+     the first command to the page it is for.
+   - `>d` lists **New braindump** and the braindumps, and ⏎ opens them in the window. Old local
+     dumps are listed below under their own heading, still editable in the palette, but none are
+     created and none are sent anywhere.
+   - **One repository** (open question 2): `palette.json` records when its repository changed, and
+     `lifosy-palette` answers Chrome native messaging (`SYNC_REPO`, `native_host.rs`). The
+     extension (`background/repo-sync.ts`) stamps every change of `lifeos_repo` and tells the
+     desktop at once, and asks it hourly and when a start page opens (at most every 30 s; the page
+     reloads when the repository changed). The newer choice wins; while neither side has recorded
+     a change, the extension's. `lifosy-palette native-host install <extension id>` registers the
+     host.
+   - → verified: palette vitest 248 (15 for the window, 6 for `>d`), extension vitest 288 (6 for
+     the repo sync), Rust 84 (the native host's framing, reconcile rule and install, the new
+     command, the replayed first command). The real binary answered framed `SYNC_REPO` messages
+     and installed a manifest in a scratch profile. The built window was driven in Chromium with a
+     stubbed Tauri bridge: new → type → saved → ⌃O → filter → ⏎ → Esc.
+   - Not verified here: the window on Hyprland itself (floating rule, focus on show, alt-tab) and
+     native messaging from a real Chrome. Both need your machine.
 4. **New tab** (`apps/browser-extension`)
    - `githubDeleteFile`, the braindump folder in `today.ts`, the 60 s tree refresh on open,
      `DELETE_BRAINDUMP` in `types.ts` and the worker, and the `Braindumps` widget.
@@ -244,10 +254,8 @@ Each phase ships and is checked on its own.
 
 1. ~~What is "the current GitHub repo"?~~ Answered: the palette's **active repo** (`palette.json`,
    switched with "Switch repository…"), which is also the repo the new tab page reads.
-2. **The desktop and the extension keep their active repo separately** (keyring + `palette.json`
-   vs `chrome.storage.local`). They must point at the same repo, or the new tab will not show what
-   the desktop wrote. Is that already true on your machine, or should syncing the active repo
-   between the two be part of this?
+2. ~~The desktop and the extension keep their active repo separately~~ Answered: keep them in
+   sync. Done through native messaging (phase 3).
 3. ~~The palette's `>d` dumps~~ Answered: `>d` lists braindumps and opens them in the window. The
    existing local dumps are left to age out.
 4. **Commit noise.** One or two commits per braindump on the default branch is fine for a private

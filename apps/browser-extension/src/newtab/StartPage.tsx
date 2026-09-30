@@ -203,6 +203,13 @@ export function StartPage() {
       setCaptureLog({ ...EMPTY_CAPTURE_LOG, ...(result[CAPTURE_LOG_KEY] as Partial<CaptureLog>) });
       if (storedToken) void loadAll();
     });
+    // The desktop palette may have switched repositories since; the page then starts over on it.
+    send({ type: 'SYNC_REPO_WITH_DESKTOP' }).then(
+      (response) => {
+        if (response.changed) window.location.reload();
+      },
+      (e: Error) => console.warn('LifeOS Extension: could not ask the desktop for its repository', e),
+    );
     const timer = setInterval(() => setNow(new Date()), TICK_MS);
     return () => clearInterval(timer);
   }, []);

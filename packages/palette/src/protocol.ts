@@ -147,6 +147,11 @@ export interface PaletteProtocol {
    * the first failure; what failed is kept and tried again on the next sync.
    */
   SYNC_BRAINDUMPS: { request: NoFields; response: { braindumps: Braindump[] } };
+  /**
+   * Desktop only: hides the palette and shows the braindump window with that braindump, or a new
+   * one without `id`.
+   */
+  OPEN_BRAINDUMP: { request: { id?: BraindumpId }; response: NoFields };
   /** Desktop only: repositories for `>c`, most recently used first (omarchy's `eee` history). */
   LIST_CLAUDE_CODE_REPOS: { request: NoFields; response: { repos: string[] } };
   /**

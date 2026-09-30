@@ -8,6 +8,8 @@
  */
 
 import {
+  type BraindumpId,
+  braindumpTitle,
   commandParameters,
   fillCommand,
   parseCommands,
@@ -380,7 +382,7 @@ export const formatStamp = (date: Date) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
   `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 
-/** A dump's first non-empty line, as its title. */
+/** A dump's first non-empty line, as its title. Dumps were `>d` before braindumps. */
 const dumpTitle = (text: string) => {
   const line =
     text
@@ -390,12 +392,12 @@ const dumpTitle = (text: string) => {
   return line.length > 60 ? `${line.slice(0, 59)}…` : line || '(blank)';
 };
 
-/** An open dump. A new one gets its id from the first save, so it is only created once typed in. */
-const dumpEditor = (port: ActionPort, dump?: { id: string; text: string }): EditableText => {
-  let id = dump?.id;
+/** An open dump. Its id came from its first save, back when `>d` still created dumps. */
+const dumpEditor = (port: ActionPort, dump: { id: string; text: string }): EditableText => {
+  let id: string | undefined = dump.id;
   return {
-    title: dump ? dumpTitle(dump.text) : 'New dump',
-    text: dump?.text ?? '',
+    title: dumpTitle(dump.text),
+    text: dump.text,
     save: async (text) => {
       ({ id } = await port.send({ type: 'SAVE_DUMP', ...(id ? { id } : {}), text }));
     },
@@ -406,39 +408,64 @@ const dumpEditor = (port: ActionPort, dump?: { id: string; text: string }): Edit
   };
 };
 
-const dumpItems = async (port: ActionPort): Promise<ModeItem[]> => {
-  const { dumps } = await port.send({ type: 'LIST_DUMPS' });
+/** Hands over to the braindump window; the backend hides the palette for it. */
+const openBraindump = (port: ActionPort, id?: BraindumpId) => async () => {
+  await port.send({ type: 'OPEN_BRAINDUMP', ...(id ? { id } : {}) });
+  return '';
+};
+
+const braindumpItems = async (port: ActionPort): Promise<ModeItem[]> => {
+  const [{ braindumps }, { dumps }] = await Promise.all([
+    port.send({ type: 'LIST_BRAINDUMPS' }),
+    port.send({ type: 'LIST_DUMPS' }),
+  ]);
   return [
     {
-      id: 'dump:new',
-      title: 'New dump',
-      subtitle: 'Paste, edit, copy — saved as you type, the last 25 kept',
-      edit: () => dumpEditor(port),
+      id: 'braindump:new',
+      title: 'New braindump',
+      subtitle: 'Opens the braindump window — saved as you type, in the repo once you stop',
+      action: {
+        id: 'braindump:new',
+        title: 'New braindump',
+        run: openBraindump(port),
+        closes: true,
+      },
     },
-    ...dumps.map((dump) => {
-      const lines = dump.text.split('\n').length;
-      return {
-        id: `dump:${dump.id}`,
-        title: dumpTitle(dump.text),
-        subtitle: `${formatStamp(new Date(dump.updatedAt))} · ${plural(lines, 'line')}`,
-        keywords: dump.text,
-        edit: () => dumpEditor(port, dump),
-      };
-    }),
+    ...braindumps.map((dump) => ({
+      id: `braindump:${dump.id}`,
+      title: braindumpTitle(dump.text),
+      subtitle: `${formatStamp(new Date(dump.updatedAt))} · ${plural(dump.text.split('\n').length, 'line')}${dump.synced ? '' : ' · not synced yet'}`,
+      keywords: dump.text,
+      action: {
+        id: `braindump:${dump.id}`,
+        title: braindumpTitle(dump.text),
+        run: openBraindump(port, dump.id),
+        closes: true,
+        recent: false as const,
+      },
+    })),
+    // Dumps from before braindumps: still here to copy or clear, but never sent anywhere.
+    ...dumps.map((dump) => ({
+      id: `dump:${dump.id}`,
+      title: dumpTitle(dump.text),
+      subtitle: `${formatStamp(new Date(dump.updatedAt))} · ${plural(dump.text.split('\n').length, 'line')}`,
+      keywords: dump.text,
+      group: 'Old dumps — on this machine only',
+      edit: () => dumpEditor(port, dump),
+    })),
   ];
 };
 
 /**
- * `>d` — a scratch text editor with a history, for the desktop: dumps are local files, which the
- * browser has no place for.
+ * `>d` — braindumps, for the desktop: a new one or an existing one opens in the braindump window.
+ * Old local dumps are listed below them until they are cleared.
  */
 export const dumpMode = (port: ActionPort): PaletteMode => ({
   prefix: 'd',
-  title: 'Dump',
-  placeholder: 'Search dumps — ⏎ opens one',
-  description:
-    'A scratch editor for pasting and copying, the last 25 kept — ⌃⏎ copies all, ⌃S saves a copy as a file',
-  load: () => dumpItems(port),
+  title: 'Braindumps',
+  placeholder: 'Search braindumps — ⏎ opens one in the braindump window',
+  description: 'Braindumps: a window that saves as you type and keeps each one in the repo',
+  load: () => braindumpItems(port),
 });
 
 /**

@@ -10,6 +10,7 @@ The official browser extension for Lifosy, designed to enhance your web experien
 - **Context Menu Integration**: Conveniently access Lifosy features directly from the browser's context menu.
 - **Pinned Tabs Sync**: Save named groups of pinned tabs to your repo, and load any of them into the current window on any machine.
 - **Bookmarks**: Your repo's bookmarks, mirrored into the browser and synced at most once an hour. Bookmark the current page from the popup or the palette, or import the ones this browser already has. Opens are counted so you can find the ones you never use.
+- **Same repository as the desktop palette**: with `lifosy-palette native-host install <this extension's id>` run once, switching the repository here or in the desktop palette switches the other too — the newer choice wins (`nativeMessaging` permission; see the desktop palette's README).
 - **Command Palette**: `Ctrl+Shift+K` on any page to search those bookmarks, repeat what you did last, run any of the extension's actions — and, on request, search your repo.
 - **Start Page**: a New Tab page of your own — what is coming up and in progress, habit and time trackers, the read-later queue, world clocks, the bookmarks you reach for, a box for a note, todo or log entry, and the palette (which Chrome's own New Tab page cannot host).
 

@@ -17,6 +17,7 @@ import {
   withTranslationText,
 } from '@lifosy/palette';
 import { type Message } from '../types';
+import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
 import {
@@ -107,11 +108,22 @@ chrome.alarms.create('swKeepAlive', { periodInMinutes: 0.5 });
 // bookmarks get opened — is counted locally and pushed with the next sync.
 chrome.alarms.create('repoSync', { periodInMinutes: 60 });
 
+// The desktop palette hears of a repository chosen here at once, and is asked for its own choice
+// hourly and when a start page opens.
+watchRepoChanges();
+
+/** A start page asks at most this often, since each ask starts the desktop's host process. */
+const REPO_SYNC_INTERVAL_MS = 30_000;
+let repoSyncedAt = 0;
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'swKeepAlive') {
     // No-op: waking the worker is sufficient.
   }
   if (alarm.name === 'repoSync') {
+    syncRepoWithDesktop().catch((e) =>
+      console.warn('LifeOS Extension: repository sync with the desktop failed', e),
+    );
     syncBookmarks().catch((e) => console.warn('LifeOS Extension: bookmark sync failed', e));
     syncPinnedTabs().catch((e) => console.warn('LifeOS Extension: pinned tab sync failed', e));
     syncToday().catch((e) => console.warn('LifeOS Extension: start page sync failed', e));
@@ -1371,6 +1383,18 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       (error) => sendResponse({ error: error.message }),
     );
     return true; // Indicate async response
+  }
+
+  if (message.type === 'SYNC_REPO_WITH_DESKTOP') {
+    if (Date.now() - repoSyncedAt < REPO_SYNC_INTERVAL_MS) {
+      sendResponse({ success: true, changed: false });
+      return false;
+    }
+    repoSyncedAt = Date.now();
+    return answer(
+      syncRepoWithDesktop().then((changed) => ({ changed })),
+      sendResponse,
+    );
   }
 
   if (message.type === 'SET_REPO') {

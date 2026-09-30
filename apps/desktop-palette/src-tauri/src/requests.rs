@@ -468,7 +468,7 @@ pub async fn handle(request: Value) -> Result<Value, String> {
                 return Err(format!("{repo} is not an owner/name repository"));
             }
             let mut settings = Settings::load();
-            settings.use_repo(&repo);
+            settings.use_repo(&repo, now_ms());
             // The bookmark cache names its repo, so it invalidates itself on the next read.
             settings.save()?;
             Ok(json!({}))
