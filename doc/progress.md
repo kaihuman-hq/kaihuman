@@ -1,17 +1,18 @@
 # Progress
 
-## 2026-09-30 — Home-screen icon readable in iOS dark mode
+## 2026-09-30 — Home-screen icon readable with iOS dark icons
 
-- With iOS set to dark (or tinted) icons, the kaihuman home-screen icon turned almost black. iOS
-  builds a dark version of an icon that has none by treating its background as the part to darken.
-  The yellow "K" of the logo runs off all four edges and covers most of the tile, so iOS read the
-  yellow as the background and darkened it. Only dark shades were left.
-- `apps/console/public/apple-touch-icon.png` now shows the whole "K" at 30 % scale, centered on
-  the near-black tile (same polygon as `logo.svg`, transform
-  `translate(512 512) scale(0.3) translate(-748.49 -522.57)`). iOS now sees the dark tile as the
-  background and keeps the "K" as the foreground. Favicons, PWA and extension icons are unchanged.
-- iOS saves the icon when you add the app to the home screen. To get the new icon, remove the app
-  from the home screen and add it again from Safari.
+- With iOS set to dark icons, the kaihuman home-screen icon turned almost black. iOS darkens
+  what it takes for an icon's background. The yellow "K" runs off all four edges of the opaque
+  `apple-touch-icon.png`, so iOS took the yellow for the background and darkened it.
+- New `apps/console/public/apple-touch-icon-dark.png`: the same logo, pixel for pixel, but the
+  near-black areas are transparent. iOS fills transparent areas with its own dark background and
+  keeps the "K".
+- `apps/console/index.html` points the `apple-touch-icon` link at the dark file when the system
+  is in dark mode (`prefers-color-scheme: dark`). In light mode the opaque icon stays, because iOS
+  fills transparent areas with white there.
+- iOS saves the icon when you add the app to the home screen. To get the new icon, switch the
+  iPhone to dark mode, remove the app from the home screen and add it again from Safari.
 
 ## 2026-09-29 — New logo
 
