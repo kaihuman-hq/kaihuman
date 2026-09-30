@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-09-30 — Home-screen icon readable with iOS dark icons
+
+- With iOS set to dark icons, the kaihuman home-screen icon turned almost black. iOS darkens
+  what it takes for an icon's background. The yellow "K" runs off all four edges of the opaque
+  `apple-touch-icon.png`, so iOS took the yellow for the background and darkened it.
+- New `apps/console/public/apple-touch-icon-dark.png`: the same logo, pixel for pixel, but the
+  near-black areas are transparent. iOS fills transparent areas with its own dark background and
+  keeps the "K".
+- `apps/console/index.html` points the `apple-touch-icon` link at the dark file when the system
+  is in dark mode (`prefers-color-scheme: dark`). In light mode the opaque icon stays, because iOS
+  fills transparent areas with white there.
+- iOS saves the icon when you add the app to the home screen. To get the new icon, switch the
+  iPhone to dark mode, remove the app from the home screen and add it again from Safari.
+
 ## 2026-09-29 — New logo
 
 - The new kaihuman logo (yellow "K" on near-black) replaces the old one everywhere:
