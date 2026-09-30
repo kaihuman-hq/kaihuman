@@ -75,6 +75,7 @@ import {
   parsePinnedTabs,
   putGroup,
   removeGroup,
+  setGroupFavorite,
   serializePinnedTabs,
   tabsToOpen,
   tabsToUnpin,
@@ -964,6 +965,7 @@ async function listPinnedTabGroups(token: string, repo: string) {
       name: group.name,
       createdAt: group.createdAt,
       tabCount: group.tabs.length,
+      favorite: group.favorite === true,
     })),
     activeId,
   };
@@ -1032,6 +1034,19 @@ async function movePinnedTabGroup(token: string, repo: string, groupId: string, 
   if (next === config) return { moved: false };
   await writeConfig(token, repo, next, sha);
   return { moved: true };
+}
+
+/** Answers with the list as `LIST_PINNED_TAB_GROUPS` does, so the page redraws from the commit. */
+async function favoritePinnedTabGroup(
+  token: string,
+  repo: string,
+  groupId: string,
+  favorite: boolean,
+) {
+  const { config, sha } = await readConfig(token, repo, true);
+  const next = setGroupFavorite(config, groupId, favorite, new Date().toISOString());
+  await writeConfig(token, repo, next, sha);
+  return listPinnedTabGroups(token, repo);
 }
 
 /** Only forgets the group; the window keeps whatever it currently has pinned. */
@@ -1497,6 +1512,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     message.type === 'SAVE_PINNED_TAB_GROUP' ||
     message.type === 'RENAME_PINNED_TAB_GROUP' ||
     message.type === 'MOVE_PINNED_TAB_GROUP' ||
+    message.type === 'FAVORITE_PINNED_TAB_GROUP' ||
     message.type === 'DELETE_PINNED_TAB_GROUP'
   ) {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
@@ -1528,6 +1544,16 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
           sendResponse({
             success: true,
             ...(await movePinnedTabGroup(token, repo, message.groupId, message.offset)),
+          });
+        } else if (message.type === 'FAVORITE_PINNED_TAB_GROUP') {
+          sendResponse({
+            success: true,
+            ...(await favoritePinnedTabGroup(
+              token,
+              repo,
+              message.groupId,
+              message.favorite === true,
+            )),
           });
         } else {
           sendResponse({

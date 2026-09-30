@@ -20,7 +20,15 @@ const bookmark = (title: string, lastUsedAt: string, pinned = false): Bookmark =
 });
 
 let BOOKMARKS: Bookmark[];
-let GROUPS: { id: string; name: string; createdAt: string; tabCount: number }[];
+let GROUPS: {
+  id: string;
+  name: string;
+  createdAt: string;
+  tabCount: number;
+  favorite: boolean;
+}[];
+/** What the worker says to a favourite; a string is answered as an error. */
+let favoriteReply: string | null;
 let activeGroup: string | null;
 /** What the worker says to a pin; a string is answered as an error. */
 let pinReply: string | null;
@@ -32,6 +40,7 @@ const emptyToday = (): TodaySummary => ({
   overdue: [],
   inbox: { path: '.kh/inbox.todos.md', count: 0 },
   readLater: [],
+  unreadCount: 0,
   habits: [],
   timers: [],
   clocks: [],
@@ -73,6 +82,12 @@ const reply = (message: { type?: string; bookmarkId?: string; pinned?: boolean }
     };
   }
   if (message.type === 'LIST_PINNED_TAB_GROUPS') return { groups: GROUPS, activeId: activeGroup };
+  if (message.type === 'FAVORITE_PINNED_TAB_GROUP') {
+    if (favoriteReply) return { error: favoriteReply };
+    const { groupId, favorite } = message as { groupId: string; favorite: boolean };
+    GROUPS = GROUPS.map((g) => (g.id === groupId ? { ...g, favorite } : g));
+    return { groups: GROUPS, activeId: activeGroup };
+  }
   if (message.type === 'LOAD_PINNED_TAB_GROUP') {
     activeGroup = (message as { groupId: string }).groupId;
     return { opened: 1, unpinned: 0, name: 'Work' };
@@ -110,10 +125,40 @@ const mount = async (settled: () => boolean) => {
   await waitFor(settled);
 };
 
-const cardTitles = () =>
-  [...host.querySelectorAll('ul[aria-label="Bookmarks"] li button span:first-child')].map(
-    (span) => span.textContent,
-  );
+const titlesIn = (list: string) =>
+  [
+    ...host.querySelectorAll(
+      `ul[aria-label="${list}"] > li > button:first-child > span:last-child > span:first-child`,
+    ),
+  ].map((span) => span.textContent);
+const pinnedTitles = () => titlesIn('Pinned');
+const recentTitles = () => titlesIn('Recently used');
+
+/** The capture box's own button, not the tab of the same name. */
+const clickSubmit = (label: string) => {
+  const button = buttons().find((b) => b.textContent === label && !b.hasAttribute('aria-pressed'));
+  if (!button) throw new Error(`No submit button labelled "${label}"`);
+  button.click();
+};
+
+const type = async (field: HTMLInputElement | HTMLTextAreaElement, value: string) => {
+  field.value = value;
+  field.dispatchEvent(new Event('input', { bubbles: true }));
+  await tick();
+};
+
+const press = (target: EventTarget, key: string, init: KeyboardEventInit = {}) =>
+  target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...init }));
+
+const search = () => host.querySelector('input[aria-label="Search"]') as HTMLInputElement;
+
+const habit = (name: string, checkedToday: boolean, streak: number) => ({
+  path: `.kh/${name}.habit.csv`,
+  name,
+  checkedToday,
+  streak,
+  week: [true, false, true, true, false, true, checkedToday],
+});
 
 const pinButton = (title: string) => {
   const button = host.querySelector<HTMLButtonElement>(
@@ -129,9 +174,10 @@ beforeEach(() => {
     bookmark('newer', '2026-09-03T10:00:00.000Z'),
   ];
   GROUPS = [
-    { id: 'work', name: 'Work', createdAt: NOW, tabCount: 3 },
-    { id: 'home', name: 'Home', createdAt: NOW, tabCount: 1 },
+    { id: 'work', name: 'Work', createdAt: NOW, tabCount: 3, favorite: false },
+    { id: 'home', name: 'Home', createdAt: NOW, tabCount: 1, favorite: false },
   ];
+  favoriteReply = null;
   activeGroup = 'home';
   pinReply = null;
   TODAY = undefined;
@@ -143,6 +189,9 @@ beforeEach(() => {
       local: {
         get: (_keys: string[], respond: (result: Record<string, unknown>) => void) =>
           respond(store),
+        set: async (items: Record<string, unknown>) => {
+          store = { ...store, ...items };
+        },
       },
     },
     runtime: {
@@ -186,8 +235,9 @@ describe('StartPage', () => {
   it('lists the bookmarks used most recently first', async () => {
     await mount(() => host.textContent?.includes('newer') ?? false);
 
-    expect(cardTitles()).toEqual(['newer', 'older']);
+    expect(recentTitles()).toEqual(['newer', 'older']);
     expect(host.textContent).toContain('newer.example');
+    expect(host.textContent).toContain('2 links');
   });
 
   it('puts a pinned bookmark first, whatever was used since', async () => {
@@ -197,7 +247,9 @@ describe('StartPage', () => {
     ];
     await mount(() => host.textContent?.includes('newer') ?? false);
 
-    expect(cardTitles()).toEqual(['older', 'newer']);
+    expect(pinnedTitles()).toEqual(['older']);
+    expect(recentTitles()).toEqual(['newer']);
+    expect(host.textContent).toContain('press 1 to open');
     expect(pinButton('older').getAttribute('aria-pressed')).toBe('true');
     expect(pinButton('newer').getAttribute('aria-pressed')).toBe('false');
   });
@@ -206,7 +258,8 @@ describe('StartPage', () => {
     await mount(() => host.textContent?.includes('newer') ?? false);
 
     pinButton('older').click();
-    await waitFor(() => cardTitles()[0] === 'older');
+    await waitFor(() => pinnedTitles()[0] === 'older');
+    expect(recentTitles()).toEqual(['newer']);
 
     expect(sent.find((message) => message.type === 'SET_BOOKMARK_PINNED')).toEqual({
       type: 'SET_BOOKMARK_PINNED',
@@ -224,7 +277,8 @@ describe('StartPage', () => {
     await mount(() => host.textContent?.includes('newer') ?? false);
 
     pinButton('older').click();
-    await waitFor(() => cardTitles()[0] === 'newer');
+    await waitFor(() => pinnedTitles().length === 0);
+    expect(recentTitles()).toEqual(['newer', 'older']);
 
     expect(sent.find((message) => message.type === 'SET_BOOKMARK_PINNED')).toMatchObject({
       bookmarkId: 'older',
@@ -239,7 +293,8 @@ describe('StartPage', () => {
     pinButton('older').click();
     await waitFor(() => host.textContent?.includes('no longer in the repo') ?? false);
 
-    expect(cardTitles()).toEqual(['newer', 'older']);
+    expect(pinnedTitles()).toEqual([]);
+    expect(recentTitles()).toEqual(['newer', 'older']);
     expect(pinButton('older').getAttribute('aria-pressed')).toBe('false');
   });
 
@@ -260,18 +315,65 @@ describe('StartPage', () => {
     });
   });
 
-  it('lists the pinned tab groups above the bookmarks, marking the loaded one', async () => {
+  it('lists the tab groups between the pinned and the recent bookmarks, marking the loaded one', async () => {
     await mount(() => host.textContent?.includes('Work') ?? false);
 
     const groups = host.querySelector('ul[aria-label="Pinned tab groups"]');
     expect(groups?.textContent).toContain('3 tabs');
     expect(groups?.textContent).toContain('1 tab');
     const headings = [...host.querySelectorAll('h2')].map((h) => h.textContent);
-    expect(headings.indexOf('Pinned tabs')).toBeLessThan(
-      headings.indexOf('Pinned & recently used'),
-    );
+    expect(headings.indexOf('Pinned')).toBeLessThan(headings.indexOf('Tab groups'));
+    expect(headings.indexOf('Tab groups')).toBeLessThan(headings.indexOf('Recently used'));
     const current = groups?.querySelectorAll('button[aria-current="true"]');
     expect([...(current ?? [])].map((b) => b.textContent)).toEqual(['Home1 tab']);
+  });
+
+  it('marks a tab group as a favourite, moving it first and highlighting it', async () => {
+    await mount(() => host.textContent?.includes('Work') ?? false);
+    const chipNames = () =>
+      [...host.querySelectorAll('ul[aria-label="Pinned tab groups"] li > button:first-child')].map(
+        (button) => button.querySelector('span')?.textContent,
+      );
+    const star = (name: string) =>
+      host.querySelector<HTMLButtonElement>(
+        `button[aria-label="Add ${name} to favourites"], button[aria-label="Remove ${name} from favourites"]`,
+      ) as HTMLButtonElement;
+    expect(chipNames()).toEqual(['Work', 'Home']);
+
+    star('Home').click();
+    await waitFor(() => chipNames()[0] === 'Home');
+
+    expect(sent.find((message) => message.type === 'FAVORITE_PINNED_TAB_GROUP')).toEqual({
+      type: 'FAVORITE_PINNED_TAB_GROUP',
+      groupId: 'home',
+      favorite: true,
+    });
+    expect(star('Home').getAttribute('aria-pressed')).toBe('true');
+    expect(star('Home').textContent).toBe('★');
+    const chip = star('Home').previousElementSibling as HTMLElement;
+    expect(chip.className).toContain('bg-nt-pin-hover');
+    // The star is not a load: the window's pinned tabs stay as they are.
+    expect(sent.some((message) => message.type === 'LOAD_PINNED_TAB_GROUP')).toBe(false);
+
+    star('Home').click();
+    await waitFor(() => chipNames()[0] === 'Work');
+    expect(star('Home').textContent).toBe('☆');
+  });
+
+  it('takes the favourite back and says why when it cannot be saved', async () => {
+    favoriteReply = 'Failed to write .kh/browser.pinnedtabs.json';
+    await mount(() => host.textContent?.includes('Work') ?? false);
+
+    (
+      host.querySelector('button[aria-label="Add Home to favourites"]') as HTMLButtonElement
+    ).click();
+    await waitFor(() => host.textContent?.includes('Failed to write') ?? false);
+
+    expect(
+      host
+        .querySelector('button[aria-label="Add Home to favourites"]')
+        ?.getAttribute('aria-pressed'),
+    ).toBe('false');
   });
 
   it('loads a tab group from its card and marks it loaded', async () => {
@@ -295,11 +397,9 @@ describe('StartPage', () => {
     await mount(() => host.textContent?.includes('newer') ?? false);
 
     const textarea = host.querySelector('textarea') as HTMLTextAreaElement;
-    textarea.value = 'remember this';
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
+    await type(textarea, 'remember this');
 
-    click('Add note');
+    clickSubmit('Add note');
     await waitFor(() => sent.some((message) => message.type === 'DUMP_NOTE'));
 
     expect(sent.find((message) => message.type === 'DUMP_NOTE')).toMatchObject({
@@ -332,7 +432,7 @@ describe('StartPage', () => {
       inProgress: [{ text: 'Implement demo mode', path: 'p.todos.md' }],
       overdue: [{ text: 'Fix alpha', path: 'p.todos.md', milestone: 'Alpha' }],
       inbox: { path: '.kh/inbox.todos.md', count: 3 },
-      habits: [{ path: '.kh/health.habit.csv', name: 'health', checkedToday: false, streak: 4 }],
+      habits: [habit('health', false, 4)],
       timers: [
         { path: '.kh/work.timetracking.csv', name: 'work', running: false, closedMinutes: 125 },
       ],
@@ -345,6 +445,7 @@ describe('StartPage', () => {
           path: 'r.readitlater.json',
         },
       ],
+      unreadCount: 7,
       clocks: [{ zone: 'Asia/Tokyo', label: 'Tokyo' }],
     };
     await mount(() => host.textContent?.includes('Implement demo mode') ?? false);
@@ -355,9 +456,13 @@ describe('StartPage', () => {
     expect(text).toContain('Launch');
     expect(text).toContain('3 in the inbox');
     expect(text).toContain('! Fix alpha');
-    expect(text).toContain('4d streak');
+    expect(text).toContain('4d');
+    expect(host.querySelector('[aria-label="4 of the last 7 days"]')).not.toBeNull();
+    expect(text).toContain('work today');
     expect(text).toContain('2h 05m');
+    expect(text).toContain('▶ start');
     expect(text).toContain('Long read');
+    expect(text).toContain('7 unread');
     expect(host.querySelector('ul[aria-label="World clocks"]')?.textContent).toMatch(
       /Tokyo \d\d:\d\d/,
     );
@@ -374,12 +479,16 @@ describe('StartPage', () => {
   it('checks a habit in from its card', async () => {
     TODAY = {
       ...emptyToday(),
-      habits: [{ path: '.kh/health.habit.csv', name: 'health', checkedToday: false, streak: 4 }],
+      habits: [habit('health', false, 4)],
     };
-    await mount(() => host.textContent?.includes('4d streak') ?? false);
+    await mount(() => host.textContent?.includes('4d') ?? false);
 
-    click('health');
-    await waitFor(() => host.textContent?.includes('5d streak') ?? false);
+    (
+      host.querySelector('button[aria-label="Check in health for today"]') as HTMLButtonElement
+    ).click();
+    await waitFor(() => host.textContent?.includes('5d') ?? false);
+    const done = host.querySelector('button[aria-label="health is done for today"]');
+    expect(done?.hasAttribute('disabled')).toBe(true);
 
     expect(sent.find((message) => message.type === 'TODAY_CHECK_IN')).toEqual({
       type: 'TODAY_CHECK_IN',
@@ -418,16 +527,11 @@ describe('StartPage', () => {
     TODAY = emptyToday();
     await mount(() => host.textContent?.includes('newer') ?? false);
     const textarea = host.querySelector('textarea') as HTMLTextAreaElement;
-    const type = async (value: string) => {
-      textarea.value = value;
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      await tick();
-    };
 
     click('Todo');
     await waitFor(() => host.textContent?.includes('.kh/inbox.todos.md') ?? false);
-    await type('Buy milk #home');
-    click('Add todo');
+    await type(textarea, 'Buy milk #home');
+    clickSubmit('Add todo');
     await waitFor(() => sent.some((message) => message.type === 'ADD_TODO'));
     expect(sent.find((message) => message.type === 'ADD_TODO')).toEqual({
       type: 'ADD_TODO',
@@ -437,8 +541,8 @@ describe('StartPage', () => {
 
     click('Log');
     await waitFor(() => host.textContent?.includes('.kh/daily.actionlog.md') ?? false);
-    await type('Shipped it #work #milestone');
-    click('Log it');
+    await type(textarea, 'Shipped it #work #milestone');
+    clickSubmit('Log');
     await waitFor(() => sent.some((message) => message.type === 'ADD_ACTION_LOG'));
     expect(sent.find((message) => message.type === 'ADD_ACTION_LOG')).toEqual({
       type: 'ADD_ACTION_LOG',
@@ -449,7 +553,7 @@ describe('StartPage', () => {
   });
 
   it('says how fresh the data is and syncs on request', async () => {
-    await mount(() => host.textContent?.includes('synced 12 min ago') ?? false);
+    await mount(() => host.textContent?.includes('synced 12m ago') ?? false);
     expect(host.textContent).toContain('2 opens to push');
 
     const before = sent.filter((message) => message.type === 'GET_BOOKMARKS').length;
@@ -473,12 +577,104 @@ describe('StartPage', () => {
     expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
   });
 
-  it('opens the palette from the search field', async () => {
+  it('hands the search to the palette on Enter', async () => {
     await mount(() => host.textContent?.includes('newer') ?? false);
 
-    click('Search bookmarks');
+    await type(search(), 'deploy notes');
+    press(search(), 'Enter');
     await tick();
 
-    expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
+    const palette = document.getElementById(PALETTE_HOST_ID);
+    expect(palette).not.toBeNull();
+    expect(palette?.shadowRoot?.querySelector('input')?.value).toBe('deploy notes');
+  });
+
+  it('filters the pinned and recent bookmarks as the search is typed', async () => {
+    BOOKMARKS = [
+      bookmark('mail', '', true),
+      bookmark('chat', '', true),
+      bookmark('mailbox', '2026-09-01T10:00:00.000Z'),
+      bookmark('docs', '2026-09-02T10:00:00.000Z'),
+    ];
+    await mount(() => host.textContent?.includes('docs') ?? false);
+
+    await type(search(), 'MAIL');
+    expect(pinnedTitles()).toEqual(['mail']);
+    expect(recentTitles()).toEqual(['mailbox']);
+    expect(host.textContent).not.toContain('No bookmarks match');
+
+    await type(search(), 'nothing like it');
+    expect(pinnedTitles()).toEqual([]);
+    expect(recentTitles()).toEqual([]);
+    expect(host.textContent).toContain('No bookmarks match. Enter searches the repo and the web.');
+  });
+
+  it('tags DEV, INT and PROD links in the recent list', async () => {
+    BOOKMARKS = [
+      bookmark('Control PROD', '2026-09-03T10:00:00.000Z'),
+      { ...bookmark('Console', '2026-09-02T10:00:00.000Z'), tags: ['int'] },
+      bookmark('Wiki', '2026-09-01T10:00:00.000Z'),
+    ];
+    await mount(() => host.textContent?.includes('Wiki') ?? false);
+
+    const tags = [...host.querySelectorAll('ul[aria-label="Recently used"] li button')]
+      .filter((button) => !button.hasAttribute('aria-pressed'))
+      .map((button) => button.querySelector('span')?.textContent);
+    expect(tags).toEqual(['PROD', 'INT', '—']);
+  });
+
+  it('focuses the search on / and opens a pinned bookmark by its number', async () => {
+    BOOKMARKS = [
+      bookmark('first', '', true),
+      bookmark('second', '', true),
+      bookmark('loose', '2026-09-03T10:00:00.000Z'),
+    ];
+    await mount(() => host.textContent?.includes('loose') ?? false);
+    expect(host.textContent).toContain('press 1–2 to open');
+
+    press(document.body, '/');
+    expect(document.activeElement).toBe(search());
+
+    // Typed into a field, a digit is text.
+    press(search(), '2');
+    expect(sent.some((message) => message.type === 'OPEN_URL')).toBe(false);
+
+    press(search(), 'Escape');
+    expect(document.activeElement).not.toBe(search());
+
+    press(document.body, '3');
+    press(document.body, '2');
+    await waitFor(() => sent.some((message) => message.type === 'OPEN_URL'));
+    expect(sent.filter((message) => message.type === 'OPEN_URL')).toEqual([
+      { type: 'OPEN_URL', url: 'https://second.example/page', reuse: true },
+    ]);
+  });
+
+  it('saves on Ctrl+Enter and lists the latest captures of the kind, kept for later tabs', async () => {
+    store = {
+      ...store,
+      startPageCaptures: { note: [{ time: '09:00', text: 'earlier' }], todo: [], log: [] },
+    };
+    await mount(() => host.textContent?.includes('earlier') ?? false);
+    const textarea = host.querySelector('textarea') as HTMLTextAreaElement;
+
+    await type(textarea, '   ');
+    press(textarea, 'Enter', { ctrlKey: true });
+    await tick();
+    expect(sent.some((message) => message.type === 'DUMP_NOTE')).toBe(false);
+
+    await type(textarea, 'call the bank');
+    press(textarea, 'Enter', { ctrlKey: true });
+    await waitFor(() => host.textContent?.includes('call the bank') ?? false);
+
+    const captures = () =>
+      [...host.querySelectorAll('ul[aria-label="Latest captures"] li span:last-child')].map(
+        (span) => span.textContent,
+      );
+    expect(captures()).toEqual(['call the bank', 'earlier']);
+    expect((store.startPageCaptures as { note: unknown[] }).note).toHaveLength(2);
+
+    click('Todo');
+    await waitFor(() => captures().length === 0);
   });
 });

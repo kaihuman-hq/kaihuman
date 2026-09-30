@@ -195,8 +195,11 @@ export interface PaletteOptions {
 }
 
 export interface CommandPalette {
-  /** Opens the palette, or only refocuses its input if it is already open. */
-  open: () => void;
+  /**
+   * Opens the palette, or only refocuses its input if it is already open. A `query` is typed in
+   * as if by hand, so a search box elsewhere on the page can hand its text over.
+   */
+  open: (query?: string) => void;
   toggle: () => void;
   close: () => void;
   destroy: () => void;
@@ -1553,9 +1556,14 @@ export function createCommandPalette(
   };
 
   return {
-    open: () => {
+    open: (query) => {
       if (open) input.focus();
       else void show();
+      if (query) {
+        input.value = query;
+        // Through the input handler, so a typed mode prefix (`>t …`) switches mode as usual.
+        input.dispatchEvent(new Event('input'));
+      }
     },
     toggle: () => {
       if (open) close();

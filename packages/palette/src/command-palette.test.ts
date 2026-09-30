@@ -231,6 +231,14 @@ describe('open', () => {
     expect(document.getElementById(PALETTE_HOST_ID)).not.toBeNull();
     expect(shadow().activeElement).toBe(input());
   });
+
+  it('types a given query into the input, as if by hand', async () => {
+    palette.close();
+    palette.open('zul');
+    await settle();
+    expect(input().value).toBe('zul');
+    expect(rowTitles()[0]).toBe('Zulip');
+  });
 });
 
 describe('options', () => {

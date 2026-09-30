@@ -6,6 +6,7 @@ import {
   type Bookmark,
   type BookmarksCache,
   type BookmarkUsage,
+  bookmarkEnvironment,
   CACHE_TTL_MS,
   countUse,
   hasUsageToPush,
@@ -249,29 +250,62 @@ describe('startPageBookmarks', () => {
     lastUsedAt,
     pinned,
   });
+  const titles = (list: Bookmark[]) => list.map((b) => b.title);
 
-  it('puts every pinned bookmark first, in file order, then the recently used rest', () => {
+  it('lists every pinned bookmark in file order apart from the recently used rest', () => {
     const bookmarks = [
       entry('recent', '2026-09-03T10:00:00.000Z'),
       entry('pinned-a', '', true),
       entry('older', '2026-09-01T10:00:00.000Z'),
       entry('pinned-b', '2026-09-02T10:00:00.000Z', true),
     ];
-    expect(startPageBookmarks(bookmarks).map((b) => b.title)).toEqual([
-      'pinned-a',
-      'pinned-b',
-      'recent',
-      'older',
-    ]);
+    const { pinned, recent } = startPageBookmarks(bookmarks);
+    expect(titles(pinned)).toEqual(['pinned-a', 'pinned-b']);
+    expect(titles(recent)).toEqual(['recent', 'older']);
   });
 
-  it('never cuts a pin to fit the limit, and lists each bookmark once', () => {
+  it('never cuts a pin to fit the limit', () => {
     const bookmarks = [
       ...Array.from({ length: 3 }, (_, i) => entry(`pin${i}`, '', true)),
       ...Array.from({ length: 5 }, (_, i) => entry(`b${i}`, '')),
     ];
-    const grid = startPageBookmarks(bookmarks, 2);
-    expect(grid.map((b) => b.title)).toEqual(['pin0', 'pin1', 'pin2', 'b0', 'b1']);
+    const { pinned, recent } = startPageBookmarks(bookmarks, '', 2);
+    expect(titles(pinned)).toEqual(['pin0', 'pin1', 'pin2']);
+    expect(titles(recent)).toEqual(['b0', 'b1']);
+  });
+
+  it('narrows both lists to titles and hosts containing the query, ignoring case', () => {
+    const bookmarks = [
+      entry('Mail', '', true),
+      entry('Calendar', '', true),
+      { ...entry('Docs', ''), url: 'https://www.mailbox.org/' },
+      entry('Chat', ''),
+    ];
+    const { pinned, recent } = startPageBookmarks(bookmarks, '  MAIL ');
+    expect(titles(pinned)).toEqual(['Mail']);
+    expect(titles(recent)).toEqual(['Docs']);
+    // The www. a card leaves out is not searched either.
+    expect(startPageBookmarks(bookmarks, 'www').recent).toEqual([]);
+  });
+});
+
+describe('bookmarkEnvironment', () => {
+  const env = (title: string, tags: string[] = []) => bookmarkEnvironment({ title, tags });
+
+  it('reads a word standing alone in the title, whatever its case', () => {
+    expect(env('Control PROD')).toBe('PROD');
+    expect(env('Console Legacy Int')).toBe('INT');
+    expect(env('[DEPLOY/DEV] Unified')).toBe('DEV');
+  });
+
+  it('lets a tag set by hand win over the title', () => {
+    expect(env('Control PROD', ['work', 'dev'])).toBe('DEV');
+  });
+
+  it('leaves a bookmark without one alone', () => {
+    expect(env('Developer docs')).toBeNull();
+    expect(env('International news')).toBeNull();
+    expect(env('Mixpanel Events PDP', ['production'])).toBeNull();
   });
 });
 

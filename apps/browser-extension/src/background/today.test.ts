@@ -3,6 +3,7 @@ import {
   buildToday,
   DEFAULT_ACTION_LOG_PATH,
   fetchToday,
+  habitWeek,
   type TodayCache,
   timerState,
   upcomingEvents,
@@ -93,8 +94,27 @@ describe('habits', () => {
 
   it('reports each habit file with its name', () => {
     expect(buildToday(cache({ '.kh/health.habit.csv': csv }), NOW).habits).toEqual([
-      { path: '.kh/health.habit.csv', name: 'health', checkedToday: false, streak: 2 },
+      {
+        path: '.kh/health.habit.csv',
+        name: 'health',
+        checkedToday: false,
+        streak: 2,
+        week: [false, false, true, false, true, true, false],
+      },
     ]);
+  });
+
+  it('marks the last seven days, the oldest first and today last', () => {
+    expect(habitWeek(`${csv}\n2026-09-23;x\n2026-09-17;x\n2026-09-16;x`, NOW)).toEqual([
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+    ]);
+    expect(habitWeek('', NOW)).toEqual(Array(7).fill(false));
   });
 });
 
@@ -140,6 +160,20 @@ describe('read it later', () => {
   it('lists the oldest unread items first', () => {
     const today = buildToday(cache({ 'x.readitlater.json': json }), NOW);
     expect(today.readLater.map((item) => item.id)).toEqual(['c', 'a']);
+    expect(today.unreadCount).toBe(2);
+  });
+
+  it('counts every unread item, not only the ones listed', () => {
+    const many = JSON.stringify({
+      items: ['a', 'b', 'c', 'd'].map((id) => ({
+        id,
+        url: `https://${id}.example`,
+        status: 'new',
+      })),
+    });
+    const today = buildToday(cache({ 'x.readitlater.json': many }), NOW);
+    expect(today.readLater).toHaveLength(3);
+    expect(today.unreadCount).toBe(4);
   });
 });
 

@@ -6,6 +6,7 @@ interface GroupSummary {
   name: string;
   createdAt: string;
   tabCount: number;
+  favorite: boolean;
 }
 
 interface PinnedTabsPanelProps {
@@ -112,6 +113,18 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
       return `Moved ${group.name} ${offset < 0 ? 'up' : 'down'}`;
     });
 
+  const toggleFavorite = (group: GroupSummary) =>
+    run(`favorite:${group.id}`, async () => {
+      await send({
+        type: 'FAVORITE_PINNED_TAB_GROUP',
+        groupId: group.id,
+        favorite: !group.favorite,
+      });
+      return group.favorite
+        ? `Removed ${group.name} from favourites`
+        : `Added ${group.name} to favourites`;
+    });
+
   const toggleEditMode = () => {
     setEditing(null);
     setEditMode((on) => !on);
@@ -168,7 +181,9 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
           return (
             <div
               key={group.id}
-              class={`p-2 rounded border bg-[var(--los-bg-hover)] ${active ? 'border-[var(--los-accent)]' : 'border-[var(--los-border)]'}`}
+              class={`p-2 rounded border ${
+                group.favorite ? 'bg-[var(--los-accent-dim)]' : 'bg-[var(--los-bg-hover)]'
+              } ${active ? 'border-[var(--los-accent)]' : 'border-[var(--los-border)]'}`}
             >
               {edit === 'rename' ? (
                 <div class="flex gap-1">
@@ -227,8 +242,35 @@ export function PinnedTabsPanel({ repo }: PinnedTabsPanelProps) {
                 </div>
               ) : (
                 <div class="flex gap-2 min-h-[44px]">
+                  {/* Kept in the file's order here, where ↑/↓ arrange it; the start page puts
+                      favourites first. */}
+                  <button
+                    type="button"
+                    onClick={() => toggleFavorite(group)}
+                    disabled={!!busy}
+                    aria-pressed={group.favorite}
+                    aria-label={
+                      group.favorite
+                        ? `Remove ${group.name} from favourites`
+                        : `Add ${group.name} to favourites`
+                    }
+                    title={group.favorite ? 'Unfavourite' : 'Favourite'}
+                    class={`shrink-0 text-sm transition-colors disabled:opacity-50 ${
+                      group.favorite
+                        ? 'text-[var(--los-accent)] hover:text-[var(--los-fg)]'
+                        : 'text-[var(--los-fg-dim)] hover:text-[var(--los-accent)]'
+                    }`}
+                  >
+                    {group.favorite ? '★' : '☆'}
+                  </button>
                   <div class="flex-1 min-w-0 flex flex-col justify-center">
-                    <div class="text-xs text-[var(--los-fg)] truncate">
+                    <div
+                      class={`text-xs truncate ${
+                        group.favorite
+                          ? 'text-[var(--los-accent)] font-bold'
+                          : 'text-[var(--los-fg)]'
+                      }`}
+                    >
                       {active && <span class="text-[var(--los-accent)]">● </span>}
                       {group.name}
                     </div>
