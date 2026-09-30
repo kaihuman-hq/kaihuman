@@ -38,7 +38,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
-| Favourite tab groups: ☆/★ on each group chip; favourites come first and are highlighted, saved in the repo file | start page | 2026-09-30 |
+| Favourite tab groups: ☆/★ on each group chip; favourites come first and are highlighted, saved in the repo file | start page, popup Pinned Tabs panel | 2026-09-30 |
 | Start page redesign: full-width two-column layout, Noto Sans Mono bundled, date with ISO week in the header | start page | 2026-09-30 |
 | Start page search filters pinned and recent bookmarks as you type; ⏎ hands the text to the palette; `/` focuses it | start page | 2026-09-30 |
 | Pinned bookmarks as numbered cards, opened with keys 1–9; recently used as a separate list | start page | 2026-09-30 |

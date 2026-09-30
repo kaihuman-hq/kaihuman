@@ -10,6 +10,9 @@
   favourites do not change. New worker message `FAVORITE_PINNED_TAB_GROUP` re-reads the file,
   commits and answers with the updated list; `LIST_PINNED_TAB_GROUPS` now reports `favorite`.
 - The star changes at once; if the commit fails it goes back and the page says why.
+- The popup's **Pinned Tabs** panel has the same star before each group name. Favourites there get
+  a green background and a bold green name, but stay in the file's order, because that panel is
+  where ↑/↓ arrange the groups.
 
 ## 2026-09-30 — New Tab page redesign
 

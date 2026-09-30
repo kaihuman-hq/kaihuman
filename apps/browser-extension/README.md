@@ -38,6 +38,9 @@ edit mode.
   leaves a clean window and nothing is lost. Loading the same group twice is a no-op.
 - **Update** — writes the window's current pinned tabs back into the loaded group, keeping its
   id, name and creation date. This is how you add or remove a tab from a saved group.
+- **☆ / ★** — marks the group as a favourite, or takes that back. Favourites have a green
+  background and name here and come first on the start page. The mark is stored in the repo file
+  as `"favorite": true` (left out when unset).
 - **Save current** — types a name and stores the window's pinned tabs as a new group.
 - **Rename** *(edit mode)* — edits the group's name in place, keeping its tabs and creation date.
 - **↑ / ↓** *(edit mode)* — reorders the group in the list; the order is stored in the repo file.
@@ -447,7 +450,8 @@ focused for you: click into the page first, or use the shortcut.
   the popup's **Load** does — pins what is missing, unpins what the group does not have — and leaves
   the start page where it is. **☆** beside a group makes it a favourite: it moves to the front
   and is filled in green, and **★** takes that back. The mark is committed to the group in
-  `.kh/browser.pinnedtabs.json` (`"favorite": true`), so every browser sees it. Saving, renaming
+  `.kh/browser.pinnedtabs.json` (`"favorite": true`), so every browser sees it. The popup's
+  **Pinned Tabs** panel has the same star. Saving, renaming
   and reordering groups stay in the popup and the palette.
 - **Recently used** — the twelve other bookmarks you opened most recently. A repo whose bookmarks
   have never been opened still shows its latest ones. Each row has an environment tag:
