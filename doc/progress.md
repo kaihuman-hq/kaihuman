@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-09-30 — Braindumps phase 1: the shared file format
+
+- `@lifosy/formats` gains `braindumps.ts`: braindumps are `.kh/braindumps/<created-ms>.md`, one file
+  each, named once and never renamed. `braindumpIdOf(path)` is the one way from a path to a
+  `BraindumpId` (branded, digits only), so a path from a page or webview can never reach another
+  file. `braindumpTitle(text)` is the first non-empty line without heading marks, up to 60
+  characters. The new tab page and the braindump window both build on these.
+- Plan revised (`doc/braindump.md`): braindumps are not part of the command palette. They get a
+  dedicated window opened by its own key (`lifosy-palette-toggle braindump`), with its own list on
+  ⌃O. The palette and its `>d` dumps are unchanged.
+
+Checks: formats vitest 76/76 (8 new), tsc and biome clean; the palette, extension, desktop and
+console typecheck against the new export.
+
 ## 2026-09-30 — Braindumps: study and plan
 
 - New `doc/braindump.md`: a proposal (nothing implemented) for turning the desktop palette's local

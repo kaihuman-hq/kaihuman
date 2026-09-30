@@ -1,6 +1,8 @@
 # Braindumps — study and plan
 
-Status: proposal (2026-09-30). Nothing is implemented yet.
+Status: phase 1 (the shared file format) is done (2026-09-30). Revised the same day: braindumps
+are **not part of the command palette**. They get a dedicated window with its own key and its own
+list.
 
 ## Goal
 
@@ -27,10 +29,11 @@ There are already six capture paths. The design must not add a seventh that does
 | `>q` capture, `cli capture`, `kh-capture`, `kh-capture-native` | `.kh/raw/<ms>-<slug>.md` | Create-only, with no later editing. `/kb-ingest` processes it into the wiki, which is a different lifecycle. |
 | Console `/new` (DumpView) | Save wizard → `.kh/quicknotes/` | This is the main app in a tab: the friction you want to avoid. |
 
-**Recommendation: braindumps are `>d` dumps, moved to the repo, with a window of their own.** Keep
-the name, the `>d` prefix, the autosave logic and the local store (it becomes the offline copy).
-Only where the files end up and where the editor shows change. There is one scratch concept, not
-two.
+**Recommendation: braindumps are a dedicated window, not part of the command palette.** The
+window reuses what `>d` already proved (autosave while typing, one file each, an empty one is never
+created) and its local store (it becomes the offline copy). The files end up in the repo. The
+palette gets no braindump action or mode. `>d` stays as it is for now; whether to retire it once the
+window ships is open question 3.
 
 ## Decision 1 — one file per braindump, not one shared file
 
@@ -101,21 +104,21 @@ You suggested Chrome opening the console's editor. Here are the options side by 
   CSS, in an app that has no framework at all today. Markdown highlighting adds little to prose you
   are typing in a hurry. If you still want it, it can be added later behind the same
   `EditableText`-like interface.
-- **How it opens**
-  1. **A direct key.** Add `Command::Braindump` to `lib.rs` and let `lifosy-palette-toggle braindump`
-     show the window with a *new* empty braindump:
-     `bind = SUPER SHIFT, D, exec, lifosy-palette-toggle braindump`.
-     This is the no-friction path: one chord, 4–9 ms client, the window is already there.
-  2. **From the palette.** A top-level action "New braindump", and `>d` lists the open braindumps
-     (repo and local, newest first). ⏎ on one hides the palette (it holds the keyboard) and shows
-     the window with that braindump.
+- **How it opens: only by its own key.** Add `Command::Braindump` to `lib.rs` and let
+  `lifosy-palette-toggle braindump` show the window with a *new* empty braindump:
+  `bind = SUPER SHIFT, D, exec, lifosy-palette-toggle braindump`.
+  This is the no-friction path: one chord, a 4–9 ms client, and the window already exists. The
+  palette is not involved. The window only shares the daemon process with it, for the token, the
+  repo setting and the GitHub client.
+- **Switching is inside the window.** ⌃O swaps the text area for a list of the open braindumps
+  (repo and local, newest first, filtered as you type); ⏎ opens one, Esc goes back to the text.
 - **Keys in the window**
 
   | Key | Action |
   | --- | --- |
   | Esc | Flush the save and hide the window. The text stays; nothing asks "save?" |
   | ⌃N | New braindump |
-  | ⌃O or ⌃P | Open the palette in `>d` to switch |
+  | ⌃O | The window's own list of braindumps, to switch |
   | ⌃⏎ | Copy all and hide, as in the dump editor now |
   | ⌃⌫ on an empty text | Delete this braindump |
 
@@ -183,18 +186,21 @@ local copies that are *unsynced* or among the 25 most recent. **Never** delete a
 
 Each phase ships and is checked on its own.
 
-1. **Shared contract** (`packages/palette`)
-   - `braindump.ts`: `braindumpPath(id)`, `isBraindumpPath`, `braindumpTitle(text)` (moved from
-     `dumpTitle`), and the folder constant.
-   - `protocol.ts`: `LIST_BRAINDUMPS`, `SAVE_BRAINDUMP`, `DELETE_BRAINDUMP`, `OPEN_BRAINDUMP` (the
-     desktop shows the window). `dumpMode` switches to them.
-   - → verify: vitest for the path check and title, and `fakePort` tests for the reworked `>d` mode;
-     tsc and biome clean.
+1. **Shared file format** (`packages/formats/src/braindumps.ts`). **Done.**
+   - `BRAINDUMP_FOLDER`, the branded `BraindumpId`, `braindumpPath(id)`, `braindumpIdOf(path)`
+     (the only way from a path to an id; anything outside the folder, in a subfolder or not all
+     digits is `null`), `braindumpCreatedAt(id)` and `braindumpTitle(text)`.
+   - It lives in `@lifosy/formats`, next to the other repo file formats, because the new tab page
+     and the braindump window both need it and the palette does not. The palette is unchanged.
+   - → verified: vitest (paths, refused paths, titles), tsc and biome clean; the palette,
+     extension, desktop and console typecheck against it.
 2. **Desktop sync** (`apps/desktop-palette/src-tauri`)
    - `github.rs`: `delete(path, sha, message)`.
    - `braindumps.rs`: the local store (from `dumps.rs`) plus the sidecar, the push queue and the
      rules table above.
-   - `requests.rs`: route the new requests. Existing local dumps keep working (see question 3).
+   - The window's requests (`LIST_BRAINDUMPS`, `SAVE_BRAINDUMP`, `DELETE_BRAINDUMP`) in a small
+     protocol of its own, not in `PaletteProtocol`, routed next to `requests.rs`. The path check is
+     mirrored in Rust with the same cases as `braindumps.test.ts`. Local `>d` dumps keep working.
    - → verify: Rust tests against a stand-in API (`LIFOSY_GITHUB_API`) for create, update, 409 with
      an unchanged remote, 409 with a changed remote (conflict copy), 404 with and without local
      edits, and offline then retry. `cargo clippy` and `fmt` clean.
@@ -203,10 +209,10 @@ Each phase ships and is checked on its own.
      not, resizable) and a `braindump.html` Vite input with a small TS entry (textarea, status line,
      keys).
    - Add the label to `capabilities/default.json`. Add `Command::Braindump` and the toggle client
-     argument. Opening from the palette hides the palette first.
+     argument. If the palette happens to be open, it is hidden first (it holds the keyboard).
    - Document the key binding and the window rule in the README.
    - → verify: Rust tests for the new `Command` parsing; the built UI driven in Chromium with the
-     stubbed Tauri bridge (new → type → Esc → reopen from `>d` → delete). The Hyprland checklist:
+     stubbed Tauri bridge (new → type → Esc → reopen from ⌃O → delete). The Hyprland checklist:
      opens floating and centred on the focused monitor, typing works at once, alt-tab away and back,
      Esc returns focus.
 4. **New tab** (`apps/browser-extension`)
@@ -219,19 +225,16 @@ Each phase ships and is checked on its own.
 
 ## Open questions for you
 
-1. **What is "the current GitHub repo"?** The proposal uses the palette's **active repo**
-   (`palette.json`, switched with "Switch repository…"), because that is the repo the new tab page
-   reads. If you meant *the repo you are coding in* (the focused terminal's directory, or the last
-   `>c` Claude Code repo), braindumps would scatter across many repos. The new tab could then only
-   list the ones in its own repo. Which one did you mean?
+1. ~~What is "the current GitHub repo"?~~ Answered: the palette's **active repo** (`palette.json`,
+   switched with "Switch repository…"), which is also the repo the new tab page reads.
 2. **The desktop and the extension keep their active repo separately** (keyring + `palette.json`
    vs `chrome.storage.local`). They must point at the same repo, or the new tab will not show what
    the desktop wrote. Is that already true on your machine, or should syncing the active repo
    between the two be part of this?
-3. **The existing local-only dumps.** Should they (a) be uploaded once as braindumps, (b) stay
-   local and slowly age out, or (c) should `>d` keep a "local only" toggle for text that must never
-   reach GitHub (pasted secrets, for example)? The recommendation is (b), plus a warning in the
-   window title while offline.
+3. **The palette's `>d` dumps.** With braindumps out of the palette, `>d` is a second scratch pad.
+   Once the window ships, should `>d` (a) go, with its local dumps uploaded once as braindumps, (b)
+   go, with its dumps left to age out, or (c) stay, as a local-only pad for text that must never
+   reach GitHub (pasted secrets, for example)? The recommendation is (b).
 4. **Commit noise.** One or two commits per braindump on the default branch is fine for a private
    data repo. Would you rather have a dedicated `braindumps` branch? It is cheap in the desktop app
    but makes the new tab listing read a second tree.
