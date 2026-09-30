@@ -501,6 +501,65 @@ describe('dumpMode', () => {
     expect(existing?.action?.recent).toBe(false);
   });
 
+  describe('deleting from the palette', () => {
+    const braindump = async () => {
+      answers.LIST_BRAINDUMPS = {
+        braindumps: [{ id: '7' as BraindumpId, text: 'Call the bank', updatedAt: 0, synced: true }],
+      };
+      answers.LIST_DUMPS = { dumps: [] };
+      const [, item] = await load();
+      return item;
+    };
+
+    it('offers opening and deleting on ⇥', async () => {
+      const item = await braindump();
+      expect(item?.children?.map((child) => child.title)).toEqual([
+        'Open in the braindump window',
+        'Delete…',
+      ]);
+      expect(item?.children?.[0]?.action).toBe(item?.action);
+    });
+
+    it('deletes after DELETE is typed, then syncs so the repo follows', async () => {
+      const remove = (await braindump())?.children?.[1]?.action;
+      expect(remove?.prompts?.[0]?.label).toBe('Type DELETE to delete “Call the bank”');
+      answers.SAVE_BRAINDUMP = {};
+      answers.SYNC_BRAINDUMPS = { braindumps: [] };
+      expect(await remove?.run?.([' delete '])).toBe('Deleted Call the bank');
+      expect(sent.slice(-2)).toEqual([
+        { type: 'SAVE_BRAINDUMP', id: '7', text: '' },
+        { type: 'SYNC_BRAINDUMPS' },
+      ]);
+      expect(remove?.recent).toBe(false);
+    });
+
+    it('leaves it alone without the word', async () => {
+      const remove = (await braindump())?.children?.[1]?.action;
+      const before = sent.length;
+      expect(await remove?.run?.(['yes'])).toBe('Left alone');
+      expect(sent.length).toBe(before);
+    });
+
+    it('says the repo follows later when the sync fails', async () => {
+      const remove = (await braindump())?.children?.[1]?.action;
+      answers.SAVE_BRAINDUMP = {};
+      // No answer for SYNC_BRAINDUMPS: the fake port rejects, as an offline backend would.
+      expect(await remove?.run?.(['DELETE'])).toBe(
+        'Deleted Call the bank here; the repo follows on the next sync (no answer for SYNC_BRAINDUMPS)',
+      );
+    });
+
+    it('deletes an old local dump after DELETE is typed', async () => {
+      answers.LIST_BRAINDUMPS = { braindumps: [] };
+      answers.LIST_DUMPS = { dumps: [{ id: '3', text: 'old scratch', updatedAt: 0 }] };
+      const [, old] = await load();
+      const remove = old?.children?.[0]?.action;
+      answers.SAVE_DUMP = {};
+      expect(await remove?.run?.(['DELETE'])).toBe('Deleted old scratch');
+      expect(sent.at(-1)).toEqual({ type: 'SAVE_DUMP', id: '3', text: '' });
+    });
+  });
+
   it('lists old local dumps below, under their own heading, to edit in place', async () => {
     answers.LIST_BRAINDUMPS = { braindumps: [] };
     answers.LIST_DUMPS = { dumps: [{ id: '3', text: 'x'.repeat(80), updatedAt: 0 }] };

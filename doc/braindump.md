@@ -260,6 +260,10 @@ Each phase ships and is checked on its own.
      the minute rule) and 5 start page tests (preview and expand, confirm then delete, rollback on
      failure, a refusal shown, the fresher summary taken). The built page was driven in Chromium
      with a stubbed `chrome`: list → expand → delete? → delete.
+   - Afterwards, on request: `>d` also deletes. Each braindump gets **Open in the braindump
+     window** and **Delete…** on ⇥. Delete asks for `DELETE`, then sends `SAVE_BRAINDUMP` with no
+     text (the local delete) and `SYNC_BRAINDUMPS`, so the repo follows under the usual sync rules.
+     Old local dumps get the same **Delete…**.
 5. **Docs**: `features.md`, the desktop README, the extension README and `progress.md`.
    `documentation.md` covers the CLI only, which braindumps do not touch.
 

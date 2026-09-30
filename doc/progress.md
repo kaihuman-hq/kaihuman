@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-09-30 — Delete braindumps from the desktop palette
+
+- In `>d`, **⇥** (or **→**) on a braindump offers **Open in the braindump window** and
+  **Delete…**. Delete asks you to type `DELETE`, as deleting a tab group does, then deletes the
+  braindump here and syncs at once, so the repo follows.
+- If the sync fails (offline), the palette says the repo will follow on the next sync.
+- The sync's rules apply: only the version this machine last saw is deleted, and an edit made
+  elsewhere since comes back.
+- Old local dumps get **Delete…** too, on this machine only.
+
+Checks: palette tsc, biome and vitest 253/253 (5 new). The built desktop palette was driven in
+Chromium with a stubbed Tauri bridge: `>d` → `bank` → ⇥ → Delete… → `DELETE` → ⏎ → "Deleted Call
+the bank", with `SAVE_BRAINDUMP` (empty) then `SYNC_BRAINDUMPS`.
+
 ## 2026-09-30 — Braindumps phase 4: the list on the new tab page
 
 - **Braindumps** on the start page, above the capture box. It shows the ten newest files in

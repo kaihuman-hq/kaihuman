@@ -65,9 +65,13 @@ The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-re
   full. Nothing runs until Run is chosen. Commands run with `bash -c` from your home directory.
 - **`>d`** lists braindumps: **New braindump** first, then the ones in the active repository,
   most recently edited first, searchable by their text. ⏎ hides the palette and opens the choice in
-  the **braindump window** (below). Dumps from before braindumps are listed underneath under
-  *Old dumps — on this machine only*: they still open in the palette's editor to copy (⌃⏎), save as
-  a file (⌃S) or clear, but no new ones are made and none are ever sent to GitHub.
+  the **braindump window** (below). **⇥** (or **→**) on one offers **Open in the braindump window**
+  and **Delete…**. Delete asks you to type `DELETE`, removes the braindump here, and syncs at once,
+  so the repo follows. Offline, it says so, and the repo follows on the next sync. As with every
+  sync, only the version this machine last saw is deleted: an edit made elsewhere since comes
+  back. Dumps from before braindumps are listed underneath under *Old dumps — on this machine
+  only*. They still open in the palette's editor to copy (⌃⏎), save as a file (⌃S) or clear, and
+  **⇥ → Delete…** removes one. No new ones are made, and none are ever sent to GitHub.
 - **`>c`** (from `omarchy-claude-code`) lists the repositories in `$EEE_HISTORY_FILE` or
   `~/.config/eee/history`, most recent first. ⏎ asks for the prompt; ⏎ again opens
   `https://claude.ai/code?prompt=…&repo=owner/name&branch=main` and closes the palette. The

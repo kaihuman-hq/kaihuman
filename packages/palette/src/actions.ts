@@ -414,6 +414,33 @@ const openBraindump = (port: ActionPort, id?: BraindumpId) => async () => {
   return '';
 };
 
+/** Deleting is one keystroke away from opening, so it asks for the word, as tab groups do. */
+const confirmDelete = (title: string) => [{ label: `Type DELETE to delete “${title}”` }];
+
+const confirmed = (input = '') => input.trim().toUpperCase() === 'DELETE';
+
+/**
+ * Deletes a braindump here, then syncs so the repo follows at once. The sync deletes only the
+ * version this machine last saw: an edit made elsewhere since comes back instead of being lost.
+ */
+const deleteBraindump = (port: ActionPort, id: BraindumpId, title: string): PaletteAction => ({
+  id: `braindump:${id}:delete`,
+  title: `Delete ${title}`,
+  prompts: confirmDelete(title),
+  recent: false,
+  run: async ([input]: string[]) => {
+    if (!confirmed(input)) return 'Left alone';
+    await port.send({ type: 'SAVE_BRAINDUMP', id, text: '' });
+    try {
+      await port.send({ type: 'SYNC_BRAINDUMPS' });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      return `Deleted ${title} here; the repo follows on the next sync (${reason})`;
+    }
+    return `Deleted ${title}`;
+  },
+});
+
 const braindumpItems = async (port: ActionPort): Promise<ModeItem[]> => {
   const [{ braindumps }, { dumps }] = await Promise.all([
     port.send({ type: 'LIST_BRAINDUMPS' }),
@@ -431,28 +458,65 @@ const braindumpItems = async (port: ActionPort): Promise<ModeItem[]> => {
         closes: true,
       },
     },
-    ...braindumps.map((dump) => ({
-      id: `braindump:${dump.id}`,
-      title: braindumpTitle(dump.text),
-      subtitle: `${formatStamp(new Date(dump.updatedAt))} · ${plural(dump.text.split('\n').length, 'line')}${dump.synced ? '' : ' · not synced yet'}`,
-      keywords: dump.text,
-      action: {
+    ...braindumps.map((dump): ModeItem => {
+      const title = braindumpTitle(dump.text);
+      const open: PaletteAction = {
         id: `braindump:${dump.id}`,
-        title: braindumpTitle(dump.text),
+        title,
         run: openBraindump(port, dump.id),
         closes: true,
-        recent: false as const,
-      },
-    })),
+        recent: false,
+      };
+      return {
+        id: `braindump:${dump.id}`,
+        title,
+        subtitle: `${formatStamp(new Date(dump.updatedAt))} · ${plural(dump.text.split('\n').length, 'line')}${dump.synced ? '' : ' · not synced yet'}`,
+        keywords: dump.text,
+        action: open,
+        children: [
+          {
+            id: `braindump:${dump.id}:open`,
+            title: 'Open in the braindump window',
+            action: open,
+          },
+          {
+            id: `braindump:${dump.id}:delete`,
+            title: 'Delete…',
+            subtitle: 'Here and in the repo — git history keeps it',
+            action: deleteBraindump(port, dump.id, title),
+          },
+        ],
+      };
+    }),
     // Dumps from before braindumps: still here to copy or clear, but never sent anywhere.
-    ...dumps.map((dump) => ({
-      id: `dump:${dump.id}`,
-      title: dumpTitle(dump.text),
-      subtitle: `${formatStamp(new Date(dump.updatedAt))} · ${plural(dump.text.split('\n').length, 'line')}`,
-      keywords: dump.text,
-      group: 'Old dumps — on this machine only',
-      edit: () => dumpEditor(port, dump),
-    })),
+    ...dumps.map(
+      (dump): ModeItem => ({
+        id: `dump:${dump.id}`,
+        title: dumpTitle(dump.text),
+        subtitle: `${formatStamp(new Date(dump.updatedAt))} · ${plural(dump.text.split('\n').length, 'line')}`,
+        keywords: dump.text,
+        group: 'Old dumps — on this machine only',
+        edit: () => dumpEditor(port, dump),
+        children: [
+          {
+            id: `dump:${dump.id}:delete`,
+            title: 'Delete…',
+            subtitle: 'From this machine — it was never anywhere else',
+            action: {
+              id: `dump:${dump.id}:delete`,
+              title: `Delete ${dumpTitle(dump.text)}`,
+              prompts: confirmDelete(dumpTitle(dump.text)),
+              recent: false,
+              run: async ([input]: string[]) => {
+                if (!confirmed(input)) return 'Left alone';
+                await port.send({ type: 'SAVE_DUMP', id: dump.id, text: '' });
+                return `Deleted ${dumpTitle(dump.text)}`;
+              },
+            },
+          },
+        ],
+      }),
+    ),
   ];
 };
 
@@ -463,7 +527,7 @@ const braindumpItems = async (port: ActionPort): Promise<ModeItem[]> => {
 export const dumpMode = (port: ActionPort): PaletteMode => ({
   prefix: 'd',
   title: 'Braindumps',
-  placeholder: 'Search braindumps — ⏎ opens one in the braindump window',
+  placeholder: 'Search braindumps — ⏎ opens one in the braindump window, ⇥ to delete it',
   description: 'Braindumps: a window that saves as you type and keeps each one in the repo',
   load: () => braindumpItems(port),
 });
