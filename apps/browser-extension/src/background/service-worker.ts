@@ -2,6 +2,7 @@ import {
   addActionLogEntry,
   addReadLaterEntry,
   addTodoEntry,
+  braindumpIdOf,
   checkIn,
   localDate,
   markReadItLaterRead,
@@ -92,6 +93,7 @@ import {
   readLaterPath,
   type TodayCache,
   withFile,
+  withoutFile,
 } from './today';
 
 console.log('LifeOS Extension: Background script loaded');
@@ -463,6 +465,23 @@ async function githubWriteFile(
   // The commit response carries the new blob sha, so the cache can be refreshed without a re-read.
   const written = await res.json().catch(() => null);
   return written?.content?.sha ?? null;
+}
+
+/** Deletes the version `sha` names; one already gone is fine. */
+async function githubDeleteFile(
+  token: string,
+  repoUrl: string,
+  filePath: string,
+  sha: string,
+  message: string,
+) {
+  const res = await fetch(`https://api.github.com/repos/${repoUrl}/contents/${filePath}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
+    body: JSON.stringify({ message, sha }),
+  });
+  if (res.status === 404) return;
+  if (!res.ok) throw await githubFailure(res, `Failed to delete ${filePath}`);
 }
 
 /** Creates a file from already-encoded bytes, e.g. an image downloaded for the knowledge base. */
@@ -1099,6 +1118,53 @@ async function getToday() {
 }
 
 /**
+ * A start page opening: the braindumps must be fresh (the desktop writes them a minute before),
+ * so a cache older than this is checked. The tree request carries its ETag, so an unchanged repo
+ * costs a 304, which GitHub does not bill.
+ */
+const TODAY_FRESH_MS = 60_000;
+
+/** Answers `today: null` when the cache is fresh enough to keep. */
+async function refreshToday() {
+  const { repo } = await credentials();
+  const cache = await readTodayCache();
+  if (cache && isTodayCacheUsable(cache, repo) && Date.now() - cache.fetchedAt < TODAY_FRESH_MS) {
+    return { today: null };
+  }
+  const next = await syncToday();
+  if (!next) throw new Error(NOT_LOGGED_IN);
+  return { today: buildToday(next, new Date()) };
+}
+
+/**
+ * Deletes a braindump the start page shows — but only the version it showed (`sha`): when the
+ * desktop has written more since, nothing is deleted and the page gets the newer text to look at.
+ */
+async function deleteBraindump(path: string, sha: string) {
+  // The path comes from a page, so only a braindump's own file can be named.
+  if (!braindumpIdOf(path)) throw new Error(`${path} is not a braindump`);
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  let cache = await readTodayCache();
+  if (!isTodayCacheUsable(cache, repo) || !cache) cache = await syncToday();
+  if (!cache) throw new Error(NOT_LOGGED_IN);
+
+  const file = await githubReadFile(token, repo, path);
+  let next = withoutFile(cache, path);
+  if (file && file.sha !== sha) {
+    next = withFile(cache, { path, sha: file.sha, content: file.content });
+    await chrome.storage.local.set({ todayCache: next });
+    return {
+      today: buildToday(next, new Date()),
+      refused: 'It changed since — this is the new text. Delete again to remove it.',
+    };
+  }
+  if (file) await githubDeleteFile(token, repo, path, sha, `braindump: delete ${path}`);
+  await chrome.storage.local.set({ todayCache: next });
+  return { today: buildToday(next, new Date()) };
+}
+
+/**
  * Commits one change to one of the start page's files and answers with the updated summary. The
  * file is re-read first, as every other write here does, so an edit made in the console since the
  * last sync is built on rather than overwritten.
@@ -1593,6 +1659,12 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   }
 
   if (message.type === 'GET_TODAY') return answer(getToday(), sendResponse);
+
+  if (message.type === 'REFRESH_TODAY') return answer(refreshToday(), sendResponse);
+
+  if (message.type === 'DELETE_BRAINDUMP') {
+    return answer(deleteBraindump(message.path || '', message.sha || ''), sendResponse);
+  }
 
   if (message.type === 'GET_SYNC_STATUS') return answer(syncStatus(), sendResponse);
 

@@ -39,6 +39,8 @@ export interface Message {
     | 'GET_PALETTE_SETTINGS'
     | 'TOGGLE_COMMAND_PALETTE'
     | 'GET_TODAY'
+    | 'REFRESH_TODAY'
+    | 'DELETE_BRAINDUMP'
     | 'GET_SYNC_STATUS'
     | 'TODAY_CHECK_IN'
     | 'TODAY_TOGGLE_TIMER'

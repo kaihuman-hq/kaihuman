@@ -38,6 +38,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Braindumps on the start page: the ten newest from `.kh/braindumps/` with preview and age, opened to the whole text or in the console, deleted after a second click (only the version shown); a start page on data older than a minute checks the repo | start page | 2026-09-30 |
 | Favourite tab groups: ☆/★ on each group chip; favourites come first and are highlighted, saved in the repo file | start page, popup Pinned Tabs panel | 2026-09-30 |
 | Start page redesign: full-width two-column layout, Noto Sans Mono bundled, date with ISO week in the header | start page | 2026-09-30 |
 | Start page search filters pinned and recent bookmarks as you type; ⏎ hands the text to the palette; `/` focuses it | start page | 2026-09-30 |

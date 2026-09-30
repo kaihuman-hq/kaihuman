@@ -45,8 +45,15 @@ const emptyToday = (): TodaySummary => ({
   timers: [],
   clocks: [],
   actionLogPath: '.kh/daily.actionlog.md',
+  braindumps: [],
+  braindumpCount: 0,
   fetchedAt: 0,
 });
+
+/** What the worker says to a delete: a summary, a refusal with one, or an error. */
+let deleteReply: { error: string } | { refused: string } | null;
+/** What a refresh behind the cached page brings; `null` when the cache was fresh enough. */
+let FRESHER: TodaySummary | null;
 
 type Listener = (
   message: unknown,
@@ -101,6 +108,14 @@ const reply = (message: { type?: string; bookmarkId?: string; pinned?: boolean }
       ...TODAY,
       habits: TODAY.habits.map((h) => ({ ...h, checkedToday: true, streak: h.streak + 1 })),
     };
+    return { today: TODAY };
+  }
+  if (message.type === 'REFRESH_TODAY') return { today: FRESHER };
+  if (message.type === 'DELETE_BRAINDUMP' && TODAY) {
+    if (deleteReply && 'error' in deleteReply) return deleteReply;
+    if (deleteReply) return { today: TODAY, ...deleteReply };
+    const { path } = message as { path: string };
+    TODAY = { ...TODAY, braindumps: TODAY.braindumps.filter((dump) => dump.path !== path) };
     return { today: TODAY };
   }
   if (message.type === 'ADD_TODO' && TODAY) {
@@ -181,6 +196,8 @@ beforeEach(() => {
   activeGroup = 'home';
   pinReply = null;
   TODAY = undefined;
+  deleteReply = null;
+  FRESHER = null;
   store = { lifeos_token: 'token', lifeos_repo: 'owner/repo' };
   sent = [];
   listeners = [];
@@ -520,6 +537,84 @@ describe('StartPage', () => {
       type: 'READ_LATER_DONE',
       path: 'r.readitlater.json',
       id: 'r1',
+    });
+  });
+
+  describe('braindumps', () => {
+    const withBraindump = (): TodaySummary => ({
+      ...emptyToday(),
+      braindumps: [
+        {
+          path: '.kh/braindumps/1.md',
+          sha: 'v1',
+          title: 'Call the bank',
+          text: 'Call the bank\nabout the card\nthen the trip',
+          createdAt: Date.now() - 12 * 60_000,
+        },
+      ],
+      braindumpCount: 1,
+    });
+    const deleteButton = () =>
+      host.querySelector('button[aria-label$="Call the bank"]') as HTMLButtonElement;
+
+    it('lists each with its next lines and age, and opens to the whole text', async () => {
+      TODAY = withBraindump();
+      await mount(() => host.textContent?.includes('Call the bank') ?? false);
+      const list = host.querySelector('ul[aria-label="Braindumps"]') as HTMLElement;
+      expect(list.textContent).toContain('about the card · then the trip');
+      expect(list.textContent).toContain('12m ago');
+
+      (list.querySelector('button[aria-expanded]') as HTMLButtonElement).click();
+      await waitFor(() => list.querySelector('.whitespace-pre-wrap') !== null);
+      expect(list.querySelector('.whitespace-pre-wrap')?.textContent).toBe(
+        'Call the bank\nabout the card\nthen the trip',
+      );
+    });
+
+    it('asks once more, then deletes the version it showed', async () => {
+      TODAY = withBraindump();
+      await mount(() => host.textContent?.includes('Call the bank') ?? false);
+      deleteButton().click();
+      await waitFor(() => deleteButton()?.textContent === 'delete?');
+      expect(sent.some((message) => message.type === 'DELETE_BRAINDUMP')).toBe(false);
+
+      deleteButton().click();
+      await waitFor(() => !host.textContent?.includes('Call the bank'));
+      expect(sent.find((message) => message.type === 'DELETE_BRAINDUMP')).toEqual({
+        type: 'DELETE_BRAINDUMP',
+        path: '.kh/braindumps/1.md',
+        sha: 'v1',
+      });
+      expect(host.textContent).toContain('Nothing waiting.');
+    });
+
+    it('puts it back with the reason when the delete fails', async () => {
+      TODAY = withBraindump();
+      deleteReply = { error: 'Failed to delete: 500' };
+      await mount(() => host.textContent?.includes('Call the bank') ?? false);
+      deleteButton().click();
+      await waitFor(() => deleteButton()?.textContent === 'delete?');
+      deleteButton().click();
+      await waitFor(() => host.textContent?.includes('Failed to delete: 500') ?? false);
+      expect(host.textContent).toContain('Call the bank');
+    });
+
+    it('shows why a delete was refused, with the newer text', async () => {
+      TODAY = withBraindump();
+      deleteReply = { refused: 'It changed since — this is the new text.' };
+      await mount(() => host.textContent?.includes('Call the bank') ?? false);
+      deleteButton().click();
+      await waitFor(() => deleteButton()?.textContent === 'delete?');
+      deleteButton().click();
+      await waitFor(() => host.textContent?.includes('It changed since') ?? false);
+      expect(host.textContent).toContain('Call the bank');
+    });
+
+    it('takes a fresher summary once the page has drawn from the cache', async () => {
+      TODAY = emptyToday();
+      FRESHER = withBraindump();
+      await mount(() => host.textContent?.includes('Call the bank') ?? false);
+      expect(sent.map((message) => message.type)).toContain('REFRESH_TODAY');
     });
   });
 

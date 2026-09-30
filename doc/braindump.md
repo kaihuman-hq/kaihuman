@@ -1,9 +1,10 @@
 # Braindumps — study and plan
 
-Status: phases 1–3 are done (2026-09-30): the shared file format, the desktop sync, and the
-braindump window with `>d`, plus the extension and palette sharing one active repository. Phase 4
-(the new tab page) is next. The editor is a **dedicated window**, never the palette's own editor:
-it has its own key and its own list, and the palette's `>d` lists braindumps and opens them there.
+Status: all four phases are done (2026-09-30): the shared file format, the desktop sync, the
+braindump window with `>d` (plus the extension and palette sharing one active repository), and the
+braindump list on the extension's new tab page. The editor is a **dedicated window**, never the
+palette's own editor: it has its own key and its own list, and the palette's `>d` lists braindumps
+and opens them there.
 
 ## Goal
 
@@ -242,13 +243,25 @@ Each phase ships and is checked on its own.
      stubbed Tauri bridge: new → type → saved → ⌃O → filter → ⏎ → Esc.
    - Not verified here: the window on Hyprland itself (floating rule, focus on show, alt-tab) and
      native messaging from a real Chrome. Both need your machine.
-4. **New tab** (`apps/browser-extension`)
-   - `githubDeleteFile`, the braindump folder in `today.ts`, the 60 s tree refresh on open,
-     `DELETE_BRAINDUMP` in `types.ts` and the worker, and the `Braindumps` widget.
-   - → verify: worker tests (listing from the tree, delete with a fresh sha, a bad path refused) and
-     `StartPage.test.tsx` (renders the list, delete is optimistic and rolls back on failure).
-5. **Docs**: `features.md`, `documentation.md`, the desktop README, the extension README, and
-   `progress.md`.
+4. **New tab** (`apps/browser-extension`). **Done.**
+   - `today.ts` reads `.kh/braindumps/*.md` along with the widget files (the same ETag'd tree
+     listing, and a read only for changed blobs). The summary gains `braindumps` (the ten newest,
+     with path, sha, title, text and creation time) and `braindumpCount`.
+   - The worker has `githubDeleteFile` and `DELETE_BRAINDUMP { path, sha }`. The path must be a
+     braindump's own file. The file is re-read, and when its sha is no longer the one the page
+     showed, nothing is deleted: the answer carries the newer text and says why (`refused`).
+   - `REFRESH_TODAY`: the page draws from the cache, then asks. The worker syncs only when the
+     cache is older than a minute.
+   - The `Braindumps` widget in `Today.tsx`: preview and age, click to open the whole text,
+     **open** in the console, and **delete** after a second click. The row goes at once and comes
+     back with the reason if the delete fails.
+   - → verified: extension vitest 299: 6 worker tests (listing from the tree while skipping
+     subfolders, deleting the version shown, refusing a changed one, one already gone, bad paths,
+     the minute rule) and 5 start page tests (preview and expand, confirm then delete, rollback on
+     failure, a refusal shown, the fresher summary taken). The built page was driven in Chromium
+     with a stubbed `chrome`: list → expand → delete? → delete.
+5. **Docs**: `features.md`, the desktop README, the extension README and `progress.md`.
+   `documentation.md` covers the CLI only, which braindumps do not touch.
 
 ## Open questions for you
 

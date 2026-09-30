@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-09-30 — Braindumps phase 4: the list on the new tab page
+
+- **Braindumps** on the start page, above the capture box. It shows the ten newest files in
+  `.kh/braindumps/` with their title, the next two lines and how long each has waited. A click
+  opens the whole text, and **open** takes it to the console.
+- **delete** asks once more, then removes the row at once and the file from the repo. Only the
+  version shown is deleted: when the desktop has written more since, nothing is deleted and the
+  page shows the new text (`DELETE_BRAINDUMP { path, sha }` re-reads the file first). A failed
+  delete puts the row back with the reason.
+- `today.ts` reads the braindump folder in the same tree sync as the widget files.
+- New `REFRESH_TODAY`: a start page draws from the cache, then the worker checks the repo if its
+  data is over a minute old. That costs a 304 when nothing changed, so a braindump written a
+  minute ago shows up.
+- `githubDeleteFile` in the worker; the path must be a braindump's own file.
+
+Checks: extension tsc clean and vitest 299/299 (11 new). biome is clean on the files that were
+clean before; `StartPage.tsx` and `service-worker.ts` already failed biome before this change and
+were not reformatted. The built start page was driven in Chromium with a stubbed `chrome`: list →
+expand → delete? → delete.
+
 ## 2026-09-30 — Braindumps phase 3: the braindump window, `>d`, and one repository
 
 - **Braindump window.** A second window in the desktop palette's daemon, created hidden, so

@@ -20,6 +20,7 @@ import { DEFAULT_ACTION_LOG_PATH, type TodaySummary } from '../background/today'
 import { CONSOLE_URL, consoleFileUrl } from '../console';
 import { send, workerPort } from '../palette/port';
 import {
+  Braindumps,
   Clocks,
   ComingUp,
   Doing,
@@ -183,13 +184,22 @@ export function StartPage() {
         (e: Error) => setBookmarksError(e.message),
       ),
       refreshTabGroups(),
-      send({ type: 'GET_TODAY' }).then(
-        (response) => {
-          setToday(response.today);
-          setTodayError(null);
-        },
-        (e: Error) => setTodayError(e.message),
-      ),
+      send({ type: 'GET_TODAY' })
+        .then(
+          (response) => {
+            setToday(response.today);
+            setTodayError(null);
+          },
+          (e: Error) => setTodayError(e.message),
+        )
+        // The cache answered at once; braindumps written a minute ago need a check behind it.
+        .then(() => send({ type: 'REFRESH_TODAY' }))
+        .then(
+          (response) => {
+            if (response?.today) setToday(response.today);
+          },
+          (e: Error) => console.warn('LifeOS Extension: could not refresh the start page', e),
+        ),
     ];
     // Asked last, so it reports on whatever the loads above just fetched.
     return Promise.all(loads).then(refreshSyncStatus);
@@ -364,6 +374,31 @@ export function StartPage() {
       setToday(response.today);
     } catch (e: any) {
       setTodayError(e.message || 'Could not save that');
+    } finally {
+      setBusyPath(null);
+    }
+  };
+
+  /** Gone from the list at once; back, with the reason, if the delete fails or is refused. */
+  const deleteBraindump = async (path: string, sha: string) => {
+    const before = today;
+    setBusyPath(path);
+    setTodayError(null);
+    setToday(
+      (current) =>
+        current && {
+          ...current,
+          braindumps: current.braindumps.filter((dump) => dump.path !== path),
+          braindumpCount: current.braindumpCount - 1,
+        },
+    );
+    try {
+      const response = await send({ type: 'DELETE_BRAINDUMP', path, sha });
+      setToday(response.today);
+      if (response.refused) setTodayError(response.refused);
+    } catch (e: any) {
+      setToday(before);
+      setTodayError(e.message || 'Could not delete that');
     } finally {
       setBusyPath(null);
     }
@@ -728,6 +763,13 @@ export function StartPage() {
                   today={today}
                   busyPath={busyPath}
                   onCheckIn={(path) => void commitToday(path, { type: 'TODAY_CHECK_IN', path })}
+                />
+                <Braindumps
+                  today={today}
+                  now={now}
+                  busyPath={busyPath}
+                  onOpenFile={openFile}
+                  onDelete={(path, sha) => void deleteBraindump(path, sha)}
                 />
               </>
             )}

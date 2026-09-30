@@ -4,6 +4,7 @@
  * the worker builds out of its hourly cache, so a new tab costs no GitHub request.
  */
 import type { ComponentChildren } from 'preact';
+import { useState } from 'preact/hooks';
 import { EVENTS_HORIZON_DAYS, HABIT_WEEK_DAYS, type TodaySummary } from '../background/today';
 
 const linkButton = 'text-left hover:text-nt-accent truncate';
@@ -367,6 +368,125 @@ export function ReadLater(props: {
               </button>
             </li>
           ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** "just now", "12m ago", "3h ago", "2d ago" — how long a braindump has been waiting. */
+export function ageLabel(since: number, now: Date): string {
+  const minutes = Math.floor((now.getTime() - since) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)}h ago`;
+  return `${Math.floor(minutes / (24 * 60))}d ago`;
+}
+
+/** The lines after the title, for the collapsed row. */
+const preview = (text: string, title: string) =>
+  text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line, index) => index > 0 || !line.includes(title.replace(/…$/, '')))
+    .slice(0, 2)
+    .join(' · ');
+
+/**
+ * Braindumps typed in the desktop's braindump window, waiting to be dealt with. A row opens to the
+ * whole text; deleting one is how it is done with (git history keeps it). Delete asks once more
+ * before it goes.
+ */
+export function Braindumps(props: {
+  today: TodaySummary;
+  now: Date;
+  busyPath: string | null;
+  onOpenFile: (path: string) => void;
+  onDelete: (path: string, sha: string) => void;
+}) {
+  const { braindumps, braindumpCount } = props.today;
+  const { busyPath } = props;
+  const [open, setOpen] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
+  return (
+    <section class="flex flex-col gap-[10px]">
+      <SectionHead
+        title="Braindumps"
+        meta={
+          braindumpCount > braindumps.length
+            ? `${braindumps.length} of ${braindumpCount}`
+            : undefined
+        }
+      />
+      {braindumps.length === 0 ? (
+        <p class="text-[13px] text-nt-faint">Nothing waiting.</p>
+      ) : (
+        <ul aria-label="Braindumps" class="flex flex-col gap-[10px]">
+          {braindumps.map((dump) => {
+            const expanded = open === dump.path;
+            const rest = preview(dump.text, dump.title);
+            return (
+              <li
+                key={dump.path}
+                class="flex items-start gap-4 border border-nt-control px-[14px] py-3"
+              >
+                <button
+                  type="button"
+                  class="group flex-1 min-w-0 flex flex-col gap-[3px] text-left"
+                  onClick={() => setOpen(expanded ? null : dump.path)}
+                  aria-expanded={expanded}
+                >
+                  <span class="text-[14px] truncate group-hover:text-nt-accent">{dump.title}</span>
+                  {expanded ? (
+                    <span class="text-[12px] whitespace-pre-wrap break-words">{dump.text}</span>
+                  ) : (
+                    rest && <span class="text-[12px] text-nt-muted truncate">{rest}</span>
+                  )}
+                  <span class="text-[11px] text-nt-faint">
+                    {ageLabel(dump.createdAt, props.now)}
+                  </span>
+                </button>
+                <div class="shrink-0 flex flex-col items-end gap-[6px] text-[12px]">
+                  <button
+                    type="button"
+                    onClick={() => props.onOpenFile(dump.path)}
+                    title="Open in the console"
+                    class="text-nt-muted hover:text-nt-accent"
+                  >
+                    open
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyPath !== null}
+                    onClick={() => {
+                      if (confirming !== dump.path) {
+                        setConfirming(dump.path);
+                        return;
+                      }
+                      setConfirming(null);
+                      props.onDelete(dump.path, dump.sha);
+                    }}
+                    onBlur={() =>
+                      setConfirming((current) => (current === dump.path ? null : current))
+                    }
+                    aria-label={
+                      confirming === dump.path
+                        ? `Really delete ${dump.title}`
+                        : `Delete ${dump.title}`
+                    }
+                    class={`disabled:opacity-50 ${
+                      confirming === dump.path
+                        ? 'text-nt-prod'
+                        : 'text-nt-muted hover:text-nt-accent'
+                    }`}
+                  >
+                    {busyPath === dump.path ? '…' : confirming === dump.path ? 'delete?' : 'delete'}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

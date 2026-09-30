@@ -481,6 +481,14 @@ says why.
 - **Trackers** — a row per `.habit.csv`: a box to check in for today, the last seven days (oldest
   on the left) and the streak. A check-in stays for the day: the console's habit files have no
   undo either.
+- **Braindumps** — the ten newest files in `.kh/braindumps/`, typed in the desktop palette's
+  braindump window (`doc/braindump.md`): the title, the next two lines and how long it has been
+  waiting. A click opens the whole text; **open** takes it to the console. **delete** asks once
+  more (**delete?**), then removes it from the list at once and from the repo — only the version
+  shown: if the desktop has written more since, nothing is deleted and the new text is shown
+  instead. A failed delete puts the row back with the reason. Git history keeps every deleted one.
+  The desktop writes a braindump a minute before you might look, so a start page opening on data
+  older than a minute checks the repo behind the cached page (a 304 when nothing changed).
 - **Note / Todo / Log** — one box, three targets: a note goes to `.lifeos/dump.md`, a todo is
   added to the inbox the console's quick-todo page uses (`#tags` move to the end), and a log
   entry goes to the repo's action log (the app folder's first `.actionlog.md`), `#tags` and all —
