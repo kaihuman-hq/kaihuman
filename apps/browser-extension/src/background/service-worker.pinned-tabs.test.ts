@@ -76,6 +76,10 @@ beforeEach(async () => {
     runtime: {
       getManifest: () => ({ content_scripts: [] }),
       onInstalled: { addListener: vi.fn() },
+      // No desktop palette host in tests.
+      sendNativeMessage: vi.fn(async () => {
+        throw new Error('Specified native messaging host not found.');
+      }),
       onConnect: { addListener: vi.fn() },
       onMessage: {
         addListener: (l: Listener) => {
@@ -83,7 +87,11 @@ beforeEach(async () => {
         },
       },
     },
-    storage: { local: localStorageStub(), session: { get: async () => ({}), set: async () => {} } },
+    storage: {
+      local: localStorageStub(),
+      session: { get: async () => ({}), set: async () => {} },
+      onChanged: { addListener: vi.fn() },
+    },
     tabs: { query: async () => [], create: vi.fn(), update: vi.fn(), sendMessage: vi.fn() },
   });
   vi.stubGlobal('fetch', fetchMock);

@@ -117,6 +117,10 @@ beforeEach(async () => {
       getURL: (path: string) => `chrome-extension://abc/${path}`,
       sendMessage: broadcast,
       onInstalled: { addListener: vi.fn() },
+      // No desktop palette host in tests.
+      sendNativeMessage: vi.fn(async () => {
+        throw new Error('Specified native messaging host not found.');
+      }),
       onConnect: { addListener: vi.fn() },
       onMessage: {
         addListener: (l: Listener) => {
@@ -127,6 +131,7 @@ beforeEach(async () => {
     storage: {
       local: localStorageStub(),
       session: { get: async () => ({}), set: async () => {} },
+      onChanged: { addListener: vi.fn() },
     },
     tabs: {
       query: async () => [{ id: 7, windowId: 1 }],

@@ -8,5 +8,9 @@ export default defineConfig({
     target: 'es2022',
     outDir: 'dist',
     emptyOutDir: true,
+    // Two pages: the palette overlay and the braindump window.
+    rollupOptions: {
+      input: { palette: 'index.html', braindump: 'braindump.html' },
+    },
   },
 });

@@ -38,6 +38,8 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Delete braindumps (and old local dumps) from the desktop palette: `>d`, ⇥ on one, **Delete…**, type DELETE — removed here and, by an immediate sync, from the repo | desktop palette | 2026-09-30 |
+| Braindumps on the start page: the ten newest from `.kh/braindumps/` with preview and age, opened to the whole text or in the console, deleted after a second click (only the version shown); a start page on data older than a minute checks the repo | start page | 2026-09-30 |
 | Favourite tab groups: ☆/★ on each group chip; favourites come first and are highlighted, saved in the repo file | start page, popup Pinned Tabs panel | 2026-09-30 |
 | Start page redesign: full-width two-column layout, Noto Sans Mono bundled, date with ISO week in the header | start page | 2026-09-30 |
 | Start page search filters pinned and recent bookmarks as you type; ⏎ hands the text to the palette; `/` focuses it | start page | 2026-09-30 |
@@ -95,7 +97,9 @@
 | `>u` shows the cached usage at once with its age (green / yellow / red) and syncs in the background once it is 5 min old | desktop palette | 2026-09-24 |
 | `>c` Claude Code (new session on claude.ai for a repo from omarchy's `eee` history) and `>u` Claude usage (rate limits, pace, resets, spend per account) — from omarchy | desktop palette | 2026-09-23 |
 | `?` help — every prefix with its description, searching and keys, and every action; searchable, ⏎ switches mode or runs the action | desktop palette, command palette | 2026-09-23 |
-| `>d` dumps — a scratch text editor in the palette with the last 25 kept as local files; ⌃⏎ copies all, ⌃S saves a copy to a path | desktop palette | 2026-09-23 |
+| Braindump window — its own key (`lifosy-palette-toggle braindump`) or `>d` opens a text window that saves as you type and keeps each braindump in the repo (`.kh/braindumps/`), synced when you stop; ⌃O lists them, ⌃N starts another, ⌃⏎ copies all | desktop palette | 2026-09-30 |
+| Same active repository as the browser extension, through Chrome native messaging (`lifosy-palette native-host install <id>`); the newer choice wins | desktop palette, browser extension | 2026-09-30 |
+| `>d` dumps — a scratch text editor in the palette with the last 25 kept as local files; ⌃⏎ copies all, ⌃S saves a copy to a path (replaced by braindumps on 2026-09-30; old dumps stay listed) | desktop palette | 2026-09-23 |
 | `>p` prompts, `>t` translate, `>r` repos — omarchy's prompt, translate and repo menus in the palette; copies with `wl-copy`, and `>r` ranks omarchy's `~/.config/eee/counts` first | desktop palette | 2026-09-23 |
 | `lifosy-palette login`: token checked against the repo, kept in the Secret Service | CLI | 2026-09-23 |
 

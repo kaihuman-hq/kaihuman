@@ -5,6 +5,7 @@
  * desktop app will answer the same request names from Rust. A request names its `type`, and the
  * response lists only the fields the palette reads — a backend may send more.
  */
+import type { BraindumpId } from '@lifosy/formats';
 import type { Bookmark } from './bookmarks.js';
 import type { ClaudeUsage } from './claude-usage.js';
 import type { RecentEntry, RepoResult } from './command-palette.js';
@@ -43,6 +44,14 @@ export interface GithubWorkItem {
   pullRequest: boolean;
   /** ISO 8601. */
   updatedAt: string;
+}
+
+/** A braindump as the desktop keeps it (doc/braindump.md); `synced` once GitHub has this text. */
+export interface Braindump {
+  id: BraindumpId;
+  text: string;
+  updatedAt: number;
+  synced: boolean;
 }
 
 export interface PaletteProtocol {
@@ -126,6 +135,23 @@ export interface PaletteProtocol {
   SAVE_DUMP: { request: { id?: string; text: string }; response: { id?: string } };
   /** Desktop only: writes the text to `path` (`~/` allowed), never over an existing file. */
   EXPORT_DUMP: { request: { path: string; text: string }; response: { path: string } };
+  /** Desktop only: the active repo's braindumps kept on this machine, most recently edited first. */
+  LIST_BRAINDUMPS: { request: NoFields; response: { braindumps: Braindump[] } };
+  /**
+   * Desktop only: saves on this machine at once, creating a braindump when `id` is missing; empty
+   * text deletes it and the response has no `id`. GitHub follows on the next `SYNC_BRAINDUMPS`.
+   */
+  SAVE_BRAINDUMP: { request: { id?: BraindumpId; text: string }; response: { id?: BraindumpId } };
+  /**
+   * Desktop only: sends what changed here to GitHub, then takes what changed there. Rejects with
+   * the first failure; what failed is kept and tried again on the next sync.
+   */
+  SYNC_BRAINDUMPS: { request: NoFields; response: { braindumps: Braindump[] } };
+  /**
+   * Desktop only: hides the palette and shows the braindump window with that braindump, or a new
+   * one without `id`.
+   */
+  OPEN_BRAINDUMP: { request: { id?: BraindumpId }; response: NoFields };
   /** Desktop only: repositories for `>c`, most recently used first (omarchy's `eee` history). */
   LIST_CLAUDE_CODE_REPOS: { request: NoFields; response: { repos: string[] } };
   /**

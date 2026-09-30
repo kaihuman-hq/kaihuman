@@ -1,5 +1,113 @@
 # Progress
 
+## 2026-09-30 — Delete braindumps from the desktop palette
+
+- In `>d`, **⇥** (or **→**) on a braindump offers **Open in the braindump window** and
+  **Delete…**. Delete asks you to type `DELETE`, as deleting a tab group does, then deletes the
+  braindump here and syncs at once, so the repo follows.
+- If the sync fails (offline), the palette says the repo will follow on the next sync.
+- The sync's rules apply: only the version this machine last saw is deleted, and an edit made
+  elsewhere since comes back.
+- Old local dumps get **Delete…** too, on this machine only.
+
+Checks: palette tsc, biome and vitest 253/253 (5 new). The built desktop palette was driven in
+Chromium with a stubbed Tauri bridge: `>d` → `bank` → ⇥ → Delete… → `DELETE` → ⏎ → "Deleted Call
+the bank", with `SAVE_BRAINDUMP` (empty) then `SYNC_BRAINDUMPS`.
+
+## 2026-09-30 — Braindumps phase 4: the list on the new tab page
+
+- **Braindumps** on the start page, above the capture box. It shows the ten newest files in
+  `.kh/braindumps/` with their title, the next two lines and how long each has waited. A click
+  opens the whole text, and **open** takes it to the console.
+- **delete** asks once more, then removes the row at once and the file from the repo. Only the
+  version shown is deleted: when the desktop has written more since, nothing is deleted and the
+  page shows the new text (`DELETE_BRAINDUMP { path, sha }` re-reads the file first). A failed
+  delete puts the row back with the reason.
+- `today.ts` reads the braindump folder in the same tree sync as the widget files.
+- New `REFRESH_TODAY`: a start page draws from the cache, then the worker checks the repo if its
+  data is over a minute old. That costs a 304 when nothing changed, so a braindump written a
+  minute ago shows up.
+- `githubDeleteFile` in the worker; the path must be a braindump's own file.
+
+Checks: extension tsc clean and vitest 299/299 (11 new). biome is clean on the files that were
+clean before; `StartPage.tsx` and `service-worker.ts` already failed biome before this change and
+were not reformatted. The built start page was driven in Chromium with a stubbed `chrome`: list →
+expand → delete? → delete.
+
+## 2026-09-30 — Braindumps phase 3: the braindump window, `>d`, and one repository
+
+- **Braindump window.** A second window in the desktop palette's daemon, created hidden, so
+  `lifosy-palette-toggle braindump` (bind it to a key) shows it at once with the cursor in a new
+  braindump. It is a normal window, not an overlay, and its title is always `lifosy-braindump` for
+  a Hyprland float rule (in the README).
+  - It saves 400 ms after the last key, on this machine.
+  - It syncs to the repo when hidden (Esc) or when switching braindumps, after 30 s without typing,
+    at least every 2 minutes while typing, on start, and a minute after a failure.
+  - Keys: ⌃N new, ⌃O its own filtered list, ⌃⏎ copy all and hide. A sync that took an edit made
+    elsewhere shows it, unless something was typed since.
+  - The logic is `createBraindumpWindow` in `packages/palette`, tested with fake timers. The desktop
+    page only connects it to Tauri.
+- **`>d`** now lists **New braindump** and the braindumps, and ⏎ hides the palette and opens the
+  choice in the window (`OPEN_BRAINDUMP`). Old local dumps are listed below under *Old dumps — on
+  this machine only*: still editable, never created again, never sent anywhere.
+- **One repository for the extension and the desktop palette.**
+  - `palette.json` records when its repository changed.
+  - `lifosy-palette` answers Chrome native messaging (`SYNC_REPO`); the newer choice wins.
+    `lifosy-palette native-host install <extension id>` registers it.
+  - The extension (`background/repo-sync.ts`, new `nativeMessaging` permission) stamps every
+    change of its repository and tells the desktop at once. It asks hourly and when a start page
+    opens (at most every 30 s), and the page reloads when the repository changed.
+  - Without the host installed, nothing changes.
+- **Fix found by a test**: the extension's repository-name check accepted `../x`; it now refuses
+  `.` and `..` parts, as the desktop does.
+
+Checks: palette tsc, biome and vitest 248/248 (21 new); extension tsc and vitest 288/288 (6 new);
+desktop tsc and biome clean, `cargo test` 84 passed (9 new), clippy and fmt clean.
+- The real binary answered framed `SYNC_REPO` messages and wrote a host manifest in a scratch
+  profile.
+- The built braindump window was driven in Chromium with a stubbed Tauri bridge: new → type →
+  saved → ⌃O → filter → ⏎ → Esc.
+- Not checked here: Hyprland itself, and native messaging from a real Chrome.
+
+## 2026-09-30 — Braindumps phase 2: desktop sync to GitHub
+
+- New `braindumps.rs` in the desktop palette. Braindumps are saved on this machine at once
+  (`SAVE_BRAINDUMP`), one directory per repository under `$XDG_DATA_HOME/lifosy/braindumps/`.
+  `SYNC_BRAINDUMPS` sends what changed to `.kh/braindumps/<id>.md` in the active repo, then takes
+  what changed there: new ones from another machine, edits made elsewhere, deletes made elsewhere.
+  `LIST_BRAINDUMPS` lists them with a `synced` flag. All three are in `PaletteProtocol`.
+- Nothing typed is lost. A write GitHub refuses is resolved by reading its copy: a stale version
+  is retried, and an edit made elsewhere too becomes a braindump of its own, so both versions
+  survive. A delete never throws away an edit made elsewhere. Offline, everything waits for the
+  next sync.
+- `github.rs` gains `put` (answers the new sha), `delete` and `folder`.
+- Plan: `>d` will list braindumps and open them in the braindump window (phase 3).
+- No window yet, so nothing calls these requests; phase 3 adds the window and the `>d` rework.
+
+Checks: desktop `cargo test` 75 passed (14 new, against an in-memory GitHub), clippy and fmt
+clean; palette tsc, biome and vitest 233/233; extension tsc and vitest 282/282.
+
+## 2026-09-30 — Braindumps phase 1: the shared file format
+
+- `@lifosy/formats` gains `braindumps.ts`: braindumps are `.kh/braindumps/<created-ms>.md`, one file
+  each, named once and never renamed. `braindumpIdOf(path)` is the one way from a path to a
+  `BraindumpId` (branded, digits only), so a path from a page or webview can never reach another
+  file. `braindumpTitle(text)` is the first non-empty line without heading marks, up to 60
+  characters. The new tab page and the braindump window both build on these.
+- Plan revised (`doc/braindump.md`): braindumps are not part of the command palette. They get a
+  dedicated window opened by its own key (`lifosy-palette-toggle braindump`), with its own list on
+  ⌃O. The palette and its `>d` dumps are unchanged.
+
+Checks: formats vitest 76/76 (8 new), tsc and biome clean; the palette, extension, desktop and
+console typecheck against the new export.
+
+## 2026-09-30 — Braindumps: study and plan
+
+- New `doc/braindump.md`: a proposal (nothing implemented) for turning the desktop palette's local
+  `>d` dumps into repo-backed braindumps. One file per braindump in `.kh/braindumps/<ms>.md`, a
+  second floating Tauri window opened by its own key, local-first saving with a debounced push to
+  GitHub, and a list with delete on the new tab page. Ends with a phased plan and open questions.
+
 ## 2026-09-30 — Favourite tab groups on the start page
 
 - Each chip under **Tab groups** has a star. **☆** makes the group a favourite, **★** takes that

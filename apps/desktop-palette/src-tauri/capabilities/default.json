@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The palette window may call the app's own commands and listen for its events.",
-  "windows": ["palette"],
+  "description": "The palette and braindump windows may call the app's own commands and listen for its events.",
+  "windows": ["palette", "braindump"],
   "permissions": ["core:event:default"]
 }

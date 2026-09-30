@@ -10,6 +10,7 @@ The official browser extension for Lifosy, designed to enhance your web experien
 - **Context Menu Integration**: Conveniently access Lifosy features directly from the browser's context menu.
 - **Pinned Tabs Sync**: Save named groups of pinned tabs to your repo, and load any of them into the current window on any machine.
 - **Bookmarks**: Your repo's bookmarks, mirrored into the browser and synced at most once an hour. Bookmark the current page from the popup or the palette, or import the ones this browser already has. Opens are counted so you can find the ones you never use.
+- **Same repository as the desktop palette**: with `lifosy-palette native-host install <this extension's id>` run once, switching the repository here or in the desktop palette switches the other too — the newer choice wins (`nativeMessaging` permission; see the desktop palette's README).
 - **Command Palette**: `Ctrl+Shift+K` on any page to search those bookmarks, repeat what you did last, run any of the extension's actions — and, on request, search your repo.
 - **Start Page**: a New Tab page of your own — what is coming up and in progress, habit and time trackers, the read-later queue, world clocks, the bookmarks you reach for, a box for a note, todo or log entry, and the palette (which Chrome's own New Tab page cannot host).
 
@@ -480,6 +481,14 @@ says why.
 - **Trackers** — a row per `.habit.csv`: a box to check in for today, the last seven days (oldest
   on the left) and the streak. A check-in stays for the day: the console's habit files have no
   undo either.
+- **Braindumps** — the ten newest files in `.kh/braindumps/`, typed in the desktop palette's
+  braindump window (`doc/braindump.md`): the title, the next two lines and how long it has been
+  waiting. A click opens the whole text; **open** takes it to the console. **delete** asks once
+  more (**delete?**), then removes it from the list at once and from the repo — only the version
+  shown: if the desktop has written more since, nothing is deleted and the new text is shown
+  instead. A failed delete puts the row back with the reason. Git history keeps every deleted one.
+  The desktop writes a braindump a minute before you might look, so a start page opening on data
+  older than a minute checks the repo behind the cached page (a 304 when nothing changed).
 - **Note / Todo / Log** — one box, three targets: a note goes to `.lifeos/dump.md`, a todo is
   added to the inbox the console's quick-todo page uses (`#tags` move to the end), and a log
   entry goes to the repo's action log (the app folder's first `.actionlog.md`), `#tags` and all —
