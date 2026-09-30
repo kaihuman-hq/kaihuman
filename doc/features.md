@@ -38,6 +38,12 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Start page redesign: full-width two-column layout, Noto Sans Mono bundled, date with ISO week in the header | start page | 2026-09-30 |
+| Start page search filters pinned and recent bookmarks as you type; ⏎ hands the text to the palette; `/` focuses it | start page | 2026-09-30 |
+| Pinned bookmarks as numbered cards, opened with keys 1–9; recently used as a separate list | start page | 2026-09-30 |
+| DEV / INT / PROD tags on recent bookmarks, from a bookmark tag or the title | start page | 2026-09-30 |
+| Habit rows with a 7-day strip; working-time timer in the Doing card, ticking in seconds | start page | 2026-09-30 |
+| Capture box: Ctrl/⌘+Enter saves; last five entries per kind listed and kept across tabs | start page | 2026-09-30 |
 | Start page "today" view: upcoming events and milestone, in-progress/overdue todos and inbox count, habit check-in and time-tracking clock cards, read-later queue, world clocks — from one hourly cache | start page | 2026-09-23 |
 | Start page capture box writes a note, an inbox todo or an action log entry | start page | 2026-09-23 |
 | Sync status (age of the cached data, opens waiting to be pushed) with a sync button | start page header | 2026-09-23 |

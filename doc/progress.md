@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-09-30 — New Tab page redesign
+
+- The start page follows the new design: dark `#050505`, Noto Sans Mono, no rounded corners, and
+  the full width of the screen (up to 1240px). Header → search → two columns; below about 920px the
+  right column moves under the left one.
+- **Header**: the date with its ISO week (`Wed 30 Sept · W40`), the world clocks, the repo name and
+  the sync status (`synced 3m ago`).
+- **Search** is a real field now. Typing filters the pinned and recently used bookmarks (title or
+  host, any case); ⏎ opens the palette with the text in it (new `open(query)` on the shared
+  palette); `/` focuses the field and Esc leaves it. The extension shortcut still opens the palette.
+- **Left column**: Pinned (numbered cards, keys 1–9 open them), Tab groups (chips), Recently used
+  (rows with a DEV / INT / PROD tag), Read later (with the total unread count).
+- **Right column**: Doing (in-progress and overdue todos, plus the time-tracking total with
+  start/stop; green with seconds while it runs), Coming up, Trackers (a check box, a 7-day strip and
+  the streak per habit), and the capture box (Ctrl/⌘+Enter saves, last five entries per kind kept
+  in `chrome.storage.local`).
+- Environment tags come from a `dev`/`int`/`prod` bookmark tag, else from that word in the title
+  (`bookmarkEnvironment` in `background/bookmarks.ts`). `startPageBookmarks` now returns the pinned
+  and recent lists separately and takes the search query.
+- The Today summary has two more fields: `week` per habit (last seven days) and `unreadCount`.
+- The font is bundled (`src/newtab/fonts`, latin and latin-ext, SIL OFL), because Manifest V3
+  blocks Google Fonts.
+
 ## 2026-09-30 — Home-screen icon readable with iOS dark icons
 
 - With iOS set to dark icons, the kaihuman home-screen icon turned almost black. iOS darkens

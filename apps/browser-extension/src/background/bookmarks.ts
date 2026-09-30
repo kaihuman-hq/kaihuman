@@ -161,14 +161,59 @@ export function recentlyUsedBookmarks(bookmarks: Bookmark[], limit = 12): Bookma
   return [...bookmarks].sort((a, b) => b.lastUsedAt.localeCompare(a.lastUsedAt)).slice(0, limit);
 }
 
+/** `https://www.x.com/a` → `x.com`: what a card shows under the title. */
+export const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+};
+
 /**
- * The start page's grid: every pinned bookmark first, in the file's order, then the `limit` most
- * recently used of the rest. Pins are never cut by the limit — they are the ones asked for.
+ * The start page's two lists: every pinned bookmark in the file's order, and the `limit` most
+ * recently used of the rest. A query narrows both to bookmarks whose title or host contains it,
+ * ignoring case. Pins are never cut by the limit — they are the ones asked for.
  */
-export function startPageBookmarks(bookmarks: Bookmark[], limit = 12): Bookmark[] {
-  const pinned = bookmarks.filter((bookmark) => bookmark.pinned);
-  const rest = bookmarks.filter((bookmark) => !bookmark.pinned);
-  return [...pinned, ...recentlyUsedBookmarks(rest, limit)];
+export function startPageBookmarks(
+  bookmarks: Bookmark[],
+  query = '',
+  limit = 12,
+): { pinned: Bookmark[]; recent: Bookmark[] } {
+  const needle = query.trim().toLowerCase();
+  const matching = needle
+    ? bookmarks.filter((bookmark) =>
+        `${bookmark.title} ${hostOf(bookmark.url)}`.toLowerCase().includes(needle),
+      )
+    : bookmarks;
+  return {
+    pinned: matching.filter((bookmark) => bookmark.pinned),
+    recent: recentlyUsedBookmarks(
+      matching.filter((bookmark) => !bookmark.pinned),
+      limit,
+    ),
+  };
+}
+
+export const ENVIRONMENTS = ['DEV', 'INT', 'PROD'] as const;
+export type Environment = (typeof ENVIRONMENTS)[number];
+
+const ENVIRONMENT_WORD = /\b(dev|int|prod)\b/i;
+
+/**
+ * Which deployment a bookmark points at, so DEV, INT and PROD links of one tool can be told apart.
+ * A tag set by hand (`prod`) wins; otherwise the first of the words standing alone in the title
+ * ("Control PROD", "[DEPLOY/DEV] Unified"). Hosts are not read: `vitest.dev` is no DEV link.
+ */
+export function bookmarkEnvironment(
+  bookmark: Pick<Bookmark, 'title' | 'tags'>,
+): Environment | null {
+  const isEnvironment = (word: string): word is Environment =>
+    (ENVIRONMENTS as readonly string[]).includes(word);
+  const tagged = bookmark.tags.map((tag) => tag.toUpperCase()).find(isEnvironment);
+  if (tagged) return tagged;
+  const word = bookmark.title.match(ENVIRONMENT_WORD)?.[1]?.toUpperCase() ?? '';
+  return isEnvironment(word) ? word : null;
 }
 
 /**
