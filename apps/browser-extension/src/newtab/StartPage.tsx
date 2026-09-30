@@ -387,9 +387,10 @@ export function StartPage() {
   const title = (
     <a
       href={CONSOLE_URL}
-      class="text-[24px] font-bold tracking-[-0.5px] text-nt-accent"
+      class="flex items-center gap-3 text-[24px] font-bold tracking-[-0.5px] text-nt-accent"
       title={`Open ${CONSOLE_URL}`}
     >
+      <img src="/icon.svg" alt="" class="w-8 h-8" />
       kaihuman
     </a>
   );
@@ -436,7 +437,7 @@ export function StartPage() {
     <div class={root}>
       <div class="mx-auto w-full max-w-[1240px] px-8 pt-8 pb-16 flex flex-col gap-7">
         <header class="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 pb-5 border-b border-nt-divider">
-          <div class="flex flex-wrap items-baseline gap-x-7 gap-y-2">
+          <div class="flex flex-wrap items-center gap-x-7 gap-y-2">
             {title}
             <span class="text-[13px] text-nt-muted">{dateLine(now)}</span>
           </div>

@@ -5,7 +5,7 @@
 - The start page follows the new design: dark `#050505`, Noto Sans Mono, no rounded corners, and
   the full width of the screen (up to 1240px). Header → search → two columns; below about 920px the
   right column moves under the left one.
-- **Header**: the date with its ISO week (`Wed 30 Sept · W40`), the world clocks, the repo name and
+- **Header**: the logo and "kaihuman" (a link to the console), the date with its ISO week (`Wed 30 Sept · W40`), the world clocks, the repo name and
   the sync status (`synced 3m ago`).
 - **Search** is a real field now. Typing filters the pinned and recently used bookmarks (title or
   host, any case); ⏎ opens the palette with the text in it (new `open(query)` on the shared

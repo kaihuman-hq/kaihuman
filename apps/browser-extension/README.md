@@ -424,6 +424,7 @@ left one.
 
 **Header**
 
+- **Logo and title** — the kaihuman logo and name; a click opens the console.
 - **Date** — `Wed 30 Sept · W40`, with the ISO week number.
 - **World clocks** — every zone in the repo's `.timezones.json` files, labelled by its first city.
   Edit that file to change the cities.
