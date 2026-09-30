@@ -15,7 +15,9 @@ use crate::config::{
 };
 use crate::github::{Client, Read, WorkFilter, console_file_url, encode_path};
 use crate::recents::{self, RecentEntry};
-use crate::{claude, commands, dumps, entries, palette_settings, prompts, repos, translate};
+use crate::{
+    braindumps, claude, commands, dumps, entries, palette_settings, prompts, repos, translate,
+};
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -108,6 +110,13 @@ pub enum Request {
         path: String,
         text: String,
     },
+    ListBraindumps,
+    SaveBraindump {
+        #[serde(default)]
+        id: Option<String>,
+        text: String,
+    },
+    SyncBraindumps,
     /// Pinned tab groups and importing the browser's bookmarks: only the extension can do these.
     #[serde(other)]
     BrowserOnly,
@@ -149,6 +158,11 @@ async fn capture_knowledge(path: &str, content: &str) -> Result<Value, String> {
 
 fn client() -> Result<Client, String> {
     Ok(Client::new(config::token()?, Settings::load().repo()))
+}
+
+/// The braindumps of the repository the palette works on.
+fn braindump_store() -> Result<braindumps::Store, String> {
+    braindumps::Store::new(&config::braindumps_dir(), &Settings::load().repo())
 }
 
 fn now_ms() -> u64 {
@@ -512,6 +526,18 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             let written = dumps::export(path.trim(), &text, &home)?;
             Ok(json!({ "path": written.display().to_string() }))
         }
+        Request::ListBraindumps => Ok(json!({ "braindumps": braindump_store()?.list() })),
+        Request::SaveBraindump { id, text } => {
+            match braindump_store()?.save(id.as_deref(), &text, now_ms())? {
+                Some(id) => Ok(json!({ "id": id })),
+                None => Ok(json!({})),
+            }
+        }
+        Request::SyncBraindumps => {
+            let store = braindump_store()?;
+            braindumps::sync(&store, &client()?, now_ms()).await?;
+            Ok(json!({ "braindumps": store.list() }))
+        }
         Request::BrowserOnly => Err(format!(
             "{kind} needs the browser extension — the desktop palette cannot do that yet"
         )),
@@ -645,6 +671,17 @@ mod tests {
                 path: "~/a.txt".into(),
                 text: "x".into()
             }
+        );
+        assert_eq!(
+            parse(json!({ "type": "SAVE_BRAINDUMP", "id": "12", "text": "x" })),
+            Request::SaveBraindump {
+                id: Some("12".into()),
+                text: "x".into()
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "SYNC_BRAINDUMPS" })),
+            Request::SyncBraindumps
         );
     }
 

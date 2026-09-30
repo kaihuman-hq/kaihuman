@@ -176,6 +176,7 @@ to change its animation.
 | `$XDG_CACHE_HOME/lifosy/prompts.json` | the repository's `.prompts.md` files as last fetched (five minutes) |
 | `$XDG_STATE_HOME/lifosy/recents.json` | the palette's last ten actions |
 | `$XDG_DATA_HOME/lifosy/dumps/*.txt` | the `>d` dumps, the last 25 |
+| `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/` | braindumps (`<id>.md`) and what GitHub last had of each (`<id>.json`); see `doc/braindump.md` |
 | `$XDG_STATE_HOME/lifosy/translations.json` | the last 20 texts translated with `>t` |
 
 For development and tests, `LIFOSY_GITHUB_TOKEN` takes the place of the keyring and

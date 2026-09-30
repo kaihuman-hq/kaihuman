@@ -63,6 +63,41 @@ struct ContentsResponse {
     sha: String,
 }
 
+/// What a write that names a version got back: GitHub refuses one whose `sha` is stale (409), or
+/// that has none while the file exists (422), and the caller reads the file to decide what next.
+#[derive(Debug, PartialEq)]
+pub enum Put {
+    Written { sha: String },
+    Rejected,
+}
+
+/// What a delete got back; `Rejected` means `sha` is no longer the file's version.
+#[derive(Debug, PartialEq)]
+pub enum Delete {
+    Deleted,
+    Missing,
+    Rejected,
+}
+
+#[derive(Deserialize)]
+struct PutResponse {
+    content: PutContent,
+}
+
+#[derive(Deserialize)]
+struct PutContent {
+    sha: String,
+}
+
+/// One entry of a directory listing.
+#[derive(Debug, Deserialize)]
+pub struct FolderEntry {
+    pub name: String,
+    pub sha: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+}
+
 #[derive(Deserialize)]
 struct SearchResponse {
     #[serde(default)]
@@ -268,6 +303,69 @@ impl Client {
         }
     }
 
+    /// Writes `path` over the version `sha` names, or creates it when there is none, and answers
+    /// the new version — so the next write can name it without reading the file again.
+    pub async fn put(
+        &self,
+        path: &str,
+        content: &str,
+        sha: Option<&str>,
+        message: &str,
+    ) -> Result<Put, String> {
+        let body = serde_json::json!({
+            "message": message,
+            "content": STANDARD.encode(content),
+            "sha": sha,
+        });
+        let response = self
+            .request(reqwest::Method::PUT, &self.contents_url(path))
+            .json(&body)
+            .send()
+            .await
+            .map_err(network_error)?;
+        match response.status() {
+            StatusCode::CONFLICT | StatusCode::UNPROCESSABLE_ENTITY => Ok(Put::Rejected),
+            status if !status.is_success() => Err(format!("Failed to update {path}: {status}")),
+            _ => {
+                let body: PutResponse = response.json().await.map_err(network_error)?;
+                Ok(Put::Written {
+                    sha: body.content.sha,
+                })
+            }
+        }
+    }
+
+    /// Deletes the version `sha` names.
+    pub async fn delete(&self, path: &str, sha: &str, message: &str) -> Result<Delete, String> {
+        let body = serde_json::json!({ "message": message, "sha": sha });
+        let response = self
+            .request(reqwest::Method::DELETE, &self.contents_url(path))
+            .json(&body)
+            .send()
+            .await
+            .map_err(network_error)?;
+        match response.status() {
+            StatusCode::NOT_FOUND => Ok(Delete::Missing),
+            StatusCode::CONFLICT | StatusCode::UNPROCESSABLE_ENTITY => Ok(Delete::Rejected),
+            status if !status.is_success() => Err(format!("Failed to delete {path}: {status}")),
+            _ => Ok(Delete::Deleted),
+        }
+    }
+
+    /// The files and folders directly in `path`; a folder that does not exist is empty.
+    pub async fn folder(&self, path: &str) -> Result<Vec<FolderEntry>, String> {
+        let response = self
+            .request(reqwest::Method::GET, &self.contents_url(path))
+            .send()
+            .await
+            .map_err(network_error)?;
+        match response.status() {
+            StatusCode::NOT_FOUND => Ok(Vec::new()),
+            status if !status.is_success() => Err(format!("Could not list {path}: {status}")),
+            _ => response.json().await.map_err(network_error),
+        }
+    }
+
     /// One code search. GitHub gives this endpoint its own small budget, so the palette only
     /// calls it when the user presses Tab.
     pub async fn search(&self, query: &str) -> Result<Vec<SearchHit>, String> {
@@ -469,6 +567,29 @@ mod tests {
                     "updatedAt": "2026-09-23T08:00:00Z"
                 }
             ])
+        );
+    }
+
+    #[test]
+    fn reads_the_new_version_and_folder_entries_as_github_sends_them() {
+        let put: PutResponse = serde_json::from_value(serde_json::json!({
+            "content": { "name": "1.md", "path": ".kh/braindumps/1.md", "sha": "abc" },
+            "commit": { "sha": "def" }
+        }))
+        .unwrap();
+        assert_eq!(put.content.sha, "abc");
+
+        let folder: Vec<FolderEntry> = serde_json::from_value(serde_json::json!([
+            { "name": "1.md", "path": ".kh/braindumps/1.md", "sha": "a", "type": "file" },
+            { "name": "old", "path": ".kh/braindumps/old", "sha": "b", "type": "dir" }
+        ]))
+        .unwrap();
+        assert_eq!(
+            folder
+                .iter()
+                .map(|entry| (entry.name.as_str(), entry.sha.as_str(), entry.kind.as_str()))
+                .collect::<Vec<_>>(),
+            [("1.md", "a", "file"), ("old", "b", "dir")]
         );
     }
 

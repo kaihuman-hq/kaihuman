@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-09-30 — Braindumps phase 2: desktop sync to GitHub
+
+- New `braindumps.rs` in the desktop palette. Braindumps are saved on this machine at once
+  (`SAVE_BRAINDUMP`), one directory per repository under `$XDG_DATA_HOME/lifosy/braindumps/`.
+  `SYNC_BRAINDUMPS` sends what changed to `.kh/braindumps/<id>.md` in the active repo, then takes
+  what changed there: new ones from another machine, edits made elsewhere, deletes made elsewhere.
+  `LIST_BRAINDUMPS` lists them with a `synced` flag. All three are in `PaletteProtocol`.
+- Nothing typed is lost. A write GitHub refuses is resolved by reading its copy: a stale version
+  is retried, and an edit made elsewhere too becomes a braindump of its own, so both versions
+  survive. A delete never throws away an edit made elsewhere. Offline, everything waits for the
+  next sync.
+- `github.rs` gains `put` (answers the new sha), `delete` and `folder`.
+- Plan: `>d` will list braindumps and open them in the braindump window (phase 3).
+- No window yet, so nothing calls these requests; phase 3 adds the window and the `>d` rework.
+
+Checks: desktop `cargo test` 75 passed (14 new, against an in-memory GitHub), clippy and fmt
+clean; palette tsc, biome and vitest 233/233; extension tsc and vitest 282/282.
+
 ## 2026-09-30 — Braindumps phase 1: the shared file format
 
 - `@lifosy/formats` gains `braindumps.ts`: braindumps are `.kh/braindumps/<created-ms>.md`, one file

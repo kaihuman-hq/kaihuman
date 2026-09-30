@@ -69,6 +69,11 @@ pub fn dumps_dir() -> PathBuf {
     xdg_dir("XDG_DATA_HOME", ".local/share").join("dumps")
 }
 
+/// Braindumps kept on this machine, one directory per `owner/name` below it.
+pub fn braindumps_dir() -> PathBuf {
+    xdg_dir("XDG_DATA_HOME", ".local/share").join("braindumps")
+}
+
 pub fn commands_cache_file() -> PathBuf {
     xdg_dir("XDG_CACHE_HOME", ".cache").join("commands.json")
 }
