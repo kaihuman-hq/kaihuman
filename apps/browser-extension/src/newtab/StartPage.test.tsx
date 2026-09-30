@@ -20,7 +20,15 @@ const bookmark = (title: string, lastUsedAt: string, pinned = false): Bookmark =
 });
 
 let BOOKMARKS: Bookmark[];
-let GROUPS: { id: string; name: string; createdAt: string; tabCount: number }[];
+let GROUPS: {
+  id: string;
+  name: string;
+  createdAt: string;
+  tabCount: number;
+  favorite: boolean;
+}[];
+/** What the worker says to a favourite; a string is answered as an error. */
+let favoriteReply: string | null;
 let activeGroup: string | null;
 /** What the worker says to a pin; a string is answered as an error. */
 let pinReply: string | null;
@@ -74,6 +82,12 @@ const reply = (message: { type?: string; bookmarkId?: string; pinned?: boolean }
     };
   }
   if (message.type === 'LIST_PINNED_TAB_GROUPS') return { groups: GROUPS, activeId: activeGroup };
+  if (message.type === 'FAVORITE_PINNED_TAB_GROUP') {
+    if (favoriteReply) return { error: favoriteReply };
+    const { groupId, favorite } = message as { groupId: string; favorite: boolean };
+    GROUPS = GROUPS.map((g) => (g.id === groupId ? { ...g, favorite } : g));
+    return { groups: GROUPS, activeId: activeGroup };
+  }
   if (message.type === 'LOAD_PINNED_TAB_GROUP') {
     activeGroup = (message as { groupId: string }).groupId;
     return { opened: 1, unpinned: 0, name: 'Work' };
@@ -160,9 +174,10 @@ beforeEach(() => {
     bookmark('newer', '2026-09-03T10:00:00.000Z'),
   ];
   GROUPS = [
-    { id: 'work', name: 'Work', createdAt: NOW, tabCount: 3 },
-    { id: 'home', name: 'Home', createdAt: NOW, tabCount: 1 },
+    { id: 'work', name: 'Work', createdAt: NOW, tabCount: 3, favorite: false },
+    { id: 'home', name: 'Home', createdAt: NOW, tabCount: 1, favorite: false },
   ];
+  favoriteReply = null;
   activeGroup = 'home';
   pinReply = null;
   TODAY = undefined;
@@ -311,6 +326,54 @@ describe('StartPage', () => {
     expect(headings.indexOf('Tab groups')).toBeLessThan(headings.indexOf('Recently used'));
     const current = groups?.querySelectorAll('button[aria-current="true"]');
     expect([...(current ?? [])].map((b) => b.textContent)).toEqual(['Home1 tab']);
+  });
+
+  it('marks a tab group as a favourite, moving it first and highlighting it', async () => {
+    await mount(() => host.textContent?.includes('Work') ?? false);
+    const chipNames = () =>
+      [...host.querySelectorAll('ul[aria-label="Pinned tab groups"] li > button:first-child')].map(
+        (button) => button.querySelector('span')?.textContent,
+      );
+    const star = (name: string) =>
+      host.querySelector<HTMLButtonElement>(
+        `button[aria-label="Add ${name} to favourites"], button[aria-label="Remove ${name} from favourites"]`,
+      ) as HTMLButtonElement;
+    expect(chipNames()).toEqual(['Work', 'Home']);
+
+    star('Home').click();
+    await waitFor(() => chipNames()[0] === 'Home');
+
+    expect(sent.find((message) => message.type === 'FAVORITE_PINNED_TAB_GROUP')).toEqual({
+      type: 'FAVORITE_PINNED_TAB_GROUP',
+      groupId: 'home',
+      favorite: true,
+    });
+    expect(star('Home').getAttribute('aria-pressed')).toBe('true');
+    expect(star('Home').textContent).toBe('★');
+    const chip = star('Home').previousElementSibling as HTMLElement;
+    expect(chip.className).toContain('bg-nt-pin-hover');
+    // The star is not a load: the window's pinned tabs stay as they are.
+    expect(sent.some((message) => message.type === 'LOAD_PINNED_TAB_GROUP')).toBe(false);
+
+    star('Home').click();
+    await waitFor(() => chipNames()[0] === 'Work');
+    expect(star('Home').textContent).toBe('☆');
+  });
+
+  it('takes the favourite back and says why when it cannot be saved', async () => {
+    favoriteReply = 'Failed to write .kh/browser.pinnedtabs.json';
+    await mount(() => host.textContent?.includes('Work') ?? false);
+
+    (
+      host.querySelector('button[aria-label="Add Home to favourites"]') as HTMLButtonElement
+    ).click();
+    await waitFor(() => host.textContent?.includes('Failed to write') ?? false);
+
+    expect(
+      host
+        .querySelector('button[aria-label="Add Home to favourites"]')
+        ?.getAttribute('aria-pressed'),
+    ).toBe('false');
   });
 
   it('loads a tab group from its card and marks it loaded', async () => {

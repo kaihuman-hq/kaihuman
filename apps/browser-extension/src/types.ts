@@ -7,6 +7,7 @@ export interface Message {
     | 'SAVE_PINNED_TAB_GROUP'
     | 'RENAME_PINNED_TAB_GROUP'
     | 'MOVE_PINNED_TAB_GROUP'
+    | 'FAVORITE_PINNED_TAB_GROUP'
     | 'DELETE_PINNED_TAB_GROUP'
     | 'GET_BOOKMARKS'
     | 'ADD_BOOKMARK'
@@ -57,6 +58,8 @@ export interface Message {
   bookmarkId?: string;
   /** `SET_BOOKMARK_PINNED`: the state to set, not a toggle, so a double click cannot undo itself. */
   pinned?: boolean;
+  /** `FAVORITE_PINNED_TAB_GROUP`: the state to set, not a toggle, for the same reason. */
+  favorite?: boolean;
   force?: boolean;
   /** `OPEN_URL`: navigate the sender's own tab rather than opening another one. */
   reuse?: boolean;

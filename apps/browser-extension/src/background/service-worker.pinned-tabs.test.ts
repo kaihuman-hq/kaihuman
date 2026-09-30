@@ -180,6 +180,23 @@ describe('writing groups', () => {
     expect(JSON.parse(writes()[0]?.[1].body).sha).toBe('sha-1');
   });
 
+  it('commits a favourite and answers with the updated list', async () => {
+    seedCache();
+
+    const response = await call({
+      type: 'FAVORITE_PINNED_TAB_GROUP',
+      groupId: 'g1',
+      favorite: true,
+    });
+
+    const written = JSON.parse(atob(JSON.parse(writes()[0]?.[1].body).content));
+    expect(written.groups[0]).toMatchObject({ id: 'g1', name: 'Work', favorite: true });
+    expect(response.success).toBe(true);
+    expect(response.groups).toEqual([
+      expect.objectContaining({ id: 'g1', name: 'Work', favorite: true }),
+    ]);
+  });
+
   it('puts what it committed into the cache, with no ETag left to replay', async () => {
     await call({ type: 'RENAME_PINNED_TAB_GROUP', groupId: 'g1', name: 'Renamed' });
 

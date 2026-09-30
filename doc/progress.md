@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-09-30 — Favourite tab groups on the start page
+
+- Each chip under **Tab groups** has a star. **☆** makes the group a favourite, **★** takes that
+  back. Favourites come first (the popup's order holds within each part) and have a green fill and
+  green name. The group loaded in this window keeps its bright outline.
+- The mark is stored as `"favorite": true` on the group in `.kh/browser.pinnedtabs.json`
+  (`setGroupFavorite` in `background/pinned-tabs.ts`), and left out when false, so files without
+  favourites do not change. New worker message `FAVORITE_PINNED_TAB_GROUP` re-reads the file,
+  commits and answers with the updated list; `LIST_PINNED_TAB_GROUPS` now reports `favorite`.
+- The star changes at once; if the commit fails it goes back and the page says why.
+
 ## 2026-09-30 — New Tab page redesign
 
 - The start page follows the new design: dark `#050505`, Noto Sans Mono, no rounded corners, and

@@ -70,6 +70,7 @@ interface TabGroupSummary {
   id: string;
   name: string;
   tabCount: number;
+  favorite: boolean;
 }
 
 const plural = (count: number) => `${count} tab${count === 1 ? '' : 's'}`;
@@ -120,6 +121,8 @@ export function StartPage() {
   const [tabGroupsError, setTabGroupsError] = useState<string | null>(null);
   // One load at a time: two would each unpin what the other just pinned.
   const [loadingGroupId, setLoadingGroupId] = useState<string | null>(null);
+  // One favourite commit at a time, as with the pins: two would race for the file's sha.
+  const [favoriting, setFavoriting] = useState(false);
   const [note, setNote] = useState('');
   const [noteStatus, setNoteStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [noteError, setNoteError] = useState<string | null>(null);
@@ -301,6 +304,34 @@ export function StartPage() {
       setTabGroupsError(e.message || `Could not load ${group.name}`);
     } finally {
       setLoadingGroupId(null);
+    }
+  };
+
+  /** Marks the group at once and commits behind it; a failure takes the mark back and says why. */
+  const toggleFavorite = async (group: TabGroupSummary) => {
+    const favorite = !group.favorite;
+    const setFavoriteLocally = (value: boolean) =>
+      setTabGroups((list) =>
+        list.map((candidate) =>
+          candidate.id === group.id ? { ...candidate, favorite: value } : candidate,
+        ),
+      );
+    setFavoriting(true);
+    setTabGroupsError(null);
+    setFavoriteLocally(favorite);
+    try {
+      const response = await send({
+        type: 'FAVORITE_PINNED_TAB_GROUP',
+        groupId: group.id,
+        favorite,
+      });
+      setTabGroups(response.groups);
+      setActiveGroupId(response.activeId);
+    } catch (e: any) {
+      setFavoriteLocally(!favorite);
+      setTabGroupsError(e.message || `Could not save ${group.name} as a favourite`);
+    } finally {
+      setFavoriting(false);
     }
   };
 
@@ -548,10 +579,16 @@ export function StartPage() {
                 )
               ) : (
                 <ul aria-label="Pinned tab groups" class="flex flex-wrap gap-2">
-                  {tabGroups.map((group) => {
+                  {/* Favourites first; the popup's order holds within each part. */}
+                  {[
+                    ...tabGroups.filter((group) => group.favorite),
+                    ...tabGroups.filter((group) => !group.favorite),
+                  ].map((group) => {
                     const active = group.id === activeGroupId;
                     return (
-                      <li key={group.id}>
+                      // The star sits beside the chip's button rather than inside it: a button
+                      // cannot hold a button.
+                      <li key={group.id} class="relative">
                         <button
                           type="button"
                           onClick={() => void loadTabGroup(group)}
@@ -562,14 +599,37 @@ export function StartPage() {
                               ? `${group.name} is loaded — click to restore its pinned tabs`
                               : `Pin the tabs of ${group.name} in this window`
                           }
-                          class={`flex items-baseline gap-[10px] border px-3 py-2 text-[14px] text-left hover:border-nt-accent disabled:opacity-50 ${
-                            active ? 'border-nt-accent' : 'border-nt-control'
-                          }`}
+                          class={`flex items-baseline gap-[10px] border py-2 pl-3 pr-8 text-[14px] text-left hover:border-nt-accent disabled:opacity-50 ${
+                            active
+                              ? 'border-nt-accent'
+                              : group.favorite
+                                ? 'border-nt-pin'
+                                : 'border-nt-control'
+                          } ${group.favorite ? 'bg-nt-pin-hover text-nt-accent' : ''}`}
                         >
                           <span>{group.name}</span>
                           <span class="text-[11px] text-nt-muted">
                             {loadingGroupId === group.id ? 'Loading…' : plural(group.tabCount)}
                           </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void toggleFavorite(group)}
+                          disabled={favoriting}
+                          aria-pressed={group.favorite}
+                          aria-label={
+                            group.favorite
+                              ? `Remove ${group.name} from favourites`
+                              : `Add ${group.name} to favourites`
+                          }
+                          title={group.favorite ? 'Unfavourite' : 'Favourite'}
+                          class={`absolute right-2.5 top-1/2 -translate-y-1/2 text-[12px] disabled:opacity-50 ${
+                            group.favorite
+                              ? 'text-nt-accent hover:text-nt-fg'
+                              : 'text-nt-icon hover:text-nt-accent'
+                          }`}
+                        >
+                          {group.favorite ? '★' : '☆'}
                         </button>
                       </li>
                     );

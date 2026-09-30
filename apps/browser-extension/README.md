@@ -445,8 +445,10 @@ focused for you: click into the page first, or use the shortcut.
 - **Tab groups** — the saved pinned-tab groups, the same list the popup's **Pinned Tabs** panel
   shows. The group this window is running is outlined in green. A click loads the group exactly as
   the popup's **Load** does — pins what is missing, unpins what the group does not have — and leaves
-  the start page where it is. Saving, renaming and reordering groups stay in the popup and the
-  palette.
+  the start page where it is. **☆** beside a group makes it a favourite: it moves to the front
+  and is filled in green, and **★** takes that back. The mark is committed to the group in
+  `.kh/browser.pinnedtabs.json` (`"favorite": true`), so every browser sees it. Saving, renaming
+  and reordering groups stay in the popup and the palette.
 - **Recently used** — the twelve other bookmarks you opened most recently. A repo whose bookmarks
   have never been opened still shows its latest ones. Each row has an environment tag:
   **DEV**, **INT** or **PROD**. Set it by hand with a `dev`, `int` or `prod` tag on the bookmark;
