@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-09-30 — Braindumps: study and plan
+
+- New `doc/braindump.md`: a proposal (nothing implemented) for turning the desktop palette's local
+  `>d` dumps into repo-backed braindumps. One file per braindump in `.kh/braindumps/<ms>.md`, a
+  second floating Tauri window opened by its own key, local-first saving with a debounced push to
+  GitHub, and a list with delete on the new tab page. Ends with a phased plan and open questions.
+
 ## 2026-09-30 — Favourite tab groups on the start page
 
 - Each chip under **Tab groups** has a star. **☆** makes the group a favourite, **★** takes that
