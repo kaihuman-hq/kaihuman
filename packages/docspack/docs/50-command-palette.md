@@ -91,7 +91,7 @@ Modes come in four kinds in `PaletteMode`: `load` (a list filtered as you type),
 
 ## Which prefixes the palette has
 
-<!-- docspack: tags=prefixes,list,modes,reference -->
+<!-- docspack: tags=prefixes,all prefixes,list of modes,cheat sheet,reference -->
 
 | Prefix | Mode | Surfaces |
 | --- | --- | --- |
