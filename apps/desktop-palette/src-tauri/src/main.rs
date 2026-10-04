@@ -13,6 +13,7 @@ mod config;
 mod console_login;
 mod dumps;
 mod entries;
+mod files;
 mod github;
 #[cfg(target_os = "linux")]
 mod layer;

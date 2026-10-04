@@ -94,6 +94,7 @@
 | The command palette as a desktop overlay, centered on the focused monitor (wlr-layer-shell: Hyprland, Sway, KDE…) | `lifosy-palette-toggle` bound to a key | 2026-09-23 |
 | Bookmarks, web search, repo search, notes and action log, recents, repository switch — shared with the extension via `@lifosy/palette` | desktop palette | 2026-09-23 |
 | `>f` files: add a todo, action, event, prompt or command to the repo's widget files, or open one in Kaihuman — shared with the extension | desktop palette | 2026-09-24 |
+| `>o` files on this computer: by name, `>o c: …` by contents too, under the home directory (`fd`/`find`, `rg`/`grep`); ⏎ opens with the default app, ⇥ opens the folder in the file manager or ghostty | desktop palette | 2026-10-04 |
 | `>u` shows the cached usage at once with its age (green / yellow / red) and syncs in the background once it is 5 min old | desktop palette | 2026-09-24 |
 | `>c` Claude Code (new session on claude.ai for a repo from omarchy's `eee` history) and `>u` Claude usage (rate limits, pace, resets, spend per account) — from omarchy | desktop palette | 2026-09-23 |
 | `?` help — every prefix with its description, searching and keys, and every action; searchable, ⏎ switches mode or runs the action | desktop palette, command palette | 2026-09-23 |

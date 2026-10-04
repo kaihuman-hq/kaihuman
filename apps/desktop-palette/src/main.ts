@@ -11,6 +11,7 @@ import {
   commandsMode,
   createCommandPalette,
   dumpMode,
+  localFilesMode,
   paletteModes,
   portHandlers,
   repoActions,
@@ -48,14 +49,15 @@ const palette = createCommandPalette(
         run: () => invoke<string>('console_login'),
       },
     ],
-    // These read local files — dumps, omarchy's repo history, Claude's credentials — which only
-    // the desktop has.
+    // These read local files — dumps, omarchy's repo history, Claude's credentials, the home
+    // directory — which only the desktop has.
     modes: [
       ...paletteModes(port),
       commandsMode(port, { canRun: true }),
       dumpMode(port),
       claudeCodeMode(port),
       claudeUsageMode(port),
+      localFilesMode(port),
     ],
     copy: async (text) => {
       await invoke('copy_text', { text }).catch((error: unknown) => {

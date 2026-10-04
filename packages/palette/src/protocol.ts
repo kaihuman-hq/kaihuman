@@ -46,6 +46,15 @@ export interface GithubWorkItem {
   updatedAt: string;
 }
 
+/** A file or folder `SEARCH_LOCAL_FILES` found. */
+export interface LocalFileHit {
+  /** Absolute. */
+  path: string;
+  folder: boolean;
+  /** For a match in the contents: the first matching line, `12:text`. */
+  line?: string;
+}
+
 /** A braindump as the desktop keeps it (doc/braindump.md); `synced` once GitHub has this text. */
 export interface Braindump {
   id: BraindumpId;
@@ -152,6 +161,23 @@ export interface PaletteProtocol {
    * one without `id`.
    */
   OPEN_BRAINDUMP: { request: { id?: BraindumpId }; response: NoFields };
+  /**
+   * Desktop only: files and folders under the home directory whose name holds `query`; with
+   * `contents`, also files whose text does, after them. Hidden files and `node_modules` are left
+   * out. Rejects when the search ran out of time without finding anything.
+   */
+  SEARCH_LOCAL_FILES: {
+    request: { query: string; contents: boolean };
+    response: { home: string; hits: LocalFileHit[] };
+  };
+  /**
+   * Desktop only: opens a path `SEARCH_LOCAL_FILES` found — with its default app, or the folder it
+   * is in in the file manager or a terminal.
+   */
+  OPEN_LOCAL_FILE: {
+    request: { path: string; with: 'app' | 'file-manager' | 'terminal' };
+    response: NoFields;
+  };
   /** Desktop only: repositories for `>c`, most recently used first (omarchy's `eee` history). */
   LIST_CLAUDE_CODE_REPOS: { request: NoFields; response: { repos: string[] } };
   /**

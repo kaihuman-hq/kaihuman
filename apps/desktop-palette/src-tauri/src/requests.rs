@@ -16,7 +16,8 @@ use crate::config::{
 use crate::github::{Client, Read, WorkFilter, console_file_url, encode_path};
 use crate::recents::{self, RecentEntry};
 use crate::{
-    braindumps, claude, commands, dumps, entries, palette_settings, prompts, repos, translate,
+    braindumps, claude, commands, dumps, entries, files, palette_settings, prompts, repos,
+    translate,
 };
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
@@ -96,6 +97,15 @@ pub enum Request {
     },
     GetPaletteSettings,
     ListClaudeCodeRepos,
+    SearchLocalFiles {
+        query: String,
+        #[serde(default)]
+        contents: bool,
+    },
+    OpenLocalFile {
+        path: String,
+        with: files::OpenWith,
+    },
     GetClaudeUsage {
         #[serde(default)]
         cached: bool,
@@ -513,6 +523,18 @@ pub async fn handle(request: Value) -> Result<Value, String> {
         Request::ListGithubWork { filter } => Ok(json!({ "items": client()?.work(filter).await? })),
         Request::GetPaletteSettings => get_palette_settings().await,
         Request::ListClaudeCodeRepos => Ok(json!({ "repos": claude::code_repos()? })),
+        Request::SearchLocalFiles { query, contents } => {
+            // Walking the home directory blocks for up to `files::TIME_LIMIT`.
+            let hits =
+                tauri::async_runtime::spawn_blocking(move || files::search(&query, contents))
+                    .await
+                    .map_err(|error| format!("The file search stopped: {error}"))??;
+            Ok(json!({ "home": files::home(), "hits": hits }))
+        }
+        Request::OpenLocalFile { path, with } => {
+            files::open(&path, with)?;
+            Ok(json!({}))
+        }
         Request::GetClaudeUsage { cached } => claude_usage(cached).await,
         Request::ListDumps => Ok(json!({ "dumps": dumps::list(&config::dumps_dir()) })),
         Request::SaveDump { id, text } => {
@@ -635,6 +657,20 @@ mod tests {
         assert_eq!(
             parse(json!({ "type": "LIST_CLAUDE_CODE_REPOS" })),
             Request::ListClaudeCodeRepos
+        );
+        assert_eq!(
+            parse(json!({ "type": "SEARCH_LOCAL_FILES", "query": "tax", "contents": true })),
+            Request::SearchLocalFiles {
+                query: "tax".into(),
+                contents: true
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "OPEN_LOCAL_FILE", "path": "/a/b", "with": "file-manager" })),
+            Request::OpenLocalFile {
+                path: "/a/b".into(),
+                with: files::OpenWith::FileManager
+            }
         );
         assert_eq!(
             parse(json!({ "type": "GET_CLAUDE_USAGE" })),
