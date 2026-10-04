@@ -16,8 +16,8 @@ The official browser extension for Lifosy, designed to enhance your web experien
 
 ## Popup
 
-The popup opens on two icon buttons — **pin this page to the Knowledge Base** and **bookmark this
-page** — followed by the pinned-tab groups and the note box. The star opens a view of its own where
+The popup opens on three icon buttons — **pin this page to the Knowledge Base**, **bookmark this
+page** and **read this page later** — followed by the pinned-tab groups and the note box. The star opens a view of its own where
 you can add comma-separated tags and **Save**, or **Skip** to save the page without any. That view
 also holds **Import all browser bookmarks**.
 

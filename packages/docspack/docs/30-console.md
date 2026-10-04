@@ -207,7 +207,7 @@ Palette deep links open files in the console as `/files/<path>?repo=owner/name`.
 ## Editing files in the console
 <!-- docspack: tags=editor,codemirror,cascivo,save,autosave,markdown -->
 
-Files open in `FileViewer` (`apps/console/src/components/FileViewer.tsx`), which renders `CodeMirrorEditor` (`src/components/editor/CodeMirrorEditor.tsx`). Despite the name, the editor is now `CodeEditor` from `@cascivo/editor`; the README still says CodeMirror 6.
+Files open in `FileViewer` (`apps/console/src/components/FileViewer.tsx`), which renders `CodeMirrorEditor` (`src/components/editor/CodeMirrorEditor.tsx`). Despite the name, the editor is `CodeEditor` from `@cascivo/editor`.
 
 - The language comes from the file extension (`languageForPath` in `src/components/editor/language.ts`). Unknown or extension-less files use `markdown`.
 - `.md` files wrap lines.

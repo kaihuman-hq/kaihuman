@@ -84,7 +84,7 @@ The `n`, `k`, `s`, `f` and `d` actions start a login first if there is no GitHub
 | Dashboard view | `Up`/`Down`; `Enter` opens a file; `Esc` back |
 | File editor | Type to edit; `Ctrl+S` saves, commits and pushes; `Esc` closes |
 
-The AI prompt sends on plain `Enter` with any modifier, because `Ctrl+Enter` is unreliable across terminals. Older docs that say `Ctrl+Enter` sends are out of date.
+The AI prompt sends on plain `Enter` with any modifier, because `Ctrl+Enter` is unreliable across terminals.
 
 ## Writing a quick note or knowledge note in the TUI
 <!-- docspack: tags=n key,k key,quick note,knowledge note,file created -->
@@ -96,7 +96,7 @@ Both note types use a single text box in the TUI and save on `Enter` through the
 | `n` | `.lifeos/quicknotes/quicknote-<UTC timestamp>.md`, for example `quicknote-2024-03-24T12-34-56Z.md` | `Add quicknote via CLI` |
 | `k` | `.kh/raw/<epoch-ms>-<slug>.md` with knowledge frontmatter | `note: add knowledge capture via CLI` |
 
-The quick note file holds the raw text. The knowledge note uses the same format as `cli capture`. Neither path uses the offline spool. A failed save is written to `error.log` in the current working directory. The `README` claim that `n` appends to `inbox.md` is stale: `append_to_inbox` exists in `github.rs` but nothing calls it.
+The quick note file holds the raw text. The knowledge note uses the same format as `cli capture`. Neither path uses the offline spool. A failed save is written to `error.log` in the current working directory. `append_to_inbox` in `github.rs` is unused: nothing writes to `inbox.md` from the TUI.
 
 ## Capturing a note from the command line with cli capture
 <!-- docspack: tags=headless,quick capture,til,stdin,pipe -->
@@ -227,7 +227,7 @@ cli server -p 3000
 ## Where the CLI stores config and data
 <!-- docspack: tags=config directory,auth.json,data location,xdg -->
 
-The config directory comes from `ProjectDirs::from("com", "lifosy", "cli")` (the `directories` crate). On Linux it is `$XDG_CONFIG_HOME/cli`, which is `~/.config/cli`. On macOS it is `~/Library/Application Support/com.lifosy.cli`. Other docs give `~/.config/com/lifosy/cli/` or `~/.config/com.lifosy.cli/`; those paths are not what the code computes on Linux.
+The config directory comes from `ProjectDirs::from("com", "lifosy", "cli")` (the `directories` crate). On Linux it is `$XDG_CONFIG_HOME/cli`, which is `~/.config/cli`. On macOS it is `~/Library/Application Support/com.lifosy.cli`.
 
 | Path in config dir | Contents |
 |---|---|

@@ -92,7 +92,7 @@ The build runs `tsc -p tsconfig.build.json` and writes `apps/kb-mcp/dist/index.j
 
 Any other argument is an error, because argument parsing is strict. Inside the repository, the server uses `.kh/` when it exists, else the legacy `.lifeos/`, else `.kh/`, which is created on the first `kb_add_raw`.
 
-The Lifosy CLI clones repositories to `~/.config/com/lifosy/cli/repos/<owner>/<repo>`. When Claude Code runs inside such a clone, no path is needed.
+The Lifosy CLI clones repositories to `~/.config/cli/repos/<owner>/<repo>` (Linux). When Claude Code runs inside such a clone, no path is needed.
 
 ## Adding the server to Claude Code
 <!-- docspack: tags=claude mcp add,claude code,setup -->
@@ -107,7 +107,7 @@ To point it at a specific clone:
 
 ```sh
 claude mcp add lifosy-kb -- node /absolute/path/to/monorepo/apps/kb-mcp/dist/index.js \
-  --repo ~/.config/com/lifosy/cli/repos/<owner>/<repo>
+  --repo ~/.config/cli/repos/<owner>/<repo>
 ```
 
 After that, Claude Code can call `kb_search`, `kb_read` and the other tools directly, alongside the `/kb-*` slash commands in the repository's `.claude/commands/`.

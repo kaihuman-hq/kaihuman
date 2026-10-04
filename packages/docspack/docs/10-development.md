@@ -53,7 +53,7 @@ The root `package.json` scripts call Turborepo tasks defined in `turbo.json`.
 | `pnpm console:build` | `turbo run build:prod --filter=@lifosy/app-console` |
 | `pnpm landing-nextgen:build` | `turbo run build --filter=@lifosy/landing-page-nextgen` |
 
-`turbo.json` caches `build` outputs (`dist/**`, `.next/**`, `target/release/**`). `dev` and `watch` are persistent and uncached. `turbo.json` defines no `test` task and no `check` task. So `pnpm turbo test` and `pnpm turbo check`, as written in the root `README.md`, fail with "Could not find task". Use `pnpm check` and run tests per package.
+`turbo.json` caches `build` outputs (`dist/**`, `.next/**`, `target/release/**`). `dev` and `watch` are persistent and uncached. `turbo.json` defines no `test` task and no `check` task. So `pnpm turbo test` and `pnpm turbo check` fail with "Could not find task". Use `pnpm check` for lint and types, and `pnpm -r test` (or `pnpm --filter <package> test`) for tests.
 
 `pnpm build` also runs `cargo build --release` in `apps/cli`, so a full build needs Rust.
 
@@ -117,7 +117,7 @@ pnpm --filter @lifosy/core fix      # biome check --write --unsafe .
 | Landing page | `pnpm --filter @lifosy/landing-page-nextgen dev` | Astro on `localhost:4321` |
 | Storybook | `pnpm --filter @lifosy/ui storybook` | port `6006` |
 
-The console imports `@lifosy/ui` from its build, so run `pnpm --filter @lifosy/ui build` once, or use `pnpm dev:console` to watch both. The root `README.md` says the console runs on port 5173; `apps/console/vite.config.ts` sets `server.port` to `4300`.
+The console imports `@lifosy/ui` from its build, so run `pnpm --filter @lifosy/ui build` once, or use `pnpm dev:console` to watch both. The console dev server runs on port `4300` (`server.port` in `apps/console/vite.config.ts`).
 
 ## Rust toolchain for the CLI and desktop palette
 <!-- docspack: tags=rust,cargo,rustfmt,clippy,rust-toolchain -->

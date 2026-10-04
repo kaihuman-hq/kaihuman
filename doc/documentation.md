@@ -23,7 +23,8 @@ cli capture                  # …or open $EDITOR for a multi-line note
 ## `cli capture` — knowledge quick-capture
 
 Writes a free-text note to `.kh/raw/` in the active repo as an OKF-aligned
-markdown file (`type: note`; title and slug derived from the first line), later
+markdown file (front matter `title`, `url`, `date`, `processed: false`, `tags: [general]`;
+title and slug derived from the first line), later
 folded into the journal + wiki by `/kb-ingest`.
 
 It is **offline-safe**: every capture is written to a local spool (in the CLI
@@ -59,7 +60,7 @@ and leaves the text in the input to try again.
 | Key | Action |
 |-----|--------|
 | `Tab` | Cycle provider: Claude → Copilot → Gemini |
-| `Ctrl+Enter` | Send prompt |
+| `Enter` | Send prompt |
 | `Esc` | Back to main |
 
 ### AI Response
@@ -102,15 +103,16 @@ Shows workspaces, theme, and all files referenced in `dashboard.config.json`.
 When you open the file browser or dashboard view, the CLI automatically:
 
 1. Clones `https://github.com/<owner>/<repo>` (shallow, depth 1) into
-   `~/.config/com/lifosy/cli/repos/<owner>/<repo>/`
+   `~/.config/cli/repos/<owner>/<repo>/` (Linux; `~/Library/Application Support/com.lifosy.cli/` on macOS)
 2. On subsequent opens it runs `git pull --ff-only` to sync.
 
-Changes saved in the editor are written to the local clone only. Use git to push them.
+`Ctrl+S` in the editor writes the file to the local clone, then commits and pushes it in the
+background.
 
 ## Recent files
 
 The last 20 opened files are stored in
-`~/.config/com/lifosy/cli/recent_files.json` (relative paths within the repo).
+`~/.config/cli/recent_files.json` (relative paths within the repo).
 
 ## AI providers
 
@@ -142,7 +144,7 @@ The CLI understands this structure:
 
 A stdio MCP server that exposes a repo's `.kh/` knowledge base (falls back to `.lifeos/`) to Claude
 Code or any MCP client. It works on a local clone — for example the CLI's
-`~/.config/com/lifosy/cli/repos/<owner>/<repo>`.
+`~/.config/cli/repos/<owner>/<repo>`.
 
 ```sh
 pnpm --filter @lifosy/kb-mcp build
