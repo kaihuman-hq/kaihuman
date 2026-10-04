@@ -35,7 +35,7 @@ Each app has its own chunk of documentation. The "Doc" column names that chunk's
 
 | App | Stack | What it does | Doc |
 | --- | --- | --- | --- |
-| `apps/console` | Preact, Vite, Tailwind, PWA | The main web app at `app.kaihuman.com`: file browser, Markdown editor, widgets, kanban board, analytics, wiki | Web console |
+| `apps/console` | Preact, Vite, Tailwind, PWA | The main web app at `app.kaihuman.com`: file browser, Markdown editor, widgets, kanban board, analytics, wiki, knowledge graph, commit history, local AI chat, push reminders | Web console, Console widgets, Console views |
 | `apps/cli` | Rust, Ratatui | Terminal UI with notes, file browser, AI prompt, dashboard view; `cli capture` and `cli server` subcommands | Terminal CLI |
 | `apps/cli/scripts` | shell, wofi | `Super+K` Hyprland overlay that pipes a thought into `cli capture` | Desktop quick capture |
 | `apps/kh-capture-native` | Zig, native-sdk (experimental) | Native quick-capture window that writes to `.kh/raw/` | Desktop quick capture |

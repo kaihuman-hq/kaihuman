@@ -12,6 +12,7 @@
 |---------|----------|-------|
 | `@lifosy/docspack` — every app, package, repo file format and `cli` command documented for AI agents (232 chunks), built and checked with docspack; `docspack ask` answers from it offline | `packages/docspack` | 2026-10-04 |
 | "Documented for agents" section and **Docs** nav link | nextgen landing page `#docs` | 2026-10-04 |
+| Console views documented: knowledge graph, commit history, AI panel, quick dump, push reminders, zen mode | `packages/docspack/docs/32-console-views.md` | 2026-10-04 |
 
 ## Console (`apps/console`)
 

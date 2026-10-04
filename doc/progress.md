@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-10-04 — Docs follow the code; console views documented
+
+- Fixed docs that disagreed with the code: the CLI config dir is `~/.config/cli` on Linux
+  (`~/Library/Application Support/com.lifosy.cli` on macOS); the AI prompt sends on `Enter`;
+  `Ctrl+S` in the CLI editor commits and pushes; `n` writes
+  `.lifeos/quicknotes/quicknote-<ts>.md`; knowledge-note front matter; the console dev server is
+  on port 4300; `pnpm check` and `pnpm -r test` replace the `turbo check` / `turbo test` tasks that
+  do not exist; the console editor is `@cascivo/editor`; the extension popup has three buttons.
+  Touched `README.md`, `doc/documentation.md` and the cli, console, kb-mcp and extension READMEs.
+- New `packages/docspack/docs/32-console-views.md` (`# Console views`): knowledge graph, commit
+  history and per-file history, the LifeOS Copilot AI panel and its local server, the `/new` quick
+  dump editor compared with `/quick-note`, push notifications for overdue milestones and the Todo
+  Reminders workflow, zen mode. 8 new eval questions.
+
+Checks: docspack build 243 chunks (~56k tokens), `doctor --strict` ok, `eval` top-3 77/80 (96 %).
+
 ## 2026-10-04 — Everything documented as a docspack package
 
 - New package **`packages/docspack`** (`@lifosy/docspack`): kaihuman's documentation for AI agents,

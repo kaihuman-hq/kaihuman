@@ -113,7 +113,10 @@
   },
   {
     "query": "where does the console quick note page write",
-    "expect": "web-console-capturing-a-quick-note"
+    "expect": [
+      "web-console-capturing-a-quick-note",
+      "console-views-quick-dump-quick-note-and-the-quick-note-menu"
+    ]
   },
   {
     "query": "configure which items show in the bottom navbar",
@@ -296,5 +299,37 @@
   {
     "query": "how is tsconfig shared between packages",
     "expect": "shared-packages-shared-typescript-biome-and-tailwind-config"
+  },
+  {
+    "query": "show a graph of links between my markdown notes",
+    "expect": "console-views-seeing-how-notes-link-to-each-other-in-the-kno"
+  },
+  {
+    "query": "see recent commits in the console",
+    "expect": "console-views-viewing-the-repository-s-commit-history"
+  },
+  {
+    "query": "console ai panel says server disconnected",
+    "expect": "console-views-fixing-ai-server-disconnected-in-the-console"
+  },
+  {
+    "query": "does the ai panel send my file contents to the model",
+    "expect": "console-views-chatting-with-a-local-ai-from-the-console"
+  },
+  {
+    "query": "what is the /new quick dump page",
+    "expect": "console-views-writing-scratch-text-in-the-quick-dump-editor"
+  },
+  {
+    "query": "enable push notifications for overdue milestones",
+    "expect": "console-views-getting-push-notifications-for-overdue-milesto"
+  },
+  {
+    "query": "what time does the todo reminders workflow run",
+    "expect": "console-views-when-and-why-reminder-notifications-are-sent"
+  },
+  {
+    "query": "keyboard shortcut for zen mode",
+    "expect": "console-views-focusing-on-one-file-with-zen-mode"
   }
 ]
