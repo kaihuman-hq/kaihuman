@@ -3,12 +3,24 @@ import type { ActionPort, LocalFileHit, PaletteProtocol } from './protocol.js';
 
 type OpenWith = PaletteProtocol['OPEN_LOCAL_FILE']['request']['with'];
 
-/** `c: budget` searches the contents too; anything else only names. */
-export function parseLocalFileQuery(query: string): { text: string; contents: boolean } {
-  const match = /^c:\s*/i.exec(query.trim());
-  return match
-    ? { text: query.trim().slice(match[0].length).trim(), contents: true }
-    : { text: query.trim(), contents: false };
+/**
+ * Leading `c:` searches the contents too and `a:` the whole file system instead of the home
+ * directory, in either order (`a: c: nginx`); anything else is the text to search for.
+ */
+export function parseLocalFileQuery(query: string): {
+  text: string;
+  contents: boolean;
+  everywhere: boolean;
+} {
+  let text = query.trim();
+  let contents = false;
+  let everywhere = false;
+  for (let flag = /^([ac]):\s*/i.exec(text); flag; flag = /^([ac]):\s*/i.exec(text)) {
+    if (flag[1]?.toLowerCase() === 'c') contents = true;
+    else everywhere = true;
+    text = text.slice(flag[0].length);
+  }
+  return { text: text.trim(), contents, everywhere };
 }
 
 /** `/home/me/Documents` → `~/Documents`. */
@@ -61,22 +73,27 @@ const hitItem = (
 };
 
 /**
- * `>o` — files and folders on this computer, by name; `>o c: …` searches their contents too.
- * ⏎ opens one with its default app, ⇥ offers the folder it is in in the file manager or a
- * terminal. Desktop only: the backend searches the home directory.
+ * `>o` — files and folders in the home directory, by name; `>o c: …` searches their contents too
+ * and `>o a: …` the whole file system. ⏎ opens one with its default app, ⇥ offers the folder it is
+ * in in the file manager or a terminal. Desktop only: the backend searches the disk.
  */
 export const localFilesMode = (port: ActionPort): PaletteMode => ({
   prefix: 'o',
   title: 'Search files',
-  placeholder: 'A file name — “c: …” searches contents too · ⏎ searches, ⇥ for the folder',
+  placeholder: 'A file name — “c: …” contents too, “a: …” the whole disk · ⏎ searches',
   description:
-    'Files and folders in your home directory by name, “>o c: …” by contents too — ⏎ opens one with its default app, ⇥ opens its folder in the file manager or a terminal',
+    'Files and folders in your home directory by name, “>o c: …” by contents too, “>o a: …” on the whole file system — ⏎ opens one with its default app, ⇥ opens its folder in the file manager or a terminal',
   // What is found depends on what is typed; there is nothing to choose again.
   recents: false,
   submit: async (query) => {
-    const { text, contents } = parseLocalFileQuery(query);
+    const { text, contents, everywhere } = parseLocalFileQuery(query);
     if (!text) return [];
-    const { home, hits } = await port.send({ type: 'SEARCH_LOCAL_FILES', query: text, contents });
+    const { home, hits } = await port.send({
+      type: 'SEARCH_LOCAL_FILES',
+      query: text,
+      contents,
+      everywhere,
+    });
     return hits.map((hit) => hitItem(port, hit, home, contents));
   },
 });

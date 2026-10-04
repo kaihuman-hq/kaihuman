@@ -162,12 +162,13 @@ export interface PaletteProtocol {
    */
   OPEN_BRAINDUMP: { request: { id?: BraindumpId }; response: NoFields };
   /**
-   * Desktop only: files and folders under the home directory whose name holds `query`; with
-   * `contents`, also files whose text does, after them. Hidden files and `node_modules` are left
-   * out. Rejects when the search ran out of time without finding anything.
+   * Desktop only: files and folders under the home directory — with `everywhere`, anywhere on the
+   * file system but `/proc`, `/sys`, `/dev` and `/run` — whose name holds `query`; with `contents`,
+   * also files whose text does, after them. Hidden files and `node_modules` are left out. Rejects
+   * when the search ran out of time without finding anything.
    */
   SEARCH_LOCAL_FILES: {
-    request: { query: string; contents: boolean };
+    request: { query: string; contents: boolean; everywhere: boolean };
     response: { home: string; hits: LocalFileHit[] };
   };
   /**

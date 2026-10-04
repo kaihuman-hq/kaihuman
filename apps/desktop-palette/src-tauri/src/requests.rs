@@ -101,6 +101,8 @@ pub enum Request {
         query: String,
         #[serde(default)]
         contents: bool,
+        #[serde(default)]
+        everywhere: bool,
     },
     OpenLocalFile {
         path: String,
@@ -523,12 +525,17 @@ pub async fn handle(request: Value) -> Result<Value, String> {
         Request::ListGithubWork { filter } => Ok(json!({ "items": client()?.work(filter).await? })),
         Request::GetPaletteSettings => get_palette_settings().await,
         Request::ListClaudeCodeRepos => Ok(json!({ "repos": claude::code_repos()? })),
-        Request::SearchLocalFiles { query, contents } => {
-            // Walking the home directory blocks for up to `files::TIME_LIMIT`.
-            let hits =
-                tauri::async_runtime::spawn_blocking(move || files::search(&query, contents))
-                    .await
-                    .map_err(|error| format!("The file search stopped: {error}"))??;
+        Request::SearchLocalFiles {
+            query,
+            contents,
+            everywhere,
+        } => {
+            // Walking the disk blocks for up to `files::EVERYWHERE_TIME_LIMIT`.
+            let hits = tauri::async_runtime::spawn_blocking(move || {
+                files::search(&query, contents, everywhere)
+            })
+            .await
+            .map_err(|error| format!("The file search stopped: {error}"))??;
             Ok(json!({ "home": files::home(), "hits": hits }))
         }
         Request::OpenLocalFile { path, with } => {
@@ -662,7 +669,21 @@ mod tests {
             parse(json!({ "type": "SEARCH_LOCAL_FILES", "query": "tax", "contents": true })),
             Request::SearchLocalFiles {
                 query: "tax".into(),
-                contents: true
+                contents: true,
+                everywhere: false
+            }
+        );
+        assert_eq!(
+            parse(json!({
+                "type": "SEARCH_LOCAL_FILES",
+                "query": "nginx",
+                "contents": false,
+                "everywhere": true
+            })),
+            Request::SearchLocalFiles {
+                query: "nginx".into(),
+                contents: false,
+                everywhere: true
             }
         );
         assert_eq!(

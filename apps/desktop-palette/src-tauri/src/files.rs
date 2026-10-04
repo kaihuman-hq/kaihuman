@@ -1,6 +1,7 @@
 //! Searching this computer's files — the palette's `>o`, desktop only — and opening what it found.
 //!
-//! Everything is searched under the home directory with the tools a Linux desktop already has:
+//! The home directory is searched, or — when asked — the whole file system but its virtual parts
+//! (`/proc`, `/sys`, `/dev`, `/run`), with the tools a Linux desktop already has:
 //! - **names**: `fd` when installed (Fedora: `fd-find`), else `find`;
 //! - **contents**: `rg` when installed (`ripgrep`), else `grep -r`.
 //!
@@ -21,8 +22,14 @@ use serde::{Deserialize, Serialize};
 /// Hits listed per kind of search; names and contents each get this many.
 const LIMIT: usize = 25;
 
-/// A search stops here and answers with what it has.
+/// A search of the home directory stops here and answers with what it has.
 pub const TIME_LIMIT: Duration = Duration::from_secs(10);
+
+/// The whole file system takes longer to walk, so it gets longer.
+pub const EVERYWHERE_TIME_LIMIT: Duration = Duration::from_secs(30);
+
+/// Top-level folders that hold no files of anyone's: the kernel's and the devices' views.
+const VIRTUAL: [&str; 4] = ["proc", "sys", "dev", "run"];
 
 /// A matched line is shown after the file's folder, so only its start.
 const LINE_LENGTH: usize = 120;
@@ -66,19 +73,19 @@ fn glob_escape(text: &str) -> String {
         .collect()
 }
 
-fn name_search(query: &str, root: &Path) -> Command {
+fn name_search(query: &str, roots: &[PathBuf]) -> Command {
     if on_path("fd") {
         let mut command = Command::new("fd");
         command
             .args(["--ignore-case", "--fixed-strings", "--absolute-path"])
             .args(["--color", "never", "--exclude", "node_modules", "--"])
             .arg(query)
-            .arg(root);
+            .args(roots);
         command
     } else {
         let mut command = Command::new("find");
         command
-            .arg(root)
+            .args(roots)
             .args([
                 "-mindepth",
                 "1",
@@ -98,7 +105,7 @@ fn name_search(query: &str, root: &Path) -> Command {
 }
 
 /// Both tools print `path`, a NUL, then `line:text` — one line per file.
-fn contents_search(query: &str, root: &Path) -> Command {
+fn contents_search(query: &str, roots: &[PathBuf]) -> Command {
     if on_path("rg") {
         let mut command = Command::new("rg");
         command
@@ -119,7 +126,7 @@ fn contents_search(query: &str, root: &Path) -> Command {
                 "--",
             ])
             .arg(query)
-            .arg(root);
+            .args(roots);
         command
     } else {
         let mut command = Command::new("grep");
@@ -127,7 +134,7 @@ fn contents_search(query: &str, root: &Path) -> Command {
             .args(["-r", "-I", "-i", "-F", "-m", "1", "-n", "-Z", "-s"])
             .args(["--exclude-dir=.*", "--exclude-dir=node_modules", "--"])
             .arg(query)
-            .arg(root);
+            .args(roots);
         command
     }
 }
@@ -202,18 +209,24 @@ fn collect(
     Ok((hits, timed_out))
 }
 
-/// Files and folders under `root` whose name holds `query`, ignoring case; with `contents`, also
-/// files whose text does — those after the names, each file once.
-pub fn search_in(root: &Path, query: &str, contents: bool) -> Result<Vec<Hit>, String> {
+/// Files and folders under `roots` whose name holds `query`, ignoring case; with `contents`, also
+/// files whose text does — those after the names, each file once. Stops after `time_limit`.
+pub fn search_in(
+    roots: &[PathBuf],
+    query: &str,
+    contents: bool,
+    time_limit: Duration,
+) -> Result<Vec<Hit>, String> {
     let query = query.trim();
     if query.is_empty() {
         return Err("Type part of a file name to search for".into());
     }
-    let deadline = Instant::now() + TIME_LIMIT;
+    let deadline = Instant::now() + time_limit;
     let (names, by_contents) = std::thread::scope(|scope| {
-        let by_contents = contents
-            .then(|| scope.spawn(|| collect(contents_search(query, root), contents_hit, deadline)));
-        let names = collect(name_search(query, root), name_hit, deadline);
+        let by_contents = contents.then(|| {
+            scope.spawn(|| collect(contents_search(query, roots), contents_hit, deadline))
+        });
+        let names = collect(name_search(query, roots), name_hit, deadline);
         (
             names,
             by_contents.map(|search| search.join().expect("the contents search does not panic")),
@@ -229,14 +242,34 @@ pub fn search_in(root: &Path, query: &str, contents: bool) -> Result<Vec<Hit>, S
     if hits.is_empty() && timed_out {
         return Err(format!(
             "Nothing found in {} s, when the search stops — try a longer part of the name",
-            TIME_LIMIT.as_secs()
+            time_limit.as_secs()
         ));
     }
     Ok(hits)
 }
 
-pub fn search(query: &str, contents: bool) -> Result<Vec<Hit>, String> {
-    search_in(&home(), query, contents)
+/// Every top-level folder of `/` but the virtual ones, so a search never walks `/proc`.
+fn file_system_roots(top: &Path) -> Result<Vec<PathBuf>, String> {
+    let entries = std::fs::read_dir(top)
+        .map_err(|error| format!("Could not list {}: {error}", top.display()))?;
+    let mut roots: Vec<PathBuf> = entries
+        .flatten()
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+        .filter(|entry| !VIRTUAL.iter().any(|name| entry.file_name() == *name))
+        .map(|entry| entry.path())
+        .collect();
+    roots.sort();
+    Ok(roots)
+}
+
+/// The home directory, or with `everywhere` the whole file system.
+pub fn search(query: &str, contents: bool, everywhere: bool) -> Result<Vec<Hit>, String> {
+    if everywhere {
+        let roots = file_system_roots(Path::new("/"))?;
+        search_in(&roots, query, contents, EVERYWHERE_TIME_LIMIT)
+    } else {
+        search_in(&[home()], query, contents, TIME_LIMIT)
+    }
 }
 
 fn spawn_detached(program: &str, args: &[&OsStr], dir: Option<&Path>) -> Result<(), String> {
@@ -326,7 +359,7 @@ mod tests {
                 ("notes.md", "the tax report is due"),
             ],
         );
-        let hits = search_in(&tree.0, "report", false).unwrap();
+        let hits = search_in(std::slice::from_ref(&tree.0), "report", false, TIME_LIMIT).unwrap();
         assert_eq!(
             paths(&hits),
             [tree.path("Documents/Tax-Report.pdf"), tree.path("reports")]
@@ -349,7 +382,7 @@ mod tests {
             ],
         );
         assert_eq!(
-            paths(&search_in(&tree.0, "report", true).unwrap()),
+            paths(&search_in(std::slice::from_ref(&tree.0), "report", true, TIME_LIMIT).unwrap()),
             [tree.path("work/report.txt")]
         );
     }
@@ -358,7 +391,7 @@ mod tests {
     fn matches_names_as_typed_not_as_patterns() {
         let tree = Tree::new("literal", &[("a*b.txt", ""), ("axb.txt", "")]);
         assert_eq!(
-            paths(&search_in(&tree.0, "a*b", false).unwrap()),
+            paths(&search_in(std::slice::from_ref(&tree.0), "a*b", false, TIME_LIMIT).unwrap()),
             [tree.path("a*b.txt")]
         );
     }
@@ -373,11 +406,11 @@ mod tests {
             ],
         );
         assert_eq!(
-            paths(&search_in(&tree.0, "budget", false).unwrap()),
+            paths(&search_in(std::slice::from_ref(&tree.0), "budget", false, TIME_LIMIT).unwrap()),
             [tree.path("budget.txt")]
         );
         assert_eq!(
-            search_in(&tree.0, "budget", true).unwrap(),
+            search_in(std::slice::from_ref(&tree.0), "budget", true, TIME_LIMIT).unwrap(),
             [
                 Hit {
                     path: tree.path("budget.txt"),
@@ -396,13 +429,51 @@ mod tests {
     #[test]
     fn lists_a_file_once_when_both_its_name_and_text_match() {
         let tree = Tree::new("once", &[("budget.txt", "budget")]);
-        assert_eq!(search_in(&tree.0, "budget", true).unwrap().len(), 1);
+        assert_eq!(
+            search_in(std::slice::from_ref(&tree.0), "budget", true, TIME_LIMIT)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn searches_several_roots_at_once() {
+        let tree = Tree::new(
+            "roots",
+            &[("one/report.txt", "report"), ("two/report.md", "")],
+        );
+        let roots = [tree.0.join("one"), tree.0.join("two")];
+        assert_eq!(
+            paths(&search_in(&roots, "report", true, TIME_LIMIT).unwrap()),
+            [tree.path("one/report.txt"), tree.path("two/report.md")]
+        );
+    }
+
+    #[test]
+    fn leaves_the_virtual_file_systems_out_of_the_whole_file_system() {
+        let tree = Tree::new(
+            "top",
+            &[
+                ("etc/hosts", ""),
+                ("home/me/notes.md", ""),
+                ("proc/1/status", ""),
+                ("sys/kernel/x", ""),
+                ("dev/null", ""),
+                ("run/user/x", ""),
+                ("file-at-the-top", ""),
+            ],
+        );
+        assert_eq!(
+            file_system_roots(&tree.0).unwrap(),
+            [tree.0.join("etc"), tree.0.join("home")]
+        );
     }
 
     #[test]
     fn refuses_an_empty_query() {
         assert_eq!(
-            search_in(Path::new("/"), "  ", false).unwrap_err(),
+            search_in(&[PathBuf::from("/")], "  ", false, TIME_LIMIT).unwrap_err(),
             "Type part of a file name to search for"
         );
     }

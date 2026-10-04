@@ -27,11 +27,25 @@ beforeEach(() => {
 });
 
 describe('parseLocalFileQuery', () => {
-  it('searches names unless the query starts with c:', () => {
-    expect(parseLocalFileQuery('  tax report ')).toEqual({ text: 'tax report', contents: false });
-    expect(parseLocalFileQuery('c: budget')).toEqual({ text: 'budget', contents: true });
-    expect(parseLocalFileQuery('C:budget 2026')).toEqual({ text: 'budget 2026', contents: true });
-    expect(parseLocalFileQuery('abc: x')).toEqual({ text: 'abc: x', contents: false });
+  const home = { contents: false, everywhere: false };
+
+  it('searches names in the home directory unless the query starts with c: or a:', () => {
+    expect(parseLocalFileQuery('  tax report ')).toEqual({ ...home, text: 'tax report' });
+    expect(parseLocalFileQuery('abc: x')).toEqual({ ...home, text: 'abc: x' });
+    expect(parseLocalFileQuery('x c: y')).toEqual({ ...home, text: 'x c: y' });
+  });
+
+  it('reads c: as contents too and a: as the whole file system, in either order', () => {
+    expect(parseLocalFileQuery('c: budget')).toEqual({ ...home, text: 'budget', contents: true });
+    expect(parseLocalFileQuery('C:budget 2026')).toEqual({
+      ...home,
+      text: 'budget 2026',
+      contents: true,
+    });
+    expect(parseLocalFileQuery('a: nginx')).toEqual({ ...home, text: 'nginx', everywhere: true });
+    const both = { text: 'nginx', contents: true, everywhere: true };
+    expect(parseLocalFileQuery('a: c: nginx')).toEqual(both);
+    expect(parseLocalFileQuery('c:a:nginx')).toEqual(both);
   });
 });
 
@@ -42,17 +56,20 @@ describe('localFilesMode', () => {
     expect(mode.recents).toBe(false);
   });
 
-  it('asks for names by default and for contents after c:', async () => {
+  it('asks for names in the home directory by default, for contents after c:, everywhere after a:', async () => {
     await submit('report');
     await submit('c: budget');
+    await submit('a: nginx');
     expect(sent).toEqual([
-      { type: 'SEARCH_LOCAL_FILES', query: 'report', contents: false },
-      { type: 'SEARCH_LOCAL_FILES', query: 'budget', contents: true },
+      { type: 'SEARCH_LOCAL_FILES', query: 'report', contents: false, everywhere: false },
+      { type: 'SEARCH_LOCAL_FILES', query: 'budget', contents: true, everywhere: false },
+      { type: 'SEARCH_LOCAL_FILES', query: 'nginx', contents: false, everywhere: true },
     ]);
   });
 
-  it('asks nothing for c: alone', async () => {
+  it('asks nothing for flags alone', async () => {
     expect(await submit('c:')).toEqual([]);
+    expect(await submit('a: c:')).toEqual([]);
     expect(sent).toEqual([]);
   });
 

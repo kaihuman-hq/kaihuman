@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-10-04 — `>o a: …` searches the whole file system
+
+- `>o` still searches only the home directory. A leading `a:` searches the whole file system
+  instead: every top-level folder but the virtual `/proc`, `/sys`, `/dev` and `/run`. It combines
+  with `c:` in either order (`>o a: c: …`), and stops after 30 s instead of 10 s.
+- `SEARCH_LOCAL_FILES` takes `everywhere`.
+
+Checks: palette biome, tsc and vitest 262/262; desktop-palette biome and tsc; Rust fmt, clippy
+`-D warnings` and `cargo test` 95/95 (2 new), the search tests also with `find` + `grep` and with
+`fd` + `rg`.
+
 ## 2026-10-04 — Search files on this computer from the desktop palette
 
 - New prefix **`>o`**: ⏎ searches the home directory for files and folders whose name holds what

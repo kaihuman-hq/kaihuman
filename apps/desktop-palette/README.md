@@ -37,7 +37,7 @@ way.
 | `>q` capture to the knowledge base — what is typed becomes `.kh/raw/<epoch>-<slug>.md` for `/kb-ingest`, as `cli capture` writes it; also offered as **Capture “…”** for any text in the main search | ✓ (pushes directly; no offline spool — `cli capture` has one) |
 | A prefix that a longer one starts with (`>l` next to `>le`) is entered after a space | ✓ |
 | `>f` files — todo lists, action logs, events, prompts, commands: open one in Kaihuman or add an entry as its widget does (also from ⇥ repo-search hits) | ✓ |
-| `>o` files on this computer — by name, `>o c: …` by contents too; ⏎ opens one with its default app, ⇥ opens its folder in the file manager or a terminal | ✓ desktop only (`fd` or `find`, `rg` or `grep`) |
+| `>o` files in your home directory — by name, `>o c: …` by contents too, `>o a: …` on the whole file system; ⏎ opens one with its default app, ⇥ opens its folder in the file manager or a terminal | ✓ desktop only (`fd` or `find`, `rg` or `grep`) |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |
 | Counting how often a bookmark is opened | — the extension counts; the desktop does not yet |
 
@@ -86,9 +86,11 @@ The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-re
 - **`>o`** searches your home directory on ⏎ — not as you type, since every search walks the
   disk. What is typed is matched anywhere in a file or folder name, ignoring case; `c: …` also
   searches inside the files and lists those hits under **Contents**, after the names, with the
-  first matching line. Hidden files and folders (`~/.cache`, `~/.config`…), `node_modules` and,
+  first matching line. `a: …` searches the whole file system instead — every top-level folder but
+  `/proc`, `/sys`, `/dev` and `/run`, skipping what you may not read — and may take up to 30 s.
+  The two combine: `>o a: c: listen 443`. Hidden files and folders (`~/.cache`, `~/.config`…), `node_modules` and,
   with `fd` and `rg`, anything a `.gitignore` excludes are left out. Each search lists at most 25
-  names (and 25 content hits) and stops after 10 s with what it has. ⏎ opens a file with
+  names (and 25 content hits) and stops after 10 s (30 s with `a:`) with what it has. ⏎ opens a file with
   `xdg-open`, so with its default app, and a folder in the file manager; **⇥** (or **→**) offers
   the folder it is in in the file manager (`xdg-open`) or in a new `ghostty` window. Names are
   found with `fd` when installed, else `find`; contents with `rg`, else `grep -r`. On Fedora,
