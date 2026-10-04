@@ -14,7 +14,9 @@
         ".next/**",
         "!.next/cache/**",
         "dist/**",
-        "target/release/**"
+        "target/release/**",
+        ".llms/**",
+        "llms.txt"
       ]
     },
     "build:prod": {

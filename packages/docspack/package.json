@@ -1,0 +1,18 @@
+{
+  "name": "@lifosy/docspack",
+  "version": "0.1.0",
+  "description": "Lifosy's documentation as a docspack package, for AI agents",
+  "license": "MIT",
+  "files": [".llms", "llms.txt", "README.md"],
+  "keywords": ["docspack", "lifosy", "documentation"],
+  "scripts": {
+    "build": "docspack build",
+    "lint": "docspack build && docspack doctor --strict",
+    "test": "docspack build && docspack eval ./eval/queries.json --min-hit-rate 90",
+    "prepublishOnly": "docspack build && docspack doctor --strict"
+  },
+  "docspack": {
+    "from": "./docs",
+    "cmdspec": "./cmdspec.yaml"
+  }
+}
