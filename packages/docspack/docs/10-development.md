@@ -209,16 +209,16 @@ A `doc/progress.md` entry has the heading `## YYYY-MM-DD — <title>`, bullets d
 ## Building and checking the docspack documentation package
 <!-- docspack: tags=docspack,docs-package,llms,eval -->
 
-`packages/docspack` publishes this documentation as `@lifosy/docspack`, an npm package that AI agents query offline. Sources are the Markdown files in `packages/docspack/docs/`; `package.json` sets `"docspack": { "from": "./docs" }`.
+`packages/docspack` publishes this documentation as `@lifosy/docspack`, an npm package that AI agents query offline. Sources are the Markdown files in `packages/docspack/docs/`; `packages/docspack/cmdspec.yaml` describes the `cli` binary, one chunk per command. `package.json` sets `"docspack": { "from": "./docs", "cmdspec": "./cmdspec.yaml" }`.
 
 ```sh
 pnpm --filter @lifosy/docspack build   # docspack build -> .llms/ and llms.txt
-pnpm --filter @lifosy/docspack check   # docspack build && docspack doctor --strict
+pnpm --filter @lifosy/docspack lint    # docspack build && docspack doctor --strict
 pnpm --filter @lifosy/docspack test    # docspack build && docspack eval ./eval/queries.json --min-hit-rate 90
 ```
 
 - `build` writes the `.llms/` payload and `llms.txt`; both are git-ignored and published via `files`.
-- `doctor --strict` checks the package as the indexer would and treats warnings as failures.
+- `doctor --strict` checks the package as the indexer would and treats warnings as failures. It is the package's `lint` script, so root `pnpm lint` runs it.
 - `eval` runs the questions in `eval/queries.json` and fails below a 90% hit rate.
 - `prepublishOnly` runs build and doctor before `npm publish`.
 - `docspack preview "<question>"` in `packages/docspack` shows which chunks answer a question.
