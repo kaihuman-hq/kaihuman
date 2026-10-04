@@ -1,0 +1,156 @@
+cmdspec: "0.1"
+info:
+  name: cli
+  version: 0.1.0
+  summary: Lifosy terminal UI, local AI proxy server and knowledge capture
+  description: |
+    The Rust terminal app in `apps/cli`. Run with no subcommand, it opens an
+    interactive terminal UI (ratatui) for notes, knowledge captures, repository
+    selection, a file browser and editor, a dashboard view and an AI prompt.
+    It signs in with GitHub through the web console and works on one active
+    repository, saved in `auth.json` in the config directory.
+syntax:
+  precedence: [flag, default]
+options:
+  - name: --help
+    aliases: [-h]
+    summary: Print help
+  - name: --version
+    aliases: [-V]
+    summary: Print version
+interactive:
+  when: always
+effects: [read, write, network, exec]
+exits:
+  "0":
+    meaning: Success, or the TUI was quit
+  "1":
+    meaning: The terminal could not be set up or the config directory could not be opened
+  "2":
+    meaning: Invalid command line (clap usage error)
+io:
+  stdout:
+    - mediaType: text/plain
+      summary: The full-screen terminal UI, drawn in the alternate screen
+environment:
+  - name: XDG_CONFIG_HOME
+    summary: Base of the config directory on Linux (default ~/.config)
+  - name: HOME
+    summary: Used to find the config directory when XDG_CONFIG_HOME is unset
+files:
+  - path: $XDG_CONFIG_HOME/cli/auth.json
+    role: state
+    format: json
+    summary: "GitHub token and active repository ({token, active_repo}); ~/.config/cli on Linux, ~/Library/Application Support/com.lifosy.cli on macOS"
+  - path: $XDG_CONFIG_HOME/cli/cache.db
+    role: cache
+    summary: SQLite cache of each repository's file tree
+  - path: $XDG_CONFIG_HOME/cli/recent_files.json
+    role: state
+    format: json
+    summary: The last 20 files opened in the editor
+  - path: $XDG_CONFIG_HOME/cli/spool
+    role: data
+    summary: Knowledge captures waiting to be pushed to GitHub
+  - path: $XDG_CONFIG_HOME/cli/repos
+    role: cache
+    summary: Shallow git clones of the active repositories
+examples:
+  - run: cli
+    summary: Open the terminal UI (logs in through the browser on first run)
+commands:
+  - name: server
+    summary: Start the local AI API server
+    description: |
+      Serves HTTP on 127.0.0.1 for the web app and browser extension.
+      `GET /health` returns the JSON string `"OK"`. `POST /chat` takes
+      `{"message", "provider"}` (provider `claude`, `gemini` or `copilot`, default
+      `copilot`), runs `<provider> -p <message>` and returns `{"response"}`.
+      CORS allows any origin. Server errors are printed to stderr and the
+      command exits 0.
+    options:
+      - name: --port
+        aliases: [-p]
+        summary: Port to run the server on
+        value:
+          name: port
+          type: integer
+          minimum: 0
+          maximum: 65535
+          default: 4000
+      - name: --help
+        aliases: [-h]
+        summary: Print help
+    longRunning: true
+    interactive:
+      when: never
+    effects: [network, exec]
+    io:
+      stdout:
+        - mediaType: text/plain
+          summary: Startup lines, including the address it listens on
+      stderr:
+        - mediaType: text/plain
+          summary: "Server error: <reason> when the server stops"
+    examples:
+      - run: cli server
+        summary: Listen on http://127.0.0.1:4000
+      - run: cli server --port 3000
+        summary: Listen on another port
+  - name: capture
+    summary: Capture a knowledge note to .kh/raw/ (offline-safe; flushes a local spool)
+    description: |
+      Writes the note to the local spool first, then pushes every spooled note,
+      oldest first, to `.kh/raw/<epoch-ms>-<slug>.md` in the active repository
+      through the GitHub contents API, with up to 3 attempts each. A note that
+      fails to push stays in the spool for the next run. Without a login or an
+      active repository the note is only saved locally.
+    arguments:
+      - name: text
+        summary: Note text; the words are joined with spaces
+        variadic: true
+        description: |
+          If omitted, the text is read from piped standard input, or `$EDITOR`
+          (fallback `nano`) is opened on a temporary file when standard input
+          is a terminal.
+    options:
+      - name: --help
+        aliases: [-h]
+        summary: Print help
+    interactive:
+      when: tty
+    effects: [read, write, network, exec]
+    exits:
+      "0":
+        meaning: Captured, saved locally for a later push, or nothing to capture
+      "1":
+        meaning: The capture failed (for example the spool could not be written); the reason is printed to stderr
+    io:
+      stdin:
+        - mediaType: text/plain
+          summary: Note text, read when no text argument is given and stdin is not a terminal
+      stdout:
+        - mediaType: text/plain
+          summary: One status line, such as "Captured → owner/repo (1 pushed)"
+      stderr:
+        - mediaType: text/plain
+          summary: "capture error: <reason>"
+    examples:
+      - run: cli capture "TIL rustfmt output changes between releases"
+        summary: Capture a one-line note
+      - run: echo "note text" | cli capture
+        summary: Capture text from a pipe, as the desktop overlay does
+      - run: cli capture
+        summary: Write a multi-line note in $EDITOR
+  - name: help
+    summary: Print this message or the help of the given subcommand(s)
+    arguments:
+      - name: command
+        summary: Subcommand to show help for
+        variadic: true
+    effects: []
+    interactive:
+      when: never
+    examples:
+      - run: cli help capture
+        summary: Show the help of the capture subcommand
