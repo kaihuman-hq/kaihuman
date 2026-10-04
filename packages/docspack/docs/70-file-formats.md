@@ -48,7 +48,7 @@ Widget files can live in any folder; the console finds them by suffix. Fixed pat
 `githubFileStore.appFolder` in `packages/core` resolves `.kh` or `.lifeos`. The browser extension and desktop palette still read quick-note targets from `.lifeos/.dashboard.config.json` and default notes to `.lifeos/dump.md`.
 
 ## Todo list format (`.todos.md`)
-<!-- docspack: tags=todos,tasks,kanban,markdown checklist,milestones -->
+<!-- docspack: tags=todos,todo file,tasks,markdown checklist,milestones,status marker,in progress,done,rejected -->
 
 A todo file is a flat Markdown checklist with inline metadata and optional milestones in frontmatter:
 

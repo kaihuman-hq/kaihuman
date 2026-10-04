@@ -25,3 +25,9 @@
 - [x] Interactive `/kb-ingest`; `/kb-lint` stale claims and research suggestions
 - [x] Wiki view: wikilinks, backlinks, tags
 - [x] MCP server over the knowledge base (`apps/kb-mcp`)
+
+## Documentation
+
+- [x] Document every app, package, file format and CLI command as a docspack package (`packages/docspack`)
+- [ ] Publish `@lifosy/docspack` to npm
+- [ ] Run `docspack doctor --strict` and `docspack eval` in CI

@@ -87,6 +87,7 @@ The `n`, `k`, `s`, `f` and `d` actions start a login first if there is no GitHub
 The AI prompt sends on plain `Enter` with any modifier, because `Ctrl+Enter` is unreliable across terminals. Older docs that say `Ctrl+Enter` sends are out of date.
 
 ## Writing a quick note or knowledge note in the TUI
+<!-- docspack: tags=n key,k key,quick note,knowledge note,file created -->
 
 Both note types use a single text box in the TUI and save on `Enter` through the GitHub contents API.
 

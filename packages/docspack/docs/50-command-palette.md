@@ -64,8 +64,7 @@ Web rows come after actions, so typing an action's name and pressing ⏎ runs it
 Children are, for example, a repository's issues and pull requests in `>r`, or **Open** and **Delete…** on a braindump in `>d`. A click outside the panel also closes the palette. Mouse clicks choose rows.
 
 ## Searching the repository with Tab
-
-<!-- docspack: tags=code search,github,repo search -->
+<!-- docspack: tags=tab,tab key,⇥,code search,github,repo search -->
 
 ⇥ in the main search runs one GitHub code search for what is typed. It never runs while typing, because GitHub's code-search endpoint has a small rate budget. Hits appear under **Repo**. Typing again clears them.
 

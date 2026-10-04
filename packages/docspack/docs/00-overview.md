@@ -87,7 +87,7 @@ Offline behaviour differs per app.
 - **Browser extension:** serves bookmarks and tab groups from its cache; writes (saving a bookmark, loading a group change) need the network.
 
 ## Where my data lives and what Lifosy stores
-<!-- docspack: tags=privacy,security,data,token,local-first -->
+<!-- docspack: tags=privacy,security,data,token,local-first,server,copy of my notes,cloud -->
 
 Your content lives only in your GitHub repository. Each app keeps local copies and a GitHub token on your machine.
 

@@ -6,6 +6,13 @@
 |---------|----------|-------|
 | Auto-generated, seamless-looping product screencast (demo-mode walkthrough) | both pages' demo section + `landing-page-nextgen/scripts/record-screencast.mjs` | 2026-06-25 |
 
+## Documentation package (`packages/docspack`)
+
+| Feature | Location | Added |
+|---------|----------|-------|
+| `@lifosy/docspack` — every app, package, repo file format and `cli` command documented for AI agents (232 chunks), built and checked with docspack; `docspack ask` answers from it offline | `packages/docspack` | 2026-10-04 |
+| "Documented for agents" section and **Docs** nav link | nextgen landing page `#docs` | 2026-10-04 |
+
 ## Console (`apps/console`)
 
 | Feature | Route/Location | Added |

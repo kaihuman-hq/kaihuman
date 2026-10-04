@@ -161,3 +161,13 @@ The repo path comes from `--repo`, then `KB_REPO_PATH`, then the current directo
 | `kb_add_raw {title, text, url?, tags?}` | Writes a new `raw/<epoch>-<slug>.md` source; nothing else is written |
 
 See `apps/kb-mcp/README.md` for a `.mcp.json` snippet.
+
+## Documentation for AI agents
+
+Everything in this file, and the rest of the monorepo, is also packaged for agents as
+`@lifosy/docspack` (`packages/docspack`). From the repo root:
+
+```sh
+pnpm --filter @lifosy/docspack build
+pnpm --filter @lifosy/docspack exec docspack preview "how do I capture a note"
+```

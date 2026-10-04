@@ -24,6 +24,7 @@ The nextgen page is a single route, `src/pages/index.astro`, wrapped by `src/lay
 - **Philosophy:** kaizen, getting 1% better every day.
 - **Principles:** three cards, **Track**, **Own** and **Know**.
 - **Ownership:** "YOUR DATA. YOUR RULES." — local-first, plain files, no tracking.
+- **Docs (`#docs`):** "DOCUMENTED FOR AGENTS." — the `@lifosy/docspack` package, with a terminal block showing `pnpm add -D docspack @lifosy/docspack`, `npx docspack sync` and `npx docspack ask`. The **Docs** link in the nav pill jumps here.
 - **CTA:** **START IMPROVING TODAY** and the GitHub link.
 
 The page title is "kaihuman — The ever-improving human." The default meta description is set in `Layout.astro`. The old page in `apps/landing-page` has the same screencast and demo link right below its hero.

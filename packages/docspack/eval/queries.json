@@ -1,0 +1,300 @@
+[
+  {
+    "query": "is kaihuman the same thing as lifosy",
+    "expect": "lifosy-lifosy-vs-kaihuman-which-name-is-which"
+  },
+  {
+    "query": "does lifosy keep a copy of my notes on its own server",
+    "expect": "lifosy-where-my-data-lives-and-what-lifosy-stores"
+  },
+  {
+    "query": "how does the github token get to the cli after login",
+    "expect": "lifosy-signing-in-with-github"
+  },
+  {
+    "query": "what happens to captures when I'm offline",
+    "expect": "lifosy-what-happens-when-you-are-offline"
+  },
+  {
+    "query": "does the web console cache repo files locally",
+    "expect": "lifosy-how-data-flows-between-github-and-the-apps"
+  },
+  {
+    "query": "pnpm install fails with ERR_PNPM_IGNORED_BUILDS",
+    "expect": "developing-in-the-monorepo-prerequisites-and-the-pnpm-12-4-1"
+  },
+  {
+    "query": "pnpm turbo test says could not find task",
+    "expect": "developing-in-the-monorepo-root-scripts-build-lint-check-typ"
+  },
+  {
+    "query": "which cloudflare pages project does the console deploy to",
+    "expect": "developing-in-the-monorepo-ci-workflows-and-cloudflare-pages"
+  },
+  {
+    "query": "how do I bump the console version",
+    "expect": "developing-in-the-monorepo-how-the-console-version-number-is"
+  },
+  {
+    "query": "how do I use the lifosy docs from my own project with docspack ask",
+    "expect": "developing-in-the-monorepo-using-the-lifosy-docs-from-anothe"
+  },
+  {
+    "query": "how do I regenerate the landing page demo video",
+    "expect": "landing-pages-regenerating-the-product-screencast"
+  },
+  {
+    "query": "which landing page app is deployed to production",
+    "expect": "landing-pages-which-landing-page-is-in-production"
+  },
+  {
+    "query": "what port does the local AI server listen on by default",
+    "expect": "cli-cli-server"
+  },
+  {
+    "query": "what JSON body does the /chat endpoint take",
+    "expect": "terminal-cli-running-the-local-ai-server-with-cli-server"
+  },
+  {
+    "query": "cli capture exit codes",
+    "expect": "cli-cli-capture"
+  },
+  {
+    "query": "where is the GitHub token saved after login",
+    "expect": "terminal-cli-signing-in-with-github-from-the-terminal"
+  },
+  {
+    "query": "what happens to captured notes when I'm offline",
+    "expect": [
+      "terminal-cli-how-the-capture-spool-keeps-notes-safe-offline",
+      "desktop-quick-capture-what-happens-to-a-desktop-capture-when",
+      "lifosy-what-happens-when-you-are-offline"
+    ]
+  },
+  {
+    "query": "which file does pressing n create in the repo",
+    "expect": "terminal-cli-writing-a-quick-note-or-knowledge-note-in-the-t"
+  },
+  {
+    "query": "does saving in the file editor push to github",
+    "expect": "terminal-cli-browsing-and-editing-repository-files"
+  },
+  {
+    "query": "frontmatter of knowledge notes in .kh/raw",
+    "expect": "terminal-cli-knowledge-note-file-format-in-kh-raw"
+  },
+  {
+    "query": "where does the cli keep its config directory on linux",
+    "expect": "terminal-cli-where-the-cli-stores-config-and-data"
+  },
+  {
+    "query": "where does dashboard.config.json need to be",
+    "expect": "terminal-cli-viewing-the-dashboard-config-in-the-tui"
+  },
+  {
+    "query": "how do I bind the quick capture overlay to a hotkey in hyprland",
+    "expect": "desktop-quick-capture-setting-up-the-super-k-capture-overlay"
+  },
+  {
+    "query": "drive the capture window with native automate from an agent",
+    "expect": "desktop-quick-capture-letting-an-agent-capture-through-the-n"
+  },
+  {
+    "query": "how do I run the console dev server",
+    "expect": "web-console-running-the-console-locally"
+  },
+  {
+    "query": "how is the console deployed to cloudflare",
+    "expect": "web-console-deploying-the-console"
+  },
+  {
+    "query": "try the console without a GitHub account",
+    "expect": "web-console-trying-the-console-in-demo-mode"
+  },
+  {
+    "query": "where does the console quick note page write",
+    "expect": "web-console-capturing-a-quick-note"
+  },
+  {
+    "query": "configure which items show in the bottom navbar",
+    "expect": "web-console-changing-workspaces-theme-and-the-bottom-navbar"
+  },
+  {
+    "query": "add android home screen shortcut for quick todo",
+    "expect": "web-console-adding-capture-shortcuts-to-a-phone-home-screen"
+  },
+  {
+    "query": "what does Ctrl+K do in the console",
+    "expect": "web-console-searching-files-and-running-commands-with-ctrl-k"
+  },
+  {
+    "query": "how does the CLI get the token from the console",
+    "expect": [
+      "web-console-logging-in-the-cli-or-desktop-palette-through-th",
+      "terminal-cli-signing-in-with-github-from-the-terminal"
+    ]
+  },
+  {
+    "query": "dashboard config file format",
+    "expect": "web-console-where-the-dashboard-layout-is-stored"
+  },
+  {
+    "query": "edit search engines for the palette",
+    "expect": "console-widgets-editing-command-palette-settings"
+  },
+  {
+    "query": "sort bookmarks by least used",
+    "expect": "console-widgets-keeping-bookmarks-in-the-console"
+  },
+  {
+    "query": "which widget opens for a .habit.csv file",
+    "expect": "console-widgets-tracking-habits-time-money-and-other-data"
+  },
+  {
+    "query": "how do I load the extension unpacked in chrome",
+    "expect": "browser-extension-loading-the-extension-into-chrome-for-deve"
+  },
+  {
+    "query": "extension says not logged in how does it get the github token",
+    "expect": [
+      "browser-extension-signing-in-connecting-the-extension-to-the",
+      "web-console-how-the-browser-extension-gets-the-console-token"
+    ]
+  },
+  {
+    "query": "where are pinned tab groups saved in the repo",
+    "expect": "browser-extension-format-of-the-pinned-tab-groups-file"
+  },
+  {
+    "query": "right click selected text save to knowledge base",
+    "expect": "browser-extension-clipping-selected-text-with-the-context-me"
+  },
+  {
+    "query": "why does ctrl+shift+k not open the palette",
+    "expect": "browser-extension-when-the-palette-shortcut-does-nothing"
+  },
+  {
+    "query": "how often does the extension call github for bookmarks",
+    "expect": "browser-extension-how-bookmark-and-tab-group-sync-works"
+  },
+  {
+    "query": "start page habit check in and working time timer",
+    "expect": "browser-extension-start-page-today-view-todos-events-habits"
+  },
+  {
+    "query": "which chrome.storage keys does the extension use",
+    "expect": "browser-extension-what-the-extension-keeps-in-local-browser"
+  },
+  {
+    "query": "delete a braindump from the new tab page",
+    "expect": "browser-extension-braindumps-on-the-start-page"
+  },
+  {
+    "query": "what message does the popup send to add a bookmark",
+    "expect": "browser-extension-message-types-handled-by-the-background-se"
+  },
+  {
+    "query": "pinned page images downloaded to assets",
+    "expect": "browser-extension-pinning-a-page-to-the-knowledge-base"
+  },
+  {
+    "query": "switch repo in extension also changes desktop palette",
+    "expect": "browser-extension-switching-the-active-repository"
+  },
+  {
+    "query": "how do I bind the palette to a keyboard shortcut in hyprland",
+    "expect": "desktop-palette-binding-the-global-hotkey-in-hyprland"
+  },
+  {
+    "query": "search files on my computer by contents",
+    "expect": "desktop-palette-searching-local-files-with-o"
+  },
+  {
+    "query": "add a custom search engine to the palette",
+    "expect": "command-palette-configuring-search-engines-assistants-and-li"
+  },
+  {
+    "query": "show pull requests waiting for my review in the palette",
+    "expect": "command-palette-github-repositories-search-and-work-r-g-w"
+  },
+  {
+    "query": "convert 5 km to feet in the palette",
+    "expect": "command-palette-converting-units-and-pixels"
+  },
+  {
+    "query": "braindump not synced to github when offline",
+    "expect": "desktop-palette-how-braindumps-are-saved-and-synced-to-githu"
+  },
+  {
+    "query": "run a command from commands.md in a terminal",
+    "expect": "desktop-palette-running-commands-from-commands-md-in-ghostty"
+  },
+  {
+    "query": "where are mode recents stored on desktop",
+    "expect": "desktop-palette-files-the-desktop-palette-stores"
+  },
+  {
+    "query": "how to build lifosy-palette on fedora",
+    "expect": "desktop-palette-building-and-installing-the-desktop-palette"
+  },
+  {
+    "query": "open a new Claude Code session from the palette",
+    "expect": "desktop-palette-starting-a-claude-code-session-with-c"
+  },
+  {
+    "query": "what does Tab do in the palette",
+    "expect": "command-palette-searching-the-repository-with-tab"
+  },
+  {
+    "query": "copy an emoji from the palette",
+    "expect": "command-palette-finding-symbols-emoji-and-kaomoji-with-s"
+  },
+  {
+    "query": "where is the kb-ingest command text defined",
+    "expect": "knowledge-base-where-the-kb-slash-commands-are-defined"
+  },
+  {
+    "query": "what does kb-digest read",
+    "expect": "knowledge-base-summarising-personal-data-with-kb-digest"
+  },
+  {
+    "query": "save an answer from kb-ask as a wiki page",
+    "expect": "knowledge-base-asking-the-wiki-a-question-with-kb-ask"
+  },
+  {
+    "query": "what frontmatter does a captured raw note have",
+    "expect": "knowledge-base-raw-source-file-format-in-kh-raw"
+  },
+  {
+    "query": "how do I add the knowledge base MCP server to claude code",
+    "expect": "knowledge-base-mcp-server-adding-the-server-to-claude-code"
+  },
+  {
+    "query": "how does kb_search score results",
+    "expect": "knowledge-base-mcp-server-how-kb-search-ranks-wiki-pages"
+  },
+  {
+    "query": "kb-mcp exits with code 1 on startup",
+    "expect": "knowledge-base-mcp-server-diagnosing-kb-mcp-startup-errors"
+  },
+  {
+    "query": "how do I mark a task as in progress in the todos file",
+    "expect": "repo-file-formats-todo-list-format-todos-md"
+  },
+  {
+    "query": "how do parameters work in commands.md",
+    "expect": "repo-file-formats-command-library-format-commands-md-and-nam"
+  },
+  {
+    "query": "format of habit csv file",
+    "expect": "repo-file-formats-habit-tracker-format-habit-csv"
+  },
+  {
+    "query": "how does demo mode avoid hitting GitHub",
+    "expect": "shared-packages-github-access-and-demo-mode-in-lifosy-core"
+  },
+  {
+    "query": "how is tsconfig shared between packages",
+    "expect": "shared-packages-shared-typescript-biome-and-tailwind-config"
+  }
+]
