@@ -7,6 +7,7 @@ export * from './command-palette.js';
 export * from './convert.js';
 export * from './entries.js';
 export * from './knowledge.js';
+export * from './local-files.js';
 export * from './protocol.js';
 export * from './symbols.js';
 export * from './translate.js';
