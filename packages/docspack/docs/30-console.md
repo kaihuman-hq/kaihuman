@@ -135,8 +135,8 @@ The CLI and the desktop palette log in by opening `/auth/cli?port=<port>&state=<
 
 It also dispatches a `lifosy-auth-update` window event with `{ token, repo, repos }`. The `/extension-onboarded` page fetches the repos, shows "You're connected." and closes itself 1.5 s after the extension fires `EXTENSION_ONBOARDED`.
 
-## Dashboard config file
-<!-- docspack: tags=.dashboard.config.json,workspaces,tiles,theme,recent files -->
+## Where the dashboard layout is stored
+<!-- docspack: tags=.dashboard.config.json,dashboard config,config format,workspaces,tiles,theme,recent files -->
 
 The dashboard reads `<appFolder>/.dashboard.config.json`, normally `.kh/.dashboard.config.json`. The app folder is `.kh`; an old `.lifeos` folder is still read and migrated to `.kh` by `githubFileStore.migrateAppFolder()`. The type is `DashboardConfig` in `packages/core/src/models/types.ts`.
 
@@ -236,7 +236,7 @@ The todo file format is documented with the formats, not here.
 - 2026-10-04 your note text
 ```
 
-The newest note is at the top. **SAVE NOTE** or `Ctrl+Enter` / `Cmd+Enter` saves and commits. The file is created if missing.
+The page header shows the target path. The newest note is at the top. **SAVE NOTE** or `Ctrl+Enter` / `Cmd+Enter` saves and commits. The file is created if missing.
 
 ## Capturing something you learned
 <!-- docspack: tags=quick knowledge,.kh/raw,knowledge capture,til -->
