@@ -60,9 +60,9 @@ The CLI opens a browser window to authenticate via GitHub OAuth. After that it d
 | `d` | Dashboard config view (syncs repo first) |
 | `q` / `Ctrl+C` | Quit |
 
-**AI prompt:** `Tab` cycles provider · `Ctrl+Enter` sends · `Esc` cancels
+**AI prompt:** `Tab` cycles provider · `Enter` sends · `Esc` cancels
 
-**File editor:** `Ctrl+S` saves · `Esc` closes
+**File editor:** `Ctrl+S` saves, then commits and pushes the file · `Esc` closes
 
 See [`doc/documentation.md`](doc/documentation.md) for full key-binding reference.
 
@@ -77,7 +77,7 @@ A `Super+K` overlay that captures a thought straight into `.kh/raw/` via
 ```sh
 pnpm install
 pnpm dev --filter=@lifosy/app-console
-# → http://localhost:5173
+# → http://localhost:4300
 ```
 
 ## Monorepo commands
@@ -85,8 +85,8 @@ pnpm dev --filter=@lifosy/app-console
 ```sh
 pnpm turbo build          # build everything
 pnpm turbo dev            # dev servers for all apps
-pnpm turbo check          # lint + type-check
-pnpm turbo test           # run tests
+pnpm check                # lint + type-check (turbo has no `check` task)
+pnpm -r test              # run tests in every package that has them (turbo has no `test` task)
 ```
 
 ## Packages
@@ -98,11 +98,14 @@ pnpm turbo test           # run tests
 | `packages/formats` | The widget file formats every app reads and writes (todos, action logs, events, prompts, commands, habits, time tracking, timezones, read later) |
 | `packages/palette` | The command palette shared by the browser extension and the desktop app |
 | `packages/config` | Shared TypeScript / Biome / Tailwind config |
+| `packages/docspack` | `@lifosy/docspack` — all of the above documented for AI agents with [docspack](https://docspack.dev) (`npx docspack ask "…"`) |
 
 ## Config files stored by the CLI
 
+In `~/.config/cli/` on Linux (`~/Library/Application Support/com.lifosy.cli/` on macOS):
+
 ```
-~/.config/com/lifosy/cli/
+~/.config/cli/
   auth.json            # GitHub token + active repo
   recent_files.json    # Last 20 opened files (relative repo paths)
   spool/               # Pending knowledge captures awaiting push (offline queue)

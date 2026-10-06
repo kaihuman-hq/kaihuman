@@ -1,5 +1,43 @@
 # Progress
 
+## 2026-10-04 — Docs follow the code; console views documented
+
+- Fixed docs that disagreed with the code: the CLI config dir is `~/.config/cli` on Linux
+  (`~/Library/Application Support/com.lifosy.cli` on macOS); the AI prompt sends on `Enter`;
+  `Ctrl+S` in the CLI editor commits and pushes; `n` writes
+  `.lifeos/quicknotes/quicknote-<ts>.md`; knowledge-note front matter; the console dev server is
+  on port 4300; `pnpm check` and `pnpm -r test` replace the `turbo check` / `turbo test` tasks that
+  do not exist; the console editor is `@cascivo/editor`; the extension popup has three buttons.
+  Touched `README.md`, `doc/documentation.md` and the cli, console, kb-mcp and extension READMEs.
+- New `packages/docspack/docs/32-console-views.md` (`# Console views`): knowledge graph, commit
+  history and per-file history, the LifeOS Copilot AI panel and its local server, the `/new` quick
+  dump editor compared with `/quick-note`, push notifications for overdue milestones and the Todo
+  Reminders workflow, zen mode. 8 new eval questions.
+
+Checks: docspack build 243 chunks (~56k tokens), `doctor --strict` ok, `eval` top-3 77/80 (96 %).
+
+## 2026-10-04 — Everything documented as a docspack package
+
+- New package **`packages/docspack`** (`@lifosy/docspack`): kaihuman's documentation for AI agents,
+  built with [docspack](https://docspack.dev). 14 Markdown files in `docs/` — overview, development,
+  terminal CLI, desktop quick capture, web console and its widgets, browser extension, command
+  palette, desktop palette, knowledge base, KB MCP server, repo file formats, shared packages and
+  landing pages — written one `##` heading per question. `cmdspec.yaml` describes the `cli`
+  binary (`server`, `capture`), one chunk per command.
+- `pnpm --filter @lifosy/docspack build` writes the `.llms/` payload (git-ignored, a turbo build
+  output); `lint` runs `docspack doctor --strict`; `test` runs `docspack eval` over 72 questions in
+  `eval/queries.json` and fails below 90 % in the top 3. `prepublishOnly` rebuilds and checks.
+- `docspack` 1.3.1 added to the root `devDependencies`.
+- Landing page (nextgen): a **Documented for agents** section (`#docs`) with the install / sync /
+  ask commands, and a **Docs** link in the nav pill.
+- Found while writing (documented as the code behaves, not changed): the CLI config dir is
+  `~/.config/cli` on Linux, not `~/.config/com/lifosy/cli/`; `n` writes
+  `.lifeos/quicknotes/quicknote-<ts>.md`; the AI prompt sends on `Enter`; the console dev server
+  runs on port 4300; `turbo.json` has no `test` or `check` task.
+
+Checks: docspack build 232 chunks (~54k tokens), `doctor --strict` ok, `eval` top-3 69/72 (96 %),
+top-1 54/72; landing page `astro build` ok, checked at 1440 px and 390 px.
+
 ## 2026-10-04 — `>o a: …` searches the whole file system
 
 - `>o` still searches only the home directory. A leading `a:` searches the whole file system
