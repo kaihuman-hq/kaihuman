@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-10-06 — Fix deploy workflows: lockfile entry for packages/docspack
+
+- Both deploy workflows failed at `pnpm install` on main after #141:
+  `ERR_PNPM_PACKAGE_MANAGER_NO_IMPORTER`, because `pnpm-lock.yaml` had no
+  `importers["packages/docspack"]` entry. The package has no dependencies of its own, so
+  `pnpm install --lockfile-only` leaves the lockfile alone and does not add it. Added
+  `packages/docspack: {}`, which is how the lockfile lists other packages without dependencies
+  (like `packages/formats`).
+
+Checks: `pnpm install --frozen-lockfile` ok; `pnpm -r run build` ok.
+
 ## 2026-10-04 — Docs follow the code; console views documented
 
 - Fixed docs that disagreed with the code: the CLI config dir is `~/.config/cli` on Linux
