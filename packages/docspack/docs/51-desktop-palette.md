@@ -151,7 +151,7 @@ The request is `RUN_COMMAND { command, where }`, with `where` `terminal` or `bac
 
 ## Opening and using the braindump window
 
-<!-- docspack: tags=braindump,window,notes,scratch,ctrl+n,ctrl+o -->
+<!-- docspack: tags=braindump,window,notes,scratch,ctrl+n,ctrl+o,ctrl+f,find,search -->
 
 The braindump window is a plain text window for getting thoughts down fast. Open it with `lifosy-palette-toggle braindump` (bound to a key) for a new braindump, or from `>d` in the palette.
 
@@ -161,6 +161,7 @@ The braindump window is a plain text window for getting thoughts down fast. Open
 | ⌃N | New braindump (the toggle key does the same unless the current one is empty) |
 | ⌃O | The window's own list of braindumps: type to filter, ⏎ opens, Esc goes back |
 | ⌃⏎ | Copy all and hide |
+| ⌃F | Find in the text: every match is highlighted, ⏎ / ⇧⏎ go to the next / previous one, Esc goes back to the text with the match selected |
 
 It is a normal window, not an overlay, so other windows stay usable. Its title is always `lifosy-braindump`. To float it in Hyprland ≤ 0.54: `windowrule = float, title:^(lifosy-braindump)$`, plus `center` and `size 760 520`. Check the rule syntax for Lua configs (0.55+). The status line shows the title and `saved here`, `synced 10:42`, or why a sync failed.
 
