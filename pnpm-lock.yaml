@@ -397,6 +397,8 @@ importers:
         specifier: ^7.3.1
         version: 7.3.1(@types/node@24.10.13)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.0)(yaml@2.9.0)
 
+  packages/docspack: {}
+
   packages/formats: {}
 
   packages/palette:
