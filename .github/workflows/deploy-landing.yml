@@ -2,7 +2,8 @@ name: "[PROD] Deploy Landing Page"
 
 # The nextgen landing page is the default/production site, served by the
 # `lifosy-landing` Cloudflare Pages project. It deploys on changes to either
-# the nextgen app or its source assets (e.g. the auto-generated screencast).
+# the nextgen app or its source assets (e.g. the auto-generated screencast),
+# and on changes to the docspack Markdown, which the site renders at /docs/.
 
 on:
   push:
@@ -10,6 +11,7 @@ on:
       - main
     paths:
       - "apps/landing-page-nextgen/**"
+      - "packages/docspack/docs/**"
   workflow_dispatch:
 
 permissions:

@@ -44,6 +44,10 @@
     "expect": "landing-pages-regenerating-the-product-screencast"
   },
   {
+    "query": "where can I read the docs in a browser",
+    "expect": "landing-pages-reading-the-docs-on-the-website"
+  },
+  {
     "query": "which landing page app is deployed to production",
     "expect": "landing-pages-which-landing-page-is-in-production"
   },

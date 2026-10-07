@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-10-07 — Docs readable on the landing page at /docs/
+
+- The docs from #141 could not be reached: the **Docs** nav link only scrolled to the
+  "Documented for agents" section, whose install command names `@lifosy/docspack`, which is not
+  on npm yet. And the live site never got that section, because the deploy for #141 failed on
+  the lockfile and #143 (the fix) touched no path that triggers the deploy.
+- The nextgen landing page now renders `packages/docspack/docs/*.md` as `/docs/` (an index of
+  cards) and `/docs/<page>/` (one page per file, sidebar with all pages), through an Astro
+  content collection, so there is one source for the site and the agent index. The nav **Docs**
+  link opens `/docs/`, and the docs section has a **Read the docs →** link.
+- The nav pill moved into `src/components/NavPill.astro` so the docs pages share it.
+- `deploy-landing.yml` also runs on changes to `packages/docspack/docs/**`.
+- Docs: new "Reading the docs on the website" section in `90-landing-pages.md`, with an eval
+  question.
+
+Checks: `astro build` (17 pages); `astro check` (only the existing `astro.config.mjs` Vite type
+error); `docspack doctor --strict` and `docspack eval`; screenshots at 1440 and 390 px with no
+horizontal scroll.
+
 ## 2026-10-06 — Find in the braindump window (⌃F)
 
 - ⌃F in the braindump window opens a find bar above the status line, filled with the selected
