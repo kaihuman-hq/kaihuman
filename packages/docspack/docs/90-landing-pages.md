@@ -24,10 +24,21 @@ The nextgen page is a single route, `src/pages/index.astro`, wrapped by `src/lay
 - **Philosophy:** kaizen, getting 1% better every day.
 - **Principles:** three cards, **Track**, **Own** and **Know**.
 - **Ownership:** "YOUR DATA. YOUR RULES." — local-first, plain files, no tracking.
-- **Docs (`#docs`):** "DOCUMENTED FOR AGENTS." — the `@lifosy/docspack` package, with a terminal block showing `pnpm add -D docspack @lifosy/docspack`, `npx docspack sync` and `npx docspack ask`. The **Docs** link in the nav pill jumps here.
+- **Docs (`#docs`):** "DOCUMENTED FOR AGENTS." — the `@lifosy/docspack` package, with a terminal block showing `pnpm add -D docspack @lifosy/docspack`, `npx docspack sync` and `npx docspack ask`, and a **Read the docs →** link to `/docs/`.
 - **CTA:** **START IMPROVING TODAY** and the GitHub link.
 
-The page title is "kaihuman — The ever-improving human." The default meta description is set in `Layout.astro`. The old page in `apps/landing-page` has the same screencast and demo link right below its hero.
+The **Docs** link in the nav pill (`src/components/NavPill.astro`, shared by every page) opens `/docs/`. The page title is "kaihuman — The ever-improving human." The default meta description is set in `Layout.astro`. The old page in `apps/landing-page` has the same screencast and demo link right below its hero.
+
+## Reading the docs on the website
+<!-- docspack: tags=docs-site,/docs,read-online,browser,human-readable -->
+
+The nextgen site renders this documentation as web pages at `/docs/` (for example `https://kaihuman.com/docs/cli/`). The pages are built from the same Markdown that ships as `@lifosy/docspack`, so the site and the agent index never disagree.
+
+- `src/content.config.ts` defines the `docs` content collection: Astro's `glob` loader reads `../../packages/docspack/docs/*.md`. The id drops the number prefix, so `20-cli.md` becomes `/docs/cli/`.
+- `src/lib/docs.ts` (`getDocPages`) sorts the pages by filename and takes each title from its `#` heading and its summary from the first paragraph.
+- `src/pages/docs/index.astro` lists every page as a card. `src/pages/docs/[id].astro` renders one page, with the page list from `src/layouts/DocsLayout.astro` as a sidebar (below the article on narrow screens).
+
+A change under `packages/docspack/docs/` triggers the production deploy too, so the website follows every docs edit.
 
 ## How the landing page is styled
 <!-- docspack: tags=css,tailwind,design-tokens,fonts -->
@@ -68,7 +79,7 @@ pnpm landing:build             # old page build
 ## How the landing page is deployed
 <!-- docspack: tags=deploy,cloudflare-pages,ci,github-actions,lifosy-landing -->
 
-`.github/workflows/deploy-landing.yml` (named `[PROD] Deploy Landing Page`) deploys the nextgen app. It runs on a push to `main` that touches `apps/landing-page-nextgen/**`, or manually via `workflow_dispatch`.
+`.github/workflows/deploy-landing.yml` (named `[PROD] Deploy Landing Page`) deploys the nextgen app. It runs on a push to `main` that touches `apps/landing-page-nextgen/**` or `packages/docspack/docs/**`, or manually via `workflow_dispatch`.
 
 It calls the reusable `template-deploy-to-cloudflare.yaml` with these inputs:
 

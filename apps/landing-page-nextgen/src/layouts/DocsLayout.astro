@@ -1,0 +1,127 @@
+---
+import NavPill from '../components/NavPill.astro';
+import type { DocPage } from '../lib/docs';
+import Layout from './Layout.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+  pages: DocPage[];
+  /** id of the page being shown; omitted on the docs index. */
+  currentId?: string;
+}
+
+const { title, description, pages, currentId } = Astro.props;
+---
+
+<Layout title={title} description={description}>
+  <NavPill current="docs" />
+
+  <div class="docs-shell">
+    <aside class="docs-nav" aria-label="Documentation pages">
+      <a href="/docs/" class="docs-nav__home" aria-current={currentId ? undefined : 'page'}>// docs</a>
+      <ul class="docs-nav__list">
+        {
+          pages.map(({ entry, title }) => (
+            <li>
+              <a
+                href={`/docs/${entry.id}/`}
+                class="docs-nav__link"
+                aria-current={entry.id === currentId ? 'page' : undefined}
+              >
+                {title}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </aside>
+
+    <main class="docs-main">
+      <slot />
+    </main>
+  </div>
+</Layout>
+
+<style>
+  .docs-shell {
+    max-width: 88rem;
+    margin-inline: auto;
+    padding: calc(var(--space-3xl) + var(--space-lg)) clamp(var(--space-md), 6vw, var(--space-3xl))
+      var(--space-3xl);
+    display: grid;
+    gap: var(--space-2xl);
+  }
+
+  @media (min-width: 60rem) {
+    .docs-shell {
+      grid-template-columns: 16rem minmax(0, 1fr);
+    }
+
+    .docs-nav {
+      position: sticky;
+      top: calc(var(--space-3xl) + var(--space-lg));
+      align-self: start;
+      max-height: calc(100vh - var(--space-4xl));
+      overflow-y: auto;
+    }
+  }
+
+  /* On narrow screens the page list follows the article instead of pushing it down. */
+  @media (max-width: 59.99rem) {
+    .docs-nav {
+      order: 1;
+      padding-top: var(--space-xl);
+      border-top: 1px solid var(--color-rule);
+    }
+  }
+
+  .docs-nav__home {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--color-accent);
+    letter-spacing: 0.08em;
+    text-decoration: none;
+    margin-bottom: var(--space-md);
+  }
+
+  .docs-nav__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-left: 1px solid var(--color-rule);
+  }
+
+  .docs-nav__link {
+    display: block;
+    padding: var(--space-2xs) var(--space-md);
+    margin-left: -1px;
+    border-left: 1px solid transparent;
+    font-size: var(--text-sm);
+    color: var(--color-ink-2);
+    text-decoration: none;
+    transition: color var(--dur-short) var(--ease-out);
+  }
+
+  .docs-nav__link[aria-current='page'] {
+    color: var(--color-accent);
+    border-left-color: var(--color-accent);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .docs-nav__link:hover,
+    .docs-nav__home:hover {
+      color: var(--color-accent);
+    }
+  }
+
+  .docs-nav__link:focus-visible,
+  .docs-nav__home:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .docs-main {
+    min-width: 0;
+  }
+</style>
