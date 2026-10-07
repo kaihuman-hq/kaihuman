@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-10-06 — Find in the braindump window (⌃F)
+
+- ⌃F in the braindump window opens a find bar above the status line, filled with the selected
+  text if there is one. Every match is highlighted in the text, the current one in orange, with a
+  count (`3/12`, `no matches`). ⏎ / ⇧⏎ go to the next / previous match, wrapping around, and
+  scroll it into view; ⌃F again selects the query; Esc goes back to the text with the match
+  selected (a second Esc hides the window as before). Matching is plain text, ignoring case.
+- Tauri's webview has no find of its own, and a textarea cannot style part of its text (the CSS
+  Custom Highlight API does not reach inside it). So the text is copied, with `<mark>`s, into a
+  layer behind the now transparent textarea with the same font, padding, wrapping and width,
+  scrolled with it. No new dependency.
+- `findMatches` exported from `@lifosy/palette`; 9 new tests in `braindump-window.test.ts`.
+  Checked by hand in Chromium against a stubbed Tauri bridge: wrapped lines and tabs line up, and
+  a match far down scrolls into view.
+
 ## 2026-10-06 — Fix deploy workflows: lockfile entry for packages/docspack
 
 - Both deploy workflows failed at `pnpm install` on main after #141:

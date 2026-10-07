@@ -115,7 +115,8 @@ to a key, below) or `>d` in the palette opens a plain text window with the curso
   versions are kept, the other one as a braindump of its own. See `doc/braindump.md`.
 - **Keys**: **Esc** hides (and syncs), **⌃N** new braindump (the key does the same, unless the one
   showing is still empty), **⌃O** the window's own list of braindumps (type to filter, ⏎ opens,
-  Esc goes back), **⌃⏎** copies all and hides.
+  Esc goes back), **⌃⏎** copies all and hides, **⌃F** finds in the text (every match highlighted,
+  ⏎ / ⇧⏎ next / previous, Esc back to the text with the match selected).
 - It is a normal window, not an overlay, so other windows stay usable while you write. Its title is
   always `lifosy-braindump` for your window rules (below).
 

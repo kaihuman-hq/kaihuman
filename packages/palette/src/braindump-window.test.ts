@@ -7,6 +7,7 @@ import {
   BRAINDUMP_SAVE_DELAY_MS,
   type BraindumpWindow,
   createBraindumpWindow,
+  findMatches,
 } from './braindump-window.js';
 import type { ActionPort, Braindump } from './protocol.js';
 
@@ -65,8 +66,10 @@ const type = (value: string) => {
   text().dispatchEvent(new Event('input'));
 };
 
-const key = (target: HTMLElement, name: string, ctrlKey = false) =>
-  target.dispatchEvent(new KeyboardEvent('keydown', { key: name, ctrlKey, bubbles: true }));
+const key = (target: HTMLElement, name: string, ctrlKey = false, shiftKey = false) =>
+  target.dispatchEvent(
+    new KeyboardEvent('keydown', { key: name, ctrlKey, shiftKey, bubbles: true }),
+  );
 
 /** Lets queued promises and due timers run. */
 const tick = async (ms = 0) => {
@@ -236,5 +239,111 @@ describe('braindump window', () => {
     key(text(), 'Escape');
     await tick();
     expect(text().value).toBe('edited elsewhere');
+  });
+});
+
+describe('findMatches', () => {
+  it('finds every occurrence, ignoring case, and treats the query as plain text', () => {
+    expect(findMatches('Milk, milk and MILK', 'milk')).toEqual([
+      { start: 0, end: 4 },
+      { start: 6, end: 10 },
+      { start: 15, end: 19 },
+    ]);
+    expect(findMatches('a.b axb (c)', '.')).toEqual([{ start: 1, end: 2 }]);
+    expect(findMatches('f(x) = (c)', '(c)')).toEqual([{ start: 7, end: 10 }]);
+    expect(findMatches('anything', '')).toEqual([]);
+  });
+
+  it('keeps offsets right where lower case is longer', () => {
+    expect(findMatches('İstanbul is', 'is')).toEqual([{ start: 9, end: 11 }]);
+  });
+});
+
+describe('find in the braindump', () => {
+  const bar = () => root.querySelector('.braindump-find') as HTMLElement;
+  const input = () => root.querySelector('.braindump-find-input') as HTMLInputElement;
+  const count = () => root.querySelector('.braindump-find-count')?.textContent;
+  const marked = () =>
+    [...root.querySelectorAll('.braindump-marks mark')].map((mark) =>
+      mark.classList.contains('current') ? `[${mark.textContent}]` : mark.textContent,
+    );
+  const find = (query: string) => {
+    input().value = query;
+    input().dispatchEvent(new Event('input'));
+  };
+
+  it('opens on ⌃F and highlights every match, the first after the caret as current', () => {
+    type('one two one three one');
+    text().setSelectionRange(5, 5);
+    key(text(), 'f', true);
+    expect(bar().hidden).toBe(false);
+    expect(document.activeElement).toBe(input());
+    find('one');
+    expect(marked()).toEqual(['one', '[one]', 'one']);
+    expect(count()).toBe('2/3');
+    expect(root.querySelector('.braindump-marks')?.textContent).toBe('one two one three one ');
+  });
+
+  it('starts from the selected text', () => {
+    type('pick this word');
+    text().setSelectionRange(5, 9);
+    key(text(), 'f', true);
+    expect(input().value).toBe('this');
+    expect(count()).toBe('1/1');
+  });
+
+  it('steps with ⏎ and ⇧⏎, wrapping around', () => {
+    type('a b a b a');
+    text().setSelectionRange(0, 0);
+    key(text(), 'f', true);
+    find('a');
+    expect(count()).toBe('1/3');
+    key(input(), 'Enter');
+    expect(count()).toBe('2/3');
+    key(input(), 'Enter');
+    key(input(), 'Enter');
+    expect(count()).toBe('1/3');
+    key(input(), 'Enter', false, true);
+    expect(count()).toBe('3/3');
+    expect(marked()).toEqual(['a', 'a', '[a]']);
+  });
+
+  it('says when nothing matches', () => {
+    type('nothing here');
+    key(text(), 'f', true);
+    find('zebra');
+    expect(marked()).toEqual([]);
+    expect(count()).toBe('no matches');
+  });
+
+  it('closes on Esc, back in the text with the current match selected, and leaves the window open', () => {
+    type('x target y');
+    key(text(), 'f', true);
+    find('target');
+    key(input(), 'Escape');
+    expect(bar().hidden).toBe(true);
+    expect(marked()).toEqual([]);
+    expect(document.activeElement).toBe(text());
+    expect([text().selectionStart, text().selectionEnd]).toEqual([2, 8]);
+    expect(hide).not.toHaveBeenCalled();
+  });
+
+  it('follows edits made while it is open', () => {
+    type('cat');
+    text().setSelectionRange(0, 0);
+    key(text(), 'f', true);
+    find('cat');
+    type('cat and cat');
+    expect(marked()).toEqual(['[cat]', 'cat']);
+    expect(count()).toBe('1/2');
+  });
+
+  it('closes when the list opens', async () => {
+    type('cat');
+    key(text(), 'f', true);
+    find('cat');
+    key(text(), 'o', true);
+    await tick();
+    expect(bar().hidden).toBe(true);
   });
 });
