@@ -24,6 +24,7 @@ import {
   type TodoItem,
 } from '@lifosy/formats';
 import { CACHE_TTL_MS } from './bookmarks';
+import { STATUS_CONFIG_PATH } from './service-status';
 
 /** Files whose content the start page reads. Action logs are only written to, so only listed. */
 export const TODAY_SUFFIXES = [
@@ -69,10 +70,17 @@ interface TreeEntry {
   sha: string;
 }
 
-/** The files the start page reads: its widgets' kinds, and the braindumps (doc/braindump.md). */
+/**
+ * The files the start page reads: its widgets' kinds, the braindumps (doc/braindump.md), and the
+ * list of services whose status it shows — which rides along so it costs no request of its own.
+ */
 const isTodayPath = (path: string) => {
   const lower = path.toLowerCase();
-  return TODAY_SUFFIXES.some((suffix) => lower.endsWith(suffix)) || braindumpIdOf(path) !== null;
+  return (
+    TODAY_SUFFIXES.some((suffix) => lower.endsWith(suffix)) ||
+    braindumpIdOf(path) !== null ||
+    path === STATUS_CONFIG_PATH
+  );
 };
 
 export function appFolderOf(tree: { path: string }[]): string {

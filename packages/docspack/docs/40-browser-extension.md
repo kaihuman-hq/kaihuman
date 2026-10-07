@@ -338,12 +338,40 @@ The capture box has three targets:
 
 The box does not read the repo's quick-note list, to avoid a GitHub request per new tab. Other targets are in the palette action **Add a note…**.
 
+## Service status lights on the start page
+<!-- docspack: tags=status,traffic light,outage,github status,aws health,cloudflare,gcp,statuspage -->
+
+A strip under the start page header shows one light per watched service: green operational, amber degraded, red outage, blue maintenance, grey unknown. Hover for the provider's description; a click opens the service's status page in the tab. A dimmed light is the last known answer because the latest check failed.
+
+The services are listed in `.kh/browser.status.json` (`STATUS_CONFIG_PATH`, `src/background/service-status.ts`). Without that file the start page watches GitHub, Claude, AWS (`eu-central-1`, `us-east-1`), Cloudflare and GCP:
+
+```json
+{
+  "services": [
+    { "name": "GitHub", "type": "statuspage", "url": "https://www.githubstatus.com" },
+    { "name": "Cloudflare", "type": "statuspage", "url": "https://www.cloudflarestatus.com", "components": ["CDN/Cache"] },
+    { "name": "AWS", "type": "aws", "regions": ["eu-central-1", "us-east-1"] },
+    { "name": "GCP", "type": "gcp", "products": ["Compute Engine"] }
+  ]
+}
+```
+
+| `type` | Source | Options |
+| --- | --- | --- |
+| `statuspage` | Any Atlassian Statuspage (`<url>/api/v2/status.json`), e.g. GitHub, Claude (`https://status.claude.com`), Cloudflare | `url` (https, required); `components`: only these components count, read from `summary.json` |
+| `aws` | `health.aws.amazon.com/public/currentevents` (UTF-16) | `regions`: region codes; `global` events always count |
+| `gcp` | `status.cloud.google.com/incidents.json`, open incidents only | `products`: product names; a `high` severity is red |
+
+The page sends `GET_SERVICE_STATUS` when it opens and every five minutes. The worker answers from `serviceStatusCache` when it is under five minutes old (`STATUS_CACHE_TTL_MS`) and checks the same services; otherwise it checks every service at once. A failed check keeps the last answer for up to 30 minutes, then shows unknown. The config file is read with the start page's own repo sync, so it costs no GitHub request; an invalid file is shown as an error under the header.
+
+No proxy is needed: the extension's `host_permissions` (`<all_urls>`) exempt its pages and worker from CORS, which matters for AWS, the one provider that sends no CORS header.
+
 ## How the start page data is cached
 
 Bookmarks and tab groups come from the same caches as the popup and palette. The rest is in `todayCache` in `chrome.storage.local`, refreshed by the hourly `repoSync` alarm.
 
 - One request lists the repo tree: `GET /repos/<repo>/git/trees/HEAD?recursive=1`, sent with the stored `ETag`. An unchanged repo answers `304`.
-- Only changed files with these suffixes are read (`TODAY_SUFFIXES`): `.todos.md`, `.events.csv`, `.habit.csv`, `.timetracking.csv`, `.timezones.json`, `.readitlater.json`. Braindumps in `.kh/braindumps/` are read too.
+- Only changed files with these suffixes are read (`TODAY_SUFFIXES`): `.todos.md`, `.events.csv`, `.habit.csv`, `.timetracking.csv`, `.timezones.json`, `.readitlater.json`. Braindumps in `.kh/braindumps/` and `.kh/browser.status.json` are read too.
 - `.actionlog.md` paths are only listed, not read.
 - The cache records `repo`, `appFolder` (`.kh`, or `.lifeos` in older repos), `files` with `sha` and `content`, `etag` and `fetchedAt`.
 - An empty repository (`404` or `409`) is an empty cache, not an error.
@@ -363,7 +391,7 @@ Popup, start page, content script and palette talk to `src/background/service-wo
 | Bookmarks | `GET_BOOKMARKS`, `ADD_BOOKMARK`, `IMPORT_CHROME_BOOKMARKS`, `RECORD_BOOKMARK_USE`, `SET_BOOKMARK_PINNED`, `SYNC_NOW` |
 | Palette | `GET_RECENTS`, `ADD_RECENT`, `GET_MODE_RECENTS`, `ADD_MODE_RECENT`, `SEARCH_REPO`, `OPEN_URL`, `LIST_PROMPT_FILES`, `LIST_COMMAND_FILES`, `LIST_ENTRY_FILES`, `READ_ENTRY_FILE`, `WRITE_ENTRY_FILE`, `GET_PALETTE_SETTINGS`, `LIST_GITHUB_REPOS`, `LIST_GITHUB_WORK`, `TOGGLE_COMMAND_PALETTE` |
 | Translation | `TRANSLATE`, `GET_TRANSLATION_HISTORY`, `ADD_TRANSLATION_HISTORY`, `SET_TRANSLATION_KEY` |
-| Start page | `GET_TODAY`, `REFRESH_TODAY`, `DELETE_BRAINDUMP`, `GET_SYNC_STATUS`, `TODAY_CHECK_IN`, `TODAY_TOGGLE_TIMER`, `READ_LATER_DONE`, `READ_LATER_ADD`, `ADD_TODO` |
+| Start page | `GET_TODAY`, `REFRESH_TODAY`, `GET_SERVICE_STATUS`, `DELETE_BRAINDUMP`, `GET_SYNC_STATUS`, `TODAY_CHECK_IN`, `TODAY_TOGGLE_TIMER`, `READ_LATER_DONE`, `READ_LATER_ADD`, `ADD_TODO` |
 
 The worker also sends `EXTRACT_ARTICLE` and `TOGGLE_COMMAND_PALETTE` to content scripts. Input from pages is checked: `OPEN_URL` only opens safe schemes, `READ_ENTRY_FILE`/`WRITE_ENTRY_FILE` only touch widget file types, and `CAPTURE_KNOWLEDGE` only creates files under the knowledge path. Popups hold a `chrome.runtime.connect` port open to keep the worker alive during long edits.
 
@@ -380,6 +408,7 @@ The worker also sends `EXTRACT_ARTICLE` and `TOGGLE_COMMAND_PALETTE` to content 
 | `bookmarkUsage` | Local open-count deltas not yet pushed |
 | `pinnedTabsCache` | Pinned tab groups |
 | `todayCache` | Start page files from the repo |
+| `serviceStatusCache` | Start page service status lights and the services they were checked for |
 | `paletteSettingsCache` | Cached `.kh/command-palette.settings.json` |
 | `recentActions`, `modeRecents` | Palette **Recent** list, and recents per prefix |
 | `translationHistory`, `deepl_key` | `>t` history and DeepL API key |
@@ -394,6 +423,7 @@ The worker also sends `EXTRACT_ARTICLE` and `TOGGLE_COMMAND_PALETTE` to content 
 | --- | --- |
 | `.kh/browser.bookmarks.json` | Bookmarks, pins, use counts |
 | `.kh/browser.pinnedtabs.json` | Pinned tab groups |
+| `.kh/browser.status.json` | Services shown as status lights on the start page (read only) |
 | `.kh/raw/<epoch-ms>-<slug>.md` | Pinned pages and clips for `/kb-ingest` |
 | `.kh/assets/<stamp>/<n>.<ext>` | Images of pinned pages |
 | `.kh/braindumps/<created-ms>.md` | Braindumps on the start page |

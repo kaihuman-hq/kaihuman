@@ -2,6 +2,7 @@ import { PALETTE_HOST_ID } from '@lifosy/palette';
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Bookmark } from '../background/bookmarks';
+import type { ServiceStatus } from '../background/service-status';
 import type { TodaySummary } from '../background/today';
 import { StartPage } from './StartPage';
 
@@ -33,6 +34,7 @@ let activeGroup: string | null;
 /** What the worker says to a pin; a string is answered as an error. */
 let pinReply: string | null;
 let TODAY: TodaySummary | undefined;
+let STATUSES: ServiceStatus[];
 
 const emptyToday = (): TodaySummary => ({
   events: [],
@@ -100,6 +102,7 @@ const reply = (message: { type?: string; bookmarkId?: string; pinned?: boolean }
     return { opened: 1, unpinned: 0, name: 'Work' };
   }
   if (message.type === 'GET_RECENTS') return { recents: [] };
+  if (message.type === 'GET_SERVICE_STATUS') return { statuses: STATUSES };
   if (message.type === 'GET_TODAY') return TODAY ? { today: TODAY } : { error: 'offline' };
   if (message.type === 'GET_SYNC_STATUS')
     return { syncedAt: Date.now() - 12.5 * 60_000, pendingOpens: 2 };
@@ -196,6 +199,7 @@ beforeEach(() => {
   activeGroup = 'home';
   pinReply = null;
   TODAY = undefined;
+  STATUSES = [];
   deleteReply = null;
   FRESHER = null;
   store = { lifeos_token: 'token', lifeos_repo: 'owner/repo' };
@@ -657,6 +661,42 @@ describe('StartPage', () => {
     expect(sent.find((message) => message.type === 'SYNC_NOW')).toEqual({
       type: 'SYNC_NOW',
       force: true,
+    });
+  });
+
+  it('shows a light per service and opens its status page in this tab', async () => {
+    STATUSES = [
+      {
+        name: 'GitHub',
+        level: 'outage',
+        description: 'Partial System Outage',
+        link: 'https://www.githubstatus.com',
+        checkedAt: 0,
+      },
+      {
+        name: 'GCP',
+        level: 'operational',
+        description: 'No open incidents',
+        link: 'https://status.cloud.google.com',
+        checkedAt: 0,
+        stale: true,
+      },
+    ];
+    await mount(() => host.querySelector('ul[aria-label="Service status"]') !== null);
+
+    const lights = [...host.querySelectorAll('ul[aria-label="Service status"] button')];
+    expect(lights.map((light) => light.textContent)).toEqual([
+      'GitHub: outage',
+      'GCP: operational',
+    ]);
+    expect(lights[0]?.querySelector('span')?.className).toContain('bg-nt-prod');
+    expect(lights[1]?.getAttribute('title')).toContain('latest check failed');
+
+    click('GitHub');
+    expect(sent).toContainEqual({
+      type: 'OPEN_URL',
+      url: 'https://www.githubstatus.com',
+      reuse: true,
     });
   });
 

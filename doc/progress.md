@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-10-07 — Service status lights on the start page
+
+- Before building: checked every provider for CORS. The extension needs no proxy — its
+  `host_permissions: ['<all_urls>']` exempt the start page and the worker from CORS. GitHub,
+  Claude and Cloudflare (Atlassian Statuspage) and GCP send `Access-Control-Allow-Origin: *`
+  anyway; AWS's Health Dashboard feed sends none and is big-endian UTF-16, so it is decoded from
+  its bytes rather than with `response.json()`.
+- A strip under the start page header shows a light per service (operational, degraded, outage,
+  maintenance, unknown); hover for the provider's text, click for its status page.
+- Services come from `.kh/browser.status.json` (types `statuspage` with optional `components`,
+  `aws` with `regions`, `gcp` with `products`), read along with the start page's own repo sync.
+  Without the file: GitHub, Claude, AWS `eu-central-1`/`us-east-1`, Cloudflare, GCP.
+- New `GET_SERVICE_STATUS` message; results cached in `serviceStatusCache` for five minutes and
+  only checked when a start page asks. A failed check keeps the last answer, dimmed, for up to
+  30 minutes.
+- New `src/background/service-status.ts`, `src/newtab/ServiceStatus.tsx`; tests in
+  `service-status.test.ts`, `service-worker.today.test.ts` and `StartPage.test.tsx`. Docs in the
+  extension README and the docspack browser-extension and file-format pages, with an eval query.
+
+Checks: `tsc -b`, `vitest run` (all extension tests), `vite build`, Biome on the changed files
+(the two errors left in `service-worker.ts` were there before); a live run of the checker
+against the five real status feeds.
+
 ## 2026-10-07 — Docs readable on the landing page at /docs/
 
 - The docs from #141 could not be reached: the **Docs** nav link only scrolled to the

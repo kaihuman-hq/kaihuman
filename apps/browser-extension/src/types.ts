@@ -40,6 +40,7 @@ export interface Message {
     | 'TOGGLE_COMMAND_PALETTE'
     | 'GET_TODAY'
     | 'REFRESH_TODAY'
+    | 'GET_SERVICE_STATUS'
     | 'DELETE_BRAINDUMP'
     | 'GET_SYNC_STATUS'
     | 'TODAY_CHECK_IN'
