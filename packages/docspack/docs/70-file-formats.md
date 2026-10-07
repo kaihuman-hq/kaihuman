@@ -42,6 +42,7 @@ Widget files can live in any folder; the console finds them by suffix. Fixed pat
 | `.kh/command-palette.settings.json` | Palette search engines, assistants and tools |
 | `.kh/browser.bookmarks.json` | Bookmarks synced into the browser extension |
 | `.kh/browser.pinnedtabs.json` | Pinned-tab groups: `{ groups: [{ id, name, createdAt, tabs, favorite? }], updatedAt }` |
+| `.kh/browser.status.json` | Start page status lights: `{ services: [{ name, type: "statuspage" \| "aws" \| "gcp", url?, components?, regions?, products? }] }` |
 | `.kh/braindumps/<created-ms>.md` | Braindumps from the desktop palette |
 | `.kh/raw/`, `.kh/wiki/`, `.kh/log.md` | Knowledge base, see the "Knowledge base" page |
 

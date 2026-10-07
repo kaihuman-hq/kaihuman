@@ -84,6 +84,14 @@ import {
   toPinnedTabs,
 } from './pinned-tabs';
 import {
+  checkServices,
+  DEFAULT_SERVICES,
+  isStatusCacheFresh,
+  parseStatusConfig,
+  STATUS_CONFIG_PATH,
+  type ServiceStatusCache,
+} from './service-status';
+import {
   buildToday,
   DEFAULT_ACTION_LOG_PATH,
   fetchToday,
@@ -1137,6 +1145,29 @@ async function refreshToday() {
 }
 
 /**
+ * The traffic lights. The services come from the repo's config, which the start page's own sync
+ * already carries, and their statuses are checked at most every five minutes — when a start page
+ * asks, so a browser with no new tab open checks nothing.
+ */
+async function getServiceStatus() {
+  const { repo } = await credentials();
+  const today = await readTodayCache();
+  const file = isTodayCacheUsable(today, repo)
+    ? today?.files.find((candidate) => candidate.path === STATUS_CONFIG_PATH)
+    : undefined;
+  const services = file ? parseStatusConfig(file.content) : DEFAULT_SERVICES;
+
+  const stored = await chrome.storage.local.get('serviceStatusCache');
+  const cache = stored.serviceStatusCache as ServiceStatusCache | undefined;
+  if (cache && isStatusCacheFresh(cache, services)) return { statuses: cache.statuses };
+
+  const statuses = await checkServices(services, cache?.statuses ?? []);
+  const next: ServiceStatusCache = { services, statuses, fetchedAt: Date.now() };
+  await chrome.storage.local.set({ serviceStatusCache: next });
+  return { statuses };
+}
+
+/**
  * Deletes a braindump the start page shows — but only the version it showed (`sha`): when the
  * desktop has written more since, nothing is deleted and the page gets the newer text to look at.
  */
@@ -1661,6 +1692,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'GET_TODAY') return answer(getToday(), sendResponse);
 
   if (message.type === 'REFRESH_TODAY') return answer(refreshToday(), sendResponse);
+
+  if (message.type === 'GET_SERVICE_STATUS') return answer(getServiceStatus(), sendResponse);
 
   if (message.type === 'DELETE_BRAINDUMP') {
     return answer(deleteBraindump(message.path || '', message.sha || ''), sendResponse);

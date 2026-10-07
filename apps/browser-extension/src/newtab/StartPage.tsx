@@ -16,9 +16,11 @@ import {
   hostOf,
   startPageBookmarks,
 } from '../background/bookmarks';
+import { type ServiceStatus, STATUS_CACHE_TTL_MS } from '../background/service-status';
 import { DEFAULT_ACTION_LOG_PATH, type TodaySummary } from '../background/today';
 import { CONSOLE_URL, consoleFileUrl } from '../console';
 import { send, workerPort } from '../palette/port';
+import { ServiceStatusStrip } from './ServiceStatus';
 import {
   Braindumps,
   Clocks,
@@ -139,6 +141,8 @@ export function StartPage() {
   });
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [statuses, setStatuses] = useState<ServiceStatus[]>([]);
+  const [statusError, setStatusError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -166,6 +170,15 @@ export function StartPage() {
         setActiveGroupId(response.activeId);
       },
       (e: Error) => setTabGroupsError(e.message),
+    );
+
+  const refreshServiceStatus = () =>
+    send({ type: 'GET_SERVICE_STATUS' }).then(
+      (response) => {
+        setStatuses(response.statuses);
+        setStatusError(null);
+      },
+      (e: Error) => setStatusError(e.message),
     );
 
   const refreshSyncStatus = () =>
@@ -213,6 +226,10 @@ export function StartPage() {
       setCaptureLog({ ...EMPTY_CAPTURE_LOG, ...(result[CAPTURE_LOG_KEY] as Partial<CaptureLog>) });
       if (storedToken) void loadAll();
     });
+    // Status pages need no login. Asked again as often as the worker's cache allows, for a start
+    // page left open.
+    void refreshServiceStatus();
+    const statusTimer = setInterval(() => void refreshServiceStatus(), STATUS_CACHE_TTL_MS);
     // The desktop palette may have switched repositories since; the page then starts over on it.
     send({ type: 'SYNC_REPO_WITH_DESKTOP' }).then(
       (response) => {
@@ -221,7 +238,10 @@ export function StartPage() {
       (e: Error) => console.warn('LifeOS Extension: could not ask the desktop for its repository', e),
     );
     const timer = setInterval(() => setNow(new Date()), TICK_MS);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      clearInterval(statusTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -531,6 +551,8 @@ export function StartPage() {
             </div>
           </div>
         </header>
+
+        <ServiceStatusStrip statuses={statuses} error={statusError} onOpen={openInThisTab} />
 
         <div class="flex items-center gap-3 h-[52px] px-4 border border-nt-control focus-within:border-nt-accent">
           <span aria-hidden="true" class="text-[15px] text-nt-accent">

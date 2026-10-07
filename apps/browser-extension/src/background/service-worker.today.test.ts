@@ -48,6 +48,9 @@ beforeEach(async () => {
     '.kh/inbox.todos.md': '- [ ] existing\n',
   };
   fetchMock = vi.fn(async (url: string, init?: any) => {
+    if (url.endsWith('/api/v2/status.json')) {
+      return { ok: true, status: 200, json: async () => ({ status: { indicator: 'none' } }) };
+    }
     if (init?.method === 'DELETE') {
       const path = pathOf(url);
       if (!(path in remote)) return { ok: false, status: 404, statusText: 'Not Found' };
@@ -505,5 +508,55 @@ describe('braindumps on the start page', () => {
     remote[BRAINDUMP] = 'written a minute ago';
     const response = await call({ type: 'REFRESH_TODAY' });
     expect(response.today.braindumps[0].text).toBe('written a minute ago');
+  });
+});
+
+describe('GET_SERVICE_STATUS', () => {
+  const statusRequests = () =>
+    fetchMock.mock.calls.filter(([url]) => url.endsWith('/api/v2/status.json')).length;
+
+  it('checks the services the repo lists, then answers from the cache', async () => {
+    remote['.kh/browser.status.json'] = JSON.stringify({
+      services: [{ name: 'GitHub', type: 'statuspage', url: 'https://www.githubstatus.com' }],
+    });
+    seedCache();
+
+    const first = await call({ type: 'GET_SERVICE_STATUS' });
+    expect(first.statuses).toMatchObject([{ name: 'GitHub', level: 'operational' }]);
+    expect(statusRequests()).toBe(1);
+
+    await call({ type: 'GET_SERVICE_STATUS' });
+    expect(statusRequests()).toBe(1);
+  });
+
+  it('checks again once the cache is five minutes old', async () => {
+    remote['.kh/browser.status.json'] = JSON.stringify({
+      services: [{ name: 'GitHub', type: 'statuspage', url: 'https://www.githubstatus.com' }],
+    });
+    seedCache();
+    await call({ type: 'GET_SERVICE_STATUS' });
+    store.serviceStatusCache.fetchedAt -= 5 * 60 * 1000 + 1;
+
+    await call({ type: 'GET_SERVICE_STATUS' });
+    expect(statusRequests()).toBe(2);
+  });
+
+  it('watches the default services when the repo lists none', async () => {
+    seedCache();
+    const response = await call({ type: 'GET_SERVICE_STATUS' });
+    expect(response.statuses.map((status: any) => status.name)).toEqual([
+      'GitHub',
+      'Claude',
+      'AWS',
+      'Cloudflare',
+      'GCP',
+    ]);
+  });
+
+  it('reports a broken config instead of guessing', async () => {
+    remote['.kh/browser.status.json'] = '{"services": {}}';
+    seedCache();
+    const response = await call({ type: 'GET_SERVICE_STATUS' });
+    expect(response.error).toContain('missing a "services" array');
   });
 });

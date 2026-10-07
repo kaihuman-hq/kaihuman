@@ -436,6 +436,29 @@ left one.
   bookmark opens are still waiting to be pushed, and **sync**, which does what the palette's
   **Sync with GitHub now** does and reloads the page's data.
 
+**Service status** — under the header, a traffic light per service you depend on: green
+operational, amber degraded, red outage, blue maintenance, grey unknown. Hovering shows what the
+provider says; a click opens its status page. List the services in `.kh/browser.status.json`;
+without one, GitHub, Claude, AWS (`eu-central-1` and `us-east-1`), Cloudflare and GCP are shown:
+
+```json
+{
+  "services": [
+    { "name": "GitHub", "type": "statuspage", "url": "https://www.githubstatus.com" },
+    { "name": "Claude", "type": "statuspage", "url": "https://status.claude.com" },
+    { "name": "Cloudflare", "type": "statuspage", "url": "https://www.cloudflarestatus.com", "components": ["CDN/Cache"] },
+    { "name": "AWS", "type": "aws", "regions": ["eu-central-1", "us-east-1"] },
+    { "name": "GCP", "type": "gcp", "products": ["Compute Engine"] }
+  ]
+}
+```
+
+`statuspage` works for any Atlassian Statuspage; `components` narrows it to those components
+(Cloudflare's overall status counts hundreds of data centres). `regions` and `products` narrow AWS
+and GCP the same way. Statuses are checked straight from the providers — the extension's host
+permission exempts it from CORS, so there is no proxy — at most every five minutes, when a start
+page asks. A provider that cannot be reached keeps its last light, dimmed, for up to 30 minutes.
+
 **Search** — typing filters the pinned and recently used bookmarks as you type (title or host, any
 case). **⏎** hands the text to the command palette, which searches the repo and the web and lists
 every action. **/** puts the cursor in the field. The extension shortcut (**Ctrl+Shift+K**) opens
