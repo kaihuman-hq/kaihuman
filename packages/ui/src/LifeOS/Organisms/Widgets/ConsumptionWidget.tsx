@@ -9,6 +9,7 @@ import {
   type MonthlyStats,
   parseConsumption,
   removeColumn,
+  sameDayLastYear,
   serializeConsumption,
   type YearlyStats,
 } from './ConsumptionLogic';
@@ -97,6 +98,7 @@ export const ConsumptionWidget = ({
 
 const RecentTable = ({ data, compact }: { data: ConsumptionData; compact?: boolean }) => {
   const recent = data.entries.slice(-30).reverse();
+  const byDate = useMemo(() => new Map(data.entries.map((e) => [e.date, e])), [data.entries]);
 
   if (recent.length === 0) {
     return <div className="p-4 text-[var(--los-muted)] font-mono text-xs">No entries yet</div>;
@@ -130,11 +132,17 @@ const RecentTable = ({ data, compact }: { data: ConsumptionData; compact?: boole
               </td>
               {data.columns.map((col) => {
                 const delta = entry.deltas[col.key];
+                const lastYear = byDate.get(sameDayLastYear(entry.date))?.deltas[col.key];
                 return (
                   <td key={col.key} className="py-1 px-2 text-right tabular-nums">
                     {delta !== undefined && !Number.isNaN(delta) && delta > 0
                       ? formatNum(delta)
                       : '–'}
+                    {lastYear !== undefined && !Number.isNaN(lastYear) && lastYear > 0 && (
+                      <span className="ml-1 text-[var(--los-muted)] opacity-70">
+                        ({formatNum(lastYear)})
+                      </span>
+                    )}
                   </td>
                 );
               })}
