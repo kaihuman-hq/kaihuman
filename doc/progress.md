@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-10-08 — Last year's value in the consumption Recent table
+
+- `.consumption.csv` widget, Recent tab: each cell now also shows the value of the same day one
+  year earlier in brackets, in the muted colour, when that day has a value. Feb 29 has no match.
+- New `sameDayLastYear` helper in `ConsumptionLogic.ts`, with tests; `packages/ui` gets a
+  `test` script.
+
+Checks: `tsc --noEmit`, `vitest run`, Biome, `vite build` for `packages/ui`.
+
 ## 2026-10-08 — Bigger service status lights
 
 - The status lights from #145 were hard to see: the dots grew from 9px to 12px and got a 3px

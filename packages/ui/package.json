@@ -27,7 +27,8 @@
     "build": "vite build",
     "watch": "vite build --watch",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "preact": "^10.0.0"

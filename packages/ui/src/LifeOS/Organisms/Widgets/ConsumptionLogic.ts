@@ -464,3 +464,8 @@ export function getYearlyStats(data: ConsumptionData): YearlyStats[] {
 
   return result.sort((a, b) => a.year - b.year);
 }
+
+/** Same calendar day one year earlier (YYYY-MM-DD). Feb 29 maps to a non-existent date, so lookups miss. */
+export function sameDayLastYear(date: string): string {
+  return `${String(Number(date.slice(0, 4)) - 1).padStart(4, '0')}${date.slice(4)}`;
+}
