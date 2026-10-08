@@ -30,7 +30,7 @@ export function App() {
     // Check for auth token, repo, and repos
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', 'lifeos_repos'], (result) => {
       const storedToken = (result.lifeos_token as string) || null;
-      const storedRepo = (result.lifeos_repo as string) || 'lifosy/monorepo';
+      const storedRepo = (result.lifeos_repo as string) || 'kaihuman-hq/kaihuman';
       const storedRepos = (result.lifeos_repos as { full_name: string }[]) || [];
 
       setToken(storedToken);
@@ -251,7 +251,7 @@ export function App() {
       <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
         <BookmarkPageForm
           page={activeTab}
-          repo={activeRepo || 'lifosy/monorepo'}
+          repo={activeRepo || 'kaihuman-hq/kaihuman'}
           onClose={() => setView('main')}
         />
       </div>
@@ -290,7 +290,7 @@ export function App() {
           </div>
           {repos.length > 0 ? (
             <select
-              value={activeRepo || 'lifosy/monorepo'}
+              value={activeRepo || 'kaihuman-hq/kaihuman'}
               onChange={handleRepoChange}
               class="text-[10px] text-[var(--los-fg)] font-mono bg-[var(--los-bg)] border border-[var(--los-border)] rounded px-1 py-0.5 max-w-[150px] truncate focus:outline-none focus:border-[var(--los-accent)] cursor-pointer"
             >
@@ -333,7 +333,7 @@ export function App() {
           </div>
         )}
 
-        <PinnedTabsPanel repo={activeRepo || 'lifosy/monorepo'} />
+        <PinnedTabsPanel repo={activeRepo || 'kaihuman-hq/kaihuman'} />
 
         {/* Dump Note Section */}
         <section class="space-y-2 flex flex-col flex-1">
@@ -344,7 +344,7 @@ export function App() {
                 value={selectedNote}
                 onChange={(e) => setSelectedNote((e.target as HTMLSelectElement).value)}
                 class="text-[10px] text-[var(--los-fg-dim)] font-mono bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded px-1 py-0.5 max-w-[150px] truncate focus:outline-none focus:border-[var(--los-accent)] cursor-pointer"
-                title={`${activeRepo || 'lifosy/monorepo'}/${selectedNote}`}
+                title={`${activeRepo || 'kaihuman-hq/kaihuman'}/${selectedNote}`}
               >
                 <option value=".lifeos/dump.md" class="bg-[var(--los-bg)]">.lifeos/dump.md</option>
                 {quickNotes.map((q) => (
@@ -352,7 +352,7 @@ export function App() {
                 ))}
               </select>
             ) : (
-              <span class="text-[10px] text-[var(--los-fg-dim)] line-clamp-1 break-all px-2 py-0.5 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]" title={`${activeRepo || 'lifosy/monorepo'}/${selectedNote}`}>
+              <span class="text-[10px] text-[var(--los-fg-dim)] line-clamp-1 break-all px-2 py-0.5 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]" title={`${activeRepo || 'kaihuman-hq/kaihuman'}/${selectedNote}`}>
                 {selectedNote}
               </span>
             )}

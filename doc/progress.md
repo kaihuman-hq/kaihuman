@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-10-08 — Repository renamed to kaihuman-hq/kaihuman
+
+- The default repository (browser extension, desktop palette `DEFAULT_REPO`, console search and
+  repo fallback) is now `kaihuman-hq/kaihuman` instead of `lifosy/monorepo`. Stored choices are
+  kept; GitHub redirects the old name.
+- "View Source" links on both landing pages, the README title, the root package name and the
+  docspack pages now name the new repository. Package scope `@lifosy/*`, binaries, config paths
+  and the native host `com.lifosy.palette` are unchanged.
+
+Checks: `tsc` for the extension and `packages/ui`, `vitest run` (all extension tests), Biome on
+the changed files (no new findings), `docspack build` and `docspack eval`.
+
 ## 2026-10-08 — Last year's value in the consumption Recent table
 
 - `.consumption.csv` widget, Recent tab: each cell now also shows the value of the same day one

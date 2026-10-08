@@ -6,7 +6,7 @@ export default {
 };
 
 const sampleRepos = [
-  { id: '1', name: 'monorepo', full_name: 'lifosy/monorepo' },
+  { id: '1', name: 'kaihuman', full_name: 'kaihuman-hq/kaihuman' },
   { id: '2', name: 'dotfiles', full_name: 'adam/dotfiles' },
   { id: '3', name: 'obsidian-vault', full_name: 'adam/obsidian-vault' },
   { id: '4', name: 'project-x', full_name: 'work/project-x' },

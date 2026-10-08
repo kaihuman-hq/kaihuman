@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 /// The same default as the browser extension, so both start out on the same repository.
-pub const DEFAULT_REPO: &str = "lifosy/monorepo";
+pub const DEFAULT_REPO: &str = "kaihuman-hq/kaihuman";
 
 const KEYRING_SERVICE: &str = "lifosy-palette";
 const KEYRING_USER: &str = "github-token";
@@ -323,7 +323,7 @@ mod tests {
 
     #[test]
     fn accepts_owner_slash_name_only() {
-        assert!(is_repo_name("lifosy/monorepo"));
+        assert!(is_repo_name("kaihuman-hq/kaihuman"));
         assert!(is_repo_name("a-b/c_d.e"));
         for bad in ["lifosy", "a/b/c", "/b", "a/", "a/..", "a b/c", "a/b?x=1"] {
             assert!(!is_repo_name(bad), "{bad} should be rejected");

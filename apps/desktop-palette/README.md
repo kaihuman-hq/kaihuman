@@ -171,7 +171,7 @@ lifosy-palette logout
   and never written to a file. Hyprland does not start one for you, so start one from your config,
   for example `gnome-keyring-daemon --start --components=secrets`.
 - `--repo` is optional; without it the palette uses the repository from the last login, or
-  `lifosy/monorepo`. **Switch repository…** in the palette lists every repository you have logged
+  `kaihuman-hq/kaihuman`. **Switch repository…** in the palette lists every repository you have logged
   in with.
 
 ## Hyprland

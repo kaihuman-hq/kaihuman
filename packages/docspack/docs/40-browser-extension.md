@@ -68,7 +68,7 @@ Each new token drops `bookmarksCache` and `todayCache`, because a new token can 
 ## Switching the active repository
 <!-- docspack: tags=repo,repository,switch repo,native messaging -->
 
-Every file the extension reads or writes is in one active repository, stored as `lifeos_repo` in `chrome.storage.local`. The default is `lifosy/monorepo`.
+Every file the extension reads or writes is in one active repository, stored as `lifeos_repo` in `chrome.storage.local`. The default is `kaihuman-hq/kaihuman`.
 
 - The popup header has a repository `<select>`. On open, the popup fetches `GET /user/repos?per_page=100&sort=updated` and saves the list as `lifeos_repos`. If the stored repo is not in that list, the first one becomes active.
 - The palette action **Switch repository…** picks from the repositories the console shared (`GET_REPOS`, `SET_REPO`).

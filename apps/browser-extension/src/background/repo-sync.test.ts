@@ -44,11 +44,11 @@ describe('syncRepoWithDesktop', () => {
   });
 
   it('sends the default and no change time before either was stored', async () => {
-    host.mockResolvedValue({ repo: 'lifosy/monorepo', changedAt: 0 });
+    host.mockResolvedValue({ repo: 'kaihuman-hq/kaihuman', changedAt: 0 });
     expect(await syncRepoWithDesktop()).toBe(false);
     expect(host).toHaveBeenCalledWith(NATIVE_HOST, {
       type: 'SYNC_REPO',
-      repo: 'lifosy/monorepo',
+      repo: 'kaihuman-hq/kaihuman',
       changedAt: 0,
     });
   });

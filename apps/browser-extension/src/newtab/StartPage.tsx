@@ -38,7 +38,7 @@ import {
  * to spend a GitHub request on it. */
 const DUMP_PATH = '.lifeos/dump.md';
 
-const DEFAULT_REPO = 'lifosy/monorepo';
+const DEFAULT_REPO = 'kaihuman-hq/kaihuman';
 
 /** What the capture box writes: a note to the dump, a todo to the inbox, or an action log entry. */
 type CaptureKind = 'note' | 'todo' | 'log';
