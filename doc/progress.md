@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-10-08 — Bigger service status lights
+
+- The status lights from #145 were hard to see: the dots grew from 9px to 12px and got a 3px
+  halo in their own colour (30% opacity), with a bit more space before the label.
+
+Checks: `tsc -b`, `vitest run` (all extension tests), `vite build`, Biome on the changed file;
+a screenshot of the new lights on the dark background.
+
 ## 2026-10-07 — Service status lights on the start page
 
 - Before building: checked every provider for CORS. The extension needs no proxy — its
