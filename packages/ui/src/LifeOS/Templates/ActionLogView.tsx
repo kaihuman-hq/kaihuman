@@ -1,11 +1,11 @@
-import { githubFileStore, layoutStore } from '@lifosy/core';
+import { githubFileStore, layoutStore } from '@kaihuman/core';
 import {
   type ActionLogEntry,
   type ActionLogFile,
   addActionLogEntry,
   parseActionLog,
   serializeActionLog,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import { ArrowLeft, Plus, Search, Tag, X } from 'lucide-preact';
 import { Fragment } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';

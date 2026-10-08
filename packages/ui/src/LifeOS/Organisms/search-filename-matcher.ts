@@ -1,4 +1,4 @@
-import type { TreeItem } from '@lifosy/core';
+import type { TreeItem } from '@kaihuman/core';
 
 export interface FilenameMatch {
   name: string;

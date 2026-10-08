@@ -1,10 +1,10 @@
-import { Logger } from '@lifosy/core';
+import { Logger } from '@kaihuman/core';
 import { useEffect } from 'preact/hooks';
 
 const logger = new Logger('FileViewer');
 
-import { githubFileStore } from '@lifosy/core';
-import { EncryptedTileWrapper, type TileDef } from '@lifosy/ui';
+import { githubFileStore } from '@kaihuman/core';
+import { EncryptedTileWrapper, type TileDef } from '@kaihuman/ui';
 import { CodeMirrorEditor } from './editor/CodeMirrorEditor';
 
 interface FileViewerProps {

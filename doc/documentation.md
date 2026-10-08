@@ -147,8 +147,8 @@ Code or any MCP client. It works on a local clone — for example the CLI's
 `~/.config/cli/repos/<owner>/<repo>`.
 
 ```sh
-pnpm --filter @lifosy/kb-mcp build
-claude mcp add lifosy-kb -- node /path/to/monorepo/apps/kb-mcp/dist/index.js --repo /path/to/clone
+pnpm --filter @kaihuman/kb-mcp build
+claude mcp add kaihuman-kb -- node /path/to/monorepo/apps/kb-mcp/dist/index.js --repo /path/to/clone
 ```
 
 The repo path comes from `--repo`, then `KB_REPO_PATH`, then the current directory.
@@ -167,9 +167,9 @@ See `apps/kb-mcp/README.md` for a `.mcp.json` snippet.
 ## Documentation for AI agents
 
 Everything in this file, and the rest of the monorepo, is also packaged for agents as
-`@lifosy/docspack` (`packages/docspack`). From the repo root:
+`@kaihuman/docspack` (`packages/docspack`). From the repo root:
 
 ```sh
-pnpm --filter @lifosy/docspack build
-pnpm --filter @lifosy/docspack exec docspack preview "how do I capture a note"
+pnpm --filter @kaihuman/docspack build
+pnpm --filter @kaihuman/docspack exec docspack preview "how do I capture a note"
 ```

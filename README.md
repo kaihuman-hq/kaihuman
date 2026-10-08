@@ -76,7 +76,7 @@ A `Super+K` overlay that captures a thought straight into `.kh/raw/` via
 
 ```sh
 pnpm install
-pnpm dev --filter=@lifosy/app-console
+pnpm dev --filter=@kaihuman/app-console
 # → http://localhost:4300
 ```
 
@@ -98,7 +98,7 @@ pnpm -r test              # run tests in every package that has them (turbo has 
 | `packages/formats` | The widget file formats every app reads and writes (todos, action logs, events, prompts, commands, habits, time tracking, timezones, read later) |
 | `packages/palette` | The command palette shared by the browser extension and the desktop app |
 | `packages/config` | Shared TypeScript / Biome / Tailwind config |
-| `packages/docspack` | `@lifosy/docspack` — all of the above documented for AI agents with [docspack](https://docspack.dev) (`npx docspack ask "…"`) |
+| `packages/docspack` | `@kaihuman/docspack` — all of the above documented for AI agents with [docspack](https://docspack.dev) (`npx docspack ask "…"`) |
 
 ## Config files stored by the CLI
 

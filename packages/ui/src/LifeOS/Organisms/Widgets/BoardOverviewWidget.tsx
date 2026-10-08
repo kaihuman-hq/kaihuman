@@ -1,5 +1,5 @@
-import { githubFileStore, layoutStore } from '@lifosy/core';
-import { parseTodos, type TodoStatus } from '@lifosy/formats';
+import { githubFileStore, layoutStore } from '@kaihuman/core';
+import { parseTodos, type TodoStatus } from '@kaihuman/formats';
 import { CheckCircle2, Circle, Clock, ExternalLink, PlayCircle, XCircle } from 'lucide-preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';

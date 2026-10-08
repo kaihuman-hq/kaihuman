@@ -12,7 +12,7 @@ pub const BOOKMARKS_PATH: &str = ".kh/browser.bookmarks.json";
 /// How long a cached copy is served before it is refreshed in the background.
 pub const CACHE_TTL_MS: u64 = 60 * 60 * 1000;
 
-/// The shape `@lifosy/palette` expects (`Bookmark` in packages/palette/src/bookmarks.ts).
+/// The shape `@kaihuman/palette` expects (`Bookmark` in packages/palette/src/bookmarks.ts).
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bookmark {

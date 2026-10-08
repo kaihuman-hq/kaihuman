@@ -1,4 +1,4 @@
-export * from '@lifosy/formats';
+export * from '@kaihuman/formats';
 export * from './components/Button';
 export * from './components/editor/Editor';
 export * from './components/Input';

@@ -65,7 +65,7 @@ The overlay calls `cli capture`, which writes each note to the `spool/` director
 
 | File | Contents |
 |---|---|
-| `app.zon` | Manifest: id `com.lifosy.kh-capture`, name `kh-capture`, one `main` window 560×160, permissions `view`, `window`, `net`, `fs`, capability `shortcuts` |
+| `app.zon` | Manifest: id `com.kaihuman.kh-capture`, name `kh-capture`, one `main` window 560×160, permissions `view`, `window`, `net`, `fs`, capability `shortcuts` |
 | `src/app.native` | Markup: title text, an autofocused input bound to `{draft}`, **Save** and **Dismiss** buttons, a `{status}` text |
 | `src/main.zig` | Model, messages, effects and capture builders |
 | `scripts/agent-capture.sh` | Automation driver and acceptance test |

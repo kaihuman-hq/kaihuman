@@ -1,6 +1,6 @@
 //! The socket protocol between the palette daemon and its clients.
 //!
-//! Kept free of Tauri so `lifosy-palette-toggle`, which links only this, starts in a couple of
+//! Kept free of Tauri so `kaihuman-palette-toggle`, which links only this, starts in a couple of
 //! milliseconds instead of loading the ~130 shared libraries the WebKitGTK daemon needs.
 
 use std::io::Write;
@@ -68,7 +68,7 @@ pub fn socket_path() -> PathBuf {
     let dir = std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir);
-    dir.join("lifosy-palette.sock")
+    dir.join("kaihuman-palette.sock")
 }
 
 /// One request per connection: `<command> <client start in ms>\n`.

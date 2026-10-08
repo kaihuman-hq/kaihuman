@@ -1,5 +1,5 @@
-import { encrypt, Logger, passwordStore } from '@lifosy/core';
-import { DEFAULT_PALETTE_SETTINGS, serializePaletteSettings } from '@lifosy/formats';
+import { encrypt, Logger, passwordStore } from '@kaihuman/core';
+import { DEFAULT_PALETTE_SETTINGS, serializePaletteSettings } from '@kaihuman/formats';
 import {
   Activity,
   AlertTriangle,

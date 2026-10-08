@@ -114,7 +114,7 @@ packages/
       "command": "node",
       "args": ["/path/to/kaihuman/mcp-server/dist/index.js"],
       "env": {
-        "KAIHUMAN_REPO_PATH": "~/.config/com/lifosy/cli/repos/your-user/your-repo"
+        "KAIHUMAN_REPO_PATH": "~/.config/com/kaihuman/cli/repos/your-user/your-repo"
       }
     }
   }
@@ -132,7 +132,7 @@ Create `~/.claude/commands/` with skills tailored to your workflow:
 **`/kh-review`** — Morning or evening review
 ```markdown
 Read today's todos, habits, and inbox from the kaihuman repo at
-~/.config/com/lifosy/cli/repos/. Summarize: what's done, what's pending,
+~/.config/com/kaihuman/cli/repos/. Summarize: what's done, what's pending,
 any habit streaks at risk. Keep it under 200 words, actionable tone.
 ```
 
@@ -165,7 +165,7 @@ These live in `~/.claude/commands/` and are available in any Claude Code session
     "Stop": [{
       "hooks": [{
         "type": "command",
-        "command": "echo \"- $(date +%H:%M) Claude session in $(basename $PWD)\" >> ~/.config/com/lifosy/cli/repos/<owner>/<repo>/daily/$(date +%Y-%m-%d).md"
+        "command": "echo \"- $(date +%H:%M) Claude session in $(basename $PWD)\" >> ~/.config/com/kaihuman/cli/repos/<owner>/<repo>/daily/$(date +%Y-%m-%d).md"
       }]
     }]
   }

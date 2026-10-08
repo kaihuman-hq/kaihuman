@@ -129,7 +129,7 @@ fn parse_request(method: &str, target: &str, body: &[u8], expected_state: &str) 
     }
 }
 
-const PAGE: &str = "<!doctype html><meta charset=utf-8><title>lifosy-palette</title>\
+const PAGE: &str = "<!doctype html><meta charset=utf-8><title>kaihuman-palette</title>\
 <body style=\"font:16px monospace;background:#0d0d0d;color:#e6e6e6;display:grid;place-items:center;height:90vh\">";
 
 fn respond(mut stream: TcpStream, status: &str, message: &str) {

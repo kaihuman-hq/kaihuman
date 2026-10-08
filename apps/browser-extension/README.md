@@ -1,16 +1,16 @@
-# Lifosy Browser Extension
+# kaihuman Browser Extension
 
-The official browser extension for Lifosy, designed to enhance your web experience and seamlessly integrate with your Lifosy console.
+The official browser extension for kaihuman, designed to enhance your web experience and seamlessly integrate with your kaihuman console.
 
 ## Features
 
 - **Read-it-later**: Quickly save web pages to your "read-it-later" list.
 - **Save to Knowledge Base**: Add selected text or snippets directly to your knowledge base.
 - **Quick Dump Notes**: Rapidly create notes without navigating away from your current tab.
-- **Context Menu Integration**: Conveniently access Lifosy features directly from the browser's context menu.
+- **Context Menu Integration**: Conveniently access kaihuman features directly from the browser's context menu.
 - **Pinned Tabs Sync**: Save named groups of pinned tabs to your repo, and load any of them into the current window on any machine.
 - **Bookmarks**: Your repo's bookmarks, mirrored into the browser and synced at most once an hour. Bookmark the current page from the popup or the palette, or import the ones this browser already has. Opens are counted so you can find the ones you never use.
-- **Same repository as the desktop palette**: with `lifosy-palette native-host install <this extension's id>` run once, switching the repository here or in the desktop palette switches the other too — the newer choice wins (`nativeMessaging` permission; see the desktop palette's README).
+- **Same repository as the desktop palette**: with `kaihuman-palette native-host install <this extension's id>` run once, switching the repository here or in the desktop palette switches the other too — the newer choice wins (`nativeMessaging` permission; see the desktop palette's README).
 - **Command Palette**: `Ctrl+Shift+K` on any page to search those bookmarks, repeat what you did last, run any of the extension's actions — and, on request, search your repo.
 - **Start Page**: a New Tab page of your own — what is coming up and in progress, habit and time trackers, the read-later queue, world clocks, the bookmarks you reach for, a box for a note, todo or log entry, and the palette (which Chrome's own New Tab page cannot host).
 
@@ -379,7 +379,7 @@ Everything the extension can do is here, so the popup is never the only way in:
 | Switch repository… | Pick from the repositories the console shared |
 | Sync with GitHub now | Fetches and pushes immediately, ignoring the hourly budget |
 | Set the DeepL API key… | For `>t` translations; an empty key forgets it |
-| Open the Lifosy console | |
+| Open the kaihuman console | |
 
 The four page actions at the top — bookmark, read later, pin, clip — need a page to read, so the palette on
 the start page starts at **Add a note…**. Everything below it is the same list.
@@ -403,7 +403,7 @@ relay finds nothing listening — you do not need to reload your tabs.
 
 If a press still does nothing, work through these in order:
 
-1. **Check the binding.** Open `chrome://extensions/shortcuts`. If the row for "Open the Lifosy
+1. **Check the binding.** Open `chrome://extensions/shortcuts`. If the row for "Open the kaihuman
    command palette" is empty, Chrome could not honour the suggested `Ctrl+Shift+K` — the
    combination is already taken by the OS or another extension — and silently left it unbound.
    Click the field and set any combination you like; `Ctrl`/`Alt` plus an optional `Shift` and a

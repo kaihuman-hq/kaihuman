@@ -1,6 +1,6 @@
 # Web console
 
-The web console is the main Lifosy (kaihuman) web app, in `apps/console` (package `@lifosy/app-console`). It is a Preact + Vite + Tailwind CSS single-page app, installable as a PWA, that reads and writes plain files in your own GitHub repository through the GitHub API. Most UI lives in `packages/ui` (`@lifosy/ui`) and the stores and GitHub service live in `packages/core` (`@lifosy/core`); the console wires them to routes. It is deployed to Cloudflare Pages and served at `app.kaihuman.com`.
+The web console is the main kaihuman (kaihuman) web app, in `apps/console` (package `@kaihuman/app-console`). It is a Preact + Vite + Tailwind CSS single-page app, installable as a PWA, that reads and writes plain files in your own GitHub repository through the GitHub API. Most UI lives in `packages/ui` (`@kaihuman/ui`) and the stores and GitHub service live in `packages/core` (`@kaihuman/core`); the console wires them to routes. It is deployed to Cloudflare Pages and served at `app.kaihuman.com`.
 
 ## Running the console locally
 <!-- docspack: tags=dev server,start,localhost,pnpm dev -->
@@ -13,7 +13,7 @@ pnpm dev          # generates src/version.ts, then vite (port 4300, see vite.con
 pnpm prod         # dev server with --mode prod (reads .env.prod)
 ```
 
-From the root, `pnpm dev:console` runs `turbo run dev watch --filter=@lifosy/app-console --filter=@lifosy/ui`, so changes in `packages/ui` rebuild too. The root `README.md` also shows `pnpm dev --filter=@lifosy/app-console`.
+From the root, `pnpm dev:console` runs `turbo run dev watch --filter=@kaihuman/app-console --filter=@kaihuman/ui`, so changes in `packages/ui` rebuild too. The root `README.md` also shows `pnpm dev --filter=@kaihuman/app-console`.
 
 Login needs the env variable `VITE_GH_LOGIN`, the URL of the GitHub OAuth gateway. It is set in `apps/console/.env.prod`. Without it, `authStore.login()` logs `VITE_GH_LOGIN is not defined` and does nothing. Use `/demo` to try the app without a login.
 
@@ -32,7 +32,7 @@ Scripts in `apps/console/package.json`:
 | `pnpm check-types` | `tsc --noEmit` |
 | `pnpm version:bump[:minor|:major]` | Bumps `version.json` and regenerates `src/version.ts` |
 
-The default Vitest config excludes `src/spikes/**`. Those spike tests run only with `vitest.spike.config.ts`. The version (`version.json`, shown in the status bar) and `src/version.ts` (generated, with build time and git hash) are described in `apps/console/VERSION.md`. Type checking the console may need `@lifosy/ui` to be built first.
+The default Vitest config excludes `src/spikes/**`. Those spike tests run only with `vitest.spike.config.ts`. The version (`version.json`, shown in the status bar) and `src/version.ts` (generated, with build time and git hash) are described in `apps/console/VERSION.md`. Type checking the console may need `@kaihuman/ui` to be built first.
 
 ## Deploying the console
 <!-- docspack: tags=deploy,cloudflare pages,ci,github actions -->
@@ -40,8 +40,8 @@ The default Vitest config excludes `src/spikes/**`. Those spike tests run only w
 The workflow `.github/workflows/deploy-magic-life-os.yaml` ("[PROD] Deploy Life OS") deploys the console. It runs on a push to `main` that touches `apps/console/**`, or by `workflow_dispatch`.
 
 - It calls `template-deploy-to-cloudflare.yaml` with `buildTarget: console:build`.
-- The root script `console:build` runs `turbo run build:prod --filter=@lifosy/app-console`, which bumps the patch version.
-- It uploads `apps/console/dist` to the Cloudflare Pages project `lifosy-console`.
+- The root script `console:build` runs `turbo run build:prod --filter=@kaihuman/app-console`, which bumps the patch version.
+- It uploads `apps/console/dist` to the Cloudflare Pages project `kaihuman-console`.
 - It commits the generated `apps/console/src/version.ts` and `apps/console/version.json` back to the branch.
 - Secrets: `CF_ACCOUNT_ID`, `CF_API_TOKEN`.
 
@@ -63,7 +63,7 @@ The workflow `.github/workflows/deploy-magic-life-os.yaml` ("[PROD] Deploy Life 
 | `packages/ui/src/LifeOS/Templates/` | `KanbanBoard`, `TodoAnalytics`, `ActionLogView`, `Login` |
 | `packages/core/src/stores/` | `authStore`, `githubFileStore`, `githubProfileStore`, `layoutStore`, `navigationStore`, demo store |
 
-State uses Preact signals in these stores. Widget file formats come from `packages/formats` (`@lifosy/formats`). React imports are aliased to `preact/compat` in `vite.config.ts`.
+State uses Preact signals in these stores. Widget file formats come from `packages/formats` (`@kaihuman/formats`). React imports are aliased to `preact/compat` in `vite.config.ts`.
 
 ## Console routes
 <!-- docspack: tags=urls,pages,router,paths -->
@@ -86,7 +86,7 @@ All routes are in `apps/console/src/App.tsx`. Routes marked protected show the l
 | `/wiki` | `WikiPage` | yes |
 | `/extension-onboarded` | `ExtensionSuccess` | yes |
 
-Any other path renders `NotFound` from `@lifosy/ui`. `/files/<path>` opens that repo file in the editor; `/files/new` and `/new` open the New File wizard. A `?repo=owner/name` parameter on a deep link selects that repository first (the browser extension sends it).
+Any other path renders `NotFound` from `@kaihuman/ui`. `/files/<path>` opens that repo file in the editor; `/files/new` and `/new` open the New File wizard. A `?repo=owner/name` parameter on a deep link selects that repository first (the browser extension sends it).
 
 ## Signing in with GitHub
 <!-- docspack: tags=login,oauth,auth,token,logout -->
@@ -103,7 +103,7 @@ The token is kept in IndexedDB, with `localStorage` key `lifeos_gh_token` as a b
 ## Trying the console in demo mode
 <!-- docspack: tags=demo,try without login,sample data,in-memory -->
 
-Demo mode runs the console on seeded, in-memory data, with no GitHub account. Open `/demo`, or click **View demo** on the login page. Both call `enterDemoMode()` from `@lifosy/core` and route to `/`.
+Demo mode runs the console on seeded, in-memory data, with no GitHub account. Open `/demo`, or click **View demo** on the login page. Both call `enterDemoMode()` from `@kaihuman/core` and route to `/`.
 
 - `enterDemoMode()` (`packages/core/src/stores/demo.store.ts`) loads `buildDemoSeed()` (`packages/core/src/demo/seed.ts`) into `inMemoryGithubService` and sets the `demoMode` signal.
 - All persistence goes to memory; nothing is written to `localStorage` or IndexedDB. Data is gone on refresh.
@@ -129,11 +129,11 @@ The CLI and the desktop palette log in by opening `/auth/cli?port=<port>&state=<
 
 `ExtensionAuthBridge` (`apps/console/src/components/ExtensionAuthBridge.tsx`) is mounted on every page. It writes these attributes on `<body>` for the extension's content script:
 
-- `data-lifosy-auth` — the GitHub token
-- `data-lifosy-repo` — the selected repo `owner/name`
-- `data-lifosy-repos` — the repo list as JSON
+- `data-kaihuman-auth` — the GitHub token
+- `data-kaihuman-repo` — the selected repo `owner/name`
+- `data-kaihuman-repos` — the repo list as JSON
 
-It also dispatches a `lifosy-auth-update` window event with `{ token, repo, repos }`. The `/extension-onboarded` page fetches the repos, shows "You're connected." and closes itself 1.5 s after the extension fires `EXTENSION_ONBOARDED`.
+It also dispatches a `kaihuman-auth-update` window event with `{ token, repo, repos }`. The `/extension-onboarded` page fetches the repos, shows "You're connected." and closes itself 1.5 s after the extension fires `EXTENSION_ONBOARDED`.
 
 ## Where the dashboard layout is stored
 <!-- docspack: tags=.dashboard.config.json,dashboard config,config format,workspaces,tiles,theme,recent files -->
@@ -222,7 +222,7 @@ Files open in `FileViewer` (`apps/console/src/components/FileViewer.tsx`), which
 `/quick-todo` (`apps/console/src/pages/QuickTodoPage.tsx`) adds one task to `<appFolder>/inbox.todos.md`, normally `.kh/inbox.todos.md`.
 
 - Fields: **Task** and optional **Tags** (space or comma separated; `#` is stripped, lowercased).
-- **ADD TO INBOX** appends the entry with `addTodoEntry` from `@lifosy/formats` and commits. The file is created if missing.
+- **ADD TO INBOX** appends the entry with `addTodoEntry` from `@kaihuman/formats` and commits. The file is created if missing.
 - **BOARD →** opens `/board`, where the inbox always shows.
 
 The todo file format is documented with the formats, not here.
@@ -265,7 +265,7 @@ whole text
 `/quick-log` (`apps/console/src/pages/QuickLogPage.tsx`) adds a timestamped entry to `<appFolder>/inbox.actionlog.md`, normally `.kh/inbox.actionlog.md`.
 
 - Fields: **What happened?** and optional **Tags**.
-- **LOG IT** or `Ctrl+Enter` writes the entry with `addActionLogEntry` from `@lifosy/formats` and commits.
+- **LOG IT** or `Ctrl+Enter` writes the entry with `addActionLogEntry` from `@kaihuman/formats` and commits.
 - **VIEW LOG →** opens `/action-log`.
 
 `/action-log` (`ActionLogView` in `packages/ui/src/LifeOS/Templates/ActionLogView.tsx`) shows all `.actionlog.md` files on the dashboards (or in the tree with no config), always including the inbox log, and has an add form.

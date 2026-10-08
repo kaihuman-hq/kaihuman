@@ -1,11 +1,11 @@
 //! Chrome native messaging, so the browser extension and the palette work on the same repository.
 //!
-//! Chrome starts `lifosy-palette chrome-extension://<id>/` when the extension sends a message, and
+//! Chrome starts `kaihuman-palette chrome-extension://<id>/` when the extension sends a message, and
 //! each message is 4 bytes of length (native byte order) and that much JSON, both ways. Only
 //! `SYNC_REPO` is understood: each side sends the repository it uses and when that last changed,
 //! the newer choice wins, and the answer is the winner, for the extension to take.
 //!
-//! `lifosy-palette native-host install <extension id>` registers this binary with the browsers
+//! `kaihuman-palette native-host install <extension id>` registers this binary with the browsers
 //! found under `$XDG_CONFIG_HOME`.
 
 use std::io::{Read, Write};
@@ -127,7 +127,7 @@ fn is_extension_id(id: &str) -> bool {
 fn manifest(binary: &Path, extension_id: &str) -> Value {
     json!({
         "name": HOST_NAME,
-        "description": "Keeps the Lifosy extension and desktop palette on the same repository",
+        "description": "Keeps the kaihuman extension and desktop palette on the same repository",
         "path": binary,
         "type": "stdio",
         "allowed_origins": [format!("chrome-extension://{extension_id}/")],
@@ -262,19 +262,19 @@ mod tests {
 
     #[test]
     fn installs_for_the_browsers_it_finds_and_only_for_that_extension() {
-        let home = std::env::temp_dir().join(format!("lifosy-native-{}", std::process::id()));
+        let home = std::env::temp_dir().join(format!("kaihuman-native-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&home);
         std::fs::create_dir_all(home.join("chromium")).unwrap();
         let id = "abcdefghijklmnopabcdefghijklmnop";
 
-        let written = install(&home, Path::new("/usr/bin/lifosy-palette"), id).unwrap();
+        let written = install(&home, Path::new("/usr/bin/kaihuman-palette"), id).unwrap();
         assert_eq!(
             written,
             [home.join("chromium/NativeMessagingHosts/com.lifosy.palette.json")]
         );
         let manifest: Value =
             serde_json::from_str(&std::fs::read_to_string(&written[0]).unwrap()).unwrap();
-        assert_eq!(manifest["path"], "/usr/bin/lifosy-palette");
+        assert_eq!(manifest["path"], "/usr/bin/kaihuman-palette");
         assert_eq!(
             manifest["allowed_origins"],
             json!([format!("chrome-extension://{id}/")])

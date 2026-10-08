@@ -1,4 +1,4 @@
-import { githubFileStore, Logger, layoutStore } from '@lifosy/core';
+import { githubFileStore, Logger, layoutStore } from '@kaihuman/core';
 import {
   Command,
   CornerDownLeft,

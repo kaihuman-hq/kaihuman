@@ -1,5 +1,5 @@
-import { authStore, githubProfileStore } from '@lifosy/core';
-import { Button } from '@lifosy/ui';
+import { authStore, githubProfileStore } from '@kaihuman/core';
+import { Button } from '@kaihuman/ui';
 import { useEffect, useState } from 'preact/hooks';
 import { submitCliCallback } from '../lib/cli-callback';
 

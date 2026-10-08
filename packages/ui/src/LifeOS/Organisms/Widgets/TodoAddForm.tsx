@@ -1,4 +1,4 @@
-import type { Milestone, TodoPrompt } from '@lifosy/formats';
+import type { Milestone, TodoPrompt } from '@kaihuman/formats';
 import { useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../../Atoms/Typography';

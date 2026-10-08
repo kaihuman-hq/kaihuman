@@ -1,5 +1,5 @@
-import { githubFileStore } from '@lifosy/core';
-import { StatusBar, WikiView } from '@lifosy/ui';
+import { githubFileStore } from '@kaihuman/core';
+import { StatusBar, WikiView } from '@kaihuman/ui';
 import { useEffect } from 'preact/hooks';
 import { route } from 'preact-router';
 

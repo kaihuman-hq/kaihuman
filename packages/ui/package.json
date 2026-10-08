@@ -1,5 +1,5 @@
 {
-  "name": "@lifosy/ui",
+  "name": "@kaihuman/ui",
   "version": "0.0.0",
   "private": true,
   "main": "./dist/index.mjs",
@@ -43,8 +43,8 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@lifosy/core": "workspace:*",
-    "@lifosy/formats": "workspace:*",
+    "@kaihuman/core": "workspace:*",
+    "@kaihuman/formats": "workspace:*",
     "@preact/signals": "^2.0.1",
     "clsx": "^2.1.0",
     "framer-motion": "^12.26.2",

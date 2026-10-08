@@ -1,4 +1,4 @@
-import { addCommandEntry, commandParameters, fillCommand, parseCommands } from '@lifosy/formats';
+import { addCommandEntry, commandParameters, fillCommand, parseCommands } from '@kaihuman/formats';
 import { Check, Copy } from 'lucide-preact';
 import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';

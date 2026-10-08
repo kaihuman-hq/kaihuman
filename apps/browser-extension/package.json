@@ -10,8 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@lifosy/formats": "workspace:*",
-    "@lifosy/palette": "workspace:*",
+    "@kaihuman/formats": "workspace:*",
+    "@kaihuman/palette": "workspace:*",
     "preact": "^10.27.2"
   },
   "devDependencies": {

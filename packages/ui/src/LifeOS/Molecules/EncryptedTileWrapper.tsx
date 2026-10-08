@@ -5,7 +5,7 @@ import {
   Logger,
   passwordStore,
   unlockedFiles,
-} from '@lifosy/core';
+} from '@kaihuman/core';
 import { useSignal } from '@preact/signals';
 import { useEffect } from 'preact/hooks';
 import type { TileDef } from '../Layouts/MainApp';

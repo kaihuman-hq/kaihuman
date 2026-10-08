@@ -1,6 +1,6 @@
-# @lifosy/kb-mcp
+# @kaihuman/kb-mcp
 
-A stdio [MCP](https://modelcontextprotocol.io) server. It gives an LLM agent (for example Claude Code) access to the Lifosy knowledge base in a local repository clone.
+A stdio [MCP](https://modelcontextprotocol.io) server. It gives an LLM agent (for example Claude Code) access to the kaihuman knowledge base in a local repository clone.
 
 The server reads the `.kh/` folder in the repository. If `.kh/` does not exist, it uses the legacy `.lifeos/` folder.
 
@@ -33,10 +33,10 @@ Prerequisites: Node.js 22 or later, pnpm.
 
 ```sh
 pnpm install
-pnpm --filter @lifosy/kb-mcp build
+pnpm --filter @kaihuman/kb-mcp build
 ```
 
-The build writes `apps/kb-mcp/dist/index.js`. This file is also the `lifosy-kb-mcp` bin.
+The build writes `apps/kb-mcp/dist/index.js`. This file is also the `kaihuman-kb-mcp` bin.
 
 ### Repository selection
 
@@ -46,20 +46,20 @@ The server uses the first value that is set:
 2. `KB_REPO_PATH` environment variable
 3. the current working directory
 
-The Lifosy CLI clones repositories to `~/.config/cli/repos/<owner>/<repo>` (Linux). When Claude Code runs inside such a clone, you do not need to set a path.
+The kaihuman CLI clones repositories to `~/.config/cli/repos/<owner>/<repo>` (Linux). When Claude Code runs inside such a clone, you do not need to set a path.
 
 ### Claude Code
 
 Add the server to the current project:
 
 ```sh
-claude mcp add lifosy-kb -- node /absolute/path/to/monorepo/apps/kb-mcp/dist/index.js
+claude mcp add kaihuman-kb -- node /absolute/path/to/monorepo/apps/kb-mcp/dist/index.js
 ```
 
 To use a specific repository:
 
 ```sh
-claude mcp add lifosy-kb -- node /absolute/path/to/monorepo/apps/kb-mcp/dist/index.js \
+claude mcp add kaihuman-kb -- node /absolute/path/to/monorepo/apps/kb-mcp/dist/index.js \
   --repo ~/.config/cli/repos/<owner>/<repo>
 ```
 
@@ -68,7 +68,7 @@ Alternatively, put this in `.mcp.json` at the root of the knowledge-base reposit
 ```json
 {
   "mcpServers": {
-    "lifosy-kb": {
+    "kaihuman-kb": {
       "command": "node",
       "args": ["/absolute/path/to/monorepo/apps/kb-mcp/dist/index.js"],
       "env": { "KB_REPO_PATH": "." }
@@ -82,10 +82,10 @@ The server writes diagnostics to stderr, because stdout carries the MCP protocol
 ## Development
 
 ```sh
-pnpm --filter @lifosy/kb-mcp build        # tsc to dist/
-pnpm --filter @lifosy/kb-mcp check-types  # tsc --noEmit
-pnpm --filter @lifosy/kb-mcp lint         # biome check
-pnpm --filter @lifosy/kb-mcp test         # vitest run
+pnpm --filter @kaihuman/kb-mcp build        # tsc to dist/
+pnpm --filter @kaihuman/kb-mcp check-types  # tsc --noEmit
+pnpm --filter @kaihuman/kb-mcp lint         # biome check
+pnpm --filter @kaihuman/kb-mcp test         # vitest run
 ```
 
 Source layout (`src/`):

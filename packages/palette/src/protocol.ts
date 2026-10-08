@@ -5,7 +5,7 @@
  * desktop app will answer the same request names from Rust. A request names its `type`, and the
  * response lists only the fields the palette reads — a backend may send more.
  */
-import type { BraindumpId } from '@lifosy/formats';
+import type { BraindumpId } from '@kaihuman/formats';
 import type { Bookmark } from './bookmarks.js';
 import type { ClaudeUsage } from './claude-usage.js';
 import type { RecentEntry, RepoResult } from './command-palette.js';

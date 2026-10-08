@@ -1,5 +1,5 @@
-import { githubProfileStore } from '@lifosy/core';
-import { StatusBar } from '@lifosy/ui';
+import { githubProfileStore } from '@kaihuman/core';
+import { StatusBar } from '@kaihuman/ui';
 import { ArrowLeft } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { route } from 'preact-router';

@@ -1,5 +1,5 @@
-import type { PushSetupResult } from '@lifosy/core';
-import { isPushEnabled } from '@lifosy/core';
+import type { PushSetupResult } from '@kaihuman/core';
+import { isPushEnabled } from '@kaihuman/core';
 import {
   ArrowDown,
   ArrowUp,

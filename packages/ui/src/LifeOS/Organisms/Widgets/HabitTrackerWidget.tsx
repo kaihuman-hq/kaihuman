@@ -1,5 +1,5 @@
-import { Logger } from '@lifosy/core';
-import { calculateStats, checkIn, isCheckedIn, parseHabitData } from '@lifosy/formats';
+import { Logger } from '@kaihuman/core';
+import { calculateStats, checkIn, isCheckedIn, parseHabitData } from '@kaihuman/formats';
 import { CalendarCheck, CheckCircle, Flame, Trophy } from 'lucide-preact';
 import { useMemo } from 'preact/hooks';
 import { cn } from '../../../utils';

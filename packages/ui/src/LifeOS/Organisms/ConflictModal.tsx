@@ -1,4 +1,4 @@
-import { githubFileStore } from '@lifosy/core';
+import { githubFileStore } from '@kaihuman/core';
 import { AlertTriangle, DownloadCloud, FilePen } from 'lucide-preact';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
 

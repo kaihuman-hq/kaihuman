@@ -8,7 +8,7 @@ import {
   portHandlers,
   repoActions,
   splitTags,
-} from '@lifosy/palette';
+} from '@kaihuman/palette';
 import { send, workerPort } from '../palette/port';
 import { extractArticle } from './extract';
 
@@ -16,12 +16,12 @@ console.log('LifeOS Extension: Content script loaded');
 
 // Function to extract token and send to background
 function extractToken() {
-  const bridge = document.getElementById('lifosy-extension-bridge');
+  const bridge = document.getElementById('kaihuman-extension-bridge');
   if (bridge) {
     // Check if attribute is already there (React/Preact might have rendered it)
-    const token = document.body.getAttribute('data-lifosy-auth');
-    const repo = document.body.getAttribute('data-lifosy-repo');
-    const reposRaw = document.body.getAttribute('data-lifosy-repos');
+    const token = document.body.getAttribute('data-kaihuman-auth');
+    const repo = document.body.getAttribute('data-kaihuman-repo');
+    const reposRaw = document.body.getAttribute('data-kaihuman-repos');
 
     if (token) {
       let repos = [];
@@ -42,7 +42,7 @@ function extractToken() {
 extractToken();
 
 // Listen for custom event from the web app
-window.addEventListener('lifosy-auth-update', (event: any) => {
+window.addEventListener('kaihuman-auth-update', (event: any) => {
   const token = event.detail.token;
   const repo = event.detail.repo;
   const repos = event.detail.repos || [];
@@ -58,9 +58,9 @@ const observer = new MutationObserver((mutations) => {
   for (const mutation of mutations) {
     if (
       mutation.type === 'attributes' &&
-      (mutation.attributeName === 'data-lifosy-auth' ||
-        mutation.attributeName === 'data-lifosy-repo' ||
-        mutation.attributeName === 'data-lifosy-repos')
+      (mutation.attributeName === 'data-kaihuman-auth' ||
+        mutation.attributeName === 'data-kaihuman-repo' ||
+        mutation.attributeName === 'data-kaihuman-repos')
     ) {
       shouldExtract = true;
     }

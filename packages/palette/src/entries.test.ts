@@ -21,7 +21,7 @@ describe('entryKindOf', () => {
   });
 });
 
-// The formats themselves are tested in @lifosy/formats; these check the answers reach them.
+// The formats themselves are tested in @kaihuman/formats; these check the answers reach them.
 describe('each kind hands its answers to the shared add', () => {
   it('a todo, its #tags taken from the text', () => {
     expect(add('a.todos.md', '', ['Call #admin the bank'])).toBe(

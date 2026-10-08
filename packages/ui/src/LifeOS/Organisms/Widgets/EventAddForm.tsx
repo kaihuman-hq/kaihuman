@@ -1,4 +1,4 @@
-import type { EventEntry } from '@lifosy/formats';
+import type { EventEntry } from '@kaihuman/formats';
 import { useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader } from '../../Atoms/Typography';

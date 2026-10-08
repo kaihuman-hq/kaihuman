@@ -17,15 +17,15 @@ import {
   sortableKeyboardCoordinates,
   useSortable,
 } from '@dnd-kit/sortable';
-import { githubFileStore, githubProfileStore, Logger, layoutStore } from '@lifosy/core';
-import type { ReadItLaterItem } from '@lifosy/formats';
+import { githubFileStore, githubProfileStore, Logger, layoutStore } from '@kaihuman/core';
+import type { ReadItLaterItem } from '@kaihuman/formats';
 import {
   addEventEntry,
   addTodoEntry,
   parseTimezones,
   parseTodos,
   serializeTimezones,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import {
   Edit,
   FileText,
@@ -98,8 +98,8 @@ import { MainGrid } from './MainGrid';
 const logger = new Logger('MainApp');
 
 import { CSS } from '@dnd-kit/utilities';
-import type { TileDef as CoreTileDef } from '@lifosy/core';
-import { setupPushNotifications } from '@lifosy/core';
+import type { TileDef as CoreTileDef } from '@kaihuman/core';
+import { setupPushNotifications } from '@kaihuman/core';
 import { ConflictModal } from '../Organisms/ConflictModal';
 import { MoveFileModal } from '../Organisms/MoveFileModal';
 import { NewFileWizard } from '../Organisms/NewFileWizard';

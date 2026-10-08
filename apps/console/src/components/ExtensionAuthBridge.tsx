@@ -1,5 +1,9 @@
-import { authStore, githubProfileStore } from '@lifosy/core';
+import { authStore, githubProfileStore } from '@kaihuman/core';
 import { useEffect } from 'preact/hooks';
+
+// Extensions built before the rename still look for the `lifosy` names, and the console deploys
+// before every installed extension updates; drop 'lifosy' once those have updated.
+const PREFIXES = ['kaihuman', 'lifosy'];
 
 export function ExtensionAuthBridge() {
   // Accessing signal .value inside the component body tells Preact to re-render
@@ -12,34 +16,38 @@ export function ExtensionAuthBridge() {
     // Expose token for the extension content script to grab
     // We put it in a specific hidden element that the content script can find easily
     // This is a simple bridge mechanism.
-    if (token) {
-      document.body.setAttribute('data-lifosy-auth', token);
-    } else {
-      document.body.removeAttribute('data-lifosy-auth');
-    }
-
-    if (repo) {
-      document.body.setAttribute('data-lifosy-repo', repo);
-    } else {
-      document.body.removeAttribute('data-lifosy-repo');
-    }
-
     const reposList = githubProfileStore.repos.value || [];
-    if (reposList.length > 0) {
-      document.body.setAttribute('data-lifosy-repos', JSON.stringify(reposList));
-    } else {
-      document.body.removeAttribute('data-lifosy-repos');
-    }
+    for (const prefix of PREFIXES) {
+      if (token) {
+        document.body.setAttribute(`data-${prefix}-auth`, token);
+      } else {
+        document.body.removeAttribute(`data-${prefix}-auth`);
+      }
 
-    // Also dispatch an event in case the extension is listening
-    window.dispatchEvent(
-      new CustomEvent('lifosy-auth-update', { detail: { token, repo, repos: reposList } }),
-    );
+      if (repo) {
+        document.body.setAttribute(`data-${prefix}-repo`, repo);
+      } else {
+        document.body.removeAttribute(`data-${prefix}-repo`);
+      }
+
+      if (reposList.length > 0) {
+        document.body.setAttribute(`data-${prefix}-repos`, JSON.stringify(reposList));
+      } else {
+        document.body.removeAttribute(`data-${prefix}-repos`);
+      }
+
+      // Also dispatch an event in case the extension is listening
+      window.dispatchEvent(
+        new CustomEvent(`${prefix}-auth-update`, { detail: { token, repo, repos: reposList } }),
+      );
+    }
 
     return () => {
-      document.body.removeAttribute('data-lifosy-auth');
-      document.body.removeAttribute('data-lifosy-repo');
-      document.body.removeAttribute('data-lifosy-repos');
+      for (const prefix of PREFIXES) {
+        document.body.removeAttribute(`data-${prefix}-auth`);
+        document.body.removeAttribute(`data-${prefix}-repo`);
+        document.body.removeAttribute(`data-${prefix}-repos`);
+      }
     };
   }, [token, repo, reposList]);
 
@@ -47,5 +55,11 @@ export function ExtensionAuthBridge() {
     // We can keep this empty or remove it, but nothing needed here since the success page handles it.
   }, []);
 
-  return <div id="lifosy-extension-bridge" style={{ display: 'none' }} />;
+  return (
+    <>
+      {PREFIXES.map((prefix) => (
+        <div key={prefix} id={`${prefix}-extension-bridge`} style={{ display: 'none' }} />
+      ))}
+    </>
+  );
 }

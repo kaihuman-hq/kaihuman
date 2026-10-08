@@ -11,6 +11,6 @@
     "test:desktop": "vite build && cargo test --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {
-    "@lifosy/palette": "workspace:*"
+    "@kaihuman/palette": "workspace:*"
   }
 }

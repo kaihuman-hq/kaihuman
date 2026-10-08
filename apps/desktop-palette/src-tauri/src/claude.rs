@@ -17,7 +17,7 @@ const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const TOKEN_URL: &str = "https://platform.claude.com/v1/oauth/token";
 const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 const OAUTH_BETA: &str = "oauth-2025-04-20";
-const USER_AGENT: &str = "lifosy-palette";
+const USER_AGENT: &str = "kaihuman-palette";
 /// A token this close to expiring is refreshed first, as omarchy's script does.
 const REFRESH_MARGIN_MS: u64 = 60_000;
 
@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn writes_credentials_readable_by_the_user_alone() {
         use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("lifosy-claude-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kaihuman-claude-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join(".credentials.json");
         write_credentials(&path, &json!({ "a": 1 })).unwrap();

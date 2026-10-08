@@ -6,9 +6,9 @@
 //
 // Prerequisites (handled automatically when possible):
 //   - The console dev server (http://localhost:4300). If it isn't running the
-//     script starts `pnpm --filter @lifosy/app-console dev` itself and stops it
+//     script starts `pnpm --filter @kaihuman/app-console dev` itself and stops it
 //     when done. That requires deps installed (`pnpm install`) and the UI
-//     package built once (`pnpm --filter @lifosy/ui build`).
+//     package built once (`pnpm --filter @kaihuman/ui build`).
 //   - A Chromium for Playwright (bundled in CI; locally run
 //     `pnpm exec playwright install chromium`).
 //   - ffmpeg, used to trim the leading load + re-encode for a seamless loop.
@@ -77,7 +77,7 @@ async function ensureServer() {
     return null;
   }
   console.log('• Starting console dev server…');
-  const child = spawn('pnpm', ['--filter', '@lifosy/app-console', 'dev'], {
+  const child = spawn('pnpm', ['--filter', '@kaihuman/app-console', 'dev'], {
     cwd: REPO_ROOT,
     detached: true,
     stdio: 'ignore',

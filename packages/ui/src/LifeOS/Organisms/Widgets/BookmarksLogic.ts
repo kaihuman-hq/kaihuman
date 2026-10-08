@@ -5,7 +5,7 @@
  * shape here is the contract between the two apps — see apps/browser-extension/src/background/bookmarks.ts.
  */
 
-import { Logger } from '@lifosy/core';
+import { Logger } from '@kaihuman/core';
 
 const logger = new Logger('BookmarksLogic');
 

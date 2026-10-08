@@ -2,7 +2,7 @@ cmdspec: "0.1"
 info:
   name: cli
   version: 0.1.0
-  summary: Lifosy terminal UI, local AI proxy server and knowledge capture
+  summary: kaihuman terminal UI, local AI proxy server and knowledge capture
   description: |
     The Rust terminal app in `apps/cli`. Run with no subcommand, it opens an
     interactive terminal UI (ratatui) for notes, knowledge captures, repository

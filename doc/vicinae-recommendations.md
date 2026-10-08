@@ -2,7 +2,7 @@
 
 [Vicinae](https://github.com/vicinaehq/vicinae) is a Raycast-like launcher for Linux with a store of
 community extensions. This note looks at its extension list (Sep 2026) and asks which ideas fit the
-Lifosy palettes: the browser extension's and the desktop one on Omarchy/Hyprland. None of this is
+kaihuman palettes: the browser extension's and the desktop one on Omarchy/Hyprland. None of this is
 implemented unless its heading says done; it is input for `doc/roadmap.md`.
 
 ## What the list covers
@@ -85,7 +85,7 @@ security review. Recommended only as `rbw` / `pass` wrappers on the desktop.
 
 ### 8. Tool packs in the settings widget
 
-Vicinae's store installs extensions. Lifosy's link tools are data, so the equivalent is a curated
+Vicinae's store installs extensions. kaihuman's link tools are data, so the equivalent is a curated
 gallery in the Command Palette Settings widget: one-click packs such as "Arch" (Arch packages, AUR,
 Arch Wiki), "Dev" (MDN, crates.io, pkg.go.dev, Docker Hub) and "German" (LEO, dict.cc, DWDS). The
 "add back a default" buttons are the first step toward this.

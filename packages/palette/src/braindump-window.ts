@@ -10,7 +10,7 @@
  * ⌃F finds in the text. A textarea cannot style part of its text, so the matches are drawn as
  * `<mark>`s in a copy of the text laid out the same way behind it (the textarea is transparent).
  */
-import { type BraindumpId, braindumpTitle } from '@lifosy/formats';
+import { type BraindumpId, braindumpTitle } from '@kaihuman/formats';
 import { formatStamp, plural } from './actions.js';
 import { filterModeItems, type ModeItem } from './command-palette.js';
 import type { ActionPort, Braindump } from './protocol.js';

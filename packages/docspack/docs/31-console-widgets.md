@@ -71,7 +71,7 @@ The **ADD TO DASHBOARD** modal (`AddToDashboardModal.tsx`) adds the entry for th
 
 A `.todos.md` file opens in `TodoWidget` (`Widgets/TodoWidget.tsx`). The widget shows **TASKS** and **TOP PRIORITIES**.
 
-- Add a task with `TodoAddForm`; it uses the shared `addTodoEntry` from `@lifosy/formats`.
+- Add a task with `TodoAddForm`; it uses the shared `addTodoEntry` from `@kaihuman/formats`.
 - Add, assign and delete milestones; edit due dates.
 - A task can carry an AI prompt and a `ref:` to a prompts file.
 - A file in an old format shows a button to migrate it.
@@ -121,7 +121,7 @@ A `.commands.md` file opens in `CommandsWidget` (`Widgets/CommandsWidget.tsx`) a
 - **Search commands...** and tag chips filter the list.
 - In the focused view, each command with `{{name}}` parameters gets one field per parameter. **Copy command** copies it with the values filled in.
 - Outside the focused view a command copies as written, `{{name}}` and all.
-- New commands are added with `addCommandEntry` from `@lifosy/formats`.
+- New commands are added with `addCommandEntry` from `@kaihuman/formats`.
 
 The desktop palette runs these commands with `>x`; the extension copies them. The `.commands.md` format is documented with the file formats.
 

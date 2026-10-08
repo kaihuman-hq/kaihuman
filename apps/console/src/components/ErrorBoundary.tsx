@@ -1,4 +1,4 @@
-import { Logger } from '@lifosy/core';
+import { Logger } from '@kaihuman/core';
 import { AlertTriangle, RefreshCw } from 'lucide-preact';
 import { Component, type ComponentChildren } from 'preact';
 

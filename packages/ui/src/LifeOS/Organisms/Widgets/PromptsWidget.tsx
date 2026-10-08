@@ -1,4 +1,4 @@
-import { addPromptEntry, parsePrompts } from '@lifosy/formats';
+import { addPromptEntry, parsePrompts } from '@kaihuman/formats';
 import { Check, Copy } from 'lucide-preact';
 import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';

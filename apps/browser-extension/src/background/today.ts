@@ -22,7 +22,7 @@ import {
   parseTodos,
   type ReadItLaterItem,
   type TodoItem,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import { CACHE_TTL_MS } from './bookmarks';
 import { STATUS_CONFIG_PATH } from './service-status';
 

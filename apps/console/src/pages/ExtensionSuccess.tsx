@@ -1,4 +1,4 @@
-import { githubProfileStore } from '@lifosy/core';
+import { githubProfileStore } from '@kaihuman/core';
 import { useEffect } from 'preact/hooks';
 
 export function ExtensionSuccess() {

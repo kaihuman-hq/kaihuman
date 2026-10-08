@@ -1,4 +1,4 @@
-import { AVAILABLE_TIMEZONES, type TimezoneEntry } from '@lifosy/formats';
+import { AVAILABLE_TIMEZONES, type TimezoneEntry } from '@kaihuman/formats';
 import { Plus, Search } from 'lucide-preact';
 import { useMemo, useState } from 'preact/hooks';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';

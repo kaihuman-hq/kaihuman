@@ -1,12 +1,12 @@
 # Command palette
 
-The command palette is a keyboard launcher shared by the browser extension and the desktop app. It searches bookmarks, runs actions, searches the repository and the web, and switches into prefix modes such as `>p` prompts or `>k` conversions. The code lives in `packages/palette` (`@lifosy/palette`), plain TypeScript with no UI framework, rendered in a shadow root. Each surface answers its requests through an `ActionPort`: the extension's service worker, or the Rust backend of `apps/desktop-palette`.
+The command palette is a keyboard launcher shared by the browser extension and the desktop app. It searches bookmarks, runs actions, searches the repository and the web, and switches into prefix modes such as `>p` prompts or `>k` conversions. The code lives in `packages/palette` (`@kaihuman/palette`), plain TypeScript with no UI framework, rendered in a shadow root. Each surface answers its requests through an `ActionPort`: the extension's service worker, or the Rust backend of `apps/desktop-palette`.
 
 ## Where the command palette code lives
 
 <!-- docspack: tags=source,files,package,architecture -->
 
-`@lifosy/palette` holds the palette, its modes and the request contract. Each surface only wires it up.
+`@kaihuman/palette` holds the palette, its modes and the request contract. Each surface only wires it up.
 
 | File in `packages/palette/src/` | Holds |
 | --- | --- |
@@ -27,7 +27,7 @@ Surfaces that use it:
 - `apps/browser-extension/src/newtab/StartPage.tsx`: the palette on the start page.
 - `apps/desktop-palette/src/main.ts`: the desktop overlay, with extra modes `>d`, `>c`, `>u`, `>o`.
 
-The settings format (`.kh/command-palette.settings.json`) lives in `packages/formats/src/palette-settings.ts`. Run the tests with `pnpm --filter @lifosy/palette test` (Vitest).
+The settings format (`.kh/command-palette.settings.json`) lives in `packages/formats/src/palette-settings.ts`. Run the tests with `pnpm --filter @kaihuman/palette test` (Vitest).
 
 ## What the main search shows as you type
 
@@ -68,7 +68,7 @@ Children are, for example, a repository's issues and pull requests in `>r`, or *
 
 ⇥ in the main search runs one GitHub code search for what is typed. It never runs while typing, because GitHub's code-search endpoint has a small rate budget. Hits appear under **Repo**. Typing again clears them.
 
-- ⏎ on a hit opens the file in the Lifosy console (`https://app.kaihuman.com/files/<path>`), not on GitHub.
+- ⏎ on a hit opens the file in the kaihuman console (`https://app.kaihuman.com/files/<path>`), not on GitHub.
 - A hit that a widget can add to offers two choices instead: **Open … in Kaihuman** and **Add a todo…** (or an action, event, prompt, command).
 - The widget files are the suffixes in `ENTRY_KINDS`: `.todos.md`, `.actionlog.md`, `.events.csv`, `.prompts.md`, `.commands.md`.
 
@@ -168,7 +168,7 @@ On the desktop, `>r` and `>g` rank repositories from omarchy's `~/.config/eee/co
 | `.prompts.md` | `Title #tags`, then the prompt |
 | `.commands.md` | `Title #tags`, then the command with `{{name}}` parameters |
 
-The entry is written with the same `@lifosy/formats` functions as the console's Add forms. The palette reads the file (`READ_ENTRY_FILE`) and writes it back over that version (`WRITE_ENTRY_FILE` with `sha`). A change made elsewhere meanwhile fails the write instead of being overwritten.
+The entry is written with the same `@kaihuman/formats` functions as the console's Add forms. The palette reads the file (`READ_ENTRY_FILE`) and writes it back over that version (`WRITE_ENTRY_FILE` with `sha`). A change made elsewhere meanwhile fails the write instead of being overwritten.
 
 The **Add a note…** action does the same for `.lifeos/dump.md` and the quick-note files; plain files get a `- text` line (`DUMP_NOTE`).
 
@@ -325,8 +325,8 @@ Actions are listed under **Actions** in the main search and in the `?` help. Sha
 | **Switch repository…** | Lists repositories you have used; marks the current one |
 | **Sync with GitHub now** | Ignores the hourly budget and syncs bookmarks |
 | **Set the DeepL API key…** | Stores the `>t` key; empty forgets it |
-| **Open the Lifosy console** | Opens `https://app.kaihuman.com` |
-| **Log in with the Lifosy console** | Desktop only |
+| **Open the kaihuman console** | Opens `https://app.kaihuman.com` |
+| **Log in with the kaihuman console** | Desktop only |
 
 Deleting a tab group asks you to type `DELETE`. Actions with fields walk through them one at a time; the breadcrumb shows `field (1/3)`, and Esc goes back a field.
 
@@ -348,4 +348,4 @@ export interface ActionPort {
 - The desktop sends them to the Tauri command `palette_request`, answered in `apps/desktop-palette/src-tauri/src/requests.rs`.
 - A backend that cannot serve a request rejects it, and the palette shows the message in its status line.
 
-To add a mode: write a `PaletteMode` in `actions.ts`, add its requests to `PaletteProtocol`, handle them in each backend, and add the prefix to `BUILT_IN_PALETTE_PREFIXES` in `@lifosy/formats`.
+To add a mode: write a `PaletteMode` in `actions.ts`, add its requests to `PaletteProtocol`, handle them in each backend, and add the prefix to `BUILT_IN_PALETTE_PREFIXES` in `@kaihuman/formats`.

@@ -1,4 +1,4 @@
-import { githubFileStore, githubProfileStore, Logger } from '@lifosy/core';
+import { githubFileStore, githubProfileStore, Logger } from '@kaihuman/core';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'preact/compat';
 
 // import ForceGraph2D from 'react-force-graph-2d';

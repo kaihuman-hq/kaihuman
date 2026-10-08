@@ -1,5 +1,5 @@
 /**
- * The desktop palette: the shared `@lifosy/palette`, answered by the Rust daemon.
+ * The desktop palette: the shared `@kaihuman/palette`, answered by the Rust daemon.
  *
  * The daemon maps the overlay and says `palette:show`; the palette closes itself (Esc, a click
  * outside, after opening something), and each close asks the daemon to hide the overlay again.
@@ -16,7 +16,7 @@ import {
   portHandlers,
   repoActions,
   wifiMode,
-} from '@lifosy/palette';
+} from '@kaihuman/palette';
 
 /** Actions that act on browser tabs or the browser's bookmarks, which only the extension can do. */
 const BROWSER_ONLY = new Set(['tabs', 'tabs-save', 'import-chrome-bookmarks']);
@@ -44,7 +44,7 @@ const palette = createCommandPalette(
       ...repoActions(port).filter((action) => !BROWSER_ONLY.has(action.id)),
       {
         id: 'console-login',
-        title: 'Log in with the Lifosy console',
+        title: 'Log in with the kaihuman console',
         subtitle: 'Opens the console in your browser and takes the token from there',
         // The daemon hides the overlay for the browser and reports the outcome as a notification.
         run: () => invoke<string>('console_login'),

@@ -1,4 +1,4 @@
-import { Logger } from '@lifosy/core';
+import { Logger } from '@kaihuman/core';
 import { Check, ChevronRight, Folder } from 'lucide-preact';
 import { useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';

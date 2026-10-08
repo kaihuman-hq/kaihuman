@@ -195,12 +195,12 @@ fn keyring_entry(user: &str) -> Result<keyring::Entry, String> {
         .map_err(|error| format!("the keyring is unavailable: {error}"))
 }
 
-/// The token from `LIFOSY_GITHUB_TOKEN` if set, else from the Secret Service.
+/// The token from `KAIHUMAN_GITHUB_TOKEN` if set, else from the Secret Service.
 ///
-/// The variable is for development and tests; `lifosy-palette login` is the normal way in, and
+/// The variable is for development and tests; `kaihuman-palette login` is the normal way in, and
 /// nothing ever writes the token to a file.
 pub fn token() -> Result<String, String> {
-    if let Some(token) = std::env::var("LIFOSY_GITHUB_TOKEN")
+    if let Some(token) = std::env::var("KAIHUMAN_GITHUB_TOKEN")
         .ok()
         .filter(|token| !token.is_empty())
     {
@@ -209,7 +209,8 @@ pub fn token() -> Result<String, String> {
     match keyring_entry(KEYRING_USER)?.get_password() {
         Ok(token) => Ok(token),
         Err(keyring::Error::NoEntry) => Err(
-            "Not logged in — run “Log in with the Lifosy console” or `lifosy-palette login`".into(),
+            "Not logged in — run “Log in with the kaihuman console” or `kaihuman-palette login`"
+                .into(),
         ),
         Err(error) => Err(format!(
             "Could not read the token from the keyring ({error}). Is a Secret Service \
@@ -325,7 +326,7 @@ mod tests {
     fn accepts_owner_slash_name_only() {
         assert!(is_repo_name("kaihuman-hq/kaihuman"));
         assert!(is_repo_name("a-b/c_d.e"));
-        for bad in ["lifosy", "a/b/c", "/b", "a/", "a/..", "a b/c", "a/b?x=1"] {
+        for bad in ["kaihuman", "a/b/c", "/b", "a/", "a/..", "a b/c", "a/b?x=1"] {
             assert!(!is_repo_name(bad), "{bad} should be rejected");
         }
     }
@@ -352,7 +353,8 @@ mod tests {
 
     #[test]
     fn json_files_round_trip_and_create_their_directory() {
-        let dir = std::env::temp_dir().join(format!("lifosy-palette-test-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("kaihuman-palette-test-{}", std::process::id()));
         let path = dir.join("nested").join("palette.json");
         let settings = Settings {
             repo: Some("o/r".into()),

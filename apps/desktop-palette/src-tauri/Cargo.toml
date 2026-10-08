@@ -3,7 +3,7 @@ name = "desktop-palette"
 version = "0.1.0"
 edition = "2024"
 publish = false
-description = "The Lifosy command palette as a desktop overlay (wlr-layer-shell), toggled from a key."
+description = "The kaihuman command palette as a desktop overlay (wlr-layer-shell), toggled from a key."
 
 [lib]
 # Only the socket protocol: the toggle client links this and nothing heavier.
@@ -11,12 +11,12 @@ name = "desktop_palette"
 path = "src/lib.rs"
 
 [[bin]]
-name = "lifosy-palette"
+name = "kaihuman-palette"
 path = "src/main.rs"
 
 [[bin]]
-name = "lifosy-palette-toggle"
-path = "src/bin/lifosy-palette-toggle.rs"
+name = "kaihuman-palette-toggle"
+path = "src/bin/kaihuman-palette-toggle.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

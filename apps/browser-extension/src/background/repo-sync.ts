@@ -1,6 +1,6 @@
 /**
  * Keeps the extension on the same repository as the desktop palette, through Chrome native
- * messaging (`lifosy-palette native-host install <extension id>`; the host is
+ * messaging (`kaihuman-palette native-host install <extension id>`; the host is
  * apps/desktop-palette/src-tauri/src/native_host.rs).
  *
  * Each side records when its repository last changed, and the newer choice wins. Without the host

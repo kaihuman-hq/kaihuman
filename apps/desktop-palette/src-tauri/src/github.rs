@@ -6,7 +6,7 @@ use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
-/// The Lifosy console — where a repo file is opened, rather than on GitHub.
+/// The kaihuman console — where a repo file is opened, rather than on GitHub.
 pub const CONSOLE_URL: &str = "https://app.kaihuman.com";
 
 /// What `encodeURIComponent` leaves alone; the console decodes paths the way the browser encodes.
@@ -211,7 +211,7 @@ impl Client {
         Self {
             http: reqwest::Client::new(),
             // Overridable so tests can point the palette at a local stand-in for GitHub.
-            api: std::env::var("LIFOSY_GITHUB_API")
+            api: std::env::var("KAIHUMAN_GITHUB_API")
                 .unwrap_or_else(|_| "https://api.github.com".into()),
             token,
             repo,
@@ -228,7 +228,7 @@ impl Client {
             .bearer_auth(&self.token)
             .header("Accept", "application/vnd.github+json")
             // GitHub refuses requests without one; the browser sends its own.
-            .header("User-Agent", "lifosy-palette")
+            .header("User-Agent", "kaihuman-palette")
     }
 
     fn contents_url(&self, path: &str) -> String {

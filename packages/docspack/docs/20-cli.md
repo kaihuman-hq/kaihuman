@@ -1,6 +1,6 @@
 # Terminal CLI
 
-The terminal CLI is a Rust program in `apps/cli` whose binary is called `cli` (crate `cli`, version `0.1.0`, npm workspace name `@lifosy/cli`). Run with no arguments, it opens an interactive terminal UI built with `ratatui` and `crossterm` for notes, knowledge captures, repo selection, a file browser and editor, a dashboard view and an AI prompt. It also has two subcommands: `cli server` starts a local AI proxy over HTTP, and `cli capture` writes a knowledge note to `.kh/raw/` with an offline spool. It signs in with GitHub through the web console and works on one active GitHub repository at a time.
+The terminal CLI is a Rust program in `apps/cli` whose binary is called `cli` (crate `cli`, version `0.1.0`, npm workspace name `@kaihuman/cli`). Run with no arguments, it opens an interactive terminal UI built with `ratatui` and `crossterm` for notes, knowledge captures, repo selection, a file browser and editor, a dashboard view and an AI prompt. It also has two subcommands: `cli server` starts a local AI proxy over HTTP, and `cli capture` writes a knowledge note to `.kh/raw/` with an offline spool. It signs in with GitHub through the web console and works on one active GitHub repository at a time.
 
 ## Building and running the CLI
 <!-- docspack: tags=install,cargo,compile,release binary -->

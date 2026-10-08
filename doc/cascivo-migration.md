@@ -1,4 +1,4 @@
-# Migrating `@lifosy/ui` to Cascivo
+# Migrating `@kaihuman/ui` to Cascivo
 
 **Status:** Plan + Phase 0 validated (integration spike green).
 **Date:** 2026-06-23
@@ -6,7 +6,7 @@
 
 Cascivo (<https://cascivo.com>) is a CSS-native, signal-driven, AI-first React
 design system (181 components, MIT). This document is the plan to migrate the
-console's UI — which lives almost entirely in the `@lifosy/ui` package — onto it,
+console's UI — which lives almost entirely in the `@kaihuman/ui` package — onto it,
 driven by Cascivo's AI tooling.
 
 ---
@@ -15,7 +15,7 @@ driven by Cascivo's AI tooling.
 
 | Decision | Choice | Rationale |
 | --- | --- | --- |
-| Consumption model | **Copy-paste / owned source** (`npx cascivo add`, MCP `add_to_project`) into `@lifosy/ui` | Own the source → patch for Preact, no v0.x upgrade churn, fits the existing package. Prebuilt `@cascivo/react` is used for the Phase 0 spike. |
+| Consumption model | **Copy-paste / owned source** (`npx cascivo add`, MCP `add_to_project`) into `@kaihuman/ui` | Own the source → patch for Preact, no v0.x upgrade churn, fits the existing package. Prebuilt `@cascivo/react` is used for the Phase 0 spike. |
 | Styling | **Coexist**, primitives first | Keep Tailwind for domain/app code; scope Cascivo CSS tokens to migrated primitives. ~2,300 Tailwind usages are not rewritten in one shot. |
 | Editor | **Migrate** to `@cascivo/editor` `CodeEditor` | The upgraded manifest resolves the prior blockers (see below). CodeMirror stays as fallback until the swap passes its behavior tests. |
 
@@ -81,13 +81,13 @@ fully retiring CodeMirror. This is the one open item in the editor swap.
 
 ---
 
-## Component mapping (`@lifosy/ui` → Cascivo)
+## Component mapping (`@kaihuman/ui` → Cascivo)
 
 Derived from the live registry; finalize each with `get_component` at execution.
 
 ### Generic primitives (migrate, drop Radix)
 
-| `@lifosy/ui` | Cascivo slug | Notes |
+| `@kaihuman/ui` | Cascivo slug | Notes |
 | --- | --- | --- |
 | `Button` | `button` (+ `icon-button`, `button-group`) | |
 | `Input` | `input` (+ `textarea`) | |
@@ -132,7 +132,7 @@ Derived from the live registry; finalize each with `get_component` at execution.
   `[data-theme='dark']`, so `data-theme="dark"` is set on the inner
   `.life-os-root` for Cascivo's structural tokens (radius/shadow/ring/status/
   chart/fonts) without colliding. The brand-override layer
-  (`packages/ui/src/cascivo.css`, exported as `@lifosy/ui/cascivo.css`) remaps
+  (`packages/ui/src/cascivo.css`, exported as `@kaihuman/ui/cascivo.css`) remaps
   Cascivo's semantic color/font tokens onto the live `--los-*` palette, so
   Cascivo components automatically track the active LifeOS theme. CSS import
   order (components → tokens+theme → brand) is wired in `main.tsx` + `index.css`
@@ -142,11 +142,11 @@ Derived from the live registry; finalize each with `get_component` at execution.
   visual confirmation.
 - **Phase 3 — Migrate primitives incrementally. IN PROGRESS.** Leaf-first
   (Button → Input → Dialog → DropdownMenu → Panel/Sidebar/SplitView → FileTree →
-  Charts). Each existing `@lifosy/ui` export is re-implemented as a thin wrapper
+  Charts). Each existing `@kaihuman/ui` export is re-implemented as a thin wrapper
   over the Cascivo component so console call sites don't change; Radix removed
   once its last consumer migrates. *Verify per component:* build + `tsc` +
   `biome` + `vitest`.
-  - **Build wiring (done once):** `@lifosy/ui` lib build externalizes
+  - **Build wiring (done once):** `@kaihuman/ui` lib build externalizes
     `@cascivo/*` + `@preact/signals-react[/runtime]`; the console app build
     aliases `@preact/signals-react → @preact/signals` and the `/runtime`
     `useSignals` to the no-op shim (mirrors the spike). React-typed Cascivo
@@ -179,7 +179,7 @@ Derived from the live registry; finalize each with `get_component` at execution.
 **Phase 3 outcome:** Button + Input + Charts migrated to Cascivo; Dialog,
 DropdownMenu, Panel, Sidebar, SplitView, FileTree removed as unused (dropping
 `@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`,
-`react-resizable-panels`). `@lifosy/ui`'s generic component surface is now
+`react-resizable-panels`). `@kaihuman/ui`'s generic component surface is now
 Cascivo-backed.
 - **Phase 4 — Editor swap. DONE.** `@cascivo/editor@0.2.1` shipped its build
   (the prior empty-publish blocker is resolved). The validation gate passed —
@@ -195,7 +195,7 @@ Cascivo-backed.
     `wrap` for `.md`; auto-save + save-button preserved.
   - `packages/ui/src/components/editor/Editor.tsx` (used by `DumpView`).
   - Deleted the now-orphaned `docSync.ts` + `docSync.test.ts`; removed all seven
-    `@codemirror/*` deps from the console and `@lifosy/ui` (−24 packages). The
+    `@codemirror/*` deps from the console and `@kaihuman/ui` (−24 packages). The
     `CodeMirrorEditor` filename is now a misnomer (kept to avoid churn; cosmetic
     rename is a possible follow-up). Cascivo's `virtualize` handles large docs.
 - **Phase 5 — Domain widgets re-skin (optional).** Swap widgets' internal

@@ -1,8 +1,8 @@
 # desktop-palette
 
-The Lifosy command palette as a desktop overlay: press a key anywhere and the palette opens
+The kaihuman command palette as a desktop overlay: press a key anywhere and the palette opens
 **centered on the focused monitor**, above whatever is tiled there, with the keyboard in its input.
-It is the same palette as the browser extension's (`@lifosy/palette`), answered by a Rust backend
+It is the same palette as the browser extension's (`@kaihuman/palette`), answered by a Rust backend
 instead of the extension's service worker.
 
 Built for Wayland compositors with `wlr-layer-shell`: Hyprland, Sway, river, niri, KDE. On GNOME or
@@ -17,7 +17,7 @@ way.
 | Web search: Google, DuckDuckGo, Ecosia, Amazon, Amazon.de, Reddit, Bing, Brave Search, Startpage, Wikipedia, YouTube, GitHub, Stack Overflow, Yahoo, Qwant — or the engines in `.kh/command-palette.settings.json` | ✓ |
 | ⇥ Tab: GitHub code search in the repo, opened in the console | ✓ |
 | Add a note… (dump, quick-note files, `.actionlog.md` with `#tags`) | ✓ |
-| Recent, Switch repository…, Sync with GitHub now, Open the Lifosy console | ✓ |
+| Recent, Switch repository…, Sync with GitHub now, Open the kaihuman console | ✓ |
 | `>b` bookmarks only, without actions or web search | ✓ |
 | `>p` prompts from the repo's `.prompts.md` files, ⏎ copies | ✓ (with `wl-copy`) |
 | `>t` translate with DeepL into EN-US and DE (`>t fr: …` for one language), ⏎ copies | ✓ (key from `DEEPL_AUTH_KEY`, `~/.config/envvars/deepl.env` or the keyring) |
@@ -103,7 +103,7 @@ The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-re
 
 ## Braindump window
 
-For thoughts you need to get out of your head right now: `lifosy-palette-toggle braindump` (bind it
+For thoughts you need to get out of your head right now: `kaihuman-palette-toggle braindump` (bind it
 to a key, below) or `>d` in the palette opens a plain text window with the cursor in it.
 
 - **Saved as you type**, 400 ms after the last key, on this machine — typing never waits for the
@@ -119,7 +119,7 @@ to a key, below) or `>d` in the palette opens a plain text window with the curso
   Esc goes back), **⌃⏎** copies all and hides, **⌃F** finds in the text (every match highlighted,
   ⏎ / ⇧⏎ next / previous, Esc back to the text with the match selected).
 - It is a normal window, not an overlay, so other windows stay usable while you write. Its title is
-  always `lifosy-braindump` for your window rules (below).
+  always `kaihuman-braindump` for your window rules (below).
 
 ## Build and install (Fedora)
 
@@ -132,20 +132,31 @@ sudo dnf group install c-development
 pnpm install                       # from the repo root
 cd apps/desktop-palette
 pnpm run build:desktop             # the UI, then both binaries
-install -m 755 src-tauri/target/release/lifosy-palette \
-  src-tauri/target/release/lifosy-palette-toggle ~/.local/bin/
+install -m 755 src-tauri/target/release/kaihuman-palette \
+  src-tauri/target/release/kaihuman-palette-toggle ~/.local/bin/
 ```
 
 The two binaries must stay in the same directory: the toggle client starts the daemon from there.
 `pnpm run build` builds only the UI (what the monorepo's own build runs); `pnpm run test:desktop`
 runs the Rust tests.
 
+### Upgrading from `lifosy-palette`
+
+The binaries were called `lifosy-palette` and `lifosy-palette-toggle` before October 2026. After
+installing the new ones:
+
+1. Stop the old daemon with `lifosy-palette quit`, then delete both old binaries.
+2. In your compositor config, replace `lifosy-palette` with `kaihuman-palette` everywhere: the key
+   bindings, the layer rule (namespace `kaihuman-palette`) and the braindump window rule (title
+   `kaihuman-braindump`).
+3. The development variables are now `KAIHUMAN_GITHUB_TOKEN` and `KAIHUMAN_GITHUB_API`.
+
 ## Log in
 
-Either way below takes the token from the Lifosy console, the same way the CLI's login does:
+Either way below takes the token from the kaihuman console, the same way the CLI's login does:
 
-- **From the palette:** run **Log in with the Lifosy console**.
-- **From a terminal:** run `lifosy-palette login`.
+- **From the palette:** run **Log in with the kaihuman console**.
+- **From a terminal:** run `kaihuman-palette login`.
 
 Both open `app.kaihuman.com/auth/cli` in your browser. Once you are logged in there, which is usually
 already the case, the page hands the token to the palette and the tab closes itself. From the
@@ -153,11 +164,11 @@ palette, the overlay steps aside for the browser, and a notification (mako, duns
 went.
 
 ```sh
-lifosy-palette login                          # through the console, as above
-lifosy-palette login --repo owner/name        # …and work on this repository
-lifosy-palette login --paste                  # type a token instead (not echoed)
-pass github/palette | lifosy-palette login --paste
-lifosy-palette logout
+kaihuman-palette login                          # through the console, as above
+kaihuman-palette login --repo owner/name        # …and work on this repository
+kaihuman-palette login --paste                  # type a token instead (not echoed)
+pass github/palette | kaihuman-palette login --paste
+kaihuman-palette logout
 ```
 
 - **How the token arrives:** the console posts a form with `token`, `state` and `repo` to
@@ -181,22 +192,22 @@ Bind the toggle client to a key of your choice. Hyprland 0.55+ (Lua):
 
 ```lua
 hl.on("hyprland.start", function()
-    hl.exec_cmd("lifosy-palette daemon")   -- optional: the first toggle starts it anyway
+    hl.exec_cmd("kaihuman-palette daemon")   -- optional: the first toggle starts it anyway
 end)
-hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("lifosy-palette-toggle"))
+hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("kaihuman-palette-toggle"))
 ```
 
-Older hyprlang configs: `exec-once = lifosy-palette daemon` and
-`bind = SUPER, SPACE, exec, lifosy-palette-toggle`. No window rules are needed: the palette is a
-layer surface named `lifosy-palette` (`hyprctl layers`), which `hl.layer_rule` can match if you want
+Older hyprlang configs: `exec-once = kaihuman-palette daemon` and
+`bind = SUPER, SPACE, exec, kaihuman-palette-toggle`. No window rules are needed: the palette is a
+layer surface named `kaihuman-palette` (`hyprctl layers`), which `hl.layer_rule` can match if you want
 to change its animation.
 
 The braindump window gets a key of its own, for example
-`hl.bind("SUPER + SHIFT + D", hl.dsp.exec_cmd("lifosy-palette-toggle braindump"))`
-(hyprlang: `bind = SUPER SHIFT, D, exec, lifosy-palette-toggle braindump`). It is an ordinary
-window, so Hyprland tiles it unless a window rule floats it. Match its title, `lifosy-braindump`,
+`hl.bind("SUPER + SHIFT + D", hl.dsp.exec_cmd("kaihuman-palette-toggle braindump"))`
+(hyprlang: `bind = SUPER SHIFT, D, exec, kaihuman-palette-toggle braindump`). It is an ordinary
+window, so Hyprland tiles it unless a window rule floats it. Match its title, `kaihuman-braindump`,
 and make it float, centred, at about 760×520 — in hyprlang up to 0.54
-`windowrule = float, title:^(lifosy-braindump)$` plus the same with `center` and
+`windowrule = float, title:^(kaihuman-braindump)$` plus the same with `center` and
 `size 760 520`. The rule syntax changed with the Lua config in 0.55, so check it against your
 version's wiki page; the title to match stays the same.
 
@@ -206,7 +217,7 @@ The palette and the extension each remember a repository. To keep them on the sa
 the palette as the extension's native messaging host — once, from the installed binary:
 
 ```sh
-lifosy-palette native-host install <extension id>   # the id is on chrome://extensions
+kaihuman-palette native-host install <extension id>   # the id is on chrome://extensions
 ```
 
 It writes `com.lifosy.palette.json` into `NativeMessagingHosts/` of every Chrome, Chromium, Brave,
@@ -214,15 +225,15 @@ Edge or Vivaldi profile under `$XDG_CONFIG_HOME`, allowing only that extension. 
 extension. From then on, switching the repository in either one switches the other: each side
 records when its repository changed, and the newer choice wins. The extension asks when a start
 page opens (at most every 30 s) and once an hour, and tells the palette at once when you switch
-there. Chrome starts `lifosy-palette` for each message, so the daemon does not need to run.
+there. Chrome starts `kaihuman-palette` for each message, so the daemon does not need to run.
 Flatpak and Snap browsers cannot start host programs without extra sandbox setup.
 
 ## How it works
 
-- **`lifosy-palette daemon`** keeps the palette loaded in a hidden overlay, so opening it only maps
+- **`kaihuman-palette daemon`** keeps the palette loaded in a hidden overlay, so opening it only maps
   a window.
-- **`lifosy-palette-toggle [toggle|show|hide|quit]`** writes one line to
-  `$XDG_RUNTIME_DIR/lifosy-palette.sock` and exits. It links only libc and takes a few
+- **`kaihuman-palette-toggle [toggle|show|hide|quit]`** writes one line to
+  `$XDG_RUNTIME_DIR/kaihuman-palette.sock` and exits. It links only libc and takes a few
   milliseconds. If no daemon is running, it starts one.
 - **The palette hides itself** on Esc, on a click outside the panel, and after opening something.
 - **Each request** the palette makes (`PaletteProtocol` in `packages/palette/src/protocol.ts`) goes
@@ -239,13 +250,13 @@ Flatpak and Snap browsers cannot start host programs without extra sandbox setup
 | `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/` | braindumps (`<id>.md`) and what GitHub last had of each (`<id>.json`); see `doc/braindump.md` |
 | `$XDG_STATE_HOME/lifosy/translations.json` | the last 20 texts translated with `>t` |
 
-For development and tests, `LIFOSY_GITHUB_TOKEN` takes the place of the keyring and
-`LIFOSY_GITHUB_API` points the backend at a stand-in for `https://api.github.com`.
+For development and tests, `KAIHUMAN_GITHUB_TOKEN` takes the place of the keyring and
+`KAIHUMAN_GITHUB_API` points the backend at a stand-in for `https://api.github.com`.
 
 ## Troubleshooting
 
-- **"Not logged in"** in the palette's status line: run **Log in with the Lifosy console**, or `lifosy-palette login`.
+- **"Not logged in"** in the palette's status line: run **Log in with the kaihuman console**, or `kaihuman-palette login`.
 - **Keyring errors:** no Secret Service is running (see Log in).
 - **It opens as a normal, tiled window:** the compositor has no layer-shell (GNOME), or GTK picked
   X11. The daemon sets `GDK_BACKEND=wayland` when `WAYLAND_DISPLAY` is set; check that it is.
-- **Daemon output:** run `lifosy-palette daemon` in a terminal instead of from the compositor.
+- **Daemon output:** run `kaihuman-palette daemon` in a terminal instead of from the compositor.

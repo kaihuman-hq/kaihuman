@@ -1,4 +1,4 @@
-import { Logger } from '@lifosy/core';
+import { Logger } from '@kaihuman/core';
 export interface RssConfig {
   feedOptions: RssFeedConfig[];
   readLater: string[]; // List of URLs or IDs? Requirements say "skip this for now" but field exists.

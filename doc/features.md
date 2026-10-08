@@ -10,7 +10,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
-| `@lifosy/docspack` — every app, package, repo file format and `cli` command documented for AI agents (232 chunks), built and checked with docspack; `docspack ask` answers from it offline | `packages/docspack` | 2026-10-04 |
+| `@kaihuman/docspack` — every app, package, repo file format and `cli` command documented for AI agents (232 chunks), built and checked with docspack; `docspack ask` answers from it offline | `packages/docspack` | 2026-10-04 |
 | "Documented for agents" section and **Docs** nav link | nextgen landing page `#docs` | 2026-10-04 |
 | Docs readable on the website: the docspack Markdown rendered as `/docs/` pages, linked from the nav and the docs section | nextgen landing page `/docs/` | 2026-10-07 |
 | Console views documented: knowledge graph, commit history, AI panel, quick dump, push reminders, zen mode | `packages/docspack/docs/32-console-views.md` | 2026-10-04 |
@@ -96,25 +96,25 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
-| stdio MCP server: `kb_search`, `kb_read`, `kb_list`, `kb_index`, `kb_log`, `kb_add_raw` over a local clone | `lifosy-kb-mcp --repo <path>` | 2026-09-23 |
+| stdio MCP server: `kb_search`, `kb_read`, `kb_list`, `kb_index`, `kb_log`, `kb_add_raw` over a local clone | `kaihuman-kb-mcp --repo <path>` | 2026-09-23 |
 
 ## Desktop palette (`apps/desktop-palette`)
 
 | Feature | Location | Added |
 |---------|----------|-------|
-| The command palette as a desktop overlay, centered on the focused monitor (wlr-layer-shell: Hyprland, Sway, KDE…) | `lifosy-palette-toggle` bound to a key | 2026-09-23 |
-| Bookmarks, web search, repo search, notes and action log, recents, repository switch — shared with the extension via `@lifosy/palette` | desktop palette | 2026-09-23 |
+| The command palette as a desktop overlay, centered on the focused monitor (wlr-layer-shell: Hyprland, Sway, KDE…) | `kaihuman-palette-toggle` bound to a key | 2026-09-23 |
+| Bookmarks, web search, repo search, notes and action log, recents, repository switch — shared with the extension via `@kaihuman/palette` | desktop palette | 2026-09-23 |
 | `>f` files: add a todo, action, event, prompt or command to the repo's widget files, or open one in Kaihuman — shared with the extension | desktop palette | 2026-09-24 |
 | `>o` files on this computer: by name, `>o c: …` by contents too, in the home directory or with `>o a: …` the whole file system (`fd`/`find`, `rg`/`grep`); ⏎ opens with the default app, ⇥ opens the folder in the file manager or ghostty | desktop palette | 2026-10-04 |
 | `>u` shows the cached usage at once with its age (green / yellow / red) and syncs in the background once it is 5 min old | desktop palette | 2026-09-24 |
 | `>c` Claude Code (new session on claude.ai for a repo from omarchy's `eee` history) and `>u` Claude usage (rate limits, pace, resets, spend per account) — from omarchy | desktop palette | 2026-09-23 |
 | `?` help — every prefix with its description, searching and keys, and every action; searchable, ⏎ switches mode or runs the action | desktop palette, command palette | 2026-09-23 |
 | Find in a braindump: ⌃F in the braindump window opens a find bar that highlights every match in the text (the current one in orange) and counts them; ⏎ / ⇧⏎ step through, Esc goes back to the text with the match selected | desktop palette | 2026-10-06 |
-| Braindump window — its own key (`lifosy-palette-toggle braindump`) or `>d` opens a text window that saves as you type and keeps each braindump in the repo (`.kh/braindumps/`), synced when you stop; ⌃O lists them, ⌃N starts another, ⌃⏎ copies all | desktop palette | 2026-09-30 |
-| Same active repository as the browser extension, through Chrome native messaging (`lifosy-palette native-host install <id>`); the newer choice wins | desktop palette, browser extension | 2026-09-30 |
+| Braindump window — its own key (`kaihuman-palette-toggle braindump`) or `>d` opens a text window that saves as you type and keeps each braindump in the repo (`.kh/braindumps/`), synced when you stop; ⌃O lists them, ⌃N starts another, ⌃⏎ copies all | desktop palette | 2026-09-30 |
+| Same active repository as the browser extension, through Chrome native messaging (`kaihuman-palette native-host install <id>`); the newer choice wins | desktop palette, browser extension | 2026-09-30 |
 | `>d` dumps — a scratch text editor in the palette with the last 25 kept as local files; ⌃⏎ copies all, ⌃S saves a copy to a path (replaced by braindumps on 2026-09-30; old dumps stay listed) | desktop palette | 2026-09-23 |
 | `>p` prompts, `>t` translate, `>r` repos — omarchy's prompt, translate and repo menus in the palette; copies with `wl-copy`, and `>r` ranks omarchy's `~/.config/eee/counts` first | desktop palette | 2026-09-23 |
-| `lifosy-palette login`: token checked against the repo, kept in the Secret Service | CLI | 2026-09-23 |
+| `kaihuman-palette login`: token checked against the repo, kept in the Secret Service | CLI | 2026-09-23 |
 
 ## CLI (`apps/cli`)
 

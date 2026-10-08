@@ -8,7 +8,7 @@
 use gtk_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
 /// Compositor layer rules match on this; the library's default is shared with every other tool.
-const NAMESPACE: &str = "lifosy-palette";
+const NAMESPACE: &str = "kaihuman-palette";
 
 /// Whether the session offers layer-shell at all. Must run on the GTK main thread.
 pub fn is_supported() -> bool {

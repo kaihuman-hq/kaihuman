@@ -1,7 +1,7 @@
 {
-  "name": "@lifosy/docspack",
+  "name": "@kaihuman/docspack",
   "version": "0.1.0",
-  "description": "Lifosy's documentation as a docspack package, for AI agents",
+  "description": "kaihuman's documentation as a docspack package, for AI agents",
   "license": "MIT",
   "files": [
     ".llms",
@@ -10,7 +10,7 @@
   ],
   "keywords": [
     "docspack",
-    "lifosy",
+    "kaihuman",
     "documentation"
   ],
   "scripts": {

@@ -576,7 +576,7 @@ mod tests {
 
     fn store(name: &str) -> Store {
         let root =
-            std::env::temp_dir().join(format!("lifosy-braindumps-{name}-{}", std::process::id()));
+            std::env::temp_dir().join(format!("kaihuman-braindumps-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         Store::new(&root, "o/r").unwrap()
     }

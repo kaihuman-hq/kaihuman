@@ -4,7 +4,7 @@ import {
   getYearProgress,
   parseTimezones,
   type TimezoneData,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import { Calendar, Globe, Trash2 } from 'lucide-preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';

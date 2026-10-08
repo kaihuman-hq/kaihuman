@@ -5,12 +5,12 @@
  * is the contract between the two apps — see
  * packages/ui/src/LifeOS/Organisms/Widgets/BookmarksLogic.ts.
  */
-import type { Bookmark } from '@lifosy/palette';
+import type { Bookmark } from '@kaihuman/palette';
 import { isOpenableUrl, normalizeUrl } from './pinned-tabs';
 
 // The shape and the search are shared with the desktop palette; re-exported so the rest of the
 // extension keeps importing bookmarks from one place.
-export { type Bookmark, searchBookmarks } from '@lifosy/palette';
+export { type Bookmark, searchBookmarks } from '@kaihuman/palette';
 
 /** Repo file the extension mirrors. The console can keep bookmark files anywhere; this is the
  * one the extension reads, exactly like `.kh/browser.pinnedtabs.json` for pinned tabs. */

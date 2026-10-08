@@ -1,4 +1,10 @@
-import { authStore, githubFileStore, githubProfileStore, Logger, layoutStore } from '@lifosy/core';
+import {
+  authStore,
+  githubFileStore,
+  githubProfileStore,
+  Logger,
+  layoutStore,
+} from '@kaihuman/core';
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 
@@ -11,7 +17,7 @@ import {
   RepositorySelector,
   serializeReadItLater,
   type TileDef,
-} from '@lifosy/ui';
+} from '@kaihuman/ui';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FileViewer } from '../components/FileViewer';
 import { KBCommandsModal } from '../components/KBCommandsModal';
@@ -90,7 +96,7 @@ export const Dashboard = () => {
       layoutStore.remoteConfig.value = null;
 
       logger.info('Checking for remote config...');
-      let config: import('@lifosy/core').DashboardConfig | null = null;
+      let config: import('@kaihuman/core').DashboardConfig | null = null;
 
       const folder = githubFileStore.appFolder.peek();
       const CONFIG_PATH = `${folder}/.dashboard.config.json`;
