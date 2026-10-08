@@ -76,6 +76,10 @@ beforeEach(async () => {
     runtime: {
       getManifest: () => ({ content_scripts: [] }),
       onInstalled: { addListener: vi.fn() },
+      // No desktop palette host in tests.
+      sendNativeMessage: vi.fn(async () => {
+        throw new Error('Specified native messaging host not found.');
+      }),
       onConnect: { addListener: vi.fn() },
       onMessage: {
         addListener: (l: Listener) => {
@@ -83,7 +87,11 @@ beforeEach(async () => {
         },
       },
     },
-    storage: { local: localStorageStub(), session: { get: async () => ({}), set: async () => {} } },
+    storage: {
+      local: localStorageStub(),
+      session: { get: async () => ({}), set: async () => {} },
+      onChanged: { addListener: vi.fn() },
+    },
     tabs: { query: async () => [], create: vi.fn(), update: vi.fn(), sendMessage: vi.fn() },
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -178,6 +186,55 @@ describe('writing groups', () => {
 
     expect(reads()).toHaveLength(1);
     expect(JSON.parse(writes()[0]?.[1].body).sha).toBe('sha-1');
+  });
+
+  it('commits a favourite and answers with the updated list', async () => {
+    seedCache();
+
+    const response = await call({
+      type: 'FAVORITE_PINNED_TAB_GROUP',
+      groupId: 'g1',
+      favorite: true,
+    });
+
+    // Committed to the repo file itself, on top of the version just re-read.
+    const [url, init] = writes()[0] ?? [];
+    expect(url).toBe('https://api.github.com/repos/o/r/contents/.kh/browser.pinnedtabs.json');
+    expect(JSON.parse(init.body).sha).toBe('sha-1');
+    const written = JSON.parse(atob(JSON.parse(init.body).content));
+    expect(written.groups[0]).toMatchObject({ id: 'g1', name: 'Work', favorite: true });
+    expect(response.success).toBe(true);
+    expect(response.groups).toEqual([
+      expect.objectContaining({ id: 'g1', name: 'Work', favorite: true }),
+    ]);
+  });
+
+  it('keeps a favourite through a rename or an update, and drops the field when unset', async () => {
+    const favourite = { ...remoteConfig.groups[0], favorite: true };
+    fetchMock.mockImplementation(async (_url: string, init?: any) =>
+      init?.method === 'PUT'
+        ? { ok: true, status: 200, json: async () => ({ content: { sha: 'sha-2' } }) }
+        : {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              content: btoa(JSON.stringify({ ...remoteConfig, groups: [favourite] })),
+              sha: 'sha-1',
+            }),
+            headers: { get: () => null },
+          },
+    );
+    const committed = (index: number) =>
+      JSON.parse(atob(JSON.parse(writes()[index]?.[1].body).content)).groups[0];
+
+    await call({ type: 'RENAME_PINNED_TAB_GROUP', groupId: 'g1', name: 'Renamed' });
+    expect(committed(0)).toMatchObject({ name: 'Renamed', favorite: true });
+
+    await call({ type: 'SAVE_PINNED_TAB_GROUP', groupId: 'g1' });
+    expect(committed(1)).toMatchObject({ tabs: [], favorite: true });
+
+    await call({ type: 'FAVORITE_PINNED_TAB_GROUP', groupId: 'g1', favorite: false });
+    expect(committed(2)).not.toHaveProperty('favorite');
   });
 
   it('puts what it committed into the cache, with no ETag left to replay', async () => {

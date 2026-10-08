@@ -46,7 +46,7 @@ The server uses the first value that is set:
 2. `KB_REPO_PATH` environment variable
 3. the current working directory
 
-The Lifosy CLI clones repositories to `~/.config/com/lifosy/cli/repos/<owner>/<repo>`. When Claude Code runs inside such a clone, you do not need to set a path.
+The Lifosy CLI clones repositories to `~/.config/cli/repos/<owner>/<repo>` (Linux). When Claude Code runs inside such a clone, you do not need to set a path.
 
 ### Claude Code
 
@@ -60,7 +60,7 @@ To use a specific repository:
 
 ```sh
 claude mcp add lifosy-kb -- node /absolute/path/to/monorepo/apps/kb-mcp/dist/index.js \
-  --repo ~/.config/com/lifosy/cli/repos/<owner>/<repo>
+  --repo ~/.config/cli/repos/<owner>/<repo>
 ```
 
 Alternatively, put this in `.mcp.json` at the root of the knowledge-base repository:

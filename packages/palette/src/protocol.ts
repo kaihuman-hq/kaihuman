@@ -5,6 +5,7 @@
  * desktop app will answer the same request names from Rust. A request names its `type`, and the
  * response lists only the fields the palette reads — a backend may send more.
  */
+import type { BraindumpId } from '@lifosy/formats';
 import type { Bookmark } from './bookmarks.js';
 import type { ClaudeUsage } from './claude-usage.js';
 import type { RecentEntry, RepoResult } from './command-palette.js';
@@ -43,6 +44,23 @@ export interface GithubWorkItem {
   pullRequest: boolean;
   /** ISO 8601. */
   updatedAt: string;
+}
+
+/** A file or folder `SEARCH_LOCAL_FILES` found. */
+export interface LocalFileHit {
+  /** Absolute. */
+  path: string;
+  folder: boolean;
+  /** For a match in the contents: the first matching line, `12:text`. */
+  line?: string;
+}
+
+/** A braindump as the desktop keeps it (doc/braindump.md); `synced` once GitHub has this text. */
+export interface Braindump {
+  id: BraindumpId;
+  text: string;
+  updatedAt: number;
+  synced: boolean;
 }
 
 /** One Wi‑Fi network from a `LIST_WIFI` scan; the strongest access point stands for its SSID. */
@@ -139,6 +157,41 @@ export interface PaletteProtocol {
   SAVE_DUMP: { request: { id?: string; text: string }; response: { id?: string } };
   /** Desktop only: writes the text to `path` (`~/` allowed), never over an existing file. */
   EXPORT_DUMP: { request: { path: string; text: string }; response: { path: string } };
+  /** Desktop only: the active repo's braindumps kept on this machine, most recently edited first. */
+  LIST_BRAINDUMPS: { request: NoFields; response: { braindumps: Braindump[] } };
+  /**
+   * Desktop only: saves on this machine at once, creating a braindump when `id` is missing; empty
+   * text deletes it and the response has no `id`. GitHub follows on the next `SYNC_BRAINDUMPS`.
+   */
+  SAVE_BRAINDUMP: { request: { id?: BraindumpId; text: string }; response: { id?: BraindumpId } };
+  /**
+   * Desktop only: sends what changed here to GitHub, then takes what changed there. Rejects with
+   * the first failure; what failed is kept and tried again on the next sync.
+   */
+  SYNC_BRAINDUMPS: { request: NoFields; response: { braindumps: Braindump[] } };
+  /**
+   * Desktop only: hides the palette and shows the braindump window with that braindump, or a new
+   * one without `id`.
+   */
+  OPEN_BRAINDUMP: { request: { id?: BraindumpId }; response: NoFields };
+  /**
+   * Desktop only: files and folders under the home directory — with `everywhere`, anywhere on the
+   * file system but `/proc`, `/sys`, `/dev` and `/run` — whose name holds `query`; with `contents`,
+   * also files whose text does, after them. Hidden files and `node_modules` are left out. Rejects
+   * when the search ran out of time without finding anything.
+   */
+  SEARCH_LOCAL_FILES: {
+    request: { query: string; contents: boolean; everywhere: boolean };
+    response: { home: string; hits: LocalFileHit[] };
+  };
+  /**
+   * Desktop only: opens a path `SEARCH_LOCAL_FILES` found — with its default app, or the folder it
+   * is in in the file manager or a terminal.
+   */
+  OPEN_LOCAL_FILE: {
+    request: { path: string; with: 'app' | 'file-manager' | 'terminal' };
+    response: NoFields;
+  };
   /** Desktop only: repositories for `>c`, most recently used first (omarchy's `eee` history). */
   LIST_CLAUDE_CODE_REPOS: { request: NoFields; response: { repos: string[] } };
   /**

@@ -17,6 +17,8 @@ export interface PinnedTabGroup {
   name: string;
   createdAt: string;
   tabs: PinnedTab[];
+  /** Marked as a favourite on the start page. Left out of the file unless set. */
+  favorite?: boolean;
 }
 
 export interface PinnedTabsConfig {
@@ -98,6 +100,7 @@ function parseGroup(raw: unknown, index: number): PinnedTabGroup {
     name: asString(group.name) || group.id,
     createdAt: asString(group.createdAt),
     tabs: parseTabs(group.tabs),
+    ...(group.favorite === true && { favorite: true }),
   };
 }
 
@@ -184,6 +187,20 @@ export function removeGroup(
   const groups = config.groups.filter((group) => group.id !== groupId);
   if (groups.length === config.groups.length) throw missingGroup(groupId);
   return { groups, updatedAt };
+}
+
+/**
+ * Marks a group as a favourite or not. Unmarking drops the field rather than writing `false`, so
+ * a group that was never a favourite reads the same in the file as before.
+ */
+export function setGroupFavorite(
+  config: PinnedTabsConfig,
+  groupId: string,
+  favorite: boolean,
+  updatedAt: string,
+): PinnedTabsConfig {
+  const { favorite: _previous, ...group } = findGroup(config, groupId);
+  return putGroup(config, favorite ? { ...group, favorite: true } : group, updatedAt);
 }
 
 /**

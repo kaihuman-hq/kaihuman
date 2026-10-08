@@ -24,6 +24,10 @@ beforeEach(async () => {
     contextMenus: { create: vi.fn(), onClicked: { addListener: vi.fn() } },
     runtime: {
       onInstalled: { addListener: vi.fn() },
+      // No desktop palette host in tests.
+      sendNativeMessage: vi.fn(async () => {
+        throw new Error('Specified native messaging host not found.');
+      }),
       onConnect: {
         addListener: (l: () => void) => {
           connectListener = l;
@@ -46,6 +50,7 @@ beforeEach(async () => {
         remove: vi.fn(async () => {}),
       },
       session: { get: async () => ({}), set: async () => {} },
+      onChanged: { addListener: vi.fn() },
     },
     tabs: { query: async () => [], create: vi.fn(), update: vi.fn() },
   });

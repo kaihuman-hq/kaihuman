@@ -6,6 +6,15 @@
 |---------|----------|-------|
 | Auto-generated, seamless-looping product screencast (demo-mode walkthrough) | both pages' demo section + `landing-page-nextgen/scripts/record-screencast.mjs` | 2026-06-25 |
 
+## Documentation package (`packages/docspack`)
+
+| Feature | Location | Added |
+|---------|----------|-------|
+| `@lifosy/docspack` — every app, package, repo file format and `cli` command documented for AI agents (232 chunks), built and checked with docspack; `docspack ask` answers from it offline | `packages/docspack` | 2026-10-04 |
+| "Documented for agents" section and **Docs** nav link | nextgen landing page `#docs` | 2026-10-04 |
+| Docs readable on the website: the docspack Markdown rendered as `/docs/` pages, linked from the nav and the docs section | nextgen landing page `/docs/` | 2026-10-07 |
+| Console views documented: knowledge graph, commit history, AI panel, quick dump, push reminders, zen mode | `packages/docspack/docs/32-console-views.md` | 2026-10-04 |
+
 ## Console (`apps/console`)
 
 | Feature | Route/Location | Added |
@@ -39,6 +48,16 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Service status traffic lights (GitHub, Claude, AWS, Cloudflare, GCP by default; any Statuspage, AWS regions, GCP products via `.kh/browser.status.json`), checked at most every five minutes, no proxy | start page | 2026-10-07 |
+| Delete braindumps (and old local dumps) from the desktop palette: `>d`, ⇥ on one, **Delete…**, type DELETE — removed here and, by an immediate sync, from the repo | desktop palette | 2026-09-30 |
+| Braindumps on the start page: the ten newest from `.kh/braindumps/` with preview and age, opened to the whole text or in the console, deleted after a second click (only the version shown); a start page on data older than a minute checks the repo | start page | 2026-09-30 |
+| Favourite tab groups: ☆/★ on each group chip; favourites come first and are highlighted, saved in the repo file | start page, popup Pinned Tabs panel | 2026-09-30 |
+| Start page redesign: full-width two-column layout, Noto Sans Mono bundled, date with ISO week in the header | start page | 2026-09-30 |
+| Start page search filters pinned and recent bookmarks as you type; ⏎ hands the text to the palette; `/` focuses it | start page | 2026-09-30 |
+| Pinned bookmarks as numbered cards, opened with keys 1–9; recently used as a separate list | start page | 2026-09-30 |
+| DEV / INT / PROD tags on recent bookmarks, from a bookmark tag or the title | start page | 2026-09-30 |
+| Habit rows with a 7-day strip; working-time timer in the Doing card, ticking in seconds | start page | 2026-09-30 |
+| Capture box: Ctrl/⌘+Enter saves; last five entries per kind listed and kept across tabs | start page | 2026-09-30 |
 | Start page "today" view: upcoming events and milestone, in-progress/overdue todos and inbox count, habit check-in and time-tracking clock cards, read-later queue, world clocks — from one hourly cache | start page | 2026-09-23 |
 | Start page capture box writes a note, an inbox todo or an action log entry | start page | 2026-09-23 |
 | Sync status (age of the cached data, opens waiting to be pushed) with a sync button | start page header | 2026-09-23 |
@@ -86,10 +105,14 @@
 | The command palette as a desktop overlay, centered on the focused monitor (wlr-layer-shell: Hyprland, Sway, KDE…) | `lifosy-palette-toggle` bound to a key | 2026-09-23 |
 | Bookmarks, web search, repo search, notes and action log, recents, repository switch — shared with the extension via `@lifosy/palette` | desktop palette | 2026-09-23 |
 | `>f` files: add a todo, action, event, prompt or command to the repo's widget files, or open one in Kaihuman — shared with the extension | desktop palette | 2026-09-24 |
+| `>o` files on this computer: by name, `>o c: …` by contents too, in the home directory or with `>o a: …` the whole file system (`fd`/`find`, `rg`/`grep`); ⏎ opens with the default app, ⇥ opens the folder in the file manager or ghostty | desktop palette | 2026-10-04 |
 | `>u` shows the cached usage at once with its age (green / yellow / red) and syncs in the background once it is 5 min old | desktop palette | 2026-09-24 |
 | `>c` Claude Code (new session on claude.ai for a repo from omarchy's `eee` history) and `>u` Claude usage (rate limits, pace, resets, spend per account) — from omarchy | desktop palette | 2026-09-23 |
 | `?` help — every prefix with its description, searching and keys, and every action; searchable, ⏎ switches mode or runs the action | desktop palette, command palette | 2026-09-23 |
-| `>d` dumps — a scratch text editor in the palette with the last 25 kept as local files; ⌃⏎ copies all, ⌃S saves a copy to a path | desktop palette | 2026-09-23 |
+| Find in a braindump: ⌃F in the braindump window opens a find bar that highlights every match in the text (the current one in orange) and counts them; ⏎ / ⇧⏎ step through, Esc goes back to the text with the match selected | desktop palette | 2026-10-06 |
+| Braindump window — its own key (`lifosy-palette-toggle braindump`) or `>d` opens a text window that saves as you type and keeps each braindump in the repo (`.kh/braindumps/`), synced when you stop; ⌃O lists them, ⌃N starts another, ⌃⏎ copies all | desktop palette | 2026-09-30 |
+| Same active repository as the browser extension, through Chrome native messaging (`lifosy-palette native-host install <id>`); the newer choice wins | desktop palette, browser extension | 2026-09-30 |
+| `>d` dumps — a scratch text editor in the palette with the last 25 kept as local files; ⌃⏎ copies all, ⌃S saves a copy to a path (replaced by braindumps on 2026-09-30; old dumps stay listed) | desktop palette | 2026-09-23 |
 | `>p` prompts, `>t` translate, `>r` repos — omarchy's prompt, translate and repo menus in the palette; copies with `wl-copy`, and `>r` ranks omarchy's `~/.config/eee/counts` first | desktop palette | 2026-09-23 |
 | `lifosy-palette login`: token checked against the repo, kept in the Secret Service | CLI | 2026-09-23 |
 

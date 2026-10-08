@@ -7,6 +7,7 @@ export interface Message {
     | 'SAVE_PINNED_TAB_GROUP'
     | 'RENAME_PINNED_TAB_GROUP'
     | 'MOVE_PINNED_TAB_GROUP'
+    | 'FAVORITE_PINNED_TAB_GROUP'
     | 'DELETE_PINNED_TAB_GROUP'
     | 'GET_BOOKMARKS'
     | 'ADD_BOOKMARK'
@@ -20,6 +21,7 @@ export interface Message {
     | 'ADD_MODE_RECENT'
     | 'GET_REPOS'
     | 'SET_REPO'
+    | 'SYNC_REPO_WITH_DESKTOP'
     | 'SAVE_SELECTION'
     | 'SEARCH_REPO'
     | 'OPEN_URL'
@@ -37,6 +39,9 @@ export interface Message {
     | 'GET_PALETTE_SETTINGS'
     | 'TOGGLE_COMMAND_PALETTE'
     | 'GET_TODAY'
+    | 'REFRESH_TODAY'
+    | 'GET_SERVICE_STATUS'
+    | 'DELETE_BRAINDUMP'
     | 'GET_SYNC_STATUS'
     | 'TODAY_CHECK_IN'
     | 'TODAY_TOGGLE_TIMER'
@@ -57,6 +62,8 @@ export interface Message {
   bookmarkId?: string;
   /** `SET_BOOKMARK_PINNED`: the state to set, not a toggle, so a double click cannot undo itself. */
   pinned?: boolean;
+  /** `FAVORITE_PINNED_TAB_GROUP`: the state to set, not a toggle, for the same reason. */
+  favorite?: boolean;
   force?: boolean;
   /** `OPEN_URL`: navigate the sender's own tab rather than opening another one. */
   reuse?: boolean;

@@ -1,0 +1,151 @@
+---
+import { render } from 'astro:content';
+import DocsLayout from '../../layouts/DocsLayout.astro';
+import { type DocPage, getDocPages } from '../../lib/docs';
+
+export async function getStaticPaths() {
+  const pages = await getDocPages();
+  return pages.map((page) => ({ params: { id: page.entry.id }, props: { page, pages } }));
+}
+
+interface Props {
+  page: DocPage;
+  pages: DocPage[];
+}
+
+const { page, pages } = Astro.props;
+const { Content } = await render(page.entry);
+---
+
+<DocsLayout
+  title={`${page.title} — kaihuman docs`}
+  description={page.summary.replaceAll('`', '')}
+  pages={pages}
+  currentId={page.entry.id}
+>
+  <article class="prose">
+    <Content />
+  </article>
+</DocsLayout>
+
+<style>
+  .prose {
+    max-width: 78ch;
+    color: var(--color-ink-2);
+    line-height: 1.75;
+  }
+
+  .prose :global(h1) {
+    font-family: var(--font-display);
+    font-size: var(--text-display-s);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    color: var(--color-ink);
+    margin-bottom: var(--space-xl);
+    overflow-wrap: anywhere;
+  }
+
+  .prose :global(h2) {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--color-ink);
+    line-height: 1.2;
+    margin-top: var(--space-2xl);
+    margin-bottom: var(--space-md);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--color-rule);
+    scroll-margin-top: var(--space-4xl);
+  }
+
+  .prose :global(h3) {
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    font-weight: 700;
+    color: var(--color-ink);
+    margin-top: var(--space-xl);
+    margin-bottom: var(--space-sm);
+    scroll-margin-top: var(--space-4xl);
+  }
+
+  .prose :global(p),
+  .prose :global(ul),
+  .prose :global(ol),
+  .prose :global(table),
+  .prose :global(pre),
+  .prose :global(blockquote) {
+    margin-bottom: var(--space-md);
+  }
+
+  .prose :global(ul) {
+    list-style: square;
+    padding-left: var(--space-lg);
+  }
+
+  .prose :global(ol) {
+    list-style: decimal;
+    padding-left: var(--space-lg);
+  }
+
+  .prose :global(li) {
+    margin-bottom: var(--space-2xs);
+  }
+
+  .prose :global(li::marker) {
+    color: var(--color-accent);
+  }
+
+  .prose :global(strong) {
+    color: var(--color-ink);
+  }
+
+  .prose :global(a) {
+    color: var(--color-accent);
+    text-underline-offset: 3px;
+  }
+
+  .prose :global(:not(pre) > code) {
+    font-size: 0.9em;
+    color: var(--color-ink);
+    background: var(--color-paper-3);
+    border-radius: 0.25rem;
+    padding: 0.1em 0.35em;
+    overflow-wrap: anywhere;
+  }
+
+  .prose :global(pre) {
+    padding: var(--space-md) var(--space-lg);
+    border: 1px solid var(--color-rule);
+    border-radius: 0.5rem;
+    font-size: var(--text-sm);
+    line-height: 1.7;
+    overflow-x: auto;
+  }
+
+  .prose :global(table) {
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+  }
+
+  .prose :global(th),
+  .prose :global(td) {
+    text-align: left;
+    vertical-align: top;
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 1px solid var(--color-rule);
+  }
+
+  .prose :global(th) {
+    color: var(--color-ink);
+  }
+
+  .prose :global(blockquote) {
+    border-left: 2px solid var(--color-accent);
+    padding-left: var(--space-md);
+    color: var(--color-neutral);
+  }
+</style>

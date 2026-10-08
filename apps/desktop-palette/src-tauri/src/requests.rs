@@ -15,7 +15,10 @@ use crate::config::{
 };
 use crate::github::{Client, Read, WorkFilter, console_file_url, encode_path};
 use crate::recents::{self, RecentEntry};
-use crate::{claude, commands, dumps, entries, palette_settings, prompts, repos, translate, wifi};
+use crate::{
+    braindumps, claude, commands, dumps, entries, files, palette_settings, prompts, repos,
+    translate, wifi,
+};
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
 #[derive(Debug, Deserialize, PartialEq)]
@@ -94,6 +97,17 @@ pub enum Request {
     },
     GetPaletteSettings,
     ListClaudeCodeRepos,
+    SearchLocalFiles {
+        query: String,
+        #[serde(default)]
+        contents: bool,
+        #[serde(default)]
+        everywhere: bool,
+    },
+    OpenLocalFile {
+        path: String,
+        with: files::OpenWith,
+    },
     GetClaudeUsage {
         #[serde(default)]
         cached: bool,
@@ -108,6 +122,13 @@ pub enum Request {
         path: String,
         text: String,
     },
+    ListBraindumps,
+    SaveBraindump {
+        #[serde(default)]
+        id: Option<String>,
+        text: String,
+    },
+    SyncBraindumps,
     ListWifi {
         #[serde(default)]
         rescan: bool,
@@ -161,6 +182,11 @@ async fn capture_knowledge(path: &str, content: &str) -> Result<Value, String> {
 
 fn client() -> Result<Client, String> {
     Ok(Client::new(config::token()?, Settings::load().repo()))
+}
+
+/// The braindumps of the repository the palette works on.
+fn braindump_store() -> Result<braindumps::Store, String> {
+    braindumps::Store::new(&config::braindumps_dir(), &Settings::load().repo())
 }
 
 fn now_ms() -> u64 {
@@ -489,7 +515,7 @@ pub async fn handle(request: Value) -> Result<Value, String> {
                 return Err(format!("{repo} is not an owner/name repository"));
             }
             let mut settings = Settings::load();
-            settings.use_repo(&repo);
+            settings.use_repo(&repo, now_ms());
             // The bookmark cache names its repo, so it invalidates itself on the next read.
             settings.save()?;
             Ok(json!({}))
@@ -534,6 +560,23 @@ pub async fn handle(request: Value) -> Result<Value, String> {
         Request::ListGithubWork { filter } => Ok(json!({ "items": client()?.work(filter).await? })),
         Request::GetPaletteSettings => get_palette_settings().await,
         Request::ListClaudeCodeRepos => Ok(json!({ "repos": claude::code_repos()? })),
+        Request::SearchLocalFiles {
+            query,
+            contents,
+            everywhere,
+        } => {
+            // Walking the disk blocks for up to `files::EVERYWHERE_TIME_LIMIT`.
+            let hits = tauri::async_runtime::spawn_blocking(move || {
+                files::search(&query, contents, everywhere)
+            })
+            .await
+            .map_err(|error| format!("The file search stopped: {error}"))??;
+            Ok(json!({ "home": files::home(), "hits": hits }))
+        }
+        Request::OpenLocalFile { path, with } => {
+            files::open(&path, with)?;
+            Ok(json!({}))
+        }
         Request::GetClaudeUsage { cached } => claude_usage(cached).await,
         Request::ListDumps => Ok(json!({ "dumps": dumps::list(&config::dumps_dir()) })),
         Request::SaveDump { id, text } => {
@@ -546,6 +589,18 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             let home = PathBuf::from(std::env::var_os("HOME").unwrap_or_default());
             let written = dumps::export(path.trim(), &text, &home)?;
             Ok(json!({ "path": written.display().to_string() }))
+        }
+        Request::ListBraindumps => Ok(json!({ "braindumps": braindump_store()?.list() })),
+        Request::SaveBraindump { id, text } => {
+            match braindump_store()?.save(id.as_deref(), &text, now_ms())? {
+                Some(id) => Ok(json!({ "id": id })),
+                None => Ok(json!({})),
+            }
+        }
+        Request::SyncBraindumps => {
+            let store = braindump_store()?;
+            braindumps::sync(&store, &client()?, now_ms()).await?;
+            Ok(json!({ "braindumps": store.list() }))
         }
         Request::ListWifi { rescan } => list_wifi(rescan).await,
         Request::SetWifi { enabled } => {
@@ -655,6 +710,34 @@ mod tests {
             Request::ListClaudeCodeRepos
         );
         assert_eq!(
+            parse(json!({ "type": "SEARCH_LOCAL_FILES", "query": "tax", "contents": true })),
+            Request::SearchLocalFiles {
+                query: "tax".into(),
+                contents: true,
+                everywhere: false
+            }
+        );
+        assert_eq!(
+            parse(json!({
+                "type": "SEARCH_LOCAL_FILES",
+                "query": "nginx",
+                "contents": false,
+                "everywhere": true
+            })),
+            Request::SearchLocalFiles {
+                query: "nginx".into(),
+                contents: false,
+                everywhere: true
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "OPEN_LOCAL_FILE", "path": "/a/b", "with": "file-manager" })),
+            Request::OpenLocalFile {
+                path: "/a/b".into(),
+                with: files::OpenWith::FileManager
+            }
+        );
+        assert_eq!(
             parse(json!({ "type": "GET_CLAUDE_USAGE" })),
             Request::GetClaudeUsage { cached: false }
         );
@@ -689,6 +772,17 @@ mod tests {
                 path: "~/a.txt".into(),
                 text: "x".into()
             }
+        );
+        assert_eq!(
+            parse(json!({ "type": "SAVE_BRAINDUMP", "id": "12", "text": "x" })),
+            Request::SaveBraindump {
+                id: Some("12".into()),
+                text: "x".into()
+            }
+        );
+        assert_eq!(
+            parse(json!({ "type": "SYNC_BRAINDUMPS" })),
+            Request::SyncBraindumps
         );
     }
 

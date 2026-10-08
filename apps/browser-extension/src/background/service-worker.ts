@@ -2,6 +2,7 @@ import {
   addActionLogEntry,
   addReadLaterEntry,
   addTodoEntry,
+  braindumpIdOf,
   checkIn,
   localDate,
   markReadItLaterRead,
@@ -17,6 +18,7 @@ import {
   withTranslationText,
 } from '@lifosy/palette';
 import { type Message } from '../types';
+import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import { consoleFileUrl } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
 import {
@@ -75,11 +77,20 @@ import {
   parsePinnedTabs,
   putGroup,
   removeGroup,
+  setGroupFavorite,
   serializePinnedTabs,
   tabsToOpen,
   tabsToUnpin,
   toPinnedTabs,
 } from './pinned-tabs';
+import {
+  checkServices,
+  DEFAULT_SERVICES,
+  isStatusCacheFresh,
+  parseStatusConfig,
+  STATUS_CONFIG_PATH,
+  type ServiceStatusCache,
+} from './service-status';
 import {
   buildToday,
   DEFAULT_ACTION_LOG_PATH,
@@ -90,6 +101,7 @@ import {
   readLaterPath,
   type TodayCache,
   withFile,
+  withoutFile,
 } from './today';
 
 console.log('LifeOS Extension: Background script loaded');
@@ -106,11 +118,22 @@ chrome.alarms.create('swKeepAlive', { periodInMinutes: 0.5 });
 // bookmarks get opened — is counted locally and pushed with the next sync.
 chrome.alarms.create('repoSync', { periodInMinutes: 60 });
 
+// The desktop palette hears of a repository chosen here at once, and is asked for its own choice
+// hourly and when a start page opens.
+watchRepoChanges();
+
+/** A start page asks at most this often, since each ask starts the desktop's host process. */
+const REPO_SYNC_INTERVAL_MS = 30_000;
+let repoSyncedAt = 0;
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'swKeepAlive') {
     // No-op: waking the worker is sufficient.
   }
   if (alarm.name === 'repoSync') {
+    syncRepoWithDesktop().catch((e) =>
+      console.warn('LifeOS Extension: repository sync with the desktop failed', e),
+    );
     syncBookmarks().catch((e) => console.warn('LifeOS Extension: bookmark sync failed', e));
     syncPinnedTabs().catch((e) => console.warn('LifeOS Extension: pinned tab sync failed', e));
     syncToday().catch((e) => console.warn('LifeOS Extension: start page sync failed', e));
@@ -452,6 +475,23 @@ async function githubWriteFile(
   return written?.content?.sha ?? null;
 }
 
+/** Deletes the version `sha` names; one already gone is fine. */
+async function githubDeleteFile(
+  token: string,
+  repoUrl: string,
+  filePath: string,
+  sha: string,
+  message: string,
+) {
+  const res = await fetch(`https://api.github.com/repos/${repoUrl}/contents/${filePath}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
+    body: JSON.stringify({ message, sha }),
+  });
+  if (res.status === 404) return;
+  if (!res.ok) throw await githubFailure(res, `Failed to delete ${filePath}`);
+}
+
 /** Creates a file from already-encoded bytes, e.g. an image downloaded for the knowledge base. */
 async function githubPutBase64(token: string, repoUrl: string, filePath: string, base64: string) {
   const res = await fetch(`https://api.github.com/repos/${repoUrl}/contents/${filePath}`, {
@@ -582,7 +622,7 @@ async function credentials(): Promise<{ token?: string; repo: string }> {
   const data = await chrome.storage.local.get(['lifeos_token', 'lifeos_repo']);
   return {
     token: data.lifeos_token as string | undefined,
-    repo: (data.lifeos_repo as string) || 'lifosy/monorepo',
+    repo: (data.lifeos_repo as string) || 'kaihuman-hq/kaihuman',
   };
 }
 
@@ -964,6 +1004,7 @@ async function listPinnedTabGroups(token: string, repo: string) {
       name: group.name,
       createdAt: group.createdAt,
       tabCount: group.tabs.length,
+      favorite: group.favorite === true,
     })),
     activeId,
   };
@@ -1034,6 +1075,19 @@ async function movePinnedTabGroup(token: string, repo: string, groupId: string, 
   return { moved: true };
 }
 
+/** Answers with the list as `LIST_PINNED_TAB_GROUPS` does, so the page redraws from the commit. */
+async function favoritePinnedTabGroup(
+  token: string,
+  repo: string,
+  groupId: string,
+  favorite: boolean,
+) {
+  const { config, sha } = await readConfig(token, repo, true);
+  const next = setGroupFavorite(config, groupId, favorite, new Date().toISOString());
+  await writeConfig(token, repo, next, sha);
+  return listPinnedTabGroups(token, repo);
+}
+
 /** Only forgets the group; the window keeps whatever it currently has pinned. */
 async function deletePinnedTabGroup(token: string, repo: string, groupId: string) {
   const { config, sha } = await readConfig(token, repo, true);
@@ -1069,6 +1123,76 @@ async function getToday() {
     if (!cache) throw new Error(NOT_LOGGED_IN);
   }
   return { today: buildToday(cache, new Date()) };
+}
+
+/**
+ * A start page opening: the braindumps must be fresh (the desktop writes them a minute before),
+ * so a cache older than this is checked. The tree request carries its ETag, so an unchanged repo
+ * costs a 304, which GitHub does not bill.
+ */
+const TODAY_FRESH_MS = 60_000;
+
+/** Answers `today: null` when the cache is fresh enough to keep. */
+async function refreshToday() {
+  const { repo } = await credentials();
+  const cache = await readTodayCache();
+  if (cache && isTodayCacheUsable(cache, repo) && Date.now() - cache.fetchedAt < TODAY_FRESH_MS) {
+    return { today: null };
+  }
+  const next = await syncToday();
+  if (!next) throw new Error(NOT_LOGGED_IN);
+  return { today: buildToday(next, new Date()) };
+}
+
+/**
+ * The traffic lights. The services come from the repo's config, which the start page's own sync
+ * already carries, and their statuses are checked at most every five minutes — when a start page
+ * asks, so a browser with no new tab open checks nothing.
+ */
+async function getServiceStatus() {
+  const { repo } = await credentials();
+  const today = await readTodayCache();
+  const file = isTodayCacheUsable(today, repo)
+    ? today?.files.find((candidate) => candidate.path === STATUS_CONFIG_PATH)
+    : undefined;
+  const services = file ? parseStatusConfig(file.content) : DEFAULT_SERVICES;
+
+  const stored = await chrome.storage.local.get('serviceStatusCache');
+  const cache = stored.serviceStatusCache as ServiceStatusCache | undefined;
+  if (cache && isStatusCacheFresh(cache, services)) return { statuses: cache.statuses };
+
+  const statuses = await checkServices(services, cache?.statuses ?? []);
+  const next: ServiceStatusCache = { services, statuses, fetchedAt: Date.now() };
+  await chrome.storage.local.set({ serviceStatusCache: next });
+  return { statuses };
+}
+
+/**
+ * Deletes a braindump the start page shows — but only the version it showed (`sha`): when the
+ * desktop has written more since, nothing is deleted and the page gets the newer text to look at.
+ */
+async function deleteBraindump(path: string, sha: string) {
+  // The path comes from a page, so only a braindump's own file can be named.
+  if (!braindumpIdOf(path)) throw new Error(`${path} is not a braindump`);
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  let cache = await readTodayCache();
+  if (!isTodayCacheUsable(cache, repo) || !cache) cache = await syncToday();
+  if (!cache) throw new Error(NOT_LOGGED_IN);
+
+  const file = await githubReadFile(token, repo, path);
+  let next = withoutFile(cache, path);
+  if (file && file.sha !== sha) {
+    next = withFile(cache, { path, sha: file.sha, content: file.content });
+    await chrome.storage.local.set({ todayCache: next });
+    return {
+      today: buildToday(next, new Date()),
+      refused: 'It changed since — this is the new text. Delete again to remove it.',
+    };
+  }
+  if (file) await githubDeleteFile(token, repo, path, sha, `braindump: delete ${path}`);
+  await chrome.storage.local.set({ todayCache: next });
+  return { today: buildToday(next, new Date()) };
 }
 
 /**
@@ -1216,7 +1340,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'DUMP_NOTE') {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
       const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'lifosy/monorepo';
+      const repo = data.lifeos_repo || 'kaihuman-hq/kaihuman';
       if (!token) {
         sendResponse({ error: 'No token found' });
         return;
@@ -1246,7 +1370,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'FETCH_QUICK_NOTES') {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
       const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'lifosy/monorepo';
+      const repo = data.lifeos_repo || 'kaihuman-hq/kaihuman';
       if (!token) {
         sendResponse({ error: 'No token found' });
         return;
@@ -1350,12 +1474,24 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       (data) =>
         sendResponse({
           success: true,
-          repo: (data.lifeos_repo as string) || 'lifosy/monorepo',
+          repo: (data.lifeos_repo as string) || 'kaihuman-hq/kaihuman',
           repos: (data.lifeos_repos as { full_name: string }[] | undefined) ?? [],
         }),
       (error) => sendResponse({ error: error.message }),
     );
     return true; // Indicate async response
+  }
+
+  if (message.type === 'SYNC_REPO_WITH_DESKTOP') {
+    if (Date.now() - repoSyncedAt < REPO_SYNC_INTERVAL_MS) {
+      sendResponse({ success: true, changed: false });
+      return false;
+    }
+    repoSyncedAt = Date.now();
+    return answer(
+      syncRepoWithDesktop().then((changed) => ({ changed })),
+      sendResponse,
+    );
   }
 
   if (message.type === 'SET_REPO') {
@@ -1497,11 +1633,12 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     message.type === 'SAVE_PINNED_TAB_GROUP' ||
     message.type === 'RENAME_PINNED_TAB_GROUP' ||
     message.type === 'MOVE_PINNED_TAB_GROUP' ||
+    message.type === 'FAVORITE_PINNED_TAB_GROUP' ||
     message.type === 'DELETE_PINNED_TAB_GROUP'
   ) {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
       const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'lifosy/monorepo';
+      const repo = data.lifeos_repo || 'kaihuman-hq/kaihuman';
       if (!token) {
         sendResponse({ error: 'No token found' });
         return;
@@ -1529,6 +1666,16 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
             success: true,
             ...(await movePinnedTabGroup(token, repo, message.groupId, message.offset)),
           });
+        } else if (message.type === 'FAVORITE_PINNED_TAB_GROUP') {
+          sendResponse({
+            success: true,
+            ...(await favoritePinnedTabGroup(
+              token,
+              repo,
+              message.groupId,
+              message.favorite === true,
+            )),
+          });
         } else {
           sendResponse({
             success: true,
@@ -1543,6 +1690,14 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   }
 
   if (message.type === 'GET_TODAY') return answer(getToday(), sendResponse);
+
+  if (message.type === 'REFRESH_TODAY') return answer(refreshToday(), sendResponse);
+
+  if (message.type === 'GET_SERVICE_STATUS') return answer(getServiceStatus(), sendResponse);
+
+  if (message.type === 'DELETE_BRAINDUMP') {
+    return answer(deleteBraindump(message.path || '', message.sha || ''), sendResponse);
+  }
 
   if (message.type === 'GET_SYNC_STATUS') return answer(syncStatus(), sendResponse);
 
@@ -1599,7 +1754,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'PIN_ARTICLE') {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', KB_IMAGES_SETTING], async (data: any) => {
       const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'lifosy/monorepo';
+      const repo = data.lifeos_repo || 'kaihuman-hq/kaihuman';
       if (!token) {
         sendResponse({ error: 'No token found' });
         return;

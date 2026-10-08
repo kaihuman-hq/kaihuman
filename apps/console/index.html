@@ -4,6 +4,23 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <!-- With dark icons on, iOS darkens what it takes for the icon's background. In the
+       opaque icon the yellow K runs off every edge, so iOS darkens the K and the icon turns
+       black. In dark mode, give iOS the same logo with transparent dark areas instead: iOS
+       fills them with its dark background and keeps the K. iOS reads this link when the app
+       is added to the Home Screen. -->
+  <script>
+    (() => {
+      const icon = document.querySelector('link[rel="apple-touch-icon"]');
+      const dark = matchMedia('(prefers-color-scheme: dark)');
+      const update = () => {
+        icon.href = dark.matches ? '/apple-touch-icon-dark.png' : '/apple-touch-icon.png';
+      };
+      update();
+      dark.addEventListener('change', update);
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0a0a0f" />
   <title>kaihuman</title>

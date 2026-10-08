@@ -1,0 +1,113 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+import { getDocPages } from '../../lib/docs';
+
+const pages = await getDocPages();
+---
+
+<DocsLayout
+  title="Docs — kaihuman"
+  description="Documentation for every kaihuman app, file format and command."
+  pages={pages}
+>
+  <p class="docs-index__eyebrow">// documentation</p>
+  <h1 class="docs-index__title">kaihuman docs</h1>
+  <p class="docs-index__lead">
+    Every app, file format and command, on one page each. The same text ships as the
+    <code>@lifosy/docspack</code> package, so a coding agent can query it offline with
+    <code>docspack ask</code>.
+  </p>
+
+  <ul class="docs-index__grid">
+    {
+      pages.map(({ entry, title, summary }) => (
+        <li>
+          <a href={`/docs/${entry.id}/`} class="docs-index__card">
+            <span class="docs-index__card-title">{title}</span>
+            <span class="docs-index__card-summary">{summary.replaceAll('`', '')}</span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</DocsLayout>
+
+<style>
+  .docs-index__eyebrow {
+    font-size: var(--text-xs);
+    color: var(--color-accent);
+    letter-spacing: 0.08em;
+    margin-bottom: var(--space-md);
+  }
+
+  .docs-index__title {
+    font-family: var(--font-display);
+    font-size: var(--text-display-s);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+    margin-bottom: var(--space-lg);
+  }
+
+  .docs-index__lead {
+    color: var(--color-neutral);
+    max-width: 64ch;
+    line-height: 1.7;
+    margin-bottom: var(--space-2xl);
+  }
+
+  .docs-index__lead code {
+    color: var(--color-ink);
+  }
+
+  .docs-index__grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-md);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  }
+
+  .docs-index__card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    height: 100%;
+    padding: var(--space-lg);
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-rule);
+    border-radius: 0.5rem;
+    text-decoration: none;
+    transition: border-color var(--dur-short) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .docs-index__card:hover {
+      border-color: var(--color-accent);
+    }
+  }
+
+  .docs-index__card:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .docs-index__card-title {
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    font-weight: 700;
+    color: var(--color-ink);
+  }
+
+  .docs-index__card-summary {
+    font-size: var(--text-sm);
+    color: var(--color-neutral);
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+</style>

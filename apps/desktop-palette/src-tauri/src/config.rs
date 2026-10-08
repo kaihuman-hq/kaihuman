@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 /// The same default as the browser extension, so both start out on the same repository.
-pub const DEFAULT_REPO: &str = "lifosy/monorepo";
+pub const DEFAULT_REPO: &str = "kaihuman-hq/kaihuman";
 
 const KEYRING_SERVICE: &str = "lifosy-palette";
 const KEYRING_USER: &str = "github-token";
@@ -19,6 +19,11 @@ fn xdg_base(variable: &str, fallback: &str) -> PathBuf {
         .unwrap_or_else(|| {
             PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(fallback)
         })
+}
+
+/// `$XDG_CONFIG_HOME`, where the browsers keep their profiles and native messaging hosts.
+pub fn config_home() -> PathBuf {
+    xdg_base("XDG_CONFIG_HOME", ".config")
 }
 
 /// `$XDG_<kind>_HOME/lifosy`.
@@ -67,6 +72,11 @@ pub fn bookmarks_cache_file() -> PathBuf {
 
 pub fn dumps_dir() -> PathBuf {
     xdg_dir("XDG_DATA_HOME", ".local/share").join("dumps")
+}
+
+/// Braindumps kept on this machine, one directory per `owner/name` below it.
+pub fn braindumps_dir() -> PathBuf {
+    xdg_dir("XDG_DATA_HOME", ".local/share").join("braindumps")
 }
 
 pub fn commands_cache_file() -> PathBuf {
@@ -123,6 +133,10 @@ pub struct Settings {
     pub repo: Option<String>,
     #[serde(default)]
     pub repos: Vec<String>,
+    /// When the repository in use last changed (ms), so the browser extension and the palette
+    /// agree on the newer choice (`native_host.rs`). `None` until it first changes here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo_changed_at: Option<u64>,
 }
 
 impl Settings {
@@ -140,10 +154,14 @@ impl Settings {
             .unwrap_or_else(|| DEFAULT_REPO.to_string())
     }
 
-    /// Makes `repo` current and remembers it for the switcher.
-    pub fn use_repo(&mut self, repo: &str) {
+    /// Makes `repo` current and remembers it for the switcher; `changed_at` is when it was
+    /// chosen, recorded only when it differs from the repository in use.
+    pub fn use_repo(&mut self, repo: &str, changed_at: u64) {
         if !self.repos.iter().any(|known| known == repo) {
             self.repos.push(repo.to_string());
+        }
+        if self.repo() != repo {
+            self.repo_changed_at = Some(changed_at);
         }
         self.repo = Some(repo.to_string());
     }
@@ -305,7 +323,7 @@ mod tests {
 
     #[test]
     fn accepts_owner_slash_name_only() {
-        assert!(is_repo_name("lifosy/monorepo"));
+        assert!(is_repo_name("kaihuman-hq/kaihuman"));
         assert!(is_repo_name("a-b/c_d.e"));
         for bad in ["lifosy", "a/b/c", "/b", "a/", "a/..", "a b/c", "a/b?x=1"] {
             assert!(!is_repo_name(bad), "{bad} should be rejected");
@@ -318,10 +336,14 @@ mod tests {
         assert_eq!(settings.repo(), DEFAULT_REPO);
         assert_eq!(settings.known_repos(), vec![DEFAULT_REPO.to_string()]);
 
-        settings.use_repo("o/a");
-        settings.use_repo("o/b");
-        settings.use_repo("o/a");
+        settings.use_repo("o/a", 1);
+        settings.use_repo("o/b", 2);
+        settings.use_repo("o/a", 3);
         assert_eq!(settings.repo(), "o/a");
+        assert_eq!(settings.repo_changed_at, Some(3));
+        // Choosing the repository in use again is no change.
+        settings.use_repo("o/a", 4);
+        assert_eq!(settings.repo_changed_at, Some(3));
         assert_eq!(
             settings.known_repos(),
             vec!["o/a".to_string(), "o/b".to_string()]
@@ -335,6 +357,7 @@ mod tests {
         let settings = Settings {
             repo: Some("o/r".into()),
             repos: vec!["o/r".into()],
+            repo_changed_at: Some(7),
         };
         write_json(&path, &settings).unwrap();
         assert_eq!(read_json::<Settings>(&path), Some(settings));

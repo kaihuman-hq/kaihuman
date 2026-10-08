@@ -1,5 +1,338 @@
 # Progress
 
+## 2026-10-08 — Repository renamed to kaihuman-hq/kaihuman
+
+- The default repository (browser extension, desktop palette `DEFAULT_REPO`, console search and
+  repo fallback) is now `kaihuman-hq/kaihuman` instead of `lifosy/monorepo`. Stored choices are
+  kept; GitHub redirects the old name.
+- "View Source" links on both landing pages, the README title, the root package name and the
+  docspack pages now name the new repository. Package scope `@lifosy/*`, binaries, config paths
+  and the native host `com.lifosy.palette` are unchanged.
+
+Checks: `tsc` for the extension and `packages/ui`, `vitest run` (all extension tests), Biome on
+the changed files (no new findings), `docspack build` and `docspack eval`.
+
+## 2026-10-08 — Last year's value in the consumption Recent table
+
+- `.consumption.csv` widget, Recent tab: each cell now also shows the value of the same day one
+  year earlier in brackets, in the muted colour, when that day has a value. Feb 29 has no match.
+- New `sameDayLastYear` helper in `ConsumptionLogic.ts`, with tests; `packages/ui` gets a
+  `test` script.
+
+Checks: `tsc --noEmit`, `vitest run`, Biome, `vite build` for `packages/ui`.
+
+## 2026-10-08 — Bigger service status lights
+
+- The status lights from #145 were hard to see: the dots grew from 9px to 12px and got a 3px
+  halo in their own colour (30% opacity), with a bit more space before the label.
+
+Checks: `tsc -b`, `vitest run` (all extension tests), `vite build`, Biome on the changed file;
+a screenshot of the new lights on the dark background.
+
+## 2026-10-07 — Service status lights on the start page
+
+- Before building: checked every provider for CORS. The extension needs no proxy — its
+  `host_permissions: ['<all_urls>']` exempt the start page and the worker from CORS. GitHub,
+  Claude and Cloudflare (Atlassian Statuspage) and GCP send `Access-Control-Allow-Origin: *`
+  anyway; AWS's Health Dashboard feed sends none and is big-endian UTF-16, so it is decoded from
+  its bytes rather than with `response.json()`.
+- A strip under the start page header shows a light per service (operational, degraded, outage,
+  maintenance, unknown); hover for the provider's text, click for its status page.
+- Services come from `.kh/browser.status.json` (types `statuspage` with optional `components`,
+  `aws` with `regions`, `gcp` with `products`), read along with the start page's own repo sync.
+  Without the file: GitHub, Claude, AWS `eu-central-1`/`us-east-1`, Cloudflare, GCP.
+- New `GET_SERVICE_STATUS` message; results cached in `serviceStatusCache` for five minutes and
+  only checked when a start page asks. A failed check keeps the last answer, dimmed, for up to
+  30 minutes.
+- New `src/background/service-status.ts`, `src/newtab/ServiceStatus.tsx`; tests in
+  `service-status.test.ts`, `service-worker.today.test.ts` and `StartPage.test.tsx`. Docs in the
+  extension README and the docspack browser-extension and file-format pages, with an eval query.
+
+Checks: `tsc -b`, `vitest run` (all extension tests), `vite build`, Biome on the changed files
+(the two errors left in `service-worker.ts` were there before); a live run of the checker
+against the five real status feeds.
+
+## 2026-10-07 — Docs readable on the landing page at /docs/
+
+- The docs from #141 could not be reached: the **Docs** nav link only scrolled to the
+  "Documented for agents" section, whose install command names `@lifosy/docspack`, which is not
+  on npm yet. And the live site never got that section, because the deploy for #141 failed on
+  the lockfile and #143 (the fix) touched no path that triggers the deploy.
+- The nextgen landing page now renders `packages/docspack/docs/*.md` as `/docs/` (an index of
+  cards) and `/docs/<page>/` (one page per file, sidebar with all pages), through an Astro
+  content collection, so there is one source for the site and the agent index. The nav **Docs**
+  link opens `/docs/`, and the docs section has a **Read the docs →** link.
+- The nav pill moved into `src/components/NavPill.astro` so the docs pages share it.
+- `deploy-landing.yml` also runs on changes to `packages/docspack/docs/**`.
+- Docs: new "Reading the docs on the website" section in `90-landing-pages.md`, with an eval
+  question.
+
+Checks: `astro build` (17 pages); `astro check` (only the existing `astro.config.mjs` Vite type
+error); `docspack doctor --strict` and `docspack eval`; screenshots at 1440 and 390 px with no
+horizontal scroll.
+
+## 2026-10-06 — Find in the braindump window (⌃F)
+
+- ⌃F in the braindump window opens a find bar above the status line, filled with the selected
+  text if there is one. Every match is highlighted in the text, the current one in orange, with a
+  count (`3/12`, `no matches`). ⏎ / ⇧⏎ go to the next / previous match, wrapping around, and
+  scroll it into view; ⌃F again selects the query; Esc goes back to the text with the match
+  selected (a second Esc hides the window as before). Matching is plain text, ignoring case.
+- Tauri's webview has no find of its own, and a textarea cannot style part of its text (the CSS
+  Custom Highlight API does not reach inside it). So the text is copied, with `<mark>`s, into a
+  layer behind the now transparent textarea with the same font, padding, wrapping and width,
+  scrolled with it. No new dependency.
+- `findMatches` exported from `@lifosy/palette`; 9 new tests in `braindump-window.test.ts`.
+  Checked by hand in Chromium against a stubbed Tauri bridge: wrapped lines and tabs line up, and
+  a match far down scrolls into view.
+
+## 2026-10-06 — Fix deploy workflows: lockfile entry for packages/docspack
+
+- Both deploy workflows failed at `pnpm install` on main after #141:
+  `ERR_PNPM_PACKAGE_MANAGER_NO_IMPORTER`, because `pnpm-lock.yaml` had no
+  `importers["packages/docspack"]` entry. The package has no dependencies of its own, so
+  `pnpm install --lockfile-only` leaves the lockfile alone and does not add it. Added
+  `packages/docspack: {}`, which is how the lockfile lists other packages without dependencies
+  (like `packages/formats`).
+
+Checks: `pnpm install --frozen-lockfile` ok; `pnpm -r run build` ok.
+
+## 2026-10-04 — Docs follow the code; console views documented
+
+- Fixed docs that disagreed with the code: the CLI config dir is `~/.config/cli` on Linux
+  (`~/Library/Application Support/com.lifosy.cli` on macOS); the AI prompt sends on `Enter`;
+  `Ctrl+S` in the CLI editor commits and pushes; `n` writes
+  `.lifeos/quicknotes/quicknote-<ts>.md`; knowledge-note front matter; the console dev server is
+  on port 4300; `pnpm check` and `pnpm -r test` replace the `turbo check` / `turbo test` tasks that
+  do not exist; the console editor is `@cascivo/editor`; the extension popup has three buttons.
+  Touched `README.md`, `doc/documentation.md` and the cli, console, kb-mcp and extension READMEs.
+- New `packages/docspack/docs/32-console-views.md` (`# Console views`): knowledge graph, commit
+  history and per-file history, the LifeOS Copilot AI panel and its local server, the `/new` quick
+  dump editor compared with `/quick-note`, push notifications for overdue milestones and the Todo
+  Reminders workflow, zen mode. 8 new eval questions.
+
+Checks: docspack build 243 chunks (~56k tokens), `doctor --strict` ok, `eval` top-3 77/80 (96 %).
+
+## 2026-10-04 — Everything documented as a docspack package
+
+- New package **`packages/docspack`** (`@lifosy/docspack`): kaihuman's documentation for AI agents,
+  built with [docspack](https://docspack.dev). 14 Markdown files in `docs/` — overview, development,
+  terminal CLI, desktop quick capture, web console and its widgets, browser extension, command
+  palette, desktop palette, knowledge base, KB MCP server, repo file formats, shared packages and
+  landing pages — written one `##` heading per question. `cmdspec.yaml` describes the `cli`
+  binary (`server`, `capture`), one chunk per command.
+- `pnpm --filter @lifosy/docspack build` writes the `.llms/` payload (git-ignored, a turbo build
+  output); `lint` runs `docspack doctor --strict`; `test` runs `docspack eval` over 72 questions in
+  `eval/queries.json` and fails below 90 % in the top 3. `prepublishOnly` rebuilds and checks.
+- `docspack` 1.3.1 added to the root `devDependencies`.
+- Landing page (nextgen): a **Documented for agents** section (`#docs`) with the install / sync /
+  ask commands, and a **Docs** link in the nav pill.
+- Found while writing (documented as the code behaves, not changed): the CLI config dir is
+  `~/.config/cli` on Linux, not `~/.config/com/lifosy/cli/`; `n` writes
+  `.lifeos/quicknotes/quicknote-<ts>.md`; the AI prompt sends on `Enter`; the console dev server
+  runs on port 4300; `turbo.json` has no `test` or `check` task.
+
+Checks: docspack build 232 chunks (~54k tokens), `doctor --strict` ok, `eval` top-3 69/72 (96 %),
+top-1 54/72; landing page `astro build` ok, checked at 1440 px and 390 px.
+
+## 2026-10-04 — `>o a: …` searches the whole file system
+
+- `>o` still searches only the home directory. A leading `a:` searches the whole file system
+  instead: every top-level folder but the virtual `/proc`, `/sys`, `/dev` and `/run`. It combines
+  with `c:` in either order (`>o a: c: …`), and stops after 30 s instead of 10 s.
+- `SEARCH_LOCAL_FILES` takes `everywhere`.
+
+Checks: palette biome, tsc and vitest 262/262; desktop-palette biome and tsc; Rust fmt, clippy
+`-D warnings` and `cargo test` 95/95 (2 new), the search tests also with `find` + `grep` and with
+`fd` + `rg`.
+
+## 2026-10-04 — Search files on this computer from the desktop palette
+
+- New prefix **`>o`**: ⏎ searches the home directory for files and folders whose name holds what
+  is typed, ignoring case. `>o c: …` searches the contents too; content hits come after the
+  names, under their own heading, with the first matching line.
+- Uses what the desktop has: `fd` (else `find`) for names, `rg` (else `grep -r`) for contents.
+  Hidden files and `node_modules` are skipped. At most 25 hits per kind; the search stops after
+  10 s with what it found.
+- ⏎ on a hit opens it with `xdg-open` (its default app; a folder in the file manager). ⇥ offers
+  the folder it is in in the file manager or in a `ghostty` window.
+- New requests `SEARCH_LOCAL_FILES` and `OPEN_LOCAL_FILE` (desktop only), answered by
+  `src-tauri/src/files.rs`.
+
+Checks: palette biome, tsc and vitest 261/261 (8 new); desktop-palette biome and tsc; Rust fmt,
+clippy `-D warnings` and `cargo test` 93/93 (9 new). The Rust search tests also passed with only
+`find` + `grep` and with `fd` + `rg` on the `PATH`.
+
+## 2026-09-30 — Delete braindumps from the desktop palette
+
+- In `>d`, **⇥** (or **→**) on a braindump offers **Open in the braindump window** and
+  **Delete…**. Delete asks you to type `DELETE`, as deleting a tab group does, then deletes the
+  braindump here and syncs at once, so the repo follows.
+- If the sync fails (offline), the palette says the repo will follow on the next sync.
+- The sync's rules apply: only the version this machine last saw is deleted, and an edit made
+  elsewhere since comes back.
+- Old local dumps get **Delete…** too, on this machine only.
+
+Checks: palette tsc, biome and vitest 253/253 (5 new). The built desktop palette was driven in
+Chromium with a stubbed Tauri bridge: `>d` → `bank` → ⇥ → Delete… → `DELETE` → ⏎ → "Deleted Call
+the bank", with `SAVE_BRAINDUMP` (empty) then `SYNC_BRAINDUMPS`.
+
+## 2026-09-30 — Braindumps phase 4: the list on the new tab page
+
+- **Braindumps** on the start page, above the capture box. It shows the ten newest files in
+  `.kh/braindumps/` with their title, the next two lines and how long each has waited. A click
+  opens the whole text, and **open** takes it to the console.
+- **delete** asks once more, then removes the row at once and the file from the repo. Only the
+  version shown is deleted: when the desktop has written more since, nothing is deleted and the
+  page shows the new text (`DELETE_BRAINDUMP { path, sha }` re-reads the file first). A failed
+  delete puts the row back with the reason.
+- `today.ts` reads the braindump folder in the same tree sync as the widget files.
+- New `REFRESH_TODAY`: a start page draws from the cache, then the worker checks the repo if its
+  data is over a minute old. That costs a 304 when nothing changed, so a braindump written a
+  minute ago shows up.
+- `githubDeleteFile` in the worker; the path must be a braindump's own file.
+
+Checks: extension tsc clean and vitest 299/299 (11 new). biome is clean on the files that were
+clean before; `StartPage.tsx` and `service-worker.ts` already failed biome before this change and
+were not reformatted. The built start page was driven in Chromium with a stubbed `chrome`: list →
+expand → delete? → delete.
+
+## 2026-09-30 — Braindumps phase 3: the braindump window, `>d`, and one repository
+
+- **Braindump window.** A second window in the desktop palette's daemon, created hidden, so
+  `lifosy-palette-toggle braindump` (bind it to a key) shows it at once with the cursor in a new
+  braindump. It is a normal window, not an overlay, and its title is always `lifosy-braindump` for
+  a Hyprland float rule (in the README).
+  - It saves 400 ms after the last key, on this machine.
+  - It syncs to the repo when hidden (Esc) or when switching braindumps, after 30 s without typing,
+    at least every 2 minutes while typing, on start, and a minute after a failure.
+  - Keys: ⌃N new, ⌃O its own filtered list, ⌃⏎ copy all and hide. A sync that took an edit made
+    elsewhere shows it, unless something was typed since.
+  - The logic is `createBraindumpWindow` in `packages/palette`, tested with fake timers. The desktop
+    page only connects it to Tauri.
+- **`>d`** now lists **New braindump** and the braindumps, and ⏎ hides the palette and opens the
+  choice in the window (`OPEN_BRAINDUMP`). Old local dumps are listed below under *Old dumps — on
+  this machine only*: still editable, never created again, never sent anywhere.
+- **One repository for the extension and the desktop palette.**
+  - `palette.json` records when its repository changed.
+  - `lifosy-palette` answers Chrome native messaging (`SYNC_REPO`); the newer choice wins.
+    `lifosy-palette native-host install <extension id>` registers it.
+  - The extension (`background/repo-sync.ts`, new `nativeMessaging` permission) stamps every
+    change of its repository and tells the desktop at once. It asks hourly and when a start page
+    opens (at most every 30 s), and the page reloads when the repository changed.
+  - Without the host installed, nothing changes.
+- **Fix found by a test**: the extension's repository-name check accepted `../x`; it now refuses
+  `.` and `..` parts, as the desktop does.
+
+Checks: palette tsc, biome and vitest 248/248 (21 new); extension tsc and vitest 288/288 (6 new);
+desktop tsc and biome clean, `cargo test` 84 passed (9 new), clippy and fmt clean.
+- The real binary answered framed `SYNC_REPO` messages and wrote a host manifest in a scratch
+  profile.
+- The built braindump window was driven in Chromium with a stubbed Tauri bridge: new → type →
+  saved → ⌃O → filter → ⏎ → Esc.
+- Not checked here: Hyprland itself, and native messaging from a real Chrome.
+
+## 2026-09-30 — Braindumps phase 2: desktop sync to GitHub
+
+- New `braindumps.rs` in the desktop palette. Braindumps are saved on this machine at once
+  (`SAVE_BRAINDUMP`), one directory per repository under `$XDG_DATA_HOME/lifosy/braindumps/`.
+  `SYNC_BRAINDUMPS` sends what changed to `.kh/braindumps/<id>.md` in the active repo, then takes
+  what changed there: new ones from another machine, edits made elsewhere, deletes made elsewhere.
+  `LIST_BRAINDUMPS` lists them with a `synced` flag. All three are in `PaletteProtocol`.
+- Nothing typed is lost. A write GitHub refuses is resolved by reading its copy: a stale version
+  is retried, and an edit made elsewhere too becomes a braindump of its own, so both versions
+  survive. A delete never throws away an edit made elsewhere. Offline, everything waits for the
+  next sync.
+- `github.rs` gains `put` (answers the new sha), `delete` and `folder`.
+- Plan: `>d` will list braindumps and open them in the braindump window (phase 3).
+- No window yet, so nothing calls these requests; phase 3 adds the window and the `>d` rework.
+
+Checks: desktop `cargo test` 75 passed (14 new, against an in-memory GitHub), clippy and fmt
+clean; palette tsc, biome and vitest 233/233; extension tsc and vitest 282/282.
+
+## 2026-09-30 — Braindumps phase 1: the shared file format
+
+- `@lifosy/formats` gains `braindumps.ts`: braindumps are `.kh/braindumps/<created-ms>.md`, one file
+  each, named once and never renamed. `braindumpIdOf(path)` is the one way from a path to a
+  `BraindumpId` (branded, digits only), so a path from a page or webview can never reach another
+  file. `braindumpTitle(text)` is the first non-empty line without heading marks, up to 60
+  characters. The new tab page and the braindump window both build on these.
+- Plan revised (`doc/braindump.md`): braindumps are not part of the command palette. They get a
+  dedicated window opened by its own key (`lifosy-palette-toggle braindump`), with its own list on
+  ⌃O. The palette and its `>d` dumps are unchanged.
+
+Checks: formats vitest 76/76 (8 new), tsc and biome clean; the palette, extension, desktop and
+console typecheck against the new export.
+
+## 2026-09-30 — Braindumps: study and plan
+
+- New `doc/braindump.md`: a proposal (nothing implemented) for turning the desktop palette's local
+  `>d` dumps into repo-backed braindumps. One file per braindump in `.kh/braindumps/<ms>.md`, a
+  second floating Tauri window opened by its own key, local-first saving with a debounced push to
+  GitHub, and a list with delete on the new tab page. Ends with a phased plan and open questions.
+
+## 2026-09-30 — Favourite tab groups on the start page
+
+- Each chip under **Tab groups** has a star. **☆** makes the group a favourite, **★** takes that
+  back. Favourites come first (the popup's order holds within each part) and have a green fill and
+  green name. The group loaded in this window keeps its bright outline.
+- The mark is stored as `"favorite": true` on the group in `.kh/browser.pinnedtabs.json`
+  (`setGroupFavorite` in `background/pinned-tabs.ts`), and left out when false, so files without
+  favourites do not change. New worker message `FAVORITE_PINNED_TAB_GROUP` re-reads the file,
+  commits and answers with the updated list; `LIST_PINNED_TAB_GROUPS` now reports `favorite`.
+- The star changes at once; if the commit fails it goes back and the page says why.
+- The popup's **Pinned Tabs** panel has the same star before each group name. Favourites there get
+  a green background and a bold green name, but stay in the file's order, because that panel is
+  where ↑/↓ arrange the groups.
+
+## 2026-09-30 — New Tab page redesign
+
+- The start page follows the new design: dark `#050505`, Noto Sans Mono, no rounded corners, and
+  the full width of the screen (up to 1240px). Header → search → two columns; below about 920px the
+  right column moves under the left one.
+- **Header**: the logo and "kaihuman" (a link to the console), the date with its ISO week (`Wed 30 Sept · W40`), the world clocks, the repo name and
+  the sync status (`synced 3m ago`).
+- **Search** is a real field now. Typing filters the pinned and recently used bookmarks (title or
+  host, any case); ⏎ opens the palette with the text in it (new `open(query)` on the shared
+  palette); `/` focuses the field and Esc leaves it. The extension shortcut still opens the palette.
+- **Left column**: Pinned (numbered cards, keys 1–9 open them), Tab groups (chips), Recently used
+  (rows with a DEV / INT / PROD tag), Read later (with the total unread count).
+- **Right column**: Doing (in-progress and overdue todos, plus the time-tracking total with
+  start/stop; green with seconds while it runs), Coming up, Trackers (a check box, a 7-day strip and
+  the streak per habit), and the capture box (Ctrl/⌘+Enter saves, last five entries per kind kept
+  in `chrome.storage.local`).
+- Environment tags come from a `dev`/`int`/`prod` bookmark tag, else from that word in the title
+  (`bookmarkEnvironment` in `background/bookmarks.ts`). `startPageBookmarks` now returns the pinned
+  and recent lists separately and takes the search query.
+- The Today summary has two more fields: `week` per habit (last seven days) and `unreadCount`.
+- The font is bundled (`src/newtab/fonts`, latin and latin-ext, SIL OFL), because Manifest V3
+  blocks Google Fonts.
+
+## 2026-09-30 — Home-screen icon readable with iOS dark icons
+
+- With iOS set to dark icons, the kaihuman home-screen icon turned almost black. iOS darkens
+  what it takes for an icon's background. The yellow "K" runs off all four edges of the opaque
+  `apple-touch-icon.png`, so iOS took the yellow for the background and darkened it.
+- New `apps/console/public/apple-touch-icon-dark.png`: the same logo, pixel for pixel, but the
+  near-black areas are transparent. iOS fills transparent areas with its own dark background and
+  keeps the "K".
+- `apps/console/index.html` points the `apple-touch-icon` link at the dark file when the system
+  is in dark mode (`prefers-color-scheme: dark`). In light mode the opaque icon stays, because iOS
+  fills transparent areas with white there.
+- iOS saves the icon when you add the app to the home screen. To get the new icon, switch the
+  iPhone to dark mode, remove the app from the home screen and add it again from Safari.
+
+## 2026-09-29 — New logo
+
+- The new kaihuman logo (yellow "K" on near-black) replaces the old one everywhere:
+  - **Console**: favicon (`logo.svg`), PWA icons (`pwa-192x192.png`, `pwa-512x512.png`) and a
+    new `apple-touch-icon.png` (180×180), linked from `index.html`.
+  - **Browser extension**: `icon.svg` and the toolbar/store icons (`icon-16/32/48/128.png`). The
+    logo now sits next to "kaihuman" in the popup header and on the New Tab page title.
+  - **Landing pages**: `favicon.svg` and `favicon.ico` for both sites.
+  - **Desktop palette**: the Tauri `icons/icon.png`.
+- The PNGs are rendered from the SVG. The SVG is the one supplied, minus its C2PA metadata block.
+
 ## 2026-09-28 — Desktop palette: `>w` Wi‑Fi; GitHub work moves to `>gw`
 
 - **`>w` Wi‑Fi** (`wifiMode` in `packages/palette/src/wifi.ts`, desktop only; `src-tauri/src/wifi.rs`
@@ -19,6 +352,8 @@
   so far leaves it out.
 - **GitHub work** moves from `>w` to `>gw` on both surfaces. `>g` now waits for a space, because
   `>gw` starts with it. `gw` joins `BUILT_IN_PALETTE_PREFIXES`.
+- The docspack pages (`30-console.md`, `50-command-palette.md`, `51-desktop-palette.md`) name
+  `>gw` for GitHub work and list `>w` Wi‑Fi and its requests.
 
 ## 2026-09-25 — Bookmarks widget: edit title and link
 

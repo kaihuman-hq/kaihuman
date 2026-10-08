@@ -10,13 +10,14 @@ The official browser extension for Lifosy, designed to enhance your web experien
 - **Context Menu Integration**: Conveniently access Lifosy features directly from the browser's context menu.
 - **Pinned Tabs Sync**: Save named groups of pinned tabs to your repo, and load any of them into the current window on any machine.
 - **Bookmarks**: Your repo's bookmarks, mirrored into the browser and synced at most once an hour. Bookmark the current page from the popup or the palette, or import the ones this browser already has. Opens are counted so you can find the ones you never use.
+- **Same repository as the desktop palette**: with `lifosy-palette native-host install <this extension's id>` run once, switching the repository here or in the desktop palette switches the other too — the newer choice wins (`nativeMessaging` permission; see the desktop palette's README).
 - **Command Palette**: `Ctrl+Shift+K` on any page to search those bookmarks, repeat what you did last, run any of the extension's actions — and, on request, search your repo.
 - **Start Page**: a New Tab page of your own — what is coming up and in progress, habit and time trackers, the read-later queue, world clocks, the bookmarks you reach for, a box for a note, todo or log entry, and the palette (which Chrome's own New Tab page cannot host).
 
 ## Popup
 
-The popup opens on two icon buttons — **pin this page to the Knowledge Base** and **bookmark this
-page** — followed by the pinned-tab groups and the note box. The star opens a view of its own where
+The popup opens on three icon buttons — **pin this page to the Knowledge Base**, **bookmark this
+page** and **read this page later** — followed by the pinned-tab groups and the note box. The star opens a view of its own where
 you can add comma-separated tags and **Save**, or **Skip** to save the page without any. That view
 also holds **Import all browser bookmarks**.
 
@@ -38,6 +39,9 @@ edit mode.
   leaves a clean window and nothing is lost. Loading the same group twice is a no-op.
 - **Update** — writes the window's current pinned tabs back into the loaded group, keeping its
   id, name and creation date. This is how you add or remove a tab from a saved group.
+- **☆ / ★** — marks the group as a favourite, or takes that back. Favourites have a green
+  background and name here and come first on the start page. The mark is stored in the repo file
+  as `"favorite": true` (left out when unset).
 - **Save current** — types a name and stores the window's pinned tabs as a new group.
 - **Rename** *(edit mode)* — edits the group's name in place, keeping its tabs and creation date.
 - **↑ / ↓** *(edit mode)* — reorders the group in the list; the order is stored in the repo file.
@@ -417,55 +421,115 @@ If a press still does nothing, work through these in order:
 ## Start Page
 
 The extension replaces Chrome's New Tab page with its own (`chrome_url_overrides.newtab`), which
-Chrome asks you to confirm the first time. It holds:
+Chrome asks you to confirm the first time. The page is dark, set in Noto Sans Mono (bundled with
+the extension, since Manifest V3 blocks remote fonts), and uses the full width of the screen: a
+header, the search bar, then two columns. Below about 920px wide the right column moves under the
+left one.
 
-- **Sync status** — under the repo name: how old the cached data is (`synced 12 min ago`), how
-  many bookmark opens are still waiting to be pushed, and **sync**, which does what the palette's
-  **Sync with GitHub now** does and reloads the page's data.
-- **Search** — opens the command palette, with the whole action list and your bookmarks in it.
-  Chrome keeps the focus in the address bar on an override page, so nothing here is focused for you
-  and typing still goes to the omnibox: press the shortcut, or click the field.
+**Header**
+
+- **Logo and title** — the kaihuman logo and name; a click opens the console.
+- **Date** — `Wed 30 Sept · W40`, with the ISO week number.
 - **World clocks** — every zone in the repo's `.timezones.json` files, labelled by its first city.
+  Edit that file to change the cities.
+- **Sync status** — under the repo name: how old the cached data is (`synced 12m ago`), how many
+  bookmark opens are still waiting to be pushed, and **sync**, which does what the palette's
+  **Sync with GitHub now** does and reloads the page's data.
+
+**Service status** — under the header, a traffic light per service you depend on: green
+operational, amber degraded, red outage, blue maintenance, grey unknown. Hovering shows what the
+provider says; a click opens its status page. List the services in `.kh/browser.status.json`;
+without one, GitHub, Claude, AWS (`eu-central-1` and `us-east-1`), Cloudflare and GCP are shown:
+
+```json
+{
+  "services": [
+    { "name": "GitHub", "type": "statuspage", "url": "https://www.githubstatus.com" },
+    { "name": "Claude", "type": "statuspage", "url": "https://status.claude.com" },
+    { "name": "Cloudflare", "type": "statuspage", "url": "https://www.cloudflarestatus.com", "components": ["CDN/Cache"] },
+    { "name": "AWS", "type": "aws", "regions": ["eu-central-1", "us-east-1"] },
+    { "name": "GCP", "type": "gcp", "products": ["Compute Engine"] }
+  ]
+}
+```
+
+`statuspage` works for any Atlassian Statuspage; `components` narrows it to those components
+(Cloudflare's overall status counts hundreds of data centres). `regions` and `products` narrow AWS
+and GCP the same way. Statuses are checked straight from the providers — the extension's host
+permission exempts it from CORS, so there is no proxy — at most every five minutes, when a start
+page asks. A provider that cannot be reached keeps its last light, dimmed, for up to 30 minutes.
+
+**Search** — typing filters the pinned and recently used bookmarks as you type (title or host, any
+case). **⏎** hands the text to the command palette, which searches the repo and the web and lists
+every action. **/** puts the cursor in the field. The extension shortcut (**Ctrl+Shift+K**) opens
+the palette directly. Chrome keeps the focus in the address bar on an override page, so nothing is
+focused for you: click into the page first, or use the shortcut.
+
+**Left column**
+
+- **Pinned** — every pinned bookmark, in the order the repo file holds them, as a card with a
+  number. **1**–**9** open the first nine (when no text field has the focus). **●** unpins.
+- **Tab groups** — the saved pinned-tab groups, the same list the popup's **Pinned Tabs** panel
+  shows. The group this window is running is outlined in green. A click loads the group exactly as
+  the popup's **Load** does — pins what is missing, unpins what the group does not have — and leaves
+  the start page where it is. **☆** beside a group makes it a favourite: it moves to the front
+  and is filled in green, and **★** takes that back. The mark is committed to the group in
+  `.kh/browser.pinnedtabs.json` (`"favorite": true`), so every browser sees it. The popup's
+  **Pinned Tabs** panel has the same star. Saving, renaming
+  and reordering groups stay in the popup and the palette.
+- **Recently used** — the twelve other bookmarks you opened most recently. A repo whose bookmarks
+  have never been opened still shows its latest ones. Each row has an environment tag:
+  **DEV**, **INT** or **PROD**. Set it by hand with a `dev`, `int` or `prod` tag on the bookmark;
+  otherwise the page takes the word from the title ("Control PROD", "[DEPLOY/DEV] Unified").
+  Rows without one show `—`. **○** pins.
+- **Read later** — the three oldest unread items of the `.readitlater.json` files, with the total
+  unread count. A click opens the page, **✓ read** marks it read. Pages get onto the list with the
+  palette's **Read later: this page**.
+
+Opening a bookmark is counted exactly as it is in the palette, and **takes this tab over** rather
+than leaving a blank start page behind. Pinning or unpinning moves the link between the two lists
+at once and commits `"pinned"` to the bookmark in the repo file — the same field the console's
+Bookmarks widget sets, so a pin made in either place shows up in both. If the commit fails
+(offline, or the bookmark was deleted in the console meanwhile) the link goes back and the page
+says why.
+
+**Right column**
+
+- **Doing** — every in-progress (`[>]`) todo, open todos whose milestone is past due (marked `!`),
+  and how many are waiting in the inbox (`<app folder>/inbox.todos.md`). Every line opens its file
+  in the console. Below them, today's total of each `.timetracking.csv` (`working-time today`) with
+  **▶ start** / **■ stop** to clock in or out. While it runs, the total is green and counts seconds.
 - **Coming up** — the next seven days of `.events.csv` (birthdays in their next year, a multi-day
   event while it runs) and the next milestone due in a `.todos.md`, with its open todos.
-- **Doing** — every in-progress (`[>]`) todo, open todos whose milestone is past due (in red), and
-  how many are waiting in the inbox (`<app folder>/inbox.todos.md`). Every line opens its file in
-  the console.
-- **Trackers** — a card per `.habit.csv` (click to check in for today; shows the streak) and per
-  `.timetracking.csv` (click to clock in or out; shows today's total, ticking while it runs). Both
-  write the file exactly as the console's widgets do.
-- **Read later** — the three oldest unread items of the `.readitlater.json` files; a click opens
-  the page, **✓ read** marks it read. Pages get onto the list with the palette's **Read later: this
-  page**.
-- **Pinned tabs** — the saved pinned-tab groups, the same list the popup's **Pinned Tabs** panel
-  shows, as compact cards in the bookmark grid. The group this window is running is outlined in the
-  accent colour. Clicking a card loads it exactly as the popup's **Load** does — pins what is
-  missing, unpins what the group does not have — and leaves the start page where it is. Saving,
-  renaming and reordering groups stay in the popup and the palette.
-- **Pinned & recently used** — every pinned bookmark first, in the order the repo file holds them,
-  then the twelve you opened most recently. A repo whose bookmarks have never been opened still
-  shows its latest ones instead of an empty grid. Opening one is counted exactly as it is in the
-  palette, and **takes this tab over** rather than leaving a blank start page behind.
-
-  Each card has a **pin** in its corner. Pinning moves the card to the top at once and commits
-  `"pinned": true` to the bookmark in the repo file — the same field the console's Bookmarks widget
-  sets, so a pin made in either place shows up in both. A pin is never cut to fit the twelve. If the
-  commit fails (offline, or the bookmark was deleted in the console meanwhile) the card goes back
-  and the page says why.
+- **Trackers** — a row per `.habit.csv`: a box to check in for today, the last seven days (oldest
+  on the left) and the streak. A check-in stays for the day: the console's habit files have no
+  undo either.
+- **Braindumps** — the ten newest files in `.kh/braindumps/`, typed in the desktop palette's
+  braindump window (`doc/braindump.md`): the title, the next two lines and how long it has been
+  waiting. A click opens the whole text; **open** takes it to the console. **delete** asks once
+  more (**delete?**), then removes it from the list at once and from the repo — only the version
+  shown: if the desktop has written more since, nothing is deleted and the new text is shown
+  instead. A failed delete puts the row back with the reason. Git history keeps every deleted one.
+  The desktop writes a braindump a minute before you might look, so a start page opening on data
+  older than a minute checks the repo behind the cached page (a 304 when nothing changed).
 - **Note / Todo / Log** — one box, three targets: a note goes to `.lifeos/dump.md`, a todo is
   added to the inbox the console's quick-todo page uses (`#tags` move to the end), and a log
   entry goes to the repo's action log (the app folder's first `.actionlog.md`), `#tags` and all —
   both written by the same shared functions as the console's own (`packages/formats`).
+  **Ctrl+Enter** (**⌘+Enter** on a Mac) saves. The last five saved entries of each kind are listed
+  under the box and kept in `chrome.storage.local`, so the next tab shows them too.
   Other note targets are one palette action away (**Add a note…**), which is also the only place
   that reads the repo's quick-note list: a new tab is opened far too often to spend a GitHub
   request on it.
+
+**Esc** leaves a text field.
 
 Bookmarks and tab groups come from the same caches the popup and the palette read, so a new tab costs no GitHub
 request of its own — a cache past its hour is refreshed in the background, as everywhere else. The
 rest comes from one more cache, refreshed on the same hourly alarm: one listing of the repo's tree,
 replayed with its `ETag` so an unchanged repo answers 304, and a read only of the event, todo,
-habit, time-tracking, timezone and read-later files whose content changed since. A section with no
-file behind it is not shown. Each click that writes (check-in, clock, read, todo) re-reads its file
+habit, time-tracking, timezone and read-later files whose content changed since. Doing and
+Trackers are not shown when no file is behind them. Each click that writes (check-in, clock, read, todo) re-reads its file
 first and commits on top of it, so an edit made in the console since the last sync is kept.
 
 The **kaihuman** title opens the app, like the popup's.

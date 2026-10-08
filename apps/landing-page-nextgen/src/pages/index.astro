@@ -1,15 +1,11 @@
 ---
+import NavPill from '../components/NavPill.astro';
 import Layout from '../layouts/Layout.astro';
 ---
 
 <Layout title="kaihuman — The ever-improving human.">
 
-  <!-- ── Nav · N5 Floating Pill ────────────────────────── -->
-  <nav class="nav-pill" aria-label="Site navigation">
-    <a href="/" class="nav-pill__wordmark" aria-label="kaihuman home">kaihuman</a>
-    <span class="nav-pill__sep" aria-hidden="true"></span>
-    <a href="https://app.kaihuman.com" class="nav-pill__action">Open App</a>
-  </nav>
+  <NavPill />
 
   <main>
 
@@ -41,7 +37,7 @@ import Layout from '../layouts/Layout.astro';
 
         <div class="hero__ctas reveal" style="--i: 3">
           <a href="https://app.kaihuman.com" class="btn-primary">Start Improving</a>
-          <a href="https://github.com/lifosy/monorepo" class="btn-ghost">View Source →</a>
+          <a href="https://github.com/kaihuman-hq/kaihuman" class="btn-ghost">View Source →</a>
         </div>
       </div>
     </section>
@@ -153,6 +149,41 @@ import Layout from '../layouts/Layout.astro';
       </div>
     </section>
 
+    <!-- ── Docs for agents ─────────────────────────────────── -->
+    <section class="docs" id="docs" aria-labelledby="docs-heading">
+      <div class="section-inner docs__grid">
+        <div>
+          <p class="docs__eyebrow reveal">// documentation</p>
+          <h2 class="docs__headline reveal" id="docs-heading" style="--i: 1">
+            DOCUMENTED<br>FOR <em class="block-accent">AGENTS</em>.
+          </h2>
+          <p class="docs__body reveal" style="--i: 2">
+            Every app, file format and command in kaihuman is documented as one
+            <a href="https://docspack.dev">docspack</a> package. Your coding agent asks a
+            question and gets the few passages that answer it — offline, from a local index,
+            pinned to the version you installed.
+          </p>
+          <p class="docs__body reveal" style="--i: 3">
+            Terminal CLI, web console, browser extension, command palette, knowledge base and
+            its MCP server, and the plain-text formats your repo holds.
+          </p>
+          <p class="docs__read reveal" style="--i: 4">
+            <a class="docs__read-link" href="/docs/">Read the docs →</a>
+          </p>
+        </div>
+        <div class="docs__terminal reveal" style="--i: 2" role="figure" aria-label="Installing and querying the kaihuman docs">
+          <div class="demo__player-bar">
+            <span class="demo__player-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="demo__player-title">terminal</span>
+          </div>
+          <pre class="docs__code"><code><span class="docs__prompt">$</span> pnpm add -D docspack @lifosy/docspack
+<span class="docs__prompt">$</span> npx docspack sync
+<span class="docs__prompt">$</span> npx docspack ask "where are todos stored"
+<span class="docs__comment"># answers from @lifosy/docspack, ≤ 3,000 tokens</span></code></pre>
+        </div>
+      </div>
+    </section>
+
     <!-- ── CTA ─────────────────────────────────────────────── -->
     <section class="cta-section" aria-label="Call to action">
       <div class="section-inner">
@@ -165,8 +196,8 @@ import Layout from '../layouts/Layout.astro';
             START IMPROVING TODAY
           </a>
         </div>
-        <a href="https://github.com/lifosy/monorepo" class="cta-section__secondary reveal" style="--i: 2">
-          github.com/lifosy/monorepo →
+        <a href="https://github.com/kaihuman-hq/kaihuman" class="cta-section__secondary reveal" style="--i: 2">
+          github.com/kaihuman-hq/kaihuman →
         </a>
       </div>
     </section>
@@ -213,78 +244,6 @@ import Layout from '../layouts/Layout.astro';
     margin-inline: auto;
     padding-inline: clamp(var(--space-lg), 6vw, var(--space-3xl));
     position: relative;
-  }
-
-  /* ── NAV · N5 Floating Pill ───────────────────────────── */
-
-  .nav-pill {
-    position: fixed;
-    top: var(--space-lg);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: var(--z-sticky);
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    background: oklch(10% 0.008 145 / 0.85);
-    border: 1px solid var(--color-rule);
-    border-radius: 999px;
-    padding: var(--space-xs) var(--space-md);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    white-space: nowrap;
-  }
-
-  .nav-pill__wordmark {
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--color-accent);
-    text-decoration: none;
-  }
-
-  .nav-pill__wordmark:focus-visible {
-    outline: 2px solid var(--color-focus);
-    outline-offset: 3px;
-    border-radius: 2px;
-  }
-
-  .nav-pill__sep {
-    width: 1px;
-    height: 1rem;
-    background: var(--color-rule);
-  }
-
-  .nav-pill__action {
-    font-family: var(--font-body);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--color-ink);
-    text-decoration: none;
-    padding: var(--space-2xs) var(--space-sm);
-    border: 1px solid var(--color-rule);
-    border-radius: 999px;
-    white-space: nowrap;
-    transition:
-      border-color var(--dur-short) var(--ease-out),
-      color var(--dur-short) var(--ease-out);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .nav-pill__action:hover {
-      border-color: var(--color-accent);
-      color: var(--color-accent);
-    }
-  }
-
-  .nav-pill__action:focus-visible {
-    outline: 2px solid var(--color-focus);
-    outline-offset: 2px;
-    border-radius: 999px;
   }
 
   /* ── HERO ─────────────────────────────────────────────── */
@@ -610,6 +569,108 @@ import Layout from '../layouts/Layout.astro';
     letter-spacing: 0.08em;
   }
 
+  /* ── DOCS FOR AGENTS ──────────────────────────────────── */
+
+  .docs {
+    background: var(--color-paper);
+    padding-block: clamp(var(--space-2xl), 12vw, var(--space-4xl));
+    border-top: 1px solid var(--color-rule);
+  }
+
+  .docs__grid {
+    display: grid;
+    gap: var(--space-2xl);
+    align-items: center;
+  }
+
+  @media (min-width: 60rem) {
+    .docs__grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+
+  .docs__eyebrow {
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    color: var(--color-accent);
+    letter-spacing: 0.08em;
+    margin-bottom: var(--space-md);
+  }
+
+  .docs__headline {
+    font-family: var(--font-display);
+    font-size: var(--text-display-s);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+    color: var(--color-ink);
+    margin-bottom: var(--space-xl);
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+
+  .docs__body {
+    font-family: var(--font-body);
+    font-size: clamp(var(--text-sm), 1.2vw + 0.4rem, var(--text-base));
+    color: var(--color-neutral);
+    line-height: 1.7;
+    max-width: 52ch;
+    margin-bottom: var(--space-lg);
+  }
+
+  .docs__body a {
+    color: var(--color-accent);
+    text-underline-offset: 3px;
+  }
+
+  .docs__body a:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .docs__read-link {
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-accent);
+    text-underline-offset: 4px;
+  }
+
+  .docs__read-link:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 3px;
+  }
+
+  .docs__terminal {
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-rule);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .docs__code {
+    margin: 0;
+    padding: var(--space-lg);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    line-height: 1.9;
+    color: var(--color-ink);
+    overflow-x: auto;
+  }
+
+  .docs__prompt {
+    color: var(--color-accent);
+    user-select: none;
+  }
+
+  .docs__comment {
+    color: var(--color-muted);
+  }
+
   /* ── CTA SECTION ──────────────────────────────────────── */
 
   .cta-section {
@@ -899,11 +960,6 @@ import Layout from '../layouts/Layout.astro';
   /* ── RESPONSIVE ───────────────────────────────────────── */
 
   @media (max-width: 40rem) {
-    .nav-pill {
-      top: var(--space-md);
-      padding: var(--space-2xs) var(--space-sm);
-    }
-
     .hero__kanji {
       opacity: 0.025;
       right: -5vw;

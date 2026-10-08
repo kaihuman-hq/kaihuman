@@ -16,6 +16,7 @@ import {
   putGroup,
   removeGroup,
   serializePinnedTabs,
+  setGroupFavorite,
   tabsToOpen,
   tabsToUnpin,
   toPinnedTabs,
@@ -197,6 +198,44 @@ describe('removeGroup', () => {
   it('throws when the group is already gone', () => {
     expect(() => removeGroup(config(group('g1', [])), 'g2', 'now')).toThrow(
       `Tab group "g2" no longer exists in ${PINNED_TABS_PATH}`,
+    );
+  });
+});
+
+describe('parsePinnedTabs favourites', () => {
+  const parseGroups = (favorite: unknown) =>
+    parsePinnedTabs(JSON.stringify({ groups: [{ id: 'g', tabs: [], favorite }], updatedAt: '' }))
+      .groups;
+
+  it('keeps a favourite and leaves the field out of any other group', () => {
+    expect(parseGroups(true)[0]?.favorite).toBe(true);
+    expect(parseGroups(false)[0]).not.toHaveProperty('favorite');
+    expect(parseGroups('yes')[0]).not.toHaveProperty('favorite');
+  });
+});
+
+describe('setGroupFavorite', () => {
+  const before = config(group('a', []), group('b', []));
+
+  it('marks a group in place and stamps the file', () => {
+    const next = setGroupFavorite(before, 'b', true, 'now');
+    expect(next.groups.map((g) => [g.id, g.favorite])).toEqual([
+      ['a', undefined],
+      ['b', true],
+    ]);
+    expect(next.updatedAt).toBe('now');
+  });
+
+  it('drops the field again when unmarked, so the file reads as before', () => {
+    const marked = setGroupFavorite(before, 'b', true, 'now');
+    const unmarked = setGroupFavorite(marked, 'b', false, 'later');
+    expect(unmarked.groups[1]).toEqual(group('b', []));
+    expect(serializePinnedTabs(unmarked)).not.toContain('favorite');
+  });
+
+  it('throws when the group is gone', () => {
+    expect(() => setGroupFavorite(before, 'zz', true, 'now')).toThrow(
+      `Tab group "zz" no longer exists in ${PINNED_TABS_PATH}`,
     );
   });
 });

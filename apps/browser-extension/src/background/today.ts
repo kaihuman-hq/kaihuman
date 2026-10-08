@@ -7,6 +7,9 @@
  */
 
 import {
+  braindumpCreatedAt,
+  braindumpIdOf,
+  braindumpTitle,
   calculateStats,
   getUpcomingEvents,
   isCheckedIn,
@@ -21,6 +24,7 @@ import {
   type TodoItem,
 } from '@lifosy/formats';
 import { CACHE_TTL_MS } from './bookmarks';
+import { STATUS_CONFIG_PATH } from './service-status';
 
 /** Files whose content the start page reads. Action logs are only written to, so only listed. */
 export const TODAY_SUFFIXES = [
@@ -66,9 +70,17 @@ interface TreeEntry {
   sha: string;
 }
 
+/**
+ * The files the start page reads: its widgets' kinds, the braindumps (doc/braindump.md), and the
+ * list of services whose status it shows — which rides along so it costs no request of its own.
+ */
 const isTodayPath = (path: string) => {
   const lower = path.toLowerCase();
-  return TODAY_SUFFIXES.some((suffix) => lower.endsWith(suffix));
+  return (
+    TODAY_SUFFIXES.some((suffix) => lower.endsWith(suffix)) ||
+    braindumpIdOf(path) !== null ||
+    path === STATUS_CONFIG_PATH
+  );
 };
 
 export function appFolderOf(tree: { path: string }[]): string {
@@ -145,6 +157,11 @@ export async function fetchToday(
   };
 }
 
+/** The cache after a delete: the file is gone from it, and the tree ETag with it. */
+export function withoutFile(cache: TodayCache, path: string): TodayCache {
+  return { ...cache, files: cache.files.filter((file) => file.path !== path), etag: null };
+}
+
 /** The cache after a commit: the written file replaces (or joins) what was cached. */
 export function withFile(cache: TodayCache, file: TodayFile): TodayCache {
   const rest = cache.files.filter((candidate) => candidate.path !== file.path);
@@ -210,6 +227,25 @@ export function upcomingEvents(path: string, csv: string, now: Date): UpcomingEv
 
 const isOpen = (todo: TodoItem) => todo.status === 'backlog' || todo.status === 'in-progress';
 
+// ─── Habits (.habit.csv) ────────────────────────────────────────────────────
+
+/** How many days the start page's strip shows, today included. */
+export const HABIT_WEEK_DAYS = 7;
+
+/** Whether the goal was reached on each of the last seven days, the oldest first. */
+export function habitWeek(csv: string, now: Date): boolean[] {
+  const reached = new Set(
+    parseHabitData(csv)
+      .entries.filter((entry) => entry.reached)
+      .map((entry) => entry.date),
+  );
+  return Array.from({ length: HABIT_WEEK_DAYS }, (_, index) => {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    day.setDate(day.getDate() - (HABIT_WEEK_DAYS - 1 - index));
+    return reached.has(localDate(day));
+  });
+}
+
 // ─── Time tracking (.timetracking.csv) ──────────────────────────────────────
 
 export interface TimerState {
@@ -269,15 +305,28 @@ export interface TodaySummary {
   milestone?: { name: string; dueDate: string; daysUntil: number; open: number; path: string };
   inbox: { path: string; count: number };
   readLater: (Pick<ReadItLaterItem, 'id' | 'url' | 'name' | 'createdAt'> & { path: string })[];
-  habits: { path: string; name: string; checkedToday: boolean; streak: number }[];
+  /** Every unread item, where `readLater` is cut to the oldest few. */
+  unreadCount: number;
+  habits: {
+    path: string;
+    name: string;
+    checkedToday: boolean;
+    streak: number;
+    /** The last seven days, the oldest first — today is the last. */
+    week: boolean[];
+  }[];
   timers: ({ path: string; name: string } & TimerState)[];
   clocks: Clock[];
   actionLogPath: string;
+  /** The newest braindumps first, cut to the newest few; `sha` is what a delete must name. */
+  braindumps: { path: string; sha: string; title: string; text: string; createdAt: number }[];
+  braindumpCount: number;
   fetchedAt: number;
 }
 
 const LIST_LIMIT = 5;
 const READ_LATER_LIMIT = 3;
+const BRAINDUMP_LIMIT = 10;
 
 /** The inbox the console's quick-todo page writes to. */
 export const inboxPath = (cache: Pick<TodayCache, 'appFolder'>) =>
@@ -301,18 +350,30 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
     overdue: [],
     inbox: { path: inboxPath(cache), count: 0 },
     readLater: [],
+    unreadCount: 0,
     habits: [],
     timers: [],
     clocks: [],
     actionLogPath: actionLogPath(cache),
+    braindumps: [],
+    braindumpCount: 0,
     fetchedAt: cache.fetchedAt,
   };
   const today = localDate(now);
   const files = [...cache.files].sort((a, b) => a.path.localeCompare(b.path));
 
-  for (const { path, content } of files) {
+  for (const { path, sha, content } of files) {
     const lower = path.toLowerCase();
-    if (lower.endsWith('.events.csv')) {
+    const braindump = braindumpIdOf(path);
+    if (braindump) {
+      summary.braindumps.push({
+        path,
+        sha,
+        title: braindumpTitle(content),
+        text: content,
+        createdAt: braindumpCreatedAt(braindump),
+      });
+    } else if (lower.endsWith('.events.csv')) {
       summary.events.push(...upcomingEvents(path, content, now));
     } else if (lower.endsWith('.todos.md')) {
       const { items: todos, milestones } = parseTodos(content);
@@ -346,6 +407,7 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
         name: fileLabel(path),
         checkedToday: isCheckedIn(content, today),
         streak: calculateStats(parseHabitData(content), now).currentStreak,
+        week: habitWeek(content, now),
       });
     } else if (lower.endsWith('.timetracking.csv')) {
       summary.timers.push({ path, name: fileLabel(path), ...timerState(content, now) });
@@ -370,7 +432,11 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
   summary.inProgress = summary.inProgress.slice(0, LIST_LIMIT);
   summary.overdue = summary.overdue.slice(0, LIST_LIMIT);
   // The oldest first: they are the ones the list is for.
+  summary.unreadCount = summary.readLater.length;
   summary.readLater.sort((a, b) => a.createdAt - b.createdAt);
   summary.readLater = summary.readLater.slice(0, READ_LATER_LIMIT);
+  summary.braindumpCount = summary.braindumps.length;
+  summary.braindumps.sort((a, b) => b.createdAt - a.createdAt);
+  summary.braindumps = summary.braindumps.slice(0, BRAINDUMP_LIMIT);
   return summary;
 }

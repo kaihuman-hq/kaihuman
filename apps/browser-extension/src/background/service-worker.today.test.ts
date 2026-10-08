@@ -48,6 +48,15 @@ beforeEach(async () => {
     '.kh/inbox.todos.md': '- [ ] existing\n',
   };
   fetchMock = vi.fn(async (url: string, init?: any) => {
+    if (url.endsWith('/api/v2/status.json')) {
+      return { ok: true, status: 200, json: async () => ({ status: { indicator: 'none' } }) };
+    }
+    if (init?.method === 'DELETE') {
+      const path = pathOf(url);
+      if (!(path in remote)) return { ok: false, status: 404, statusText: 'Not Found' };
+      delete remote[path];
+      return { ok: true, status: 200, json: async () => ({}) };
+    }
     if (init?.method === 'PUT') {
       const body = JSON.parse(init.body);
       remote[pathOf(url)] = new TextDecoder().decode(
@@ -91,6 +100,10 @@ beforeEach(async () => {
     runtime: {
       getManifest: () => ({ content_scripts: [] }),
       onInstalled: { addListener: vi.fn() },
+      // No desktop palette host in tests.
+      sendNativeMessage: vi.fn(async () => {
+        throw new Error('Specified native messaging host not found.');
+      }),
       onConnect: { addListener: vi.fn() },
       onMessage: {
         addListener: (l: Listener) => {
@@ -98,7 +111,11 @@ beforeEach(async () => {
         },
       },
     },
-    storage: { local: localStorageStub(), session: { get: async () => ({}), set: async () => {} } },
+    storage: {
+      local: localStorageStub(),
+      session: { get: async () => ({}), set: async () => {} },
+      onChanged: { addListener: vi.fn() },
+    },
     tabs: { query: async () => [], create: vi.fn(), update: vi.fn(), sendMessage: vi.fn() },
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -411,5 +428,135 @@ describe('GET_PALETTE_SETTINGS', () => {
     store.lifeos_repo = 'o/other';
     await call({ type: 'GET_PALETTE_SETTINGS' });
     expect(reads()).toHaveLength(2);
+  });
+});
+
+describe('braindumps on the start page', () => {
+  const BRAINDUMP = '.kh/braindumps/1790000000000.md';
+  const deletes = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'DELETE');
+
+  it('lists them from the tree, newest first, with their title and version', async () => {
+    remote[BRAINDUMP] = '# Plan\n- one';
+    remote['.kh/braindumps/1790000000500.md'] = 'newer';
+    remote['.kh/braindumps/archive/1.md'] = 'not one of them';
+    const { today } = await call({ type: 'GET_TODAY' });
+    expect(today.braindumpCount).toBe(2);
+    expect(today.braindumps).toEqual([
+      expect.objectContaining({ title: 'newer', createdAt: 1790000000500 }),
+      {
+        path: BRAINDUMP,
+        sha: `sha-${BRAINDUMP}`,
+        title: 'Plan',
+        text: '# Plan\n- one',
+        createdAt: 1790000000000,
+      },
+    ]);
+  });
+
+  it('deletes the version the page showed', async () => {
+    remote[BRAINDUMP] = 'done with this';
+    seedCache();
+    const response = await call({
+      type: 'DELETE_BRAINDUMP',
+      path: BRAINDUMP,
+      sha: `sha-${BRAINDUMP}`,
+    });
+    expect(response.today.braindumps).toEqual([]);
+    expect(BRAINDUMP in remote).toBe(false);
+    expect(JSON.parse(deletes()[0]?.[1].body)).toEqual({
+      message: `braindump: delete ${BRAINDUMP}`,
+      sha: `sha-${BRAINDUMP}`,
+    });
+  });
+
+  it('deletes nothing written since the page showed it, and answers the newer text', async () => {
+    remote[BRAINDUMP] = 'more, typed on the desktop';
+    seedCache();
+    const response = await call({
+      type: 'DELETE_BRAINDUMP',
+      path: BRAINDUMP,
+      sha: 'what-the-page-saw',
+    });
+    expect(response.refused).toContain('changed since');
+    expect(deletes()).toEqual([]);
+    expect(response.today.braindumps[0].text).toBe('more, typed on the desktop');
+  });
+
+  it('takes one already gone off the page', async () => {
+    seedCache({
+      files: [{ path: BRAINDUMP, sha: 'v1', content: 'x' }],
+    });
+    const response = await call({ type: 'DELETE_BRAINDUMP', path: BRAINDUMP, sha: 'v1' });
+    expect(response.today.braindumps).toEqual([]);
+    expect(deletes()).toEqual([]);
+  });
+
+  it('refuses to delete anything but a braindump', async () => {
+    seedCache();
+    for (const path of ['.kh/inbox.todos.md', '.kh/braindumps/../inbox.todos.md', '']) {
+      const response = await call({ type: 'DELETE_BRAINDUMP', path, sha: 'x' });
+      expect(response.error).toContain('is not a braindump');
+    }
+    expect(deletes()).toEqual([]);
+  });
+
+  it('checks the repository when a page opens on a cache older than a minute', async () => {
+    seedCache({ fetchedAt: Date.now() });
+    expect((await call({ type: 'REFRESH_TODAY' })).today).toBeNull();
+
+    seedCache({ fetchedAt: Date.now() - 61_000 });
+    remote[BRAINDUMP] = 'written a minute ago';
+    const response = await call({ type: 'REFRESH_TODAY' });
+    expect(response.today.braindumps[0].text).toBe('written a minute ago');
+  });
+});
+
+describe('GET_SERVICE_STATUS', () => {
+  const statusRequests = () =>
+    fetchMock.mock.calls.filter(([url]) => url.endsWith('/api/v2/status.json')).length;
+
+  it('checks the services the repo lists, then answers from the cache', async () => {
+    remote['.kh/browser.status.json'] = JSON.stringify({
+      services: [{ name: 'GitHub', type: 'statuspage', url: 'https://www.githubstatus.com' }],
+    });
+    seedCache();
+
+    const first = await call({ type: 'GET_SERVICE_STATUS' });
+    expect(first.statuses).toMatchObject([{ name: 'GitHub', level: 'operational' }]);
+    expect(statusRequests()).toBe(1);
+
+    await call({ type: 'GET_SERVICE_STATUS' });
+    expect(statusRequests()).toBe(1);
+  });
+
+  it('checks again once the cache is five minutes old', async () => {
+    remote['.kh/browser.status.json'] = JSON.stringify({
+      services: [{ name: 'GitHub', type: 'statuspage', url: 'https://www.githubstatus.com' }],
+    });
+    seedCache();
+    await call({ type: 'GET_SERVICE_STATUS' });
+    store.serviceStatusCache.fetchedAt -= 5 * 60 * 1000 + 1;
+
+    await call({ type: 'GET_SERVICE_STATUS' });
+    expect(statusRequests()).toBe(2);
+  });
+
+  it('watches the default services when the repo lists none', async () => {
+    seedCache();
+    const response = await call({ type: 'GET_SERVICE_STATUS' });
+    expect(response.statuses.map((status: any) => status.name)).toEqual([
+      'GitHub',
+      'Claude',
+      'AWS',
+      'Cloudflare',
+      'GCP',
+    ]);
+  });
+
+  it('reports a broken config instead of guessing', async () => {
+    remote['.kh/browser.status.json'] = '{"services": {}}';
+    seedCache();
+    const response = await call({ type: 'GET_SERVICE_STATUS' });
+    expect(response.error).toContain('missing a "services" array');
   });
 });

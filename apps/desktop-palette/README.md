@@ -22,7 +22,7 @@ way.
 | `>p` prompts from the repo's `.prompts.md` files, ⏎ copies | ✓ (with `wl-copy`) |
 | `>t` translate with DeepL into EN-US and DE (`>t fr: …` for one language), ⏎ copies | ✓ (key from `DEEPL_AUTH_KEY`, `~/.config/envvars/deepl.env` or the keyring) |
 | `>x` commands from the repo's `.commands.md` files — fill in each `{{name}}`, then copy, run in ghostty, or run in the background | ✓ (running: desktop only) |
-| `>d` dumps — a scratch editor for pasting and copying, the last 25 kept, ⌃S saves one as a file | ✓ desktop only |
+| `>d` braindumps, opened in the braindump window (its own key too); old local dumps below | ✓ desktop only |
 | `>c` Claude Code — pick a repo, type a prompt, ⏎ opens a new session on claude.ai | ✓ desktop only |
 | `>u` Claude usage — rate limits, pace, resets and spend per account; the last fetch shows at once with its age (green under 15 min, yellow up to an hour, red beyond), synced in the background once 5 min old | ✓ desktop only |
 | `>r` GitHub repositories, ⇥ for issues, pull requests, actions… | ✓, and omarchy's `~/.config/eee/counts` ranks the ones you open most first |
@@ -38,6 +38,7 @@ way.
 | `>q` capture to the knowledge base — what is typed becomes `.kh/raw/<epoch>-<slug>.md` for `/kb-ingest`, as `cli capture` writes it; also offered as **Capture “…”** for any text in the main search | ✓ (pushes directly; no offline spool — `cli capture` has one) |
 | A prefix that a longer one starts with (`>l` next to `>le`) is entered after a space | ✓ |
 | `>f` files — todo lists, action logs, events, prompts, commands: open one in Kaihuman or add an entry as its widget does (also from ⇥ repo-search hits) | ✓ |
+| `>o` files in your home directory — by name, `>o c: …` by contents too, `>o a: …` on the whole file system; ⏎ opens one with its default app, ⇥ opens its folder in the file manager or a terminal | ✓ desktop only (`fd` or `find`, `rg` or `grep`) |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |
 | Counting how often a bookmark is opened | — the extension counts; the desktop does not yet |
 
@@ -64,16 +65,15 @@ The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-re
   **Copy**, **Run in terminal** (a `ghostty` window that stays open until a key is pressed) and
   **Run in the background** (a notification says how it ended), with the finished command shown in
   full. Nothing runs until Run is chosen. Commands run with `bash -c` from your home directory.
-- **`>d`** is a scratch editor for text you only need for a moment. **New dump** (the first row)
-  opens an empty editor in the palette; the rows below are earlier dumps, most recently edited
-  first, searchable by their text — ⏎ opens one.
-  - Saved as you type (after a short pause, and on leaving). Clearing a dump deletes it; opening
-    **New dump** and leaving it empty creates nothing.
-  - **Esc** goes back to the list, **⌃⏎** copies all of it and closes, **⌃S** asks for a path
-    (prefilled `~/Documents/dump-<date>.txt`) and writes a copy there — missing directories are
-    created, an existing file is never overwritten.
-  - Plain files in `$XDG_DATA_HOME/lifosy/dumps/`, local only; past 25, the least recently edited
-    one is removed.
+- **`>d`** lists braindumps: **New braindump** first, then the ones in the active repository,
+  most recently edited first, searchable by their text. ⏎ hides the palette and opens the choice in
+  the **braindump window** (below). **⇥** (or **→**) on one offers **Open in the braindump window**
+  and **Delete…**. Delete asks you to type `DELETE`, removes the braindump here, and syncs at once,
+  so the repo follows. Offline, it says so, and the repo follows on the next sync. As with every
+  sync, only the version this machine last saw is deleted: an edit made elsewhere since comes
+  back. Dumps from before braindumps are listed underneath under *Old dumps — on this machine
+  only*. They still open in the palette's editor to copy (⌃⏎), save as a file (⌃S) or clear, and
+  **⇥ → Delete…** removes one. No new ones are made, and none are ever sent to GitHub.
 - **`>c`** (from `omarchy-claude-code`) lists the repositories in `$EEE_HISTORY_FILE` or
   `~/.config/eee/history`, most recent first. ⏎ asks for the prompt; ⏎ again opens
   `https://claude.ai/code?prompt=…&repo=owner/name&branch=main` and closes the palette. The
@@ -84,9 +84,42 @@ The prefix modes stand in for omarchy's `omarchy-show-prompts`, `omarchy-show-re
   the pace (how much of the window has passed) and when it resets, then spend or extra credits.
   An expired OAuth token is refreshed as Claude Code does it and written back to that account's
   `.credentials.json` (mode 600), so `claude` keeps working. ⏎ opens claude.ai's usage page.
+- **`>o`** searches your home directory on ⏎ — not as you type, since every search walks the
+  disk. What is typed is matched anywhere in a file or folder name, ignoring case; `c: …` also
+  searches inside the files and lists those hits under **Contents**, after the names, with the
+  first matching line. `a: …` searches the whole file system instead — every top-level folder but
+  `/proc`, `/sys`, `/dev` and `/run`, skipping what you may not read — and may take up to 30 s.
+  The two combine: `>o a: c: listen 443`. Hidden files and folders (`~/.cache`, `~/.config`…), `node_modules` and,
+  with `fd` and `rg`, anything a `.gitignore` excludes are left out. Each search lists at most 25
+  names (and 25 content hits) and stops after 10 s (30 s with `a:`) with what it has. ⏎ opens a file with
+  `xdg-open`, so with its default app, and a folder in the file manager; **⇥** (or **→**) offers
+  the folder it is in in the file manager (`xdg-open`) or in a new `ghostty` window. Names are
+  found with `fd` when installed, else `find`; contents with `rg`, else `grep -r`. On Fedora,
+  `sudo dnf install fd-find ripgrep` makes both faster. Any text typed in the main search is also
+  offered as **Search files “…”**.
 - **`>r`** reads `$EEE_COUNTS_FILE` or `~/.config/eee/counts` (`owner/repo count` per line), lists
   those repositories by count, then the rest of your GitHub repositories. Without a login or a
   network, the counted ones still show.
+
+## Braindump window
+
+For thoughts you need to get out of your head right now: `lifosy-palette-toggle braindump` (bind it
+to a key, below) or `>d` in the palette opens a plain text window with the cursor in it.
+
+- **Saved as you type**, 400 ms after the last key, on this machine — typing never waits for the
+  network. Clearing the text deletes the braindump; an untouched new one is never created.
+- **In the repository** as `.kh/braindumps/<created-ms>.md`, one file each, synced when the window
+  hides or switches braindumps, after 30 s without typing, at least every 2 minutes while typing,
+  and when the daemon starts. The status line says `saved here`, `synced 10:42`, or why a sync
+  failed (it is tried again a minute later). A sync also takes braindumps changed or deleted on
+  GitHub, by another machine or the extension's start page. Edited in two places at once, both
+  versions are kept, the other one as a braindump of its own. See `doc/braindump.md`.
+- **Keys**: **Esc** hides (and syncs), **⌃N** new braindump (the key does the same, unless the one
+  showing is still empty), **⌃O** the window's own list of braindumps (type to filter, ⏎ opens,
+  Esc goes back), **⌃⏎** copies all and hides, **⌃F** finds in the text (every match highlighted,
+  ⏎ / ⇧⏎ next / previous, Esc back to the text with the match selected).
+- It is a normal window, not an overlay, so other windows stay usable while you write. Its title is
+  always `lifosy-braindump` for your window rules (below).
 
 ## Build and install (Fedora)
 
@@ -139,7 +172,7 @@ lifosy-palette logout
   and never written to a file. Hyprland does not start one for you, so start one from your config,
   for example `gnome-keyring-daemon --start --components=secrets`.
 - `--repo` is optional; without it the palette uses the repository from the last login, or
-  `lifosy/monorepo`. **Switch repository…** in the palette lists every repository you have logged
+  `kaihuman-hq/kaihuman`. **Switch repository…** in the palette lists every repository you have logged
   in with.
 
 ## Hyprland
@@ -158,6 +191,32 @@ Older hyprlang configs: `exec-once = lifosy-palette daemon` and
 layer surface named `lifosy-palette` (`hyprctl layers`), which `hl.layer_rule` can match if you want
 to change its animation.
 
+The braindump window gets a key of its own, for example
+`hl.bind("SUPER + SHIFT + D", hl.dsp.exec_cmd("lifosy-palette-toggle braindump"))`
+(hyprlang: `bind = SUPER SHIFT, D, exec, lifosy-palette-toggle braindump`). It is an ordinary
+window, so Hyprland tiles it unless a window rule floats it. Match its title, `lifosy-braindump`,
+and make it float, centred, at about 760×520 — in hyprlang up to 0.54
+`windowrule = float, title:^(lifosy-braindump)$` plus the same with `center` and
+`size 760 520`. The rule syntax changed with the Lua config in 0.55, so check it against your
+version's wiki page; the title to match stays the same.
+
+## Same repository as the browser extension
+
+The palette and the extension each remember a repository. To keep them on the same one, register
+the palette as the extension's native messaging host — once, from the installed binary:
+
+```sh
+lifosy-palette native-host install <extension id>   # the id is on chrome://extensions
+```
+
+It writes `com.lifosy.palette.json` into `NativeMessagingHosts/` of every Chrome, Chromium, Brave,
+Edge or Vivaldi profile under `$XDG_CONFIG_HOME`, allowing only that extension. Then reload the
+extension. From then on, switching the repository in either one switches the other: each side
+records when its repository changed, and the newer choice wins. The extension asks when a start
+page opens (at most every 30 s) and once an hour, and tells the palette at once when you switch
+there. Chrome starts `lifosy-palette` for each message, so the daemon does not need to run.
+Flatpak and Snap browsers cannot start host programs without extra sandbox setup.
+
 ## How it works
 
 - **`lifosy-palette daemon`** keeps the palette loaded in a hidden overlay, so opening it only maps
@@ -171,12 +230,13 @@ to change its animation.
 
 | Path | Holds |
 | --- | --- |
-| `$XDG_CONFIG_HOME/lifosy/palette.json` | the current repository and the ones you have used |
+| `$XDG_CONFIG_HOME/lifosy/palette.json` | the current repository, when it last changed, and the ones you have used |
 | `$XDG_CACHE_HOME/lifosy/bookmarks.json` | GitHub's bookmarks file as last fetched, with its ETag |
 | `$XDG_CACHE_HOME/lifosy/commands.json` | the repository's `.commands.md` files as last fetched (five minutes) |
 | `$XDG_CACHE_HOME/lifosy/prompts.json` | the repository's `.prompts.md` files as last fetched (five minutes) |
 | `$XDG_STATE_HOME/lifosy/recents.json` | the palette's last ten actions |
-| `$XDG_DATA_HOME/lifosy/dumps/*.txt` | the `>d` dumps, the last 25 |
+| `$XDG_DATA_HOME/lifosy/dumps/*.txt` | old dumps from before braindumps, listed under `>d` until cleared |
+| `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/` | braindumps (`<id>.md`) and what GitHub last had of each (`<id>.json`); see `doc/braindump.md` |
 | `$XDG_STATE_HOME/lifosy/translations.json` | the last 20 texts translated with `>t` |
 
 For development and tests, `LIFOSY_GITHUB_TOKEN` takes the place of the keyring and

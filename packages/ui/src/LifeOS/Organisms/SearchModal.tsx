@@ -90,7 +90,7 @@ export const SearchModal = ({
   isOpen,
   onClose,
   onSelect,
-  currentRepository = 'lifosy/monorepo',
+  currentRepository = 'kaihuman-hq/kaihuman',
   githubToken,
   repositories = [],
   workspaces = [],
