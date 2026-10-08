@@ -21,7 +21,7 @@ export interface PinnedTabGroupSummary {
   tabCount: number;
 }
 
-/** What `>w` lists: pull requests to review, what is assigned, and your PRs whose checks fail. */
+/** What `>gw` lists: pull requests to review, what is assigned, and your PRs whose checks fail. */
 export type GithubWorkFilter = 'review-requested' | 'assigned' | 'failing';
 
 /**
@@ -61,6 +61,19 @@ export interface Braindump {
   text: string;
   updatedAt: number;
   synced: boolean;
+}
+
+/** One Wi‑Fi network from a `LIST_WIFI` scan; the strongest access point stands for its SSID. */
+export interface WifiNetwork {
+  ssid: string;
+  /** 0–100. */
+  signal: number;
+  /** As NetworkManager names it (`WPA2`, `WPA1 WPA2`, `WPA3`…); empty for an open network. */
+  security: string;
+  /** Connected right now. */
+  active: boolean;
+  /** A saved profile exists, so connecting needs no password. */
+  known: boolean;
 }
 
 export interface PaletteProtocol {
@@ -230,6 +243,21 @@ export interface PaletteProtocol {
    * with its console link. Backends refuse any path `isKnowledgePath` does not allow.
    */
   CAPTURE_KNOWLEDGE: { request: { path: string; content: string }; response: { url: string } };
+  /**
+   * Desktop only: whether Wi‑Fi is on and the networks in range, connected first, then strongest.
+   * `rescan` waits for a fresh scan; without it the last scan answers at once.
+   */
+  LIST_WIFI: {
+    request: { rescan?: boolean };
+    response: { enabled: boolean; networks: WifiNetwork[] };
+  };
+  /** Desktop only: turns the Wi‑Fi radio on or off. */
+  SET_WIFI: { request: { enabled: boolean }; response: NoFields };
+  /**
+   * Desktop only: connects to `ssid` — through its saved profile when there is one, else with
+   * `password` (none for an open network). A new profile that fails to connect is not kept.
+   */
+  CONNECT_WIFI: { request: { ssid: string; password?: string }; response: NoFields };
   /** GitHub repositories to open, most relevant first — the order is the backend's. */
   LIST_GITHUB_REPOS: {
     request: NoFields;

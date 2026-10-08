@@ -132,7 +132,7 @@ pub struct UserRepo {
     pub description: Option<String>,
 }
 
-/// What `>w` searches; mirrors `GITHUB_WORK_QUERIES` in packages/palette/src/protocol.ts.
+/// What `>gw` searches; mirrors `GITHUB_WORK_QUERIES` in packages/palette/src/protocol.ts.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub enum WorkFilter {
@@ -396,7 +396,7 @@ impl Client {
         }
     }
 
-    /// One issue search for `>w`, most recently updated first.
+    /// One issue search for `>gw`, most recently updated first.
     pub async fn work(&self, filter: WorkFilter) -> Result<Vec<WorkItem>, String> {
         let response = self
             .request(reqwest::Method::GET, &format!("{}/search/issues", self.api))

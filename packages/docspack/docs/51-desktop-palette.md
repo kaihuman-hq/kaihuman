@@ -96,6 +96,7 @@ The desktop palette has all shared prefixes plus these (`apps/desktop-palette/sr
 | `>c` | New Claude Code session on claude.ai |
 | `>u` | Claude usage per account |
 | `>o` | Search local files; `c:` contents, `a:` whole file system |
+| `>w` | Wi‑Fi through NetworkManager's `nmcli`: turn it on or off, list networks, connect |
 | `>x` | Also **Run in terminal** (ghostty) and **Run in the background** |
 | `>r`, `>g` | Ranked by omarchy's `~/.config/eee/counts` |
 | Copy | Through `wl-copy` |
@@ -267,7 +268,7 @@ The webview talks to Rust through `window.__TAURI__.core.invoke`. Commands regis
 
 Events from Rust: `palette:show`, `palette:hide`, `braindump:open` (`{ id }`), `braindump:hidden`.
 
-`Request` in `src-tauri/src/requests.rs` mirrors the protocol. Desktop-only requests: `RUN_COMMAND`, `SEARCH_LOCAL_FILES`, `OPEN_LOCAL_FILE`, `LIST_CLAUDE_CODE_REPOS`, `GET_CLAUDE_USAGE`, `LIST_DUMPS`, `SAVE_DUMP`, `EXPORT_DUMP`, `LIST_BRAINDUMPS`, `SAVE_BRAINDUMP`, `SYNC_BRAINDUMPS`, `OPEN_BRAINDUMP`. Unknown request types fall into `BrowserOnly` and are rejected. For tests, `LIFOSY_GITHUB_TOKEN` replaces the keyring and `LIFOSY_GITHUB_API` points at a stand-in for `https://api.github.com`.
+`Request` in `src-tauri/src/requests.rs` mirrors the protocol. Desktop-only requests: `RUN_COMMAND`, `SEARCH_LOCAL_FILES`, `OPEN_LOCAL_FILE`, `LIST_CLAUDE_CODE_REPOS`, `GET_CLAUDE_USAGE`, `LIST_DUMPS`, `SAVE_DUMP`, `EXPORT_DUMP`, `LIST_BRAINDUMPS`, `SAVE_BRAINDUMP`, `SYNC_BRAINDUMPS`, `OPEN_BRAINDUMP`, `LIST_WIFI`, `SET_WIFI`, `CONNECT_WIFI`. Unknown request types fall into `BrowserOnly` and are rejected. For tests, `LIFOSY_GITHUB_TOKEN` replaces the keyring and `LIFOSY_GITHUB_API` points at a stand-in for `https://api.github.com`.
 
 ## Files the desktop palette stores
 

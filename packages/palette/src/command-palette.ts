@@ -32,6 +32,8 @@ export interface PromptStep {
   label: string;
   /** Prefilled and editable — a field the user usually keeps but sometimes corrects. */
   initial?: () => string;
+  /** Typed masked, like a password, and never listed among the answers so far. */
+  secret?: boolean;
 }
 
 /**
@@ -103,6 +105,8 @@ export interface ModeItem {
   action?: PaletteAction;
   /** Anything else choosing it should do — the help's entries switch modes. */
   choose?: () => void;
+  /** Choosing it loads the mode's entries again, then refreshes them — a rescan, say. */
+  reloads?: true;
   /** Consecutive entries with the same group are listed under it as one heading. */
   group?: string;
   /** A coloured mark before the title — how fresh cached data is, say. */
@@ -802,6 +806,12 @@ export function createCommandPalette(
       item.choose();
       return;
     }
+    if (item.reloads && mode && 'load' in mode.mode) {
+      input.value = '';
+      selected = 0;
+      void loadMode(mode, mode.mode.load);
+      return;
+    }
     if (item.action) {
       // The action takes over the input, so the mode steps aside for it.
       mode = null;
@@ -1205,6 +1215,7 @@ export function createCommandPalette(
         : mode.mode.title;
     else crumb.textContent = here?.title ?? '';
     crumb.hidden = !pending && !here && !mode;
+    input.type = step?.secret ? 'password' : 'text';
     // Submenu titles already end in an ellipsis, which would otherwise double up here.
     if (step) input.placeholder = step.label;
     else if (mode)
@@ -1276,7 +1287,9 @@ export function createCommandPalette(
       // What has been answered so far, so a long walk stays reviewable.
       // Before any answer, the subtitle says what is being filled in — a command's `{{port}}`, say.
       addNote(
-        pending.values.filter(Boolean).join('  ·  ') ||
+        pending.values
+          .filter((value, index) => value && !pending?.action.prompts?.[index]?.secret)
+          .join('  ·  ') ||
           pending.action.subtitle ||
           pending.action.title,
       );

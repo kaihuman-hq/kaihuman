@@ -401,6 +401,29 @@ describe('running an action', () => {
     // Once on open, once after the action.
     expect(loadBookmarks).toHaveBeenCalledTimes(2);
   });
+
+  it('masks a secret field and leaves it out of the answers so far', async () => {
+    const join = vi.fn(async () => 'Joined');
+    actions = [
+      {
+        id: 'join',
+        title: 'Join…',
+        prompts: [{ label: 'Password', secret: true }, { label: 'Name' }],
+        run: join,
+      },
+    ];
+    type('');
+    await activateRow('Join…');
+    expect(input().type).toBe('password');
+    type('hunter2');
+    press('Enter');
+    expect(input().type).toBe('text');
+    expect(shadow().querySelector('.empty')?.textContent).toBe('Join…');
+    type('Ada');
+    press('Enter');
+    await settle();
+    expect(join).toHaveBeenCalledWith(['hunter2', 'Ada']);
+  });
 });
 
 describe('submenus', () => {
@@ -1904,5 +1927,30 @@ describe('modes that refresh what they loaded', () => {
     await settle();
     expect(rowTitles()).toEqual(['A']);
     expect(load).toHaveBeenCalledOnce();
+  });
+
+  it('loads and refreshes again, staying in the mode, when an entry reloads it', async () => {
+    let scans = 0;
+    const refresh = vi.fn(async () => [
+      { id: 'again', title: 'Scan again', reloads: true as const },
+      { id: 'n', title: `Scan ${scans}` },
+    ]);
+    const load = vi.fn(async () => {
+      scans++;
+      return [{ id: 'again', title: 'Scan again', reloads: true as const }];
+    });
+    modes.push({ prefix: 'u', title: 'U', placeholder: '', description: '', load, refresh });
+    type('>u');
+    await settle();
+    expect(rowTitles()).toEqual(['Scan again', 'Scan 1']);
+
+    type('scan');
+    press('Enter');
+    await settle();
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(input().value).toBe('');
+    expect(crumbText()).toBe('U');
+    expect(rowTitles()).toEqual(['Scan again', 'Scan 2']);
   });
 });

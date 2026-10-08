@@ -343,7 +343,7 @@ const githubSearchItems = async (port: ActionPort): Promise<ModeItem[]> => {
   }));
 };
 
-/** `>w`'s searches, in the order its groups are listed. */
+/** `>gw`'s searches, in the order its groups are listed. */
 const GITHUB_WORK: { filter: GithubWorkFilter; group: string }[] = [
   { filter: 'review-requested', group: 'Review requested' },
   { filter: 'assigned', group: 'Assigned to you' },
@@ -779,7 +779,7 @@ const entryFileItems = async (port: ActionPort): Promise<ModeItem[]> => {
 
 /**
  * The prefix modes every surface offers: `>p` prompts, `>t` translate, `>r` GitHub repositories,
- * `>g` a search in one of them, `>w` GitHub work waiting on you, `>f` the files widgets add to,
+ * `>g` a search in one of them, `>gw` GitHub work waiting on you, `>f` the files widgets add to,
  * `>q` a knowledge capture, `>k` conversions and `>s` symbols. Link tools like `>l` come from the
  * repository's palette settings instead (`loadSettings`).
  */
@@ -816,7 +816,7 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
     load: () => githubSearchItems(port),
   },
   {
-    prefix: 'w',
+    prefix: 'gw',
     title: 'GitHub work',
     placeholder: 'Filter what waits on you on GitHub — ⏎ opens it',
     description:

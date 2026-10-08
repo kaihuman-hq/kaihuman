@@ -235,7 +235,7 @@ describe('paletteModes', () => {
     ...over,
   });
 
-  it('>w lists what waits on you on GitHub, each once, under the first search that found it', async () => {
+  it('>gw lists what waits on you on GitHub, each once, under the first search that found it', async () => {
     const byFilter = {
       'review-requested': [work('https://github.com/o/r/pull/1')],
       assigned: [
@@ -252,8 +252,8 @@ describe('paletteModes', () => {
         return { items: byFilter[filter] } as never;
       },
     };
-    const found = paletteModes(port).find((candidate) => candidate.prefix === 'w');
-    if (!found) throw new Error('no mode w');
+    const found = paletteModes(port).find((candidate) => candidate.prefix === 'gw');
+    if (!found) throw new Error('no mode gw');
     const items = await load(found);
     expect(sent).toEqual([
       { type: 'LIST_GITHUB_WORK', filter: 'review-requested' },
@@ -268,9 +268,9 @@ describe('paletteModes', () => {
     expect(items[1]?.subtitle).toBe('o/r#2 · issue · updated 2026-09-24');
   });
 
-  it('>w says so when nothing waits on you', async () => {
+  it('>gw says so when nothing waits on you', async () => {
     answers.LIST_GITHUB_WORK = { items: [] };
-    await expect(load(mode('w'))).rejects.toThrow('Nothing on GitHub is waiting on you');
+    await expect(load(mode('gw'))).rejects.toThrow('Nothing on GitHub is waiting on you');
   });
 
   it('>k converts what is typed, >s lists symbols to copy', async () => {

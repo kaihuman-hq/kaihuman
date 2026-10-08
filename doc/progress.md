@@ -333,6 +333,28 @@ console typecheck against the new export.
   - **Desktop palette**: the Tauri `icons/icon.png`.
 - The PNGs are rendered from the SVG. The SVG is the one supplied, minus its C2PA metadata block.
 
+## 2026-09-28 — Desktop palette: `>w` Wi‑Fi; GitHub work moves to `>gw`
+
+- **`>w` Wi‑Fi** (`wifiMode` in `packages/palette/src/wifi.ts`, desktop only; `src-tauri/src/wifi.rs`
+  drives NetworkManager through `nmcli`). The first row shows whether Wi‑Fi is on, and ⏎ turns it on
+  or off. The networks in range follow, one row per SSID: connected first, then by signal, each
+  with its bars, security, and whether a profile is saved. ⏎ connects. A secured network with no
+  saved profile first asks for its password, typed masked. The last scan shows at once, and a fresh
+  one (`--rescan yes`) replaces it when it arrives. While Wi‑Fi is on, a **Refresh networks** row
+  (second) scans again without leaving `>w`.
+- New requests `LIST_WIFI { rescan? } → { enabled, networks }`, `SET_WIFI { enabled }` and
+  `CONNECT_WIFI { ssid, password? }`. If a new profile fails to connect (for example, a wrong
+  password), it is deleted, so the next try asks for the password again. `nmcli` takes the password
+  as an argument, so it is visible in the process list while `nmcli` runs.
+- `ModeItem.reloads`: choosing such an entry loads its mode's list again and then refreshes it,
+  and the palette stays in the mode.
+- `PromptStep.secret`: that step's input is a password field, and the note that lists the answers
+  so far leaves it out.
+- **GitHub work** moves from `>w` to `>gw` on both surfaces. `>g` now waits for a space, because
+  `>gw` starts with it. `gw` joins `BUILT_IN_PALETTE_PREFIXES`.
+- The docspack pages (`30-console.md`, `50-command-palette.md`, `51-desktop-palette.md`) name
+  `>gw` for GitHub work and list `>w` Wi‑Fi and its requests.
+
 ## 2026-09-25 — Bookmarks widget: edit title and link
 
 - Each row in the focused Bookmarks widget has an **Edit** (pencil) button next to pin and delete.

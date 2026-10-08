@@ -11,3 +11,4 @@ export * from './local-files.js';
 export * from './protocol.js';
 export * from './symbols.js';
 export * from './translate.js';
+export * from './wifi.js';

@@ -100,7 +100,7 @@ Modes come in four kinds in `PaletteMode`: `load` (a list filtered as you type),
 | `>t` | Translate with DeepL | all |
 | `>r` | Your GitHub repositories; ⇥ for issues, pull requests… | all |
 | `>g` | GitHub search: repository, then issues or pull requests, then term | all |
-| `>w` | GitHub work waiting on you | all |
+| `>gw` | GitHub work waiting on you | all |
 | `>f` | Widget files: open in Kaihuman or add an entry | all |
 | `>q` | Capture to the knowledge base (`.kh/raw/`) | all |
 | `>k` | Convert colors, numbers, sums, times, units, case, Lorem ipsum | all |
@@ -112,8 +112,9 @@ Modes come in four kinds in `PaletteMode`: `load` (a list filtered as you type),
 | `>c` | Claude Code session | desktop |
 | `>u` | Claude usage | desktop |
 | `>o` | Local files; `c:` contents, `a:` whole disk | desktop |
+| `>w` | Wi‑Fi: on/off, networks in range, connect | desktop |
 
-The built-in prefixes that settings tools cannot take are in `BUILT_IN_PALETTE_PREFIXES`: `b p t r g f x d c u a w q k s`. `>o` is not in that list; a tool with prefix `o` is dropped on the desktop because the desktop mode claims it. The desktop-only modes are described in the desktop palette docs.
+The built-in prefixes that settings tools cannot take are in `BUILT_IN_PALETTE_PREFIXES`: `b p t r g f x d c u a w gw q k s`. `>o` is not in that list; a tool with prefix `o` is dropped on the desktop because the desktop mode claims it. The desktop-only modes are described in the desktop palette docs.
 
 ## Copying prompts and filling in commands
 
@@ -143,13 +144,13 @@ Nothing runs until a Run choice is picked. The extension can only copy (`command
 
 The key is set with the **Set the DeepL API key…** action (free keys at deepl.com/pro-api); an empty value forgets it. Requests: `TRANSLATE`, `GET_TRANSLATION_HISTORY`, `ADD_TRANSLATION_HISTORY`, `SET_TRANSLATION_KEY`.
 
-## GitHub repositories, search and work: >r, >g, >w
+## GitHub repositories, search and work: >r, >g, >gw
 
 <!-- docspack: tags=github,issues,pull requests,review requests -->
 
 - **`>r`** lists your GitHub repositories (`LIST_GITHUB_REPOS`). ⏎ opens one. ⇥ or → lists its pages: Issues, Pull requests, Actions, Releases, Discussions, Commits, Branches, Tags, Wiki, Projects, Insights, Settings (`GITHUB_REPO_VIEWS`).
 - **`>g`** lists the same repositories. ⇥ or ⏎ offers **Issues** or **Pull requests**; ⏎ asks for a search term, then opens GitHub's search with `is:issue …` or `is:pr …`. No term opens the plain list.
-- **`>w`** lists what waits on you, in three groups: **Review requested**, **Assigned to you**, **Your pull requests with failing checks**. Each item appears once. It sends `LIST_GITHUB_WORK` with filters `review-requested`, `assigned` and `failing`. With nothing found it says `Nothing on GitHub is waiting on you`.
+- **`>gw`** lists what waits on you, in three groups: **Review requested**, **Assigned to you**, **Your pull requests with failing checks**. Each item appears once. It sends `LIST_GITHUB_WORK` with filters `review-requested`, `assigned` and `failing`. With nothing found it says `Nothing on GitHub is waiting on you`.
 
 On the desktop, `>r` and `>g` rank repositories from omarchy's `~/.config/eee/counts` first.
 

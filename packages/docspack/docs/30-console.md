@@ -196,7 +196,7 @@ In the console, `Ctrl+K` (or `Cmd+K`) toggles the search modal (`SearchModal` in
 ## Where the palette prefixes appear in the console
 <!-- docspack: tags=>q,>a,>x,>p,palette prefixes,command palette settings -->
 
-The `>`-prefixed command palette (`>q`, `>a`, `>x`, `>p`, `>w`, `>k`, …) runs in the browser extension and in `apps/desktop-palette`, from `packages/palette`. The console does not run it, but it touches it in three places:
+The `>`-prefixed command palette (`>q`, `>a`, `>x`, `>p`, `>gw`, `>k`, …) runs in the browser extension and in `apps/desktop-palette`, from `packages/palette`. The console does not run it, but it touches it in three places:
 
 - The **Command Palette Settings** widget edits `.kh/command-palette.settings.json`: search engines, `>a` assistants and link tools (see `# Console widgets`).
 - The `.commands.md` and `.prompts.md` widgets edit the files that `>x` and `>p` read.
