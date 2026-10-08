@@ -29,8 +29,8 @@ way.
 | `>g` GitHub search — pick a repository, then issues or pull requests, then type the search term | ✓, repositories ranked as in `>r` |
 | `>a` ask AI — the question to ChatGPT, Claude, Gemini, GitHub Copilot or Perplexity in a new chat, also copied for the ones that do not read it from the link; assistants from `.kh/command-palette.settings.json` | ✓ (copying with `wl-copy`) |
 | `>e` LEO dictionary, `>m` Google Maps, `>n` npm, `>i` IMDb — default link tools like `>l` | ✓ |
-| `>l` logs — Tsuga's log explorer, searching for what is typed; more link tools from `.kh/command-palette.settings.json` (see the extension's README, "Palette settings") | ✓ (settings cached in `$XDG_CACHE_HOME/lifosy/palette-settings.json` for five minutes) |
-| Recent: each prefix lists the last 10 entries chosen in it first (kept in `$XDG_STATE_HOME/lifosy/mode-recents.json`) | ✓ |
+| `>l` logs — Tsuga's log explorer, searching for what is typed; more link tools from `.kh/command-palette.settings.json` (see the extension's README, "Palette settings") | ✓ (settings cached in `$XDG_CACHE_HOME/kaihuman/palette-settings.json` for five minutes) |
+| Recent: each prefix lists the last 10 entries chosen in it first (kept in `$XDG_STATE_HOME/kaihuman/mode-recents.json`) | ✓ |
 | `>gw` GitHub work — review requests, what is assigned to you, your PRs with failing checks | ✓ |
 | `>w` Wi‑Fi — ⏎ on the first row turns it on or off; the networks in range follow (connected first, then by signal), and ⏎ connects, asking for the password (masked) when none is saved. The last scan shows at once, and a fresh one replaces it a few seconds later; **Refresh networks** scans again | ✓ desktop only (NetworkManager with `nmcli`) |
 | `>k` convert — colors, number bases, arithmetic, timestamps, metric ⇄ US units (`5 km`, `350 °F`, `5'11"`, `5 km in ft`), lengths ⇄ pixels at 80/150/300 dpi (`10 cm to px`, `1000 px`), letter case, Lorem ipsum; also offered inline for a color, sum, `0x…`, timestamp or quantity typed into the main search | ✓ (copying with `wl-copy`) |
@@ -151,6 +151,13 @@ installing the new ones:
    `kaihuman-braindump`).
 3. The development variables are now `KAIHUMAN_GITHUB_TOKEN` and `KAIHUMAN_GITHUB_API`.
 
+The rest moves by itself. The `$XDG_*_HOME/lifosy` directories (settings, caches, dumps and
+braindumps) become `$XDG_*_HOME/kaihuman` the first time the palette looks for them, the token
+and DeepL key move from the keyring service `lifosy-palette` to `kaihuman-palette` the first time
+they are read, and the daemon re-registers a native messaging host installed as
+`com.lifosy.palette` as `com.kaihuman.palette` for the same extension when it starts. A new
+directory that already exists is never merged with or replaced by an old one.
+
 ## Log in
 
 Either way below takes the token from the kaihuman console, the same way the CLI's login does:
@@ -220,7 +227,7 @@ the palette as the extension's native messaging host — once, from the installe
 kaihuman-palette native-host install <extension id>   # the id is on chrome://extensions
 ```
 
-It writes `com.lifosy.palette.json` into `NativeMessagingHosts/` of every Chrome, Chromium, Brave,
+It writes `com.kaihuman.palette.json` into `NativeMessagingHosts/` of every Chrome, Chromium, Brave,
 Edge or Vivaldi profile under `$XDG_CONFIG_HOME`, allowing only that extension. Then reload the
 extension. From then on, switching the repository in either one switches the other: each side
 records when its repository changed, and the newer choice wins. The extension asks when a start
@@ -241,14 +248,14 @@ Flatpak and Snap browsers cannot start host programs without extra sandbox setup
 
 | Path | Holds |
 | --- | --- |
-| `$XDG_CONFIG_HOME/lifosy/palette.json` | the current repository, when it last changed, and the ones you have used |
-| `$XDG_CACHE_HOME/lifosy/bookmarks.json` | GitHub's bookmarks file as last fetched, with its ETag |
-| `$XDG_CACHE_HOME/lifosy/commands.json` | the repository's `.commands.md` files as last fetched (five minutes) |
-| `$XDG_CACHE_HOME/lifosy/prompts.json` | the repository's `.prompts.md` files as last fetched (five minutes) |
-| `$XDG_STATE_HOME/lifosy/recents.json` | the palette's last ten actions |
-| `$XDG_DATA_HOME/lifosy/dumps/*.txt` | old dumps from before braindumps, listed under `>d` until cleared |
-| `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/` | braindumps (`<id>.md`) and what GitHub last had of each (`<id>.json`); see `doc/braindump.md` |
-| `$XDG_STATE_HOME/lifosy/translations.json` | the last 20 texts translated with `>t` |
+| `$XDG_CONFIG_HOME/kaihuman/palette.json` | the current repository, when it last changed, and the ones you have used |
+| `$XDG_CACHE_HOME/kaihuman/bookmarks.json` | GitHub's bookmarks file as last fetched, with its ETag |
+| `$XDG_CACHE_HOME/kaihuman/commands.json` | the repository's `.commands.md` files as last fetched (five minutes) |
+| `$XDG_CACHE_HOME/kaihuman/prompts.json` | the repository's `.prompts.md` files as last fetched (five minutes) |
+| `$XDG_STATE_HOME/kaihuman/recents.json` | the palette's last ten actions |
+| `$XDG_DATA_HOME/kaihuman/dumps/*.txt` | old dumps from before braindumps, listed under `>d` until cleared |
+| `$XDG_DATA_HOME/kaihuman/braindumps/<owner>/<name>/` | braindumps (`<id>.md`) and what GitHub last had of each (`<id>.json`); see `doc/braindump.md` |
+| `$XDG_STATE_HOME/kaihuman/translations.json` | the last 20 texts translated with `>t` |
 
 For development and tests, `KAIHUMAN_GITHUB_TOKEN` takes the place of the keyring and
 `KAIHUMAN_GITHUB_API` points the backend at a stand-in for `https://api.github.com`.

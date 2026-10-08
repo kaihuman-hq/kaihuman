@@ -68,7 +68,7 @@ The GitHub repository is the single source of truth. Each app talks to it in its
 
 - **Web console:** reads the repository tree and files through the GitHub REST API (`githubService` in `packages/core`). Files are cached in IndexedDB (`life-os-db`, stores `files` and `trees`). Saves commit through the API against the file's last known `sha`.
 - **Browser extension:** calls the GitHub API from its service worker. It caches bookmarks and pinned-tab groups in `chrome.storage.local` and refreshes them at most once an hour, using `ETag`/`If-None-Match` so unchanged files cost a `304`.
-- **Desktop palette:** a Rust backend calls the GitHub API and caches files under `$XDG_CACHE_HOME/lifosy/`.
+- **Desktop palette:** a Rust backend calls the GitHub API and caches files under `$XDG_CACHE_HOME/kaihuman/`.
 - **Terminal CLI:** keeps a shallow git clone of the active repository in its config directory (`repos/<owner>/<repo>`) and syncs it before file operations.
 - **kb-mcp:** reads a local clone on disk; it never calls GitHub.
 
@@ -96,7 +96,7 @@ Your content lives only in your GitHub repository. Each app keeps local copies a
 | Web console | IndexedDB `life-os-db` (`auth` store), mirrored in `localStorage` key `lifeos_gh_token` | IndexedDB `files` and `trees` stores |
 | Terminal CLI | `auth.json` in the CLI config directory | shallow clone under `repos/`, `spool/` |
 | Browser extension | `chrome.storage.local` | `chrome.storage.local` |
-| Desktop palette | the Secret Service (gnome-keyring, KeePassXC), never a file | `$XDG_CACHE_HOME/lifosy/`, `$XDG_DATA_HOME/lifosy/` |
+| Desktop palette | the Secret Service (gnome-keyring, KeePassXC), never a file | `$XDG_CACHE_HOME/kaihuman/`, `$XDG_DATA_HOME/kaihuman/` |
 
 Demo mode (`/demo`, or **View demo** on the login screen) uses seeded in-memory data and writes nothing to `localStorage` or IndexedDB. The extension and palette only send data to GitHub, plus DeepL for `>t` translations when you set a key. AI assistant links (`>a`) only build a URL.
 

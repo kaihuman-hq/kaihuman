@@ -103,7 +103,7 @@ Shows workspaces, theme, and all files referenced in `dashboard.config.json`.
 When you open the file browser or dashboard view, the CLI automatically:
 
 1. Clones `https://github.com/<owner>/<repo>` (shallow, depth 1) into
-   `~/.config/cli/repos/<owner>/<repo>/` (Linux; `~/Library/Application Support/com.lifosy.cli/` on macOS)
+   `~/.config/cli/repos/<owner>/<repo>/` (Linux; `~/Library/Application Support/com.kaihuman.cli/` on macOS)
 2. On subsequent opens it runs `git pull --ff-only` to sync.
 
 `Ctrl+S` in the editor writes the file to the local clone, then commits and pushes it in the

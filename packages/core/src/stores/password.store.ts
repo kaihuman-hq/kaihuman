@@ -4,7 +4,9 @@ import { githubProfileStore } from './github-profile.store.js';
 
 const logger = new Logger('PasswordStore');
 
-const LS_KEY = 'lifosy_saved_passwords';
+const LS_KEY = 'kaihuman_saved_passwords';
+// The key before the October 2026 rename; its entries move to LS_KEY on load.
+const OLD_LS_KEY = 'lifosy_saved_passwords';
 
 // Static component of the obfuscation key. Combined with repo context so the same
 // file path in different repos produces a different ciphertext.
@@ -58,6 +60,11 @@ const store = {
 
   loadFromStorage() {
     try {
+      const old = localStorage.getItem(OLD_LS_KEY);
+      if (old !== null) {
+        if (localStorage.getItem(LS_KEY) === null) localStorage.setItem(LS_KEY, old);
+        localStorage.removeItem(OLD_LS_KEY);
+      }
       const raw = localStorage.getItem(LS_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);

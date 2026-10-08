@@ -102,7 +102,7 @@ pnpm -r test              # run tests in every package that has them (turbo has 
 
 ## Config files stored by the CLI
 
-In `~/.config/cli/` on Linux (`~/Library/Application Support/com.lifosy.cli/` on macOS):
+In `~/.config/cli/` on Linux (`~/Library/Application Support/com.kaihuman.cli/` on macOS):
 
 ```
 ~/.config/cli/

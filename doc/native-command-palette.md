@@ -135,7 +135,7 @@ shared actions (`repoActions(port)`, `portHandlers(port)`).
 3. **ActionPort for the desktop.** Commands go through Tauri `invoke` to Rust.
    - The GitHub REST calls (bookmarks file, code search, note commits) move to `reqwest`, so there
      is no CORS and the token stays out of the webview.
-   - The bookmark cache lives in `$XDG_CACHE_HOME/lifosy/`, with the same hour-long budget as the
+   - The bookmark cache lives in `$XDG_CACHE_HOME/kaihuman/`, with the same hour-long budget as the
      extension.
 4. **Token.** Stored in the Secret Service with the `keyring` crate, and set once with
    `kaihuman-palette login`.
@@ -144,7 +144,7 @@ shared actions (`repoActions(port)`, `portHandlers(port)`).
    - If none is running, the palette says so and exits. It does not fall back to a plain-text file.
 5. **Opening URLs.** Use `tauri-plugin-opener` (xdg-open). Bookmarks and web searches open in your
    default browser, and Hyprland focuses that browser's window.
-6. **Config.** A small `$XDG_CONFIG_HOME/lifosy/palette.toml` for the repo and theme. The shortcut
+6. **Config.** A small `$XDG_CONFIG_HOME/kaihuman/palette.toml` for the repo and theme. The shortcut
    stays in your compositor config and is documented, not installed.
 7. **Packaging.** An RPM from the Tauri bundler, or a plain `cargo install` for your own machine.
    Avoid AppImage: its GTK hook forces X11, and Wayland crashes have been reported.
@@ -164,7 +164,7 @@ what the desktop can and cannot do. Where it differs from the list above:
 
 ### Phase 3 — optional: talk to Chrome through native messaging
 
-A native messaging host (`~/.config/google-chrome/NativeMessagingHosts/com.lifosy.palette.json`)
+A native messaging host (`~/.config/google-chrome/NativeMessagingHosts/com.kaihuman.palette.json`)
 lets the desktop palette list and load pinned tab groups and open a URL in the current Chrome
 window.
 

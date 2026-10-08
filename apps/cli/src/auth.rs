@@ -3,7 +3,7 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::oneshot;
 use warp::Filter;
@@ -22,12 +22,34 @@ pub struct AuthManager {
     config_path: PathBuf,
 }
 
+/// Renames `old` to `new` when `old` exists and `new` does not; a `new` already there is kept.
+fn adopt_old_dir(old: &Path, new: &Path) -> std::io::Result<()> {
+    if !old.is_dir() || new.exists() {
+        return Ok(());
+    }
+    if let Some(parent) = new.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::rename(old, new)
+}
+
 #[allow(dead_code)]
 impl AuthManager {
     pub fn new() -> Result<Self> {
-        let proj_dirs = ProjectDirs::from("com", "lifosy", "cli")
+        let proj_dirs = ProjectDirs::from("com", "kaihuman", "cli")
             .context("Failed to determine config directory")?;
         let config_dir = proj_dirs.config_dir();
+        // Named after lifosy, the code name before October 2026. Only macOS puts the
+        // qualifier in the path; on Linux both are ~/.config/cli.
+        if let Some(old) = ProjectDirs::from("com", "lifosy", "cli") {
+            adopt_old_dir(old.config_dir(), config_dir).with_context(|| {
+                format!(
+                    "Failed to move {} to {}",
+                    old.config_dir().display(),
+                    config_dir.display()
+                )
+            })?;
+        }
         fs::create_dir_all(config_dir)?;
 
         Ok(Self {
@@ -298,5 +320,24 @@ mod tests {
         assert_eq!(a.len(), 32);
         assert!(a.chars().all(|c| c.is_ascii_hexdigit()));
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn takes_over_the_old_config_dir_only_when_the_new_one_is_missing() {
+        let base = std::env::temp_dir().join(format!("kaihuman-cli-adopt-{}", std::process::id()));
+        let (old, new) = (base.join("com.lifosy.cli"), base.join("com.kaihuman.cli"));
+        fs::create_dir_all(old.join("spool")).unwrap();
+        fs::write(old.join("auth.json"), "{}").unwrap();
+
+        adopt_old_dir(&old, &new).unwrap();
+        assert!(!old.exists());
+        assert!(new.join("auth.json").exists() && new.join("spool").is_dir());
+
+        // Both there (and the Linux case, where they are the same path): left alone.
+        fs::create_dir_all(&old).unwrap();
+        adopt_old_dir(&old, &new).unwrap();
+        adopt_old_dir(&new, &new).unwrap();
+        assert!(old.is_dir() && new.join("auth.json").exists());
+        fs::remove_dir_all(base).unwrap();
     }
 }

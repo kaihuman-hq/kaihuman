@@ -26,7 +26,7 @@ There are already six capture paths. The design must not add a seventh that does
 
 | Existing | Where it writes | Why it is not a braindump |
 | --- | --- | --- |
-| Desktop palette `>d` dumps (`dumps.rs`, `dumpMode` in `packages/palette/src/actions.ts`) | `$XDG_DATA_HOME/lifosy/dumps/<ms>.txt`, local, last 25 kept | **Closest match**: autosaving editor, one file each, list and reopen. But it is local only and lives inside the 620×420 overlay, which grabs the keyboard exclusively. |
+| Desktop palette `>d` dumps (`dumps.rs`, `dumpMode` in `packages/palette/src/actions.ts`) | `$XDG_DATA_HOME/kaihuman/dumps/<ms>.txt`, local, last 25 kept | **Closest match**: autosaving editor, one file each, list and reopen. But it is local only and lives inside the 620×420 overlay, which grabs the keyboard exclusively. |
 | Palette "Add a note…", console `/quick-note`, start-page note box | Prepends `- text` to `.lifeos/dump.md` | One line into a shared file. No multi-line editing, and the file cannot be reopened. |
 | `>q` capture, `cli capture`, `kh-capture`, `kh-capture-native` | `.kh/raw/<ms>-<slug>.md` | Create-only, with no later editing. `/kb-ingest` processes it into the wiki, which is a different lifecycle. |
 | Console `/new` (DumpView) | Save wizard → `.kh/quicknotes/` | This is the main app in a tab: the friction you want to avoid. |
@@ -146,7 +146,7 @@ opposite directions:
 
 **As built** (`apps/desktop-palette/src-tauri/src/braindumps.rs`):
 
-- Each repository has its own directory, `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/`, so
+- Each repository has its own directory, `$XDG_DATA_HOME/kaihuman/braindumps/<owner>/<name>/`, so
   switching repositories never moves a half-written braindump. Only the active repo is synced;
   another repo's braindumps wait until it is active again.
 - `<id>.md` is the text, and `<id>.json` is what GitHub last had: `{ sha, text }`. Together they

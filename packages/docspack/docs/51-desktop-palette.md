@@ -182,7 +182,7 @@ Braindumps save locally first, then sync to the active repository.
 - **Offline**: nothing is lost; unsent changes go out on the next sync.
 - A delete removes only the version this machine last saw; an edit made elsewhere comes back.
 
-Local copies live in `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/`: `<id>.md` is the text, `<id>.json` holds GitHub's last `{ sha, text }`. Only the active repository syncs. Code: `src-tauri/src/braindumps.rs`; design in `doc/braindump.md`.
+Local copies live in `$XDG_DATA_HOME/kaihuman/braindumps/<owner>/<name>/`: `<id>.md` is the text, `<id>.json` holds GitHub's last `{ sha, text }`. Only the active repository syncs. Code: `src-tauri/src/braindumps.rs`; design in `doc/braindump.md`.
 
 ## Listing and deleting braindumps with >d
 
@@ -194,7 +194,7 @@ Local copies live in `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/`: `<id>.m
 - ⇥ or → offers **Open in the braindump window** and **Delete…**.
 - **Delete…** asks you to type `DELETE`. It removes the braindump here (`SAVE_BRAINDUMP` with empty text) and syncs at once. Offline, it says the repo follows on the next sync.
 
-Below them, under *Old dumps — on this machine only*, are dumps from before braindumps (`$XDG_DATA_HOME/lifosy/dumps/*.txt`). They open in the palette's own editor: ⌃⏎ copies all, ⌃S saves to a path (`EXPORT_DUMP`), and clearing the text deletes it. **⇥ → Delete…** removes one. No new old dumps are made, and none are sent to GitHub.
+Below them, under *Old dumps — on this machine only*, are dumps from before braindumps (`$XDG_DATA_HOME/kaihuman/dumps/*.txt`). They open in the palette's own editor: ⌃⏎ copies all, ⌃S saves to a path (`EXPORT_DUMP`), and clearing the text deletes it. **⇥ → Delete…** removes one. No new old dumps are made, and none are sent to GitHub.
 
 ## Starting a Claude Code session with >c
 
@@ -219,7 +219,7 @@ An empty prompt is refused with `Type a prompt for Claude Code`. The session lan
 - Once the cache is 5 minutes old, it syncs in the background and replaces the rows.
 - An expired OAuth token is refreshed and written back to that account's `.credentials.json` (mode 600).
 
-Requests: `GET_CLAUDE_USAGE` and `GET_CLAUDE_USAGE { cached: true }`. The cache is `$XDG_CACHE_HOME/lifosy/claude-usage.json`. Code: `src-tauri/src/claude.rs`, `packages/palette/src/claude-usage.ts`.
+Requests: `GET_CLAUDE_USAGE` and `GET_CLAUDE_USAGE { cached: true }`. The cache is `$XDG_CACHE_HOME/kaihuman/claude-usage.json`. Code: `src-tauri/src/claude.rs`, `packages/palette/src/claude-usage.ts`.
 
 ## Setting the DeepL key for >t on the desktop
 
@@ -231,7 +231,7 @@ The desktop looks up the DeepL key on every translation. The first match wins:
 2. `~/.config/envvars/deepl.env` (`$XDG_CONFIG_HOME/envvars/deepl.env`), a `DEEPL_AUTH_KEY=…` or `DEEPL_API_KEY=…` line. `export` and quotes are allowed.
 3. The Secret Service, where the **Set the DeepL API key…** action stores it.
 
-Editing the env file needs no daemon restart. The last 20 translated texts are kept in `$XDG_STATE_HOME/lifosy/translations.json`. Code: `src-tauri/src/translate.rs` and `config.rs`.
+Editing the env file needs no daemon restart. The last 20 translated texts are kept in `$XDG_STATE_HOME/kaihuman/translations.json`. Code: `src-tauri/src/translate.rs` and `config.rs`.
 
 ## Keeping the same repository as the browser extension
 
@@ -243,7 +243,7 @@ The palette and the extension each remember an active repository. Register the p
 kaihuman-palette native-host install <extension id>   # the id is on chrome://extensions
 ```
 
-- It writes `com.lifosy.palette.json` into `NativeMessagingHosts/` of every Chrome, Chromium, Brave, Edge or Vivaldi profile under `$XDG_CONFIG_HOME`, allowing only that extension.
+- It writes `com.kaihuman.palette.json` into `NativeMessagingHosts/` of every Chrome, Chromium, Brave, Edge or Vivaldi profile under `$XDG_CONFIG_HOME`, allowing only that extension.
 - Reload the extension afterwards.
 - Each side records when its repository changed; the newer choice wins.
 - The extension asks when a start page opens (at most every 30 s) and hourly, and tells the palette when you switch there.
@@ -276,17 +276,17 @@ Events from Rust: `palette:show`, `palette:hide`, `braindump:open` (`{ id }`), `
 
 | Path | Holds |
 | --- | --- |
-| `$XDG_CONFIG_HOME/lifosy/palette.json` | Current repository, when it changed, repositories used |
-| `$XDG_CACHE_HOME/lifosy/bookmarks.json` | `.kh/browser.bookmarks.json` as last fetched, with its ETag (one hour) |
-| `$XDG_CACHE_HOME/lifosy/commands.json` | `.commands.md` files (five minutes) |
-| `$XDG_CACHE_HOME/lifosy/prompts.json` | `.prompts.md` files (five minutes) |
-| `$XDG_CACHE_HOME/lifosy/palette-settings.json` | `.kh/command-palette.settings.json` (five minutes) |
-| `$XDG_CACHE_HOME/lifosy/claude-usage.json` | Last `>u` fetch |
-| `$XDG_STATE_HOME/lifosy/recents.json` | The main search's last ten actions and opens |
-| `$XDG_STATE_HOME/lifosy/mode-recents.json` | Last 10 choices per prefix |
-| `$XDG_STATE_HOME/lifosy/translations.json` | Last 20 `>t` texts |
-| `$XDG_DATA_HOME/lifosy/dumps/*.txt` | Old dumps from before braindumps |
-| `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/` | Braindumps (`<id>.md`, `<id>.json`) |
+| `$XDG_CONFIG_HOME/kaihuman/palette.json` | Current repository, when it changed, repositories used |
+| `$XDG_CACHE_HOME/kaihuman/bookmarks.json` | `.kh/browser.bookmarks.json` as last fetched, with its ETag (one hour) |
+| `$XDG_CACHE_HOME/kaihuman/commands.json` | `.commands.md` files (five minutes) |
+| `$XDG_CACHE_HOME/kaihuman/prompts.json` | `.prompts.md` files (five minutes) |
+| `$XDG_CACHE_HOME/kaihuman/palette-settings.json` | `.kh/command-palette.settings.json` (five minutes) |
+| `$XDG_CACHE_HOME/kaihuman/claude-usage.json` | Last `>u` fetch |
+| `$XDG_STATE_HOME/kaihuman/recents.json` | The main search's last ten actions and opens |
+| `$XDG_STATE_HOME/kaihuman/mode-recents.json` | Last 10 choices per prefix |
+| `$XDG_STATE_HOME/kaihuman/translations.json` | Last 20 `>t` texts |
+| `$XDG_DATA_HOME/kaihuman/dumps/*.txt` | Old dumps from before braindumps |
+| `$XDG_DATA_HOME/kaihuman/braindumps/<owner>/<name>/` | Braindumps (`<id>.md`, `<id>.json`) |
 
 The token is never written to a file; it is in the Secret Service. Paths are built in `src-tauri/src/config.rs`, falling back to `~/.config`, `~/.cache`, `~/.local/state` and `~/.local/share`.
 

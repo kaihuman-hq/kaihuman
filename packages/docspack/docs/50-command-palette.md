@@ -306,9 +306,9 @@ With nothing typed, each prefix mode lists the last 10 entries chosen in it firs
 - `>a`, `>k`, `>q`, `>u` and `>o` keep no recents (`recents: false`).
 - `>t` shows its own history instead: the last 20 texts translated.
 - Requests: `GET_MODE_RECENTS { prefix }` and `ADD_MODE_RECENT { prefix, id }`.
-- The extension keeps them in its local storage. The desktop keeps them in `$XDG_STATE_HOME/lifosy/mode-recents.json`.
+- The extension keeps them in its local storage. The desktop keeps them in `$XDG_STATE_HOME/kaihuman/mode-recents.json`.
 
-The main search's **Recent** group is separate: the last ten opens and actions (`GET_RECENTS`, `ADD_RECENT`). The desktop keeps those in `$XDG_STATE_HOME/lifosy/recents.json`.
+The main search's **Recent** group is separate: the last ten opens and actions (`GET_RECENTS`, `ADD_RECENT`). The desktop keeps those in `$XDG_STATE_HOME/kaihuman/recents.json`.
 
 ## Actions the palette offers
 

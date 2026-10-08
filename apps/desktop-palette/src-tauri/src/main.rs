@@ -548,6 +548,19 @@ fn main() {
         unsafe { std::env::set_var("GDK_BACKEND", "wayland") };
     }
 
+    // Hosts registered before the rename name the old binary, which is gone; this one takes over.
+    match std::env::current_exe()
+        .map_err(|error| error.to_string())
+        .and_then(|binary| native_host::migrate(&config::config_home(), &binary))
+    {
+        Ok(files) => {
+            for file in files {
+                eprintln!("native messaging host moved to {}", file.display());
+            }
+        }
+        Err(error) => eprintln!("could not move the native messaging host: {error}"),
+    }
+
     run_daemon(command, listener);
 }
 

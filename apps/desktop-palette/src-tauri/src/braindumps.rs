@@ -1,7 +1,7 @@
 //! Braindumps (doc/braindump.md): texts typed in the braindump window, one markdown file each in
 //! the repo's `.kh/braindumps/`, with a copy on this machine so typing never waits for GitHub.
 //!
-//! Each repository has its own directory, `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/`, so
+//! Each repository has its own directory, `$XDG_DATA_HOME/kaihuman/braindumps/<owner>/<name>/`, so
 //! switching repositories never moves a braindump. There, `<id>.md` is the text and `<id>.json`
 //! is what GitHub last had (`Synced`). Together they say what a sync has to do:
 //!

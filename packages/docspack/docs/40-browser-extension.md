@@ -78,7 +78,7 @@ Every file the extension reads or writes is in one active repository, stored as 
 
 Run `kaihuman-palette native-host install <this extension's id>` once. After that, switching the repository in the extension or the desktop palette switches the other too. The newer choice wins.
 
-`src/background/repo-sync.ts` talks to the native host `com.lifosy.palette` with a `SYNC_REPO` message. It stamps each change of `lifeos_repo` in `lifeos_repo_changed_at`. It asks the desktop hourly and when a start page opens, at most every 30 seconds. Without the host installed, the extension keeps its own choice.
+`src/background/repo-sync.ts` talks to the native host `com.kaihuman.palette` with a `SYNC_REPO` message. It stamps each change of `lifeos_repo` in `lifeos_repo_changed_at`. It asks the desktop hourly and when a start page opens, at most every 30 seconds. Without the host installed, the extension keeps its own choice.
 
 ## What the toolbar popup contains
 <!-- docspack: tags=popup,toolbar,action button -->
@@ -446,4 +446,4 @@ Declared in `manifest.ts`:
 - `host_permissions`: `<all_urls>`.
 - `content_scripts`: `src/content/index.ts` on `<all_urls>`.
 
-`tabs` reads tab URLs for pinned tab groups. `scripting` injects the content script into old tabs. `nativeMessaging` reaches the desktop palette host `com.lifosy.palette`.
+`tabs` reads tab URLs for pinned tab groups. `scripting` injects the content script into old tabs. `nativeMessaging` reaches the desktop palette host `com.kaihuman.palette`.
