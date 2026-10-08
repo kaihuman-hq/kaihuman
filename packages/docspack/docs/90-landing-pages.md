@@ -1,6 +1,6 @@
 # Landing pages
 
-The kaihuman marketing site is a static Astro site styled with Tailwind CSS v4 (`@tailwindcss/vite`). Two versions live in the monorepo: `apps/landing-page-nextgen` (`@lifosy/landing-page-nextgen`) is the production site, and `apps/landing-page` (`@lifosy/landing-page`) is the older design, kept in the repo but no longer deployed. Both pages link to the app at `https://app.kaihuman.com`, the live demo at `/demo`, and the source at `github.com/lifosy/monorepo`.
+The kaihuman marketing site is a static Astro site styled with Tailwind CSS v4 (`@tailwindcss/vite`). Two versions live in the monorepo: `apps/landing-page-nextgen` (`@lifosy/landing-page-nextgen`) is the production site, and `apps/landing-page` (`@lifosy/landing-page`) is the older design, kept in the repo but no longer deployed. Both pages link to the app at `https://app.kaihuman.com`, the live demo at `/demo`, and the source at `github.com/kaihuman-hq/kaihuman`.
 
 ## Which landing page is in production
 <!-- docspack: tags=production,nextgen,old-landing-page,which -->

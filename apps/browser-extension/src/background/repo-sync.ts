@@ -11,7 +11,7 @@ export const NATIVE_HOST = 'com.lifosy.palette';
 /** When `lifeos_repo` last changed here, or the desktop's time for a choice taken from it. */
 export const REPO_CHANGED_AT = 'lifeos_repo_changed_at';
 
-const DEFAULT_REPO = 'lifosy/monorepo';
+const DEFAULT_REPO = 'kaihuman-hq/kaihuman';
 
 interface RepoChoice {
   repo: string;

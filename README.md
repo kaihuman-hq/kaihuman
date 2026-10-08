@@ -1,4 +1,4 @@
-# Lifosy Monorepo
+# kaihuman
 
 A personal life-OS built on GitHub — notes, dashboards, habits, and tasks, all stored as files in your own repos.
 

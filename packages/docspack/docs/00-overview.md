@@ -1,6 +1,6 @@
 # Lifosy
 
-Lifosy is a personal life OS: notes, todos, habits, dashboards, bookmarks and a knowledge base, all stored as plain files in a GitHub repository you own. The product faces users under the name kaihuman (web app at `https://app.kaihuman.com`), while the code, packages and binaries use the name Lifosy (`@lifosy/*`, `lifosy-palette`). The monorepo `lifosy/monorepo` holds a web console, a terminal CLI, a browser extension, a desktop command palette, an MCP server and the landing pages.
+Lifosy is a personal life OS: notes, todos, habits, dashboards, bookmarks and a knowledge base, all stored as plain files in a GitHub repository you own. The product faces users under the name kaihuman (web app at `https://app.kaihuman.com`), while the code, packages and binaries use the name Lifosy (`@lifosy/*`, `lifosy-palette`). The monorepo `kaihuman-hq/kaihuman` holds a web console, a terminal CLI, a browser extension, a desktop command palette, an MCP server and the landing pages.
 
 ## Lifosy vs kaihuman: which name is which
 <!-- docspack: tags=naming,brand,kaihuman,lifosy,lifeos -->

@@ -199,7 +199,7 @@ export const HabitTracking: StoryObj = {
 };
 
 const mockRepos = [
-  { id: '1', name: 'Lifosy/monorepo', branch: 'main' },
+  { id: '1', name: 'kaihuman-hq/kaihuman', branch: 'main' },
   { id: '2', name: 'Lifosy/ui', branch: 'develop' },
   { id: '3', name: 'Lifosy/core', branch: 'feature/repo-selection' },
 ];
