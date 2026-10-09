@@ -152,7 +152,8 @@ async fn store_login(
     let mut settings = config::Settings::load();
     let repo = requested
         .or(from_console.filter(|repo| config::is_repo_name(repo)))
-        .unwrap_or_else(|| settings.repo());
+        .or_else(|| settings.repo())
+        .ok_or("No repository to log in to — pass one: login --repo owner/name")?;
     github::Client::new(token.clone(), repo.clone())
         .can_read_repo()
         .await?;

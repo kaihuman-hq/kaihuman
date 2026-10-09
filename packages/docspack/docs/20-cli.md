@@ -1,6 +1,6 @@
 # Terminal CLI
 
-The terminal CLI is a Rust program in `apps/cli` whose binary is called `cli` (crate `cli`, version `0.1.0`, npm workspace name `@kaihuman/cli`). Run with no arguments, it opens an interactive terminal UI built with `ratatui` and `crossterm` for notes, knowledge captures, repo selection, a file browser and editor, a dashboard view and an AI prompt. It also has two subcommands: `cli server` starts a local AI proxy over HTTP, and `cli capture` writes a knowledge note to `.kh/raw/` with an offline spool. It signs in with GitHub through the web console and works on one active GitHub repository at a time.
+The terminal CLI is a Rust program in `apps/cli` whose binary is called `kaihuman` (crate `cli`, version `0.1.0`, npm workspace name `@kaihuman/cli`). Run with no arguments, it opens an interactive terminal UI built with `ratatui` and `crossterm` for notes, knowledge captures, repo selection, a file browser and editor, a dashboard view and an AI prompt. It also has two subcommands: `kaihuman server` starts a local AI proxy over HTTP, and `kaihuman capture` writes a knowledge note to `.kh/raw/` with an offline spool. It signs in with GitHub through the web console and works on one active GitHub repository at a time.
 
 ## Building and running the CLI
 <!-- docspack: tags=install,cargo,compile,release binary -->
@@ -11,28 +11,28 @@ Prerequisites are Rust and Cargo, `git` on `$PATH` for repo sync, and optionally
 cd apps/cli
 cargo run                        # launch the TUI (dev build)
 cargo run -- server --port 3000  # run a subcommand through cargo
-cargo build --release            # release binary: target/release/cli
-./target/release/cli
+cargo build --release            # release binary: target/release/kaihuman
+./target/release/kaihuman
 ```
 
 To use the desktop capture overlay, install the binary on your `PATH`:
 
 ```sh
-install -Dm755 target/release/cli ~/.local/bin/cli
+install -Dm755 target/release/kaihuman ~/.local/bin/kaihuman
 ```
 
-## Which commands and flags the cli binary accepts
+## Which commands and flags the kaihuman binary accepts
 
 The command line is defined with `clap` (derive) in `apps/cli/src/main.rs`.
 
 | Command | What it does |
 |---|---|
-| `cli` | Opens the interactive TUI in the terminal's alternate screen |
-| `cli server [--port <n>]` / `-p <n>` | Starts the local AI proxy on `127.0.0.1`, default port `4000` |
-| `cli capture [TEXT...]` | Captures a knowledge note to `.kh/raw/` in the active repo |
-| `cli --help`, `cli --version` / `-V` | Clap's built-in help and version |
+| `kaihuman` | Opens the interactive TUI in the terminal's alternate screen |
+| `kaihuman server [--port <n>]` / `-p <n>` | Starts the local AI proxy on `127.0.0.1`, default port `4000` |
+| `kaihuman capture [TEXT...]` | Captures a knowledge note to `.kh/raw/` in the active repo |
+| `kaihuman --help`, `kaihuman --version` / `-V` | Clap's built-in help and version |
 
-`cli capture` joins all words of `TEXT` with spaces. With no words it reads piped stdin, or opens `$EDITOR` when stdin is a terminal. There are no other flags, no `login` subcommand and no config-file options.
+`kaihuman capture` joins all words of `TEXT` with spaces. With no words it reads piped stdin, or opens `$EDITOR` when stdin is a terminal. There are no other flags, no `login` subcommand and no config-file options.
 
 ## Signing in with GitHub from the terminal
 <!-- docspack: tags=login,oauth,authenticate,token,auth -->
@@ -51,7 +51,7 @@ The browser tab shows "Login successful!" and tries to close itself.
 
 Press `s` on the main menu to choose the repository every action works on. The list comes from GitHub `GET /user/repos?sort=updated&per_page=20`, so only your 20 most recently updated repos appear. Use `Up`/`Down` to move, `Enter` to choose and `Esc` to cancel.
 
-The choice is saved as `active_repo` (`owner/repo`) in `auth.json`, and the header shows `Repo: owner/repo`. The `cli capture` command and the desktop capture tools also read `active_repo`. Changing the repo clears the local clone path, so the next file browser open syncs again.
+The choice is saved as `active_repo` (`owner/repo`) in `auth.json`, and the header shows `Repo: owner/repo`. The `kaihuman capture` command and the desktop capture tools also read `active_repo`. Changing the repo clears the local clone path, so the next file browser open syncs again.
 
 ## TUI key bindings on the main menu
 <!-- docspack: tags=shortcuts,keys,keyboard,hotkeys -->
@@ -96,17 +96,17 @@ Both note types use a single text box in the TUI and save on `Enter` through the
 | `n` | `.lifeos/quicknotes/quicknote-<UTC timestamp>.md`, for example `quicknote-2024-03-24T12-34-56Z.md` | `Add quicknote via CLI` |
 | `k` | `.kh/raw/<epoch-ms>-<slug>.md` with knowledge frontmatter | `note: add knowledge capture via CLI` |
 
-The quick note file holds the raw text. The knowledge note uses the same format as `cli capture`. Neither path uses the offline spool. A failed save is written to `error.log` in the current working directory. `append_to_inbox` in `github.rs` is unused: nothing writes to `inbox.md` from the TUI.
+The quick note file holds the raw text. The knowledge note uses the same format as `kaihuman capture`. Neither path uses the offline spool. A failed save is written to `error.log` in the current working directory. `append_to_inbox` in `github.rs` is unused: nothing writes to `inbox.md` from the TUI.
 
-## Capturing a note from the command line with cli capture
+## Capturing a note from the command line with kaihuman capture
 <!-- docspack: tags=headless,quick capture,til,stdin,pipe -->
 
-`cli capture` saves a thought to `.kh/raw/` in the active repo without opening the TUI. `/kb-ingest` later folds these notes into the journal and wiki. The code is in `apps/cli/src/capture.rs`.
+`kaihuman capture` saves a thought to `.kh/raw/` in the active repo without opening the TUI. `/kb-ingest` later folds these notes into the journal and wiki. The code is in `apps/cli/src/capture.rs`.
 
 ```sh
-cli capture "TIL rustfmt output changes between releases"
-echo "note text" | cli capture   # read from piped stdin
-cli capture                      # open $EDITOR (fallback nano) on a temp file
+kaihuman capture "TIL rustfmt output changes between releases"
+echo "note text" | kaihuman capture   # read from piped stdin
+kaihuman capture                      # open $EDITOR (fallback nano) on a temp file
 ```
 
 The text source order is: arguments, then piped stdin, then `$EDITOR`. The editor edits `kh-capture-<pid>.md` in the system temp directory. Text is trimmed; empty text prints `Nothing captured.` and exits 0. Any error prints `capture error: …` and exits 1.
@@ -116,24 +116,24 @@ Possible output lines:
 - `Captured → owner/repo (N pushed)` when the spool is empty afterwards.
 - `Captured locally · N pushed, M pending (will retry on next capture)` when some pushes failed.
 - `Saved locally — not authenticated.` when there is no `auth.json`.
-- `Saved locally — no active repo.` when no repo is selected; run `cli` and press `s`.
+- `Saved locally — no active repo.` when no repo is selected; run `kaihuman` and press `s`.
 
 ## How the capture spool keeps notes safe offline
 <!-- docspack: tags=offline,queue,retry,backlog -->
 
-Every `cli capture` writes the note to the `spool/` directory in the CLI config directory before any network call. It then flushes the whole spool, oldest first, to `.kh/raw/<filename>` on GitHub. Spool filenames start with a millisecond timestamp, so sorting by name gives capture order.
+Every `kaihuman capture` writes the note to the `spool/` directory in the CLI config directory before any network call. It then flushes the whole spool, oldest first, to `.kh/raw/<filename>` on GitHub. Spool filenames start with a millisecond timestamp, so sorting by name gives capture order.
 
 - Each file gets up to 3 PUT attempts, with backoff of 0.5 s and then 1 s.
 - A spool file is deleted only after its push succeeds.
-- A file that still fails stays in the spool for the next `cli capture` run.
+- A file that still fails stays in the spool for the next `kaihuman capture` run.
 - Only `*.md` files in the spool are pushed.
 
-The timestamp and date are fixed when the note is spooled, so a late push keeps the real capture time. The native capture app writes failed captures into the same `spool/` directory, so `cli capture` also flushes those.
+The timestamp and date are fixed when the note is spooled, so a late push keeps the real capture time. The native capture app writes failed captures into the same `spool/` directory, so `kaihuman capture` also flushes those.
 
 ## Knowledge note file format in .kh/raw/
 <!-- docspack: tags=frontmatter,okf,filename,slug -->
 
-`build_kb_note` in `apps/cli/src/github.rs` builds the file name and content for `k` notes and `cli capture`.
+`build_kb_note` in `apps/cli/src/github.rs` builds the file name and content for `k` notes and `kaihuman capture`.
 
 - File name: `<epoch-ms>-<slug>.md`. The slug comes from the first non-blank line: lowercased ASCII alphanumerics, other characters become `-`, trimmed of `-`, at most 40 characters, or `note` when empty.
 - Title: the first non-blank line, `"` replaced with `'`, at most 80 characters.
@@ -207,14 +207,14 @@ Press `d` to see the repo's dashboard config and open the files it lists. The CL
 
 The view shows the config path, workspace names and theme, then the `files` list followed by each `entries[].path`. A leading `./` is stripped and duplicates are dropped. Fields with unexpected types are skipped rather than failing the parse. `Enter` opens the file in the editor, and `Esc` from that editor returns to the dashboard.
 
-## Running the local AI server with cli server
+## Running the local AI server with kaihuman server
 <!-- docspack: tags=http,api,proxy,endpoints,port 4000,cors -->
 
-`cli server` starts a warp HTTP server on `127.0.0.1` that lets the web app and browser extension call a local AI CLI. Code: `apps/cli/src/server.rs`.
+`kaihuman server` starts a warp HTTP server on `127.0.0.1` that lets the web app and browser extension call a local AI CLI. Code: `apps/cli/src/server.rs`.
 
 ```sh
-cli server            # http://127.0.0.1:4000
-cli server -p 3000
+kaihuman server            # http://127.0.0.1:4000
+kaihuman server -p 3000
 ```
 
 | Route | Request | Response |
@@ -234,7 +234,7 @@ The config directory comes from `ProjectDirs::from("com", "kaihuman", "cli")` (t
 | `auth.json` | `{"token": "...", "active_repo": "owner/repo"}`; deleting it logs out |
 | `cache.db` | sqlite cache of repo file trees |
 | `recent_files.json` | `{"files": [...]}`, last 20 opened paths, newest first |
-| `spool/` | `cli capture` notes waiting to be pushed |
+| `spool/` | `kaihuman capture` notes waiting to be pushed |
 | `repos/<owner>/<repo>/` | Shallow git clone of the active repo |
 
 The TUI also writes `error.log` to the current working directory when saving a note fails.
@@ -262,11 +262,11 @@ After each sync, `set_files` replaces all rows for the repo in one transaction a
 | `ui.rs` | ratatui rendering of every screen and the status bar |
 | `auth.rs` | `AuthManager`, browser login, `/callback` route, `auth.json` |
 | `github.rs` | `GithubClient` (repos, quick notes, `put_file`), `build_kb_note` |
-| `capture.rs` | `cli capture`, spool and retry |
+| `capture.rs` | `kaihuman capture`, spool and retry |
 | `git.rs` | `sync_repo`, `commit_and_push` |
 | `files.rs` | recent files, dashboard config loading, file walk |
 | `db.rs` | sqlite `Cache` |
-| `server.rs` | `cli server` routes |
+| `server.rs` | `kaihuman server` routes |
 
 ## Linting, formatting and testing the CLI
 <!-- docspack: tags=clippy,rustfmt,cargo test,ci -->

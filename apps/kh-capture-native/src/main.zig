@@ -128,7 +128,7 @@ pub fn update(model: *Model, msg: Msg, fx: *Effects) void {
                     model.status = "auth.json has no active repo — run `cli`, press s";
                 }
             } else {
-                model.status = "no auth — run `cli` to log in and select a repo";
+                model.status = "no auth — run `kaihuman` to log in and select a repo";
             }
         },
 

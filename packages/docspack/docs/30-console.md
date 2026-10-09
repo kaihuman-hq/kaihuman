@@ -257,7 +257,7 @@ tags: [general]
 whole text
 ```
 
-**SAVE TO KNOWLEDGE** or `Ctrl+Enter` saves. The commit message is `note: add "<title>"`. The CLI (`cli capture`) and the palettes' `>q` write the same kind of file.
+**SAVE TO KNOWLEDGE** or `Ctrl+Enter` saves. The commit message is `note: add "<title>"`. The CLI (`kaihuman capture`) and the palettes' `>q` write the same kind of file.
 
 ## Logging an action
 <!-- docspack: tags=quick log,action log,inbox.actionlog.md -->
@@ -346,7 +346,7 @@ The **Knowledge Base Commands** modal (`apps/console/src/components/KBCommandsMo
 | Tab | Content |
 |-----|---------|
 | Knowledge Base | The flow (capture, ingest, index, ask, lint), journal vs. wiki, automation |
-| Quick Capture | Every way to capture: CLI `k`, Hyprland `Super+K`, `cli capture`, `/quick-knowledge`, **+ Add note**, browser extension, palette `>q` |
+| Quick Capture | Every way to capture: CLI `k`, Hyprland `Super+K`, `kaihuman capture`, `/quick-knowledge`, **+ Add note**, browser extension, palette `>q` |
 | CLI Keys | The CLI TUI keys (`n`, `k`, `s`, `a`, `f`, `d`, `l`, `q`) |
 | Slash Commands | One line per `/kb-*` command |
 

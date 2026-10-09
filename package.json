@@ -1,6 +1,7 @@
 {
   "name": "kaihuman",
   "private": true,
+  "license": "AGPL-3.0-only",
   "scripts": {
     "build": "turbo run build",
     "console:build": "turbo run build:prod --filter=@kaihuman/app-console",

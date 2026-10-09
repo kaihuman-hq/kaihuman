@@ -2,6 +2,7 @@ import { authStore } from '@kaihuman/core';
 import { NotFound } from '@kaihuman/ui';
 
 import { Route, Router, route } from 'preact-router';
+import { DemoBanner } from './components/DemoBanner';
 import { ExtensionAuthBridge } from './components/ExtensionAuthBridge';
 import { ActionLogViewPage } from './pages/ActionLogViewPage';
 import { AuthCli } from './pages/AuthCli';
@@ -55,6 +56,7 @@ export const App = () => {
       class="life-os-root h-screen w-screen overflow-hidden bg-[var(--los-bg)] text-[var(--los-fg)] font-mono selection:bg-[var(--los-accent-dim)] selection:text-[var(--los-accent)]"
     >
       <ExtensionAuthBridge />
+      <DemoBanner />
       <Router>
         <Route path="/login" component={Login} />
         <Route path="/demo" component={DemoEntry} />

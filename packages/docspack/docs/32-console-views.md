@@ -49,13 +49,13 @@ The **AI** toggle at the right of the desktop status bar opens the **LifeOS Copi
 The address is fixed in `SERVER_URL` in `packages/core/src/stores/ai.store.ts`. The panel is `packages/ui/src/LifeOS/Templates/AIPanel.tsx`.
 
 ## Fixing "AI Server Disconnected" in the console
-<!-- docspack: tags=ai,disconnected,localhost 4000,cli server,retry connection -->
+<!-- docspack: tags=ai,disconnected,localhost 4000,kaihuman server,retry connection -->
 
 The AI panel talks to the terminal CLI's `server` subcommand on port 4000. Start it on the same machine as the browser:
 
 ```sh
 cd apps/cli
-cargo run -- server      # or: cli server
+cargo run -- server      # or: kaihuman server
 ```
 
 The console always uses port `4000`, so do not pass a different `--port`. The server binds to `127.0.0.1`, allows CORS from any origin and runs `claude -p`, `gemini -p` or `copilot -p` as a subprocess. Each provider CLI must be on the `PATH` and signed in; the console stores no API keys. After starting the server, press **Retry Connection**. The service worker never caches `http://127.0.0.1:4000/` (`NetworkOnly` in `apps/console/vite.config.ts`).

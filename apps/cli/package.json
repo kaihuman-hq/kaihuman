@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "cargo build --release",
+    "package": "cargo build --release && sh scripts/package.sh",
     "dev": "cargo run",
     "lint": "cargo fmt --check && cargo clippy",
     "format": "cargo fmt",

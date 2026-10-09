@@ -3,6 +3,12 @@ name = "cli"
 version = "0.1.0"
 edition = "2024"
 
+# Installed and released as `kaihuman`; the crate keeps its old name, which nothing outside the
+# repo sees.
+[[bin]]
+name = "kaihuman"
+path = "src/main.rs"
+
 [dependencies]
 ratatui = "0.29.0"
 crossterm = "0.28.1"

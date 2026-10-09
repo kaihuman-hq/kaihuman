@@ -24,6 +24,14 @@ A personal life-OS built on GitHub — notes, dashboards, habits, and tasks, all
 - `git` on `$PATH` (used by the CLI for repo sync)
 - Optional: `claude`, `copilot`, or `gemini` CLI on `$PATH` for AI features
 
+## Downloads
+
+The [releases page](https://github.com/kaihuman-hq/kaihuman/releases) has:
+
+- **CLI** (`cli-v…`): `kaihuman` for Linux x86_64 and macOS arm64.
+- **Desktop palette** (`desktop-v…`): Linux x86_64, Wayland. Unpack it and run `./install.sh`.
+- **Browser extension** (`extension-v…`): the Chrome Web Store zip.
+
 ## CLI — quick start
 
 ```sh
@@ -40,7 +48,7 @@ echo "note" | cargo run -- capture   # …or pipe it in (used by the desktop ove
 
 # Build a release binary
 cargo build --release
-./target/release/cli
+./target/release/kaihuman
 ```
 
 ### First launch
@@ -69,7 +77,7 @@ See [`doc/documentation.md`](doc/documentation.md) for full key-binding referenc
 ### Desktop quick-capture (Hyprland / wlroots)
 
 A `Super+K` overlay that captures a thought straight into `.kh/raw/` via
-`cli capture` (spooled locally, offline-safe). See
+`kaihuman capture` (spooled locally, offline-safe). See
 [`apps/cli/scripts/README.md`](apps/cli/scripts/README.md) for setup.
 
 ## Web console — quick start
@@ -111,3 +119,8 @@ In `~/.config/cli/` on Linux (`~/Library/Application Support/com.kaihuman.cli/` 
   spool/               # Pending knowledge captures awaiting push (offline queue)
   repos/<owner>/<repo> # Shallow git clone of active repo
 ```
+
+## License
+
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). See also the
+[privacy policy](https://kaihuman.com/privacy) (source: `apps/landing-page-nextgen/src/pages/privacy.astro`).

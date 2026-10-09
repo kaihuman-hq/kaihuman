@@ -19,7 +19,9 @@ import {
 } from '@kaihuman/palette';
 import { type Message } from '../types';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
-import { consoleFileUrl } from '../console';
+import { consoleFileUrl, isConsolePage } from '../console';
+// The bundled loader's path, for injecting the page script on demand (CRXJS `?script` import).
+import PAGE_SCRIPT from '../content/index.ts?script';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
 import {
   encodePath,
@@ -104,7 +106,6 @@ import {
   withoutFile,
 } from './today';
 
-console.log('LifeOS Extension: Background script loaded');
 
 // Keep the service worker alive to prevent the HMR port (crx-client-port.js)
 // from disconnecting. Chrome suspends MV3 service workers after ~30s of
@@ -132,11 +133,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
   if (alarm.name === 'repoSync') {
     syncRepoWithDesktop().catch((e) =>
-      console.warn('LifeOS Extension: repository sync with the desktop failed', e),
+      console.warn('kaihuman: repository sync with the desktop failed', e),
     );
-    syncBookmarks().catch((e) => console.warn('LifeOS Extension: bookmark sync failed', e));
-    syncPinnedTabs().catch((e) => console.warn('LifeOS Extension: pinned tab sync failed', e));
-    syncToday().catch((e) => console.warn('LifeOS Extension: start page sync failed', e));
+    syncBookmarks().catch((e) => console.warn('kaihuman: bookmark sync failed', e));
+    syncPinnedTabs().catch((e) => console.warn('kaihuman: pinned tab sync failed', e));
+    syncToday().catch((e) => console.warn('kaihuman: start page sync failed', e));
   }
 });
 
@@ -148,10 +149,6 @@ chrome.runtime.onConnect.addListener(() => {
   // Accepting the port is the whole job — holding it open is what keeps the worker alive.
 });
 
-// Whatever the bundler named the content script, so injecting it needs no hard-coded hash.
-function contentScriptFiles(): string[] {
-  return (chrome.runtime.getManifest().content_scripts ?? []).flatMap((script) => script.js ?? []);
-}
 
 /** Whether the tab is showing a page of this extension's own — the start page, in practice. */
 async function isExtensionPage(tabId: number): Promise<boolean> {
@@ -166,32 +163,22 @@ const togglePalette = (tabId: number) =>
   chrome.tabs.sendMessage(tabId, { type: 'TOGGLE_COMMAND_PALETTE' });
 
 /**
- * Relays the shortcut to the tab, injecting the content script first if it is not there.
+ * Runs `deliver` against the page script, injecting the script first if it is not there.
  *
- * Declared content scripts only run when a page loads, so every tab that was already open when
- * the extension was installed, reloaded or updated has none until it is reloaded — pressing the
- * shortcut in one of those used to do nothing at all. Injecting on demand covers that without
- * asking the user to reload anything.
+ * The page script (palette and article extraction) is not declared for every site: it is injected
+ * only when the user acts on a tab — the shortcut, the popup or the context menu — which grants
+ * `activeTab` for that tab, so the extension needs no standing access to every website.
  */
-async function openPaletteInTab(tabId: number): Promise<boolean> {
+async function withPageScript(tabId: number, deliver: () => Promise<unknown>): Promise<boolean> {
   try {
-    await togglePalette(tabId);
+    await deliver();
     return true;
   } catch {
     // Nothing listening yet — fall through and inject.
   }
 
-  // The start page is one of ours, and nothing may be injected into an extension page. It answers
-  // a broadcast instead, which every open start page hears and only the visible one acts on.
-  if (await isExtensionPage(tabId)) {
-    await chrome.runtime.sendMessage({ type: 'TOGGLE_COMMAND_PALETTE' }).catch(() => {});
-    return true;
-  }
-
-  const files = contentScriptFiles();
-  if (files.length === 0) return false;
   try {
-    await chrome.scripting.executeScript({ target: { tabId }, files });
+    await chrome.scripting.executeScript({ target: { tabId }, files: [PAGE_SCRIPT] });
   } catch {
     // A page no extension may touch: chrome://, the Web Store, the PDF viewer, view-source.
     return false;
@@ -202,13 +189,24 @@ async function openPaletteInTab(tabId: number): Promise<boolean> {
   for (let attempt = 0; attempt < TOGGLE_RETRIES; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, TOGGLE_RETRY_MS));
     try {
-      await togglePalette(tabId);
+      await deliver();
       return true;
     } catch {
       // Still coming up.
     }
   }
   return false;
+}
+
+/** Relays the shortcut to the tab, injecting the page script first if it is not there. */
+async function openPaletteInTab(tabId: number): Promise<boolean> {
+  // The start page is one of ours, and nothing may be injected into an extension page. It answers
+  // a broadcast instead, which every open start page hears and only the visible one acts on.
+  if (await isExtensionPage(tabId)) {
+    await chrome.runtime.sendMessage({ type: 'TOGGLE_COMMAND_PALETTE' }).catch(() => {});
+    return true;
+  }
+  return withPageScript(tabId, () => togglePalette(tabId));
 }
 
 async function readUsage(repo: string): Promise<BookmarkUsage> {
@@ -251,9 +249,9 @@ async function syncIfStale(force = false) {
   if (force) {
     // Best effort: a hand-broken pinnedtabs file should not take "Sync now" down with it.
     await syncPinnedTabs().catch((e) =>
-      console.warn('LifeOS Extension: pinned tab sync failed', e),
+      console.warn('kaihuman: pinned tab sync failed', e),
     );
-    await syncToday().catch((e) => console.warn('LifeOS Extension: start page sync failed', e));
+    await syncToday().catch((e) => console.warn('kaihuman: start page sync failed', e));
   }
   return { synced: true, bookmarks: synced?.bookmarks.length ?? 0 };
 }
@@ -319,7 +317,7 @@ chrome.commands.onCommand.addListener(async (command) => {
   await chrome.action.setBadgeText({ tabId: tab.id, text: '' });
   if (await openPaletteInTab(tab.id)) return;
 
-  console.warn(`LifeOS Extension: the palette cannot run on this page (${tab.url ?? 'unknown'})`);
+  console.warn(`kaihuman: the palette cannot run on this page (${tab.url ?? 'unknown'})`);
   await flagPaletteFailure(tab.id);
 });
 
@@ -339,10 +337,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   const commands = await chrome.commands.getAll();
   const shortcut = commands.find((c) => c.name === 'toggle-command-palette')?.shortcut;
   if (shortcut) {
-    console.log(`LifeOS Extension: command palette bound to ${shortcut}`);
+    console.log(`kaihuman: command palette bound to ${shortcut}`);
   } else {
     console.warn(
-      'LifeOS Extension: no shortcut is bound to the command palette — assign one at chrome://extensions/shortcuts',
+      'kaihuman: no shortcut is bound to the command palette — assign one at chrome://extensions/shortcuts',
     );
   }
 });
@@ -351,7 +349,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'kaihuman-save-knowledge' && info.selectionText) {
     saveToKnowledgeBase(info.selectionText, tab?.url || '', tab?.title || '').catch((e) =>
-      console.error('LifeOS Extension: Error saving clipping', e),
+      console.error('kaihuman: Error saving clipping', e),
     );
   }
 });
@@ -588,7 +586,7 @@ async function readConfig(token: string, repo: string, fresh = false) {
     if (isPinnedTabsCacheUsable(cache, repo) && cache) {
       if (isPinnedTabsCacheStale(cache)) {
         syncPinnedTabs().catch((e) =>
-          console.warn('LifeOS Extension: pinned tab refresh failed', e),
+          console.warn('kaihuman: pinned tab refresh failed', e),
         );
       }
       return { config: cache.config, sha: cache.sha ?? undefined };
@@ -620,12 +618,11 @@ async function readBookmarksCache(): Promise<BookmarksCache | undefined> {
   return stored.bookmarksCache as BookmarksCache | undefined;
 }
 
+/** Without a repository there is nowhere to read or write, so a token alone does not connect. */
 async function credentials(): Promise<{ token?: string; repo: string }> {
   const data = await chrome.storage.local.get(['lifeos_token', 'lifeos_repo']);
-  return {
-    token: data.lifeos_token as string | undefined,
-    repo: (data.lifeos_repo as string) || 'kaihuman-hq/kaihuman',
-  };
+  const repo = (data.lifeos_repo as string | undefined) ?? '';
+  return { token: repo ? (data.lifeos_token as string | undefined) : undefined, repo };
 }
 
 /**
@@ -735,7 +732,7 @@ async function getBookmarks(): Promise<{
     const stale = isCacheStale(cache);
     if (stale) {
       // Deliberately not awaited: the caller gets the cached list now.
-      syncBookmarks().catch((e) => console.warn('LifeOS Extension: bookmark refresh failed', e));
+      syncBookmarks().catch((e) => console.warn('kaihuman: bookmark refresh failed', e));
     }
     return {
       bookmarks: applyUsage(cache.bookmarks, await readUsage(repo)),
@@ -873,7 +870,7 @@ async function searchRepo(query: string) {
   return { results };
 }
 
-const NOT_LOGGED_IN = 'Not logged in — open the kaihuman console to connect the extension';
+const NOT_LOGGED_IN = 'Not connected — open the kaihuman console and pick a repository';
 
 /** Prompt files for `>p`, command files for `>x` — found, fetched and cached the same way. */
 const REPO_FILE_KINDS = {
@@ -903,7 +900,7 @@ async function listRepoFiles(kind: keyof typeof REPO_FILE_KINDS) {
   if (cache?.repo !== repo) return { files: (await refreshRepoFiles(kind, token, repo)).files };
   if (isPromptsCacheStale(cache, Date.now())) {
     refreshRepoFiles(kind, token, repo).catch((e) =>
-      console.warn(`LifeOS Extension: ${kind} refresh failed`, e),
+      console.warn(`kaihuman: ${kind} refresh failed`, e),
     );
   }
   return { files: cache.files };
@@ -935,7 +932,7 @@ async function paletteSettings() {
   if (cache?.repo !== repo) return { content: (await refreshPaletteSettings(token, repo)).content };
   if (isPromptsCacheStale(cache, Date.now())) {
     refreshPaletteSettings(token, repo).catch((e) =>
-      console.warn('LifeOS Extension: palette settings refresh failed', e),
+      console.warn('kaihuman: palette settings refresh failed', e),
     );
   }
   return { content: cache.content };
@@ -1118,7 +1115,7 @@ async function getToday() {
   let cache = await readTodayCache();
   if (isTodayCacheUsable(cache, repo) && cache) {
     if (isTodayCacheStale(cache)) {
-      syncToday().catch((e) => console.warn('LifeOS Extension: start page refresh failed', e));
+      syncToday().catch((e) => console.warn('kaihuman: start page refresh failed', e));
     }
   } else {
     cache = await syncToday();
@@ -1151,7 +1148,7 @@ async function refreshToday() {
  * already carries, and their statuses are checked at most every five minutes — when a start page
  * asks, so a browser with no new tab open checks nothing.
  */
-async function getServiceStatus() {
+async function getServiceStatus(refresh = false) {
   const { repo } = await credentials();
   const today = await readTodayCache();
   const file = isTodayCacheUsable(today, repo)
@@ -1161,9 +1158,11 @@ async function getServiceStatus() {
 
   const stored = await chrome.storage.local.get('serviceStatusCache');
   const cache = stored.serviceStatusCache as ServiceStatusCache | undefined;
-  if (cache && isStatusCacheFresh(cache, services)) return { statuses: cache.statuses };
+  if (!refresh && cache && isStatusCacheFresh(cache, services)) return { statuses: cache.statuses };
 
-  const statuses = await checkServices(services, cache?.statuses ?? []);
+  const statuses = await checkServices(services, cache?.statuses ?? [], fetch, Date.now(), (pattern) =>
+    chrome.permissions.contains({ origins: [pattern] }),
+  );
   const next: ServiceStatusCache = { services, statuses, fetchedAt: Date.now() };
   await chrome.storage.local.set({ serviceStatusCache: next });
   return { statuses };
@@ -1324,14 +1323,22 @@ const answer = (work: Promise<object>, sendResponse: (response: unknown) => void
 
 // Message Handling
 chrome.runtime.onMessage.addListener((message: Message | any, sender, sendResponse) => {
+  if (message.type === 'ENSURE_PAGE_SCRIPT') {
+    return answer(
+      withPageScript(message.tabId, () =>
+        chrome.tabs.sendMessage(message.tabId, { type: 'PAGE_SCRIPT_PING' }),
+      ).then((ready) => ({ ready })),
+      sendResponse,
+    );
+  }
+
   if (message.type === 'AUTH_TOKEN_UPDATE' && message.token) {
-    console.log('LifeOS Extension: Received token update');
+    // The content script runs on every site; only a token coming from the console is trusted.
+    if (!isConsolePage(sender.url)) return false;
     chrome.storage.local.set({
       lifeos_token: message.token,
       lifeos_repo: message.repo,
       lifeos_repos: message.repos || []
-    }, () => {
-      console.log('LifeOS Extension: Token & Repo data saved');
     });
     // A new token can mean a different account, whose repo file is a different list.
     chrome.storage.local.remove('bookmarksCache');
@@ -1342,8 +1349,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'DUMP_NOTE') {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
       const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'kaihuman-hq/kaihuman';
-      if (!token) {
+      const repo = data.lifeos_repo;
+      if (!token || !repo) {
         sendResponse({ error: 'No token found' });
         return;
       }
@@ -1372,8 +1379,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'FETCH_QUICK_NOTES') {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
       const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'kaihuman-hq/kaihuman';
-      if (!token) {
+      const repo = data.lifeos_repo;
+      if (!token || !repo) {
         sendResponse({ error: 'No token found' });
         return;
       }
@@ -1476,7 +1483,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       (data) =>
         sendResponse({
           success: true,
-          repo: (data.lifeos_repo as string) || 'kaihuman-hq/kaihuman',
+          repo: (data.lifeos_repo as string | undefined) ?? '',
           repos: (data.lifeos_repos as { full_name: string }[] | undefined) ?? [],
         }),
       (error) => sendResponse({ error: error.message }),
@@ -1640,8 +1647,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   ) {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
       const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'kaihuman-hq/kaihuman';
-      if (!token) {
+      const repo = data.lifeos_repo;
+      if (!token || !repo) {
         sendResponse({ error: 'No token found' });
         return;
       }
@@ -1695,7 +1702,9 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'REFRESH_TODAY') return answer(refreshToday(), sendResponse);
 
-  if (message.type === 'GET_SERVICE_STATUS') return answer(getServiceStatus(), sendResponse);
+  if (message.type === 'GET_SERVICE_STATUS') {
+    return answer(getServiceStatus(message.force === true), sendResponse);
+  }
 
   if (message.type === 'DELETE_BRAINDUMP') {
     return answer(deleteBraindump(message.path || '', message.sha || ''), sendResponse);
@@ -1756,8 +1765,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'PIN_ARTICLE') {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', KB_IMAGES_SETTING], async (data: any) => {
       const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'kaihuman-hq/kaihuman';
-      if (!token) {
+      const repo = data.lifeos_repo;
+      if (!token || !repo) {
         sendResponse({ error: 'No token found' });
         return;
       }

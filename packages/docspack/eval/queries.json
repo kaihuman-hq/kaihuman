@@ -53,15 +53,15 @@
   },
   {
     "query": "what port does the local AI server listen on by default",
-    "expect": "cli-cli-server"
+    "expect": "cli-kaihuman-server"
   },
   {
     "query": "what JSON body does the /chat endpoint take",
-    "expect": "terminal-cli-running-the-local-ai-server-with-cli-server"
+    "expect": "terminal-cli-running-the-local-ai-server-with-kaihuman-serve"
   },
   {
-    "query": "cli capture exit codes",
-    "expect": "cli-cli-capture"
+    "query": "kaihuman capture exit codes",
+    "expect": "cli-kaihuman-capture"
   },
   {
     "query": "where is the GitHub token saved after login",

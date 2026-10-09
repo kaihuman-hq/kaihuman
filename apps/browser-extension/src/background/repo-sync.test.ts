@@ -43,14 +43,21 @@ describe('syncRepoWithDesktop', () => {
     expect(store).toEqual({ lifeos_repo: 'o/desktop', [REPO_CHANGED_AT]: 20 });
   });
 
-  it('sends the default and no change time before either was stored', async () => {
-    host.mockResolvedValue({ repo: 'kaihuman-hq/kaihuman', changedAt: 0 });
+  it('sends no repository and no change time before either was stored', async () => {
+    host.mockResolvedValue({ repo: '', changedAt: 0 });
     expect(await syncRepoWithDesktop()).toBe(false);
     expect(host).toHaveBeenCalledWith(NATIVE_HOST, {
       type: 'SYNC_REPO',
-      repo: 'kaihuman-hq/kaihuman',
+      repo: '',
       changedAt: 0,
     });
+    expect(store).toEqual({});
+  });
+
+  it('takes the desktop’s repository when it has none of its own', async () => {
+    host.mockResolvedValue({ repo: 'o/desktop', changedAt: 5 });
+    expect(await syncRepoWithDesktop()).toBe(true);
+    expect(store).toEqual({ lifeos_repo: 'o/desktop', [REPO_CHANGED_AT]: 5 });
   });
 
   it('keeps its own repository when no desktop palette answers', async () => {

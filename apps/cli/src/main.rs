@@ -21,7 +21,7 @@ mod ui;
 use app::App;
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(name = "kaihuman", author, version, about, long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,

@@ -38,8 +38,6 @@ import {
  * to spend a GitHub request on it. */
 const DUMP_PATH = '.lifeos/dump.md';
 
-const DEFAULT_REPO = 'kaihuman-hq/kaihuman';
-
 /** What the capture box writes: a note to the dump, a todo to the inbox, or an action log entry. */
 type CaptureKind = 'note' | 'todo' | 'log';
 
@@ -98,7 +96,7 @@ const isTextField = (target: EventTarget | undefined): target is HTMLElement =>
  */
 const openInThisTab = (url: string) => {
   send({ type: 'OPEN_URL', url, reuse: true }).catch((e) =>
-    console.warn('LifeOS Extension: could not open', url, e),
+    console.warn('kaihuman: could not open', url, e),
   );
 };
 
@@ -112,7 +110,7 @@ const openInThisTab = (url: string) => {
  */
 export function StartPage() {
   const [token, setToken] = useState<string | null>(null);
-  const [repo, setRepo] = useState(DEFAULT_REPO);
+  const [repo, setRepo] = useState('');
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [bookmarksError, setBookmarksError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -172,8 +170,8 @@ export function StartPage() {
       (e: Error) => setTabGroupsError(e.message),
     );
 
-  const refreshServiceStatus = () =>
-    send({ type: 'GET_SERVICE_STATUS' }).then(
+  const refreshServiceStatus = (force = false) =>
+    send({ type: 'GET_SERVICE_STATUS', force }).then(
       (response) => {
         setStatuses(response.statuses);
         setStatusError(null);
@@ -185,7 +183,7 @@ export function StartPage() {
     send({ type: 'GET_SYNC_STATUS' }).then(
       (response) =>
         setSync({ syncedAt: response.syncedAt ?? null, pendingOpens: response.pendingOpens ?? 0 }),
-      (e: Error) => console.warn('LifeOS Extension: could not read the sync status', e),
+      (e: Error) => console.warn('kaihuman: could not read the sync status', e),
     );
 
   // Every read here is served from a cache the worker refreshes in the background when its hour
@@ -211,7 +209,7 @@ export function StartPage() {
           (response) => {
             if (response?.today) setToday(response.today);
           },
-          (e: Error) => console.warn('LifeOS Extension: could not refresh the start page', e),
+          (e: Error) => console.warn('kaihuman: could not refresh the start page', e),
         ),
     ];
     // Asked last, so it reports on whatever the loads above just fetched.
@@ -222,7 +220,7 @@ export function StartPage() {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', CAPTURE_LOG_KEY], (result) => {
       const storedToken = (result.lifeos_token as string) || null;
       setToken(storedToken);
-      setRepo((result.lifeos_repo as string) || DEFAULT_REPO);
+      setRepo((result.lifeos_repo as string) || '');
       setCaptureLog({ ...EMPTY_CAPTURE_LOG, ...(result[CAPTURE_LOG_KEY] as Partial<CaptureLog>) });
       if (storedToken) void loadAll();
     });
@@ -235,7 +233,7 @@ export function StartPage() {
       (response) => {
         if (response.changed) window.location.reload();
       },
-      (e: Error) => console.warn('LifeOS Extension: could not ask the desktop for its repository', e),
+      (e: Error) => console.warn('kaihuman: could not ask the desktop for its repository', e),
     );
     const timer = setInterval(() => setNow(new Date()), TICK_MS);
     return () => {
@@ -269,7 +267,7 @@ export function StartPage() {
   // Both messages reach the worker in order, so the open is counted whatever the tab does next.
   const openBookmark = (bookmark: Bookmark) => {
     send({ type: 'RECORD_BOOKMARK_USE', bookmarkId: bookmark.id }).catch((e) =>
-      console.warn('LifeOS Extension: could not count use of', bookmark.id, e),
+      console.warn('kaihuman: could not count use of', bookmark.id, e),
     );
     openInThisTab(bookmark.url);
   };
@@ -443,7 +441,7 @@ export function StartPage() {
     setCaptureLog(next);
     chrome.storage.local
       .set({ [CAPTURE_LOG_KEY]: next })
-      .catch((e: Error) => console.warn('LifeOS Extension: could not remember the capture', e));
+      .catch((e: Error) => console.warn('kaihuman: could not remember the capture', e));
   };
 
   const addNote = async () => {
@@ -552,7 +550,17 @@ export function StartPage() {
           </div>
         </header>
 
-        <ServiceStatusStrip statuses={statuses} error={statusError} onOpen={openInThisTab} />
+        <ServiceStatusStrip
+          statuses={statuses}
+          error={statusError}
+          onOpen={openInThisTab}
+          // Requested straight from the click, which Chrome requires for a permission prompt.
+          onAllow={(pattern) =>
+            chrome.permissions.request({ origins: [pattern] }).then((granted) => {
+              if (granted) void refreshServiceStatus(true);
+            })
+          }
+        />
 
         <div class="flex items-center gap-3 h-[52px] px-4 border border-nt-control focus-within:border-nt-accent">
           <span aria-hidden="true" class="text-[15px] text-nt-accent">

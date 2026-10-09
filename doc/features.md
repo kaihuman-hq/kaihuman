@@ -13,6 +13,7 @@
 | `@kaihuman/docspack` — every app, package, repo file format and `cli` command documented for AI agents (232 chunks), built and checked with docspack; `docspack ask` answers from it offline | `packages/docspack` | 2026-10-04 |
 | "Documented for agents" section and **Docs** nav link | nextgen landing page `#docs` | 2026-10-04 |
 | Docs readable on the website: the docspack Markdown rendered as `/docs/` pages, linked from the nav and the docs section | nextgen landing page `/docs/` | 2026-10-07 |
+| Link previews: Open Graph and Twitter card tags with a 1200×630 card (`og.png`), canonical links, privacy policy at `/privacy/` | nextgen landing page, console `index.html` | 2026-10-09 |
 | Console views documented: knowledge graph, commit history, AI panel, quick dump, push reminders, zen mode | `packages/docspack/docs/32-console-views.md` | 2026-10-04 |
 
 ## Console (`apps/console`)
@@ -22,7 +23,7 @@
 | `>w` Wi‑Fi — turn it on or off, see the networks in range, connect with a password prompt when needed (NetworkManager via `nmcli`); GitHub work moves to `>gw` | desktop palette | 2026-09-28 |
 | Bookmarks: rename, change the link or delete any entry, including in search results | Bookmarks widget → pencil / trash | 2026-09-25 |
 | Command palette settings (`.kh/command-palette.settings.json`) — search engines and `>`-prefixed link tools with parameters, added, removed and reordered in a widget | New File → Command Palette Settings | 2026-09-24 |
-| `>q` knowledge capture — what is typed becomes its own `.kh/raw/` file for `/kb-ingest`, the same file `cli capture` writes; any text in the main search also offers **Capture “…”** | command palette, desktop palette | 2026-09-24 |
+| `>q` knowledge capture — what is typed becomes its own `.kh/raw/` file for `/kb-ingest`, the same file `kaihuman capture` writes; any text in the main search also offers **Capture “…”** | command palette, desktop palette | 2026-09-24 |
 | Metric ⇄ US customary units in the palette's conversions — length (and heights in feet and inches), mass, volume, area, speed, temperature; `5 km in ft` for one unit; lengths ⇄ pixels at 80, 150 and 300 dpi (`10 cm to px`, `1000 px`) | command palette, desktop palette (main search and `>k`) | 2026-09-24 |
 | `>w` GitHub work (review requests, assigned, your PRs with failing checks), `>k` conversions (colors, number bases, arithmetic, timestamps, case, Lorem ipsum; inline in the main search for colors, sums and timestamps), `>s` symbols, emoji and kaomoji; a prefix that a longer one starts with is entered after a space | command palette, desktop palette | 2026-09-24 |
 | `>a` ask AI — the typed question to ChatGPT, Claude, Gemini, GitHub Copilot or Perplexity (configurable assistants, also in the settings widget); default link tools `>e` LEO, `>m` Google Maps, `>n` npm, `>i` IMDb | command palette, desktop palette, Command Palette Settings widget | 2026-09-24 |
@@ -37,6 +38,7 @@
 | KB journal — monthly `.kh/journal/YYYY-MM.md` from `/kb-ingest` | `.kh/journal/` | 2026-07-18 |
 | Configurable desktop bottom navbar (stored in `.kh` config) | Settings → Bottom Navbar | 2026-06-26 |
 | Demo mode (in-memory seeded data) | `/demo` + login "View demo" | 2026-06-25 |
+| Demo banner: "nothing you change is saved", with **Sign in with GitHub** and **Exit** | demo mode, all pages | 2026-10-09 |
 | Quick todo to inbox | `/quick-todo` | 2026-03-28 |
 | Quick note to dump.md | `/quick-note` | 2026-03-28 |
 | Shortcuts setup guide | `/shortcuts` | 2026-03-28 |
@@ -123,7 +125,7 @@
 | GitHub OAuth login | `l` | Initial |
 | Quick note to active repo | `n` | Initial |
 | Knowledge note to `.kh/raw/` | `k` | 2026-07-18 |
-| Headless knowledge capture (offline-safe spool) | `cli capture` | 2026-07-18 |
+| Headless knowledge capture (offline-safe spool) | `kaihuman capture` | 2026-07-18 |
 | Desktop quick-capture overlay (Hyprland `Super+K`) | `scripts/kh-capture` | 2026-07-18 |
 | Native-sdk capture app (experimental, Zig core, direct GitHub API + auth.json reuse) | `apps/kh-capture-native` | 2026-07-18 |
 | Agent-driven capture command (drives native app via automation server; auto-scaffolded to KB repo) | `/kb-agent-capture` | 2026-07-18 |

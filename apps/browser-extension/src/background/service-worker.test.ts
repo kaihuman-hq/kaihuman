@@ -320,3 +320,38 @@ describe('palette mode messages', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+
+describe('AUTH_TOKEN_UPDATE', () => {
+  const update = { type: 'AUTH_TOKEN_UPDATE', token: 'planted', repo: 'attacker/repo', repos: [] };
+
+  it('stores a token handed over by the console', () => {
+    listener(update, { url: 'https://app.kaihuman.com/' }, () => {});
+    expect(chrome.storage.local.set).toHaveBeenCalledWith(
+      expect.objectContaining({ lifeos_token: 'planted', lifeos_repo: 'attacker/repo' }),
+    );
+  });
+
+  it('ignores a token sent from any other site, which would otherwise swap in its own account', () => {
+    listener(update, { url: 'https://evil.example/' }, () => {});
+    listener(update, {}, () => {});
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    expect(chrome.storage.local.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe('without a repository', () => {
+  beforeEach(() => {
+    storedExtras = { lifeos_repo: undefined };
+  });
+
+  it('writes nowhere rather than falling back to a built-in repository', async () => {
+    await expect(call({ type: 'DUMP_NOTE', note: 'x' })).resolves.toMatchObject({
+      error: 'No token found',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('reports no repository to the popup', async () => {
+    await expect(call({ type: 'GET_REPOS' })).resolves.toMatchObject({ repo: '' });
+  });
+});

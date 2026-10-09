@@ -10,6 +10,10 @@ const {
   title,
   description = 'kaihuman — The ever-improving human. A local-first life OS built on continuous improvement. Track habits, goals, and knowledge in plain files.'
 } = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site);
+// The card chat apps and social sites show for a shared link (1200×630).
+const image = new URL('/og.png', Astro.site);
 ---
 
 <!doctype html>
@@ -21,6 +25,17 @@ const {
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="kaihuman" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={image} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="kaihuman: every day is an edit. A life OS in plain files, stored in your own GitHub repo." />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

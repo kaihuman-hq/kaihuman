@@ -1,6 +1,6 @@
 cmdspec: "0.1"
 info:
-  name: cli
+  name: kaihuman
   version: 0.1.0
   summary: kaihuman terminal UI, local AI proxy server and knowledge capture
   description: |
@@ -56,7 +56,7 @@ files:
     role: cache
     summary: Shallow git clones of the active repositories
 examples:
-  - run: cli
+  - run: kaihuman
     summary: Open the terminal UI (logs in through the browser on first run)
 commands:
   - name: server
@@ -93,9 +93,9 @@ commands:
         - mediaType: text/plain
           summary: "Server error: <reason> when the server stops"
     examples:
-      - run: cli server
+      - run: kaihuman server
         summary: Listen on http://127.0.0.1:4000
-      - run: cli server --port 3000
+      - run: kaihuman server --port 3000
         summary: Listen on another port
   - name: capture
     summary: Capture a knowledge note to .kh/raw/ (offline-safe; flushes a local spool)
@@ -136,11 +136,11 @@ commands:
         - mediaType: text/plain
           summary: "capture error: <reason>"
     examples:
-      - run: cli capture "TIL rustfmt output changes between releases"
+      - run: kaihuman capture "TIL rustfmt output changes between releases"
         summary: Capture a one-line note
-      - run: echo "note text" | cli capture
+      - run: echo "note text" | kaihuman capture
         summary: Capture text from a pipe, as the desktop overlay does
-      - run: cli capture
+      - run: kaihuman capture
         summary: Write a multi-line note in $EDITOR
   - name: help
     summary: Print this message or the help of the given subcommand(s)
@@ -152,5 +152,5 @@ commands:
     interactive:
       when: never
     examples:
-      - run: cli help capture
+      - run: kaihuman help capture
         summary: Show the help of the capture subcommand

@@ -28,7 +28,7 @@ The same `.kh/` folder also holds the widget files (todos, action logs, habits) 
 
 The user curates sources and asks questions; Claude maintains the wiki. The scaffolded `CLAUDE.md` lists the workflow:
 
-1. Sources land in `.kh/raw/` with `processed: false`. They come from the browser extension, the console's "Add note", `cli capture`, the palette's `>q`, `/kb-session`, `/kb-digest` or the MCP tool `kb_add_raw`.
+1. Sources land in `.kh/raw/` with `processed: false`. They come from the browser extension, the console's "Add note", `kaihuman capture`, the palette's `>q`, `/kb-session`, `/kb-digest` or the MCP tool `kb_add_raw`.
 2. `/kb-ingest` compiles them into `.kh/wiki/` pages, appends each to `.kh/journal/YYYY-MM.md`, and moves it to `.kh/raw/processed/`.
 3. `/kb-index` rebuilds `.kh/search.kb.json` from all wiki pages.
 4. `/kb-ask <question>` answers from the wiki; `--save` files the answer as a new page.
@@ -181,7 +181,7 @@ The target repository comes from `~/.claude/kb.json`:
 - `/kb-session set owner/repo` maps the current project (basename of `$PWD`).
 - A legacy top-level `"repo"` field is read as `default`.
 
-`/kb-agent-capture` is a separate, experimental command. It drives the `kh-capture` native window through `native automate` to capture a note, and falls back to `cli capture "<text>"`.
+`/kb-agent-capture` is a separate, experimental command. It drives the `kh-capture` native window through `native automate` to capture a note, and falls back to `kaihuman capture "<text>"`.
 
 ## Raw source file format in `.kh/raw/`
 <!-- docspack: tags=raw note,capture,frontmatter,inbox -->
@@ -202,7 +202,7 @@ Note text...
 
 Writers of this format:
 
-- `cli capture` and the TUI key `k` (`apps/cli`), with an offline spool
+- `kaihuman capture` and the TUI key `k` (`apps/cli`), with an offline spool
 - The palette's `>q` (`knowledgeNote` in `packages/palette/src/knowledge.ts`)
 - The browser extension's pin and clip actions (`buildRawNote` in `apps/browser-extension/src/background/kb-capture.ts`)
 - The console's "Add note" (`addRawNote`) and `/quick-knowledge` page

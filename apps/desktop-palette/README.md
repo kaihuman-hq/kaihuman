@@ -35,7 +35,7 @@ way.
 | `>w` Wi‑Fi — ⏎ on the first row turns it on or off; the networks in range follow (connected first, then by signal), and ⏎ connects, asking for the password (masked) when none is saved. The last scan shows at once, and a fresh one replaces it a few seconds later; **Refresh networks** scans again | ✓ desktop only (NetworkManager with `nmcli`) |
 | `>k` convert — colors, number bases, arithmetic, timestamps, metric ⇄ US units (`5 km`, `350 °F`, `5'11"`, `5 km in ft`), lengths ⇄ pixels at 80/150/300 dpi (`10 cm to px`, `1000 px`), letter case, Lorem ipsum; also offered inline for a color, sum, `0x…`, timestamp or quantity typed into the main search | ✓ (copying with `wl-copy`) |
 | `>s` symbols, emoji and kaomoji by name, ⏎ copies | ✓ |
-| `>q` capture to the knowledge base — what is typed becomes `.kh/raw/<epoch>-<slug>.md` for `/kb-ingest`, as `cli capture` writes it; also offered as **Capture “…”** for any text in the main search | ✓ (pushes directly; no offline spool — `cli capture` has one) |
+| `>q` capture to the knowledge base — what is typed becomes `.kh/raw/<epoch>-<slug>.md` for `/kb-ingest`, as `kaihuman capture` writes it; also offered as **Capture “…”** for any text in the main search | ✓ (pushes directly; no offline spool — `kaihuman capture` has one) |
 | A prefix that a longer one starts with (`>l` next to `>le`) is entered after a space | ✓ |
 | `>f` files — todo lists, action logs, events, prompts, commands: open one in Kaihuman or add an entry as its widget does (also from ⇥ repo-search hits) | ✓ |
 | `>o` files in your home directory — by name, `>o c: …` by contents too, `>o a: …` on the whole file system; ⏎ opens one with its default app, ⇥ opens its folder in the file manager or a terminal | ✓ desktop only (`fd` or `find`, `rg` or `grep`) |
@@ -120,6 +120,20 @@ to a key, below) or `>d` in the palette opens a plain text window with the curso
   ⏎ / ⇧⏎ next / previous, Esc back to the text with the match selected).
 - It is a normal window, not an overlay, so other windows stay usable while you write. Its title is
   always `kaihuman-braindump` for your window rules (below).
+
+## Install a release
+
+Linux (x86_64) tarballs are on the [releases page](https://github.com/kaihuman-hq/kaihuman/releases) (tags `desktop-v…`). The palette needs
+Wayland, plus GTK 3, WebKitGTK 4.1 and gtk-layer-shell from your distribution:
+
+```sh
+tar -xzf kaihuman-palette-<version>-linux-x86_64.tar.gz
+cd kaihuman-palette-<version>-linux-x86_64
+./install.sh               # into ~/.local/bin; PREFIX=/somewhere/else ./install.sh to change
+```
+
+`install.sh` names any system library that is missing, with the packages for Fedora, Debian/Ubuntu
+and Arch. Then bind the toggle to a key and log in (below).
 
 ## Build and install (Fedora)
 
@@ -263,7 +277,18 @@ For development and tests, `KAIHUMAN_GITHUB_TOKEN` takes the place of the keyrin
 ## Troubleshooting
 
 - **"Not logged in"** in the palette's status line: run **Log in with the kaihuman console**, or `kaihuman-palette login`.
+- **"No repository selected":** the palette has no built-in repository. Logging in through the
+  console takes the one selected there; otherwise run `kaihuman-palette login --repo owner/name`.
 - **Keyring errors:** no Secret Service is running (see Log in).
 - **It opens as a normal, tiled window:** the compositor has no layer-shell (GNOME), or GTK picked
   X11. The daemon sets `GDK_BACKEND=wayland` when `WAYLAND_DISPLAY` is set; check that it is.
 - **Daemon output:** run `kaihuman-palette daemon` in a terminal instead of from the compositor.
+
+## Releasing
+
+1. Raise `version` in `src-tauri/Cargo.toml`.
+2. `pnpm run package` builds and writes `release/kaihuman-palette-<version>-linux-<arch>.tar.gz`
+   with both binaries, `install.sh`, this README and the license.
+3. Push a tag `desktop-v<version>`. The **Release CLI and Desktop Palette** workflow runs the Rust
+   tests, builds the tarball on Ubuntu 22.04 (so it runs on older glibc too) and attaches it to a
+   GitHub release. It fails if the tag does not match `Cargo.toml`.

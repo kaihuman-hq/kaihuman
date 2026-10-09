@@ -1,6 +1,6 @@
 # Desktop quick capture
 
-Desktop quick capture puts a thought into the knowledge base inbox `.kh/raw/` from a global hotkey, without opening a terminal. There are two implementations. The shipped one is a Bash overlay script, `apps/cli/scripts/kh-capture`, bound to `Super+K` in Hyprland, which pipes the text into `cli capture`. The experimental one is `apps/kh-capture-native`, a small native-sdk (Zig core) window that pushes to GitHub directly and is meant for `Super+Shift+K`. Both reuse the terminal CLI's login and active repo.
+Desktop quick capture puts a thought into the knowledge base inbox `.kh/raw/` from a global hotkey, without opening a terminal. There are two implementations. The shipped one is a Bash overlay script, `apps/cli/scripts/kh-capture`, bound to `Super+K` in Hyprland, which pipes the text into `kaihuman capture`. The experimental one is `apps/kh-capture-native`, a small native-sdk (Zig core) window that pushes to GitHub directly and is meant for `Super+Shift+K`. Both reuse the terminal CLI's login and active repo.
 
 ## Setting up the Super+K capture overlay on Hyprland
 <!-- docspack: tags=install,hotkey,keybind,wayland,wlroots -->
@@ -12,7 +12,7 @@ On Wayland the compositor owns global shortcuts, so `hyprland.conf` binds the ke
    ```sh
    cd apps/cli
    cargo build --release
-   install -Dm755 target/release/cli ~/.local/bin/cli
+   install -Dm755 target/release/kaihuman ~/.local/bin/kaihuman
    ```
 
 2. Install the overlay script:
@@ -30,7 +30,7 @@ On Wayland the compositor owns global shortcuts, so `hyprland.conf` binds the ke
 ## How the kh-capture overlay script works
 <!-- docspack: tags=wofi,fuzzel,zenity,notify-send,prompt -->
 
-`kh-capture` shows a one-line prompt labelled `learned:` and pipes the result into `cli capture`. It uses the first prompt tool it finds:
+`kh-capture` shows a one-line prompt labelled `learned:` and pipes the result into `kaihuman capture`. It uses the first prompt tool it finds:
 
 1. `wofi --dmenu`
 2. `fuzzel --dmenu`
@@ -38,15 +38,15 @@ On Wayland the compositor owns global shortcuts, so `hyprland.conf` binds the ke
 
 If none is installed, it sends a notification asking you to install one. Pressing `Esc` cancels and exits 0. Empty or whitespace-only input is ignored. On success, `notify-send` shows "Captured to knowledge base"; on failure it shows "kh-capture failed". Notifications are skipped when `notify-send` is missing.
 
-Set `KH_CLI=/path/to/cli` when the `cli` binary is not on `PATH`.
+Set `KH_CLI=/path/to/kaihuman` when the `cli` binary is not on `PATH`.
 
 ## Capturing a multi-line note from a hotkey
 <!-- docspack: tags=editor,floating terminal,kitty -->
 
-The single-line overlay cannot take several lines. `hyprland-kh-capture.conf` has a commented-out alternative that runs `cli capture` with no input in a floating terminal, which opens `$EDITOR` for a full note:
+The single-line overlay cannot take several lines. `hyprland-kh-capture.conf` has a commented-out alternative that runs `kaihuman capture` with no input in a floating terminal, which opens `$EDITOR` for a full note:
 
 ```ini
-bind = SUPER SHIFT, K, exec, kitty --class kh-capture -e cli capture
+bind = SUPER SHIFT, K, exec, kitty --class kh-capture -e kaihuman capture
 windowrulev2 = float,  class:^(kh-capture)$
 windowrulev2 = center, class:^(kh-capture)$
 windowrulev2 = size 720 320, class:^(kh-capture)$
@@ -56,12 +56,12 @@ Replace `kitty` with your terminal and keep `--class kh-capture` so the window r
 
 ## What happens to a desktop capture when offline
 
-The overlay calls `cli capture`, which writes each note to the `spool/` directory in the CLI config directory (`~/.config/cli/spool/` on Linux) before pushing. If GitHub is not reachable, the note stays on disk. The next capture pushes the whole backlog to `.kh/raw/`, oldest first. The native app writes failed pushes into the same `spool/` directory, so either tool flushes the other's backlog. Run `/kb-ingest` in Claude Code to fold captured notes into the monthly journal and wiki.
+The overlay calls `kaihuman capture`, which writes each note to the `spool/` directory in the CLI config directory (`~/.config/cli/spool/` on Linux) before pushing. If GitHub is not reachable, the note stays on disk. The next capture pushes the whole backlog to `.kh/raw/`, oldest first. The native app writes failed pushes into the same `spool/` directory, so either tool flushes the other's backlog. Run `/kb-ingest` in Claude Code to fold captured notes into the monthly journal and wiki.
 
 ## What the native kh-capture app is
 <!-- docspack: tags=native-sdk,zig,experimental,kh-capture-native -->
 
-`apps/kh-capture-native` is an experimental capture window built with native-sdk (Zig core). It runs next to the shipped `cli capture` overlay so native-sdk can be evaluated without changing the shipped flow. It does not call `cli`.
+`apps/kh-capture-native` is an experimental capture window built with native-sdk (Zig core). It runs next to the shipped `kaihuman capture` overlay so native-sdk can be evaluated without changing the shipped flow. It does not call `cli`.
 
 | File | Contents |
 |---|---|
@@ -76,7 +76,7 @@ The code has not been compiled against a live toolchain. native-sdk names that w
 <!-- docspack: tags=github api,auth.json,fetch,spool -->
 
 1. On boot, `initEffects` finds `$XDG_CONFIG_HOME/cli/auth.json`, or `~/.config/cli/auth.json`, and reads `token` and `active_repo`. Without them the status shows `no auth — run cli to log in and select a repo` or `auth.json has no active repo — run cli, press s`.
-2. On submit (`Enter` or **Save**), it builds the same `<epoch-ms>-<slug>.md` file and frontmatter as `cli capture`.
+2. On submit (`Enter` or **Save**), it builds the same `<epoch-ms>-<slug>.md` file and frontmatter as `kaihuman capture`.
 3. It PUTs the base64 content to `https://api.github.com/repos/<owner>/<repo>/contents/.kh/raw/<file>` with commit message `note: capture via kh-capture`.
 4. On HTTP 200 or 201, the status shows `captured ✓` and the window closes.
 5. On failure, it writes the markdown to `<config dir>/spool/<file>` and shows `offline — saved locally, will sync via cli`.
@@ -121,6 +121,6 @@ agent-capture.sh "note text"
 echo "note text" | agent-capture.sh
 ```
 
-It launches `zig-out/bin/kh-capture` if needed, then runs `native automate wait`, asserts a `Save` button exists, types the text, clicks Save and asserts the status matches `captured`. Each step has a 15-second `timeout`. If `native`, the binary or any step fails, it falls back to `printf '%s\n' "$text" | cli capture`.
+It launches `zig-out/bin/kh-capture` if needed, then runs `native automate wait`, asserts a `Save` button exists, types the text, clicks Save and asserts the status matches `captured`. Each step has a 15-second `timeout`. If `native`, the binary or any step fails, it falls back to `printf '%s\n' "$text" | kaihuman capture`.
 
 The `/kb-agent-capture` Claude Code command does the same from a knowledge-base repo. It is defined in `apps/console/src/lib/kb-skills.ts` and scaffolded into `.kh`-enabled repos as `.claude/commands/kb-agent-capture.md`.

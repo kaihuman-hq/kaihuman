@@ -2,7 +2,7 @@
 #
 # kh-capture — quick-capture overlay for the knowledge base (wlroots / Hyprland).
 #
-# Pops a single-line prompt, then pipes what you type into `cli capture`, which
+# Pops a single-line prompt, then pipes what you type into `kaihuman capture`, which
 # spools it locally and pushes it to `.kh/raw/` on GitHub. Bind it to a key in
 # hyprland.conf (see hyprland-kh-capture.conf):
 #
@@ -14,8 +14,9 @@
 #
 set -euo pipefail
 
-# Path to the compiled CLI. Override with KH_CLI=/path/to/cli if it isn't on PATH.
-CLI="${KH_CLI:-cli}"
+# Path to the compiled CLI. Override with KH_CLI=/path/to/kaihuman if it isn't on PATH. Falls
+# back to `cli`, the binary's name before October 2026, until that install is replaced.
+CLI="${KH_CLI:-$(command -v kaihuman || echo cli)}"
 
 notify() { command -v notify-send >/dev/null 2>&1 && notify-send "$@" || true; }
 

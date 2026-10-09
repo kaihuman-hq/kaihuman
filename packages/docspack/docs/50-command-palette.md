@@ -180,7 +180,7 @@ The **Add a note…** action does the same for `.lifeos/dump.md` and the quick-n
 
 - The path is `.kh/raw/<epoch-ms>-<slug>.md`. The slug comes from the first line, at most 40 characters.
 - The file has front matter: `title`, `url: ''`, `date`, `processed: false`, `tags: [general]`, then the text.
-- It is the same file `cli capture` writes, so `/kb-ingest` processes it.
+- It is the same file `kaihuman capture` writes, so `/kb-ingest` processes it.
 - Blank text is refused with `Nothing to capture`.
 - Any text in the main search is also offered as **Capture “…”**.
 

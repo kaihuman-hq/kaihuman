@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { CONSOLE_URL } from './console';
+import { send } from './palette/port';
 import { ActionLogForm } from './components/ActionLogForm';
 import { BookmarkPageForm } from './components/BookmarkPageForm';
 import { QuickActions } from './components/QuickActions';
@@ -30,7 +31,7 @@ export function App() {
     // Check for auth token, repo, and repos
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', 'lifeos_repos'], (result) => {
       const storedToken = (result.lifeos_token as string) || null;
-      const storedRepo = (result.lifeos_repo as string) || 'kaihuman-hq/kaihuman';
+      const storedRepo = (result.lifeos_repo as string) || null;
       const storedRepos = (result.lifeos_repos as { full_name: string }[]) || [];
 
       setToken(storedToken);
@@ -83,7 +84,7 @@ export function App() {
     // to its hourly budget, so this is a no-op on a cache that is still fresh.
     chrome.runtime.sendMessage({ type: 'SYNC_NOW' }, () => {
       if (chrome.runtime.lastError) {
-        console.warn('LifeOS Extension: sync check failed', chrome.runtime.lastError.message);
+        console.warn('kaihuman: sync check failed', chrome.runtime.lastError.message);
       }
     });
 
@@ -123,11 +124,16 @@ export function App() {
 
   const handleReadItLater = async () => {
     if (!token || !activeTab) return;
+    // Images can come from any host, so copying them into the repo needs the optional all-sites
+    // permission. Asked for first, while the click still counts as a user gesture; refused, the
+    // images keep their remote links.
+    if (downloadImages) await chrome.permissions.request({ origins: ['<all_urls>'] }).catch(() => false);
     setStatus('saving');
     setErrorMessage(null);
     try {
-      // The content script converts the page to Markdown; tabs opened before the extension was
-      // installed have no content script, so those fall back to plain text.
+      // The page script converts the page to Markdown. It is injected on demand (opening the popup
+      // grants access to this tab); a page that refuses it falls back to plain text.
+      await send({ type: 'ENSURE_PAGE_SCRIPT', tabId: activeTab.tabId }).catch(() => {});
       const article = await chrome.tabs
         .sendMessage(activeTab.tabId, { type: 'EXTRACT_ARTICLE' })
         .catch(async () => {
@@ -251,7 +257,7 @@ export function App() {
       <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
         <BookmarkPageForm
           page={activeTab}
-          repo={activeRepo || 'kaihuman-hq/kaihuman'}
+          repo={activeRepo ?? ''}
           onClose={() => setView('main')}
         />
       </div>
@@ -290,7 +296,7 @@ export function App() {
           </div>
           {repos.length > 0 ? (
             <select
-              value={activeRepo || 'kaihuman-hq/kaihuman'}
+              value={activeRepo ?? ''}
               onChange={handleRepoChange}
               class="text-[10px] text-[var(--los-fg)] font-mono bg-[var(--los-bg)] border border-[var(--los-border)] rounded px-1 py-0.5 max-w-[150px] truncate focus:outline-none focus:border-[var(--los-accent)] cursor-pointer"
             >
@@ -333,7 +339,7 @@ export function App() {
           </div>
         )}
 
-        <PinnedTabsPanel repo={activeRepo || 'kaihuman-hq/kaihuman'} />
+        <PinnedTabsPanel repo={activeRepo ?? ''} />
 
         {/* Dump Note Section */}
         <section class="space-y-2 flex flex-col flex-1">
@@ -344,7 +350,7 @@ export function App() {
                 value={selectedNote}
                 onChange={(e) => setSelectedNote((e.target as HTMLSelectElement).value)}
                 class="text-[10px] text-[var(--los-fg-dim)] font-mono bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded px-1 py-0.5 max-w-[150px] truncate focus:outline-none focus:border-[var(--los-accent)] cursor-pointer"
-                title={`${activeRepo || 'kaihuman-hq/kaihuman'}/${selectedNote}`}
+                title={`${activeRepo ?? ''}/${selectedNote}`}
               >
                 <option value=".lifeos/dump.md" class="bg-[var(--los-bg)]">.lifeos/dump.md</option>
                 {quickNotes.map((q) => (
@@ -352,7 +358,7 @@ export function App() {
                 ))}
               </select>
             ) : (
-              <span class="text-[10px] text-[var(--los-fg-dim)] line-clamp-1 break-all px-2 py-0.5 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]" title={`${activeRepo || 'kaihuman-hq/kaihuman'}/${selectedNote}`}>
+              <span class="text-[10px] text-[var(--los-fg-dim)] line-clamp-1 break-all px-2 py-0.5 bg-[var(--los-bg-hover)] rounded border border-[var(--los-border)]" title={`${activeRepo ?? ''}/${selectedNote}`}>
                 {selectedNote}
               </span>
             )}

@@ -836,7 +836,7 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
     title: 'Capture',
     placeholder: 'A thought, a link, a quote — ⏎ saves it to the knowledge base',
     description:
-      'Saves what is typed to the knowledge base’s inbox (.kh/raw/) for /kb-ingest, as cli capture does; any text typed outside the mode is offered too',
+      'Saves what is typed to the knowledge base’s inbox (.kh/raw/) for /kb-ingest, as kaihuman capture does; any text typed outside the mode is offered too',
     // A capture is done once; there is nothing to choose again.
     recents: false,
     submit: (text) => captureItems(port, text),

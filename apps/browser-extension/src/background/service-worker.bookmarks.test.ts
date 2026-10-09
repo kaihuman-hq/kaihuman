@@ -327,7 +327,11 @@ describe('GET_BOOKMARKS', () => {
       fetchedAt: Date.now(),
     };
 
-    listener({ type: 'AUTH_TOKEN_UPDATE', token: 'new', repo: 'o/r' }, {}, () => {});
+    listener(
+      { type: 'AUTH_TOKEN_UPDATE', token: 'new', repo: 'o/r' },
+      { url: 'https://app.kaihuman.com/' },
+      () => {},
+    );
     await settle();
 
     expect(store.bookmarksCache).toBeUndefined();
@@ -549,8 +553,8 @@ describe('the palette shortcut', () => {
 
     expect(executeScript).toHaveBeenCalledWith({
       target: { tabId: 7 },
-      // Taken from the manifest, so the bundler's hashed filename is never hard-coded.
-      files: ['assets/content-loader-abc123.js'],
+      // The `?script` import's path, so the bundler's hashed filename is never hard-coded.
+      files: ['assets/index.ts-loader.js'],
     });
     expect(sendMessage).toHaveBeenCalledTimes(2);
     expect(setBadgeText).not.toHaveBeenCalledWith({ tabId: 7, text: '!' });
@@ -604,6 +608,31 @@ describe('the palette shortcut', () => {
     await commandListener('toggle-command-palette');
 
     expect(setBadgeText).toHaveBeenCalledWith({ tabId: 7, text: '' });
+  });
+});
+
+describe('ENSURE_PAGE_SCRIPT', () => {
+  const NO_RECEIVER = new Error('Could not establish connection. Receiving end does not exist.');
+
+  it('leaves a tab alone whose page script already answers', async () => {
+    await expect(call({ type: 'ENSURE_PAGE_SCRIPT', tabId: 7 })).resolves.toMatchObject({
+      ready: true,
+    });
+    expect(sendMessage).toHaveBeenCalledWith(7, { type: 'PAGE_SCRIPT_PING' });
+    expect(executeScript).not.toHaveBeenCalled();
+  });
+
+  // No page script is declared for ordinary sites any more; the popup asks for one on demand.
+  it('injects the page script into a tab that has none', async () => {
+    sendMessage.mockRejectedValueOnce(NO_RECEIVER);
+
+    await expect(call({ type: 'ENSURE_PAGE_SCRIPT', tabId: 7 })).resolves.toMatchObject({
+      ready: true,
+    });
+    expect(executeScript).toHaveBeenCalledWith({
+      target: { tabId: 7 },
+      files: ['assets/index.ts-loader.js'],
+    });
   });
 });
 

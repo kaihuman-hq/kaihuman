@@ -683,8 +683,7 @@ impl<'a> App<'a> {
                             client.create_quicknote(owner, repo, &text).await
                         };
                         if let Err(e) = result {
-                            let _ =
-                                std::fs::write("error.log", format!("Error saving note: {:?}", e));
+                            self.status_message = format!("Could not save the note: {e:#}");
                         }
                     }
                     self.current_screen = CurrentScreen::Main;

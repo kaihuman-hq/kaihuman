@@ -100,7 +100,7 @@ export async function localizeImages(
       await upload(path, bytesToBase64(bytes));
       result = result.split(`](${src})`).join(`](/${path})`);
     } catch (error) {
-      console.warn('LifeOS Extension: could not store image', src, error);
+      console.warn('kaihuman: could not store image', src, error);
     }
   }
   return result;

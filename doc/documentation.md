@@ -5,22 +5,22 @@
 ```sh
 cd apps/cli
 cargo build --release
-# Binary: target/release/cli
+# Binary: target/release/kaihuman
 ```
 
 ## Usage
 
 ```sh
 cli          # Launch TUI
-cli server   # Start local AI proxy server (default port 4000)
-cli server --port 3000
+kaihuman server   # Start local AI proxy server (default port 4000)
+kaihuman server --port 3000
 
-cli capture "TIL ..."        # Capture a knowledge note to .kh/raw/
-echo "note" | cli capture    # …or read from stdin (used by the desktop overlay)
-cli capture                  # …or open $EDITOR for a multi-line note
+kaihuman capture "TIL ..."        # Capture a knowledge note to .kh/raw/
+echo "note" | kaihuman capture    # …or read from stdin (used by the desktop overlay)
+kaihuman capture                  # …or open $EDITOR for a multi-line note
 ```
 
-## `cli capture` — knowledge quick-capture
+## `kaihuman capture` — knowledge quick-capture
 
 Writes a free-text note to `.kh/raw/` in the active repo as an OKF-aligned
 markdown file (front matter `title`, `url`, `date`, `processed: false`, `tags: [general]`;

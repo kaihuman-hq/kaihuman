@@ -36,8 +36,8 @@ Each app has its own chunk of documentation. The "Doc" column names that chunk's
 | App | Stack | What it does | Doc |
 | --- | --- | --- | --- |
 | `apps/console` | Preact, Vite, Tailwind, PWA | The main web app at `app.kaihuman.com`: file browser, Markdown editor, widgets, kanban board, analytics, wiki, knowledge graph, commit history, local AI chat, push reminders | Web console, Console widgets, Console views |
-| `apps/cli` | Rust, Ratatui | Terminal UI with notes, file browser, AI prompt, dashboard view; `cli capture` and `cli server` subcommands | Terminal CLI |
-| `apps/cli/scripts` | shell, wofi | `Super+K` Hyprland overlay that pipes a thought into `cli capture` | Desktop quick capture |
+| `apps/cli` | Rust, Ratatui | Terminal UI with notes, file browser, AI prompt, dashboard view; `kaihuman capture` and `kaihuman server` subcommands | Terminal CLI |
+| `apps/cli/scripts` | shell, wofi | `Super+K` Hyprland overlay that pipes a thought into `kaihuman capture` | Desktop quick capture |
 | `apps/kh-capture-native` | Zig, native-sdk (experimental) | Native quick-capture window that writes to `.kh/raw/` | Desktop quick capture |
 | `apps/browser-extension` | Preact, CRXJS, Vite | Popup, bookmarks mirror, pinned-tab groups, read later, start page, `Ctrl+Shift+K` palette | Browser extension |
 | `apps/desktop-palette` | Tauri (Rust) + Vite | The same command palette as a Wayland overlay, plus the braindump window | Desktop palette |
@@ -80,8 +80,8 @@ The console detects conflicts: when a file changed on GitHub while you had unsav
 Offline behaviour differs per app.
 
 - **Console:** it is a PWA (`vite-plugin-pwa`), so the shell loads from the service worker cache. Files already opened are served from the IndexedDB cache. Saving needs the GitHub API.
-- **`cli capture`:** offline-safe. Every capture is written to a local spool directory before the push. A failed push leaves the note on disk, and the next capture flushes the backlog, oldest first.
-- **kh-capture-native:** on a failed push it writes the note into the CLI's spool directory, so the next `cli capture` sends it.
+- **`kaihuman capture`:** offline-safe. Every capture is written to a local spool directory before the push. A failed push leaves the note on disk, and the next capture flushes the backlog, oldest first.
+- **kh-capture-native:** on a failed push it writes the note into the CLI's spool directory, so the next `kaihuman capture` sends it.
 - **Command palettes (`>q`):** push straight to GitHub with no spool. A failed push shows the error and keeps the text in the input.
 - **Desktop palette braindumps:** saved locally as you type, synced later; a failed sync is retried a minute later.
 - **Browser extension:** serves bookmarks and tab groups from its cache; writes (saving a bookmark, loading a group change) need the network.

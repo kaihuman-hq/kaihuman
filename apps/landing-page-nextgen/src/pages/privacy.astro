@@ -1,0 +1,187 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const EFFECTIVE = '9 October 2026';
+const CONTACT = 'privacy@kaihuman.com';
+---
+
+<Layout
+  title="Privacy policy — kaihuman"
+  description="How the kaihuman console, browser extension, desktop palette and CLI handle your data: your content stays in your own GitHub repositories."
+>
+  <main class="policy">
+    <a href="/" class="policy__home">← kaihuman</a>
+    <h1>Privacy policy</h1>
+    <p class="policy__meta">Effective {EFFECTIVE}</p>
+
+    <h2>In short</h2>
+    <ul>
+      <li>
+        Your notes, todos, bookmarks and other content are stored as files in <strong>your own
+        GitHub repositories</strong>. kaihuman has no server that stores your content.
+      </li>
+      <li>
+        The apps talk directly to GitHub from your browser or computer, using your GitHub access
+        token. The token stays on your device.
+      </li>
+      <li>There are no analytics, no tracking and no advertising, and nothing is sold.</li>
+    </ul>
+
+    <h2>Who is responsible</h2>
+    <p>
+      kaihuman is operated by Adam Urban, a private individual. For anything about privacy, write to
+      <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
+    </p>
+
+    <h2>What this policy covers</h2>
+    <p>
+      The website kaihuman.com, the web console at app.kaihuman.com, the kaihuman browser
+      extension, the desktop palette and the command-line tool (CLI).
+    </p>
+
+    <h2>Signing in with GitHub</h2>
+    <p>
+      You sign in with GitHub. A small sign-in service exchanges the one-time code from GitHub for
+      an access token and hands it straight back to your browser. It does not store the token or
+      your content. GitHub shows you which access kaihuman asks for before you agree; the apps
+      need read and write access to the repository you use with kaihuman.
+    </p>
+    <p>You can revoke the access at any time in your GitHub settings under Applications.</p>
+
+    <h2>What is stored where</h2>
+    <h3>In your GitHub repositories</h3>
+    <p>
+      Everything you create: notes, todos, logs, bookmarks, read-later items, knowledge-base
+      entries and settings. GitHub stores it under
+      <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement"
+        >GitHub's privacy statement</a
+      >. You can read, change, export or delete it directly on GitHub.
+    </p>
+
+    <h3>On your device</h3>
+    <ul>
+      <li>
+        <strong>Web console:</strong> the access token and your selected repository in the
+        browser's local storage, and a cache of your GitHub profile and files in the browser's
+        IndexedDB. Signing out removes the token.
+      </li>
+      <li>
+        <strong>Browser extension:</strong> the access token, the selected repository and caches
+        (bookmarks, usage counts, today view) in the extension's local storage. The extension
+        receives the token only from the console at app.kaihuman.com.
+      </li>
+      <li>
+        <strong>Desktop palette:</strong> the access token and an optional DeepL key in your
+        operating system's keyring; settings and caches in your user configuration folders.
+      </li>
+      <li>
+        <strong>CLI:</strong> the access token and a copy of your repository in your user
+        configuration folder.
+      </li>
+    </ul>
+
+    <h2>What the browser extension reads</h2>
+    <p>
+      The extension has no standing access to the websites you visit. It loads into a tab only when
+      you act on it there — the keyboard shortcut, the toolbar button or the right-click menu — and
+      it reads a page only then: when you save the page to read later or to your
+      knowledge base, it takes the page's title, address, main text and, if you allow it, its
+      images, and writes them to your repository. It does not collect your browsing history. Access
+      to your browser bookmarks is requested only when you import them.
+    </p>
+
+    <h2>Services you can choose to use</h2>
+    <ul>
+      <li>
+        <strong>Translation:</strong> if you set your own DeepL API key, the text you translate is
+        sent to DeepL under DeepL's terms.
+      </li>
+      <li>
+        <strong>AI providers:</strong> the CLI can pass a prompt to an AI command-line tool you have
+        installed yourself (for example Claude, Copilot or Gemini). That tool's provider handles the
+        prompt under its own terms.
+      </li>
+      <li>
+        <strong>Push reminders:</strong> if you turn on reminders, your browser's push subscription
+        is stored in your repository, and a GitHub Actions workflow in your repository sends the
+        reminders through your browser vendor's push service.
+      </li>
+    </ul>
+
+    <h2>Hosting</h2>
+    <p>
+      kaihuman.com and app.kaihuman.com are static websites hosted by Cloudflare, which processes
+      technical request data such as IP addresses to deliver and protect them. This website loads
+      its fonts from Google Fonts, which receives your IP address when the page loads.
+    </p>
+
+    <h2>Your rights</h2>
+    <p>
+      Your content is in your repositories, so you control it fully. If you are in the EU or UK,
+      you also have the right to access, correct, delete or export personal data, to restrict or
+      object to its processing, and to complain to a data protection authority. Write to
+      <a href={`mailto:${CONTACT}`}>{CONTACT}</a> to exercise them.
+    </p>
+
+    <h2>Changes</h2>
+    <p>
+      When this policy changes, the new version is published here with a new effective date. The
+      history of this page is public in the
+      <a href="https://github.com/kaihuman-hq/kaihuman">kaihuman source repository</a>.
+    </p>
+  </main>
+</Layout>
+
+<style>
+  .policy {
+    max-width: 44rem;
+    margin-inline: auto;
+    padding: var(--space-2xl) var(--space-md) var(--space-3xl);
+  }
+
+  .policy__home {
+    color: var(--color-accent);
+    text-decoration: none;
+    font-size: var(--text-sm);
+  }
+
+  .policy__meta {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+  }
+
+  .policy h1 {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    margin-block: var(--space-lg) var(--space-2xs);
+  }
+
+  .policy h2 {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    margin-block: var(--space-xl) var(--space-xs);
+  }
+
+  .policy h3 {
+    font-size: var(--text-md);
+    margin-block: var(--space-md) var(--space-2xs);
+  }
+
+  .policy ul {
+    padding-left: var(--space-md);
+    list-style: disc;
+  }
+
+  .policy li + li {
+    margin-top: var(--space-2xs);
+  }
+
+  .policy p,
+  .policy li {
+    color: var(--color-ink-2);
+  }
+
+  .policy a {
+    color: var(--color-accent);
+  }
+</style>

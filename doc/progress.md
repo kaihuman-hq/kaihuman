@@ -1,5 +1,112 @@
 # Progress
 
+## 2026-10-09 — Downloadable CLI and desktop palette
+
+- **The CLI binary is now `kaihuman`.** It was called `cli`. A `[[bin]]` target sets the name; the
+  crate keeps its old name, so the config directory does not move.
+  - clap reports `kaihuman`, and so do the capture messages.
+  - `scripts/kh-capture` falls back to an existing `cli` install.
+  - The docs and docspack say `kaihuman capture` and `kaihuman server`. The eval's expected chunk
+    ids follow the renamed headings, and the top-3 hit rate stays at 95%.
+- **`pnpm run package` in both apps** packs a release build into `release/`:
+  - CLI: `kaihuman-<version>-<os>-<arch>.tar.gz` (binary, README, license).
+  - Desktop palette: `kaihuman-palette-<version>-linux-<arch>.tar.gz` (both binaries, README,
+    license, `install.sh`).
+  - The new `install.sh` installs into `~/.local/bin` (or `$PREFIX`), names missing system
+    libraries with packages for Fedora, Debian/Ubuntu and Arch, and warns when the directory is
+    not on `PATH`.
+- **New workflow `.github/workflows/release-binaries.yml`.** A tag `cli-v<version>` builds Linux
+  x86_64 (Ubuntu 22.04) and macOS arm64 tarballs; `desktop-v<version>` builds Linux x86_64. Each
+  build runs the tests first and checks the tag against `Cargo.toml`. A final job attaches the
+  tarballs to a GitHub release.
+- The root README has a Downloads section, and the CLI and desktop READMEs say how to install and
+  release.
+
+## 2026-10-09 — Browser extension: store zip and release workflow
+
+- `apps/browser-extension/package.json` is now the single source of the version (1.0.1).
+  Before, `package.json` said `0.0.0` and the manifest said `1.0.1`; `manifest.ts` now reads the
+  version from `package.json`.
+- `pnpm package` builds the extension and checks the built manifest with
+  `scripts/release-checks.mjs`. It writes `release/kaihuman-extension-<version>.zip`, with
+  `manifest.json` at the root and `.vite/` left out. The check refuses to package when:
+  - the manifest version differs from `package.json`;
+  - the version is one Chrome would reject;
+  - the manifest has a `key`;
+  - the manifest has `<all_urls>` host permissions;
+  - a content script runs on every site.
+- New workflow `.github/workflows/release-extension.yml`. A tag `extension-v<version>` runs the
+  tests, builds the zip and attaches it to a GitHub release. A manual run keeps the zip as an
+  artifact. Uploading to the store is still done by hand.
+- Removed the unused Vite boilerplate `public/vite.svg`, which shipped in the build.
+
+## 2026-10-09 — Demo banner and link previews
+
+- **Demo banner** (`apps/console/src/components/DemoBanner.tsx`, mounted in `App.tsx`). In demo
+  mode, a floating bar says that nothing is saved. It has two actions:
+  - **Sign in with GitHub** leaves the demo, so demo data cannot mix with the real session, and
+    then starts the GitHub login.
+  - **Exit** leaves the demo and goes to `/login`.
+
+  Every page sizes itself to the viewport, so the bar floats over the page rather than taking a
+  row. On phones it sits above the bottom navigation and uses shorter text.
+- **Link previews.**
+  - The nextgen landing page's `Layout.astro` sets `og:*` and `twitter:card` tags and a canonical
+    link for every page. `astro.config.mjs` now sets `site: 'https://kaihuman.com'`, so these URLs
+    are absolute.
+  - The console's `index.html` has a description and the same tags, since `/demo` links get
+    shared.
+  - Both use `og.png`, a 1200×630 card: the landing headline next to the product screenshot.
+
+## 2026-10-09 — Extension: no standing access to websites; log files untracked
+
+- **Narrower extension permissions.** Before, the store install warning read "read and change all
+  your data on all websites". The changes:
+  - `host_permissions` now lists only `api.github.com`, the two DeepL endpoints and the default
+    status pages, instead of `<all_urls>`.
+  - The always-on content script is split:
+    - `src/content/console-bridge.ts` (the token handoff) runs only on `app.kaihuman.com`.
+    - The palette and article extraction (`src/content/index.ts`) are injected through the CRXJS
+      `?script` import when the user acts on a tab. The shortcut, the popup and the context menu
+      grant `activeTab`.
+  - New `ENSURE_PAGE_SCRIPT { tabId }`: the popup calls it before extracting an article.
+  - `optional_host_permissions: ['<all_urls>']` is requested only when it is needed:
+    - Status pages the user adds: `checkServices` reports `needsAccess`. Clicking the grey light
+      on the start page asks for that origin and checks it again.
+    - Image download for read-later saved from the popup. If this is refused, or when saving from
+      the palette, images keep their remote links.
+  - The extension README has a Permissions section, and the privacy policy is updated to match.
+- **Log files.** The CLI wrote `error.log` into the working directory when saving a note failed.
+  It now shows the error in the status line. `apps/cli/error.log` and `apps/console/dev-dist/` are
+  no longer tracked, and `.gitignore` ignores `*.log`.
+
+## 2026-10-09 — Pre-launch fixes: extension token bridge, no built-in repository, license, privacy policy
+
+- **Security: the extension takes a GitHub token only from the console.** The content script runs
+  on every page. Before, it forwarded any page's `data-kaihuman-auth` attribute or
+  `kaihuman-auth-update` event to the worker, and the worker stored it. So any website could put
+  its own token and repository in place, and read-later and knowledge captures went to that
+  repository. Now the bridge runs only when `location.origin` is the console. The worker also
+  checks `sender.url` (`isConsolePage` in `apps/browser-extension/src/console.ts`).
+- **No built-in repository.** The extension, the desktop palette and the console search used to
+  fall back to `kaihuman-hq/kaihuman` (before the rename, `lifosy/monorepo`) when no repository
+  was picked. Now a missing repository counts as "not connected":
+  - Extension: the worker reports *Not connected — open the kaihuman console and pick a
+    repository* and writes nothing.
+  - Desktop palette: `Settings::repo()` is an `Option`. Requests and braindumps fail with *No
+    repository selected*, and `login` without a repository from the console asks for `--repo`.
+  - Native-host repository sync: if neither side has a repository, the answer is an empty one,
+    which the extension ignores. The first side that has a repository passes it to the other.
+  - Console: `SearchModal` skips the GitHub content search.
+- The extension's console messages say `kaihuman:` instead of `LifeOS Extension:`, and the popup
+  title is `kaihuman`.
+- **License:** `LICENSE` holds the GNU AGPL v3.0 text. The root `package.json` declares
+  `AGPL-3.0-only`, and the README has a License section.
+- **Privacy policy** at `kaihuman.com/privacy` (`apps/landing-page-nextgen/src/pages/privacy.astro`).
+  It covers what each app stores and where, what the extension reads, the optional third-party
+  services, hosting and GDPR rights. The operator is Adam Urban, and the contact address is
+  privacy@kaihuman.com. The landing footer and the console login screen link to it.
+
 ## 2026-10-08 — Local data moves from lifosy to kaihuman names
 
 - Desktop palette: `$XDG_{CONFIG,CACHE,STATE,DATA}_HOME/lifosy` becomes `.../kaihuman`, moved

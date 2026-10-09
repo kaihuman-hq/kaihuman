@@ -20,6 +20,7 @@ export interface Message {
     | 'GET_MODE_RECENTS'
     | 'ADD_MODE_RECENT'
     | 'GET_REPOS'
+    | 'ENSURE_PAGE_SCRIPT'
     | 'SET_REPO'
     | 'SYNC_REPO_WITH_DESKTOP'
     | 'SAVE_SELECTION'
@@ -65,6 +66,8 @@ export interface Message {
   /** `FAVORITE_PINNED_TAB_GROUP`: the state to set, not a toggle, for the same reason. */
   favorite?: boolean;
   force?: boolean;
+  /** `ENSURE_PAGE_SCRIPT`: the tab to inject the page script into. */
+  tabId?: number;
   /** `OPEN_URL`: navigate the sender's own tab rather than opening another one. */
   reuse?: boolean;
   /** `TRANSLATE`: the DeepL target languages. */

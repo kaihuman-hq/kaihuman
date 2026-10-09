@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  accessPatternOf,
   checkServices,
   DEFAULT_SERVICES,
   isStatusCacheFresh,
@@ -262,5 +263,32 @@ describe('isStatusCacheFresh', () => {
 
   it('does not hold once the services change', () => {
     expect(isStatusCacheFresh(cache, DEFAULT_SERVICES.slice(1), NOW)).toBe(false);
+  });
+});
+
+describe('a status page the extension may not read', () => {
+  const custom: ServiceConfig = {
+    type: 'statuspage',
+    name: 'Acme',
+    url: 'https://status.acme.example',
+  };
+
+  it('asks for that one site instead of fetching it', async () => {
+    const fetchFn = fetchOf({});
+    const canRead = vi.fn(async (pattern: string) => pattern !== 'https://status.acme.example/*');
+    const [status] = await checkServices([custom], [], fetchFn, NOW, canRead);
+
+    expect(canRead).toHaveBeenCalledWith('https://status.acme.example/*');
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(status).toMatchObject({
+      name: 'Acme',
+      level: 'unknown',
+      needsAccess: 'https://status.acme.example/*',
+    });
+  });
+
+  it('names the hosts AWS and GCP are read from', () => {
+    expect(accessPatternOf({ type: 'aws', name: 'AWS' })).toBe('https://health.aws.amazon.com/*');
+    expect(accessPatternOf({ type: 'gcp', name: 'GCP' })).toBe('https://status.cloud.google.com/*');
   });
 });

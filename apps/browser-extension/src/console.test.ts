@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONSOLE_URL, consoleFileUrl } from './console';
+import { CONSOLE_URL, consoleFileUrl, isConsolePage } from './console';
 
 describe('consoleFileUrl', () => {
   it('carries the repository when one is given', () => {
@@ -39,5 +39,23 @@ describe('consoleFileUrl', () => {
       const url = new URL(consoleFileUrl(path));
       expect(decodeURIComponent(url.pathname.replace('/files/', ''))).toBe(path);
     }
+  });
+});
+
+describe('isConsolePage', () => {
+  it('accepts the console and its pages', () => {
+    expect(isConsolePage(CONSOLE_URL)).toBe(true);
+    expect(isConsolePage(`${CONSOLE_URL}/extension-onboarded`)).toBe(true);
+  });
+
+  it('rejects other sites, including look-alike hosts', () => {
+    expect(isConsolePage('https://evil.example/')).toBe(false);
+    expect(isConsolePage('https://app.kaihuman.com.evil.example/')).toBe(false);
+    expect(isConsolePage('http://app.kaihuman.com/')).toBe(false);
+  });
+
+  it('rejects a missing or malformed url', () => {
+    expect(isConsolePage(undefined)).toBe(false);
+    expect(isConsolePage('not a url')).toBe(false);
   });
 });

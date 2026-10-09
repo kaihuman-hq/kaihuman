@@ -9,3 +9,6 @@
 
 # Ensure Cargo.lock is tracked for binary apps, but ignore if you prefer lock-less dev
 # Cargo.lock
+
+# Release tarballs (pnpm run package)
+release

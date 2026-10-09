@@ -1,7 +1,7 @@
 # KH Capture (native-sdk) — experimental
 
 A native desktop quick-capture window built with [native-sdk](https://native-sdk.dev)
-(Zig core). It runs *in parallel* with the shipped `cli capture` + wofi overlay —
+(Zig core). It runs *in parallel* with the shipped `kaihuman capture` + wofi overlay —
 a place to evaluate native-sdk without touching the shipped flow.
 
 ## What it is — self-contained (no `cli` dependency)
@@ -16,14 +16,14 @@ login rather than asking you to manage a token:
 2. **Submit** — builds the OKF markdown + base64 JSON body and PUTs it with
    `fx.fetch` (`authorization: Bearer …`).
 3. **On failure** — writes the note as markdown into the CLI's **own spool dir**
-   (`~/.config/cli/spool/`) with `fx.writeFile`. The next `cli capture` / overlay
+   (`~/.config/cli/spool/`) with `fx.writeFile`. The next `kaihuman capture` / overlay
    run flushes it to GitHub — so the two capture paths rescue each other and no
    thought is lost, even offline.
 
 This exercises the native-sdk surfaces that matter for the trial: markup UI, the
 effects channel (file read/write + HTTP), and window lifecycle.
 
-> Earlier this app shelled out to `cli capture` via `fx.spawn`. That simpler
+> Earlier this app shelled out to `kaihuman capture` via `fx.spawn`. That simpler
 > variant is in git history if you'd rather run the thin-shell version.
 
 ## ⚠️ Status: doc-derived, not yet compiled
@@ -108,5 +108,5 @@ alongside `/kb-ingest`, `/kb-ask`, etc. — it's defined in
 `apps/console/src/lib/kb-skills.ts` and written to `.kh`-enabled repos as
 `.claude/commands/kb-agent-capture.md` (and auto-updated on version bump). This
 repo keeps [`scripts/agent-capture.sh`](scripts/agent-capture.sh) as the local
-reference driver / acceptance-test harness, which falls back to `cli capture`
+reference driver / acceptance-test harness, which falls back to `kaihuman capture`
 when automation isn't available.
