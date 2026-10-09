@@ -13,6 +13,7 @@
 | `@kaihuman/docspack` — every app, package, repo file format and `cli` command documented for AI agents (232 chunks), built and checked with docspack; `docspack ask` answers from it offline | `packages/docspack` | 2026-10-04 |
 | "Documented for agents" section and **Docs** nav link | nextgen landing page `#docs` | 2026-10-04 |
 | Docs readable on the website: the docspack Markdown rendered as `/docs/` pages, linked from the nav and the docs section | nextgen landing page `/docs/` | 2026-10-07 |
+| Link previews: Open Graph and Twitter card tags with a 1200×630 card (`og.png`), canonical links, privacy policy at `/privacy/` | nextgen landing page, console `index.html` | 2026-10-09 |
 | Console views documented: knowledge graph, commit history, AI panel, quick dump, push reminders, zen mode | `packages/docspack/docs/32-console-views.md` | 2026-10-04 |
 
 ## Console (`apps/console`)
@@ -37,6 +38,7 @@
 | KB journal — monthly `.kh/journal/YYYY-MM.md` from `/kb-ingest` | `.kh/journal/` | 2026-07-18 |
 | Configurable desktop bottom navbar (stored in `.kh` config) | Settings → Bottom Navbar | 2026-06-26 |
 | Demo mode (in-memory seeded data) | `/demo` + login "View demo" | 2026-06-25 |
+| Demo banner: "nothing you change is saved", with **Sign in with GitHub** and **Exit** | demo mode, all pages | 2026-10-09 |
 | Quick todo to inbox | `/quick-todo` | 2026-03-28 |
 | Quick note to dump.md | `/quick-note` | 2026-03-28 |
 | Shortcuts setup guide | `/shortcuts` | 2026-03-28 |

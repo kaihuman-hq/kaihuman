@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-10-09 — Demo banner and link previews
+
+- **Demo banner** (`apps/console/src/components/DemoBanner.tsx`, mounted in `App.tsx`). In demo
+  mode, a floating bar says that nothing is saved. It has two actions:
+  - **Sign in with GitHub** leaves the demo, so demo data cannot mix with the real session, and
+    then starts the GitHub login.
+  - **Exit** leaves the demo and goes to `/login`.
+
+  Every page sizes itself to the viewport, so the bar floats over the page rather than taking a
+  row. On phones it sits above the bottom navigation and uses shorter text.
+- **Link previews.**
+  - The nextgen landing page's `Layout.astro` sets `og:*` and `twitter:card` tags and a canonical
+    link for every page. `astro.config.mjs` now sets `site: 'https://kaihuman.com'`, so these URLs
+    are absolute.
+  - The console's `index.html` has a description and the same tags, since `/demo` links get
+    shared.
+  - Both use `og.png`, a 1200×630 card: the landing headline next to the product screenshot.
+
 ## 2026-10-09 — Extension: no standing access to websites; log files untracked
 
 - **Narrower extension permissions.** Before, the store install warning read "read and change all
