@@ -111,3 +111,8 @@ In `~/.config/cli/` on Linux (`~/Library/Application Support/com.kaihuman.cli/` 
   spool/               # Pending knowledge captures awaiting push (offline queue)
   repos/<owner>/<repo> # Shallow git clone of active repo
 ```
+
+## License
+
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). See also the
+[privacy policy](https://kaihuman.com/privacy) (source: `apps/landing-page-nextgen/src/pages/privacy.astro`).

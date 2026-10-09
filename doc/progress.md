@@ -1,5 +1,32 @@
 # Progress
 
+## 2026-10-09 — Pre-launch fixes: extension token bridge, no built-in repository, license, privacy policy
+
+- **Security: the extension takes a GitHub token only from the console.** The content script runs
+  on every page. Before, it forwarded any page's `data-kaihuman-auth` attribute or
+  `kaihuman-auth-update` event to the worker, and the worker stored it. So any website could put
+  its own token and repository in place, and read-later and knowledge captures went to that
+  repository. Now the bridge runs only when `location.origin` is the console. The worker also
+  checks `sender.url` (`isConsolePage` in `apps/browser-extension/src/console.ts`).
+- **No built-in repository.** The extension, the desktop palette and the console search used to
+  fall back to `kaihuman-hq/kaihuman` (before the rename, `lifosy/monorepo`) when no repository
+  was picked. Now a missing repository counts as "not connected":
+  - Extension: the worker reports *Not connected — open the kaihuman console and pick a
+    repository* and writes nothing.
+  - Desktop palette: `Settings::repo()` is an `Option`. Requests and braindumps fail with *No
+    repository selected*, and `login` without a repository from the console asks for `--repo`.
+  - Native-host repository sync: if neither side has a repository, the answer is an empty one,
+    which the extension ignores. The first side that has a repository passes it to the other.
+  - Console: `SearchModal` skips the GitHub content search.
+- The extension's console messages say `kaihuman:` instead of `LifeOS Extension:`, and the popup
+  title is `kaihuman`.
+- **License:** `LICENSE` holds the GNU AGPL v3.0 text. The root `package.json` declares
+  `AGPL-3.0-only`, and the README has a License section.
+- **Privacy policy** at `kaihuman.com/privacy` (`apps/landing-page-nextgen/src/pages/privacy.astro`).
+  It covers what each app stores and where, what the extension reads, the optional third-party
+  services, hosting and GDPR rights. The operator is Adam Urban, and the contact address is
+  privacy@kaihuman.com. The landing footer and the console login screen link to it.
+
 ## 2026-10-08 — Local data moves from lifosy to kaihuman names
 
 - Desktop palette: `$XDG_{CONFIG,CACHE,STATE,DATA}_HOME/lifosy` becomes `.../kaihuman`, moved

@@ -156,7 +156,10 @@ export const Login = ({ onLogin, onTryDemo }: LoginProps) => (
 
       {/* Footer */}
       <p className="text-[9px] font-mono text-[var(--los-muted)] opacity-40 text-center max-w-xs">
-        By signing in you agree to grant the necessary GitHub permissions for the app to function.
+        By signing in you agree to grant the necessary GitHub permissions for the app to function.{' '}
+        <a href="https://kaihuman.com/privacy" className="underline">
+          Privacy policy
+        </a>
       </p>
     </div>
   </div>
