@@ -20,3 +20,16 @@ export function consoleFileUrl(path: string, repo?: string): string {
   const query = repo ? `?${new URLSearchParams({ repo }).toString()}` : '';
   return `${CONSOLE_URL}/files/${encoded}${query}`;
 }
+
+/**
+ * Whether `url` is a page of the console. The content script runs on every site, so only the
+ * console may hand the extension a GitHub token; anything else could swap in its own account.
+ */
+export function isConsolePage(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    return new URL(url).origin === new URL(CONSOLE_URL).origin;
+  } catch {
+    return false;
+  }
+}

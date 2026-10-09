@@ -19,7 +19,7 @@ import {
 } from '@kaihuman/palette';
 import { type Message } from '../types';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
-import { consoleFileUrl } from '../console';
+import { consoleFileUrl, isConsolePage } from '../console';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
 import {
   encodePath,
@@ -1325,13 +1325,12 @@ const answer = (work: Promise<object>, sendResponse: (response: unknown) => void
 // Message Handling
 chrome.runtime.onMessage.addListener((message: Message | any, sender, sendResponse) => {
   if (message.type === 'AUTH_TOKEN_UPDATE' && message.token) {
-    console.log('LifeOS Extension: Received token update');
+    // The content script runs on every site; only a token coming from the console is trusted.
+    if (!isConsolePage(sender.url)) return false;
     chrome.storage.local.set({
       lifeos_token: message.token,
       lifeos_repo: message.repo,
       lifeos_repos: message.repos || []
-    }, () => {
-      console.log('LifeOS Extension: Token & Repo data saved');
     });
     // A new token can mean a different account, whose repo file is a different list.
     chrome.storage.local.remove('bookmarksCache');

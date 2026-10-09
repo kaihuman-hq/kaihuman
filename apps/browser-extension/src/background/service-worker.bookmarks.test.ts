@@ -327,7 +327,11 @@ describe('GET_BOOKMARKS', () => {
       fetchedAt: Date.now(),
     };
 
-    listener({ type: 'AUTH_TOKEN_UPDATE', token: 'new', repo: 'o/r' }, {}, () => {});
+    listener(
+      { type: 'AUTH_TOKEN_UPDATE', token: 'new', repo: 'o/r' },
+      { url: 'https://app.kaihuman.com/' },
+      () => {},
+    );
     await settle();
 
     expect(store.bookmarksCache).toBeUndefined();
