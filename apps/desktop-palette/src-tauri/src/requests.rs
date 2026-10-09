@@ -181,12 +181,15 @@ async fn capture_knowledge(path: &str, content: &str) -> Result<Value, String> {
 }
 
 fn client() -> Result<Client, String> {
-    Ok(Client::new(config::token()?, Settings::load().repo()))
+    let token = config::token()?;
+    let repo = Settings::load().repo().ok_or(config::NO_REPO)?;
+    Ok(Client::new(token, repo))
 }
 
 /// The braindumps of the repository the palette works on.
 fn braindump_store() -> Result<braindumps::Store, String> {
-    braindumps::Store::new(&config::braindumps_dir(), &Settings::load().repo())
+    let repo = Settings::load().repo().ok_or(config::NO_REPO)?;
+    braindumps::Store::new(&config::braindumps_dir(), &repo)
 }
 
 fn now_ms() -> u64 {
@@ -508,7 +511,7 @@ pub async fn handle(request: Value) -> Result<Value, String> {
                 .into_iter()
                 .map(|name| json!({ "full_name": name }))
                 .collect();
-            Ok(json!({ "repo": settings.repo(), "repos": repos }))
+            Ok(json!({ "repo": settings.repo().unwrap_or_default(), "repos": repos }))
         }
         Request::SetRepo { repo } => {
             if !is_repo_name(&repo) {

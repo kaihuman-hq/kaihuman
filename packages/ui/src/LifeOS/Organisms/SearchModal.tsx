@@ -90,7 +90,7 @@ export const SearchModal = ({
   isOpen,
   onClose,
   onSelect,
-  currentRepository = 'kaihuman-hq/kaihuman',
+  currentRepository,
   githubToken,
   repositories = [],
   workspaces = [],
@@ -242,9 +242,14 @@ export const SearchModal = ({
     const filenameMatches: SearchResult[] = matchFilenames(githubFileStore.tree.value, query).map(
       (f) => ({ ...f, type: 'FILE' }),
     );
-    setLoading(true);
     setResults([...cmds, ...filenameMatches].slice(0, 50));
     setSelectedIndex(0);
+    // No repository picked yet: there is nothing to run a content search against.
+    if (!currentRepository) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
 
     const controller = new AbortController();
     const timer = setTimeout(async () => {
@@ -359,7 +364,7 @@ export const SearchModal = ({
             ref={inputRef}
             type="text"
             className="flex-1 bg-transparent border-none outline-none text-[var(--los-fg)] placeholder-[var(--los-muted)] font-mono text-sm h-full"
-            placeholder={`Search files in ${currentRepository}...`}
+            placeholder={`Search files in ${currentRepository ?? 'your repository'}...`}
             value={query}
             onInput={(e) => setQuery(e.currentTarget.value)}
             onKeyDown={handleKeyDown}

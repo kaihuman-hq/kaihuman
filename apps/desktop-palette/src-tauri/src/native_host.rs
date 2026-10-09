@@ -59,13 +59,14 @@ pub struct RepoChoice {
 pub fn reconcile(settings: &mut Settings, repo: &str, changed_at: u64) -> (RepoChoice, bool) {
     let mine = settings.repo_changed_at.unwrap_or(0);
     let theirs_wins = is_repo_name(repo)
-        && settings.repo() != repo
+        && settings.repo().as_deref() != Some(repo)
         && (changed_at > mine || (changed_at == 0 && mine == 0));
     if theirs_wins {
         settings.use_repo(repo, changed_at);
     }
     let choice = RepoChoice {
-        repo: settings.repo(),
+        // Empty when neither side has a repository; the extension ignores that answer.
+        repo: settings.repo().unwrap_or_default(),
         changed_at: settings.repo_changed_at.unwrap_or(0),
     };
     (choice, theirs_wins)
@@ -245,6 +246,15 @@ mod tests {
         let (choice, changed) = reconcile(&mut mine, "o/browser", 0);
         assert!(changed);
         assert_eq!(choice.repo, "o/browser");
+    }
+
+    #[test]
+    fn answers_no_repository_while_neither_side_has_one() {
+        let mut mine = Settings::default();
+        let (choice, changed) = reconcile(&mut mine, "", 0);
+        assert!(!changed);
+        assert_eq!(choice.repo, "");
+        assert_eq!(mine.repo(), None);
     }
 
     #[test]

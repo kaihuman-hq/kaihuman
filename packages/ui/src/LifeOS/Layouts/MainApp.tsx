@@ -1490,7 +1490,7 @@ abbreviations: undefined
       <SearchModal
         isOpen={showSearch}
         onClose={() => setShowSearch(false)}
-        currentRepository={props.currentRepository?.name || 'kaihuman-hq/kaihuman'}
+        currentRepository={props.currentRepository?.name}
         githubToken={githubToken}
         repositories={props.repositories || []}
         workspaces={config ? config.dashboards.map((d) => ({ id: d.id, name: d.name })) : []}

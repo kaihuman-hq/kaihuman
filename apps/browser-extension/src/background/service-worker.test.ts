@@ -338,3 +338,20 @@ describe('AUTH_TOKEN_UPDATE', () => {
     expect(chrome.storage.local.remove).not.toHaveBeenCalled();
   });
 });
+
+describe('without a repository', () => {
+  beforeEach(() => {
+    storedExtras = { lifeos_repo: undefined };
+  });
+
+  it('writes nowhere rather than falling back to a built-in repository', async () => {
+    await expect(call({ type: 'DUMP_NOTE', note: 'x' })).resolves.toMatchObject({
+      error: 'No token found',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('reports no repository to the popup', async () => {
+    await expect(call({ type: 'GET_REPOS' })).resolves.toMatchObject({ repo: '' });
+  });
+});

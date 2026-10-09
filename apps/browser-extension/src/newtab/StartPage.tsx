@@ -38,8 +38,6 @@ import {
  * to spend a GitHub request on it. */
 const DUMP_PATH = '.lifeos/dump.md';
 
-const DEFAULT_REPO = 'kaihuman-hq/kaihuman';
-
 /** What the capture box writes: a note to the dump, a todo to the inbox, or an action log entry. */
 type CaptureKind = 'note' | 'todo' | 'log';
 
@@ -112,7 +110,7 @@ const openInThisTab = (url: string) => {
  */
 export function StartPage() {
   const [token, setToken] = useState<string | null>(null);
-  const [repo, setRepo] = useState(DEFAULT_REPO);
+  const [repo, setRepo] = useState('');
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [bookmarksError, setBookmarksError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -222,7 +220,7 @@ export function StartPage() {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', CAPTURE_LOG_KEY], (result) => {
       const storedToken = (result.lifeos_token as string) || null;
       setToken(storedToken);
-      setRepo((result.lifeos_repo as string) || DEFAULT_REPO);
+      setRepo((result.lifeos_repo as string) || '');
       setCaptureLog({ ...EMPTY_CAPTURE_LOG, ...(result[CAPTURE_LOG_KEY] as Partial<CaptureLog>) });
       if (storedToken) void loadAll();
     });
@@ -235,7 +233,8 @@ export function StartPage() {
       (response) => {
         if (response.changed) window.location.reload();
       },
-      (e: Error) => console.warn('LifeOS Extension: could not ask the desktop for its repository', e),
+      (e: Error) =>
+        console.warn('LifeOS Extension: could not ask the desktop for its repository', e),
     );
     const timer = setInterval(() => setNow(new Date()), TICK_MS);
     return () => {

@@ -4,9 +4,6 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-/// The same default as the browser extension, so both start out on the same repository.
-pub const DEFAULT_REPO: &str = "kaihuman-hq/kaihuman";
-
 const KEYRING_SERVICE: &str = "kaihuman-palette";
 /// The code name before October 2026: the keyring service and XDG directories it named are moved
 /// over the first time they are missed.
@@ -173,10 +170,10 @@ impl Settings {
         write_json(&config_file(), self)
     }
 
-    pub fn repo(&self) -> String {
-        self.repo
-            .clone()
-            .unwrap_or_else(|| DEFAULT_REPO.to_string())
+    /// None until a login, the switcher or the extension picks one; there is no repository to
+    /// fall back to.
+    pub fn repo(&self) -> Option<String> {
+        self.repo.clone()
     }
 
     /// Makes `repo` current and remembers it for the switcher; `changed_at` is when it was
@@ -185,7 +182,7 @@ impl Settings {
         if !self.repos.iter().any(|known| known == repo) {
             self.repos.push(repo.to_string());
         }
-        if self.repo() != repo {
+        if self.repo.as_deref() != Some(repo) {
             self.repo_changed_at = Some(changed_at);
         }
         self.repo = Some(repo.to_string());
@@ -193,9 +190,8 @@ impl Settings {
 
     /// Everything the switcher lists, current one included.
     pub fn known_repos(&self) -> Vec<String> {
-        let current = self.repo();
         let mut repos = self.repos.clone();
-        if !repos.contains(&current) {
+        if let Some(current) = self.repo().filter(|current| !repos.contains(current)) {
             repos.insert(0, current);
         }
         repos
@@ -214,6 +210,10 @@ pub fn is_repo_name(value: &str) -> bool {
     };
     matches!(value.split_once('/'), Some((owner, name)) if valid(owner) && valid(name))
 }
+
+/// Shown wherever the palette needs a repository and none has been picked yet.
+pub const NO_REPO: &str = "No repository selected — log in with the kaihuman console, or run \
+                           `kaihuman-palette login --repo owner/name`";
 
 fn keyring_entry(user: &str) -> Result<keyring::Entry, String> {
     keyring::Entry::new(KEYRING_SERVICE, user)
@@ -381,13 +381,13 @@ mod tests {
     #[test]
     fn switching_remembers_repos_once_and_lists_the_current_one() {
         let mut settings = Settings::default();
-        assert_eq!(settings.repo(), DEFAULT_REPO);
-        assert_eq!(settings.known_repos(), vec![DEFAULT_REPO.to_string()]);
+        assert_eq!(settings.repo(), None);
+        assert!(settings.known_repos().is_empty());
 
         settings.use_repo("o/a", 1);
         settings.use_repo("o/b", 2);
         settings.use_repo("o/a", 3);
-        assert_eq!(settings.repo(), "o/a");
+        assert_eq!(settings.repo().as_deref(), Some("o/a"));
         assert_eq!(settings.repo_changed_at, Some(3));
         // Choosing the repository in use again is no change.
         settings.use_repo("o/a", 4);

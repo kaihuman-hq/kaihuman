@@ -11,8 +11,6 @@ export const NATIVE_HOST = 'com.kaihuman.palette';
 /** When `lifeos_repo` last changed here, or the desktop's time for a choice taken from it. */
 export const REPO_CHANGED_AT = 'lifeos_repo_changed_at';
 
-const DEFAULT_REPO = 'kaihuman-hq/kaihuman';
-
 interface RepoChoice {
   repo: string;
   changedAt: number;
@@ -40,7 +38,8 @@ const isRepoChoice = (value: unknown): value is RepoChoice => {
 export async function syncRepoWithDesktop(): Promise<boolean> {
   const data = await chrome.storage.local.get(['lifeos_repo', REPO_CHANGED_AT]);
   const mine: RepoChoice = {
-    repo: (data.lifeos_repo as string | undefined) || DEFAULT_REPO,
+    // Empty when none is picked yet: the desktop then answers with its own, if it has one.
+    repo: (data.lifeos_repo as string | undefined) ?? '',
     changedAt: (data[REPO_CHANGED_AT] as number | undefined) ?? 0,
   };
   let answer: unknown;
@@ -51,6 +50,8 @@ export async function syncRepoWithDesktop(): Promise<boolean> {
     console.debug('LifeOS Extension: no desktop palette to share the repository with', error);
     return false;
   }
+  // An empty repository means the desktop has none either.
+  if ((answer as Partial<RepoChoice> | null)?.repo === '') return false;
   if (!isRepoChoice(answer)) {
     console.warn('LifeOS Extension: the desktop palette answered', answer);
     return false;

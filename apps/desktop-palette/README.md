@@ -263,6 +263,8 @@ For development and tests, `KAIHUMAN_GITHUB_TOKEN` takes the place of the keyrin
 ## Troubleshooting
 
 - **"Not logged in"** in the palette's status line: run **Log in with the kaihuman console**, or `kaihuman-palette login`.
+- **"No repository selected":** the palette has no built-in repository. Logging in through the
+  console takes the one selected there; otherwise run `kaihuman-palette login --repo owner/name`.
 - **Keyring errors:** no Secret Service is running (see Log in).
 - **It opens as a normal, tiled window:** the compositor has no layer-shell (GNOME), or GTK picked
   X11. The daemon sets `GDK_BACKEND=wayland` when `WAYLAND_DISPLAY` is set; check that it is.

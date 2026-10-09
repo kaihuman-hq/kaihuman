@@ -620,12 +620,11 @@ async function readBookmarksCache(): Promise<BookmarksCache | undefined> {
   return stored.bookmarksCache as BookmarksCache | undefined;
 }
 
+/** Without a repository there is nowhere to read or write, so a token alone does not connect. */
 async function credentials(): Promise<{ token?: string; repo: string }> {
   const data = await chrome.storage.local.get(['lifeos_token', 'lifeos_repo']);
-  return {
-    token: data.lifeos_token as string | undefined,
-    repo: (data.lifeos_repo as string) || 'kaihuman-hq/kaihuman',
-  };
+  const repo = (data.lifeos_repo as string | undefined) ?? '';
+  return { token: repo ? (data.lifeos_token as string | undefined) : undefined, repo };
 }
 
 /**
@@ -873,7 +872,7 @@ async function searchRepo(query: string) {
   return { results };
 }
 
-const NOT_LOGGED_IN = 'Not logged in — open the kaihuman console to connect the extension';
+const NOT_LOGGED_IN = 'Not connected — open the kaihuman console and pick a repository';
 
 /** Prompt files for `>p`, command files for `>x` — found, fetched and cached the same way. */
 const REPO_FILE_KINDS = {
@@ -1341,8 +1340,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'DUMP_NOTE') {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
       const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'kaihuman-hq/kaihuman';
-      if (!token) {
+      const repo = data.lifeos_repo;
+      if (!token || !repo) {
         sendResponse({ error: 'No token found' });
         return;
       }
@@ -1371,8 +1370,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'FETCH_QUICK_NOTES') {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
       const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'kaihuman-hq/kaihuman';
-      if (!token) {
+      const repo = data.lifeos_repo;
+      if (!token || !repo) {
         sendResponse({ error: 'No token found' });
         return;
       }
@@ -1475,7 +1474,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       (data) =>
         sendResponse({
           success: true,
-          repo: (data.lifeos_repo as string) || 'kaihuman-hq/kaihuman',
+          repo: (data.lifeos_repo as string | undefined) ?? '',
           repos: (data.lifeos_repos as { full_name: string }[] | undefined) ?? [],
         }),
       (error) => sendResponse({ error: error.message }),
@@ -1639,8 +1638,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   ) {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo'], async (data: any) => {
       const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'kaihuman-hq/kaihuman';
-      if (!token) {
+      const repo = data.lifeos_repo;
+      if (!token || !repo) {
         sendResponse({ error: 'No token found' });
         return;
       }
@@ -1755,8 +1754,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'PIN_ARTICLE') {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', KB_IMAGES_SETTING], async (data: any) => {
       const token = data.lifeos_token;
-      const repo = data.lifeos_repo || 'kaihuman-hq/kaihuman';
-      if (!token) {
+      const repo = data.lifeos_repo;
+      if (!token || !repo) {
         sendResponse({ error: 'No token found' });
         return;
       }
