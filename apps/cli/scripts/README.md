@@ -5,7 +5,7 @@ inbox (`.kh/raw/`). It reuses the CLI's auth and push logic — no separate app.
 
 On Wayland the compositor owns global shortcuts, so the hotkey is bound in
 `hyprland.conf` and just launches the overlay; the overlay pipes your text into
-`cli capture`, which spools it locally (offline-safe) and pushes to GitHub.
+`kaihuman capture`, which spools it locally (offline-safe) and pushes to GitHub.
 
 ## Setup
 
@@ -14,7 +14,7 @@ On Wayland the compositor owns global shortcuts, so the hotkey is bound in
    ```sh
    cd apps/cli
    cargo build --release
-   install -Dm755 target/release/cli ~/.local/bin/cli
+   install -Dm755 target/release/kaihuman ~/.local/bin/kaihuman
    ```
 
    Log in and select a repo once by running `cli` (`l` to log in, `s` to select
@@ -37,10 +37,10 @@ On Wayland the compositor owns global shortcuts, so the hotkey is bound in
 
 - `Super+K` → type a line → Enter. Done. A notification confirms the capture.
 - **Multi-line**: uncomment the floating-terminal bind in the config — it runs
-  `cli capture` with no input, which opens `$EDITOR` for a full note. Hyprland's
+  `kaihuman capture` with no input, which opens `$EDITOR` for a full note. Hyprland's
   window rules float and center it like an overlay.
-- **Headless / scripting**: `cli capture "some text"`, or pipe:
-  `echo "text" | cli capture`.
+- **Headless / scripting**: `kaihuman capture "some text"`, or pipe:
+  `echo "text" | kaihuman capture`.
 
 ## Offline behaviour
 

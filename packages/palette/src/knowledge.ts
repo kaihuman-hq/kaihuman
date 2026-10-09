@@ -1,5 +1,5 @@
 /**
- * Knowledge captures: each one becomes its own `.kh/raw/<epoch>-<slug>.md` file, as `cli capture`,
+ * Knowledge captures: each one becomes its own `.kh/raw/<epoch>-<slug>.md` file, as `kaihuman capture`,
  * the console's Quick knowledge page and the extension's clippings write them, so `/kb-ingest`
  * picks it up with the rest.
  */

@@ -28,7 +28,7 @@ cargo run
 ```bash
 ./target/debug/cli
 ```
-*(Use `./target/release/cli` if you built with the `--release` flag)*
+*(Use `./target/release/kaihuman` if you built with the `--release` flag)*
 
 ## Usage
 

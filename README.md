@@ -40,7 +40,7 @@ echo "note" | cargo run -- capture   # …or pipe it in (used by the desktop ove
 
 # Build a release binary
 cargo build --release
-./target/release/cli
+./target/release/kaihuman
 ```
 
 ### First launch
@@ -69,7 +69,7 @@ See [`doc/documentation.md`](doc/documentation.md) for full key-binding referenc
 ### Desktop quick-capture (Hyprland / wlroots)
 
 A `Super+K` overlay that captures a thought straight into `.kh/raw/` via
-`cli capture` (spooled locally, offline-safe). See
+`kaihuman capture` (spooled locally, offline-safe). See
 [`apps/cli/scripts/README.md`](apps/cli/scripts/README.md) for setup.
 
 ## Web console — quick start

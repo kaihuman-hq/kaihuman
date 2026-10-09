@@ -1,7 +1,7 @@
-//! Headless knowledge capture: `cli capture`.
+//! Headless knowledge capture: `kaihuman capture`.
 //!
 //! Designed for a desktop quick-capture overlay (e.g. a Hyprland keybind that
-//! pipes a line into `cli capture`). The capture is written to a local spool
+//! pipes a line into `kaihuman capture`). The capture is written to a local spool
 //! **first** so a thought is never lost if the network is down, then the whole
 //! spool — this note plus any earlier offline captures — is flushed to
 //! `.kh/raw/` on GitHub with retry.
@@ -49,10 +49,10 @@ pub async fn run(inline: Option<String>) -> Result<()> {
             }
         }
         (Err(_), _) => {
-            println!("Saved locally — not authenticated. Run `cli` to log in; it flushes on the next capture.");
+            println!("Saved locally — not authenticated. Run `kaihuman` to log in; it flushes on the next capture.");
         }
         (_, None) => {
-            println!("Saved locally — no active repo. Run `cli`, press `s` to select one, then capture again.");
+            println!("Saved locally — no active repo. Run `kaihuman`, press `s` to select one, then capture again.");
         }
     }
 
