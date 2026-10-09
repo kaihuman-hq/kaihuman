@@ -96,6 +96,7 @@ beforeEach(async () => {
     action: { setBadgeText: vi.fn(async () => {}), setBadgeBackgroundColor: vi.fn(async () => {}) },
     commands: { onCommand: { addListener: vi.fn() } },
     contextMenus: { create: vi.fn(), onClicked: { addListener: vi.fn() } },
+    permissions: { contains: vi.fn(async () => true) },
     scripting: { executeScript: vi.fn(async () => []) },
     runtime: {
       getManifest: () => ({ content_scripts: [] }),

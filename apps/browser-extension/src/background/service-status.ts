@@ -38,6 +38,11 @@ export interface ServiceStatus {
   checkedAt: number;
   /** The latest check failed, so this is the answer from before it. */
   stale?: boolean;
+  /**
+   * The host pattern the extension may not read yet. Status pages beyond the defaults are an
+   * optional permission, granted from the start page by clicking the light.
+   */
+  needsAccess?: string;
 }
 
 /** What lives in `chrome.storage.local` under `serviceStatusCache`. */
@@ -284,6 +289,10 @@ async function checkGcp(
 export const statusLinkOf = (service: ServiceConfig) =>
   service.type === 'statuspage' ? service.url : service.type === 'aws' ? AWS_LINK : GCP_LINK;
 
+/** The host pattern a check reads from, as `chrome.permissions` takes it. */
+export const accessPatternOf = (service: ServiceConfig) =>
+  `${new URL(service.type === 'statuspage' ? service.url : service.type === 'aws' ? AWS_EVENTS_URL : GCP_INCIDENTS_URL).origin}/*`;
+
 const check = (fetchFn: Fetch, service: ServiceConfig): Promise<Check> =>
   service.type === 'statuspage'
     ? checkStatuspage(fetchFn, service)
@@ -301,10 +310,22 @@ export async function checkServices(
   previous: ServiceStatus[],
   fetchFn: Fetch = fetch,
   now = Date.now(),
+  canRead: (pattern: string) => Promise<boolean> = async () => true,
 ): Promise<ServiceStatus[]> {
   return Promise.all(
     services.map(async (service): Promise<ServiceStatus> => {
       const link = statusLinkOf(service);
+      const pattern = accessPatternOf(service);
+      if (!(await canRead(pattern))) {
+        return {
+          name: service.name,
+          link,
+          checkedAt: now,
+          level: 'unknown',
+          description: `Click to let kaihuman read ${pattern.slice(0, -2)}`,
+          needsAccess: pattern,
+        };
+      }
       try {
         return { name: service.name, link, checkedAt: now, ...(await check(fetchFn, service)) };
       } catch (error) {

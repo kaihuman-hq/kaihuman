@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { CONSOLE_URL } from './console';
+import { send } from './palette/port';
 import { ActionLogForm } from './components/ActionLogForm';
 import { BookmarkPageForm } from './components/BookmarkPageForm';
 import { QuickActions } from './components/QuickActions';
@@ -123,11 +124,16 @@ export function App() {
 
   const handleReadItLater = async () => {
     if (!token || !activeTab) return;
+    // Images can come from any host, so copying them into the repo needs the optional all-sites
+    // permission. Asked for first, while the click still counts as a user gesture; refused, the
+    // images keep their remote links.
+    if (downloadImages) await chrome.permissions.request({ origins: ['<all_urls>'] }).catch(() => false);
     setStatus('saving');
     setErrorMessage(null);
     try {
-      // The content script converts the page to Markdown; tabs opened before the extension was
-      // installed have no content script, so those fall back to plain text.
+      // The page script converts the page to Markdown. It is injected on demand (opening the popup
+      // grants access to this tab); a page that refuses it falls back to plain text.
+      await send({ type: 'ENSURE_PAGE_SCRIPT', tabId: activeTab.tabId }).catch(() => {});
       const article = await chrome.tabs
         .sendMessage(activeTab.tabId, { type: 'EXTRACT_ARTICLE' })
         .catch(async () => {

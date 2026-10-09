@@ -39,10 +39,13 @@ export default defineManifest({
     service_worker: 'src/background/service-worker.ts',
     type: 'module',
   },
+  // Only the console's token handoff runs on its own. The palette and article extraction are
+  // injected into a tab when the user acts on it (shortcut, popup, context menu), which `activeTab`
+  // allows without standing access to every site.
   content_scripts: [
     {
-      matches: ['<all_urls>'],
-      js: ['src/content/index.ts'],
+      matches: ['https://app.kaihuman.com/*'],
+      js: ['src/content/console-bridge.ts'],
     },
   ],
   // nativeMessaging: the desktop palette's host, to keep both on the same repository.
@@ -50,5 +53,21 @@ export default defineManifest({
   // Reading the browser's own bookmarks is only needed for the import, so it is asked for from the
   // popup when the user runs it rather than warned about on install.
   optional_permissions: ['bookmarks'],
-  host_permissions: ['<all_urls>'],
+  // GitHub (the repository), DeepL (translation, with the user's own key) and the status pages the
+  // start page watches by default.
+  host_permissions: [
+    'https://api.github.com/*',
+    'https://api.deepl.com/*',
+    'https://api-free.deepl.com/*',
+    'https://www.githubstatus.com/*',
+    'https://status.claude.com/*',
+    'https://www.cloudflarestatus.com/*',
+    'https://health.aws.amazon.com/*',
+    'https://status.cloud.google.com/*',
+  ],
+  // Asked for when first needed: a status page the user added (that site only), and downloading a
+  // saved page's images, which can come from any host.
+  // @ts-expect-error CRXJS's manifest type predates `optional_host_permissions` (Chrome 102+); the
+  // key is passed through to the built manifest as written.
+  optional_host_permissions: ['<all_urls>'],
 })

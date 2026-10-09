@@ -20,6 +20,8 @@ import {
 import { type Message } from '../types';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import { consoleFileUrl, isConsolePage } from '../console';
+// The bundled loader's path, for injecting the page script on demand (CRXJS `?script` import).
+import PAGE_SCRIPT from '../content/index.ts?script';
 import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
 import {
   encodePath,
@@ -147,10 +149,6 @@ chrome.runtime.onConnect.addListener(() => {
   // Accepting the port is the whole job — holding it open is what keeps the worker alive.
 });
 
-// Whatever the bundler named the content script, so injecting it needs no hard-coded hash.
-function contentScriptFiles(): string[] {
-  return (chrome.runtime.getManifest().content_scripts ?? []).flatMap((script) => script.js ?? []);
-}
 
 /** Whether the tab is showing a page of this extension's own — the start page, in practice. */
 async function isExtensionPage(tabId: number): Promise<boolean> {
@@ -165,32 +163,22 @@ const togglePalette = (tabId: number) =>
   chrome.tabs.sendMessage(tabId, { type: 'TOGGLE_COMMAND_PALETTE' });
 
 /**
- * Relays the shortcut to the tab, injecting the content script first if it is not there.
+ * Runs `deliver` against the page script, injecting the script first if it is not there.
  *
- * Declared content scripts only run when a page loads, so every tab that was already open when
- * the extension was installed, reloaded or updated has none until it is reloaded — pressing the
- * shortcut in one of those used to do nothing at all. Injecting on demand covers that without
- * asking the user to reload anything.
+ * The page script (palette and article extraction) is not declared for every site: it is injected
+ * only when the user acts on a tab — the shortcut, the popup or the context menu — which grants
+ * `activeTab` for that tab, so the extension needs no standing access to every website.
  */
-async function openPaletteInTab(tabId: number): Promise<boolean> {
+async function withPageScript(tabId: number, deliver: () => Promise<unknown>): Promise<boolean> {
   try {
-    await togglePalette(tabId);
+    await deliver();
     return true;
   } catch {
     // Nothing listening yet — fall through and inject.
   }
 
-  // The start page is one of ours, and nothing may be injected into an extension page. It answers
-  // a broadcast instead, which every open start page hears and only the visible one acts on.
-  if (await isExtensionPage(tabId)) {
-    await chrome.runtime.sendMessage({ type: 'TOGGLE_COMMAND_PALETTE' }).catch(() => {});
-    return true;
-  }
-
-  const files = contentScriptFiles();
-  if (files.length === 0) return false;
   try {
-    await chrome.scripting.executeScript({ target: { tabId }, files });
+    await chrome.scripting.executeScript({ target: { tabId }, files: [PAGE_SCRIPT] });
   } catch {
     // A page no extension may touch: chrome://, the Web Store, the PDF viewer, view-source.
     return false;
@@ -201,13 +189,24 @@ async function openPaletteInTab(tabId: number): Promise<boolean> {
   for (let attempt = 0; attempt < TOGGLE_RETRIES; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, TOGGLE_RETRY_MS));
     try {
-      await togglePalette(tabId);
+      await deliver();
       return true;
     } catch {
       // Still coming up.
     }
   }
   return false;
+}
+
+/** Relays the shortcut to the tab, injecting the page script first if it is not there. */
+async function openPaletteInTab(tabId: number): Promise<boolean> {
+  // The start page is one of ours, and nothing may be injected into an extension page. It answers
+  // a broadcast instead, which every open start page hears and only the visible one acts on.
+  if (await isExtensionPage(tabId)) {
+    await chrome.runtime.sendMessage({ type: 'TOGGLE_COMMAND_PALETTE' }).catch(() => {});
+    return true;
+  }
+  return withPageScript(tabId, () => togglePalette(tabId));
 }
 
 async function readUsage(repo: string): Promise<BookmarkUsage> {
@@ -1149,7 +1148,7 @@ async function refreshToday() {
  * already carries, and their statuses are checked at most every five minutes — when a start page
  * asks, so a browser with no new tab open checks nothing.
  */
-async function getServiceStatus() {
+async function getServiceStatus(refresh = false) {
   const { repo } = await credentials();
   const today = await readTodayCache();
   const file = isTodayCacheUsable(today, repo)
@@ -1159,9 +1158,11 @@ async function getServiceStatus() {
 
   const stored = await chrome.storage.local.get('serviceStatusCache');
   const cache = stored.serviceStatusCache as ServiceStatusCache | undefined;
-  if (cache && isStatusCacheFresh(cache, services)) return { statuses: cache.statuses };
+  if (!refresh && cache && isStatusCacheFresh(cache, services)) return { statuses: cache.statuses };
 
-  const statuses = await checkServices(services, cache?.statuses ?? []);
+  const statuses = await checkServices(services, cache?.statuses ?? [], fetch, Date.now(), (pattern) =>
+    chrome.permissions.contains({ origins: [pattern] }),
+  );
   const next: ServiceStatusCache = { services, statuses, fetchedAt: Date.now() };
   await chrome.storage.local.set({ serviceStatusCache: next });
   return { statuses };
@@ -1322,6 +1323,15 @@ const answer = (work: Promise<object>, sendResponse: (response: unknown) => void
 
 // Message Handling
 chrome.runtime.onMessage.addListener((message: Message | any, sender, sendResponse) => {
+  if (message.type === 'ENSURE_PAGE_SCRIPT') {
+    return answer(
+      withPageScript(message.tabId, () =>
+        chrome.tabs.sendMessage(message.tabId, { type: 'PAGE_SCRIPT_PING' }),
+      ).then((ready) => ({ ready })),
+      sendResponse,
+    );
+  }
+
   if (message.type === 'AUTH_TOKEN_UPDATE' && message.token) {
     // The content script runs on every site; only a token coming from the console is trusted.
     if (!isConsolePage(sender.url)) return false;
@@ -1692,7 +1702,9 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'REFRESH_TODAY') return answer(refreshToday(), sendResponse);
 
-  if (message.type === 'GET_SERVICE_STATUS') return answer(getServiceStatus(), sendResponse);
+  if (message.type === 'GET_SERVICE_STATUS') {
+    return answer(getServiceStatus(message.force === true), sendResponse);
+  }
 
   if (message.type === 'DELETE_BRAINDUMP') {
     return answer(deleteBraindump(message.path || '', message.sha || ''), sendResponse);

@@ -170,8 +170,8 @@ export function StartPage() {
       (e: Error) => setTabGroupsError(e.message),
     );
 
-  const refreshServiceStatus = () =>
-    send({ type: 'GET_SERVICE_STATUS' }).then(
+  const refreshServiceStatus = (force = false) =>
+    send({ type: 'GET_SERVICE_STATUS', force }).then(
       (response) => {
         setStatuses(response.statuses);
         setStatusError(null);
@@ -233,8 +233,7 @@ export function StartPage() {
       (response) => {
         if (response.changed) window.location.reload();
       },
-      (e: Error) =>
-        console.warn('kaihuman: could not ask the desktop for its repository', e),
+      (e: Error) => console.warn('kaihuman: could not ask the desktop for its repository', e),
     );
     const timer = setInterval(() => setNow(new Date()), TICK_MS);
     return () => {
@@ -551,7 +550,17 @@ export function StartPage() {
           </div>
         </header>
 
-        <ServiceStatusStrip statuses={statuses} error={statusError} onOpen={openInThisTab} />
+        <ServiceStatusStrip
+          statuses={statuses}
+          error={statusError}
+          onOpen={openInThisTab}
+          // Requested straight from the click, which Chrome requires for a permission prompt.
+          onAllow={(pattern) =>
+            chrome.permissions.request({ origins: [pattern] }).then((granted) => {
+              if (granted) void refreshServiceStatus(true);
+            })
+          }
+        />
 
         <div class="flex items-center gap-3 h-[52px] px-4 border border-nt-control focus-within:border-nt-accent">
           <span aria-hidden="true" class="text-[15px] text-nt-accent">

@@ -11,7 +11,8 @@
     ],
     "types": [
       "chrome",
-      "vite/client"
+      "vite/client",
+      "@crxjs/vite-plugin/client"
     ],
     "skipLibCheck": true,
     "paths": {

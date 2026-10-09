@@ -8,13 +8,17 @@ const LIGHT: Record<StatusLevel, string> = {
   unknown: 'bg-nt-icon ring-nt-icon/30',
 };
 
-/** One light per watched service; each opens that service's status page. */
+/**
+ * One light per watched service; each opens that service's status page. A status page the
+ * extension may not read yet asks for that permission instead.
+ */
 export function ServiceStatusStrip(props: {
   statuses: ServiceStatus[];
   error: string | null;
   onOpen: (url: string) => void;
+  onAllow: (pattern: string) => void;
 }) {
-  const { statuses, error, onOpen } = props;
+  const { statuses, error, onOpen, onAllow } = props;
   if (error) {
     return (
       <p class="text-[12px] text-nt-prod break-words" title={error}>
@@ -29,7 +33,7 @@ export function ServiceStatusStrip(props: {
         <li key={status.name}>
           <button
             type="button"
-            onClick={() => onOpen(status.link)}
+            onClick={() => (status.needsAccess ? onAllow(status.needsAccess) : onOpen(status.link))}
             title={`${status.description}${status.stale ? ' (last known — the latest check failed)' : ''}`}
             class="flex items-center gap-3 text-[12px] text-nt-muted hover:text-nt-fg"
           >

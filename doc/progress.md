@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-10-09 — Extension: no standing access to websites; log files untracked
+
+- **Narrower extension permissions.** Before, the store install warning read "read and change all
+  your data on all websites". The changes:
+  - `host_permissions` now lists only `api.github.com`, the two DeepL endpoints and the default
+    status pages, instead of `<all_urls>`.
+  - The always-on content script is split:
+    - `src/content/console-bridge.ts` (the token handoff) runs only on `app.kaihuman.com`.
+    - The palette and article extraction (`src/content/index.ts`) are injected through the CRXJS
+      `?script` import when the user acts on a tab. The shortcut, the popup and the context menu
+      grant `activeTab`.
+  - New `ENSURE_PAGE_SCRIPT { tabId }`: the popup calls it before extracting an article.
+  - `optional_host_permissions: ['<all_urls>']` is requested only when it is needed:
+    - Status pages the user adds: `checkServices` reports `needsAccess`. Clicking the grey light
+      on the start page asks for that origin and checks it again.
+    - Image download for read-later saved from the popup. If this is refused, or when saving from
+      the palette, images keep their remote links.
+  - The extension README has a Permissions section, and the privacy policy is updated to match.
+- **Log files.** The CLI wrote `error.log` into the working directory when saving a note failed.
+  It now shows the error in the status line. `apps/cli/error.log` and `apps/console/dev-dist/` are
+  no longer tracked, and `.gitignore` ignores `*.log`.
+
 ## 2026-10-09 — Pre-launch fixes: extension token bridge, no built-in repository, license, privacy policy
 
 - **Security: the extension takes a GitHub token only from the console.** The content script runs
