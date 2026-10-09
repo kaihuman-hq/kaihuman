@@ -1,6 +1,6 @@
 # Landing pages
 
-The kaihuman marketing site is a static Astro site styled with Tailwind CSS v4 (`@tailwindcss/vite`). Two versions live in the monorepo: `apps/landing-page-nextgen` (`@lifosy/landing-page-nextgen`) is the production site, and `apps/landing-page` (`@lifosy/landing-page`) is the older design, kept in the repo but no longer deployed. Both pages link to the app at `https://app.kaihuman.com`, the live demo at `/demo`, and the source at `github.com/kaihuman-hq/kaihuman`.
+The kaihuman marketing site is a static Astro site styled with Tailwind CSS v4 (`@tailwindcss/vite`). Two versions live in the monorepo: `apps/landing-page-nextgen` (`@kaihuman/landing-page-nextgen`) is the production site, and `apps/landing-page` (`@kaihuman/landing-page`) is the older design, kept in the repo but no longer deployed. Both pages link to the app at `https://app.kaihuman.com`, the live demo at `/demo`, and the source at `github.com/kaihuman-hq/kaihuman`.
 
 ## Which landing page is in production
 <!-- docspack: tags=production,nextgen,old-landing-page,which -->
@@ -9,8 +9,8 @@ The kaihuman marketing site is a static Astro site styled with Tailwind CSS v4 (
 
 | App | Package | Status |
 | --- | --- | --- |
-| `apps/landing-page-nextgen` | `@lifosy/landing-page-nextgen` | Production, deployed to the Cloudflare Pages project `lifosy-landing` |
-| `apps/landing-page` | `@lifosy/landing-page` | Older design, not deployed by any workflow |
+| `apps/landing-page-nextgen` | `@kaihuman/landing-page-nextgen` | Production, deployed to the Cloudflare Pages project `kaihuman-landing` |
+| `apps/landing-page` | `@kaihuman/landing-page` | Older design, not deployed by any workflow |
 
 Before that date a separate `deploy-landing-nextgen.yml` deployed nextgen to a preview project (`kh-landingpage-nextgen`). That workflow was removed, and `deploy-landing.yml` was switched from the old app to nextgen. `doc/progress.md` records the change under "Nextgen is the default landing page".
 
@@ -24,7 +24,7 @@ The nextgen page is a single route, `src/pages/index.astro`, wrapped by `src/lay
 - **Philosophy:** kaizen, getting 1% better every day.
 - **Principles:** three cards, **Track**, **Own** and **Know**.
 - **Ownership:** "YOUR DATA. YOUR RULES." — local-first, plain files, no tracking.
-- **Docs (`#docs`):** "DOCUMENTED FOR AGENTS." — the `@lifosy/docspack` package, with a terminal block showing `pnpm add -D docspack @lifosy/docspack`, `npx docspack sync` and `npx docspack ask`, and a **Read the docs →** link to `/docs/`.
+- **Docs (`#docs`):** "DOCUMENTED FOR AGENTS." — the `@kaihuman/docspack` package, with a terminal block showing `pnpm add -D docspack @kaihuman/docspack`, `npx docspack sync` and `npx docspack ask`, and a **Read the docs →** link to `/docs/`.
 - **CTA:** **START IMPROVING TODAY** and the GitHub link.
 
 The **Docs** link in the nav pill (`src/components/NavPill.astro`, shared by every page) opens `/docs/`. The page title is "kaihuman — The ever-improving human." The default meta description is set in `Layout.astro`. The old page in `apps/landing-page` has the same screencast and demo link right below its hero.
@@ -32,7 +32,7 @@ The **Docs** link in the nav pill (`src/components/NavPill.astro`, shared by eve
 ## Reading the docs on the website
 <!-- docspack: tags=docs-site,/docs,read-online,browser,human-readable -->
 
-The nextgen site renders this documentation as web pages at `/docs/` (for example `https://kaihuman.com/docs/cli/`). The pages are built from the same Markdown that ships as `@lifosy/docspack`, so the site and the agent index never disagree.
+The nextgen site renders this documentation as web pages at `/docs/` (for example `https://kaihuman.com/docs/cli/`). The pages are built from the same Markdown that ships as `@kaihuman/docspack`, so the site and the agent index never disagree.
 
 - `src/content.config.ts` defines the `docs` content collection: Astro's `glob` loader reads `../../packages/docspack/docs/*.md`. The id drops the number prefix, so `20-cli.md` becomes `/docs/cli/`.
 - `src/lib/docs.ts` (`getDocPages`) sorts the pages by filename and takes each title from its `#` heading and its summary from the first paragraph.
@@ -70,14 +70,14 @@ Run `pnpm install` from the repository root first. Each app has the same Astro s
 From the root:
 
 ```sh
-pnpm --filter @lifosy/landing-page-nextgen dev
-pnpm landing-nextgen:build     # turbo run build --filter=@lifosy/landing-page-nextgen
-pnpm dev:landing               # old page: turbo run dev --filter=@lifosy/landing-page
+pnpm --filter @kaihuman/landing-page-nextgen dev
+pnpm landing-nextgen:build     # turbo run build --filter=@kaihuman/landing-page-nextgen
+pnpm dev:landing               # old page: turbo run dev --filter=@kaihuman/landing-page
 pnpm landing:build             # old page build
 ```
 
 ## How the landing page is deployed
-<!-- docspack: tags=deploy,cloudflare-pages,ci,github-actions,lifosy-landing -->
+<!-- docspack: tags=deploy,cloudflare-pages,ci,github-actions,kaihuman-landing -->
 
 `.github/workflows/deploy-landing.yml` (named `[PROD] Deploy Landing Page`) deploys the nextgen app. It runs on a push to `main` that touches `apps/landing-page-nextgen/**` or `packages/docspack/docs/**`, or manually via `workflow_dispatch`.
 
@@ -88,11 +88,11 @@ It calls the reusable `template-deploy-to-cloudflare.yaml` with these inputs:
 | `buildTarget` | `landing-nextgen:build` |
 | `rootDir` | `./apps/landing-page-nextgen` |
 | `distDir` | `./dist` |
-| `cfPagesName` | `lifosy-landing` |
+| `cfPagesName` | `kaihuman-landing` |
 | `branchName` | `main` |
 | `commitGeneratedFile` | `false` |
 
-The template installs with pnpm on Node 22, runs `pnpm run build` and `pnpm run landing-nextgen:build`, then runs `wrangler pages deploy ./dist --project-name=lifosy-landing --branch=main`. It needs the secrets `CF_ACCOUNT_ID` and `CF_API_TOKEN`. A change to `apps/landing-page` triggers no deploy.
+The template installs with pnpm on Node 22, runs `pnpm run build` and `pnpm run landing-nextgen:build`, then runs `wrangler pages deploy ./dist --project-name=kaihuman-landing --branch=main`. It needs the secrets `CF_ACCOUNT_ID` and `CF_API_TOKEN`. A change to `apps/landing-page` triggers no deploy.
 
 ## Regenerating the product screencast
 <!-- docspack: tags=screencast,video,playwright,ffmpeg,record-screencast,demo-video -->
@@ -100,12 +100,12 @@ The template installs with pnpm on Node 22, runs `pnpm run build` and `pnpm run 
 The hero video is recorded automatically from the console's demo mode by `apps/landing-page-nextgen/scripts/record-screencast.mjs`.
 
 ```sh
-pnpm --filter @lifosy/landing-page-nextgen screencast
+pnpm --filter @kaihuman/landing-page-nextgen screencast
 ```
 
 What it needs:
 
-- The console dev server on `http://localhost:4300`. If none is running, the script starts `pnpm --filter @lifosy/app-console dev` and stops it afterwards. That needs `pnpm install` and one `pnpm --filter @lifosy/ui build`.
+- The console dev server on `http://localhost:4300`. If none is running, the script starts `pnpm --filter @kaihuman/app-console dev` and stops it afterwards. That needs `pnpm install` and one `pnpm --filter @kaihuman/ui build`.
 - Chromium for Playwright: `pnpm exec playwright install chromium`.
 - ffmpeg. The script looks for `FFMPEG_PATH`, then Playwright's bundled ffmpeg, then `ffmpeg` on `PATH`. Without it the raw clip ships untrimmed and the loop is not seamless.
 

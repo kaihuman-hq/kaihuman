@@ -8,7 +8,7 @@ import {
   readPaletteSettings,
   type SearchEngineSetting,
   serializePaletteSettings,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';

@@ -7,7 +7,7 @@ import {
   serializeTimeTracking,
   type TimeTrackingData,
   toggleStartStop,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import { Pause, Play, Square } from 'lucide-preact';
 import { useMemo } from 'preact/hooks';
 import { cn } from '../../../utils';

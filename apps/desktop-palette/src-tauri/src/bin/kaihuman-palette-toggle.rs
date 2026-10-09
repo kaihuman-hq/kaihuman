@@ -1,18 +1,18 @@
 //! The binary to bind to a key: sends one command to the palette daemon and exits.
 //!
 //! It links only the socket protocol, not Tauri, so it starts in a few milliseconds. When no daemon
-//! is running it starts one — the full `lifosy-palette` next to this binary — which then
+//! is running it starts one — the full `kaihuman-palette` next to this binary — which then
 //! shows the palette itself.
 
 use desktop_palette::{Command, Delivery, now_ms, send};
 
-const DAEMON_BINARY: &str = "lifosy-palette";
+const DAEMON_BINARY: &str = "kaihuman-palette";
 
 fn main() {
     let sent_at = now_ms();
     let command = match std::env::args().nth(1).as_deref() {
         None => Command::Toggle,
-        Some("daemon") => fail("use `lifosy-palette daemon` to start the daemon itself"),
+        Some("daemon") => fail("use `kaihuman-palette daemon` to start the daemon itself"),
         Some(arg) => Command::parse(arg).unwrap_or_else(|message| fail(&message)),
     };
 

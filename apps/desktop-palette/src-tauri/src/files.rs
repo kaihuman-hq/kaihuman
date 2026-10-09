@@ -322,7 +322,7 @@ mod tests {
     impl Tree {
         fn new(name: &str, files: &[(&str, &str)]) -> Self {
             let root =
-                std::env::temp_dir().join(format!("lifosy-files-{name}-{}", std::process::id()));
+                std::env::temp_dir().join(format!("kaihuman-files-{name}-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&root);
             for (path, content) in files {
                 let file = root.join(path);
@@ -487,7 +487,7 @@ mod tests {
     #[test]
     fn opens_only_absolute_paths_that_exist() {
         assert!(open("relative/file", OpenWith::App).is_err());
-        assert!(open("/no/such/lifosy/file", OpenWith::Terminal).is_err());
+        assert!(open("/no/such/kaihuman/file", OpenWith::Terminal).is_err());
     }
 
     #[test]

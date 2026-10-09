@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { KnowledgeBase } from './repo.js';
 import { searchPages } from './search.js';
 
-export const SERVER_NAME = 'lifosy-kb';
+export const SERVER_NAME = 'kaihuman-kb';
 export const SERVER_VERSION = '0.1.0';
 
 const PAGE_TYPES = ['source', 'entity', 'concept', 'topic', 'question'] as const;

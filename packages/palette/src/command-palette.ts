@@ -16,7 +16,7 @@ import {
   DEFAULT_PALETTE_SETTINGS,
   PALETTE_SETTINGS_PATH,
   type PaletteToolSetting,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import { type Bookmark, searchBookmarks } from './bookmarks.js';
 import { conversionItems } from './convert.js';
 
@@ -216,7 +216,7 @@ interface Row {
   tone?: Tone;
 }
 
-export const PALETTE_HOST_ID = 'lifosy-command-palette';
+export const PALETTE_HOST_ID = 'kaihuman-command-palette';
 
 // Inside a shadow root, so only inherited properties (font, colour) can leak in from the page —
 // hence the explicit values on the container.

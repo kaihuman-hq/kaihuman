@@ -12,7 +12,7 @@ import {
   type TodoData,
   type TodoItem,
   type TodoStatus,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import {
   AlertTriangle,
   Check,

@@ -1,23 +1,23 @@
 [
   {
     "query": "is kaihuman the same thing as lifosy",
-    "expect": "lifosy-lifosy-vs-kaihuman-which-name-is-which"
+    "expect": "kaihuman-kaihuman-lifeos-and-lifosy-which-name-is-which"
   },
   {
-    "query": "does lifosy keep a copy of my notes on its own server",
-    "expect": "lifosy-where-my-data-lives-and-what-lifosy-stores"
+    "query": "does kaihuman keep a copy of my notes on its own server",
+    "expect": "kaihuman-where-my-data-lives-and-what-kaihuman-stores"
   },
   {
     "query": "how does the github token get to the cli after login",
-    "expect": "lifosy-signing-in-with-github"
+    "expect": "kaihuman-signing-in-with-github"
   },
   {
     "query": "what happens to captures when I'm offline",
-    "expect": "lifosy-what-happens-when-you-are-offline"
+    "expect": "kaihuman-what-happens-when-you-are-offline"
   },
   {
     "query": "does the web console cache repo files locally",
-    "expect": "lifosy-how-data-flows-between-github-and-the-apps"
+    "expect": "kaihuman-how-data-flows-between-github-and-the-apps"
   },
   {
     "query": "pnpm install fails with ERR_PNPM_IGNORED_BUILDS",
@@ -36,8 +36,8 @@
     "expect": "developing-in-the-monorepo-how-the-console-version-number-is"
   },
   {
-    "query": "how do I use the lifosy docs from my own project with docspack ask",
-    "expect": "developing-in-the-monorepo-using-the-lifosy-docs-from-anothe"
+    "query": "how do I use the kaihuman docs from my own project with docspack ask",
+    "expect": "developing-in-the-monorepo-using-the-kaihuman-docs-from-anot"
   },
   {
     "query": "how do I regenerate the landing page demo video",
@@ -72,7 +72,7 @@
     "expect": [
       "terminal-cli-how-the-capture-spool-keeps-notes-safe-offline",
       "desktop-quick-capture-what-happens-to-a-desktop-capture-when",
-      "lifosy-what-happens-when-you-are-offline"
+      "kaihuman-what-happens-when-you-are-offline"
     ]
   },
   {
@@ -241,7 +241,7 @@
     "expect": "desktop-palette-files-the-desktop-palette-stores"
   },
   {
-    "query": "how to build lifosy-palette on fedora",
+    "query": "how to build kaihuman-palette on fedora",
     "expect": "desktop-palette-building-and-installing-the-desktop-palette"
   },
   {
@@ -298,7 +298,7 @@
   },
   {
     "query": "how does demo mode avoid hitting GitHub",
-    "expect": "shared-packages-github-access-and-demo-mode-in-lifosy-core"
+    "expect": "shared-packages-github-access-and-demo-mode-in-kaihuman-core"
   },
   {
     "query": "how is tsconfig shared between packages",

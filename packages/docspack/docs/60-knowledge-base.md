@@ -1,6 +1,6 @@
 # Knowledge base
 
-The Lifosy knowledge base is a personal wiki kept in the `.kh/` folder of the user's GitHub repository. It follows the LLM-wiki pattern: capture tools drop raw sources into `.kh/raw/`, and Claude Code slash commands such as `/kb-ingest`, `/kb-ask`, `/kb-digest` and `/kb-lint` compile them into cross-linked wiki pages. The console scaffolds the folder and the commands from `apps/console/src/lib/kb-skills.ts`, and `apps/kb-mcp` exposes the same folder to MCP clients.
+The kaihuman knowledge base is a personal wiki kept in the `.kh/` folder of the user's GitHub repository. It follows the LLM-wiki pattern: capture tools drop raw sources into `.kh/raw/`, and Claude Code slash commands such as `/kb-ingest`, `/kb-ask`, `/kb-digest` and `/kb-lint` compile them into cross-linked wiki pages. The console scaffolds the folder and the commands from `apps/console/src/lib/kb-skills.ts`, and `apps/kb-mcp` exposes the same folder to MCP clients.
 
 ## What is inside the `.kh/` knowledge base folder
 <!-- docspack: tags=layout,directory,structure,folders -->

@@ -1,6 +1,6 @@
-# Lifosy Console
+# kaihuman Console
 
-The primary web console application for Lifosy, providing a comprehensive interface to manage your repositories, files, and tasks.
+The primary web console application for kaihuman, providing a comprehensive interface to manage your repositories, files, and tasks.
 
 ## Overview
 

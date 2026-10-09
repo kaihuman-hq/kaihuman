@@ -2,9 +2,9 @@ import { defineManifest } from '@crxjs/vite-plugin'
 
 export default defineManifest({
   manifest_version: 3,
-  name: 'Lifosy Browser Extension',
+  name: 'kaihuman Browser Extension',
   version: '1.0.1',
-  description: 'Interact with your Lifosy repo from anywhere.',
+  description: 'Interact with your kaihuman repo from anywhere.',
   icons: {
     "16": "icon-16.png",
     "32": "icon-32.png",
@@ -32,7 +32,7 @@ export default defineManifest({
         default: 'Ctrl+Shift+K',
         mac: 'Command+Shift+K',
       },
-      description: 'Open the Lifosy command palette',
+      description: 'Open the kaihuman command palette',
     },
   },
   background: {

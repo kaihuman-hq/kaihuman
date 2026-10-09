@@ -1,4 +1,4 @@
-import { Logger } from '@lifosy/core';
+import { Logger } from '@kaihuman/core';
 import { type ComponentChildren, cloneElement, toChildArray, type VNode } from 'preact';
 import { cn } from '../../utils';
 

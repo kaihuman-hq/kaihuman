@@ -1,4 +1,4 @@
-import { githubFileStore, layoutStore } from '@lifosy/core';
+import { githubFileStore, layoutStore } from '@kaihuman/core';
 import {
   addMilestone,
   addTodoEntry,
@@ -14,7 +14,7 @@ import {
   type TodoItem,
   type TodoStatus,
   updateTodoText,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import {
   ArrowLeft,
   BarChart2,

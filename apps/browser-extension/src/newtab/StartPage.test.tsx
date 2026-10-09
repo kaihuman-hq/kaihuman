@@ -1,4 +1,4 @@
-import { PALETTE_HOST_ID } from '@lifosy/palette';
+import { PALETTE_HOST_ID } from '@kaihuman/palette';
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Bookmark } from '../background/bookmarks';

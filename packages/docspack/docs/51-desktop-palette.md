@@ -1,6 +1,6 @@
 # Desktop palette
 
-The desktop palette is the shared command palette as a Linux desktop overlay. A global hotkey opens it centred on the focused monitor, above tiled windows, with the keyboard in its input. It lives in `apps/desktop-palette`: a Tauri v2 app whose webview runs `@lifosy/palette` and whose Rust backend (`src-tauri/`) answers its requests. It targets Wayland compositors with `wlr-layer-shell` (Hyprland, Sway, river, niri, KDE) and also hosts the braindump window.
+The desktop palette is the shared command palette as a Linux desktop overlay. A global hotkey opens it centred on the focused monitor, above tiled windows, with the keyboard in its input. It lives in `apps/desktop-palette`: a Tauri v2 app whose webview runs `@kaihuman/palette` and whose Rust backend (`src-tauri/`) answers its requests. It targets Wayland compositors with `wlr-layer-shell` (Hyprland, Sway, river, niri, KDE) and also hosts the braindump window.
 
 ## Building and installing the desktop palette on Linux
 
@@ -16,8 +16,8 @@ sudo dnf group install c-development
 pnpm install                       # from the repo root
 cd apps/desktop-palette
 pnpm run build:desktop             # the UI, then both binaries
-install -m 755 src-tauri/target/release/lifosy-palette \
-  src-tauri/target/release/lifosy-palette-toggle ~/.local/bin/
+install -m 755 src-tauri/target/release/kaihuman-palette \
+  src-tauri/target/release/kaihuman-palette-toggle ~/.local/bin/
 ```
 
 - The two binaries must stay in the same directory. The toggle client starts the daemon from there.
@@ -31,33 +31,33 @@ Runtime tools: `wl-copy` (package `wl-clipboard`) for copying, `xdg-open` for li
 
 <!-- docspack: tags=hotkey,shortcut,keybinding,hyprland,super space -->
 
-The compositor owns the hotkey. Bind `lifosy-palette-toggle` to a key. Hyprland 0.55+ (Lua config):
+The compositor owns the hotkey. Bind `kaihuman-palette-toggle` to a key. Hyprland 0.55+ (Lua config):
 
 ```lua
 hl.on("hyprland.start", function()
-    hl.exec_cmd("lifosy-palette daemon")   -- optional: the first toggle starts it anyway
+    hl.exec_cmd("kaihuman-palette daemon")   -- optional: the first toggle starts it anyway
 end)
-hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("lifosy-palette-toggle"))
-hl.bind("SUPER + SHIFT + D", hl.dsp.exec_cmd("lifosy-palette-toggle braindump"))
+hl.bind("SUPER + SPACE", hl.dsp.exec_cmd("kaihuman-palette-toggle"))
+hl.bind("SUPER + SHIFT + D", hl.dsp.exec_cmd("kaihuman-palette-toggle braindump"))
 ```
 
 Older hyprlang configs:
 
 ```
-exec-once = lifosy-palette daemon
-bind = SUPER, SPACE, exec, lifosy-palette-toggle
-bind = SUPER SHIFT, D, exec, lifosy-palette-toggle braindump
+exec-once = kaihuman-palette daemon
+bind = SUPER, SPACE, exec, kaihuman-palette-toggle
+bind = SUPER SHIFT, D, exec, kaihuman-palette-toggle braindump
 ```
 
-The palette needs no window rule. It is a layer surface named `lifosy-palette` (see `hyprctl layers`); `hl.layer_rule` can match it to change its animation. The braindump window is a normal window and needs a float rule (see the braindump window section). On other compositors, bind the same command with their own syntax.
+The palette needs no window rule. It is a layer surface named `kaihuman-palette` (see `hyprctl layers`); `hl.layer_rule` can match it to change its animation. The braindump window is a normal window and needs a float rule (see the braindump window section). On other compositors, bind the same command with their own syntax.
 
 ## How the daemon and the toggle client work
 
 <!-- docspack: tags=daemon,socket,toggle,process,layer-shell -->
 
-- **`lifosy-palette daemon`** keeps the palette loaded in a hidden window, so opening it only maps the window.
-- **`lifosy-palette-toggle [toggle|show|hide|quit|braindump]`** writes one line, `<command> <ms>`, to `$XDG_RUNTIME_DIR/lifosy-palette.sock` and exits. It links only libc and takes a few milliseconds. With no daemon running, `toggle`, `show` and `braindump` start one.
-- `lifosy-palette` itself accepts the same commands, but loads WebKitGTK and is slower.
+- **`kaihuman-palette daemon`** keeps the palette loaded in a hidden window, so opening it only maps the window.
+- **`kaihuman-palette-toggle [toggle|show|hide|quit|braindump]`** writes one line, `<command> <ms>`, to `$XDG_RUNTIME_DIR/kaihuman-palette.sock` and exits. It links only libc and takes a few milliseconds. With no daemon running, `toggle`, `show` and `braindump` start one.
+- `kaihuman-palette` itself accepts the same commands, but loads WebKitGTK and is slower.
 - The palette window is created hidden, 620×420, undecorated, transparent and not resizable. `layer.rs` makes it a `wlr-layer-shell` overlay with exclusive keyboard mode, anchored to all edges of the focused output.
 - Without layer-shell (GNOME, X11) it opens as an ordinary window.
 - The daemon sets `GDK_BACKEND=wayland` when `WAYLAND_DISPLAY` is set.
@@ -69,17 +69,17 @@ The socket protocol (`Command`, `parse_request`) is in `src-tauri/src/lib.rs`. T
 
 <!-- docspack: tags=login,token,keyring,secret service,logout -->
 
-The palette needs a GitHub token from the Lifosy console. Log in either way:
+The palette needs a GitHub token from the kaihuman console. Log in either way:
 
-- From the palette: run the action **Log in with the Lifosy console**.
-- From a terminal: `lifosy-palette login`.
+- From the palette: run the action **Log in with the kaihuman console**.
+- From a terminal: `kaihuman-palette login`.
 
 ```sh
-lifosy-palette login                          # through the console
-lifosy-palette login --repo owner/name        # and work on this repository
-lifosy-palette login --paste                  # type a token instead (not echoed)
-pass github/palette | lifosy-palette login --paste
-lifosy-palette logout
+kaihuman-palette login                          # through the console
+kaihuman-palette login --repo owner/name        # and work on this repository
+kaihuman-palette login --paste                  # type a token instead (not echoed)
+pass github/palette | kaihuman-palette login --paste
+kaihuman-palette logout
 ```
 
 Both open `app.kaihuman.com/auth/cli`. The console POSTs `token`, `state` and `repo` to `http://localhost:<port>/callback`. The palette listens only on `127.0.0.1`, on a random port, for five minutes, and accepts only its own `state`. The token is checked against the repository, then stored in the Secret Service (gnome-keyring, or KeePassXC). Hyprland starts no Secret Service, so run one, for example `gnome-keyring-daemon --start --components=secrets`. **Switch repository…** lists every repository you logged in with.
@@ -154,7 +154,7 @@ The request is `RUN_COMMAND { command, where }`, with `where` `terminal` or `bac
 
 <!-- docspack: tags=braindump,window,notes,scratch,ctrl+n,ctrl+o,ctrl+f,find,search -->
 
-The braindump window is a plain text window for getting thoughts down fast. Open it with `lifosy-palette-toggle braindump` (bound to a key) for a new braindump, or from `>d` in the palette.
+The braindump window is a plain text window for getting thoughts down fast. Open it with `kaihuman-palette-toggle braindump` (bound to a key) for a new braindump, or from `>d` in the palette.
 
 | Key | Effect |
 | --- | --- |
@@ -164,7 +164,7 @@ The braindump window is a plain text window for getting thoughts down fast. Open
 | ⌃⏎ | Copy all and hide |
 | ⌃F | Find in the text: every match is highlighted, ⏎ / ⇧⏎ go to the next / previous one, Esc goes back to the text with the match selected |
 
-It is a normal window, not an overlay, so other windows stay usable. Its title is always `lifosy-braindump`. To float it in Hyprland ≤ 0.54: `windowrule = float, title:^(lifosy-braindump)$`, plus `center` and `size 760 520`. Check the rule syntax for Lua configs (0.55+). The status line shows the title and `saved here`, `synced 10:42`, or why a sync failed.
+It is a normal window, not an overlay, so other windows stay usable. Its title is always `kaihuman-braindump`. To float it in Hyprland ≤ 0.54: `windowrule = float, title:^(kaihuman-braindump)$`, plus `center` and `size 760 520`. Check the rule syntax for Lua configs (0.55+). The status line shows the title and `saved here`, `synced 10:42`, or why a sync failed.
 
 Code: `packages/palette/src/braindump-window.ts` (`createBraindumpWindow`), `apps/desktop-palette/src/braindump.ts`, `braindump.html`.
 
@@ -182,7 +182,7 @@ Braindumps save locally first, then sync to the active repository.
 - **Offline**: nothing is lost; unsent changes go out on the next sync.
 - A delete removes only the version this machine last saw; an edit made elsewhere comes back.
 
-Local copies live in `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/`: `<id>.md` is the text, `<id>.json` holds GitHub's last `{ sha, text }`. Only the active repository syncs. Code: `src-tauri/src/braindumps.rs`; design in `doc/braindump.md`.
+Local copies live in `$XDG_DATA_HOME/kaihuman/braindumps/<owner>/<name>/`: `<id>.md` is the text, `<id>.json` holds GitHub's last `{ sha, text }`. Only the active repository syncs. Code: `src-tauri/src/braindumps.rs`; design in `doc/braindump.md`.
 
 ## Listing and deleting braindumps with >d
 
@@ -194,7 +194,7 @@ Local copies live in `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/`: `<id>.m
 - ⇥ or → offers **Open in the braindump window** and **Delete…**.
 - **Delete…** asks you to type `DELETE`. It removes the braindump here (`SAVE_BRAINDUMP` with empty text) and syncs at once. Offline, it says the repo follows on the next sync.
 
-Below them, under *Old dumps — on this machine only*, are dumps from before braindumps (`$XDG_DATA_HOME/lifosy/dumps/*.txt`). They open in the palette's own editor: ⌃⏎ copies all, ⌃S saves to a path (`EXPORT_DUMP`), and clearing the text deletes it. **⇥ → Delete…** removes one. No new old dumps are made, and none are sent to GitHub.
+Below them, under *Old dumps — on this machine only*, are dumps from before braindumps (`$XDG_DATA_HOME/kaihuman/dumps/*.txt`). They open in the palette's own editor: ⌃⏎ copies all, ⌃S saves to a path (`EXPORT_DUMP`), and clearing the text deletes it. **⇥ → Delete…** removes one. No new old dumps are made, and none are sent to GitHub.
 
 ## Starting a Claude Code session with >c
 
@@ -219,7 +219,7 @@ An empty prompt is refused with `Type a prompt for Claude Code`. The session lan
 - Once the cache is 5 minutes old, it syncs in the background and replaces the rows.
 - An expired OAuth token is refreshed and written back to that account's `.credentials.json` (mode 600).
 
-Requests: `GET_CLAUDE_USAGE` and `GET_CLAUDE_USAGE { cached: true }`. The cache is `$XDG_CACHE_HOME/lifosy/claude-usage.json`. Code: `src-tauri/src/claude.rs`, `packages/palette/src/claude-usage.ts`.
+Requests: `GET_CLAUDE_USAGE` and `GET_CLAUDE_USAGE { cached: true }`. The cache is `$XDG_CACHE_HOME/kaihuman/claude-usage.json`. Code: `src-tauri/src/claude.rs`, `packages/palette/src/claude-usage.ts`.
 
 ## Setting the DeepL key for >t on the desktop
 
@@ -231,7 +231,7 @@ The desktop looks up the DeepL key on every translation. The first match wins:
 2. `~/.config/envvars/deepl.env` (`$XDG_CONFIG_HOME/envvars/deepl.env`), a `DEEPL_AUTH_KEY=…` or `DEEPL_API_KEY=…` line. `export` and quotes are allowed.
 3. The Secret Service, where the **Set the DeepL API key…** action stores it.
 
-Editing the env file needs no daemon restart. The last 20 translated texts are kept in `$XDG_STATE_HOME/lifosy/translations.json`. Code: `src-tauri/src/translate.rs` and `config.rs`.
+Editing the env file needs no daemon restart. The last 20 translated texts are kept in `$XDG_STATE_HOME/kaihuman/translations.json`. Code: `src-tauri/src/translate.rs` and `config.rs`.
 
 ## Keeping the same repository as the browser extension
 
@@ -240,14 +240,14 @@ Editing the env file needs no daemon restart. The last 20 translated texts are k
 The palette and the extension each remember an active repository. Register the palette as the extension's native messaging host to keep them in step:
 
 ```sh
-lifosy-palette native-host install <extension id>   # the id is on chrome://extensions
+kaihuman-palette native-host install <extension id>   # the id is on chrome://extensions
 ```
 
-- It writes `com.lifosy.palette.json` into `NativeMessagingHosts/` of every Chrome, Chromium, Brave, Edge or Vivaldi profile under `$XDG_CONFIG_HOME`, allowing only that extension.
+- It writes `com.kaihuman.palette.json` into `NativeMessagingHosts/` of every Chrome, Chromium, Brave, Edge or Vivaldi profile under `$XDG_CONFIG_HOME`, allowing only that extension.
 - Reload the extension afterwards.
 - Each side records when its repository changed; the newer choice wins.
 - The extension asks when a start page opens (at most every 30 s) and hourly, and tells the palette when you switch there.
-- Chrome starts `lifosy-palette` per message (`SYNC_REPO`), so the daemon need not run.
+- Chrome starts `kaihuman-palette` per message (`SYNC_REPO`), so the daemon need not run.
 - Flatpak and Snap browsers cannot start host programs without extra sandbox setup.
 
 Code: `src-tauri/src/native_host.rs`.
@@ -261,14 +261,14 @@ The webview talks to Rust through `window.__TAURI__.core.invoke`. Commands regis
 | Tauri command | Purpose |
 | --- | --- |
 | `palette_request` | Every `PaletteProtocol` request; handles `OPEN_BRAINDUMP` itself, the rest in `requests::handle` |
-| `console_login` | **Log in with the Lifosy console**; hides the overlay, reports by notification |
+| `console_login` | **Log in with the kaihuman console**; hides the overlay, reports by notification |
 | `copy_text` | Copies with `wl-copy` |
 | `hide_palette`, `hide_braindump` | The page hid itself |
 | `webview_ready`, `braindump_ready` | The page is listening; replays a cold-start command |
 
 Events from Rust: `palette:show`, `palette:hide`, `braindump:open` (`{ id }`), `braindump:hidden`.
 
-`Request` in `src-tauri/src/requests.rs` mirrors the protocol. Desktop-only requests: `RUN_COMMAND`, `SEARCH_LOCAL_FILES`, `OPEN_LOCAL_FILE`, `LIST_CLAUDE_CODE_REPOS`, `GET_CLAUDE_USAGE`, `LIST_DUMPS`, `SAVE_DUMP`, `EXPORT_DUMP`, `LIST_BRAINDUMPS`, `SAVE_BRAINDUMP`, `SYNC_BRAINDUMPS`, `OPEN_BRAINDUMP`, `LIST_WIFI`, `SET_WIFI`, `CONNECT_WIFI`. Unknown request types fall into `BrowserOnly` and are rejected. For tests, `LIFOSY_GITHUB_TOKEN` replaces the keyring and `LIFOSY_GITHUB_API` points at a stand-in for `https://api.github.com`.
+`Request` in `src-tauri/src/requests.rs` mirrors the protocol. Desktop-only requests: `RUN_COMMAND`, `SEARCH_LOCAL_FILES`, `OPEN_LOCAL_FILE`, `LIST_CLAUDE_CODE_REPOS`, `GET_CLAUDE_USAGE`, `LIST_DUMPS`, `SAVE_DUMP`, `EXPORT_DUMP`, `LIST_BRAINDUMPS`, `SAVE_BRAINDUMP`, `SYNC_BRAINDUMPS`, `OPEN_BRAINDUMP`, `LIST_WIFI`, `SET_WIFI`, `CONNECT_WIFI`. Unknown request types fall into `BrowserOnly` and are rejected. For tests, `KAIHUMAN_GITHUB_TOKEN` replaces the keyring and `KAIHUMAN_GITHUB_API` points at a stand-in for `https://api.github.com`.
 
 ## Files the desktop palette stores
 
@@ -276,17 +276,17 @@ Events from Rust: `palette:show`, `palette:hide`, `braindump:open` (`{ id }`), `
 
 | Path | Holds |
 | --- | --- |
-| `$XDG_CONFIG_HOME/lifosy/palette.json` | Current repository, when it changed, repositories used |
-| `$XDG_CACHE_HOME/lifosy/bookmarks.json` | `.kh/browser.bookmarks.json` as last fetched, with its ETag (one hour) |
-| `$XDG_CACHE_HOME/lifosy/commands.json` | `.commands.md` files (five minutes) |
-| `$XDG_CACHE_HOME/lifosy/prompts.json` | `.prompts.md` files (five minutes) |
-| `$XDG_CACHE_HOME/lifosy/palette-settings.json` | `.kh/command-palette.settings.json` (five minutes) |
-| `$XDG_CACHE_HOME/lifosy/claude-usage.json` | Last `>u` fetch |
-| `$XDG_STATE_HOME/lifosy/recents.json` | The main search's last ten actions and opens |
-| `$XDG_STATE_HOME/lifosy/mode-recents.json` | Last 10 choices per prefix |
-| `$XDG_STATE_HOME/lifosy/translations.json` | Last 20 `>t` texts |
-| `$XDG_DATA_HOME/lifosy/dumps/*.txt` | Old dumps from before braindumps |
-| `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/` | Braindumps (`<id>.md`, `<id>.json`) |
+| `$XDG_CONFIG_HOME/kaihuman/palette.json` | Current repository, when it changed, repositories used |
+| `$XDG_CACHE_HOME/kaihuman/bookmarks.json` | `.kh/browser.bookmarks.json` as last fetched, with its ETag (one hour) |
+| `$XDG_CACHE_HOME/kaihuman/commands.json` | `.commands.md` files (five minutes) |
+| `$XDG_CACHE_HOME/kaihuman/prompts.json` | `.prompts.md` files (five minutes) |
+| `$XDG_CACHE_HOME/kaihuman/palette-settings.json` | `.kh/command-palette.settings.json` (five minutes) |
+| `$XDG_CACHE_HOME/kaihuman/claude-usage.json` | Last `>u` fetch |
+| `$XDG_STATE_HOME/kaihuman/recents.json` | The main search's last ten actions and opens |
+| `$XDG_STATE_HOME/kaihuman/mode-recents.json` | Last 10 choices per prefix |
+| `$XDG_STATE_HOME/kaihuman/translations.json` | Last 20 `>t` texts |
+| `$XDG_DATA_HOME/kaihuman/dumps/*.txt` | Old dumps from before braindumps |
+| `$XDG_DATA_HOME/kaihuman/braindumps/<owner>/<name>/` | Braindumps (`<id>.md`, `<id>.json`) |
 
 The token is never written to a file; it is in the Secret Service. Paths are built in `src-tauri/src/config.rs`, falling back to `~/.config`, `~/.cache`, `~/.local/state` and `~/.local/share`.
 
@@ -294,11 +294,11 @@ The token is never written to a file; it is in the Secret Service. Paths are bui
 
 <!-- docspack: tags=errors,not logged in,tiled window,keyring,debug -->
 
-- **"Not logged in"** in the status line: run **Log in with the Lifosy console**, or `lifosy-palette login`.
+- **"Not logged in"** in the status line: run **Log in with the kaihuman console**, or `kaihuman-palette login`.
 - **Keyring errors**: no Secret Service is running. Start `gnome-keyring-daemon --start --components=secrets` or enable KeePassXC's Secret Service.
 - **It opens as a normal, tiled window**: the compositor has no layer-shell (GNOME), or GTK picked X11. Check that `WAYLAND_DISPLAY` is set.
 - **Copy fails**: install `wl-clipboard` for `wl-copy`.
 - **Run in terminal fails**: install `ghostty`.
-- **Daemon output**: run `lifosy-palette daemon` in a terminal instead of from the compositor.
+- **Daemon output**: run `kaihuman-palette daemon` in a terminal instead of from the compositor.
 - **NVIDIA or rendering glitches**: `WEBKIT_DISABLE_DMABUF_RENDERER=1` is the documented workaround to try.
-- **Stop the daemon**: `lifosy-palette-toggle quit`.
+- **Stop the daemon**: `kaihuman-palette-toggle quit`.

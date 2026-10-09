@@ -200,8 +200,8 @@ export const HabitTracking: StoryObj = {
 
 const mockRepos = [
   { id: '1', name: 'kaihuman-hq/kaihuman', branch: 'main' },
-  { id: '2', name: 'Lifosy/ui', branch: 'develop' },
-  { id: '3', name: 'Lifosy/core', branch: 'feature/repo-selection' },
+  { id: '2', name: 'kaihuman/ui', branch: 'develop' },
+  { id: '3', name: 'kaihuman/core', branch: 'feature/repo-selection' },
 ];
 
 export const ConfiguredDashboard: StoryObj = {
@@ -277,7 +277,7 @@ export const ConfiguredDashboard: StoryObj = {
         opened: ['0_event.events.csv'],
         recentlyOpened: [
           '0_event.events.csv',
-          'my-lifosy-event.lifosy-event.json',
+          'my-kaihuman-event.kaihuman-event.json',
           'testidea .tldraw.json',
           '.lifeos/.readitlater.json',
         ],

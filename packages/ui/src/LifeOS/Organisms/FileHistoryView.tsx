@@ -1,4 +1,4 @@
-import { githubCommitStore } from '@lifosy/core';
+import { githubCommitStore } from '@kaihuman/core';
 import { History, Loader2, X } from 'lucide-preact';
 import { useEffect } from 'preact/hooks';
 import { MonoHeader, MonoText } from '../Atoms/Typography';

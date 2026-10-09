@@ -1,5 +1,5 @@
 {
-  "extends": "@lifosy/config/tsconfig.base.json",
+  "extends": "@kaihuman/config/tsconfig.base.json",
   "compilerOptions": {
     "module": "Preserve",
     "moduleResolution": "Bundler",

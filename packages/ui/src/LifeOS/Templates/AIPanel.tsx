@@ -1,4 +1,4 @@
-import { type AIProvider, aiStore } from '@lifosy/core';
+import { type AIProvider, aiStore } from '@kaihuman/core';
 import { Bot, Loader2, MessageSquare, Send, Trash2, User, X } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';

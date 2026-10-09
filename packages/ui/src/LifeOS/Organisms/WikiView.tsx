@@ -6,7 +6,7 @@ import {
   Logger,
   layoutStore,
   type TreeItem,
-} from '@lifosy/core';
+} from '@kaihuman/core';
 import hljs from 'highlight.js/lib/core';
 import json from 'highlight.js/lib/languages/json';
 import { Check, ChevronDown, ChevronRight, Copy, Edit3, FileText, Menu, X } from 'lucide-preact';

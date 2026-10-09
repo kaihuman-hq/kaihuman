@@ -1,4 +1,4 @@
-import { ActionLogView, StatusBar } from '@lifosy/ui';
+import { ActionLogView, StatusBar } from '@kaihuman/ui';
 import { route } from 'preact-router';
 
 export const ActionLogViewPage = () => (

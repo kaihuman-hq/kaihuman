@@ -12,7 +12,7 @@ import {
   type GithubWorkFilter,
   type GithubWorkItem,
   type Translation,
-} from '@lifosy/palette';
+} from '@kaihuman/palette';
 
 export interface PromptFile {
   path: string;

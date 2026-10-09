@@ -1,4 +1,4 @@
-import type { NavItemId } from '@lifosy/core';
+import type { NavItemId } from '@kaihuman/core';
 import {
   Archive,
   BookOpen,

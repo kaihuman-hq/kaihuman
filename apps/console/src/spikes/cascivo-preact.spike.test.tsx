@@ -4,7 +4,7 @@ import { expect, test } from 'vitest';
 import { Button } from '../../../../packages/ui/src/components/Button';
 
 // KEYSTONE SPIKE: prove the @cascivo/react Button (uses @cascivo/core signals),
-// via the @lifosy/ui wrapper, mounts under Preact (preact/compat + signals-react
+// via the @kaihuman/ui wrapper, mounts under Preact (preact/compat + signals-react
 // bridge). If the import chain or the useSignals no-op were broken, mounting
 // would throw.
 test('cascivo Button mounts and renders under preact/compat', () => {

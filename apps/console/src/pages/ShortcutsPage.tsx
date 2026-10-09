@@ -1,4 +1,4 @@
-import { StatusBar } from '@lifosy/ui';
+import { StatusBar } from '@kaihuman/ui';
 import { ArrowLeft, ExternalLink, Share2, Smartphone } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { route } from 'preact-router';

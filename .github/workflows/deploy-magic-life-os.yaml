@@ -18,7 +18,7 @@ permissions:
 
 
 jobs:
-  publish-lifosy:
+  publish-kaihuman:
     uses: ./.github/workflows/template-deploy-to-cloudflare.yaml
     with:
       buildTarget: console:build

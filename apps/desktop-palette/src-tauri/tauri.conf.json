@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "lifosy-palette",
+  "productName": "kaihuman-palette",
   "version": "0.1.0",
-  "identifier": "com.lifosy.palette",
+  "identifier": "com.kaihuman.palette",
   "build": {
     "frontendDist": "../dist"
   },

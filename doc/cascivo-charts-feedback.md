@@ -1,6 +1,6 @@
 # Cascivo Charts — Feedback for Zero-Downside Adoption
 
-**Goal:** what `@cascivo/react`'s chart components need so `@lifosy/ui`'s
+**Goal:** what `@cascivo/react`'s chart components need so `@kaihuman/ui`'s
 `DonutChart` and `StackedBarChart` (used by `TodoAnalytics`) can be replaced by
 Cascivo with **no loss of fidelity or behavior**.
 

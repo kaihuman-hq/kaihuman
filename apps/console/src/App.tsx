@@ -1,5 +1,5 @@
-import { authStore } from '@lifosy/core';
-import { NotFound } from '@lifosy/ui';
+import { authStore } from '@kaihuman/core';
+import { NotFound } from '@kaihuman/ui';
 
 import { Route, Router, route } from 'preact-router';
 import { ExtensionAuthBridge } from './components/ExtensionAuthBridge';

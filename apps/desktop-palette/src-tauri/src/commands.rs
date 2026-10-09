@@ -37,7 +37,7 @@ pub fn run(command: &str, place: Where) -> Result<(), String> {
                     "bash",
                     "-c",
                     TERMINAL_SCRIPT,
-                    "lifosy-command",
+                    "kaihuman-command",
                     command,
                 ])
                 .current_dir(home())
@@ -120,7 +120,7 @@ mod tests {
             .args([
                 "-c",
                 TERMINAL_SCRIPT.split("; echo;").next().unwrap(),
-                "lifosy-command",
+                "kaihuman-command",
                 "echo \"it's $((1 + 1))\"",
             ])
             .output()

@@ -1,4 +1,4 @@
-import type { CommandPaletteSettings, PaletteToolSetting } from '@lifosy/formats';
+import type { CommandPaletteSettings, PaletteToolSetting } from '@kaihuman/formats';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { Bookmark } from './bookmarks.js';
 import {

@@ -1,4 +1,4 @@
-import { enterDemoMode, isDemoMode } from '@lifosy/core';
+import { enterDemoMode, isDemoMode } from '@kaihuman/core';
 import { useEffect } from 'preact/hooks';
 import { route } from 'preact-router';
 

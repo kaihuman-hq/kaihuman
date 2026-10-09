@@ -1,6 +1,6 @@
 # Terminal CLI
 
-The terminal CLI is a Rust program in `apps/cli` whose binary is called `cli` (crate `cli`, version `0.1.0`, npm workspace name `@lifosy/cli`). Run with no arguments, it opens an interactive terminal UI built with `ratatui` and `crossterm` for notes, knowledge captures, repo selection, a file browser and editor, a dashboard view and an AI prompt. It also has two subcommands: `cli server` starts a local AI proxy over HTTP, and `cli capture` writes a knowledge note to `.kh/raw/` with an offline spool. It signs in with GitHub through the web console and works on one active GitHub repository at a time.
+The terminal CLI is a Rust program in `apps/cli` whose binary is called `cli` (crate `cli`, version `0.1.0`, npm workspace name `@kaihuman/cli`). Run with no arguments, it opens an interactive terminal UI built with `ratatui` and `crossterm` for notes, knowledge captures, repo selection, a file browser and editor, a dashboard view and an AI prompt. It also has two subcommands: `cli server` starts a local AI proxy over HTTP, and `cli capture` writes a knowledge note to `.kh/raw/` with an offline spool. It signs in with GitHub through the web console and works on one active GitHub repository at a time.
 
 ## Building and running the CLI
 <!-- docspack: tags=install,cargo,compile,release binary -->
@@ -227,7 +227,7 @@ cli server -p 3000
 ## Where the CLI stores config and data
 <!-- docspack: tags=config directory,auth.json,data location,xdg -->
 
-The config directory comes from `ProjectDirs::from("com", "lifosy", "cli")` (the `directories` crate). On Linux it is `$XDG_CONFIG_HOME/cli`, which is `~/.config/cli`. On macOS it is `~/Library/Application Support/com.lifosy.cli`.
+The config directory comes from `ProjectDirs::from("com", "kaihuman", "cli")` (the `directories` crate). On Linux it is `$XDG_CONFIG_HOME/cli`, which is `~/.config/cli`. On macOS it is `~/Library/Application Support/com.kaihuman.cli`; a `com.lifosy.cli` directory from before October 2026 is moved there on the next start.
 
 | Path in config dir | Contents |
 |---|---|

@@ -7,7 +7,7 @@ import {
   parseReadItLater,
   type ReadItLaterItem,
   serializeReadItLater,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import { Archive, Check, ExternalLink, RefreshCw, RotateCcw, Trash2 } from 'lucide-preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';

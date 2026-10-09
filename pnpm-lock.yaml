@@ -199,10 +199,10 @@ importers:
 
   apps/browser-extension:
     dependencies:
-      '@lifosy/formats':
+      '@kaihuman/formats':
         specifier: workspace:*
         version: link:../../packages/formats
-      '@lifosy/palette':
+      '@kaihuman/palette':
         specifier: workspace:*
         version: link:../../packages/palette
       preact:
@@ -256,13 +256,13 @@ importers:
       '@cascivo/themes':
         specifier: ^1.0.0
         version: 1.0.0
-      '@lifosy/core':
+      '@kaihuman/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@lifosy/formats':
+      '@kaihuman/formats':
         specifier: workspace:*
         version: link:../../packages/formats
-      '@lifosy/ui':
+      '@kaihuman/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       '@preact/signals':
@@ -284,7 +284,7 @@ importers:
       '@biomejs/biome':
         specifier: 2.3.11
         version: 2.3.11
-      '@lifosy/config':
+      '@kaihuman/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@preact/preset-vite':
@@ -314,7 +314,7 @@ importers:
 
   apps/desktop-palette:
     dependencies:
-      '@lifosy/palette':
+      '@kaihuman/palette':
         specifier: workspace:*
         version: link:../../packages/palette
 
@@ -387,7 +387,7 @@ importers:
       '@biomejs/biome':
         specifier: 2.3.11
         version: 2.3.11
-      '@lifosy/config':
+      '@kaihuman/config':
         specifier: workspace:*
         version: link:../config
       typescript:
@@ -403,7 +403,7 @@ importers:
 
   packages/palette:
     dependencies:
-      '@lifosy/formats':
+      '@kaihuman/formats':
         specifier: workspace:*
         version: link:../formats
 
@@ -436,10 +436,10 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@18.3.1)
-      '@lifosy/core':
+      '@kaihuman/core':
         specifier: workspace:*
         version: link:../core
-      '@lifosy/formats':
+      '@kaihuman/formats':
         specifier: workspace:*
         version: link:../formats
       '@preact/signals':

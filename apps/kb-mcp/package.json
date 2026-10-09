@@ -1,11 +1,11 @@
 {
-  "name": "@lifosy/kb-mcp",
+  "name": "@kaihuman/kb-mcp",
   "version": "0.1.0",
   "private": true,
-  "description": "MCP server exposing a local Lifosy .kh knowledge base to LLM agents",
+  "description": "MCP server exposing a local kaihuman .kh knowledge base to LLM agents",
   "type": "module",
   "bin": {
-    "lifosy-kb-mcp": "dist/index.js"
+    "kaihuman-kb-mcp": "dist/index.js"
   },
   "files": [
     "dist"

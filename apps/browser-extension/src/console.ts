@@ -1,6 +1,6 @@
-import { CONSOLE_URL } from '@lifosy/palette';
+import { CONSOLE_URL } from '@kaihuman/palette';
 
-// Defined with the shared palette, whose "Open the Lifosy console" action needs it too.
+// Defined with the shared palette, whose "Open the kaihuman console" action needs it too.
 export { CONSOLE_URL };
 
 /**

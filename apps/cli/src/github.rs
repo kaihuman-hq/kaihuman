@@ -53,7 +53,7 @@ impl GithubClient {
         let mut auth_value = HeaderValue::from_str(&format!("Bearer {}", token))?;
         auth_value.set_sensitive(true);
         headers.insert(AUTHORIZATION, auth_value);
-        headers.insert(USER_AGENT, HeaderValue::from_static("lifosy-cli"));
+        headers.insert(USER_AGENT, HeaderValue::from_static("kaihuman-cli"));
 
         let client = reqwest::Client::builder()
             .default_headers(headers)

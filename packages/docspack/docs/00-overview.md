@@ -1,24 +1,24 @@
-# Lifosy
+# kaihuman
 
-Lifosy is a personal life OS: notes, todos, habits, dashboards, bookmarks and a knowledge base, all stored as plain files in a GitHub repository you own. The product faces users under the name kaihuman (web app at `https://app.kaihuman.com`), while the code, packages and binaries use the name Lifosy (`@lifosy/*`, `lifosy-palette`). The monorepo `kaihuman-hq/kaihuman` holds a web console, a terminal CLI, a browser extension, a desktop command palette, an MCP server and the landing pages.
+kaihuman is a personal life OS: notes, todos, habits, dashboards, bookmarks and a knowledge base, all stored as plain files in a GitHub repository you own. The web app is at `https://app.kaihuman.com`; the code, packages and binaries use the same name (`@kaihuman/*`, `kaihuman-palette`). The monorepo `kaihuman-hq/kaihuman` holds a web console, a terminal CLI, a browser extension, a desktop command palette, an MCP server and the landing pages.
 
-## Lifosy vs kaihuman: which name is which
+## kaihuman, LifeOS and Lifosy: which name is which
 <!-- docspack: tags=naming,brand,kaihuman,lifosy,lifeos -->
 
-The project uses three names. They all refer to the same product.
+The project has had three names. They all refer to the same product.
 
 | Name | Where it appears |
 | --- | --- |
-| kaihuman | The brand: landing pages, the app at `https://app.kaihuman.com`, the console title, the popup header |
-| Lifosy | Code and packages: `@lifosy/app-console`, `@lifosy/core`, `lifosy-palette`, the GitHub org `lifosy` |
+| kaihuman | Everything current: landing pages, the app at `https://app.kaihuman.com`, packages (`@kaihuman/core`), binaries (`kaihuman-palette`) |
 | LifeOS | Older code: the `.lifeos/` app folder, the IndexedDB database `life-os-db`, `localStorage` keys such as `lifeos_gh_token` |
+| Lifosy | The former code name, replaced by kaihuman in October 2026. Apps move their local files from the old `lifosy` locations on first start |
 
 "Kai" (改) stands for kaizen, continuous improvement. The tagline is "The ever-improving human". The data folder in a repository is `.kh/` (for kaihuman). Code that reads it falls back to the legacy `.lifeos/` folder when `.kh/` does not exist.
 
-## What the idea behind Lifosy is
+## What the idea behind kaihuman is
 <!-- docspack: tags=concept,philosophy,local-first,plain-files -->
 
-Lifosy treats your life data as files in your own GitHub repositories. There is no Lifosy database server holding your notes.
+kaihuman treats your life data as files in your own GitHub repositories. There is no kaihuman database server holding your notes.
 
 - Every widget is backed by a file with a known suffix, for example `.todos.md`, `.habit.csv`, `.events.csv`, `.actionlog.md`, `.bookmarks.json`.
 - The files are human-readable Markdown, CSV or JSON. You can edit them in any editor, grep them, or open them on github.com.
@@ -52,12 +52,12 @@ The `packages/` folder holds code that more than one app uses. The "Doc" column 
 
 | Package | Name | What it holds | Doc |
 | --- | --- | --- | --- |
-| `packages/core` | `@lifosy/core` | GitHub service, auth and file stores (Preact Signals), IndexedDB cache, demo mode | Shared packages |
-| `packages/ui` | `@lifosy/ui` | Shared Preact UI components, the editor, Storybook | Shared packages |
-| `packages/formats` | `@lifosy/formats` | Parsers and writers for every widget file format (todos, action logs, events, prompts, commands, habits, time tracking, timezones, read later) | Repo file formats |
-| `packages/palette` | `@lifosy/palette` | The command palette UI and protocol shared by the extension and the desktop palette | Command palette |
-| `packages/config` | `@lifosy/config` | Shared `tsconfig.base.json`, `biome.json` and `tailwind-preset.js` | Shared packages |
-| `packages/docspack` | `@lifosy/docspack` | This documentation, packaged for AI agents | Developing in the monorepo |
+| `packages/core` | `@kaihuman/core` | GitHub service, auth and file stores (Preact Signals), IndexedDB cache, demo mode | Shared packages |
+| `packages/ui` | `@kaihuman/ui` | Shared Preact UI components, the editor, Storybook | Shared packages |
+| `packages/formats` | `@kaihuman/formats` | Parsers and writers for every widget file format (todos, action logs, events, prompts, commands, habits, time tracking, timezones, read later) | Repo file formats |
+| `packages/palette` | `@kaihuman/palette` | The command palette UI and protocol shared by the extension and the desktop palette | Command palette |
+| `packages/config` | `@kaihuman/config` | Shared `tsconfig.base.json`, `biome.json` and `tailwind-preset.js` | Shared packages |
+| `packages/docspack` | `@kaihuman/docspack` | This documentation, packaged for AI agents | Developing in the monorepo |
 
 The knowledge-base concepts (`.kh/raw/`, `.kh/wiki/`, `/kb-ingest`) are covered in the "Knowledge base" doc.
 
@@ -68,7 +68,7 @@ The GitHub repository is the single source of truth. Each app talks to it in its
 
 - **Web console:** reads the repository tree and files through the GitHub REST API (`githubService` in `packages/core`). Files are cached in IndexedDB (`life-os-db`, stores `files` and `trees`). Saves commit through the API against the file's last known `sha`.
 - **Browser extension:** calls the GitHub API from its service worker. It caches bookmarks and pinned-tab groups in `chrome.storage.local` and refreshes them at most once an hour, using `ETag`/`If-None-Match` so unchanged files cost a `304`.
-- **Desktop palette:** a Rust backend calls the GitHub API and caches files under `$XDG_CACHE_HOME/lifosy/`.
+- **Desktop palette:** a Rust backend calls the GitHub API and caches files under `$XDG_CACHE_HOME/kaihuman/`.
 - **Terminal CLI:** keeps a shallow git clone of the active repository in its config directory (`repos/<owner>/<repo>`) and syncs it before file operations.
 - **kb-mcp:** reads a local clone on disk; it never calls GitHub.
 
@@ -86,7 +86,7 @@ Offline behaviour differs per app.
 - **Desktop palette braindumps:** saved locally as you type, synced later; a failed sync is retried a minute later.
 - **Browser extension:** serves bookmarks and tab groups from its cache; writes (saving a bookmark, loading a group change) need the network.
 
-## Where my data lives and what Lifosy stores
+## Where my data lives and what kaihuman stores
 <!-- docspack: tags=privacy,security,data,token,local-first,server,copy of my notes,cloud -->
 
 Your content lives only in your GitHub repository. Each app keeps local copies and a GitHub token on your machine.
@@ -96,7 +96,7 @@ Your content lives only in your GitHub repository. Each app keeps local copies a
 | Web console | IndexedDB `life-os-db` (`auth` store), mirrored in `localStorage` key `lifeos_gh_token` | IndexedDB `files` and `trees` stores |
 | Terminal CLI | `auth.json` in the CLI config directory | shallow clone under `repos/`, `spool/` |
 | Browser extension | `chrome.storage.local` | `chrome.storage.local` |
-| Desktop palette | the Secret Service (gnome-keyring, KeePassXC), never a file | `$XDG_CACHE_HOME/lifosy/`, `$XDG_DATA_HOME/lifosy/` |
+| Desktop palette | the Secret Service (gnome-keyring, KeePassXC), never a file | `$XDG_CACHE_HOME/kaihuman/`, `$XDG_DATA_HOME/kaihuman/` |
 
 Demo mode (`/demo`, or **View demo** on the login screen) uses seeded in-memory data and writes nothing to `localStorage` or IndexedDB. The extension and palette only send data to GitHub, plus DeepL for `>t` translations when you set a key. AI assistant links (`>a`) only build a URL.
 
@@ -112,7 +112,7 @@ All apps authenticate with a GitHub token. The web console is where the token is
 The other apps take the token from the console:
 
 - **CLI:** press `l`. The CLI starts a callback server on `127.0.0.1` and opens the console. The console POSTs the token, the repository and a random `state` back.
-- **Desktop palette:** `lifosy-palette login` (or **Log in with the Lifosy console**) opens `app.kaihuman.com/auth/cli` and receives the token the same way.
-- **Browser extension:** while you are logged in, the console exposes the token on `document.body` as `data-lifosy-auth` (`ExtensionAuthBridge`). The extension's content script reads it and sends an `AUTH_TOKEN_UPDATE` message to the service worker. Before that, the start page shows only **Open Console**.
+- **Desktop palette:** `kaihuman-palette login` (or **Log in with the kaihuman console**) opens `app.kaihuman.com/auth/cli` and receives the token the same way.
+- **Browser extension:** while you are logged in, the console exposes the token on `document.body` as `data-kaihuman-auth` (`ExtensionAuthBridge`). The extension's content script reads it and sends an `AUTH_TOKEN_UPDATE` message to the service worker. Before that, the start page shows only **Open Console**.
 
 Logging out of the console sets `lifeos_logged_out` and deletes the stored token.

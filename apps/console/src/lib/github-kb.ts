@@ -1,4 +1,4 @@
-import { authStore, githubService } from '@lifosy/core';
+import { authStore, githubService } from '@kaihuman/core';
 import { getScaffoldFiles, getSkillOnlyFiles, KB_SKILL_VERSION } from './kb-skills';
 
 export type KBFile = { name: string; path: string; sha: string };

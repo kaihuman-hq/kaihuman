@@ -1,4 +1,4 @@
-import { getChartData, parseTimeTracking, type TimeTrackingData } from '@lifosy/formats';
+import { getChartData, parseTimeTracking, type TimeTrackingData } from '@kaihuman/formats';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader } from '../../Atoms/Typography';

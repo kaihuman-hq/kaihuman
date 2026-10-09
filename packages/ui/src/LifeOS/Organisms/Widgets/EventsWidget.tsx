@@ -1,4 +1,4 @@
-import { type EventsData, getUpcomingEvents, parseEvents } from '@lifosy/formats';
+import { type EventsData, getUpcomingEvents, parseEvents } from '@kaihuman/formats';
 import { Calendar, Gift } from 'lucide-preact';
 import { useMemo } from 'preact/hooks';
 import { cn } from '../../../utils';

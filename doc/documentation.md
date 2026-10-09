@@ -103,7 +103,7 @@ Shows workspaces, theme, and all files referenced in `dashboard.config.json`.
 When you open the file browser or dashboard view, the CLI automatically:
 
 1. Clones `https://github.com/<owner>/<repo>` (shallow, depth 1) into
-   `~/.config/cli/repos/<owner>/<repo>/` (Linux; `~/Library/Application Support/com.lifosy.cli/` on macOS)
+   `~/.config/cli/repos/<owner>/<repo>/` (Linux; `~/Library/Application Support/com.kaihuman.cli/` on macOS)
 2. On subsequent opens it runs `git pull --ff-only` to sync.
 
 `Ctrl+S` in the editor writes the file to the local clone, then commits and pushes it in the
@@ -147,8 +147,8 @@ Code or any MCP client. It works on a local clone — for example the CLI's
 `~/.config/cli/repos/<owner>/<repo>`.
 
 ```sh
-pnpm --filter @lifosy/kb-mcp build
-claude mcp add lifosy-kb -- node /path/to/monorepo/apps/kb-mcp/dist/index.js --repo /path/to/clone
+pnpm --filter @kaihuman/kb-mcp build
+claude mcp add kaihuman-kb -- node /path/to/monorepo/apps/kb-mcp/dist/index.js --repo /path/to/clone
 ```
 
 The repo path comes from `--repo`, then `KB_REPO_PATH`, then the current directory.
@@ -167,9 +167,9 @@ See `apps/kb-mcp/README.md` for a `.mcp.json` snippet.
 ## Documentation for AI agents
 
 Everything in this file, and the rest of the monorepo, is also packaged for agents as
-`@lifosy/docspack` (`packages/docspack`). From the repo root:
+`@kaihuman/docspack` (`packages/docspack`). From the repo root:
 
 ```sh
-pnpm --filter @lifosy/docspack build
-pnpm --filter @lifosy/docspack exec docspack preview "how do I capture a note"
+pnpm --filter @kaihuman/docspack build
+pnpm --filter @kaihuman/docspack exec docspack preview "how do I capture a note"
 ```

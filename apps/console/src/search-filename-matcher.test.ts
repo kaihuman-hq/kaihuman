@@ -1,4 +1,4 @@
-import type { TreeItem } from '@lifosy/core';
+import type { TreeItem } from '@kaihuman/core';
 import { describe, expect, it } from 'vitest';
 import { matchFilenames } from '../../../packages/ui/src/LifeOS/Organisms/search-filename-matcher';
 

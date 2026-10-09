@@ -1,4 +1,4 @@
-import { buildDemoSeed, type DashboardConfig, InMemoryGithubService } from '@lifosy/core';
+import { buildDemoSeed, type DashboardConfig, InMemoryGithubService } from '@kaihuman/core';
 import { describe, expect, it } from 'vitest';
 
 const CONFIG_PATH = '.kh/.dashboard.config.json';
@@ -41,7 +41,7 @@ describe('buildDemoSeed', () => {
   });
 
   // Guards the file formats against the widget parsers' expectations
-  // (see the matching *Logic.ts in @lifosy/ui). Asserted structurally to keep
+  // (see the matching *Logic.ts in @kaihuman/ui). Asserted structurally to keep
   // the suite free of the heavy UI bundle.
   it('emits widget files that match the documented formats', () => {
     const f = buildDemoSeed().files;

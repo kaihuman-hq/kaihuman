@@ -2,7 +2,7 @@ cmdspec: "0.1"
 info:
   name: cli
   version: 0.1.0
-  summary: Lifosy terminal UI, local AI proxy server and knowledge capture
+  summary: kaihuman terminal UI, local AI proxy server and knowledge capture
   description: |
     The Rust terminal app in `apps/cli`. Run with no subcommand, it opens an
     interactive terminal UI (ratatui) for notes, knowledge captures, repository
@@ -41,7 +41,7 @@ files:
   - path: $XDG_CONFIG_HOME/cli/auth.json
     role: state
     format: json
-    summary: "GitHub token and active repository ({token, active_repo}); ~/.config/cli on Linux, ~/Library/Application Support/com.lifosy.cli on macOS"
+    summary: "GitHub token and active repository ({token, active_repo}); ~/.config/cli on Linux, ~/Library/Application Support/com.kaihuman.cli on macOS"
   - path: $XDG_CONFIG_HOME/cli/cache.db
     role: cache
     summary: SQLite cache of each repository's file tree

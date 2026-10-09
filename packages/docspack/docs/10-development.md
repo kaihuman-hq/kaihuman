@@ -1,6 +1,6 @@
 # Developing in the monorepo
 
-The Lifosy code lives in one Turborepo monorepo with pnpm workspaces (`apps/*` and `packages/*`, from `pnpm-workspace.yaml`). TypeScript apps use Vite, Biome for lint and format, and Vitest for tests; the CLI and the desktop palette backend are Rust. This page covers the prerequisites, the root commands, per-app commands, CI deployment to Cloudflare Pages, versioning, documentation conventions and how the `@lifosy/docspack` documentation package is built.
+The kaihuman code lives in one Turborepo monorepo with pnpm workspaces (`apps/*` and `packages/*`, from `pnpm-workspace.yaml`). TypeScript apps use Vite, Biome for lint and format, and Vitest for tests; the CLI and the desktop palette backend are Rust. This page covers the prerequisites, the root commands, per-app commands, CI deployment to Cloudflare Pages, versioning, documentation conventions and how the `@kaihuman/docspack` documentation package is built.
 
 ## Prerequisites and the pnpm 12.4.1 install gotcha
 <!-- docspack: tags=setup,install,pnpm,corepack,ERR_PNPM_IGNORED_BUILDS -->
@@ -49,9 +49,9 @@ The root `package.json` scripts call Turborepo tasks defined in `turbo.json`.
 | `pnpm fix` | `turbo run fix` |
 | `pnpm verify` | `fix`, then `build`, `lint`, `format`, `check-types` |
 | `pnpm dev` | `turbo run dev` (all dev servers) |
-| `pnpm dev:console` | `turbo run dev watch` for `@lifosy/app-console` and `@lifosy/ui` |
-| `pnpm console:build` | `turbo run build:prod --filter=@lifosy/app-console` |
-| `pnpm landing-nextgen:build` | `turbo run build --filter=@lifosy/landing-page-nextgen` |
+| `pnpm dev:console` | `turbo run dev watch` for `@kaihuman/app-console` and `@kaihuman/ui` |
+| `pnpm console:build` | `turbo run build:prod --filter=@kaihuman/app-console` |
+| `pnpm landing-nextgen:build` | `turbo run build --filter=@kaihuman/landing-page-nextgen` |
 
 `turbo.json` caches `build` outputs (`dist/**`, `.next/**`, `target/release/**`). `dev` and `watch` are persistent and uncached. `turbo.json` defines no `test` task and no `check` task. So `pnpm turbo test` and `pnpm turbo check` fail with "Could not find task". Use `pnpm check` for lint and types, and `pnpm -r test` (or `pnpm --filter <package> test`) for tests.
 
@@ -64,20 +64,20 @@ Tests run per package with `pnpm --filter <name> test`.
 
 | Package | `test` script | Notes |
 | --- | --- | --- |
-| `@lifosy/app-console` | `vitest run` | `jsdom`, setup in `vitest.setup.ts`; spike tests only under `vitest.spike.config.ts` |
+| `@kaihuman/app-console` | `vitest run` | `jsdom`, setup in `vitest.setup.ts`; spike tests only under `vitest.spike.config.ts` |
 | `browser-extension` | `vitest run` | `jsdom` |
-| `@lifosy/palette` | `vitest run` | `jsdom` |
-| `@lifosy/formats` | `vitest run` | |
-| `@lifosy/kb-mcp` | `vitest run` | |
-| `@lifosy/cli` | `cargo test` | Rust |
+| `@kaihuman/palette` | `vitest run` | `jsdom` |
+| `@kaihuman/formats` | `vitest run` | |
+| `@kaihuman/kb-mcp` | `vitest run` | |
+| `@kaihuman/cli` | `cargo test` | Rust |
 | `desktop-palette` | `test:desktop` | `vite build && cargo test --manifest-path src-tauri/Cargo.toml` |
-| `@lifosy/docspack` | `docspack eval` | retrieval hit rate, see below |
+| `@kaihuman/docspack` | `docspack eval` | retrieval hit rate, see below |
 
 Example:
 
 ```sh
-pnpm --filter @lifosy/formats test
-pnpm --filter @lifosy/app-console test
+pnpm --filter @kaihuman/formats test
+pnpm --filter @kaihuman/app-console test
 cd apps/cli && cargo test
 ```
 
@@ -97,27 +97,27 @@ Settings in `packages/config/biome.json`:
 Each package exposes the same three scripts:
 
 ```sh
-pnpm --filter @lifosy/core lint     # biome check .
-pnpm --filter @lifosy/core format   # biome check --write .
-pnpm --filter @lifosy/core fix      # biome check --write --unsafe .
+pnpm --filter @kaihuman/core lint     # biome check .
+pnpm --filter @kaihuman/core format   # biome check --write .
+pnpm --filter @kaihuman/core fix      # biome check --write --unsafe .
 ```
 
-`@lifosy/ui` limits Biome to `src/`, `vite.config.ts` and `.storybook/`. The Rust app `apps/cli` maps `lint` to `cargo fmt --check && cargo clippy` and `format`/`fix` to `cargo fmt`.
+`@kaihuman/ui` limits Biome to `src/`, `vite.config.ts` and `.storybook/`. The Rust app `apps/cli` maps `lint` to `cargo fmt --check && cargo clippy` and `format`/`fix` to `cargo fmt`.
 
 ## Running each app in development
 <!-- docspack: tags=dev-server,localhost,ports,per-app -->
 
 | App | Command | Result |
 | --- | --- | --- |
-| Web console | `pnpm --filter @lifosy/app-console dev` | Vite on `http://localhost:4300` |
+| Web console | `pnpm --filter @kaihuman/app-console dev` | Vite on `http://localhost:4300` |
 | Browser extension | `cd apps/browser-extension && pnpm dev` | then **Load unpacked** `apps/browser-extension/dist` in `chrome://extensions` |
 | Terminal CLI | `cd apps/cli && cargo run` | TUI; `cargo run -- capture "…"`, `cargo run -- server` |
-| Desktop palette | `cd apps/desktop-palette && pnpm run build:desktop` | UI and both Rust binaries (`lifosy-palette`, `lifosy-palette-toggle`) |
-| kb-mcp | `pnpm --filter @lifosy/kb-mcp build` then `start` | `node dist/index.js` |
-| Landing page | `pnpm --filter @lifosy/landing-page-nextgen dev` | Astro on `localhost:4321` |
-| Storybook | `pnpm --filter @lifosy/ui storybook` | port `6006` |
+| Desktop palette | `cd apps/desktop-palette && pnpm run build:desktop` | UI and both Rust binaries (`kaihuman-palette`, `kaihuman-palette-toggle`) |
+| kb-mcp | `pnpm --filter @kaihuman/kb-mcp build` then `start` | `node dist/index.js` |
+| Landing page | `pnpm --filter @kaihuman/landing-page-nextgen dev` | Astro on `localhost:4321` |
+| Storybook | `pnpm --filter @kaihuman/ui storybook` | port `6006` |
 
-The console imports `@lifosy/ui` from its build, so run `pnpm --filter @lifosy/ui build` once, or use `pnpm dev:console` to watch both. The console dev server runs on port `4300` (`server.port` in `apps/console/vite.config.ts`).
+The console imports `@kaihuman/ui` from its build, so run `pnpm --filter @kaihuman/ui build` once, or use `pnpm dev:console` to watch both. The console dev server runs on port `4300` (`server.port` in `apps/console/vite.config.ts`).
 
 ## Rust toolchain for the CLI and desktop palette
 <!-- docspack: tags=rust,cargo,rustfmt,clippy,rust-toolchain -->
@@ -164,8 +164,8 @@ native check    # typecheck + validate .native / app.zon
 
 | Workflow | Name | Trigger | Builds | Cloudflare Pages project |
 | --- | --- | --- | --- | --- |
-| `deploy-magic-life-os.yaml` | `[PROD] Deploy Life OS` | push to `main` touching `apps/console/**`, or manual | `pnpm run console:build` | `lifosy-console` |
-| `deploy-landing.yml` | `[PROD] Deploy Landing Page` | push to `main` touching `apps/landing-page-nextgen/**`, or manual | `pnpm run landing-nextgen:build` | `lifosy-landing` |
+| `deploy-magic-life-os.yaml` | `[PROD] Deploy Life OS` | push to `main` touching `apps/console/**`, or manual | `pnpm run console:build` | `kaihuman-console` |
+| `deploy-landing.yml` | `[PROD] Deploy Landing Page` | push to `main` touching `apps/landing-page-nextgen/**`, or manual | `pnpm run landing-nextgen:build` | `kaihuman-landing` |
 | `template-deploy-to-cloudflare.yaml` | `Deploy To CloudFlare` | `workflow_call` only | — | input `cfPagesName` |
 
 The template runs on `ubuntu-latest` with Node 22 and pnpm (`pnpm/action-setup@v4`). Steps: `pnpm install`, `pnpm run build`, `pnpm run <buildTarget>`, an optional commit of generated files, then `wrangler pages deploy <distDir> --project-name=<cfPagesName> --branch=main`. It needs the repository secrets `CF_ACCOUNT_ID` and `CF_API_TOKEN`.
@@ -184,9 +184,9 @@ The console version lives in `apps/console/version.json` as `{ "major", "minor",
 - `build:prod` runs the bump, then `vite build --mode prod`. Every production deploy therefore bumps the patch version, and CI commits the result.
 
 ```sh
-pnpm --filter @lifosy/app-console version:bump        # patch
-pnpm --filter @lifosy/app-console version:bump:minor
-pnpm --filter @lifosy/app-console version:bump:major
+pnpm --filter @kaihuman/app-console version:bump        # patch
+pnpm --filter @kaihuman/app-console version:bump:minor
+pnpm --filter @kaihuman/app-console version:bump:major
 ```
 
 `apps/console/VERSION.md` describes the system. Production builds read `.env.prod`, which sets `VITE_GH_LOGIN`.
@@ -209,12 +209,12 @@ A `doc/progress.md` entry has the heading `## YYYY-MM-DD — <title>`, bullets d
 ## Building and checking the docspack documentation package
 <!-- docspack: tags=docspack,docs-package,llms,eval -->
 
-`packages/docspack` publishes this documentation as `@lifosy/docspack`, an npm package that AI agents query offline. Sources are the Markdown files in `packages/docspack/docs/`; `packages/docspack/cmdspec.yaml` describes the `cli` binary, one chunk per command. `package.json` sets `"docspack": { "from": "./docs", "cmdspec": "./cmdspec.yaml" }`.
+`packages/docspack` publishes this documentation as `@kaihuman/docspack`, an npm package that AI agents query offline. Sources are the Markdown files in `packages/docspack/docs/`; `packages/docspack/cmdspec.yaml` describes the `cli` binary, one chunk per command. `package.json` sets `"docspack": { "from": "./docs", "cmdspec": "./cmdspec.yaml" }`.
 
 ```sh
-pnpm --filter @lifosy/docspack build   # docspack build -> .llms/ and llms.txt
-pnpm --filter @lifosy/docspack lint    # docspack build && docspack doctor --strict
-pnpm --filter @lifosy/docspack test    # docspack build && docspack eval ./eval/queries.json --min-hit-rate 90
+pnpm --filter @kaihuman/docspack build   # docspack build -> .llms/ and llms.txt
+pnpm --filter @kaihuman/docspack lint    # docspack build && docspack doctor --strict
+pnpm --filter @kaihuman/docspack test    # docspack build && docspack eval ./eval/queries.json --min-hit-rate 90
 ```
 
 - `build` writes the `.llms/` payload and `llms.txt`; both are git-ignored and published via `files`.
@@ -225,17 +225,17 @@ pnpm --filter @lifosy/docspack test    # docspack build && docspack eval ./eval/
 
 Each doc file has one `#` title and `##` sections phrased as questions. A chunk id is `slug(H1)-slug(H2)`.
 
-## Using the Lifosy docs from another project
+## Using the kaihuman docs from another project
 <!-- docspack: tags=docspack-ask,agents,consumer,sync -->
 
-A project that wants an AI agent to answer Lifosy questions installs the docs package and indexes it locally:
+A project that wants an AI agent to answer kaihuman questions installs the docs package and indexes it locally:
 
 ```sh
-pnpm add -D docspack @lifosy/docspack
+pnpm add -D docspack @kaihuman/docspack
 npx docspack sync                         # index installed docs packages, no network
 npx docspack ask "how do I sign in with GitHub"
 ```
 
 - `docspack sync` reads `node_modules` and indexes every `@vendor/docspack` package into a local SQLite FTS5 store. `--force` re-indexes.
-- `docspack ask` answers from that index. `--package lifosy` limits it to this package, `--limit` sets the number of chunks (default 3).
+- `docspack ask` answers from that index. `--package kaihuman` limits it to this package, `--limit` sets the number of chunks (default 3).
 - One line in the consumer's `CLAUDE.md` or `AGENTS.md` is enough: "Run `docspack ask "<question>"` for documentation on this project's dependencies."

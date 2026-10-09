@@ -7,7 +7,7 @@ import {
   portHandlers,
   repoActions,
   splitTags,
-} from '@lifosy/palette';
+} from '@kaihuman/palette';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   type Bookmark,

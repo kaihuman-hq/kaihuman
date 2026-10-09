@@ -1,11 +1,11 @@
 # Knowledge base MCP server
 
-`@lifosy/kb-mcp` in `apps/kb-mcp` is a stdio MCP server that gives an LLM agent such as Claude Code access to the Lifosy knowledge base in a local repository clone. It reads the `.kh/` folder (or the legacy `.lifeos/` folder) and exposes six tools for searching, reading, listing and adding raw notes. It is written in TypeScript on Node.js 22+ with `@modelcontextprotocol/sdk` and `zod`, and builds to the `lifosy-kb-mcp` bin.
+`@kaihuman/kb-mcp` in `apps/kb-mcp` is a stdio MCP server that gives an LLM agent such as Claude Code access to the kaihuman knowledge base in a local repository clone. It reads the `.kh/` folder (or the legacy `.lifeos/` folder) and exposes six tools for searching, reading, listing and adding raw notes. It is written in TypeScript on Node.js 22+ with `@modelcontextprotocol/sdk` and `zod`, and builds to the `kaihuman-kb-mcp` bin.
 
 ## Which tools the MCP server exposes
 <!-- docspack: tags=tools,kb_search,kb_read,kb_list,kb_index,kb_log,kb_add_raw -->
 
-The server registers itself as `lifosy-kb` version `0.1.0`. Tools are registered in `createKbServer` in `apps/kb-mcp/src/server.ts`:
+The server registers itself as `kaihuman-kb` version `0.1.0`. Tools are registered in `createKbServer` in `apps/kb-mcp/src/server.ts`:
 
 | Tool | Input | Result |
 |---|---|---|
@@ -76,10 +76,10 @@ Prerequisites are Node.js 22 or later and pnpm. From the monorepo root:
 
 ```sh
 pnpm install
-pnpm --filter @lifosy/kb-mcp build
+pnpm --filter @kaihuman/kb-mcp build
 ```
 
-The build runs `tsc -p tsconfig.build.json` and writes `apps/kb-mcp/dist/index.js`. That file is also the package's `lifosy-kb-mcp` bin, and `pnpm --filter @lifosy/kb-mcp start` runs it with `node dist/index.js`.
+The build runs `tsc -p tsconfig.build.json` and writes `apps/kb-mcp/dist/index.js`. That file is also the package's `kaihuman-kb-mcp` bin, and `pnpm --filter @kaihuman/kb-mcp start` runs it with `node dist/index.js`.
 
 ## Choosing which repository the server reads
 <!-- docspack: tags=KB_REPO_PATH,--repo,environment variable,working directory -->
@@ -92,7 +92,7 @@ The build runs `tsc -p tsconfig.build.json` and writes `apps/kb-mcp/dist/index.j
 
 Any other argument is an error, because argument parsing is strict. Inside the repository, the server uses `.kh/` when it exists, else the legacy `.lifeos/`, else `.kh/`, which is created on the first `kb_add_raw`.
 
-The Lifosy CLI clones repositories to `~/.config/cli/repos/<owner>/<repo>` (Linux). When Claude Code runs inside such a clone, no path is needed.
+The kaihuman CLI clones repositories to `~/.config/cli/repos/<owner>/<repo>` (Linux). When Claude Code runs inside such a clone, no path is needed.
 
 ## Adding the server to Claude Code
 <!-- docspack: tags=claude mcp add,claude code,setup -->
@@ -100,13 +100,13 @@ The Lifosy CLI clones repositories to `~/.config/cli/repos/<owner>/<repo>` (Linu
 Register the server for the current project:
 
 ```sh
-claude mcp add lifosy-kb -- node /absolute/path/to/monorepo/apps/kb-mcp/dist/index.js
+claude mcp add kaihuman-kb -- node /absolute/path/to/monorepo/apps/kb-mcp/dist/index.js
 ```
 
 To point it at a specific clone:
 
 ```sh
-claude mcp add lifosy-kb -- node /absolute/path/to/monorepo/apps/kb-mcp/dist/index.js \
+claude mcp add kaihuman-kb -- node /absolute/path/to/monorepo/apps/kb-mcp/dist/index.js \
   --repo ~/.config/cli/repos/<owner>/<repo>
 ```
 
@@ -120,7 +120,7 @@ Put this in `.mcp.json` at the root of the knowledge base repository:
 ```json
 {
   "mcpServers": {
-    "lifosy-kb": {
+    "kaihuman-kb": {
       "command": "node",
       "args": ["/absolute/path/to/monorepo/apps/kb-mcp/dist/index.js"],
       "env": { "KB_REPO_PATH": "." }
@@ -140,8 +140,8 @@ Any MCP client that launches stdio servers can use the same three settings:
 
 stdout carries the MCP protocol, so the server writes all diagnostics to stderr.
 
-- On success it prints `lifosy-kb-mcp serving <kb folder>` to stderr.
-- If the repository path does not exist or is not a directory, it prints `lifosy-kb-mcp: Repository path does not exist or is not a directory: <path>` and exits with code 1.
+- On success it prints `kaihuman-kb-mcp serving <kb folder>` to stderr.
+- If the repository path does not exist or is not a directory, it prints `kaihuman-kb-mcp: Repository path does not exist or is not a directory: <path>` and exits with code 1.
 - An unknown command-line argument also exits with code 1.
 - A missing `wiki/` folder returns an empty page list, not an error.
 - A missing `index.kb.md` or `log.md` makes `kb_index` or `kb_log` fail with `.kh/<file> does not exist in <repo>`.
@@ -152,10 +152,10 @@ stdout carries the MCP protocol, so the server writes all diagnostics to stderr.
 Scripts in `apps/kb-mcp/package.json`:
 
 ```sh
-pnpm --filter @lifosy/kb-mcp build        # tsc to dist/
-pnpm --filter @lifosy/kb-mcp check-types  # tsc --noEmit
-pnpm --filter @lifosy/kb-mcp lint         # biome check
-pnpm --filter @lifosy/kb-mcp test         # vitest run
+pnpm --filter @kaihuman/kb-mcp build        # tsc to dist/
+pnpm --filter @kaihuman/kb-mcp check-types  # tsc --noEmit
+pnpm --filter @kaihuman/kb-mcp lint         # biome check
+pnpm --filter @kaihuman/kb-mcp test         # vitest run
 ```
 
 Source layout in `apps/kb-mcp/src/`:

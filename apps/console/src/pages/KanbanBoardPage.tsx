@@ -1,5 +1,5 @@
-import { githubFileStore } from '@lifosy/core';
-import { KanbanBoard, StatusBar } from '@lifosy/ui';
+import { githubFileStore } from '@kaihuman/core';
+import { KanbanBoard, StatusBar } from '@kaihuman/ui';
 import { route } from 'preact-router';
 
 export const KanbanBoardPage = () => (

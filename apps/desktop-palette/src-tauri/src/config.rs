@@ -1,13 +1,17 @@
 //! Where the palette keeps things, which repository it works on, and the GitHub token.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 /// The same default as the browser extension, so both start out on the same repository.
 pub const DEFAULT_REPO: &str = "kaihuman-hq/kaihuman";
 
-const KEYRING_SERVICE: &str = "lifosy-palette";
+const KEYRING_SERVICE: &str = "kaihuman-palette";
+/// The code name before October 2026: the keyring service and XDG directories it named are moved
+/// over the first time they are missed.
+const OLD_KEYRING_SERVICE: &str = "lifosy-palette";
+const OLD_DIR_NAME: &str = "lifosy";
 const KEYRING_USER: &str = "github-token";
 const KEYRING_DEEPL_USER: &str = "deepl-api-key";
 
@@ -26,9 +30,30 @@ pub fn config_home() -> PathBuf {
     xdg_base("XDG_CONFIG_HOME", ".config")
 }
 
-/// `$XDG_<kind>_HOME/lifosy`.
+/// `$XDG_<kind>_HOME/kaihuman`, taking over `$XDG_<kind>_HOME/lifosy` when only that exists.
 fn xdg_dir(variable: &str, fallback: &str) -> PathBuf {
-    xdg_base(variable, fallback).join("lifosy")
+    let base = xdg_base(variable, fallback);
+    let dir = base.join("kaihuman");
+    if let Err(error) = adopt_old_dir(&base.join(OLD_DIR_NAME), &dir) {
+        eprintln!(
+            "could not move {OLD_DIR_NAME} files to {}: {error}",
+            dir.display()
+        );
+    }
+    dir
+}
+
+/// Renames `old` to `new` when `old` exists and `new` does not; a `new` already there is kept as
+/// it is, so nothing is ever merged or overwritten.
+fn adopt_old_dir(old: &Path, new: &Path) -> std::io::Result<()> {
+    if !old.is_dir() || new.exists() {
+        return Ok(());
+    }
+    match std::fs::rename(old, new) {
+        // Another process moved it first.
+        Err(_) if new.exists() => Ok(()),
+        other => other,
+    }
 }
 
 /// Where the omarchy dotfiles keep one shell env file per secret, sourced by the scripts that need
@@ -195,21 +220,38 @@ fn keyring_entry(user: &str) -> Result<keyring::Entry, String> {
         .map_err(|error| format!("the keyring is unavailable: {error}"))
 }
 
-/// The token from `LIFOSY_GITHUB_TOKEN` if set, else from the Secret Service.
+/// The secret kept for `user`, moved from the old service name the first time it is missing.
+fn stored_secret(user: &str) -> keyring::Result<String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, user)?;
+    match entry.get_password() {
+        Err(keyring::Error::NoEntry) => {
+            let old = keyring::Entry::new(OLD_KEYRING_SERVICE, user)?;
+            let secret = old.get_password()?;
+            entry.set_password(&secret)?;
+            // Stored under the new name, so a stale copy left behind is harmless.
+            let _ = old.delete_credential();
+            Ok(secret)
+        }
+        other => other,
+    }
+}
+
+/// The token from `KAIHUMAN_GITHUB_TOKEN` if set, else from the Secret Service.
 ///
-/// The variable is for development and tests; `lifosy-palette login` is the normal way in, and
+/// The variable is for development and tests; `kaihuman-palette login` is the normal way in, and
 /// nothing ever writes the token to a file.
 pub fn token() -> Result<String, String> {
-    if let Some(token) = std::env::var("LIFOSY_GITHUB_TOKEN")
+    if let Some(token) = std::env::var("KAIHUMAN_GITHUB_TOKEN")
         .ok()
         .filter(|token| !token.is_empty())
     {
         return Ok(token);
     }
-    match keyring_entry(KEYRING_USER)?.get_password() {
+    match stored_secret(KEYRING_USER) {
         Ok(token) => Ok(token),
         Err(keyring::Error::NoEntry) => Err(
-            "Not logged in — run “Log in with the Lifosy console” or `lifosy-palette login`".into(),
+            "Not logged in — run “Log in with the kaihuman console” or `kaihuman-palette login`"
+                .into(),
         ),
         Err(error) => Err(format!(
             "Could not read the token from the keyring ({error}). Is a Secret Service \
@@ -230,10 +272,16 @@ pub fn store_token(token: &str) -> Result<(), String> {
 }
 
 pub fn forget_token() -> Result<(), String> {
-    match keyring_entry(KEYRING_USER)?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(error) => Err(format!("could not remove the token: {error}")),
+    // The old service's copy too, or the next lookup would move it back.
+    for service in [KEYRING_SERVICE, OLD_KEYRING_SERVICE] {
+        let entry = keyring::Entry::new(service, KEYRING_USER)
+            .map_err(|error| format!("the keyring is unavailable: {error}"))?;
+        match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => {}
+            Err(error) => return Err(format!("could not remove the token: {error}")),
+        }
     }
+    Ok(())
 }
 
 /// The DeepL key, looked up on every translation so an edited file needs no daemon restart:
@@ -253,7 +301,7 @@ pub fn deepl_key() -> Result<String, String> {
     {
         return Ok(key);
     }
-    match keyring_entry(KEYRING_DEEPL_USER)?.get_password() {
+    match stored_secret(KEYRING_DEEPL_USER) {
         Ok(key) => Ok(key),
         Err(keyring::Error::NoEntry) => Err(format!(
             "No DeepL API key yet — put DEEPL_AUTH_KEY=… in {}, or run “Set the DeepL API key…”",
@@ -325,7 +373,7 @@ mod tests {
     fn accepts_owner_slash_name_only() {
         assert!(is_repo_name("kaihuman-hq/kaihuman"));
         assert!(is_repo_name("a-b/c_d.e"));
-        for bad in ["lifosy", "a/b/c", "/b", "a/", "a/..", "a b/c", "a/b?x=1"] {
+        for bad in ["kaihuman", "a/b/c", "/b", "a/", "a/..", "a b/c", "a/b?x=1"] {
             assert!(!is_repo_name(bad), "{bad} should be rejected");
         }
     }
@@ -352,7 +400,8 @@ mod tests {
 
     #[test]
     fn json_files_round_trip_and_create_their_directory() {
-        let dir = std::env::temp_dir().join(format!("lifosy-palette-test-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("kaihuman-palette-test-{}", std::process::id()));
         let path = dir.join("nested").join("palette.json");
         let settings = Settings {
             repo: Some("o/r".into()),
@@ -362,5 +411,32 @@ mod tests {
         write_json(&path, &settings).unwrap();
         assert_eq!(read_json::<Settings>(&path), Some(settings));
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn an_old_directory_is_taken_over_only_when_the_new_one_is_missing() {
+        let base = std::env::temp_dir().join(format!("kaihuman-adopt-test-{}", std::process::id()));
+        let (old, new) = (base.join("lifosy"), base.join("kaihuman"));
+        std::fs::create_dir_all(old.join("dumps")).unwrap();
+        std::fs::write(old.join("dumps/1.txt"), "kept").unwrap();
+
+        adopt_old_dir(&old, &new).unwrap();
+        assert!(!old.exists());
+        assert_eq!(
+            std::fs::read_to_string(new.join("dumps/1.txt")).unwrap(),
+            "kept"
+        );
+
+        // Both there: neither is touched.
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::write(old.join("palette.json"), "old").unwrap();
+        adopt_old_dir(&old, &new).unwrap();
+        assert!(old.join("palette.json").exists());
+        assert!(!new.join("palette.json").exists());
+
+        // Nothing old: nothing happens.
+        adopt_old_dir(&base.join("missing"), &base.join("other")).unwrap();
+        assert!(!base.join("other").exists());
+        std::fs::remove_dir_all(base).unwrap();
     }
 }

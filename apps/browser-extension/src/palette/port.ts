@@ -2,7 +2,7 @@
  * The extension's side of the shared palette: every request goes to the service worker, so the
  * palette behaves the same in a content script and on the start page.
  */
-import type { ActionPort } from '@lifosy/palette';
+import type { ActionPort } from '@kaihuman/palette';
 
 /** One message to the service worker; rejects with its error, or with Chrome's. */
 export const send = (message: object): Promise<any> =>

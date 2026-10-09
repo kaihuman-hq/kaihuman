@@ -9,7 +9,7 @@ on a Hyprland machine, so phase 0 is a spike that checks the risky parts first.
 
 ## Goal
 
-Your own app, `lifosy-palette`. Running `lifosy-palette toggle` opens a palette **centered on the
+Your own app, `kaihuman-palette`. Running `kaihuman-palette toggle` opens a palette **centered on the
 focused monitor**, over whatever is tiled there, with the keyboard in its input. It has the same
 content as the extension's palette: bookmarks, repo search, web search and notes. Pinned tab groups
 come later, through the extension.
@@ -18,7 +18,7 @@ come later, through the extension.
 
 | Topic | GNOME (earlier draft) | Hyprland |
 | --- | --- | --- |
-| Hotkey | GNOME custom shortcut; portal broken on GNOME 50 | Yours: `bind = SUPER, SPACE, exec, lifosy-palette toggle` (Lua config since Hyprland 0.55) |
+| Hotkey | GNOME custom shortcut; portal broken on GNOME 50 | Yours: `bind = SUPER, SPACE, exec, kaihuman-palette toggle` (Lua config since Hyprland 0.55) |
 | Centering | mutter's `center-new-windows`, recreate the window every time | **layer-shell**: a surface with no anchors is centered by the compositor. Or a floating window with a `center` rule |
 | Tiling | not a concern | a normal window would be **tiled**; it must be a layer surface or a floating window |
 | Focus stealing | biggest risk | small: a layer surface with exclusive keyboard mode takes the keyboard |
@@ -47,14 +47,14 @@ this. It reports these problems on Hyprland:
   it hidden (`visible: false`) and calling `gtk_layer_init_for_window` on `window.gtk_window()`
   first.
 - `resizable: true` broke transparency on Hyprland 0.56.2, so keep it `false`.
-- Set a namespace of your own (`lifosy-palette`). The default `gtk-layer-shell` namespace can pick
+- Set a namespace of your own (`kaihuman-palette`). The default `gtk-layer-shell` namespace can pick
   up layer rules meant for other tools.
 - Exclusive keyboard mode means a click outside does not close the palette. Only Esc does, unless
   you handle it with the *on-demand* mode plus closing on focus loss.
 
 ### B. Normal window made to float with compositor rules (fallback)
 
-A plain Tauri window, with the class set to `lifosy-palette`, plus a rule in your config: float,
+A plain Tauri window, with the class set to `kaihuman-palette`, plus a rule in your config: float,
 center, pin, stay focused, no animations. This takes no special code. The downsides:
 
 - Every compositor needs its own rules (Hyprland rules, Sway's `for_window`, and so on).
@@ -85,7 +85,7 @@ as the fallback if the WebKitGTK + layer-shell combination turns out unreliable.
 code. Every check passed on Hyprland with the default
 full-output layer surface, and the decision is **A (layer-shell)**. It led to two changes for
 phase 2:
-- A tiny client binary, `lifosy-palette-toggle`, is what the key runs. It sends one line over a
+- A tiny client binary, `kaihuman-palette-toggle`, is what the key runs. It sends one line over a
   Unix socket and links only libc, 4–9 ms per call. The Tauri binary took ~30 ms per call because
   it loads WebKitGTK.
 - The single-instance plugin is replaced by that socket (below).
@@ -93,7 +93,7 @@ phase 2:
 1. Build a minimal Tauri v2 app: one 620×420 undecorated, transparent, non-resizable window with an
    input field.
 2. Build it as a layer surface (A) and as a floating window with rules (B).
-3. Bind `lifosy-palette toggle` in `hyprland.conf` yourself.
+3. Bind `kaihuman-palette toggle` in `hyprland.conf` yourself.
 4. Verify:
    - It opens centered on the *focused* monitor with two monitors, including a monitor with scaling.
    - It opens above a fullscreen window.
@@ -112,7 +112,7 @@ phase 2:
    extension implements it with messaging.
 3. Verify: the extension's tests and build pass unchanged.
 
-**Done.** `@lifosy/palette` holds the palette, web search, the bookmark type and search, and the
+**Done.** `@kaihuman/palette` holds the palette, web search, the bookmark type and search, and the
 shared actions (`repoActions(port)`, `portHandlers(port)`).
 - `src/protocol.ts` is the contract phase 2 implements: `PaletteProtocol` maps each request name to
   its fields and the response fields the palette reads.
@@ -124,8 +124,8 @@ shared actions (`repoActions(port)`, `portHandlers(port)`).
 
 1. **Process model.** Take this from the spike.
    - One resident daemon, started from Hyprland's autostart or a systemd user unit.
-   - It listens on `$XDG_RUNTIME_DIR/lifosy-palette.sock`.
-   - The key runs the tiny `lifosy-palette-toggle` client, which starts the daemon if none is
+   - It listens on `$XDG_RUNTIME_DIR/kaihuman-palette.sock`.
+   - The key runs the tiny `kaihuman-palette-toggle` client, which starts the daemon if none is
      running.
    - No single-instance plugin: it would put the Tauri binary's startup cost back on every key
      press.
@@ -135,16 +135,16 @@ shared actions (`repoActions(port)`, `portHandlers(port)`).
 3. **ActionPort for the desktop.** Commands go through Tauri `invoke` to Rust.
    - The GitHub REST calls (bookmarks file, code search, note commits) move to `reqwest`, so there
      is no CORS and the token stays out of the webview.
-   - The bookmark cache lives in `$XDG_CACHE_HOME/lifosy/`, with the same hour-long budget as the
+   - The bookmark cache lives in `$XDG_CACHE_HOME/kaihuman/`, with the same hour-long budget as the
      extension.
 4. **Token.** Stored in the Secret Service with the `keyring` crate, and set once with
-   `lifosy-palette login`.
+   `kaihuman-palette login`.
    - On Hyprland you must run a Secret Service yourself, for example `gnome-keyring-daemon` from
      `exec-once` or KeePassXC with its Secret Service integration.
    - If none is running, the palette says so and exits. It does not fall back to a plain-text file.
 5. **Opening URLs.** Use `tauri-plugin-opener` (xdg-open). Bookmarks and web searches open in your
    default browser, and Hyprland focuses that browser's window.
-6. **Config.** A small `$XDG_CONFIG_HOME/lifosy/palette.toml` for the repo and theme. The shortcut
+6. **Config.** A small `$XDG_CONFIG_HOME/kaihuman/palette.toml` for the repo and theme. The shortcut
    stays in your compositor config and is documented, not installed.
 7. **Packaging.** An RPM from the Tauri bundler, or a plain `cargo install` for your own machine.
    Avoid AppImage: its GTK hook forces X11, and Wayland crashes have been reported.
@@ -164,7 +164,7 @@ what the desktop can and cannot do. Where it differs from the list above:
 
 ### Phase 3 — optional: talk to Chrome through native messaging
 
-A native messaging host (`~/.config/google-chrome/NativeMessagingHosts/com.lifosy.palette.json`)
+A native messaging host (`~/.config/google-chrome/NativeMessagingHosts/com.kaihuman.palette.json`)
 lets the desktop palette list and load pinned tab groups and open a URL in the current Chrome
 window.
 
@@ -174,7 +174,7 @@ window.
 
 ### Phase 4 — optional: a pipe mode like dmenu
 
-Once there is an app, `lifosy-palette --dmenu` (read choices from stdin, print the pick to stdout)
+Once there is an app, `kaihuman-palette --dmenu` (read choices from stdin, print the pick to stdout)
 costs little. With it the palette can replace fuzzel or wofi in your own scripts.
 
 ## Risks to re-check
@@ -191,5 +191,5 @@ costs little. With it the palette can replace fuzzel or wofi in your own scripts
 
 GNOME has no layer-shell. There the palette falls back to option B, with mutter's
 `center-new-windows` setting doing the centering and a custom shortcut calling
-`lifosy-palette toggle`. Focus-stealing prevention may show an "is ready" notification instead of
+`kaihuman-palette toggle`. Focus-stealing prevention may show an "is ready" notification instead of
 focusing the window. A small GNOME Shell extension would be needed to guarantee focus.

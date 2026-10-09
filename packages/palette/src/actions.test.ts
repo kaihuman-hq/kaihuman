@@ -1,4 +1,4 @@
-import { type BraindumpId, DEFAULT_PALETTE_SETTINGS } from '@lifosy/formats';
+import { type BraindumpId, DEFAULT_PALETTE_SETTINGS } from '@kaihuman/formats';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   claudeCodeMode,

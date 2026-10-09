@@ -1,4 +1,4 @@
-import { StatusBar, TodoAnalytics } from '@lifosy/ui';
+import { StatusBar, TodoAnalytics } from '@kaihuman/ui';
 import { route } from 'preact-router';
 
 export const TodoAnalyticsPage = () => (

@@ -1,6 +1,6 @@
 # Browser extension
 
-The Lifosy browser extension lives in `apps/browser-extension` (package name `browser-extension`). It is a Chrome Manifest V3 extension built with TypeScript, Preact, Vite, Tailwind CSS and the CRXJS Vite plugin (`@crxjs/vite-plugin`). It reads and writes files in your active GitHub repository through the GitHub API, using the token the Lifosy console hands it. It has a toolbar popup, a replacement New Tab start page, a context menu clip, the shared command palette on every page, and a background service worker that caches and syncs everything.
+The kaihuman browser extension lives in `apps/browser-extension` (package name `browser-extension`). It is a Chrome Manifest V3 extension built with TypeScript, Preact, Vite, Tailwind CSS and the CRXJS Vite plugin (`@crxjs/vite-plugin`). It reads and writes files in your active GitHub repository through the GitHub API, using the token the kaihuman console hands it. It has a toolbar popup, a replacement New Tab start page, a context menu clip, the shared command palette on every page, and a background service worker that caches and syncs everything.
 
 ## Loading the extension into Chrome for development
 <!-- docspack: tags=install,unpacked,load unpacked,developer mode -->
@@ -29,7 +29,7 @@ Scripts in `apps/browser-extension/package.json`:
 
 The manifest is written in TypeScript in `manifest.ts` with `defineManifest` from `@crxjs/vite-plugin`. `vite.config.ts` uses the `preact()` and `crx({ manifest })` plugins. Tests sit next to the source as `*.test.ts` and `*.test.tsx`, for example `src/background/service-worker.bookmarks.test.ts`, `src/background/service-worker.today.test.ts` and `src/newtab/StartPage.test.tsx`.
 
-Runtime dependencies are `preact`, `@lifosy/formats` (file formats and entry writers shared with the console) and `@lifosy/palette` (the shared command palette).
+Runtime dependencies are `preact`, `@kaihuman/formats` (file formats and entry writers shared with the console) and `@kaihuman/palette` (the shared command palette).
 
 ## Where the extension's source code lives
 
@@ -55,15 +55,15 @@ Runtime dependencies are `preact`, `@lifosy/formats` (file formats and entry wri
 ## Signing in: connecting the extension to the console
 <!-- docspack: tags=login,auth,token,onboarding,log in -->
 
-The extension has no login form of its own. It takes a GitHub token from the Lifosy console at `https://app.kaihuman.com` (`CONSOLE_URL`).
+The extension has no login form of its own. It takes a GitHub token from the kaihuman console at `https://app.kaihuman.com` (`CONSOLE_URL`).
 
 - Without a token, the popup shows **Open Console**. It opens `https://app.kaihuman.com/extension-onboarded`.
 - The start page also shows only an **Open Console** button until you have logged in.
-- The console renders `ExtensionAuthBridge` (`apps/console/src/components/ExtensionAuthBridge.tsx`). It sets `data-lifosy-auth`, `data-lifosy-repo` and `data-lifosy-repos` on `document.body` and fires a `lifosy-auth-update` window event.
+- The console renders `ExtensionAuthBridge` (`apps/console/src/components/ExtensionAuthBridge.tsx`). It sets `data-kaihuman-auth`, `data-kaihuman-repo` and `data-kaihuman-repos` on `document.body` and fires a `kaihuman-auth-update` window event.
 - The content script (`src/content/index.ts`) reads these and sends `AUTH_TOKEN_UPDATE` with `token`, `repo` and `repos` to the worker. It then dispatches `EXTENSION_ONBOARDED` back to the page.
 - The worker stores `lifeos_token`, `lifeos_repo` and `lifeos_repos` in `chrome.storage.local`.
 
-Each new token drops `bookmarksCache` and `todayCache`, because a new token can mean a different account. Requests made without a token fail with "No token found" or "Not logged in — open the Lifosy console to connect the extension".
+Each new token drops `bookmarksCache` and `todayCache`, because a new token can mean a different account. Requests made without a token fail with "No token found" or "Not logged in — open the kaihuman console to connect the extension".
 
 ## Switching the active repository
 <!-- docspack: tags=repo,repository,switch repo,native messaging -->
@@ -76,9 +76,9 @@ Every file the extension reads or writes is in one active repository, stored as 
 
 ### Sharing the repository with the desktop palette
 
-Run `lifosy-palette native-host install <this extension's id>` once. After that, switching the repository in the extension or the desktop palette switches the other too. The newer choice wins.
+Run `kaihuman-palette native-host install <this extension's id>` once. After that, switching the repository in the extension or the desktop palette switches the other too. The newer choice wins.
 
-`src/background/repo-sync.ts` talks to the native host `com.lifosy.palette` with a `SYNC_REPO` message. It stamps each change of `lifeos_repo` in `lifeos_repo_changed_at`. It asks the desktop hourly and when a start page opens, at most every 30 seconds. Without the host installed, the extension keeps its own choice.
+`src/background/repo-sync.ts` talks to the native host `com.kaihuman.palette` with a `SYNC_REPO` message. It stamps each change of `lifeos_repo` in `lifeos_repo_changed_at`. It asks the desktop hourly and when a start page opens, at most every 30 seconds. Without the host installed, the extension keeps its own choice.
 
 ## What the toolbar popup contains
 <!-- docspack: tags=popup,toolbar,action button -->
@@ -109,7 +109,7 @@ Images are downloaded into `.kh/assets/<epoch-ms>-<slug>/<n>.<ext>` and the Mark
 ## Clipping selected text with the context menu
 <!-- docspack: tags=context menu,right click,selection,clipping -->
 
-Select text on a page, right-click and choose **Add to Knowledge Base**. The context menu item has the id `lifosy-save-knowledge` and appears only for a selection. It is created in `chrome.runtime.onInstalled`.
+Select text on a page, right-click and choose **Add to Knowledge Base**. The context menu item has the id `kaihuman-save-knowledge` and appears only for a selection. It is created in `chrome.runtime.onInstalled`.
 
 The palette action **Add the selected text to the Knowledge Base** does the same from the keyboard. It sends `SAVE_SELECTION`.
 
@@ -126,7 +126,7 @@ An empty selection fails with "Select some text first".
 
 The popup's **Read this page later** button and the palette action **Read later: this page** send `READ_LATER_ADD` with the page URL and title. Only `http`/`https` pages are accepted.
 
-The entry is added with `addReadLaterEntry` from `@lifosy/formats` to the first `.readitlater.json` file in the repo. If there is none, the worker creates `<app folder>/reading.readitlater.json` (the app folder is `.kh`, or `.lifeos` in older repos).
+The entry is added with `addReadLaterEntry` from `@kaihuman/formats` to the first `.readitlater.json` file in the repo. If there is none, the worker creates `<app folder>/reading.readitlater.json` (the app folder is `.kh`, or `.lifeos` in older repos).
 
 The start page's **Read later** card shows the three oldest unread items and the total unread count. **✓ read** sends `READ_LATER_DONE`, which marks the item read with `markReadItLaterRead`.
 
@@ -137,7 +137,7 @@ The popup's **Dump Note** section writes to `.lifeos/dump.md` by default.
 
 - The target selector lists `.lifeos/dump.md` plus the quick-note files from `files.quickNotes` in `.lifeos/.dashboard.config.json` (fetched with `FETCH_QUICK_NOTES`).
 - A plain note sends `DUMP_NOTE`. The worker prepends `- <text>` at the top of the file, separated by a blank line.
-- If the target ends in `.actionlog.md`, the box becomes `ActionLogForm` with a description and tags. It sends `ADD_ACTION_LOG`, written with `addActionLogEntry` from `@lifosy/formats`. The fallback action log is `.lifeos/dump.actionlog.md`.
+- If the target ends in `.actionlog.md`, the box becomes `ActionLogForm` with a description and tags. It sends `ADD_ACTION_LOG`, written with `addActionLogEntry` from `@kaihuman/formats`. The fallback action log is `.lifeos/dump.actionlog.md`.
 
 The palette action **Add a note…** offers the same targets. On an `.actionlog.md` target it takes `#tags` inside the text.
 
@@ -254,7 +254,7 @@ The cache always holds GitHub's numbers; deltas are added on read. The console's
 ## Opening the command palette in the extension
 <!-- docspack: tags=shortcut,ctrl+shift+k,hotkey,keyboard -->
 
-The command palette is the shared `@lifosy/palette` package; its modes and prefixes are documented with the palette. This section covers only the extension side.
+The command palette is the shared `@kaihuman/palette` package; its modes and prefixes are documented with the palette. This section covers only the extension side.
 
 - Press `Ctrl+Shift+K` (`Command+Shift+K` on macOS). The manifest command is `toggle-command-palette`. Rebind it at `chrome://extensions/shortcuts`.
 - On normal pages the palette runs in the content script inside a shadow root, so page styles do not leak in or out.
@@ -269,7 +269,7 @@ Extension-only palette actions: **Bookmark this page…**, **Read later: this pa
 
 Check these in order:
 
-1. **The binding.** Open `chrome://extensions/shortcuts`. If "Open the Lifosy command palette" is empty, Chrome could not take `Ctrl+Shift+K` and left it unbound. Set another combination. Avoid combinations with `Space`, which input-method switchers often claim.
+1. **The binding.** Open `chrome://extensions/shortcuts`. If "Open the kaihuman command palette" is empty, Chrome could not take `Ctrl+Shift+K` and left it unbound. Set another combination. Avoid combinations with `Space`, which input-method switchers often claim.
 2. **The page.** The palette cannot run on `chrome://…` pages, the Chrome Web Store, the PDF viewer or `view-source:`. The toolbar icon then shows a red `!` badge.
 3. **The service worker console.** On `chrome://extensions`, click "service worker" under the extension. On install or update it logs `command palette bound to <shortcut>`, or a warning that no shortcut is bound. It also names the URL that refused the palette.
 
@@ -435,7 +435,7 @@ The worker also sends `EXTRACT_ARTICLE` and `TOGGLE_COMMAND_PALETTE` to content 
 | `*.readitlater.json` | Read later list (new: `<app folder>/reading.readitlater.json`) |
 | `*.todos.md`, `*.events.csv`, `*.habit.csv`, `*.timetracking.csv`, `*.timezones.json` | Start page today view |
 
-Formats are parsed and written with `@lifosy/formats`, the same code as the console widgets.
+Formats are parsed and written with `@kaihuman/formats`, the same code as the console widgets.
 
 ## Permissions the extension requests
 
@@ -446,4 +446,4 @@ Declared in `manifest.ts`:
 - `host_permissions`: `<all_urls>`.
 - `content_scripts`: `src/content/index.ts` on `<all_urls>`.
 
-`tabs` reads tab URLs for pinned tab groups. `scripting` injects the content script into old tabs. `nativeMessaging` reaches the desktop palette host `com.lifosy.palette`.
+`tabs` reads tab URLs for pinned tab groups. `scripting` injects the content script into old tabs. `nativeMessaging` reaches the desktop palette host `com.kaihuman.palette`.

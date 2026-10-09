@@ -1,7 +1,7 @@
 //! Braindumps (doc/braindump.md): texts typed in the braindump window, one markdown file each in
 //! the repo's `.kh/braindumps/`, with a copy on this machine so typing never waits for GitHub.
 //!
-//! Each repository has its own directory, `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/`, so
+//! Each repository has its own directory, `$XDG_DATA_HOME/kaihuman/braindumps/<owner>/<name>/`, so
 //! switching repositories never moves a braindump. There, `<id>.md` is the text and `<id>.json`
 //! is what GitHub last had (`Synced`). Together they say what a sync has to do:
 //!
@@ -576,7 +576,7 @@ mod tests {
 
     fn store(name: &str) -> Store {
         let root =
-            std::env::temp_dir().join(format!("lifosy-braindumps-{name}-{}", std::process::id()));
+            std::env::temp_dir().join(format!("kaihuman-braindumps-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         Store::new(&root, "o/r").unwrap()
     }

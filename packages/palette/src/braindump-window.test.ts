@@ -1,4 +1,4 @@
-import type { BraindumpId } from '@lifosy/formats';
+import type { BraindumpId } from '@kaihuman/formats';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BRAINDUMP_IDLE_SYNC_MS,

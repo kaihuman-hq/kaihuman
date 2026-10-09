@@ -1,6 +1,6 @@
 .{
     // App identity
-    .id = "com.lifosy.kh-capture",
+    .id = "com.kaihuman.kh-capture",
     .name = "kh-capture",
     .display_name = "KH Capture",
     .version = "0.1.0",

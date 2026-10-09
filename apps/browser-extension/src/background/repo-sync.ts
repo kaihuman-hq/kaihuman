@@ -1,13 +1,13 @@
 /**
  * Keeps the extension on the same repository as the desktop palette, through Chrome native
- * messaging (`lifosy-palette native-host install <extension id>`; the host is
+ * messaging (`kaihuman-palette native-host install <extension id>`; the host is
  * apps/desktop-palette/src-tauri/src/native_host.rs).
  *
  * Each side records when its repository last changed, and the newer choice wins. Without the host
  * installed, `sendNativeMessage` fails and the extension keeps its own choice, as before.
  */
 
-export const NATIVE_HOST = 'com.lifosy.palette';
+export const NATIVE_HOST = 'com.kaihuman.palette';
 /** When `lifeos_repo` last changed here, or the desktop's time for a choice taken from it. */
 export const REPO_CHANGED_AT = 'lifeos_repo_changed_at';
 

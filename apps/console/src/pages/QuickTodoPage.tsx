@@ -1,6 +1,6 @@
-import { githubFileStore } from '@lifosy/core';
-import { addTodoEntry } from '@lifosy/formats';
-import { StatusBar } from '@lifosy/ui';
+import { githubFileStore } from '@kaihuman/core';
+import { addTodoEntry } from '@kaihuman/formats';
+import { StatusBar } from '@kaihuman/ui';
 import { ArrowLeft } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';

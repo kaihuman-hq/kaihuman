@@ -1,6 +1,6 @@
 # Repo file formats
 
-Lifosy keeps all user data as plain text files in the user's own GitHub repository: Markdown for todos, logs, prompts and commands, `;`-separated CSV for events, habits and time tracking, and JSON for bookmarks, read-later lists and settings. A file's suffix, such as `.todos.md` or `.habit.csv`, decides which widget opens it. Parsing and serialising live in `packages/formats/src/` (`@lifosy/formats`), shared by the console, the browser extension and both command palettes, with a few widget formats in `packages/ui/src/LifeOS/Organisms/Widgets/*Logic.ts`.
+kaihuman keeps all user data as plain text files in the user's own GitHub repository: Markdown for todos, logs, prompts and commands, `;`-separated CSV for events, habits and time tracking, and JSON for bookmarks, read-later lists and settings. A file's suffix, such as `.todos.md` or `.habit.csv`, decides which widget opens it. Parsing and serialising live in `packages/formats/src/` (`@kaihuman/formats`), shared by the console, the browser extension and both command palettes, with a few widget formats in `packages/ui/src/LifeOS/Organisms/Widgets/*Logic.ts`.
 
 ## Which file suffix opens which widget
 <!-- docspack: tags=file types,extensions,widgets,suffix -->
@@ -29,7 +29,7 @@ The console picks a widget by suffix (`MainApp.tsx` in `packages/ui`). New File 
 
 A plain `.md` file is a note. Ticking "encrypt" in New File appends `.enc` to the name.
 
-## Where Lifosy keeps files in the repository
+## Where kaihuman keeps files in the repository
 <!-- docspack: tags=app folder,.kh,paths,location -->
 
 Widget files can live in any folder; the console finds them by suffix. Fixed paths live in the app folder `.kh/` (legacy name `.lifeos/`):
@@ -124,7 +124,7 @@ An action log is a Markdown list of timestamped entries in local time:
 - 2026-09-22 Idea: weekly review template
 ```
 
-The browser extension's note action (`DUMP_NOTE`) also inserts `- <note>` at the top, without a date. Its default target is `.lifeos/dump.md`; other targets come from `files.quickNotes` in the dashboard config. When a quick-note target is a widget file (`.todos.md`, `.actionlog.md`, `.events.csv`, `.prompts.md`, `.commands.md`), the palette adds a proper entry with the `@lifosy/formats` entry helpers instead.
+The browser extension's note action (`DUMP_NOTE`) also inserts `- <note>` at the top, without a date. Its default target is `.lifeos/dump.md`; other targets come from `files.quickNotes` in the dashboard config. When a quick-note target is a widget file (`.todos.md`, `.actionlog.md`, `.events.csv`, `.prompts.md`, `.commands.md`), the palette adds a proper entry with the `@kaihuman/formats` entry helpers instead.
 
 ## Events format (`.events.csv`)
 <!-- docspack: tags=events,calendar,birthdays,csv -->
@@ -366,7 +366,7 @@ These formats are parsed in `packages/ui` or `packages/formats`:
 
 Stocks and data-collection timestamps accept German `DD.MM.YYYY` dates as well as ISO.
 
-## How `@lifosy/formats` reads and writes files
+## How `@kaihuman/formats` reads and writes files
 <!-- docspack: tags=parse,serialize,round trip,formats package -->
 
 Each module pairs a parser with a serialiser, for example `parseTodos`/`serializeTodos` or `parseEvents`/`serializeEvents`. Writes rewrite the whole file from parsed data. Mutations such as `setStatus`, `addTodo` or `markAsRead` return new objects and do not touch the input.

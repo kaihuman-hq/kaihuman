@@ -1,8 +1,8 @@
 /**
- * The braindump window: `createBraindumpWindow` from `@lifosy/palette`, answered by the Rust
+ * The braindump window: `createBraindumpWindow` from `@kaihuman/palette`, answered by the Rust
  * daemon. The daemon shows the window and says `braindump:open`; the page hides it again.
  */
-import { type ActionPort, type Braindump, createBraindumpWindow } from '@lifosy/palette';
+import { type ActionPort, type Braindump, createBraindumpWindow } from '@kaihuman/palette';
 
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;

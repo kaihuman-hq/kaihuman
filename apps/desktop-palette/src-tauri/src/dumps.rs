@@ -1,6 +1,6 @@
 //! Dumps: scratch texts for the palette's `>d` editor, one plain file each, the last 25 kept.
 //!
-//! They live on this machine only — `$XDG_DATA_HOME/lifosy/dumps/<id>.txt` — and never go to
+//! They live on this machine only — `$XDG_DATA_HOME/kaihuman/dumps/<id>.txt` — and never go to
 //! GitHub. The id is the creation time in milliseconds, which also names the file.
 
 use std::path::{Path, PathBuf};
@@ -147,7 +147,8 @@ mod tests {
     use std::time::{Duration, SystemTime};
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("lifosy-dumps-{name}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("kaihuman-dumps-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         dir
     }

@@ -29,5 +29,5 @@
 ## Documentation
 
 - [x] Document every app, package, file format and CLI command as a docspack package (`packages/docspack`)
-- [ ] Publish `@lifosy/docspack` to npm
+- [ ] Publish `@kaihuman/docspack` to npm
 - [ ] Run `docspack doctor --strict` and `docspack eval` in CI

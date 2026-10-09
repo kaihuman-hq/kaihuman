@@ -1,5 +1,50 @@
 # Progress
 
+## 2026-10-08 — Local data moves from lifosy to kaihuman names
+
+- Desktop palette: `$XDG_{CONFIG,CACHE,STATE,DATA}_HOME/lifosy` becomes `.../kaihuman`, moved
+  the first time the palette looks there (a new directory that already exists is left as it
+  is). The token and DeepL key move from keyring service `lifosy-palette` to `kaihuman-palette`
+  on first read; logout removes both. The daemon rewrites native messaging host manifests named
+  `com.lifosy.palette` as `com.kaihuman.palette` at start, for the same extensions, and
+  `native-host install` removes the old one. Tauri identifier `com.kaihuman.palette`.
+- Browser extension: native host `com.kaihuman.palette`. Until the desktop palette is updated
+  and started once, repository sync falls back to the extension's own choice, as with no host.
+- CLI: `ProjectDirs` qualifier `kaihuman`; on macOS `com.lifosy.cli` is moved to
+  `com.kaihuman.cli` (Linux was already `~/.config/cli`).
+- Console: saved passwords move from `localStorage['lifosy_saved_passwords']` to
+  `kaihuman_saved_passwords` on load.
+- Tests for each move: `adopt_old_dir` (desktop and CLI), native host `migrate`, and
+  `password-store.test.ts` in the console.
+
+Checks: `pnpm -r run build`, `check-types`, `lint` and `test` (all pass except the existing
+`cargo fmt` findings in `apps/cli`), `cargo test`, `cargo clippy` and `cargo fmt --check` for the
+desktop palette, `docspack eval`.
+
+## 2026-10-08 — Code renamed from lifosy to kaihuman
+
+- Package scope `@lifosy/*` is now `@kaihuman/*` (all workspace packages, imports, tsconfig
+  `extends`, Vite externals, Tailwind preset, root script filters). `packages/ui/debug-storybook.log`
+  is no longer tracked.
+- Binaries: `kaihuman-palette`, `kaihuman-palette-toggle`, `kaihuman-kb-mcp`. The palette's layer
+  namespace, braindump window title (`kaihuman-braindump`), socket (`kaihuman-palette.sock`) and
+  development variables (`KAIHUMAN_GITHUB_TOKEN`, `KAIHUMAN_GITHUB_API`) follow. The desktop
+  palette README has upgrade steps for compositor configs.
+- User-facing text that still said Lifosy (extension name and description, "Open the kaihuman
+  console", login messages, the MCP server name `kaihuman-kb`) now says kaihuman.
+- Console ↔ extension bridge: the extension reads `data-kaihuman-*` and `kaihuman-auth-update`.
+  The console writes both those and the old `lifosy` names, so extensions not yet updated stay
+  logged in. The extension clears its context menu on install so the old item id does not linger.
+- Unchanged here, moved with migrations in the next change: the desktop palette's XDG directories
+  and keyring service, the native host name, the CLI's macOS config directory and the console's
+  saved-passwords key. Unchanged on purpose: the Cloudflare Pages project names `lifosy-console`
+  and `lifosy-landing` (not visible to users; Pages projects cannot be renamed), and history
+  (this file, `docs/superpowers/`, `.agent/`).
+
+Checks: `pnpm -r run build`, `check-types`, `lint` and `test` (all pass except the existing
+`cargo fmt` findings in `apps/cli`), `cargo test` and `cargo fmt --check` for the desktop palette,
+`docspack eval` 78/82 top-3.
+
 ## 2026-10-08 — Repository renamed to kaihuman-hq/kaihuman
 
 - The default repository (browser extension, desktop palette `DEFAULT_REPO`, console search and

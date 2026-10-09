@@ -26,7 +26,7 @@ There are already six capture paths. The design must not add a seventh that does
 
 | Existing | Where it writes | Why it is not a braindump |
 | --- | --- | --- |
-| Desktop palette `>d` dumps (`dumps.rs`, `dumpMode` in `packages/palette/src/actions.ts`) | `$XDG_DATA_HOME/lifosy/dumps/<ms>.txt`, local, last 25 kept | **Closest match**: autosaving editor, one file each, list and reopen. But it is local only and lives inside the 620×420 overlay, which grabs the keyboard exclusively. |
+| Desktop palette `>d` dumps (`dumps.rs`, `dumpMode` in `packages/palette/src/actions.ts`) | `$XDG_DATA_HOME/kaihuman/dumps/<ms>.txt`, local, last 25 kept | **Closest match**: autosaving editor, one file each, list and reopen. But it is local only and lives inside the 620×420 overlay, which grabs the keyboard exclusively. |
 | Palette "Add a note…", console `/quick-note`, start-page note box | Prepends `- text` to `.lifeos/dump.md` | One line into a shared file. No multi-line editing, and the file cannot be reopened. |
 | `>q` capture, `cli capture`, `kh-capture`, `kh-capture-native` | `.kh/raw/<ms>-<slug>.md` | Create-only, with no later editing. `/kb-ingest` processes it into the wiki, which is a different lifecycle. |
 | Console `/new` (DumpView) | Save wizard → `.kh/quicknotes/` | This is the main app in a tab: the friction you want to avoid. |
@@ -80,7 +80,7 @@ You suggested Chrome opening the console's editor. Here are the options side by 
 | --- | --- | --- | --- |
 | **A. `chrome --app=https://app.kaihuman.com/new`** (console PWA window with the Cascivo editor) | 0.3–0.5 s with Chrome running; 1–2 s cold. It loads the **whole console bundle** plus the auth store and repo tree every time. | It *is* the main app, with its sidebar and the save wizard. It is a browser window, tiled by Hyprland unless a rule floats it. It needs network access or the PWA cache. The URL has no "new braindump" route yet. | No: it is exactly what you want to avoid, only in a smaller frame |
 | **B. `chrome.windows.create({type:'popup'})` from the extension** | Fast once asked | The desktop palette **cannot ask**: there is no native messaging, socket or localhost link to the extension. It only works from inside Chrome (Ctrl+Shift+K). | No as the main path. Maybe later as a browser-side entry. |
-| **C. A second window in the resident `lifosy-palette` daemon** | **Under 50 ms**: the window is created hidden at start-up and only shown, the same trick as the palette | Token (keyring), repo setting, GitHub client (`github.rs`) and local dump store are already in this process. No network is needed to start typing. | **Yes** |
+| **C. A second window in the resident `kaihuman-palette` daemon** | **Under 50 ms**: the window is created hidden at start-up and only shown, the same trick as the palette | Token (keyring), repo setting, GitHub client (`github.rs`) and local dump store are already in this process. No network is needed to start typing. | **Yes** |
 | D. `kh-capture-native` (Zig) | Unknown | Experimental and "not yet compiled"; a separate token file; create-only | No |
 
 **C, in detail**
@@ -89,7 +89,7 @@ You suggested Chrome opening the console's editor. Here are the options side by 
   is an overlay with *exclusive* keyboard focus. That is right for a 2-second launcher and wrong for
   a braindump: while writing you want to look at, copy from and click into other windows, then come
   back. A toplevel stays in alt-tab and focus-follows. One rule makes it float, centred, at about
-  760×520. It matches the window's **title**, which is always `lifosy-braindump`. Both windows
+  760×520. It matches the window's **title**, which is always `kaihuman-braindump`. Both windows
   share one process, and so one app id; the braindump window is the only toplevel of the two. The
   README gives the rule (the syntax depends on the Hyprland version). This is option B from
   `native-command-palette.md`, which is the right option for *this* window. Layer-shell with
@@ -104,9 +104,9 @@ You suggested Chrome opening the console's editor. Here are the options side by 
   are typing in a hurry. If you still want it, it can be added later behind the same
   `EditableText`-like interface.
 - **How it opens**
-  1. **Its own key.** Add `Command::Braindump` to `lib.rs` and let `lifosy-palette-toggle braindump`
+  1. **Its own key.** Add `Command::Braindump` to `lib.rs` and let `kaihuman-palette-toggle braindump`
      show the window with a *new* empty braindump:
-     `bind = SUPER SHIFT, D, exec, lifosy-palette-toggle braindump`.
+     `bind = SUPER SHIFT, D, exec, kaihuman-palette-toggle braindump`.
      This is the no-friction path: one chord, a 4–9 ms client, and the window already exists.
   2. **From the palette.** `>d` lists **New braindump**, then the braindumps (`LIST_BRAINDUMPS`).
      ⏎ sends `OPEN_BRAINDUMP { id? }`: the palette hides (it holds the keyboard) and the window
@@ -126,7 +126,7 @@ You suggested Chrome opening the console's editor. Here are the options side by 
 
   Clearing the text deletes the braindump, as clearing a dump did. A status line at the bottom
   shows the braindump's title and its state (`saved here`, `synced 12:04`, or why a sync failed).
-  The window title itself stays `lifosy-braindump`, for the window rule.
+  The window title itself stays `kaihuman-braindump`, for the window rule.
 
 ## Decision 3 — saving: local first, repo shortly after
 
@@ -146,7 +146,7 @@ opposite directions:
 
 **As built** (`apps/desktop-palette/src-tauri/src/braindumps.rs`):
 
-- Each repository has its own directory, `$XDG_DATA_HOME/lifosy/braindumps/<owner>/<name>/`, so
+- Each repository has its own directory, `$XDG_DATA_HOME/kaihuman/braindumps/<owner>/<name>/`, so
   switching repositories never moves a half-written braindump. Only the active repo is synced;
   another repo's braindumps wait until it is active again.
 - `<id>.md` is the text, and `<id>.json` is what GitHub last had: `{ sha, text }`. Together they
@@ -205,7 +205,7 @@ Each phase ships and is checked on its own.
    - `BRAINDUMP_FOLDER`, the branded `BraindumpId`, `braindumpPath(id)`, `braindumpIdOf(path)`
      (the only way from a path to an id; anything outside the folder, in a subfolder or not all
      digits is `null`), `braindumpCreatedAt(id)` and `braindumpTitle(text)`.
-   - It lives in `@lifosy/formats`, next to the other repo file formats, because the new tab page
+   - It lives in `@kaihuman/formats`, next to the other repo file formats, because the new tab page
      and the braindump window both need it and the palette does not. The palette is unchanged.
    - → verified: vitest (paths, refused paths, titles), tsc and biome clean; the palette,
      extension, desktop and console typecheck against it.
@@ -216,26 +216,26 @@ Each phase ships and is checked on its own.
      tested against an in-memory GitHub.
    - `LIST_BRAINDUMPS`, `SAVE_BRAINDUMP` and `SYNC_BRAINDUMPS` in `PaletteProtocol`, since `>d`
      uses them as well as the window; the `Braindump` type uses `BraindumpId` from
-     `@lifosy/formats`.
+     `@kaihuman/formats`.
    - → verified: 14 new Rust tests covering each row of the table, the offline case and a conflict
      interrupted halfway (still exactly one copy); clippy and fmt clean.
 3. **Desktop window, `>d` and one repository.** **Done.**
    - The window's logic is `createBraindumpWindow` in `packages/palette/src/braindump-window.ts`
      (text area, the save and sync timing from decision 3, ⌃O list, keys, status line), tested
      with fake timers. The desktop's `braindump.html` / `src/braindump.ts` only connect it to Tauri.
-   - Rust: a second window (`braindump`, title `lifosy-braindump`, created hidden with the daemon,
-     closing only hides it), `Command::Braindump` for `lifosy-palette-toggle braindump`, and
+   - Rust: a second window (`braindump`, title `kaihuman-braindump`, created hidden with the daemon,
+     closing only hides it), `Command::Braindump` for `kaihuman-palette-toggle braindump`, and
      `OPEN_BRAINDUMP { id? }`, which hides the palette and shows the window. A cold start replays
      the first command to the page it is for.
    - `>d` lists **New braindump** and the braindumps, and ⏎ opens them in the window. Old local
      dumps are listed below under their own heading, still editable in the palette, but none are
      created and none are sent anywhere.
    - **One repository** (open question 2): `palette.json` records when its repository changed, and
-     `lifosy-palette` answers Chrome native messaging (`SYNC_REPO`, `native_host.rs`). The
+     `kaihuman-palette` answers Chrome native messaging (`SYNC_REPO`, `native_host.rs`). The
      extension (`background/repo-sync.ts`) stamps every change of `lifeos_repo` and tells the
      desktop at once, and asks it hourly and when a start page opens (at most every 30 s; the page
      reloads when the repository changed). The newer choice wins; while neither side has recorded
-     a change, the extension's. `lifosy-palette native-host install <extension id>` registers the
+     a change, the extension's. `kaihuman-palette native-host install <extension id>` registers the
      host.
    - → verified: palette vitest 248 (15 for the window, 6 for `>d`), extension vitest 288 (6 for
      the repo sync), Rust 84 (the native host's framing, reconcile rule and install, the new

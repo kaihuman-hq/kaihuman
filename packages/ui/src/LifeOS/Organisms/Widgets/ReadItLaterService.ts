@@ -1,4 +1,4 @@
-import { Logger } from '@lifosy/core';
+import { Logger } from '@kaihuman/core';
 import { signal } from '@preact/signals';
 
 const logger = new Logger('ReadItLaterService');

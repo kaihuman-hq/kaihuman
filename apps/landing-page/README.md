@@ -1,6 +1,6 @@
-# Lifosy Landing Page
+# kaihuman Landing Page
 
-The promotional landing page and marketing site for Lifosy.
+The promotional landing page and marketing site for kaihuman.
 
 ## Overview
 

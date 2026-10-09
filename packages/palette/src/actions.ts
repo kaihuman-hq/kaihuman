@@ -15,7 +15,7 @@ import {
   parseCommands,
   parsePrompts,
   usablePaletteSettings,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import { usageNeedsSync, usageRows, usageStatusRow } from './claude-usage.js';
 import type {
   EditableText,
@@ -32,7 +32,7 @@ import type { ActionPort, GithubWorkFilter, PaletteResponse } from './protocol.j
 import { symbolItems } from './symbols.js';
 import { parseTranslationQuery, usefulTranslations } from './translate.js';
 
-/** The Lifosy console — where a repo file is opened, rather than on GitHub. */
+/** The kaihuman console — where a repo file is opened, rather than on GitHub. */
 export const CONSOLE_URL = 'https://app.kaihuman.com';
 
 export const splitTags = (input: string) =>
@@ -215,7 +215,7 @@ export const repoActions = (port: ActionPort): PaletteAction[] => [
   },
   {
     id: 'open-console',
-    title: 'Open the Lifosy console',
+    title: 'Open the kaihuman console',
     run: async () => {
       await port.send({ type: 'OPEN_URL', url: CONSOLE_URL });
       return 'Opening the console';

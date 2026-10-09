@@ -1,4 +1,4 @@
-import { aiStore, navigationStore } from '@lifosy/core';
+import { aiStore, navigationStore } from '@kaihuman/core';
 import {
   ChevronUp,
   GitBranch,

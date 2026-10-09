@@ -1,4 +1,4 @@
-import { Logger } from '@lifosy/core';
+import { Logger } from '@kaihuman/core';
 import { Bookmark, Check, MessageSquare, RefreshCw, Rss, Trash2 } from 'lucide-preact';
 import { memo } from 'preact/compat';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';

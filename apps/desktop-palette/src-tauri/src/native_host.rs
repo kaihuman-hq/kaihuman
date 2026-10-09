@@ -1,11 +1,11 @@
 //! Chrome native messaging, so the browser extension and the palette work on the same repository.
 //!
-//! Chrome starts `lifosy-palette chrome-extension://<id>/` when the extension sends a message, and
+//! Chrome starts `kaihuman-palette chrome-extension://<id>/` when the extension sends a message, and
 //! each message is 4 bytes of length (native byte order) and that much JSON, both ways. Only
 //! `SYNC_REPO` is understood: each side sends the repository it uses and when that last changed,
 //! the newer choice wins, and the answer is the winner, for the extension to take.
 //!
-//! `lifosy-palette native-host install <extension id>` registers this binary with the browsers
+//! `kaihuman-palette native-host install <extension id>` registers this binary with the browsers
 //! found under `$XDG_CONFIG_HOME`.
 
 use std::io::{Read, Write};
@@ -16,7 +16,9 @@ use serde_json::{Value, json};
 
 use crate::config::{Settings, is_repo_name};
 
-pub const HOST_NAME: &str = "com.lifosy.palette";
+pub const HOST_NAME: &str = "com.kaihuman.palette";
+/// The host's name before October 2026; manifests under it are moved to `HOST_NAME`.
+const OLD_HOST_NAME: &str = "com.lifosy.palette";
 
 /// The user-level profile directories of Chrome and the browsers built on it.
 const BROWSERS: [&str; 7] = [
@@ -124,14 +126,47 @@ fn is_extension_id(id: &str) -> bool {
     id.len() == 32 && id.bytes().all(|byte| (b'a'..=b'p').contains(&byte))
 }
 
-fn manifest(binary: &Path, extension_id: &str) -> Value {
+fn manifest(binary: &Path, allowed_origins: &Value) -> Value {
     json!({
         "name": HOST_NAME,
-        "description": "Keeps the Lifosy extension and desktop palette on the same repository",
+        "description": "Keeps the kaihuman extension and desktop palette on the same repository",
         "path": binary,
         "type": "stdio",
-        "allowed_origins": [format!("chrome-extension://{extension_id}/")],
+        "allowed_origins": allowed_origins,
     })
+}
+
+fn write_manifest(dir: &Path, manifest: &Value) -> Result<PathBuf, String> {
+    let file = dir.join(format!("{HOST_NAME}.json"));
+    serde_json::to_string_pretty(manifest)
+        .map_err(|error| error.to_string())
+        .and_then(|text| {
+            std::fs::create_dir_all(dir)
+                .and_then(|()| std::fs::write(&file, text))
+                .map_err(|error| format!("could not write {}: {error}", file.display()))
+        })?;
+    // Chrome would otherwise keep a host under the old name pointing at a binary that is gone.
+    let _ = std::fs::remove_file(dir.join(format!("{OLD_HOST_NAME}.json")));
+    Ok(file)
+}
+
+/// Rewrites each manifest still under the old host name as one under `HOST_NAME` for `binary`,
+/// keeping the extensions it allows, and answers where.
+pub fn migrate(config_home: &Path, binary: &Path) -> Result<Vec<PathBuf>, String> {
+    let mut written = Vec::new();
+    for browser in BROWSERS {
+        let dir = config_home.join(browser).join("NativeMessagingHosts");
+        let old = dir.join(format!("{OLD_HOST_NAME}.json"));
+        let Ok(text) = std::fs::read_to_string(&old) else {
+            continue;
+        };
+        let origins = serde_json::from_str::<Value>(&text)
+            .ok()
+            .and_then(|old| old.get("allowed_origins").cloned())
+            .ok_or_else(|| format!("{} has no allowed_origins", old.display()))?;
+        written.push(write_manifest(&dir, &manifest(binary, &origins))?);
+    }
+    Ok(written)
 }
 
 /// Writes the host manifest for every browser that has a profile under `config_home`, and
@@ -146,20 +181,20 @@ pub fn install(
             "{extension_id} is not an extension id — copy it from chrome://extensions"
         ));
     }
-    let manifest = serde_json::to_string_pretty(&manifest(binary, extension_id))
-        .map_err(|error| error.to_string())?;
+    let manifest = manifest(
+        binary,
+        &json!([format!("chrome-extension://{extension_id}/")]),
+    );
     let mut written = Vec::new();
     for browser in BROWSERS {
         let profile = config_home.join(browser);
         if !profile.is_dir() {
             continue;
         }
-        let dir = profile.join("NativeMessagingHosts");
-        let file = dir.join(format!("{HOST_NAME}.json"));
-        std::fs::create_dir_all(&dir)
-            .and_then(|()| std::fs::write(&file, &manifest))
-            .map_err(|error| format!("could not write {}: {error}", file.display()))?;
-        written.push(file);
+        written.push(write_manifest(
+            &profile.join("NativeMessagingHosts"),
+            &manifest,
+        )?);
     }
     if written.is_empty() {
         return Err(format!(
@@ -262,19 +297,19 @@ mod tests {
 
     #[test]
     fn installs_for_the_browsers_it_finds_and_only_for_that_extension() {
-        let home = std::env::temp_dir().join(format!("lifosy-native-{}", std::process::id()));
+        let home = std::env::temp_dir().join(format!("kaihuman-native-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&home);
         std::fs::create_dir_all(home.join("chromium")).unwrap();
         let id = "abcdefghijklmnopabcdefghijklmnop";
 
-        let written = install(&home, Path::new("/usr/bin/lifosy-palette"), id).unwrap();
+        let written = install(&home, Path::new("/usr/bin/kaihuman-palette"), id).unwrap();
         assert_eq!(
             written,
-            [home.join("chromium/NativeMessagingHosts/com.lifosy.palette.json")]
+            [home.join("chromium/NativeMessagingHosts/com.kaihuman.palette.json")]
         );
         let manifest: Value =
             serde_json::from_str(&std::fs::read_to_string(&written[0]).unwrap()).unwrap();
-        assert_eq!(manifest["path"], "/usr/bin/lifosy-palette");
+        assert_eq!(manifest["path"], "/usr/bin/kaihuman-palette");
         assert_eq!(
             manifest["allowed_origins"],
             json!([format!("chrome-extension://{id}/")])
@@ -287,6 +322,34 @@ mod tests {
                 .unwrap_err()
                 .contains("found no")
         );
+        std::fs::remove_dir_all(home).unwrap();
+    }
+
+    #[test]
+    fn moves_manifests_from_the_old_name_keeping_their_extensions() {
+        let home = std::env::temp_dir().join(format!("kaihuman-migrate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        let hosts = home.join("vivaldi/NativeMessagingHosts");
+        std::fs::create_dir_all(&hosts).unwrap();
+        std::fs::create_dir_all(home.join("chromium")).unwrap();
+        let origins = json!(["chrome-extension://abcdefghijklmnopabcdefghijklmnop/"]);
+        let old = hosts.join("com.lifosy.palette.json");
+        let old_manifest = json!({ "name": "com.lifosy.palette", "path": "/old/lifosy-palette",
+            "type": "stdio", "allowed_origins": origins });
+        std::fs::write(&old, old_manifest.to_string()).unwrap();
+
+        let written = migrate(&home, Path::new("/usr/bin/kaihuman-palette")).unwrap();
+        assert_eq!(written, [hosts.join("com.kaihuman.palette.json")]);
+        assert!(!old.exists());
+        let manifest: Value =
+            serde_json::from_str(&std::fs::read_to_string(&written[0]).unwrap()).unwrap();
+        assert_eq!(manifest["name"], HOST_NAME);
+        assert_eq!(manifest["path"], "/usr/bin/kaihuman-palette");
+        assert_eq!(manifest["allowed_origins"], origins);
+
+        // Done once: nothing left to move, and browsers without an old manifest get none.
+        assert!(migrate(&home, Path::new("/x")).unwrap().is_empty());
+        assert!(!home.join("chromium/NativeMessagingHosts").exists());
         std::fs::remove_dir_all(home).unwrap();
     }
 }

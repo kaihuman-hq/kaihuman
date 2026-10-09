@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  presets: [require('@lifosy/config/tailwind-preset.js')],
+  presets: [require('@kaihuman/config/tailwind-preset.js')],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",

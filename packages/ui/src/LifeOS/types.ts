@@ -4,4 +4,4 @@ export type {
   DashboardFilesConfig,
   DashboardWorkspace,
   NavItemId,
-} from '@lifosy/core';
+} from '@kaihuman/core';

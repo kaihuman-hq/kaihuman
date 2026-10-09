@@ -1,4 +1,4 @@
-import { addActionLogEntry, parseActionLog } from '@lifosy/formats';
+import { addActionLogEntry, parseActionLog } from '@kaihuman/formats';
 import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../../Atoms/Typography';

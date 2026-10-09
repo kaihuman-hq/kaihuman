@@ -10,13 +10,13 @@ import {
   parseTimeTracking,
   serializeTimeTracking,
   toggleStartStop,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import {
   type GithubWorkFilter,
   isKnowledgePath,
   withModeRecent,
   withTranslationText,
-} from '@lifosy/palette';
+} from '@kaihuman/palette';
 import { type Message } from '../types';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import { consoleFileUrl } from '../console';
@@ -325,8 +325,10 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 // Initialize Context Menu
 chrome.runtime.onInstalled.addListener(async () => {
+  // Drops items an older version registered, so one under a since-renamed id does not linger.
+  await chrome.contextMenus.removeAll();
   chrome.contextMenus.create({
-    id: 'lifosy-save-knowledge',
+    id: 'kaihuman-save-knowledge',
     title: 'Add to Knowledge Base',
     contexts: ['selection'],
   });
@@ -347,7 +349,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 // Handle Context Menu Clicks
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === 'lifosy-save-knowledge' && info.selectionText) {
+  if (info.menuItemId === 'kaihuman-save-knowledge' && info.selectionText) {
     saveToKnowledgeBase(info.selectionText, tab?.url || '', tab?.title || '').catch((e) =>
       console.error('LifeOS Extension: Error saving clipping', e),
     );
@@ -871,7 +873,7 @@ async function searchRepo(query: string) {
   return { results };
 }
 
-const NOT_LOGGED_IN = 'Not logged in — open the Lifosy console to connect the extension';
+const NOT_LOGGED_IN = 'Not logged in — open the kaihuman console to connect the extension';
 
 /** Prompt files for `>p`, command files for `>x` — found, fetched and cached the same way. */
 const REPO_FILE_KINDS = {

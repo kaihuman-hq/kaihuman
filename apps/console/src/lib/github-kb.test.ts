@@ -8,7 +8,7 @@ import {
 } from './github-kb';
 import { getScaffoldFiles, KB_SKILL_VERSION } from './kb-skills';
 
-vi.mock('@lifosy/core', () => ({
+vi.mock('@kaihuman/core', () => ({
   authStore: { token: { value: 'test-token' } },
   githubService: {
     getFileContent: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('@lifosy/core', () => ({
   },
 }));
 
-import { githubService } from '@lifosy/core';
+import { githubService } from '@kaihuman/core';
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -1,6 +1,6 @@
 /**
  * The files the palette adds entries to, and what it asks for each. Writing the entry is
- * `@lifosy/formats`' — the same functions the console's Add forms use — so the palette only turns
+ * `@kaihuman/formats`' — the same functions the console's Add forms use — so the palette only turns
  * its answers into that function's input.
  */
 import {
@@ -9,7 +9,7 @@ import {
   addEventEntry,
   addPromptEntry,
   addTodoEntry,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import type { PromptStep } from './command-palette.js';
 
 export interface EntryKind {

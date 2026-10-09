@@ -11,8 +11,8 @@ try {
   );
   await createKbServer(kb).connect(new StdioServerTransport());
   // stdout carries the MCP protocol, so diagnostics go to stderr.
-  console.error(`lifosy-kb-mcp serving ${kb.kbDir}`);
+  console.error(`kaihuman-kb-mcp serving ${kb.kbDir}`);
 } catch (error) {
-  console.error(`lifosy-kb-mcp: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`kaihuman-kb-mcp: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 }

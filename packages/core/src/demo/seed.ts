@@ -8,7 +8,7 @@ import type { GithubRepo } from '../stores/github-profile.store.js';
  * relative to "now" so widgets (streaks, upcoming events, forecasts) look
  * current whenever the demo is launched.
  *
- * The file formats here mirror the widget parsers in `@lifosy/ui`
+ * The file formats here mirror the widget parsers in `@kaihuman/ui`
  * (`*Logic.ts`); keep them in sync if a format changes.
  */
 

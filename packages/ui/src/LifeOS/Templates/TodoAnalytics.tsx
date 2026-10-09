@@ -1,4 +1,4 @@
-import { githubFileStore } from '@lifosy/core';
+import { githubFileStore } from '@kaihuman/core';
 import {
   type Milestone,
   parseTodos,
@@ -6,7 +6,7 @@ import {
   type TodoData,
   type TodoItem,
   type TodoStatus,
-} from '@lifosy/formats';
+} from '@kaihuman/formats';
 import { ArrowLeft, BarChart2 } from 'lucide-preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';

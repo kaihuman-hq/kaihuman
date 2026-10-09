@@ -1,5 +1,5 @@
-import { authStore, enterDemoMode } from '@lifosy/core';
-import { Login as LoginPage } from '@lifosy/ui';
+import { authStore, enterDemoMode } from '@kaihuman/core';
+import { Login as LoginPage } from '@kaihuman/ui';
 import { route } from 'preact-router';
 
 export function Login() {

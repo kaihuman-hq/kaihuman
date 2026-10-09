@@ -1,7 +1,7 @@
-//! `lifosy-palette`: the Lifosy command palette as a desktop overlay.
+//! `kaihuman-palette`: the kaihuman command palette as a desktop overlay.
 //!
 //! One resident daemon keeps the palette's webview loaded and hidden, so opening it is only showing
-//! a window. `lifosy-palette-toggle` — the binary to bind to a key — and the commands below reach
+//! a window. `kaihuman-palette-toggle` — the binary to bind to a key — and the commands below reach
 //! it over a Unix socket (see `lib.rs`). The window is a wlr-layer-shell overlay covering the
 //! focused output, which the compositor places above the tiled layout (see `layer.rs`).
 
@@ -40,19 +40,19 @@ const BRAINDUMP: &str = "braindump";
 
 /// What a compositor rule matches to float the braindump window (see the README), so it never
 /// changes; the window shows the braindump's own title inside.
-const BRAINDUMP_TITLE: &str = "lifosy-braindump";
+const BRAINDUMP_TITLE: &str = "kaihuman-braindump";
 
 const USAGE: &str = "\
-usage: lifosy-palette [toggle|show|hide|quit|daemon|braindump]
-       lifosy-palette login [--paste] [--repo owner/name]
-       lifosy-palette logout
-       lifosy-palette native-host install <extension id>
+usage: kaihuman-palette [toggle|show|hide|quit|daemon|braindump]
+       kaihuman-palette login [--paste] [--repo owner/name]
+       kaihuman-palette logout
+       kaihuman-palette native-host install <extension id>
 
 `login` opens the console in your browser and takes the token from there; `--paste` asks for one
 instead (or reads it from a pipe). `native-host install` lets the browser extension keep the same
 repository as the palette; the id is on chrome://extensions.
 
-Bind `lifosy-palette-toggle` to a key, and `lifosy-palette-toggle braindump` to another for a new
+Bind `kaihuman-palette-toggle` to a key, and `kaihuman-palette-toggle braindump` to another for a new
 braindump; either starts the daemon when none is running.";
 
 #[derive(Debug, PartialEq)]
@@ -113,7 +113,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Cli, String> {
     }
 }
 
-/// Reads a token without echoing it when typed; a piped one (`pass github | lifosy-palette login`)
+/// Reads a token without echoing it when typed; a piped one (`pass github | kaihuman-palette login`)
 /// is read as the first line of stdin.
 fn read_token() -> Result<String, String> {
     let token = if std::io::stdin().is_terminal() {
@@ -178,7 +178,7 @@ fn login(repo: Option<String>, paste: bool) -> Result<(), String> {
 /// palette login goes to the notification daemon (mako, dunst, swaync…) if there is one.
 fn notify(message: &str) {
     let _ = std::process::Command::new("notify-send")
-        .args(["--app-name=lifosy-palette", "Lifosy palette", message])
+        .args(["--app-name=kaihuman-palette", "kaihuman palette", message])
         .spawn()
         .map(|mut child| std::thread::spawn(move || child.wait()));
 }
@@ -289,8 +289,8 @@ async fn palette_request(
     requests::handle(request).await
 }
 
-/// "Log in with the Lifosy console": hides the overlay so the browser can be used, then logs in
-/// exactly as `lifosy-palette login` does.
+/// "Log in with the kaihuman console": hides the overlay so the browser can be used, then logs in
+/// exactly as `kaihuman-palette login` does.
 #[tauri::command]
 async fn console_login(app: AppHandle) -> Result<String, String> {
     hide(&app);
@@ -379,7 +379,7 @@ fn hide_braindump(app: AppHandle) {
 
 fn build_palette(app: &AppHandle) -> Result<WebviewWindow, Box<dyn std::error::Error>> {
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
-        .title("lifosy-palette")
+        .title("kaihuman-palette")
         .inner_size(620.0, 420.0)
         .decorations(false)
         .transparent(true)
@@ -517,7 +517,7 @@ fn main() {
         Cli::Palette(command) => command,
     };
 
-    // A daemon is running: hand it the command. `lifosy-palette-toggle` does the same, faster.
+    // A daemon is running: hand it the command. `kaihuman-palette-toggle` does the same, faster.
     match send(command, now_ms()) {
         Ok(Delivery::Sent) => return,
         Ok(Delivery::NoDaemon) if command.starts_daemon() => {}
@@ -546,6 +546,19 @@ fn main() {
     if std::env::var_os("WAYLAND_DISPLAY").is_some() && std::env::var_os("GDK_BACKEND").is_none() {
         // SAFETY: no other thread exists yet.
         unsafe { std::env::set_var("GDK_BACKEND", "wayland") };
+    }
+
+    // Hosts registered before the rename name the old binary, which is gone; this one takes over.
+    match std::env::current_exe()
+        .map_err(|error| error.to_string())
+        .and_then(|binary| native_host::migrate(&config::config_home(), &binary))
+    {
+        Ok(files) => {
+            for file in files {
+                eprintln!("native messaging host moved to {}", file.display());
+            }
+        }
+        Err(error) => eprintln!("could not move the native messaging host: {error}"),
     }
 
     run_daemon(command, listener);

@@ -1,5 +1,5 @@
 import { CodeEditor, type CodeEditorHandle } from '@cascivo/editor';
-import { githubFileStore, Logger } from '@lifosy/core';
+import { githubFileStore, Logger } from '@kaihuman/core';
 import { useSignalEffect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { languageForPath } from './language';
