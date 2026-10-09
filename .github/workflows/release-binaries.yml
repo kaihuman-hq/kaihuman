@@ -1,0 +1,128 @@
+name: "Release CLI and Desktop Palette"
+
+# A tag `cli-v<version>` builds the `kaihuman` CLI for Linux x86_64 and macOS (Apple silicon); a
+# tag `desktop-v<version>` builds the desktop palette for Linux x86_64. The version must be the one
+# in the app's Cargo.toml. The tarballs are attached to a GitHub release for the tag.
+#
+# Linux builds run on the oldest supported Ubuntu, so the binaries also run on older glibc.
+
+on:
+  push:
+    tags:
+      - "cli-v*"
+      - "desktop-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  cli:
+    if: startsWith(github.ref_name, 'cli-v')
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: apps/cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag names the Cargo.toml version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          [ "$TAG" = "cli-v$version" ] || { echo "Tag $TAG does not match Cargo.toml version $version"; exit 1; }
+
+      - name: Install system libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libxcb-shape0-dev libxcb-xfixes0-dev
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/cli
+
+      - name: Test
+        run: cargo test
+
+      - name: Build and package
+        run: cargo build --release && sh scripts/package.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.os }}
+          path: apps/cli/release/*.tar.gz
+          if-no-files-found: error
+
+  desktop:
+    if: startsWith(github.ref_name, 'desktop-v')
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: apps/desktop-palette
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag names the Cargo.toml version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' src-tauri/Cargo.toml | head -n 1)
+          [ "$TAG" = "desktop-v$version" ] || { echo "Tag $TAG does not match Cargo.toml version $version"; exit 1; }
+
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libgtk-layer-shell-dev \
+            libsoup-3.0-dev librsvg2-dev libssl-dev libdbus-1-dev
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop-palette/src-tauri
+
+      - name: Test
+        run: pnpm run test:desktop
+
+      - name: Build and package
+        run: pnpm run package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop
+          path: apps/desktop-palette/release/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    needs: [cli, desktop]
+    # One of the two build jobs is always skipped; release once the other succeeded.
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Attach to a GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          case "$TAG" in
+            cli-v*) title="CLI ${TAG#cli-v}"; notes="The kaihuman terminal app. Unpack, then put kaihuman on your PATH." ;;
+            desktop-v*) title="Desktop palette ${TAG#desktop-v}"; notes="Linux (Wayland) desktop palette. Unpack and run ./install.sh." ;;
+          esac
+          gh release create "$TAG" dist/*.tar.gz --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes"

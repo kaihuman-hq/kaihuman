@@ -8,6 +8,7 @@
     "check-types": "tsc --noEmit",
     "lint": "biome check .",
     "build:desktop": "vite build && cargo build --release --manifest-path src-tauri/Cargo.toml",
+    "package": "pnpm run build:desktop && sh scripts/package.sh",
     "test:desktop": "vite build && cargo test --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {

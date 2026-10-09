@@ -1,1 +1,4 @@
 dist
+
+# Release tarballs (pnpm run package)
+release

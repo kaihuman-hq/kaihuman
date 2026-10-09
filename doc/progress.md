@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-10-09 — Downloadable CLI and desktop palette
+
+- **The CLI binary is now `kaihuman`.** It was called `cli`. A `[[bin]]` target sets the name; the
+  crate keeps its old name, so the config directory does not move.
+  - clap reports `kaihuman`, and so do the capture messages.
+  - `scripts/kh-capture` falls back to an existing `cli` install.
+  - The docs and docspack say `kaihuman capture` and `kaihuman server`. The eval's expected chunk
+    ids follow the renamed headings, and the top-3 hit rate stays at 95%.
+- **`pnpm run package` in both apps** packs a release build into `release/`:
+  - CLI: `kaihuman-<version>-<os>-<arch>.tar.gz` (binary, README, license).
+  - Desktop palette: `kaihuman-palette-<version>-linux-<arch>.tar.gz` (both binaries, README,
+    license, `install.sh`).
+  - The new `install.sh` installs into `~/.local/bin` (or `$PREFIX`), names missing system
+    libraries with packages for Fedora, Debian/Ubuntu and Arch, and warns when the directory is
+    not on `PATH`.
+- **New workflow `.github/workflows/release-binaries.yml`.** A tag `cli-v<version>` builds Linux
+  x86_64 (Ubuntu 22.04) and macOS arm64 tarballs; `desktop-v<version>` builds Linux x86_64. Each
+  build runs the tests first and checks the tag against `Cargo.toml`. A final job attaches the
+  tarballs to a GitHub release.
+- The root README has a Downloads section, and the CLI and desktop READMEs say how to install and
+  release.
+
 ## 2026-10-09 — Browser extension: store zip and release workflow
 
 - `apps/browser-extension/package.json` is now the single source of the version (1.0.1).

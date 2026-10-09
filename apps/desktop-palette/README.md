@@ -121,6 +121,20 @@ to a key, below) or `>d` in the palette opens a plain text window with the curso
 - It is a normal window, not an overlay, so other windows stay usable while you write. Its title is
   always `kaihuman-braindump` for your window rules (below).
 
+## Install a release
+
+Linux (x86_64) tarballs are on the [releases page](https://github.com/kaihuman-hq/kaihuman/releases) (tags `desktop-v…`). The palette needs
+Wayland, plus GTK 3, WebKitGTK 4.1 and gtk-layer-shell from your distribution:
+
+```sh
+tar -xzf kaihuman-palette-<version>-linux-x86_64.tar.gz
+cd kaihuman-palette-<version>-linux-x86_64
+./install.sh               # into ~/.local/bin; PREFIX=/somewhere/else ./install.sh to change
+```
+
+`install.sh` names any system library that is missing, with the packages for Fedora, Debian/Ubuntu
+and Arch. Then bind the toggle to a key and log in (below).
+
 ## Build and install (Fedora)
 
 ```sh
@@ -269,3 +283,12 @@ For development and tests, `KAIHUMAN_GITHUB_TOKEN` takes the place of the keyrin
 - **It opens as a normal, tiled window:** the compositor has no layer-shell (GNOME), or GTK picked
   X11. The daemon sets `GDK_BACKEND=wayland` when `WAYLAND_DISPLAY` is set; check that it is.
 - **Daemon output:** run `kaihuman-palette daemon` in a terminal instead of from the compositor.
+
+## Releasing
+
+1. Raise `version` in `src-tauri/Cargo.toml`.
+2. `pnpm run package` builds and writes `release/kaihuman-palette-<version>-linux-<arch>.tar.gz`
+   with both binaries, `install.sh`, this README and the license.
+3. Push a tag `desktop-v<version>`. The **Release CLI and Desktop Palette** workflow runs the Rust
+   tests, builds the tarball on Ubuntu 22.04 (so it runs on older glibc too) and attaches it to a
+   GitHub release. It fails if the tag does not match `Cargo.toml`.

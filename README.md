@@ -24,6 +24,14 @@ A personal life-OS built on GitHub — notes, dashboards, habits, and tasks, all
 - `git` on `$PATH` (used by the CLI for repo sync)
 - Optional: `claude`, `copilot`, or `gemini` CLI on `$PATH` for AI features
 
+## Downloads
+
+The [releases page](https://github.com/kaihuman-hq/kaihuman/releases) has:
+
+- **CLI** (`cli-v…`): `kaihuman` for Linux x86_64 and macOS arm64.
+- **Desktop palette** (`desktop-v…`): Linux x86_64, Wayland. Unpack it and run `./install.sh`.
+- **Browser extension** (`extension-v…`): the Chrome Web Store zip.
+
 ## CLI — quick start
 
 ```sh
