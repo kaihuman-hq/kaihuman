@@ -1,11 +1,12 @@
 {
   "name": "browser-extension",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "package": "pnpm run build && node scripts/package.mjs",
     "preview": "vite preview",
     "test": "vitest run"
   },

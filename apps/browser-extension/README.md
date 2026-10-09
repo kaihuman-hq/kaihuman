@@ -148,21 +148,6 @@ has to start there — `chrome.permissions.request` needs a user gesture in an e
 a message from the palette is not, so the palette's version of the action points you at the popup
 until the permission is granted.
 
-### Permissions
-
-The extension has no standing access to the websites you visit:
-
-- **Install:** GitHub's API, DeepL (only used with your own key), the default status pages, and
-  `app.kaihuman.com`, where a small script takes over your login from the console.
-- **On use:** the palette and article extraction are injected into a tab only when you act on it —
-  the shortcut, the popup or the context menu. That grants `activeTab` for that tab only.
-- **Optional, asked once:** a status page you add (that site only), and copying a saved page's
-  images into the repository (all sites, since images come from anywhere). Saving from the popup
-  with image download on asks for it; refused, or saved from the palette, images keep their
-  remote links.
-- **`tabs`** reads the open tabs' addresses for pinned tab groups; **`bookmarks`** is optional and
-  only asked for by the import.
-
 ### Caching and sync
 
 The extension never waits on GitHub to show you a bookmark, and it talks to GitHub at most once
@@ -553,6 +538,21 @@ The **kaihuman** title opens the app, like the popup's.
 Everything on the page needs a token, so before you have logged in through the console it is a
 single **Open Console** button.
 
+## Permissions
+
+The extension has no standing access to the websites you visit:
+
+- **Install:** GitHub's API, DeepL (only used with your own key), the default status pages, and
+  `app.kaihuman.com`, where a small script takes over your login from the console.
+- **On use:** the palette and article extraction are injected into a tab only when you act on it —
+  the shortcut, the popup or the context menu. That grants `activeTab` for that tab only.
+- **Optional, asked once:** a status page you add (that site only), and copying a saved page's
+  images into the repository (all sites, since images come from anywhere). Saving from the popup
+  with image download on asks for it; refused, or saved from the palette, images keep their
+  remote links.
+- **`tabs`** reads the open tabs' addresses for pinned tab groups; **`bookmarks`** is optional and
+  only asked for by the import.
+
 ## Development
 
 The extension is built with TypeScript, Preact, and Vite, using Tailwind CSS for styling.
@@ -568,6 +568,8 @@ Navigate to the `apps/browser-extension` directory to run these commands:
 - `pnpm dev`: Starts the Vite development server with Hot Module Replacement (HMR).
 - `pnpm build`: Compiles TypeScript and builds the production-ready extension.
 - `pnpm preview`: Previews the built extension.
+- `pnpm package`: Builds, checks the built manifest, and writes the store zip to
+  `release/kaihuman-extension-<version>.zip` (needs `zip` on `$PATH`).
 
 ### Loading the Extension Locally
 
@@ -575,3 +577,18 @@ Navigate to the `apps/browser-extension` directory to run these commands:
 2. Open your browser's extension management page (e.g., `chrome://extensions/` in Chrome).
 3. Enable **Developer mode**.
 4. Click **Load unpacked** and select the `apps/browser-extension/dist` directory.
+
+### Releasing
+
+`package.json` holds the version; the manifest takes it from there.
+
+1. Raise `version` in `package.json`. Chrome accepts 1 to 4 dot-separated integers, and every
+   upload must be higher than the last one.
+2. Run `pnpm package`. It refuses to zip a build whose manifest has a different version, a
+   `key`, `<all_urls>` host permissions, or a content script that runs on every site.
+3. Or push a tag `extension-v<version>` (for example `extension-v1.0.2`). The **Release Browser
+   Extension** workflow then runs the tests, builds the zip and attaches it to a GitHub release.
+   It fails if the tag does not match `package.json`.
+4. Upload the zip in the Chrome Web Store developer dashboard. The store asks for the privacy
+   policy URL (`https://kaihuman.com/privacy/`) and a reason for each permission. The
+   [Permissions](#permissions) section has those reasons.

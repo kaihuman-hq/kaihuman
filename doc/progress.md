@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-10-09 — Browser extension: store zip and release workflow
+
+- `apps/browser-extension/package.json` is now the single source of the version (1.0.1).
+  Before, `package.json` said `0.0.0` and the manifest said `1.0.1`; `manifest.ts` now reads the
+  version from `package.json`.
+- `pnpm package` builds the extension and checks the built manifest with
+  `scripts/release-checks.mjs`. It writes `release/kaihuman-extension-<version>.zip`, with
+  `manifest.json` at the root and `.vite/` left out. The check refuses to package when:
+  - the manifest version differs from `package.json`;
+  - the version is one Chrome would reject;
+  - the manifest has a `key`;
+  - the manifest has `<all_urls>` host permissions;
+  - a content script runs on every site.
+- New workflow `.github/workflows/release-extension.yml`. A tag `extension-v<version>` runs the
+  tests, builds the zip and attaches it to a GitHub release. A manual run keeps the zip as an
+  artifact. Uploading to the store is still done by hand.
+- Removed the unused Vite boilerplate `public/vite.svg`, which shipped in the build.
+
 ## 2026-10-09 — Demo banner and link previews
 
 - **Demo banner** (`apps/console/src/components/DemoBanner.tsx`, mounted in `App.tsx`). In demo
