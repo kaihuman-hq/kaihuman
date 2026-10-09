@@ -104,7 +104,6 @@ import {
   withoutFile,
 } from './today';
 
-console.log('LifeOS Extension: Background script loaded');
 
 // Keep the service worker alive to prevent the HMR port (crx-client-port.js)
 // from disconnecting. Chrome suspends MV3 service workers after ~30s of
@@ -132,11 +131,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
   if (alarm.name === 'repoSync') {
     syncRepoWithDesktop().catch((e) =>
-      console.warn('LifeOS Extension: repository sync with the desktop failed', e),
+      console.warn('kaihuman: repository sync with the desktop failed', e),
     );
-    syncBookmarks().catch((e) => console.warn('LifeOS Extension: bookmark sync failed', e));
-    syncPinnedTabs().catch((e) => console.warn('LifeOS Extension: pinned tab sync failed', e));
-    syncToday().catch((e) => console.warn('LifeOS Extension: start page sync failed', e));
+    syncBookmarks().catch((e) => console.warn('kaihuman: bookmark sync failed', e));
+    syncPinnedTabs().catch((e) => console.warn('kaihuman: pinned tab sync failed', e));
+    syncToday().catch((e) => console.warn('kaihuman: start page sync failed', e));
   }
 });
 
@@ -251,9 +250,9 @@ async function syncIfStale(force = false) {
   if (force) {
     // Best effort: a hand-broken pinnedtabs file should not take "Sync now" down with it.
     await syncPinnedTabs().catch((e) =>
-      console.warn('LifeOS Extension: pinned tab sync failed', e),
+      console.warn('kaihuman: pinned tab sync failed', e),
     );
-    await syncToday().catch((e) => console.warn('LifeOS Extension: start page sync failed', e));
+    await syncToday().catch((e) => console.warn('kaihuman: start page sync failed', e));
   }
   return { synced: true, bookmarks: synced?.bookmarks.length ?? 0 };
 }
@@ -319,7 +318,7 @@ chrome.commands.onCommand.addListener(async (command) => {
   await chrome.action.setBadgeText({ tabId: tab.id, text: '' });
   if (await openPaletteInTab(tab.id)) return;
 
-  console.warn(`LifeOS Extension: the palette cannot run on this page (${tab.url ?? 'unknown'})`);
+  console.warn(`kaihuman: the palette cannot run on this page (${tab.url ?? 'unknown'})`);
   await flagPaletteFailure(tab.id);
 });
 
@@ -339,10 +338,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   const commands = await chrome.commands.getAll();
   const shortcut = commands.find((c) => c.name === 'toggle-command-palette')?.shortcut;
   if (shortcut) {
-    console.log(`LifeOS Extension: command palette bound to ${shortcut}`);
+    console.log(`kaihuman: command palette bound to ${shortcut}`);
   } else {
     console.warn(
-      'LifeOS Extension: no shortcut is bound to the command palette — assign one at chrome://extensions/shortcuts',
+      'kaihuman: no shortcut is bound to the command palette — assign one at chrome://extensions/shortcuts',
     );
   }
 });
@@ -351,7 +350,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'kaihuman-save-knowledge' && info.selectionText) {
     saveToKnowledgeBase(info.selectionText, tab?.url || '', tab?.title || '').catch((e) =>
-      console.error('LifeOS Extension: Error saving clipping', e),
+      console.error('kaihuman: Error saving clipping', e),
     );
   }
 });
@@ -588,7 +587,7 @@ async function readConfig(token: string, repo: string, fresh = false) {
     if (isPinnedTabsCacheUsable(cache, repo) && cache) {
       if (isPinnedTabsCacheStale(cache)) {
         syncPinnedTabs().catch((e) =>
-          console.warn('LifeOS Extension: pinned tab refresh failed', e),
+          console.warn('kaihuman: pinned tab refresh failed', e),
         );
       }
       return { config: cache.config, sha: cache.sha ?? undefined };
@@ -734,7 +733,7 @@ async function getBookmarks(): Promise<{
     const stale = isCacheStale(cache);
     if (stale) {
       // Deliberately not awaited: the caller gets the cached list now.
-      syncBookmarks().catch((e) => console.warn('LifeOS Extension: bookmark refresh failed', e));
+      syncBookmarks().catch((e) => console.warn('kaihuman: bookmark refresh failed', e));
     }
     return {
       bookmarks: applyUsage(cache.bookmarks, await readUsage(repo)),
@@ -902,7 +901,7 @@ async function listRepoFiles(kind: keyof typeof REPO_FILE_KINDS) {
   if (cache?.repo !== repo) return { files: (await refreshRepoFiles(kind, token, repo)).files };
   if (isPromptsCacheStale(cache, Date.now())) {
     refreshRepoFiles(kind, token, repo).catch((e) =>
-      console.warn(`LifeOS Extension: ${kind} refresh failed`, e),
+      console.warn(`kaihuman: ${kind} refresh failed`, e),
     );
   }
   return { files: cache.files };
@@ -934,7 +933,7 @@ async function paletteSettings() {
   if (cache?.repo !== repo) return { content: (await refreshPaletteSettings(token, repo)).content };
   if (isPromptsCacheStale(cache, Date.now())) {
     refreshPaletteSettings(token, repo).catch((e) =>
-      console.warn('LifeOS Extension: palette settings refresh failed', e),
+      console.warn('kaihuman: palette settings refresh failed', e),
     );
   }
   return { content: cache.content };
@@ -1117,7 +1116,7 @@ async function getToday() {
   let cache = await readTodayCache();
   if (isTodayCacheUsable(cache, repo) && cache) {
     if (isTodayCacheStale(cache)) {
-      syncToday().catch((e) => console.warn('LifeOS Extension: start page refresh failed', e));
+      syncToday().catch((e) => console.warn('kaihuman: start page refresh failed', e));
     }
   } else {
     cache = await syncToday();

@@ -47,13 +47,13 @@ export async function syncRepoWithDesktop(): Promise<boolean> {
     answer = await chrome.runtime.sendNativeMessage(NATIVE_HOST, { type: 'SYNC_REPO', ...mine });
   } catch (error) {
     // No host installed, or a sandboxed browser that cannot start it.
-    console.debug('LifeOS Extension: no desktop palette to share the repository with', error);
+    console.debug('kaihuman: no desktop palette to share the repository with', error);
     return false;
   }
   // An empty repository means the desktop has none either.
   if ((answer as Partial<RepoChoice> | null)?.repo === '') return false;
   if (!isRepoChoice(answer)) {
-    console.warn('LifeOS Extension: the desktop palette answered', answer);
+    console.warn('kaihuman: the desktop palette answered', answer);
     return false;
   }
   if (answer.repo === mine.repo) return false;
@@ -75,6 +75,6 @@ export function watchRepoChanges(now: () => number = Date.now): void {
     chrome.storage.local
       .set({ [REPO_CHANGED_AT]: now() })
       .then(syncRepoWithDesktop)
-      .catch((error) => console.warn('LifeOS Extension: could not share the repository', error));
+      .catch((error) => console.warn('kaihuman: could not share the repository', error));
   });
 }

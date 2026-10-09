@@ -144,7 +144,7 @@ function getPalette(): CommandPalette {
       // through its scheme check before anything is navigated to.
       open: (url) => {
         send({ type: 'OPEN_URL', url }).catch((e) =>
-          console.warn('LifeOS Extension: could not open', url, e),
+          console.warn('kaihuman: could not open', url, e),
         );
       },
       actions: paletteActions,

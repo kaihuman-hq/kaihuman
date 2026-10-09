@@ -83,7 +83,7 @@ export function App() {
     // to its hourly budget, so this is a no-op on a cache that is still fresh.
     chrome.runtime.sendMessage({ type: 'SYNC_NOW' }, () => {
       if (chrome.runtime.lastError) {
-        console.warn('LifeOS Extension: sync check failed', chrome.runtime.lastError.message);
+        console.warn('kaihuman: sync check failed', chrome.runtime.lastError.message);
       }
     });
 
