@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-10-09 — Sign-in worker in this repository
+
+- **New app `apps/auth-worker`.** A Cloudflare Worker that does what the `/gh/*` routes of the
+  external `api.mrs.urbanisierung.dev` service did: `GET /login` redirects to GitHub with
+  `scope=repo`, and `GET /callback` exchanges the code and redirects to
+  `APP_URL/?access_token=…`. The console code does not change.
+  - It has no storage bindings and does not log the token, and its source is now public with the
+    rest of the app, which backs the privacy policy's statement that tokens are not stored.
+  - New: a `state` value in a short-lived `HttpOnly` cookie, checked on the callback, so another
+    site cannot complete a login into an account of its choosing.
+  - The redirects send `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
+  - Dropped: the Slack ping on each login and the `/gh/test/*` routes (local development uses
+    `wrangler dev` with its own OAuth app instead).
+- `wrangler` is a root devDependency, and `workerd` is in `allowBuilds`.
+- The README of the app describes the OAuth app, the secrets, the deploy, and local development.
+  `apps/console/.env.prod` still points at the old service; switch `VITE_GH_LOGIN` after the
+  worker is deployed.
+
 ## 2026-10-09 — Downloadable CLI and desktop palette
 
 - **The CLI binary is now `kaihuman`.** It was called `cli`. A `[[bin]]` target sets the name; the

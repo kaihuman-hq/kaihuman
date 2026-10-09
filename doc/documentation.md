@@ -164,6 +164,18 @@ The repo path comes from `--repo`, then `KB_REPO_PATH`, then the current directo
 
 See `apps/kb-mcp/README.md` for a `.mcp.json` snippet.
 
+## Sign-in worker (`apps/auth-worker`)
+
+The console signs in through a Cloudflare Worker that exchanges GitHub's one-time code for an
+access token and redirects to the console with it. It has no storage and keeps no token.
+
+```sh
+pnpm --filter @kaihuman/auth-worker dev      # http://localhost:8787, reads .dev.vars
+pnpm --filter @kaihuman/auth-worker run deploy
+```
+
+See `apps/auth-worker/README.md` for the GitHub OAuth app, the secrets and the switch-over.
+
 ## Documentation for AI agents
 
 Everything in this file, and the rest of the monorepo, is also packaged for agents as

@@ -1,0 +1,16 @@
+{
+  "name": "@kaihuman/auth-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker that runs the GitHub sign-in for the kaihuman console without storing tokens",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check-types": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "fix": "biome check --write --unsafe .",
+    "test": "vitest run"
+  }
+}

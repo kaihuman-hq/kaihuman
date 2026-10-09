@@ -9,6 +9,7 @@ allowBuilds:
   '@biomejs/biome': true
   esbuild: true
   sharp: true
+  workerd: true
 
 # @cascivo/* 1.3.0 (and the tokens 1.1.1 it pulls in) were published inside
 # pnpm's 24h minimumReleaseAge window; these pins let the bump land now.
