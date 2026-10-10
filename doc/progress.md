@@ -15,8 +15,8 @@
     `wrangler dev` with its own OAuth app instead).
 - `wrangler` is a root devDependency, and `workerd` is in `allowBuilds`.
 - The README of the app describes the OAuth app, the secrets, the deploy, and local development.
-  `apps/console/.env.prod` still points at the old service; switch `VITE_GH_LOGIN` after the
-  worker is deployed.
+- The worker runs at `auth.kaihuman.com`, and `apps/console/.env.prod` now points
+  `VITE_GH_LOGIN` at `https://auth.kaihuman.com/login`.
 
 ## 2026-10-09 — Downloadable CLI and desktop palette
 
