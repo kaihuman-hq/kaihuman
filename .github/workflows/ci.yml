@@ -1,0 +1,53 @@
+name: "CI"
+
+# Builds, lints, type-checks and tests the whole monorepo on every branch push, so a broken
+# lockfile, build or test shows up before the deploy workflows run on main. Main itself is
+# skipped: the deploy workflows build it.
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The CLI (apps/cli) builds with cargo; these are the libraries its clipboard and TLS crates
+      # link against.
+      - name: Install system libraries
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libxcb-shape0-dev libxcb-xfixes0-dev
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/cli
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Lint and type-check
+        run: pnpm run check
+
+      - name: Test
+        run: pnpm -r test

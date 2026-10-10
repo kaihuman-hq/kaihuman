@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-10-10 — CI on every branch push
+
+- **New workflow `.github/workflows/ci.yml`.** It runs on every push to a branch other than
+  `main`: `pnpm install --frozen-lockfile`, `pnpm run build`, `pnpm run check` (lint and
+  type-check) and `pnpm -r test`. A broken lockfile, like the missing `apps/auth-worker` importer,
+  now fails on the branch instead of in the deploy on `main`.
+- `apps/cli` is formatted with `cargo fmt`, because its `lint` script runs `cargo fmt --check`.
+
 ## 2026-10-09 — Sign-in worker in this repository
 
 - **New app `apps/auth-worker`.** A Cloudflare Worker that does what the `/gh/*` routes of the

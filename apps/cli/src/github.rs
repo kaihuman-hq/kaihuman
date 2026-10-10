@@ -24,16 +24,30 @@ pub fn build_kb_note(text: &str) -> (String, String) {
     let timestamp = now.timestamp_millis();
     let date = now.format("%Y-%m-%d").to_string();
 
-    let first_line = text.lines().find(|l| !l.trim().is_empty()).unwrap_or("note").trim();
+    let first_line = text
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or("note")
+        .trim();
     let slug: String = {
         let s: String = first_line
             .chars()
-            .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+            .map(|c| {
+                if c.is_ascii_alphanumeric() {
+                    c.to_ascii_lowercase()
+                } else {
+                    '-'
+                }
+            })
             .collect();
         let s = s.trim_matches('-').chars().take(40).collect::<String>();
         if s.is_empty() { "note".to_string() } else { s }
     };
-    let title = first_line.replace('"', "'").chars().take(80).collect::<String>();
+    let title = first_line
+        .replace('"', "'")
+        .chars()
+        .take(80)
+        .collect::<String>();
 
     let filename = format!("{}-{}.md", timestamp, slug);
     let content = format!(
@@ -111,7 +125,10 @@ impl GithubClient {
         content: &str,
         message: &str,
     ) -> Result<()> {
-        let url = format!("https://api.github.com/repos/{}/{}/contents/{}", owner, repo, path);
+        let url = format!(
+            "https://api.github.com/repos/{}/{}/contents/{}",
+            owner, repo, path
+        );
         let encoded_content = BASE64_STANDARD.encode(content);
 
         #[derive(Serialize)]
@@ -120,7 +137,10 @@ impl GithubClient {
             content: String,
         }
 
-        let body = PutBody { message: message.to_string(), content: encoded_content };
+        let body = PutBody {
+            message: message.to_string(),
+            content: encoded_content,
+        };
 
         let res = self.client.put(&url).json(&body).send().await?;
 
@@ -138,7 +158,14 @@ impl GithubClient {
     pub async fn create_kb_note(&self, owner: &str, repo: &str, text: &str) -> Result<()> {
         let (filename, content) = build_kb_note(text);
         let path = format!(".kh/raw/{}", filename);
-        self.put_file(owner, repo, &path, &content, "note: add knowledge capture via CLI").await
+        self.put_file(
+            owner,
+            repo,
+            &path,
+            &content,
+            "note: add knowledge capture via CLI",
+        )
+        .await
     }
 
     pub async fn append_to_inbox(&self, owner: &str, repo: &str, text: &str) -> Result<()> {

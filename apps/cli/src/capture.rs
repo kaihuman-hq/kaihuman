@@ -49,10 +49,14 @@ pub async fn run(inline: Option<String>) -> Result<()> {
             }
         }
         (Err(_), _) => {
-            println!("Saved locally — not authenticated. Run `kaihuman` to log in; it flushes on the next capture.");
+            println!(
+                "Saved locally — not authenticated. Run `kaihuman` to log in; it flushes on the next capture."
+            );
         }
         (_, None) => {
-            println!("Saved locally — no active repo. Run `kaihuman`, press `s` to select one, then capture again.");
+            println!(
+                "Saved locally — no active repo. Run `kaihuman`, press `s` to select one, then capture again."
+            );
         }
     }
 
@@ -127,7 +131,10 @@ async fn flush_spool(client: &GithubClient, repo: &str, spool_dir: &Path) -> (us
         };
         let remote = format!(".kh/raw/{}", filename);
 
-        if push_with_retry(client, owner, name, &remote, &content).await.is_ok() {
+        if push_with_retry(client, owner, name, &remote, &content)
+            .await
+            .is_ok()
+        {
             let _ = fs::remove_file(&path);
             pushed += 1;
         } else {
@@ -150,7 +157,15 @@ async fn push_with_retry(
     let mut last_err = None;
 
     for attempt in 0..3 {
-        match client.put_file(owner, repo, path, content, "note: add knowledge capture via CLI").await
+        match client
+            .put_file(
+                owner,
+                repo,
+                path,
+                content,
+                "note: add knowledge capture via CLI",
+            )
+            .await
         {
             Ok(()) => return Ok(()),
             Err(e) => {
