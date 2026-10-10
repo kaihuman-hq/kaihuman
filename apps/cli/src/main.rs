@@ -55,7 +55,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Ok(())
         }
         Some(Commands::Capture { text }) => {
-            let inline = if text.is_empty() { None } else { Some(text.join(" ")) };
+            let inline = if text.is_empty() {
+                None
+            } else {
+                Some(text.join(" "))
+            };
             if let Err(e) = capture::run(inline).await {
                 eprintln!("capture error: {}", e);
                 std::process::exit(1);
