@@ -1,0 +1,14 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "kaihuman-auth",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "routes": [{ "pattern": "auth.kaihuman.com", "custom_domain": true }],
+  // Without this, `wrangler dev` rewrites request URLs to the route host, and the
+  // GitHub callback would point at production instead of localhost.
+  "dev": { "port": 8787, "host": "localhost:8787", "upstream_protocol": "http" },
+  // GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are secrets: `wrangler secret put <name>`.
+  "vars": {
+    "APP_URL": "https://app.kaihuman.com"
+  }
+}

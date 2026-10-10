@@ -100,6 +100,12 @@
 |---------|----------|-------|
 | stdio MCP server: `kb_search`, `kb_read`, `kb_list`, `kb_index`, `kb_log`, `kb_add_raw` over a local clone | `kaihuman-kb-mcp --repo <path>` | 2026-09-23 |
 
+## Sign-in worker (`apps/auth-worker`)
+
+| Feature | Location | Added |
+|---------|----------|-------|
+| GitHub OAuth sign-in for the console as a Cloudflare Worker without storage bindings: `/login`, `/callback` with a state cookie, token handed straight to the console | `auth.kaihuman.com` | 2026-10-09 |
+
 ## Desktop palette (`apps/desktop-palette`)
 
 | Feature | Location | Added |

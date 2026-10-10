@@ -10,6 +10,7 @@ A personal life-OS built on GitHub — notes, dashboards, habits, and tasks, all
 | `apps/console` | Preact + Vite | Web dashboard (files, kanban, analytics) |
 | `apps/browser-extension` | Preact + CRXJS | Browser extension |
 | `apps/kb-mcp` | Node + MCP SDK | MCP server over the `.kh/` knowledge base |
+| `apps/auth-worker` | Cloudflare Worker | GitHub sign-in for the console; stores no tokens ([setup](apps/auth-worker/README.md)) |
 
 ## Prerequisites
 
