@@ -17,6 +17,9 @@
 - The README of the app describes the OAuth app, the secrets, the deploy, and local development.
 - The worker runs at `auth.kaihuman.com`, and `apps/console/.env.prod` now points
   `VITE_GH_LOGIN` at `https://auth.kaihuman.com/login`.
+- Fix: `pnpm-lock.yaml` gets an `apps/auth-worker: {}` importer. pnpm (12.4.1 and 12.10.1)
+  does not write an entry for a new package without dependencies, but `--frozen-lockfile`
+  requires one, so every CI `pnpm install` failed after the merge.
 
 ## 2026-10-09 — Downloadable CLI and desktop palette
 
