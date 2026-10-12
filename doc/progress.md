@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-10-12 — Todo reminders and push notifications: study and proposal
+
+- New `doc/notifications.md`: a proposal (nothing implemented) for on-time todo reminders on iOS
+  and in the desktop PWA. It reviews the existing GitHub Actions push path (no `push` handler in
+  the service worker, milestones only, cron not on time), compares what PWAs can do in 2026
+  (Web Push, Declarative Web Push, dead ends), and proposes `::due::`/`::remind::`/`::repeat::`
+  todo metadata plus a self-hostable Cloudflare Worker that sends Web Push from a Durable Object
+  alarm. Ends with a phased plan and open questions.
+
 ## 2026-10-10 — CI on every branch push
 
 - **New workflow `.github/workflows/ci.yml`.** It runs on every push to a branch other than
