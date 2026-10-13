@@ -1,4 +1,15 @@
-export const KB_SKILL_VERSION = '1.7.0';
+import KH_IDEAS_SKILL_SOURCE from '@kaihuman/formats/skills/kh-ideas/SKILL.md?raw';
+
+export const KB_SKILL_VERSION = '1.8.0';
+
+/** The kh-ideas Agent Skill, as shipped in `@kaihuman/formats`. */
+export const KH_IDEAS_SKILL = KH_IDEAS_SKILL_SOURCE;
+
+// Agent Skills live in `.agents/skills/` (Gemini, Codex, Copilot, Cursor) and `.claude/skills/`.
+const KH_IDEAS_SKILL_FILES = {
+  '.agents/skills/kh-ideas/SKILL.md': KH_IDEAS_SKILL,
+  '.claude/skills/kh-ideas/SKILL.md': KH_IDEAS_SKILL,
+};
 
 // One heading per operation keeps the log greppable: `grep '^## \[' .kh/log.md | tail -5`.
 export const KB_LOG_FORMAT = '## [YYYY-MM-DD] <op> | <title>';
@@ -456,6 +467,7 @@ asks questions.
   kb-ask.md     # /kb-ask    — answer questions from wiki, filing good answers back
   kb-digest.md  # /kb-digest — summarise tracked personal data into a raw source
   kb-agent-capture.md  # /kb-agent-capture — capture via the native app's automation server
+.agents/skills/kh-ideas/  # Ideas skill for every agent (a copy lives in .claude/skills/)
 \`\`\`
 
 ## Workflow
@@ -493,6 +505,21 @@ ${KB_LOG_FORMAT}
 \`\`\`
 
 \`<op>\` is one of \`ingest\`, \`query\`, \`lint\`, \`index\`, \`digest\`.
+
+## Ideas
+
+Product and feature ideas live in \`.kh/ideas/<slug>.md\`, one file per idea, with a \`status\`
+(\`seed\`, \`exploring\`, \`committed\`, \`shipped\`, \`parked\`, \`dropped\`) in the frontmatter and
+the sections \`## Log\` (newest first, never edited), \`## Challenges\` (checked off, never removed)
+and \`## Braindump\` (only grows). Follow the \`kh-ideas\` skill (\`.agents/skills/kh-ideas/SKILL.md\`)
+before you create or change an idea; it says what goes where and how little to write.
+
+Ideas are notes that every kaihuman app reads from the default branch, so an idea change on
+another branch stays invisible until it is merged. Before you commit a change that touches only
+\`.kh/ideas/\`, ask the user once per session: "May I commit idea changes directly to <default
+branch>?" If they agree, commit those changes on top of the latest default branch and push there,
+with no extra branch or pull request. If they decline, or the push is refused, keep the change on
+your branch and say in one line that it needs a merge. Never put other files in such a commit.
 
 ## Guidelines
 
@@ -587,6 +614,7 @@ export function getScaffoldFiles(): Record<string, string> {
     '.kh/raw/.gitkeep': '',
     '.kh/journal/.gitkeep': '',
     '.kh/wiki/.gitkeep': '',
+    '.kh/ideas/.gitkeep': '',
     '.claude/commands/kb-ingest.md': KB_INGEST_SKILL,
     '.claude/commands/kb-index.md': KB_INDEX_SKILL,
     '.claude/commands/kb-lint.md': KB_LINT_SKILL,
@@ -594,8 +622,37 @@ export function getScaffoldFiles(): Record<string, string> {
     '.claude/commands/kb-session.md': KB_SESSION_SKILL,
     '.claude/commands/kb-digest.md': KB_DIGEST_SKILL,
     '.claude/commands/kb-agent-capture.md': KB_AGENT_CAPTURE_SKILL,
-    'CLAUDE.md': KB_CLAUDE_MD,
+    ...KH_IDEAS_SKILL_FILES,
   };
+}
+
+/** `CLAUDE.md`, and `AGENTS.md` for agents that read it instead; both get the same section. */
+export const AGENT_INSTRUCTION_FILES = ['CLAUDE.md', 'AGENTS.md'] as const;
+
+const SECTION_START =
+  '<!-- kaihuman:start — managed by the kaihuman console; edits here are replaced -->';
+const SECTION_END = '<!-- kaihuman:end -->';
+// How every CLAUDE.md written before the managed section began.
+const OLD_KAIHUMAN_FILE = /^# Knowledge Base\s+This repo is a personal/;
+
+export const KB_AGENT_SECTION = `${SECTION_START}\n${KB_CLAUDE_MD.trim()}\n${SECTION_END}\n`;
+
+/**
+ * An agent instruction file with kaihuman's section added or brought up to date. Only the section
+ * between the markers is kaihuman's: the user's own text around it is kept. A file an older
+ * version wrote in full (no markers) is replaced, since all of it was kaihuman's.
+ */
+export function mergeAgentInstructions(existing: string | null): string {
+  if (existing === null || !existing.trim() || OLD_KAIHUMAN_FILE.test(existing)) {
+    return KB_AGENT_SECTION;
+  }
+  const start = existing.indexOf(SECTION_START);
+  const end = existing.indexOf(SECTION_END, start);
+  if (start >= 0 && end > start) {
+    const after = existing.slice(end + SECTION_END.length).replace(/^\n/, '');
+    return `${existing.slice(0, start)}${KB_AGENT_SECTION}${after}`;
+  }
+  return `${existing.replace(/\s*$/, '')}\n\n${KB_AGENT_SECTION}`;
 }
 
 export function getSkillOnlyFiles(): Record<string, string> {
@@ -608,6 +665,6 @@ export function getSkillOnlyFiles(): Record<string, string> {
     '.claude/commands/kb-session.md': KB_SESSION_SKILL,
     '.claude/commands/kb-digest.md': KB_DIGEST_SKILL,
     '.claude/commands/kb-agent-capture.md': KB_AGENT_CAPTURE_SKILL,
-    'CLAUDE.md': KB_CLAUDE_MD,
+    ...KH_IDEAS_SKILL_FILES,
   };
 }

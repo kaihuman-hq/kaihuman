@@ -1,4 +1,4 @@
-import type { BraindumpId } from '@kaihuman/formats';
+import { type BraindumpId, parseIdea } from '@kaihuman/formats';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BRAINDUMP_IDLE_SYNC_MS,
@@ -8,6 +8,7 @@ import {
   type BraindumpWindow,
   createBraindumpWindow,
   findMatches,
+  ideaTitleOf,
 } from './braindump-window.js';
 import type { ActionPort, Braindump } from './protocol.js';
 
@@ -16,6 +17,8 @@ let stored: Map<string, string>;
 let nextId: number;
 let syncError: string | null;
 let sent: { type: string; id?: string; text?: string }[];
+/** The ideas `SAVE_IDEA` created, by path; an existing path is refused, as GitHub does. */
+let ideas: Map<string, string>;
 
 const listed = (): Braindump[] =>
   [...stored].map(([id, text]) => ({
@@ -44,6 +47,12 @@ const port: ActionPort = {
       case 'SYNC_BRAINDUMPS':
         if (syncError) throw new Error(syncError);
         return { braindumps: listed() } as never;
+      case 'SAVE_IDEA': {
+        const { path, content } = request as { path: string; content: string };
+        if (ideas.has(path)) throw new Error(`Failed to update ${path}: 422`);
+        ideas.set(path, content);
+        return { url: `https://console.example/files/${path}` } as never;
+      }
       default:
         throw new Error(`unexpected ${request.type}`);
     }
@@ -82,6 +91,7 @@ beforeEach(async () => {
   nextId = 100;
   syncError = null;
   sent = [];
+  ideas = new Map();
   root = document.createElement('div');
   document.body.replaceChildren(root);
   hide = vi.fn<() => void>();
@@ -345,5 +355,51 @@ describe('find in the braindump', () => {
     key(text(), 'o', true);
     await tick();
     expect(bar().hidden).toBe(true);
+  });
+});
+
+describe('promote to idea', () => {
+  it('takes the first line, without a heading’s #, as the title', () => {
+    expect(ideaTitleOf('\n  ## Offline palette \nmore')).toBe('Offline palette');
+    expect(ideaTitleOf(' \n ')).toBe('');
+  });
+
+  it('makes an idea of the braindump on ⌃I, then deletes the braindump', async () => {
+    type('# Offline palette\nIt should work on a plane.');
+    await tick(BRAINDUMP_SAVE_DELAY_MS);
+    expect(stored.get('100')).toBeDefined();
+    key(text(), 'i', true);
+    await tick();
+    const content = ideas.get('.kh/ideas/offline-palette.md') ?? '';
+    const idea = parseIdea(content);
+    expect(idea).toMatchObject({ title: 'Offline palette', status: 'seed' });
+    expect(idea.braindump).toBe('### Offline palette\nIt should work on a plane.');
+    expect(idea.log[0]).toMatchObject({ author: 'human', text: 'Promoted from a braindump.' });
+    expect(stored.size).toBe(0);
+    expect(saves().at(-1)).toEqual({ type: 'SAVE_BRAINDUMP', id: '100', text: '' });
+    expect(syncs()).toBe(2);
+    expect(text().value).toBe('');
+    expect(state()).toMatch(/^idea offline-palette made, braindump deleted · synced \d\d:\d\d$/);
+  });
+
+  it('keeps the braindump when the idea exists already', async () => {
+    ideas.set('.kh/ideas/offline-palette.md', 'theirs');
+    type('Offline palette');
+    key(text(), 'i', true);
+    await tick();
+    expect(ideas.get('.kh/ideas/offline-palette.md')).toBe('theirs');
+    expect(text().value).toBe('Offline palette');
+    expect(state()).toBe(
+      'not made an idea — Failed to update .kh/ideas/offline-palette.md: 422; the braindump is kept',
+    );
+    await tick(BRAINDUMP_SAVE_DELAY_MS);
+    expect(stored.get('100')).toBe('Offline palette');
+  });
+
+  it('does nothing with an empty braindump', async () => {
+    key(text(), 'i', true);
+    await tick();
+    expect(ideas.size).toBe(0);
+    expect(state()).toBe('nothing to make an idea of');
   });
 });

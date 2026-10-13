@@ -64,7 +64,7 @@ pub async fn run(inline: Option<String>) -> Result<()> {
 }
 
 /// Resolve the capture text: CLI args → piped stdin → `$EDITOR`.
-fn resolve_text(inline: Option<String>) -> Result<String> {
+pub(crate) fn resolve_text(inline: Option<String>) -> Result<String> {
     if let Some(t) = inline {
         return Ok(t);
     }

@@ -177,4 +177,14 @@ describe('paletteSettingsProblems', () => {
       'Own: >t is one of the palette’s own prefixes',
     ]);
   });
+
+  it('keeps >id for the ideas mode', () => {
+    expect(
+      paletteSettingsProblems({
+        searchEngines: [],
+        assistants: [],
+        tools: [tool({ name: 'Ids', prefix: 'id' })],
+      }),
+    ).toEqual(['Ids: >id is one of the palette’s own prefixes']);
+  });
 });

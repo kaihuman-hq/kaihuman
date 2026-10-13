@@ -1,4 +1,5 @@
 import { buildDemoSeed, type DashboardConfig, InMemoryGithubService } from '@kaihuman/core';
+import { ideaActivity, ideaSlugOf, parseIdea } from '@kaihuman/formats';
 import { describe, expect, it } from 'vitest';
 
 const CONFIG_PATH = '.kh/.dashboard.config.json';
@@ -146,5 +147,21 @@ describe('InMemoryGithubService', () => {
     await expect(svc.getFileContent(owner, repo, CONFIG_PATH)).rejects.toMatchObject({
       status: 404,
     });
+  });
+});
+
+describe('demo ideas', () => {
+  it('seeds parseable ideas across several statuses and activity levels', () => {
+    const now = new Date();
+    const ideas = Object.entries(buildDemoSeed(now).files)
+      .filter(([path]) => ideaSlugOf(path) !== null)
+      .map(([, text]) => parseIdea(text));
+    expect(ideas.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(ideas.map((idea) => idea.status)).size).toBeGreaterThanOrEqual(3);
+    const levels = new Set(ideas.map((idea) => ideaActivity(idea, now).level));
+    expect(levels.has('hot')).toBe(true);
+    expect(levels.has('dormant')).toBe(true);
+    // One idea has no log yet, so the overview shows its "no activity yet" state.
+    expect(ideas.some((idea) => idea.log.length === 0)).toBe(true);
   });
 });

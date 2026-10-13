@@ -63,6 +63,17 @@ export interface Braindump {
   synced: boolean;
 }
 
+/** One idea file (doc/ideas.md) as `LIST_IDEAS` answers it, raw; the palette parses it itself. */
+export interface IdeaFile {
+  /** `.kh/ideas/<slug>.md`. */
+  path: string;
+  /** The version read, which `SAVE_IDEA` writes over. */
+  sha: string;
+  text: string;
+  /** Where the file opens in the console. */
+  url: string;
+}
+
 /** One Wi‑Fi network from a `LIST_WIFI` scan; the strongest access point stands for its SSID. */
 export interface WifiNetwork {
   ssid: string;
@@ -243,6 +254,17 @@ export interface PaletteProtocol {
    * with its console link. Backends refuse any path `isKnowledgePath` does not allow.
    */
   CAPTURE_KNOWLEDGE: { request: { path: string; content: string }; response: { url: string } };
+  /** Every idea in `IDEAS_FOLDER` (`.kh/ideas/<slug>.md`); none when the folder is not there. */
+  LIST_IDEAS: { request: NoFields; response: { ideas: IdeaFile[] } };
+  /**
+   * Writes an idea: without `sha` only as a new file, never over an existing one; with it, over
+   * that version only, so a change made since the list fails. Answers with its console link.
+   * Backends refuse any path `ideaSlugOf` does not read a slug from.
+   */
+  SAVE_IDEA: {
+    request: { path: string; content: string; sha?: string };
+    response: { url: string };
+  };
   /**
    * Desktop only: whether Wi‑Fi is on and the networks in range, connected first, then strongest.
    * `rescan` waits for a fresh scan; without it the last scan answers at once.

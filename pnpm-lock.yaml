@@ -325,6 +325,9 @@ importers:
 
   apps/kb-mcp:
     dependencies:
+      '@kaihuman/formats':
+        specifier: workspace:*
+        version: link:../../packages/formats
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(supports-color@8.1.1)(zod@4.6.5)

@@ -71,6 +71,7 @@ export const BUILT_IN_PALETTE_PREFIXES: readonly string[] = [
   'a',
   'w',
   'gw',
+  'id',
   'q',
   'k',
   's',

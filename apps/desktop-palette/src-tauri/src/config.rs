@@ -109,6 +109,10 @@ pub fn palette_settings_cache_file() -> PathBuf {
     xdg_dir("XDG_CACHE_HOME", ".cache").join("palette-settings.json")
 }
 
+pub fn ideas_cache_file() -> PathBuf {
+    xdg_dir("XDG_CACHE_HOME", ".cache").join("ideas.json")
+}
+
 pub fn prompts_cache_file() -> PathBuf {
     xdg_dir("XDG_CACHE_HOME", ".cache").join("prompts.json")
 }

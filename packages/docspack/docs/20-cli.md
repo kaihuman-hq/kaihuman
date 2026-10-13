@@ -66,6 +66,7 @@ The main menu is a list; press its letter or move with `Up`/`Down` and press `En
 | `a` | AI prompt (Claude / Copilot / Gemini) |
 | `f` | File browser |
 | `d` | Dashboard config view |
+| `i` | Ideas list (`.kh/ideas/`) |
 | `l` | Login |
 | `q` | Quit (main menu only) |
 | `Ctrl+C` | Quit from any screen |
@@ -82,6 +83,7 @@ The `n`, `k`, `s`, `f` and `d` actions start a login first if there is no GitHub
 | AI response | `Up`/`Down` scroll; `Esc` or `Enter` back to the prompt |
 | File browser | `Up`/`Down`; `Enter` opens a file; `Esc` back |
 | Dashboard view | `Up`/`Down`; `Enter` opens a file; `Esc` back |
+| Ideas | `Up`/`Down`; `Enter` opens the idea; `n` new; `l` log entry; `r` refresh; `Esc` back |
 | File editor | Type to edit; `Ctrl+S` saves, commits and pushes; `Esc` closes |
 
 The AI prompt sends on plain `Enter` with any modifier, because `Ctrl+Enter` is unreliable across terminals.
@@ -117,6 +119,40 @@ Possible output lines:
 - `Captured locally · N pushed, M pending (will retry on next capture)` when some pushes failed.
 - `Saved locally — not authenticated.` when there is no `auth.json`.
 - `Saved locally — no active repo.` when no repo is selected; run `kaihuman` and press `s`.
+
+## Capturing and updating ideas with kaihuman idea and kaihuman ideas
+<!-- docspack: tags=ideas,kaihuman idea,kaihuman ideas,idea log,idea status,import,hand-off,skills install,kh-ideas -->
+
+Ideas are `.kh/ideas/<slug>.md` files (see "Idea file format"). The commands are the one write path that every agent and the user share; the `kh-ideas` skill tells agents to use them.
+
+```sh
+kaihuman idea "Offline sync for the palette"            # new seed idea; prints the slug
+kaihuman idea "…" --product kaihuman --tag palette --by claude
+kaihuman ideas                                          # open ideas by status (--all, --status, --product, --json)
+kaihuman ideas show palette-sync                        # the file (--json for the parsed fields)
+kaihuman ideas find offline palette                     # best matches first
+kaihuman ideas log palette-sync "CRDTs too heavy." --by claude
+kaihuman ideas challenge palette-sync "Conflicts on two devices"
+kaihuman ideas dump palette-sync "Also the settings file?"
+kaihuman ideas summary palette-sync "Queue writes; no CRDT."
+kaihuman ideas status palette-sync parked --reason "Not before v2" --by claude
+pbpaste | kaihuman ideas import --by claude.ai          # apply kh-idea blocks from a chat
+kaihuman ideas path palette-sync                        # path in the local clone
+kaihuman skills install                                 # the kh-ideas skill for every agent
+```
+
+`kaihuman idea` takes its text from the arguments, else piped stdin, else `$EDITOR`: the first line is the title, the rest the braindump. Slugs may be written with an `idea:` prefix. `--by` is `human` unless an agent names itself.
+
+- **Reads** pull the local clone (`~/.config/cli/repos/<owner>/<repo>`) first; when the pull fails they read the clone as it is and warn on stderr.
+- **Writes** go through the GitHub contents API: a new idea is a create-only PUT, so a taken slug is refused (choose another with `--slug`); an edit re-reads the file and writes over its `sha`, retrying once on a conflict. The commit message is `kaihuman: idea <slug> — <op>`.
+- **Offline, or on any GitHub error,** the write is queued as JSON in the spool's `ideas/` folder and replayed in order before the next write. An op that can never apply (a taken slug, an unknown idea) is renamed `.json.failed` and reported.
+- **Exit codes:** 0 on success or when queued, 1 on an error, printed to stderr as `<command> error: <reason>`.
+
+`kaihuman skills install` writes `~/.claude/skills/kh-ideas/SKILL.md` (Claude Code) and `~/.agents/skills/kh-ideas/SKILL.md` (Antigravity, Gemini CLI, Codex, Copilot, Cursor), so agents working in any product repository can file ideas. `--dir` installs under another directory. The text is `packages/formats/skills/kh-ideas/SKILL.md`, built into the binary.
+
+In the TUI, `i` opens the ideas list (status, title, age, open challenges): `Enter` opens the file in the editor, `n` creates an idea from a title, `l` adds a log entry as `human`, `r` refreshes, `Esc` goes back.
+
+Code: `apps/cli/src/ideas.rs` (the format, mirroring `packages/formats/src/ideas.ts`; its tests read the shared fixture) and `apps/cli/src/ideas_cli.rs` (commands, queue, overview).
 
 ## How the capture spool keeps notes safe offline
 <!-- docspack: tags=offline,queue,retry,backlog -->

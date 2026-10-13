@@ -57,6 +57,14 @@ pub fn build_kb_note(text: &str) -> (String, String) {
     (filename, content)
 }
 
+/// What a contents-API write did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PutOutcome {
+    Written,
+    /// The file changed since it was read, or a create found it already there.
+    Conflict,
+}
+
 pub struct GithubClient {
     client: reqwest::Client,
 }
@@ -149,6 +157,69 @@ impl GithubClient {
         }
 
         Ok(())
+    }
+
+    /// Read a file and its blob sha through the contents API; `None` when it does not exist.
+    pub async fn get_file(
+        &self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+    ) -> Result<Option<(String, String)>> {
+        let url = format!(
+            "https://api.github.com/repos/{}/{}/contents/{}",
+            owner, repo, path
+        );
+        let res = self.client.get(&url).send().await?;
+        if res.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        if !res.status().is_success() {
+            bail!("GET {} failed: {}", path, res.status());
+        }
+        let data: ContentResponse = res.json().await?;
+        let decoded = BASE64_STANDARD.decode(data.content.replace('\n', ""))?;
+        Ok(Some((String::from_utf8(decoded)?, data.sha)))
+    }
+
+    /// Create (`sha` is `None`, create-only) or update (`sha` of the version read) a file.
+    /// GitHub answers 409 for a stale sha and 422 when a create finds the file already there;
+    /// both come back as `PutOutcome::Conflict` so the caller can re-read or pick another name.
+    pub async fn write_file(
+        &self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+        content: &str,
+        message: &str,
+        sha: Option<&str>,
+    ) -> Result<PutOutcome> {
+        let url = format!(
+            "https://api.github.com/repos/{}/{}/contents/{}",
+            owner, repo, path
+        );
+
+        #[derive(Serialize)]
+        struct PutBody<'a> {
+            message: &'a str,
+            content: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            sha: Option<&'a str>,
+        }
+
+        let body = PutBody {
+            message,
+            content: BASE64_STANDARD.encode(content),
+            sha,
+        };
+        let res = self.client.put(&url).json(&body).send().await?;
+        match res.status() {
+            s if s.is_success() => Ok(PutOutcome::Written),
+            reqwest::StatusCode::CONFLICT | reqwest::StatusCode::UNPROCESSABLE_ENTITY => {
+                Ok(PutOutcome::Conflict)
+            }
+            s => bail!("PUT {} failed: {}", path, s),
+        }
     }
 
     /// Write a knowledge capture to `.kh/raw/` as an immutable, OKF-aligned markdown

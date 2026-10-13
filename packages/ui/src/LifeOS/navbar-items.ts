@@ -7,6 +7,7 @@ import {
   Keyboard,
   LayoutGrid,
   Library,
+  Lightbulb,
   Network,
   ScrollText,
 } from 'lucide-preact';
@@ -26,12 +27,13 @@ export const NAVBAR_ITEMS: NavbarItemDef[] = [
   { id: 'wiki', label: 'Wiki', icon: BookOpen },
   { id: 'knowledge', label: 'Knowledge Base', icon: Library },
   { id: 'actionLog', label: 'Action Log', icon: ScrollText },
+  { id: 'ideas', label: 'Ideas', icon: Lightbulb },
   { id: 'graph', label: 'Graph', icon: Network },
   { id: 'commits', label: 'Commits', icon: GitCommit },
 ];
 
-/** Items shown when the user has not customised the navbar. Matches the historical default. */
-export const DEFAULT_NAVBAR: NavItemId[] = ['dashboard', 'files', 'board', 'shortcuts'];
+/** Items shown when the user has not customised the navbar. */
+export const DEFAULT_NAVBAR: NavItemId[] = ['dashboard', 'files', 'board', 'ideas', 'shortcuts'];
 
 export const getNavbarItem = (id: NavItemId): NavbarItemDef | undefined =>
   NAVBAR_ITEMS.find((item) => item.id === id);

@@ -79,6 +79,7 @@ export type NavItemId =
   | 'wiki'
   | 'knowledge'
   | 'actionLog'
+  | 'ideas'
   | 'graph'
   | 'commits';
 

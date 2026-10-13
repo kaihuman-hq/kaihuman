@@ -4,7 +4,6 @@ import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import {
   addRawNote,
-  claudeMdExists,
   isKBInitialized,
   type KBFile,
   listKBDir,
@@ -20,7 +19,6 @@ export function KnowledgeBasePage() {
   const [processedFiles, setProcessedFiles] = useState<KBFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [scaffolding, setScaffolding] = useState(false);
-  const [claudeMdConflict, setClaudeMdConflict] = useState(false);
   const [skillsUpdated, setSkillsUpdated] = useState(false);
   const [view, setView] = useState<'inbox' | 'wiki' | 'processed'>('inbox');
   const [addingNote, setAddingNote] = useState(false);
@@ -84,16 +82,6 @@ export function KnowledgeBasePage() {
     };
   }, [repo?.full_name]);
 
-  async function handleSetup() {
-    if (!repo) return;
-    const hasClaudeMd = await claudeMdExists(repo.full_name);
-    if (hasClaudeMd) {
-      setClaudeMdConflict(true);
-      return;
-    }
-    await doScaffold(false);
-  }
-
   async function handleAddNote() {
     if (!repo || !noteText.trim()) return;
     setSubmittingNote(true);
@@ -122,12 +110,11 @@ export function KnowledgeBasePage() {
     });
   }
 
-  async function doScaffold(skipClaudeMd: boolean) {
+  async function handleSetup() {
     if (!repo) return;
-    setClaudeMdConflict(false);
     setScaffolding(true);
     try {
-      await scaffoldKB(repo.full_name, { skipClaudeMd });
+      await scaffoldKB(repo.full_name);
       await load(repo.full_name);
     } finally {
       setScaffolding(false);
@@ -174,41 +161,19 @@ export function KnowledgeBasePage() {
           <p class="text-sm text-[var(--los-fg-dim)]">
             Not set up in <span class="text-[var(--los-accent)]">{repo.full_name}</span>. This
             creates {'·'}
-            <code class="text-xs">.kh/</code> and <code class="text-xs">.claude/commands/</code> in
-            your repo.
+            <code class="text-xs">.kh/</code>, <code class="text-xs">.claude/</code> and{' '}
+            <code class="text-xs">.agents/</code> in your repo, and adds a kaihuman section to{' '}
+            <code class="text-xs">CLAUDE.md</code> and <code class="text-xs">AGENTS.md</code>. Text
+            you wrote in those files stays as it is.
           </p>
-          {claudeMdConflict ? (
-            <div class="space-y-3">
-              <p class="text-xs text-[var(--los-warning)]">
-                A <code>CLAUDE.md</code> already exists in this repo. Overwrite it?
-              </p>
-              <div class="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => doScaffold(false)}
-                  class="px-3 py-1.5 bg-[var(--los-accent)] text-black font-bold text-xs rounded hover:opacity-90"
-                >
-                  Overwrite
-                </button>
-                <button
-                  type="button"
-                  onClick={() => doScaffold(true)}
-                  class="px-3 py-1.5 border border-[var(--los-border)] text-[var(--los-fg)] text-xs rounded hover:border-[var(--los-accent)]"
-                >
-                  Keep existing
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSetup}
-              disabled={scaffolding}
-              class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50"
-            >
-              {scaffolding ? 'Setting up...' : 'Set Up Knowledge Base'}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleSetup}
+            disabled={scaffolding}
+            class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50"
+          >
+            {scaffolding ? 'Setting up...' : 'Set Up Knowledge Base'}
+          </button>
         </div>
         {bar}
       </>

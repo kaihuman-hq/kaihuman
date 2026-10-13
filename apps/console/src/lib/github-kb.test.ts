@@ -3,10 +3,11 @@ import {
   getInstalledSkillVersion,
   isKBInitialized,
   listKBDir,
+  refreshInstalledSkills,
   scaffoldKB,
   updateSkillsIfNeeded,
 } from './github-kb';
-import { getScaffoldFiles, KB_SKILL_VERSION } from './kb-skills';
+import { getScaffoldFiles, KB_AGENT_SECTION, KB_SKILL_VERSION } from './kb-skills';
 
 vi.mock('@kaihuman/core', () => ({
   authStore: { token: { value: 'test-token' } },
@@ -77,6 +78,35 @@ describe('updateSkillsIfNeeded', () => {
     expect(writtenPaths).toContain('.claude/commands/kb-ingest.md');
     expect(writtenPaths).toContain('.claude/commands/kb-lint.md');
     expect(writtenPaths).toContain('.claude/commands/kb-ask.md');
+    expect(writtenPaths).toContain('.claude/skills/kh-ideas/SKILL.md');
+    expect(writtenPaths).toContain('AGENTS.md');
+  });
+
+  it('keeps the user’s text in AGENTS.md and writes the version file last', async () => {
+    vi.mocked(githubService.getFileContent).mockImplementation(async (_o, _r, path) => {
+      if (path === '.kh/.skill-version') return { content: '0.0.1', sha: 'v' };
+      if (path === 'AGENTS.md') return { content: '# Mine\n', sha: 'a' };
+      throw new Error('Not Found');
+    });
+    vi.mocked(githubService.upsertRepoFile).mockResolvedValue({} as any);
+    await updateSkillsIfNeeded('owner/repo');
+    const calls = vi.mocked(githubService.upsertRepoFile).mock.calls;
+    const written = Object.fromEntries(calls.map((c) => [c[2], c[3]]));
+    expect(written['AGENTS.md']).toBe(`# Mine\n\n${KB_AGENT_SECTION}`);
+    expect(written['CLAUDE.md']).toBe(KB_AGENT_SECTION);
+    expect(calls.at(-1)?.[2]).toBe('.kh/.skill-version');
+  });
+
+  it('does not rewrite an instruction file that is already up to date', async () => {
+    vi.mocked(githubService.getFileContent).mockImplementation(async (_o, _r, path) => {
+      if (path === '.kh/.skill-version') return { content: '0.0.1', sha: 'v' };
+      return { content: KB_AGENT_SECTION, sha: 'a' };
+    });
+    vi.mocked(githubService.upsertRepoFile).mockResolvedValue({} as any);
+    await updateSkillsIfNeeded('owner/repo');
+    const paths = vi.mocked(githubService.upsertRepoFile).mock.calls.map((c) => c[2]);
+    expect(paths).not.toContain('CLAUDE.md');
+    expect(paths).not.toContain('AGENTS.md');
   });
 
   it('writes skill files and returns true when KB is not yet initialized', async () => {
@@ -84,6 +114,30 @@ describe('updateSkillsIfNeeded', () => {
     vi.mocked(githubService.upsertRepoFile).mockResolvedValue({} as any);
     const updated = await updateSkillsIfNeeded('owner/repo');
     expect(updated).toBe(true);
+  });
+});
+
+describe('refreshInstalledSkills', () => {
+  it('installs nothing into a repo that was never set up', async () => {
+    vi.mocked(githubService.getFileContent).mockRejectedValue(new Error('Not Found'));
+    expect(await refreshInstalledSkills('owner/repo')).toBe('missing');
+    expect(githubService.upsertRepoFile).not.toHaveBeenCalled();
+  });
+
+  it('leaves current skills alone', async () => {
+    vi.mocked(githubService.getFileContent).mockResolvedValue({
+      content: KB_SKILL_VERSION,
+      sha: 'a',
+    });
+    expect(await refreshInstalledSkills('owner/repo')).toBe('current');
+    expect(githubService.upsertRepoFile).not.toHaveBeenCalled();
+  });
+
+  it('updates outdated skills', async () => {
+    vi.mocked(githubService.getFileContent).mockResolvedValue({ content: '0.0.1', sha: 'a' });
+    vi.mocked(githubService.upsertRepoFile).mockResolvedValue({} as any);
+    expect(await refreshInstalledSkills('owner/repo')).toBe('updated');
+    expect(githubService.upsertRepoFile).toHaveBeenCalled();
   });
 });
 
@@ -137,6 +191,11 @@ describe('listKBDir', () => {
 });
 
 describe('scaffoldKB', () => {
+  beforeEach(() => {
+    vi.mocked(githubService.getFileContent).mockRejectedValue(new Error('Not Found'));
+    vi.mocked(githubService.upsertRepoFile).mockResolvedValue({} as any);
+  });
+
   it('calls saveFile once for every scaffold file', async () => {
     vi.mocked(githubService.saveFile).mockResolvedValue({} as any);
     await scaffoldKB('owner/repo');
@@ -150,5 +209,22 @@ describe('scaffoldKB', () => {
     expect(writtenPaths).toContain('.kh/.skill-version');
     expect(writtenPaths).toContain('.kh/raw/.gitkeep');
     expect(writtenPaths).toContain('.claude/commands/kb-ingest.md');
+    expect(writtenPaths).toContain('.kh/ideas/.gitkeep');
+    expect(writtenPaths).toContain('.agents/skills/kh-ideas/SKILL.md');
+  });
+
+  it('adds the kaihuman section to an existing CLAUDE.md and creates AGENTS.md', async () => {
+    vi.mocked(githubService.saveFile).mockResolvedValue({} as any);
+    vi.mocked(githubService.upsertRepoFile).mockResolvedValue({} as any);
+    vi.mocked(githubService.getFileContent).mockImplementation(async (_o, _r, path) => {
+      if (path === 'CLAUDE.md') return { content: '# Mine\n', sha: 'a' };
+      throw new Error('Not Found');
+    });
+    await scaffoldKB('owner/repo');
+    const written = Object.fromEntries(
+      vi.mocked(githubService.upsertRepoFile).mock.calls.map((c) => [c[2], c[3]]),
+    );
+    expect(written['CLAUDE.md']).toBe(`# Mine\n\n${KB_AGENT_SECTION}`);
+    expect(written['AGENTS.md']).toBe(KB_AGENT_SECTION);
   });
 });

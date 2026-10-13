@@ -11,7 +11,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "vite build",
     "start": "node dist/index.js",
     "check-types": "tsc --noEmit",
     "lint": "biome check .",
@@ -20,6 +20,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@kaihuman/formats": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^4.6.5"
   }

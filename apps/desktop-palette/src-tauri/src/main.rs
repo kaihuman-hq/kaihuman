@@ -15,6 +15,7 @@ mod dumps;
 mod entries;
 mod files;
 mod github;
+mod ideas;
 #[cfg(target_os = "linux")]
 mod layer;
 mod native_host;

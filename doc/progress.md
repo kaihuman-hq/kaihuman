@@ -1,5 +1,63 @@
 # Progress
 
+## 2026-10-13 — Ideas: agent instructions merged into CLAUDE.md and AGENTS.md
+
+- **kaihuman's text in `CLAUDE.md` and `AGENTS.md` is now one marked section**
+  (`<!-- kaihuman:start … -->` … `<!-- kaihuman:end -->`). Setup and every skill update create a
+  missing file, append the section to a file the user wrote, or replace only the section; the
+  user's own text stays. A file an older version wrote in full is replaced. The **Overwrite / Keep
+  existing** question on `/knowledge` is gone, because nothing is overwritten any more. This also
+  fixes the skill update from earlier today overwriting a hand-written `AGENTS.md`.
+- `.kh/.skill-version` is written last, so an update that fails halfway runs again.
+- **`/ideas` keeps the skills current** (`refreshInstalledSkills`) when they are installed, and
+  links to `/knowledge` when they are not. It never sets a repository up by itself.
+- **Committing ideas to the default branch:** the section and the `kh-ideas` skill tell an agent to
+  ask the user, once per session, whether it may commit idea changes straight to the default branch,
+  where the kaihuman apps read them. If not, or if the push is refused, the change stays on the
+  agent's branch and it says that a merge is needed.
+- The skill says that a repository with a `.kh/` folder is the data repo, so an agent there edits
+  `.kh/ideas/` in place instead of looking for the CLI.
+
+## 2026-10-13 — Ideas: one file per idea, shared by every agent
+
+Built from `doc/ideas.md`, with the decisions recorded there (data repo only, six statuses,
+newest-first log, agents may change the status).
+
+- **Format** (`packages/formats/src/ideas.ts`): `.kh/ideas/<slug>.md` with frontmatter, a
+  rewritten summary, an append-only newest-first log (`- YYYY-MM-DD HH:MM · <author> · <text>`),
+  challenges and the user's braindump. Edits change only the part they own. `ideaActivity` grades
+  ideas hot / warm / cool / dormant. `kh-idea` hand-off blocks bring ideas over from chat apps.
+  `#` and `##` lines in braindump text become `###`, so they cannot end the section. A shared
+  fixture (`packages/formats/fixtures/ideas/`) is read by the TypeScript and Rust tests.
+- **Skill** `kh-ideas` (`packages/formats/skills/kh-ideas/SKILL.md`, Agent Skills format): where
+  things go, noise rules, the commands, a direct-edit fallback and the hand-off block.
+- **CLI**: `kaihuman idea`, `kaihuman ideas` (overview, `show`, `find`, `log`, `challenge`,
+  `dump`, `summary`, `status`, `import`, `path`) and `kaihuman skills install` (to
+  `~/.claude/skills/` and `~/.agents/skills/`). Writes are create-only or sha-checked; offline they
+  queue in `spool/ideas/`. TUI key `i` lists ideas.
+- **Console**: `/ideas` shows every idea as a card coloured by status, with a 12-week activity
+  strip and an activity level, filters, sorts and inline log, challenge and status edits; it is in
+  the default navbar. `/quick-idea` creates an idea or applies pasted hand-off blocks. The KB
+  scaffold and skill update (`KB_SKILL_VERSION` 1.8.0) install the skill into `.agents/skills/`
+  and `.claude/skills/` and write an `AGENTS.md` next to `CLAUDE.md`. Demo mode has five ideas.
+- **kb-mcp**: eight `ideas_*` tools, and `--git` / `KB_GIT=1` to pull before and commit and push
+  after each idea write, for Claude Desktop. The server is now bundled with `vite build`, so it can
+  use `@kaihuman/formats`.
+- **Palettes**: `>id` lists ideas, creates one, or logs on one with `<slug>: <text>` (`>i` stays
+  IMDb; `id` is now a reserved prefix). The braindump window's ⌃I promotes a braindump to an
+  idea. New requests `LIST_IDEAS` and `SAVE_IDEA`, path-checked on both backends.
+- Docs: `doc/documentation.md`, `doc/features.md`, `doc/roadmap.md`, README and the docspack pages
+  (file format, CLI, console, palettes, kb-mcp, knowledge base) with four new eval queries.
+
+## 2026-10-13 — Ideas: study and proposal
+
+- **New design doc `doc/ideas.md`.** It proposes one Markdown file per product idea in
+  `.kh/ideas/<slug>.md` of the data repo, with a summary, a newest-first log, challenges and a
+  braindump that only the user writes. All agents use one `kh-ideas` skill (Agent Skills format,
+  in `.agents/skills/` and `.claude/skills/`) and a `kaihuman idea` / `kaihuman ideas` CLI. Chat apps
+  hand ideas over with a pasted block, and Claude Desktop through new `kb-mcp` tools. Nothing is
+  implemented yet.
+
 ## 2026-10-13 — docspack repo index and a leaner CLAUDE.md
 
 - Root devDependency `docspack` bumped to `1.5.0`; `npx docspack agent install --recipe repo --hooks`

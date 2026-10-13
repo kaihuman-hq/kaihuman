@@ -339,5 +339,21 @@
   {
     "query": "how do I change which services show a status light on the new tab page",
     "expect": "browser-extension-service-status-lights-on-the-start-page"
+  },
+  {
+    "query": "what does an idea file in .kh/ideas look like",
+    "expect": "repo-file-formats-idea-file-format-kh-ideas-slug-md"
+  },
+  {
+    "query": "what do the colours and the orange squares on the ideas page mean",
+    "expect": "web-console-reviewing-ideas-on-ideas"
+  },
+  {
+    "query": "add a log entry to an idea from the command palette",
+    "expect": "command-palette-ideas-with-id"
+  },
+  {
+    "query": "how does claude desktop push idea changes to github",
+    "expect": "knowledge-base-mcp-server-committing-idea-changes-with-git"
   }
 ]

@@ -11,12 +11,13 @@ use serde_json::{Value, json};
 use crate::bookmarks::{self, BOOKMARKS_PATH, Cache};
 use crate::config::{
     self, Settings, bookmarks_cache_file, claude_usage_cache_file, commands_cache_file,
-    is_repo_name, palette_settings_cache_file, prompts_cache_file, read_json, write_json,
+    ideas_cache_file, is_repo_name, palette_settings_cache_file, prompts_cache_file, read_json,
+    write_json,
 };
 use crate::github::{Client, Read, WorkFilter, console_file_url, encode_path};
 use crate::recents::{self, RecentEntry};
 use crate::{
-    braindumps, claude, commands, dumps, entries, files, palette_settings, prompts, repos,
+    braindumps, claude, commands, dumps, entries, files, ideas, palette_settings, prompts, repos,
     translate, wifi,
 };
 
@@ -90,6 +91,13 @@ pub enum Request {
     CaptureKnowledge {
         path: String,
         content: String,
+    },
+    ListIdeas,
+    SaveIdea {
+        path: String,
+        content: String,
+        #[serde(default)]
+        sha: Option<String>,
     },
     ListGithubRepos,
     ListGithubWork {
@@ -177,6 +185,42 @@ async fn capture_knowledge(path: &str, content: &str) -> Result<Value, String> {
             "Capture knowledge via the desktop palette",
         )
         .await?;
+    Ok(json!({ "url": console_file_url(path, client.repo()) }))
+}
+
+/// Every idea, with its console link. The folder is listed each time — an idea is written over
+/// the version listed, so that must be current — and only changed files are read again.
+async fn list_ideas() -> Result<Value, String> {
+    let client = client()?;
+    let file = ideas_cache_file();
+    let known = read_json::<ideas::Cache>(&file)
+        .filter(|cache| cache.repo == client.repo())
+        .map(|cache| cache.files)
+        .unwrap_or_default();
+    let files = ideas::fetch(&client, &known).await?;
+    let listed: Vec<Value> = files
+        .iter()
+        .map(|idea| {
+            let url = console_file_url(&idea.path, client.repo());
+            json!({ "path": idea.path, "sha": idea.sha, "text": idea.text, "url": url })
+        })
+        .collect();
+    let cache = ideas::Cache {
+        repo: client.repo().to_string(),
+        files,
+    };
+    if let Err(error) = write_json(&file, &cache) {
+        eprintln!("could not cache the ideas: {error}");
+    }
+    Ok(json!({ "ideas": listed }))
+}
+
+async fn save_idea(path: &str, content: &str, sha: Option<&str>) -> Result<Value, String> {
+    if !ideas::is_idea_path(path) {
+        return Err(format!("Refusing to write {path}"));
+    }
+    let client = client()?;
+    ideas::save(&client, path, content, sha).await?;
     Ok(json!({ "url": console_file_url(path, client.repo()) }))
 }
 
@@ -559,6 +603,10 @@ pub async fn handle(request: Value) -> Result<Value, String> {
             write_entry_file(&path, &content, sha.as_deref()).await
         }
         Request::CaptureKnowledge { path, content } => capture_knowledge(&path, &content).await,
+        Request::ListIdeas => list_ideas().await,
+        Request::SaveIdea { path, content, sha } => {
+            save_idea(&path, &content, sha.as_deref()).await
+        }
         Request::ListGithubRepos => list_github_repos().await,
         Request::ListGithubWork { filter } => Ok(json!({ "items": client()?.work(filter).await? })),
         Request::GetPaletteSettings => get_palette_settings().await,
@@ -926,6 +974,39 @@ mod tests {
                 .await
                 .unwrap_err();
         assert_eq!(error, "Refusing to write README.md");
+    }
+
+    #[test]
+    fn reads_idea_requests() {
+        assert_eq!(parse(json!({ "type": "LIST_IDEAS" })), Request::ListIdeas);
+        assert_eq!(
+            parse(json!({ "type": "SAVE_IDEA", "path": ".kh/ideas/ab.md", "content": "x" })),
+            Request::SaveIdea {
+                path: ".kh/ideas/ab.md".into(),
+                content: "x".into(),
+                sha: None
+            }
+        );
+        assert_eq!(
+            parse(
+                json!({ "type": "SAVE_IDEA", "path": ".kh/ideas/ab.md", "content": "x", "sha": "v1" })
+            ),
+            Request::SaveIdea {
+                path: ".kh/ideas/ab.md".into(),
+                content: "x".into(),
+                sha: Some("v1".into())
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn refuses_an_idea_outside_the_ideas_folder() {
+        for path in ["README.md", ".kh/ideas/../x.md", ".kh/ideas/sub/ab.md"] {
+            let error = handle(json!({ "type": "SAVE_IDEA", "path": path, "content": "x" }))
+                .await
+                .unwrap_err();
+            assert_eq!(error, format!("Refusing to write {path}"));
+        }
     }
 
     #[test]

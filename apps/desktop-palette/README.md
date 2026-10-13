@@ -36,7 +36,8 @@ way.
 | `>k` convert — colors, number bases, arithmetic, timestamps, metric ⇄ US units (`5 km`, `350 °F`, `5'11"`, `5 km in ft`), lengths ⇄ pixels at 80/150/300 dpi (`10 cm to px`, `1000 px`), letter case, Lorem ipsum; also offered inline for a color, sum, `0x…`, timestamp or quantity typed into the main search | ✓ (copying with `wl-copy`) |
 | `>s` symbols, emoji and kaomoji by name, ⏎ copies | ✓ |
 | `>q` capture to the knowledge base — what is typed becomes `.kh/raw/<epoch>-<slug>.md` for `/kb-ingest`, as `kaihuman capture` writes it; also offered as **Capture “…”** for any text in the main search | ✓ (pushes directly; no offline spool — `kaihuman capture` has one) |
-| A prefix that a longer one starts with (`>l` next to `>le`) is entered after a space | ✓ |
+| `>id` ideas — the repo's `.kh/ideas/`, open ones by last activity; ⏎ opens one in Kaihuman. Typing searches all of them and offers **New idea: …** (a seed, create-only); `slug: text` offers **Log on slug: …**. Both write as `human` | ✓ (the folder is listed on each visit, files cached by sha in `$XDG_CACHE_HOME/kaihuman/ideas.json`) |
+| A prefix that a longer one starts with (`>l` next to `>le`, `>i` IMDb next to `>id`) is entered after a space | ✓ |
 | `>f` files — todo lists, action logs, events, prompts, commands: open one in Kaihuman or add an entry as its widget does (also from ⇥ repo-search hits) | ✓ |
 | `>o` files in your home directory — by name, `>o c: …` by contents too, `>o a: …` on the whole file system; ⏎ opens one with its default app, ⇥ opens its folder in the file manager or a terminal | ✓ desktop only (`fd` or `find`, `rg` or `grep`) |
 | Pinned tab groups, Import the browser's bookmarks | — only the extension can reach the browser |
@@ -117,7 +118,11 @@ to a key, below) or `>d` in the palette opens a plain text window with the curso
 - **Keys**: **Esc** hides (and syncs), **⌃N** new braindump (the key does the same, unless the one
   showing is still empty), **⌃O** the window's own list of braindumps (type to filter, ⏎ opens,
   Esc goes back), **⌃⏎** copies all and hides, **⌃F** finds in the text (every match highlighted,
-  ⏎ / ⇧⏎ next / previous, Esc back to the text with the match selected).
+  ⏎ / ⇧⏎ next / previous, Esc back to the text with the match selected), **⌃I** promotes the
+  braindump to an idea: a new `.kh/ideas/<slug>.md` whose title is the first line and whose
+  Braindump section is the whole text (`#`/`##` headings become `###`), then the braindump is
+  deleted and the status line names the slug. An idea with that slug already there is not
+  touched, and the braindump stays.
 - It is a normal window, not an overlay, so other windows stay usable while you write. Its title is
   always `kaihuman-braindump` for your window rules (below).
 

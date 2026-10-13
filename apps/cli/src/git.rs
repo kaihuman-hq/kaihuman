@@ -52,6 +52,25 @@ pub async fn sync_repo(config_dir: &Path, owner: &str, repo: &str, token: &str) 
     Ok(repo_dir)
 }
 
+/// Fast-forward an existing clone. Unlike `sync_repo`, a failed pull is an error, so a caller can
+/// say that it is showing a stale copy.
+pub async fn pull_repo(repo_dir: &Path) -> Result<()> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo_dir)
+        .args(["pull", "--ff-only", "--quiet"])
+        .output()
+        .await
+        .context("Failed to run git pull")?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "git pull: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    Ok(())
+}
+
 /// Stage, commit, and push a single file in the local clone.
 pub async fn commit_and_push(repo_dir: &Path, rel_path: &str) -> Result<()> {
     let dir = repo_dir.to_str().unwrap_or("");

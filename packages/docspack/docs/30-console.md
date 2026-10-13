@@ -79,7 +79,8 @@ All routes are in `apps/console/src/App.tsx`. Routes marked protected show the l
 | `/board` | `KanbanBoardPage` | yes |
 | `/analytics` | `TodoAnalyticsPage` | yes |
 | `/action-log` | `ActionLogViewPage` | yes |
-| `/quick-todo`, `/quick-note`, `/quick-knowledge`, `/quick-log` | Quick capture pages | yes |
+| `/quick-todo`, `/quick-note`, `/quick-knowledge`, `/quick-log`, `/quick-idea` | Quick capture pages | yes |
+| `/ideas` | `IdeasPage` — overview of `.kh/ideas/` | yes |
 | `/shortcuts` | `ShortcutsPage` | yes |
 | `/cheatsheet` | `CheatsheetPage` | yes |
 | `/knowledge` | `KnowledgeBasePage` | yes |
@@ -286,6 +287,25 @@ On iOS, each quick page swaps the `<link rel="manifest">` to its own file (`publ
 
 `/shortcuts` (`ShortcutsPage.tsx`) shows step-by-step setup for iOS, Android and desktop, for each entry in `QUICK_ROUTES`. That list also has New File (`/new`) and Knowledge Base (`/knowledge`). Keep `QUICK_ROUTES` and the manifest `shortcuts` in sync.
 
+## Reviewing ideas on `/ideas`
+<!-- docspack: tags=ideas,idea overview,status colours,activity,hot,warm,cool,dormant,quick idea,hand-off -->
+
+`/ideas` (navbar **Ideas**) shows every `.kh/ideas/<slug>.md` file as a card. The status colours the card's left border and badge: seed grey, exploring blue, committed violet, shipped green, parked amber, dropped red. Count chips at the top filter by status; closed statuses (shipped, parked, dropped) are hidden until **show closed** is ticked or their chip is clicked. A text filter, a product filter and a sort (activity, created, title) narrow the list.
+
+Activity is shown separately, in orange:
+
+- a strip of 12 squares, one per week, darker the more log entries that week (0, 1, 2, 3–4, 5+);
+- a level pill from `ideaActivity`: **hot** (activity within 7 days), **warm** (30), **cool** (90), **dormant**; an idea with no log entries reads **no activity yet**;
+- `3 in 30 d · 12 total · 2 h ago`.
+
+Clicking a card opens it in place: summary, the last five log entries, open challenges, and forms to add a log entry or challenge or change the status (as `human`). Writes re-read the file first, so an agent's newer commit is kept. **Open file** opens the Markdown in the editor.
+
+`/quick-idea` takes one text: the first line is the title, the rest becomes the braindump; the slug can be edited if it is taken. Pasting a reply from claude.ai or the Gemini app that contains `kh-idea` blocks applies each block instead, with the chosen author. It has a home-screen shortcut like the other quick pages.
+
+Opening `/ideas` also brings the repository's agent skills up to date when they are installed (the same update `/knowledge` runs). When they are not, a note links to `/knowledge` to set them up, so agents can follow the `kh-ideas` skill.
+
+Code: `apps/console/src/pages/IdeasPage.tsx`, `QuickIdeaPage.tsx`, `apps/console/src/lib/ideas-overview.ts` (filtering, sorting, week buckets) and `ideas-files.ts` (loading and saving).
+
 ## Using the kanban board
 <!-- docspack: tags=board,kanban,todos,inbox,milestones -->
 
@@ -328,7 +348,7 @@ The search modal's **Open Wiki** command instead needs a file that ends in `.wik
 
 `/knowledge` (`apps/console/src/pages/KnowledgeBasePage.tsx`) manages the `.kh/` knowledge base of the selected repo.
 
-- **Setup:** if `.kh/.skill-version` is missing, the page offers setup. `scaffoldKB()` creates `.kh/schema.md`, `.kh/index.kb.md`, `.kh/log.md`, `.kh/raw/`, `.kh/journal/`, `.kh/wiki/`, the `/kb-*` skills in `.claude/commands/` and `CLAUDE.md`. If `CLAUDE.md` exists, it asks **Overwrite** or **Keep existing**.
+- **Setup:** if `.kh/.skill-version` is missing, the page offers setup. `scaffoldKB()` creates `.kh/schema.md`, `.kh/index.kb.md`, `.kh/log.md`, `.kh/raw/`, `.kh/journal/`, `.kh/wiki/`, the `/kb-*` skills in `.claude/commands/`, the `kh-ideas` skill, and a kaihuman section in `CLAUDE.md` and `AGENTS.md`. Existing files keep their own text; only the section between the kaihuman markers is kaihuman's.
 - **Skill updates:** on each visit, `updateSkillsIfNeeded()` rewrites the skill files when `.kh/.skill-version` differs from `KB_SKILL_VERSION` (now `1.7.0`) in `src/lib/kb-skills.ts`.
 - **Tabs:** **Inbox** lists `.kh/raw/`, **Wiki** points to `.kh/wiki/` and `/wiki`, **Processed** lists `.kh/raw/processed/`.
 - **Add note:** title, comma-separated tags (default `general`) and text, saved with `addRawNote()`.

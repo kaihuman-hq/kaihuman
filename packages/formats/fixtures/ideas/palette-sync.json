@@ -1,0 +1,28 @@
+{
+  "title": "Offline sync: the desktop palette",
+  "status": "exploring",
+  "product": "kaihuman",
+  "tags": ["palette", "sync"],
+  "links": ["wiki/crdt.md", ".kh/projects.todos.md"],
+  "created": "2026-10-13T09:12+02:00",
+  "updated": "2026-10-14T18:40+02:00",
+  "summary": "The palette works with no network and syncs when it comes back.\nWorth it only if it stays simpler than the braindump sync.",
+  "log": [
+    {
+      "at": "2026-10-14 18:40",
+      "author": "claude",
+      "text": "Status seed → exploring. Braindump sync already solves 80%; reuse it."
+    },
+    {
+      "at": "2026-10-14 18:31",
+      "author": "gemini",
+      "text": "Researched CRDTs: too heavy for single-user data. → [[wiki/crdt]]"
+    },
+    { "at": "2026-10-13 09:12", "author": "human", "text": "Created." }
+  ],
+  "challenges": [
+    { "done": false, "text": "Conflicts when two devices edit the same file offline." },
+    { "done": true, "text": "Does the extension need it too? No: it is always online." }
+  ],
+  "braindump": "Palette should work on the train. Maybe just queue writes like `capture` does?\n\nAlso: what about the settings file?"
+}

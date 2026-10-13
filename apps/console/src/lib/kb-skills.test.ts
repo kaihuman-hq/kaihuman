@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getScaffoldFiles,
   getSkillOnlyFiles,
+  KB_AGENT_SECTION,
   KB_ASK_SKILL,
   KB_CLAUDE_MD,
   KB_DIGEST_SKILL,
@@ -12,6 +13,8 @@ import {
   KB_SCHEMA_TEMPLATE,
   KB_SESSION_SKILL,
   KB_SKILL_VERSION,
+  KH_IDEAS_SKILL,
+  mergeAgentInstructions,
 } from './kb-skills';
 
 describe('KB_SKILL_VERSION', () => {
@@ -55,7 +58,11 @@ describe('getScaffoldFiles', () => {
     expect(files).toHaveProperty('.claude/commands/kb-session.md', KB_SESSION_SKILL);
     expect(files).toHaveProperty('.claude/commands/kb-digest.md', KB_DIGEST_SKILL);
     expect(files).toHaveProperty('.claude/commands/kb-agent-capture.md');
-    expect(files).toHaveProperty('CLAUDE.md', KB_CLAUDE_MD);
+    expect(files).not.toHaveProperty('CLAUDE.md');
+    expect(files).not.toHaveProperty('AGENTS.md');
+    expect(files).toHaveProperty('.kh/ideas/.gitkeep', '');
+    expect(files).toHaveProperty('.agents/skills/kh-ideas/SKILL.md', KH_IDEAS_SKILL);
+    expect(files).toHaveProperty('.claude/skills/kh-ideas/SKILL.md', KH_IDEAS_SKILL);
   });
 
   it('seeds the index with a section per page type', () => {
@@ -117,9 +124,9 @@ describe('command behaviour', () => {
 });
 
 describe('getSkillOnlyFiles', () => {
-  it('contains exactly the skill version file, seven command files, and CLAUDE.md', () => {
+  it('contains the skill version file, seven commands and the ideas skill', () => {
     const files = getSkillOnlyFiles();
-    expect(Object.keys(files)).toHaveLength(9);
+    expect(Object.keys(files)).toHaveLength(10);
     expect(files).toHaveProperty('.kh/.skill-version', KB_SKILL_VERSION);
     expect(files).toHaveProperty('.claude/commands/kb-ingest.md');
     expect(files).toHaveProperty('.claude/commands/kb-index.md');
@@ -128,12 +135,65 @@ describe('getSkillOnlyFiles', () => {
     expect(files).toHaveProperty('.claude/commands/kb-session.md');
     expect(files).toHaveProperty('.claude/commands/kb-digest.md');
     expect(files).toHaveProperty('.claude/commands/kb-agent-capture.md');
-    expect(files).toHaveProperty('CLAUDE.md', KB_CLAUDE_MD);
+    expect(files).toHaveProperty('.agents/skills/kh-ideas/SKILL.md', KH_IDEAS_SKILL);
+    expect(files).toHaveProperty('.claude/skills/kh-ideas/SKILL.md', KH_IDEAS_SKILL);
+    // CLAUDE.md and AGENTS.md are merged, not overwritten: see mergeAgentInstructions.
+    expect(files).not.toHaveProperty('CLAUDE.md');
+    expect(files).not.toHaveProperty('AGENTS.md');
   });
 
   it('does not include data files like index.md or schema.md', () => {
     const files = getSkillOnlyFiles();
     expect(files).not.toHaveProperty('.kh/index.kb.md');
     expect(files).not.toHaveProperty('.kh/schema.md');
+    expect(files).not.toHaveProperty('.kh/ideas/.gitkeep');
+  });
+});
+
+describe('ideas skill', () => {
+  it('is the kh-ideas Agent Skill with its frontmatter', () => {
+    expect(KH_IDEAS_SKILL).toMatch(/^---\nname: kh-ideas\n/);
+  });
+
+  it('CLAUDE.md points to the skill and the ideas folder', () => {
+    expect(KB_CLAUDE_MD).toContain('## Ideas');
+    expect(KB_CLAUDE_MD).toContain('.kh/ideas/<slug>.md');
+    expect(KB_CLAUDE_MD).toContain('.agents/skills/kh-ideas/SKILL.md');
+  });
+
+  it('CLAUDE.md asks before committing idea changes to the default branch', () => {
+    expect(KB_CLAUDE_MD).toContain('May I commit idea changes directly to <default');
+    expect(KB_CLAUDE_MD).toContain('If they decline, or the push is refused, keep the change on');
+  });
+});
+
+describe('mergeAgentInstructions', () => {
+  it('writes only the section when there is no file, or an empty one', () => {
+    expect(mergeAgentInstructions(null)).toBe(KB_AGENT_SECTION);
+    expect(mergeAgentInstructions(' \n')).toBe(KB_AGENT_SECTION);
+    expect(KB_AGENT_SECTION).toContain(KB_CLAUDE_MD.trim());
+  });
+
+  it('appends the section to the user’s own file and keeps their text', () => {
+    const own = '# My repo\n\nUse pnpm.\n';
+    expect(mergeAgentInstructions(own)).toBe(`# My repo\n\nUse pnpm.\n\n${KB_AGENT_SECTION}`);
+  });
+
+  it('replaces only the section between the markers', () => {
+    const [start = '', rest = ''] = KB_AGENT_SECTION.split('\n# Knowledge Base');
+    const end = rest.slice(rest.lastIndexOf('<!--'));
+    const file = `# Mine\n\n${start}\nold kaihuman text\n${end}\n## Also mine\n`;
+    expect(mergeAgentInstructions(file)).toBe(`# Mine\n\n${KB_AGENT_SECTION}\n## Also mine\n`);
+  });
+
+  it('is stable: merging twice changes nothing', () => {
+    const once = mergeAgentInstructions('# Mine\n');
+    expect(mergeAgentInstructions(once)).toBe(once);
+  });
+
+  it('replaces a whole file written by an older version', () => {
+    const old =
+      '# Knowledge Base\n\nThis repo is a personal AI knowledge base managed with Claude Code.\n';
+    expect(mergeAgentInstructions(old)).toBe(KB_AGENT_SECTION);
   });
 });

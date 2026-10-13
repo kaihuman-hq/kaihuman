@@ -1,0 +1,15 @@
+{
+  "name": "KH Idea",
+  "short_name": "KH Idea",
+  "description": "Capture a product idea",
+  "theme_color": "#0a0a0f",
+  "background_color": "#0a0a0f",
+  "display": "standalone",
+  "start_url": "/quick-idea",
+  "scope": "/",
+  "icons": [
+    { "src": "logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "pwa-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "pwa-512x512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
