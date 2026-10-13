@@ -2,15 +2,10 @@ import { githubProfileStore } from '@kaihuman/core';
 import { StatusBar } from '@kaihuman/ui';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
-import {
-  addRawNote,
-  isKBInitialized,
-  type KBFile,
-  listKBDir,
-  scaffoldKB,
-  updateSkillsIfNeeded,
-} from '../lib/github-kb';
+import { addRawNote, type KBFile, type KBRepo, listKBDir, syncKB } from '../lib/github-kb';
 import { KB_SKILL_VERSION } from '../lib/kb-skills';
+
+const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export function KnowledgeBasePage() {
   const repo = githubProfileStore.currentRepo.value;
@@ -19,6 +14,7 @@ export function KnowledgeBasePage() {
   const [processedFiles, setProcessedFiles] = useState<KBFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [scaffolding, setScaffolding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [skillsUpdated, setSkillsUpdated] = useState(false);
   const [view, setView] = useState<'inbox' | 'wiki' | 'processed'>('inbox');
   const [addingNote, setAddingNote] = useState(false);
@@ -28,16 +24,17 @@ export function KnowledgeBasePage() {
   const [submittingNote, setSubmittingNote] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  async function load(fullName: string) {
+  async function load(kbRepo: KBRepo) {
+    const fullName = kbRepo.full_name;
     setLoading(true);
     setSkillsUpdated(false);
     setRawFiles([]);
     setProcessedFiles([]);
-    const init = await isKBInitialized(fullName);
+    const setup = await syncKB(kbRepo);
+    const init = setup !== 'missing';
     setInitialized(init);
     if (init) {
-      const updated = await updateSkillsIfNeeded(fullName);
-      setSkillsUpdated(updated);
+      setSkillsUpdated(setup === 'updated');
       const [raw, processed] = await Promise.all([
         listKBDir(fullName, 'raw'),
         listKBDir(fullName, 'raw/processed'),
@@ -50,21 +47,22 @@ export function KnowledgeBasePage() {
 
   useEffect(() => {
     if (!repo) return;
+    const kbRepo = repo;
     const fullName = repo.full_name;
     let cancelled = false;
     setLoading(true);
+    setError(null);
     setSkillsUpdated(false);
     setRawFiles([]);
     setProcessedFiles([]);
 
     async function run() {
-      const init = await isKBInitialized(fullName);
+      const setup = await syncKB(kbRepo);
       if (cancelled) return;
+      const init = setup !== 'missing';
       setInitialized(init);
       if (init) {
-        const updated = await updateSkillsIfNeeded(fullName);
-        if (cancelled) return;
-        setSkillsUpdated(updated);
+        setSkillsUpdated(setup === 'updated');
         const [raw, processed] = await Promise.all([
           listKBDir(fullName, 'raw'),
           listKBDir(fullName, 'raw/processed'),
@@ -76,7 +74,11 @@ export function KnowledgeBasePage() {
       setLoading(false);
     }
 
-    run();
+    run().catch((e: unknown) => {
+      if (cancelled) return;
+      setError(`Could not check the knowledge base set-up: ${errorText(e)}`);
+      setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
@@ -113,9 +115,13 @@ export function KnowledgeBasePage() {
   async function handleSetup() {
     if (!repo) return;
     setScaffolding(true);
+    setError(null);
     try {
-      await scaffoldKB(repo.full_name);
-      await load(repo.full_name);
+      await syncKB(repo, { install: true });
+      await load(repo);
+    } catch (e) {
+      setError(`Set-up failed, nothing was written: ${errorText(e)}`);
+      setLoading(false);
     } finally {
       setScaffolding(false);
     }
@@ -174,6 +180,7 @@ export function KnowledgeBasePage() {
           >
             {scaffolding ? 'Setting up...' : 'Set Up Knowledge Base'}
           </button>
+          {error && <p class="text-xs text-[var(--los-warning)]">{error}</p>}
         </div>
         {bar}
       </>

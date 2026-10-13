@@ -17,71 +17,55 @@ function parseRepo(fullName: string): { owner: string; repo: string } {
   return { owner: fullName.slice(0, slash), repo: fullName.slice(slash + 1) };
 }
 
-export async function getInstalledSkillVersion(fullName: string): Promise<string | null> {
-  const { owner, repo } = parseRepo(fullName);
-  try {
-    const { content } = await githubService.getFileContent(owner, repo, VERSION_FILE);
-    return content.trim();
-  } catch {
-    return null;
-  }
-}
-
-export async function isKBInitialized(fullName: string): Promise<boolean> {
-  return (await getInstalledSkillVersion(fullName)) !== null;
-}
+/** Where kaihuman's files go: the repo's default branch. */
+export type KBRepo = { full_name: string; default_branch: string };
 
 /**
- * Adds kaihuman's section to `CLAUDE.md` and `AGENTS.md`, or brings it up to date, keeping the
- * user's own text in both. A file whose text would not change is not written.
+ * Brings kaihuman's files in the repo up to date in one commit, so a write that fails halfway
+ * leaves nothing behind. Creates set-up files that are missing (never overwriting the user's
+ * notes, log or schema), rewrites skills an older version installed, and adds or updates the
+ * kaihuman section of `CLAUDE.md` and `AGENTS.md`, keeping the user's own text in both.
+ *
+ * A repo that was never set up gets nothing unless `install` is set: setting up stays the
+ * user's choice. Returns `missing` for such a repo, `updated` when it committed, else `current`.
  */
-export async function writeAgentInstructions(fullName: string, message: string): Promise<void> {
-  const { owner, repo } = parseRepo(fullName);
-  for (const path of AGENT_INSTRUCTION_FILES) {
-    const existing = await githubService.getFileContent(owner, repo, path).then(
-      (file) => file.content,
-      () => null,
-    );
-    const merged = mergeAgentInstructions(existing);
-    if (merged !== existing) await githubService.upsertRepoFile(owner, repo, path, merged, message);
-  }
-}
-
-export async function scaffoldKB(fullName: string): Promise<void> {
-  const { owner, repo } = parseRepo(fullName);
-  const message = 'chore: scaffold knowledge base';
-  // All scaffold files are new (called only when !isKBInitialized), so create
-  // directly without a pre-check GET to avoid spurious 404s in the network log.
-  for (const [path, content] of Object.entries(getScaffoldFiles())) {
-    await githubService.saveFile(owner, repo, path, content, message);
-  }
-  await writeAgentInstructions(fullName, message);
-}
-
-/**
- * For pages other than `/knowledge`: brings installed skills up to date, but never installs them
- * into a repo that has not been set up: setting up stays a choice made on `/knowledge`.
- */
-export async function refreshInstalledSkills(
-  fullName: string,
+export async function syncKB(
+  kbRepo: KBRepo,
+  { install = false }: { install?: boolean } = {},
 ): Promise<'missing' | 'current' | 'updated'> {
-  if (!(await isKBInitialized(fullName))) return 'missing';
-  return (await updateSkillsIfNeeded(fullName)) ? 'updated' : 'current';
-}
+  const { owner, repo } = parseRepo(kbRepo.full_name);
+  const tree = await githubService.fetchRepoTree(owner, repo, kbRepo.default_branch);
+  const present = new Set(tree.map((item) => item.path));
+  if (!present.has(VERSION_FILE) && !install) return 'missing';
 
-export async function updateSkillsIfNeeded(fullName: string): Promise<boolean> {
-  const installed = await getInstalledSkillVersion(fullName);
-  if (installed === KB_SKILL_VERSION) return false;
-  const { owner, repo } = parseRepo(fullName);
-  const message = `chore: update KB skills to v${KB_SKILL_VERSION}`;
-  const files = Object.entries(getSkillOnlyFiles()).filter(([path]) => path !== VERSION_FILE);
-  for (const [path, content] of files) {
-    await githubService.upsertRepoFile(owner, repo, path, content, message);
+  const read = async (path: string) =>
+    present.has(path) ? (await githubService.getFileContent(owner, repo, path)).content : null;
+  const installed = (await read(VERSION_FILE))?.trim() ?? null;
+  const skills = getSkillOnlyFiles();
+  const writes: Record<string, string> = {};
+  for (const [path, content] of Object.entries(getScaffoldFiles())) {
+    if (!present.has(path) || (installed !== KB_SKILL_VERSION && path in skills)) {
+      writes[path] = content;
+    }
   }
-  await writeAgentInstructions(fullName, message);
-  // Last, so an update that fails halfway is tried again on the next visit.
-  await githubService.upsertRepoFile(owner, repo, VERSION_FILE, KB_SKILL_VERSION, message);
-  return true;
+  if (
+    Object.keys(writes).length > 0 ||
+    AGENT_INSTRUCTION_FILES.some((path) => !present.has(path))
+  ) {
+    for (const path of AGENT_INSTRUCTION_FILES) {
+      const existing = await read(path);
+      const merged = mergeAgentInstructions(existing);
+      if (merged !== existing) writes[path] = merged;
+    }
+  }
+  if (Object.keys(writes).length === 0) return 'current';
+
+  const message =
+    installed === null
+      ? 'chore: set up kaihuman knowledge base and agent skills'
+      : `chore: update kaihuman agent skills to v${KB_SKILL_VERSION}`;
+  await githubService.commitFiles(owner, repo, kbRepo.default_branch, writes, message);
+  return 'updated';
 }
 
 export async function addRawNote(

@@ -220,6 +220,46 @@ export class GithubService {
     });
   }
 
+  /**
+   * Writes several files in a single commit, so the branch gets all of them or none: a write
+   * that fails halfway leaves nothing behind. Fails if the branch moved while the commit was built.
+   */
+  async commitFiles(
+    owner: string,
+    repo: string,
+    branch: string,
+    files: Record<string, string>,
+    message: string,
+  ) {
+    const client = this.getClient();
+    const { data: refData } = await client.git.getRef({ owner, repo, ref: `heads/${branch}` });
+    const headSha = refData.object.sha;
+    const { data: commitData } = await client.git.getCommit({
+      owner,
+      repo,
+      commit_sha: headSha,
+    });
+    const { data: newTree } = await client.git.createTree({
+      owner,
+      repo,
+      base_tree: commitData.tree.sha,
+      tree: Object.entries(files).map(([path, content]) => ({
+        path,
+        mode: '100644' as const,
+        type: 'blob' as const,
+        content,
+      })),
+    });
+    const { data: newCommit } = await client.git.createCommit({
+      owner,
+      repo,
+      message,
+      tree: newTree.sha,
+      parents: [headSha],
+    });
+    await client.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommit.sha });
+  }
+
   /** Create or update a file, fetching the current SHA automatically when needed. */
   async upsertRepoFile(
     owner: string,
