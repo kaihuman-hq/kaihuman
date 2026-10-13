@@ -10,6 +10,8 @@ use crate::auth::AuthManager;
 use crate::db::Cache;
 use crate::files::{self, DashboardConfig, FileItem};
 use crate::github::{GithubClient, Repository};
+use crate::ideas::{self, IdeaSlug, NewIdea};
+use crate::ideas_cli::{self, IdeaOp, IdeaRow, QueuedOp, Session, Submitted};
 use crate::ui;
 
 // ── Screens ───────────────────────────────────────────────────────────────────
@@ -25,6 +27,13 @@ pub enum CurrentScreen {
     FileBrowser,
     FileEditor,
     DashboardView,
+    Ideas,
+}
+
+/// What the note input writes when it was opened from the ideas screen.
+pub enum IdeaInput {
+    New,
+    Log(IdeaSlug),
 }
 
 // ── Main menu items (key, label) ──────────────────────────────────────────────
@@ -36,6 +45,7 @@ pub const MENU_ITEMS: &[(&str, &str)] = &[
     ("a", "AI prompt  [Claude / Copilot / Gemini]"),
     ("f", "File browser"),
     ("d", "Dashboard config"),
+    ("i", "Ideas  [.kh/ideas/]"),
     ("l", "Login"),
 ];
 
@@ -126,7 +136,13 @@ pub struct App<'a> {
     // File editor (nano-like)
     pub file_editor_textarea: TextArea<'a>,
     pub file_editor_path: Option<String>,
-    pub file_editor_from_dashboard: bool,
+    /// The screen Esc returns to from the editor.
+    pub file_editor_return: CurrentScreen,
+
+    // Ideas
+    pub ideas: Vec<IdeaRow>,
+    pub ideas_state: ListState,
+    pub idea_input: Option<IdeaInput>,
 
     // AI prompt
     pub ai_prompt_textarea: TextArea<'a>,
@@ -190,7 +206,10 @@ impl<'a> App<'a> {
             file_browser_state: ListState::default(),
             file_editor_textarea: TextArea::default(),
             file_editor_path: None,
-            file_editor_from_dashboard: false,
+            file_editor_return: CurrentScreen::FileBrowser,
+            ideas: Vec::new(),
+            ideas_state: ListState::default(),
+            idea_input: None,
             ai_prompt_textarea,
             ai_provider: AiProvider::Claude,
             ai_response: String::new(),
@@ -321,6 +340,7 @@ impl<'a> App<'a> {
                             CurrentScreen::FileBrowser => self.handle_file_browser_input(key),
                             CurrentScreen::FileEditor => self.handle_file_editor_input(key),
                             CurrentScreen::DashboardView => self.handle_dashboard_view_input(key),
+                            CurrentScreen::Ideas => self.handle_ideas_input(terminal, key).await?,
                         }
                     }
                 }
@@ -489,8 +509,20 @@ impl<'a> App<'a> {
                 self.open_browser(true);
             }
 
-            // l — Login
+            // i — Ideas
             6 => {
+                if !self.ensure_authenticated(terminal).await? {
+                    return Ok(());
+                }
+                self.status_message = "↻ Syncing…".to_string();
+                terminal.draw(|f| ui::ui(f, self))?;
+                self.reload_ideas().await;
+                self.ideas_state.select(Some(0));
+                self.current_screen = CurrentScreen::Ideas;
+            }
+
+            // l — Login
+            7 => {
                 self.current_screen = CurrentScreen::Login;
                 terminal.draw(|f| ui::ui(f, self))?;
                 if self.auth_manager.login().await.is_ok() {
@@ -666,10 +698,20 @@ impl<'a> App<'a> {
 
     async fn handle_note_input(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc => self.current_screen = CurrentScreen::Main,
+            KeyCode::Esc => {
+                self.current_screen = if self.idea_input.take().is_some() {
+                    CurrentScreen::Ideas
+                } else {
+                    CurrentScreen::Main
+                };
+            }
             KeyCode::Enter => {
                 let text = self.note_textarea.lines().join("\n");
                 if text.trim().is_empty() {
+                    return;
+                }
+                if let Some(target) = self.idea_input.take() {
+                    self.submit_idea_input(target, &text).await;
                     return;
                 }
                 if let Some(client) = &self.github_client {
@@ -772,7 +814,7 @@ impl<'a> App<'a> {
                 if let Some(i) = self.file_browser_state.selected() {
                     let item = self.file_browser_items[i].clone();
                     if !item.is_dir {
-                        self.open_file_editor(&item.path, false);
+                        self.open_file_editor(&item.path, CurrentScreen::FileBrowser);
                     }
                 }
             }
@@ -791,7 +833,7 @@ impl<'a> App<'a> {
                 if let Some(i) = self.file_browser_state.selected() {
                     let item = self.file_browser_items[i].clone();
                     if !item.is_dir {
-                        self.open_file_editor(&item.path, true);
+                        self.open_file_editor(&item.path, CurrentScreen::DashboardView);
                     }
                 }
             }
@@ -811,7 +853,7 @@ impl<'a> App<'a> {
 
     // ── File editor ───────────────────────────────────────────────────────────
 
-    fn open_file_editor(&mut self, rel_path: &str, from_dashboard: bool) {
+    fn open_file_editor(&mut self, rel_path: &str, return_to: CurrentScreen) {
         let Some(ref repo_path) = self.local_repo_path.clone() else {
             self.status_message = "Repo not yet synced — please wait.".to_string();
             return;
@@ -830,18 +872,14 @@ impl<'a> App<'a> {
         );
         self.file_editor_textarea = ta;
         self.file_editor_path = Some(rel_path.to_string());
-        self.file_editor_from_dashboard = from_dashboard;
+        self.file_editor_return = return_to;
         self.current_screen = CurrentScreen::FileEditor;
     }
 
     fn handle_file_editor_input(&mut self, key: KeyEvent) {
         match (key.code, key.modifiers) {
             (KeyCode::Esc, _) => {
-                self.current_screen = if self.file_editor_from_dashboard {
-                    CurrentScreen::DashboardView
-                } else {
-                    CurrentScreen::FileBrowser
-                };
+                self.current_screen = self.file_editor_return.clone();
             }
             (KeyCode::Char('s'), m) if m.contains(KeyModifiers::CONTROL) => {
                 self.save_current_file();
@@ -866,6 +904,134 @@ impl<'a> App<'a> {
                 self.push_pending = true;
             }
             Err(e) => self.status_message = format!("Save failed: {}", e),
+        }
+    }
+
+    // ── Ideas ─────────────────────────────────────────────────────────────────
+
+    /// Pulls the clone and re-reads `.kh/ideas/`. Offline, it shows the clone as it was.
+    async fn reload_ideas(&mut self) {
+        let synced = match Session::load() {
+            Ok(session) => session.sync_clone().await,
+            Err(e) => Err(e),
+        };
+        match synced {
+            Ok((dir, warning)) => {
+                let now = chrono::Local::now().fixed_offset();
+                self.ideas = ideas_cli::idea_rows(ideas_cli::load_ideas(&dir), &now);
+                self.local_repo_path = Some(dir);
+                self.status_message = warning.unwrap_or_default();
+            }
+            Err(e) => self.status_message = format!("Could not read ideas: {e:#}"),
+        }
+        let last = self.ideas.len().saturating_sub(1);
+        if self.ideas_state.selected().is_some_and(|i| i > last) {
+            self.ideas_state.select(Some(last));
+        }
+    }
+
+    fn selected_idea(&self) -> Option<&IdeaRow> {
+        self.ideas_state.selected().and_then(|i| self.ideas.get(i))
+    }
+
+    async fn handle_ideas_input<B: Backend>(
+        &mut self,
+        terminal: &mut Terminal<B>,
+        key: KeyEvent,
+    ) -> io::Result<()> {
+        match key.code {
+            KeyCode::Esc => self.current_screen = CurrentScreen::Main,
+            KeyCode::Up | KeyCode::Down if !self.ideas.is_empty() => {
+                let n = self.ideas.len();
+                let cur = self.ideas_state.selected().unwrap_or(0);
+                let next = if key.code == KeyCode::Up {
+                    (cur + n - 1) % n
+                } else {
+                    (cur + 1) % n
+                };
+                self.ideas_state.select(Some(next));
+            }
+            KeyCode::Enter => {
+                if let Some(path) = self.selected_idea().map(|r| ideas::idea_path(&r.slug)) {
+                    self.open_file_editor(&path, CurrentScreen::Ideas);
+                }
+            }
+            KeyCode::Char('n') => self.open_idea_input(IdeaInput::New),
+            KeyCode::Char('l') => {
+                if let Some(slug) = self.selected_idea().map(|r| r.slug.clone()) {
+                    self.open_idea_input(IdeaInput::Log(slug));
+                }
+            }
+            KeyCode::Char('r') => {
+                self.status_message = "↻ Syncing…".to_string();
+                terminal.draw(|f| ui::ui(f, self))?;
+                self.reload_ideas().await;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn open_idea_input(&mut self, target: IdeaInput) {
+        let title = match &target {
+            IdeaInput::New => "New idea: its title  (Enter: save | Esc: cancel)".to_string(),
+            IdeaInput::Log(slug) => format!("Log entry on {slug}  (Enter: save | Esc: cancel)"),
+        };
+        self.note_textarea = TextArea::default();
+        self.note_textarea.set_block(
+            ratatui::widgets::Block::default()
+                .borders(ratatui::widgets::Borders::ALL)
+                .title(title),
+        );
+        self.idea_input = Some(target);
+        self.current_screen = CurrentScreen::NoteInput;
+    }
+
+    async fn submit_idea_input(&mut self, target: IdeaInput, text: &str) {
+        let now = chrono::Local::now().fixed_offset();
+        let op = match target {
+            IdeaInput::New => ideas::new_idea(
+                &NewIdea {
+                    title: text.to_string(),
+                    ..NewIdea::default()
+                },
+                "human",
+                &now,
+            )
+            .map(|file| {
+                let what = format!("new idea {}", file.slug);
+                let op = IdeaOp::Create {
+                    slug: file.slug,
+                    content: file.content,
+                };
+                (what, op)
+            }),
+            IdeaInput::Log(slug) => Ok((
+                format!("log entry on {slug}"),
+                IdeaOp::Log {
+                    slug,
+                    text: text.to_string(),
+                    author: "human".to_string(),
+                },
+            )),
+        };
+        let result = match (op, Session::load()) {
+            (Ok((what, op)), Ok(session)) => session
+                .submit(QueuedOp::now(op))
+                .await
+                .map(|(submitted, _)| (what, submitted)),
+            (Err(e), _) | (_, Err(e)) => Err(e),
+        };
+        self.current_screen = CurrentScreen::Ideas;
+        match result {
+            Ok((what, Submitted::Written { .. })) => {
+                self.reload_ideas().await;
+                self.status_message = format!("Saved: {what}");
+            }
+            Ok((what, Submitted::Queued { reason })) => {
+                self.status_message = format!("Queued: {what} ({reason})");
+            }
+            Err(e) => self.status_message = format!("Not saved: {e:#}"),
         }
     }
 

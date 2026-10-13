@@ -1,4 +1,8 @@
-import type { CommandPaletteSettings, PaletteToolSetting } from '@kaihuman/formats';
+import {
+  type CommandPaletteSettings,
+  DEFAULT_PALETTE_SETTINGS,
+  type PaletteToolSetting,
+} from '@kaihuman/formats';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { Bookmark } from './bookmarks.js';
 import {
@@ -848,6 +852,24 @@ describe('settings', () => {
     });
     type('>p');
     expect(crumbText()).toContain('Prompts');
+  });
+
+  it('enters a surface’s >id at once and the default >i IMDb tool after a space', async () => {
+    modes.push({
+      prefix: 'id',
+      title: 'Ideas',
+      placeholder: 'Search ideas',
+      description: 'Ideas',
+      load: async () => [],
+    });
+    await reopenWith(DEFAULT_PALETTE_SETTINGS);
+    type('>i');
+    expect(crumbText()).toBeNull();
+    type('>i ');
+    expect(crumbText()).toContain('IMDb');
+    await reopenWith(DEFAULT_PALETTE_SETTINGS);
+    type('>id');
+    expect(crumbText()).toContain('Ideas');
   });
 
   it('keeps the tools listed in the help', async () => {
@@ -1885,6 +1907,29 @@ describe('recently chosen entries in a mode', () => {
     expect(groupLabels()).toEqual(['Usage']);
     await activateRow('Usage row');
     expect(rememberModeRecent).not.toHaveBeenCalled();
+  });
+});
+
+describe('modes that search what they loaded', () => {
+  it('lists what `search` builds for the query instead of filtering, once loaded', async () => {
+    const search = vi.fn((query: string): ModeItem[] => [
+      { id: `new:${query}`, title: `New: ${query}`, copy: query },
+      { id: 'a', title: 'Alpha' },
+    ]);
+    modes.push({
+      prefix: 'y',
+      title: 'Ideas',
+      placeholder: '',
+      description: '',
+      load: async () => [{ id: 'a', title: 'Alpha' }],
+      search,
+    });
+    type('>y');
+    await settle();
+    expect(rowTitles()).toEqual(['New: ', 'Alpha']);
+    type('zzz');
+    expect(rowTitles()).toEqual(['New: zzz', 'Alpha']);
+    expect(search).toHaveBeenLastCalledWith('zzz');
   });
 });
 

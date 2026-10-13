@@ -44,6 +44,7 @@ Widget files can live in any folder; the console finds them by suffix. Fixed pat
 | `.kh/browser.pinnedtabs.json` | Pinned-tab groups: `{ groups: [{ id, name, createdAt, tabs, favorite? }], updatedAt }` |
 | `.kh/browser.status.json` | Start page status lights: `{ services: [{ name, type: "statuspage" \| "aws" \| "gcp", url?, components?, regions?, products? }] }` |
 | `.kh/braindumps/<created-ms>.md` | Braindumps from the desktop palette |
+| `.kh/ideas/<slug>.md` | Product and feature ideas, one file each, see "Idea file format" |
 | `.kh/raw/`, `.kh/wiki/`, `.kh/log.md` | Knowledge base, see the "Knowledge base" page |
 
 `githubFileStore.appFolder` in `packages/core` resolves `.kh` or `.lifeos`. The browser extension and desktop palette still read quick-note targets from `.lifeos/.dashboard.config.json` and default notes to `.lifeos/dump.md`.
@@ -383,6 +384,54 @@ Each module pairs a parser with a serialiser, for example `parseTodos`/`serializ
 | `addReadLaterEntry` | A read-later item |
 
 Each takes the file text and returns the new text, or throws a message to show, such as `Nothing to add`. `splitInlineTags` turns `Call #admin the bank` into text `Call the bank` and tags `['admin']`. The palettes write back with the file's `sha`, so a change made elsewhere meanwhile fails instead of being overwritten.
+
+## Idea file format (`.kh/ideas/<slug>.md`)
+<!-- docspack: tags=idea file,idea file format,what an idea file looks like,.kh/ideas,idea frontmatter,product ideas,idea log,challenges,braindump,idea status,kh-ideas skill,hand-off block -->
+
+Each product or feature idea is one Markdown file. The slug is the file name and the id people and agents use (`palette-sync`, `idea:palette-sync`): 2–40 characters of `a-z`, `0-9` and `-`. It never changes; the title can. The full design is in `doc/ideas.md`.
+
+```markdown
+---
+title: "Offline sync for the desktop palette"
+status: exploring
+product: kaihuman
+tags: [palette, sync]
+created: 2026-10-13T09:12+02:00
+updated: 2026-10-14T18:40+02:00
+---
+
+# Offline sync for the desktop palette
+
+At most three sentences on where the idea stands now.
+
+## Log
+
+- 2026-10-14 18:40 · claude · Status seed → exploring. Reuse the braindump sync.
+- 2026-10-13 09:12 · human · Created.
+
+## Challenges
+
+- [ ] Conflicts when two devices edit offline.
+
+## Braindump
+
+The user's own words.
+```
+
+| Part | Write rule |
+|---|---|
+| Summary (under the title) | Rewritten; the only part that is |
+| `## Log` | Newest first, one line `- YYYY-MM-DD HH:MM · <author> · <text>`, never edited |
+| `## Challenges` | Checklist; resolved items are checked, never removed |
+| `## Braindump` | The user's text; only appended to |
+
+Statuses: `seed`, `exploring`, `committed` (open) and `shipped`, `parked`, `dropped` (closed). A status change adds the log line `Status <old> → <new>. <reason>`. `updated` changes on every write. The author is `human` or an agent's short name (`claude`, `gemini`, `codex`, `claude.ai`).
+
+`packages/formats/src/ideas.ts` reads and edits the file in place: `parseIdea`, `newIdea`, `logIdea`, `addIdeaChallenge`, `appendIdeaBraindump`, `setIdeaSummary`, `setIdeaStatus`, `findIdeas` and `ideaActivity` (`hot` within 7 days, `warm` 30, `cool` 90, else `dormant`). The CLI mirrors it in Rust; both test suites read `packages/formats/fixtures/ideas/`.
+
+Chat apps that cannot write files hand an idea over as a fenced `kh-idea` block of `key: value` lines (`slug` or `slug: new` with `title`, then any of `status`, `product`, `tags`, `summary`, `log`, `challenges`, `braindump`). `parseIdeaHandoffs` and `applyIdeaHandoff` apply it.
+
+The `kh-ideas` agent skill (`packages/formats/skills/kh-ideas/SKILL.md`) tells Claude Code, Antigravity, Gemini CLI, Codex, Copilot and Cursor how to use these files. It is installed into `.agents/skills/` and `.claude/skills/`.
 
 ## Encrypted files (`.enc`)
 <!-- docspack: tags=encryption,password,aes,secure notes -->

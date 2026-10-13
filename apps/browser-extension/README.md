@@ -314,6 +314,7 @@ palette's hint line lists the prefixes.
 | `>s` | Symbols, emoji and kaomoji by name — arrows, math, currency, typography, keys, marks | copies it | none |
 | `>q` | One row once saved: the capture you typed, as its own `.kh/raw/<epoch>-<slug>.md` for `/kb-ingest` (first line is the title) — the same file `cli capture` writes. Typing into the main search also offers **Capture “…”** at the bottom | the first ⏎ saves, the next opens the new file in Kaihuman | one `PUT` with the extension's token, create-only |
 | `>f` | The repository's files a widget can add to — todo lists, action logs, events, prompts, commands | offers **Open … in Kaihuman** or **Add a todo…** (an action, an event…) | one tree listing per visit |
+| `>id` | Ideas (`.kh/ideas/`, `doc/ideas.md`): with nothing typed the open ones, most recently active first; typing searches all of them by slug, title, product and tags. **New idea: …** comes first for a title no idea has; `slug: text` offers **Log on slug: …** instead. `>i` stays IMDb: type `>i ` with a space | opens the idea in Kaihuman, creates a seed idea (create-only), or adds a log line as `human` over the version listed | the start page's tree sync (replayed with its ETag, so usually a 304), then one `PUT` per write |
 
 **Units** convert between metric and US customary: length (`mm cm m km` ⇄ `in ft yd mi`, and
 heights as `5'11"` or `5 ft 11 in`, shown back as feet and inches), mass (`mg g kg` ⇄ `oz lb`),
@@ -324,7 +325,7 @@ goes into the other system's closest unit — `5 km` into miles, `180 cm` into i
 works too (`1,5 kg`). **Pixels**: `10 cm to px` (any length unit) gives the pixels at 80, 150 and
 300 dpi; `1000 px` gives the length in cm at each of them, `1000 px to in` in inches.
 
-With nothing typed, every mode but `>t`, `>u`, `>a`, `>k` and `>q` lists the last 10 entries you chose in it first,
+With nothing typed, every mode but `>t`, `>u`, `>a`, `>k`, `>q` and `>id` lists the last 10 entries you chose in it first,
 under **Recent** — the prompts you copied in `>p`, the repositories you opened in `>r`, the terms
 you searched in `>l`. Choosing an entry again moves it back to the top; an entry that has since
 gone from the repository drops out. They are kept per prefix in the extension's local storage.

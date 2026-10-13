@@ -152,6 +152,7 @@ export interface MainAppProps {
   onActionLogClick?: () => void;
   onShortcutsClick?: () => void;
   onKnowledgeClick?: () => void;
+  onIdeasClick?: () => void;
   onWikiClick?: () => void;
   onCheatsheetClick?: () => void;
   onKBCommandsClick?: () => void;
@@ -241,6 +242,7 @@ export const MainApp = ({
   onActionLogClick,
   onShortcutsClick,
   onKnowledgeClick,
+  onIdeasClick,
   onWikiClick,
   onCheatsheetClick,
   onKBCommandsClick,
@@ -1364,6 +1366,7 @@ abbreviations: undefined
     wiki: onWikiClick,
     knowledge: onKnowledgeClick,
     actionLog: onActionLogClick,
+    ideas: onIdeasClick,
     graph: () => {
       setShowGraph(true);
       if (showDumpMode) setShowDumpMode(false);
@@ -2096,6 +2099,7 @@ abbreviations: undefined
                   ...(onKnowledgeClick
                     ? [{ label: 'Knowledge Base', onClick: onKnowledgeClick }]
                     : []),
+                  ...(onIdeasClick ? [{ label: 'Ideas', onClick: onIdeasClick }] : []),
                   ...(onWikiClick ? [{ label: 'Wiki', onClick: onWikiClick }] : []),
                   ...(onCheatsheetClick
                     ? [{ label: 'Cheatsheet', onClick: onCheatsheetClick }]

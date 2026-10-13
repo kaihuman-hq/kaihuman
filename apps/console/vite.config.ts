@@ -69,6 +69,13 @@ export default defineConfig({
             url: '/quick-log',
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
           },
+          {
+            name: 'Quick Idea',
+            short_name: 'KH Idea',
+            description: 'Capture a product idea',
+            url: '/quick-idea',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
         ],
         icons: [
           {

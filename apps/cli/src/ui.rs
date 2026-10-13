@@ -7,6 +7,8 @@ use ratatui::{
 };
 
 use crate::app::{App, CurrentScreen, MENU_ITEMS};
+use crate::ideas::IdeaStatus;
+use crate::ideas_cli;
 
 pub fn ui(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
@@ -39,6 +41,7 @@ pub fn ui(f: &mut Frame, app: &App) {
         CurrentScreen::FileBrowser => render_file_browser(f, app, chunks[1]),
         CurrentScreen::FileEditor => render_file_editor(f, app, chunks[1]),
         CurrentScreen::DashboardView => render_dashboard_view(f, app, chunks[1]),
+        CurrentScreen::Ideas => render_ideas(f, app, chunks[1]),
     }
 
     // Status bar
@@ -55,6 +58,9 @@ pub fn ui(f: &mut Frame, app: &App) {
             CurrentScreen::FileBrowser => "↑↓: Navigate | Enter: Open | Esc: Back",
             CurrentScreen::FileEditor => "Ctrl+S: Save | Esc: Close",
             CurrentScreen::DashboardView => "↑↓: Navigate | Enter: Open | Esc: Back",
+            CurrentScreen::Ideas => {
+                "↑↓: Navigate | Enter: Open | n: New idea | l: Log entry | r: Refresh | Esc: Back"
+            }
         }
     };
 
@@ -305,4 +311,67 @@ fn render_dashboard_view(f: &mut Frame, app: &App, area: Rect) {
         )
         .highlight_symbol(">> ");
     f.render_stateful_widget(file_list, split[1], &mut app.file_browser_state.clone());
+}
+
+// ── Ideas ─────────────────────────────────────────────────────────────────────
+
+fn status_style(status: IdeaStatus) -> Style {
+    match status {
+        IdeaStatus::Exploring => Style::default().fg(Color::Cyan),
+        IdeaStatus::Committed => Style::default().fg(Color::Green),
+        IdeaStatus::Seed => Style::default().fg(Color::Yellow),
+        _ => Style::default().fg(Color::DarkGray),
+    }
+}
+
+fn render_ideas(f: &mut Frame, app: &App, area: Rect) {
+    let now_ms = chrono::Local::now().timestamp_millis();
+    let items: Vec<ListItem> = app
+        .ideas
+        .iter()
+        .map(|row| {
+            let mut spans = vec![
+                Span::styled(
+                    format!("{:<10} ", row.idea.status),
+                    status_style(row.idea.status),
+                ),
+                Span::raw(row.idea.title.clone()),
+                Span::styled(
+                    format!(
+                        "  {}",
+                        ideas_cli::relative_age(row.activity.last_at, now_ms)
+                    ),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ];
+            let open = row.idea.open_challenges();
+            if open > 0 {
+                spans.push(Span::styled(
+                    format!("  ⚠ {open}"),
+                    Style::default().fg(Color::Yellow),
+                ));
+            }
+            ListItem::new(Line::from(spans))
+        })
+        .collect();
+
+    let title = if items.is_empty() {
+        "Ideas — none yet (n: new idea)".to_string()
+    } else {
+        format!(
+            "Ideas — {} ({})",
+            app.active_repo.as_deref().unwrap_or("?"),
+            items.len()
+        )
+    };
+
+    let list = List::new(items)
+        .block(Block::default().title(title).borders(Borders::ALL))
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .bg(Color::DarkGray),
+        )
+        .highlight_symbol(">> ");
+    f.render_stateful_widget(list, area, &mut app.ideas_state.clone());
 }

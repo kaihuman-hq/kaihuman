@@ -12,6 +12,7 @@ import {
   braindumpTitle,
   calculateStats,
   getUpcomingEvents,
+  ideaSlugOf,
   isCheckedIn,
   localDate,
   parseEvents,
@@ -73,12 +74,14 @@ interface TreeEntry {
 /**
  * The files the start page reads: its widgets' kinds, the braindumps (doc/braindump.md), and the
  * list of services whose status it shows — which rides along so it costs no request of its own.
+ * The palette's ideas (`>id`, doc/ideas.md) ride along too; the start page itself shows none.
  */
 const isTodayPath = (path: string) => {
   const lower = path.toLowerCase();
   return (
     TODAY_SUFFIXES.some((suffix) => lower.endsWith(suffix)) ||
     braindumpIdOf(path) !== null ||
+    ideaSlugOf(path) !== null ||
     path === STATUS_CONFIG_PATH
   );
 };

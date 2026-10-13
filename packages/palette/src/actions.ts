@@ -27,6 +27,7 @@ import type {
 } from './command-palette.js';
 import { conversionItems } from './convert.js';
 import { type EntryKind, entryKindOf } from './entries.js';
+import { ideasMode } from './ideas.js';
 import { knowledgeNote } from './knowledge.js';
 import type { ActionPort, GithubWorkFilter, PaletteResponse } from './protocol.js';
 import { symbolItems } from './symbols.js';
@@ -780,7 +781,7 @@ const entryFileItems = async (port: ActionPort): Promise<ModeItem[]> => {
 /**
  * The prefix modes every surface offers: `>p` prompts, `>t` translate, `>r` GitHub repositories,
  * `>g` a search in one of them, `>gw` GitHub work waiting on you, `>f` the files widgets add to,
- * `>q` a knowledge capture, `>k` conversions and `>s` symbols. Link tools like `>l` come from the
+ * `>q` a knowledge capture, `>id` ideas, `>k` conversions and `>s` symbols. Link tools like `>l` come from the
  * repository's palette settings instead (`loadSettings`).
  */
 export const paletteModes = (port: ActionPort): PaletteMode[] => [
@@ -841,6 +842,7 @@ export const paletteModes = (port: ActionPort): PaletteMode[] => [
     recents: false,
     submit: (text) => captureItems(port, text),
   },
+  ideasMode(port),
   {
     prefix: 'k',
     title: 'Convert',

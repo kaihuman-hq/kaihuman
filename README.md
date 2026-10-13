@@ -9,7 +9,7 @@ A personal life-OS built on GitHub — notes, dashboards, habits, and tasks, all
 | `apps/cli` | Rust + Ratatui | Terminal UI — notes, file browser, AI prompt, dashboard |
 | `apps/console` | Preact + Vite | Web dashboard (files, kanban, analytics) |
 | `apps/browser-extension` | Preact + CRXJS | Browser extension |
-| `apps/kb-mcp` | Node + MCP SDK | MCP server over the `.kh/` knowledge base |
+| `apps/kb-mcp` | Node + MCP SDK | MCP server over the `.kh/` knowledge base and ideas |
 | `apps/auth-worker` | Cloudflare Worker | GitHub sign-in for the console; stores no tokens ([setup](apps/auth-worker/README.md)) |
 
 ## Prerequisites
@@ -45,6 +45,8 @@ cargo run
 cargo run -- server          # start local AI proxy on :4000
 cargo run -- server --port 3000
 cargo run -- capture "TIL ..."   # capture a knowledge note to .kh/raw/ (offline-safe)
+cargo run -- idea "Offline sync" # new product idea in .kh/ideas/ (see doc/ideas.md)
+cargo run -- ideas               # overview of open ideas
 echo "note" | cargo run -- capture   # …or pipe it in (used by the desktop overlay)
 
 # Build a release binary
@@ -67,6 +69,7 @@ The CLI opens a browser window to authenticate via GitHub OAuth. After that it d
 | `a` | AI prompt — pipe to Claude / Copilot / Gemini |
 | `f` | File browser (syncs repo first) |
 | `d` | Dashboard config view (syncs repo first) |
+| `i` | Ideas list (`.kh/ideas/`) |
 | `q` / `Ctrl+C` | Quit |
 
 **AI prompt:** `Tab` cycles provider · `Enter` sends · `Esc` cancels
@@ -118,6 +121,7 @@ In `~/.config/cli/` on Linux (`~/Library/Application Support/com.kaihuman.cli/` 
   auth.json            # GitHub token + active repo
   recent_files.json    # Last 20 opened files (relative repo paths)
   spool/               # Pending knowledge captures awaiting push (offline queue)
+  spool/ideas/         # Queued idea writes, replayed in order
   repos/<owner>/<repo> # Shallow git clone of active repo
 ```
 

@@ -142,6 +142,119 @@ commands:
         summary: Capture text from a pipe, as the desktop overlay does
       - run: kaihuman capture
         summary: Write a multi-line note in $EDITOR
+  - name: idea
+    summary: Capture a new idea to .kh/ideas/<slug>.md (first line = title, the rest = braindump)
+    description: |
+      Creates a `seed` idea through the GitHub contents API with a create-only
+      PUT, so an existing slug is never overwritten. Offline, or on a GitHub
+      error, the write is queued in `spool/ideas/` and replayed in order before
+      the next ideas write.
+    arguments:
+      - name: text
+        summary: Idea text; the first line is the title, the rest the braindump
+        variadic: true
+        description: |
+          If omitted, the text is read from piped standard input, or `$EDITOR`
+          is opened when standard input is a terminal.
+    options:
+      - name: --slug
+        summary: The id, 2–40 of a-z, 0-9 and "-" (default from the title)
+        value:
+          name: slug
+          type: string
+      - name: --product
+        summary: The product the idea is for
+        value:
+          name: product
+          type: string
+      - name: --tag
+        summary: A tag; repeat for more
+        value:
+          name: tag
+          type: string
+      - name: --by
+        summary: Who writes, `human` (default) or an agent's short name such as `claude`
+        value:
+          name: author
+          type: string
+      - name: --help
+        aliases: [-h]
+        summary: Print help
+    effects: [read, write, network, exec]
+    exits:
+      "0":
+        meaning: Created, or queued for a later push
+      "1":
+        meaning: The idea could not be created (for example the slug is taken); the reason is printed to stderr
+    examples:
+      - run: kaihuman idea "Offline sync for the palette"
+        summary: Capture a one-line idea
+      - run: kaihuman idea "Voice capture" --product kaihuman --tag mobile --by claude
+        summary: Capture an idea as an agent, with a product and a tag
+  - name: ideas
+    summary: List, read and update ideas in .kh/ideas/ (overview when no subcommand is given)
+    description: |
+      Without a subcommand, prints the open ideas grouped by status. Subcommands:
+      `show <slug>`, `find <words…>`, `log <slug> <text…>`, `challenge <slug> <text…>`,
+      `dump <slug> [text…]`, `summary <slug> <text…>`,
+      `status <slug> <status> [--reason R]`, `import` (kh-idea blocks from stdin)
+      and `path [slug]`. `log`, `status` and `import` take `--by AUTHOR`.
+      Reads pull the local clone first; writes are sha-checked PUTs, queued
+      offline like `kaihuman idea`.
+    arguments:
+      - name: command
+        summary: show, find, log, challenge, dump, summary, status, import or path, with its arguments
+        variadic: true
+    options:
+      - name: --status
+        summary: Only ideas with this status (seed, exploring, committed, shipped, parked, dropped)
+        value:
+          name: status
+          type: string
+          enum: [seed, exploring, committed, shipped, parked, dropped]
+      - name: --product
+        summary: Only ideas for this product
+        value:
+          name: product
+          type: string
+      - name: --all
+        summary: Also list closed ideas (shipped, parked, dropped)
+      - name: --json
+        summary: Print JSON
+      - name: --help
+        aliases: [-h]
+        summary: Print help
+    effects: [read, write, network, exec]
+    exits:
+      "0":
+        meaning: Done, or the write was queued
+      "1":
+        meaning: The command failed (unknown idea, bad status, no change); the reason is printed to stderr
+    examples:
+      - run: kaihuman ideas
+        summary: Overview of open ideas
+      - run: kaihuman ideas log palette-sync "CRDTs are too heavy for single-user data" --by claude
+        summary: Add a log entry as an agent
+      - run: kaihuman ideas status palette-sync parked --reason "Not before v2"
+        summary: Park an idea with a reason
+      - run: pbpaste | kaihuman ideas import --by claude.ai
+        summary: Apply hand-off blocks copied from a chat
+  - name: skills
+    summary: Install agent skills
+    description: |
+      `kaihuman skills install [--dir D]` writes the kh-ideas skill to
+      `~/.claude/skills/kh-ideas/SKILL.md` and `~/.agents/skills/kh-ideas/SKILL.md`.
+    arguments:
+      - name: command
+        summary: install
+    options:
+      - name: --help
+        aliases: [-h]
+        summary: Print help
+    effects: [write]
+    examples:
+      - run: kaihuman skills install
+        summary: Make every agent able to file ideas
   - name: help
     summary: Print this message or the help of the given subcommand(s)
     arguments:
