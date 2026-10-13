@@ -20,6 +20,10 @@
 
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
+| Ideas overview: every `.kh/ideas/` idea as a card coloured by status, with a 12-week activity strip and a hot/warm/cool/dormant level; status chips, text, product and sort filters; inline log, challenge and status edits | `/ideas` (navbar **Ideas**) | 2026-10-13 |
+| Quick idea: one text becomes a seed idea; pasted `kh-idea` hand-off blocks from chat apps are applied | `/quick-idea` | 2026-10-13 |
+| `kh-ideas` agent skill installed into the data repo (`.agents/skills/`, `.claude/skills/`) together with an `AGENTS.md` | `/knowledge` scaffold and skill update | 2026-10-13 |
+| `>id` ideas — list by activity, create a seed idea, `<slug>: <text>` logs on one | command palette, desktop palette | 2026-10-13 |
 | `>w` Wi‑Fi — turn it on or off, see the networks in range, connect with a password prompt when needed (NetworkManager via `nmcli`); GitHub work moves to `>gw` | desktop palette | 2026-09-28 |
 | Bookmarks: rename, change the link or delete any entry, including in search results | Bookmarks widget → pencil / trash | 2026-09-25 |
 | Command palette settings (`.kh/command-palette.settings.json`) — search engines and `>`-prefixed link tools with parameters, added, removed and reordered in a widget | New File → Command Palette Settings | 2026-09-24 |
@@ -98,6 +102,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Ideas tools (`ideas_list`, `ideas_find`, `ideas_read`, `ideas_create`, `ideas_append`, `ideas_set_summary`, `ideas_set_status`, `ideas_import`) and opt-in `--git` commit and push, for Claude Desktop | `kaihuman-kb-mcp --repo <path> --git` | 2026-10-13 |
 | stdio MCP server: `kb_search`, `kb_read`, `kb_list`, `kb_index`, `kb_log`, `kb_add_raw` over a local clone | `kaihuman-kb-mcp --repo <path>` | 2026-09-23 |
 
 ## Sign-in worker (`apps/auth-worker`)
@@ -110,6 +115,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| ⌃I Promote to idea: the braindump becomes a `.kh/ideas/` idea and is deleted | braindump window | 2026-10-13 |
 | The command palette as a desktop overlay, centered on the focused monitor (wlr-layer-shell: Hyprland, Sway, KDE…) | `kaihuman-palette-toggle` bound to a key | 2026-09-23 |
 | Bookmarks, web search, repo search, notes and action log, recents, repository switch — shared with the extension via `@kaihuman/palette` | desktop palette | 2026-09-23 |
 | `>f` files: add a todo, action, event, prompt or command to the repo's widget files, or open one in Kaihuman — shared with the extension | desktop palette | 2026-09-24 |

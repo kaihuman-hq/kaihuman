@@ -3,7 +3,7 @@
 `@kaihuman/kb-mcp` in `apps/kb-mcp` is a stdio MCP server that gives an LLM agent such as Claude Code access to the kaihuman knowledge base in a local repository clone. It reads the `.kh/` folder (or the legacy `.lifeos/` folder) and exposes six tools for searching, reading, listing and adding raw notes. It is written in TypeScript on Node.js 22+ with `@modelcontextprotocol/sdk` and `zod`, and builds to the `kaihuman-kb-mcp` bin.
 
 ## Which tools the MCP server exposes
-<!-- docspack: tags=tools,kb_search,kb_read,kb_list,kb_index,kb_log,kb_add_raw -->
+<!-- docspack: tags=tools,kb_search,kb_read,kb_list,kb_index,kb_log,kb_add_raw,ideas_list,ideas_create -->
 
 The server registers itself as `kaihuman-kb` version `0.1.0`. Tools are registered in `createKbServer` in `apps/kb-mcp/src/server.ts`:
 
@@ -16,7 +16,16 @@ The server registers itself as `kaihuman-kb` version `0.1.0`. Tools are register
 | `kb_log` | `limit` (default 20, max 500) | Entries of `log.md` as `date`, `op`, `title`, `body`, newest first |
 | `kb_add_raw` | `title`, `text`, `url` (optional), `tags` (optional) | The repo-relative path written |
 
-All tools except `kb_add_raw` are read-only. Results are returned as pretty-printed JSON text, except `kb_index`, which returns the raw Markdown.
+| `ideas_list` | `status`, `product`, `includeClosed` (all optional) | Ideas with slug, title, status, tags, activity, open challenges, last log entry; newest activity first |
+| `ideas_find` | `query` | Up to 10 best matches |
+| `ideas_read` | `slug` | The file text and its parsed fields |
+| `ideas_create` | `title`, `author`, optional `slug`, `product`, `tags`, `summary`, `braindump` | A new `seed` idea, create-only |
+| `ideas_append` | `slug`, `kind` (`log`, `challenge`, `braindump`), `text`, `author` | The updated idea |
+| `ideas_set_summary` | `slug`, `summary` | The updated idea |
+| `ideas_set_status` | `slug`, `status`, `author`, optional `reason` | The updated idea, with a status log entry |
+| `ideas_import` | `text`, `author` | Applies every `kh-idea` block; all or nothing |
+
+All `kb_*` tools except `kb_add_raw` are read-only. The `ideas_*` tools use `@kaihuman/formats` (bundled into `dist/index.js` by `vite build`) and run one at a time, so parallel calls cannot lose an edit. Results are returned as pretty-printed JSON text, except `kb_index`, which returns the raw Markdown.
 
 ## How `kb_search` ranks wiki pages
 <!-- docspack: tags=search,ranking,scoring,search.kb.json -->
@@ -84,7 +93,7 @@ The build runs `tsc -p tsconfig.build.json` and writes `apps/kb-mcp/dist/index.j
 ## Choosing which repository the server reads
 <!-- docspack: tags=KB_REPO_PATH,--repo,environment variable,working directory -->
 
-`resolveRepoPath` in `apps/kb-mcp/src/config.ts` uses the first value that is set:
+`resolveConfig` in `apps/kb-mcp/src/config.ts` uses the first value that is set:
 
 1. The `--repo <path>` argument
 2. The `KB_REPO_PATH` environment variable
@@ -93,6 +102,13 @@ The build runs `tsc -p tsconfig.build.json` and writes `apps/kb-mcp/dist/index.j
 Any other argument is an error, because argument parsing is strict. Inside the repository, the server uses `.kh/` when it exists, else the legacy `.lifeos/`, else `.kh/`, which is created on the first `kb_add_raw`.
 
 The kaihuman CLI clones repositories to `~/.config/cli/repos/<owner>/<repo>` (Linux). When Claude Code runs inside such a clone, no path is needed.
+
+## Committing idea changes with --git
+<!-- docspack: tags=--git,KB_GIT,commit,push,pull,claude desktop -->
+
+By default the `ideas_*` tools only write files. With `--git` (or `KB_GIT=1`) the server runs `git pull --ff-only` before idea reads and writes (at most once a minute) and, after each write, commits only the idea files (`kaihuman: idea <slug> — <op>`) and pushes. A failed push still leaves the commit, and the result says so.
+
+This is how Claude Desktop, which cannot run git itself, keeps ideas in sync: point `--repo` at the CLI's clone (`/home/<you>/.config/cli/repos/<owner>/<repo>`; Desktop does not expand `~`) and add `--git`. See `apps/kb-mcp/README.md` for the config.
 
 ## Adding the server to Claude Code
 <!-- docspack: tags=claude mcp add,claude code,setup -->

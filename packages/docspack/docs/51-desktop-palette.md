@@ -162,6 +162,7 @@ The braindump window is a plain text window for getting thoughts down fast. Open
 | ⌃N | New braindump (the toggle key does the same unless the current one is empty) |
 | ⌃O | The window's own list of braindumps: type to filter, ⏎ opens, Esc goes back |
 | ⌃⏎ | Copy all and hide |
+| ⌃I | Promote to idea: the first line becomes the title of a new `.kh/ideas/` file, the whole text its braindump; then the braindump is deleted. A taken slug is reported and the braindump kept |
 | ⌃F | Find in the text: every match is highlighted, ⏎ / ⇧⏎ go to the next / previous one, Esc goes back to the text with the match selected |
 
 It is a normal window, not an overlay, so other windows stay usable. Its title is always `kaihuman-braindump`. To float it in Hyprland ≤ 0.54: `windowrule = float, title:^(kaihuman-braindump)$`, plus `center` and `size 760 520`. Check the rule syntax for Lua configs (0.55+). The status line shows the title and `saved here`, `synced 10:42`, or why a sync failed.
@@ -268,7 +269,7 @@ The webview talks to Rust through `window.__TAURI__.core.invoke`. Commands regis
 
 Events from Rust: `palette:show`, `palette:hide`, `braindump:open` (`{ id }`), `braindump:hidden`.
 
-`Request` in `src-tauri/src/requests.rs` mirrors the protocol. Desktop-only requests: `RUN_COMMAND`, `SEARCH_LOCAL_FILES`, `OPEN_LOCAL_FILE`, `LIST_CLAUDE_CODE_REPOS`, `GET_CLAUDE_USAGE`, `LIST_DUMPS`, `SAVE_DUMP`, `EXPORT_DUMP`, `LIST_BRAINDUMPS`, `SAVE_BRAINDUMP`, `SYNC_BRAINDUMPS`, `OPEN_BRAINDUMP`, `LIST_WIFI`, `SET_WIFI`, `CONNECT_WIFI`. Unknown request types fall into `BrowserOnly` and are rejected. For tests, `KAIHUMAN_GITHUB_TOKEN` replaces the keyring and `KAIHUMAN_GITHUB_API` points at a stand-in for `https://api.github.com`.
+`Request` in `src-tauri/src/requests.rs` mirrors the protocol. Desktop-only requests: `RUN_COMMAND`, `SEARCH_LOCAL_FILES`, `OPEN_LOCAL_FILE`, `LIST_CLAUDE_CODE_REPOS`, `GET_CLAUDE_USAGE`, `LIST_DUMPS`, `SAVE_DUMP`, `EXPORT_DUMP`, `LIST_BRAINDUMPS`, `SAVE_BRAINDUMP`, `SYNC_BRAINDUMPS`, `OPEN_BRAINDUMP`, `LIST_IDEAS`, `SAVE_IDEA`, `LIST_WIFI`, `SET_WIFI`, `CONNECT_WIFI`. Unknown request types fall into `BrowserOnly` and are rejected. For tests, `KAIHUMAN_GITHUB_TOKEN` replaces the keyring and `KAIHUMAN_GITHUB_API` points at a stand-in for `https://api.github.com`.
 
 ## Files the desktop palette stores
 

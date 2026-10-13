@@ -103,6 +103,7 @@ Modes come in four kinds in `PaletteMode`: `load` (a list filtered as you type),
 | `>gw` | GitHub work waiting on you | all |
 | `>f` | Widget files: open in Kaihuman or add an entry | all |
 | `>q` | Capture to the knowledge base (`.kh/raw/`) | all |
+| `>id` | Ideas: list, create, log on one (`.kh/ideas/`) | all |
 | `>k` | Convert colors, numbers, sums, times, units, case, Lorem ipsum | all |
 | `>s` | Symbols, emoji, kaomoji | all |
 | `>x` | Commands from `.commands.md`; copy (extension) or run (desktop) | all |
@@ -114,7 +115,7 @@ Modes come in four kinds in `PaletteMode`: `load` (a list filtered as you type),
 | `>o` | Local files; `c:` contents, `a:` whole disk | desktop |
 | `>w` | Wi‑Fi: on/off, networks in range, connect | desktop |
 
-The built-in prefixes that settings tools cannot take are in `BUILT_IN_PALETTE_PREFIXES`: `b p t r g f x d c u a w gw q k s`. `>o` is not in that list; a tool with prefix `o` is dropped on the desktop because the desktop mode claims it. The desktop-only modes are described in the desktop palette docs.
+The built-in prefixes that settings tools cannot take are in `BUILT_IN_PALETTE_PREFIXES`: `b p t r g f x d c u a w gw id q k s`. `>o` is not in that list; a tool with prefix `o` is dropped on the desktop because the desktop mode claims it. The desktop-only modes are described in the desktop palette docs.
 
 ## Copying prompts and filling in commands
 
@@ -185,6 +186,16 @@ The **Add a note…** action does the same for `.lifeos/dump.md` and the quick-n
 - Any text in the main search is also offered as **Capture “…”**.
 
 The request is `CAPTURE_KNOWLEDGE`. Backends only allow paths matching `isKnowledgePath` (`.kh/raw/<name>.md`). The desktop writes directly and has no offline spool.
+
+## Ideas with >id
+<!-- docspack: tags=ideas,>id,new idea,log on idea,idea list -->
+
+`>id` lists the open ideas in `.kh/ideas/`, most recently active first; typing searches all ideas by slug, title, product and tags. ⏎ on an idea opens it in the console.
+
+- Unless the text matches an idea exactly, the first item is **New idea: <text>**. It creates a `seed` idea with that title (author `human`). A taken slug is refused.
+- `<slug>: <text>` for a known slug offers **Log on <slug>: <text>**, which adds a log entry at the top of that idea's log.
+
+`>i` stays the IMDb link tool: `>id` enters ideas at once, `>i ` with a space enters IMDb. The requests are `LIST_IDEAS` and `SAVE_IDEA` (create-only without a `sha`); both backends refuse any path that is not `.kh/ideas/<slug>.md`. Code: `packages/palette/src/ideas.ts`.
 
 ## Converting colors, numbers, sums and timestamps with >k
 

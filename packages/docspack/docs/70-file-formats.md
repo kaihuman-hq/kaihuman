@@ -386,7 +386,7 @@ Each module pairs a parser with a serialiser, for example `parseTodos`/`serializ
 Each takes the file text and returns the new text, or throws a message to show, such as `Nothing to add`. `splitInlineTags` turns `Call #admin the bank` into text `Call the bank` and tags `['admin']`. The palettes write back with the file's `sha`, so a change made elsewhere meanwhile fails instead of being overwritten.
 
 ## Idea file format (`.kh/ideas/<slug>.md`)
-<!-- docspack: tags=ideas,idea,product ideas,backlog,idea log,challenges,braindump,status,kh-ideas skill,hand-off -->
+<!-- docspack: tags=idea file,idea file format,what an idea file looks like,.kh/ideas,idea frontmatter,product ideas,idea log,challenges,braindump,idea status,kh-ideas skill,hand-off block -->
 
 Each product or feature idea is one Markdown file. The slug is the file name and the id people and agents use (`palette-sync`, `idea:palette-sync`): 2–40 characters of `a-z`, `0-9` and `-`. It never changes; the title can. The full design is in `doc/ideas.md`.
 

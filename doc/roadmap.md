@@ -26,6 +26,17 @@
 - [x] Wiki view: wikilinks, backlinks, tags
 - [x] MCP server over the knowledge base (`apps/kb-mcp`)
 
+## Ideas (`doc/ideas.md`)
+
+- [x] Idea file format in `@kaihuman/formats` (`.kh/ideas/<slug>.md`)
+- [x] `kh-ideas` agent skill for Claude Code, Antigravity / Gemini CLI, Codex, Copilot, Cursor
+- [x] CLI: `kaihuman idea`, `kaihuman ideas …`, `kaihuman skills install`, TUI screen
+- [x] Hand-off blocks from chat apps (`kaihuman ideas import`, `/quick-idea`)
+- [x] Console `/ideas` overview and `/quick-idea`
+- [x] `kb-mcp` ideas tools for Claude Desktop
+- [x] Palette `>id` and braindump "Promote to idea"
+- [ ] Gemini app skill, once its format is published
+
 ## Documentation
 
 - [x] Document every app, package, file format and CLI command as a docspack package (`packages/docspack`)

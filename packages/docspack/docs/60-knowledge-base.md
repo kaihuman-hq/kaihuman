@@ -19,7 +19,7 @@ The console's scaffold and the `CLAUDE.md` it writes describe this layout:
 | `.kh/index.kb.md` | Master catalog of all wiki pages, grouped by type |
 | `.kh/log.md` | Append-only history of every operation |
 | `.kh/search.kb.json` | Optional inverted index built by `/kb-index` |
-| `.kh/.skill-version` | Version of the installed slash commands, for example `1.7.0` |
+| `.kh/.skill-version` | Version of the installed slash commands and skills, for example `1.8.0` |
 
 The same `.kh/` folder also holds the widget files (todos, action logs, habits) and app configuration such as `.kh/.dashboard.config.json` and `.kh/command-palette.settings.json`. The slash commands themselves live in `.claude/commands/` at the repository root.
 
@@ -43,11 +43,12 @@ Raw sources are ground truth: apart from the `processed` flag, the commands neve
 Open the console at `/knowledge` with a repository selected. When `.kh/.skill-version` is missing, the page offers to set the knowledge base up. `scaffoldKB` in `apps/console/src/lib/github-kb.ts` then commits these files with the message `chore: scaffold knowledge base`:
 
 - `.kh/.skill-version`, `.kh/schema.md`, `.kh/index.kb.md`, `.kh/log.md`
-- `.kh/raw/.gitkeep`, `.kh/journal/.gitkeep`, `.kh/wiki/.gitkeep`
+- `.kh/raw/.gitkeep`, `.kh/journal/.gitkeep`, `.kh/wiki/.gitkeep`, `.kh/ideas/.gitkeep`
 - `.claude/commands/kb-ingest.md`, `kb-index.md`, `kb-lint.md`, `kb-ask.md`, `kb-session.md`, `kb-digest.md`, `kb-agent-capture.md`
-- `CLAUDE.md` with the knowledge base conventions
+- `.agents/skills/kh-ideas/SKILL.md` and `.claude/skills/kh-ideas/SKILL.md`, the ideas skill (see "Idea file format")
+- `CLAUDE.md` with the knowledge base and ideas conventions, and `AGENTS.md` with the same text for agents that do not read `CLAUDE.md` (Antigravity, Codex, Copilot, Cursor)
 
-If the repository already has a `CLAUDE.md`, the page asks first and can scaffold without it (`skipClaudeMd`). On every later visit, `updateSkillsIfNeeded` compares `.kh/.skill-version` with `KB_SKILL_VERSION`. When they differ, it rewrites the command files and `CLAUDE.md` with the message `chore: update KB skills to v<version>`.
+If the repository already has a `CLAUDE.md` or `AGENTS.md`, the page names them and can scaffold without both (`skipClaudeMd`). On every later visit, `updateSkillsIfNeeded` compares `.kh/.skill-version` with `KB_SKILL_VERSION`. When they differ, it rewrites the command and skill files, `CLAUDE.md` and `AGENTS.md` with the message `chore: update KB skills to v<version>`.
 
 The page also lists the files in `.kh/raw/` and `.kh/raw/processed/`, has an "Add note" form, and shows a Commands modal (`apps/console/src/components/KBCommandsModal.tsx`) describing each slash command.
 
@@ -65,10 +66,11 @@ The command text is not stored in this monorepo as Markdown files. It lives as s
 | `KB_DIGEST_SKILL` | `.claude/commands/kb-digest.md` |
 | `KB_SESSION_SKILL` | `.claude/commands/kb-session.md` |
 | `KB_AGENT_CAPTURE_SKILL` | `.claude/commands/kb-agent-capture.md` |
-| `KB_CLAUDE_MD` | `CLAUDE.md` |
+| `KB_CLAUDE_MD` | `CLAUDE.md` and `AGENTS.md` |
+| `@kaihuman/formats/skills/kh-ideas/SKILL.md` | `.agents/skills/kh-ideas/SKILL.md`, `.claude/skills/kh-ideas/SKILL.md` |
 | `KB_SCHEMA_TEMPLATE` | `.kh/schema.md` |
 
-`getScaffoldFiles()` returns every file for a new knowledge base. `getSkillOnlyFiles()` returns only the commands, `CLAUDE.md` and `.kh/.skill-version`, for upgrades. To change a command, edit the constant and bump `KB_SKILL_VERSION`, so existing repositories pick up the new text on their next visit to `/knowledge`. Tests are in `apps/console/src/lib/kb-skills.test.ts`.
+`getScaffoldFiles()` returns every file for a new knowledge base. `getSkillOnlyFiles()` returns only the commands, skills, `CLAUDE.md`, `AGENTS.md` and `.kh/.skill-version`, for upgrades. To change a command, edit the constant and bump `KB_SKILL_VERSION`, so existing repositories pick up the new text on their next visit to `/knowledge`. Tests are in `apps/console/src/lib/kb-skills.test.ts`.
 
 ## Ingesting raw sources with `/kb-ingest`
 <!-- docspack: tags=ingest,compile,process sources -->

@@ -79,7 +79,8 @@ All routes are in `apps/console/src/App.tsx`. Routes marked protected show the l
 | `/board` | `KanbanBoardPage` | yes |
 | `/analytics` | `TodoAnalyticsPage` | yes |
 | `/action-log` | `ActionLogViewPage` | yes |
-| `/quick-todo`, `/quick-note`, `/quick-knowledge`, `/quick-log` | Quick capture pages | yes |
+| `/quick-todo`, `/quick-note`, `/quick-knowledge`, `/quick-log`, `/quick-idea` | Quick capture pages | yes |
+| `/ideas` | `IdeasPage` — overview of `.kh/ideas/` | yes |
 | `/shortcuts` | `ShortcutsPage` | yes |
 | `/cheatsheet` | `CheatsheetPage` | yes |
 | `/knowledge` | `KnowledgeBasePage` | yes |
@@ -285,6 +286,23 @@ The console is a PWA (`vite-plugin-pwa`, `registerType: 'autoUpdate'`). The mani
 On iOS, each quick page swaps the `<link rel="manifest">` to its own file (`public/manifest-quick-*.webmanifest`) with `useManifest()`, so **Add to Home Screen** starts at that page. The service worker serves `index.html` for every navigation, so a shortcut does not fall back to the dashboard.
 
 `/shortcuts` (`ShortcutsPage.tsx`) shows step-by-step setup for iOS, Android and desktop, for each entry in `QUICK_ROUTES`. That list also has New File (`/new`) and Knowledge Base (`/knowledge`). Keep `QUICK_ROUTES` and the manifest `shortcuts` in sync.
+
+## Reviewing ideas on `/ideas`
+<!-- docspack: tags=ideas,idea overview,status colours,activity,hot,warm,cool,dormant,quick idea,hand-off -->
+
+`/ideas` (navbar **Ideas**) shows every `.kh/ideas/<slug>.md` file as a card. The status colours the card's left border and badge: seed grey, exploring blue, committed violet, shipped green, parked amber, dropped red. Count chips at the top filter by status; closed statuses (shipped, parked, dropped) are hidden until **show closed** is ticked or their chip is clicked. A text filter, a product filter and a sort (activity, created, title) narrow the list.
+
+Activity is shown separately, in orange:
+
+- a strip of 12 squares, one per week, darker the more log entries that week (0, 1, 2, 3–4, 5+);
+- a level pill from `ideaActivity`: **hot** (activity within 7 days), **warm** (30), **cool** (90), **dormant**; an idea with no log entries reads **no activity yet**;
+- `3 in 30 d · 12 total · 2 h ago`.
+
+Clicking a card opens it in place: summary, the last five log entries, open challenges, and forms to add a log entry or challenge or change the status (as `human`). Writes re-read the file first, so an agent's newer commit is kept. **Open file** opens the Markdown in the editor.
+
+`/quick-idea` takes one text: the first line is the title, the rest becomes the braindump; the slug can be edited if it is taken. Pasting a reply from claude.ai or the Gemini app that contains `kh-idea` blocks applies each block instead, with the chosen author. It has a home-screen shortcut like the other quick pages.
+
+Code: `apps/console/src/pages/IdeasPage.tsx`, `QuickIdeaPage.tsx`, `apps/console/src/lib/ideas-overview.ts` (filtering, sorting, week buckets) and `ideas-files.ts` (loading and saving).
 
 ## Using the kanban board
 <!-- docspack: tags=board,kanban,todos,inbox,milestones -->
