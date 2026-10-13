@@ -53,10 +53,38 @@ When you launch the kaihuman CLI, it opens an interactive interface built with `
 |---|---|---|
 | `l` | **Login** | Opens your web browser to authenticate with the kaihuman Console. |
 | `n` | **New Note** | Opens a text area to quickly jot down a note. `Enter` saves it as a new file, `.lifeos/quicknotes/quicknote-<UTC timestamp>.md`, in your currently active repository. |
+| `i` | **Ideas** | Lists the ideas in `.kh/ideas/`, open ones first. `Enter` opens one in the editor, `n` creates one from a title, `l` adds a log entry to the selected one, `r` refreshes. |
 | `q` | **Quit** | Exits the CLI application. |
 | `Up / Down` | **Navigate** | Navigate the repository selection list (if you need to select a repository). |
 | `Enter` | **Submit** | Submits your new note or confirms a repository selection. |
 | `Esc` | **Cancel** | Cancels your current action (like abandoning a note) and returns to the home screen. |
+
+## Ideas
+
+Each product or feature idea is one Markdown file, `.kh/ideas/<slug>.md`, in your active repo
+(see `doc/ideas.md` for the format). Reads use the local clone, pulled first; if the pull fails,
+the CLI shows the clone as it was and prints a warning. Writes go through GitHub. When GitHub
+does not answer, a write is queued in the config directory (`spool/ideas/`) and sent, in order,
+by the next `idea` or `ideas` command that reaches GitHub.
+
+```sh
+kaihuman idea "Offline sync for the palette" --product kaihuman --tag palette  # new seed idea
+printf "Title\nthe rest is the braindump\n" | kaihuman idea                  # from stdin
+kaihuman ideas                                # overview, open ideas first (--all, --status, --product, --json)
+kaihuman ideas show palette-sync [--json]     # the file
+kaihuman ideas find offline palette [--json]  # best matches first
+kaihuman ideas log palette-sync "Researched CRDTs: too heavy." --by claude
+kaihuman ideas challenge palette-sync "Conflicts on two devices"
+kaihuman ideas dump palette-sync "Also the settings file?"   # stdin or $EDITOR without text
+kaihuman ideas summary palette-sync "Queue writes; no CRDT."
+kaihuman ideas status palette-sync committed --reason "Small enough." --by claude
+kaihuman ideas import --by claude.ai < chat.md # apply kh-idea hand-off blocks
+kaihuman ideas path [palette-sync]            # local clone path
+kaihuman skills install                       # kh-ideas skill → ~/.claude/skills/, ~/.agents/skills/
+```
+
+`--by` is the author of the log entry: `human` (the default) or an agent's short name. A new idea
+whose slug is taken fails; pick another one with `--slug`.
 
 ## Authentication Workflow
 

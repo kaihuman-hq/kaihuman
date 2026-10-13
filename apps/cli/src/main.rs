@@ -15,6 +15,8 @@ mod db;
 mod files;
 mod git;
 mod github;
+mod ideas;
+mod ideas_cli;
 mod server;
 mod ui;
 
@@ -39,6 +41,15 @@ enum Commands {
     Capture {
         /// Note text. If omitted, reads piped stdin, or opens $EDITOR when interactive.
         text: Vec<String>,
+    },
+    /// Capture a new idea to .kh/ideas/<slug>.md (first line = title, the rest = braindump)
+    Idea(ideas_cli::IdeaArgs),
+    /// List, read and update ideas in .kh/ideas/ (overview when no subcommand is given)
+    Ideas(ideas_cli::IdeasArgs),
+    /// Install agent skills
+    Skills {
+        #[command(subcommand)]
+        command: ideas_cli::SkillsCommand,
     },
 }
 
@@ -66,11 +77,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
             Ok(())
         }
+        Some(Commands::Idea(args)) => exit_on_error("idea", ideas_cli::run_idea(args).await),
+        Some(Commands::Ideas(args)) => exit_on_error("ideas", ideas_cli::run_ideas(args).await),
+        Some(Commands::Skills { command }) => {
+            exit_on_error("skills", ideas_cli::run_skills(command))
+        }
         None => {
             // Run the standard TUI app
             setup_and_run_tui().await
         }
     }
+}
+
+/// Prints a subcommand's error and exits 1, like `capture` does.
+fn exit_on_error(command: &str, result: Result<()>) -> Result<(), Box<dyn Error>> {
+    if let Err(e) = result {
+        eprintln!("{command} error: {e:#}");
+        std::process::exit(1);
+    }
+    Ok(())
 }
 
 async fn setup_and_run_tui() -> Result<(), Box<dyn Error>> {
