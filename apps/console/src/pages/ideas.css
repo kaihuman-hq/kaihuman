@@ -1,0 +1,72 @@
+/* Ideas overview colours. One distinct hue per status, and a separate single-hue (orange)
+   ramp for activity so the two never read as the same thing. The default block suits the dark
+   themes (nexus, amethyst); the light theme gets darker shades for contrast on a pale ground. */
+:root {
+  --idea-status-seed: #94a3b8;
+  --idea-status-exploring: #38bdf8;
+  --idea-status-committed: #a78bfa;
+  --idea-status-shipped: #34d399;
+  --idea-status-parked: #fbbf24;
+  --idea-status-dropped: #fb7185;
+  --idea-activity: #fb923c;
+}
+
+[data-theme="light"] {
+  --idea-status-seed: #64748b;
+  --idea-status-exploring: #0284c7;
+  --idea-status-committed: #7c3aed;
+  --idea-status-shipped: #059669;
+  --idea-status-parked: #a16207;
+  --idea-status-dropped: #e11d48;
+  --idea-activity: #ea580c;
+}
+
+.idea-week {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: color-mix(in oklch, var(--los-fg) 10%, transparent);
+}
+
+.idea-week[data-shade="1"] {
+  background: color-mix(in oklch, var(--idea-activity) 35%, transparent);
+}
+
+.idea-week[data-shade="2"] {
+  background: color-mix(in oklch, var(--idea-activity) 55%, transparent);
+}
+
+.idea-week[data-shade="3"] {
+  background: color-mix(in oklch, var(--idea-activity) 78%, transparent);
+}
+
+.idea-week[data-shade="4"] {
+  background: var(--idea-activity);
+}
+
+/* Activity level: hot and warm in the activity hue, cool and dormant fade to neutral, and an
+   idea without log entries ("none") reads as the quietest of all. */
+.idea-level {
+  border: 1px solid currentColor;
+}
+
+.idea-level[data-level="hot"] {
+  color: var(--idea-activity);
+  background: color-mix(in oklch, var(--idea-activity) 15%, transparent);
+}
+
+.idea-level[data-level="warm"] {
+  color: var(--idea-activity);
+  border-color: color-mix(in oklch, var(--idea-activity) 45%, transparent);
+}
+
+.idea-level[data-level="cool"] {
+  color: var(--los-muted);
+}
+
+.idea-level[data-level="dormant"],
+.idea-level[data-level="none"] {
+  color: var(--los-muted);
+  border-style: dashed;
+  opacity: 0.7;
+}

@@ -10,9 +10,11 @@ import { CheatsheetPage } from './pages/CheatsheetPage';
 import { Dashboard } from './pages/Dashboard';
 import { DemoEntry } from './pages/DemoEntry';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
+import { IdeasPage } from './pages/IdeasPage';
 import { KanbanBoardPage } from './pages/KanbanBoardPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { Login } from './pages/login';
+import { QuickIdeaPage } from './pages/QuickIdeaPage';
 import { QuickKnowledgePage } from './pages/QuickKnowledgePage';
 import { QuickLogPage } from './pages/QuickLogPage';
 import { QuickNotePage } from './pages/QuickNotePage';
@@ -70,6 +72,8 @@ export const App = () => {
         <ProtectedRoute path="/quick-note" component={QuickNotePage} />
         <ProtectedRoute path="/quick-knowledge" component={QuickKnowledgePage} />
         <ProtectedRoute path="/quick-log" component={QuickLogPage} />
+        <ProtectedRoute path="/quick-idea" component={QuickIdeaPage} />
+        <ProtectedRoute path="/ideas" component={IdeasPage} />
         <ProtectedRoute path="/shortcuts" component={ShortcutsPage} />
         <ProtectedRoute path="/cheatsheet" component={CheatsheetPage} />
         <ProtectedRoute path="/knowledge" component={KnowledgeBasePage} />

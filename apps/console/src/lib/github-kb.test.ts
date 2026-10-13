@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  existingAgentInstructionFiles,
   getInstalledSkillVersion,
   isKBInitialized,
   listKBDir,
@@ -77,6 +78,8 @@ describe('updateSkillsIfNeeded', () => {
     expect(writtenPaths).toContain('.claude/commands/kb-ingest.md');
     expect(writtenPaths).toContain('.claude/commands/kb-lint.md');
     expect(writtenPaths).toContain('.claude/commands/kb-ask.md');
+    expect(writtenPaths).toContain('.claude/skills/kh-ideas/SKILL.md');
+    expect(writtenPaths).toContain('AGENTS.md');
   });
 
   it('writes skill files and returns true when KB is not yet initialized', async () => {
@@ -150,5 +153,33 @@ describe('scaffoldKB', () => {
     expect(writtenPaths).toContain('.kh/.skill-version');
     expect(writtenPaths).toContain('.kh/raw/.gitkeep');
     expect(writtenPaths).toContain('.claude/commands/kb-ingest.md');
+    expect(writtenPaths).toContain('.kh/ideas/.gitkeep');
+    expect(writtenPaths).toContain('.agents/skills/kh-ideas/SKILL.md');
+    expect(writtenPaths).toContain('CLAUDE.md');
+    expect(writtenPaths).toContain('AGENTS.md');
+  });
+
+  it('keeps an existing CLAUDE.md and AGENTS.md when asked to', async () => {
+    vi.mocked(githubService.saveFile).mockResolvedValue({} as any);
+    await scaffoldKB('owner/repo', { skipClaudeMd: true });
+    const writtenPaths = vi.mocked(githubService.saveFile).mock.calls.map((c) => c[2]);
+    expect(writtenPaths).not.toContain('CLAUDE.md');
+    expect(writtenPaths).not.toContain('AGENTS.md');
+    expect(writtenPaths).toContain('.kh/.skill-version');
+  });
+});
+
+describe('existingAgentInstructionFiles', () => {
+  it('lists which of CLAUDE.md and AGENTS.md exist', async () => {
+    vi.mocked(githubService.getFileContent).mockImplementation(async (_o, _r, path) => {
+      if (path === 'AGENTS.md') return { content: '# x', sha: 'a' };
+      throw new Error('Not Found');
+    });
+    expect(await existingAgentInstructionFiles('owner/repo')).toEqual(['AGENTS.md']);
+  });
+
+  it('returns nothing when neither exists', async () => {
+    vi.mocked(githubService.getFileContent).mockRejectedValue(new Error('Not Found'));
+    expect(await existingAgentInstructionFiles('owner/repo')).toEqual([]);
   });
 });

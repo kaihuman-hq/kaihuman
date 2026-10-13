@@ -41,6 +41,12 @@ export const QUICK_ROUTES: QuickRoute[] = [
     description: 'Capture a timestamped action log entry to your inbox',
   },
   {
+    name: 'Quick Idea',
+    path: '/quick-idea',
+    suggestedName: 'KH Idea',
+    description: 'Capture a product idea, or paste a kh-idea hand-off from a chat',
+  },
+  {
     name: 'New File',
     path: '/new',
     suggestedName: 'KH New',
@@ -51,6 +57,12 @@ export const QUICK_ROUTES: QuickRoute[] = [
     path: '/knowledge',
     suggestedName: 'KH Knowledge',
     description: 'Pin, browse, and query your AI knowledge base',
+  },
+  {
+    name: 'Ideas',
+    path: '/ideas',
+    suggestedName: 'KH Ideas',
+    description: 'Overview of your ideas by status and recent activity',
   },
 ];
 

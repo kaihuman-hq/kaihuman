@@ -12,6 +12,7 @@ import {
   KB_SCHEMA_TEMPLATE,
   KB_SESSION_SKILL,
   KB_SKILL_VERSION,
+  KH_IDEAS_SKILL,
 } from './kb-skills';
 
 describe('KB_SKILL_VERSION', () => {
@@ -56,6 +57,10 @@ describe('getScaffoldFiles', () => {
     expect(files).toHaveProperty('.claude/commands/kb-digest.md', KB_DIGEST_SKILL);
     expect(files).toHaveProperty('.claude/commands/kb-agent-capture.md');
     expect(files).toHaveProperty('CLAUDE.md', KB_CLAUDE_MD);
+    expect(files).toHaveProperty('AGENTS.md', KB_CLAUDE_MD);
+    expect(files).toHaveProperty('.kh/ideas/.gitkeep', '');
+    expect(files).toHaveProperty('.agents/skills/kh-ideas/SKILL.md', KH_IDEAS_SKILL);
+    expect(files).toHaveProperty('.claude/skills/kh-ideas/SKILL.md', KH_IDEAS_SKILL);
   });
 
   it('seeds the index with a section per page type', () => {
@@ -117,9 +122,9 @@ describe('command behaviour', () => {
 });
 
 describe('getSkillOnlyFiles', () => {
-  it('contains exactly the skill version file, seven command files, and CLAUDE.md', () => {
+  it('contains the skill version file, seven commands, the ideas skill, CLAUDE.md and AGENTS.md', () => {
     const files = getSkillOnlyFiles();
-    expect(Object.keys(files)).toHaveLength(9);
+    expect(Object.keys(files)).toHaveLength(12);
     expect(files).toHaveProperty('.kh/.skill-version', KB_SKILL_VERSION);
     expect(files).toHaveProperty('.claude/commands/kb-ingest.md');
     expect(files).toHaveProperty('.claude/commands/kb-index.md');
@@ -128,12 +133,28 @@ describe('getSkillOnlyFiles', () => {
     expect(files).toHaveProperty('.claude/commands/kb-session.md');
     expect(files).toHaveProperty('.claude/commands/kb-digest.md');
     expect(files).toHaveProperty('.claude/commands/kb-agent-capture.md');
+    expect(files).toHaveProperty('.agents/skills/kh-ideas/SKILL.md', KH_IDEAS_SKILL);
+    expect(files).toHaveProperty('.claude/skills/kh-ideas/SKILL.md', KH_IDEAS_SKILL);
     expect(files).toHaveProperty('CLAUDE.md', KB_CLAUDE_MD);
+    expect(files).toHaveProperty('AGENTS.md', KB_CLAUDE_MD);
   });
 
   it('does not include data files like index.md or schema.md', () => {
     const files = getSkillOnlyFiles();
     expect(files).not.toHaveProperty('.kh/index.kb.md');
     expect(files).not.toHaveProperty('.kh/schema.md');
+    expect(files).not.toHaveProperty('.kh/ideas/.gitkeep');
+  });
+});
+
+describe('ideas skill', () => {
+  it('is the kh-ideas Agent Skill with its frontmatter', () => {
+    expect(KH_IDEAS_SKILL).toMatch(/^---\nname: kh-ideas\n/);
+  });
+
+  it('CLAUDE.md points to the skill and the ideas folder', () => {
+    expect(KB_CLAUDE_MD).toContain('## Ideas');
+    expect(KB_CLAUDE_MD).toContain('.kh/ideas/<slug>.md');
+    expect(KB_CLAUDE_MD).toContain('.agents/skills/kh-ideas/SKILL.md');
   });
 });

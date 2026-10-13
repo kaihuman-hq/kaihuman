@@ -23,14 +23,21 @@ export async function isKBInitialized(fullName: string): Promise<boolean> {
   return (await getInstalledSkillVersion(fullName)) !== null;
 }
 
-export async function claudeMdExists(fullName: string): Promise<boolean> {
+/** Agent instruction files the scaffold writes; an existing one is only replaced on request. */
+export const AGENT_INSTRUCTION_FILES = ['CLAUDE.md', 'AGENTS.md'] as const;
+
+/** Which of `CLAUDE.md` and `AGENTS.md` already exist in the repo. */
+export async function existingAgentInstructionFiles(fullName: string): Promise<string[]> {
   const { owner, repo } = parseRepo(fullName);
-  try {
-    await githubService.getFileContent(owner, repo, 'CLAUDE.md');
-    return true;
-  } catch {
-    return false;
-  }
+  const found = await Promise.all(
+    AGENT_INSTRUCTION_FILES.map((path) =>
+      githubService.getFileContent(owner, repo, path).then(
+        () => path,
+        () => null,
+      ),
+    ),
+  );
+  return found.filter((path) => path !== null);
 }
 
 export async function scaffoldKB(
@@ -38,9 +45,8 @@ export async function scaffoldKB(
   { skipClaudeMd = false }: { skipClaudeMd?: boolean } = {},
 ): Promise<void> {
   const { owner, repo } = parseRepo(fullName);
-  const files = Object.entries(getScaffoldFiles()).filter(
-    ([path]) => !(skipClaudeMd && path === 'CLAUDE.md'),
-  );
+  const skip: readonly string[] = skipClaudeMd ? AGENT_INSTRUCTION_FILES : [];
+  const files = Object.entries(getScaffoldFiles()).filter(([path]) => !skip.includes(path));
   // All scaffold files are new (called only when !isKBInitialized), so create
   // directly without a pre-check GET to avoid spurious 404s in the network log.
   for (const [path, content] of files) {

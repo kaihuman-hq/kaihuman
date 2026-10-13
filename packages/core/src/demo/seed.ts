@@ -470,6 +470,138 @@ const IDEAS = `# Ideas
 - Add a "books finished" tracker
 `;
 
+// ─── Ideas (.kh/ideas/<slug>.md, the format of `@kaihuman/formats` ideas.ts) ──
+
+/** `YYYY-MM-DD HH:MM`, local time: how idea log entries are dated. */
+const ideaLogTime = (d: Date) => `${isoDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/** `YYYY-MM-DDTHH:MM+hh:mm`: the `created` / `updated` frontmatter. */
+const ideaStamp = (d: Date) => {
+  const offset = -d.getTimezoneOffset();
+  const abs = Math.abs(offset);
+  return `${ideaLogTime(d).replace(' ', 'T')}${offset < 0 ? '-' : '+'}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+};
+const hoursAgo = (now: Date, h: number) => new Date(now.getTime() - h * 3_600_000);
+
+interface DemoIdea {
+  title: string;
+  status: string;
+  product?: string;
+  tags?: string[];
+  createdDaysAgo: number;
+  summary: string;
+  /** [hours ago, author, text], newest first. */
+  log: [number, string, string][];
+  challenges?: string[];
+  braindump?: string;
+}
+
+function idea(now: Date, i: DemoIdea): string {
+  const updated = i.log[0] ? hoursAgo(now, i.log[0][0]) : addDays(now, -i.createdDaysAgo);
+  return [
+    '---',
+    `title: ${JSON.stringify(i.title)}`,
+    `status: ${i.status}`,
+    ...(i.product ? [`product: ${i.product}`] : []),
+    ...(i.tags ? [`tags: [${i.tags.join(', ')}]`] : []),
+    `created: ${ideaStamp(addDays(now, -i.createdDaysAgo))}`,
+    `updated: ${ideaStamp(updated)}`,
+    '---',
+    '',
+    `# ${i.title}`,
+    '',
+    i.summary,
+    '',
+    ...(i.log.length
+      ? [
+          '## Log',
+          '',
+          ...i.log.map(([h, who, text]) => `- ${ideaLogTime(hoursAgo(now, h))} · ${who} · ${text}`),
+          '',
+        ]
+      : []),
+    ...(i.challenges ? ['## Challenges', '', ...i.challenges, ''] : []),
+    ...(i.braindump ? ['## Braindump', '', i.braindump, ''] : []),
+  ].join('\n');
+}
+
+function ideas(now: Date): Record<string, string> {
+  return {
+    '.kh/ideas/palette-sync.md': idea(now, {
+      title: 'Offline sync for the desktop palette',
+      status: 'exploring',
+      product: 'kaihuman',
+      tags: ['sync', 'desktop'],
+      createdDaysAgo: 40,
+      summary:
+        'Let the desktop palette capture while offline and push when the network is back, without a server of its own.',
+      log: [
+        [2, 'claude', 'Spiked a file-based queue; replays cleanly after a restart.'],
+        [26, 'human', 'Decided: single-user data, so a queue beats a CRDT.'],
+        [4 * 24, 'claude.ai', 'Compared CRDT vs queue; queue wins for single-user data.'],
+        [11 * 24, 'human', 'Status seed → exploring. Lost two notes on a train this week.'],
+        [18 * 24, 'gemini', 'Listed how other palettes handle offline capture.'],
+        [40 * 24, 'human', 'Created.'],
+      ],
+      challenges: [
+        '- [ ] Conflicts when two devices edit the same file offline',
+        '- [x] Where the queue lives on disk',
+      ],
+    }),
+    '.kh/ideas/weekly-review.md': idea(now, {
+      title: 'Weekly review template',
+      status: 'committed',
+      tags: ['habits'],
+      createdDaysAgo: 75,
+      summary: 'A Sunday checklist that pulls last week’s todos, habits and notes into one page.',
+      log: [
+        [9 * 24, 'human', 'Status exploring → committed. Doing it before the next quarter.'],
+        [24 * 24, 'claude', 'Drafted the sections from the digest skill.'],
+        [45 * 24, 'human', 'Tried it by hand twice; 20 minutes is the limit.'],
+        [75 * 24, 'human', 'Created.'],
+      ],
+      challenges: ['- [ ] Keep it under 20 minutes'],
+    }),
+    '.kh/ideas/voice-capture.md': idea(now, {
+      title: 'Voice capture on Android',
+      status: 'seed',
+      product: 'kaihuman',
+      tags: ['android', 'capture'],
+      createdDaysAgo: 3,
+      summary: '',
+      log: [],
+      braindump: 'Hold the home-screen icon, talk, and it lands in the inbox as text.',
+    }),
+    '.kh/ideas/budget-import.md': idea(now, {
+      title: 'Automate the monthly budget import',
+      status: 'parked',
+      tags: ['finance'],
+      createdDaysAgo: 120,
+      summary: 'Import the bank CSV into the budget file every month.',
+      log: [
+        [
+          70 * 24,
+          'human',
+          'Status exploring → parked. The bank changes its export format too often.',
+        ],
+        [100 * 24, 'claude', 'Wrote a parser for the current export.'],
+        [120 * 24, 'human', 'Created.'],
+      ],
+    }),
+    '.kh/ideas/books-tracker.md': idea(now, {
+      title: 'Books finished tracker',
+      status: 'shipped',
+      tags: ['reading'],
+      createdDaysAgo: 200,
+      summary: 'A consumption widget that counts finished books per month.',
+      log: [
+        [130 * 24, 'human', 'Status committed → shipped. Live on the Reading dashboard.'],
+        [160 * 24, 'claude', 'Built it on the consumption widget.'],
+        [200 * 24, 'human', 'Created.'],
+      ],
+    }),
+  };
+}
+
 // ─── Assembly ────────────────────────────────────────────────────────────────
 
 export function buildDemoSeed(now: Date = new Date()): DemoSeed {
@@ -493,6 +625,7 @@ export function buildDemoSeed(now: Date = new Date()): DemoSeed {
     'README.md': README,
     'notes/welcome.md': WELCOME,
     'notes/ideas.md': IDEAS,
+    ...ideas(now),
   };
 
   const repos: GithubRepo[] = [

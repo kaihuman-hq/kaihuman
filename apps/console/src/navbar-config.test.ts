@@ -6,8 +6,8 @@ import {
 } from '../../../packages/ui/src/LifeOS/navbar-items';
 
 describe('navbar catalog', () => {
-  it('defaults to the historical desktop navbar items', () => {
-    expect(DEFAULT_NAVBAR).toEqual(['dashboard', 'files', 'board', 'shortcuts']);
+  it('defaults to the historical desktop navbar items plus Ideas', () => {
+    expect(DEFAULT_NAVBAR).toEqual(['dashboard', 'files', 'board', 'ideas', 'shortcuts']);
   });
 
   it('every default item exists in the catalog', () => {
@@ -31,6 +31,7 @@ describe('navbar catalog', () => {
     expect(ids.has('wiki')).toBe(true);
     expect(ids.has('knowledge')).toBe(true);
     expect(ids.has('graph')).toBe(true);
+    expect(ids.has('ideas')).toBe(true);
   });
 
   it('getNavbarItem resolves known ids and ignores unknown ones', () => {

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import {
   addRawNote,
-  claudeMdExists,
+  existingAgentInstructionFiles,
   isKBInitialized,
   type KBFile,
   listKBDir,
@@ -20,7 +20,7 @@ export function KnowledgeBasePage() {
   const [processedFiles, setProcessedFiles] = useState<KBFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [scaffolding, setScaffolding] = useState(false);
-  const [claudeMdConflict, setClaudeMdConflict] = useState(false);
+  const [claudeMdConflict, setClaudeMdConflict] = useState<string[]>([]);
   const [skillsUpdated, setSkillsUpdated] = useState(false);
   const [view, setView] = useState<'inbox' | 'wiki' | 'processed'>('inbox');
   const [addingNote, setAddingNote] = useState(false);
@@ -86,9 +86,9 @@ export function KnowledgeBasePage() {
 
   async function handleSetup() {
     if (!repo) return;
-    const hasClaudeMd = await claudeMdExists(repo.full_name);
-    if (hasClaudeMd) {
-      setClaudeMdConflict(true);
+    const existing = await existingAgentInstructionFiles(repo.full_name);
+    if (existing.length > 0) {
+      setClaudeMdConflict(existing);
       return;
     }
     await doScaffold(false);
@@ -124,7 +124,7 @@ export function KnowledgeBasePage() {
 
   async function doScaffold(skipClaudeMd: boolean) {
     if (!repo) return;
-    setClaudeMdConflict(false);
+    setClaudeMdConflict([]);
     setScaffolding(true);
     try {
       await scaffoldKB(repo.full_name, { skipClaudeMd });
@@ -177,10 +177,11 @@ export function KnowledgeBasePage() {
             <code class="text-xs">.kh/</code> and <code class="text-xs">.claude/commands/</code> in
             your repo.
           </p>
-          {claudeMdConflict ? (
+          {claudeMdConflict.length > 0 ? (
             <div class="space-y-3">
               <p class="text-xs text-[var(--los-warning)]">
-                A <code>CLAUDE.md</code> already exists in this repo. Overwrite it?
+                <code>{claudeMdConflict.join(' and ')}</code> already{' '}
+                {claudeMdConflict.length > 1 ? 'exist' : 'exists'} in this repo. Overwrite?
               </p>
               <div class="flex gap-2">
                 <button

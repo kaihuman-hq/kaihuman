@@ -1,4 +1,15 @@
-export const KB_SKILL_VERSION = '1.7.0';
+import KH_IDEAS_SKILL_SOURCE from '@kaihuman/formats/skills/kh-ideas/SKILL.md?raw';
+
+export const KB_SKILL_VERSION = '1.8.0';
+
+/** The kh-ideas Agent Skill, as shipped in `@kaihuman/formats`. */
+export const KH_IDEAS_SKILL = KH_IDEAS_SKILL_SOURCE;
+
+// Agent Skills live in `.agents/skills/` (Gemini, Codex, Copilot, Cursor) and `.claude/skills/`.
+const KH_IDEAS_SKILL_FILES = {
+  '.agents/skills/kh-ideas/SKILL.md': KH_IDEAS_SKILL,
+  '.claude/skills/kh-ideas/SKILL.md': KH_IDEAS_SKILL,
+};
 
 // One heading per operation keeps the log greppable: `grep '^## \[' .kh/log.md | tail -5`.
 export const KB_LOG_FORMAT = '## [YYYY-MM-DD] <op> | <title>';
@@ -456,6 +467,7 @@ asks questions.
   kb-ask.md     # /kb-ask    — answer questions from wiki, filing good answers back
   kb-digest.md  # /kb-digest — summarise tracked personal data into a raw source
   kb-agent-capture.md  # /kb-agent-capture — capture via the native app's automation server
+.agents/skills/kh-ideas/  # Ideas skill for every agent (a copy lives in .claude/skills/)
 \`\`\`
 
 ## Workflow
@@ -493,6 +505,14 @@ ${KB_LOG_FORMAT}
 \`\`\`
 
 \`<op>\` is one of \`ingest\`, \`query\`, \`lint\`, \`index\`, \`digest\`.
+
+## Ideas
+
+Product and feature ideas live in \`.kh/ideas/<slug>.md\`, one file per idea, with a \`status\`
+(\`seed\`, \`exploring\`, \`committed\`, \`shipped\`, \`parked\`, \`dropped\`) in the frontmatter and
+the sections \`## Log\` (newest first, never edited), \`## Challenges\` (checked off, never removed)
+and \`## Braindump\` (only grows). Follow the \`kh-ideas\` skill (\`.agents/skills/kh-ideas/SKILL.md\`)
+before you create or change an idea; it says what goes where and how little to write.
 
 ## Guidelines
 
@@ -587,6 +607,7 @@ export function getScaffoldFiles(): Record<string, string> {
     '.kh/raw/.gitkeep': '',
     '.kh/journal/.gitkeep': '',
     '.kh/wiki/.gitkeep': '',
+    '.kh/ideas/.gitkeep': '',
     '.claude/commands/kb-ingest.md': KB_INGEST_SKILL,
     '.claude/commands/kb-index.md': KB_INDEX_SKILL,
     '.claude/commands/kb-lint.md': KB_LINT_SKILL,
@@ -594,7 +615,10 @@ export function getScaffoldFiles(): Record<string, string> {
     '.claude/commands/kb-session.md': KB_SESSION_SKILL,
     '.claude/commands/kb-digest.md': KB_DIGEST_SKILL,
     '.claude/commands/kb-agent-capture.md': KB_AGENT_CAPTURE_SKILL,
+    ...KH_IDEAS_SKILL_FILES,
     'CLAUDE.md': KB_CLAUDE_MD,
+    // The same instructions for agents that read AGENTS.md instead of CLAUDE.md.
+    'AGENTS.md': KB_CLAUDE_MD,
   };
 }
 
@@ -608,6 +632,9 @@ export function getSkillOnlyFiles(): Record<string, string> {
     '.claude/commands/kb-session.md': KB_SESSION_SKILL,
     '.claude/commands/kb-digest.md': KB_DIGEST_SKILL,
     '.claude/commands/kb-agent-capture.md': KB_AGENT_CAPTURE_SKILL,
+    ...KH_IDEAS_SKILL_FILES,
     'CLAUDE.md': KB_CLAUDE_MD,
+    // The same instructions for agents that read AGENTS.md instead of CLAUDE.md.
+    'AGENTS.md': KB_CLAUDE_MD,
   };
 }
