@@ -1,5 +1,36 @@
 # Progress
 
+## 2026-10-13 — Ideas: one file per idea, shared by every agent
+
+Built from `doc/ideas.md`, with the decisions recorded there (data repo only, six statuses,
+newest-first log, agents may change the status).
+
+- **Format** (`packages/formats/src/ideas.ts`): `.kh/ideas/<slug>.md` with frontmatter, a
+  rewritten summary, an append-only newest-first log (`- YYYY-MM-DD HH:MM · <author> · <text>`),
+  challenges and the user's braindump. Edits change only the part they own. `ideaActivity` grades
+  ideas hot / warm / cool / dormant. `kh-idea` hand-off blocks bring ideas over from chat apps.
+  `#` and `##` lines in braindump text become `###`, so they cannot end the section. A shared
+  fixture (`packages/formats/fixtures/ideas/`) is read by the TypeScript and Rust tests.
+- **Skill** `kh-ideas` (`packages/formats/skills/kh-ideas/SKILL.md`, Agent Skills format): where
+  things go, noise rules, the commands, a direct-edit fallback and the hand-off block.
+- **CLI**: `kaihuman idea`, `kaihuman ideas` (overview, `show`, `find`, `log`, `challenge`,
+  `dump`, `summary`, `status`, `import`, `path`) and `kaihuman skills install` (to
+  `~/.claude/skills/` and `~/.agents/skills/`). Writes are create-only or sha-checked; offline they
+  queue in `spool/ideas/`. TUI key `i` lists ideas.
+- **Console**: `/ideas` shows every idea as a card coloured by status, with a 12-week activity
+  strip and an activity level, filters, sorts and inline log, challenge and status edits; it is in
+  the default navbar. `/quick-idea` creates an idea or applies pasted hand-off blocks. The KB
+  scaffold and skill update (`KB_SKILL_VERSION` 1.8.0) install the skill into `.agents/skills/`
+  and `.claude/skills/` and write an `AGENTS.md` next to `CLAUDE.md`. Demo mode has five ideas.
+- **kb-mcp**: eight `ideas_*` tools, and `--git` / `KB_GIT=1` to pull before and commit and push
+  after each idea write, for Claude Desktop. The server is now bundled with `vite build`, so it can
+  use `@kaihuman/formats`.
+- **Palettes**: `>id` lists ideas, creates one, or logs on one with `<slug>: <text>` (`>i` stays
+  IMDb; `id` is now a reserved prefix). The braindump window's ⌃I promotes a braindump to an
+  idea. New requests `LIST_IDEAS` and `SAVE_IDEA`, path-checked on both backends.
+- Docs: `doc/documentation.md`, `doc/features.md`, `doc/roadmap.md`, README and the docspack pages
+  (file format, CLI, console, palettes, kb-mcp, knowledge base) with four new eval queries.
+
 ## 2026-10-13 — Ideas: study and proposal
 
 - **New design doc `doc/ideas.md`.** It proposes one Markdown file per product idea in

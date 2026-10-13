@@ -198,8 +198,9 @@ kaihuman ideas path [palette-sync]                    # local clone path, for di
 
 - Every write sets `updated`. Only `log` and `status` add log entries: a log line that only says
   "added a challenge" would be noise, and the challenge itself is in the file.
-- It writes to the local clone, commits (`kaihuman: idea palette-sync — log`) and pushes. Offline,
-  it uses the spool that `capture` already has.
+- It writes through the GitHub contents API, like `capture` (commit `kaihuman: idea palette-sync —
+  log`): creates never overwrite, edits are checked against the file's sha. Reads pull the local
+  clone first. Offline, a write is queued in the spool and replayed in order.
 - `--json` on read commands, so agents can parse the output.
 - Agents without a shell (Claude Desktop chat) use MCP (Decision 6).
 
@@ -294,7 +295,7 @@ summary: …
 ```
 ````
 
-You copy it, then run `kaihuman ideas import` (reads the clipboard or stdin), or paste it into the
+You copy it, then run `kaihuman ideas import` (reads stdin or `$EDITOR`), or paste it into the
 console's quick-idea box. Both apply it with the normal rules and the author `claude.ai` or
 `gemini`. This is one copy and one paste, and it is the same for every chat app.
 

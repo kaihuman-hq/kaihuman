@@ -18,6 +18,11 @@ kaihuman server --port 3000
 kaihuman capture "TIL ..."        # Capture a knowledge note to .kh/raw/
 echo "note" | kaihuman capture    # …or read from stdin (used by the desktop overlay)
 kaihuman capture                  # …or open $EDITOR for a multi-line note
+
+kaihuman idea "Offline sync"      # New idea in .kh/ideas/ (first line = title)
+kaihuman ideas                    # Overview of open ideas
+kaihuman ideas log <slug> "…"     # Add a log entry (see below for all commands)
+kaihuman skills install           # Install the kh-ideas skill for every agent
 ```
 
 ## `kaihuman capture` — knowledge quick-capture
@@ -40,6 +45,30 @@ with `>q` — or by choosing **Capture “…”** under whatever is typed into 
 straight to GitHub with their own token and have no offline spool: a failed push shows the error
 and leaves the text in the input to try again.
 
+## `kaihuman idea` and `kaihuman ideas` — product ideas
+
+One Markdown file per idea in `.kh/ideas/<slug>.md` (design and format: [`doc/ideas.md`](ideas.md)).
+Agents use the same commands through the `kh-ideas` skill.
+
+| Command | Does |
+|---|---|
+| `kaihuman idea [TEXT…] [--slug S] [--product P] [--tag T]… [--by A]` | New `seed` idea; text from args, stdin or `$EDITOR`; first line = title, rest = braindump |
+| `kaihuman ideas [--status S] [--product P] [--all] [--json]` | Overview grouped by status; closed ideas only with `--all` |
+| `kaihuman ideas show <slug> [--json]` | The file, or its parsed fields |
+| `kaihuman ideas find <words…> [--json]` | Best matches first |
+| `kaihuman ideas log <slug> <text…> [--by A]` | Log entry at the top of `## Log` |
+| `kaihuman ideas challenge <slug> <text…>` | Open challenge |
+| `kaihuman ideas dump <slug> [text…]` | Append to `## Braindump` (stdin or `$EDITOR` without text) |
+| `kaihuman ideas summary <slug> <text…>` | Replace the summary |
+| `kaihuman ideas status <slug> <status> [--reason R] [--by A]` | `seed`, `exploring`, `committed`, `shipped`, `parked`, `dropped`; logged |
+| `kaihuman ideas import [--by A]` | Apply `kh-idea` hand-off blocks from stdin or `$EDITOR` |
+| `kaihuman ideas path [slug]` | Path in the local clone |
+| `kaihuman skills install [--dir D]` | Write the `kh-ideas` skill to `~/.claude/skills/` and `~/.agents/skills/` |
+
+Reads pull the local clone first. Writes go through the GitHub contents API: creates never
+overwrite, edits are checked against the file's `sha`. Offline, or on a GitHub error, a write is
+queued in the spool (`ideas/`) and replayed in order before the next write.
+
 ## TUI Key Bindings
 
 ### Main screen
@@ -53,6 +82,7 @@ and leaves the text in the input to try again.
 | `a` | Open AI prompt |
 | `f` | Open file browser (syncs repo) |
 | `d` | Open dashboard config view (syncs repo) |
+| `i` | Ideas list: `Enter` opens, `n` new, `l` log entry, `r` refresh |
 | `q` / `Ctrl+C` | Quit |
 
 ### AI Prompt
