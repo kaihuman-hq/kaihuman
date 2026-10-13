@@ -120,6 +120,18 @@ export class InMemoryGithubService {
     }
   }
 
+  async commitFiles(
+    _owner: string,
+    _repo: string,
+    _branch: string,
+    files: Record<string, string>,
+    _message: string,
+  ): Promise<void> {
+    for (const [path, content] of Object.entries(files)) {
+      this.files.set(path, { content, sha: contentSha(path, content) });
+    }
+  }
+
   async upsertRepoFile(
     owner: string,
     repo: string,

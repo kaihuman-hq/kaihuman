@@ -15,7 +15,7 @@ import { AlertTriangle, ArrowLeft, ExternalLink, Plus } from 'lucide-preact';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
-import { refreshInstalledSkills } from '../lib/github-kb';
+import { syncKB } from '../lib/github-kb';
 import { ideaTreeItems, loadIdeaContents, updateIdeaFile } from '../lib/ideas-files';
 import {
   ACTIVITY_WEEKS,
@@ -362,13 +362,16 @@ export const IdeasPage = () => {
   const [sort, setSort] = useState<IdeaSort>('activity');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [skills, setSkills] = useState<'missing' | 'current' | 'updated' | null>(null);
+  const [settingUp, setSettingUp] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
 
   // Agents only follow the kh-ideas skill if the repo has it, so keep it current from here too.
   useEffect(() => {
     if (!repo) return;
     let cancelled = false;
     setSkills(null);
-    refreshInstalledSkills(repo.full_name).then(
+    setSetupError(null);
+    syncKB(repo).then(
       (result) => !cancelled && setSkills(result),
       (error) => console.warn('Could not check the agent skills:', error),
     );
@@ -426,6 +429,19 @@ export const IdeasPage = () => {
     matched.filter((c) => visible.has(c.slug) || c.slug === expanded),
     sort,
   );
+
+  const setUpSkills = async () => {
+    if (!repo) return;
+    setSettingUp(true);
+    setSetupError(null);
+    try {
+      setSkills(await syncKB(repo, { install: true }));
+    } catch (error) {
+      setSetupError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSettingUp(false);
+    }
+  };
 
   const onSaved = (path: string, content: string) =>
     setContents((previous) => ({ ...previous, [path]: content }));
@@ -589,13 +605,26 @@ export const IdeasPage = () => {
         </div>
         <div class="flex-1 overflow-y-auto p-4 sm:p-6">
           {skills === 'missing' && (
-            <p class="mb-4 text-xs text-[var(--los-muted)]">
-              Agents can't see the kh-ideas skill in this repo yet.{' '}
-              <button type="button" class="underline" onClick={() => route('/knowledge')}>
-                Set up agent skills
-              </button>{' '}
-              to add it.
-            </p>
+            <div class="mb-4 flex flex-col gap-1 text-xs text-[var(--los-muted)]">
+              <p>
+                Agents can't see the kh-ideas skill in this repo yet.{' '}
+                <button
+                  type="button"
+                  class="underline disabled:opacity-50"
+                  disabled={settingUp}
+                  onClick={setUpSkills}
+                >
+                  {settingUp ? 'Setting up…' : 'Set up agent skills'}
+                </button>{' '}
+                to add it, with <code>.kh/</code>, the kb commands and a kaihuman section in
+                CLAUDE.md / AGENTS.md, in one commit.
+              </p>
+              {setupError && (
+                <p class="text-[var(--idea-status-dropped)]">
+                  Set-up failed, nothing was written: {setupError}
+                </p>
+              )}
+            </div>
           )}
           {skills === 'updated' && (
             <p class="mb-4 text-xs text-[var(--los-muted)]">

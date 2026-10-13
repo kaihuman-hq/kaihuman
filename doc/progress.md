@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-10-13 — Knowledge base set-up in one commit, from `/knowledge` or `/ideas`
+
+- **Set-up and skill updates are one commit** (`syncKB` in `apps/console/src/lib/github-kb.ts`,
+  `githubService.commitFiles` via the Git Trees API). Before, every file was its own commit and
+  `.kh/.skill-version` came first, so a set-up that stopped halfway looked finished: the repo kept
+  the `/kb-*` commands but never got `.claude/skills/kh-ideas/`, `CLAUDE.md` or `AGENTS.md`.
+- **A half-finished set-up is completed** on the next visit to `/knowledge` or `/ideas`: missing
+  files are created from one tree read, outdated skills are rewritten, and the user's notes, log
+  and schema are never overwritten.
+- **`/ideas` sets the repo up in place** ("Set up agent skills") instead of sending the user to
+  `/knowledge`. Both pages show why a set-up failed; a failed set-up writes nothing.
+
 ## 2026-10-13 — Ideas: agent instructions merged into CLAUDE.md and AGENTS.md
 
 - **kaihuman's text in `CLAUDE.md` and `AGENTS.md` is now one marked section**
