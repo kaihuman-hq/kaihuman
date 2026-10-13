@@ -15,6 +15,7 @@ import { AlertTriangle, ArrowLeft, ExternalLink, Plus } from 'lucide-preact';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { refreshInstalledSkills } from '../lib/github-kb';
 import { ideaTreeItems, loadIdeaContents, updateIdeaFile } from '../lib/ideas-files';
 import {
   ACTIVITY_WEEKS,
@@ -360,6 +361,21 @@ export const IdeasPage = () => {
   const [product, setProduct] = useState('');
   const [sort, setSort] = useState<IdeaSort>('activity');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [skills, setSkills] = useState<'missing' | 'current' | 'updated' | null>(null);
+
+  // Agents only follow the kh-ideas skill if the repo has it, so keep it current from here too.
+  useEffect(() => {
+    if (!repo) return;
+    let cancelled = false;
+    setSkills(null);
+    refreshInstalledSkills(repo.full_name).then(
+      (result) => !cancelled && setSkills(result),
+      (error) => console.warn('Could not check the agent skills:', error),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [repo?.full_name]);
 
   // Direct navigation to /ideas: nothing has loaded the tree yet.
   useEffect(() => {
@@ -571,7 +587,23 @@ export const IdeasPage = () => {
             <Plus size={12} /> New idea
           </button>
         </div>
-        <div class="flex-1 overflow-y-auto p-4 sm:p-6">{body}</div>
+        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+          {skills === 'missing' && (
+            <p class="mb-4 text-xs text-[var(--los-muted)]">
+              Agents can't see the kh-ideas skill in this repo yet.{' '}
+              <button type="button" class="underline" onClick={() => route('/knowledge')}>
+                Set up agent skills
+              </button>{' '}
+              to add it.
+            </p>
+          )}
+          {skills === 'updated' && (
+            <p class="mb-4 text-xs text-[var(--los-muted)]">
+              Agent skills and the kaihuman section of CLAUDE.md / AGENTS.md were updated.
+            </p>
+          )}
+          {body}
+        </div>
       </div>
       <StatusBar
         mode="IDEAS"

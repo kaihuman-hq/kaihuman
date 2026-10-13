@@ -261,6 +261,13 @@ The skill is installed in two places:
    Add the two `SKILL.md` copies there. Also add an `AGENTS.md` that points to the same rules,
    because only Claude Code reads `CLAUDE.md` (Antigravity, Codex, Copilot and Cursor read
    `AGENTS.md`). This also makes the existing KB setup less Claude-only.
+
+   *As built:* kaihuman owns one marked section in `CLAUDE.md` and `AGENTS.md` and only ever
+   replaces that section, so the user's own text in both files stays. `/ideas` runs the same
+   update as `/knowledge` when the skills are installed, and links to `/knowledge` when they are
+   not. The section and the skill tell an agent working in the data repo (for example a cloud
+   session, which works on its own branch) to **ask the user** before committing idea changes
+   straight to the default branch, where the kaihuman apps read them.
 2. **Globally**, because you talk about ideas while you work in a *product* repo, not in the data
    repo. `kaihuman skills install` copies the skill to `~/.claude/skills/kh-ideas/` and
    `~/.agents/skills/kh-ideas/` (read by Antigravity, Codex, Copilot, Cursor). This is the install

@@ -6,8 +6,12 @@ description: Capture, update and review product and feature ideas kept in the us
 # kaihuman ideas
 
 Each idea is one Markdown file, `.kh/ideas/<slug>.md`, in the user's kaihuman **data repo** (their
-life-OS repo, not the repo you are working in). Many agents (Claude, Gemini, Codex, Copilot,
-Cursor) and the user share these files. Write little and write it in the right place.
+life-OS repo). Many agents (Claude, Gemini, Codex, Copilot, Cursor) and the user share these files.
+Write little and write it in the right place.
+
+**Which repo?** If the repository you are working in has a `.kh/` folder, it *is* the data repo:
+read and edit `.kh/ideas/` here. Otherwise you are in a product repo and the ideas are elsewhere:
+use the `kaihuman` CLI, which knows the data repo.
 
 ## 1. Find the idea
 
@@ -54,8 +58,8 @@ Always give a reason when you drop or park an idea: why an idea died is the most
 
 ## 5. Without the CLI
 
-If `kaihuman` is not installed, edit the file in the data repo directly, then commit and push.
-Keep the format exactly:
+If `kaihuman` is not installed, or you are working in the data repo itself (for example in a cloud
+session), edit the files directly, then commit and push. Keep the format exactly:
 
 ```markdown
 ---
@@ -89,6 +93,12 @@ The user's own words. Only ever append below.
 The slug is the file name: 2–40 characters of `a-z`, `0-9` and `-`. It never changes, even if the
 title does. Set `updated` on every change. A status change also gets a log entry:
 `Status <old> → <new>. <reason>`.
+
+The kaihuman apps read ideas from the default branch, so a change on another branch stays
+invisible until it is merged. Before your first idea commit in a session, ask the user whether you
+may commit idea changes directly to the default branch. If they agree, commit only `.kh/ideas/`
+files on top of the latest default branch and push there. If they decline, or the push is refused,
+keep the change on your branch and say in one line that it needs a merge.
 
 ## 6. Chat apps that cannot write files
 

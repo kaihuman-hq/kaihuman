@@ -46,9 +46,13 @@ Open the console at `/knowledge` with a repository selected. When `.kh/.skill-ve
 - `.kh/raw/.gitkeep`, `.kh/journal/.gitkeep`, `.kh/wiki/.gitkeep`, `.kh/ideas/.gitkeep`
 - `.claude/commands/kb-ingest.md`, `kb-index.md`, `kb-lint.md`, `kb-ask.md`, `kb-session.md`, `kb-digest.md`, `kb-agent-capture.md`
 - `.agents/skills/kh-ideas/SKILL.md` and `.claude/skills/kh-ideas/SKILL.md`, the ideas skill (see "Idea file format")
-- `CLAUDE.md` with the knowledge base and ideas conventions, and `AGENTS.md` with the same text for agents that do not read `CLAUDE.md` (Antigravity, Codex, Copilot, Cursor)
+- a kaihuman section in `CLAUDE.md` and in `AGENTS.md` (for agents that do not read `CLAUDE.md`: Antigravity, Codex, Copilot, Cursor) with the knowledge base and ideas conventions
 
-If the repository already has a `CLAUDE.md` or `AGENTS.md`, the page names them and can scaffold without both (`skipClaudeMd`). On every later visit, `updateSkillsIfNeeded` compares `.kh/.skill-version` with `KB_SKILL_VERSION`. When they differ, it rewrites the command and skill files, `CLAUDE.md` and `AGENTS.md` with the message `chore: update KB skills to v<version>`.
+The kaihuman section sits between `<!-- kaihuman:start … -->` and `<!-- kaihuman:end -->`. `mergeAgentInstructions` in `kb-skills.ts` creates a missing file, appends the section to a file the user wrote, and replaces only the text between the markers when they are there; the user's own text around it stays. A file an older version wrote in full (it starts with `# Knowledge Base` and "This repo is a personal…") is replaced. A file whose text would not change is not written.
+
+On every later visit, `updateSkillsIfNeeded` compares `.kh/.skill-version` with `KB_SKILL_VERSION`. When they differ, it rewrites the command and skill files, merges the section into `CLAUDE.md` and `AGENTS.md`, and writes `.kh/.skill-version` last, so an update that fails halfway runs again. The commit message is `chore: update KB skills to v<version>`. `/ideas` runs the same update through `refreshInstalledSkills`, which never sets up a repository that has no `.kh/.skill-version`: it links to `/knowledge` instead.
+
+The section's ideas rules tell agents to **ask the user** before committing idea changes straight to the default branch, because the kaihuman apps read ideas from there. If the user agrees, the agent commits only `.kh/ideas/` files on the latest default branch and pushes there. If not, or if the push is refused, the change stays on the agent's branch and needs a merge.
 
 The page also lists the files in `.kh/raw/` and `.kh/raw/processed/`, has an "Add note" form, and shows a Commands modal (`apps/console/src/components/KBCommandsModal.tsx`) describing each slash command.
 
@@ -66,11 +70,11 @@ The command text is not stored in this monorepo as Markdown files. It lives as s
 | `KB_DIGEST_SKILL` | `.claude/commands/kb-digest.md` |
 | `KB_SESSION_SKILL` | `.claude/commands/kb-session.md` |
 | `KB_AGENT_CAPTURE_SKILL` | `.claude/commands/kb-agent-capture.md` |
-| `KB_CLAUDE_MD` | `CLAUDE.md` and `AGENTS.md` |
+| `KB_CLAUDE_MD` | The kaihuman section of `CLAUDE.md` and `AGENTS.md` (`KB_AGENT_SECTION`) |
 | `@kaihuman/formats/skills/kh-ideas/SKILL.md` | `.agents/skills/kh-ideas/SKILL.md`, `.claude/skills/kh-ideas/SKILL.md` |
 | `KB_SCHEMA_TEMPLATE` | `.kh/schema.md` |
 
-`getScaffoldFiles()` returns every file for a new knowledge base. `getSkillOnlyFiles()` returns only the commands, skills, `CLAUDE.md`, `AGENTS.md` and `.kh/.skill-version`, for upgrades. To change a command, edit the constant and bump `KB_SKILL_VERSION`, so existing repositories pick up the new text on their next visit to `/knowledge`. Tests are in `apps/console/src/lib/kb-skills.test.ts`.
+`getScaffoldFiles()` returns every file for a new knowledge base. `getSkillOnlyFiles()` returns only the commands, skills and `.kh/.skill-version`, for upgrades; `CLAUDE.md` and `AGENTS.md` are merged separately (`writeAgentInstructions` in `github-kb.ts`). To change a command, edit the constant and bump `KB_SKILL_VERSION`, so existing repositories pick up the new text on their next visit to `/knowledge`. Tests are in `apps/console/src/lib/kb-skills.test.ts`.
 
 ## Ingesting raw sources with `/kb-ingest`
 <!-- docspack: tags=ingest,compile,process sources -->

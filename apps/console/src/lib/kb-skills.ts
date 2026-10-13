@@ -514,6 +514,13 @@ the sections \`## Log\` (newest first, never edited), \`## Challenges\` (checked
 and \`## Braindump\` (only grows). Follow the \`kh-ideas\` skill (\`.agents/skills/kh-ideas/SKILL.md\`)
 before you create or change an idea; it says what goes where and how little to write.
 
+Ideas are notes that every kaihuman app reads from the default branch, so an idea change on
+another branch stays invisible until it is merged. Before you commit a change that touches only
+\`.kh/ideas/\`, ask the user once per session: "May I commit idea changes directly to <default
+branch>?" If they agree, commit those changes on top of the latest default branch and push there,
+with no extra branch or pull request. If they decline, or the push is refused, keep the change on
+your branch and say in one line that it needs a merge. Never put other files in such a commit.
+
 ## Guidelines
 
 - Always read \`.kh/schema.md\` before creating or editing wiki pages
@@ -616,10 +623,36 @@ export function getScaffoldFiles(): Record<string, string> {
     '.claude/commands/kb-digest.md': KB_DIGEST_SKILL,
     '.claude/commands/kb-agent-capture.md': KB_AGENT_CAPTURE_SKILL,
     ...KH_IDEAS_SKILL_FILES,
-    'CLAUDE.md': KB_CLAUDE_MD,
-    // The same instructions for agents that read AGENTS.md instead of CLAUDE.md.
-    'AGENTS.md': KB_CLAUDE_MD,
   };
+}
+
+/** `CLAUDE.md`, and `AGENTS.md` for agents that read it instead; both get the same section. */
+export const AGENT_INSTRUCTION_FILES = ['CLAUDE.md', 'AGENTS.md'] as const;
+
+const SECTION_START =
+  '<!-- kaihuman:start — managed by the kaihuman console; edits here are replaced -->';
+const SECTION_END = '<!-- kaihuman:end -->';
+// How every CLAUDE.md written before the managed section began.
+const OLD_KAIHUMAN_FILE = /^# Knowledge Base\s+This repo is a personal/;
+
+export const KB_AGENT_SECTION = `${SECTION_START}\n${KB_CLAUDE_MD.trim()}\n${SECTION_END}\n`;
+
+/**
+ * An agent instruction file with kaihuman's section added or brought up to date. Only the section
+ * between the markers is kaihuman's: the user's own text around it is kept. A file an older
+ * version wrote in full (no markers) is replaced, since all of it was kaihuman's.
+ */
+export function mergeAgentInstructions(existing: string | null): string {
+  if (existing === null || !existing.trim() || OLD_KAIHUMAN_FILE.test(existing)) {
+    return KB_AGENT_SECTION;
+  }
+  const start = existing.indexOf(SECTION_START);
+  const end = existing.indexOf(SECTION_END, start);
+  if (start >= 0 && end > start) {
+    const after = existing.slice(end + SECTION_END.length).replace(/^\n/, '');
+    return `${existing.slice(0, start)}${KB_AGENT_SECTION}${after}`;
+  }
+  return `${existing.replace(/\s*$/, '')}\n\n${KB_AGENT_SECTION}`;
 }
 
 export function getSkillOnlyFiles(): Record<string, string> {
@@ -633,8 +666,5 @@ export function getSkillOnlyFiles(): Record<string, string> {
     '.claude/commands/kb-digest.md': KB_DIGEST_SKILL,
     '.claude/commands/kb-agent-capture.md': KB_AGENT_CAPTURE_SKILL,
     ...KH_IDEAS_SKILL_FILES,
-    'CLAUDE.md': KB_CLAUDE_MD,
-    // The same instructions for agents that read AGENTS.md instead of CLAUDE.md.
-    'AGENTS.md': KB_CLAUDE_MD,
   };
 }

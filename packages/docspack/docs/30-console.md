@@ -302,6 +302,8 @@ Clicking a card opens it in place: summary, the last five log entries, open chal
 
 `/quick-idea` takes one text: the first line is the title, the rest becomes the braindump; the slug can be edited if it is taken. Pasting a reply from claude.ai or the Gemini app that contains `kh-idea` blocks applies each block instead, with the chosen author. It has a home-screen shortcut like the other quick pages.
 
+Opening `/ideas` also brings the repository's agent skills up to date when they are installed (the same update `/knowledge` runs). When they are not, a note links to `/knowledge` to set them up, so agents can follow the `kh-ideas` skill.
+
 Code: `apps/console/src/pages/IdeasPage.tsx`, `QuickIdeaPage.tsx`, `apps/console/src/lib/ideas-overview.ts` (filtering, sorting, week buckets) and `ideas-files.ts` (loading and saving).
 
 ## Using the kanban board
@@ -346,7 +348,7 @@ The search modal's **Open Wiki** command instead needs a file that ends in `.wik
 
 `/knowledge` (`apps/console/src/pages/KnowledgeBasePage.tsx`) manages the `.kh/` knowledge base of the selected repo.
 
-- **Setup:** if `.kh/.skill-version` is missing, the page offers setup. `scaffoldKB()` creates `.kh/schema.md`, `.kh/index.kb.md`, `.kh/log.md`, `.kh/raw/`, `.kh/journal/`, `.kh/wiki/`, the `/kb-*` skills in `.claude/commands/` and `CLAUDE.md`. If `CLAUDE.md` exists, it asks **Overwrite** or **Keep existing**.
+- **Setup:** if `.kh/.skill-version` is missing, the page offers setup. `scaffoldKB()` creates `.kh/schema.md`, `.kh/index.kb.md`, `.kh/log.md`, `.kh/raw/`, `.kh/journal/`, `.kh/wiki/`, the `/kb-*` skills in `.claude/commands/`, the `kh-ideas` skill, and a kaihuman section in `CLAUDE.md` and `AGENTS.md`. Existing files keep their own text; only the section between the kaihuman markers is kaihuman's.
 - **Skill updates:** on each visit, `updateSkillsIfNeeded()` rewrites the skill files when `.kh/.skill-version` differs from `KB_SKILL_VERSION` (now `1.7.0`) in `src/lib/kb-skills.ts`.
 - **Tabs:** **Inbox** lists `.kh/raw/`, **Wiki** points to `.kh/wiki/` and `/wiki`, **Processed** lists `.kh/raw/processed/`.
 - **Add note:** title, comma-separated tags (default `general`) and text, saved with `addRawNote()`.

@@ -1,7 +1,15 @@
 import { authStore, githubService } from '@kaihuman/core';
-import { getScaffoldFiles, getSkillOnlyFiles, KB_SKILL_VERSION } from './kb-skills';
+import {
+  AGENT_INSTRUCTION_FILES,
+  getScaffoldFiles,
+  getSkillOnlyFiles,
+  KB_SKILL_VERSION,
+  mergeAgentInstructions,
+} from './kb-skills';
 
 export type KBFile = { name: string; path: string; sha: string };
+
+const VERSION_FILE = '.kh/.skill-version';
 
 function parseRepo(fullName: string): { owner: string; repo: string } {
   const slash = fullName.indexOf('/');
@@ -12,7 +20,7 @@ function parseRepo(fullName: string): { owner: string; repo: string } {
 export async function getInstalledSkillVersion(fullName: string): Promise<string | null> {
   const { owner, repo } = parseRepo(fullName);
   try {
-    const { content } = await githubService.getFileContent(owner, repo, '.kh/.skill-version');
+    const { content } = await githubService.getFileContent(owner, repo, VERSION_FILE);
     return content.trim();
   } catch {
     return null;
@@ -23,50 +31,56 @@ export async function isKBInitialized(fullName: string): Promise<boolean> {
   return (await getInstalledSkillVersion(fullName)) !== null;
 }
 
-/** Agent instruction files the scaffold writes; an existing one is only replaced on request. */
-export const AGENT_INSTRUCTION_FILES = ['CLAUDE.md', 'AGENTS.md'] as const;
-
-/** Which of `CLAUDE.md` and `AGENTS.md` already exist in the repo. */
-export async function existingAgentInstructionFiles(fullName: string): Promise<string[]> {
+/**
+ * Adds kaihuman's section to `CLAUDE.md` and `AGENTS.md`, or brings it up to date, keeping the
+ * user's own text in both. A file whose text would not change is not written.
+ */
+export async function writeAgentInstructions(fullName: string, message: string): Promise<void> {
   const { owner, repo } = parseRepo(fullName);
-  const found = await Promise.all(
-    AGENT_INSTRUCTION_FILES.map((path) =>
-      githubService.getFileContent(owner, repo, path).then(
-        () => path,
-        () => null,
-      ),
-    ),
-  );
-  return found.filter((path) => path !== null);
+  for (const path of AGENT_INSTRUCTION_FILES) {
+    const existing = await githubService.getFileContent(owner, repo, path).then(
+      (file) => file.content,
+      () => null,
+    );
+    const merged = mergeAgentInstructions(existing);
+    if (merged !== existing) await githubService.upsertRepoFile(owner, repo, path, merged, message);
+  }
 }
 
-export async function scaffoldKB(
-  fullName: string,
-  { skipClaudeMd = false }: { skipClaudeMd?: boolean } = {},
-): Promise<void> {
+export async function scaffoldKB(fullName: string): Promise<void> {
   const { owner, repo } = parseRepo(fullName);
-  const skip: readonly string[] = skipClaudeMd ? AGENT_INSTRUCTION_FILES : [];
-  const files = Object.entries(getScaffoldFiles()).filter(([path]) => !skip.includes(path));
+  const message = 'chore: scaffold knowledge base';
   // All scaffold files are new (called only when !isKBInitialized), so create
   // directly without a pre-check GET to avoid spurious 404s in the network log.
-  for (const [path, content] of files) {
-    await githubService.saveFile(owner, repo, path, content, 'chore: scaffold knowledge base');
+  for (const [path, content] of Object.entries(getScaffoldFiles())) {
+    await githubService.saveFile(owner, repo, path, content, message);
   }
+  await writeAgentInstructions(fullName, message);
+}
+
+/**
+ * For pages other than `/knowledge`: brings installed skills up to date, but never installs them
+ * into a repo that has not been set up: setting up stays a choice made on `/knowledge`.
+ */
+export async function refreshInstalledSkills(
+  fullName: string,
+): Promise<'missing' | 'current' | 'updated'> {
+  if (!(await isKBInitialized(fullName))) return 'missing';
+  return (await updateSkillsIfNeeded(fullName)) ? 'updated' : 'current';
 }
 
 export async function updateSkillsIfNeeded(fullName: string): Promise<boolean> {
   const installed = await getInstalledSkillVersion(fullName);
   if (installed === KB_SKILL_VERSION) return false;
   const { owner, repo } = parseRepo(fullName);
-  for (const [path, content] of Object.entries(getSkillOnlyFiles())) {
-    await githubService.upsertRepoFile(
-      owner,
-      repo,
-      path,
-      content,
-      `chore: update KB skills to v${KB_SKILL_VERSION}`,
-    );
+  const message = `chore: update KB skills to v${KB_SKILL_VERSION}`;
+  const files = Object.entries(getSkillOnlyFiles()).filter(([path]) => path !== VERSION_FILE);
+  for (const [path, content] of files) {
+    await githubService.upsertRepoFile(owner, repo, path, content, message);
   }
+  await writeAgentInstructions(fullName, message);
+  // Last, so an update that fails halfway is tried again on the next visit.
+  await githubService.upsertRepoFile(owner, repo, VERSION_FILE, KB_SKILL_VERSION, message);
   return true;
 }
 

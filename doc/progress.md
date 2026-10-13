@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-10-13 — Ideas: agent instructions merged into CLAUDE.md and AGENTS.md
+
+- **kaihuman's text in `CLAUDE.md` and `AGENTS.md` is now one marked section**
+  (`<!-- kaihuman:start … -->` … `<!-- kaihuman:end -->`). Setup and every skill update create a
+  missing file, append the section to a file the user wrote, or replace only the section; the
+  user's own text stays. A file an older version wrote in full is replaced. The **Overwrite / Keep
+  existing** question on `/knowledge` is gone, because nothing is overwritten any more. This also
+  fixes the skill update from earlier today overwriting a hand-written `AGENTS.md`.
+- `.kh/.skill-version` is written last, so an update that fails halfway runs again.
+- **`/ideas` keeps the skills current** (`refreshInstalledSkills`) when they are installed, and
+  links to `/knowledge` when they are not. It never sets a repository up by itself.
+- **Committing ideas to the default branch:** the section and the `kh-ideas` skill tell an agent to
+  ask the user, once per session, whether it may commit idea changes straight to the default branch,
+  where the kaihuman apps read them. If not, or if the push is refused, the change stays on the
+  agent's branch and it says that a merge is needed.
+- The skill says that a repository with a `.kh/` folder is the data repo, so an agent there edits
+  `.kh/ideas/` in place instead of looking for the CLI.
+
 ## 2026-10-13 — Ideas: one file per idea, shared by every agent
 
 Built from `doc/ideas.md`, with the decisions recorded there (data repo only, six statuses,
