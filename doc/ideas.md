@@ -17,7 +17,7 @@ command or one key.
 | Ideas live in Gemini and Claude chats. You lose track of them. | Each idea is one Markdown file in `.kh/ideas/`, in git. |
 | One agent does not know what another found. | All agents use the same files and the same skill. |
 | No history in your own space. | Each file has a dated log, and git keeps every version. |
-| A quick thought has nowhere to go. | `kaihuman idea "…"`, `>i` in the palette, or `/quick-idea` in the console. |
+| A quick thought has nowhere to go. | `kaihuman idea "…"`, `>id` in the palette, or `/quick-idea` in the console. |
 
 **Success criteria**
 
@@ -338,7 +338,7 @@ new idea, `l` adds a log entry, `s` changes status. This uses the `CurrentScreen
 
 ### Everywhere else
 
-- **Palette `>i`**: lists ideas (`load`). Typing text and ⏎ makes a seed idea. `slug: text` adds a
+- **Palette `>id`** (`>i` is already IMDb): lists ideas, most recently active first. Typing text and ⏎ makes a seed idea. `slug: text` adds a
   log line to that idea. Works in the extension and the desktop palette.
 - **Braindump window**: a "Promote to idea" action makes an idea from the braindump. The braindump
   text becomes the idea's Braindump section, then the braindump is deleted.
@@ -352,7 +352,7 @@ new idea, `l` adds a log entry, `s` changes status. This uses the `CurrentScreen
 | `apps/cli` (Rust) | `ideas.rs` mirroring the format (with "Mirrors `X`" comments, as `build_kb_note` does), the `idea` / `ideas` subcommands, the TUI screen, the spool reuse. |
 | `apps/console` | Skill files in `kb-skills.ts` (+ version bump), `/ideas` and `/quick-idea` pages. |
 | `apps/kb-mcp` | `ideas_*` tools. |
-| `packages/palette`, `apps/desktop-palette` | `>i` mode, `CREATE_IDEA` / `APPEND_IDEA` messages, promote action. |
+| `packages/palette`, `apps/desktop-palette` | `>id` mode, `LIST_IDEAS` / `SAVE_IDEA` messages, ⌃I "Promote to idea" in the braindump window. |
 | Docs | `doc/documentation.md`, `doc/features.md`, `packages/docspack` (file format page), roadmap. |
 
 The format must exist in TypeScript and Rust. That is the same duplication as the raw-note format
@@ -367,7 +367,7 @@ The format must exist in TypeScript and Rust. That is the same duplication as th
 | 2 | Hand-off block + `kaihuman ideas import` + claude.ai skill ZIP | Ideas from web chats reach the repo in one paste. | Paste a block from claude.ai; the log line has `claude.ai` as author. |
 | 3 | Console `/ideas` + `/quick-idea`; scaffold writes skill + `AGENTS.md` | Overview and quick add in the browser and on Android. | |
 | 4 | `kb-mcp` idea tools | Claude Desktop reads and writes ideas. | |
-| 5 | Palette `>i`, braindump "Promote to idea", TUI screen | One-key capture on the desktop. | |
+| 5 | Palette `>id`, braindump "Promote to idea", TUI screen | One-key capture on the desktop. | |
 
 Phase 1 is the core. Everything after it is another way in to the same files.
 
