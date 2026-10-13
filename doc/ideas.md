@@ -1,6 +1,7 @@
 # Ideas — study and proposal
 
-Status: proposal (2026-10-13). Nothing here is built yet.
+Status: built (2026-10-13). The answers to the open questions are at the end. Where the build
+differs from the first proposal, this file says what was built.
 
 ## Goal
 
@@ -195,7 +196,8 @@ kaihuman ideas summary palette-sync "…"               # replace the summary
 kaihuman ideas path [palette-sync]                    # local clone path, for direct reads
 ```
 
-- Every write adds a log entry (except `log` itself, which is one) and sets `updated`.
+- Every write sets `updated`. Only `log` and `status` add log entries: a log line that only says
+  "added a challenge" would be noise, and the challenge itself is in the file.
 - It writes to the local clone, commits (`kaihuman: idea palette-sync — log`) and pushes. Offline,
   it uses the spool that `capture` already has.
 - `--json` on read commands, so agents can parse the output.
@@ -282,7 +284,7 @@ The **hand-off block** is a fenced block the chat writes at the end of a discuss
 
 ````markdown
 ```kh-idea
-slug: palette-sync          # or "new"
+slug: palette-sync
 title: Offline sync for the desktop palette
 product: kaihuman
 log: Compared CRDT vs queue; queue wins for single-user data.
@@ -372,15 +374,15 @@ Phase 1 is the core. Everything after it is another way in to the same files.
 **Migration.** A one-time `/kb-*`-style prompt (or `kaihuman ideas import --from-text`) that turns a
 pasted list, or an exported chat, into seed ideas. You review the slugs before anything is written.
 
-## Open questions for you
+## Decided (2026-10-13)
 
-1. **Data repo only, or also product repos?** The proposal is data repo only. A later option: the
-   CLI also reads `.kh/ideas/` in the current product repo and shows both.
-2. **The statuses.** Are `seed / exploring / committed / shipped / parked / dropped` the right six?
-3. **The log order.** Newest first (as asked) has a small merge cost. Do you want it anyway?
-4. **Who may change the status?** The proposal lets agents do it, with a log line. Or only you?
-5. **`AiProvider` in the CLI.** It still runs `gemini`. Individual users now have `agy` instead.
-   Out of scope here, but the `a` key will stop working for Gemini users.
+1. **Data repo only.** Product repos do not get their own `.kh/ideas/`.
+2. **The six statuses** stay: `seed / exploring / committed / shipped / parked / dropped`.
+3. **The log stays newest first**, with its small merge cost.
+4. **Agents may change the status**, always with a log line.
+
+Still open: the CLI's `AiProvider` runs `gemini`, and individual users now have `agy` instead.
+That is outside this feature.
 
 ## Sources
 
