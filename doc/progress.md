@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-10-13 — Ideas: study and proposal
+
+- **New design doc `doc/ideas.md`.** It proposes one Markdown file per product idea in
+  `.kh/ideas/<slug>.md` of the data repo, with a summary, a newest-first log, challenges and a
+  braindump that only the user writes. All agents use one `kh-ideas` skill (Agent Skills format,
+  in `.agents/skills/` and `.claude/skills/`) and a `kaihuman idea` / `kaihuman ideas` CLI. Chat apps
+  hand ideas over with a pasted block, and Claude Desktop through new `kb-mcp` tools. Nothing is
+  implemented yet.
+
 ## 2026-10-10 — CI on every branch push
 
 - **New workflow `.github/workflows/ci.yml`.** It runs on every push to a branch other than
