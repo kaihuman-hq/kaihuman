@@ -1,6 +1,6 @@
 # @kaihuman/kb-mcp
 
-A stdio [MCP](https://modelcontextprotocol.io) server. It gives an LLM agent (for example Claude Code) access to the kaihuman knowledge base in a local repository clone.
+A stdio [MCP](https://modelcontextprotocol.io) server. It gives an LLM agent (for example Claude Code or Claude Desktop) access to the kaihuman knowledge base and the ideas in a local repository clone.
 
 The server reads the `.kh/` folder in the repository. If `.kh/` does not exist, it uses the legacy `.lifeos/` folder.
 
@@ -12,6 +12,7 @@ The server reads the `.kh/` folder in the repository. If `.kh/` does not exist, 
   index.kb.md         catalog
   log.md              append-only log: ## [YYYY-MM-DD] <op> | <title>
   search.kb.json      optional inverted index (built by /kb-index)
+  ideas/<slug>.md     one file per product or feature idea (doc/ideas.md)
 ```
 
 ## Tools
@@ -25,7 +26,24 @@ The server reads the `.kh/` folder in the repository. If `.kh/` does not exist, 
 | `kb_log` | `limit` (default 20) | Entries of `log.md` (`date`, `op`, `title`, `body`), newest first. |
 | `kb_add_raw` | `title`, `text`, `url` (optional), `tags` (optional, default `[general]`) | Writes `raw/<epoch-ms>-<slug>.md` with `processed: false` and returns its repo-relative path. It does not write other files. Run `/kb-ingest` later to process the note. |
 
-All tools except `kb_add_raw` are read-only.
+### Ideas tools
+
+The idea files use the format of `@kaihuman/formats` (`packages/formats/src/ideas.ts`) and the rules of the `kh-ideas` skill: one log entry per meaningful step, the summary is the only part that is rewritten, and the log, challenges and braindump are never rewritten. `author` is the agent's short lowercase name (`claude`, `gemini`, …); the user is `human`. A slug is 2–40 characters of `a-z`, `0-9` and `-`.
+
+| Tool | Input | Result |
+| --- | --- | --- |
+| `ideas_list` | `status`, `product`, `includeClosed` (default `false`) | Ideas, most recently active first: `slug`, `title`, `status`, `product`, `tags`, `updated`, `activity` (`level`, `recent`, `total`), `openChallenges`, `lastLog`. Closed ideas (`shipped`, `parked`, `dropped`) are left out unless `includeClosed` is set or `status` asks for them. |
+| `ideas_find` | `query` | At most 10 ideas that match the words in the slug, title, product or tags, best first. |
+| `ideas_read` | `slug` | The file text (`content`) and the parsed fields: `title`, `status`, `summary`, `log`, `challenges`, `braindump`, `activity`, … |
+| `ideas_create` | `title`, `slug` (optional, default from the title), `product`, `tags`, `summary`, `braindump` (optional), `author` | Writes a new idea with status `seed` and a first log entry. Fails if the slug exists. |
+| `ideas_append` | `slug`, `kind` (`log`, `challenge`, `braindump`), `text`, `author` | Adds a log entry at the top of the log, an open challenge, or text at the end of the braindump. |
+| `ideas_set_summary` | `slug`, `summary` | Replaces the summary under the title. |
+| `ideas_set_status` | `slug`, `status`, `reason` (optional), `author` | Changes the status and logs `Status <old> → <new>. <reason>`. |
+| `ideas_import` | `text`, `author` | Applies every ` ```kh-idea ` hand-off block in the text. If one block fails, no file is written. |
+
+Each ideas write returns the written path(s) and a `git` line that says if the change was committed and pushed (see [Git sync](#git-sync)). The server runs ideas tools one at a time, so concurrent calls cannot overwrite each other.
+
+All tools except `kb_add_raw` and the ideas writes are read-only.
 
 ## Setup
 
@@ -36,7 +54,7 @@ pnpm install
 pnpm --filter @kaihuman/kb-mcp build
 ```
 
-The build writes `apps/kb-mcp/dist/index.js`. This file is also the `kaihuman-kb-mcp` bin.
+The build writes `apps/kb-mcp/dist/index.js`. This file is also the `kaihuman-kb-mcp` bin. `@kaihuman/formats` ships TypeScript source, so the build (`vite build` in SSR mode) bundles it into `dist/index.js`; `@modelcontextprotocol/sdk` and `zod` stay external.
 
 ### Repository selection
 
@@ -47,6 +65,16 @@ The server uses the first value that is set:
 3. the current working directory
 
 The kaihuman CLI clones repositories to `~/.config/cli/repos/<owner>/<repo>` (Linux). When Claude Code runs inside such a clone, you do not need to set a path.
+
+### Git sync
+
+Clients without a shell (Claude Desktop) cannot commit. Start the server with `--git` (or set `KB_GIT=1`) to let it do that for ideas:
+
+- Before an ideas tool runs, the server runs `git pull --ff-only`, at most once every 60 seconds. If the pull fails, the tool still runs on the local clone.
+- After each ideas write, it commits only the written file(s) with the message `kaihuman: idea <slug> — <op>`, then runs `git push`. Other staged changes stay out of the commit.
+- If the push fails, the tool still succeeds. Its `git` line says that the change is committed locally but not pushed, with git's error.
+
+Without `--git`, the `git` line says that the file was written but not committed. Git runs without a shell and never prompts for credentials, so the clone needs credentials that work without a prompt (the CLI's clones have them).
 
 ### Claude Code
 
@@ -62,6 +90,30 @@ To use a specific repository:
 claude mcp add kaihuman-kb -- node /absolute/path/to/monorepo/apps/kb-mcp/dist/index.js \
   --repo ~/.config/cli/repos/<owner>/<repo>
 ```
+
+### Claude Desktop
+
+Add the server to `claude_desktop_config.json` (Settings → Developer → Edit Config). Point `--repo` at the CLI's clone and turn on git sync, so ideas written from a chat are committed and pushed:
+
+```json
+{
+  "mcpServers": {
+    "kaihuman-kb": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/monorepo/apps/kb-mcp/dist/index.js",
+        "--repo",
+        "/home/<you>/.config/cli/repos/<owner>/<repo>",
+        "--git"
+      ]
+    }
+  }
+}
+```
+
+Claude Desktop does not expand `~`, so give the absolute path.
+
+### `.mcp.json`
 
 Alternatively, put this in `.mcp.json` at the root of the knowledge-base repository:
 
@@ -82,7 +134,7 @@ The server writes diagnostics to stderr, because stdout carries the MCP protocol
 ## Development
 
 ```sh
-pnpm --filter @kaihuman/kb-mcp build        # tsc to dist/
+pnpm --filter @kaihuman/kb-mcp build        # vite to dist/
 pnpm --filter @kaihuman/kb-mcp check-types  # tsc --noEmit
 pnpm --filter @kaihuman/kb-mcp lint         # biome check
 pnpm --filter @kaihuman/kb-mcp test         # vitest run
@@ -92,5 +144,7 @@ Source layout (`src/`):
 
 - `frontmatter.ts`, `wikilinks.ts`, `search.ts`, `log.ts`: pure parsing and scoring logic
 - `repo.ts`: filesystem access to the knowledge-base folder (`KnowledgeBase`)
+- `ideas.ts`: the idea files in `<kb>/ideas/` (`IdeaFiles`); the format itself comes from `@kaihuman/formats`
+- `git.ts`: opt-in pull, commit and push (`GitSync`)
 - `server.ts`: MCP tool registration (`createKbServer`)
 - `config.ts`, `index.ts`: CLI arguments and the stdio entry point

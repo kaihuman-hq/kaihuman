@@ -38,7 +38,7 @@ export class KbError extends Error {
   override name = 'KbError';
 }
 
-function isNotFound(error: unknown): boolean {
+export function isNotFound(error: unknown): boolean {
   return (error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
 }
 
@@ -51,7 +51,7 @@ async function isDirectory(path: string): Promise<boolean> {
   }
 }
 
-function isInside(dir: string, path: string): boolean {
+export function isInside(dir: string, path: string): boolean {
   return path.startsWith(dir + sep);
 }
 
