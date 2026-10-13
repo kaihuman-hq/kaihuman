@@ -4,6 +4,7 @@ import {
   addTodoEntry,
   braindumpIdOf,
   checkIn,
+  ideaSlugOf,
   localDate,
   markReadItLaterRead,
   PALETTE_SETTINGS_PATH,
@@ -1296,6 +1297,60 @@ async function captureKnowledge(path: string, content: string) {
   return { url: consoleFileUrl(path, repo) };
 }
 
+/**
+ * `>id`'s ideas, from the start page's tree sync. It runs on every ask, since a log line is
+ * written over the version listed; the tree is replayed with its ETag and only changed files are
+ * read, so an unchanged repo costs a 304.
+ */
+async function listIdeas() {
+  const { repo } = await credentials();
+  const cache = await syncToday();
+  if (!cache) throw new Error(NOT_LOGGED_IN);
+  const ideas = cache.files
+    .filter((file) => ideaSlugOf(file.path))
+    .sort((a, b) => a.path.localeCompare(b.path))
+    .map(({ path, sha, content }) => ({
+      path,
+      sha,
+      text: content,
+      url: consoleFileUrl(path, repo),
+    }));
+  return { ideas };
+}
+
+/**
+ * Writes an idea: without `sha` only as a new file (GitHub refuses one that exists), with it only
+ * over that version. The start page's cache takes the new text, so the next list has its sha.
+ */
+async function saveIdea(path: string, content: string, sha?: string) {
+  // The path comes from a page, so only an idea's own file can be named.
+  const slug = ideaSlugOf(path);
+  if (!slug) throw new Error(`Refusing to write ${path}`);
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  let written: string | null;
+  try {
+    written = await githubWriteFile(token, repo, path, content, sha);
+  } catch (error) {
+    // 422: no sha for a file that exists; 409: the sha is no longer the file's version.
+    if (error instanceof Error && /: (409|422)\b/.test(error.message)) {
+      throw new Error(
+        sha
+          ? `The idea ${slug} changed since it was listed — open it again and retry`
+          : `There is an idea ${slug} already`,
+      );
+    }
+    throw error;
+  }
+  const cache = await readTodayCache();
+  if (cache && isTodayCacheUsable(cache, repo)) {
+    await chrome.storage.local.set({
+      todayCache: withFile(cache, { path, sha: written ?? '', content }),
+    });
+  }
+  return { url: consoleFileUrl(path, repo) };
+}
+
 /** How fresh the start page's data is, and what is still waiting to be pushed. */
 async function syncStatus() {
   const { repo } = await credentials();
@@ -1559,6 +1614,15 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'CAPTURE_KNOWLEDGE') {
     return answer(captureKnowledge(message.path || '', message.content ?? ''), sendResponse);
+  }
+
+  if (message.type === 'LIST_IDEAS') return answer(listIdeas(), sendResponse);
+
+  if (message.type === 'SAVE_IDEA') {
+    return answer(
+      saveIdea(message.path || '', message.content ?? '', message.sha || undefined),
+      sendResponse,
+    );
   }
 
   if (message.type === 'TRANSLATE') {

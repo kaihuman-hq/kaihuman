@@ -31,6 +31,8 @@ export interface Message {
     | 'LIST_ENTRY_FILES'
     | 'READ_ENTRY_FILE'
     | 'WRITE_ENTRY_FILE'
+    | 'LIST_IDEAS'
+    | 'SAVE_IDEA'
     | 'TRANSLATE'
     | 'GET_TRANSLATION_HISTORY'
     | 'ADD_TRANSLATION_HISTORY'
@@ -78,9 +80,9 @@ export interface Message {
   id?: string;
   /** `GET_MODE_RECENTS`, `ADD_MODE_RECENT`: the palette mode's prefix (`p` for `>p`). */
   prefix?: string;
-  /** `WRITE_ENTRY_FILE`: the file's new text. */
+  /** `WRITE_ENTRY_FILE`, `SAVE_IDEA`: the file's new text. */
   content?: string;
-  /** `WRITE_ENTRY_FILE`: the version the text was built on. */
+  /** `WRITE_ENTRY_FILE`, `SAVE_IDEA`: the version the text was built on. */
   sha?: string;
   /** `LIST_GITHUB_WORK`: which search; checked, since it comes from the page. */
   filter?: string;

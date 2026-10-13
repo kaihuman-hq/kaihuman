@@ -561,3 +561,71 @@ describe('GET_SERVICE_STATUS', () => {
     expect(response.error).toContain('missing a "services" array');
   });
 });
+
+describe('the palette’s ideas', () => {
+  const IDEA = '.kh/ideas/palette-sync.md';
+
+  it('lists the ideas with their versions and console links, from the start page’s sync', async () => {
+    remote[IDEA] = '# Palette sync\n';
+    remote['.kh/ideas/sub/nested.md'] = 'x';
+    const response = await call({ type: 'LIST_IDEAS' });
+    expect(response.ideas).toEqual([
+      {
+        path: IDEA,
+        sha: `sha-${IDEA}`,
+        text: '# Palette sync\n',
+        url: 'https://app.kaihuman.com/files/.kh/ideas/palette-sync.md?repo=o%2Fr',
+      },
+    ]);
+    expect(store.todayCache.files.some((file: any) => file.path === IDEA)).toBe(true);
+  });
+
+  it('creates an idea without a sha, and keeps the cache in step', async () => {
+    seedCache();
+    const response = await call({ type: 'SAVE_IDEA', path: IDEA, content: '# New\n' });
+    expect(response).toEqual({
+      success: true,
+      url: 'https://app.kaihuman.com/files/.kh/ideas/palette-sync.md?repo=o%2Fr',
+    });
+    expect(remote[IDEA]).toBe('# New\n');
+    expect(JSON.parse(writes()[0]?.[1].body).sha).toBeUndefined();
+    expect(store.todayCache.files.find((f: any) => f.path === IDEA)).toEqual({
+      path: IDEA,
+      sha: 'new-sha',
+      content: '# New\n',
+    });
+  });
+
+  it('writes over the version listed', async () => {
+    remote[IDEA] = 'old';
+    await call({ type: 'SAVE_IDEA', path: IDEA, content: 'new', sha: `sha-${IDEA}` });
+    expect(JSON.parse(writes()[0]?.[1].body).sha).toBe(`sha-${IDEA}`);
+    expect(remote[IDEA]).toBe('new');
+  });
+
+  it('says the slug is taken when GitHub refuses to create it', async () => {
+    fetchMock.mockImplementationOnce(async () => ({
+      ok: false,
+      status: 422,
+      statusText: '',
+      json: async () => ({ message: 'Invalid request. "sha" wasn\'t supplied.' }),
+    }));
+    expect(await call({ type: 'SAVE_IDEA', path: IDEA, content: 'x' })).toEqual({
+      error: 'There is an idea palette-sync already',
+    });
+  });
+
+  it('refuses any path that is not an idea’s own file', async () => {
+    for (const path of [
+      'README.md',
+      '.kh/ideas/../x.md',
+      '.kh/ideas/sub/ab.md',
+      '.kh/ideas/A.md',
+    ]) {
+      expect(await call({ type: 'SAVE_IDEA', path, content: 'x' })).toEqual({
+        error: `Refusing to write ${path}`,
+      });
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

@@ -191,6 +191,15 @@ describe('edits', () => {
     expect(appendIdeaBraindump('# T\n', 'raw', { now })).toMatch(/## Braindump\n\nraw\n$/);
   });
 
+  it('keeps headings in braindump text inside the section', () => {
+    const typed = '# My idea\n\n## Why\nbecause\n### Deeper';
+    const { content } = newIdea({ title: 'My idea', braindump: typed }, edit);
+    expect(parseIdea(content).braindump).toBe('### My idea\n\n### Why\nbecause\n### Deeper');
+    expect(parseIdea(content).title).toBe('My idea');
+    const appended = appendIdeaBraindump(SAMPLE, '## Later\nmore', { now });
+    expect(parseIdea(appended).braindump).toMatch(/### Later\nmore$/);
+  });
+
   it('replaces only the summary', () => {
     const next = setIdeaSummary(SAMPLE, 'Queue writes; no CRDT.', { now });
     expect(parseIdea(next).summary).toBe('Queue writes; no CRDT.');

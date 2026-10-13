@@ -134,6 +134,11 @@ export type PaletteMode = {
        * a cache, this from the source — or null when there is nothing newer to fetch.
        */
       refresh?: () => Promise<ModeItem[]> | null;
+      /**
+       * In place of the local filter, once `load` has answered: the entries for what is typed (even
+       * nothing) — for a mode that also offers what the query names, such as a new idea.
+       */
+      search?: (query: string) => ModeItem[];
     }
   | {
       /**
@@ -773,9 +778,12 @@ export function createCommandPalette(
     if (mode.mode === helpMode)
       return mode.items.filter((item) => filterModeItems([item], input.value).length > 0);
     // A submitted answer is already for exactly what is typed; filtering it would hide it.
-    return 'load' in mode.mode
-      ? withRecents(mode, filterModeItems(mode.items, input.value))
-      : mode.items;
+    if (!('load' in mode.mode)) return mode.items;
+    const { search } = mode.mode;
+    return withRecents(
+      mode,
+      search ? search(input.value.trim()) : filterModeItems(mode.items, input.value),
+    );
   };
 
   const showChildren = (item: ModeItem | undefined) => {

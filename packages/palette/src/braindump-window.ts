@@ -10,9 +10,10 @@
  * ⌃F finds in the text. A textarea cannot style part of its text, so the matches are drawn as
  * `<mark>`s in a copy of the text laid out the same way behind it (the textarea is transparent).
  */
-import { type BraindumpId, braindumpTitle } from '@kaihuman/formats';
+import { type BraindumpId, braindumpTitle, newIdea } from '@kaihuman/formats';
 import { formatStamp, plural } from './actions.js';
 import { filterModeItems, type ModeItem } from './command-palette.js';
+import { IDEA_AUTHOR } from './ideas.js';
 import type { ActionPort, Braindump } from './protocol.js';
 
 export const BRAINDUMP_SAVE_DELAY_MS = 400;
@@ -35,7 +36,14 @@ export interface BraindumpWindow {
   settled: () => Promise<void>;
 }
 
-const HINTS = 'Esc hide · ⌃F find · ⌃N new · ⌃O braindumps · ⌃⏎ copy all';
+const HINTS = 'Esc hide · ⌃F find · ⌃N new · ⌃O braindumps · ⌃I idea · ⌃⏎ copy all';
+
+/** An idea's title from a braindump: its first line, without a heading's `#`s. */
+export const ideaTitleOf = (text: string) =>
+  text
+    .split('\n')
+    .map((line) => line.replace(/^\s*#+\s*/, '').trim())
+    .find(Boolean) ?? '';
 
 export interface TextMatch {
   start: number;
@@ -296,6 +304,43 @@ export const createBraindumpWindow = (
     showEditor();
   };
 
+  /**
+   * ⌃I: the braindump becomes a new idea — its first line the title, all of it the idea's
+   * braindump — and is then deleted, here and (on the sync) in the repo. An idea with that slug
+   * already there refuses the write, and the braindump stays.
+   */
+  const promote = async () => {
+    const text = editor.value;
+    const title = ideaTitleOf(text);
+    if (!title) {
+      showState('nothing to make an idea of');
+      return;
+    }
+    let slug: string;
+    try {
+      const idea = newIdea(
+        { title, braindump: text, note: 'Promoted from a braindump.' },
+        { author: IDEA_AUTHOR, now: new Date(now()) },
+      );
+      slug = idea.slug;
+      showState(`making idea ${slug}…`);
+      await port.send({ type: 'SAVE_IDEA', path: idea.path, content: idea.content });
+    } catch (error) {
+      showState(`not made an idea — ${message(error)}; the braindump is kept`);
+      return;
+    }
+    // Typed while the idea was being written: that stays, as a braindump.
+    if (editor.value !== text) {
+      showState(`idea ${slug} made; the braindump is kept, it changed meanwhile`);
+      return;
+    }
+    editor.value = '';
+    await save();
+    load({ text: '' });
+    await sync();
+    showState(`idea ${slug} made, braindump deleted · ${state.textContent}`);
+  };
+
   const close = async () => {
     host.hide();
     await leave();
@@ -367,6 +412,9 @@ export const createBraindumpWindow = (
     } else if (mod && event.key.toLowerCase() === 'f') {
       event.preventDefault();
       openFind();
+    } else if (mod && event.key.toLowerCase() === 'i') {
+      event.preventDefault();
+      void promote();
     }
   });
   editor.addEventListener('scroll', () => {

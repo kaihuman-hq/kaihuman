@@ -307,6 +307,15 @@ const oneLine = (text: string, what: string) => {
   return line;
 };
 
+/**
+ * Braindump lines as stored: a line starting with `#` or `##` would end the section (or read as
+ * the title), so it becomes a `###` heading. Deeper headings and all other text stay as typed.
+ */
+const braindumpLines = (text: string) =>
+  trimBlank(text.replace(/\r\n/g, '\n').split('\n')).map((line) =>
+    /^#{1,2}\s/.test(line) ? line.replace(/^#{1,2}/, '###') : line,
+  );
+
 const checkAuthor = (author: string) => {
   if (!AUTHOR.test(author)) {
     throw new Error(
@@ -345,7 +354,7 @@ export const addIdeaChallenge = (text: string, challenge: string, { now }: IdeaE
 
 /** Appends text at the end of `## Braindump`, under what is already there. */
 export const appendIdeaBraindump = (text: string, addition: string, { now }: IdeaEdit) => {
-  const lines = trimBlank(addition.replace(/\r\n/g, '\n').split('\n'));
+  const lines = braindumpLines(addition);
   if (!lines.length) throw new Error('The braindump text is empty.');
   const doc = touch(split(text), now);
   return join({
@@ -419,7 +428,7 @@ export const newIdea = (input: NewIdea, edit: IdeaAuthoredEdit) => {
     `updated: ${stamp}`,
   ];
   const summary = trimBlank((input.summary ?? '').split('\n'));
-  const braindump = trimBlank((input.braindump ?? '').replace(/\r\n/g, '\n').split('\n'));
+  const braindump = braindumpLines(input.braindump ?? '');
   const body = [
     '',
     `# ${title}`,
