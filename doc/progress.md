@@ -58,6 +58,17 @@ newest-first log, agents may change the status).
   hand ideas over with a pasted block, and Claude Desktop through new `kb-mcp` tools. Nothing is
   implemented yet.
 
+## 2026-10-13 — docspack repo index and a leaner CLAUDE.md
+
+- Root devDependency `docspack` bumped to `1.5.0`; `npx docspack agent install --recipe repo --hooks`
+  added the docspack block to `CLAUDE.md`, the `docspack` and `docspack-repo` skills under
+  `.claude/skills/`, and SessionStart hooks (`sync`, `index --repo`) in `.claude/settings.json`.
+- New `scripts/docspack-nudge.mjs` (+ test): a PreToolUse hook that points broad greps/globs at
+  `docspack recall`. It still has to be registered in `.claude/settings.json`.
+- `CLAUDE.md` cut from ~2,260 to ~860 tokens: the generic guideline boilerplate is now a short
+  rules list, and the stack/structure claims are corrected (the console is Preact + signals +
+  Tailwind + cascivo, not React + Carbon + Zustand; there is no `apps/backend`/`apps/frontend`).
+
 ## 2026-10-10 — CI on every branch push
 
 - **New workflow `.github/workflows/ci.yml`.** It runs on every push to a branch other than
