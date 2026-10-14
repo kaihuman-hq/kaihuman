@@ -1,6 +1,6 @@
 # Work streams — design
 
-Status: design approved in chat (2026-10-14), not built. The implementation plan comes next.
+Status: built (2026-10-14); the manual check with a real account is still open.
 
 ## Goal
 
@@ -141,8 +141,9 @@ Searches that stay true until the state changes:
 | Your PR, changes requested | `is:open is:pr archived:false author:@me review:changes_requested` |
 | Your PR, approved and green | `is:open is:pr archived:false author:@me review:approved status:success` |
 
-The first three are the existing `GITHUB_WORK_QUERIES` in `packages/palette/src/protocol.ts`; the
-table gets the last two. ✕ hides a row on this device **until the item's `updatedAt` changes**.
+The inbox searches live in `apps/browser-extension/src/background/work/queries.ts` and reuse three
+strings from `GITHUB_WORK_QUERIES` in `packages/palette/src/protocol.ts`, so the palette's `>gw` is
+unchanged. ✕ hides a row on this device **until the item's `updatedAt` changes**.
 
 ### New activity (events)
 
@@ -319,3 +320,15 @@ mocked, and components rendered with `preact` `render` (as in `StartPage.test.ts
 - A console view of the streams (the file format makes it possible later).
 - Notifications on the desktop or the phone.
 - Fading or archiving old `link` items automatically.
+
+## Decisions made while building
+
+- **OAuth approval link:** `https://github.com/settings/applications`; the SSO link is
+  `https://github.com/orgs/<org>/sso`.
+- **Notifications that are not PRs or issues** (discussions, releases, check suites) show as
+  `thread:<id>` rows, so they are not lost.
+- **More than 50 pinned items** are split into several GraphQL queries.
+- **Stream order** changes with ↑/↓ buttons.
+- **Done items** are pruned when `now − doneAt > 14 days` exactly.
+- **Transient GraphQL errors** keep the last data instead of replacing it.
+- **The sign-in message** shows only when signed out, not when only the data repo is missing.

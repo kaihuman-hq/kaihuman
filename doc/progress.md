@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-10-14 — Work streams: side panel, inbox and pinned streams in the browser extension
+
+- **Streams format** `.kh/browser.streams.json` in `@kaihuman/formats` (`streams.ts`): item refs and URL normalisation (one PR, many URL spellings), parse/serialize that keeps unknown entries, pure idempotent operations and a strict 14-day prune of done items.
+- **Background work cycle** (`apps/browser-extension/src/background/work/`): streams store with a write queue that survives restarts, one GraphQL query for inbox searches and pinned item status, participating notifications with conditional polling, inbox rows with dismissals, auto-done for merged or closed items, polling with backoff, a snapshot and the toolbar badge.
+- **Side panel** (`sidepanel.html`, `src/sidepanel/`): Waiting on you and New activity inbox, My open PRs, streams with labels, moves, rename, reorder and done items, status chips for CI and review, problem banners (sign-in, org access) and the optional work token.
+- **Pinning**: `Alt+Shift+P` (`pin-current-tab`), right-click **Pin to stream ▸**, and the This-tab bar in the panel.
+- **Start page**: a work summary card (`WorkCard.tsx`) that opens the side panel; manifest gets the `sidePanel` permission.
+- Docs: `doc/work-streams.md` (status and decisions made while building), `doc/features.md`, `packages/docspack/docs/40-browser-extension.md`.
+- Not yet checked by hand: (1) pin a GitHub PR, a Slack thread and a Claude session, and see all three in the panel and in `.kh/browser.streams.json` after one commit; (2) merge or close the pinned PR and see it under Done within 5 minutes (1 with the panel open); (3) get a review requested and see it under Waiting on you within 2 minutes, with ✕ removing it from github.com/notifications; (4) `Alt+Shift+P` pins to the last stream and right-click **Pin to stream ▸** lists the streams; (5) the employer org's PRs appear, or the org banner shows, and they appear once a work token is set. This needs a real account and could not be done from the cloud container.
+
 ## 2026-10-14 — Work streams: design
 
 - **Design for one overview of parallel work** in the browser extension (`doc/work-streams.md`):
