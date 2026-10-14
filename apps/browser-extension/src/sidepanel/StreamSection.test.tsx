@@ -147,6 +147,8 @@ beforeEach(() => {
     storage: {
       local: {
         get: async (keys: string | string[]) => {
+          // A real storage round trip, so overlapping read-modify-writes can interleave.
+          await tick();
           const wanted = Array.isArray(keys) ? keys : [keys];
           return Object.fromEntries(wanted.filter((k) => k in store).map((k) => [k, store[k]]));
         },
@@ -335,6 +337,14 @@ describe('StreamSection', () => {
     await waitFor(() => host.textContent?.includes('▸ Alpha') ?? false);
   });
 
+  it('keeps both toggles when two streams are collapsed at once', async () => {
+    await mount('Alpha (3)');
+    (header('Alpha').querySelector('button') as HTMLElement).click();
+    (header('Beta').querySelector('button') as HTMLElement).click();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect((store.workUi as { collapsed: string[] }).collapsed.sort()).toEqual(['st_a', 'st_b']);
+  });
+
   it('moves an item with the Move select', async () => {
     await mount('Alpha (3)');
     const select = rowOf('A doc').querySelector('select') as HTMLSelectElement;
@@ -410,7 +420,7 @@ describe('StreamSection', () => {
     await mount('Settings');
     clickText(host, 'Settings');
     await waitFor(() => host.querySelector('input[type="password"]') !== null);
-    expect(host.textContent).toContain('A work token is set');
+    await waitFor(() => host.textContent?.includes('A work token is set') ?? false);
     expect(host.innerHTML).not.toContain('ghp_secret');
     expect(host.textContent).toContain(
       'A classic token with repo and notifications, for orgs that block the kaihuman app.',

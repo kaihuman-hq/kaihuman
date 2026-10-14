@@ -1,6 +1,6 @@
 import { itemRefOf, type Stream, type StreamItem, type StreamOp } from '@kaihuman/formats';
-import { useRef, useState } from 'preact/hooks';
-import { WORK_KEYS, type WorkSnapshot, type WorkUi } from '../background/work/types.js';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import type { WorkSnapshot } from '../background/work/types.js';
 import { send } from '../palette/port.js';
 import { age } from './age.js';
 import { chip, StatusChips } from './StatusChips.js';
@@ -15,16 +15,12 @@ const sendOps = (ops: StreamOp[]) => {
   void send({ type: 'WORK_OPS', ops }).catch(() => {});
 };
 
-const toggleCollapsed = async (streamId: string) => {
-  const data = await chrome.storage.local.get(WORK_KEYS.ui);
-  const ui = data[WORK_KEYS.ui] as Partial<WorkUi> | undefined;
-  const current = ui?.collapsed ?? [];
-  await updateWorkUi({
-    collapsed: current.includes(streamId)
-      ? current.filter((id) => id !== streamId)
-      : [...current, streamId],
-  });
-};
+const toggleCollapsed = (streamId: string) =>
+  updateWorkUi((ui) => ({
+    collapsed: ui.collapsed.includes(streamId)
+      ? ui.collapsed.filter((id) => id !== streamId)
+      : [...ui.collapsed, streamId],
+  }));
 
 interface Props {
   stream: Stream;
@@ -187,6 +183,7 @@ export function StreamSection(props: Props) {
   const [renaming, setRenaming] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const toggleTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(toggleTimer.current), []);
   const matches = (item: StreamItem) => label === undefined || item.labels.includes(label);
   const open = stream.items.filter((item) => !item.doneAt && matches(item));
   const done = stream.items.filter((item) => item.doneAt && matches(item));

@@ -66,9 +66,23 @@ export function useWorkState(): WorkState {
   return state;
 }
 
-/** Read-modify-write of the panel's own settings. */
-export async function updateWorkUi(patch: Partial<WorkUi>): Promise<void> {
-  const data = await chrome.storage.local.get(WORK_KEYS.ui);
-  const ui = { ...EMPTY_WORK_UI, ...(data[WORK_KEYS.ui] as Partial<WorkUi> | undefined) };
-  await chrome.storage.local.set({ [WORK_KEYS.ui]: { ...ui, ...patch } });
+let pending: Promise<unknown> = Promise.resolve();
+
+/**
+ * Read-modify-write of the panel's own settings. Calls run one after another, so concurrent
+ * updates (two streams collapsed at once) each see the previous one's result.
+ */
+export function updateWorkUi(
+  patch: Partial<WorkUi> | ((ui: WorkUi) => Partial<WorkUi>),
+): Promise<void> {
+  const run = async () => {
+    const data = await chrome.storage.local.get(WORK_KEYS.ui);
+    const ui = { ...EMPTY_WORK_UI, ...(data[WORK_KEYS.ui] as Partial<WorkUi> | undefined) };
+    const change = typeof patch === 'function' ? patch(ui) : patch;
+    await chrome.storage.local.set({ [WORK_KEYS.ui]: { ...ui, ...change } });
+  };
+  // A failed update must not stop the ones queued behind it.
+  const result = pending.then(run, run);
+  pending = result.catch(() => {});
+  return result;
 }
