@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  emptyStreams,
   isSafeUrl,
   itemRefOf,
   newItemId,
@@ -148,5 +149,61 @@ describe('parseStreams / serializeStreams', () => {
   it('makes ids with the right prefixes', () => {
     expect(newStreamId()).toMatch(/^st_[a-z0-9]{8}$/);
     expect(newItemId()).toMatch(/^it_[a-z0-9]{8}$/);
+  });
+
+  it('keeps the rejected entries verbatim, after the valid ones', () => {
+    const bad = [
+      { id: 'it_bad1', url: 'javascript:alert(1)', title: 'x', addedAt: 'T', labels: [] },
+      { id: 'it_bad2', url: 'https://x.dev', title: 'x', addedAt: 'T', labels: [1] },
+      { id: 'it_bad3', url: 'https://x.dev', title: 'x', addedAt: 'T', labels: [], doneAt: 5 },
+      { id: 'it_bad4', url: 'https://x.dev', title: 7, addedAt: 'T', labels: [] },
+    ];
+    const good = { id: 'it_ok', url: 'https://x.dev', title: 'y', addedAt: 'T', labels: [] };
+    const badStreams = [
+      { id: 'st_noitems', name: 'N', createdAt: 'T' },
+      { id: 'st_name', name: 5, createdAt: 'T', items: [] },
+      { id: 'st_created', name: 'N', createdAt: { a: 1 }, items: [] },
+      { name: 'no id', createdAt: 'T', items: [] },
+      'junk',
+    ];
+    const text = JSON.stringify({
+      version: 1,
+      updatedAt: 'T',
+      streams: [
+        { id: 'st_a', name: 'A', createdAt: 'T', items: [bad[0], good, ...bad.slice(1)] },
+        ...badStreams,
+      ],
+    });
+    const { file } = parseStreams(text) as { ok: true; file: StreamsFile };
+    expect(file.streams.map((s) => s.id)).toEqual(['st_a']);
+    expect(file.invalidStreams).toEqual(badStreams);
+    expect(file.streams[0]?.invalidItems).toEqual(bad);
+    const again = JSON.parse(serializeStreams(file));
+    expect(again.streams[0].items).toEqual([good, ...bad]);
+    expect(again.streams.slice(1)).toEqual(badStreams);
+  });
+
+  it('refuses a file without a streams array or an updatedAt instead of rewriting it', () => {
+    expect(parseStreams('{"version":1,"updatedAt":"T"}')).toEqual({
+      ok: false,
+      error: '.kh/browser.streams.json is missing a "streams" array',
+    });
+    expect(parseStreams('{"version":1,"updatedAt":"T","streams":{"a":1}}')).toMatchObject({
+      ok: false,
+    });
+    expect(parseStreams('{"version":1,"updatedAt":3,"streams":[]}')).toEqual({
+      ok: false,
+      error: '.kh/browser.streams.json is missing "updatedAt"',
+    });
+  });
+
+  it('builds an empty file', () => {
+    expect(emptyStreams('T')).toEqual({
+      version: 1,
+      updatedAt: 'T',
+      streams: [],
+      invalidStreams: [],
+      extra: {},
+    });
   });
 });

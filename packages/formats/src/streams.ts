@@ -149,7 +149,10 @@ const toItem = (raw: unknown): StreamItem | null => {
 };
 
 const toStream = (raw: unknown): Stream | null => {
-  if (!isRec(raw) || !isString(raw.id) || !Array.isArray(raw.items)) return null;
+  if (!isRec(raw) || !isString(raw.id) || !isString(raw.name) || !isString(raw.createdAt)) {
+    return null;
+  }
+  if (!Array.isArray(raw.items)) return null;
   const items: StreamItem[] = [];
   const invalidItems: unknown[] = [];
   for (const entry of raw.items) {
@@ -159,8 +162,8 @@ const toStream = (raw: unknown): Stream | null => {
   }
   return {
     id: raw.id as StreamId,
-    name: isString(raw.name) ? raw.name : '',
-    createdAt: isString(raw.createdAt) ? raw.createdAt : '',
+    name: raw.name,
+    createdAt: raw.createdAt,
     items,
     invalidItems,
     extra: without(raw, STREAM_KEYS),
@@ -183,9 +186,17 @@ export const parseStreams = (content: string): StreamsParse => {
       error: `${STREAMS_PATH} has version ${String(raw.version)}; this extension reads version 1`,
     };
   }
+  // Missing or mistyped known fields make the file read-only rather than being coerced:
+  // a write would otherwise replace whatever a newer writer put there.
+  if (!Array.isArray(raw.streams)) {
+    return { ok: false, error: `${STREAMS_PATH} is missing a "streams" array` };
+  }
+  if (!isString(raw.updatedAt)) {
+    return { ok: false, error: `${STREAMS_PATH} is missing "updatedAt"` };
+  }
   const streams: Stream[] = [];
   const invalidStreams: unknown[] = [];
-  for (const entry of Array.isArray(raw.streams) ? raw.streams : []) {
+  for (const entry of raw.streams) {
     const stream = toStream(entry);
     if (stream) streams.push(stream);
     else invalidStreams.push(entry);
@@ -194,7 +205,7 @@ export const parseStreams = (content: string): StreamsParse => {
     ok: true,
     file: {
       version: 1,
-      updatedAt: isString(raw.updatedAt) ? raw.updatedAt : '',
+      updatedAt: raw.updatedAt,
       streams,
       invalidStreams,
       extra: without(raw, FILE_KEYS),
@@ -209,7 +220,8 @@ const itemOut = (item: StreamItem): Rec => ({
   addedAt: item.addedAt,
   labels: item.labels,
   ...(item.doneAt === undefined ? {} : { doneAt: item.doneAt }),
-  ...item.extra,
+  // Filtered so a stray known key in `extra` can never override a typed field.
+  ...without(item.extra, ITEM_KEYS),
 });
 
 const streamOut = (stream: Stream): Rec => ({
@@ -217,7 +229,7 @@ const streamOut = (stream: Stream): Rec => ({
   name: stream.name,
   createdAt: stream.createdAt,
   items: [...stream.items.map(itemOut), ...stream.invalidItems],
-  ...stream.extra,
+  ...without(stream.extra, STREAM_KEYS),
 });
 
 export const serializeStreams = (file: StreamsFile): string =>
@@ -226,7 +238,7 @@ export const serializeStreams = (file: StreamsFile): string =>
       version: file.version,
       updatedAt: file.updatedAt,
       streams: [...file.streams.map(streamOut), ...file.invalidStreams],
-      ...file.extra,
+      ...without(file.extra, FILE_KEYS),
     },
     null,
     2,
