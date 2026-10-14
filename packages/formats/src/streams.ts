@@ -78,3 +78,173 @@ export const normalizeItemUrl = (url: string): string => {
   }
   return parsed.toString();
 };
+
+export const STREAMS_PATH = '.kh/browser.streams.json';
+
+export type StreamId = string & { readonly __brand: 'StreamId' };
+export type ItemId = string & { readonly __brand: 'ItemId' };
+
+export interface StreamItem {
+  id: ItemId;
+  url: string;
+  title: string;
+  addedAt: string;
+  labels: string[];
+  doneAt?: string;
+  /** Keys this version does not know; written back unchanged. */
+  extra: Record<string, unknown>;
+}
+
+export interface Stream {
+  id: StreamId;
+  name: string;
+  createdAt: string;
+  items: StreamItem[];
+  /** Entries that failed validation; kept so a newer writer's data is never dropped. */
+  invalidItems: unknown[];
+  extra: Record<string, unknown>;
+}
+
+export interface StreamsFile {
+  version: 1;
+  updatedAt: string;
+  streams: Stream[];
+  invalidStreams: unknown[];
+  extra: Record<string, unknown>;
+}
+
+export type StreamsParse = { ok: true; file: StreamsFile } | { ok: false; error: string };
+
+type Rec = Record<string, unknown>;
+
+const isRec = (value: unknown): value is Rec =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+
+const without = (rec: Rec, known: readonly string[]): Rec =>
+  Object.fromEntries(Object.entries(rec).filter(([key]) => !known.includes(key)));
+
+const ITEM_KEYS = ['id', 'url', 'title', 'addedAt', 'labels', 'doneAt'] as const;
+const STREAM_KEYS = ['id', 'name', 'createdAt', 'items'] as const;
+const FILE_KEYS = ['version', 'updatedAt', 'streams'] as const;
+
+const toItem = (raw: unknown): StreamItem | null => {
+  if (!isRec(raw)) return null;
+  const { id, url, title, addedAt, labels, doneAt } = raw;
+  if (!isString(id) || !isString(url) || !isSafeUrl(url)) return null;
+  if (!isString(title) || !isString(addedAt)) return null;
+  if (!Array.isArray(labels) || !labels.every(isString)) return null;
+  if (doneAt !== undefined && !isString(doneAt)) return null;
+  const item: StreamItem = {
+    id: id as ItemId,
+    url,
+    title,
+    addedAt,
+    labels: [...labels],
+    extra: without(raw, ITEM_KEYS),
+  };
+  if (doneAt !== undefined) item.doneAt = doneAt;
+  return item;
+};
+
+const toStream = (raw: unknown): Stream | null => {
+  if (!isRec(raw) || !isString(raw.id) || !Array.isArray(raw.items)) return null;
+  const items: StreamItem[] = [];
+  const invalidItems: unknown[] = [];
+  for (const entry of raw.items) {
+    const item = toItem(entry);
+    if (item) items.push(item);
+    else invalidItems.push(entry);
+  }
+  return {
+    id: raw.id as StreamId,
+    name: isString(raw.name) ? raw.name : '',
+    createdAt: isString(raw.createdAt) ? raw.createdAt : '',
+    items,
+    invalidItems,
+    extra: without(raw, STREAM_KEYS),
+  };
+};
+
+export const parseStreams = (content: string): StreamsParse => {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content);
+  } catch {
+    return { ok: false, error: `${STREAMS_PATH} is not valid JSON` };
+  }
+  if (!isRec(raw)) return { ok: false, error: `${STREAMS_PATH} is not a JSON object` };
+  // A different version is reported, never "repaired": rewriting it would lose the other
+  // version's data.
+  if (raw.version !== 1) {
+    return {
+      ok: false,
+      error: `${STREAMS_PATH} has version ${String(raw.version)}; this extension reads version 1`,
+    };
+  }
+  const streams: Stream[] = [];
+  const invalidStreams: unknown[] = [];
+  for (const entry of Array.isArray(raw.streams) ? raw.streams : []) {
+    const stream = toStream(entry);
+    if (stream) streams.push(stream);
+    else invalidStreams.push(entry);
+  }
+  return {
+    ok: true,
+    file: {
+      version: 1,
+      updatedAt: isString(raw.updatedAt) ? raw.updatedAt : '',
+      streams,
+      invalidStreams,
+      extra: without(raw, FILE_KEYS),
+    },
+  };
+};
+
+const itemOut = (item: StreamItem): Rec => ({
+  id: item.id,
+  url: item.url,
+  title: item.title,
+  addedAt: item.addedAt,
+  labels: item.labels,
+  ...(item.doneAt === undefined ? {} : { doneAt: item.doneAt }),
+  ...item.extra,
+});
+
+const streamOut = (stream: Stream): Rec => ({
+  id: stream.id,
+  name: stream.name,
+  createdAt: stream.createdAt,
+  items: [...stream.items.map(itemOut), ...stream.invalidItems],
+  ...stream.extra,
+});
+
+export const serializeStreams = (file: StreamsFile): string =>
+  `${JSON.stringify(
+    {
+      version: file.version,
+      updatedAt: file.updatedAt,
+      streams: [...file.streams.map(streamOut), ...file.invalidStreams],
+      ...file.extra,
+    },
+    null,
+    2,
+  )}\n`;
+
+export const emptyStreams = (now: string): StreamsFile => ({
+  version: 1,
+  updatedAt: now,
+  streams: [],
+  invalidStreams: [],
+  extra: {},
+});
+
+const randomSuffix = (): string => {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  // 256 is not a multiple of 36, but the slight bias is irrelevant for a local id.
+  return Array.from(bytes, (b) => (b % 36).toString(36)).join('');
+};
+
+export const newStreamId = (): StreamId => `st_${randomSuffix()}` as StreamId;
+export const newItemId = (): ItemId => `it_${randomSuffix()}` as ItemId;

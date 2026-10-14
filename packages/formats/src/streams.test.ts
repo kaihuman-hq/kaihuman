@@ -1,5 +1,15 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { isSafeUrl, itemRefOf, normalizeItemUrl } from './streams.js';
+import {
+  isSafeUrl,
+  itemRefOf,
+  newItemId,
+  newStreamId,
+  normalizeItemUrl,
+  parseStreams,
+  type StreamsFile,
+  serializeStreams,
+} from './streams.js';
 
 describe('itemRefOf', () => {
   it('reads PRs and issues, with any suffix', () => {
@@ -73,5 +83,70 @@ describe('normalizeItemUrl', () => {
 
   it('returns unsafe URLs unchanged', () => {
     expect(normalizeItemUrl('javascript:alert(1)')).toBe('javascript:alert(1)');
+  });
+});
+
+describe('parseStreams / serializeStreams', () => {
+  it('round-trips the example from the spec', () => {
+    const text = readFileSync(new URL('../fixtures/streams/example.json', import.meta.url), 'utf8');
+    const parsed = parseStreams(text);
+    expect(parsed.ok).toBe(true);
+    // Compared with the canonical layout rather than the file bytes: Biome keeps short arrays
+    // on one line in the fixture, JSON.stringify expands them.
+    expect(serializeStreams((parsed as { ok: true; file: StreamsFile }).file)).toBe(
+      `${JSON.stringify(JSON.parse(text), null, 2)}\n`,
+    );
+  });
+
+  it('keeps unknown fields and invalid entries', () => {
+    const text = JSON.stringify({
+      version: 1,
+      updatedAt: 'T',
+      future: 1,
+      streams: [
+        {
+          id: 'st_a',
+          name: 'A',
+          createdAt: 'T',
+          color: 'red',
+          items: [
+            { id: 'it_1', url: 'javascript:alert(1)', title: 'x', addedAt: 'T', labels: [] },
+            {
+              id: 'it_2',
+              url: 'https://x.dev',
+              title: 'y',
+              addedAt: 'T',
+              labels: [],
+              pinnedBy: 'me',
+            },
+          ],
+        },
+        { name: 'no id' },
+      ],
+    });
+    const { file } = parseStreams(text) as { ok: true; file: StreamsFile };
+    expect(file.streams[0]?.items.map((i) => i.id)).toEqual(['it_2']);
+    const again = JSON.parse(serializeStreams(file));
+    expect(again.future).toBe(1);
+    expect(again.streams[0].color).toBe('red');
+    expect(again.streams[0].items).toHaveLength(2);
+    expect(again.streams[0].items[0].pinnedBy).toBe('me');
+    expect(again.streams).toHaveLength(2);
+  });
+
+  it('reports invalid JSON and a wrong version instead of repairing them', () => {
+    expect(parseStreams('{ nope')).toEqual({
+      ok: false,
+      error: '.kh/browser.streams.json is not valid JSON',
+    });
+    expect(parseStreams('{"version":2,"streams":[]}')).toEqual({
+      ok: false,
+      error: '.kh/browser.streams.json has version 2; this extension reads version 1',
+    });
+  });
+
+  it('makes ids with the right prefixes', () => {
+    expect(newStreamId()).toMatch(/^st_[a-z0-9]{8}$/);
+    expect(newItemId()).toMatch(/^it_[a-z0-9]{8}$/);
   });
 });
