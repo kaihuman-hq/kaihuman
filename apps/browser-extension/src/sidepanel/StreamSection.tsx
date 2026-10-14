@@ -1,5 +1,5 @@
 import { itemRefOf, type Stream, type StreamItem, type StreamOp } from '@kaihuman/formats';
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { WORK_KEYS, type WorkSnapshot, type WorkUi } from '../background/work/types.js';
 import { send } from '../palette/port.js';
 import { age } from './age.js';
@@ -7,6 +7,7 @@ import { chip, StatusChips } from './StatusChips.js';
 import { updateWorkUi } from './useWorkState.js';
 
 const DRAG_TYPE = 'text/kaihuman-item';
+const CLICK_DELAY = 250;
 const button = 'px-1 text-[13px] text-[#999] disabled:opacity-40';
 
 /** Edits go through the worker, which queues and retries them; a failure surfaces as its banner. */
@@ -185,6 +186,7 @@ export function StreamSection(props: Props) {
   const { stream, index, count, label, collapsed, readOnly, streams } = props;
   const [renaming, setRenaming] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  const toggleTimer = useRef<ReturnType<typeof setTimeout>>();
   const matches = (item: StreamItem) => label === undefined || item.labels.includes(label);
   const open = stream.items.filter((item) => !item.doneAt && matches(item));
   const done = stream.items.filter((item) => item.doneAt && matches(item));
@@ -222,7 +224,9 @@ export function StreamSection(props: Props) {
           if (readOnly) return;
           event.preventDefault();
           const itemId = event.dataTransfer?.getData(DRAG_TYPE);
-          if (itemId) sendOps([{ op: 'move', itemId: itemId as never, streamId: stream.id }]);
+          const own = stream.items.some((item) => item.id === itemId);
+          if (itemId && !own)
+            sendOps([{ op: 'move', itemId: itemId as never, streamId: stream.id }]);
         }}
       >
         {renaming ? (
@@ -241,8 +245,18 @@ export function StreamSection(props: Props) {
           <button
             type="button"
             class="flex-1 text-left"
-            onClick={() => void toggleCollapsed(stream.id)}
-            onDblClick={() => !readOnly && setRenaming(true)}
+            onClick={(event) => {
+              if (readOnly) return void toggleCollapsed(stream.id);
+              // A double click is two clicks then dblclick: wait to see whether it becomes a rename.
+              if (event.detail > 1) return;
+              clearTimeout(toggleTimer.current);
+              toggleTimer.current = setTimeout(() => void toggleCollapsed(stream.id), CLICK_DELAY);
+            }}
+            onDblClick={() => {
+              if (readOnly) return;
+              clearTimeout(toggleTimer.current);
+              setRenaming(true);
+            }}
           >
             {`${collapsed ? '▸' : '▾'} ${stream.name} (${open.length})`}
           </button>

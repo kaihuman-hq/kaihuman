@@ -313,6 +313,64 @@ describe('StreamSection', () => {
     expect(ops()[5]).toEqual({ op: 'renameStream', streamId: 'st_b', name: 'Gamma' });
   });
 
+  it('double click renames without toggling collapse', async () => {
+    await mount('Alpha (3)');
+    const button = header('Alpha').querySelector('button') as HTMLElement;
+    const mouse = (type: string, detail: number) =>
+      button.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, detail }));
+    mouse('click', 1);
+    mouse('click', 2);
+    mouse('dblclick', 2);
+    await waitFor(() => host.querySelector('input[aria-label="Stream name"]') !== null);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(store.workUi).toBeUndefined();
+    expect(host.textContent).toContain('Live title');
+  });
+
+  it('persists collapse on a header click', async () => {
+    await mount('Alpha (3)');
+    (header('Alpha').querySelector('button') as HTMLElement).click();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect((store.workUi as { collapsed: string[] }).collapsed).toEqual(['st_a']);
+    await waitFor(() => host.textContent?.includes('▸ Alpha') ?? false);
+  });
+
+  it('moves an item with the Move select', async () => {
+    await mount('Alpha (3)');
+    const select = rowOf('A doc').querySelector('select') as HTMLSelectElement;
+    select.value = 'st_c';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await waitFor(() => ops().length > 0);
+    expect(ops()[0]).toEqual({ op: 'move', itemId: 'it_2', streamId: 'st_c' });
+  });
+
+  it('moves a stream down, with the end buttons disabled', async () => {
+    await mount('Alpha (3)');
+    const btn = (name: string, text: string) =>
+      [...header(name).querySelectorAll('button')].find(
+        (b) => b.textContent === text,
+      ) as HTMLButtonElement;
+    expect(btn('Alpha', '↑').disabled).toBe(true);
+    expect(btn('Empty', '↓').disabled).toBe(true);
+    btn('Alpha', '↓').click();
+    await waitFor(() => ops().length > 0);
+    expect(ops()[0]).toEqual({ op: 'reorderStreams', order: ['st_b', 'st_a', 'st_c'] });
+  });
+
+  it('ignores a drop that is not an item or lands on its own stream', async () => {
+    await mount('Alpha (3)');
+    const drop = (name: string, value: string) => {
+      const event = new Event('drop', { bubbles: true, cancelable: true });
+      Object.assign(event, { dataTransfer: { getData: () => value } });
+      header(name).dispatchEvent(event);
+    };
+    drop('Beta', '');
+    drop('Alpha', 'it_2');
+    await tick();
+    await tick();
+    expect(ops()).toHaveLength(0);
+  });
+
   it('disables editing when the file is read-only', async () => {
     host = document.createElement('div');
     document.body.appendChild(host);
