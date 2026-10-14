@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'preact/hooks';
 import { WORK_KEYS } from '../background/work/types.js';
 import { send } from '../palette/port.js';
+import { errorText, field, primary, quiet } from './controls.js';
 
 /** The work token is write-only here: only whether one exists is ever read back. */
 export function WorkSettings() {
-  const [open, setOpen] = useState(false);
   const [set, setSet] = useState(false);
   const [key, setKey] = useState('');
   const [error, setError] = useState<string>();
@@ -26,55 +26,44 @@ export function WorkSettings() {
       setSet(value !== '');
       setKey('');
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
+      setError(errorText(failure));
     }
   };
 
   return (
-    <section class="flex flex-col gap-2 border-t border-[#222] pt-2">
-      <button
-        type="button"
-        class="text-left text-[13px] font-bold"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
+    <section
+      aria-label="Settings"
+      class="flex flex-col gap-2 border-b border-nt-divider bg-nt-row-hover px-3 py-3 text-[12px]"
+    >
+      <h2 class="text-[12px] font-bold">Work token</h2>
+      <p class="text-nt-muted">
+        {set ? 'A work token is set.' : 'No work token is set.'} A classic token with repo and
+        notifications, for orgs that block the kaihuman app.
+      </p>
+      <form
+        class="flex gap-1.5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (key.trim() !== '') void store(key.trim());
+        }}
       >
-        Settings
-      </button>
-      {open && (
-        <div class="flex flex-col gap-2 text-[13px]">
-          <p class="text-[#999]">{set ? 'A work token is set.' : 'No work token is set.'}</p>
-          <input
-            type="password"
-            class="bg-[#111] px-2 py-1"
-            aria-label="Work token"
-            autocomplete="off"
-            value={key}
-            onInput={(event) => setKey(event.currentTarget.value)}
-          />
-          <p class="text-[12px] text-[#999]">
-            A classic token with repo and notifications, for orgs that block the kaihuman app.
-          </p>
-          <div class="flex gap-2">
-            <button
-              type="button"
-              class="border border-[#333] px-2"
-              disabled={key.trim() === ''}
-              onClick={() => void store(key.trim())}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              class="border border-[#333] px-2 disabled:opacity-40"
-              disabled={!set}
-              onClick={() => void store('')}
-            >
-              Remove
-            </button>
-          </div>
-          {error && <p class="text-red-400 text-[12px] break-words">{error}</p>}
-        </div>
-      )}
+        <input
+          type="password"
+          class={`${field} flex-1`}
+          aria-label="Work token"
+          placeholder="ghp_…"
+          autocomplete="off"
+          value={key}
+          onInput={(event) => setKey(event.currentTarget.value)}
+        />
+        <button type="submit" class={primary} disabled={key.trim() === ''}>
+          Save
+        </button>
+        <button type="button" class={quiet} disabled={!set} onClick={() => void store('')}>
+          Remove
+        </button>
+      </form>
+      {error && <p class="text-nt-prod [overflow-wrap:anywhere]">{error}</p>}
     </section>
   );
 }

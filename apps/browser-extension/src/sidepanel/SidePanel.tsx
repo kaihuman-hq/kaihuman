@@ -1,10 +1,11 @@
 import { newStreamId, streamLabels } from '@kaihuman/formats';
-import { useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { buildInbox, unreadKeys } from '../background/work/inbox.js';
 import type { OrgAccessProblem, WorkProblem } from '../background/work/types.js';
 import { CONSOLE_URL, consoleFileUrl } from '../console.js';
 import { send } from '../palette/port.js';
 import { age } from './age.js';
+import { Choice, Heading, iconButton, NewStreamInput, sendOps } from './controls.js';
 import { InboxSection, MineSection } from './InboxSection.js';
 import { StreamSection } from './StreamSection.js';
 import { ThisTabBar } from './ThisTabBar.js';
@@ -14,8 +15,9 @@ import { WorkSettings } from './WorkSettings.js';
 const clock = (ms: number) =>
   new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-const link = 'underline text-[#e6e6e6]';
-const banner = 'border border-[#333] px-3 py-2 text-[13px]';
+const link = 'underline decoration-nt-faint underline-offset-2 hover:text-nt-accent';
+const banner =
+  'border-l-2 border-nt-int bg-nt-row-hover px-3 py-2 text-[12px] [overflow-wrap:anywhere]';
 
 function ProblemBanner({
   problem,
@@ -60,9 +62,90 @@ function OrgBanner({ problem }: { problem: OrgAccessProblem }) {
 
 export { age };
 
+/** Every stream under one heading, with the label filter and new streams kept in place. */
+function Streams({
+  state,
+  unread,
+}: {
+  state: ReturnType<typeof useWorkState>;
+  unread: Set<string>;
+}) {
+  const { file, snapshot, ui, streams } = state;
+  const [adding, setAdding] = useState(false);
+  if (!file) return null;
+  const readOnly = streams ? !streams.state.ok : false;
+  const labels = streamLabels(file);
+  const label = ui.label !== undefined && labels.includes(ui.label) ? ui.label : undefined;
+  const add = (name: string) => {
+    setAdding(false);
+    sendOps([{ op: 'addStream', streamId: newStreamId(), name, at: new Date().toISOString() }]);
+  };
+  return (
+    <section class="flex flex-col gap-2">
+      <Heading title="Streams" count={file.streams.length}>
+        <button
+          type="button"
+          class="shrink-0 text-[12px] text-nt-muted hover:text-nt-accent disabled:opacity-40"
+          aria-expanded={adding}
+          disabled={readOnly}
+          onClick={() => setAdding(!adding)}
+        >
+          + New stream
+        </button>
+      </Heading>
+      {adding && <NewStreamInput onCreate={add} onCancel={() => setAdding(false)} />}
+      {labels.length > 0 && (
+        <fieldset class="m-0 flex min-w-0 flex-wrap items-center gap-1 border-0 p-0">
+          <legend class="sr-only">Filter by label</legend>
+          <Choice
+            selected={label === undefined}
+            onClick={() => void updateWorkUi({ label: undefined })}
+          >
+            All
+          </Choice>
+          {labels.map((name) => (
+            <Choice
+              key={name}
+              title={name}
+              selected={label === name}
+              onClick={() => void updateWorkUi({ label: label === name ? undefined : name })}
+            >
+              {name}
+            </Choice>
+          ))}
+        </fieldset>
+      )}
+      {file.streams.length === 0 && !adding && (
+        <p class="text-[12px] text-nt-faint">
+          No streams yet. Pin the open tab above, or add a stream for a piece of work.
+        </p>
+      )}
+      <div class="flex flex-col gap-1">
+        {file.streams.map((stream, index) => (
+          <StreamSection
+            key={stream.id}
+            stream={stream}
+            index={index}
+            count={file.streams.length}
+            statuses={snapshot?.pinned ?? {}}
+            threads={snapshot?.threads}
+            unread={unread}
+            label={label}
+            collapsed={ui.collapsed.includes(stream.id)}
+            readOnly={readOnly}
+            streams={file.streams}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function SidePanel() {
+  const state = useWorkState();
   const { snapshot, streams, file, dismissed, saveError, queueLength, workTokenSet, ui, loaded } =
-    useWorkState();
+    state;
+  const [settings, setSettings] = useState(false);
 
   useEffect(() => {
     // Opening the port tells the worker the panel is visible so it polls faster. A restarted
@@ -82,7 +165,7 @@ export function SidePanel() {
     };
   }, []);
 
-  const shell = 'w-[360px] max-w-full min-h-screen bg-[#050505] text-[#e6e6e6] p-3';
+  const shell = 'min-h-screen w-full bg-nt-bg font-nt text-[13px] text-nt-fg antialiased';
   if (!loaded) return <main class={shell} />;
 
   // A missing streams cache only hides the streams; the worker polls with a work token alone.
@@ -91,136 +174,111 @@ export function SidePanel() {
   const unread = snapshot ? unreadKeys(snapshot) : new Set<string>();
   const readOnly = streams ? !streams.state.ok : false;
 
-  const addStream = () => {
-    const name = window.prompt('Name of the new stream')?.trim();
-    if (!name) return;
-    void send({
-      type: 'WORK_OPS',
-      ops: [{ op: 'addStream', streamId: newStreamId(), name, at: new Date().toISOString() }],
-    }).catch(() => {});
-  };
-  const labels = file ? streamLabels(file) : [];
-  const label = ui.label !== undefined && labels.includes(ui.label) ? ui.label : undefined;
-
   return (
-    <main class={`${shell} flex flex-col gap-3 font-sans`}>
-      <header class="flex items-center gap-2">
-        <h1 class="text-[16px] font-bold flex-1">Work</h1>
-        {snapshot && <span class="text-[12px] text-[#999]">{age(snapshot.fetchedAt)}</span>}
+    <main class={`${shell} flex flex-col`}>
+      <header class="sticky top-0 z-10 flex items-center gap-1 border-b border-nt-divider bg-nt-bg px-3 py-2">
+        <h1 class="flex-1 text-[14px] font-bold">Work</h1>
+        {snapshot && (
+          <span class="pr-1 text-[11px] text-nt-faint" title="Last checked">
+            {age(snapshot.fetchedAt)}
+          </span>
+        )}
         <button
           type="button"
           aria-label="Refresh"
-          class="px-2 text-[16px]"
+          title="Refresh"
+          class={iconButton}
           onClick={() => void send({ type: 'WORK_REFRESH' }).catch(() => {})}
         >
-          ⟳
+          ↻
+        </button>
+        <button
+          type="button"
+          aria-label="Settings"
+          title="Settings"
+          aria-expanded={settings}
+          class={`${iconButton} ${settings ? 'text-nt-accent' : ''}`}
+          onClick={() => setSettings(!settings)}
+        >
+          ⚙
         </button>
       </header>
-      {signedOut ? (
-        <p class="text-[13px]">
-          Sign in to kaihuman in the console to see your work.{' '}
-          <a class={link} href={CONSOLE_URL} target="_blank" rel="noreferrer">
-            Open the console
-          </a>
-        </p>
-      ) : (
-        <>
-          {snapshot?.problem && (
-            <ProblemBanner
-              problem={snapshot.problem}
-              fetchedAt={snapshot.fetchedAt}
-              workTokenSet={workTokenSet}
-            />
-          )}
-          {readOnly && (
-            <p class={banner}>
-              The streams file is not valid JSON, so it is read-only.{' '}
-              <a
-                class={link}
-                href={consoleFileUrl('.kh/browser.streams.json', streams?.repo)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open it in the console
-              </a>
-            </p>
-          )}
-          {saveError && (
-            <p class={`${banner} text-red-400 break-words`}>
-              {queueLength > 0
-                ? `Not saved yet: ${saveError}`
-                : `Could not apply a change: ${saveError}`}
-            </p>
-          )}
-          {snapshot?.orgProblems.map((problem) => (
-            <OrgBanner key={problem.org} problem={problem} />
-          ))}
-          <ThisTabBar file={file} ui={ui} readOnly={readOnly} />
-          {inbox && (
-            <>
-              <InboxSection
-                title="Waiting on you"
-                rows={inbox.waiting}
-                file={file}
-                readOnly={readOnly}
-              />
-              <InboxSection
-                title="New activity"
-                rows={inbox.activity}
-                file={file}
-                readOnly={readOnly}
-              />
-              <MineSection
-                title="My open PRs"
-                prs={inbox.mine}
-                file={file}
-                readOnly={readOnly}
-                unread={unread}
-              />
-            </>
-          )}
-          {file && (
-            <>
-              <div class="flex items-center gap-2">
-                <select
-                  class="flex-1 bg-[#050505] text-[12px] text-[#999]"
-                  aria-label="Filter by label"
-                  value={label ?? ''}
-                  onChange={(event) =>
-                    void updateWorkUi({ label: event.currentTarget.value || undefined })
-                  }
-                >
-                  <option value="">all</option>
-                  {labels.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" class="border border-[#333] px-2" onClick={addStream}>
-                  + New stream
-                </button>
+      {settings && <WorkSettings />}
+      <div class="flex flex-col gap-5 px-3 py-3">
+        {signedOut ? (
+          <p class="text-[13px] leading-5">
+            Sign in to kaihuman in the console to see your work.{' '}
+            <a class={link} href={CONSOLE_URL} target="_blank" rel="noreferrer">
+              Open the console
+            </a>
+          </p>
+        ) : (
+          <>
+            {(snapshot?.problem ||
+              readOnly ||
+              saveError ||
+              (snapshot?.orgProblems.length ?? 0) > 0) && (
+              <div class="flex flex-col gap-1.5">
+                {snapshot?.problem && (
+                  <ProblemBanner
+                    problem={snapshot.problem}
+                    fetchedAt={snapshot.fetchedAt}
+                    workTokenSet={workTokenSet}
+                  />
+                )}
+                {readOnly && (
+                  <p class={banner}>
+                    The streams file is not valid JSON, so it is read-only.{' '}
+                    <a
+                      class={link}
+                      href={consoleFileUrl('.kh/browser.streams.json', streams?.repo)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open it in the console
+                    </a>
+                  </p>
+                )}
+                {saveError && (
+                  <p class={`${banner} border-nt-prod`}>
+                    {queueLength > 0
+                      ? `Not saved yet: ${saveError}`
+                      : `Could not apply a change: ${saveError}`}
+                  </p>
+                )}
+                {snapshot?.orgProblems.map((problem) => (
+                  <OrgBanner key={problem.org} problem={problem} />
+                ))}
               </div>
-              {file.streams.map((stream, index) => (
-                <StreamSection
-                  key={stream.id}
-                  stream={stream}
-                  index={index}
-                  count={file.streams.length}
-                  statuses={snapshot?.pinned ?? {}}
-                  threads={snapshot?.threads}
-                  unread={unread}
-                  label={label}
-                  collapsed={ui.collapsed.includes(stream.id)}
+            )}
+            <ThisTabBar file={file} ui={ui} readOnly={readOnly} />
+            {inbox && (
+              <div class="flex flex-col gap-4">
+                <InboxSection
+                  title="Waiting on you"
+                  rows={inbox.waiting}
+                  file={file}
                   readOnly={readOnly}
-                  streams={file.streams}
                 />
-              ))}
-            </>
-          )}
-        </>
-      )}
-      <WorkSettings />
+                <InboxSection
+                  title="New activity"
+                  rows={inbox.activity}
+                  file={file}
+                  readOnly={readOnly}
+                />
+                <MineSection
+                  title="My open PRs"
+                  prs={inbox.mine}
+                  file={file}
+                  readOnly={readOnly}
+                  unread={unread}
+                />
+              </div>
+            )}
+            <Streams state={state} unread={unread} />
+          </>
+        )}
+      </div>
     </main>
   );
 }

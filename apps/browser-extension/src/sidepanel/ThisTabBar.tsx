@@ -7,9 +7,10 @@ import {
   type StreamOp,
   type StreamsFile,
 } from '@kaihuman/formats';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { WorkUi } from '../background/work/types.js';
 import { send } from '../palette/port.js';
+import { Choice, errorText, field, primary, splitLabels } from './controls.js';
 import { updateWorkUi } from './useWorkState.js';
 
 const NEW_STREAM = '__new__';
@@ -47,8 +48,32 @@ function useActiveTab(): TabInfo | undefined {
   return tab;
 }
 
-const field = 'bg-[#111] border border-[#333] text-[#e6e6e6] text-[13px] px-2 py-1 min-w-0';
-const action = 'px-3 py-1 bg-[#e6e6e6] text-black text-[13px] font-bold disabled:opacity-50';
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).host.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+};
+
+const box = 'flex flex-col gap-2.5 border border-nt-divider bg-nt-row-hover p-3';
+
+/** The page being looked at, clamped so a long title never pushes the controls off screen. */
+function Page({ title, url }: { title: string; url: string }) {
+  return (
+    <div class="flex min-w-0 flex-col gap-0.5">
+      <p
+        class="text-[13px] font-bold leading-[18px] line-clamp-2 [overflow-wrap:anywhere]"
+        title={title}
+      >
+        {title}
+      </p>
+      <p class="truncate text-[11px] text-nt-muted" title={url}>
+        {hostOf(url)}
+      </p>
+    </div>
+  );
+}
 
 export function ThisTabBar({
   file,
@@ -61,15 +86,23 @@ export function ThisTabBar({
 }) {
   const tab = useActiveTab();
   const [streamId, setStreamId] = useState<string>();
+  const [newName, setNewName] = useState('');
   const [labels, setLabels] = useState('');
   const [error, setError] = useState<string>();
+  const nameInput = useRef<HTMLInputElement>(null);
+  // Focus follows a click on "+ New stream"; an empty file opens on it without taking focus.
+  useEffect(() => {
+    if (streamId === NEW_STREAM) nameInput.current?.focus();
+  }, [streamId]);
 
   if (!tab) return null;
-  const box = 'border border-[#222] p-3 flex flex-col gap-2 text-[13px]';
   if (!tab.url || !isSafeUrl(tab.url)) {
-    return <section class={box}>This page cannot be pinned.</section>;
+    return (
+      <section class={`${box} text-[12px] text-nt-muted`}>This page cannot be pinned.</section>
+    );
   }
   const url = tab.url;
+  const title = tab.title || url;
   const streams = file?.streams ?? [];
 
   const run = async (ops: StreamOp[]): Promise<boolean> => {
@@ -78,7 +111,7 @@ export function ThisTabBar({
       await send({ type: 'WORK_OPS', ops });
       return true;
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
+      setError(errorText(failure));
       return false;
     }
   };
@@ -86,51 +119,51 @@ export function ThisTabBar({
   const found = file ? findItemByUrl(file, url) : undefined;
   if (found) {
     const { stream, item } = found;
+    const isDone = item.doneAt !== undefined;
+    const others = streams.filter((candidate) => candidate.id !== stream.id);
     return (
-      <section class={box}>
-        <div class="truncate">
-          {item.doneAt === undefined ? 'In' : 'Done in'} {stream.name}
-        </div>
-        <div class="flex gap-2 items-center">
-          {item.doneAt === undefined ? (
-            <button
-              type="button"
-              class={action}
-              disabled={readOnly}
-              onClick={() =>
-                void run([{ op: 'markDone', itemId: item.id, at: new Date().toISOString() }])
-              }
-            >
-              ✓ Done
-            </button>
-          ) : (
-            <button
-              type="button"
-              class={action}
-              disabled={readOnly}
-              onClick={() => void run([{ op: 'undone', itemId: item.id }])}
-            >
-              Undo
-            </button>
-          )}
-          <select
-            aria-label="Move"
-            class={`${field} flex-1`}
+      <section class={box} aria-label="This tab">
+        <Page title={title} url={url} />
+        <div class="flex items-center gap-2">
+          <p class="flex min-w-0 flex-1 items-baseline gap-1.5 text-[12px] text-nt-muted">
+            <span class="shrink-0">{isDone ? 'Done in ' : 'In '}</span>
+            <span class={`truncate ${isDone ? 'text-nt-done' : 'text-nt-fg'}`} title={stream.name}>
+              {stream.name}
+            </span>
+          </p>
+          <button
+            type="button"
+            class={primary}
             disabled={readOnly}
-            value={stream.id}
-            onChange={(event) => {
-              const to = event.currentTarget.value as StreamId;
-              if (to !== stream.id) void run([{ op: 'move', itemId: item.id, streamId: to }]);
-            }}
+            onClick={() =>
+              void run(
+                isDone
+                  ? [{ op: 'undone', itemId: item.id }]
+                  : [{ op: 'markDone', itemId: item.id, at: new Date().toISOString() }],
+              )
+            }
           >
-            {streams.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                Move to {candidate.name}
-              </option>
-            ))}
-          </select>
+            {isDone ? 'Undo' : '✓ Done'}
+          </button>
         </div>
-        {error && <p class="text-red-400 break-words">{error}</p>}
+        {others.length > 0 && (
+          <div class="flex flex-wrap items-center gap-1">
+            <span class="pr-1 text-[11px] text-nt-muted">Move to</span>
+            {others.map((candidate) => (
+              <Choice
+                key={candidate.id}
+                title={candidate.name}
+                disabled={readOnly}
+                onClick={() =>
+                  void run([{ op: 'move', itemId: item.id, streamId: candidate.id as StreamId }])
+                }
+              >
+                {candidate.name}
+              </Choice>
+            ))}
+          </div>
+        )}
+        {error && <p class="text-[12px] text-nt-prod [overflow-wrap:anywhere]">{error}</p>}
       </section>
     );
   }
@@ -140,14 +173,19 @@ export function ThisTabBar({
       ? NEW_STREAM
       : (streamId ??
         (streams.some((s) => s.id === ui.lastStreamId) ? ui.lastStreamId : streams[0]?.id));
+  const naming = selected === NEW_STREAM;
 
   const pin = async () => {
     const at = new Date().toISOString();
     const ops: StreamOp[] = [];
     let target = selected as StreamId;
-    if (selected === NEW_STREAM) {
-      const name = window.prompt('Name of the new stream')?.trim();
-      if (!name) return;
+    if (naming) {
+      const name = newName.trim();
+      if (!name) {
+        setError('Name the new stream first.');
+        nameInput.current?.focus();
+        return;
+      }
       target = newStreamId();
       ops.push({ op: 'addStream', streamId: target, name, at });
     }
@@ -156,51 +194,82 @@ export function ThisTabBar({
       streamId: target,
       itemId: newItemId(),
       url,
-      title: tab.title || url,
-      labels: labels
-        .split(',')
-        .map((label) => label.trim())
-        .filter((label) => label !== ''),
+      title,
+      labels: splitLabels(labels),
       at,
     });
     if (!(await run(ops))) return;
-    if (selected !== NEW_STREAM) await updateWorkUi({ lastStreamId: target });
+    // A stream made here becomes the next pin's default, as a picked one does.
+    await updateWorkUi({ lastStreamId: target });
+    setStreamId(undefined);
+    setNewName('');
     setLabels('');
   };
 
   return (
-    <section class={box}>
-      <div class="truncate" title={url}>
-        {tab.title || url}
-      </div>
-      <div class="flex gap-2">
-        <select
-          aria-label="Stream"
-          class={`${field} flex-1`}
-          disabled={readOnly}
-          value={selected}
-          onChange={(event) => setStreamId(event.currentTarget.value)}
-        >
+    <form
+      class={box}
+      aria-label="This tab"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!readOnly) void pin();
+      }}
+    >
+      <Page title={title} url={url} />
+      <div class="flex flex-col gap-1.5">
+        <span class="text-[11px] text-nt-muted">Pin to</span>
+        <div class="flex flex-wrap gap-1">
           {streams.map((stream) => (
-            <option key={stream.id} value={stream.id}>
+            <Choice
+              key={stream.id}
+              title={stream.name}
+              selected={selected === stream.id}
+              disabled={readOnly}
+              onClick={() => {
+                setError(undefined);
+                setStreamId(stream.id);
+              }}
+            >
               {stream.name}
-            </option>
+            </Choice>
           ))}
-          <option value={NEW_STREAM}>New stream…</option>
-        </select>
+          <Choice
+            selected={naming}
+            disabled={readOnly}
+            onClick={() => {
+              setError(undefined);
+              setStreamId(NEW_STREAM);
+            }}
+          >
+            + New stream
+          </Choice>
+        </div>
+        {naming && (
+          <input
+            aria-label="New stream name"
+            placeholder="Name the new stream"
+            class={field}
+            value={newName}
+            disabled={readOnly}
+            ref={nameInput}
+            onInput={(event) => setNewName(event.currentTarget.value)}
+          />
+        )}
+      </div>
+      <div class="flex gap-1.5">
         <input
           aria-label="Labels"
           class={`${field} flex-1`}
-          placeholder="labels, comma separated"
+          placeholder="Labels, comma separated"
           value={labels}
           disabled={readOnly}
           onInput={(event) => setLabels(event.currentTarget.value)}
         />
-        <button type="button" class={action} disabled={readOnly} onClick={() => void pin()}>
+        <button type="submit" class={primary} disabled={readOnly}>
           Pin
         </button>
       </div>
-      {error && <p class="text-red-400 break-words">{error}</p>}
-    </section>
+      {error && <p class="text-[12px] text-nt-prod [overflow-wrap:anywhere]">{error}</p>}
+    </form>
   );
 }

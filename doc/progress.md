@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-10-14 — Work side panel: everything in place, no dialogs, and a cleaner layout
+
+- **Fix: a new stream from the panel did nothing.** Chrome side panels block `window.prompt` and `window.confirm`: the panel dimmed to grey and the call returned nothing, so **New stream…** never created a stream. Every dialog is now inline (`src/sidepanel/controls.tsx`): the stream name is typed in the This-tab card, the inbox pin menu and under **Streams**; labels are edited in the item's row; deleting a stream with items asks in place (**Delete stream** / **Keep**). The tests fail if any panel code calls `prompt` or `confirm`.
+- **Redesign** on the start page's palette and Noto Sans Mono (`src/sidepanel/sidepanel.css`): a sticky header with refresh and a settings toggle (the work token form opens under it), a This-tab card with the streams as choices, and a colour rail on every row: red for failing CI, conflicts or changes requested, amber for pending CI or a requested review, green for approved or green CI (`toneOf` in `StatusChips.tsx`). Merged and closed items show their state and go quiet.
+- **Long titles**: item, inbox and tab titles are cut at two lines and shown whole on hover; stream names, labels and stream choices are cut with an ellipsis, so nothing widens the panel. Counts are kept apart from titles, so a long name never hides them.
+- **Tidier rows**: ✓ stays on the row; move, labels and remove sit behind ⋯ in the row; rename, reorder and delete sit behind ⋯ on the stream. The label filter is a row of choices, and an item can be dropped anywhere on a stream.
+
 ## 2026-10-14 — Work streams: side panel, inbox and pinned streams in the browser extension
 
 - **Streams format** `.kh/browser.streams.json` in `@kaihuman/formats` (`streams.ts`): item refs and URL normalisation (one PR, many URL spellings), parse/serialize that keeps unknown entries, pure idempotent operations and a strict 14-day prune of done items.

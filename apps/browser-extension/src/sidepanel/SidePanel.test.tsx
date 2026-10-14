@@ -140,7 +140,13 @@ beforeEach(() => {
       lastError: undefined,
     },
   };
-  window.prompt = () => null;
+  // Side panels block these: calling one dims the panel and returns nothing.
+  window.prompt = () => {
+    throw new Error('window.prompt does not work in a side panel');
+  };
+  window.confirm = () => {
+    throw new Error('window.confirm does not work in a side panel');
+  };
 });
 
 afterEach(() => {
@@ -345,5 +351,79 @@ describe('SidePanel', () => {
     await waitFor(() => sent.some((m) => m.type === 'WORK_OPS'));
     const message = sent.find((m) => m.type === 'WORK_OPS') as { ops: Record<string, unknown>[] };
     expect(message.ops).toEqual([{ op: 'undone', itemId: 'it_1' }]);
+  });
+
+  it('creates a stream for the active tab in place, without a dialog', async () => {
+    store = { streamsCache: cache(), workSnapshot: snapshot() };
+    await mount('Pin to');
+    click('+ New stream');
+    await waitFor(() => host.querySelector('input[aria-label="New stream name"]') !== null);
+    const name = host.querySelector('input[aria-label="New stream name"]') as HTMLInputElement;
+    await waitFor(() => document.activeElement === name);
+    // Pinning with no name asks for one instead of sending anything.
+    click('Pin');
+    await waitFor(() => host.textContent?.includes('Name the new stream first.') ?? false);
+    expect(sent.some((m) => m.type === 'WORK_OPS')).toBe(false);
+    name.value = ' Launch ';
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    click('Pin');
+    await waitFor(() => sent.some((m) => m.type === 'WORK_OPS'));
+    const message = sent.find((m) => m.type === 'WORK_OPS') as { ops: Record<string, unknown>[] };
+    expect(message.ops).toHaveLength(2);
+    expect(message.ops[0]).toMatchObject({ op: 'addStream', name: 'Launch' });
+    expect(message.ops[1]).toMatchObject({
+      op: 'pin',
+      streamId: message.ops[0]?.streamId,
+      url: 'https://example.com/new',
+    });
+    await waitFor(
+      () => (store.workUi as { lastStreamId?: string })?.lastStreamId === message.ops[0]?.streamId,
+    );
+  });
+
+  it('asks for a stream name at once when there are no streams yet', async () => {
+    const empty = file();
+    empty.streams = [];
+    store = { streamsCache: cache({ ok: true, file: empty }), workSnapshot: snapshot() };
+    await mount('No streams yet.');
+    await waitFor(() => host.querySelector('input[aria-label="New stream name"]') !== null);
+    const name = host.querySelector('input[aria-label="New stream name"]') as HTMLInputElement;
+    expect(name).not.toBeNull();
+    name.value = 'First';
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    name.form?.requestSubmit();
+    await waitFor(() => sent.some((m) => m.type === 'WORK_OPS'));
+    const message = sent.find((m) => m.type === 'WORK_OPS') as { ops: Record<string, unknown>[] };
+    expect(message.ops.map((op) => op.op)).toEqual(['addStream', 'pin']);
+  });
+
+  it('keeps long titles whole for hover and clamps them in place', async () => {
+    const long = `Refactor ${'the very long subsystem name '.repeat(8)}end`;
+    activeTab = { id: 7, url: 'https://example.com/long', title: long };
+    store = { streamsCache: cache(), workSnapshot: snapshot() };
+    await mount('Pin to');
+    const title = [...host.querySelectorAll('p')].find((p) => p.textContent === long);
+    expect(title?.getAttribute('title')).toBe(long);
+    expect(title?.className).toContain('line-clamp-2');
+  });
+
+  it('opens the settings inline from the header', async () => {
+    store = { streamsCache: cache(), workSnapshot: snapshot() };
+    await mount('Work');
+    const gear = host.querySelector('button[aria-label="Settings"]') as HTMLButtonElement;
+    expect(gear.getAttribute('aria-expanded')).toBe('false');
+    expect(host.querySelector('input[aria-label="Work token"]')).toBeNull();
+    gear.click();
+    await waitFor(() => host.querySelector('input[aria-label="Work token"]') !== null);
+    expect(gear.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('renders no stray text when there is nothing to warn about', async () => {
+    store = { streamsCache: cache(), workSnapshot: snapshot() };
+    await mount('Work');
+    const body = host.querySelector('main > div:last-child') as HTMLElement;
+    expect([...body.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE)).toEqual([]);
   });
 });
