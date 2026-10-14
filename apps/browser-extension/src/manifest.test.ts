@@ -10,6 +10,9 @@ describe('manifest permissions', () => {
     host_permissions: string[];
     optional_host_permissions: string[];
     content_scripts: { matches: string[] }[];
+    permissions: string[];
+    side_panel?: { default_path: string };
+    commands: Record<string, { suggested_key?: { default?: string } }>;
   };
 
   it('asks for no standing access to every site', () => {
@@ -24,5 +27,27 @@ describe('manifest permissions', () => {
     for (const service of DEFAULT_SERVICES) {
       expect(m.host_permissions).toContain(accessPatternOf(service));
     }
+  });
+
+  it('declares the side panel', () => {
+    expect(m.permissions).toContain('sidePanel');
+    expect(m.side_panel?.default_path).toBe('sidepanel.html');
+  });
+
+  it('binds pin-current-tab', () => {
+    expect(m.commands['pin-current-tab']?.suggested_key?.default).toBe('Alt+Shift+P');
+  });
+
+  it('adds no host permission for work', () => {
+    expect(m.host_permissions).toEqual([
+      'https://api.github.com/*',
+      'https://api.deepl.com/*',
+      'https://api-free.deepl.com/*',
+      'https://www.githubstatus.com/*',
+      'https://status.claude.com/*',
+      'https://www.cloudflarestatus.com/*',
+      'https://health.aws.amazon.com/*',
+      'https://status.cloud.google.com/*',
+    ]);
   });
 });

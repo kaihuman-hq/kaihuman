@@ -1,4 +1,4 @@
-import type { GithubKey, StreamsParse } from '@kaihuman/formats';
+import type { GithubKey, StreamId, StreamsParse } from '@kaihuman/formats';
 
 /** `chrome.storage.local` keys of the work-streams feature. */
 export const WORK_KEYS = {
@@ -83,3 +83,13 @@ export interface WorkSnapshot {
   orgProblems: OrgAccessProblem[];
   problem: WorkProblem | null;
 }
+
+/** The side panel's own settings, kept across sessions. */
+export interface WorkUi {
+  /** Where the next pin goes when none is named. */
+  lastStreamId?: StreamId;
+  collapsed: string[];
+  label?: string;
+}
+
+export const EMPTY_WORK_UI: WorkUi = { collapsed: [] };

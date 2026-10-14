@@ -21,6 +21,15 @@ import {
 import { type Message } from '../types';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import { connectWorkPanel, isPanelOpen, runWorkCycle, watchWorkTokens } from './work/poller';
+import {
+  handlePinMenuClick,
+  handleWorkMessage,
+  pinCurrentTab,
+  pinMenuFile,
+  rebuildPinMenu,
+  watchPinMenu,
+} from './work/messages';
+import { type StreamsCache, WORK_KEYS } from './work/types';
 import { consoleFileUrl, isConsolePage } from '../console';
 // The bundled loader's path, for injecting the page script on demand (CRXJS `?script` import).
 import PAGE_SCRIPT from '../content/index.ts?script';
@@ -124,6 +133,7 @@ chrome.alarms.create('repoSync', { periodInMinutes: 60 });
 // Work streams poll GitHub on their own schedule; the cycle decides each minute what is due.
 chrome.alarms.create('work', { periodInMinutes: 1 });
 watchWorkTokens();
+watchPinMenu();
 
 // The desktop palette hears of a repository chosen here at once, and is asked for its own choice
 // hourly and when a start page opens.
@@ -336,6 +346,11 @@ chrome.commands.onCommand.addListener(async (command) => {
   await flagPaletteFailure(tab.id);
 });
 
+chrome.commands.onCommand.addListener((command) => {
+  if (command !== 'pin-current-tab') return;
+  pinCurrentTab().catch((e) => console.warn('kaihuman: pinning the tab failed', e));
+});
+
 // Initialize Context Menu
 chrome.runtime.onInstalled.addListener(async () => {
   // Drops items an older version registered, so one under a since-renamed id does not linger.
@@ -345,6 +360,8 @@ chrome.runtime.onInstalled.addListener(async () => {
     title: 'Add to Knowledge Base',
     contexts: ['selection'],
   });
+  const cached = await chrome.storage.local.get(WORK_KEYS.streamsCache);
+  await rebuildPinMenu(pinMenuFile(cached[WORK_KEYS.streamsCache] as StreamsCache | undefined));
 
   // Chrome drops a `suggested_key` it cannot honour — because the OS, another extension or Chrome
   // itself already owns the combination — and leaves the command unbound without saying so. Say so
@@ -367,6 +384,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       console.error('kaihuman: Error saving clipping', e),
     );
   }
+  handlePinMenuClick(info, tab);
 });
 
 // Add comprehensive GitHub API helper
@@ -1392,6 +1410,9 @@ const answer = (work: Promise<object>, sendResponse: (response: unknown) => void
 
 // Message Handling
 chrome.runtime.onMessage.addListener((message: Message | any, sender, sendResponse) => {
+  const work = handleWorkMessage(message);
+  if (work) return answer(work as Promise<object>, sendResponse);
+
   if (message.type === 'ENSURE_PAGE_SCRIPT') {
     return answer(
       withPageScript(message.tabId, () =>

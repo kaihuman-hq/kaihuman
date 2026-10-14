@@ -1,3 +1,5 @@
+import type { StreamOp } from '@kaihuman/formats';
+
 export interface Message {
   type:
     | 'AUTH_TOKEN_UPDATE'
@@ -50,7 +52,13 @@ export interface Message {
     | 'TODAY_TOGGLE_TIMER'
     | 'READ_LATER_DONE'
     | 'READ_LATER_ADD'
-    | 'ADD_TODO';
+    | 'ADD_TODO'
+    | 'WORK_OPS'
+    | 'WORK_REFRESH'
+    | 'WORK_DISMISS'
+    | 'WORK_OPEN'
+    | 'WORK_SET_TOKEN'
+    | 'WORK_PIN_TAB';
   token?: string;
   path?: string;
   note?: string;
@@ -74,8 +82,21 @@ export interface Message {
   reuse?: boolean;
   /** `TRANSLATE`: the DeepL target languages. */
   targets?: string[];
-  /** `SET_TRANSLATION_KEY`: the DeepL API key; empty forgets it. */
+  /**
+   * `SET_TRANSLATION_KEY`: the DeepL API key; `WORK_SET_TOKEN`: the work token; empty forgets
+   * either. `WORK_DISMISS`: the inbox row's key.
+   */
   key?: string;
+  /** `WORK_OPS`: stream changes from the side panel. */
+  ops?: StreamOp[];
+  /** `WORK_DISMISS`: the row's `updatedAt`, so a later change brings it back. */
+  updatedAt?: string;
+  /** `WORK_DISMISS`, `WORK_OPEN`: the GitHub notification thread to mark done or read. */
+  threadId?: string;
+  /** `WORK_PIN_TAB`: the stream to pin into; default the last one used. */
+  streamId?: string;
+  /** `WORK_PIN_TAB`: labels for the pinned item. */
+  labels?: string[];
   /** `READ_LATER_DONE`: the item to mark read; `ADD_MODE_RECENT`: the entry chosen. */
   id?: string;
   /** `GET_MODE_RECENTS`, `ADD_MODE_RECENT`: the palette mode's prefix (`p` for `>p`). */
