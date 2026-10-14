@@ -36,7 +36,13 @@ export default defineManifest({
       },
       description: 'Open the kaihuman command palette',
     },
+    'pin-current-tab': {
+      suggested_key: { default: 'Alt+Shift+P' },
+      description: 'Pin the current tab to a kaihuman work stream',
+    },
   },
+  // The work streams panel.
+  side_panel: { default_path: 'sidepanel.html' },
   background: {
     service_worker: 'src/background/service-worker.ts',
     type: 'module',
@@ -59,6 +65,7 @@ export default defineManifest({
     'alarms',
     'tabs',
     'nativeMessaging',
+    'sidePanel',
   ],
   // Reading the browser's own bookmarks is only needed for the import, so it is asked for from the
   // popup when the user runs it rather than warned about on install.

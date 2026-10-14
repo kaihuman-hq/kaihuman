@@ -54,6 +54,9 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Work side panel: pinned streams with labels, Waiting on you / New activity inbox from GitHub, My open PRs, live CI and review status, merged or closed items done by themselves | side panel (popup → **Open work panel**, or the start page card) | 2026-10-14 |
+| Pin any tab to a stream: Alt+Shift+P, right-click **Pin to stream ▸**, or the This-tab bar; stored in .kh/browser.streams.json | all pages | 2026-10-14 |
+| Work summary card and toolbar badge with the Waiting-on-you count | start page, toolbar icon | 2026-10-14 |
 | Service status traffic lights (GitHub, Claude, AWS, Cloudflare, GCP by default; any Statuspage, AWS regions, GCP products via `.kh/browser.status.json`), checked at most every five minutes, no proxy | start page | 2026-10-07 |
 | Delete braindumps (and old local dumps) from the desktop palette: `>d`, ⇥ on one, **Delete…**, type DELETE — removed here and, by an immediate sync, from the repo | desktop palette | 2026-09-30 |
 | Braindumps on the start page: the ten newest from `.kh/braindumps/` with preview and age, opened to the whole text or in the console, deleted after a second click (only the version shown); a start page on data older than a minute checks the repo | start page | 2026-09-30 |

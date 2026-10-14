@@ -338,6 +338,17 @@ The capture box has three targets:
 
 The box does not read the repo's quick-note list, to avoid a GitHub request per new tab. Other targets are in the palette action **Add a note…**.
 
+## Work streams
+<!-- docspack: tags=work,streams,side panel,inbox,pin,alt+shift+p,github notifications,work token -->
+
+The side panel (the **Open work panel** button in the popup, or the work card on the start page) shows what needs you and what you work on. **Waiting on you** lists PRs where your review is requested, items assigned to you, and your own PRs with failing CI, changes requested, or approved and green (ready to merge); **New activity** lists unread GitHub notifications you take part in (mentions, comments and so on); **My open PRs** lists your open pull requests. Pinned items sit in **streams** with labels, and show CI and review chips. A merged or closed pinned item moves to **Done** by itself and is removed after 14 days. ✕ hides an inbox row until the item changes, and removes it from github.com/notifications. The toolbar badge shows the Waiting-on-you count.
+
+There are three ways to pin a page to a stream: `Alt+Shift+P` pins the current tab to the last used stream, right-click **Pin to stream ▸** lists the streams, and the This-tab bar in the panel pins the tab you are on. Slack threads and Claude sessions are pinned the same way as any other page.
+
+Streams are stored in `.kh/browser.streams.json` in the active repository, so they are the same in every browser. Collapsed streams, dismissed rows and the work token stay on the device.
+
+GitHub organisations that restrict OAuth apps hide their PRs. The panel then shows an org-access banner with a link to `https://github.com/settings/applications` to request approval, or to `https://github.com/orgs/<org>/sso` when SSO is the cause. An optional work token is a classic personal access token with the `repo` and `notifications` scopes (SSO-authorised if the org needs it), set in the panel. Use it when an org blocks the kaihuman OAuth app and approval is not possible; it is used for reading only, and saving to the repo still uses the console sign-in.
+
 ## Service status lights on the start page
 <!-- docspack: tags=status,traffic light,outage,github status,aws health,cloudflare,gcp,statuspage -->
 
@@ -441,9 +452,9 @@ Formats are parsed and written with `@kaihuman/formats`, the same code as the co
 
 Declared in `manifest.ts`:
 
-- `permissions`: `contextMenus`, `storage`, `activeTab`, `scripting`, `alarms`, `tabs`, `nativeMessaging`.
+- `permissions`: `contextMenus`, `storage`, `activeTab`, `scripting`, `alarms`, `tabs`, `nativeMessaging`, `sidePanel`.
 - `optional_permissions`: `bookmarks`, requested from the popup only for the import.
 - `host_permissions`: `<all_urls>`.
 - `content_scripts`: `src/content/index.ts` on `<all_urls>`.
 
-`tabs` reads tab URLs for pinned tab groups. `scripting` injects the content script into old tabs. `nativeMessaging` reaches the desktop palette host `com.kaihuman.palette`.
+`tabs` reads tab URLs for pinned tab groups. `scripting` injects the content script into old tabs. `nativeMessaging` reaches the desktop palette host `com.kaihuman.palette`. `sidePanel` opens the work side panel.

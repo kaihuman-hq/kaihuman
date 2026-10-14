@@ -67,7 +67,11 @@ beforeEach(async () => {
   );
 
   vi.stubGlobal('chrome', {
-    alarms: { create: vi.fn(), onAlarm: { addListener: vi.fn() } },
+    alarms: {
+      create: vi.fn(),
+      get: vi.fn(async () => undefined),
+      onAlarm: { addListener: vi.fn() },
+    },
     action: { setBadgeText: vi.fn(async () => {}), setBadgeBackgroundColor: vi.fn(async () => {}) },
     bookmarks: { getTree: vi.fn(async () => []) },
     commands: { onCommand: { addListener: vi.fn() } },

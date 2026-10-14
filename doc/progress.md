@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-10-14 — Work streams: side panel, inbox and pinned streams in the browser extension
+
+- **Streams format** `.kh/browser.streams.json` in `@kaihuman/formats` (`streams.ts`): item refs and URL normalisation (one PR, many URL spellings), parse/serialize that keeps unknown entries, pure idempotent operations and a strict 14-day prune of done items.
+- **Background work cycle** (`apps/browser-extension/src/background/work/`): streams store with a write queue that survives restarts, one GraphQL query for inbox searches and pinned item status, participating notifications with conditional polling, inbox rows with dismissals, auto-done for merged or closed items, polling with backoff, a snapshot and the toolbar badge.
+- **Side panel** (`sidepanel.html`, `src/sidepanel/`): Waiting on you and New activity inbox, My open PRs, streams with labels, moves, rename, reorder and done items, status chips for CI and review, problem banners (sign-in, org access) and the optional work token.
+- **Pinning**: `Alt+Shift+P` (`pin-current-tab`), right-click **Pin to stream ▸**, and the This-tab bar in the panel.
+- **Start page**: a work summary card (`WorkCard.tsx`) that opens the side panel; manifest gets the `sidePanel` permission.
+- Docs: `doc/work-streams.md` (status and decisions made while building), `doc/features.md`, `packages/docspack/docs/40-browser-extension.md`.
+- **Fixes from the final review**: changes show in the panel and the start page card at once (the unsaved queue is applied on top of the cached file, `background/work/pending.ts`); route fragments are kept so Gmail threads (`#inbox/<id>`) stay separate items, plain anchors are still dropped; opening a notification marks it read and ✕ removes it from the snapshot, serialized with the poll cycle; the `work` alarm is created only when missing and the keep-alive alarm also runs the time-gated cycle; the popup has **Open work panel** and the start page card stays with **Nothing waiting — open work panel**; the panel opens synchronously in the click; the palette shortcut no longer hides the badge count; a pin from a stale menu entry goes to the default stream; a rename is kept on blur; the panel reconnects its port after a worker restart; a GraphQL `RATE_LIMITED` pauses until the reset; a 401 with a work token points at Settings; a flush whose ops change nothing makes no commit; a done tab shows **Done in <stream>** with **Undo**.
+- Not yet checked by hand: (1) pin a GitHub PR, a Slack thread and a Claude session, and see all three in the panel and in `.kh/browser.streams.json` after one commit; (2) merge or close the pinned PR and see it under Done within 5 minutes (1 with the panel open); (3) get a review requested and see it under Waiting on you within 2 minutes, with ✕ removing it from github.com/notifications; (4) `Alt+Shift+P` pins to the last stream and right-click **Pin to stream ▸** lists the streams; (5) the employer org's PRs appear, or the org banner shows, and they appear once a work token is set. This needs a real account and could not be done from the cloud container.
+
+## 2026-10-14 — Work streams: design
+
+- **Design for one overview of parallel work** in the browser extension (`doc/work-streams.md`):
+  a side panel with pinned **streams** (any tab, Slack threads included) and labels, an automatic
+  **inbox** from GitHub notifications and searches, **My open PRs**, a start-page card and a
+  toolbar badge. Streams are stored in `.kh/browser.streams.json`; nothing is built yet.
+- Research in the same file: the `repo` OAuth token already reaches all repos (org OAuth
+  restrictions and SSO are the limits), the Notifications API is the feed, and Slack comes in by
+  pinning because its API has no activity feed.
+- Implementation plan in 14 test-first tasks: `doc/work-streams-plan.md`.
+
 ## 2026-10-13 — Knowledge base set-up in one commit, from `/knowledge` or `/ideas`
 
 - **Set-up and skill updates are one commit** (`syncKB` in `apps/console/src/lib/github-kb.ts`,

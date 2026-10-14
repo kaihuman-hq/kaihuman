@@ -32,6 +32,7 @@ import {
   SyncStatus,
   Trackers,
 } from './Today';
+import { WorkCard } from './WorkCard';
 
 /** Where the note box writes. Any other target is one palette action away ("Add a note…"), which
  * is also the only place that reads the repo's quick-note list — a new tab is opened far too often
@@ -777,6 +778,7 @@ export function StartPage() {
           </main>
 
           <aside class="flex-[1_1_320px] min-w-0 flex flex-col gap-6">
+            <WorkCard />
             {today && (
               <>
                 <Doing

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "updatedAt": "2026-10-14T09:12:00Z",
+  "streams": [
+    {
+      "id": "st_k3f9",
+      "name": "Payments migration",
+      "createdAt": "2026-10-14T09:00:00Z",
+      "items": [
+        {
+          "id": "it_8a2c",
+          "url": "https://github.com/acme/api/pull/412",
+          "title": "Move refunds to the new ledger",
+          "addedAt": "2026-10-14T09:05:00Z",
+          "labels": ["waiting on Sam"]
+        },
+        {
+          "id": "it_q71d",
+          "url": "https://acme.slack.com/archives/C04/p1728896",
+          "title": "#payments: @Claude rollout plan",
+          "addedAt": "2026-10-14T09:10:00Z",
+          "labels": [],
+          "doneAt": "2026-10-15T16:00:00Z"
+        }
+      ]
+    }
+  ]
+}

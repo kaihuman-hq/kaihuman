@@ -98,12 +98,21 @@ beforeEach(async () => {
   ]);
   fetchMock = vi.fn(okFile);
 
+  // The worker registers one listener per command; the tests hear them all, as Chrome would.
+  const commandListeners: Array<(command: string) => unknown> = [];
+  commandListener = async (command) => {
+    for (const l of commandListeners) await l(command);
+  };
   vi.stubGlobal('chrome', {
-    alarms: { create: vi.fn(), onAlarm: { addListener: vi.fn() } },
+    alarms: {
+      create: vi.fn(),
+      get: vi.fn(async () => undefined),
+      onAlarm: { addListener: vi.fn() },
+    },
     commands: {
       onCommand: {
         addListener: (l: (command: string) => unknown) => {
-          commandListener = l;
+          commandListeners.push(l);
         },
       },
     },
@@ -607,7 +616,7 @@ describe('the palette shortcut', () => {
   it('clears a stale failure badge before trying again', async () => {
     await commandListener('toggle-command-palette');
 
-    expect(setBadgeText).toHaveBeenCalledWith({ tabId: 7, text: '' });
+    expect(setBadgeText).toHaveBeenCalledWith({ tabId: 7, text: null });
   });
 });
 

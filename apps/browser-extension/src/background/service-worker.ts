@@ -20,6 +20,22 @@ import {
 } from '@kaihuman/palette';
 import { type Message } from '../types';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
+import {
+  connectWorkPanel,
+  ensureWorkAlarm,
+  isPanelOpen,
+  runWorkCycle,
+  watchWorkTokens,
+} from './work/poller';
+import {
+  handlePinMenuClick,
+  handleWorkMessage,
+  pinCurrentTab,
+  pinMenuFile,
+  rebuildPinMenu,
+  watchPinMenu,
+} from './work/messages';
+import { type StreamsCache, WORK_KEYS } from './work/types';
 import { consoleFileUrl, isConsolePage } from '../console';
 // The bundled loader's path, for injecting the page script on demand (CRXJS `?script` import).
 import PAGE_SCRIPT from '../content/index.ts?script';
@@ -120,6 +136,11 @@ chrome.alarms.create('swKeepAlive', { periodInMinutes: 0.5 });
 // bookmarks get opened — is counted locally and pushed with the next sync.
 chrome.alarms.create('repoSync', { periodInMinutes: 60 });
 
+// Work streams poll GitHub on their own schedule; the cycle decides each minute what is due.
+ensureWorkAlarm().catch((e) => console.warn('kaihuman: creating the work alarm failed', e));
+watchWorkTokens();
+watchPinMenu();
+
 // The desktop palette hears of a repository chosen here at once, and is asked for its own choice
 // hourly and when a start page opens.
 watchRepoChanges();
@@ -130,7 +151,11 @@ let repoSyncedAt = 0;
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'swKeepAlive') {
-    // No-op: waking the worker is sufficient.
+    // Also a backstop for the work alarm: the cycle is time-gated by its poll state, so this
+    // costs no extra GitHub calls.
+    runWorkCycle({ panelOpen: isPanelOpen() }).catch((e) =>
+      console.warn('kaihuman: work polling failed', e),
+    );
   }
   if (alarm.name === 'repoSync') {
     syncRepoWithDesktop().catch((e) =>
@@ -140,14 +165,23 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     syncPinnedTabs().catch((e) => console.warn('kaihuman: pinned tab sync failed', e));
     syncToday().catch((e) => console.warn('kaihuman: start page sync failed', e));
   }
+  if (alarm.name === 'work') {
+    runWorkCycle({ panelOpen: isPanelOpen() }).catch((e) =>
+      console.warn('kaihuman: work polling failed', e),
+    );
+  }
 });
 
 // An open port keeps the MV3 service worker from being collected. The popup holds one for
 // as long as it is open, so a request fired after the user has spent a while typing (renaming
 // a tab group, say) still finds the worker alive instead of racing its teardown — which
 // surfaced as "The message port closed before a response was received".
-chrome.runtime.onConnect.addListener(() => {
+chrome.runtime.onConnect.addListener((port) => {
   // Accepting the port is the whole job — holding it open is what keeps the worker alive.
+  // The work side panel also refreshes its data as it opens.
+  if (port.name === 'work-panel') {
+    connectWorkPanel(port).catch((e) => console.warn('kaihuman: work panel refresh failed', e));
+  }
 });
 
 
@@ -315,11 +349,17 @@ chrome.commands.onCommand.addListener(async (command) => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab?.id === undefined) return;
 
-  await chrome.action.setBadgeText({ tabId: tab.id, text: '' });
+  // `null` clears only this tab's own text; `''` would hide the Waiting-on-you count here.
+  await chrome.action.setBadgeText({ tabId: tab.id, text: null as unknown as string });
   if (await openPaletteInTab(tab.id)) return;
 
   console.warn(`kaihuman: the palette cannot run on this page (${tab.url ?? 'unknown'})`);
   await flagPaletteFailure(tab.id);
+});
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command !== 'pin-current-tab') return;
+  pinCurrentTab().catch((e) => console.warn('kaihuman: pinning the tab failed', e));
 });
 
 // Initialize Context Menu
@@ -331,6 +371,8 @@ chrome.runtime.onInstalled.addListener(async () => {
     title: 'Add to Knowledge Base',
     contexts: ['selection'],
   });
+  const cached = await chrome.storage.local.get(WORK_KEYS.streamsCache);
+  await rebuildPinMenu(pinMenuFile(cached[WORK_KEYS.streamsCache] as StreamsCache | undefined));
 
   // Chrome drops a `suggested_key` it cannot honour — because the OS, another extension or Chrome
   // itself already owns the combination — and leaves the command unbound without saying so. Say so
@@ -353,6 +395,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       console.error('kaihuman: Error saving clipping', e),
     );
   }
+  handlePinMenuClick(info, tab);
 });
 
 // Add comprehensive GitHub API helper
@@ -1378,6 +1421,9 @@ const answer = (work: Promise<object>, sendResponse: (response: unknown) => void
 
 // Message Handling
 chrome.runtime.onMessage.addListener((message: Message | any, sender, sendResponse) => {
+  const work = handleWorkMessage(message);
+  if (work) return answer(work as Promise<object>, sendResponse);
+
   if (message.type === 'ENSURE_PAGE_SCRIPT') {
     return answer(
       withPageScript(message.tabId, () =>
