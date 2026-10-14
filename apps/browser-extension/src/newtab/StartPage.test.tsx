@@ -67,6 +67,7 @@ let host: HTMLDivElement;
 let store: Record<string, unknown>;
 let sent: Record<string, unknown>[];
 let listeners: Listener[];
+let panelOpened: unknown[];
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -204,17 +205,28 @@ beforeEach(() => {
   FRESHER = null;
   store = { lifeos_token: 'token', lifeos_repo: 'owner/repo' };
   sent = [];
+  panelOpened = [];
   listeners = [];
   (globalThis as unknown as { chrome: unknown }).chrome = {
     storage: {
+      onChanged: { addListener: () => {}, removeListener: () => {} },
       local: {
-        get: (_keys: string[], respond: (result: Record<string, unknown>) => void) =>
-          respond(store),
+        // Callback style for the page's own reads, a promise for `useWorkState`'s.
+        get: (_keys: unknown, respond?: (result: Record<string, unknown>) => void) => {
+          respond?.(store);
+          return Promise.resolve(store);
+        },
         set: async (items: Record<string, unknown>) => {
           store = { ...store, ...items };
         },
       },
     },
+    sidePanel: {
+      open: async (options: unknown) => {
+        panelOpened.push(options);
+      },
+    },
+    windows: { getCurrent: async () => ({ id: 7 }) },
     runtime: {
       sendMessage: (message: Record<string, unknown>, respond?: (response: unknown) => void) => {
         sent.push(message);
@@ -811,5 +823,96 @@ describe('StartPage', () => {
 
     click('Todo');
     await waitFor(() => captures().length === 0);
+  });
+
+  describe('work card', () => {
+    const status = (number: number, title: string) => ({
+      key: `github:o/r#${number}`,
+      url: `https://github.com/o/r/pull/${number}`,
+      repo: 'o/r',
+      number,
+      kind: 'pr',
+      title,
+      state: 'open',
+      isDraft: false,
+      review: null,
+      ci: null,
+      conflict: false,
+      updatedAt: `2026-09-22T10:0${number}:00.000Z`,
+    });
+    const snapshot = (searches: Record<string, unknown[]>, problem: unknown = null) => ({
+      login: 'me',
+      fetchedAt: 1,
+      searches: {
+        'review-requested': [],
+        assigned: [],
+        failing: [],
+        'changes-requested': [],
+        'ready-to-merge': [],
+        mine: [],
+        ...searches,
+      },
+      threads: [],
+      pinned: {},
+      orgProblems: [],
+      problem,
+    });
+    const card = () => host.querySelector('button[aria-label="Open work in the side panel"]');
+    const settled = () => host.textContent?.includes('newer') ?? false;
+
+    it('shows the work summary and the first three waiting rows', async () => {
+      store.workSnapshot = snapshot({
+        'review-requested': [status(1, 'Add parser'), status(2, 'Fix cache'), status(3, 'Docs')],
+        failing: [status(4, 'Flaky build'), status(2, 'Fix cache')],
+        assigned: [status(5, 'Fifth')],
+      });
+      await mount(() => card() !== null);
+
+      expect(card()?.textContent).toContain('5 waiting on you');
+      expect(card()?.textContent).toContain('Flaky build');
+      expect(card()?.textContent).toContain('CI failing');
+      expect(card()?.textContent).toContain('review requested');
+      // Newest first, three rows: 5 (assigned), 4, 3.
+      expect(card()?.textContent).toContain('Fifth');
+      expect(card()?.textContent).toContain('assigned');
+      expect(card()?.textContent).not.toContain('Add parser');
+    });
+
+    it('leaves out zero counts', async () => {
+      store.workSnapshot = snapshot({ assigned: [status(1, 'Only one')] });
+      await mount(() => card() !== null);
+
+      expect(card()?.textContent).toContain('1 waiting on you');
+      expect(card()?.textContent).not.toContain('new');
+      expect(card()?.textContent).not.toContain('red CI');
+      expect(card()?.textContent).not.toContain('·');
+    });
+
+    it('opens the side panel on click', async () => {
+      store.workSnapshot = snapshot({ assigned: [status(1, 'Only one')] });
+      await mount(() => card() !== null);
+
+      (card() as HTMLButtonElement).click();
+      await waitFor(() => panelOpened.length > 0);
+
+      expect(panelOpened).toEqual([{ windowId: 7 }]);
+    });
+
+    it('shows nothing when signed out', async () => {
+      store.workSnapshot = snapshot({ assigned: [status(1, 'Hidden')] }, { kind: 'signed-out' });
+      await mount(settled);
+      await tick();
+
+      expect(card()).toBeNull();
+      expect(host.textContent).not.toContain('Hidden');
+      expect(host.textContent).not.toContain('GitHub refused');
+    });
+
+    it('says so when GitHub refused the token and nothing is waiting', async () => {
+      store.workSnapshot = snapshot({}, { kind: 'auth' });
+      await mount(() => host.textContent?.includes('GitHub refused the token') ?? false);
+
+      expect(host.textContent).toContain('open the side panel');
+    });
   });
 });
