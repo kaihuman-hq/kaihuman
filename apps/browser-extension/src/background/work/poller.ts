@@ -155,15 +155,22 @@ async function newAutoDoneOps(
   );
 }
 
-async function cycle(opts: {
+interface CycleOptions {
   force?: boolean;
   panelOpen: boolean;
   now?: number;
-}): Promise<WorkSnapshot | undefined> {
+}
+
+/** `reset` starts from a fresh poll state: a new token owes nothing to the old one's schedule. */
+type CycleRequest = CycleOptions & { reset?: boolean };
+
+async function cycle(opts: CycleRequest): Promise<WorkSnapshot | undefined> {
   const now = opts.now ?? Date.now();
   const force = opts.force === true;
   const prev = (await getStored<WorkSnapshot>(WORK_KEYS.snapshot)) ?? emptySnapshot();
-  let state = (await getStored<WorkPollState>(WORK_KEYS.pollState)) ?? initialPollState();
+  let state = opts.reset
+    ? initialPollState()
+    : ((await getStored<WorkPollState>(WORK_KEYS.pollState)) ?? initialPollState());
 
   const token = await workPollingToken();
   if (!token) {
@@ -259,17 +266,53 @@ async function cycle(opts: {
 }
 
 let running: Promise<WorkSnapshot | undefined> | undefined;
+let followUp:
+  | {
+      opts: CycleRequest;
+      promise: Promise<WorkSnapshot | undefined>;
+      resolve: (run: Promise<WorkSnapshot | undefined>) => void;
+    }
+  | undefined;
 
-/** One cycle at a time: an alarm and a panel opening can coincide, and both share the run. */
-export function runWorkCycle(opts: {
-  force?: boolean;
-  panelOpen: boolean;
-  now?: number;
-}): Promise<WorkSnapshot | undefined> {
-  running ??= cycle(opts).finally(() => {
+function start(opts: CycleRequest): Promise<WorkSnapshot | undefined> {
+  const run = cycle(opts).finally(() => {
     running = undefined;
+    // Started in the same callback, so no other caller can slip a cycle in between.
+    const next = followUp;
+    followUp = undefined;
+    if (next) next.resolve(start(next.opts));
   });
-  return running;
+  running = run;
+  return run;
+}
+
+/**
+ * One cycle at a time. A plain call during a run shares it; a forced, panel-open or reset one
+ * asks for a run of its own, so it waits for the current run and then gets exactly one more
+ * (requests made meanwhile merge into it).
+ */
+function requestCycle(opts: CycleRequest): Promise<WorkSnapshot | undefined> {
+  if (!running) return start(opts);
+  if (!opts.force && !opts.panelOpen && !opts.reset) return running;
+  if (followUp) {
+    followUp.opts = {
+      force: followUp.opts.force || opts.force,
+      reset: followUp.opts.reset || opts.reset,
+      panelOpen: opts.panelOpen,
+      now: opts.now,
+    };
+    return followUp.promise;
+  }
+  let resolve: (run: Promise<WorkSnapshot | undefined>) => void = () => {};
+  const promise = new Promise<WorkSnapshot | undefined>((r) => {
+    resolve = r;
+  });
+  followUp = { opts, promise, resolve };
+  return promise;
+}
+
+export function runWorkCycle(opts: CycleOptions): Promise<WorkSnapshot | undefined> {
+  return requestCycle(opts);
 }
 
 /** The side panel opened: reread the streams file and refresh everything now. */
@@ -287,11 +330,10 @@ export function watchWorkTokens(): void {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if (!('lifeos_token' in changes) && !(WORK_KEYS.workToken in changes)) return;
-    // Wait out a running cycle so it cannot write back the state being reset.
-    Promise.resolve(running)
-      .catch(() => undefined)
-      .then(() => chrome.storage.local.remove(WORK_KEYS.pollState))
-      .then(() => runWorkCycle({ force: true, panelOpen: isPanelOpen() }))
-      .catch((error) => console.warn('kaihuman: work refresh failed', error));
+    // A cycle still running with the old token finishes first; this one then starts afresh and
+    // writes over whatever poll state that cycle left.
+    requestCycle({ force: true, reset: true, panelOpen: isPanelOpen() }).catch((error) =>
+      console.warn('kaihuman: work refresh failed', error),
+    );
   });
 }

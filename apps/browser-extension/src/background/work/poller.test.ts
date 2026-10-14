@@ -2,13 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkSnapshot } from './types';
 
 type Res = { status: number; body?: unknown; headers?: Record<string, string> };
-type Call = { url: string; method: string; auth?: string; body?: any };
+type Call = { url: string; method: string; auth?: string; ims?: string; body?: any };
 
 const T0 = Date.parse('2026-10-14T10:00:00.000Z');
 const MIN = 60_000;
 
 let store: Record<string, unknown>;
-let notifResponses: Array<Res | Error>;
+let notifResponses: Array<Res | Error | Promise<Res>>;
 let gqlResponses: Array<Res | Error>;
 let remoteFile: string | null;
 let calls: Call[];
@@ -137,10 +137,11 @@ beforeEach(() => {
         url,
         method,
         auth: init?.headers?.Authorization,
+        ims: init?.headers?.['If-Modified-Since'],
         body: init?.body ? JSON.parse(init.body) : undefined,
       });
       let r: Res | Error | undefined;
-      if (url.startsWith('https://api.github.com/notifications')) r = notifResponses.shift();
+      if (url.startsWith('https://api.github.com/notifications')) r = await notifResponses.shift();
       else if (url === 'https://api.github.com/graphql') r = gqlResponses.shift();
       else if (url.includes('/contents/')) {
         if (method === 'PUT') {
@@ -501,10 +502,97 @@ describe('runWorkCycle', () => {
     notifResponses.push(notifChanged());
     gqlResponses.push(gqlOk());
     const a = runWorkCycle({ panelOpen: false, now: at(T0) });
-    const b = runWorkCycle({ force: true, panelOpen: true, now: T0 });
+    const b = runWorkCycle({ panelOpen: false, now: T0 });
     expect(b).toBe(a);
     await a;
     expect(notifCalls()).toHaveLength(1);
     expect(urls().filter((u) => u.endsWith('/graphql'))).toHaveLength(1);
+  });
+
+  it('runs a forced cycle after the running one when forced mid-cycle', async () => {
+    const { runWorkCycle } = await load();
+    // GraphQL is not due, so only a forced cycle runs it.
+    store.workPollState = {
+      notificationsLastModified: null,
+      nextNotificationsAt: 0,
+      nextGraphqlAt: T0 + 5 * MIN,
+      backoffStep: 0,
+    };
+    let release: (r: Res) => void = () => {};
+    notifResponses.push(
+      new Promise<Res>((resolve) => {
+        release = resolve;
+      }),
+    );
+    const alarm = runWorkCycle({ panelOpen: false, now: at(T0) });
+    await vi.waitFor(() => expect(notifCalls()).toHaveLength(1));
+
+    notifResponses.push(notif304);
+    gqlResponses.push(gqlOk());
+    const forced = runWorkCycle({ force: true, panelOpen: true, now: T0 });
+    const again = runWorkCycle({ force: true, panelOpen: true, now: T0 });
+    expect(forced).not.toBe(alarm);
+    expect(again).toBe(forced);
+    release(notif304);
+    await alarm;
+    expect(gqlCalls()).toHaveLength(0);
+    const result = await forced;
+    expect(result?.problem).toBeNull();
+    expect(notifCalls()).toHaveLength(2);
+    expect(gqlCalls()).toHaveLength(1);
+    expect((store.workPollState as any).nextGraphqlAt).toBe(T0 + MIN);
+  });
+
+  it('tries the new token after a 401 even if an alarm cycle is running', async () => {
+    const { runWorkCycle, watchWorkTokens } = await load();
+    store.workToken = 'work1';
+    notifResponses.push({ status: 401, body: { message: 'Bad credentials' } });
+    await runWorkCycle({ panelOpen: false, now: at(T0) });
+    expect(snapshot().problem).toEqual({ kind: 'auth' });
+    watchWorkTokens();
+
+    store.workToken = 'work2';
+    notifResponses.push(notifChanged());
+    gqlResponses.push(gqlOk());
+    storageListeners[0]({ workToken: { newValue: 'work2' } }, 'local');
+    // The minute alarm fires in the same tick as the token change.
+    const alarm = runWorkCycle({ panelOpen: false });
+    await alarm;
+    await vi.waitFor(() => expect(snapshot().problem).toBeNull());
+    expect(notifCalls().map((c) => c.auth)).toEqual(['Bearer work1', 'Bearer work2']);
+  });
+
+  it('does not let a cycle running across a token change keep the old poll state', async () => {
+    const { runWorkCycle, watchWorkTokens } = await load();
+    watchWorkTokens();
+    store.workPollState = {
+      notificationsLastModified: 'old',
+      nextNotificationsAt: 0,
+      nextGraphqlAt: T0 + 5 * MIN,
+      backoffStep: 3,
+    };
+    let release: (r: Res) => void = () => {};
+    notifResponses.push(
+      new Promise<Res>((resolve) => {
+        release = resolve;
+      }),
+    );
+    const alarm = runWorkCycle({ panelOpen: false, now: at(T0) });
+    await vi.waitFor(() => expect(notifCalls()).toHaveLength(1));
+
+    store.workToken = 'work2';
+    notifResponses.push(notifChanged([], 'new'));
+    gqlResponses.push(gqlOk());
+    storageListeners[0]({ workToken: { newValue: 'work2' } }, 'local');
+    release({ status: 502 });
+    await alarm;
+    await vi.waitFor(() => expect(gqlCalls()).toHaveLength(1));
+    await vi.waitFor(() =>
+      expect((store.workPollState as any).notificationsLastModified).toBe('new'),
+    );
+    // The new token's first poll is unconditional, and the old backoff is gone.
+    expect(notifCalls()[0].ims).toBe('old');
+    expect(notifCalls()[1].ims).toBeUndefined();
+    expect((store.workPollState as any).backoffStep).toBe(0);
   });
 });
