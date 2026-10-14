@@ -123,7 +123,9 @@ export const buildInbox = (
     const isWaiting = row.reasons.some(isInboxReason);
     // Dismissal hides the row but must not resurface it under "mine".
     if (isWaiting) waitingKeys.add(row.key);
-    if (dismissed[row.key] === row.updatedAt) continue;
+    const at = dismissed[row.key];
+    // `>=` so a vanished unread thread (older merged timestamp) keeps the row hidden.
+    if (at !== undefined && at >= row.updatedAt) continue;
     (isWaiting ? waiting : activity).push(row);
   }
   const mine = snapshot.searches.mine.filter(

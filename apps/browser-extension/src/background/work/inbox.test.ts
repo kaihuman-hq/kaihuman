@@ -114,6 +114,22 @@ describe('buildInbox', () => {
     expect(buildInbox(snap, null, { [key(1)]: '2025-12-31T00:00:00Z' }).waiting).toHaveLength(1);
   });
 
+  it('keeps a dismissed row hidden after its thread is marked done', () => {
+    const search = { assigned: [status(1, { updatedAt: '2026-01-01T00:00:00Z' })] };
+    const withThread = snapshot(search, [thread(1, { updatedAt: '2026-02-01T00:00:00Z' })]);
+    expect(buildInbox(withThread, null, {}).waiting[0]?.updatedAt).toBe('2026-02-01T00:00:00Z');
+    const dismissed = { [key(1)]: '2026-02-01T00:00:00Z' };
+    const done = snapshot(search, [
+      thread(1, { updatedAt: '2026-02-01T00:00:00Z', unread: false }),
+    ]);
+    expect(buildInbox(done, null, dismissed).waiting).toEqual([]);
+  });
+
+  it('brings a dismissed row back when a newer change arrives', () => {
+    const snap = snapshot({ assigned: [status(1, { updatedAt: '2026-03-01T00:00:00Z' })] });
+    expect(buildInbox(snap, null, { [key(1)]: '2026-02-01T00:00:00Z' }).waiting).toHaveLength(1);
+  });
+
   it('puts thread-only items under activity', () => {
     const snap = snapshot({ mine: [status(2)] }, [
       thread(1),
