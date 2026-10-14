@@ -20,6 +20,7 @@ import {
 } from '@kaihuman/palette';
 import { type Message } from '../types';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
+import { connectWorkPanel, isPanelOpen, runWorkCycle, watchWorkTokens } from './work/poller';
 import { consoleFileUrl, isConsolePage } from '../console';
 // The bundled loader's path, for injecting the page script on demand (CRXJS `?script` import).
 import PAGE_SCRIPT from '../content/index.ts?script';
@@ -120,6 +121,10 @@ chrome.alarms.create('swKeepAlive', { periodInMinutes: 0.5 });
 // bookmarks get opened — is counted locally and pushed with the next sync.
 chrome.alarms.create('repoSync', { periodInMinutes: 60 });
 
+// Work streams poll GitHub on their own schedule; the cycle decides each minute what is due.
+chrome.alarms.create('work', { periodInMinutes: 1 });
+watchWorkTokens();
+
 // The desktop palette hears of a repository chosen here at once, and is asked for its own choice
 // hourly and when a start page opens.
 watchRepoChanges();
@@ -140,14 +145,23 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     syncPinnedTabs().catch((e) => console.warn('kaihuman: pinned tab sync failed', e));
     syncToday().catch((e) => console.warn('kaihuman: start page sync failed', e));
   }
+  if (alarm.name === 'work') {
+    runWorkCycle({ panelOpen: isPanelOpen() }).catch((e) =>
+      console.warn('kaihuman: work polling failed', e),
+    );
+  }
 });
 
 // An open port keeps the MV3 service worker from being collected. The popup holds one for
 // as long as it is open, so a request fired after the user has spent a while typing (renaming
 // a tab group, say) still finds the worker alive instead of racing its teardown — which
 // surfaced as "The message port closed before a response was received".
-chrome.runtime.onConnect.addListener(() => {
+chrome.runtime.onConnect.addListener((port) => {
   // Accepting the port is the whole job — holding it open is what keeps the worker alive.
+  // The work side panel also refreshes its data as it opens.
+  if (port.name === 'work-panel') {
+    connectWorkPanel(port).catch((e) => console.warn('kaihuman: work panel refresh failed', e));
+  }
 });
 
 
