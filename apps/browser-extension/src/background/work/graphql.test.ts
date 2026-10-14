@@ -154,7 +154,10 @@ describe('parseWorkResponses', () => {
       [
         {
           data: { p0: { repository: null }, p1: null },
-          errors: [{ type: 'NOT_FOUND', path: ['p0', 'repository'], message: 'nope' }],
+          errors: [
+            { type: 'NOT_FOUND', path: ['p0', 'repository'], message: 'nope' },
+            { type: 'NOT_FOUND', path: ['p1'], message: 'nope' },
+          ],
         },
       ],
       pinned,
@@ -240,11 +243,79 @@ describe('parseWorkResponses', () => {
   it('reads later responses with their own alias numbering offset', () => {
     const pinned = Array.from({ length: 51 }, (_, i) => ref('o', 'r', i + 1));
     const out = parseWorkResponses(
-      [{ data: { viewer: { login: 'me' } } }, { data: { p0: null } }],
+      [
+        { data: { viewer: { login: 'me' } } },
+        { data: { p0: null }, errors: [{ type: 'NOT_FOUND', path: ['p0'], message: 'x' }] },
+      ],
       pinned,
     );
     expect(out.login).toBe('me');
     expect(out.pinned[pinned[50].key]).toMatchObject({ error: 'not-found' });
+  });
+});
+
+describe('failures', () => {
+  it('leaves a pinned item out on a transient lookup error', () => {
+    const pinned = [ref('a', 'b', 1), ref('a', 'b', 2)];
+    const out = parseWorkResponses(
+      [
+        {
+          data: { viewer: { login: 'me' }, p0: null, p1: null },
+          errors: [{ type: 'RESOURCE_LIMITS_EXCEEDED', path: ['p0'], message: 'slow' }],
+        },
+      ],
+      pinned,
+    );
+    expect(out.pinned).toEqual({});
+  });
+
+  it('throws when the response has errors and no data', () => {
+    expect(() =>
+      parseWorkResponses([{ errors: [{ type: 'RATE_LIMITED', message: 'slow down' }] }], []),
+    ).toThrow('GitHub GraphQL failed: slow down');
+    expect(() => parseWorkResponses([{ data: null, errors: [{ message: 'boom' }] }], [])).toThrow(
+      'boom',
+    );
+  });
+
+  it('throws when a search fails', () => {
+    expect(() =>
+      parseWorkResponses(
+        [
+          {
+            data: { viewer: { login: 'me' }, assigned: null },
+            errors: [{ type: 'INTERNAL', path: ['assigned'], message: 'oops' }],
+          },
+        ],
+        [],
+      ),
+    ).toThrow('GitHub GraphQL failed: oops');
+  });
+
+  it('ignores a forbidden search', () => {
+    const out = parseWorkResponses(
+      [
+        {
+          data: { viewer: { login: 'me' }, assigned: null },
+          errors: [{ type: 'FORBIDDEN', path: ['assigned'], message: 'no' }],
+        },
+      ],
+      [],
+    );
+    expect(out.searches.assigned).toEqual([]);
+    expect(out.login).toBe('me');
+  });
+
+  it('reads issue state from an alias so the fragments do not conflict', () => {
+    const [q] = buildWorkQueries([ref('a', 'b', 1)]);
+    const issueFragment = q.query.split('... on Issue {')[1].split('}')[0];
+    expect(issueFragment).not.toMatch(/(?<!issueState: )\bstate\b/);
+    expect(q.query).toContain('issueState: state');
+    const out = parseWorkResponses(
+      [{ data: { mine: { nodes: [{ ...issueNode, state: undefined, issueState: 'CLOSED' }] } } }],
+      [],
+    );
+    expect(out.searches.mine[0].state).toBe('closed');
   });
 });
 

@@ -35,7 +35,7 @@ const NODE_FIELDS = `
     commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
   }
   ... on Issue {
-    number title url state updatedAt
+    number title url issueState: state updatedAt
     repository { owner { login } name }
   }`;
 
@@ -85,6 +85,7 @@ interface RawNode {
   title?: string;
   url?: string;
   state?: string;
+  issueState?: string;
   updatedAt?: string;
   isDraft?: boolean;
   reviewDecision?: string | null;
@@ -121,7 +122,7 @@ function toStatus(node: RawNode): WorkItemStatus | null {
     number: node.number,
     kind: pr ? 'pr' : 'issue',
     title: node.title ?? '',
-    state: (node.state ?? 'OPEN').toLowerCase() as WorkItemStatus['state'],
+    state: (node.state ?? node.issueState ?? 'OPEN').toLowerCase() as WorkItemStatus['state'],
     isDraft: pr && node.isDraft === true,
     review: pr && node.reviewDecision ? (node.reviewDecision.toLowerCase() as ReviewState) : null,
     ci: pr && rollup ? (CI[rollup] ?? null) : null,
@@ -141,6 +142,21 @@ export function parseWorkResponses(
 } {
   type Body = { data?: Record<string, any> | null; errors?: GraphqlError[] };
   const bodies = responses as Body[];
+
+  for (const body of bodies) {
+    const errors = body?.errors ?? [];
+    if (errors.length > 0 && !body?.data) {
+      throw new Error(`GitHub GraphQL failed: ${errors[0].message ?? 'no data'}`);
+    }
+  }
+  const searchAliases = new Set(SEARCHES.map(([, alias]) => alias));
+  // A failed search would read as "nothing needs you"; a FORBIDDEN one is just what the token may see.
+  const searchFailure = bodies[0]?.errors?.find(
+    (e) => searchAliases.has(String(e.path?.[0])) && e.type !== 'FORBIDDEN',
+  );
+  if (searchFailure) {
+    throw new Error(`GitHub GraphQL failed: ${searchFailure.message ?? searchFailure.type}`);
+  }
 
   const searches = Object.fromEntries(
     SEARCHES.map(([k]) => [k, [] as WorkItemStatus[]]),
@@ -162,11 +178,14 @@ export function parseWorkResponses(
       result[ref.key] = status;
       return;
     }
-    const error = body?.errors?.find((e) => e.path?.[0] === alias && e.type === 'FORBIDDEN');
-    if (!error) {
+    const errors = body?.errors?.filter((e) => e.path?.[0] === alias) ?? [];
+    if (errors.some((e) => e.type === 'NOT_FOUND')) {
       result[ref.key] = { key: ref.key, error: 'not-found', org: ref.owner };
       return;
     }
+    const error = errors.find((e) => e.type === 'FORBIDDEN');
+    // Any other failure leaves the status unknown, so the caller shows no chip rather than a wrong one.
+    if (!error) return;
     result[ref.key] = { key: ref.key, error: 'forbidden', org: ref.owner };
     if (!orgProblems.some((p) => p.org === ref.owner)) {
       const sso = /SAML/i.test(error.message ?? '');
