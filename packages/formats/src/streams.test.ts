@@ -404,7 +404,7 @@ describe('stream operations', () => {
           at: T0,
         },
         { op: 'markDone', itemId: 'it_old' as ItemId, at: '2026-09-29T00:00:00Z' },
-        { op: 'markDone', itemId: 'it_edge' as ItemId, at: '2026-09-30T00:00:00Z' },
+        { op: 'markDone', itemId: 'it_edge' as ItemId, at: '2026-09-30T00:00:02Z' },
       ],
       T0,
     );

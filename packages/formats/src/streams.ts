@@ -443,15 +443,13 @@ export const applyOp = (file: StreamsFile, op: StreamOp): StreamsFile => {
     case 'remove':
       return dropItem(file, op.itemId);
     case 'prune': {
-      const now = Date.parse(op.now);
       return withStreams(
         file,
         file.streams.map((stream) => ({
           ...stream,
           items: stream.items.filter((item) => {
             if (item.doneAt === undefined) return true;
-            // Whole elapsed days, so "done 14 days ago" stays until the 15th day starts.
-            return !(Math.floor((now - Date.parse(item.doneAt)) / DAY_MS) > PRUNE_AFTER_DAYS);
+            return !(Date.parse(op.now) - Date.parse(item.doneAt) > PRUNE_AFTER_DAYS * DAY_MS);
           }),
         })),
       );
