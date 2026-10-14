@@ -1,5 +1,5 @@
 import type { ItemId, StreamId, StreamOp } from '@kaihuman/formats';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Res = { status: number; body?: unknown; etag?: string };
 let store: Record<string, unknown>;
@@ -28,7 +28,7 @@ const pin = (url = 'https://github.com/o/r/pull/1'): StreamOp => ({
 
 beforeEach(() => {
   vi.resetModules();
-  vi.useRealTimers();
+  vi.useFakeTimers();
   store = { lifeos_token: 't', lifeos_repo: 'o/r' };
   responses = [];
   calls = [];
@@ -66,6 +66,12 @@ beforeEach(() => {
       };
     }),
   );
+});
+
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 const load = () => import('./streams-store');
@@ -232,7 +238,6 @@ describe('streams store', () => {
   });
 
   it('flushes on its own three seconds after the last op', async () => {
-    vi.useFakeTimers();
     responses.push(
       { status: 200, body: fileBody(streamsJson) },
       { status: 200, body: fileBody(streamsJson) },
@@ -243,5 +248,42 @@ describe('streams store', () => {
     expect(puts()).toHaveLength(0);
     await vi.advanceTimersByTimeAsync(3000);
     expect(puts()).toHaveLength(1);
+  });
+
+  it('keeps both ops of two concurrent enqueues', async () => {
+    // Both calls miss the cache and read the file.
+    responses.push(
+      { status: 200, body: fileBody(streamsJson) },
+      { status: 200, body: fileBody(streamsJson) },
+    );
+    const { enqueueStreamOps } = await load();
+    const a = pin();
+    const b = { ...pin('https://github.com/o/r/pull/2'), itemId: 'it_2' as ItemId };
+    await Promise.all([enqueueStreamOps([a]), enqueueStreamOps([b])]);
+    expect(store.streamsWriteQueue).toEqual([a, b]);
+  });
+
+  it('neither loses nor repeats an op enqueued while the commit finishes', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    responses.push(
+      { status: 200, body: fileBody(streamsJson) },
+      { status: 200, body: fileBody(streamsJson) },
+      async () => {
+        await gate;
+        return { status: 200, body: { content: { sha: 's2' } } };
+      },
+    );
+    const { enqueueStreamOps, flushStreams } = await load();
+    const a = pin();
+    const b = { ...pin('https://github.com/o/r/pull/2'), itemId: 'it_2' as ItemId };
+    await enqueueStreamOps([a]);
+    const flush = flushStreams();
+    await vi.waitFor(() => expect(puts()).toHaveLength(1));
+    release();
+    await Promise.all([flush, enqueueStreamOps([b])]);
+    expect(store.streamsWriteQueue).toEqual([b]);
   });
 });

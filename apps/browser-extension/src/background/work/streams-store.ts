@@ -29,6 +29,15 @@ async function getStored<T>(key: string): Promise<T | undefined> {
   return data[key] as T | undefined;
 }
 
+// Queue changes are read-modify-write on storage; two interleaved ones would lose or repeat ops.
+// Everything runs inside the worker, so a promise chain is enough.
+let queueLock: Promise<unknown> = Promise.resolve();
+function withQueueLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = queueLock.then(fn, fn);
+  queueLock = run.catch(() => undefined);
+  return run;
+}
+
 const getQueue = async () => (await getStored<StreamOp[]>(WORK_KEYS.queue)) ?? [];
 
 function parseFile(content: string | null, now: number): StreamsParse {
@@ -75,8 +84,10 @@ export async function enqueueStreamOps(ops: StreamOp[]): Promise<void> {
   if (!cache.state.ok) {
     throw new Error('The streams file is read-only until it is valid JSON again');
   }
-  const queue = await getQueue();
-  await chrome.storage.local.set({ [WORK_KEYS.queue]: [...queue, ...ops] });
+  await withQueueLock(async () => {
+    const queue = await getQueue();
+    await chrome.storage.local.set({ [WORK_KEYS.queue]: [...queue, ...ops] });
+  });
   clearTimeout(flushTimer);
   flushTimer = setTimeout(() => {
     void flushStreams();
@@ -141,7 +152,6 @@ async function runFlush(): Promise<{ saved: boolean }> {
       const content = serializeStreams(file);
       try {
         const newSha = await writeRepoFile(token, repo, STREAMS_PATH, content, sha, COMMIT_MESSAGE);
-        const current = await getQueue();
         const cache: StreamsCache = {
           repo,
           state: { ok: true, file },
@@ -149,9 +159,12 @@ async function runFlush(): Promise<{ saved: boolean }> {
           etag: null,
           fetchedAt: now,
         };
-        await chrome.storage.local.set({
-          [WORK_KEYS.queue]: current.slice(flushed),
-          [WORK_KEYS.streamsCache]: cache,
+        await withQueueLock(async () => {
+          const current = await getQueue();
+          await chrome.storage.local.set({
+            [WORK_KEYS.queue]: current.slice(flushed),
+            [WORK_KEYS.streamsCache]: cache,
+          });
         });
         if (failures.length > 0) {
           await chrome.storage.local.set({ [WORK_KEYS.saveError]: failures.join('; ') });
