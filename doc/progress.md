@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-10-14 — Open the work side panel with a shortcut or from the command palette
+
+- **`Alt+Shift+W`** (`open-work-panel` in `manifest.ts`) opens the work panel in the current window; it can be changed at chrome://extensions/shortcuts. The worker opens the panel straight from the command, since `sidePanel.open` only works while Chrome counts the key press as the user's (`background/work/side-panel.ts`).
+- **Open work panel** in the command palette, on any page and on the start page (`src/palette/work-panel.ts`). The palette sends `OPEN_WORK_PANEL`; the worker handles it first and without awaiting, and opens the panel in the palette's window. A refusal shows in the palette.
+- Not yet checked by hand in Chrome: that the palette's ⏎ still counts as the user's action when the message reaches the worker.
+
 ## 2026-10-14 — Work side panel: everything in place, no dialogs, and a cleaner layout
 
 - **Fix: a new stream from the panel did nothing.** Chrome side panels block `window.prompt` and `window.confirm`: the panel dimmed to grey and the call returned nothing, so **New stream…** never created a stream. Every dialog is now inline (`src/sidepanel/controls.tsx`): the stream name is typed in the This-tab card, the inbox pin menu and under **Streams**; labels are edited in the item's row; deleting a stream with items asks in place (**Delete stream** / **Keep**). The tests fail if any panel code calls `prompt` or `confirm`.

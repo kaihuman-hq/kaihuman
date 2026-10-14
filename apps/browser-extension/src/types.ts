@@ -58,7 +58,8 @@ export interface Message {
     | 'WORK_DISMISS'
     | 'WORK_OPEN'
     | 'WORK_SET_TOKEN'
-    | 'WORK_PIN_TAB';
+    | 'WORK_PIN_TAB'
+    | 'OPEN_WORK_PANEL';
   token?: string;
   path?: string;
   note?: string;

@@ -20,6 +20,7 @@ import { type ServiceStatus, STATUS_CACHE_TTL_MS } from '../background/service-s
 import { DEFAULT_ACTION_LOG_PATH, type TodaySummary } from '../background/today';
 import { CONSOLE_URL, consoleFileUrl } from '../console';
 import { send, workerPort } from '../palette/port';
+import { openWorkPanelAction } from '../palette/work-panel';
 import { ServiceStatusStrip } from './ServiceStatus';
 import {
   Braindumps,
@@ -153,7 +154,7 @@ export function StartPage() {
         ...portHandlers(workerPort),
         // This tab is a blank start page, so a hit takes it over rather than leaving it behind.
         open: openInThisTab,
-        actions: () => repoActions(workerPort),
+        actions: () => [openWorkPanelAction(send), ...repoActions(workerPort)],
         // The browser cannot run commands, so `>x` only copies them.
         modes: [...paletteModes(workerPort), commandsMode(workerPort, { canRun: false })],
         copy: copyToClipboard,

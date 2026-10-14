@@ -35,6 +35,7 @@ import {
   rebuildPinMenu,
   watchPinMenu,
 } from './work/messages';
+import { openWorkPanel } from './work/side-panel';
 import { type StreamsCache, WORK_KEYS } from './work/types';
 import { consoleFileUrl, isConsolePage } from '../console';
 // The bundled loader's path, for injecting the page script on demand (CRXJS `?script` import).
@@ -355,6 +356,12 @@ chrome.commands.onCommand.addListener(async (command) => {
 
   console.warn(`kaihuman: the palette cannot run on this page (${tab.url ?? 'unknown'})`);
   await flagPaletteFailure(tab.id);
+});
+
+// The shortcut counts as the user's action, which `sidePanel.open` needs, so the panel opens here.
+chrome.commands.onCommand.addListener((command, tab) => {
+  if (command !== 'open-work-panel') return;
+  openWorkPanel(tab?.windowId).catch((e) => console.warn('kaihuman: opening the work panel failed', e));
 });
 
 chrome.commands.onCommand.addListener((command) => {
@@ -1421,6 +1428,14 @@ const answer = (work: Promise<object>, sendResponse: (response: unknown) => void
 
 // Message Handling
 chrome.runtime.onMessage.addListener((message: Message | any, sender, sendResponse) => {
+  // First and synchronous: the palette's ⏎ still counts as the user's action only until an await.
+  if (message.type === 'OPEN_WORK_PANEL') {
+    return answer(
+      openWorkPanel(sender.tab?.windowId).then(() => ({})),
+      sendResponse,
+    );
+  }
+
   const work = handleWorkMessage(message);
   if (work) return answer(work as Promise<object>, sendResponse);
 

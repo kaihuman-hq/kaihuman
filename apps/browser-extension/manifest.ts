@@ -36,6 +36,10 @@ export default defineManifest({
       },
       description: 'Open the kaihuman command palette',
     },
+    'open-work-panel': {
+      suggested_key: { default: 'Alt+Shift+W' },
+      description: 'Open the kaihuman work panel',
+    },
     'pin-current-tab': {
       suggested_key: { default: 'Alt+Shift+P' },
       description: 'Pin the current tab to a kaihuman work stream',

@@ -10,6 +10,7 @@ import {
   splitTags,
 } from '@kaihuman/palette';
 import { send, workerPort } from '../palette/port';
+import { openWorkPanelAction } from '../palette/work-panel';
 import { extractArticle } from './extract';
 
 // Built on first use so pages that never open the palette pay nothing for it.
@@ -69,6 +70,7 @@ const paletteActions = (): PaletteAction[] => [
       return 'Added to the Knowledge Base';
     },
   },
+  openWorkPanelAction(send),
   ...repoActions(workerPort),
 ];
 
