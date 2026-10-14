@@ -898,6 +898,26 @@ describe('StartPage', () => {
       expect(panelOpened).toEqual([{ windowId: 7 }]);
     });
 
+    it('opens the side panel inside the click, with the window resolved beforehand', async () => {
+      store.workSnapshot = snapshot({ assigned: [status(1, 'Only one')] });
+      await mount(() => card() !== null);
+      await tick();
+
+      (card() as HTMLButtonElement).click();
+      // No await: `sidePanel.open` only works inside the user gesture.
+      expect(panelOpened).toEqual([{ windowId: 7 }]);
+    });
+
+    it('stays as a way into the panel when nothing is waiting', async () => {
+      store.workSnapshot = snapshot({});
+      await mount(() => card() !== null);
+      await tick();
+
+      expect(card()?.textContent).toContain('Nothing waiting — open work panel');
+      (card() as HTMLButtonElement).click();
+      expect(panelOpened).toEqual([{ windowId: 7 }]);
+    });
+
     it('shows nothing when signed out', async () => {
       store.workSnapshot = snapshot({ assigned: [status(1, 'Hidden')] }, { kind: 'signed-out' });
       await mount(settled);

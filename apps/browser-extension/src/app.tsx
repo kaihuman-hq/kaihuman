@@ -5,6 +5,7 @@ import { ActionLogForm } from './components/ActionLogForm';
 import { BookmarkPageForm } from './components/BookmarkPageForm';
 import { QuickActions } from './components/QuickActions';
 import { PinnedTabsPanel } from './components/PinnedTabsPanel';
+import { OpenWorkPanel } from './components/OpenWorkPanel';
 import { imagesEnabled, KB_IMAGES_SETTING } from './background/kb-capture';
 import './index.css';
 
@@ -338,6 +339,8 @@ export function App() {
             {errorMessage}
           </div>
         )}
+
+        <OpenWorkPanel />
 
         <PinnedTabsPanel repo={activeRepo ?? ''} />
 

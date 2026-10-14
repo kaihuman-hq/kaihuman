@@ -88,18 +88,31 @@ export function ThisTabBar({
     const { stream, item } = found;
     return (
       <section class={box}>
-        <div class="truncate">In {stream.name}</div>
+        <div class="truncate">
+          {item.doneAt === undefined ? 'In' : 'Done in'} {stream.name}
+        </div>
         <div class="flex gap-2 items-center">
-          <button
-            type="button"
-            class={action}
-            disabled={readOnly || item.doneAt !== undefined}
-            onClick={() =>
-              void run([{ op: 'markDone', itemId: item.id, at: new Date().toISOString() }])
-            }
-          >
-            ✓ Done
-          </button>
+          {item.doneAt === undefined ? (
+            <button
+              type="button"
+              class={action}
+              disabled={readOnly}
+              onClick={() =>
+                void run([{ op: 'markDone', itemId: item.id, at: new Date().toISOString() }])
+              }
+            >
+              ✓ Done
+            </button>
+          ) : (
+            <button
+              type="button"
+              class={action}
+              disabled={readOnly}
+              onClick={() => void run([{ op: 'undone', itemId: item.id }])}
+            >
+              Undo
+            </button>
+          )}
           <select
             aria-label="Move"
             class={`${field} flex-1`}

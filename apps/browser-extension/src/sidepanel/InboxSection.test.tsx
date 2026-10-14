@@ -132,7 +132,7 @@ beforeEach(() => {
       onUpdated: { addListener: () => {}, removeListener: () => {} },
     },
     runtime: {
-      connect: () => ({ disconnect: () => {} }),
+      connect: () => ({ disconnect: () => {}, onDisconnect: { addListener: () => {} } }),
       sendMessage: (message: Record<string, unknown>, respond?: (response: unknown) => void) => {
         sent.push(message);
         if (failNext) respond?.({ error: failNext });

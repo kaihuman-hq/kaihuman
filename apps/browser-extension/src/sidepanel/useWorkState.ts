@@ -1,5 +1,7 @@
+import type { StreamsFile } from '@kaihuman/formats';
 import { useEffect, useState } from 'preact/hooks';
 import type { Dismissed } from '../background/work/inbox.js';
+import { pendingStreams } from '../background/work/pending.js';
 import {
   EMPTY_WORK_UI,
   type StreamsCache,
@@ -11,9 +13,13 @@ import {
 export interface WorkState {
   snapshot?: WorkSnapshot;
   streams?: StreamsCache;
+  /** The streams with unsaved changes applied; `null` without a cache or when read-only. */
+  file: StreamsFile | null;
   dismissed: Dismissed;
   saveError?: string;
   queueLength: number;
+  /** Whether a work token is set; its value is never kept here. */
+  workTokenSet: boolean;
   ui: WorkUi;
   /** False until the first read of storage has landed. */
   loaded: boolean;
@@ -26,19 +32,30 @@ const KEYS = [
   WORK_KEYS.saveError,
   WORK_KEYS.dismissed,
   WORK_KEYS.ui,
+  WORK_KEYS.workToken,
 ];
 
-const INITIAL: WorkState = { dismissed: {}, queueLength: 0, ui: EMPTY_WORK_UI, loaded: false };
+const INITIAL: WorkState = {
+  file: null,
+  dismissed: {},
+  queueLength: 0,
+  workTokenSet: false,
+  ui: EMPTY_WORK_UI,
+  loaded: false,
+};
 
 const read = async (): Promise<WorkState> => {
   const data = await chrome.storage.local.get(KEYS);
   const queue = data[WORK_KEYS.queue];
+  const streams = data[WORK_KEYS.streamsCache] as StreamsCache | undefined;
   return {
     snapshot: data[WORK_KEYS.snapshot] as WorkSnapshot | undefined,
-    streams: data[WORK_KEYS.streamsCache] as StreamsCache | undefined,
+    streams,
+    file: pendingStreams(streams, queue),
     dismissed: (data[WORK_KEYS.dismissed] as Dismissed | undefined) ?? {},
     saveError: (data[WORK_KEYS.saveError] as string | undefined) || undefined,
     queueLength: Array.isArray(queue) ? queue.length : 0,
+    workTokenSet: Boolean(data[WORK_KEYS.workToken]),
     ui: { ...EMPTY_WORK_UI, ...(data[WORK_KEYS.ui] as Partial<WorkUi> | undefined) },
     loaded: true,
   };

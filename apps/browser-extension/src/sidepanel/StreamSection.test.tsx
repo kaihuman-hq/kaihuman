@@ -170,7 +170,7 @@ beforeEach(() => {
       onUpdated: { addListener: () => {}, removeListener: () => {} },
     },
     runtime: {
-      connect: () => ({ disconnect: () => {} }),
+      connect: () => ({ disconnect: () => {}, onDisconnect: { addListener: () => {} } }),
       sendMessage: (message: Record<string, unknown>, respond?: (response: unknown) => void) => {
         sent.push(message);
         respond?.({ ok: true });
@@ -313,6 +313,29 @@ describe('StreamSection', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await waitFor(() => ops().length > 5);
     expect(ops()[5]).toEqual({ op: 'renameStream', streamId: 'st_b', name: 'Gamma' });
+  });
+
+  it('keeps a rename on blur, and drops it on Escape', async () => {
+    await mount('Alpha (3)');
+    const rename = async (name: string) => {
+      header('Beta')
+        .querySelector('span,button')
+        ?.dispatchEvent(new Event('dblclick', { bubbles: true }));
+      await waitFor(() => host.querySelector('input[aria-label="Stream name"]') !== null);
+      const input = host.querySelector('input[aria-label="Stream name"]') as HTMLInputElement;
+      input.value = name;
+      return input;
+    };
+    (await rename('Gamma')).dispatchEvent(new FocusEvent('blur'));
+    await waitFor(() => ops().length > 0);
+    expect(ops()).toEqual([{ op: 'renameStream', streamId: 'st_b', name: 'Gamma' }]);
+
+    const input = await rename('Delta');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    input.dispatchEvent(new FocusEvent('blur'));
+    await waitFor(() => host.querySelector('input[aria-label="Stream name"]') === null);
+    await tick();
+    expect(ops()).toHaveLength(1);
   });
 
   it('double click renames without toggling collapse', async () => {

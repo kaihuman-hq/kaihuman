@@ -66,6 +66,7 @@ let host: HTMLDivElement;
 let store: Record<string, unknown>;
 let sent: Record<string, unknown>[];
 let connected: { name?: string }[];
+let portDisconnects: (() => void)[];
 let changeListeners: ((changes: Record<string, unknown>, area: string) => void)[];
 let activeTab: { id: number; url?: string; title?: string };
 
@@ -97,6 +98,7 @@ beforeEach(() => {
   store = {};
   sent = [];
   connected = [];
+  portDisconnects = [];
   changeListeners = [];
   activeTab = { id: 7, url: 'https://example.com/new', title: 'New page' };
   (globalThis as unknown as { chrome: unknown }).chrome = {
@@ -126,7 +128,10 @@ beforeEach(() => {
     runtime: {
       connect: (info: { name?: string }) => {
         connected.push(info);
-        return { disconnect: () => {} };
+        return {
+          disconnect: () => {},
+          onDisconnect: { addListener: (l: () => void) => portDisconnects.push(l) },
+        };
       },
       sendMessage: (message: Record<string, unknown>, respond?: (response: unknown) => void) => {
         sent.push(message);
@@ -293,5 +298,52 @@ describe('SidePanel', () => {
     store = { ...store, workSnapshot: snapshot({ problem: { kind: 'auth' } }) };
     for (const l of changeListeners) l({ workSnapshot: {} }, 'local');
     await waitFor(() => host.textContent?.includes('GitHub refused the token.') ?? false);
+  });
+
+  it('shows a queued pin at once, before the commit lands', async () => {
+    store = {
+      streamsCache: cache(),
+      workSnapshot: snapshot(),
+      streamsWriteQueue: [
+        {
+          op: 'pin',
+          streamId: 'st_b',
+          itemId: 'it_q',
+          url: 'https://example.com/new',
+          title: 'New page',
+          labels: [],
+          at: NOW,
+        },
+      ],
+    };
+    await mount('In Beta');
+    expect([...host.querySelectorAll('button')].some((b) => b.textContent === 'Pin')).toBe(false);
+  });
+
+  it('reconnects the work-panel port when the worker restarts', async () => {
+    store = { streamsCache: cache(), workSnapshot: snapshot() };
+    await mount('Work');
+    expect(connected).toHaveLength(1);
+    for (const l of portDisconnects.splice(0)) l();
+    expect(connected).toEqual([{ name: 'work-panel' }, { name: 'work-panel' }]);
+  });
+
+  it('points at the work token when GitHub refuses it', async () => {
+    store = { workSnapshot: snapshot({ problem: { kind: 'auth' } }), workToken: 'ghp_x' };
+    await mount('GitHub refused the work token. Update it in Settings.');
+    expect(host.textContent).not.toContain('Sign in again');
+  });
+
+  it('offers to undo a done item instead of a disabled ✓', async () => {
+    activeTab = { id: 7, url: 'https://example.com/pinned', title: 'Pinned page' };
+    const done = file();
+    const first = done.streams[0]?.items[0];
+    if (first) first.doneAt = NOW;
+    store = { streamsCache: cache({ ok: true, file: done }), workSnapshot: snapshot() };
+    await mount('Done in Alpha');
+    click('Undo');
+    await waitFor(() => sent.some((m) => m.type === 'WORK_OPS'));
+    const message = sent.find((m) => m.type === 'WORK_OPS') as { ops: Record<string, unknown>[] };
+    expect(message.ops).toEqual([{ op: 'undone', itemId: 'it_1' }]);
   });
 });

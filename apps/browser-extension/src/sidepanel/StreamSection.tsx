@@ -183,6 +183,8 @@ export function StreamSection(props: Props) {
   const [renaming, setRenaming] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const toggleTimer = useRef<ReturnType<typeof setTimeout>>();
+  // Set once Enter or Escape has settled the rename, so the blur of the closing input is ignored.
+  const renameSettled = useRef(false);
   useEffect(() => () => clearTimeout(toggleTimer.current), []);
   const matches = (item: StreamItem) => label === undefined || item.labels.includes(label);
   const open = stream.items.filter((item) => !item.doneAt && matches(item));
@@ -202,6 +204,8 @@ export function StreamSection(props: Props) {
     sendOps([{ op: 'deleteStream', streamId: stream.id }]);
   };
   const commitRename = (value: string) => {
+    if (renameSettled.current) return;
+    renameSettled.current = true;
     const name = value.trim();
     setRenaming(false);
     if (name && name !== stream.name) {
@@ -234,9 +238,15 @@ export function StreamSection(props: Props) {
             ref={(el) => el?.focus()}
             onKeyDown={(event) => {
               if (event.key === 'Enter') commitRename(event.currentTarget.value);
-              if (event.key === 'Escape') setRenaming(false);
+              if (event.key === 'Escape') {
+                renameSettled.current = true;
+                setRenaming(false);
+              }
             }}
-            onBlur={() => setRenaming(false)}
+            // Clicking away keeps what was typed, as Enter does; only Escape throws it away.
+            onBlur={(event) => {
+              commitRename(event.currentTarget.value);
+            }}
           />
         ) : (
           <button
@@ -252,6 +262,7 @@ export function StreamSection(props: Props) {
             onDblClick={() => {
               if (readOnly) return;
               clearTimeout(toggleTimer.current);
+              renameSettled.current = false;
               setRenaming(true);
             }}
           >
