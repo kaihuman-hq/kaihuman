@@ -84,6 +84,20 @@ describe('normalizeItemUrl', () => {
     );
   });
 
+  it('keeps route-like fragments so hash-routed pages stay distinct', () => {
+    const a = 'https://mail.google.com/mail/u/0/#inbox/FMfcgzQ1';
+    const b = 'https://mail.google.com/mail/u/0/#inbox/FMfcgzQ2';
+    expect(normalizeItemUrl(a)).toBe(a);
+    expect(normalizeItemUrl(b)).toBe(b);
+    expect(normalizeItemUrl('https://app.example.com/#!/board/7')).toBe(
+      'https://app.example.com/#!/board/7',
+    );
+  });
+
+  it('still drops plain anchors', () => {
+    expect(normalizeItemUrl('https://example.com/docs#section-2')).toBe('https://example.com/docs');
+  });
+
   it('keeps Slack thread parameters', () => {
     const url = 'https://acme.slack.com/archives/C04/p1728896?thread_ts=1728896.1&cid=C04';
     expect(normalizeItemUrl(url)).toBe(url);

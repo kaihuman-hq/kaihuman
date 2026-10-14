@@ -1,7 +1,7 @@
 /**
- * Work streams: the URL helpers behind `.kh/streams.md` (doc/work-streams.md).
- * An item is identified by its normalised URL, so every spelling of one pull request
- * (trailing slash, `/files`, a fragment, `www.`) has to collapse to the same string.
+ * Work streams: the file format and URL helpers behind `.kh/browser.streams.json`
+ * (doc/work-streams.md). An item is identified by its normalised URL, so every spelling of one
+ * pull request (trailing slash, `/files`, a fragment, `www.`) has to collapse to the same string.
  */
 
 /** `owner/repo#number` with owner and repo lowercased — GitHub treats them case-insensitively. */
@@ -58,6 +58,13 @@ export const itemRefOf = (url: string): ItemRef | null => {
   return githubRefOf(parsed) ?? { kind: 'link', host: parsed.hostname };
 };
 
+/**
+ * Hash-routed apps (Gmail's `#inbox/<id>`, `#!/board/7`) keep the page identity in the fragment,
+ * so dropping it would merge every thread into one item; plain anchors (`#top`) are just scroll
+ * positions on the same page.
+ */
+const isRouteFragment = (hash: string): boolean => hash.startsWith('#!') || hash.includes('/');
+
 const isTracking = (name: string) => name.startsWith('utm_') || TRACKING_PARAMS.includes(name);
 
 /** The canonical spelling of an item's URL; unsafe URLs come back unchanged. */
@@ -69,11 +76,13 @@ export const normalizeItemUrl = (url: string): string => {
     const type = ref.kind === 'github-pr' ? 'pull' : 'issues';
     return `https://github.com/${ref.owner}/${ref.repo}/${type}/${ref.number}`;
   }
-  parsed.hash = '';
+  const route = isRouteFragment(parsed.hash);
+  if (!route) parsed.hash = '';
   for (const name of [...parsed.searchParams.keys()]) {
     if (isTracking(name)) parsed.searchParams.delete(name);
   }
-  if (parsed.pathname.length > 1 && parsed.pathname.endsWith('/')) {
+  // A hash-routed app is mounted at its exact path, so it is left as the app serves it.
+  if (!route && parsed.pathname.length > 1 && parsed.pathname.endsWith('/')) {
     parsed.pathname = parsed.pathname.slice(0, -1);
   }
   return parsed.toString();
