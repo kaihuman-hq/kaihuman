@@ -79,7 +79,7 @@ describe('parseWorkResponses', () => {
             viewer: { login: 'me' },
             reviewRequested: searchData([prNode(), {}]),
             assigned: searchData([issueNode]),
-            p0: { repository: { issueOrPullRequest: prNode() } },
+            p0: { issueOrPullRequest: prNode() },
           },
         },
       ],
@@ -153,7 +153,7 @@ describe('parseWorkResponses', () => {
     const out = parseWorkResponses(
       [
         {
-          data: { p0: { repository: null }, p1: null },
+          data: { p0: null, p1: null },
           errors: [
             { type: 'NOT_FOUND', path: ['p0', 'repository'], message: 'nope' },
             { type: 'NOT_FOUND', path: ['p1'], message: 'nope' },
@@ -228,7 +228,7 @@ describe('parseWorkResponses', () => {
         {
           data: {
             viewer: { login: 'me' },
-            p0: { repository: { issueOrPullRequest: prNode() } },
+            p0: { issueOrPullRequest: prNode() },
             p1: null,
           },
           errors: [{ type: 'FORBIDDEN', path: ['p1'], message: 'no' }],
@@ -316,6 +316,22 @@ describe('failures', () => {
       [],
     );
     expect(out.searches.mine[0].state).toBe('closed');
+  });
+});
+
+describe('query and parser agree', () => {
+  it('reads a pinned lookup in the shape GitHub returns for the alias', () => {
+    const pinned = [ref('Acme', 'Web', 7), ref('Acme', 'Web', 8)];
+    const [q] = buildWorkQueries(pinned);
+    const aliases = [...q.query.matchAll(/\b(p\d+): repository\(/g)].map((m) => m[1]);
+    expect(aliases).toEqual(['p0', 'p1']);
+    // GitHub answers `alias: repository(...) { issueOrPullRequest(...) }` as data[alias].issueOrPullRequest.
+    const data = Object.fromEntries(
+      aliases.map((a, i) => [a, { issueOrPullRequest: prNode({ number: 7 + i }) }]),
+    );
+    const out = parseWorkResponses([{ data }], pinned);
+    expect(Object.keys(out.pinned)).toEqual(pinned.map((r) => r.key));
+    expect(out.pinned[pinned[1].key]).toMatchObject({ number: 8, kind: 'pr' });
   });
 });
 

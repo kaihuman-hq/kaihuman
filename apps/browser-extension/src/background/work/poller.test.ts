@@ -63,7 +63,7 @@ const gqlOk = (
     mine: { nodes: [] },
   };
   (opts.pinned ?? []).forEach((node, i) => {
-    data[`p${i}`] = { repository: { issueOrPullRequest: node } };
+    data[`p${i}`] = { issueOrPullRequest: node };
   });
   return { status: 200, body: { data } };
 };

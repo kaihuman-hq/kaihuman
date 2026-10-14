@@ -172,7 +172,7 @@ export function parseWorkResponses(
   pinned.forEach((ref, index) => {
     const body = bodies[Math.floor(index / MAX_LOOKUPS_PER_QUERY)];
     const alias = `p${index % MAX_LOOKUPS_PER_QUERY}`;
-    const found = body?.data?.[alias]?.repository?.issueOrPullRequest as RawNode | null | undefined;
+    const found = body?.data?.[alias]?.issueOrPullRequest as RawNode | null | undefined;
     const status = found ? toStatus(found) : null;
     if (status) {
       result[ref.key] = status;
