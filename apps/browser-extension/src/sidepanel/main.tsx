@@ -1,3 +1,5 @@
 import { render } from 'preact';
+import '../index.css';
+import { SidePanel } from './SidePanel.tsx';
 
-render(<p>Work</p>, document.getElementById('app') as HTMLElement);
+render(<SidePanel />, document.getElementById('app') as HTMLElement);
