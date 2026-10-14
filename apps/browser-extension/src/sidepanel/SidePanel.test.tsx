@@ -196,6 +196,8 @@ describe('SidePanel', () => {
       workUi: { collapsed: [], lastStreamId: 'st_b' },
     };
     await mount('Pin');
+    // "Pin" also appears in the streams' item titles, so wait for the tab bar itself.
+    await waitFor(() => host.querySelector('input[aria-label="Labels"]') !== null);
     const labels = host.querySelector('input[aria-label="Labels"]') as HTMLInputElement;
     labels.value = ' read, ,later ';
     labels.dispatchEvent(new Event('input', { bubbles: true }));

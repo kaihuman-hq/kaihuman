@@ -1,3 +1,4 @@
+import { newStreamId, streamLabels } from '@kaihuman/formats';
 import { useEffect } from 'preact/hooks';
 import { buildInbox, unreadKeys } from '../background/work/inbox.js';
 import type { OrgAccessProblem, WorkProblem } from '../background/work/types.js';
@@ -5,8 +6,10 @@ import { CONSOLE_URL, consoleFileUrl } from '../console.js';
 import { send } from '../palette/port.js';
 import { age } from './age.js';
 import { InboxSection, MineSection } from './InboxSection.js';
+import { StreamSection } from './StreamSection.js';
 import { ThisTabBar } from './ThisTabBar.js';
-import { useWorkState } from './useWorkState.js';
+import { updateWorkUi, useWorkState } from './useWorkState.js';
+import { WorkSettings } from './WorkSettings.js';
 
 const clock = (ms: number) =>
   new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -60,6 +63,17 @@ export function SidePanel() {
   const inbox = snapshot ? buildInbox(snapshot, file, dismissed) : undefined;
   const unread = snapshot ? unreadKeys(snapshot) : new Set<string>();
   const readOnly = streams ? !streams.state.ok : false;
+
+  const addStream = () => {
+    const name = window.prompt('Name of the new stream')?.trim();
+    if (!name) return;
+    void send({
+      type: 'WORK_OPS',
+      ops: [{ op: 'addStream', streamId: newStreamId(), name, at: new Date().toISOString() }],
+    }).catch(() => {});
+  };
+  const labels = file ? streamLabels(file) : [];
+  const label = ui.label !== undefined && labels.includes(ui.label) ? ui.label : undefined;
 
   return (
     <main class={`${shell} flex flex-col gap-3 font-sans`}>
@@ -134,8 +148,48 @@ export function SidePanel() {
               />
             </>
           )}
+          {file && (
+            <>
+              <div class="flex items-center gap-2">
+                <select
+                  class="flex-1 bg-[#050505] text-[12px] text-[#999]"
+                  aria-label="Filter by label"
+                  value={label ?? ''}
+                  onChange={(event) =>
+                    void updateWorkUi({ label: event.currentTarget.value || undefined })
+                  }
+                >
+                  <option value="">all</option>
+                  {labels.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" class="border border-[#333] px-2" onClick={addStream}>
+                  + New stream
+                </button>
+              </div>
+              {file.streams.map((stream, index) => (
+                <StreamSection
+                  key={stream.id}
+                  stream={stream}
+                  index={index}
+                  count={file.streams.length}
+                  statuses={snapshot?.pinned ?? {}}
+                  threads={snapshot?.threads}
+                  unread={unread}
+                  label={label}
+                  collapsed={ui.collapsed.includes(stream.id)}
+                  readOnly={readOnly}
+                  streams={file.streams}
+                />
+              ))}
+            </>
+          )}
         </>
       )}
+      <WorkSettings />
     </main>
   );
 }
