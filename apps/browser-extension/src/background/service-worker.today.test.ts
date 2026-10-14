@@ -87,6 +87,7 @@ beforeEach(async () => {
   vi.stubGlobal('chrome', {
     alarms: {
       create: vi.fn(),
+      get: vi.fn(async () => undefined),
       onAlarm: {
         addListener: (l: typeof alarmListener) => {
           alarmListener = l;

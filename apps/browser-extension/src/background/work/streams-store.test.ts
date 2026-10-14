@@ -213,6 +213,21 @@ describe('streams store', () => {
     expect(store.streamsSaveError).toEqual(expect.any(String));
   });
 
+  it('does not commit when no op changes the file, and clears those ops', async () => {
+    responses.push(
+      { status: 200, body: fileBody(streamsJson) },
+      { status: 200, body: fileBody(streamsJson, 'sha7') },
+    );
+    const { enqueueStreamOps, flushStreams } = await load();
+    await enqueueStreamOps([
+      { op: 'markDone', itemId: 'it_missing' as ItemId, at: '2026-10-01T00:00:00.000Z' },
+    ]);
+    expect(await flushStreams()).toEqual({ saved: true });
+    expect(puts()).toHaveLength(0);
+    expect(store.streamsWriteQueue).toEqual([]);
+    expect((store.streamsCache as any).sha).toBe('sha7');
+  });
+
   it('keeps ops queued during a flush', async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => {

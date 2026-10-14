@@ -372,4 +372,23 @@ describe('runWorkQueries', () => {
       status: 401,
     });
   });
+
+  it('turns a RATE_LIMITED error in a 200 body into a 403 that waits for the reset', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000000' }),
+        json: async () => ({
+          errors: [{ type: 'RATE_LIMITED', message: 'API rate limit exceeded' }],
+        }),
+      })),
+    );
+    await expect(runWorkQueries('tok', [])).rejects.toMatchObject({
+      name: 'GithubHttpError',
+      status: 403,
+      retryAt: 1_800_000_000_000,
+    });
+  });
 });

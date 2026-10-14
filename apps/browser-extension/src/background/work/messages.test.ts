@@ -2,10 +2,10 @@ import type { StreamId, StreamOp, StreamsFile } from '@kaihuman/formats';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Message } from '../../types.js';
 import { markThreadDone, markThreadRead } from './notifications.js';
-import { isPanelOpen, runWorkCycle, workPollingToken } from './poller.js';
+import { isPanelOpen, patchSnapshotThreads, runWorkCycle, workPollingToken } from './poller.js';
 import { GithubHttpError } from './repo-file.js';
 import { enqueueStreamOps, loadStreams } from './streams-store.js';
-import { type StreamsCache, WORK_KEYS } from './types.js';
+import { type NotificationThread, type StreamsCache, WORK_KEYS } from './types.js';
 
 vi.mock('./streams-store.js', () => ({
   loadStreams: vi.fn(),
@@ -15,6 +15,7 @@ vi.mock('./poller.js', () => ({
   runWorkCycle: vi.fn(),
   isPanelOpen: vi.fn(() => false),
   workPollingToken: vi.fn(),
+  patchSnapshotThreads: vi.fn(),
 }));
 vi.mock('./notifications.js', () => ({
   markThreadDone: vi.fn(),
@@ -104,7 +105,25 @@ beforeEach(() => {
   vi.mocked(markThreadDone).mockResolvedValue(undefined);
   vi.mocked(markThreadRead).mockResolvedValue(undefined);
   vi.mocked(runWorkCycle).mockResolvedValue(undefined);
+  vi.mocked(patchSnapshotThreads).mockResolvedValue(undefined);
 });
+
+const threadOf = (threadId: string): NotificationThread => ({
+  threadId,
+  key: `thread:${threadId}`,
+  reason: 'mention',
+  title: `Thread ${threadId}`,
+  url: 'https://github.com/o/r/pull/1',
+  repo: 'o/r',
+  updatedAt: AT,
+  unread: true,
+});
+
+/** What the snapshot patches sent so far do to two unread threads, 8 and 9. */
+const patchedThreads = () =>
+  vi
+    .mocked(patchSnapshotThreads)
+    .mock.calls.reduce((threads, [patch]) => patch(threads), [threadOf('8'), threadOf('9')]);
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -303,5 +322,53 @@ describe('work messages', () => {
       title: 'Page A',
     });
     expect(store[WORK_KEYS.ui]).toMatchObject({ lastStreamId: 'st_a' });
+  });
+
+  it('marks an opened thread read in the snapshot once GitHub has it', async () => {
+    vi.mocked(markThreadRead).mockRejectedValueOnce(new GithubHttpError('boom', 500));
+    await send({ type: 'WORK_OPEN', url: 'https://github.com/o/r/pull/1', threadId: '9' });
+    expect(patchSnapshotThreads).not.toHaveBeenCalled();
+
+    await send({ type: 'WORK_OPEN', url: 'https://github.com/o/r/pull/1', threadId: '9' });
+    expect(patchedThreads().map((t) => [t.threadId, t.unread])).toEqual([
+      ['8', true],
+      ['9', false],
+    ]);
+  });
+
+  it('drops a dismissed thread from the snapshot once GitHub has it done', async () => {
+    vi.mocked(markThreadDone).mockRejectedValueOnce(new GithubHttpError('boom', 500));
+    await expect(
+      send({ type: 'WORK_DISMISS', key: 'o/r#1', updatedAt: AT, threadId: '9' }),
+    ).rejects.toThrow();
+    expect(patchSnapshotThreads).not.toHaveBeenCalled();
+
+    await send({ type: 'WORK_DISMISS', key: 'o/r#1', updatedAt: AT, threadId: '9' });
+    expect(patchedThreads().map((t) => t.threadId)).toEqual(['8']);
+
+    // Already done on GitHub is done here too.
+    vi.mocked(patchSnapshotThreads).mockClear();
+    vi.mocked(markThreadDone).mockRejectedValueOnce(new GithubHttpError('gone', 404));
+    await send({ type: 'WORK_DISMISS', key: 'o/r#1', updatedAt: AT, threadId: '8' });
+    expect(patchedThreads().map((t) => t.threadId)).toEqual(['9']);
+  });
+
+  it('pins into the default stream when the menu names a stream that is gone', async () => {
+    store[WORK_KEYS.ui] = { lastStreamId: 'st_b', collapsed: [] };
+    const tab = { id: 7, url: 'https://example.com/a', title: 'Page A' } as chrome.tabs.Tab;
+    await handlePinMenuClick(
+      { menuItemId: 'kaihuman-pin:st_gone' } as chrome.contextMenus.OnClickData,
+      tab,
+    );
+    expect(enqueued()).toEqual([[expect.objectContaining({ op: 'pin', streamId: 'st_b' })]]);
+    expect(store[WORK_KEYS.ui]).toMatchObject({ lastStreamId: 'st_b' });
+  });
+
+  it('sees a queued stream when pinning before it is saved', async () => {
+    store[WORK_KEYS.queue] = [
+      { op: 'addStream', streamId: 'st_new', name: 'New', at: AT },
+    ] satisfies StreamOp[];
+    await send({ type: 'WORK_PIN_TAB', streamId: 'st_new' });
+    expect(enqueued()[0]?.[0]).toMatchObject({ op: 'pin', streamId: 'st_new' });
   });
 });

@@ -1,5 +1,4 @@
 import {
-  applyOp,
   isSafeUrl,
   newItemId,
   newStreamId,
@@ -10,7 +9,8 @@ import {
 import type { Message } from '../../types.js';
 import type { Dismissed } from './inbox.js';
 import { markThreadDone, markThreadRead } from './notifications.js';
-import { isPanelOpen, runWorkCycle, workPollingToken } from './poller.js';
+import { applyPending } from './pending.js';
+import { isPanelOpen, patchSnapshotThreads, runWorkCycle, workPollingToken } from './poller.js';
 import { GithubHttpError } from './repo-file.js';
 import { enqueueStreamOps, loadStreams } from './streams-store.js';
 import { EMPTY_WORK_UI, type StreamsCache, WORK_KEYS, type WorkUi } from './types.js';
@@ -41,14 +41,7 @@ async function pendingFile(): Promise<StreamsFile> {
   if (!cache.state.ok) {
     throw new Error('The streams file is read-only until it is valid JSON again');
   }
-  const queue = (await getStored<StreamOp[]>(WORK_KEYS.queue)) ?? [];
-  return queue.reduce((file, op) => {
-    try {
-      return applyOp(file, op);
-    } catch {
-      return file;
-    }
-  }, cache.state.file);
+  return applyPending(cache.state.file, (await getStored<StreamOp[]>(WORK_KEYS.queue)) ?? []);
 }
 
 async function pinUrl(
@@ -63,7 +56,13 @@ async function pinUrl(
   const lastStreamId = (await getStored<WorkUi>(WORK_KEYS.ui))?.lastStreamId;
   const at = new Date().toISOString();
   const ops: StreamOp[] = [];
-  let streamId = opts.streamId ?? (known(lastStreamId) ? lastStreamId : file.streams[0]?.id);
+  // A menu entry can outlive its stream (deleted elsewhere); pinning into nothing would be a
+  // silent no-op behind a ✓, so an unknown stream falls back like no stream at all.
+  let streamId = known(opts.streamId)
+    ? opts.streamId
+    : known(lastStreamId)
+      ? lastStreamId
+      : file.streams[0]?.id;
   if (streamId === undefined) {
     streamId = newStreamId();
     ops.push({ op: 'addStream', streamId, name: FIRST_STREAM_NAME, at });
@@ -102,6 +101,16 @@ async function setDismissed(key: string, updatedAt: string | undefined): Promise
   await chrome.storage.local.set({ [WORK_KEYS.dismissed]: dismissed });
 }
 
+/**
+ * GitHub's Last-Modified does not move when a thread is read or done, so the poller's 304s would
+ * keep the old thread around; the snapshot is patched here instead. A failed patch only leaves
+ * the row until the next change, so it is not reported as the action failing.
+ */
+const patchThreads = (patch: Parameters<typeof patchSnapshotThreads>[0]) =>
+  patchSnapshotThreads(patch).catch((error) =>
+    console.warn('kaihuman: updating the work snapshot failed', error),
+  );
+
 async function dismiss(key: string, updatedAt: string, threadId?: string): Promise<void> {
   await setDismissed(key, updatedAt);
   if (threadId === undefined) return;
@@ -111,11 +120,13 @@ async function dismiss(key: string, updatedAt: string, threadId?: string): Promi
     await markThreadDone(token, threadId);
   } catch (error) {
     // 404: the thread is already done, which is what was asked for.
-    if (error instanceof GithubHttpError && error.status === 404) return;
-    console.warn('kaihuman: marking the notification done failed', error);
-    await setDismissed(key, undefined);
-    throw new Error(DISMISS_FAILED);
+    if (!(error instanceof GithubHttpError && error.status === 404)) {
+      console.warn('kaihuman: marking the notification done failed', error);
+      await setDismissed(key, undefined);
+      throw new Error(DISMISS_FAILED);
+    }
   }
+  await patchThreads((threads) => threads.filter((thread) => thread.threadId !== threadId));
 }
 
 async function open(url: string, threadId?: string): Promise<void> {
@@ -124,7 +135,18 @@ async function open(url: string, threadId?: string): Promise<void> {
   if (threadId === undefined) return;
   // Opening is what the user asked for; a notification left unread is harmless.
   const token = await workPollingToken();
-  if (token) await markThreadRead(token, threadId).catch(() => undefined);
+  if (!token) return;
+  const read = await markThreadRead(token, threadId).then(
+    () => true,
+    () => false,
+  );
+  if (read) {
+    await patchThreads((threads) =>
+      threads.map((thread) =>
+        thread.threadId === threadId ? { ...thread, unread: false } : thread,
+      ),
+    );
+  }
 }
 
 async function refresh() {

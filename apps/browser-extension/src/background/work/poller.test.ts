@@ -595,4 +595,74 @@ describe('runWorkCycle', () => {
     expect(notifCalls()[1].ims).toBeUndefined();
     expect((store.workPollState as any).backoffStep).toBe(0);
   });
+
+  it('applies a thread patch after a running cycle, so the cycle does not write over it', async () => {
+    const { runWorkCycle, patchSnapshotThreads } = await load();
+    store.workPollState = {
+      notificationsLastModified: null,
+      nextNotificationsAt: 0,
+      nextGraphqlAt: T0 + 5 * MIN,
+      backoffStep: 0,
+    };
+    let release: (r: Res) => void = () => {};
+    notifResponses.push(
+      new Promise<Res>((resolve) => {
+        release = resolve;
+      }),
+    );
+    gqlResponses.push(gqlOk());
+    const cycle = runWorkCycle({ panelOpen: false, now: at(T0) });
+    await vi.waitFor(() => expect(notifCalls()).toHaveLength(1));
+
+    const patch = patchSnapshotThreads((threads) =>
+      threads.map((t) => (t.threadId === '9' ? { ...t, unread: false } : t)),
+    );
+    release(notifChanged([thread('9', 9), thread('8', 8)]));
+    await cycle;
+    await patch;
+    expect(snapshot().threads.map((t) => [t.threadId, t.unread])).toEqual([
+      ['9', false],
+      ['8', true],
+    ]);
+  });
+
+  it('patches the stored snapshot when no cycle is running', async () => {
+    const { runWorkCycle, patchSnapshotThreads } = await load();
+    notifResponses.push(notifChanged([thread('9', 9), thread('8', 8)]));
+    gqlResponses.push(gqlOk());
+    await runWorkCycle({ panelOpen: false, now: at(T0) });
+    await patchSnapshotThreads((threads) => threads.filter((t) => t.threadId !== '9'));
+    expect(snapshot().threads.map((t) => t.threadId)).toEqual(['8']);
+  });
+
+  it('pauses until the reset when GraphQL says RATE_LIMITED in a 200', async () => {
+    const { runWorkCycle } = await load();
+    const resetSec = Math.floor((T0 + 20 * MIN) / 1000);
+    notifResponses.push(notif304);
+    gqlResponses.push({
+      status: 200,
+      body: { errors: [{ type: 'RATE_LIMITED', message: 'API rate limit exceeded' }] },
+      headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': String(resetSec) },
+    });
+    const result = await runWorkCycle({ panelOpen: false, now: at(T0) });
+    expect(result?.problem).toEqual({ kind: 'rate-limit', until: resetSec * 1000 });
+    expect((store.workPollState as any).nextGraphqlAt).toBe(resetSec * 1000);
+  });
+});
+
+describe('ensureWorkAlarm', () => {
+  it('creates the work alarm only when it does not exist', async () => {
+    const { ensureWorkAlarm } = await load();
+    let existing: unknown;
+    const create = vi.fn();
+    vi.stubGlobal('chrome', {
+      alarms: { get: vi.fn(async () => existing), create },
+    });
+    existing = { name: 'work', periodInMinutes: 1 };
+    await ensureWorkAlarm();
+    expect(create).not.toHaveBeenCalled();
+    existing = undefined;
+    await ensureWorkAlarm();
+    expect(create).toHaveBeenCalledWith('work', { periodInMinutes: 1 });
+  });
 });

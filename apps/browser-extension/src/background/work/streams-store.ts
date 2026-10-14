@@ -149,13 +149,11 @@ async function runFlush(): Promise<{ saved: boolean }> {
         queue.slice(0, flushed),
         new Date(now).toISOString(),
       );
-      const content = serializeStreams(file);
-      try {
-        const newSha = await writeRepoFile(token, repo, STREAMS_PATH, content, sha, COMMIT_MESSAGE);
+      const done = async (saved: { file: typeof file; sha: string | null }) => {
         const cache: StreamsCache = {
           repo,
-          state: { ok: true, file },
-          sha: newSha,
+          state: { ok: true, file: saved.file },
+          sha: saved.sha,
           etag: null,
           fetchedAt: now,
         };
@@ -172,6 +170,16 @@ async function runFlush(): Promise<{ saved: boolean }> {
           await chrome.storage.local.remove(WORK_KEYS.saveError);
         }
         return { saved: true };
+      };
+      const content = serializeStreams(file);
+      // Ops that change nothing (an auto-done already applied elsewhere) would still bump
+      // `updatedAt` and make a commit; there is nothing to save, so they just leave the queue.
+      if (content === serializeStreams({ ...state.file, updatedAt: file.updatedAt })) {
+        return await done({ file: state.file, sha });
+      }
+      try {
+        const newSha = await writeRepoFile(token, repo, STREAMS_PATH, content, sha, COMMIT_MESSAGE);
+        return await done({ file, sha: newSha });
       } catch (error) {
         if (!(error instanceof WriteConflict)) throw error;
       }

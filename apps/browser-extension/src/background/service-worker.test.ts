@@ -19,7 +19,11 @@ beforeEach(async () => {
   vi.resetModules();
   storedExtras = {};
   vi.stubGlobal('chrome', {
-    alarms: { create: vi.fn(), onAlarm: { addListener: vi.fn() } },
+    alarms: {
+      create: vi.fn(),
+      get: vi.fn(async () => undefined),
+      onAlarm: { addListener: vi.fn() },
+    },
     commands: { onCommand: { addListener: vi.fn() } },
     contextMenus: { create: vi.fn(), onClicked: { addListener: vi.fn() } },
     runtime: {

@@ -20,7 +20,13 @@ import {
 } from '@kaihuman/palette';
 import { type Message } from '../types';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
-import { connectWorkPanel, isPanelOpen, runWorkCycle, watchWorkTokens } from './work/poller';
+import {
+  connectWorkPanel,
+  ensureWorkAlarm,
+  isPanelOpen,
+  runWorkCycle,
+  watchWorkTokens,
+} from './work/poller';
 import {
   handlePinMenuClick,
   handleWorkMessage,
@@ -131,7 +137,7 @@ chrome.alarms.create('swKeepAlive', { periodInMinutes: 0.5 });
 chrome.alarms.create('repoSync', { periodInMinutes: 60 });
 
 // Work streams poll GitHub on their own schedule; the cycle decides each minute what is due.
-chrome.alarms.create('work', { periodInMinutes: 1 });
+ensureWorkAlarm().catch((e) => console.warn('kaihuman: creating the work alarm failed', e));
 watchWorkTokens();
 watchPinMenu();
 
@@ -145,7 +151,11 @@ let repoSyncedAt = 0;
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'swKeepAlive') {
-    // No-op: waking the worker is sufficient.
+    // Also a backstop for the work alarm: the cycle is time-gated by its poll state, so this
+    // costs no extra GitHub calls.
+    runWorkCycle({ panelOpen: isPanelOpen() }).catch((e) =>
+      console.warn('kaihuman: work polling failed', e),
+    );
   }
   if (alarm.name === 'repoSync') {
     syncRepoWithDesktop().catch((e) =>
@@ -339,7 +349,8 @@ chrome.commands.onCommand.addListener(async (command) => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab?.id === undefined) return;
 
-  await chrome.action.setBadgeText({ tabId: tab.id, text: '' });
+  // `null` clears only this tab's own text; `''` would hide the Waiting-on-you count here.
+  await chrome.action.setBadgeText({ tabId: tab.id, text: null as unknown as string });
   if (await openPaletteInTab(tab.id)) return;
 
   console.warn(`kaihuman: the palette cannot run on this page (${tab.url ?? 'unknown'})`);

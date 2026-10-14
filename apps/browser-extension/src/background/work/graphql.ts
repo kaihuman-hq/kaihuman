@@ -1,6 +1,6 @@
 import { type GithubRef, githubKey } from '@kaihuman/formats';
 import { INBOX_QUERIES, MY_OPEN_PRS_QUERY } from './queries.js';
-import { githubHttpError } from './repo-file.js';
+import { GithubHttpError, githubHttpError } from './repo-file.js';
 import type {
   CiState,
   InboxReason,
@@ -213,7 +213,21 @@ export async function runWorkQueries(
       body: JSON.stringify({ query, variables }),
     });
     if (!res.ok) throw await githubHttpError(res, 'GitHub GraphQL failed');
-    bodies.push(await res.json());
+    const body = await res.json();
+    const limited = (body as { errors?: GraphqlError[] } | null)?.errors?.find(
+      (error) => error.type === 'RATE_LIMITED',
+    );
+    // GraphQL reports its rate limit in a 200; as a plain error it would read as offline and
+    // retry on the backoff, spending calls that GitHub refuses until the reset anyway.
+    if (limited) {
+      const reset = Number(res.headers?.get('x-ratelimit-reset'));
+      throw new GithubHttpError(
+        `GitHub GraphQL failed: 403 ${limited.message ?? 'rate limited'}`,
+        403,
+        Number.isFinite(reset) && reset > 0 ? reset * 1000 : undefined,
+      );
+    }
+    bodies.push(body);
   }
   return parseWorkResponses(bodies, pinned);
 }

@@ -5,6 +5,7 @@ import { pollNotifications } from './notifications.js';
 import { GithubHttpError } from './repo-file.js';
 import { enqueueStreamOps, flushStreams, loadStreams } from './streams-store.js';
 import {
+  type NotificationThread,
   type PinnedStatus,
   type StreamsCache,
   WORK_KEYS,
@@ -265,6 +266,28 @@ async function cycle(opts: CycleRequest): Promise<WorkSnapshot | undefined> {
   return snapshot;
 }
 
+// Cycles and thread patches both read-modify-write the snapshot; run one after another so
+// neither writes over the other's change.
+let snapshotLock: Promise<unknown> = Promise.resolve();
+function withSnapshotLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = snapshotLock.then(fn, fn);
+  snapshotLock = run.catch(() => undefined);
+  return run;
+}
+
+/** Changes the stored threads, after any running cycle, and updates the badge to match. */
+export function patchSnapshotThreads(
+  patch: (threads: NotificationThread[]) => NotificationThread[],
+): Promise<void> {
+  return withSnapshotLock(async () => {
+    const prev = await getStored<WorkSnapshot>(WORK_KEYS.snapshot);
+    if (!prev) return;
+    const snapshot = { ...prev, threads: patch(prev.threads) };
+    await chrome.storage.local.set({ [WORK_KEYS.snapshot]: snapshot });
+    await setBadge(snapshot, await cachedStreams());
+  });
+}
+
 let running: Promise<WorkSnapshot | undefined> | undefined;
 let followUp:
   | {
@@ -275,7 +298,7 @@ let followUp:
   | undefined;
 
 function start(opts: CycleRequest): Promise<WorkSnapshot | undefined> {
-  const run = cycle(opts).finally(() => {
+  const run = withSnapshotLock(() => cycle(opts)).finally(() => {
     running = undefined;
     // Started in the same callback, so no other caller can slip a cycle in between.
     const next = followUp;
@@ -313,6 +336,18 @@ function requestCycle(opts: CycleRequest): Promise<WorkSnapshot | undefined> {
 
 export function runWorkCycle(opts: CycleOptions): Promise<WorkSnapshot | undefined> {
   return requestCycle(opts);
+}
+
+const WORK_ALARM = 'work';
+
+/**
+ * Creates the minute alarm the work cycle runs on, unless it is there. `create` replaces an
+ * existing alarm and restarts its period, so a worker restarted more often than once a minute
+ * would push it back every time and it would never fire.
+ */
+export async function ensureWorkAlarm(): Promise<void> {
+  if (await chrome.alarms.get(WORK_ALARM)) return;
+  await chrome.alarms.create(WORK_ALARM, { periodInMinutes: 1 });
 }
 
 /** The side panel opened: reread the streams file and refresh everything now. */
