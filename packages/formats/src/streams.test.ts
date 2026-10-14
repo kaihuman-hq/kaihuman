@@ -1,15 +1,22 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  applyOp,
+  applyOps,
   emptyStreams,
+  findItemByUrl,
+  type ItemId,
   isSafeUrl,
   itemRefOf,
   newItemId,
   newStreamId,
   normalizeItemUrl,
   parseStreams,
+  type StreamId,
+  type StreamOp,
   type StreamsFile,
   serializeStreams,
+  streamLabels,
 } from './streams.js';
 
 describe('itemRefOf', () => {
@@ -205,5 +212,279 @@ describe('parseStreams / serializeStreams', () => {
       invalidStreams: [],
       extra: {},
     });
+  });
+});
+
+describe('stream operations', () => {
+  const T0 = '2026-10-14T00:00:00Z';
+  const A = 'st_a' as StreamId;
+  const B = 'st_b' as StreamId;
+  const I1 = 'it_1' as ItemId;
+  const PR = 'https://github.com/Acme/API/pull/1/';
+
+  const base = (): StreamsFile =>
+    applyOps(
+      emptyStreams(T0),
+      [
+        { op: 'addStream', streamId: A, name: ' Alpha ', at: T0 },
+        { op: 'addStream', streamId: B, name: 'Beta', at: T0 },
+        { op: 'pin', streamId: A, itemId: I1, url: PR, title: 'PR one', labels: ['x'], at: T0 },
+      ],
+      T0,
+    );
+
+  const deepFreeze = <T>(value: T): T => {
+    if (typeof value === 'object' && value !== null) {
+      for (const v of Object.values(value)) deepFreeze(v);
+      Object.freeze(value);
+    }
+    return value;
+  };
+
+  const everyOp = (): StreamOp[] => [
+    { op: 'addStream', streamId: 'st_c' as StreamId, name: 'C', at: T0 },
+    { op: 'renameStream', streamId: A, name: 'Renamed' },
+    { op: 'reorderStreams', order: [B, A] },
+    {
+      op: 'pin',
+      streamId: B,
+      itemId: 'it_2' as ItemId,
+      url: 'https://x.dev/a',
+      title: 't',
+      labels: [],
+      at: T0,
+    },
+    {
+      op: 'pin',
+      streamId: B,
+      itemId: 'it_9' as ItemId,
+      url: PR,
+      title: 't',
+      labels: ['y'],
+      at: T0,
+    },
+    { op: 'move', itemId: I1, streamId: A, index: 0 },
+    { op: 'setLabels', itemId: I1, labels: ['q', 'q', ' '] },
+    { op: 'markDone', itemId: I1, at: T0 },
+    { op: 'undone', itemId: I1 },
+    { op: 'markDone', itemId: I1, at: T0 },
+    { op: 'prune', now: '2027-01-01T00:00:00Z' },
+    { op: 'remove', itemId: I1 },
+    { op: 'deleteStream', streamId: B },
+  ];
+
+  it('pins a page into a stream with a normalised url', () => {
+    const file = base();
+    expect(file.streams[0]?.name).toBe('Alpha');
+    expect(file.streams[0]?.items).toEqual([
+      {
+        id: I1,
+        url: 'https://github.com/acme/api/pull/1',
+        title: 'PR one',
+        addedAt: T0,
+        labels: ['x'],
+        extra: {},
+      },
+    ]);
+  });
+
+  it('moves an already pinned url instead of duplicating it', () => {
+    const next = applyOp(base(), {
+      op: 'pin',
+      streamId: B,
+      itemId: 'it_new' as ItemId,
+      url: 'https://github.com/acme/api/pull/1/files',
+      title: 'again',
+      labels: ['y', 'x'],
+      at: '2026-10-15T00:00:00Z',
+    });
+    const all = next.streams.flatMap((s) => s.items);
+    expect(all).toHaveLength(1);
+    expect(next.streams[1]?.items[0]).toMatchObject({ id: I1, addedAt: T0, labels: ['x', 'y'] });
+    expect(next.streams[1]?.items[0]?.doneAt).toBeUndefined();
+    const done = applyOp(base(), { op: 'markDone', itemId: I1, at: T0 });
+    const repinned = applyOp(done, {
+      op: 'pin',
+      streamId: A,
+      itemId: I1,
+      url: PR,
+      title: 't',
+      labels: [],
+      at: T0,
+    });
+    expect(repinned.streams[0]?.items[0]?.doneAt).toBeUndefined();
+  });
+
+  it('keeps extra, invalidItems and invalidStreams through every op', () => {
+    const file = base();
+    file.extra = { k: 1 };
+    file.invalidStreams = ['s'];
+    const s0 = file.streams[0];
+    if (!s0) throw new Error('setup');
+    s0.invalidItems = ['i'];
+    s0.extra = { z: 2 };
+    const item = s0.items[0];
+    if (!item) throw new Error('setup');
+    item.extra = { e: 3 };
+    let out = file;
+    for (const op of everyOp().filter(
+      (o) => o.op !== 'deleteStream' && o.op !== 'remove' && o.op !== 'prune',
+    )) {
+      out = applyOp(out, op);
+    }
+    expect(out.extra).toEqual({ k: 1 });
+    expect(out.invalidStreams).toEqual(['s']);
+    const a = out.streams.find((s) => s.id === A);
+    expect(a?.invalidItems).toEqual(['i']);
+    expect(a?.extra).toEqual({ z: 2 });
+    expect(findItemByUrl(out, PR)?.item.extra).toEqual({ e: 3 });
+  });
+
+  it('ignores operations on missing ids', () => {
+    const file = base();
+    const ghost = 'it_ghost' as ItemId;
+    const none = 'st_none' as StreamId;
+    for (const op of [
+      { op: 'move', itemId: ghost, streamId: A },
+      { op: 'move', itemId: I1, streamId: none },
+      { op: 'setLabels', itemId: ghost, labels: ['a'] },
+      { op: 'markDone', itemId: ghost, at: T0 },
+      { op: 'undone', itemId: ghost },
+      { op: 'remove', itemId: ghost },
+      { op: 'renameStream', streamId: none, name: 'n' },
+      { op: 'deleteStream', streamId: none },
+      {
+        op: 'pin',
+        streamId: none,
+        itemId: ghost,
+        url: 'https://x.dev',
+        title: 't',
+        labels: [],
+        at: T0,
+      },
+    ] satisfies StreamOp[]) {
+      expect(applyOp(file, op)).toEqual(file);
+    }
+  });
+
+  it('is idempotent', () => {
+    for (const op of everyOp()) {
+      const once = applyOp(base(), op);
+      expect(applyOp(once, op)).toEqual(once);
+    }
+  });
+
+  it('keeps the first doneAt', () => {
+    const first = applyOp(base(), { op: 'markDone', itemId: I1, at: '2026-10-14T01:00:00Z' });
+    const second = applyOp(first, { op: 'markDone', itemId: I1, at: '2026-10-14T09:00:00Z' });
+    expect(second.streams[0]?.items[0]?.doneAt).toBe('2026-10-14T01:00:00Z');
+  });
+
+  it('prunes only items done more than 14 days ago', () => {
+    let file = base();
+    file = applyOps(
+      file,
+      [
+        {
+          op: 'pin',
+          streamId: A,
+          itemId: 'it_old' as ItemId,
+          url: 'https://x.dev/old',
+          title: 'o',
+          labels: [],
+          at: T0,
+        },
+        {
+          op: 'pin',
+          streamId: A,
+          itemId: 'it_edge' as ItemId,
+          url: 'https://x.dev/edge',
+          title: 'e',
+          labels: [],
+          at: T0,
+        },
+        { op: 'markDone', itemId: 'it_old' as ItemId, at: '2026-09-29T00:00:00Z' },
+        { op: 'markDone', itemId: 'it_edge' as ItemId, at: '2026-09-30T00:00:00Z' },
+      ],
+      T0,
+    );
+    const pruned = applyOp(file, { op: 'prune', now: '2026-10-14T00:00:01Z' });
+    expect(pruned.streams[0]?.items.map((i) => i.id)).toEqual([I1, 'it_edge']);
+  });
+
+  it('applyOps prunes at updatedAt and stamps it', () => {
+    const file = applyOps(
+      base(),
+      [{ op: 'markDone', itemId: I1, at: '2026-09-01T00:00:00Z' }],
+      '2026-10-14T00:00:01Z',
+    );
+    expect(file.updatedAt).toBe('2026-10-14T00:00:01Z');
+    expect(file.streams[0]?.items).toEqual([]);
+  });
+
+  it('reorders listed streams first', () => {
+    const c = applyOp(base(), { op: 'addStream', streamId: 'st_c' as StreamId, name: 'C', at: T0 });
+    const out = applyOp(c, {
+      op: 'reorderStreams',
+      order: ['st_c' as StreamId, 'st_x' as StreamId, B],
+    });
+    expect(out.streams.map((s) => s.id)).toEqual(['st_c', B, A]);
+  });
+
+  it('moves to an index within the target stream', () => {
+    let file = base();
+    file = applyOp(file, {
+      op: 'pin',
+      streamId: A,
+      itemId: 'it_2' as ItemId,
+      url: 'https://x.dev/2',
+      title: 't',
+      labels: [],
+      at: T0,
+    });
+    file = applyOp(file, { op: 'move', itemId: 'it_2' as ItemId, streamId: A, index: 0 });
+    expect(file.streams[0]?.items.map((i) => i.id)).toEqual(['it_2', I1]);
+  });
+
+  it('refuses an empty stream name and an unsafe url', () => {
+    expect(() =>
+      applyOp(base(), { op: 'addStream', streamId: 'st_c' as StreamId, name: '  ', at: T0 }),
+    ).toThrow(new Error('Give the stream a name'));
+    expect(() =>
+      applyOp(base(), {
+        op: 'pin',
+        streamId: A,
+        itemId: 'it_2' as ItemId,
+        url: 'javascript:alert(1)',
+        title: 't',
+        labels: [],
+        at: T0,
+      }),
+    ).toThrow(new Error('Only http and https pages can be pinned'));
+  });
+
+  it('lists labels across streams, sorted and unique', () => {
+    let file = base();
+    file = applyOp(file, {
+      op: 'pin',
+      streamId: B,
+      itemId: 'it_2' as ItemId,
+      url: 'https://x.dev/2',
+      title: 't',
+      labels: ['b', 'x', ' a '],
+      at: T0,
+    });
+    expect(streamLabels(file)).toEqual(['a', 'b', 'x']);
+  });
+
+  it('finds an item by any spelling of its url', () => {
+    expect(findItemByUrl(base(), 'https://github.com/acme/api/pull/1/files')?.stream.id).toBe(A);
+    expect(findItemByUrl(base(), 'https://x.dev/none')).toBeUndefined();
+  });
+
+  it('does not mutate its input', () => {
+    const frozen = deepFreeze(structuredClone(base()));
+    for (const op of everyOp()) expect(() => applyOp(frozen, op)).not.toThrow();
+    expect(() => applyOps(frozen, everyOp(), T0)).not.toThrow();
   });
 });

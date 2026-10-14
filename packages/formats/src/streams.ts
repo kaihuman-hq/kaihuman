@@ -260,3 +260,211 @@ const randomSuffix = (): string => {
 
 export const newStreamId = (): StreamId => `st_${randomSuffix()}` as StreamId;
 export const newItemId = (): ItemId => `it_${randomSuffix()}` as ItemId;
+
+export const PRUNE_AFTER_DAYS = 14;
+
+export type StreamOp =
+  | { op: 'addStream'; streamId: StreamId; name: string; at: string }
+  | { op: 'renameStream'; streamId: StreamId; name: string }
+  | { op: 'deleteStream'; streamId: StreamId }
+  | { op: 'reorderStreams'; order: StreamId[] }
+  | {
+      op: 'pin';
+      streamId: StreamId;
+      itemId: ItemId;
+      url: string;
+      title: string;
+      labels: string[];
+      at: string;
+    }
+  | { op: 'move'; itemId: ItemId; streamId: StreamId; index?: number }
+  | { op: 'setLabels'; itemId: ItemId; labels: string[] }
+  | { op: 'markDone'; itemId: ItemId; at: string }
+  | { op: 'undone'; itemId: ItemId }
+  | { op: 'remove'; itemId: ItemId }
+  | { op: 'prune'; now: string };
+
+const cleanLabels = (labels: readonly string[]): string[] => [
+  ...new Set(labels.map((label) => label.trim()).filter((label) => label !== '')),
+];
+
+const cleanName = (name: string): string => {
+  const trimmed = name.trim();
+  if (trimmed === '') throw new Error('Give the stream a name');
+  return trimmed;
+};
+
+const withStreams = (file: StreamsFile, streams: Stream[]): StreamsFile => ({ ...file, streams });
+
+const mapItem = (
+  file: StreamsFile,
+  itemId: ItemId,
+  change: (item: StreamItem) => StreamItem,
+): StreamsFile =>
+  withStreams(
+    file,
+    file.streams.map((stream) => ({
+      ...stream,
+      items: stream.items.map((item) => (item.id === itemId ? change(item) : item)),
+    })),
+  );
+
+const findItem = (file: StreamsFile, itemId: ItemId): StreamItem | undefined => {
+  for (const stream of file.streams) {
+    const item = stream.items.find((candidate) => candidate.id === itemId);
+    if (item) return item;
+  }
+  return undefined;
+};
+
+const dropItem = (file: StreamsFile, itemId: ItemId): StreamsFile =>
+  withStreams(
+    file,
+    file.streams.map((stream) => ({
+      ...stream,
+      items: stream.items.filter((item) => item.id !== itemId),
+    })),
+  );
+
+/** Put `item` into the stream at `index` (default: the end), removing it from wherever it was. */
+const place = (
+  file: StreamsFile,
+  streamId: StreamId,
+  item: StreamItem,
+  index?: number,
+): StreamsFile => {
+  const without = dropItem(file, item.id);
+  return withStreams(
+    without,
+    without.streams.map((stream) => {
+      if (stream.id !== streamId) return stream;
+      const items = [...stream.items];
+      items.splice(index === undefined ? items.length : Math.max(0, index), 0, item);
+      return { ...stream, items };
+    }),
+  );
+};
+
+export const findItemByUrl = (
+  file: StreamsFile,
+  url: string,
+): { stream: Stream; item: StreamItem } | undefined => {
+  const wanted = normalizeItemUrl(url);
+  for (const stream of file.streams) {
+    const item = stream.items.find((candidate) => normalizeItemUrl(candidate.url) === wanted);
+    if (item) return { stream, item };
+  }
+  return undefined;
+};
+
+const DAY_MS = 86_400_000;
+
+const pin = (file: StreamsFile, op: Extract<StreamOp, { op: 'pin' }>): StreamsFile => {
+  if (!isSafeUrl(op.url)) throw new Error('Only http and https pages can be pinned');
+  if (!file.streams.some((stream) => stream.id === op.streamId)) return file;
+  const url = normalizeItemUrl(op.url);
+  const existing = findItemByUrl(file, url);
+  if (!existing) {
+    const item: StreamItem = {
+      id: op.itemId,
+      url,
+      title: op.title,
+      addedAt: op.at,
+      labels: cleanLabels(op.labels),
+      extra: {},
+    };
+    return place(file, op.streamId, item);
+  }
+  const { doneAt: _cleared, ...rest } = existing.item;
+  const merged: StreamItem = {
+    ...rest,
+    labels: cleanLabels([...existing.item.labels, ...op.labels]),
+  };
+  // Re-pinning inside the same stream keeps the item where the user put it.
+  const index =
+    existing.stream.id === op.streamId
+      ? existing.stream.items.findIndex((item) => item.id === merged.id)
+      : undefined;
+  return place(file, op.streamId, merged, index);
+};
+
+export const applyOp = (file: StreamsFile, op: StreamOp): StreamsFile => {
+  switch (op.op) {
+    case 'addStream': {
+      const name = cleanName(op.name);
+      if (file.streams.some((stream) => stream.id === op.streamId)) return file;
+      const stream: Stream = {
+        id: op.streamId,
+        name,
+        createdAt: op.at,
+        items: [],
+        invalidItems: [],
+        extra: {},
+      };
+      return withStreams(file, [...file.streams, stream]);
+    }
+    case 'renameStream': {
+      const name = cleanName(op.name);
+      return withStreams(
+        file,
+        file.streams.map((stream) => (stream.id === op.streamId ? { ...stream, name } : stream)),
+      );
+    }
+    case 'deleteStream':
+      return withStreams(
+        file,
+        file.streams.filter((stream) => stream.id !== op.streamId),
+      );
+    case 'reorderStreams': {
+      const listed = op.order.flatMap((id) => file.streams.filter((stream) => stream.id === id));
+      const first = [...new Set(listed)];
+      return withStreams(file, [...first, ...file.streams.filter((s) => !first.includes(s))]);
+    }
+    case 'pin':
+      return pin(file, op);
+    case 'move': {
+      const item = findItem(file, op.itemId);
+      if (!item || !file.streams.some((stream) => stream.id === op.streamId)) return file;
+      return place(file, op.streamId, item, op.index);
+    }
+    case 'setLabels': {
+      const labels = cleanLabels(op.labels);
+      return mapItem(file, op.itemId, (item) => ({ ...item, labels }));
+    }
+    case 'markDone':
+      return mapItem(file, op.itemId, (item) =>
+        item.doneAt === undefined ? { ...item, doneAt: op.at } : item,
+      );
+    case 'undone':
+      return mapItem(file, op.itemId, (item) => {
+        const { doneAt: _cleared, ...rest } = item;
+        return rest;
+      });
+    case 'remove':
+      return dropItem(file, op.itemId);
+    case 'prune': {
+      const now = Date.parse(op.now);
+      return withStreams(
+        file,
+        file.streams.map((stream) => ({
+          ...stream,
+          items: stream.items.filter((item) => {
+            if (item.doneAt === undefined) return true;
+            // Whole elapsed days, so "done 14 days ago" stays until the 15th day starts.
+            return !(Math.floor((now - Date.parse(item.doneAt)) / DAY_MS) > PRUNE_AFTER_DAYS);
+          }),
+        })),
+      );
+    }
+  }
+};
+
+export const applyOps = (file: StreamsFile, ops: StreamOp[], updatedAt: string): StreamsFile => {
+  const applied = ops.reduce(applyOp, file);
+  return { ...applyOp(applied, { op: 'prune', now: updatedAt }), updatedAt };
+};
+
+export const streamLabels = (file: StreamsFile): string[] =>
+  [...new Set(file.streams.flatMap((stream) => stream.items.flatMap((item) => item.labels)))].sort(
+    (a, b) => a.localeCompare(b),
+  );
