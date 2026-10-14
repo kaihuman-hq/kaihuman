@@ -47,7 +47,14 @@ const cache = (state: StreamsCache['state'] = { ok: true, file: file() }): Strea
 const snapshot = (patch: Partial<WorkSnapshot> = {}): WorkSnapshot => ({
   login: 'me',
   fetchedAt: FETCHED,
-  searches: {} as WorkSnapshot['searches'],
+  searches: {
+    'review-requested': [],
+    assigned: [],
+    failing: [],
+    'changes-requested': [],
+    'ready-to-merge': [],
+    mine: [],
+  },
   threads: [],
   pinned: {},
   orgProblems: [],

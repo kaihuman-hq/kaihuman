@@ -1,21 +1,15 @@
 import { useEffect } from 'preact/hooks';
+import { buildInbox, unreadKeys } from '../background/work/inbox.js';
 import type { OrgAccessProblem, WorkProblem } from '../background/work/types.js';
 import { CONSOLE_URL, consoleFileUrl } from '../console.js';
 import { send } from '../palette/port.js';
+import { age } from './age.js';
+import { InboxSection, MineSection } from './InboxSection.js';
 import { ThisTabBar } from './ThisTabBar.js';
 import { useWorkState } from './useWorkState.js';
 
 const clock = (ms: number) =>
   new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-/** "just now", "12m ago", "3h ago", "2d ago". */
-export function age(ms: number, now = Date.now()): string {
-  const minutes = Math.max(0, Math.floor((now - ms) / 60_000));
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
-  return `${Math.floor(minutes / 1440)}d ago`;
-}
 
 const link = 'underline text-[#e6e6e6]';
 const banner = 'border border-[#333] px-3 py-2 text-[13px]';
@@ -46,8 +40,10 @@ function OrgBanner({ problem }: { problem: OrgAccessProblem }) {
   );
 }
 
+export { age };
+
 export function SidePanel() {
-  const { snapshot, streams, saveError, queueLength, ui, loaded } = useWorkState();
+  const { snapshot, streams, dismissed, saveError, queueLength, ui, loaded } = useWorkState();
 
   useEffect(() => {
     // Opening the port tells the worker the panel is visible so it polls faster.
@@ -61,6 +57,8 @@ export function SidePanel() {
   // A missing streams cache only hides the streams; the worker polls with a work token alone.
   const signedOut = snapshot ? snapshot.problem?.kind === 'signed-out' : !streams;
   const file = streams?.state.ok ? streams.state.file : null;
+  const inbox = snapshot ? buildInbox(snapshot, file, dismissed) : undefined;
+  const unread = snapshot ? unreadKeys(snapshot) : new Set<string>();
   const readOnly = streams ? !streams.state.ok : false;
 
   return (
@@ -113,6 +111,29 @@ export function SidePanel() {
             <OrgBanner key={problem.org} problem={problem} />
           ))}
           <ThisTabBar file={file} ui={ui} readOnly={readOnly} />
+          {inbox && (
+            <>
+              <InboxSection
+                title="Waiting on you"
+                rows={inbox.waiting}
+                file={file}
+                readOnly={readOnly}
+              />
+              <InboxSection
+                title="New activity"
+                rows={inbox.activity}
+                file={file}
+                readOnly={readOnly}
+              />
+              <MineSection
+                title="My open PRs"
+                prs={inbox.mine}
+                file={file}
+                readOnly={readOnly}
+                unread={unread}
+              />
+            </>
+          )}
         </>
       )}
     </main>
