@@ -9,6 +9,7 @@ export * from './ideas.js';
 export * from './palette-settings.js';
 export * from './prompts.js';
 export * from './read-later.js';
+export * from './streams.js';
 export * from './time-tracking.js';
 export * from './timezones.js';
 export * from './todos.js';
