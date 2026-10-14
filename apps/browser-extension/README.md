@@ -12,7 +12,7 @@ The official browser extension for kaihuman, designed to enhance your web experi
 - **Bookmarks**: Your repo's bookmarks, mirrored into the browser and synced at most once an hour. Bookmark the current page from the popup or the palette, or import the ones this browser already has. Opens are counted so you can find the ones you never use.
 - **Same repository as the desktop palette**: with `kaihuman-palette native-host install <this extension's id>` run once, switching the repository here or in the desktop palette switches the other too — the newer choice wins (`nativeMessaging` permission; see the desktop palette's README).
 - **Command Palette**: `Ctrl+Shift+K` on any page to search those bookmarks, repeat what you did last, run any of the extension's actions — and, on request, search your repo.
-- **Work side panel**: pinned streams of the tabs you work on (GitHub, Slack threads, Claude sessions), a Waiting-on-you inbox from GitHub, your open PRs with CI and review status, and a toolbar badge. Pin with `Alt+Shift+P` or right-click **Pin to stream**; stored in `.kh/browser.streams.json`.
+- **Work side panel**: pinned streams of the tabs you work on (GitHub, Slack threads, Claude sessions), a Waiting-on-you inbox from GitHub, your open PRs with CI and review status, and a toolbar badge. Open it from the popup (**Open work panel**) or the start page card. Pin with `Alt+Shift+P` or right-click **Pin to stream**; stored in `.kh/browser.streams.json`.
 - **Start Page**: a New Tab page of your own — what is coming up and in progress, habit and time trackers, the read-later queue, world clocks, the bookmarks you reach for, a box for a note, todo or log entry, and the palette (which Chrome's own New Tab page cannot host).
 
 ## Popup

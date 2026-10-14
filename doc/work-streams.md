@@ -109,8 +109,10 @@ Rules:
 - **The kind comes from the URL and is not stored.** A parser gives a discriminated union:
   `github-pr` and `github-issue` (with `owner`, `repo`, `number`), or `link`. URLs such as
   `/pull/412/files` or `/pull/412#discussion_r1` are the same PR. New kinds need no file change.
-- **One URL, one place.** URLs are compared after normalisation (no fragment, no tracking query
-  parameters, no trailing slash). Pinning a URL that is already pinned moves it.
+- **One URL, one place.** URLs are compared after normalisation (no tracking query parameters, no
+  trailing slash, and no plain anchor such as `#top`). A fragment that is a route (it contains `/`
+  or starts with `#!`, as in Gmail's `#inbox/<id>`) is kept, so hash-routed pages stay separate
+  items. Pinning a URL that is already pinned moves it.
 - **Done.** A GitHub item gets `doneAt` when it is merged or closed. A link gets `doneAt` when you
   click ✓. Done items are in a collapsed **Done** row in their stream. A write removes items whose
   `doneAt` is more than 14 days old.
@@ -209,11 +211,13 @@ and read-only; **Pin** moves a PR into a stream.
 ### Start page card
 
 One card: **"3 waiting on you · 2 new · 1 red CI in streams"**, then the first three rows of
-Waiting on you. A click opens the side panel.
+Waiting on you. A click opens the side panel. With nothing waiting, the card says **Nothing
+waiting — open work panel**, so it is always a way into the panel.
 
 ### Toolbar badge
 
-The extension icon shows the Waiting-on-you count. A click still opens the popup.
+The extension icon shows the Waiting-on-you count. A click still opens the popup, which has an
+**Open work panel** button.
 
 ## Polling and status
 
