@@ -9,6 +9,7 @@
 - Research in the same file: the `repo` OAuth token already reaches all repos (org OAuth
   restrictions and SSO are the limits), the Notifications API is the feed, and Slack comes in by
   pinning because its API has no activity feed.
+- Implementation plan in 14 test-first tasks: `doc/work-streams-plan.md`.
 
 ## 2026-10-13 — Knowledge base set-up in one commit, from `/knowledge` or `/ideas`
 
