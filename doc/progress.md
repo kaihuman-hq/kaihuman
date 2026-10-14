@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-10-14 — Work streams: design
+
+- **Design for one overview of parallel work** in the browser extension (`doc/work-streams.md`):
+  a side panel with pinned **streams** (any tab, Slack threads included) and labels, an automatic
+  **inbox** from GitHub notifications and searches, **My open PRs**, a start-page card and a
+  toolbar badge. Streams are stored in `.kh/browser.streams.json`; nothing is built yet.
+- Research in the same file: the `repo` OAuth token already reaches all repos (org OAuth
+  restrictions and SSO are the limits), the Notifications API is the feed, and Slack comes in by
+  pinning because its API has no activity feed.
+
 ## 2026-10-13 — Knowledge base set-up in one commit, from `/knowledge` or `/ideas`
 
 - **Set-up and skill updates are one commit** (`syncKB` in `apps/console/src/lib/github-kb.ts`,
