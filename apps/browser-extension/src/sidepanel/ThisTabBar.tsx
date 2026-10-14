@@ -72,12 +72,14 @@ export function ThisTabBar({
   const url = tab.url;
   const streams = file?.streams ?? [];
 
-  const run = async (ops: StreamOp[]) => {
+  const run = async (ops: StreamOp[]): Promise<boolean> => {
     setError(undefined);
     try {
       await send({ type: 'WORK_OPS', ops });
+      return true;
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
+      return false;
     }
   };
 
@@ -148,7 +150,7 @@ export function ThisTabBar({
         .filter((label) => label !== ''),
       at,
     });
-    await run(ops);
+    if (!(await run(ops))) return;
     if (selected !== NEW_STREAM) await updateWorkUi({ lastStreamId: target });
     setLabels('');
   };

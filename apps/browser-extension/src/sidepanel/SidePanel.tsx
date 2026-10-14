@@ -58,7 +58,8 @@ export function SidePanel() {
   const shell = 'w-[360px] max-w-full min-h-screen bg-[#050505] text-[#e6e6e6] p-3';
   if (!loaded) return <main class={shell} />;
 
-  const signedOut = !streams || snapshot?.problem?.kind === 'signed-out';
+  // A missing streams cache only hides the streams; the worker polls with a work token alone.
+  const signedOut = snapshot ? snapshot.problem?.kind === 'signed-out' : !streams;
   const file = streams?.state.ok ? streams.state.file : null;
   const readOnly = streams ? !streams.state.ok : false;
 

@@ -59,6 +59,7 @@ let host: HTMLDivElement;
 let store: Record<string, unknown>;
 let sent: Record<string, unknown>[];
 let connected: { name?: string }[];
+let changeListeners: ((changes: Record<string, unknown>, area: string) => void)[];
 let activeTab: { id: number; url?: string; title?: string };
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -89,6 +90,7 @@ beforeEach(() => {
   store = {};
   sent = [];
   connected = [];
+  changeListeners = [];
   activeTab = { id: 7, url: 'https://example.com/new', title: 'New page' };
   (globalThis as unknown as { chrome: unknown }).chrome = {
     storage: {
@@ -101,7 +103,13 @@ beforeEach(() => {
           store = { ...store, ...items };
         },
       },
-      onChanged: { addListener: () => {}, removeListener: () => {} },
+      onChanged: {
+        addListener: (l: (changes: Record<string, unknown>, area: string) => void) =>
+          changeListeners.push(l),
+        removeListener: (l: (changes: Record<string, unknown>, area: string) => void) => {
+          changeListeners = changeListeners.filter((c) => c !== l);
+        },
+      },
     },
     tabs: {
       query: async () => [activeTab],
@@ -235,5 +243,46 @@ describe('SidePanel', () => {
     host.remove();
     store = { ...store, streamsWriteQueue: [] };
     await mount('Could not apply a change: offline');
+  });
+
+  it('shows the 401 message with a work token and no data repo', async () => {
+    store = { workSnapshot: snapshot({ problem: { kind: 'auth' } }) };
+    await mount('GitHub refused the token. Sign in again.');
+    expect(host.textContent).not.toContain('Sign in to kaihuman in the console');
+  });
+
+  it('shows the rate-limit pause', async () => {
+    const until = new Date('2026-10-14T11:30:00.000Z').getTime();
+    store = {
+      streamsCache: cache(),
+      workSnapshot: snapshot({ problem: { kind: 'rate-limit', until } }),
+    };
+    await mount(`Paused by GitHub until ${timeOf(until)}.`);
+  });
+
+  it('shows org banners without a streams cache', async () => {
+    store = {
+      workSnapshot: snapshot({
+        orgProblems: [{ org: 'acme', fix: 'sso', url: 'https://github.com/orgs/acme/sso' }],
+      }),
+    };
+    await mount('acme hides its items from kaihuman.');
+    expect(host.textContent).not.toContain('Sign in to kaihuman in the console');
+  });
+
+  it('disables pinning when the file is read-only', async () => {
+    store = { streamsCache: cache({ ok: false, error: 'bad' }), workSnapshot: snapshot() };
+    await mount('read-only');
+    await waitFor(() => host.textContent?.includes('Pin') ?? false);
+    const pin = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Pin');
+    expect(pin?.disabled).toBe(true);
+  });
+
+  it('re-renders when storage changes', async () => {
+    store = { streamsCache: cache(), workSnapshot: snapshot() };
+    await mount('Work');
+    store = { ...store, workSnapshot: snapshot({ problem: { kind: 'auth' } }) };
+    for (const l of changeListeners) l({ workSnapshot: {} }, 'local');
+    await waitFor(() => host.textContent?.includes('GitHub refused the token.') ?? false);
   });
 });
