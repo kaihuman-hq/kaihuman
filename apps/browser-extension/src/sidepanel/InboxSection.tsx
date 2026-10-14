@@ -22,7 +22,7 @@ interface Props {
   readOnly: boolean;
 }
 
-function PinMenu({ row, file }: { row: InboxRow; file: StreamsFile }) {
+function PinMenu({ row, file, onDone }: { row: InboxRow; file: StreamsFile; onDone: () => void }) {
   const [error, setError] = useState<string>();
   const pin = async (streamId: ReturnType<typeof newStreamId>, extra: StreamOp[] = []) => {
     const at = new Date().toISOString();
@@ -37,6 +37,7 @@ function PinMenu({ row, file }: { row: InboxRow; file: StreamsFile }) {
     };
     try {
       await send({ type: 'WORK_OPS', ops: [...extra, op] });
+      onDone();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
     }
@@ -120,7 +121,7 @@ function Row({
         <StatusChips status={row.status} unread={unread} />
         <span class="ml-auto">{age(Date.parse(row.updatedAt))}</span>
       </div>
-      {menu && file && !readOnly && <PinMenu row={row} file={file} />}
+      {menu && file && !readOnly && <PinMenu row={row} file={file} onDone={() => setMenu(false)} />}
       {failed && <p class="text-red-400 text-[12px]">could not dismiss — retry</p>}
     </li>
   );
@@ -136,7 +137,9 @@ function Section({
 }: { title: string; rows: InboxRow[]; dismissible: boolean; unread?: Set<string> } & Props) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [failed, setFailed] = useState<Set<string>>(new Set());
-  const shown = rows.filter((row) => !hidden.has(row.key));
+  // Keyed by timestamp too: a newer update to a dismissed item must show again.
+  const slot = (row: InboxRow) => `${row.key}@${row.updatedAt}`;
+  const shown = rows.filter((row) => !hidden.has(slot(row)));
   const update = (set: Set<string>, key: string, on: boolean) => {
     const next = new Set(set);
     if (on) next.add(key);
@@ -144,8 +147,8 @@ function Section({
     return next;
   };
   const dismiss = (row: InboxRow) => {
-    setHidden((h) => update(h, row.key, true));
-    setFailed((f) => update(f, row.key, false));
+    setHidden((h) => update(h, slot(row), true));
+    setFailed((f) => update(f, slot(row), false));
     const message: Record<string, string> = {
       type: 'WORK_DISMISS',
       key: row.key,
@@ -153,8 +156,8 @@ function Section({
     };
     if (row.threadId) message.threadId = row.threadId;
     send(message).catch(() => {
-      setHidden((h) => update(h, row.key, false));
-      setFailed((f) => update(f, row.key, true));
+      setHidden((h) => update(h, slot(row), false));
+      setFailed((f) => update(f, slot(row), true));
     });
   };
   return (
@@ -171,7 +174,7 @@ function Section({
               file={file}
               readOnly={readOnly}
               dismissible={dismissible}
-              failed={failed.has(row.key)}
+              failed={failed.has(slot(row))}
               unread={unread?.has(row.key) ?? row.threadId !== undefined}
               onDismiss={() => dismiss(row)}
             />

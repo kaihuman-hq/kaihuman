@@ -74,6 +74,7 @@ let host: HTMLDivElement;
 let store: Record<string, unknown>;
 let sent: Record<string, unknown>[];
 let failNext: string | undefined;
+let listeners: ((changes: Record<string, unknown>, area: string) => void)[];
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 const waitFor = async (condition: () => boolean) => {
@@ -109,6 +110,7 @@ beforeEach(() => {
   store = { streamsCache: cache(), workSnapshot: snapshot() };
   sent = [];
   failNext = undefined;
+  listeners = [];
   (globalThis as unknown as { chrome: unknown }).chrome = {
     storage: {
       local: {
@@ -118,7 +120,11 @@ beforeEach(() => {
         },
         set: async () => {},
       },
-      onChanged: { addListener: () => {}, removeListener: () => {} },
+      onChanged: {
+        addListener: (l: (changes: Record<string, unknown>, area: string) => void) =>
+          listeners.push(l),
+        removeListener: () => {},
+      },
     },
     tabs: {
       query: async () => [],
@@ -211,5 +217,51 @@ describe('InboxSection', () => {
       url: 'https://github.com/acme/web/pull/3',
       threadId: 't9',
     });
+  });
+
+  it('shows a dismissed row again when it comes back newer', async () => {
+    await mount('Waiting on you (2)');
+    byLabel(section('Waiting on you (2)'), 'Dismiss PR 2').click();
+    await waitFor(() => host.textContent?.includes('Waiting on you (1)') ?? false);
+    const snap = snapshot();
+    snap.searches.assigned = [status(2, { updatedAt: '2026-10-14T09:50:00.000Z' }), status(1)];
+    store = { ...store, workSnapshot: snap };
+    for (const l of listeners) l({ workSnapshot: {} }, 'local');
+    await waitFor(() => host.textContent?.includes('Waiting on you (2)') ?? false);
+    expect(section('Waiting on you (2)').textContent).toContain('PR 2');
+  });
+
+  it('creates a stream and pins in one message from New stream…, and cancel sends nothing', async () => {
+    await mount('Waiting on you (2)');
+    const waiting = section('Waiting on you (2)');
+    byLabel(waiting, 'Pin PR 2').click();
+    await tick();
+    clickText(waiting, 'New stream…');
+    await tick();
+    expect(sent.filter((m) => m.type === 'WORK_OPS')).toHaveLength(0);
+    window.prompt = () => 'Fresh';
+    clickText(waiting, 'New stream…');
+    await waitFor(() => sent.some((m) => m.type === 'WORK_OPS'));
+    const message = sent.find((m) => m.type === 'WORK_OPS') as { ops: Record<string, unknown>[] };
+    expect(message.ops).toHaveLength(2);
+    expect(message.ops[0]).toMatchObject({ op: 'addStream', name: 'Fresh' });
+    expect(message.ops[1]).toMatchObject({ op: 'pin', streamId: message.ops[0]?.streamId });
+  });
+
+  it('closes the pin menu after pinning', async () => {
+    await mount('Waiting on you (2)');
+    const waiting = section('Waiting on you (2)');
+    byLabel(waiting, 'Pin PR 2').click();
+    await tick();
+    clickText(waiting, 'Alpha');
+    await waitFor(() => !section('Waiting on you (2)').textContent?.includes('New stream…'));
+  });
+
+  it('disables pinning without a file', async () => {
+    store = { workSnapshot: snapshot() };
+    await mount('Waiting on you (2)');
+    expect((byLabel(section('Waiting on you (2)'), 'Pin PR 2') as HTMLButtonElement).disabled).toBe(
+      true,
+    );
   });
 });
