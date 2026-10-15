@@ -26,9 +26,19 @@ const pageUrl = () =>
  * arrived falls back to the page's own values.
  */
 let bookmarkDraft: { title: string; tags: string[] } | null = null;
+// Asked separately and shown the moment it is back: an exact duplicate needs no model (F12).
+let savedAlready: { title: string; url: string } | null = null;
 
 const requestBookmarkDraft = () => {
   bookmarkDraft = null;
+  savedAlready = null;
+  send({ type: 'BOOKMARK_DUPLICATES', url: pageUrl(), title: document.title }).then(
+    (response) => {
+      const exact = (response?.duplicates ?? []).find((entry: { exact?: boolean }) => entry.exact);
+      if (exact) savedAlready = exact;
+    },
+    () => {},
+  );
   send({ type: 'BOOKMARK_DRAFT', url: pageUrl(), title: document.title }).then(
     (response) => {
       if (response?.draft) bookmarkDraft = response.draft;
@@ -47,7 +57,9 @@ const paletteActions = (): PaletteAction[] => [
   {
     id: 'bookmark-page',
     title: 'Bookmark this page…',
-    subtitle: document.title || location.href,
+    subtitle: savedAlready
+      ? `Already saved: ${savedAlready.title || savedAlready.url}`
+      : document.title || location.href,
     // The page's own url and title are only a starting point: a tracking-laden url or a
     // site's boilerplate title is worth fixing before it is saved, so both are prefilled
     // and editable, and ⏎ keeps what is there.

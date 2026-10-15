@@ -20,7 +20,7 @@ import {
   withTranslationText,
 } from '@kaihuman/palette';
 import { type Message } from '../types';
-import { draftBookmark, findDuplicates } from './ai/bookmark-draft.js';
+import { draftBookmark, findDuplicates, findExactDuplicates } from './ai/bookmark-draft.js';
 import { precomputeBrief, precomputeFocus, readAiCards } from './ai/brief.js';
 import { captureContext, classifyCapture } from './ai/capture.js';
 import { digestToday } from './ai/digest.js';
@@ -1178,9 +1178,26 @@ async function deletePinnedTabGroup(token: string, repo: string, groupId: string
   return { name };
 }
 
+/** What is already saved, for finding duplicates; read-only. */
+async function savedEntries(bookmarks: Bookmark[]) {
+  const today = await readTodayCache();
+  const readLater = (today?.files ?? [])
+    .filter((file) => file.path.endsWith('.readitlater.json'))
+    .flatMap((file) => unreadItems(file.content));
+  // Streams are a nicety here: signed out or a failed read only means fewer duplicates found.
+  const streams = await loadStreams().catch(() => undefined);
+  return { bookmarks, readLater, streams: streams?.state.ok ? streams.state.file : null };
+}
+
+/** Exact duplicates only: no model, so the form can show them at once (spec F12). */
+async function bookmarkDuplicates(url: string) {
+  const { bookmarks } = await getBookmarks();
+  return { duplicates: findExactDuplicates({ url }, await savedEntries(bookmarks)) };
+}
+
 /**
- * A title, tags and environment for the page being bookmarked, and where it is already saved.
- * Read-only: the repo is only written when the user saves.
+ * A title, tags and environment for the page being bookmarked, and where it is already saved
+ * (near copies too). Read-only: the repo is only written when the user saves.
  */
 async function bookmarkDraft(url: string, title: string) {
   const { bookmarks } = await getBookmarks();
@@ -1192,20 +1209,10 @@ async function bookmarkDraft(url: string, title: string) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 50)
     .map(([tag]) => tag);
-  const today = await readTodayCache();
-  const readLater = (today?.files ?? [])
-    .filter((file) => file.path.endsWith('.readitlater.json'))
-    .flatMap((file) => unreadItems(file.content));
-  // Streams are a nicety here: signed out or a failed read only means fewer duplicates found.
-  const streams = await loadStreams().catch(() => undefined);
   const page = { url, title };
   const [draft, duplicates] = await Promise.all([
     draftBookmark(page, knownTags),
-    findDuplicates(page, {
-      bookmarks,
-      readLater,
-      streams: streams?.state.ok ? streams.state.file : null,
-    }),
+    savedEntries(bookmarks).then((saved) => findDuplicates(page, saved)),
   ]);
   return { draft, duplicates };
 }
@@ -1680,6 +1687,14 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     return true; // Indicate async response
   }
 
+  if (message.type === 'BOOKMARK_DUPLICATES') {
+    bookmarkDuplicates(String(message.url || '')).then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
   if (message.type === 'BOOKMARK_DRAFT') {
     bookmarkDraft(String(message.url || ''), String(message.title || '')).then(
       (result) => sendResponse({ success: true, ...result }),
@@ -2034,16 +2049,26 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       text: (message.text || '').trim(),
     };
     return answer(
-      // Enriched first and committed after, so the file is not held open while the model works.
-      readLaterExtras(page).then((extras) =>
-        commitTodayFile(readLaterPath, (json) =>
-          addReadLaterEntry(
-            json,
-            { url: page.url, title: page.title, ...extras },
-            crypto.randomUUID(),
+      // A page already on the list is refused before the model is asked about it; the commit
+      // below still checks the file itself.
+      readTodayCache()
+        .then((cache) => {
+          const onList = (cache?.files ?? [])
+            .filter((file) => file.path.toLowerCase().endsWith('.readitlater.json'))
+            .some((file) => unreadItems(file.content).some((item) => item.url === page.url));
+          if (onList) throw new Error('Already on the read-later list');
+        })
+        // Enriched first and committed after, so the file is not held open while the model works.
+        .then(() => readLaterExtras(page))
+        .then((extras) =>
+          commitTodayFile(readLaterPath, (json) =>
+            addReadLaterEntry(
+              json,
+              { url: page.url, title: page.title, ...extras },
+              crypto.randomUUID(),
+            ),
           ),
         ),
-      ),
       sendResponse,
     );
   }

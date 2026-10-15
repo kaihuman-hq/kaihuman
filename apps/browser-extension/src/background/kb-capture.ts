@@ -61,7 +61,9 @@ export function buildRawNote(note: {
   const summary = points.length
     ? `summary:\n${points.map((point) => `  - ${JSON.stringify(point)}\n`).join('')}`
     : '';
-  return `---\ntitle: "${title}"\nurl: '${url}'\ndate: ${note.date}\nprocessed: false\n${type}tags: [${note.tags.join(', ')}]\n${summary}---\n\n${note.text}`;
+  // Quoted like the title: a tag with a comma, colon or bracket would otherwise break the list.
+  const tags = [...new Set(note.tags)].map((tag) => JSON.stringify(tag)).join(', ');
+  return `---\ntitle: "${title}"\nurl: '${url}'\ndate: ${note.date}\nprocessed: false\n${type}tags: [${tags}]\n${summary}---\n\n${note.text}`;
 }
 
 export function selectionText(text: string, url: string, pageTitle: string): string {

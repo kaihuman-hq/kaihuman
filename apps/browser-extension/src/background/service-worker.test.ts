@@ -169,7 +169,7 @@ describe('knowledge base captures', () => {
     const [put] = puts();
     expect(put.path).toMatch(/^\.kh\/raw\/\d+-page\.md$/);
     expect(put.body).toContain('processed: false');
-    expect(put.body).toContain('tags: [clipping]');
+    expect(put.body).toContain('tags: ["clipping"]');
     expect(put.body).toContain('> a quote');
   });
 

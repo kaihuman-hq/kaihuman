@@ -237,16 +237,6 @@ export function parseCaptureAnswer(
   return guesses.length ? guesses : null;
 }
 
-const within = <T>(work: Promise<T>, ms: number, fallback: T): Promise<T> => {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  return Promise.race([
-    work,
-    new Promise<T>((resolve) => {
-      timer = setTimeout(() => resolve(fallback), ms);
-    }),
-  ]).finally(() => clearTimeout(timer));
-};
-
 /** Up to three guesses, the best first; [] without the model, when switched off, or too slow. */
 export async function classifyCapture(text: string, ctx: CaptureContext): Promise<CaptureGuess[]> {
   const input = text.trim();
@@ -257,7 +247,8 @@ export async function classifyCapture(text: string, ctx: CaptureContext): Promis
     hashKey('capture', input, JSON.stringify(ctx)),
     CACHE_TTL_MS,
     async () => {
-      const language = await within(detectLanguage(input), CAPTURE_TIMEOUT_MS, null);
+      // The timeout also frees the model queue; `within` alone would leave a hung detector in it.
+      const language = await detectLanguage(input, { timeoutMs: CAPTURE_TIMEOUT_MS });
       const timeoutMs = deadline - Date.now();
       if (timeoutMs <= 0) return null;
       return promptJson({

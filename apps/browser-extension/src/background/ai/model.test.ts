@@ -164,6 +164,34 @@ describe('summarize, translate and detectLanguage', () => {
     expect(await detectLanguage('Guten Morgen, wie geht es dir?')).toBe('de');
   });
 
+  it('detectLanguage with a timeout gives null on a hung detector and frees the queue', async () => {
+    vi.stubGlobal('LanguageDetector', {
+      availability: async () => 'available',
+      create: async () => ({ detect: () => new Promise(() => {}), destroy: () => {} }),
+    });
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => 'available',
+      create: async () => ({ prompt: async () => '{"a":1}', destroy: () => {} }),
+    });
+    expect(await detectLanguage('Hallo', { timeoutMs: 50 })).toBeNull();
+    const answer = await promptJson({
+      system: 's',
+      input: 'i',
+      schema: {},
+      validate: (raw) => raw as { a: number },
+      timeoutMs: 1000,
+    });
+    expect(answer).toEqual({ a: 1 });
+  });
+
+  it('translate with a timeout gives null on a hung translator', async () => {
+    vi.stubGlobal('Translator', {
+      availability: async () => 'available',
+      create: async () => ({ translate: () => new Promise(() => {}), destroy: () => {} }),
+    });
+    expect(await translate('Hallo', 'de', 'en', { timeoutMs: 50 })).toBeNull();
+  });
+
   it('detectLanguage gives the base of a regional tag, and null for undetermined', async () => {
     let result = [{ detectedLanguage: 'pt-BR', confidence: 0.8 }];
     vi.stubGlobal('LanguageDetector', {

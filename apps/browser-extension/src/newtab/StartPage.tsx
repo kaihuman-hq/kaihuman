@@ -165,6 +165,10 @@ export function StartPage() {
   const [guessIndex, setGuessIndex] = useState(0);
   // The latest question asked, so a save can wait for its answer and a stale answer is dropped.
   const classifyRef = useRef<{ text: string; result: Promise<CaptureGuess[]> } | null>(null);
+  const generationRef = useRef(0);
+  const inFlightRef = useRef<Promise<CaptureGuess[]> | null>(null);
+  const waitingRef = useRef<(() => void) | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [captureLog, setCaptureLog] = useState<CaptureLog>(EMPTY_CAPTURE_LOG);
   const [today, setToday] = useState<TodaySummary | null>(null);
   const [likely, setLikely] = useState<Ranking | undefined>(undefined);
@@ -271,21 +275,41 @@ export function StartPage() {
     });
   }, []);
 
+  // Only the newest question matters. The worker runs every request it gets, one at a time, so
+  // asking again while one is out would queue behind it and time out; the newest text waits for
+  // the one in flight instead, and older waiting ones are dropped.
   const classify = (text: string) => {
+    const generation = ++generationRef.current;
+    const stale = () => generationRef.current !== generation;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const result = Promise.race([
-      send({ type: 'CAPTURE_CLASSIFY', text }).then(
-        (response) =>
-          Array.isArray(response?.guesses) ? (response.guesses as CaptureGuess[]) : [],
-        (): CaptureGuess[] => [],
-      ),
-      new Promise<CaptureGuess[]>((resolve) => {
-        timer = setTimeout(() => resolve([]), CLASSIFY_TIMEOUT_MS);
-      }),
-    ]).finally(() => clearTimeout(timer));
+    const result = new Promise<CaptureGuess[]>((resolve) => {
+      timer = setTimeout(() => resolve([]), CLASSIFY_TIMEOUT_MS);
+      const start = () => {
+        if (stale()) return resolve([]);
+        const request = send({ type: 'CAPTURE_CLASSIFY', text }).then(
+          (response) =>
+            Array.isArray(response?.guesses) ? (response.guesses as CaptureGuess[]) : [],
+          (): CaptureGuess[] => [],
+        );
+        const flight = Promise.race([
+          request,
+          new Promise<CaptureGuess[]>((r) => setTimeout(() => r([]), CLASSIFY_TIMEOUT_MS)),
+        ]);
+        inFlightRef.current = flight;
+        void flight.then((list) => {
+          resolve(list);
+          if (inFlightRef.current === flight) inFlightRef.current = null;
+          const next = waitingRef.current;
+          waitingRef.current = null;
+          next?.();
+        });
+      };
+      if (inFlightRef.current) waitingRef.current = start;
+      else start();
+    }).finally(() => clearTimeout(timer));
     classifyRef.current = { text, result };
     void result.then((list) => {
-      if (classifyRef.current?.text !== text) return;
+      if (stale()) return;
       setGuesses(list);
       setGuessIndex(0);
     });
@@ -293,14 +317,22 @@ export function StartPage() {
   };
 
   useEffect(() => {
+    // A save already asked about this very text (effects run after the keystroke has painted).
+    if (capture === 'auto' && note.trim() && classifyRef.current?.text === note.trim()) return;
     setGuesses([]);
     setGuessIndex(0);
+    // Whatever was asked about the previous text is out of date from here on.
+    generationRef.current++;
     const text = note.trim();
     if (capture !== 'auto' || !text) {
       classifyRef.current = null;
       return;
     }
-    const timer = setTimeout(() => void classify(text), CLASSIFY_DEBOUNCE_MS);
+    const timer = setTimeout(() => {
+      debounceRef.current = undefined;
+      void classify(text);
+    }, CLASSIFY_DEBOUNCE_MS);
+    debounceRef.current = timer;
     return () => clearTimeout(timer);
   }, [note, capture]);
 
@@ -619,7 +651,10 @@ export function StartPage() {
     setNoteError(null);
     try {
       if (kind === 'auto') {
-        // A save before the answer waits for it, up to the timeout, then files a note.
+        // A save before the answer waits for it, up to the timeout, then files a note. The
+        // pending debounce is cancelled so the same text is not sent a second time.
+        clearTimeout(debounceRef.current);
+        debounceRef.current = undefined;
         const pending =
           classifyRef.current?.text === text ? classifyRef.current.result : classify(text);
         const list = await pending;

@@ -34,6 +34,17 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
 
   useEffect(() => {
     if (!page?.url) return;
+    // Exact duplicates need no model, so they show as soon as they are found; the draft's own
+    // duplicates (near copies) never replace an exact one.
+    chrome.runtime.sendMessage(
+      { type: 'BOOKMARK_DUPLICATES', url: page.url, title: page.title },
+      (response) => {
+        if (chrome.runtime.lastError) return;
+        const found: DraftDuplicate[] = response?.duplicates ?? [];
+        const exact = found.find((entry) => entry.exact);
+        if (exact) setDuplicate(exact);
+      },
+    );
     chrome.runtime.sendMessage(
       { type: 'BOOKMARK_DRAFT', url: page.url, title: page.title },
       (response) => {
@@ -50,7 +61,9 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
           if (all.length) setTagsInput(all.join(', '));
         }
         const found: DraftDuplicate[] = response.duplicates ?? [];
-        setDuplicate(found.find((entry) => entry.exact) ?? found[0] ?? null);
+        setDuplicate((current) =>
+          current?.exact ? current : (found.find((entry) => entry.exact) ?? found[0] ?? null),
+        );
       },
     );
   }, [page?.url, page?.title]);

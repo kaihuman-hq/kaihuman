@@ -164,17 +164,15 @@ const overlap = (a: string, b: string): number => {
   return shared / (left.size + right.size - shared);
 };
 
-/**
- * Where the page is already saved: the same address (after tracking parameters and fragments are
- * dropped) is a certain duplicate; another page of the same site whose title reads alike is a
- * maybe the model is asked about, from the five closest titles. Without the model only the certain
- * ones are reported.
- */
-export async function findDuplicates(
-  page: { url: string; title: string },
-  data: { bookmarks: Bookmark[]; readLater: ReadItLaterItem[]; streams: StreamsFile | null },
-): Promise<Duplicate[]> {
-  const known: Duplicate[] = [
+type DuplicateData = {
+  bookmarks: Bookmark[];
+  readLater: ReadItLaterItem[];
+  streams: StreamsFile | null;
+};
+
+/** Everything already saved, as duplicate candidates. */
+function knownEntries(data: DuplicateData): Duplicate[] {
+  return [
     ...data.bookmarks.map(
       (b): Duplicate => ({ kind: 'bookmark', title: b.title, url: b.url, exact: false }),
     ),
@@ -187,11 +185,30 @@ export async function findDuplicates(
       ),
     ) ?? []),
   ];
+}
 
+/**
+ * Saved entries with the same normalised url. No model: shown at once, before the draft is back.
+ */
+export function findExactDuplicates(page: { url: string }, data: DuplicateData): Duplicate[] {
   const wanted = normalizeItemUrl(page.url);
-  const exact = known
+  return knownEntries(data)
     .filter((entry) => normalizeItemUrl(entry.url) === wanted)
     .map((entry) => ({ ...entry, exact: true }));
+}
+
+/**
+ * Where the page is already saved: the same address (after tracking parameters and fragments are
+ * dropped) is a certain duplicate; another page of the same site whose title reads alike is a
+ * maybe the model is asked about, from the five closest titles. Without the model only the certain
+ * ones are reported.
+ */
+export async function findDuplicates(
+  page: { url: string; title: string },
+  data: DuplicateData,
+): Promise<Duplicate[]> {
+  const known = knownEntries(data);
+  const exact = findExactDuplicates(page, data);
   if (exact.length > 0 || !(await readAiSettings()).enrichment) return exact;
 
   const host = hostOf(page.url);

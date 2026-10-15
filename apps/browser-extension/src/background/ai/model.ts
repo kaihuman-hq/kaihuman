@@ -277,7 +277,10 @@ export async function summarize(
 }
 
 /** The most likely language as a BCP-47 base ('de' for 'de-AT'), or null when unsure. */
-export async function detectLanguage(text: string): Promise<string | null> {
+export async function detectLanguage(
+  text: string,
+  opts: { priority?: Priority; timeoutMs?: number } = {},
+): Promise<string | null> {
   const api = globals().LanguageDetector;
   if (!api) return null;
   return runJob(
@@ -289,7 +292,8 @@ export async function detectLanguage(text: string): Promise<string | null> {
       const base = top?.detectedLanguage.split('-')[0]?.toLowerCase();
       return base && base !== 'und' ? base : null;
     },
-    'interactive',
+    opts.priority ?? 'interactive',
+    opts.timeoutMs,
   );
 }
 
@@ -297,6 +301,7 @@ export async function translate(
   text: string,
   source: string,
   target: string,
+  opts: { priority?: Priority; timeoutMs?: number } = {},
 ): Promise<string | null> {
   const api = globals().Translator;
   if (!api) return null;
@@ -308,6 +313,7 @@ export async function translate(
       const translator = track(await api.create(options));
       return (await translator.translate(text)) || null;
     },
-    'interactive',
+    opts.priority ?? 'interactive',
+    opts.timeoutMs,
   );
 }

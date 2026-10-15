@@ -1060,6 +1060,58 @@ describe('StartPage', () => {
       ]);
     });
 
+    /** Holds every `CAPTURE_CLASSIFY` answer until the test releases it. */
+    const heldClassify = () => {
+      const held: ((guesses: unknown[]) => void)[] = [];
+      const sendMessage = (globalThis as any).chrome.runtime.sendMessage;
+      (globalThis as any).chrome.runtime.sendMessage = (
+        message: Record<string, unknown>,
+        respond?: (response: unknown) => void,
+      ) => {
+        if (message.type !== 'CAPTURE_CLASSIFY') return sendMessage(message, respond);
+        sent.push(message);
+        held.push((guesses) => respond?.({ success: true, guesses }));
+      };
+      return held;
+    };
+
+    it('sends at most one question at a time and applies only the latest answer', async () => {
+      const held = heldClassify();
+      const textarea = await mountAuto();
+      await type(textarea, 'Call');
+      await waitLong(() => sent.filter((m) => m.type === 'CAPTURE_CLASSIFY').length === 1);
+      await type(textarea, 'Call the');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await type(textarea, 'Call the bank');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      // The first is still out, so nothing else was sent.
+      expect(sent.filter((m) => m.type === 'CAPTURE_CLASSIFY')).toHaveLength(1);
+
+      held[0]?.([LOG_GUESS]);
+      await waitLong(() => sent.filter((m) => m.type === 'CAPTURE_CLASSIFY').length === 2);
+      expect(sent.filter((m) => m.type === 'CAPTURE_CLASSIFY').map((m) => m.text)).toEqual([
+        'Call',
+        'Call the bank',
+      ]);
+      expect(host.textContent).not.toContain('Log →');
+      held[1]?.([TODO_GUESS]);
+      await waitLong(() => host.textContent?.includes('Todo → work.todos.md') ?? false);
+      expect(host.textContent).not.toContain('Log →');
+    });
+
+    it('Enter within 400 ms sends one question and one save', async () => {
+      const held = heldClassify();
+      const textarea = await mountAuto();
+      await type(textarea, 'Call the bank');
+      press(textarea, 'Enter');
+      // The answer is slow, so the debounce timer would fire while the save waits.
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      held[0]?.([TODO_GUESS]);
+      await waitFor(() => sent.some((m) => m.type === 'ADD_TODO'));
+      expect(sent.filter((m) => m.type === 'CAPTURE_CLASSIFY')).toHaveLength(1);
+      expect(sent.filter((m) => m.type === 'ADD_TODO')).toHaveLength(1);
+    });
+
     it('Tab cycles guesses', async () => {
       classifyWith([TODO_GUESS, LOG_GUESS]);
       const textarea = await mountAuto();

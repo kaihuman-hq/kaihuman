@@ -423,6 +423,28 @@ describe('writes from the start page', () => {
     }
   });
 
+  it('refuses a page already on the list before asking the model', async () => {
+    remote['.kh/a.readitlater.json'] = JSON.stringify({
+      items: [{ id: 'old', url: 'https://example.com/a', name: 'A', status: 'new' }],
+    });
+    seedCache();
+    const create = vi.fn(async () => ({ summarize: async () => 'x', destroy: () => {} }));
+    vi.stubGlobal('Summarizer', { availability: async () => 'available', create });
+    try {
+      const response = await call({
+        type: 'READ_LATER_ADD',
+        url: 'https://example.com/a',
+        title: 'A',
+        text: 'some text',
+      });
+      expect(response.error).toBe('Already on the read-later list');
+      expect(create).not.toHaveBeenCalled();
+      expect(writes()).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('only saves web pages for later', async () => {
     seedCache();
     const response = await call({ type: 'READ_LATER_ADD', url: 'javascript:alert(1)' });

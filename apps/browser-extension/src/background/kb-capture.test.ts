@@ -40,7 +40,7 @@ describe('buildRawNote', () => {
         date: '2026-09-23',
       }),
     ).toBe(
-      `---\ntitle: "He said \\"hi\\" again"\nurl: 'https://x.com/it''s'\ndate: 2026-09-23\nprocessed: false\ntags: [clipping]\n---\n\nbody`,
+      `---\ntitle: "He said \\"hi\\" again"\nurl: 'https://x.com/it''s'\ndate: 2026-09-23\nprocessed: false\ntags: ["clipping"]\n---\n\nbody`,
     );
   });
 });
@@ -58,7 +58,7 @@ describe('buildRawNote enrichment', () => {
         summary: ['Use "backoff"', 'Add jitter'],
       }),
     ).toBe(
-      `---\ntitle: "T"\nurl: 'https://x.com'\ndate: 2026-09-23\nprocessed: false\ntype: how-to\ntags: [general, ops]\nsummary:\n  - "Use \\"backoff\\""\n  - "Add jitter"\n---\n\nbody`,
+      `---\ntitle: "T"\nurl: 'https://x.com'\ndate: 2026-09-23\nprocessed: false\ntype: how-to\ntags: ["general", "ops"]\nsummary:\n  - "Use \\"backoff\\""\n  - "Add jitter"\n---\n\nbody`,
     );
   });
 });
@@ -113,5 +113,16 @@ describe('imagesEnabled', () => {
     expect(imagesEnabled(undefined)).toBe(true);
     expect(imagesEnabled(true)).toBe(true);
     expect(imagesEnabled(false)).toBe(false);
+  });
+
+  it('quotes each tag and lists it once', () => {
+    const note = buildRawNote({
+      title: 'T',
+      url: 'https://x.com',
+      date: '2026-09-23',
+      text: 'body',
+      tags: ['general', 'a, b]', 'say "hi"', 'general'],
+    });
+    expect(note).toContain('tags: ["general", "a, b]", "say \\"hi\\""]\n');
   });
 });
