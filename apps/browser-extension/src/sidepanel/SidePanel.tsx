@@ -1,6 +1,7 @@
 import { newStreamId, type StreamId, streamLabels } from '@kaihuman/formats';
 import { Fragment } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
+import type { ReviewRange } from '../background/ai/review.js';
 import { buildInbox, type InboxRow, unreadKeys } from '../background/work/inbox.js';
 import type { OrgAccessProblem, WorkProblem } from '../background/work/types.js';
 import { CONSOLE_URL, consoleFileUrl } from '../console.js';
@@ -9,6 +10,7 @@ import { age } from './age.js';
 import { Choice, Heading, iconButton, NewStreamInput, sendOps } from './controls.js';
 import { InboxSection, MineSection, useTldrs } from './InboxSection.js';
 import { RelatedPicker } from './RelatedPicker.js';
+import { ReviewDraft } from './ReviewDraft.js';
 import { StreamSection } from './StreamSection.js';
 import { ThisTabBar } from './ThisTabBar.js';
 import { useInboxLabels } from './useInboxLabels.js';
@@ -169,6 +171,8 @@ export function SidePanel() {
   const { labels, assigned, muted } = useInboxLabels();
   const [labelFilter, setLabelFilter] = useState<string>();
   const tldrs = useTldrs(snapshot?.fetchedAt);
+  const [menu, setMenu] = useState(false);
+  const [review, setReview] = useState<ReviewRange>();
 
   useEffect(() => {
     // Opening the port tells the worker the panel is visible so it polls faster. A restarted
@@ -232,7 +236,42 @@ export function SidePanel() {
         >
           ⚙
         </button>
+        <div class="relative">
+          <button
+            type="button"
+            aria-label="More"
+            title="More"
+            aria-haspopup="menu"
+            aria-expanded={menu}
+            class={`${iconButton} ${menu ? 'text-nt-accent' : ''}`}
+            onClick={() => setMenu(!menu)}
+          >
+            ⋯
+          </button>
+          {menu && (
+            <div
+              role="menu"
+              class="absolute right-0 top-7 z-20 flex w-36 flex-col border border-nt-divider bg-nt-bg py-1"
+            >
+              {(['standup', 'week'] as const).map((range) => (
+                <button
+                  key={range}
+                  type="button"
+                  role="menuitem"
+                  class="px-3 py-1 text-left text-[12px] hover:bg-nt-row-hover"
+                  onClick={() => {
+                    setMenu(false);
+                    setReview(range);
+                  }}
+                >
+                  {range === 'standup' ? 'Standup' : 'Week review'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </header>
+      {review && <ReviewDraft range={review} onClose={() => setReview(undefined)} />}
       {settings && <WorkSettings ui={ui} />}
       <div class="flex flex-col gap-5 px-3 py-3">
         {signedOut ? (
