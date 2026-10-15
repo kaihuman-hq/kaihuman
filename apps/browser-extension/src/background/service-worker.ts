@@ -29,6 +29,14 @@ import { draftBookmark, findDuplicates, findExactDuplicates } from './ai/bookmar
 import { precomputeBrief, precomputeFocus, readAiCards } from './ai/brief.js';
 import { precomputeTldrs, readTldrs } from './ai/tldr.js';
 import { askPage, pageSummary } from './ai/page.js';
+import {
+  type IntentContext,
+  intentContext,
+  intentMessages,
+  parseIntent,
+  previewOf,
+  validateIntent,
+} from './ai/intent.js';
 import { peek, put } from './ai/cache.js';
 import { captureContext, classifyCapture } from './ai/capture.js';
 import { buildWorkContext } from './ai/context.js';
@@ -126,6 +134,7 @@ import {
   STATUS_CONFIG_PATH,
 } from './service-status';
 import {
+  actionLogPath,
   buildToday,
   DEFAULT_ACTION_LOG_PATH,
   fetchToday,
@@ -1510,6 +1519,75 @@ async function askAboutPage(text: string, question: string) {
 }
 
 /**
+ * What the palette's ask may pick from: the synced files, the cached bookmarks and the streams.
+ * Streams only on a web page, since pinning needs one; null while signed out or before a sync.
+ */
+async function currentIntentContext(onPage: boolean) {
+  const { repo } = await credentials();
+  const cache = await readTodayCache();
+  if (!cache || !isTodayCacheUsable(cache, repo)) return null;
+  const bookmarksCache = await readBookmarksCache();
+  const bookmarks =
+    bookmarksCache && isCacheUsable(bookmarksCache, repo)
+      ? applyUsage(bookmarksCache.bookmarks, await readUsage(repo))
+      : [];
+  const streams = onPage ? await loadStreams().catch(() => undefined) : undefined;
+  const named = streams?.state.ok
+    ? streams.state.file.streams.map(({ id, name }) => ({ id, name }))
+    : [];
+  const ctx: IntentContext = intentContext(cache, named, bookmarks, new Date());
+  return { ctx, cache, bookmarks };
+}
+
+/** The palette's ask: one action and its preview, or none. */
+async function intentParse(text: string, url: string) {
+  const none = { intent: null, preview: '' };
+  if ((await readAiSettings()).palette === false) return none;
+  const onPage = isOpenableUrl(url);
+  const found = await currentIntentContext(onPage);
+  if (!found) return none;
+  const intent = await parseIntent(text, found.ctx);
+  // Off a web page (the start page) there is nothing to save for later.
+  if (!intent || (intent.action === 'read-later' && !onPage)) return none;
+  return { intent, preview: previewOf(intent, found.ctx) };
+}
+
+/** Runs an intent the palette's ask previewed, through the handlers its messages name. */
+async function intentRun(
+  raw: unknown,
+  page: { url: string; title: string },
+  opts: { tabId?: number; reuse: boolean; dispatch: (message: object) => Promise<unknown> },
+) {
+  const onPage = isOpenableUrl(page.url);
+  const found = await currentIntentContext(onPage);
+  if (!found) throw new Error('Sync the start page first');
+  // It comes back from the page, and the repo may have moved on: checked again before writing.
+  const intent = validateIntent(raw, found.ctx);
+  if (!intent || (intent.action === 'read-later' && !onPage)) {
+    throw new Error('That no longer fits — try again');
+  }
+  const text =
+    intent.action === 'read-later' && opts.tabId !== undefined
+      ? await chrome.tabs
+          .sendMessage(opts.tabId, { type: 'EXTRACT_ARTICLE' })
+          .then((article) => String(article?.text ?? ''))
+          .catch(() => '')
+      : '';
+  const bookmarkUrl =
+    intent.action === 'open-bookmark'
+      ? found.bookmarks.find((bookmark) => bookmark.id === intent.bookmarkId)?.url
+      : undefined;
+  const messages = intentMessages(intent, {
+    page: { ...page, text },
+    logPath: actionLogPath(found.cache),
+    bookmarkUrl,
+    reuse: opts.reuse,
+  });
+  for (const next of messages) await opts.dispatch(next);
+  return { preview: previewOf(intent, found.ctx) };
+}
+
+/**
  * An action log entry from the popup or the start page, written as the console's Action Log widget
  * writes it, over the version read.
  */
@@ -1728,7 +1806,12 @@ const answer = (work: Promise<object>, sendResponse: (response: unknown) => void
 };
 
 // Message Handling
-chrome.runtime.onMessage.addListener((message: Message | any, sender, sendResponse) => {
+// Named, so INTENT_RUN can hand the messages it builds to the handlers below.
+chrome.runtime.onMessage.addListener(function onMessage(
+  message: Message | any,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: unknown) => void,
+): boolean | undefined {
   // First and synchronous: the palette's ⏎ still counts as the user's action only until an await.
   if (message.type === 'OPEN_WORK_PANEL') {
     return answer(
@@ -2286,6 +2369,31 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'PAGE_ASK') {
     return answer(
       askAboutPage(String(message.text || ''), String(message.question || '')),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'INTENT_PARSE') {
+    return answer(intentParse(String(message.text || ''), String(message.url || '')), sendResponse);
+  }
+
+  if (message.type === 'INTENT_RUN') {
+    const dispatch = (next: object) =>
+      new Promise<unknown>((resolve, reject) => {
+        let replied = false;
+        const reply = (response?: any) => {
+          replied = true;
+          if (response?.error) reject(new Error(response.error));
+          else resolve(response);
+        };
+        if (onMessage(next, sender, reply) !== true && !replied) resolve(undefined);
+      });
+    return answer(
+      intentRun(
+        message.intent,
+        { url: String(message.url || ''), title: String(message.title || '') },
+        { tabId: sender.tab?.id, reuse: message.reuse === true, dispatch },
+      ),
       sendResponse,
     );
   }

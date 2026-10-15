@@ -24,6 +24,7 @@ import {
 import { type ServiceStatus, STATUS_CACHE_TTL_MS } from '../background/service-status';
 import { DEFAULT_ACTION_LOG_PATH, type TodaySummary } from '../background/today';
 import { CONSOLE_URL, consoleFileUrl } from '../console';
+import { askHandler } from '../palette/ask';
 import { notesMode } from '../palette/notes-mode';
 import { send, workerPort } from '../palette/port';
 import { openWorkPanelAction } from '../palette/work-panel';
@@ -226,6 +227,10 @@ export function StartPage() {
           notesMode(send),
         ],
         copy: copyToClipboard,
+        // No page here to pin or save, and a bookmark takes this blank tab over like any hit.
+        ask: askHandler(send, () => ({ url: location.href, title: document.title }), {
+          reuse: true,
+        }),
       });
     }
     return paletteRef.current;

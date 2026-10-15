@@ -9,6 +9,7 @@ import {
   repoActions,
   splitTags,
 } from '@kaihuman/palette';
+import { askHandler } from '../palette/ask';
 import { notesMode } from '../palette/notes-mode';
 import { send, workerPort } from '../palette/port';
 import { openWorkPanelAction } from '../palette/work-panel';
@@ -141,6 +142,7 @@ function getPalette(): CommandPalette {
         notesMode(send),
       ],
       copy: copyToClipboard,
+      ask: askHandler(send, () => ({ url: pageUrl(), title: document.title })),
     });
   }
   return palette;
