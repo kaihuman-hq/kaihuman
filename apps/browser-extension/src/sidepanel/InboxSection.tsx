@@ -1,5 +1,6 @@
 import { newItemId, newStreamId, type StreamOp, type StreamsFile } from '@kaihuman/formats';
 import { useEffect, useState } from 'preact/hooks';
+import { AI_CACHE_KEY } from '../background/ai/cache.js';
 import type { InboxRow } from '../background/work/inbox.js';
 import type { WorkItemStatus } from '../background/work/types.js';
 import { send } from '../palette/port.js';
@@ -27,25 +28,41 @@ interface Props {
   tldrs?: Record<string, string>;
 }
 
-/** The TL;DRs the worker has written, asked for once per snapshot (`stamp` changes with it). */
+/**
+ * The TL;DRs the worker has written, asked for once per snapshot (`stamp` changes with it) and
+ * again when the AI cache changes: the summaries are written after the snapshot, by the precompute
+ * run, and should show without waiting for the next snapshot.
+ */
 export function useTldrs(stamp: number | undefined): Record<string, string> {
   const [tldrs, setTldrs] = useState<Record<string, string>>({});
   useEffect(() => {
     if (stamp === undefined) return;
     let live = true;
-    send({ type: 'GET_TLDRS' }).then(
-      (response) => {
-        if (!live || typeof response !== 'object' || response === null) return;
-        const next: Record<string, string> = {};
-        for (const [key, value] of Object.entries(response)) {
-          if (typeof value === 'string' && value !== '') next[key] = value;
-        }
-        setTldrs(next);
-      },
-      () => {},
-    );
+    const ask = () =>
+      send({ type: 'GET_TLDRS' }).then(
+        (response) => {
+          if (!live || typeof response !== 'object' || response === null) return;
+          const next: Record<string, string> = {};
+          for (const [key, value] of Object.entries(response)) {
+            if (typeof value === 'string' && value !== '') next[key] = value;
+          }
+          setTldrs(next);
+        },
+        () => {},
+      );
+    // A precompute run writes many cache entries in a row; one question covers the burst.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onChanged = (changes: Record<string, unknown>, area: string) => {
+      if (area !== 'local' || !(AI_CACHE_KEY in changes)) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => void ask(), 100);
+    };
+    void ask();
+    chrome.storage.onChanged.addListener(onChanged);
     return () => {
       live = false;
+      clearTimeout(timer);
+      chrome.storage.onChanged.removeListener(onChanged);
     };
   }, [stamp]);
   return tldrs;
@@ -203,9 +220,10 @@ function Row({
             type="button"
             aria-label={`Pin ${row.title} to ${suggested}`}
             title={
-              suggestion.source === 'model'
+              suggestion.reason ??
+              (suggestion.source === 'model'
                 ? "Suggested by Chrome's on-device model"
-                : 'Most items from this repository are in this stream'
+                : 'Most items from this repository are in this stream')
             }
             class="flex min-w-0 max-w-full items-baseline gap-1.5 self-start text-left text-[11px] text-nt-muted hover:text-nt-accent"
             onClick={() => {

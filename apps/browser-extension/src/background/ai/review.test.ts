@@ -78,6 +78,11 @@ const todayCache = {
       sha: '',
       content: 'date;time\n2026-10-14;09:00,11:00\n2026-10-09;09:00,10:00',
     },
+    {
+      path: '.kh/home.timetracking.csv',
+      sha: '',
+      content: 'date;time\n2026-10-13;09:00,10:00\n2026-10-14;09:00,09:30',
+    },
   ],
 } as unknown as TodayCache;
 
@@ -108,7 +113,11 @@ describe('review ranges', () => {
     const week = reviewSources('week', NOW, data);
     expect(week.done.map((d) => d.title)).toEqual(['Old item', 'Recent item']);
     expect(week.merged.map((m) => m.title)).toEqual(['PR 1']);
-    expect(week.minutes).toEqual([{ name: '2026-10-14', minutes: 120 }]);
+    // Named by tracker file, summed over the range (the 2026-10-09 entry is before it).
+    expect(week.minutes).toEqual([
+      { name: 'work', minutes: 120 },
+      { name: 'home', minutes: 90 },
+    ]);
   });
 });
 
@@ -119,7 +128,7 @@ describe('bulletsOf', () => {
     expect(text).toContain('- Logged: Fixed login');
     expect(text).toContain('- Done: Recent item');
     expect(text).toContain('- Merged: PR 1');
-    expect(text).toContain('- Tracked 2h 0m on 2026-10-14');
+    expect(text).toContain('- Tracked 2h 0m on work');
   });
 });
 

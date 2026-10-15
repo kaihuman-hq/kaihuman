@@ -66,8 +66,10 @@ export function buildWorkContext(input: {
   todayCache: TodayCache;
   streams: StreamsFile | null;
   snapshot: WorkSnapshot | undefined;
+  /** Keys the user muted by label; they do not wait on anyone, so the model is not told of them. */
+  muted?: Set<string>;
 }): WorkContext {
-  const { today, todayCache, streams, snapshot } = input;
+  const { today, todayCache, streams, snapshot, muted } = input;
   const todoTags: string[] = [];
   const openIdeas: string[] = [];
   for (const { path, content } of todayCache.files) {
@@ -100,7 +102,7 @@ export function buildWorkContext(input: {
     eventsToday: today.events.filter((event) => event.daysUntil === 0).map((event) => event.name),
     // Inbox rows come urgency-ordered, so the head is the most pressing.
     waiting: snapshot
-      ? buildInbox(snapshot, streams, {}, new Date())
+      ? buildInbox(snapshot, streams, {}, new Date(), muted)
           .waiting.slice(0, WAITING_LIMIT)
           .map((row) => row.title)
       : [],

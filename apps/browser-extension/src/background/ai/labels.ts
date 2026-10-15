@@ -34,8 +34,20 @@ export async function labelRows(
   rows: Row[],
   labels: InboxLabel[],
 ): Promise<Record<string, string>> {
+  return (await askLabels(rows, labels)).assigned;
+}
+
+/**
+ * Like `labelRows`, and also which keys the model answered for. A row the model left out of an
+ * answered batch is 'none'; a batch with no answer at all says nothing about its rows.
+ */
+async function askLabels(
+  rows: Row[],
+  labels: InboxLabel[],
+): Promise<{ assigned: Record<string, string>; answered: Set<string> }> {
   const assigned: Record<string, string> = {};
-  if (labels.length === 0) return assigned;
+  const answered = new Set<string>();
+  if (labels.length === 0) return { assigned, answered };
   const names = labels.map((label) => label.name);
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
@@ -83,9 +95,11 @@ export async function labelRows(
       },
       priority: 'background',
     });
-    for (const { key, label } of answer ?? []) assigned[key] = label;
+    if (answer === null) continue;
+    for (const row of batch) answered.add(row.key);
+    for (const { key, label } of answer) assigned[key] = label;
   }
-  return assigned;
+  return { assigned, answered };
 }
 
 /** Keys whose label is one the user muted. A label renamed or removed since mutes nothing. */
@@ -129,13 +143,13 @@ export async function precomputeInboxLabels(
     if (hit === undefined) todo.push(row);
     else if (hit !== NONE) assigned[row.key] = hit;
   }
-  const fresh = await labelRows(todo, labels);
-  // A model that was unavailable answers nothing; that must not pin every row to 'none' for a day.
-  const answered = Object.keys(fresh).length > 0;
+  const { assigned: fresh, answered } = await askLabels(todo, labels);
   for (const row of todo) {
     const label = fresh[row.key];
     if (label) assigned[row.key] = label;
-    if (label || answered) await put(slots.get(row.key) ?? '', label ?? NONE, TTL_MS);
+    // Only rows of a batch the model answered are cached, 'none' included. A batch it could not
+    // answer is retried next run instead of being pinned to 'none' for a day.
+    if (answered.has(row.key)) await put(slots.get(row.key) ?? '', label ?? NONE, TTL_MS);
   }
   await put(INBOX_LABELS_CACHE, assigned, TTL_MS);
 }

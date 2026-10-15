@@ -50,7 +50,7 @@ import {
   withAltText,
   within,
 } from './ai/enrich.js';
-import { precomputeInboxLabels } from './ai/labels.js';
+import { precomputeInboxLabels, readMutedKeys } from './ai/labels.js';
 import {
   AI_ALARM,
   ensureAiAlarm,
@@ -1306,6 +1306,7 @@ async function cardInputs() {
     todayCache,
     streams: streams?.state.ok ? streams.state.file : null,
     snapshot: snapshot as WorkSnapshot | undefined,
+    muted: await readMutedKeys().catch(() => new Set<string>()),
   };
 }
 
@@ -1346,6 +1347,7 @@ async function rankingContext() {
       todayCache: cache,
       streams: streams?.state.ok ? streams.state.file : null,
       snapshot: snapshot as WorkSnapshot | undefined,
+      muted: await readMutedKeys().catch(() => new Set<string>()),
     }),
   };
 }

@@ -1213,6 +1213,25 @@ describe('StartPage', () => {
     const card = () => host.querySelector('button[aria-label="Open work in the side panel"]');
     const settled = () => host.textContent?.includes('newer') ?? false;
 
+    it('leaves rows with a muted label off the card, count and list alike', async () => {
+      store.workSnapshot = snapshot({
+        failing: [status(4, 'Bot bump')],
+        assigned: [status(5, 'Mine to do')],
+      });
+      store.aiSettings = { inboxLabels: [{ name: 'Noise', hint: 'bots', mute: true }] };
+      store.aiCache = {
+        'inbox:labels': {
+          value: { 'github:o/r#4': 'Noise' },
+          at: Date.now(),
+          ttl: 60_000,
+        },
+      };
+      await mount(() => card() !== null);
+      await waitFor(() => !(card()?.textContent ?? '').includes('Bot bump'));
+      expect(card()?.textContent).toContain('1 waiting on you');
+      expect(card()?.textContent).toContain('Mine to do');
+    });
+
     it('shows the work summary and the first three waiting rows', async () => {
       store.workSnapshot = snapshot({
         'review-requested': [status(1, 'Add parser'), status(2, 'Fix cache'), status(3, 'Docs')],

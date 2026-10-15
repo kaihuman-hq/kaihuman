@@ -1,8 +1,9 @@
 import type { StreamsFile } from '@kaihuman/formats';
 import { render } from 'preact';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StreamsCache, WorkItemStatus, WorkSnapshot } from '../background/work/types';
 import { SidePanel } from './SidePanel';
+import { resetSuggestions } from './useSuggestion';
 
 const NOW = '2026-10-14T10:00:00.000Z';
 const FETCHED = new Date('2026-10-14T09:45:00.000Z').getTime();
@@ -113,6 +114,8 @@ const clickText = (root: Element, text: string) => {
 };
 
 beforeEach(() => {
+  // Earlier mounts cached "no suggestion" for these rows.
+  resetSuggestions();
   store = { streamsCache: cache(), workSnapshot: snapshot() };
   sent = [];
   failNext = undefined;
@@ -151,6 +154,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   render(null, host);
   host.remove();
 });
@@ -178,6 +182,39 @@ describe('InboxSection', () => {
       'Retries',
     );
     expect(sent.filter((m) => m.type === 'GET_TLDRS')).toHaveLength(1);
+  });
+
+  it('asks for the TL;DRs again when the AI cache changes', async () => {
+    await mount('Waiting on you (2)');
+    await waitFor(() => sent.some((m) => m.type === 'GET_TLDRS'));
+    const asked = () => sent.filter((m) => m.type === 'GET_TLDRS').length;
+    // Other storage keys are none of its business.
+    for (const l of listeners) l({ somethingElse: {} }, 'local');
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(asked()).toBe(1);
+    for (const l of listeners) l({ aiCache: {} }, 'local');
+    for (const l of listeners) l({ aiCache: {} }, 'local');
+    await waitFor(() => asked() > 1);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    // Writes that come in a burst are asked for once.
+    expect(asked()).toBe(2);
+  });
+
+  it("puts the suggestion's reason in the button's title", async () => {
+    store.aiSettings = { inboxLabels: [] };
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async () =>
+          JSON.stringify({ stream: 'Alpha', labels: [], reason: 'Same repo as Alpha' }),
+        destroy: () => {},
+      }),
+    });
+    await mount('Waiting on you (2)');
+    await waitFor(() => host.querySelector('button[aria-label^="Pin PR 2 to"]') !== null);
+    expect(host.querySelector('button[aria-label^="Pin PR 2 to"]')?.getAttribute('title')).toBe(
+      'Same repo as Alpha',
+    );
   });
 
   it('shows one row with two reason chips', async () => {

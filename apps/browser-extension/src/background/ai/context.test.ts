@@ -123,6 +123,18 @@ describe('buildWorkContext', () => {
     expect(build({ snapshot: snap }).waiting).toEqual(['failing', 'changes', 'ready']);
   });
 
+  it('leaves muted rows out of waiting', () => {
+    const snap = snapshot({
+      searches: {
+        ...snapshot().searches,
+        failing: [status(2, { title: 'bot noise' })],
+        'changes-requested': [status(3, { title: 'changes' })],
+      },
+    });
+    const muted = new Set([String(status(2).key)]);
+    expect(build({ snapshot: snap, muted }).waiting).toEqual(['changes']);
+  });
+
   it('lists red CI of pinned items, today events, todo tags and open ideas', () => {
     const streams = file([{ name: 'S', items: [item(1, 'https://github.com/o/r/pull/1')] }]);
     const snap = snapshot({

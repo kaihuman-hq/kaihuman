@@ -72,11 +72,15 @@ export function reviewSources(
       : [{ title: status.title, url: status.url }],
   );
 
+  // One line per tracker (`work` for `.kh/work.timetracking.csv`), summed over the range.
   const minutes = data.todayCache.files
     .filter((file) => file.path.toLowerCase().endsWith('.timetracking.csv'))
-    .flatMap((file) => parseTimeTracking(file.content).entries)
-    .filter((entry) => entry.date >= dateOf(start) && entry.date <= dateOf(now))
-    .map((entry) => ({ name: entry.date, minutes: calculateDurationMinutes(entry) }))
+    .map((file) => ({
+      name: (file.path.split('/').pop() ?? file.path).replace(/\.timetracking\.csv$/i, ''),
+      minutes: parseTimeTracking(file.content)
+        .entries.filter((entry) => entry.date >= dateOf(start) && entry.date <= dateOf(now))
+        .reduce((sum, entry) => sum + calculateDurationMinutes(entry), 0),
+    }))
     .filter((m) => m.minutes > 0);
 
   return { log, done, merged, minutes };
