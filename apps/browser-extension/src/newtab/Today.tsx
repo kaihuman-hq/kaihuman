@@ -350,9 +350,15 @@ export function ReadLater(props: {
                 title={item.url}
               >
                 <span class="text-[14px] truncate group-hover:text-nt-accent">{item.name}</span>
-                {item.createdAt > 0 && (
+                {item.summary && (
+                  <span class="text-[12px] text-nt-muted line-clamp-2">{item.summary}</span>
+                )}
+                {(item.createdAt > 0 || item.readMinutes) && (
                   <span class="text-[11px] text-nt-muted">
-                    saved {new Date(item.createdAt).toLocaleDateString('en-US')}
+                    {item.createdAt > 0 &&
+                      `saved ${new Date(item.createdAt).toLocaleDateString('en-US')}`}
+                    {item.createdAt > 0 && item.readMinutes ? ' · ' : ''}
+                    {item.readMinutes ? `${item.readMinutes} min` : ''}
                   </span>
                 )}
               </button>

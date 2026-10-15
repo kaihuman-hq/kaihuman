@@ -307,7 +307,10 @@ export interface TodaySummary {
   overdue: { text: string; path: string; milestone: string }[];
   milestone?: { name: string; dueDate: string; daysUntil: number; open: number; path: string };
   inbox: { path: string; count: number };
-  readLater: (Pick<ReadItLaterItem, 'id' | 'url' | 'name' | 'createdAt'> & { path: string })[];
+  readLater: (Pick<
+    ReadItLaterItem,
+    'id' | 'url' | 'name' | 'createdAt' | 'summary' | 'readMinutes'
+  > & { path: string })[];
   /** Every unread item, where `readLater` is cut to the oldest few. */
   unreadCount: number;
   habits: {
@@ -339,6 +342,20 @@ export const inboxPath = (cache: Pick<TodayCache, 'appFolder'>) =>
 export const readLaterPath = (cache: TodayCache) =>
   cache.files.find((file) => file.path.toLowerCase().endsWith('.readitlater.json'))?.path ??
   `${cache.appFolder}/reading.readitlater.json`;
+
+/** Every tag already on a read-later item, so a new page is only filed under those. */
+export const knownReadLaterTags = (cache: TodayCache | undefined): string[] => {
+  const tags = new Set<string>();
+  for (const file of cache?.files ?? []) {
+    if (!file.path.toLowerCase().endsWith('.readitlater.json')) continue;
+    for (const item of parseReadItLater(file.content).items) {
+      if (Array.isArray(item?.tags)) {
+        for (const tag of item.tags) if (typeof tag === 'string' && tag) tags.add(tag);
+      }
+    }
+  }
+  return [...tags];
+};
 
 /** The first action log, preferring the app folder's own — the log box has one target. */
 export const actionLogPath = (cache: TodayCache) =>
@@ -424,6 +441,8 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
           url,
           name: name || url,
           createdAt: Number(createdAt) || 0,
+          ...(typeof item.summary === 'string' && item.summary ? { summary: item.summary } : {}),
+          ...(Number(item.readMinutes) > 0 ? { readMinutes: Number(item.readMinutes) } : {}),
           path,
         });
       }

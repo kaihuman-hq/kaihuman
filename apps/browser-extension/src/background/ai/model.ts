@@ -11,8 +11,16 @@ interface Destroyable {
   destroy(): void;
 }
 
+/** Text, or one user message mixing text and images (the Prompt API's multimodal form). */
+type PromptInput =
+  | string
+  | {
+      role: 'user';
+      content: ({ type: 'text'; value: string } | { type: 'image'; value: Blob })[];
+    }[];
+
 interface ModelSession extends Destroyable {
-  prompt(input: string, options?: { responseConstraint?: object }): Promise<string>;
+  prompt(input: PromptInput, options?: { responseConstraint?: object }): Promise<string>;
 }
 
 interface DownloadMonitor {
@@ -78,8 +86,8 @@ interface AiGlobals {
 const globals = () => globalThis as AiGlobals;
 
 // Prompts, schemas and labels are English; callers add a language the input is in (D8).
-const languages = (list: string[] = ['en']) => ({
-  expectedInputs: [{ type: 'text', languages: list }],
+const languages = (list: string[] = ['en'], images = false) => ({
+  expectedInputs: [{ type: 'text', languages: list }, ...(images ? [{ type: 'image' }] : [])],
   expectedOutputs: [{ type: 'text', languages: list }],
 });
 
@@ -190,6 +198,8 @@ export async function promptJson<T>(task: {
   priority?: Priority;
   timeoutMs?: number;
   languages?: string[];
+  /** Pictures the question is about; the model must accept image input. */
+  images?: Blob[];
 }): Promise<T | null> {
   const model = globals().LanguageModel;
   if (!model) return null;
@@ -197,7 +207,7 @@ export async function promptJson<T>(task: {
     'answer',
     async (track) => {
       // The languages the session declares: an extra one may still need downloading.
-      const declared = languages(task.languages);
+      const declared = languages(task.languages, !!task.images?.length);
       if ((await model.availability(declared).catch(() => 'unavailable')) !== 'available') {
         return null;
       }
@@ -208,7 +218,18 @@ export async function promptJson<T>(task: {
           initialPrompts: [{ role: 'system', content: task.system }],
         }),
       );
-      const raw = await session.prompt(task.input, { responseConstraint: task.schema });
+      const input: PromptInput = task.images?.length
+        ? [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', value: task.input },
+                ...task.images.map((value) => ({ type: 'image' as const, value })),
+              ],
+            },
+          ]
+        : task.input;
+      const raw = await session.prompt(input, { responseConstraint: task.schema });
       let parsed: unknown;
       try {
         parsed = JSON.parse(raw);

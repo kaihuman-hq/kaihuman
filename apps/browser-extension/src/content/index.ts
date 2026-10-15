@@ -47,7 +47,13 @@ const paletteActions = (): PaletteAction[] => [
     title: 'Read later: this page',
     subtitle: 'Adds it to the repo’s read-later list, which the start page shows',
     run: async () => {
-      await send({ type: 'READ_LATER_ADD', url: pageUrl(), title: document.title });
+      // The text is what the worker summarizes and tags the page from.
+      await send({
+        type: 'READ_LATER_ADD',
+        url: pageUrl(),
+        title: document.title,
+        text: extractArticle().text,
+      });
       return `Saved “${document.title || pageUrl()}” for later`;
     },
   },
