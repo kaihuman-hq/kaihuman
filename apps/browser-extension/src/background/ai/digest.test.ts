@@ -93,4 +93,35 @@ describe('digestToday', () => {
     store = { aiSettings: { newTab: false } };
     expect(await digestToday(cache())).toBeNull();
   });
+
+  const withDumps = (count: number, sha = 's'): TodayCache => ({
+    ...cache(),
+    files: Array.from({ length: count }, (_, i) => ({
+      path: `.kh/braindumps/${1000 + i}.md`,
+      sha: `${sha}${i}`,
+      content: `Thought ${i}`,
+    })),
+  });
+
+  it('sees up to 30 braindumps, newest first, not the ten the page shows', async () => {
+    const { prompts } = fakeModel({
+      themes: [{ title: 'T', ids: ['.kh/braindumps/1000.md'], todo: 'x' }],
+    });
+    await digestToday(withDumps(35));
+    const input = prompts[0]?.input ?? '';
+    expect(input.match(/^id: /gm)).toHaveLength(30);
+    expect(input).toContain('id: .kh/braindumps/1034.md');
+    expect(input).not.toContain('id: .kh/braindumps/1004.md');
+  });
+
+  it('digests again when a braindump was edited', async () => {
+    const { model } = fakeModel({
+      themes: [{ title: 'T', ids: ['.kh/braindumps/1000.md'], todo: 'x' }],
+    });
+    await digestToday(withDumps(2, 'a'));
+    await digestToday(withDumps(2, 'a'));
+    expect(model.create).toHaveBeenCalledTimes(1);
+    await digestToday(withDumps(2, 'b'));
+    expect(model.create).toHaveBeenCalledTimes(2);
+  });
 });

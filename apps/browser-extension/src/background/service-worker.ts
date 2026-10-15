@@ -1286,7 +1286,9 @@ const RANKING_TTL_MS = 60 * 60 * 1000;
 
 /** The summary with the cached read-later order. The model is never called from here (D2). */
 async function todayWithRanking(cache: TodayCache) {
-  return buildToday(cache, new Date(), await peek<Ranking>(READ_LATER_KEY));
+  // Switched off means the rule order, even while an answer is still cached (D6).
+  const ranking = (await readAiSettings()).newTab ? await peek<Ranking>(READ_LATER_KEY) : undefined;
+  return buildToday(cache, new Date(), ranking);
 }
 
 /** What the ranking jobs tell the model about the user's work; undefined until there is a cache. */
@@ -1307,6 +1309,8 @@ async function rankingContext() {
 }
 
 async function precomputeLikelyNext() {
+  // At most hourly (D7): a fresh answer means no model prompt.
+  if ((await peek(LIKELY_KEY)) !== undefined) return;
   const work = await rankingContext();
   if (!work) return;
   const { bookmarks } = await getBookmarks();
@@ -1324,6 +1328,7 @@ async function precomputeLabels() {
 }
 
 async function precomputeReadLater() {
+  if ((await peek(READ_LATER_KEY)) !== undefined) return;
   const work = await rankingContext();
   if (!work) return;
   const items = work.cache.files
@@ -1346,7 +1351,9 @@ async function getToday() {
   }
   return {
     today: await todayWithRanking(cache),
-    ranking: { likely: await peek<Ranking>(LIKELY_KEY) },
+    ranking: {
+      likely: (await readAiSettings()).newTab ? await peek<Ranking>(LIKELY_KEY) : undefined,
+    },
   };
 }
 
@@ -2141,7 +2148,12 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'GET_TODAY') return answer(getToday(), sendResponse);
 
-  if (message.type === 'GET_AI_CARDS') return answer(readAiCards(), sendResponse);
+  if (message.type === 'GET_AI_CARDS') {
+    return answer(
+      readAiSettings().then((settings) => (settings.newTab ? readAiCards() : {})),
+      sendResponse,
+    );
+  }
 
   if (message.type === 'GET_TLDRS') return answer(readTldrs(), sendResponse);
 

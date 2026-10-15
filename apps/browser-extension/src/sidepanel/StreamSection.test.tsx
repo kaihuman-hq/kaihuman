@@ -245,10 +245,10 @@ describe('StreamSection', () => {
     await mount('Alpha', 3);
     await options('Alpha');
     clickText(stream('Alpha'), 'Find related');
-    await waitFor(() => host.querySelector('[aria-label="Related to Alpha"]') !== null);
-    expect(host.querySelector('[aria-label="Related to Alpha"]')?.textContent).toContain(
-      'No other open tabs',
-    );
+    const picker = () => host.querySelector('[aria-label="Related to Alpha"]');
+    // The picker opens on "Looking for related tabs…" and fills in once its async search returns.
+    await waitFor(() => picker()?.textContent?.includes('No other open tabs') ?? false);
+    expect(picker()?.textContent).toContain('No other open tabs');
   });
 
   it('uses the live title for GitHub items', async () => {

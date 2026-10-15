@@ -350,6 +350,26 @@ export interface TodaySummary {
 const LIST_LIMIT = 5;
 const READ_LATER_LIMIT = 3;
 const BRAINDUMP_LIMIT = 10;
+
+/** Every braindump in the synced files, newest first and not cut to what the page shows. */
+export function allBraindumps(cache: TodayCache): TodaySummary['braindumps'] {
+  return cache.files
+    .flatMap(({ path, sha, content }) => {
+      const id = braindumpIdOf(path);
+      return id
+        ? [
+            {
+              path,
+              sha,
+              title: braindumpTitle(content),
+              text: content,
+              createdAt: braindumpCreatedAt(id),
+            },
+          ]
+        : [];
+    })
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
 const RESURFACE_LIMIT = 2;
 const RESURFACE_IDLE_DAYS = 30;
 

@@ -9,6 +9,7 @@ import {
   repoActions,
   splitTags,
 } from '@kaihuman/palette';
+import type { Dispatch, StateUpdater } from 'preact/hooks';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { CaptureGuess } from '../background/ai/capture';
 import { availability } from '../background/ai/model';
@@ -171,7 +172,23 @@ export function StartPage() {
   const waitingRef = useRef<(() => void) | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [captureLog, setCaptureLog] = useState<CaptureLog>(EMPTY_CAPTURE_LOG);
-  const [today, setToday] = useState<TodaySummary | null>(null);
+  const [today, setTodayState] = useState<TodaySummary | null>(null);
+  // Read later keeps the order it was first drawn in: a ranking computed since must not reshuffle
+  // an open page, whichever action brought the new summary (D7).
+  const readLaterOrder = useRef<string[]>([]);
+  const setToday: Dispatch<StateUpdater<TodaySummary | null>> = (next) =>
+    setTodayState((current) => {
+      const value = typeof next === 'function' ? next(current) : next;
+      if (!value) return value;
+      const readLater = applyRanking(value.readLater, {
+        ids: readLaterOrder.current,
+        reasons: {},
+        computedAt: 0,
+      });
+      // New items go after those already shown.
+      readLaterOrder.current = readLater.map((item) => item.id);
+      return { ...value, readLater };
+    });
   const [likely, setLikely] = useState<Ranking | undefined>(undefined);
   const [todayError, setTodayError] = useState<string | null>(null);
   // Cached model cards: read once on load, never recomputed here (the worker owns the model).

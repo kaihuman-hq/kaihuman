@@ -162,6 +162,8 @@ describe('GET_TODAY', () => {
     expect(first.today.inbox).toEqual({ path: '.kh/inbox.todos.md', count: 1 });
     expect(first.today.habits[0]).toMatchObject({ name: 'health', checkedToday: false });
 
+    // The sync starts the AI jobs behind the answer; they read the bookmarks, so let them finish.
+    for (let i = 0; i < 20; i++) await settle();
     const requests = fetchMock.mock.calls.length;
     await call({ type: 'GET_TODAY' });
     expect(fetchMock.mock.calls.length).toBe(requests);
@@ -763,5 +765,76 @@ describe('the palette’s ideas', () => {
       });
     }
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('AI precompute jobs', () => {
+  const rankPrompts = () => {
+    const prompts: string[] = [];
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async (input: string) => {
+          prompts.push(input);
+          return JSON.stringify({
+            ranked: [
+              { id: 'b', reason: 'Short' },
+              { id: 'a', reason: 'Long' },
+            ],
+          });
+        },
+        destroy: () => {},
+      }),
+    });
+    return prompts;
+  };
+  const twoItems = () => {
+    remote['.kh/reading.readitlater.json'] = JSON.stringify({
+      items: [
+        { id: 'a', url: 'https://example.com/a', name: 'A', status: 'new', createdAt: 1 },
+        { id: 'b', url: 'https://example.com/b', name: 'B', status: 'new', createdAt: 2 },
+      ],
+    });
+    seedCache();
+  };
+  const runAlarm = async () => {
+    alarmListener({ name: 'ai' });
+    for (let i = 0; i < 20; i++) await settle();
+  };
+
+  it('asks the model for the read-later ranking once while the cache is fresh', async () => {
+    twoItems();
+    const prompts = rankPrompts();
+    await runAlarm();
+    await runAlarm();
+    expect(prompts.filter((input) => input.includes('saved pages'))).toHaveLength(1);
+    vi.unstubAllGlobals();
+  });
+
+  it('GET_TODAY shows the cached read-later order with its reasons', async () => {
+    twoItems();
+    rankPrompts();
+    await runAlarm();
+    const response = await call({ type: 'GET_TODAY' });
+    expect(response.today.readLater.map((item: any) => item.id)).toEqual(['b', 'a']);
+    expect(response.today.readLaterReasons).toEqual({ b: 'Short', a: 'Long' });
+    vi.unstubAllGlobals();
+  });
+
+  it('shows no ranking and no cards when the new tab group is off, even if cached', async () => {
+    twoItems();
+    rankPrompts();
+    await runAlarm();
+    store.aiSettings = { newTab: false };
+    const response = await call({ type: 'GET_TODAY' });
+    expect(response.today.readLater.map((item: any) => item.id)).toEqual(['a', 'b']);
+    expect(response.ranking.likely).toBeUndefined();
+    store.aiCache = { 'card:focus': { value: 'Do it', at: Date.now(), ttl: 3_600_000 } };
+    const cards = await call({ type: 'GET_AI_CARDS' });
+    expect(cards.success).toBe(true);
+    expect(cards.focus).toBeUndefined();
+    store.aiSettings = { newTab: true };
+    expect((await call({ type: 'GET_AI_CARDS' })).focus).toBe('Do it');
+    vi.unstubAllGlobals();
   });
 });

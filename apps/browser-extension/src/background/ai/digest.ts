@@ -3,7 +3,7 @@
  * few themes, each with a todo and the dumps it came from. It only ever names dumps it was given;
  * turning a theme into a todo or an idea is the user's click, so nothing is written here.
  */
-import { buildToday, type TodayCache } from '../today.js';
+import { allBraindumps, type TodayCache } from '../today.js';
 import { cached, hashKey } from './cache.js';
 import { promptJson } from './model.js';
 import { readAiSettings } from './settings.js';
@@ -27,6 +27,8 @@ const MAX_DUMP_TEXT = 600;
 const MAX_LINE = 120;
 // The key already changes with the dumps, so this only bounds how long a stale answer can live.
 const CACHE_TTL_MS = 60 * 60_000;
+// Like summarize and ask: a person is waiting, but the model is slow on 30 dumps.
+const INTERACTIVE_TIMEOUT_MS = 30_000;
 
 export function digestSchema(ids: string[]): object {
   return {
@@ -95,17 +97,18 @@ export async function digestBraindumps(dumps: DigestInput[]): Promise<Theme[] | 
     validate: (raw) => parseDigest(raw, new Set(ids)),
     // Asked for by a click.
     priority: 'interactive',
+    timeoutMs: INTERACTIVE_TIMEOUT_MS,
   });
 }
 
 /** The digest of the braindumps in the synced files; null when switched off or not possible. */
 export async function digestToday(cache: TodayCache | undefined): Promise<Theme[] | null> {
   if (!cache || (await readAiSettings()).newTab === false) return null;
-  const dumps = buildToday(cache, new Date())
-    .braindumps.slice(0, MAX_DUMPS)
-    .map((dump) => ({ id: dump.path, title: dump.title, text: dump.text }));
+  // Not the page's list, which stops at ten.
+  const newest = allBraindumps(cache).slice(0, MAX_DUMPS);
+  const dumps = newest.map((dump) => ({ id: dump.path, title: dump.title, text: dump.text }));
   if (!dumps.length) return null;
-  return cached(hashKey('digest', ...dumps.map((dump) => dump.id)), CACHE_TTL_MS, () =>
-    digestBraindumps(dumps),
-  );
+  // The sha is in the key, so an edited dump gets a fresh digest.
+  const key = hashKey('digest', ...newest.map((dump) => `${dump.path}@${dump.sha}`));
+  return cached(key, CACHE_TTL_MS, () => digestBraindumps(dumps));
 }

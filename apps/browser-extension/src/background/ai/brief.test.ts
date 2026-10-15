@@ -130,3 +130,26 @@ describe('focus', () => {
     expect(await readAiCards()).toEqual({ focus: 'Finish the report' });
   });
 });
+
+describe('a refused answer', () => {
+  it('is not asked for again within 15 minutes, focus or brief', async () => {
+    answers = [JSON.stringify({ focus: '' }), JSON.stringify({ sentences: ['a'] })];
+    const at = new Date(2026, 9, 15, 9, 0);
+    await precomputeFocus(inputs);
+    await precomputeFocus(inputs);
+    await precomputeBrief(inputs, at);
+    await precomputeBrief(inputs, at);
+    expect(prompts).toHaveLength(2);
+    expect(await readAiCards(at)).toEqual({});
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + 16 * 60_000);
+      answers = [JSON.stringify({ focus: 'Finish the report' })];
+      await precomputeFocus(inputs);
+      expect(prompts).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

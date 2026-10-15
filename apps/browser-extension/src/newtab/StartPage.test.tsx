@@ -600,6 +600,31 @@ describe('StartPage', () => {
     });
   });
 
+  it('keeps the read-later order it first drew, whatever a later summary ranks', async () => {
+    const item = (id: string) => ({
+      id,
+      url: `https://${id}.example/`,
+      name: `Read ${id}`,
+      createdAt: 0,
+      path: 'r.readitlater.json',
+    });
+    const readLaterNames = () =>
+      [...host.querySelectorAll('ul[aria-label="Read later"] > li > button:first-child')].map(
+        (button) => button.getAttribute('title'),
+      );
+    TODAY = { ...emptyToday(), readLater: [item('r2'), item('r1'), item('r3')] };
+    // A refresh lands after a new ranking: r3 gone, r4 new, the rest in another order.
+    FRESHER = { ...emptyToday(), readLater: [item('r1'), item('r4'), item('r2')] };
+    await mount(() => host.textContent?.includes('Read r2') ?? false);
+    await waitFor(() => readLaterNames().includes('https://r4.example/'));
+
+    expect(readLaterNames()).toEqual([
+      'https://r2.example/',
+      'https://r1.example/',
+      'https://r4.example/',
+    ]);
+  });
+
   it('marks a read-later item read', async () => {
     TODAY = {
       ...emptyToday(),
