@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-10-15 — On-device AI features: design
+
+- **Design for 21 on-device AI features** in the browser extension (`doc/ai-features.md`): a shared AI layer (one model queue, a cache, precomputing in the worker), ranking rules for the new tab page, enrichment at save time, side panel triage, palette actions and tidying tabs, in six phases with parallel lanes. Nothing is built yet.
+
 ## 2026-10-15 — Work streams: stream and label suggestions from Chrome's on-device model
 
 - **Suggestions** (`background/work/suggest.ts`): Chrome's built-in model (the Prompt API, Gemini Nano) picks the stream an item belongs to and up to three labels, or names a new stream when none fits. The answer is held to a JSON schema whose stream list is the user's streams plus `(new stream)`, and is checked again before use: an unknown stream, an unnamed new stream or broken JSON counts as no answer. Each item gets a fresh session, so earlier items cannot sway it. Without the model (unsupported device, not downloaded, or an error) the pick falls back to the stream that holds most of the item's repository; with neither, the old behaviour stands.
