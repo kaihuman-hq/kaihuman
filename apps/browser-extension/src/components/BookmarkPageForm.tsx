@@ -1,4 +1,14 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+
+interface DraftDuplicate {
+  kind: 'bookmark' | 'read-later' | 'stream';
+  title: string;
+  url: string;
+  exact: boolean;
+}
+
+const KIND_LABEL = { bookmark: 'a bookmark', 'read-later': 'read later', stream: 'a stream' };
+const ENVIRONMENT_WORD = /\b(dev|int|prod)\b/i;
 
 interface BookmarkPageFormProps {
   page: { title: string; url: string } | null;
@@ -18,6 +28,32 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
   const [tagsInput, setTagsInput] = useState('');
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
+  const [duplicate, setDuplicate] = useState<DraftDuplicate | null>(null);
+  // A suggestion arrives late; it only fills a field the user has not started editing.
+  const touched = useRef({ title: false, tags: false });
+
+  useEffect(() => {
+    if (!page?.url) return;
+    chrome.runtime.sendMessage(
+      { type: 'BOOKMARK_DRAFT', url: page.url, title: page.title },
+      (response) => {
+        if (chrome.runtime.lastError || !response?.draft) return;
+        const { title: suggested, tags: suggestedTags, environment } = response.draft;
+        if (!touched.current.title && suggested) setTitle(suggested);
+        if (!touched.current.tags) {
+          // The environment is read from the title or a tag, so a model-found one becomes a tag.
+          const extra =
+            environment && !ENVIRONMENT_WORD.test(suggested ?? '')
+              ? [String(environment).toLowerCase()]
+              : [];
+          const all = [...(suggestedTags ?? []), ...extra];
+          if (all.length) setTagsInput(all.join(', '));
+        }
+        const found: DraftDuplicate[] = response.duplicates ?? [];
+        setDuplicate(found.find((entry) => entry.exact) ?? found[0] ?? null);
+      },
+    );
+  }, [page?.url, page?.title]);
 
   const send = (message: Record<string, unknown>, onDone: (response: any) => void) => {
     setStatus('saving');
@@ -119,7 +155,10 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
           id="bookmark-title"
           type="text"
           value={title}
-          onInput={(e) => setTitle((e.target as HTMLInputElement).value)}
+          onInput={(e) => {
+            touched.current.title = true;
+            setTitle((e.target as HTMLInputElement).value);
+          }}
           class="w-full bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded p-2 text-xs text-[var(--los-fg)] focus:border-[var(--los-accent)] focus:ring-1 focus:ring-[var(--los-accent)] focus:outline-none transition-colors"
           placeholder="Defaults to the URL"
           disabled={status === 'saving'}
@@ -135,13 +174,32 @@ export function BookmarkPageForm({ page, repo, onClose }: BookmarkPageFormProps)
           id="bookmark-tags"
           type="text"
           value={tagsInput}
-          onInput={(e) => setTagsInput((e.target as HTMLInputElement).value)}
+          onInput={(e) => {
+            touched.current.tags = true;
+            setTagsInput((e.target as HTMLInputElement).value);
+          }}
           class="w-full bg-[var(--los-bg-hover)] border border-[var(--los-border)] rounded p-2 text-xs text-[var(--los-fg)] focus:border-[var(--los-accent)] focus:ring-1 focus:ring-[var(--los-accent)] focus:outline-none transition-colors"
           placeholder="e.g. dev, docs"
           disabled={status === 'saving'}
           // biome-ignore lint/a11y/noAutofocus: the user opened this view to fill it in, and tags are the field they came to add
           autoFocus
         />
+
+        {duplicate && (
+          <div class="flex items-center justify-between gap-2 text-[10px] p-2 rounded border text-[var(--los-fg-dim)] bg-[var(--los-bg-hover)] border-[var(--los-border)]">
+            <span class="break-words min-w-0">
+              {duplicate.exact ? 'Already saved' : 'Looks like'} in {KIND_LABEL[duplicate.kind]}:{' '}
+              {duplicate.title || duplicate.url}
+            </span>
+            <button
+              type="button"
+              onClick={() => chrome.runtime.sendMessage({ type: 'OPEN_URL', url: duplicate.url })}
+              class="shrink-0 uppercase tracking-wider font-bold hover:text-[var(--los-fg)]"
+            >
+              Open existing
+            </button>
+          </div>
+        )}
 
         {message && (
           <div
