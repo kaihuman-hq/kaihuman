@@ -57,6 +57,8 @@ const emptyToday = (): TodaySummary => ({
 let deleteReply: { error: string } | { refused: string } | null;
 /** What a refresh behind the cached page brings; `null` when the cache was fresh enough. */
 let FRESHER: TodaySummary | null;
+/** The themes the worker digests the braindumps into. */
+let DIGEST: { title: string; ids: string[]; todo: string }[] | null;
 
 type Listener = (
   message: unknown,
@@ -116,6 +118,7 @@ const reply = (message: { type?: string; bookmarkId?: string; pinned?: boolean }
     return { today: TODAY };
   }
   if (message.type === 'REFRESH_TODAY') return { today: FRESHER };
+  if (message.type === 'BRAINDUMP_DIGEST') return { themes: DIGEST };
   if (message.type === 'DELETE_BRAINDUMP' && TODAY) {
     if (deleteReply && 'error' in deleteReply) return deleteReply;
     if (deleteReply) return { today: TODAY, ...deleteReply };
@@ -205,6 +208,7 @@ beforeEach(() => {
   STATUSES = [];
   deleteReply = null;
   FRESHER = null;
+  DIGEST = null;
   store = { lifeos_token: 'token', lifeos_repo: 'owner/repo' };
   sent = [];
   panelOpened = [];
@@ -635,6 +639,61 @@ describe('StartPage', () => {
       FRESHER = withBraindump();
       await mount(() => host.textContent?.includes('Call the bank') ?? false);
       expect(sent.map((message) => message.type)).toContain('REFRESH_TODAY');
+    });
+
+    describe('digest', () => {
+      beforeEach(() => {
+        DIGEST = [{ title: 'Bank errands', ids: ['.kh/braindumps/1.md'], todo: 'Call the bank' }];
+      });
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      it('shows no Digest button without the model', async () => {
+        TODAY = withBraindump();
+        await mount(() => host.textContent?.includes('Call the bank') ?? false);
+        await tick();
+        expect(buttons().some((b) => b.textContent === 'Digest')).toBe(false);
+      });
+
+      it('lists the themes, and Make a todo fills the capture box', async () => {
+        vi.stubGlobal('LanguageModel', { availability: async () => 'available' });
+        TODAY = withBraindump();
+        await mount(() => buttons().some((b) => b.textContent === 'Digest'));
+        click('Digest');
+        await waitFor(() => host.textContent?.includes('Bank errands') ?? false);
+        expect(sent.find((m) => m.type === 'BRAINDUMP_DIGEST')).toEqual({
+          type: 'BRAINDUMP_DIGEST',
+        });
+
+        click('Make a todo');
+        const textarea = host.querySelector('textarea') as HTMLTextAreaElement;
+        await waitFor(() => textarea.value === 'Call the bank');
+        expect(
+          buttons()
+            .find((b) => b.textContent === 'Todo')
+            ?.getAttribute('aria-pressed'),
+        ).toBe('true');
+      });
+
+      it('Make an idea saves a seed idea under the theme title', async () => {
+        vi.stubGlobal('LanguageModel', { availability: async () => 'available' });
+        TODAY = withBraindump();
+        await mount(() => buttons().some((b) => b.textContent === 'Digest'));
+        click('Digest');
+        await waitFor(() => host.textContent?.includes('Bank errands') ?? false);
+        click('Make an idea');
+        await waitFor(() => sent.some((m) => m.type === 'SAVE_IDEA'));
+        const message = sent.find((m) => m.type === 'SAVE_IDEA') as {
+          path: string;
+          content: string;
+          sha?: string;
+        };
+        expect(message.path).toBe('.kh/ideas/bank-errands.md');
+        expect(message.sha).toBeUndefined();
+        expect(message.content).toContain('title: "Bank errands"');
+        expect(message.content).toContain('status: seed');
+      });
     });
   });
 

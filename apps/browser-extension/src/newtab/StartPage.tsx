@@ -1,3 +1,4 @@
+import { newIdea } from '@kaihuman/formats';
 import {
   type CommandPalette,
   commandsMode,
@@ -572,6 +573,22 @@ export function StartPage() {
       .catch((e: Error) => console.warn('kaihuman: could not remember the capture', e));
   };
 
+  /** A digest theme's todo goes into the capture box; saving it stays the user's click. */
+  const makeTodoFrom = (text: string) => {
+    setCapture('todo');
+    setNote(text);
+    setNoteStatus('idle');
+  };
+
+  /** Creates the idea file only; GitHub refuses a slug that exists, and that reaches the user. */
+  const makeSeedIdea = async (ideaTitle: string) => {
+    const idea = newIdea(
+      { title: ideaTitle, status: 'seed' },
+      { now: new Date(), author: 'human' },
+    );
+    await send({ type: 'SAVE_IDEA', path: idea.path, content: idea.content });
+  };
+
   const addNote = async () => {
     const text = note.trim();
     if (!text || noteStatus === 'saving') return;
@@ -935,6 +952,8 @@ export function StartPage() {
                   busyPath={busyPath}
                   onOpenFile={openFile}
                   onDelete={(path, sha) => void deleteBraindump(path, sha)}
+                  onMakeTodo={makeTodoFrom}
+                  onMakeIdea={makeSeedIdea}
                 />
                 <Resurface today={today} onOpenIdea={(title) => palette().open(`>id ${title}`)} />
               </>

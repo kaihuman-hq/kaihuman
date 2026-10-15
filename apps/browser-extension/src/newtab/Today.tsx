@@ -4,8 +4,12 @@
  * the worker builds out of its hourly cache, so a new tab costs no GitHub request.
  */
 import type { ComponentChildren } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
+import type { Theme } from '../background/ai/digest';
+import { availability } from '../background/ai/model';
+import { readAiSettings } from '../background/ai/settings';
 import { EVENTS_HORIZON_DAYS, HABIT_WEEK_DAYS, type TodaySummary } from '../background/today';
+import { send } from '../palette/port';
 
 const linkButton = 'text-left hover:text-nt-accent truncate';
 
@@ -444,21 +448,110 @@ export function Braindumps(props: {
   busyPath: string | null;
   onOpenFile: (path: string) => void;
   onDelete: (path: string, sha: string) => void;
+  /** Puts a theme's todo into the capture box. */
+  onMakeTodo: (text: string) => void;
+  /** Saves a theme as a seed idea; rejects with the reason it could not. */
+  onMakeIdea: (title: string) => Promise<void>;
 }) {
   const { braindumps, braindumpCount } = props.today;
   const { busyPath } = props;
   const [open, setOpen] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [canDigest, setCanDigest] = useState(false);
+  const [themes, setThemes] = useState<Theme[] | null>(null);
+  const [digesting, setDigesting] = useState(false);
+  const [madeIdeas, setMadeIdeas] = useState<string[]>([]);
+  const [digestError, setDigestError] = useState<string | null>(null);
+
+  // The button exists only when a digest can be made: the model is ready and the switch is on.
+  useEffect(() => {
+    void Promise.all([availability('prompt'), readAiSettings()]).then(
+      ([state, settings]) => setCanDigest(state === 'available' && settings.newTab),
+      () => setCanDigest(false),
+    );
+  }, []);
+
+  const digest = async () => {
+    setDigesting(true);
+    setDigestError(null);
+    try {
+      const response = await send({ type: 'BRAINDUMP_DIGEST' });
+      const found: Theme[] = Array.isArray(response?.themes) ? response.themes : [];
+      setThemes(found);
+      setMadeIdeas([]);
+      if (!found.length) setDigestError('No themes found.');
+    } catch (e) {
+      setDigestError(e instanceof Error ? e.message : 'The digest failed.');
+    } finally {
+      setDigesting(false);
+    }
+  };
+
+  const makeIdea = async (title: string) => {
+    setDigestError(null);
+    try {
+      await props.onMakeIdea(title);
+      setMadeIdeas((made) => [...made, title]);
+    } catch (e) {
+      setDigestError(e instanceof Error ? e.message : 'Could not save the idea.');
+    }
+  };
+
   return (
     <section class="flex flex-col gap-[10px]">
       <SectionHead
         title="Braindumps"
         meta={
-          braindumpCount > braindumps.length
-            ? `${braindumps.length} of ${braindumpCount}`
-            : undefined
+          <>
+            {braindumpCount > braindumps.length
+              ? `${braindumps.length} of ${braindumpCount}`
+              : undefined}
+            {canDigest && braindumps.length > 0 && (
+              <button
+                type="button"
+                disabled={digesting}
+                onClick={() => void digest()}
+                class="ml-3 text-nt-muted hover:text-nt-accent disabled:opacity-50"
+              >
+                {digesting ? 'Digesting…' : 'Digest'}
+              </button>
+            )}
+          </>
         }
       />
+      {digestError && <p class="text-[12px] text-nt-prod">{digestError}</p>}
+      {themes && themes.length > 0 && (
+        <ul aria-label="Themes" class="flex flex-col gap-[10px]">
+          {themes.map((theme) => (
+            <li
+              key={theme.title}
+              class="flex flex-col gap-1 border border-nt-control px-[14px] py-3"
+            >
+              <span class="text-[14px]">{theme.title}</span>
+              <span class="text-[12px] text-nt-muted">
+                {theme.todo} · {theme.ids.length} {theme.ids.length === 1 ? 'dump' : 'dumps'}
+              </span>
+              <span class="flex gap-4 text-[12px]">
+                <button
+                  type="button"
+                  onClick={() => props.onMakeTodo(theme.todo)}
+                  class="text-nt-muted hover:text-nt-accent"
+                >
+                  Make a todo
+                </button>
+                <button
+                  type="button"
+                  disabled={madeIdeas.includes(theme.title)}
+                  onClick={() => void makeIdea(theme.title)}
+                  class="text-nt-muted hover:text-nt-accent disabled:opacity-50"
+                >
+                  {madeIdeas.includes(theme.title) ? 'Idea saved' : 'Make an idea'}
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       {braindumps.length === 0 ? (
         <p class="text-[13px] text-nt-faint">Nothing waiting.</p>
       ) : (

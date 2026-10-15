@@ -35,6 +35,7 @@ export interface Message {
     | 'WRITE_ENTRY_FILE'
     | 'LIST_IDEAS'
     | 'SAVE_IDEA'
+    | 'BRAINDUMP_DIGEST'
     | 'TRANSLATE'
     | 'GET_TRANSLATION_HISTORY'
     | 'ADD_TRANSLATION_HISTORY'

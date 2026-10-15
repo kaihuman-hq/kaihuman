@@ -22,6 +22,7 @@ import {
 import { type Message } from '../types';
 import { draftBookmark, findDuplicates } from './ai/bookmark-draft.js';
 import { captureContext, classifyCapture } from './ai/capture.js';
+import { digestToday } from './ai/digest.js';
 import { AI_ALARM, ensureAiAlarm, precomputeInBackground } from './ai/precompute.js';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import {
@@ -1999,6 +2000,13 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       commitTodayFile({ path: message.path || '', suffix: '.events.csv' }, (csv) =>
         addEventEntry(csv, entry),
       ),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'BRAINDUMP_DIGEST') {
+    return answer(
+      readTodayCache().then(async (cache) => ({ themes: (await digestToday(cache)) ?? [] })),
       sendResponse,
     );
   }
