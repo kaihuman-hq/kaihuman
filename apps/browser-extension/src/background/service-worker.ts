@@ -21,9 +21,15 @@ import {
 } from '@kaihuman/palette';
 import { type Message } from '../types';
 import { draftBookmark, findDuplicates } from './ai/bookmark-draft.js';
+import { precomputeBrief, precomputeFocus, readAiCards } from './ai/brief.js';
 import { captureContext, classifyCapture } from './ai/capture.js';
 import { digestToday } from './ai/digest.js';
-import { AI_ALARM, ensureAiAlarm, precomputeInBackground } from './ai/precompute.js';
+import {
+  AI_ALARM,
+  ensureAiAlarm,
+  precomputeInBackground,
+  registerPrecompute,
+} from './ai/precompute.js';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import {
   connectWorkPanel,
@@ -51,7 +57,7 @@ import {
 import { readAiSettings } from './ai/settings.js';
 import { openWorkPanel } from './work/side-panel';
 import { loadStreams } from './work/streams-store';
-import { type StreamsCache, WORK_KEYS } from './work/types';
+import { type StreamsCache, WORK_KEYS, type WorkSnapshot } from './work/types';
 import { consoleFileUrl, isConsolePage } from '../console';
 // The bundled loader's path, for injecting the page script on demand (CRXJS `?script` import).
 import PAGE_SCRIPT from '../content/index.ts?script';
@@ -1204,6 +1210,23 @@ async function readTodayCache(): Promise<TodayCache | undefined> {
   return stored.todayCache as TodayCache | undefined;
 }
 
+/** What the on-device cards are written from; null while signed out or before the first sync. */
+async function cardInputs() {
+  const todayCache = await readTodayCache();
+  if (!todayCache) return null;
+  const streams = await loadStreams().catch(() => undefined);
+  const snapshot = (await chrome.storage.local.get(WORK_KEYS.snapshot))[WORK_KEYS.snapshot];
+  return {
+    today: buildToday(todayCache, new Date()),
+    todayCache,
+    streams: streams?.state.ok ? streams.state.file : null,
+    snapshot: snapshot as WorkSnapshot | undefined,
+  };
+}
+
+registerPrecompute({ id: 'card:focus', group: 'newTab', run: () => precomputeFocus(cardInputs) });
+registerPrecompute({ id: 'card:brief', group: 'newTab', run: () => precomputeBrief(cardInputs) });
+
 /** The start page's files, on the same hourly budget as the bookmarks. */
 async function syncToday(): Promise<TodayCache | undefined> {
   const { token, repo } = await credentials();
@@ -1907,6 +1930,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   }
 
   if (message.type === 'GET_TODAY') return answer(getToday(), sendResponse);
+
+  if (message.type === 'GET_AI_CARDS') return answer(readAiCards(), sendResponse);
 
   if (message.type === 'REFRESH_TODAY') return answer(refreshToday(), sendResponse);
 

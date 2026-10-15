@@ -31,6 +31,8 @@ import {
   ComingUp,
   Doing,
   dateLine,
+  FocusLine,
+  MorningBrief,
   ReadLater,
   Resurface,
   SectionHead,
@@ -162,6 +164,12 @@ export function StartPage() {
   const [captureLog, setCaptureLog] = useState<CaptureLog>(EMPTY_CAPTURE_LOG);
   const [today, setToday] = useState<TodaySummary | null>(null);
   const [todayError, setTodayError] = useState<string | null>(null);
+  // Cached model cards: read once on load, never recomputed here (the worker owns the model).
+  const [aiCards, setAiCards] = useState<{ focus?: string; brief?: string[]; briefDate?: string }>(
+    {},
+  );
+  const [briefDismissed, setBriefDismissed] = useState<string | null>(null);
+  const [briefShown, setBriefShown] = useState(false);
   // One commit at a time, as with the pins: two would race each other for the file's sha.
   const [busyPath, setBusyPath] = useState<string | null>(null);
   const [sync, setSync] = useState<{ syncedAt: number | null; pendingOpens: number }>({
@@ -297,6 +305,13 @@ export function StartPage() {
       setCaptureLog({ ...EMPTY_CAPTURE_LOG, ...(result[CAPTURE_LOG_KEY] as Partial<CaptureLog>) });
       if (storedToken) void loadAll();
     });
+    send({ type: 'GET_AI_CARDS' }).then(
+      (response) => setAiCards(response ?? {}),
+      (e: Error) => console.warn('kaihuman: could not read the AI cards', e),
+    );
+    chrome.storage.local.get('briefDismissed', (result) =>
+      setBriefDismissed(typeof result.briefDismissed === 'string' ? result.briefDismissed : null),
+    );
     // Status pages need no login. Asked again as often as the worker's cache allows, for a start
     // page left open.
     void refreshServiceStatus();
@@ -678,6 +693,20 @@ export function StartPage() {
   return (
     <div class={root}>
       <div class="mx-auto w-full max-w-[1240px] px-8 pt-8 pb-16 flex flex-col gap-7">
+        {aiCards.brief && aiCards.briefDate && (
+          <MorningBrief
+            sentences={aiCards.brief}
+            collapsed={briefDismissed === aiCards.briefDate && !briefShown}
+            onDismiss={() => {
+              const date = aiCards.briefDate;
+              if (!date) return;
+              setBriefDismissed(date);
+              setBriefShown(false);
+              void chrome.storage.local.set({ briefDismissed: date });
+            }}
+            onShow={() => setBriefShown(true)}
+          />
+        )}
         <header class="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 pb-5 border-b border-nt-divider">
           <div class="flex flex-wrap items-center gap-x-7 gap-y-2">
             {title}
@@ -931,6 +960,7 @@ export function StartPage() {
             <WorkCard />
             {today && (
               <>
+                <FocusLine focus={aiCards.focus} />
                 <Doing
                   today={today}
                   now={now}
