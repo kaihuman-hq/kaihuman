@@ -39,6 +39,8 @@ export interface WorkItemStatus {
   ci: CiState;
   conflict: boolean;
   updatedAt: string;
+  /** Start of the description; only the waiting searches ask for it, as input for the TL;DR. */
+  body?: string;
 }
 
 export type PinnedStatus =

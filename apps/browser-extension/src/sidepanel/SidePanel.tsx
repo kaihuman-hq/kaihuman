@@ -7,7 +7,7 @@ import { CONSOLE_URL, consoleFileUrl } from '../console.js';
 import { send } from '../palette/port.js';
 import { age } from './age.js';
 import { Choice, Heading, iconButton, NewStreamInput, sendOps } from './controls.js';
-import { InboxSection, MineSection } from './InboxSection.js';
+import { InboxSection, MineSection, useTldrs } from './InboxSection.js';
 import { RelatedPicker } from './RelatedPicker.js';
 import { StreamSection } from './StreamSection.js';
 import { ThisTabBar } from './ThisTabBar.js';
@@ -168,6 +168,7 @@ export function SidePanel() {
   const [settings, setSettings] = useState(false);
   const { labels, assigned, muted } = useInboxLabels();
   const [labelFilter, setLabelFilter] = useState<string>();
+  const tldrs = useTldrs(snapshot?.fetchedAt);
 
   useEffect(() => {
     // Opening the port tells the worker the panel is visible so it polls faster. A restarted
@@ -310,6 +311,7 @@ export function SidePanel() {
                   labels={assigned}
                   file={file}
                   readOnly={readOnly}
+                  tldrs={tldrs}
                 />
                 <InboxSection
                   title="New activity"
@@ -317,6 +319,7 @@ export function SidePanel() {
                   labels={assigned}
                   file={file}
                   readOnly={readOnly}
+                  tldrs={tldrs}
                 />
                 <MineSection
                   title="My open PRs"

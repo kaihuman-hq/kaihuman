@@ -1,5 +1,5 @@
 import { newItemId, newStreamId, type StreamOp, type StreamsFile } from '@kaihuman/formats';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import type { InboxRow } from '../background/work/inbox.js';
 import type { WorkItemStatus } from '../background/work/types.js';
 import { send } from '../palette/port.js';
@@ -23,6 +23,32 @@ interface Props {
   readOnly: boolean;
   /** row key → the user's label for it. */
   labels?: Record<string, string>;
+  /** One-line summaries by item key; absent while the model has not written them. */
+  tldrs?: Record<string, string>;
+}
+
+/** The TL;DRs the worker has written, asked for once per snapshot (`stamp` changes with it). */
+export function useTldrs(stamp: number | undefined): Record<string, string> {
+  const [tldrs, setTldrs] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (stamp === undefined) return;
+    let live = true;
+    send({ type: 'GET_TLDRS' }).then(
+      (response) => {
+        if (!live || typeof response !== 'object' || response === null) return;
+        const next: Record<string, string> = {};
+        for (const [key, value] of Object.entries(response)) {
+          if (typeof value === 'string' && value !== '') next[key] = value;
+        }
+        setTldrs(next);
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [stamp]);
+  return tldrs;
 }
 
 function PinMenu({ row, file, onDone }: { row: InboxRow; file: StreamsFile; onDone: () => void }) {
@@ -83,6 +109,7 @@ function Row({
   file,
   readOnly,
   labels,
+  tldrs,
 }: {
   row: InboxRow;
   unread: boolean;
@@ -126,6 +153,11 @@ function Row({
             {age(Date.parse(row.updatedAt))}
           </span>
         </div>
+        {tldrs?.[row.key] && (
+          <p class="text-[11px] leading-4 text-nt-muted line-clamp-2 [overflow-wrap:anywhere]">
+            {tldrs[row.key]}
+          </p>
+        )}
         <div class="flex items-center gap-1">
           <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1">
             <span class="min-w-0 max-w-full truncate text-[11px] text-nt-muted" title={ref}>
@@ -211,6 +243,7 @@ function Section({
   file,
   readOnly,
   labels,
+  tldrs,
 }: { title: string; rows: InboxRow[]; dismissible: boolean; unread?: Set<string> } & Props) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [failed, setFailed] = useState<Set<string>>(new Set());
@@ -249,6 +282,7 @@ function Section({
               file={file}
               readOnly={readOnly}
               labels={labels}
+              tldrs={tldrs}
               dismissible={dismissible}
               failed={failed.has(slot(row))}
               unread={unread?.has(row.key) ?? row.threadId !== undefined}
