@@ -6,6 +6,7 @@ import {
   type StreamOp,
   type StreamsFile,
 } from '@kaihuman/formats';
+import { promptJson } from '../ai/model.js';
 
 /** Something about to be pinned: an open tab, an inbox row or a page from the menu. */
 export interface Candidate {
@@ -139,15 +140,20 @@ const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().t
  * say, but a small model can still name a stream it was not shown or leave a new one unnamed.
  */
 export function parseModelAnswer(raw: string, file: StreamsFile): Suggestion | null {
-  let answer: { stream?: unknown; newStreamName?: unknown; labels?: unknown };
+  let answer: unknown;
   try {
     answer = JSON.parse(raw);
   } catch {
     return null;
   }
-  if (typeof answer !== 'object' || answer === null || typeof answer.stream !== 'string') {
-    return null;
-  }
+  return suggestionFrom(answer, file);
+}
+
+/** An already parsed answer as a suggestion, or null when it is not one. */
+function suggestionFrom(parsed: unknown, file: StreamsFile): Suggestion | null {
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const answer = parsed as { stream?: unknown; newStreamName?: unknown; labels?: unknown };
+  if (typeof answer.stream !== 'string') return null;
   const labels = [
     ...new Set(
       (Array.isArray(answer.labels) ? answer.labels : [])
@@ -201,88 +207,20 @@ export function suggestionOps(
   return { streamId, ops };
 }
 
-/* Chrome's built-in model (the Prompt API). Typed here: no published types match Chrome 155. */
-
-export type ModelAvailability = 'unavailable' | 'downloadable' | 'downloading' | 'available';
-
-interface ModelSession {
-  prompt(input: string, options?: { responseConstraint?: object }): Promise<string>;
-  destroy(): void;
-}
-
-interface DownloadMonitor {
-  addEventListener(type: 'downloadprogress', listener: (event: { loaded: number }) => void): void;
-}
-
-interface LanguageModelApi {
-  availability(options?: object): Promise<ModelAvailability>;
-  create(options?: {
-    initialPrompts?: { role: 'system' | 'user' | 'assistant'; content: string }[];
-    expectedInputs?: object[];
-    expectedOutputs?: object[];
-    monitor?: (monitor: DownloadMonitor) => void;
-  }): Promise<ModelSession>;
-}
-
-// Pinned items are titled in many languages; English is what the prompt and labels are in.
-const LANGUAGES = {
-  expectedInputs: [{ type: 'text', languages: ['en'] }],
-  expectedOutputs: [{ type: 'text', languages: ['en'] }],
-};
-
-const api = (): LanguageModelApi | undefined =>
-  (globalThis as { LanguageModel?: LanguageModelApi }).LanguageModel;
-
-/** Whether this context can use the model; `unavailable` also covers a Chrome without the API. */
-export async function modelAvailability(): Promise<ModelAvailability> {
-  const model = api();
-  if (!model) return 'unavailable';
-  try {
-    return await model.availability(LANGUAGES);
-  } catch {
-    return 'unavailable';
-  }
-}
-
-/**
- * Downloads the model. Chrome only starts the download from a click, so this is called straight
- * from one, before any await.
- */
-export async function downloadModel(onProgress: (fraction: number) => void): Promise<void> {
-  const model = api();
-  if (!model) throw new Error('This Chrome has no built-in model.');
-  const session = await model.create({
-    ...LANGUAGES,
-    monitor: (monitor) =>
-      monitor.addEventListener('downloadprogress', (event) => onProgress(event.loaded)),
-  });
-  session.destroy();
-}
+// The model's plumbing moved to the shared AI layer; the side panel still imports it from here.
+export { downloadModel, type ModelAvailability, modelAvailability } from '../ai/model.js';
 
 /** The model's pick, or null when it is missing, still downloading, or answers nonsense. */
-export async function modelSuggestion(
+export function modelSuggestion(
   file: StreamsFile,
   candidate: Candidate,
 ): Promise<Suggestion | null> {
-  const model = api();
-  if (!model || (await modelAvailability()) !== 'available') return null;
-  let session: ModelSession | undefined;
-  try {
-    // A fresh session per item: earlier items would otherwise crowd the context and sway the pick.
-    session = await model.create({
-      ...LANGUAGES,
-      initialPrompts: [{ role: 'system', content: SYSTEM_PROMPT }],
-    });
-    const raw = await session.prompt(promptFor(file, candidate), {
-      responseConstraint: schemaFor(file),
-    });
-    return parseModelAnswer(raw, file);
-  } catch (error) {
-    console.warn('kaihuman: the built-in model could not suggest a stream', error);
-    return null;
-  } finally {
-    session?.destroy();
-  }
+  return promptJson({
+    system: SYSTEM_PROMPT,
+    input: promptFor(file, candidate),
+    schema: schemaFor(file),
+    validate: (answer) => suggestionFrom(answer, file),
+  });
 }
 
 /** The model's pick when it can give one, else the same-repository rule, else nothing. */
