@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-10-15 — Work streams: stream and label suggestions from Chrome's on-device model
+
+- **Suggestions** (`background/work/suggest.ts`): Chrome's built-in model (the Prompt API, Gemini Nano) picks the stream an item belongs to and up to three labels, or names a new stream when none fits. The answer is held to a JSON schema whose stream list is the user's streams plus `(new stream)`, and is checked again before use: an unknown stream, an unnamed new stream or broken JSON counts as no answer. Each item gets a fresh session, so earlier items cannot sway it. Without the model (unsupported device, not downloaded, or an error) the pick falls back to the stream that holds most of the item's repository; with neither, the old behaviour stands.
+- **Where they show**: the This-tab card preselects the suggested stream and labels (marked **Suggested**, or a new stream with its name filled in), and the user's own pick wins; every inbox row gets a one-click **→ stream** line (`sidepanel/useSuggestion.ts`, one question to the model at a time, answers cached per stream list).
+- **Filing**: `Alt+Shift+P` files into the suggested stream, creating it when the model names a new one (setting, on by default), and the right-click menu has a **Suggested stream** entry. New Waiting-on-you items can be filed on their own while the panel is open (setting, off by default, since filed items leave the inbox and the badge count); each item is filed once, so one taken back out stays in the inbox (`workAutoFiled`).
+- **Settings → Suggestions**: the model's state, a **Download the model** button with progress (Chrome only starts the download from a click), and both filing switches.
+- Not yet checked by hand in Chrome 155: the model's answers on real streams, the download, and whether the service worker can run the model (if it cannot, the shortcut and the menu use the repository rule).
+
 ## 2026-10-14 — Open the work side panel with a shortcut or from the command palette
 
 - **`Alt+Shift+W`** (`open-work-panel` in `manifest.ts`) opens the work panel in the current window; it can be changed at chrome://extensions/shortcuts. The worker opens the panel straight from the command, since `sidePanel.open` only works while Chrome counts the key press as the user's (`background/work/side-panel.ts`).

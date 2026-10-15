@@ -9,6 +9,7 @@ import { Choice, Heading, iconButton, NewStreamInput, sendOps } from './controls
 import { InboxSection, MineSection } from './InboxSection.js';
 import { StreamSection } from './StreamSection.js';
 import { ThisTabBar } from './ThisTabBar.js';
+import { useAutoFileInbox } from './useSuggestion.js';
 import { updateWorkUi, useWorkState } from './useWorkState.js';
 import { WorkSettings } from './WorkSettings.js';
 
@@ -165,14 +166,16 @@ export function SidePanel() {
     };
   }, []);
 
+  const inbox = snapshot ? buildInbox(snapshot, file, dismissed) : undefined;
+  const readOnly = streams ? !streams.state.ok : false;
+  useAutoFileInbox(inbox?.waiting, file, ui.autoFileInbox === true && !readOnly);
+
   const shell = 'min-h-screen w-full bg-nt-bg font-nt text-[13px] text-nt-fg antialiased';
   if (!loaded) return <main class={shell} />;
 
   // A missing streams cache only hides the streams; the worker polls with a work token alone.
   const signedOut = snapshot ? snapshot.problem?.kind === 'signed-out' : !streams;
-  const inbox = snapshot ? buildInbox(snapshot, file, dismissed) : undefined;
   const unread = snapshot ? unreadKeys(snapshot) : new Set<string>();
-  const readOnly = streams ? !streams.state.ok : false;
 
   return (
     <main class={`${shell} flex flex-col`}>
@@ -203,7 +206,7 @@ export function SidePanel() {
           ⚙
         </button>
       </header>
-      {settings && <WorkSettings />}
+      {settings && <WorkSettings ui={ui} />}
       <div class="flex flex-col gap-5 px-3 py-3">
         {signedOut ? (
           <p class="text-[13px] leading-5">

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { WorkUi } from '../background/work/types.js';
 import { send } from '../palette/port.js';
 import { Choice, errorText, field, primary, splitLabels } from './controls.js';
+import { useSuggestion } from './useSuggestion.js';
 import { updateWorkUi } from './useWorkState.js';
 
 const NEW_STREAM = '__new__';
@@ -75,28 +76,38 @@ function Page({ title, url }: { title: string; url: string }) {
   );
 }
 
-export function ThisTabBar({
-  file,
-  ui,
-  readOnly,
-}: {
+interface CardProps {
   file: StreamsFile | null;
   ui: WorkUi;
   readOnly: boolean;
-}) {
+}
+
+export function ThisTabBar(props: CardProps) {
   const tab = useActiveTab();
+  if (!tab) return null;
+  // Keyed by the page, so a choice made for one tab does not carry over to the next.
+  return <TabCard key={tab.url ?? ''} tab={tab} {...props} />;
+}
+
+function TabCard({ tab, file, ui, readOnly }: CardProps & { tab: TabInfo }) {
+  // Unset until the user picks or types, so a suggestion arriving later can still fill them in.
   const [streamId, setStreamId] = useState<string>();
-  const [newName, setNewName] = useState('');
-  const [labels, setLabels] = useState('');
+  const [typedName, setNewName] = useState<string>();
+  const [typedLabels, setLabels] = useState<string>();
   const [error, setError] = useState<string>();
   const nameInput = useRef<HTMLInputElement>(null);
   // Focus follows a click on "+ New stream"; an empty file opens on it without taking focus.
   useEffect(() => {
     if (streamId === NEW_STREAM) nameInput.current?.focus();
   }, [streamId]);
+  const pinnable = tab.url !== undefined && isSafeUrl(tab.url);
+  const candidate =
+    pinnable && tab.url && file && !findItemByUrl(file, tab.url) && !readOnly
+      ? { url: tab.url, title: tab.title || tab.url }
+      : undefined;
+  const suggestion = useSuggestion(file, candidate);
 
-  if (!tab) return null;
-  if (!tab.url || !isSafeUrl(tab.url)) {
+  if (!tab.url || !pinnable) {
     return (
       <section class={`${box} text-[12px] text-nt-muted`}>This page cannot be pinned.</section>
     );
@@ -168,12 +179,23 @@ export function ThisTabBar({
     );
   }
 
+  const suggested =
+    suggestion?.stream.kind === 'new'
+      ? NEW_STREAM
+      : suggestion?.stream.kind === 'existing'
+        ? suggestion.stream.id
+        : undefined;
   const selected =
     streams.length === 0
       ? NEW_STREAM
       : (streamId ??
+        suggested ??
         (streams.some((s) => s.id === ui.lastStreamId) ? ui.lastStreamId : streams[0]?.id));
   const naming = selected === NEW_STREAM;
+  const newName = typedName ?? (suggestion?.stream.kind === 'new' ? suggestion.stream.name : '');
+  const labels = typedLabels ?? suggestion?.labels.join(', ') ?? '';
+  // Shown while the pick is still the suggestion's, so the user knows where the choice came from.
+  const showsSuggestion = suggestion && streamId === undefined;
 
   const pin = async () => {
     const at = new Date().toISOString();
@@ -202,8 +224,8 @@ export function ThisTabBar({
     // A stream made here becomes the next pin's default, as a picked one does.
     await updateWorkUi({ lastStreamId: target });
     setStreamId(undefined);
-    setNewName('');
-    setLabels('');
+    setNewName(undefined);
+    setLabels(undefined);
   };
 
   return (
@@ -217,7 +239,22 @@ export function ThisTabBar({
     >
       <Page title={title} url={url} />
       <div class="flex flex-col gap-1.5">
-        <span class="text-[11px] text-nt-muted">Pin to</span>
+        <p class="flex items-baseline gap-2 text-[11px] text-nt-muted">
+          <span>Pin to</span>
+          {suggestion === undefined && candidate && <span class="text-nt-faint">Suggesting…</span>}
+          {showsSuggestion && (
+            <span
+              class="text-nt-accent"
+              title={
+                suggestion.source === 'model'
+                  ? "Suggested by Chrome's on-device model"
+                  : 'Most items from this repository are in this stream'
+              }
+            >
+              Suggested
+            </span>
+          )}
+        </p>
         <div class="flex flex-wrap gap-1">
           {streams.map((stream) => (
             <Choice

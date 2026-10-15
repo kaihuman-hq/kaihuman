@@ -6,6 +6,7 @@ import { send } from '../palette/port.js';
 import { age } from './age.js';
 import { Choice, errorText, Heading, iconButton, NewStreamInput } from './controls.js';
 import { chipClass, Rail, StatusChips, type Tone, toneOf } from './StatusChips.js';
+import { fileAsSuggested, suggestionName, useSuggestion } from './useSuggestion.js';
 
 const REASONS: Record<string, readonly [label: string, tone: Tone]> = {
   'review-requested': ['review requested', 'warn'],
@@ -87,6 +88,12 @@ function Row({
   onDismiss: () => void;
 } & Props) {
   const [menu, setMenu] = useState(false);
+  const [pinError, setPinError] = useState<string>();
+  const suggestion = useSuggestion(
+    file,
+    file && !readOnly ? { url: row.url, title: row.title } : undefined,
+  );
+  const suggested = suggestion && file ? suggestionName(file, suggestion) : undefined;
   const open = () => {
     const message: Record<string, string> = { type: 'WORK_OPEN', url: row.url };
     if (row.threadId) message.threadId = row.threadId;
@@ -151,6 +158,33 @@ function Row({
             </button>
           )}
         </div>
+        {suggestion && suggested && !menu && (
+          <button
+            type="button"
+            aria-label={`Pin ${row.title} to ${suggested}`}
+            title={
+              suggestion.source === 'model'
+                ? "Suggested by Chrome's on-device model"
+                : 'Most items from this repository are in this stream'
+            }
+            class="flex min-w-0 max-w-full items-baseline gap-1.5 self-start text-left text-[11px] text-nt-muted hover:text-nt-accent"
+            onClick={() => {
+              setPinError(undefined);
+              fileAsSuggested(suggestion, row).catch((failure) => setPinError(errorText(failure)));
+            }}
+          >
+            <span aria-hidden="true" class="shrink-0">
+              →
+            </span>
+            <span class="truncate">
+              {suggestion.stream.kind === 'new' ? `New stream “${suggested}”` : suggested}
+            </span>
+            {suggestion.labels.length > 0 && (
+              <span class="shrink-0 text-nt-faint">{suggestion.labels.join(', ')}</span>
+            )}
+          </button>
+        )}
+        {pinError && <p class="text-[12px] text-nt-prod [overflow-wrap:anywhere]">{pinError}</p>}
         {menu && file && !readOnly && (
           <PinMenu row={row} file={file} onDone={() => setMenu(false)} />
         )}
