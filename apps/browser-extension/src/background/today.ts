@@ -17,6 +17,7 @@ import {
   localDate,
   parseEvents,
   parseHabitData,
+  parseIdea,
   parseReadItLater,
   parseTimeTracking,
   parseTimezones,
@@ -302,9 +303,10 @@ export const unreadItems = (json: string): ReadItLaterItem[] =>
 
 export interface TodaySummary {
   events: UpcomingEvent[];
-  inProgress: { text: string; path: string }[];
+  /** Most overdue first; a todo without a milestone date comes last. */
+  inProgress: { text: string; path: string; dueDate?: string }[];
   /** Open todos whose milestone is already due. */
-  overdue: { text: string; path: string; milestone: string }[];
+  overdue: { text: string; path: string; milestone: string; dueDate: string }[];
   milestone?: { name: string; dueDate: string; daysUntil: number; open: number; path: string };
   inbox: { path: string; count: number };
   readLater: (Pick<ReadItLaterItem, 'id' | 'url' | 'name' | 'createdAt'> & { path: string })[];
@@ -315,6 +317,8 @@ export interface TodaySummary {
     name: string;
     checkedToday: boolean;
     streak: number;
+    /** A streak still running that today's check-in has yet to keep. */
+    atRisk: boolean;
     /** The last seven days, the oldest first — today is the last. */
     week: boolean[];
   }[];
@@ -324,12 +328,22 @@ export interface TodaySummary {
   /** The newest braindumps first, cut to the newest few; `sha` is what a delete must name. */
   braindumps: { path: string; sha: string; title: string; text: string; createdAt: number }[];
   braindumpCount: number;
+  /** Seed or exploring ideas untouched for a month, the longest idle first. */
+  resurface: {
+    slug: string;
+    title: string;
+    status: 'seed' | 'exploring';
+    lastActivity: string;
+    path: string;
+  }[];
   fetchedAt: number;
 }
 
 const LIST_LIMIT = 5;
 const READ_LATER_LIMIT = 3;
 const BRAINDUMP_LIMIT = 10;
+const RESURFACE_LIMIT = 2;
+const RESURFACE_IDLE_DAYS = 30;
 
 /** The inbox the console's quick-todo page writes to. */
 export const inboxPath = (cache: Pick<TodayCache, 'appFolder'>) =>
@@ -360,15 +374,36 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
     actionLogPath: actionLogPath(cache),
     braindumps: [],
     braindumpCount: 0,
+    resurface: [],
     fetchedAt: cache.fetchedAt,
   };
   const today = localDate(now);
+  const idleSince = localDate(
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() - RESURFACE_IDLE_DAYS),
+  );
   const files = [...cache.files].sort((a, b) => a.path.localeCompare(b.path));
 
   for (const { path, sha, content } of files) {
     const lower = path.toLowerCase();
     const braindump = braindumpIdOf(path);
-    if (braindump) {
+    const slug = ideaSlugOf(path);
+    if (slug) {
+      const idea = parseIdea(content);
+      if (idea.status !== 'seed' && idea.status !== 'exploring') continue;
+      // Timestamps come as `2026-10-13T09:12+02:00` or `2026-10-13 09:12`; the date is what counts.
+      const lastActivity = [idea.updated, idea.created, ...idea.log.map((entry) => entry.at)]
+        .map((at) => at?.slice(0, 10) ?? '')
+        .reduce((latest, day) => (day > latest ? day : latest), '');
+      if (lastActivity && lastActivity <= idleSince) {
+        summary.resurface.push({
+          slug,
+          title: idea.title,
+          status: idea.status,
+          lastActivity,
+          path,
+        });
+      }
+    } else if (braindump) {
       summary.braindumps.push({
         path,
         sha,
@@ -380,18 +415,29 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
       summary.events.push(...upcomingEvents(path, content, now));
     } else if (lower.endsWith('.todos.md')) {
       const { items: todos, milestones } = parseTodos(content);
+      const dueDates = new Map(milestones.map((milestone) => [milestone.id, milestone.dueDate]));
       if (path === summary.inbox.path) {
         summary.inbox.count = todos.filter((todo) => todo.status === 'backlog').length;
       }
       for (const todo of todos) {
-        if (todo.status === 'in-progress') summary.inProgress.push({ text: todo.text, path });
+        if (todo.status === 'in-progress')
+          summary.inProgress.push({
+            text: todo.text,
+            path,
+            dueDate: todo.milestoneId ? dueDates.get(todo.milestoneId) : undefined,
+          });
       }
       for (const milestone of milestones) {
         if (!milestone.dueDate) continue;
         const open = todos.filter((todo) => todo.milestoneId === milestone.id && isOpen(todo));
         if (milestone.dueDate < today) {
           for (const todo of open) {
-            summary.overdue.push({ text: todo.text, path, milestone: milestone.name });
+            summary.overdue.push({
+              text: todo.text,
+              path,
+              milestone: milestone.name,
+              dueDate: milestone.dueDate,
+            });
           }
         } else if (!summary.milestone || milestone.dueDate < summary.milestone.dueDate) {
           const due = parseLocalDate(milestone.dueDate);
@@ -405,11 +451,14 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
         }
       }
     } else if (lower.endsWith('.habit.csv')) {
+      const checkedToday = isCheckedIn(content, today);
+      const streak = calculateStats(parseHabitData(content), now).currentStreak;
       summary.habits.push({
         path,
         name: fileLabel(path),
-        checkedToday: isCheckedIn(content, today),
-        streak: calculateStats(parseHabitData(content), now).currentStreak,
+        checkedToday,
+        streak,
+        atRisk: streak > 0 && !checkedToday,
         week: habitWeek(content, now),
       });
     } else if (lower.endsWith('.timetracking.csv')) {
@@ -432,8 +481,16 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
 
   summary.events.sort((a, b) => a.daysUntil - b.daysUntil);
   summary.events = summary.events.slice(0, LIST_LIMIT);
+  // The ones that have waited longest, and the habits about to lose a streak, are the ones to see.
+  const byDue = (a: string | undefined, b: string | undefined) =>
+    a === b ? 0 : !a ? 1 : !b ? -1 : a < b ? -1 : 1;
+  summary.inProgress.sort((a, b) => byDue(a.dueDate, b.dueDate));
   summary.inProgress = summary.inProgress.slice(0, LIST_LIMIT);
+  summary.overdue.sort((a, b) => byDue(a.dueDate, b.dueDate));
   summary.overdue = summary.overdue.slice(0, LIST_LIMIT);
+  summary.habits.sort((a, b) => Number(b.atRisk) - Number(a.atRisk));
+  summary.resurface.sort((a, b) => a.lastActivity.localeCompare(b.lastActivity));
+  summary.resurface = summary.resurface.slice(0, RESURFACE_LIMIT);
   // The oldest first: they are the ones the list is for.
   summary.unreadCount = summary.readLater.length;
   summary.readLater.sort((a, b) => a.createdAt - b.createdAt);

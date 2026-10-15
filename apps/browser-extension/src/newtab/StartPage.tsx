@@ -28,6 +28,7 @@ import {
   Doing,
   dateLine,
   ReadLater,
+  Resurface,
   SectionHead,
   SyncStatus,
   Trackers,
@@ -803,6 +804,7 @@ export function StartPage() {
                   onOpenFile={openFile}
                   onDelete={(path, sha) => void deleteBraindump(path, sha)}
                 />
+                <Resurface today={today} onOpenIdea={(title) => palette().open(`>id ${title}`)} />
               </>
             )}
 

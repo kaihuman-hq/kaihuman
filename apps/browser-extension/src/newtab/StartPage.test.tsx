@@ -49,6 +49,7 @@ const emptyToday = (): TodaySummary => ({
   actionLogPath: '.kh/daily.actionlog.md',
   braindumps: [],
   braindumpCount: 0,
+  resurface: [],
   fetchedAt: 0,
 });
 
@@ -176,6 +177,7 @@ const habit = (name: string, checkedToday: boolean, streak: number) => ({
   name,
   checkedToday,
   streak,
+  atRisk: streak > 0 && !checkedToday,
   week: [true, false, true, true, false, true, checkedToday],
 });
 
@@ -463,7 +465,9 @@ describe('StartPage', () => {
         path: 'p.todos.md',
       },
       inProgress: [{ text: 'Implement demo mode', path: 'p.todos.md' }],
-      overdue: [{ text: 'Fix alpha', path: 'p.todos.md', milestone: 'Alpha' }],
+      overdue: [
+        { text: 'Fix alpha', path: 'p.todos.md', milestone: 'Alpha', dueDate: '2026-09-01' },
+      ],
       inbox: { path: '.kh/inbox.todos.md', count: 3 },
       habits: [habit('health', false, 4)],
       timers: [
@@ -734,6 +738,31 @@ describe('StartPage', () => {
     const palette = document.getElementById(PALETTE_HOST_ID);
     expect(palette).not.toBeNull();
     expect(palette?.shadowRoot?.querySelector('input')?.value).toBe('deploy notes');
+  });
+
+  it('shows Resurface and opens the palette with >id', async () => {
+    TODAY = {
+      ...emptyToday(),
+      resurface: [
+        {
+          slug: 'old-idea',
+          title: 'Old idea',
+          status: 'seed',
+          lastActivity: '2026-07-01',
+          path: '.kh/ideas/old-idea.md',
+        },
+      ],
+    };
+    await mount(() => host.textContent?.includes('Old idea') ?? false);
+    expect(host.textContent).toContain('Resurface');
+
+    click('Old idea');
+    await tick();
+
+    // The palette takes `>id` as its mode and leaves the words in the field.
+    const palette = document.getElementById(PALETTE_HOST_ID);
+    expect(palette?.shadowRoot?.querySelector('input')?.value).toBe('Old idea');
+    expect(palette?.shadowRoot?.textContent).toMatch(/idea/i);
   });
 
   it('filters the pinned and recent bookmarks as the search is typed', async () => {
