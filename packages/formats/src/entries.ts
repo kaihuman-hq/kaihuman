@@ -123,7 +123,7 @@ export function addCommandEntry(
 /** A page at the end of a `.readitlater.json`, unless it is already there unread. */
 export function addReadLaterEntry(
   content: string,
-  page: { url: string; title: string },
+  page: { url: string; title: string; summary?: string; tags?: string[]; readMinutes?: number },
   id: string,
   now = Date.now(),
 ): string {
@@ -136,7 +136,9 @@ export function addReadLaterEntry(
     url: page.url,
     name: page.title.trim() || page.url,
     status: 'new',
-    tags: [],
+    tags: page.tags ?? [],
+    ...(page.summary ? { summary: page.summary } : {}),
+    ...(page.readMinutes ? { readMinutes: page.readMinutes } : {}),
     createdAt: now,
     updatedAt: now,
   };

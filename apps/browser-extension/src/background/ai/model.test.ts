@@ -175,3 +175,42 @@ describe('summarize, translate and detectLanguage', () => {
     expect(await detectLanguage('???')).toBeNull();
   });
 });
+
+describe('promptJson with images', () => {
+  it('declares image input and sends the blob in the multimodal prompt form', async () => {
+    const prompts: unknown[] = [];
+    const created: any[] = [];
+    vi.stubGlobal('LanguageModel', {
+      availability: vi.fn(async () => 'available'),
+      create: async (options: object) => {
+        created.push(options);
+        return {
+          prompt: async (input: unknown) => {
+            prompts.push(input);
+            return JSON.stringify({ ok: true });
+          },
+          destroy: () => {},
+        };
+      },
+    });
+    const blob = new Blob(['x'], { type: 'image/png' });
+    const result = await promptJson({
+      system: 's',
+      input: 'Describe',
+      images: [blob],
+      schema: {},
+      validate: (raw) => (raw as { ok?: boolean }).ok ?? null,
+    });
+    expect(result).toBe(true);
+    expect(created[0].expectedInputs).toContainEqual({ type: 'image' });
+    expect(prompts[0]).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', value: 'Describe' },
+          { type: 'image', value: blob },
+        ],
+      },
+    ]);
+  });
+});

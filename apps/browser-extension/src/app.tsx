@@ -167,13 +167,20 @@ export function App() {
     }
   };
 
-  // Only the link and title go to the read-later list, so unlike pinning there is no page to read.
-  const handleSaveForLater = () => {
+  // The page text only feeds the summary and tags; a page that cannot be read is still saved.
+  const handleSaveForLater = async () => {
     if (!token || !activeTab) return;
     setStatus('saving');
     setErrorMessage(null);
+    let text: string | undefined;
+    try {
+      await send({ type: 'ENSURE_PAGE_SCRIPT', tabId: activeTab.tabId });
+      text = (await chrome.tabs.sendMessage(activeTab.tabId, { type: 'EXTRACT_ARTICLE' }))?.text;
+    } catch {
+      text = undefined;
+    }
     chrome.runtime.sendMessage(
-      { type: 'READ_LATER_ADD', url: activeTab.url, title: activeTab.title },
+      { type: 'READ_LATER_ADD', url: activeTab.url, title: activeTab.title, text },
       (response) => {
         if (chrome.runtime.lastError || response?.error) {
           setErrorMessage(chrome.runtime.lastError?.message || response?.error || 'Unknown error');

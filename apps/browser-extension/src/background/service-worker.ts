@@ -37,6 +37,15 @@ import {
   rebuildPinMenu,
   watchPinMenu,
 } from './work/messages';
+import {
+  enrichCapture,
+  enrichReadLater,
+  fetchImageBlobs,
+  readMinutes,
+  withAltText,
+  within,
+} from './ai/enrich.js';
+import { readAiSettings } from './ai/settings.js';
 import { openWorkPanel } from './work/side-panel';
 import { loadStreams } from './work/streams-store';
 import { type StreamsCache, WORK_KEYS } from './work/types';
@@ -66,6 +75,7 @@ import {
   selectionText,
   slugify,
   urlToSlug,
+  type CaptureType,
 } from './kb-capture';
 import {
   addBookmark,
@@ -121,6 +131,7 @@ import {
   inboxPath,
   isTodayCacheStale,
   isTodayCacheUsable,
+  knownReadLaterTags,
   readLaterPath,
   type TodayCache,
   unreadItems,
@@ -1918,10 +1929,21 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       sendResponse({ error: 'Only web pages can be saved for later' });
       return false;
     }
-    const page = { url: message.url, title: message.title || '' };
+    const page = {
+      url: message.url,
+      title: message.title || '',
+      text: (message.text || '').trim(),
+    };
     return answer(
-      commitTodayFile(readLaterPath, (json) =>
-        addReadLaterEntry(json, page, crypto.randomUUID()),
+      // Enriched first and committed after, so the file is not held open while the model works.
+      readLaterExtras(page).then((extras) =>
+        commitTodayFile(readLaterPath, (json) =>
+          addReadLaterEntry(
+            json,
+            { url: page.url, title: page.title, ...extras },
+            crypto.randomUUID(),
+          ),
+        ),
       ),
       sendResponse,
     );
@@ -1952,11 +1974,25 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
         };
         const stamp = `${Date.now()}-${urlToSlug(url)}`;
         const toStore = imagesEnabled(data[KB_IMAGES_SETTING]) ? (images ?? []) : [];
-        const body = await localizeImages(text, toStore, `${KB_ASSET_DIR}/${stamp}`, (path, base64) =>
-          githubPutBase64(token, repo, path, base64),
+        const { alts, ...extras } = await captureExtras({ title, text, imageUrls: toStore });
+        // Alt text first: localizing rewrites the urls it is matched by.
+        const described = withAltText(text, alts.srcs, alts.texts);
+        const body = await localizeImages(
+          described,
+          toStore,
+          `${KB_ASSET_DIR}/${stamp}`,
+          (path, base64) => githubPutBase64(token, repo, path, base64),
         );
         const date = new Date().toISOString().slice(0, 10);
-        const content = buildRawNote({ title, url, text: body, tags: ['general'], date });
+        const content = buildRawNote({
+          title,
+          url,
+          text: body,
+          tags: ['general', ...extras.tags],
+          date,
+          type: extras.type,
+          summary: extras.summary,
+        });
         await githubUpsertFile(token, repo, `${KB_RAW_DIR}/${stamp}.md`, content);
         sendResponse({ success: true });
       } catch (error: any) {
@@ -1967,18 +2003,64 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   }
 });
 
+const ENRICH_BUDGET_MS = 8_000;
+
+/** What a page saved for later gains on device; only the read time without the model. */
+async function readLaterExtras(page: { url: string; title: string; text: string }) {
+  if (!page.text) return {};
+  const minutes = { readMinutes: readMinutes(page.text) };
+  if (!(await readAiSettings()).enrichment) return minutes;
+  const known = knownReadLaterTags(await readTodayCache());
+  const { summary, tags } = await within<Awaited<ReturnType<typeof enrichReadLater>>>(
+    ENRICH_BUDGET_MS,
+    enrichReadLater(page, known),
+    { tags: [] },
+  );
+  return { ...minutes, ...(summary ? { summary } : {}), tags };
+}
+
+/**
+ * Summary, type, tags and image alt text for a knowledge base note. Tags come from those already
+ * on the read-later list: the notes themselves live in the repo and are not read here.
+ */
+async function captureExtras(note: { title: string; text: string; imageUrls: string[] }) {
+  const none = {
+    summary: undefined as string[] | undefined,
+    type: undefined as CaptureType | undefined,
+    tags: [] as string[],
+    alts: { srcs: [] as string[], texts: [] as string[] },
+  };
+  if (!(await readAiSettings()).enrichment) return none;
+  const known = knownReadLaterTags(await readTodayCache());
+  return within(
+    ENRICH_BUDGET_MS,
+    (async () => {
+      const { srcs, blobs } = await fetchImageBlobs(note.imageUrls);
+      const result = await enrichCapture(
+        { title: note.title, text: note.text, images: blobs },
+        known,
+      );
+      return { ...none, ...result, alts: { srcs, texts: result.alts } };
+    })(),
+    none,
+  );
+}
+
 async function saveToKnowledgeBase(text: string, url: string, pageTitle: string) {
   const { token, repo } = await credentials();
   if (!token) throw new Error('No token found');
   if (!text.trim()) throw new Error('Select some text first');
 
   const date = new Date().toISOString().slice(0, 10);
+  const extras = await captureExtras({ title: pageTitle || url, text, imageUrls: [] });
   const content = buildRawNote({
     title: `Clipping: ${pageTitle || url}`,
     url,
     text: selectionText(text, url, pageTitle),
-    tags: ['clipping'],
+    tags: ['clipping', ...extras.tags],
     date,
+    type: extras.type,
+    summary: extras.summary,
   });
   const path = `${KB_RAW_DIR}/${Date.now()}-${slugify(pageTitle, 'clipping')}.md`;
   await githubUpsertFile(token, repo, path, content);

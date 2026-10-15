@@ -45,6 +45,24 @@ describe('buildRawNote', () => {
   });
 });
 
+describe('buildRawNote enrichment', () => {
+  it('writes type and summary list and keeps processed: false', () => {
+    expect(
+      buildRawNote({
+        title: 'T',
+        url: 'https://x.com',
+        text: 'body',
+        tags: ['general', 'ops'],
+        date: '2026-09-23',
+        type: 'how-to',
+        summary: ['Use "backoff"', 'Add jitter'],
+      }),
+    ).toBe(
+      `---\ntitle: "T"\nurl: 'https://x.com'\ndate: 2026-09-23\nprocessed: false\ntype: how-to\ntags: [general, ops]\nsummary:\n  - "Use \\"backoff\\""\n  - "Add jitter"\n---\n\nbody`,
+    );
+  });
+});
+
 describe('selectionText', () => {
   it('quotes every line and links the source page', () => {
     expect(selectionText(' one\n\ntwo ', 'https://a.b/c', 'Page')).toBe(

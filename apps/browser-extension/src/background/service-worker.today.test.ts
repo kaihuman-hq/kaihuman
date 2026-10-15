@@ -310,6 +310,64 @@ describe('writes from the start page', () => {
     );
   });
 
+  it('saves the summary, known tags and read time with the page', async () => {
+    remote['.kh/a.readitlater.json'] = JSON.stringify({
+      items: [
+        { id: 'old', url: 'https://example.com/old', name: 'Old', status: 'read', tags: ['rust'] },
+      ],
+    });
+    seedCache();
+    vi.stubGlobal('Summarizer', {
+      availability: async () => 'available',
+      create: async () => ({ summarize: async () => 'A tldr.', destroy: () => {} }),
+    });
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async () => JSON.stringify({ tags: ['rust'] }),
+        destroy: () => {},
+      }),
+    });
+    const response = await call({
+      type: 'READ_LATER_ADD',
+      url: 'https://example.com/a',
+      title: 'An article',
+      text: 'word '.repeat(500),
+    });
+    expect(response.error).toBeUndefined();
+    const added = JSON.parse(remote['.kh/a.readitlater.json'] ?? '').items[1];
+    expect(added).toMatchObject({ summary: 'A tldr.', tags: ['rust'], readMinutes: 3 });
+    vi.unstubAllGlobals();
+  });
+
+  it('READ_LATER_ADD commits after 8 s even if the Summarizer hangs', async () => {
+    seedCache();
+    vi.stubGlobal('Summarizer', {
+      availability: async () => 'available',
+      create: async () => ({ summarize: () => new Promise<string>(() => {}), destroy: () => {} }),
+    });
+    vi.useFakeTimers();
+    try {
+      const pending = new Promise<any>((resolve) => {
+        listener(
+          { type: 'READ_LATER_ADD', url: 'https://example.com/a', title: 'A', text: 'some text' },
+          {},
+          resolve,
+        );
+      });
+      await vi.advanceTimersByTimeAsync(7_900);
+      expect(writes()).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(200);
+      const response = await pending;
+      expect(response.error).toBeUndefined();
+      const item = JSON.parse(remote['.kh/reading.readitlater.json'] ?? '').items[0];
+      expect(item).toMatchObject({ url: 'https://example.com/a', readMinutes: 1 });
+      expect(item.summary).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('only saves web pages for later', async () => {
     seedCache();
     const response = await call({ type: 'READ_LATER_ADD', url: 'javascript:alert(1)' });
