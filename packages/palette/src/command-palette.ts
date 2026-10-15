@@ -218,6 +218,9 @@ export interface CommandPalette {
   toggle: () => void;
   close: () => void;
   destroy: () => void;
+  isOpen: () => boolean;
+  /** Redraws the list if open, for an action whose text arrived after the palette opened. */
+  refresh: () => void;
 }
 
 interface Row {
@@ -532,6 +535,12 @@ export function createCommandPalette(
   let askTimer: ReturnType<typeof setTimeout> | undefined;
   /** Guards against a slow answer landing after the query moved on, like `searchToken`. */
   let askToken = 0;
+  /**
+   * One ask at a time: the worker runs every one it gets, in turn, so asks sent while one runs
+   * would queue there and spend the newest one's deadline waiting. Only the newest waits here.
+   */
+  let askInFlight = false;
+  let askWaiting: (() => void) | null = null;
 
   const needle = () => input.value.trim().toLowerCase();
 
@@ -1100,6 +1109,7 @@ export function createCommandPalette(
     clearTimeout(askTimer);
     askToken++;
     asked = null;
+    askWaiting = null;
   };
 
   /** Asks about the query once typing has paused, unless it moved on by then. */
@@ -1109,8 +1119,17 @@ export function createCommandPalette(
     const query = input.value.trim();
     if (!ask || mode || pending || trail.length > 0 || !isAskable(query)) return;
     const token = askToken;
-    askTimer = setTimeout(async () => {
+    const run = async () => {
+      if (askInFlight) {
+        askWaiting = () => void run();
+        return;
+      }
+      askInFlight = true;
       const item = await ask(query).catch(() => null);
+      askInFlight = false;
+      const waiting = askWaiting;
+      askWaiting = null;
+      waiting?.();
       // A mode, a field or a submenu entered meanwhile has rows of its own.
       if (token !== askToken || !open || !item || mode || pending || trail.length > 0) return;
       // It arrives above the rest and late, so it must not take Enter from the row the user is
@@ -1119,7 +1138,8 @@ export function createCommandPalette(
       asked = { query, item };
       selected = others > 0 ? selected + 1 : 0;
       render();
-    }, ASK_DELAY_MS);
+    };
+    askTimer = setTimeout(run, ASK_DELAY_MS);
   };
 
   /** One row per engine for whatever is typed; opening one is opening its results page. */
@@ -1657,6 +1677,10 @@ export function createCommandPalette(
       else void show();
     },
     close,
+    isOpen: () => open,
+    refresh: () => {
+      if (open) render();
+    },
     destroy: () => {
       close();
       input.removeEventListener('keydown', onInputKeyDown);

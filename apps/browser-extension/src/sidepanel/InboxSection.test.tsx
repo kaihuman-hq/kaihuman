@@ -1,6 +1,7 @@
 import type { StreamsFile } from '@kaihuman/formats';
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { suggestStream } from '../background/work/suggest';
 import type { StreamsCache, WorkItemStatus, WorkSnapshot } from '../background/work/types';
 import { SidePanel } from './SidePanel';
 import { resetSuggestions } from './useSuggestion';
@@ -145,7 +146,12 @@ beforeEach(() => {
       sendMessage: (message: Record<string, unknown>, respond?: (response: unknown) => void) => {
         sent.push(message);
         if (message.type === 'GET_TLDRS') respond?.({ 'acme/web#2': 'Retries flaky uploads.' });
-        else if (failNext) respond?.({ error: failNext });
+        // The worker's side, run here against the stubbed model.
+        else if (message.type === 'SUGGEST_STREAM') {
+          void suggestStream(message.file as never, message.candidate as never).then((suggestion) =>
+            respond?.({ ok: true, suggestion }),
+          );
+        } else if (failNext) respond?.({ error: failNext });
         else respond?.({ ok: true });
       },
       lastError: undefined,
@@ -254,6 +260,27 @@ describe('InboxSection', () => {
     await waitFor(() => headings().includes('Waiting on you (1)'));
     expect(section('Waiting on you (1)').textContent).toContain('PR 1');
     expect(section('Waiting on you (1)').textContent).not.toContain('PR 2');
+  });
+
+  it('ignores cached labels and mutes while the side panel AI is off', async () => {
+    store.aiSettings = {
+      sidePanel: false,
+      inboxLabels: [
+        { name: 'Mine', hint: 'mine', mute: false },
+        { name: 'Noise', hint: 'noise', mute: true },
+      ],
+    };
+    store.aiCache = {
+      'inbox:labels': {
+        value: { 'acme/web#1': 'Mine', 'acme/web#3': 'Noise' },
+        at: Date.now(),
+        ttl: 60_000,
+      },
+    };
+    await mount('Waiting on you (2)');
+    await tick();
+    expect(headings()).toEqual(['Waiting on you (2)', 'New activity (1)', 'My open PRs (1)']);
+    expect(host.querySelectorAll('[data-label]')).toHaveLength(0);
   });
 
   it('pins a row into a stream', async () => {

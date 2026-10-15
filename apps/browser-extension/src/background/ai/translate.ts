@@ -17,8 +17,9 @@ export async function translateOnDevice(text: string, targets: string[]): Promis
     // Already in that language: nothing to translate, and `usefulTranslations` drops it.
     const translated =
       to === source ? text : await translate(text, source, to, { timeoutMs: 30_000 });
-    if (!translated) throw new Error(MISSING_PACK);
-    out.push({ target, text: translated, detectedSource: source.toUpperCase() });
+    // One missing pack should not cost the targets that could be translated.
+    if (translated) out.push({ target, text: translated, detectedSource: source.toUpperCase() });
   }
+  if (out.length === 0) throw new Error(MISSING_PACK);
   return out;
 }

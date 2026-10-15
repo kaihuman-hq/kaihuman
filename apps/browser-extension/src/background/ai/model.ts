@@ -128,6 +128,19 @@ export async function availability(cap: Capability): Promise<ModelAvailability> 
   }
 }
 
+export type AiAvailability = Record<Capability, ModelAvailability>;
+
+/** Every capability's state in this context; the worker answers for itself with it. */
+export async function aiAvailability(): Promise<AiAvailability> {
+  const [prompt, summarizer, translator, detector] = await Promise.all([
+    availability('prompt'),
+    availability('summarizer'),
+    availability('translator'),
+    availability('detector'),
+  ]);
+  return { prompt, summarizer, translator, detector };
+}
+
 /** The Prompt API's availability, under the name the side panel already uses. */
 export const modelAvailability = (): Promise<ModelAvailability> => availability('prompt');
 
@@ -147,9 +160,18 @@ export async function downloadModel(onProgress: (fraction: number) => void): Pro
 }
 
 /**
+ * A background job's longest run. Nobody waits on it, but while it runs nothing else can, and a
+ * prompt that never settles would hold the queue (and the precompute run) until the browser
+ * restarts.
+ */
+const BACKGROUND_CEILING_MS = 60_000;
+
+/**
  * Runs `work` in the queue, closing every session it opens. With a timeout, the caller gets null
  * once it passes, counting the wait in the queue, and the queue is freed too: a hung prompt
- * would otherwise block every later call. Errors become null, since every caller has a fallback.
+ * would otherwise block every later call. A background job without one gets the ceiling, counted
+ * from when it starts, since waiting behind interactive work is expected. Errors become null,
+ * since every caller has a fallback.
  */
 function runJob<T>(
   label: string,
@@ -170,16 +192,17 @@ function runJob<T>(
     return session;
   };
 
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const expired =
-    timeoutMs === undefined
-      ? undefined
-      : new Promise<null>((resolve) => {
-          timer = setTimeout(() => {
-            close();
-            resolve(null);
-          }, timeoutMs);
-        });
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  const after = (ms: number) =>
+    new Promise<null>((resolve) => {
+      timers.push(
+        setTimeout(() => {
+          close();
+          resolve(null);
+        }, ms),
+      );
+    });
+  const expired = timeoutMs === undefined ? undefined : after(timeoutMs);
 
   const guarded = async (): Promise<T | null> => {
     if (closed) return null;
@@ -193,9 +216,15 @@ function runJob<T>(
     }
   };
 
-  const job = enqueue(() => (expired ? Promise.race([guarded(), expired]) : guarded()), priority);
+  const run = () => {
+    const limit = expired ?? (priority === 'background' ? after(BACKGROUND_CEILING_MS) : undefined);
+    return limit ? Promise.race([guarded(), limit]) : guarded();
+  };
+  const job = enqueue(run, priority);
   const result = expired ? Promise.race([job, expired]) : job;
-  return result.finally(() => clearTimeout(timer));
+  return result.finally(() => {
+    for (const timer of timers) clearTimeout(timer);
+  });
 }
 
 /**

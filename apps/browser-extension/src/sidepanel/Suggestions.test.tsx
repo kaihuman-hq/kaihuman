@@ -1,6 +1,8 @@
 import type { StreamsFile } from '@kaihuman/formats';
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { aiAvailability } from '../background/ai/model';
+import { suggestStream } from '../background/work/suggest';
 import type { StreamsCache, WorkItemStatus, WorkSnapshot } from '../background/work/types';
 import { SidePanel } from './SidePanel';
 import { resetSuggestions } from './useSuggestion';
@@ -157,6 +159,17 @@ beforeEach(() => {
       connect: () => ({ disconnect: () => {}, onDisconnect: { addListener: () => {} } }),
       sendMessage: (message: Record<string, unknown>, respond?: (response: unknown) => void) => {
         sent.push(message);
+        // The worker's side, run here against the stubbed model.
+        if (message.type === 'SUGGEST_STREAM') {
+          void suggestStream(message.file as never, message.candidate as never).then((suggestion) =>
+            respond?.({ ok: true, suggestion }),
+          );
+          return;
+        }
+        if (message.type === 'AI_AVAILABILITY') {
+          void aiAvailability().then((availability) => respond?.({ ok: true, availability }));
+          return;
+        }
         respond?.({ ok: true });
       },
       lastError: undefined,
@@ -182,6 +195,10 @@ describe('suggestions in the This-tab card', () => {
     expect(ops()).toEqual([
       expect.objectContaining({ op: 'pin', streamId: 'st_b', labels: ['people'] }),
     ]);
+    // Asked of the worker, whose queue runs one model call at a time (D1).
+    expect(sent.find((m) => m.type === 'SUGGEST_STREAM')).toMatchObject({
+      candidate: { url: 'https://example.com/hiring', title: 'Hiring plan' },
+    });
   });
 
   it('shows the reason under Suggested', async () => {

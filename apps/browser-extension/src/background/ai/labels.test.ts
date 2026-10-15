@@ -207,6 +207,14 @@ describe('readMutedKeys', () => {
     expect(await readMutedKeys()).toEqual(new Set(['a']));
   });
 
+  it('is empty while the side panel AI is off, even with labels cached', async () => {
+    store.aiSettings = { inboxLabels: labels, sidePanel: false };
+    store.aiCache = {
+      [INBOX_LABELS_CACHE]: { value: { a: 'Noise' }, at: Date.now(), ttl: 60_000 },
+    };
+    expect(await readMutedKeys()).toEqual(new Set());
+  });
+
   it('is empty without a cache', async () => {
     withLabels();
     expect(await readMutedKeys()).toEqual(new Set());

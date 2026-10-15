@@ -1,16 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
-import { availability as capability, downloadTranslationPacks } from '../background/ai/model.js';
+import { type AiAvailability, downloadTranslationPacks } from '../background/ai/model.js';
 import {
   type AiSettings,
   type InboxLabel,
   readAiSettings,
   writeAiSettings,
 } from '../background/ai/settings.js';
-import {
-  downloadModel,
-  type ModelAvailability,
-  modelAvailability,
-} from '../background/work/suggest.js';
+import { downloadModel, type ModelAvailability } from '../background/work/suggest.js';
 import { WORK_KEYS, type WorkUi } from '../background/work/types.js';
 import { send } from '../palette/port.js';
 import { errorText, field, primary, quiet } from './controls.js';
@@ -23,6 +19,14 @@ const STATUS: Record<ModelAvailability, string> = {
   downloading: 'Chrome is downloading its on-device model.',
   unavailable:
     "Chrome's on-device model is not available on this device, so suggestions only follow the repositories already in your streams.",
+};
+
+const SUMMARIZER_STATUS: Record<Exclude<ModelAvailability, 'available'>, string> = {
+  downloadable:
+    "Chrome's summarizer is not downloaded yet, so TL;DRs and page summaries wait for it.",
+  downloading: 'Chrome is downloading its summarizer.',
+  unavailable:
+    "Chrome's summarizer is not available to kaihuman here, so there are no TL;DRs or page summaries.",
 };
 
 function Toggle({
@@ -58,24 +62,23 @@ function SuggestionSettings({ ui }: { ui: WorkUi }) {
   const [progress, setProgress] = useState<number>();
   const [error, setError] = useState<string>();
 
-  useEffect(() => {
-    let live = true;
-    void modelAvailability().then((state) => {
-      if (live) setAvailability(state);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-
+  const [summarizer, setSummarizer] = useState<ModelAvailability>();
   const [packs, setPacks] = useState<ModelAvailability>();
   const [packsBusy, setPacksBusy] = useState(false);
 
+  // Asked of the worker, where the model runs: the panel's own globals can differ from its.
   useEffect(() => {
     let live = true;
-    void capability('translator').then((state) => {
-      if (live) setPacks(state);
-    });
+    void send({ type: 'AI_AVAILABILITY' }).then(
+      (response: { availability?: AiAvailability } | undefined) => {
+        const states = response?.availability;
+        if (!live || !states) return;
+        setAvailability(states.prompt);
+        setSummarizer(states.summarizer);
+        setPacks(states.translator);
+      },
+      () => {},
+    );
     return () => {
       live = false;
     };
@@ -117,6 +120,9 @@ function SuggestionSettings({ ui }: { ui: WorkUi }) {
     <div class="flex flex-col gap-2">
       <h2 class="text-[12px] font-bold">On-device AI</h2>
       {availability && <p class="text-nt-muted">{STATUS[availability]}</p>}
+      {summarizer && summarizer !== 'available' && (
+        <p class="text-nt-muted">{SUMMARIZER_STATUS[summarizer]}</p>
+      )}
       {progress !== undefined ? (
         <output class="text-nt-muted">Downloading the model… {Math.round(progress * 100)}%</output>
       ) : (

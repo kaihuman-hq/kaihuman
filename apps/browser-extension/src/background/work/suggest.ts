@@ -7,6 +7,7 @@ import {
   type StreamsFile,
 } from '@kaihuman/formats';
 import { promptJson } from '../ai/model.js';
+import { readAiSettings } from '../ai/settings.js';
 
 /** Something about to be pinned: an open tab, an inbox row or a page from the menu. */
 export interface Candidate {
@@ -231,7 +232,13 @@ export function suggestionOps(
 // The model's plumbing moved to the shared AI layer; the side panel still imports it from here.
 export { downloadModel, type ModelAvailability, modelAvailability } from '../ai/model.js';
 
-/** The model's pick, or null when it is missing, still downloading, or answers nonsense. */
+/**
+ * How long a suggestion may take, the wait in the model's queue included. A pin from the shortcut
+ * or the menu waits on it, so a hung model must not hold the save.
+ */
+export const SUGGEST_TIMEOUT_MS = 8_000;
+
+/** The model's pick, or null when it is missing, still downloading, too slow or answers nonsense. */
 export function modelSuggestion(
   file: StreamsFile,
   candidate: Candidate,
@@ -241,13 +248,20 @@ export function modelSuggestion(
     input: promptFor(file, candidate),
     schema: schemaFor(file),
     validate: (answer) => suggestionFrom(answer, file),
+    timeoutMs: SUGGEST_TIMEOUT_MS,
   });
 }
 
-/** The model's pick when it can give one, else the same-repository rule, else nothing. */
+/**
+ * The model's pick when it can give one, else the same-repository rule, else nothing. With
+ * "Triage in the side panel" off only the rule answers (D6).
+ */
 export async function suggestStream(
   file: StreamsFile,
   candidate: Candidate,
 ): Promise<Suggestion | null> {
-  return (await modelSuggestion(file, candidate)) ?? ruleSuggestion(file, candidate);
+  // Unreadable settings count as the defaults, which allow the model.
+  const settings = await readAiSettings().catch(() => undefined);
+  const model = settings?.sidePanel === false ? null : await modelSuggestion(file, candidate);
+  return model ?? ruleSuggestion(file, candidate);
 }

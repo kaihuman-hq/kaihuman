@@ -99,7 +99,7 @@ describe('runPrecompute', () => {
 });
 
 describe('the work throttle', () => {
-  it('work triggers run at most once per 10 minutes', async () => {
+  it('work and today triggers run at most once per 10 minutes', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     const start = new Date('2026-10-15T10:00:00.000Z').getTime();
     vi.setSystemTime(start);
@@ -110,13 +110,17 @@ describe('the work throttle', () => {
     vi.setSystemTime(start + 60_000);
     await runPrecompute('work');
     expect(runs).toBe(1);
-    // The hourly alarm and a start page sync are not throttled.
+    // A start page sync is throttled the same way: every new tab can bring one.
+    await runPrecompute('today');
+    expect(runs).toBe(1);
+    // The hourly alarm always runs.
     await runPrecompute('alarm');
     expect(runs).toBe(2);
+    // Any run restarts the clock; eleven minutes after the last one, both run again.
+    vi.setSystemTime(start + 11 * 60_000);
     await runPrecompute('today');
     expect(runs).toBe(3);
-    // Any run restarts the clock; eleven minutes after the last one, work runs again.
-    vi.setSystemTime(start + 11 * 60_000);
+    vi.setSystemTime(start + 22 * 60_000);
     await runPrecompute('work');
     expect(runs).toBe(4);
     vi.useRealTimers();

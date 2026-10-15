@@ -389,6 +389,52 @@ describe('work messages', () => {
     expect(enqueued()[0]?.[0]).toMatchObject({ op: 'pin', streamId: 'st_new' });
   });
 
+  describe('model questions from the side panel', () => {
+    it('answers SUGGEST_STREAM from the worker, with the model', async () => {
+      vi.stubGlobal('LanguageModel', {
+        availability: async () => 'available',
+        create: async () => ({
+          prompt: async () => JSON.stringify({ stream: 'B', labels: ['docs'] }),
+          destroy: () => {},
+        }),
+      });
+      const answer = await send({
+        type: 'SUGGEST_STREAM',
+        file: fileWith(['st_a', 'A'], ['st_b', 'B']),
+        candidate: { url: 'https://example.com/x', title: 'X' },
+      });
+      expect(answer).toMatchObject({
+        suggestion: { stream: { kind: 'existing', id: 'st_b' }, labels: ['docs'] },
+      });
+    });
+
+    it('answers RELATED_TO with candidate ids', async () => {
+      const answer = await send({
+        type: 'RELATED_TO',
+        profile: { name: 'A', titles: [], repos: [], hosts: ['docs.example.com'] },
+        candidates: [
+          { id: 'a', title: 'Docs', url: 'https://docs.example.com/x' },
+          { id: 'b', title: 'Other', url: 'https://other.example.org/' },
+        ],
+      });
+      expect(answer).toMatchObject({ related: ['a'] });
+    });
+
+    it('answers AI_AVAILABILITY with what this context can use', async () => {
+      vi.stubGlobal('LanguageModel', { availability: async () => 'downloadable' });
+      vi.stubGlobal('Summarizer', { availability: async () => 'available' });
+      const answer = await send({ type: 'AI_AVAILABILITY' });
+      expect(answer).toMatchObject({
+        availability: {
+          prompt: 'downloadable',
+          summarizer: 'available',
+          translator: 'unavailable',
+          detector: 'unavailable',
+        },
+      });
+    });
+  });
+
   describe('filing into the suggested stream', () => {
     const answer = (value: object) => {
       vi.stubGlobal('LanguageModel', {

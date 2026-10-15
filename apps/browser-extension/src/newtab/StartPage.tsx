@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { CaptureGuess } from '../background/ai/capture';
 import { availability } from '../background/ai/model';
 import { applyRanking, type Ranking } from '../background/ai/rank';
+import { readAiSettings } from '../background/ai/settings';
 import {
   type Bookmark,
   bookmarkEnvironment,
@@ -293,10 +294,11 @@ export function StartPage() {
     return Promise.all(loads).then(refreshSyncStatus);
   };
 
-  // Auto only when the model is ready: until then a guess would always time out into a note.
+  // Auto only when the model is ready and "Suggest when saving" is on: otherwise every guess
+  // would come back empty and Auto would quietly save everything as a note.
   useEffect(() => {
-    void availability('prompt').then((state) => {
-      if (state !== 'available') return;
+    void Promise.all([availability('prompt'), readAiSettings()]).then(([state, settings]) => {
+      if (state !== 'available' || !settings.enrichment) return;
       setAutoAvailable(true);
       setCapture((current) => (current === 'note' ? 'auto' : current));
     });

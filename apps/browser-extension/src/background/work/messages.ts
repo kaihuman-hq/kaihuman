@@ -7,6 +7,8 @@ import {
   type StreamsFile,
 } from '@kaihuman/formats';
 import type { Message } from '../../types.js';
+import { relatedTo } from '../ai/grow.js';
+import { aiAvailability } from '../ai/model.js';
 import type { Dismissed } from './inbox.js';
 import { markThreadDone, markThreadRead } from './notifications.js';
 import { applyPending } from './pending.js';
@@ -202,6 +204,19 @@ export function handleWorkMessage(message: Message): Promise<unknown> | undefine
       return open(message.url ?? '', message.threadId).then(() => OK);
     case 'WORK_SET_TOKEN':
       return setWorkToken((message.key ?? '').trim()).then(() => OK);
+    // The side panel's model questions run here, in the worker's one queue (D1), not beside it.
+    case 'SUGGEST_STREAM': {
+      const { file, candidate } = message;
+      if (!file || !candidate) return Promise.reject(new Error('Nothing to suggest for'));
+      return suggestStream(file, candidate).then((suggestion) => ({ ...OK, suggestion }));
+    }
+    case 'RELATED_TO': {
+      const { profile, candidates } = message;
+      if (!profile || !Array.isArray(candidates)) return Promise.resolve({ ...OK, related: [] });
+      return relatedTo(profile, candidates).then((related) => ({ ...OK, related }));
+    }
+    case 'AI_AVAILABILITY':
+      return aiAvailability().then((availability) => ({ ...OK, availability }));
     case 'WORK_PIN_TAB':
       return pinTab({
         tabId: message.tabId,

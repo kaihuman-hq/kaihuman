@@ -7,6 +7,18 @@ vi.mock('./ai/rank.js', async (original) => ({
   rerank: rerankSpy,
 }));
 
+const precomputeJobs = vi.hoisted(() => [] as { id: string; run: () => Promise<void> }[]);
+vi.mock('./ai/precompute.js', async (original) => {
+  const real = await original<typeof import('./ai/precompute')>();
+  return {
+    ...real,
+    registerPrecompute: (job: { id: string; run: () => Promise<void> }) => {
+      precomputeJobs.push(job);
+      real.registerPrecompute(job as never);
+    },
+  };
+});
+
 type Listener = (msg: any, sender: any, sendResponse: (r: any) => void) => unknown;
 
 let listener: Listener;
@@ -48,6 +60,7 @@ let putStatus: number;
 
 beforeEach(async () => {
   vi.resetModules();
+  precomputeJobs.length = 0;
   rerankSpy.mockReset();
   rerankSpy.mockResolvedValue(null);
   putStatus = 200;
@@ -249,5 +262,34 @@ describe('RERANK', () => {
     const [, sent, , opts] = rerankSpy.mock.calls[0] ?? [];
     expect(sent[0].text).toHaveLength(500);
     expect(opts).toEqual({ priority: 'interactive', timeoutMs: 8000 });
+  });
+});
+
+describe('the precompute jobs', () => {
+  it('registers the focus and brief cards before the heavier ranking and inbox jobs', () => {
+    const ids = precomputeJobs.map((job) => job.id);
+    expect(ids.slice(0, 2)).toEqual(['card:focus', 'card:brief']);
+    expect(ids).toContain('rank:likely');
+  });
+
+  it('ranks likely-next from the cached bookmarks, never syncing or committing', async () => {
+    seedCache();
+    const job = precomputeJobs.find((candidate) => candidate.id === 'rank:likely');
+    // No bookmark cache: nothing to rank, and no blocking fetch.
+    await expect(job?.run()).resolves.toBeUndefined();
+    store.bookmarksCache = {
+      repo: 'o/r',
+      bookmarks: [],
+      sha: 'sha',
+      etag: null,
+      fetchedAt: 0,
+    };
+    await job?.run();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const bookmarkCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes('browser.bookmarks'),
+    );
+    expect(bookmarkCalls).toEqual([]);
+    expect(writes()).toHaveLength(0);
   });
 });

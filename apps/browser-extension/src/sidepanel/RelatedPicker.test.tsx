@@ -1,6 +1,7 @@
 import type { StreamsFile } from '@kaihuman/formats';
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { relatedTo } from '../background/ai/grow';
 import type { InboxRow } from '../background/work/inbox';
 import { RelatedPicker } from './RelatedPicker';
 
@@ -79,6 +80,13 @@ beforeEach(() => {
     runtime: {
       sendMessage: (message: Record<string, unknown>, respond?: (response: unknown) => void) => {
         sent.push(message);
+        // The worker's side of "Find related", run here with no model: the rules answer.
+        if (message.type === 'RELATED_TO') {
+          void relatedTo(message.profile as never, message.candidates as never).then((related) =>
+            respond?.({ ok: true, related }),
+          );
+          return;
+        }
         respond?.({ ok: true });
       },
       lastError: undefined,
@@ -107,9 +115,9 @@ describe('RelatedPicker', () => {
     box('Refund bug').click();
     await waitFor(() => /Add 2/.test(button(/^Add/).textContent ?? ''));
     button(/^Add 2$/).click();
-    await waitFor(() => sent.length > 0);
-    expect(sent).toHaveLength(1);
-    const message = sent[0] as { type: string; ops: Record<string, unknown>[] };
+    await waitFor(() => sent.some((m) => m.type === 'WORK_OPS'));
+    expect(sent.map((m) => m.type)).toEqual(['RELATED_TO', 'WORK_OPS']);
+    const message = sent[1] as { type: string; ops: Record<string, unknown>[] };
     expect(message.type).toBe('WORK_OPS');
     expect(message.ops).toHaveLength(2);
     expect(message.ops.map((op) => op.url).sort()).toEqual([
@@ -118,6 +126,22 @@ describe('RelatedPicker', () => {
     ]);
     expect(message.ops.every((op) => op.op === 'pin' && op.streamId === 'st_a')).toBe(true);
     await waitFor(() => closed === 1);
+  });
+
+  it('asks the worker, keeping inbox rows when there are 40 or more tabs', async () => {
+    tabs = Array.from({ length: 45 }, (_, i) => ({
+      url: `https://example.com/${i}`,
+      title: `Tab ${i}`,
+    }));
+    await mount();
+    const asked = sent.find((m) => m.type === 'RELATED_TO') as {
+      profile: { name: string };
+      candidates: { title: string }[];
+    };
+    expect(asked.profile.name).toBe('Payments');
+    expect(asked.candidates).toHaveLength(31);
+    expect(asked.candidates.at(-1)?.title).toBe('Refund bug');
+    expect(box('Refund bug').checked).toBe(true);
   });
 
   it('excludes already pinned URLs', async () => {

@@ -1053,6 +1053,19 @@ describe('StartPage', () => {
       return host.querySelector('textarea') as HTMLTextAreaElement;
     };
 
+    it('offers no Auto mode while Suggest when saving is off', async () => {
+      store.aiSettings = { enrichment: false };
+      await mount(() => host.textContent?.includes('newer') ?? false);
+      await tick();
+      await tick();
+      expect(buttons().some((b) => b.textContent === 'Auto')).toBe(false);
+      expect(
+        buttons()
+          .find((b) => b.textContent === 'Note')
+          ?.getAttribute('aria-pressed'),
+      ).toBe('true');
+    });
+
     it('Auto shows a preview and saves the top guess', async () => {
       classifyWith([TODO_GUESS, LOG_GUESS]);
       const textarea = await mountAuto();

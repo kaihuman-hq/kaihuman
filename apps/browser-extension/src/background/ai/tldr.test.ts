@@ -49,6 +49,13 @@ describe('summarizeWaiting', () => {
     expect(summarizer.summarize).toHaveBeenCalledTimes(2);
   });
 
+  it('remembers a failed summary for a while instead of asking on every run', async () => {
+    summarizer.summarize.mockResolvedValue('');
+    expect(await summarizeWaiting([row(1)])).toEqual({});
+    expect(await summarizeWaiting([row(1)])).toEqual({});
+    expect(summarizer.summarize).toHaveBeenCalledTimes(1);
+  });
+
   it('leaves a row out while the model is missing', async () => {
     vi.stubGlobal('Summarizer', undefined);
     expect(await summarizeWaiting([row(1)])).toEqual({});
@@ -91,6 +98,13 @@ describe('the job and the read', () => {
     });
     expect(summarizer.summarize).not.toHaveBeenCalled();
     expect(tldrKey(item(1))).toBe('tldr:acme/web#1@2026-10-14T09:01:00Z');
+  });
+
+  it('serves no cached summary while the side panel AI is off', async () => {
+    store.workSnapshot = snapshot();
+    await precomputeTldrs();
+    store.aiSettings = { sidePanel: false };
+    expect(await readTldrs()).toEqual({});
   });
 
   it('does nothing when the side panel AI is off', async () => {

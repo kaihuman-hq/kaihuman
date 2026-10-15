@@ -225,6 +225,25 @@ describe('toggle', () => {
   });
 });
 
+describe('isOpen and refresh', () => {
+  it('tells whether it is open, and refresh redraws a row whose text changed', () => {
+    expect(palette.isOpen()).toBe(true);
+    const first = actions[0];
+    if (first) first.subtitle = 'Already saved';
+    expect(shadow().querySelector('.row .subtitle')?.textContent).not.toBe('Already saved');
+    palette.refresh();
+    const subtitles = Array.from(shadow().querySelectorAll('.row .subtitle')).map(
+      (element) => element.textContent,
+    );
+    expect(subtitles).toContain('Already saved');
+    palette.close();
+    expect(palette.isOpen()).toBe(false);
+    // Closed, there is nothing to redraw and nothing is mounted again.
+    palette.refresh();
+    expect(document.getElementById(PALETTE_HOST_ID)).toBeNull();
+  });
+});
+
 describe('open', () => {
   it('opens a closed palette and leaves an open one open', async () => {
     palette.close();
@@ -2091,6 +2110,48 @@ describe('ask', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(askRun).not.toHaveBeenCalled();
     expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps one ask in flight and sends only the newest waiting query after it', async () => {
+    let finishFirst: (item: ModeItem | null) => void = () => {};
+    ask.mockImplementationOnce(
+      () =>
+        new Promise<ModeItem | null>((resolve) => {
+          finishFirst = resolve;
+        }),
+    );
+    type('log 30m on payments');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(ask).toHaveBeenCalledTimes(1);
+    type('log 45m on payments');
+    await vi.advanceTimersByTimeAsync(300);
+    type('log 60m on payments');
+    await vi.advanceTimersByTimeAsync(300);
+    // Both wait for the one in flight; only the newer is kept.
+    expect(ask).toHaveBeenCalledTimes(1);
+    finishFirst(null);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(ask).toHaveBeenCalledTimes(2);
+    expect(ask).toHaveBeenLastCalledWith('log 60m on payments');
+    expect(rowTitles()[0]).toBe('Log: 30m on payments');
+  });
+
+  it('drops a waiting ask once the palette closes', async () => {
+    let finishFirst: (item: ModeItem | null) => void = () => {};
+    ask.mockImplementationOnce(
+      () =>
+        new Promise<ModeItem | null>((resolve) => {
+          finishFirst = resolve;
+        }),
+    );
+    type('log 30m on payments');
+    await vi.advanceTimersByTimeAsync(300);
+    type('log 45m on payments');
+    await vi.advanceTimersByTimeAsync(300);
+    palette.close();
+    finishFirst(null);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(ask).toHaveBeenCalledTimes(1);
   });
 
   it('shows no row when ask has nothing', async () => {

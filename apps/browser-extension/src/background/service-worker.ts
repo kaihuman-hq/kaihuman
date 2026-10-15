@@ -185,6 +185,10 @@ chrome.alarms.create('repoSync', { periodInMinutes: 60 });
 ensureWorkAlarm().catch((e) => console.warn('kaihuman: creating the work alarm failed', e));
 // On-device AI fills its cache hourly, and after each start page sync and work cycle.
 ensureAiAlarm().catch((e) => console.warn('kaihuman: creating the AI alarm failed', e));
+// The cards first: the page reads them once, and the ranking and inbox jobs behind them can
+// take minutes of model time.
+registerPrecompute({ id: 'card:focus', group: 'newTab', run: () => precomputeFocus(cardInputs) });
+registerPrecompute({ id: 'card:brief', group: 'newTab', run: () => precomputeBrief(cardInputs) });
 registerPrecompute({ id: 'rank:likely', group: 'newTab', run: precomputeLikelyNext });
 registerPrecompute({ id: 'rank:readLater', group: 'newTab', run: precomputeReadLater });
 registerPrecompute({ id: 'inbox:labels', group: 'sidePanel', run: precomputeLabels });
@@ -1323,9 +1327,6 @@ async function cardInputs() {
   };
 }
 
-registerPrecompute({ id: 'card:focus', group: 'newTab', run: () => precomputeFocus(cardInputs) });
-registerPrecompute({ id: 'card:brief', group: 'newTab', run: () => precomputeBrief(cardInputs) });
-
 /** The start page's files, on the same hourly budget as the bookmarks. */
 async function syncToday(): Promise<TodayCache | undefined> {
   const { token, repo } = await credentials();
@@ -1370,7 +1371,11 @@ async function precomputeLikelyNext() {
   if ((await peek(LIKELY_KEY)) !== undefined) return;
   const work = await rankingContext();
   if (!work) return;
-  const { bookmarks } = await getBookmarks();
+  // The cache only: `getBookmarks` could start a GitHub sync and a usage commit (D5).
+  const { repo } = await credentials();
+  const cache = await readBookmarksCache();
+  if (!cache || !isCacheUsable(cache, repo)) return;
+  const bookmarks = applyUsage(cache.bookmarks, await readUsage(repo));
   await put(LIKELY_KEY, await likelyNext(bookmarks, work.ctx, new Date()), RANKING_TTL_MS);
 }
 

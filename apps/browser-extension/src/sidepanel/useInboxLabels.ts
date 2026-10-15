@@ -19,8 +19,11 @@ export function useInboxLabels(): InboxLabels {
     let live = true;
     const refresh = async () => {
       try {
-        const { inboxLabels: labels } = await readAiSettings();
-        const assigned = (await peek<Record<string, string>>(INBOX_LABELS_CACHE)) ?? {};
+        const { inboxLabels: labels, sidePanel } = await readAiSettings();
+        // Switched off, the cached answers label and mute nothing (D6).
+        const assigned = sidePanel
+          ? ((await peek<Record<string, string>>(INBOX_LABELS_CACHE)) ?? {})
+          : {};
         if (live) setState({ labels, assigned, muted: mutedKeys(assigned, labels) });
       } catch {
         // Labels are optional: the inbox shows without them.

@@ -7,7 +7,12 @@ import {
   type StreamsFile,
 } from '@kaihuman/formats';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { type Candidate, MAX_CANDIDATES, profileOf, relatedTo } from '../background/ai/grow.js';
+import {
+  type Candidate,
+  MAX_CANDIDATES,
+  MAX_TAB_CANDIDATES,
+  profileOf,
+} from '../background/ai/grow.js';
 import type { InboxRow } from '../background/work/inbox.js';
 import { send } from '../palette/port.js';
 import { errorText, quiet } from './controls.js';
@@ -20,20 +25,23 @@ interface Props {
   onClose: () => void;
 }
 
-/** Open tabs of this window, then inbox rows, without anything already pinned or repeated. */
+/**
+ * Open tabs of this window, then inbox rows, without anything already pinned or repeated. Tabs
+ * stop at 30, so a window full of tabs still leaves the inbox rows a place under the cap.
+ */
 async function collect(file: StreamsFile, rows: InboxRow[]): Promise<Candidate[]> {
   const tabs = await chrome.tabs.query({ currentWindow: true }).catch(() => []);
   const seen = new Set<string>();
   const out: Candidate[] = [];
-  const add = (url: string | undefined, title: string | undefined) => {
-    if (!url || !isSafeUrl(url)) return;
+  const add = (url: string | undefined, title: string | undefined, max: number) => {
+    if (out.length >= max || !url || !isSafeUrl(url)) return;
     const id = normalizeItemUrl(url);
     if (seen.has(id) || findItemByUrl(file, url)) return;
     seen.add(id);
     out.push({ id, title: title || url, url });
   };
-  for (const tab of tabs.slice(0, MAX_CANDIDATES)) add(tab.url, tab.title);
-  for (const row of rows) add(row.url, row.title);
+  for (const tab of tabs) add(tab.url, tab.title, MAX_TAB_CANDIDATES);
+  for (const row of rows) add(row.url, row.title, MAX_CANDIDATES);
   return out;
 }
 
@@ -51,7 +59,15 @@ export function RelatedPicker({ stream, file, rows, onClose }: Props) {
       const found = await collect(file, rows);
       if (!live) return;
       setCandidates(found);
-      const related = await relatedTo(profileOf(stream), found).catch(() => []);
+      // The worker asks the model, in its one queue and with a timeout.
+      const related: string[] = await send({
+        type: 'RELATED_TO',
+        profile: profileOf(stream),
+        candidates: found,
+      }).then(
+        (response) => (Array.isArray(response?.related) ? response.related : []),
+        () => [],
+      );
       if (!live) return;
       if (!touched.current) setChecked(new Set(related));
       setFinding(false);

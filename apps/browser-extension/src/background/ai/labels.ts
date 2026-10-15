@@ -108,11 +108,16 @@ export function mutedKeys(assigned: Record<string, string>, labels: InboxLabel[]
   return new Set(Object.keys(assigned).filter((key) => muted.has(assigned[key] ?? '')));
 }
 
-/** The muted keys from the cached labels, for the badge. */
+/**
+ * The muted keys from the cached labels, for the badge. None while the side panel AI is off: the
+ * model's old answers must not keep hiding rows after the user turned it off (D6).
+ */
 export async function readMutedKeys(): Promise<Set<string>> {
+  const settings = await readAiSettings();
+  if (!settings.sidePanel) return new Set();
   const assigned = await peek<Record<string, string>>(INBOX_LABELS_CACHE);
   if (!assigned) return new Set();
-  return mutedKeys(assigned, (await readAiSettings()).inboxLabels);
+  return mutedKeys(assigned, settings.inboxLabels);
 }
 
 const labelsHash = (labels: InboxLabel[]) =>

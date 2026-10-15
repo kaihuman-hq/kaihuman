@@ -252,6 +252,36 @@ describe('suggestStream', () => {
   });
 });
 
+describe('suggestStream limits', () => {
+  const candidate = { url: 'https://github.com/acme/payments/pull/9', title: 'Refunds' };
+  const rule = expect.objectContaining({ stream: { kind: 'existing', id: 'st_pay' } });
+
+  it('gives up on a hung model after 8 s and falls back to the repository rule', async () => {
+    vi.useFakeTimers();
+    try {
+      const { model } = fakeModel('');
+      model.create.mockResolvedValueOnce({
+        prompt: () => new Promise<string>(() => {}),
+        destroy: () => {},
+      } as never);
+      const asked = suggestStream(file(), candidate);
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(await asked).toEqual(rule);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses only the repository rule when the side panel switch is off', async () => {
+    vi.stubGlobal('chrome', {
+      storage: { local: { get: async () => ({ aiSettings: { sidePanel: false } }) } },
+    });
+    const { prompts } = fakeModel(JSON.stringify({ stream: 'Website', labels: [] }));
+    expect(await suggestStream(file(), candidate)).toEqual(rule);
+    expect(prompts).toEqual([]);
+  });
+});
+
 describe('modelAvailability and downloadModel', () => {
   it('reports a Chrome without the API as unavailable', async () => {
     expect(await modelAvailability()).toBe('unavailable');

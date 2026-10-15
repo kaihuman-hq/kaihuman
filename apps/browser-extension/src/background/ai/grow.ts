@@ -18,6 +18,10 @@ export interface StreamProfile {
 }
 
 export const MAX_CANDIDATES = 40;
+/** Open tabs offered at most, so inbox rows still fit under `MAX_CANDIDATES`. */
+export const MAX_TAB_CANDIDATES = 30;
+// The picker is open and spinning while it waits, the queue's wait included.
+const RELATED_TIMEOUT_MS = 8_000;
 const MAX_RELATED = 8;
 const MAX_TITLES = 8;
 const MAX_TITLE = 80;
@@ -111,6 +115,7 @@ export async function relatedTo(stream: StreamProfile, candidates: Candidate[]):
         .filter((id): id is string => id !== undefined);
       return [...new Set(ids)].slice(0, MAX_RELATED);
     },
+    timeoutMs: RELATED_TIMEOUT_MS,
   });
   return answer ?? rules();
 }

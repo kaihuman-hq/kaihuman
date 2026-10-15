@@ -78,6 +78,48 @@ describe('relatedTo', () => {
     expect(ids).toEqual(['a']);
   });
 
+  it('sends a schema that allows only the numbers shown', async () => {
+    const constraints: object[] = [];
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async (_input: string, options: { responseConstraint: object }) => {
+          constraints.push(options.responseConstraint);
+          return JSON.stringify({ related: ['1'] });
+        },
+        destroy: () => {},
+      }),
+    });
+    await relatedTo(stream, [
+      candidate('a', 'https://a.example/'),
+      candidate('b', 'https://b.example/'),
+    ]);
+    expect(constraints).toEqual([
+      {
+        type: 'object',
+        properties: {
+          related: { type: 'array', items: { type: 'string', enum: ['1', '2'] }, maxItems: 8 },
+        },
+        required: ['related'],
+      },
+    ]);
+  });
+
+  it('falls back to the rules when the model hangs past 8 s', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal('LanguageModel', {
+        availability: async () => 'available',
+        create: async () => ({ prompt: () => new Promise(() => {}), destroy: () => {} }),
+      });
+      const asked = relatedTo(stream, [candidate('a', 'https://docs.example.com/x')]);
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(await asked).toEqual(['a']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('returns nothing without candidates', async () => {
     expect(await relatedTo(stream, [])).toEqual([]);
   });

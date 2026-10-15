@@ -1,4 +1,5 @@
-import type { StreamOp } from '@kaihuman/formats';
+import type { StreamOp, StreamsFile } from '@kaihuman/formats';
+import type { Candidate, StreamProfile } from './background/ai/grow.js';
 
 export interface Message {
   type:
@@ -71,6 +72,9 @@ export interface Message {
     | 'WORK_OPEN'
     | 'WORK_SET_TOKEN'
     | 'WORK_PIN_TAB'
+    | 'SUGGEST_STREAM'
+    | 'RELATED_TO'
+    | 'AI_AVAILABILITY'
     | 'OPEN_WORK_PANEL';
   token?: string;
   path?: string;
@@ -104,6 +108,14 @@ export interface Message {
   key?: string;
   /** `WORK_OPS`: stream changes from the side panel. */
   ops?: StreamOp[];
+  /** `SUGGEST_STREAM`: the streams to choose from, as the panel sees them. */
+  file?: StreamsFile;
+  /** `SUGGEST_STREAM`: what is about to be pinned. */
+  candidate?: { url: string; title: string };
+  /** `RELATED_TO`: the stream to grow. */
+  profile?: StreamProfile;
+  /** `RELATED_TO`: open tabs and inbox rows that might belong to it. */
+  candidates?: Candidate[];
   /** `WORK_DISMISS`: the row's `updatedAt`, so a later change brings it back. */
   updatedAt?: string;
   /** `WORK_DISMISS`, `WORK_OPEN`: the GitHub notification thread to mark done or read. */

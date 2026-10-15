@@ -3,7 +3,7 @@
  * panel. Written ahead of time by the precompute run, so opening the panel never waits on the model.
  */
 import { WORK_KEYS, type WorkItemStatus, type WorkSnapshot } from '../work/types.js';
-import { cached, peek } from './cache.js';
+import { cached, peek, put } from './cache.js';
 import { summarize } from './model.js';
 import { readAiSettings } from './settings.js';
 
@@ -18,6 +18,8 @@ export interface TldrRow {
 const CACHE_TTL_MS = 7 * 24 * 60 * 60_000;
 // The newest rows first: the model is slow and the panel shows the top of the list.
 const MAX_ROWS = 30;
+// A failed summary is not cached, so without this it would be asked again on every run.
+const REFUSED_TTL_MS = 30 * 60_000;
 
 export const tldrKey = (row: Pick<TldrRow, 'key' | 'updatedAt'>) =>
   `tldr:${row.key}@${row.updatedAt}`;
@@ -29,6 +31,8 @@ export async function summarizeWaiting(rows: TldrRow[]): Promise<Record<string, 
   const out: Record<string, string> = {};
   for (const row of rows.slice(0, MAX_ROWS)) {
     if (!row.body) continue;
+    const refused = `${tldrKey(row)}:refused`;
+    if ((await peek(refused)) !== undefined) continue;
     const text = await cached<string>(tldrKey(row), CACHE_TTL_MS, async () => {
       const summary = await summarize(`${row.title}\n\n${row.body}`, {
         type: 'tldr',
@@ -38,6 +42,7 @@ export async function summarizeWaiting(rows: TldrRow[]): Promise<Record<string, 
       return summary ? oneLine(summary) || null : null;
     });
     if (text) out[row.key] = text;
+    else await put(refused, true, REFUSED_TTL_MS);
   }
   return out;
 }
@@ -74,9 +79,10 @@ export async function precomputeTldrs(): Promise<void> {
   await summarizeWaiting(waitingRows(await readSnapshot()));
 }
 
-/** What is already written, by item key; never calls the model. */
+/** What is already written, by item key; never calls the model. Nothing while switched off (D6). */
 export async function readTldrs(): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
+  if (!(await readAiSettings()).sidePanel) return out;
   for (const row of waitingRows(await readSnapshot()).slice(0, MAX_ROWS)) {
     const text = await peek<string>(tldrKey(row));
     if (text) out[row.key] = text;

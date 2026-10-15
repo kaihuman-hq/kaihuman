@@ -93,6 +93,32 @@ describe('promptJson', () => {
     expect(await promptJson(task)).toEqual({ pick: 'a' });
   });
 
+  it('a background job gives up after 60 s, freeing the queue for the jobs behind it', async () => {
+    vi.useFakeTimers();
+    try {
+      const { destroyed } = fakeModel(new Promise<string>(() => {}));
+      const log: string[] = [];
+      const hung = promptJson({ ...task, priority: 'background' }).then((r) => {
+        log.push('hung');
+        return r;
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      // Queued behind the hung one; the interactive job still jumps the waiting background one.
+      fakeModel(JSON.stringify({ pick: 'a' }));
+      const later = promptJson({ ...task, priority: 'background' }).then(() => log.push('bg'));
+      const urgent = promptJson(task).then(() => log.push('interactive'));
+      await vi.advanceTimersByTimeAsync(59_999);
+      expect(log).toEqual([]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await hung).toBeNull();
+      expect(destroyed).toHaveLength(1);
+      await Promise.all([later, urgent]);
+      expect(log).toEqual(['hung', 'interactive', 'bg']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('promptJson destroys its session', async () => {
     const { destroyed } = fakeModel(JSON.stringify({ pick: 'a' }));
     await promptJson(task);

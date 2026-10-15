@@ -1,12 +1,7 @@
 import type { StreamsFile } from '@kaihuman/formats';
 import { useEffect, useState } from 'preact/hooks';
 import type { InboxRow } from '../background/work/inbox.js';
-import {
-  type Candidate,
-  type Suggestion,
-  suggestionOps,
-  suggestStream,
-} from '../background/work/suggest.js';
+import { type Candidate, type Suggestion, suggestionOps } from '../background/work/suggest.js';
 import { WORK_KEYS } from '../background/work/types.js';
 import { send } from '../palette/port.js';
 
@@ -29,7 +24,17 @@ export function suggestFor(file: StreamsFile, candidate: Candidate): Promise<Sug
   const key = `${signature(file)}|${candidate.url}`;
   const known = cache.get(key);
   if (known) return known;
-  const asked = queue.then(() => suggestStream(file, candidate)).catch(() => null);
+  // Asked of the worker, whose queue keeps the model to one call at a time with its precompute.
+  const asked = queue
+    .then(() =>
+      send({
+        type: 'SUGGEST_STREAM',
+        file,
+        candidate: { url: candidate.url, title: candidate.title },
+      }),
+    )
+    .then((response): Suggestion | null => response?.suggestion ?? null)
+    .catch(() => null);
   queue = asked;
   cache.set(key, asked);
   return asked;

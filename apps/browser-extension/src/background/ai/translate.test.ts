@@ -34,6 +34,18 @@ describe('translateOnDevice', () => {
     ]);
   });
 
+  it('keeps the targets it can translate when one pack is missing', async () => {
+    stub('en');
+    vi.mocked(
+      (globalThis as unknown as { Translator: { availability: () => Promise<string> } }).Translator
+        .availability,
+    ).mockImplementation((async (o: { targetLanguage: string }) =>
+      o.targetLanguage === 'ja' ? 'downloadable' : 'available') as never);
+    expect(await translateOnDevice('Hi', ['DE', 'JA'])).toEqual([
+      { target: 'DE', text: 'en>de:Hi', detectedSource: 'EN' },
+    ]);
+  });
+
   it('explains a missing language pack', async () => {
     stub('de', 'downloadable');
     await expect(translateOnDevice('Hallo', ['EN-US'])).rejects.toThrow(/language pack/);
