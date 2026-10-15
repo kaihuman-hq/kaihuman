@@ -1,6 +1,6 @@
 import { PALETTE_HOST_ID } from '@kaihuman/palette';
 import { render } from 'preact';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Bookmark } from '../background/bookmarks';
 import type { ServiceStatus } from '../background/service-status';
 import type { TodaySummary } from '../background/today';
@@ -852,6 +852,131 @@ describe('StartPage', () => {
 
     click('Todo');
     await waitFor(() => captures().length === 0);
+  });
+
+  describe('auto capture', () => {
+    const TODO_GUESS = {
+      kind: 'todo',
+      text: 'Call the bank',
+      tags: ['bank'],
+      path: 'work.todos.md',
+    };
+    const LOG_GUESS = { kind: 'log', description: 'Call the bank', tags: [] };
+
+    beforeEach(() => {
+      TODAY = emptyToday();
+      vi.stubGlobal('LanguageModel', { availability: async () => 'available' });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    // The page asks 400 ms after the last keystroke, longer than `waitFor`'s ticks add up to.
+    const waitLong = async (condition: () => boolean) => {
+      for (let i = 0; i < 100; i++) {
+        if (condition()) return;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      throw new Error('Timed out waiting for the capture box');
+    };
+
+    /** Answers `CAPTURE_CLASSIFY` with `guesses`, or never when null. */
+    const classifyWith = (guesses: unknown[] | null) => {
+      const sendMessage = (globalThis as any).chrome.runtime.sendMessage;
+      (globalThis as any).chrome.runtime.sendMessage = (
+        message: Record<string, unknown>,
+        respond?: (response: unknown) => void,
+      ) => {
+        if (message.type !== 'CAPTURE_CLASSIFY') return sendMessage(message, respond);
+        sent.push(message);
+        if (guesses) respond?.({ success: true, guesses });
+      };
+    };
+
+    const mountAuto = async () => {
+      await mount(() => host.textContent?.includes('newer') ?? false);
+      await waitFor(
+        () =>
+          buttons()
+            .find((b) => b.textContent === 'Auto')
+            ?.getAttribute('aria-pressed') === 'true',
+      );
+      return host.querySelector('textarea') as HTMLTextAreaElement;
+    };
+
+    it('Auto shows a preview and saves the top guess', async () => {
+      classifyWith([TODO_GUESS, LOG_GUESS]);
+      const textarea = await mountAuto();
+      await type(textarea, 'Call the bank #bank');
+      await waitLong(() => host.textContent?.includes('Todo → work.todos.md · #bank') ?? false);
+      expect(sent.find((m) => m.type === 'CAPTURE_CLASSIFY')).toEqual({
+        type: 'CAPTURE_CLASSIFY',
+        text: 'Call the bank #bank',
+      });
+
+      press(textarea, 'Enter');
+      await waitFor(() => sent.some((m) => m.type === 'ADD_TODO'));
+      expect(sent.find((m) => m.type === 'ADD_TODO')).toMatchObject({
+        type: 'ADD_TODO',
+        text: 'Call the bank',
+        path: 'work.todos.md',
+        tags: ['bank'],
+      });
+      await waitFor(() => textarea.value === '');
+    });
+
+    it('asks once, 400 ms after the last keystroke', async () => {
+      classifyWith([TODO_GUESS]);
+      const textarea = await mountAuto();
+      await type(textarea, 'Call');
+      await type(textarea, 'Call the bank');
+      await waitLong(() => host.textContent?.includes('Todo →') ?? false);
+      expect(sent.filter((m) => m.type === 'CAPTURE_CLASSIFY')).toEqual([
+        { type: 'CAPTURE_CLASSIFY', text: 'Call the bank' },
+      ]);
+    });
+
+    it('Tab cycles guesses', async () => {
+      classifyWith([TODO_GUESS, LOG_GUESS]);
+      const textarea = await mountAuto();
+      await type(textarea, 'Call the bank');
+      await waitLong(() => host.textContent?.includes('Todo → work.todos.md') ?? false);
+
+      press(textarea, 'Tab');
+      await waitFor(() => host.textContent?.includes('Log → .kh/daily.actionlog.md') ?? false);
+      press(textarea, 'Tab');
+      await waitLong(() => host.textContent?.includes('Todo → work.todos.md') ?? false);
+      press(textarea, 'Tab');
+      await waitFor(() => host.textContent?.includes('Log →') ?? false);
+
+      press(textarea, 'Enter');
+      await waitFor(() => sent.some((m) => m.type === 'ADD_ACTION_LOG'));
+      expect(sent.find((m) => m.type === 'ADD_ACTION_LOG')).toEqual({
+        type: 'ADD_ACTION_LOG',
+        path: '.kh/daily.actionlog.md',
+        description: 'Call the bank',
+        tags: [],
+      });
+    });
+
+    it('falls back to Note when nothing comes back within 4 s', async () => {
+      classifyWith(null);
+      const textarea = await mountAuto();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      await type(textarea, 'remember this');
+      press(textarea, 'Enter');
+      await tick();
+      expect(sent.some((m) => m.type === 'DUMP_NOTE')).toBe(false);
+
+      vi.advanceTimersByTime(4000);
+      await waitFor(() => sent.some((m) => m.type === 'DUMP_NOTE'));
+      expect(sent.find((m) => m.type === 'DUMP_NOTE')).toMatchObject({
+        path: '.lifeos/dump.md',
+        note: 'remember this',
+      });
+    });
   });
 
   describe('work card', () => {

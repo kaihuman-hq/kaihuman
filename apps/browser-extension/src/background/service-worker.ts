@@ -1,5 +1,6 @@
 import {
   addActionLogEntry,
+  addEventEntry,
   addReadLaterEntry,
   addTodoEntry,
   braindumpIdOf,
@@ -20,6 +21,7 @@ import {
 } from '@kaihuman/palette';
 import { type Message } from '../types';
 import { draftBookmark, findDuplicates } from './ai/bookmark-draft.js';
+import { captureContext, classifyCapture } from './ai/capture.js';
 import { AI_ALARM, ensureAiAlarm, precomputeInBackground } from './ai/precompute.js';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import {
@@ -1337,6 +1339,27 @@ async function commitTodayFile(
 }
 
 /**
+ * Where a todo from the start page goes: the inbox, or another todo list the page knows. The inbox
+ * may not exist yet, which is why it is not held to the cache's files.
+ */
+function todoTarget(cache: TodayCache, path: string | undefined): string {
+  const inbox = inboxPath(cache);
+  if (!path || path === inbox) return inbox;
+  if (!path.toLowerCase().endsWith('.todos.md') || !cache.files.some((f) => f.path === path)) {
+    throw new Error(`${path} is not one of the start page's .todos.md files`);
+  }
+  return path;
+}
+
+/** The capture box's guesses, from the synced files only: a new tab must not cost a request. */
+async function captureGuesses(text: string) {
+  const { repo } = await credentials();
+  const cache = await readTodayCache();
+  if (!cache || !isTodayCacheUsable(cache, repo)) return { guesses: [] };
+  return { guesses: await classifyCapture(text, captureContext(cache, new Date())) };
+}
+
+/**
  * An action log entry from the popup or the start page, written as the console's Action Log widget
  * writes it, over the version read.
  */
@@ -1951,10 +1974,37 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'ADD_TODO') {
     const now = new Date();
+    const entry = {
+      text: message.text || '',
+      tags: (message.tags ?? []).filter((tag: unknown) => typeof tag === 'string'),
+      milestoneId: message.milestoneId || undefined,
+    };
     return answer(
-      commitTodayFile(inboxPath, (md) => addTodoEntry(md, { text: message.text || '' }, now)),
+      commitTodayFile(
+        (cache) => todoTarget(cache, message.path),
+        (md) => addTodoEntry(md, entry, now),
+      ),
       sendResponse,
     );
+  }
+
+  if (message.type === 'ADD_EVENT') {
+    const entry = {
+      name: message.name || '',
+      type: message.eventType || 'general',
+      startDate: message.startDate || '',
+      endDate: message.endDate,
+    };
+    return answer(
+      commitTodayFile({ path: message.path || '', suffix: '.events.csv' }, (csv) =>
+        addEventEntry(csv, entry),
+      ),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'CAPTURE_CLASSIFY') {
+    return answer(captureGuesses(message.text || ''), sendResponse);
   }
 
   if (message.type === 'PIN_ARTICLE') {

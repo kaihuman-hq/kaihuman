@@ -53,6 +53,8 @@ export interface Message {
     | 'READ_LATER_DONE'
     | 'READ_LATER_ADD'
     | 'ADD_TODO'
+    | 'ADD_EVENT'
+    | 'CAPTURE_CLASSIFY'
     | 'WORK_OPS'
     | 'WORK_REFRESH'
     | 'WORK_DISMISS'
@@ -108,6 +110,13 @@ export interface Message {
   sha?: string;
   /** `LIST_GITHUB_WORK`: which search; checked, since it comes from the page. */
   filter?: string;
+  /** `ADD_TODO`: the milestone the todo belongs to. */
+  milestoneId?: string;
+  /** `ADD_EVENT`: the event's name, type, and first and last day (YYYY-MM-DD). */
+  name?: string;
+  eventType?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface MessageResponse {

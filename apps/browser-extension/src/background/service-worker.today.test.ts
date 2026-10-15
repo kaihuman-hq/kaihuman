@@ -215,6 +215,61 @@ describe('writes from the start page', () => {
     );
   });
 
+  it('adds a todo to another known list, with its tags and milestone', async () => {
+    remote['work.todos.md'] = '- [ ] existing\n';
+    seedCache();
+    const response = await call({
+      type: 'ADD_TODO',
+      text: 'Call the bank #urgent',
+      path: 'work.todos.md',
+      tags: ['bank'],
+      milestoneId: 'q4',
+    });
+    expect(response.success).toBe(true);
+    expect(remote['work.todos.md']).toMatch(/- \[ \] Call the bank #bank #urgent !q4\n/);
+    expect(remote['.kh/inbox.todos.md']).toBe('- [ ] existing\n');
+  });
+
+  it('refuses a todo for a list the page does not know', async () => {
+    seedCache();
+    for (const path of ['secret.todos.md', '.kh/health.habit.csv']) {
+      const response = await call({ type: 'ADD_TODO', text: 'x', path });
+      expect(response.error).toContain('not one of the start page');
+    }
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('adds an event to a known events file, and only there', async () => {
+    remote['.kh/dates.events.csv'] = 'name;type;start;end\nOld;general;2026-01-01;2026-01-01\n';
+    seedCache();
+    const response = await call({
+      type: 'ADD_EVENT',
+      path: '.kh/dates.events.csv',
+      name: 'Lunch with Anna',
+      eventType: 'general',
+      startDate: '2026-10-16',
+      endDate: '2026-10-16',
+    });
+    expect(response.success).toBe(true);
+    expect(remote['.kh/dates.events.csv']).toContain(
+      'Lunch with Anna;general;2026-10-16;2026-10-16',
+    );
+
+    const refused = await call({
+      type: 'ADD_EVENT',
+      path: '.kh/inbox.todos.md',
+      name: 'x',
+      startDate: '2026-10-16',
+    });
+    expect(refused.error).toContain('not one of the start page');
+  });
+
+  it('classifies a capture to no guesses without the model', async () => {
+    seedCache();
+    const response = await call({ type: 'CAPTURE_CLASSIFY', text: 'Call the bank' });
+    expect(response).toEqual({ success: true, guesses: [] });
+  });
+
   it('adds an action log entry as the console does, over the version read', async () => {
     remote['.lifeos/dump.actionlog.md'] = '---\n---\n\n# Action Log\n\n- 2026-09-23 10:00:00 Old';
     const response = await call({
