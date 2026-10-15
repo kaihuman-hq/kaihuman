@@ -345,6 +345,26 @@ The side panel (the **Open work panel** button in the popup, or the work card on
 
 Suggestions: Chrome's on-device model (Settings → Suggestions downloads it) picks the stream and labels for an item, or names a new stream. The This-tab card comes preselected, each inbox row has a one-click **→ stream** line, `Alt+Shift+P` and right-click **Pin to stream ▸ Suggested stream** file there, and new Waiting-on-you items can be filed on their own (off by default: filed items leave the inbox). Without the model, the stream holding most of the item's repository is suggested.
 
+On-device AI everywhere (Settings → On-device AI switches each group on or off). Every feature works, more simply, without the model.
+- **Start page:**
+  - The capture box's Auto mode files notes, todos, log entries and events.
+  - "Likely next" bookmarks.
+  - Read later for today, with reasons.
+  - A focus line and a morning brief.
+  - A braindump digest.
+- **Saving:** bookmark drafts with duplicate warnings; read-later TL;DRs; knowledge base key points, type and alt text.
+- **Side panel:**
+  - "Find related" for a stream.
+  - Inbox labels in your own words, which can be muted.
+  - PR/issue TL;DRs.
+  - Standup and week review drafts.
+- **Palette:**
+  - On-device `>t` translation.
+  - Summarize or ask this page.
+  - "Ask kaihuman" plain-language actions.
+  - `>n` meaning search.
+  - Tidy open tabs.
+
 `Alt+Shift+W` opens the panel from any page (change it at chrome://extensions/shortcuts), and so does **Open work panel** in the command palette, on a page or on the start page.
 
 There are three ways to pin a page to a stream: `Alt+Shift+P` pins the current tab to the last used stream, right-click **Pin to stream ▸** lists the streams, and the This-tab bar in the panel pins the tab you are on. Slack threads and Claude sessions are pinned the same way as any other page.

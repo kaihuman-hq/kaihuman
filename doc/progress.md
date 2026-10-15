@@ -1,5 +1,34 @@
 # Progress
 
+## 2026-10-15 — On-device AI, phases 2–6: saving, new tab cards, side panel, palette, tabs
+
+- **Capture box (Auto):** the start page capture box files a note, todo (file, milestone, tags), log entry or event on its own, with a preview; Tab cycles the alternatives. Answers within 4 s, else a note. Only the latest text is classified (`ai/capture.ts`, `ADD_EVENT`, `ADD_TODO` with path/tags).
+- **Bookmarks and duplicates:** "Bookmark this page" comes prefilled with a tidied title, tags from existing tags and a prod/int/dev guess (`BOOKMARK_DRAFT`). Exact duplicates (bookmark, read later, stream) show at once without the model (`BOOKMARK_DUPLICATES`), near duplicates after the model confirms them.
+- **Saving:** read-later items get a TL;DR, tags and read time. Knowledge base captures get key points, a type (snippet, decision, how-to, reference, idea), quoted and deduped tags, and alt text for up to 3 images. Saves never wait more than 8 s for the model (`ai/enrich.ts`).
+- **New tab:**
+  - "Likely next" bookmarks: frecency boosted by active streams, re-ranked by the model.
+  - Read later for today: three items, each with a reason, plus "Archive?" for unread items older than 60 days.
+  - A focus line and a morning brief (once per day after 05:00).
+  - A braindump digest that groups up to 30 braindumps into themes, each offering "Make a todo" or "Make an idea".
+  - All computed in the background (`ai/rank.ts`, `ai/brief.ts`, `ai/digest.ts`, `ai/context.ts`). An open page never reorders.
+- **Side panel:**
+  - Suggestions say why.
+  - "Find related" grows a stream from open tabs and inbox rows.
+  - Inbox labels can be written in your own words, with filter chips; a muted label hides its rows from Waiting on you, the badge and the work card (`ai/labels.ts`).
+  - A one-line TL;DR shows under waiting PRs and issues (`bodyText` for waiting searches only, `ai/tldr.ts`).
+  - Standup and week review drafts can be saved to the action log (`ai/review.ts`).
+- **Palette:**
+  - `>t` translates on-device without a DeepL key, and after a DeepL failure.
+  - "Summarize this page" and "Ask this page…" can save to the knowledge base.
+  - An "Ask kaihuman" row turns 3+ words into a typed action with a preview. It never takes the selection from a listed row, and it is checked again before it runs (`ai/intent.ts`, `palette/ask.ts`).
+  - `>n` searches braindumps and ideas by meaning.
+- **Tabs:** "Tidy open tabs" (popup and palette) proposes up to 4 groups, one at a time. Each can be saved as a pinned-tab group or pinned to a stream; tabs close only on "Close these tabs" (`ai/tidy.ts`).
+- Settings → On-device AI has switches for each of these groups, the inbox label editor and an English ↔ German language pack download.
+- Not yet checked by hand in Chrome 155:
+  1. Real model answers, and how long they take.
+  2. Whether the service worker exposes `Translator` and `LanguageDetector` (the tests stub them).
+  3. Whether one click is enough user activation for both language-pack downloads.
+
 ## 2026-10-15 — On-device AI, phase 1: ranking without the model
 
 - **Bookmarks:** "Recently used" ranks by frecency, `(1 + useCount) × 2^(−days since last use / 14)` (`background/ranking.ts`).
