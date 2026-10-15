@@ -872,10 +872,21 @@ describe('StartPage', () => {
       expect(card()?.textContent).toContain('Flaky build');
       expect(card()?.textContent).toContain('CI failing');
       expect(card()?.textContent).toContain('review requested');
-      // Newest first, three rows: 5 (assigned), 4, 3.
-      expect(card()?.textContent).toContain('Fifth');
-      expect(card()?.textContent).toContain('assigned');
+      // Most urgent first, three rows: 4 and 2 (failing), 3 (old review request).
+      expect(card()?.textContent).toContain('Docs');
       expect(card()?.textContent).not.toContain('Add parser');
+      expect(card()?.textContent).not.toContain('Fifth');
+    });
+
+    it('shows the most urgent first', async () => {
+      store.workSnapshot = snapshot({
+        assigned: [status(5, 'Newest but mild')],
+        failing: [status(1, 'Oldest but red')],
+      });
+      await mount(() => card() !== null);
+
+      const text = card()?.textContent ?? '';
+      expect(text.indexOf('Oldest but red')).toBeLessThan(text.indexOf('Newest but mild'));
     });
 
     it('leaves out zero counts', async () => {

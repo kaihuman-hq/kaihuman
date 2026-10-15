@@ -1,6 +1,14 @@
 import type { GithubKey, StreamsFile } from '@kaihuman/formats';
 import { describe, expect, it } from 'vitest';
-import { autoDoneOps, buildInbox, pinnedKeys, unreadKeys, workSummary } from './inbox.js';
+import {
+  autoDoneOps,
+  buildInbox,
+  type InboxRow,
+  pinnedKeys,
+  unreadKeys,
+  urgencyOf,
+  workSummary,
+} from './inbox.js';
 import type {
   InboxReason,
   NotificationThread,
@@ -153,6 +161,46 @@ describe('buildInbox', () => {
     const { waiting, activity } = buildInbox(snap, null, {});
     expect(waiting[0]?.updatedAt).toBe('2026-02-01T00:00:00Z');
     expect(activity[0]).toMatchObject({ kind: 'issue', number: 2, repo: 'o/r' });
+  });
+});
+
+describe('inbox urgency', () => {
+  const now = new Date('2026-02-01T00:00:00Z');
+  const old = '2026-01-01T00:00:00Z';
+  const fresh = '2026-01-31T20:00:00Z';
+
+  it('failing CI outranks an old review request, which outranks changes requested', () => {
+    const snap = snapshot({
+      'changes-requested': [status(3, { updatedAt: fresh })],
+      'review-requested': [status(2, { updatedAt: old })],
+      failing: [status(1, { updatedAt: old })],
+    });
+    const { waiting } = buildInbox(snap, null, {}, now);
+    expect(waiting.map((row) => row.key)).toEqual([key(1), key(2), key(3)]);
+  });
+
+  it('a fresh review request ranks below changes requested', () => {
+    const snap = snapshot({
+      'review-requested': [status(1, { updatedAt: fresh })],
+      'changes-requested': [status(2, { updatedAt: old })],
+    });
+    const { waiting } = buildInbox(snap, null, {}, now);
+    expect(waiting.map((row) => row.key)).toEqual([key(2), key(1)]);
+  });
+
+  it('equal urgency keeps newest first', () => {
+    const snap = snapshot({
+      assigned: [status(1, { updatedAt: old }), status(2, { updatedAt: fresh })],
+    });
+    const { waiting } = buildInbox(snap, null, {}, now);
+    expect(waiting.map((row) => row.key)).toEqual([key(2), key(1)]);
+  });
+
+  it('scores a thread-only row 20 and takes the maximum over reasons', () => {
+    const snap = snapshot({ assigned: [status(1)] }, [thread(1), thread(2)]);
+    const { waiting, activity } = buildInbox(snap, null, {}, now);
+    expect(urgencyOf(waiting[0] as InboxRow, now)).toBe(25);
+    expect(urgencyOf(activity[0] as InboxRow, now)).toBe(20);
   });
 });
 
