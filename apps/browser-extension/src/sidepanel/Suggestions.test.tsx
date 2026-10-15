@@ -184,6 +184,13 @@ describe('suggestions in the This-tab card', () => {
     ]);
   });
 
+  it('shows the reason under Suggested', async () => {
+    model(() => ({ stream: 'Beta', labels: [], reason: 'Hiring plans live here' }));
+    await mount('Pin to');
+    await waitFor(() => host.textContent?.includes('Hiring plans live here') ?? false);
+    expect(host.textContent).toContain('Suggested');
+  });
+
   it('proposes a new stream by name and creates it on Pin', async () => {
     model(() => ({ stream: '(new stream)', newStreamName: 'Hiring', labels: [] }));
     await mount('Pin to');

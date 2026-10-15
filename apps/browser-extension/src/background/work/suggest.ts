@@ -21,6 +21,8 @@ export interface Suggestion {
   labels: string[];
   /** `model`: Chrome's on-device model chose; `rules`: same-repository items decided. */
   source: 'model' | 'rules';
+  /** Why, in a short line the user can check at a glance. */
+  reason?: string;
 }
 
 /** The answer the model may give for a "new stream" pick. */
@@ -28,6 +30,7 @@ export const NEW_STREAM = '(new stream)';
 const MAX_LABELS = 3;
 const MAX_LABEL_LENGTH = 24;
 const MAX_NAME_LENGTH = 40;
+const MAX_REASON_LENGTH = 80;
 const MAX_STREAMS = 15;
 const ITEMS_PER_STREAM = 4;
 const MAX_TITLE = 80;
@@ -66,7 +69,12 @@ export function ruleSuggestion(file: StreamsFile, candidate: Candidate): Suggest
     .sort((a, b) => b.count - a.count);
   const [first, second] = counts;
   if (!first || (second && second.count === first.count)) return null;
-  return { stream: { kind: 'existing', id: first.id }, labels: [], source: 'rules' };
+  return {
+    stream: { kind: 'existing', id: first.id },
+    labels: [],
+    source: 'rules',
+    reason: `Most items from ${repo} are here`,
+  };
 }
 
 /** The labels already in use, most used first, so the model reuses them before inventing more. */
@@ -87,6 +95,7 @@ export const SYSTEM_PROMPT = [
   'Pick the existing stream the item belongs to.',
   `Answer "${NEW_STREAM}" only when no stream fits, and then name the new stream in two to four words.`,
   'Suggest at most three short lowercase labels, reusing the user’s labels when they fit.',
+  'Give a reason of at most 80 characters.',
 ].join(' ');
 
 /** The streams and the candidate, in as few tokens as the choice needs. */
@@ -128,6 +137,7 @@ export function schemaFor(file: StreamsFile): object {
         items: { type: 'string', maxLength: MAX_LABEL_LENGTH },
         maxItems: MAX_LABELS,
       },
+      reason: { type: 'string', maxLength: MAX_REASON_LENGTH },
     },
     required: ['stream', 'labels'],
   };
@@ -152,7 +162,12 @@ export function parseModelAnswer(raw: string, file: StreamsFile): Suggestion | n
 /** An already parsed answer as a suggestion, or null when it is not one. */
 function suggestionFrom(parsed: unknown, file: StreamsFile): Suggestion | null {
   if (typeof parsed !== 'object' || parsed === null) return null;
-  const answer = parsed as { stream?: unknown; newStreamName?: unknown; labels?: unknown };
+  const answer = parsed as {
+    stream?: unknown;
+    newStreamName?: unknown;
+    labels?: unknown;
+    reason?: unknown;
+  };
   if (typeof answer.stream !== 'string') return null;
   const labels = [
     ...new Set(
@@ -162,6 +177,9 @@ function suggestionFrom(parsed: unknown, file: StreamsFile): Suggestion | null {
         .filter((label) => label !== ''),
     ),
   ].slice(0, MAX_LABELS);
+  // A reason over the limit is dropped, not cut: a clipped sentence reads as a wrong one.
+  const text = typeof answer.reason === 'string' ? answer.reason.trim() : '';
+  const reason = text && text.length <= MAX_REASON_LENGTH ? { reason: text } : {};
   const pick = answer.stream;
   if (pick === NEW_STREAM) {
     const name =
@@ -175,10 +193,13 @@ function suggestionFrom(parsed: unknown, file: StreamsFile): Suggestion | null {
       stream: existing ? { kind: 'existing', id: existing.id } : { kind: 'new', name },
       labels,
       source: 'model',
+      ...reason,
     };
   }
   const stream = file.streams.find((candidate) => candidate.name === pick);
-  return stream ? { stream: { kind: 'existing', id: stream.id }, labels, source: 'model' } : null;
+  return stream
+    ? { stream: { kind: 'existing', id: stream.id }, labels, source: 'model', ...reason }
+    : null;
 }
 
 /** The ops that file a candidate as suggested, creating the stream first when it is new. */

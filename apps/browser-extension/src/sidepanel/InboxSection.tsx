@@ -182,6 +182,7 @@ function Row({
             {suggestion.labels.length > 0 && (
               <span class="shrink-0 text-nt-faint">{suggestion.labels.join(', ')}</span>
             )}
+            {suggestion.reason && <span class="truncate text-nt-faint">{suggestion.reason}</span>}
           </button>
         )}
         {pinError && <p class="text-[12px] text-nt-prod [overflow-wrap:anywhere]">{pinError}</p>}

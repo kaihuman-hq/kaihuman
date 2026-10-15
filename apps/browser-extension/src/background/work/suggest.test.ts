@@ -82,7 +82,12 @@ describe('ruleSuggestion', () => {
   it('picks the stream that holds most of the repository', () => {
     expect(
       ruleSuggestion(file(), { url: 'https://github.com/acme/payments/pull/9', title: 'X' }),
-    ).toEqual({ stream: { kind: 'existing', id: 'st_pay' }, labels: [], source: 'rules' });
+    ).toEqual({
+      stream: { kind: 'existing', id: 'st_pay' },
+      labels: [],
+      source: 'rules',
+      reason: 'Most items from acme/payments are here',
+    });
   });
 
   it('stays out of a tie, an unknown repository and non-GitHub pages', () => {
@@ -144,6 +149,14 @@ describe('parseModelAnswer', () => {
       labels: ['frontend', 'ui', 'a'],
       source: 'model',
     });
+  });
+
+  it('keeps a reason of 80 characters or fewer and drops a longer one', () => {
+    const answer = (reason: string) =>
+      parseModelAnswer(JSON.stringify({ stream: 'Website', labels: [], reason }), file());
+    expect(answer('x'.repeat(80))?.reason).toBe('x'.repeat(80));
+    expect(answer('x'.repeat(81))?.reason).toBeUndefined();
+    expect(answer('x'.repeat(81))?.stream).toEqual({ kind: 'existing', id: 'st_web' });
   });
 
   it('turns a named new stream into one, unless the name already exists', () => {
@@ -222,7 +235,12 @@ describe('suggestStream', () => {
   });
 
   it('falls back to the repository rule without a usable model', async () => {
-    const rule = { stream: { kind: 'existing', id: 'st_pay' }, labels: [], source: 'rules' };
+    const rule = {
+      stream: { kind: 'existing', id: 'st_pay' },
+      labels: [],
+      source: 'rules',
+      reason: 'Most items from acme/payments are here',
+    };
     expect(await suggestStream(file(), candidate)).toEqual(rule);
     fakeModel('{}', 'downloadable');
     expect(await suggestStream(file(), candidate)).toEqual(rule);
