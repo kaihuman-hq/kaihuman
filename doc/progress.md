@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-10-15 — On-device AI, phase 1: ranking without the model
+
+- **Bookmarks:** "Recently used" ranks by frecency, `(1 + useCount) × 2^(−days since last use / 14)` (`background/ranking.ts`).
+- **Inbox:** "Waiting on you" and "New activity" are ordered by urgency, then newest first (`urgencyOf` in `work/inbox.ts`). The order is: failing CI, then a review request older than 24 h, then changes requested, then a fresh review request, then ready to merge, then assigned, then threads. The start page work card follows the same order.
+- **Doing and Trackers:** overdue todos come most overdue first, and in-progress todos by milestone due date. Habits with a streak at risk come first.
+- **Resurface:** a new section shows up to 2 seed or exploring ideas that have been idle for 30 days. A click opens `>id` in the palette.
+
 ## 2026-10-15 — On-device AI, phase 0: shared AI layer
 
 - `apps/browser-extension/src/background/ai/`: one model queue (interactive before background), `promptJson` with schema, validation and timeouts, Summarizer, Translator and Language Detector wrappers, and an `aiCache` with TTL and a 500-entry cap. Stream suggestions run on it unchanged.

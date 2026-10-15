@@ -55,6 +55,7 @@
 | Feature | Location | Added |
 |---------|----------|-------|
 | Work side panel: pinned streams with labels, Waiting on you / New activity inbox from GitHub, My open PRs, live CI and review status, merged or closed items done by themselves | side panel (popup → **Open work panel**, or the start page card) | 2026-10-14 |
+| New tab ranking: frecency bookmarks, inbox and work card by urgency, overdue todos by due date, habits at risk first, resurfaced idle ideas | start page, side panel | 2026-10-15 |
 | Stream and label suggestions from Chrome's on-device model: preselected in the This-tab card, one click on inbox rows, `Alt+Shift+P` and **Suggested stream** file there (new streams included), optional auto-filing of new inbox items | side panel, shortcut, context menu | 2026-10-15 |
 | Open the work side panel with Alt+Shift+W or **Open work panel** in the command palette | all pages, start page | 2026-10-14 |
 | Pin any tab to a stream: Alt+Shift+P, right-click **Pin to stream ▸**, or the This-tab bar; stored in .kh/browser.streams.json | all pages | 2026-10-14 |
