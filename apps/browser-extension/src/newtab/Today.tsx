@@ -298,6 +298,11 @@ export function Trackers(props: {
               <span class="flex-1 min-w-0 text-[13px] truncate" title={habit.name}>
                 {habit.name}
               </span>
+              {habit.atRisk && (
+                <span class="shrink-0 text-[11px] text-nt-prod" title="Check in to keep the streak">
+                  at risk
+                </span>
+              )}
               <span
                 role="img"
                 aria-label={`${reached} of the last ${HABIT_WEEK_DAYS} days`}
@@ -318,6 +323,35 @@ export function Trackers(props: {
             </li>
           );
         })}
+      </ul>
+    </section>
+  );
+}
+
+/** Ideas gone quiet, offered back: a click opens the palette's `>id` search on the title. */
+export function Resurface(props: { today: TodaySummary; onOpenIdea: (title: string) => void }) {
+  const { resurface } = props.today;
+  if (resurface.length === 0) return null;
+  return (
+    <section class="flex flex-col gap-[10px]">
+      <SectionHead title="Resurface" />
+      <ul aria-label="Resurface" class="flex flex-col border-t border-nt-divider">
+        {resurface.map((idea) => (
+          <li
+            key={idea.path}
+            class="flex items-center gap-[10px] py-[10px] border-b border-nt-row min-w-0"
+          >
+            <button
+              type="button"
+              class={`flex-1 ${linkButton}`}
+              onClick={() => props.onOpenIdea(idea.title)}
+              title={`${idea.status} since ${idea.lastActivity}`}
+            >
+              {idea.title}
+            </button>
+            <span class="shrink-0 text-[11px] text-nt-muted tabular-nums">{idea.lastActivity}</span>
+          </li>
+        ))}
       </ul>
     </section>
   );

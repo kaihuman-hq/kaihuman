@@ -66,10 +66,15 @@ describe('todos', () => {
   it('summarises what is in progress, overdue and next due', () => {
     const today = buildToday(cache({ '.kh/projects.todos.md': md }), NOW);
     expect(today.inProgress).toEqual([
-      { text: 'Implement demo mode', path: '.kh/projects.todos.md' },
+      { text: 'Implement demo mode', path: '.kh/projects.todos.md', dueDate: '2026-09-30' },
     ]);
     expect(today.overdue).toEqual([
-      { text: 'Fix the alpha bug', path: '.kh/projects.todos.md', milestone: 'Alpha' },
+      {
+        text: 'Fix the alpha bug',
+        path: '.kh/projects.todos.md',
+        milestone: 'Alpha',
+        dueDate: '2026-09-01',
+      },
     ]);
     expect(today.milestone).toMatchObject({ name: 'Launch', daysUntil: 7, open: 2 });
   });
@@ -99,6 +104,7 @@ describe('habits', () => {
         name: 'health',
         checkedToday: false,
         streak: 2,
+        atRisk: true,
         week: [false, false, true, false, true, true, false],
       },
     ]);
@@ -186,6 +192,120 @@ describe('buildToday', () => {
       ).actionLogPath,
     ).toBe('.kh/daily.actionlog.md');
     expect(buildToday(cache({}), NOW).actionLogPath).toBe(DEFAULT_ACTION_LOG_PATH);
+  });
+
+  const todos = [
+    '---',
+    'milestones:',
+    '  - id: a',
+    '    name: Alpha',
+    '    dueDate: 2026-09-20',
+    '  - id: b',
+    '    name: Beta',
+    '    dueDate: 2026-09-10',
+    '  - id: c',
+    '    name: Gamma',
+    '    dueDate: 2026-10-30',
+    '---',
+    '- [ ] late-a #x !a',
+    '- [ ] later-b #x !b',
+    '- [>] doing-c #x !c',
+    '- [>] doing-none',
+    '- [>] doing-b !b',
+  ].join('\n');
+
+  it('overdue sorted by most days overdue', () => {
+    const { overdue } = buildToday(cache({ 'p.todos.md': todos }), NOW);
+    expect(overdue.map((t) => [t.text, t.dueDate])).toEqual([
+      ['later-b', '2026-09-10'],
+      ['doing-b', '2026-09-10'],
+      ['late-a', '2026-09-20'],
+    ]);
+  });
+
+  it('in progress sorted by milestone due date, none last', () => {
+    const { inProgress } = buildToday(cache({ 'p.todos.md': todos }), NOW);
+    expect(inProgress.map((t) => [t.text, t.dueDate])).toEqual([
+      ['doing-b', '2026-09-10'],
+      ['doing-c', '2026-10-30'],
+      ['doing-none', undefined],
+    ]);
+  });
+
+  it('habits at risk come first', () => {
+    const row = (day: string) => `${day};x`;
+    const { habits } = buildToday(
+      cache({
+        'a.habit.csv': ['iso date;reached', row('2026-09-23')].join('\n'),
+        'b.habit.csv': ['iso date;reached', row('2026-09-22')].join('\n'),
+      }),
+      NOW,
+    );
+    expect(habits.map((h) => [h.name, h.atRisk])).toEqual([
+      ['b', true],
+      ['a', false],
+    ]);
+  });
+
+  it('resurfaces up to 2 seed or exploring ideas idle for 30 days, oldest first', () => {
+    const idea = (title: string, status: string, updated: string, log = '') =>
+      [
+        '---',
+        `title: ${title}`,
+        `status: ${status}`,
+        'created: 2026-01-01T09:00+00:00',
+        `updated: ${updated}`,
+        '---',
+        `# ${title}`,
+        '',
+        '## Log',
+        log,
+      ].join('\n');
+    const { resurface } = buildToday(
+      cache({
+        '.kh/ideas/old.md': idea('Old', 'seed', '2026-07-01T09:00+00:00'),
+        '.kh/ideas/older.md': idea('Older', 'exploring', '2026-06-01T09:00+00:00'),
+        '.kh/ideas/third.md': idea('Third', 'seed', '2026-08-01T09:00+00:00'),
+        '.kh/ideas/fresh.md': idea('Fresh', 'seed', '2026-08-24T09:00+00:00'),
+        '.kh/ideas/committed.md': idea('Done', 'committed', '2026-01-01T09:00+00:00'),
+        '.kh/ideas/logged.md': idea(
+          'Logged',
+          'seed',
+          '2026-01-01T09:00+00:00',
+          '- 2026-09-20 08:00 · human · touched',
+        ),
+      }),
+      NOW,
+    );
+    expect(resurface).toEqual([
+      {
+        slug: 'older',
+        title: 'Older',
+        status: 'exploring',
+        lastActivity: '2026-06-01',
+        path: '.kh/ideas/older.md',
+      },
+      {
+        slug: 'old',
+        title: 'Old',
+        status: 'seed',
+        lastActivity: '2026-07-01',
+        path: '.kh/ideas/old.md',
+      },
+    ]);
+  });
+
+  it('keeps an idea idle 30 days and drops one idle 29', () => {
+    const idea = (updated: string) =>
+      `---\ntitle: T\nstatus: seed\nupdated: ${updated}\n---\n# T\n`;
+    const { resurface } = buildToday(
+      cache({
+        '.kh/ideas/thirty.md': idea('2026-08-24T09:00+00:00'),
+        '.kh/ideas/twenty-nine.md': idea('2026-08-25T09:00+00:00'),
+      }),
+      NOW,
+    );
+    expect(resurface.map((r) => r.slug)).toEqual(['thirty']);
   });
 });
 
