@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-10-15 — On-device AI, phase 0: shared AI layer
+
+- `apps/browser-extension/src/background/ai/`: one model queue (interactive before background), `promptJson` with schema, validation and timeouts, Summarizer, Translator and Language Detector wrappers, and an `aiCache` with TTL and a 500-entry cap. Stream suggestions run on it unchanged.
+- AI settings (`aiSettings`: new tab, saving, side panel, palette and tabs switches) under **On-device AI** in the side panel settings, and a background precompute pipeline: an hourly `ai` alarm, after each repo sync, and after work polls at most every 10 minutes.
+
 ## 2026-10-15 — On-device AI features: design
 
 - **Design for 21 on-device AI features** in the browser extension (`doc/ai-features.md`): a shared AI layer (one model queue, a cache, precomputing in the worker), ranking rules for the new tab page, enrichment at save time, side panel triage, palette actions and tidying tabs, in six phases with parallel lanes. Approved with everything in one PR; implementation plan in 22 tasks with parallel lanes per phase: `doc/ai-features-plan.md`. Nothing is built yet.
