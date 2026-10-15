@@ -6,7 +6,7 @@ import { CONSOLE_URL, consoleFileUrl } from '../console.js';
 import { send } from '../palette/port.js';
 import { age } from './age.js';
 import { Choice, Heading, iconButton, NewStreamInput, sendOps } from './controls.js';
-import { InboxSection, MineSection } from './InboxSection.js';
+import { InboxSection, MineSection, useTldrs } from './InboxSection.js';
 import { StreamSection } from './StreamSection.js';
 import { ThisTabBar } from './ThisTabBar.js';
 import { useAutoFileInbox } from './useSuggestion.js';
@@ -147,6 +147,7 @@ export function SidePanel() {
   const { snapshot, streams, file, dismissed, saveError, queueLength, workTokenSet, ui, loaded } =
     state;
   const [settings, setSettings] = useState(false);
+  const tldrs = useTldrs(snapshot?.fetchedAt);
 
   useEffect(() => {
     // Opening the port tells the worker the panel is visible so it polls faster. A restarted
@@ -262,12 +263,14 @@ export function SidePanel() {
                   rows={inbox.waiting}
                   file={file}
                   readOnly={readOnly}
+                  tldrs={tldrs}
                 />
                 <InboxSection
                   title="New activity"
                   rows={inbox.activity}
                   file={file}
                   readOnly={readOnly}
+                  tldrs={tldrs}
                 />
                 <MineSection
                   title="My open PRs"

@@ -24,6 +24,7 @@ import { draftBookmark, findDuplicates } from './ai/bookmark-draft.js';
 import { precomputeBrief, precomputeFocus, readAiCards } from './ai/brief.js';
 import { captureContext, classifyCapture } from './ai/capture.js';
 import { digestToday } from './ai/digest.js';
+import { precomputeTldrs, readTldrs } from './ai/tldr.js';
 import { peek, put } from './ai/cache.js';
 import { buildWorkContext } from './ai/context.js';
 import {
@@ -170,6 +171,7 @@ ensureWorkAlarm().catch((e) => console.warn('kaihuman: creating the work alarm f
 ensureAiAlarm().catch((e) => console.warn('kaihuman: creating the AI alarm failed', e));
 registerPrecompute({ id: 'rank:likely', group: 'newTab', run: precomputeLikelyNext });
 registerPrecompute({ id: 'rank:readLater', group: 'newTab', run: precomputeReadLater });
+registerPrecompute({ id: 'inbox:tldr', group: 'sidePanel', run: precomputeTldrs });
 watchWorkTokens();
 watchPinMenu();
 
@@ -1982,6 +1984,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   if (message.type === 'GET_TODAY') return answer(getToday(), sendResponse);
 
   if (message.type === 'GET_AI_CARDS') return answer(readAiCards(), sendResponse);
+
+  if (message.type === 'GET_TLDRS') return answer(readTldrs(), sendResponse);
 
   if (message.type === 'REFRESH_TODAY') return answer(refreshToday(), sendResponse);
 

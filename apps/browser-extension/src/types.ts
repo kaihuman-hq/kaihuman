@@ -46,6 +46,7 @@ export interface Message {
     | 'TOGGLE_COMMAND_PALETTE'
     | 'GET_TODAY'
     | 'GET_AI_CARDS'
+    | 'GET_TLDRS'
     | 'REFRESH_TODAY'
     | 'GET_SERVICE_STATUS'
     | 'DELETE_BRAINDUMP'

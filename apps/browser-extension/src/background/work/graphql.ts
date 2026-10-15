@@ -27,20 +27,27 @@ const SEARCHES: [SearchKey, string, string][] = [
   ['mine', 'mine', MY_OPEN_PRS_QUERY],
 ];
 
-const NODE_FIELDS = `
+const nodeFields = (extra = '') => `
   __typename
   ... on PullRequest {
-    number title url state updatedAt isDraft reviewDecision mergeable
+    number title url state updatedAt isDraft reviewDecision mergeable${extra}
     repository { owner { login } name }
     commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
   }
   ... on Issue {
-    number title url issueState: state updatedAt
+    number title url issueState: state updatedAt${extra}
     repository { owner { login } name }
   }`;
 
-const searchBlock = ([, alias, q]: [SearchKey, string, string]) =>
-  `${alias}: search(query: ${JSON.stringify(q)}, type: ISSUE, first: 50) { nodes { ${NODE_FIELDS} } }`;
+const NODE_FIELDS = nodeFields();
+// Only the waiting rows get a TL;DR, so only they pay for the body text.
+const WAITING_FIELDS = nodeFields(' bodyText');
+
+/** Enough to say what a PR or issue is about; the rest only costs model time. */
+export const MAX_BODY = 1000;
+
+const searchBlock = ([key, alias, q]: [SearchKey, string, string]) =>
+  `${alias}: search(query: ${JSON.stringify(q)}, type: ISSUE, first: 50) { nodes { ${key === 'mine' ? NODE_FIELDS : WAITING_FIELDS} } }`;
 
 export function buildWorkQueries(
   pinned: GithubRef[],
@@ -87,6 +94,7 @@ interface RawNode {
   state?: string;
   issueState?: string;
   updatedAt?: string;
+  bodyText?: string;
   isDraft?: boolean;
   reviewDecision?: string | null;
   mergeable?: string;
@@ -115,6 +123,7 @@ function toStatus(node: RawNode): WorkItemStatus | null {
   }
   const pr = node.__typename === 'PullRequest';
   const rollup = node.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state;
+  const body = node.bodyText?.trim().slice(0, MAX_BODY);
   return {
     key: githubKey(owner, name, node.number),
     url: node.url ?? '',
@@ -128,6 +137,7 @@ function toStatus(node: RawNode): WorkItemStatus | null {
     ci: pr && rollup ? (CI[rollup] ?? null) : null,
     conflict: pr && node.mergeable === 'CONFLICTING',
     updatedAt: node.updatedAt ?? '',
+    ...(body ? { body } : {}),
   };
 }
 

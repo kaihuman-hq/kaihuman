@@ -141,7 +141,8 @@ beforeEach(() => {
       connect: () => ({ disconnect: () => {}, onDisconnect: { addListener: () => {} } }),
       sendMessage: (message: Record<string, unknown>, respond?: (response: unknown) => void) => {
         sent.push(message);
-        if (failNext) respond?.({ error: failNext });
+        if (message.type === 'GET_TLDRS') respond?.({ 'acme/web#2': 'Retries flaky uploads.' });
+        else if (failNext) respond?.({ error: failNext });
         else respond?.({ ok: true });
       },
       lastError: undefined,
@@ -162,6 +163,21 @@ describe('InboxSection', () => {
     expect(section('New activity (1)').textContent).toContain('review requested by');
     expect(section('My open PRs (1)').textContent).toContain('draft');
     expect(section('My open PRs (1)').querySelector('[aria-label="Dismiss"]')).toBeNull();
+  });
+
+  it('shows the TL;DR line', async () => {
+    await mount('Waiting on you (2)');
+    await waitFor(
+      () => section('Waiting on you (2)').textContent?.includes('Retries flaky') ?? false,
+    );
+    const rows = [...section('Waiting on you (2)').querySelectorAll('li')];
+    expect(rows.find((li) => li.textContent?.includes('PR 2'))?.textContent).toContain(
+      'Retries flaky uploads.',
+    );
+    expect(rows.find((li) => li.textContent?.includes('PR 1'))?.textContent).not.toContain(
+      'Retries',
+    );
+    expect(sent.filter((m) => m.type === 'GET_TLDRS')).toHaveLength(1);
   });
 
   it('shows one row with two reason chips', async () => {
