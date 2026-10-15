@@ -1113,9 +1113,11 @@ export function createCommandPalette(
       const item = await ask(query).catch(() => null);
       // A mode, a field or a submenu entered meanwhile has rows of its own.
       if (token !== askToken || !open || !item || mode || pending || trail.length > 0) return;
+      // It arrives above the rest and late, so it must not take Enter from the row the user is
+      // looking at: the selection moves down with that row. It is preselected only when alone.
+      const others = allRows().length;
       asked = { query, item };
-      // The row arrives above the rest, so a row already arrowed to stays the selected one.
-      if (selected > 0) selected++;
+      selected = others > 0 ? selected + 1 : 0;
       render();
     }, ASK_DELAY_MS);
   };

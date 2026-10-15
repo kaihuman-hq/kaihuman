@@ -137,6 +137,18 @@ describe('summarize, translate and detectLanguage', () => {
     expect(destroyed).toHaveLength(1);
   });
 
+  it('translator availability is the least ready of en->de and de->en', async () => {
+    const asks: string[] = [];
+    vi.stubGlobal('Translator', {
+      availability: async (o: { sourceLanguage: string; targetLanguage: string }) => {
+        asks.push(`${o.sourceLanguage}>${o.targetLanguage}`);
+        return o.sourceLanguage === 'de' ? 'downloadable' : 'available';
+      },
+    });
+    expect(await availability('translator')).toBe('downloadable');
+    expect(asks.sort()).toEqual(['de>en', 'en>de']);
+  });
+
   it('translates when the pair is available', async () => {
     vi.stubGlobal('Translator', {
       availability: async () => 'available',

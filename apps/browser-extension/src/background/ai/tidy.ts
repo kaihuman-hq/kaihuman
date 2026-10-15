@@ -23,6 +23,8 @@ export const MAX_PROPOSALS = 4;
 export const MIN_GROUP = 3;
 export const TIDY_TIMEOUT_MS = 8_000;
 const MAX_NAME = 60;
+// The schema holds the model to a short label; MAX_NAME only trims what still slips through.
+const MAX_SCHEMA_NAME = 40;
 const MAX_TITLE = 100;
 
 export function tidySchema(ids: number[]): object {
@@ -36,7 +38,7 @@ export function tidySchema(ids: number[]): object {
         items: {
           type: 'object',
           properties: {
-            name: { type: 'string' },
+            name: { type: 'string', maxLength: MAX_SCHEMA_NAME },
             tabIds: { type: 'array', minItems: 2, items: { type: 'number', enum: ids } },
           },
           required: ['name', 'tabIds'],

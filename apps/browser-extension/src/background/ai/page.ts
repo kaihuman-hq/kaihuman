@@ -40,7 +40,11 @@ export async function pageSummary(text: string): Promise<string[] | null> {
 /** The model's answer to `question` from the page text alone, or null. */
 export async function askPage(text: string, question: string): Promise<string | null> {
   const page = text.slice(0, PAGE_TEXT_LIMIT);
+  // Detecting and asking share one deadline, so the palette never waits for twice its limit.
+  const deadline = Date.now() + PAGE_TIMEOUT_MS;
   const language = await detectLanguage(page.slice(0, 1000), { timeoutMs: PAGE_TIMEOUT_MS });
+  const timeoutMs = deadline - Date.now();
+  if (timeoutMs <= 0) return null;
   return promptJson<string>({
     system: ASK_SYSTEM,
     input: `Page text:\n${page}\n\nQuestion: ${question}`,
@@ -52,7 +56,7 @@ export async function askPage(text: string, question: string): Promise<string | 
         : null;
     },
     priority: 'interactive',
-    timeoutMs: PAGE_TIMEOUT_MS,
+    timeoutMs,
     languages: language === 'de' ? ['en', 'de'] : ['en'],
   });
 }

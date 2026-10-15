@@ -92,9 +92,22 @@ const languages = (list: string[] = ['en'], images = false) => ({
 });
 
 const SUMMARY_DEFAULTS: SummarizerOptions = { type: 'tldr', length: 'short', format: 'plain-text' };
-// The translator's availability depends on the pair; English to German stands in for "is the
-// translator here at all", and `translate` checks its own pair.
-const TRANSLATOR_PROBE: TranslatorOptions = { sourceLanguage: 'en', targetLanguage: 'de' };
+// The translator's availability depends on the pair. The settings button speaks for both
+// directions of English and German, so both are asked; `translate` checks its own pair.
+const TRANSLATOR_PAIRS: TranslatorOptions[] = [
+  { sourceLanguage: 'en', targetLanguage: 'de' },
+  { sourceLanguage: 'de', targetLanguage: 'en' },
+];
+// The least ready of several states is the state of the lot.
+const READINESS: ModelAvailability[] = ['unavailable', 'downloading', 'downloadable', 'available'];
+
+async function leastReady(
+  api: NonNullable<ReturnType<typeof globals>['Translator']>,
+  pairs: TranslatorOptions[],
+): Promise<ModelAvailability> {
+  const states = await Promise.all(pairs.map((pair) => api.availability(pair)));
+  return READINESS.find((state) => states.includes(state)) ?? 'unavailable';
+}
 
 /** Whether this context can use a capability; `unavailable` also covers a Chrome without it. */
 export async function availability(cap: Capability): Promise<ModelAvailability> {
@@ -106,7 +119,7 @@ export async function availability(cap: Capability): Promise<ModelAvailability> 
       case 'summarizer':
         return g.Summarizer ? await g.Summarizer.availability(SUMMARY_DEFAULTS) : 'unavailable';
       case 'translator':
-        return g.Translator ? await g.Translator.availability(TRANSLATOR_PROBE) : 'unavailable';
+        return g.Translator ? await leastReady(g.Translator, TRANSLATOR_PAIRS) : 'unavailable';
       case 'detector':
         return g.LanguageDetector ? await g.LanguageDetector.availability() : 'unavailable';
     }

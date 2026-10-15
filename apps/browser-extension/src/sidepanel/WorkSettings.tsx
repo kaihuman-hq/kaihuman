@@ -130,10 +130,12 @@ function SuggestionSettings({ ui }: { ui: WorkUi }) {
         <button
           type="button"
           class={`${quiet} self-start`}
-          disabled={packsBusy}
+          disabled={packsBusy || packs === 'downloading'}
           onClick={downloadPacks}
         >
-          {packsBusy ? 'Downloading English ↔ German…' : 'Download English ↔ German'}
+          {packsBusy || packs === 'downloading'
+            ? 'Downloading English ↔ German…'
+            : 'Download English ↔ German'}
         </button>
       )}
       {error && <p class="text-nt-prod [overflow-wrap:anywhere]">{error}</p>}

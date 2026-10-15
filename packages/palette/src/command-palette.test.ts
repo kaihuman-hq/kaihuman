@@ -2067,11 +2067,30 @@ describe('ask', () => {
   it('Enter on the ask row runs its action', async () => {
     type('log 30m on payments');
     await vi.advanceTimersByTimeAsync(300);
+    // The web rows are listed too, so the ask row is reached by arrowing up to it.
+    press('ArrowUp');
     expect(selectedTitle()).toBe('Log: 30m on payments');
     press('Enter');
     await vi.advanceTimersByTimeAsync(0);
     expect(askRun).toHaveBeenCalledTimes(1);
     expect(statusText()).toBe('Logged');
+  });
+
+  it('a late ask row does not take Enter from the row that was selected', async () => {
+    loadBookmarks.mockResolvedValue([bookmark('log 30m on payments', 'https://pay.example/')]);
+    palette.toggle();
+    palette.toggle();
+    await vi.advanceTimersByTimeAsync(0);
+    type('log 30m on payments');
+    // The bookmark row is listed and selected before the answer lands.
+    expect(selectedTitle()).toBe('log 30m on payments');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(rowTitles()[0]).toBe('Log: 30m on payments');
+    expect(selectedTitle()).toBe('log 30m on payments');
+    press('Enter');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(askRun).not.toHaveBeenCalled();
+    expect(open).toHaveBeenCalledTimes(1);
   });
 
   it('shows no row when ask has nothing', async () => {

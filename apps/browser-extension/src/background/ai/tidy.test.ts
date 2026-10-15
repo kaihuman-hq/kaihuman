@@ -43,6 +43,15 @@ const stubModel = (answer: unknown) => {
 };
 
 describe('proposeGroups', () => {
+  it('holds the group name to 40 characters in the schema', async () => {
+    const prompts = stubModel({ groups: [{ name: 'A', tabIds: [1, 2] }] });
+    await proposeGroups([tab(1, 'a.example'), tab(2, 'b.example')]);
+    expect(prompts[0]?.schema.properties.groups.items.properties.name).toMatchObject({
+      type: 'string',
+      maxLength: 40,
+    });
+  });
+
   it('caps input at 40 tabs', async () => {
     const tabs = Array.from({ length: 60 }, (_, i) => tab(i + 1, 'big.example'));
     const prompts = stubModel({ groups: [{ name: 'All', tabIds: [1, 2, 3] }] });

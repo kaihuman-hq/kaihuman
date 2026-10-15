@@ -2,7 +2,7 @@ import { itemRefOf, type ReadItLaterItem } from '@kaihuman/formats';
 import { type Bookmark, hostOf } from '../bookmarks.js';
 import { frecency } from '../ranking.js';
 import { contextText, type WorkContext } from './context.js';
-import { promptJson } from './model.js';
+import { type Priority, promptJson } from './model.js';
 
 /** An ordering of item ids, with a short reason for some of them. */
 export interface Ranking {
@@ -27,12 +27,14 @@ const SYSTEM = [
 /**
  * The model's order for up to 20 candidates, or null when it is missing or its answer repeats or
  * invents an id (the schema forbids both, but a small model still does it). It may name only some
- * items; the caller appends the rest in rule order. Runs at background priority: it is precompute.
+ * items; the caller appends the rest in rule order. Background priority with no deadline unless
+ * the caller (a palette submit) says otherwise: precompute may wait, a person may not.
  */
 export async function rerank(
   task: string,
   items: { id: string; text: string }[],
   ctx: WorkContext,
+  opts: { priority?: Priority; timeoutMs?: number } = {},
 ): Promise<Ranking | null> {
   const candidates = items.slice(0, MAX_CANDIDATES);
   if (candidates.length === 0) return null;
@@ -83,7 +85,8 @@ export async function rerank(
       }
       return { ids, reasons };
     },
-    priority: 'background',
+    priority: opts.priority ?? 'background',
+    timeoutMs: opts.timeoutMs,
   });
   return answer ? { ...answer, computedAt: Date.now() } : null;
 }

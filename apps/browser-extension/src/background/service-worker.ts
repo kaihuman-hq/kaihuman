@@ -1119,11 +1119,24 @@ async function tidyTabs(windowId: number | undefined) {
   return { tabs, proposals, streams };
 }
 
-/** Closes tabs the user chose in the tidy view; the only place tidy closes anything. */
-async function closeTabs(ids: unknown) {
-  const tabIds = Array.isArray(ids) ? ids.filter((id): id is number => Number.isInteger(id)) : [];
-  if (tabIds.length) await chrome.tabs.remove(tabIds);
-  return { closed: tabIds.length };
+/**
+ * Closes tabs the user chose in the tidy view; the only place tidy closes anything. The ids come
+ * from a page, so only tabs that still exist, are unpinned and sit in the asking window go.
+ */
+async function closeTabs(ids: unknown, windowId: number | undefined) {
+  const asked = new Set(
+    Array.isArray(ids) ? ids.filter((id): id is number => Number.isInteger(id)) : [],
+  );
+  if (asked.size === 0) return { closed: 0 };
+  const open = await chrome.tabs.query(
+    windowId === undefined ? { currentWindow: true } : { windowId },
+  );
+  const tabIds = open.flatMap((tab) =>
+    tab.id !== undefined && asked.has(tab.id) && !tab.pinned ? [tab.id] : [],
+  );
+  // One at a time: a tab the user closed meanwhile must not fail the rest.
+  const results = await Promise.allSettled(tabIds.map((id) => chrome.tabs.remove(id)));
+  return { closed: results.filter((result) => result.status === 'fulfilled').length };
 }
 
 /** The window the popup belongs to, plus its pinned tabs in one round-trip. */
@@ -1739,18 +1752,27 @@ async function listIdeas() {
   return { ideas };
 }
 
+/** A braindump can be long; twenty of them would overflow the model's context. */
+const NOTE_TEXT_LIMIT = 500;
+/** `>n` waits for this answer with the palette open, so it gets a short deadline. */
+const RERANK_TIMEOUT_MS = 8_000;
+
 /** Braindumps and ideas from the start page's cache, for `>n`; nothing is fetched. */
 async function listNotes() {
+  const { repo } = await credentials();
   const cache = await readTodayCache();
-  if (!cache) throw new Error(NOT_LOGGED_IN);
+  // A cache of another repo would list notes the person is no longer working in.
+  if (!cache || !isTodayCacheUsable(cache, repo)) throw new Error(NOT_LOGGED_IN);
   const notes = cache.files.flatMap(({ path, content }) => {
     const url = consoleFileUrl(path, cache.repo);
     if (braindumpIdOf(path) !== null) {
-      return [{ id: path, title: braindumpTitle(content), text: content, path, url }];
+      const text = content.slice(0, NOTE_TEXT_LIMIT);
+      return [{ id: path, title: braindumpTitle(content), text, path, url }];
     }
     if (ideaSlugOf(path)) {
       const idea = parseIdea(content);
-      return [{ id: path, title: idea.title, text: `${idea.title}\n${idea.summary}`, path, url }];
+      const text = `${idea.title}\n${idea.summary}`.slice(0, NOTE_TEXT_LIMIT);
+      return [{ id: path, title: idea.title, text, path, url }];
     }
     return [];
   });
@@ -1776,8 +1798,10 @@ async function rerankNotes(query: string, items: { id: string; text: string }[] 
   };
   const ranking = await rerank(
     `Which of these notes best match what the user describes: "${query.slice(0, 200)}"?`,
-    candidates,
+    // Capped here too: the items come from a page, and `listNotes` caps only its own.
+    candidates.map((item) => ({ id: item.id, text: item.text.slice(0, NOTE_TEXT_LIMIT) })),
     work?.ctx ?? empty,
+    { priority: 'interactive', timeoutMs: RERANK_TIMEOUT_MS },
   ).catch(() => null);
   return { ids: ranking?.ids ?? null };
 }
@@ -2419,7 +2443,7 @@ chrome.runtime.onMessage.addListener(function onMessage(
   }
 
   if (message.type === 'TIDY_CLOSE_TABS') {
-    return answer(closeTabs(message.tabIds), sendResponse);
+    return answer(closeTabs(message.tabIds, sender.tab?.windowId), sendResponse);
   }
 
   if (message.type === 'PAGE_ASK') {

@@ -136,10 +136,36 @@ describe('TIDY_TABS', () => {
 });
 
 describe('closing and saving', () => {
-  it('TIDY_CLOSE_TABS removes exactly the given tabs', async () => {
-    const response = await call({ type: 'TIDY_CLOSE_TABS', tabIds: [3, 4, 'x'] });
-    expect(remove).toHaveBeenCalledWith([3, 4]);
+  it('TIDY_CLOSE_TABS removes exactly the given tabs that are open in the window', async () => {
+    query.mockResolvedValue([
+      tab(3, 'https://a.dev/3'),
+      tab(4, 'https://a.dev/4'),
+      tab(5, 'https://a.dev/5'),
+    ]);
+    const response = await call(
+      { type: 'TIDY_CLOSE_TABS', tabIds: [3, 4, 'x'] },
+      { tab: { windowId: 7 } },
+    );
+    expect(query).toHaveBeenCalledWith({ windowId: 7 });
+    expect(remove.mock.calls.map(([id]) => id).sort()).toEqual([3, 4]);
     expect(response.closed).toBe(2);
+  });
+
+  it('TIDY_CLOSE_TABS leaves pinned tabs, other windows and unknown ids alone', async () => {
+    query.mockResolvedValue([tab(3, 'https://a.dev/3', { pinned: true }), tab(4, 'https://a.dev')]);
+    const response = await call({ type: 'TIDY_CLOSE_TABS', tabIds: [3, 4, 99] });
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith(4);
+    expect(response.closed).toBe(1);
+  });
+
+  it('TIDY_CLOSE_TABS survives a tab that closed meanwhile', async () => {
+    query.mockResolvedValue([tab(3, 'https://a.dev/3'), tab(4, 'https://a.dev/4')]);
+    remove.mockImplementation(async (id: number) => {
+      if (id === 3) throw new Error('No tab with id: 3.');
+    });
+    const response = await call({ type: 'TIDY_CLOSE_TABS', tabIds: [3, 4] });
+    expect(response.closed).toBe(1);
   });
 
   it('TIDY_TABS closes nothing', async () => {
