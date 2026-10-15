@@ -23,6 +23,7 @@ import {
 import { type ServiceStatus, STATUS_CACHE_TTL_MS } from '../background/service-status';
 import { DEFAULT_ACTION_LOG_PATH, type TodaySummary } from '../background/today';
 import { CONSOLE_URL, consoleFileUrl } from '../console';
+import { notesMode } from '../palette/notes-mode';
 import { send, workerPort } from '../palette/port';
 import { openWorkPanelAction } from '../palette/work-panel';
 import { ServiceStatusStrip } from './ServiceStatus';
@@ -202,7 +203,11 @@ export function StartPage() {
         open: openInThisTab,
         actions: () => [openWorkPanelAction(send), ...repoActions(workerPort)],
         // The browser cannot run commands, so `>x` only copies them.
-        modes: [...paletteModes(workerPort), commandsMode(workerPort, { canRun: false })],
+        modes: [
+          ...paletteModes(workerPort),
+          commandsMode(workerPort, { canRun: false }),
+          notesMode(send),
+        ],
         copy: copyToClipboard,
       });
     }

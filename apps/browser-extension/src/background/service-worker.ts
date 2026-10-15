@@ -4,11 +4,13 @@ import {
   addReadLaterEntry,
   addTodoEntry,
   braindumpIdOf,
+  braindumpTitle,
   checkIn,
   ideaSlugOf,
   localDate,
   markReadItLaterRead,
   PALETTE_SETTINGS_PATH,
+  parseIdea,
   parseTimeTracking,
   serializeTimeTracking,
   toggleStartStop,
@@ -32,7 +34,7 @@ import {
   precomputeInBackground,
   registerPrecompute,
 } from './ai/precompute.js';
-import { likelyNext, type Ranking, readLaterForToday } from './ai/rank.js';
+import { likelyNext, type Ranking, readLaterForToday, rerank } from './ai/rank.js';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import {
   connectWorkPanel,
@@ -1523,6 +1525,49 @@ async function listIdeas() {
   return { ideas };
 }
 
+/** Braindumps and ideas from the start page's cache, for `>n`; nothing is fetched. */
+async function listNotes() {
+  const cache = await readTodayCache();
+  if (!cache) throw new Error(NOT_LOGGED_IN);
+  const notes = cache.files.flatMap(({ path, content }) => {
+    const url = consoleFileUrl(path, cache.repo);
+    if (braindumpIdOf(path) !== null) {
+      return [{ id: path, title: braindumpTitle(content), text: content, path, url }];
+    }
+    if (ideaSlugOf(path)) {
+      const idea = parseIdea(content);
+      return [{ id: path, title: idea.title, text: `${idea.title}\n${idea.summary}`, path, url }];
+    }
+    return [];
+  });
+  return { notes };
+}
+
+/** The model's order for `>n`; `ids` is null when it is switched off or unavailable. */
+async function rerankNotes(query: string, items: { id: string; text: string }[] | undefined) {
+  const candidates = Array.isArray(items)
+    ? items.filter((item) => typeof item?.id === 'string' && typeof item.text === 'string')
+    : [];
+  if (!(await readAiSettings()).palette || candidates.length === 0) return { ids: null };
+  // Without a cache there is no work context, but the question still has an answer.
+  const work = await rankingContext();
+  const empty = {
+    streams: [],
+    todos: [],
+    todoTags: [],
+    eventsToday: [],
+    waiting: [],
+    redCi: [],
+    openIdeas: [],
+  };
+  const ranking = await rerank(
+    `Which of these notes best match what the user describes: "${query.slice(0, 200)}"?`,
+    candidates,
+    work?.ctx ?? empty,
+  ).catch(() => null);
+  return { ids: ranking?.ids ?? null };
+}
+
 /**
  * Writes an idea: without `sha` only as a new file (GitHub refuses one that exists), with it only
  * over that version. The start page's cache takes the new text, so the next list has its sha.
@@ -1849,6 +1894,12 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   }
 
   if (message.type === 'LIST_IDEAS') return answer(listIdeas(), sendResponse);
+
+  if (message.type === 'LIST_NOTES') return answer(listNotes(), sendResponse);
+
+  if (message.type === 'RERANK') {
+    return answer(rerankNotes(message.query || '', message.items), sendResponse);
+  }
 
   if (message.type === 'SAVE_IDEA') {
     return answer(
