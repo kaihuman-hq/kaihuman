@@ -24,12 +24,15 @@ import { draftBookmark, findDuplicates } from './ai/bookmark-draft.js';
 import { precomputeBrief, precomputeFocus, readAiCards } from './ai/brief.js';
 import { captureContext, classifyCapture } from './ai/capture.js';
 import { digestToday } from './ai/digest.js';
+import { peek, put } from './ai/cache.js';
+import { buildWorkContext } from './ai/context.js';
 import {
   AI_ALARM,
   ensureAiAlarm,
   precomputeInBackground,
   registerPrecompute,
 } from './ai/precompute.js';
+import { likelyNext, type Ranking, readLaterForToday } from './ai/rank.js';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import {
   connectWorkPanel,
@@ -165,6 +168,8 @@ chrome.alarms.create('repoSync', { periodInMinutes: 60 });
 ensureWorkAlarm().catch((e) => console.warn('kaihuman: creating the work alarm failed', e));
 // On-device AI fills its cache hourly, and after each start page sync and work cycle.
 ensureAiAlarm().catch((e) => console.warn('kaihuman: creating the AI alarm failed', e));
+registerPrecompute({ id: 'rank:likely', group: 'newTab', run: precomputeLikelyNext });
+registerPrecompute({ id: 'rank:readLater', group: 'newTab', run: precomputeReadLater });
 watchWorkTokens();
 watchPinMenu();
 
@@ -1237,6 +1242,48 @@ async function syncToday(): Promise<TodayCache | undefined> {
   return next;
 }
 
+const LIKELY_KEY = 'rank:likely';
+const READ_LATER_KEY = 'rank:readLater';
+const RANKING_TTL_MS = 60 * 60 * 1000;
+
+/** The summary with the cached read-later order. The model is never called from here (D2). */
+async function todayWithRanking(cache: TodayCache) {
+  return buildToday(cache, new Date(), await peek<Ranking>(READ_LATER_KEY));
+}
+
+/** What the ranking jobs tell the model about the user's work; undefined until there is a cache. */
+async function rankingContext() {
+  const cache = await readTodayCache();
+  if (!cache) return undefined;
+  const streams = await loadStreams().catch(() => undefined);
+  const snapshot = (await chrome.storage.local.get(WORK_KEYS.snapshot))[WORK_KEYS.snapshot];
+  return {
+    cache,
+    ctx: buildWorkContext({
+      today: buildToday(cache, new Date()),
+      todayCache: cache,
+      streams: streams?.state.ok ? streams.state.file : null,
+      snapshot: snapshot as WorkSnapshot | undefined,
+    }),
+  };
+}
+
+async function precomputeLikelyNext() {
+  const work = await rankingContext();
+  if (!work) return;
+  const { bookmarks } = await getBookmarks();
+  await put(LIKELY_KEY, await likelyNext(bookmarks, work.ctx, new Date()), RANKING_TTL_MS);
+}
+
+async function precomputeReadLater() {
+  const work = await rankingContext();
+  if (!work) return;
+  const items = work.cache.files
+    .filter((file) => file.path.toLowerCase().endsWith('.readitlater.json'))
+    .flatMap((file) => unreadItems(file.content));
+  await put(READ_LATER_KEY, await readLaterForToday(items, work.ctx), RANKING_TTL_MS);
+}
+
 /** Cache first, like the bookmarks: a new tab never waits on GitHub unless there is no cache. */
 async function getToday() {
   const { repo } = await credentials();
@@ -1249,7 +1296,10 @@ async function getToday() {
     cache = await syncToday();
     if (!cache) throw new Error(NOT_LOGGED_IN);
   }
-  return { today: buildToday(cache, new Date()) };
+  return {
+    today: await todayWithRanking(cache),
+    ranking: { likely: await peek<Ranking>(LIKELY_KEY) },
+  };
 }
 
 /**
@@ -1268,7 +1318,7 @@ async function refreshToday() {
   }
   const next = await syncToday();
   if (!next) throw new Error(NOT_LOGGED_IN);
-  return { today: buildToday(next, new Date()) };
+  return { today: await todayWithRanking(next) };
 }
 
 /**
@@ -1315,13 +1365,13 @@ async function deleteBraindump(path: string, sha: string) {
     next = withFile(cache, { path, sha: file.sha, content: file.content });
     await chrome.storage.local.set({ todayCache: next });
     return {
-      today: buildToday(next, new Date()),
+      today: await todayWithRanking(next),
       refused: 'It changed since — this is the new text. Delete again to remove it.',
     };
   }
   if (file) await githubDeleteFile(token, repo, path, sha, `braindump: delete ${path}`);
   await chrome.storage.local.set({ todayCache: next });
-  return { today: buildToday(next, new Date()) };
+  return { today: await todayWithRanking(next) };
 }
 
 /**
@@ -1359,7 +1409,7 @@ async function commitTodayFile(
 
   const next = withFile(cache, { path: target, sha: sha ?? '', content });
   await chrome.storage.local.set({ todayCache: next });
-  return { today: buildToday(next, new Date()) };
+  return { today: await todayWithRanking(next) };
 }
 
 /**

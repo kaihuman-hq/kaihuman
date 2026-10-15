@@ -25,6 +25,7 @@ import {
   type ReadItLaterItem,
   type TodoItem,
 } from '@kaihuman/formats';
+import { applyRanking, archiveCandidates, type Ranking } from './ai/rank.js';
 import { CACHE_TTL_MS } from './bookmarks';
 import { STATUS_CONFIG_PATH } from './service-status';
 
@@ -313,7 +314,11 @@ export interface TodaySummary {
     ReadItLaterItem,
     'id' | 'url' | 'name' | 'createdAt' | 'summary' | 'readMinutes'
   > & { path: string })[];
-  /** Every unread item, where `readLater` is cut to the oldest few. */
+  /** Why the model put an item on the list, by item id; empty until a ranking is cached. */
+  readLaterReasons: Record<string, string>;
+  /** Ids of unread items left so long that archiving them is worth asking about. */
+  archive: string[];
+  /** Every unread item, where `readLater` is cut to a few. */
   unreadCount: number;
   habits: {
     path: string;
@@ -377,13 +382,16 @@ export const actionLogPath = (cache: TodayCache) =>
   cache.actionLogPaths[0] ??
   DEFAULT_ACTION_LOG_PATH;
 
-export function buildToday(cache: TodayCache, now: Date): TodaySummary {
+export function buildToday(cache: TodayCache, now: Date, readLaterRanking?: Ranking): TodaySummary {
+  const unread: ReadItLaterItem[] = [];
   const summary: TodaySummary = {
     events: [],
     inProgress: [],
     overdue: [],
     inbox: { path: inboxPath(cache), count: 0 },
     readLater: [],
+    readLaterReasons: {},
+    archive: [],
     unreadCount: 0,
     habits: [],
     timers: [],
@@ -484,6 +492,7 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
       summary.clocks.push(...worldClocks(content));
     } else if (lower.endsWith('.readitlater.json')) {
       for (const item of unreadItems(content)) {
+        unread.push(item);
         const { id, url, name, createdAt } = item;
         summary.readLater.push({
           id,
@@ -510,10 +519,15 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
   summary.habits.sort((a, b) => Number(b.atRisk) - Number(a.atRisk));
   summary.resurface.sort((a, b) => a.lastActivity.localeCompare(b.lastActivity));
   summary.resurface = summary.resurface.slice(0, RESURFACE_LIMIT);
-  // The oldest first: they are the ones the list is for.
+  // The oldest first is the rule; a cached ranking (never computed here) may reorder it.
   summary.unreadCount = summary.readLater.length;
   summary.readLater.sort((a, b) => a.createdAt - b.createdAt);
-  summary.readLater = summary.readLater.slice(0, READ_LATER_LIMIT);
+  summary.readLater = applyRanking(summary.readLater, readLaterRanking).slice(0, READ_LATER_LIMIT);
+  for (const { id } of summary.readLater) {
+    const reason = readLaterRanking?.reasons[id];
+    if (reason) summary.readLaterReasons[id] = reason;
+  }
+  summary.archive = archiveCandidates(unread, now);
   summary.braindumpCount = summary.braindumps.length;
   summary.braindumps.sort((a, b) => b.createdAt - a.createdAt);
   summary.braindumps = summary.braindumps.slice(0, BRAINDUMP_LIMIT);
