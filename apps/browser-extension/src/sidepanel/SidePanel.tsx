@@ -11,6 +11,7 @@ import { InboxSection, MineSection } from './InboxSection.js';
 import { RelatedPicker } from './RelatedPicker.js';
 import { StreamSection } from './StreamSection.js';
 import { ThisTabBar } from './ThisTabBar.js';
+import { useInboxLabels } from './useInboxLabels.js';
 import { useAutoFileInbox } from './useSuggestion.js';
 import { updateWorkUi, useWorkState } from './useWorkState.js';
 import { WorkSettings } from './WorkSettings.js';
@@ -165,6 +166,8 @@ export function SidePanel() {
   const { snapshot, streams, file, dismissed, saveError, queueLength, workTokenSet, ui, loaded } =
     state;
   const [settings, setSettings] = useState(false);
+  const { labels, assigned, muted } = useInboxLabels();
+  const [labelFilter, setLabelFilter] = useState<string>();
 
   useEffect(() => {
     // Opening the port tells the worker the panel is visible so it polls faster. A restarted
@@ -184,7 +187,7 @@ export function SidePanel() {
     };
   }, []);
 
-  const inbox = snapshot ? buildInbox(snapshot, file, dismissed) : undefined;
+  const inbox = snapshot ? buildInbox(snapshot, file, dismissed, new Date(), muted) : undefined;
   const readOnly = streams ? !streams.state.ok : false;
   useAutoFileInbox(inbox?.waiting, file, ui.autoFileInbox === true && !readOnly);
 
@@ -194,6 +197,11 @@ export function SidePanel() {
   // A missing streams cache only hides the streams; the worker polls with a work token alone.
   const signedOut = snapshot ? snapshot.problem?.kind === 'signed-out' : !streams;
   const unread = snapshot ? unreadKeys(snapshot) : new Set<string>();
+  // A filter whose label was since removed would hide everything with no chip to clear it.
+  const chipLabels = labels.filter((l) => !l.mute);
+  const filter = chipLabels.some((l) => l.name === labelFilter) ? labelFilter : undefined;
+  const byLabel = (rows: InboxRow[]) =>
+    filter ? rows.filter((row) => assigned[row.key] === filter) : rows;
 
   return (
     <main class={`${shell} flex flex-col`}>
@@ -275,15 +283,38 @@ export function SidePanel() {
             <ThisTabBar file={file} ui={ui} readOnly={readOnly} />
             {inbox && (
               <div class="flex flex-col gap-4">
+                {chipLabels.length > 0 && (
+                  <fieldset class="m-0 flex min-w-0 flex-wrap items-center gap-1 border-0 p-0">
+                    <legend class="sr-only">Filter inbox by label</legend>
+                    <Choice
+                      selected={filter === undefined}
+                      onClick={() => setLabelFilter(undefined)}
+                    >
+                      All
+                    </Choice>
+                    {chipLabels.map(({ name }) => (
+                      <Choice
+                        key={name}
+                        title={name}
+                        selected={filter === name}
+                        onClick={() => setLabelFilter(filter === name ? undefined : name)}
+                      >
+                        {name}
+                      </Choice>
+                    ))}
+                  </fieldset>
+                )}
                 <InboxSection
                   title="Waiting on you"
-                  rows={inbox.waiting}
+                  rows={byLabel(inbox.waiting)}
+                  labels={assigned}
                   file={file}
                   readOnly={readOnly}
                 />
                 <InboxSection
                   title="New activity"
-                  rows={inbox.activity}
+                  rows={byLabel(inbox.activity)}
+                  labels={assigned}
                   file={file}
                   readOnly={readOnly}
                 />

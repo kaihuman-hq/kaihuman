@@ -239,6 +239,17 @@ describe('workSummary', () => {
   });
 });
 
+describe('muted keys', () => {
+  it('a muted label removes rows from waiting and activity and the summary', () => {
+    const snap = snapshot({ assigned: [status(1), status(2)] }, [thread(3)]);
+    const muted = new Set([key(1), key(3)]);
+    const inbox = buildInbox(snap, null, {}, new Date(), muted);
+    expect(inbox.waiting.map((r) => r.key)).toEqual([key(2)]);
+    expect(inbox.activity).toEqual([]);
+    expect(workSummary(snap, null, {}, muted)).toMatchObject({ waiting: 1, activity: 0 });
+  });
+});
+
 describe('autoDoneOps', () => {
   it('marks merged and closed pinned items done, once', () => {
     const file = fileWith([

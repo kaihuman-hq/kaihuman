@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'preact/hooks';
-import { type AiSettings, readAiSettings, writeAiSettings } from '../background/ai/settings.js';
+import {
+  type AiSettings,
+  type InboxLabel,
+  readAiSettings,
+  writeAiSettings,
+} from '../background/ai/settings.js';
 import {
   downloadModel,
   type ModelAvailability,
@@ -148,7 +153,75 @@ function AiGroupSettings() {
           }}
         />
       ))}
+      <LabelSettings initial={settings.inboxLabels} />
     </>
+  );
+}
+
+const MAX_LABELS = 6;
+
+/**
+ * The user's own inbox labels. Drafts stay here while typed; only those with a name are saved, so
+ * the worker never labels with an empty name.
+ */
+function LabelSettings({ initial }: { initial: InboxLabel[] }) {
+  const [drafts, setDrafts] = useState<InboxLabel[]>(initial);
+  const change = (next: InboxLabel[]) => {
+    setDrafts(next);
+    const named = next.map((l) => ({ ...l, name: l.name.trim() })).filter((l) => l.name !== '');
+    void writeAiSettings({ inboxLabels: named });
+  };
+  const edit = (index: number, patch: Partial<InboxLabel>) =>
+    change(drafts.map((label, i) => (i === index ? { ...label, ...patch } : label)));
+  return (
+    <div class="flex flex-col gap-2">
+      <h3 class="text-[12px] font-bold">Inbox labels</h3>
+      <p class="text-nt-faint">
+        Name a label and say what belongs in it. The model sorts the inbox into your labels.
+      </p>
+      {drafts.map((label, index) => (
+        <div key={index} class="flex flex-col gap-1">
+          <div class="flex gap-1.5">
+            <input
+              class={`${field} w-28`}
+              aria-label={`Label ${index + 1} name`}
+              placeholder="Name"
+              value={label.name}
+              onInput={(event) => edit(index, { name: event.currentTarget.value })}
+            />
+            <input
+              class={`${field} min-w-0 flex-1`}
+              aria-label={`Label ${index + 1} hint`}
+              placeholder="What goes in it"
+              value={label.hint}
+              onInput={(event) => edit(index, { hint: event.currentTarget.value })}
+            />
+            <button
+              type="button"
+              class={quiet}
+              aria-label={`Remove label ${index + 1}`}
+              onClick={() => change(drafts.filter((_, i) => i !== index))}
+            >
+              ✕
+            </button>
+          </div>
+          <Toggle
+            checked={label.mute}
+            label="Mute: hide from the inbox and the badge count"
+            onChange={(on) => edit(index, { mute: on })}
+          />
+        </div>
+      ))}
+      {drafts.length < MAX_LABELS && (
+        <button
+          type="button"
+          class={`${quiet} self-start`}
+          onClick={() => setDrafts([...drafts, { name: '', hint: '', mute: false }])}
+        >
+          Add a label
+        </button>
+      )}
+    </div>
   );
 }
 

@@ -21,6 +21,8 @@ const reasonOf = (reason: string) =>
 interface Props {
   file: StreamsFile | null;
   readOnly: boolean;
+  /** row key → the user's label for it. */
+  labels?: Record<string, string>;
 }
 
 function PinMenu({ row, file, onDone }: { row: InboxRow; file: StreamsFile; onDone: () => void }) {
@@ -80,6 +82,7 @@ function Row({
   onDismiss,
   file,
   readOnly,
+  labels,
 }: {
   row: InboxRow;
   unread: boolean;
@@ -133,6 +136,11 @@ function Row({
                 {label}
               </span>
             ))}
+            {labels?.[row.key] && (
+              <span class={chipClass('plain')} data-label>
+                {labels[row.key]}
+              </span>
+            )}
             <StatusChips status={row.status} unread={unread} />
           </div>
           <button
@@ -202,6 +210,7 @@ function Section({
   unread,
   file,
   readOnly,
+  labels,
 }: { title: string; rows: InboxRow[]; dismissible: boolean; unread?: Set<string> } & Props) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [failed, setFailed] = useState<Set<string>>(new Set());
@@ -239,6 +248,7 @@ function Section({
               row={row}
               file={file}
               readOnly={readOnly}
+              labels={labels}
               dismissible={dismissible}
               failed={failed.has(slot(row))}
               unread={unread?.has(row.key) ?? row.threadId !== undefined}
