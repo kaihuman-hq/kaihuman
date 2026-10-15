@@ -7,6 +7,7 @@ import {
   braindumpTitle,
   checkIn,
   ideaSlugOf,
+  isSafeUrl,
   localDate,
   markReadItLaterRead,
   PALETTE_SETTINGS_PATH,
@@ -51,6 +52,7 @@ import {
 import { likelyNext, type Ranking, readLaterForToday, rerank } from './ai/rank.js';
 import { bulletsOf, draftReview, type ReviewRange, reviewSources } from './ai/review.js';
 import { readAiSettings } from './ai/settings.js';
+import { MAX_TABS, proposeGroups } from './ai/tidy.js';
 import { translateOnDevice } from './ai/translate.js';
 import {
   addBookmark,
@@ -1086,6 +1088,35 @@ async function githubRepos() {
   return { repos: await listGithubRepos(token) };
 }
 
+/**
+ * The open tabs of a window (the sender's, else the current one) as the tidy view groups them.
+ * Pinned tabs are already arranged, so they are left out, as are pages that cannot be pinned.
+ */
+async function tidyTabs(windowId: number | undefined) {
+  const open = await chrome.tabs.query(
+    windowId === undefined ? { currentWindow: true } : { windowId },
+  );
+  const tabs = open
+    .filter((tab) => tab.id !== undefined && !tab.pinned && !!tab.url && isSafeUrl(tab.url))
+    .slice(0, MAX_TABS)
+    .map((tab) => ({
+      id: tab.id as number,
+      title: tab.title || (tab.url as string),
+      url: tab.url as string,
+    }));
+  const proposals = await proposeGroups(tabs);
+  const parsed = (await loadStreams().catch(() => undefined))?.state;
+  const streams = parsed?.ok ? parsed.file.streams.map(({ id, name }) => ({ id, name })) : [];
+  return { tabs, proposals, streams };
+}
+
+/** Closes tabs the user chose in the tidy view; the only place tidy closes anything. */
+async function closeTabs(ids: unknown) {
+  const tabIds = Array.isArray(ids) ? ids.filter((id): id is number => Number.isInteger(id)) : [];
+  if (tabIds.length) await chrome.tabs.remove(tabIds);
+  return { closed: tabIds.length };
+}
+
 /** The window the popup belongs to, plus its pinned tabs in one round-trip. */
 async function currentWindow() {
   const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -1154,10 +1185,12 @@ async function savePinnedTabGroup(
   repo: string,
   groupId: string | undefined,
   name: string | undefined,
+  given?: { url?: string; title?: string }[],
 ) {
   const { config, sha } = await readConfig(token, repo, true);
   const { windowId, pinned } = await currentWindow();
-  const tabs = toPinnedTabs(pinned);
+  // Tidy hands over the tabs of a proposal; they are not what the window has pinned.
+  const tabs = toPinnedTabs(given ?? pinned);
   const now = new Date().toISOString();
 
   let group: PinnedTabGroup;
@@ -1168,7 +1201,7 @@ async function savePinnedTabGroup(
   }
 
   await writeConfig(token, repo, putGroup(config, group, now), sha);
-  if (windowId !== undefined) await rememberActiveGroup(windowId, group.id);
+  if (windowId !== undefined && !given) await rememberActiveGroup(windowId, group.id);
   return { count: tabs.length, name: group.name };
 }
 
@@ -2104,7 +2137,20 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
         } else if (message.type === 'SAVE_PINNED_TAB_GROUP') {
           sendResponse({
             success: true,
-            ...(await savePinnedTabGroup(token, repo, message.groupId, message.name)),
+            ...(await savePinnedTabGroup(
+              token,
+              repo,
+              message.groupId,
+              message.name,
+              Array.isArray(message.tabs)
+                ? message.tabs.filter(
+                    (tab: unknown): tab is { url: string; title: string } =>
+                      typeof tab === 'object' &&
+                      tab !== null &&
+                      typeof (tab as { url?: unknown }).url === 'string',
+                  )
+                : undefined,
+            )),
           });
         } else if (message.type === 'RENAME_PINNED_TAB_GROUP') {
           sendResponse({
@@ -2269,6 +2315,14 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'PAGE_SUMMARIZE') {
     return answer(summarizePage(String(message.text || '')), sendResponse);
+  }
+
+  if (message.type === 'TIDY_TABS') {
+    return answer(tidyTabs(sender.tab?.windowId), sendResponse);
+  }
+
+  if (message.type === 'TIDY_CLOSE_TABS') {
+    return answer(closeTabs(message.tabIds), sendResponse);
   }
 
   if (message.type === 'PAGE_ASK') {

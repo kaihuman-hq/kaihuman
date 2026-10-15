@@ -14,6 +14,7 @@ import { send, workerPort } from '../palette/port';
 import { openWorkPanelAction } from '../palette/work-panel';
 import { extractArticle } from './extract';
 import { askPageAction, summarizePageAction } from './page-ai';
+import { tidyTabsAction } from './tidy-tabs';
 
 // Built on first use so pages that never open the palette pay nothing for it.
 let palette: CommandPalette | null = null;
@@ -118,6 +119,7 @@ const paletteActions = (): PaletteAction[] => [
   },
   summarizePageAction(pageAi),
   askPageAction(pageAi),
+  tidyTabsAction({ send }),
   openWorkPanelAction(send),
   ...repoActions(workerPort),
 ];
