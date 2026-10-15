@@ -63,6 +63,8 @@ export interface Message {
     | 'CAPTURE_CLASSIFY'
     | 'PAGE_SUMMARIZE'
     | 'PAGE_ASK'
+    | 'TIDY_TABS'
+    | 'TIDY_CLOSE_TABS'
     | 'WORK_OPS'
     | 'WORK_REFRESH'
     | 'WORK_DISMISS'
@@ -122,6 +124,10 @@ export interface Message {
   filter?: string;
   /** `PAGE_ASK`: what to ask about the page text. */
   question?: string;
+  /** `SAVE_PINNED_TAB_GROUP`: the tabs to save, in place of the window's pinned ones. */
+  tabs?: { url: string; title: string }[];
+  /** `TIDY_CLOSE_TABS`: the tabs to close. */
+  tabIds?: number[];
   /** `ADD_TODO`: the milestone the todo belongs to. */
   milestoneId?: string;
   /** `ADD_EVENT`: the event's name, type, and first and last day (YYYY-MM-DD). */

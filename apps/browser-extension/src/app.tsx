@@ -6,6 +6,7 @@ import { BookmarkPageForm } from './components/BookmarkPageForm';
 import { QuickActions } from './components/QuickActions';
 import { PinnedTabsPanel } from './components/PinnedTabsPanel';
 import { OpenWorkPanel } from './components/OpenWorkPanel';
+import { TidyTabs } from './components/TidyTabs';
 import { imagesEnabled, KB_IMAGES_SETTING } from './background/kb-capture';
 import './index.css';
 
@@ -20,7 +21,7 @@ export function App() {
   const [quickNotes, setQuickNotes] = useState<string[]>([]);
   const [selectedNote, setSelectedNote] = useState<string>('.lifeos/dump.md');
   // The star opens a view of its own rather than growing the popup with another form.
-  const [view, setView] = useState<'main' | 'bookmark'>('main');
+  const [view, setView] = useState<'main' | 'bookmark' | 'tidy'>('main');
   const [downloadImages, setDownloadImages] = useState(true);
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'failed'>('idle');
 
@@ -272,6 +273,14 @@ export function App() {
     );
   }
 
+  if (view === 'tidy') {
+    return (
+      <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
+        <TidyTabs onClose={() => setView('main')} />
+      </div>
+    );
+  }
+
   return (
     <div class="life-os-root w-[350px] min-h-[480px] bg-[var(--los-bg)] text-[var(--los-fg)] p-4 font-mono flex flex-col">
       <header class="flex items-center justify-between mb-4 pb-2 border-b border-[var(--los-border)]">
@@ -348,6 +357,14 @@ export function App() {
         )}
 
         <OpenWorkPanel />
+
+        <button
+          type="button"
+          onClick={() => setView('tidy')}
+          class="w-full py-2 px-3 border border-[var(--los-border)] text-xs rounded hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
+        >
+          Tidy open tabs
+        </button>
 
         <PinnedTabsPanel repo={activeRepo ?? ''} />
 
