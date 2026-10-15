@@ -29,6 +29,8 @@ interface Props {
   streams: Stream[];
   /** Used to open an item at its unread notification thread. */
   threads?: WorkSnapshot['threads'];
+  /** Opens the picker of related tabs and inbox items for this stream. */
+  onFindRelated?: () => void;
 }
 
 const iconOf = (ref: ReturnType<typeof itemRefOf>) => {
@@ -365,6 +367,19 @@ export function StreamSection(props: Props) {
           <button type="button" class={quiet} disabled={readOnly} onClick={startRename}>
             Rename
           </button>
+          {props.onFindRelated && (
+            <button
+              type="button"
+              class={quiet}
+              disabled={readOnly}
+              onClick={() => {
+                setMenu('closed');
+                props.onFindRelated?.();
+              }}
+            >
+              Find related
+            </button>
+          )}
           <button
             type="button"
             class={quiet}

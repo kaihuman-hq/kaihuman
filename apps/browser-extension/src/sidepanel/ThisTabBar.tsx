@@ -254,6 +254,9 @@ function TabCard({ tab, file, ui, readOnly }: CardProps & { tab: TabInfo }) {
               Suggested
             </span>
           )}
+          {showsSuggestion && suggestion.reason && (
+            <span class="min-w-0 truncate text-nt-faint">{suggestion.reason}</span>
+          )}
         </p>
         <div class="flex flex-wrap gap-1">
           {streams.map((stream) => (
