@@ -19,36 +19,16 @@ import {
   withModeRecent,
   withTranslationText,
 } from '@kaihuman/palette';
-import { type Message } from '../types';
+import { consoleFileUrl, isConsolePage } from '../console';
+// The bundled loader's path, for injecting the page script on demand (CRXJS `?script` import).
+import PAGE_SCRIPT from '../content/index.ts?script';
+import type { Message } from '../types';
 import { draftBookmark, findDuplicates, findExactDuplicates } from './ai/bookmark-draft.js';
 import { precomputeBrief, precomputeFocus, readAiCards } from './ai/brief.js';
-import { captureContext, classifyCapture } from './ai/capture.js';
-import { digestToday } from './ai/digest.js';
 import { peek, put } from './ai/cache.js';
+import { captureContext, classifyCapture } from './ai/capture.js';
 import { buildWorkContext } from './ai/context.js';
-import {
-  AI_ALARM,
-  ensureAiAlarm,
-  precomputeInBackground,
-  registerPrecompute,
-} from './ai/precompute.js';
-import { likelyNext, type Ranking, readLaterForToday } from './ai/rank.js';
-import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
-import {
-  connectWorkPanel,
-  ensureWorkAlarm,
-  isPanelOpen,
-  runWorkCycle,
-  watchWorkTokens,
-} from './work/poller';
-import {
-  handlePinMenuClick,
-  handleWorkMessage,
-  pinCurrentTab,
-  pinMenuFile,
-  rebuildPinMenu,
-  watchPinMenu,
-} from './work/messages';
+import { digestToday } from './ai/digest.js';
 import {
   enrichCapture,
   enrichReadLater,
@@ -57,38 +37,15 @@ import {
   withAltText,
   within,
 } from './ai/enrich.js';
+import {
+  AI_ALARM,
+  ensureAiAlarm,
+  precomputeInBackground,
+  registerPrecompute,
+} from './ai/precompute.js';
+import { likelyNext, type Ranking, readLaterForToday } from './ai/rank.js';
 import { readAiSettings } from './ai/settings.js';
-import { openWorkPanel } from './work/side-panel';
-import { loadStreams } from './work/streams-store';
-import { type StreamsCache, WORK_KEYS, type WorkSnapshot } from './work/types';
-import { consoleFileUrl, isConsolePage } from '../console';
-// The bundled loader's path, for injecting the page script on demand (CRXJS `?script` import).
-import PAGE_SCRIPT from '../content/index.ts?script';
-import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
-import {
-  encodePath,
-  fetchEntryFilePaths,
-  fetchPromptFiles,
-  isEntryFilePath,
-  isGithubWorkFilter,
-  isPromptsCacheStale,
-  listGithubRepos,
-  type PromptsCache,
-  searchGithubWork,
-  translateWithDeepl,
-} from './palette-modes';
-import {
-  buildRawNote,
-  imagesEnabled,
-  KB_ASSET_DIR,
-  KB_IMAGES_SETTING,
-  KB_RAW_DIR,
-  localizeImages,
-  selectionText,
-  slugify,
-  urlToSlug,
-  type CaptureType,
-} from './kb-capture';
+import { translateOnDevice } from './ai/translate.js';
 import {
   addBookmark,
   applyUsage,
@@ -107,6 +64,31 @@ import {
   setBookmarkPinned,
   settleUsage,
 } from './bookmarks';
+import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
+import {
+  buildRawNote,
+  type CaptureType,
+  imagesEnabled,
+  KB_ASSET_DIR,
+  KB_IMAGES_SETTING,
+  KB_RAW_DIR,
+  localizeImages,
+  selectionText,
+  slugify,
+  urlToSlug,
+} from './kb-capture';
+import {
+  encodePath,
+  fetchEntryFilePaths,
+  fetchPromptFiles,
+  isEntryFilePath,
+  isGithubWorkFilter,
+  isPromptsCacheStale,
+  listGithubRepos,
+  type PromptsCache,
+  searchGithubWork,
+  translateWithDeepl,
+} from './palette-modes';
 import {
   findGroup,
   isOpenableUrl,
@@ -122,19 +104,20 @@ import {
   parsePinnedTabs,
   putGroup,
   removeGroup,
-  setGroupFavorite,
   serializePinnedTabs,
+  setGroupFavorite,
   tabsToOpen,
   tabsToUnpin,
   toPinnedTabs,
 } from './pinned-tabs';
+import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import {
   checkServices,
   DEFAULT_SERVICES,
   isStatusCacheFresh,
   parseStatusConfig,
-  STATUS_CONFIG_PATH,
   type ServiceStatusCache,
+  STATUS_CONFIG_PATH,
 } from './service-status';
 import {
   buildToday,
@@ -150,7 +133,24 @@ import {
   withFile,
   withoutFile,
 } from './today';
-
+import {
+  handlePinMenuClick,
+  handleWorkMessage,
+  pinCurrentTab,
+  pinMenuFile,
+  rebuildPinMenu,
+  watchPinMenu,
+} from './work/messages';
+import {
+  connectWorkPanel,
+  ensureWorkAlarm,
+  isPanelOpen,
+  runWorkCycle,
+  watchWorkTokens,
+} from './work/poller';
+import { openWorkPanel } from './work/side-panel';
+import { loadStreams } from './work/streams-store';
+import { type StreamsCache, WORK_KEYS, type WorkSnapshot } from './work/types';
 
 // Keep the service worker alive to prevent the HMR port (crx-client-port.js)
 // from disconnecting. Chrome suspends MV3 service workers after ~30s of
@@ -216,7 +216,6 @@ chrome.runtime.onConnect.addListener((port) => {
     connectWorkPanel(port).catch((e) => console.warn('kaihuman: work panel refresh failed', e));
   }
 });
-
 
 /** Whether the tab is showing a page of this extension's own — the start page, in practice. */
 async function isExtensionPage(tabId: number): Promise<boolean> {
@@ -316,9 +315,7 @@ async function syncIfStale(force = false) {
   const synced = await syncBookmarks();
   if (force) {
     // Best effort: a hand-broken pinnedtabs file should not take "Sync now" down with it.
-    await syncPinnedTabs().catch((e) =>
-      console.warn('kaihuman: pinned tab sync failed', e),
-    );
+    await syncPinnedTabs().catch((e) => console.warn('kaihuman: pinned tab sync failed', e));
     await syncToday().catch((e) => console.warn('kaihuman: start page sync failed', e));
   }
   return { synced: true, bookmarks: synced?.bookmarks.length ?? 0 };
@@ -393,7 +390,9 @@ chrome.commands.onCommand.addListener(async (command) => {
 // The shortcut counts as the user's action, which `sidePanel.open` needs, so the panel opens here.
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command !== 'open-work-panel') return;
-  openWorkPanel(tab?.windowId).catch((e) => console.warn('kaihuman: opening the work panel failed', e));
+  openWorkPanel(tab?.windowId).catch((e) =>
+    console.warn('kaihuman: opening the work panel failed', e),
+  );
 });
 
 chrome.commands.onCommand.addListener((command) => {
@@ -438,7 +437,13 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 // Add comprehensive GitHub API helper
-async function githubUpsertFile(token: string, repoUrl: string, filePath: string, newContentLines: string, position: 'top' | 'bottom' = 'bottom') {
+async function githubUpsertFile(
+  token: string,
+  repoUrl: string,
+  filePath: string,
+  newContentLines: string,
+  position: 'top' | 'bottom' = 'bottom',
+) {
   const url = `https://api.github.com/repos/${repoUrl}/contents/${filePath}`;
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -463,7 +468,9 @@ async function githubUpsertFile(token: string, repoUrl: string, filePath: string
     }
 
     const updatedContent = currentContent
-      ? (position === 'top' ? `${newContentLines}\n\n${currentContent}` : `${currentContent}\n\n${newContentLines}`)
+      ? position === 'top'
+        ? `${newContentLines}\n\n${currentContent}`
+        : `${currentContent}\n\n${newContentLines}`
       : newContentLines;
 
     // Encode base64
@@ -668,9 +675,7 @@ async function readConfig(token: string, repo: string, fresh = false) {
     const cache = await readPinnedTabsCache();
     if (isPinnedTabsCacheUsable(cache, repo) && cache) {
       if (isPinnedTabsCacheStale(cache)) {
-        syncPinnedTabs().catch((e) =>
-          console.warn('kaihuman: pinned tab refresh failed', e),
-        );
+        syncPinnedTabs().catch((e) => console.warn('kaihuman: pinned tab refresh failed', e));
       }
       return { config: cache.config, sha: cache.sha ?? undefined };
     }
@@ -998,7 +1003,11 @@ interface PaletteSettingsCache {
 
 async function refreshPaletteSettings(token: string, repo: string) {
   const file = await githubReadFile(token, repo, PALETTE_SETTINGS_PATH);
-  const cache: PaletteSettingsCache = { repo, content: file?.content ?? null, fetchedAt: Date.now() };
+  const cache: PaletteSettingsCache = {
+    repo,
+    content: file?.content ?? null,
+    fetchedAt: Date.now(),
+  };
   await chrome.storage.local.set({ paletteSettingsCache: cache });
   return cache;
 }
@@ -1023,8 +1032,22 @@ async function paletteSettings() {
 
 async function translate(text: string, targets: string[]) {
   const { deepl_key: key } = await chrome.storage.local.get('deepl_key');
-  if (!key) throw new Error('No DeepL API key yet — run “Set the DeepL API key…” first');
-  return { translations: await translateWithDeepl(key as string, text, targets) };
+  // The on-device Translator covers a missing key and an offline DeepL, unless palette AI is off.
+  const onDevice = (await readAiSettings()).palette !== false;
+  if (!key) {
+    if (!onDevice) throw new Error('No DeepL API key yet — run “Set the DeepL API key…” first');
+    return { translations: await translateOnDevice(text, targets) };
+  }
+  try {
+    return { translations: await translateWithDeepl(key as string, text, targets) };
+  } catch (failure) {
+    if (!onDevice) throw failure;
+    try {
+      return { translations: await translateOnDevice(text, targets) };
+    } catch {
+      throw failure;
+    }
+  }
 }
 
 async function readTranslationHistory(): Promise<string[]> {
@@ -1345,8 +1368,12 @@ async function getServiceStatus(refresh = false) {
   const cache = stored.serviceStatusCache as ServiceStatusCache | undefined;
   if (!refresh && cache && isStatusCacheFresh(cache, services)) return { statuses: cache.statuses };
 
-  const statuses = await checkServices(services, cache?.statuses ?? [], fetch, Date.now(), (pattern) =>
-    chrome.permissions.contains({ origins: [pattern] }),
+  const statuses = await checkServices(
+    services,
+    cache?.statuses ?? [],
+    fetch,
+    Date.now(),
+    (pattern) => chrome.permissions.contains({ origins: [pattern] }),
   );
   const next: ServiceStatusCache = { services, statuses, fetchedAt: Date.now() };
   await chrome.storage.local.set({ serviceStatusCache: next });
@@ -1609,7 +1636,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     chrome.storage.local.set({
       lifeos_token: message.token,
       lifeos_repo: message.repo,
-      lifeos_repos: message.repos || []
+      lifeos_repos: message.repos || [],
     });
     // A new token can mean a different account, whose repo file is a different list.
     chrome.storage.local.remove('bookmarksCache');
@@ -2014,7 +2041,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     const date = localDate(new Date());
     return answer(
       commitTodayFile({ path: message.path || '', suffix: '.habit.csv' }, (csv) =>
-        checkIn(csv, date)),
+        checkIn(csv, date),
+      ),
       sendResponse,
     );
   }
@@ -2116,47 +2144,50 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
   }
 
   if (message.type === 'PIN_ARTICLE') {
-    chrome.storage.local.get(['lifeos_token', 'lifeos_repo', KB_IMAGES_SETTING], async (data: any) => {
-      const token = data.lifeos_token;
-      const repo = data.lifeos_repo;
-      if (!token || !repo) {
-        sendResponse({ error: 'No token found' });
-        return;
-      }
-      try {
-        const { title, url, text, images } = message as {
-          title: string;
-          url: string;
-          text: string;
-          images?: string[];
-        };
-        const stamp = `${Date.now()}-${urlToSlug(url)}`;
-        const toStore = imagesEnabled(data[KB_IMAGES_SETTING]) ? (images ?? []) : [];
-        const { alts, ...extras } = await captureExtras({ title, text, imageUrls: toStore });
-        // Alt text first: localizing rewrites the urls it is matched by.
-        const described = withAltText(text, alts.srcs, alts.texts);
-        const body = await localizeImages(
-          described,
-          toStore,
-          `${KB_ASSET_DIR}/${stamp}`,
-          (path, base64) => githubPutBase64(token, repo, path, base64),
-        );
-        const date = new Date().toISOString().slice(0, 10);
-        const content = buildRawNote({
-          title,
-          url,
-          text: body,
-          tags: ['general', ...extras.tags],
-          date,
-          type: extras.type,
-          summary: extras.summary,
-        });
-        await githubUpsertFile(token, repo, `${KB_RAW_DIR}/${stamp}.md`, content);
-        sendResponse({ success: true });
-      } catch (error: any) {
-        sendResponse({ error: error.message });
-      }
-    });
+    chrome.storage.local.get(
+      ['lifeos_token', 'lifeos_repo', KB_IMAGES_SETTING],
+      async (data: any) => {
+        const token = data.lifeos_token;
+        const repo = data.lifeos_repo;
+        if (!token || !repo) {
+          sendResponse({ error: 'No token found' });
+          return;
+        }
+        try {
+          const { title, url, text, images } = message as {
+            title: string;
+            url: string;
+            text: string;
+            images?: string[];
+          };
+          const stamp = `${Date.now()}-${urlToSlug(url)}`;
+          const toStore = imagesEnabled(data[KB_IMAGES_SETTING]) ? (images ?? []) : [];
+          const { alts, ...extras } = await captureExtras({ title, text, imageUrls: toStore });
+          // Alt text first: localizing rewrites the urls it is matched by.
+          const described = withAltText(text, alts.srcs, alts.texts);
+          const body = await localizeImages(
+            described,
+            toStore,
+            `${KB_ASSET_DIR}/${stamp}`,
+            (path, base64) => githubPutBase64(token, repo, path, base64),
+          );
+          const date = new Date().toISOString().slice(0, 10);
+          const content = buildRawNote({
+            title,
+            url,
+            text: body,
+            tags: ['general', ...extras.tags],
+            date,
+            type: extras.type,
+            summary: extras.summary,
+          });
+          await githubUpsertFile(token, repo, `${KB_RAW_DIR}/${stamp}.md`, content);
+          sendResponse({ success: true });
+        } catch (error: any) {
+          sendResponse({ error: error.message });
+        }
+      },
+    );
     return true;
   }
 });

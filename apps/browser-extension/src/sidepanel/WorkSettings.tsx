@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { availability as capability, downloadTranslationPacks } from '../background/ai/model.js';
 import { type AiSettings, readAiSettings, writeAiSettings } from '../background/ai/settings.js';
 import {
   downloadModel,
@@ -62,6 +63,35 @@ function SuggestionSettings({ ui }: { ui: WorkUi }) {
     };
   }, []);
 
+  const [packs, setPacks] = useState<ModelAvailability>();
+  const [packsBusy, setPacksBusy] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    void capability('translator').then((state) => {
+      if (live) setPacks(state);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const downloadPacks = () => {
+    setError(undefined);
+    setPacksBusy(true);
+    // Called straight from the click: Translator.create needs its user activation.
+    downloadTranslationPacks().then(
+      () => {
+        setPacksBusy(false);
+        setPacks('available');
+      },
+      (failure) => {
+        setPacksBusy(false);
+        setError(errorText(failure));
+      },
+    );
+  };
+
   const download = () => {
     setError(undefined);
     setProgress(0);
@@ -90,6 +120,16 @@ function SuggestionSettings({ ui }: { ui: WorkUi }) {
             Download the model
           </button>
         )
+      )}
+      {packs && packs !== 'unavailable' && packs !== 'available' && (
+        <button
+          type="button"
+          class={`${quiet} self-start`}
+          disabled={packsBusy}
+          onClick={downloadPacks}
+        >
+          {packsBusy ? 'Downloading English ↔ German…' : 'Download English ↔ German'}
+        </button>
       )}
       {error && <p class="text-nt-prod [overflow-wrap:anywhere]">{error}</p>}
       <Toggle
