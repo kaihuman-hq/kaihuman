@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { type AiSettings, readAiSettings, writeAiSettings } from '../background/ai/settings.js';
 import {
   downloadModel,
   type ModelAvailability,
@@ -79,7 +80,7 @@ function SuggestionSettings({ ui }: { ui: WorkUi }) {
 
   return (
     <div class="flex flex-col gap-2">
-      <h2 class="text-[12px] font-bold">Suggestions</h2>
+      <h2 class="text-[12px] font-bold">On-device AI</h2>
       {availability && <p class="text-nt-muted">{STATUS[availability]}</p>}
       {progress !== undefined ? (
         <output class="text-nt-muted">Downloading the model… {Math.round(progress * 100)}%</output>
@@ -103,7 +104,51 @@ function SuggestionSettings({ ui }: { ui: WorkUi }) {
         hint="Filed items leave the inbox and the badge count; their status shows in the stream."
         onChange={(on) => void updateWorkUi({ autoFileInbox: on })}
       />
+      <AiGroupSettings />
     </div>
+  );
+}
+
+type AiGroup = keyof Omit<AiSettings, 'inboxLabels'>;
+
+const AI_GROUPS: [AiGroup, string][] = [
+  ['newTab', 'Rank and summarize on the new tab page'],
+  ['enrichment', 'Suggest when saving'],
+  ['sidePanel', 'Triage in the side panel'],
+  ['palette', 'Palette actions'],
+  ['tabs', 'Tidy tabs'],
+];
+
+/** One switch per surface the model may work on. */
+function AiGroupSettings() {
+  const [settings, setSettings] = useState<AiSettings>();
+
+  useEffect(() => {
+    let live = true;
+    void readAiSettings().then((stored) => {
+      if (live) setSettings(stored);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // Shown once read, so a switch never flips from its default to the stored value under the user.
+  if (!settings) return null;
+  return (
+    <>
+      {AI_GROUPS.map(([group, label]) => (
+        <Toggle
+          key={group}
+          checked={settings[group]}
+          label={label}
+          onChange={(on) => {
+            setSettings({ ...settings, [group]: on });
+            void writeAiSettings({ [group]: on });
+          }}
+        />
+      ))}
+    </>
   );
 }
 

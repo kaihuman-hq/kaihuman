@@ -19,6 +19,7 @@ import {
   withTranslationText,
 } from '@kaihuman/palette';
 import { type Message } from '../types';
+import { AI_ALARM, ensureAiAlarm, precomputeInBackground } from './ai/precompute.js';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import {
   connectWorkPanel,
@@ -139,6 +140,8 @@ chrome.alarms.create('repoSync', { periodInMinutes: 60 });
 
 // Work streams poll GitHub on their own schedule; the cycle decides each minute what is due.
 ensureWorkAlarm().catch((e) => console.warn('kaihuman: creating the work alarm failed', e));
+// On-device AI fills its cache hourly, and after each start page sync and work cycle.
+ensureAiAlarm().catch((e) => console.warn('kaihuman: creating the AI alarm failed', e));
 watchWorkTokens();
 watchPinMenu();
 
@@ -154,9 +157,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'swKeepAlive') {
     // Also a backstop for the work alarm: the cycle is time-gated by its poll state, so this
     // costs no extra GitHub calls.
-    runWorkCycle({ panelOpen: isPanelOpen() }).catch((e) =>
-      console.warn('kaihuman: work polling failed', e),
-    );
+    runWorkCycle({ panelOpen: isPanelOpen() })
+      .then(() => precomputeInBackground('work'))
+      .catch((e) => console.warn('kaihuman: work polling failed', e));
   }
   if (alarm.name === 'repoSync') {
     syncRepoWithDesktop().catch((e) =>
@@ -166,10 +169,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     syncPinnedTabs().catch((e) => console.warn('kaihuman: pinned tab sync failed', e));
     syncToday().catch((e) => console.warn('kaihuman: start page sync failed', e));
   }
+  if (alarm.name === AI_ALARM) precomputeInBackground('alarm');
   if (alarm.name === 'work') {
-    runWorkCycle({ panelOpen: isPanelOpen() }).catch((e) =>
-      console.warn('kaihuman: work polling failed', e),
-    );
+    runWorkCycle({ panelOpen: isPanelOpen() })
+      .then(() => precomputeInBackground('work'))
+      .catch((e) => console.warn('kaihuman: work polling failed', e));
   }
 });
 
@@ -1157,6 +1161,7 @@ async function syncToday(): Promise<TodayCache | undefined> {
   if (!token) return undefined;
   const next = await fetchToday(token, repo, await readTodayCache());
   await chrome.storage.local.set({ todayCache: next });
+  precomputeInBackground('today');
   return next;
 }
 

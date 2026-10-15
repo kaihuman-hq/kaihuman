@@ -98,6 +98,11 @@ const mount = async (settled: string) => {
 const byLabel = (label: string) => host.querySelector(`[aria-label="${label}"]`) as HTMLElement;
 const button = (text: string) =>
   [...host.querySelectorAll('button')].find((b) => b.textContent === text) as HTMLButtonElement;
+/** The checkbox whose label starts with `label`. */
+const checkbox = (label: string) =>
+  [...host.querySelectorAll('label')]
+    .find((l) => l.textContent?.startsWith(label))
+    ?.querySelector('input[type="checkbox"]') as HTMLInputElement | undefined;
 const ops = () => sent.filter((m) => m.type === 'WORK_OPS').flatMap((m) => m.ops as never[]);
 
 /** Chrome's model as a stub: `answer` maps an item's title to the JSON the model returns. */
@@ -292,15 +297,34 @@ describe('suggestion settings', () => {
   it('stores both filing switches', async () => {
     await mount('Work');
     byLabel('Settings').click();
-    await waitFor(() => host.querySelectorAll('input[type="checkbox"]').length === 2);
-    const [files, inbox] = [
-      ...host.querySelectorAll('input[type="checkbox"]'),
-    ] as HTMLInputElement[];
+    await waitFor(() => checkbox('Tidy tabs') !== undefined);
+    const files = checkbox('File pins from the shortcut');
+    const inbox = checkbox('File new Waiting-on-you items');
     expect(files?.checked).toBe(true);
     expect(inbox?.checked).toBe(false);
     files?.click();
     await waitFor(() => (store.workUi as { autoFile?: boolean })?.autoFile === false);
     inbox?.click();
     await waitFor(() => (store.workUi as { autoFileInbox?: boolean })?.autoFileInbox === true);
+  });
+
+  it('stores the AI group switches', async () => {
+    await mount('Work');
+    byLabel('Settings').click();
+    await waitFor(() => host.textContent?.includes('On-device AI') ?? false);
+    await waitFor(() => checkbox('Rank and summarize on the new tab page') !== undefined);
+    for (const label of [
+      'Rank and summarize on the new tab page',
+      'Suggest when saving',
+      'Triage in the side panel',
+      'Palette actions',
+      'Tidy tabs',
+    ]) {
+      expect(checkbox(label)?.checked).toBe(true);
+    }
+    checkbox('Rank and summarize on the new tab page')?.click();
+    await waitFor(() => (store.aiSettings as { newTab?: boolean })?.newTab === false);
+    expect(store.aiSettings).toMatchObject({ newTab: false, tabs: true });
+    expect(checkbox('Rank and summarize on the new tab page')?.checked).toBe(false);
   });
 });
