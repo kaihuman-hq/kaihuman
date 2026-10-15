@@ -317,3 +317,20 @@ export async function translate(
     opts.timeoutMs,
   );
 }
+
+/**
+ * Downloads the English and German translation packs, both directions. Chrome only starts a
+ * download from a click, so this is called straight from one, before any await.
+ */
+export function downloadTranslationPacks(): Promise<void> {
+  const api = globals().Translator;
+  if (!api) return Promise.reject(new Error('This Chrome has no built-in translator.'));
+  // Both creates start now, inside the click's user activation.
+  const pairs: TranslatorOptions[] = [
+    { sourceLanguage: 'en', targetLanguage: 'de' },
+    { sourceLanguage: 'de', targetLanguage: 'en' },
+  ];
+  return Promise.all(pairs.map((pair) => api.create(pair))).then((translators) => {
+    for (const translator of translators) translator.destroy();
+  });
+}

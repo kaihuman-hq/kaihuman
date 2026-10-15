@@ -48,6 +48,7 @@ import {
 import { likelyNext, type Ranking, readLaterForToday } from './ai/rank.js';
 import { bulletsOf, draftReview, type ReviewRange, reviewSources } from './ai/review.js';
 import { readAiSettings } from './ai/settings.js';
+import { translateOnDevice } from './ai/translate.js';
 import {
   addBookmark,
   applyUsage,
@@ -1036,8 +1037,22 @@ async function paletteSettings() {
 
 async function translate(text: string, targets: string[]) {
   const { deepl_key: key } = await chrome.storage.local.get('deepl_key');
-  if (!key) throw new Error('No DeepL API key yet — run “Set the DeepL API key…” first');
-  return { translations: await translateWithDeepl(key as string, text, targets) };
+  // The on-device Translator covers a missing key and an offline DeepL, unless palette AI is off.
+  const onDevice = (await readAiSettings()).palette !== false;
+  if (!key) {
+    if (!onDevice) throw new Error('No DeepL API key yet — run “Set the DeepL API key…” first');
+    return { translations: await translateOnDevice(text, targets) };
+  }
+  try {
+    return { translations: await translateWithDeepl(key as string, text, targets) };
+  } catch (failure) {
+    if (!onDevice) throw failure;
+    try {
+      return { translations: await translateOnDevice(text, targets) };
+    } catch {
+      throw failure;
+    }
+  }
 }
 
 async function readTranslationHistory(): Promise<string[]> {

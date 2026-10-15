@@ -16,6 +16,7 @@ const file = {
 };
 
 beforeEach(async () => {
+  vi.unstubAllGlobals();
   vi.resetModules();
   storedExtras = {};
   vi.stubGlobal('chrome', {
@@ -68,6 +69,20 @@ beforeEach(async () => {
   );
   await import('./service-worker');
 });
+
+const stubOnDevice = () => {
+  vi.stubGlobal('Translator', {
+    availability: async () => 'available',
+    create: async () => ({ translate: async (t: string) => `on-device ${t}`, destroy: () => {} }),
+  });
+  vi.stubGlobal('LanguageDetector', {
+    availability: async () => 'available',
+    create: async () => ({
+      detect: async () => [{ detectedLanguage: 'de', confidence: 0.9 }],
+      destroy: () => {},
+    }),
+  });
+};
 
 const call = (msg: any) =>
   new Promise<any>((resolve, reject) => {
@@ -243,13 +258,44 @@ describe('knowledge base captures', () => {
 });
 
 describe('palette mode messages', () => {
-  it('asks for a DeepL key before translating anything', async () => {
+  it('explains a missing language pack', async () => {
+    expect(await call({ type: 'TRANSLATE', text: 'Hallo', targets: ['EN-US'] })).toEqual({
+      error:
+        'On-device translation needs the language pack: download it in the side panel settings, or set a DeepL key.',
+    });
+  });
+
+  it('asks for a DeepL key when palette AI is off', async () => {
+    storedExtras = { aiSettings: { palette: false } };
     expect(await call({ type: 'TRANSLATE', text: 'Hallo', targets: ['EN-US'] })).toEqual({
       error: 'No DeepL API key yet — run “Set the DeepL API key…” first',
     });
   });
 
-  it('translates with the stored key', async () => {
+  it('uses on-device without a key', async () => {
+    stubOnDevice();
+    expect(await call({ type: 'TRANSLATE', text: 'Hallo', targets: ['EN-US'] })).toEqual({
+      success: true,
+      translations: [{ target: 'EN-US', text: 'on-device Hallo', detectedSource: 'DE' }],
+    });
+  });
+
+  it('falls back to on-device when DeepL fails offline', async () => {
+    storedExtras = { deepl_key: 'k:fx' };
+    stubOnDevice();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+    expect(await call({ type: 'TRANSLATE', text: 'Hallo', targets: ['EN-US'] })).toEqual({
+      success: true,
+      translations: [{ target: 'EN-US', text: 'on-device Hallo', detectedSource: 'DE' }],
+    });
+  });
+
+  it('uses DeepL when a key is set', async () => {
     storedExtras = { deepl_key: 'k:fx' };
     vi.stubGlobal(
       'fetch',
