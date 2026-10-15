@@ -28,16 +28,6 @@ import PAGE_SCRIPT from '../content/index.ts?script';
 import type { Message } from '../types';
 import { draftBookmark, findDuplicates, findExactDuplicates } from './ai/bookmark-draft.js';
 import { precomputeBrief, precomputeFocus, readAiCards } from './ai/brief.js';
-import { precomputeTldrs, readTldrs } from './ai/tldr.js';
-import { askPage, pageSummary } from './ai/page.js';
-import {
-  type IntentContext,
-  intentContext,
-  intentMessages,
-  parseIntent,
-  previewOf,
-  validateIntent,
-} from './ai/intent.js';
 import { peek, put } from './ai/cache.js';
 import { captureContext, classifyCapture } from './ai/capture.js';
 import { buildWorkContext } from './ai/context.js';
@@ -50,7 +40,16 @@ import {
   withAltText,
   within,
 } from './ai/enrich.js';
+import {
+  type IntentContext,
+  intentContext,
+  intentMessages,
+  parseIntent,
+  previewOf,
+  validateIntent,
+} from './ai/intent.js';
 import { precomputeInboxLabels, readMutedKeys } from './ai/labels.js';
+import { askPage, pageSummary } from './ai/page.js';
 import {
   AI_ALARM,
   ensureAiAlarm,
@@ -61,6 +60,7 @@ import { likelyNext, type Ranking, readLaterForToday, rerank } from './ai/rank.j
 import { bulletsOf, draftReview, type ReviewRange, reviewSources } from './ai/review.js';
 import { readAiSettings } from './ai/settings.js';
 import { MAX_TABS, proposeGroups } from './ai/tidy.js';
+import { precomputeTldrs, readTldrs } from './ai/tldr.js';
 import { translateOnDevice } from './ai/translate.js';
 import {
   addBookmark,
