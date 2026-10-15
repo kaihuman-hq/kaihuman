@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Listener = (msg: any, sender: any, sendResponse: (r: any) => void) => unknown;
 let listener: Listener;
@@ -357,5 +357,41 @@ describe('without a repository', () => {
 
   it('reports no repository to the popup', async () => {
     await expect(call({ type: 'GET_REPOS' })).resolves.toMatchObject({ repo: '' });
+  });
+});
+
+describe('page summarize and ask', () => {
+  afterEach(() => vi.stubGlobal('Summarizer', undefined));
+
+  const unavailable = { error: 'The on-device model is not available.' };
+
+  it('answer "The on-device model is not available." without the model', async () => {
+    expect(await call({ type: 'PAGE_SUMMARIZE', title: 't', url: 'u', text: 'x' })).toEqual(
+      unavailable,
+    );
+    expect(
+      await call({ type: 'PAGE_ASK', title: 't', url: 'u', text: 'x', question: 'q' }),
+    ).toEqual(unavailable);
+  });
+
+  it('does not use the model when the palette switch is off', async () => {
+    storedExtras = { aiSettings: { palette: false } };
+    const availability = vi.fn(async () => 'available');
+    vi.stubGlobal('Summarizer', { availability });
+    expect(await call({ type: 'PAGE_SUMMARIZE', title: 't', url: 'u', text: 'x' })).toEqual(
+      unavailable,
+    );
+    expect(availability).not.toHaveBeenCalled();
+  });
+
+  it('answers a summary as lines', async () => {
+    vi.stubGlobal('Summarizer', {
+      availability: async () => 'available',
+      create: async () => ({ summarize: async () => '- One\n- Two', destroy: () => {} }),
+    });
+    expect(await call({ type: 'PAGE_SUMMARIZE', title: 't', url: 'u', text: 'x' })).toEqual({
+      success: true,
+      lines: ['One', 'Two'],
+    });
   });
 });

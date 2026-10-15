@@ -24,6 +24,7 @@ import { draftBookmark, findDuplicates, findExactDuplicates } from './ai/bookmar
 import { precomputeBrief, precomputeFocus, readAiCards } from './ai/brief.js';
 import { captureContext, classifyCapture } from './ai/capture.js';
 import { digestToday } from './ai/digest.js';
+import { askPage, pageSummary } from './ai/page.js';
 import { peek, put } from './ai/cache.js';
 import { buildWorkContext } from './ai/context.js';
 import {
@@ -1440,6 +1441,23 @@ async function captureGuesses(text: string) {
   return { guesses: await classifyCapture(text, captureContext(cache, new Date())) };
 }
 
+const MODEL_UNAVAILABLE = 'The on-device model is not available.';
+
+/** Key points of the page text for the palette; an error message when the model cannot give them. */
+async function summarizePage(text: string) {
+  if (!(await readAiSettings()).palette) throw new Error(MODEL_UNAVAILABLE);
+  const lines = await pageSummary(text);
+  if (!lines) throw new Error(MODEL_UNAVAILABLE);
+  return { lines };
+}
+
+async function askAboutPage(text: string, question: string) {
+  if (!(await readAiSettings()).palette) throw new Error(MODEL_UNAVAILABLE);
+  const answer = await askPage(text, question);
+  if (!answer) throw new Error(MODEL_UNAVAILABLE);
+  return { answer };
+}
+
 /**
  * An action log entry from the popup or the start page, written as the console's Action Log widget
  * writes it, over the version read.
@@ -2113,6 +2131,17 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'CAPTURE_CLASSIFY') {
     return answer(captureGuesses(message.text || ''), sendResponse);
+  }
+
+  if (message.type === 'PAGE_SUMMARIZE') {
+    return answer(summarizePage(String(message.text || '')), sendResponse);
+  }
+
+  if (message.type === 'PAGE_ASK') {
+    return answer(
+      askAboutPage(String(message.text || ''), String(message.question || '')),
+      sendResponse,
+    );
   }
 
   if (message.type === 'PIN_ARTICLE') {

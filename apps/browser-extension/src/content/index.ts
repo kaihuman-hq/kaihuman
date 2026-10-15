@@ -12,6 +12,7 @@ import {
 import { send, workerPort } from '../palette/port';
 import { openWorkPanelAction } from '../palette/work-panel';
 import { extractArticle } from './extract';
+import { askPageAction, summarizePageAction } from './page-ai';
 
 // Built on first use so pages that never open the palette pay nothing for it.
 let palette: CommandPalette | null = null;
@@ -53,6 +54,15 @@ const bookmarkPage = async (url: string, title: string, tags: string[]) => {
 };
 
 /** Everything the popup and the context menu can do, as palette actions. */
+const pageAi = {
+  send,
+  copy: copyToClipboard,
+  article: () => {
+    const article = extractArticle();
+    return { title: article.title, url: article.url || pageUrl(), text: article.text };
+  },
+};
+
 const paletteActions = (): PaletteAction[] => [
   {
     id: 'bookmark-page',
@@ -105,6 +115,8 @@ const paletteActions = (): PaletteAction[] => [
       return 'Added to the Knowledge Base';
     },
   },
+  summarizePageAction(pageAi),
+  askPageAction(pageAi),
   openWorkPanelAction(send),
   ...repoActions(workerPort),
 ];
