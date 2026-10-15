@@ -241,6 +241,16 @@ describe('StreamSection', () => {
     expect(ops()[0]).toEqual({ op: 'undone', itemId: 'it_4' });
   });
 
+  it('opens the related picker from the options menu', async () => {
+    await mount('Alpha', 3);
+    await options('Alpha');
+    clickText(stream('Alpha'), 'Find related');
+    await waitFor(() => host.querySelector('[aria-label="Related to Alpha"]') !== null);
+    expect(host.querySelector('[aria-label="Related to Alpha"]')?.textContent).toContain(
+      'No other open tabs',
+    );
+  });
+
   it('uses the live title for GitHub items', async () => {
     await mount('Alpha', 3);
     expect(host.textContent).toContain('Live title');

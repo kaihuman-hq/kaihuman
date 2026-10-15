@@ -1,12 +1,14 @@
-import { newStreamId, streamLabels } from '@kaihuman/formats';
+import { newStreamId, type StreamId, streamLabels } from '@kaihuman/formats';
+import { Fragment } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { buildInbox, unreadKeys } from '../background/work/inbox.js';
+import { buildInbox, type InboxRow, unreadKeys } from '../background/work/inbox.js';
 import type { OrgAccessProblem, WorkProblem } from '../background/work/types.js';
 import { CONSOLE_URL, consoleFileUrl } from '../console.js';
 import { send } from '../palette/port.js';
 import { age } from './age.js';
 import { Choice, Heading, iconButton, NewStreamInput, sendOps } from './controls.js';
 import { InboxSection, MineSection } from './InboxSection.js';
+import { RelatedPicker } from './RelatedPicker.js';
 import { StreamSection } from './StreamSection.js';
 import { ThisTabBar } from './ThisTabBar.js';
 import { useAutoFileInbox } from './useSuggestion.js';
@@ -67,19 +69,25 @@ export { age };
 function Streams({
   state,
   unread,
+  rows,
 }: {
   state: ReturnType<typeof useWorkState>;
   unread: Set<string>;
+  rows: InboxRow[];
 }) {
   const { file, snapshot, ui, streams } = state;
   const [adding, setAdding] = useState(false);
+  const [growing, setGrowing] = useState<StreamId>();
   if (!file) return null;
   const readOnly = streams ? !streams.state.ok : false;
   const labels = streamLabels(file);
   const label = ui.label !== undefined && labels.includes(ui.label) ? ui.label : undefined;
   const add = (name: string) => {
     setAdding(false);
-    sendOps([{ op: 'addStream', streamId: newStreamId(), name, at: new Date().toISOString() }]);
+    const streamId = newStreamId();
+    sendOps([{ op: 'addStream', streamId, name, at: new Date().toISOString() }]);
+    // A new stream is empty: offer the tabs and items that already belong with it.
+    setGrowing(streamId);
   };
   return (
     <section class="flex flex-col gap-2">
@@ -123,19 +131,29 @@ function Streams({
       )}
       <div class="flex flex-col gap-1">
         {file.streams.map((stream, index) => (
-          <StreamSection
-            key={stream.id}
-            stream={stream}
-            index={index}
-            count={file.streams.length}
-            statuses={snapshot?.pinned ?? {}}
-            threads={snapshot?.threads}
-            unread={unread}
-            label={label}
-            collapsed={ui.collapsed.includes(stream.id)}
-            readOnly={readOnly}
-            streams={file.streams}
-          />
+          <Fragment key={stream.id}>
+            <StreamSection
+              stream={stream}
+              index={index}
+              count={file.streams.length}
+              statuses={snapshot?.pinned ?? {}}
+              threads={snapshot?.threads}
+              unread={unread}
+              label={label}
+              collapsed={ui.collapsed.includes(stream.id)}
+              readOnly={readOnly}
+              streams={file.streams}
+              onFindRelated={() => setGrowing(stream.id)}
+            />
+            {growing === stream.id && (
+              <RelatedPicker
+                stream={stream}
+                file={file}
+                rows={rows}
+                onClose={() => setGrowing(undefined)}
+              />
+            )}
+          </Fragment>
         ))}
       </div>
     </section>
@@ -278,7 +296,11 @@ export function SidePanel() {
                 />
               </div>
             )}
-            <Streams state={state} unread={unread} />
+            <Streams
+              state={state}
+              unread={unread}
+              rows={inbox ? [...inbox.waiting, ...inbox.activity] : []}
+            />
           </>
         )}
       </div>
