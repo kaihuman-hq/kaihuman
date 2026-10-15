@@ -19,6 +19,7 @@ import {
   withTranslationText,
 } from '@kaihuman/palette';
 import { type Message } from '../types';
+import { draftBookmark, findDuplicates } from './ai/bookmark-draft.js';
 import { AI_ALARM, ensureAiAlarm, precomputeInBackground } from './ai/precompute.js';
 import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import {
@@ -37,6 +38,7 @@ import {
   watchPinMenu,
 } from './work/messages';
 import { openWorkPanel } from './work/side-panel';
+import { loadStreams } from './work/streams-store';
 import { type StreamsCache, WORK_KEYS } from './work/types';
 import { consoleFileUrl, isConsolePage } from '../console';
 // The bundled loader's path, for injecting the page script on demand (CRXJS `?script` import).
@@ -121,6 +123,7 @@ import {
   isTodayCacheUsable,
   readLaterPath,
   type TodayCache,
+  unreadItems,
   withFile,
   withoutFile,
 } from './today';
@@ -1150,6 +1153,38 @@ async function deletePinnedTabGroup(token: string, repo: string, groupId: string
   return { name };
 }
 
+/**
+ * A title, tags and environment for the page being bookmarked, and where it is already saved.
+ * Read-only: the repo is only written when the user saves.
+ */
+async function bookmarkDraft(url: string, title: string) {
+  const { bookmarks } = await getBookmarks();
+  const counts = new Map<string, number>();
+  for (const tag of bookmarks.flatMap((bookmark) => bookmark.tags)) {
+    counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  }
+  const knownTags = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 50)
+    .map(([tag]) => tag);
+  const today = await readTodayCache();
+  const readLater = (today?.files ?? [])
+    .filter((file) => file.path.endsWith('.readitlater.json'))
+    .flatMap((file) => unreadItems(file.content));
+  // Streams are a nicety here: signed out or a failed read only means fewer duplicates found.
+  const streams = await loadStreams().catch(() => undefined);
+  const page = { url, title };
+  const [draft, duplicates] = await Promise.all([
+    draftBookmark(page, knownTags),
+    findDuplicates(page, {
+      bookmarks,
+      readLater,
+      streams: streams?.state.ok ? streams.state.file : null,
+    }),
+  ]);
+  return { draft, duplicates };
+}
+
 async function readTodayCache(): Promise<TodayCache | undefined> {
   const stored = await chrome.storage.local.get('todayCache');
   return stored.todayCache as TodayCache | undefined;
@@ -1531,6 +1566,14 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'GET_BOOKMARKS') {
     getBookmarks().then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'BOOKMARK_DRAFT') {
+    bookmarkDraft(String(message.url || ''), String(message.title || '')).then(
       (result) => sendResponse({ success: true, ...result }),
       (error) => sendResponse({ error: error.message }),
     );

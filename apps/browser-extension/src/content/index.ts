@@ -20,6 +20,23 @@ let palette: CommandPalette | null = null;
 const pageUrl = () =>
   document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href || location.href;
 
+/**
+ * The worker's suggestion for the bookmark prompts, asked for when the palette opens so it is
+ * usually there by the time the prompt is. `initial` is synchronous, so a suggestion that has not
+ * arrived falls back to the page's own values.
+ */
+let bookmarkDraft: { title: string; tags: string[] } | null = null;
+
+const requestBookmarkDraft = () => {
+  bookmarkDraft = null;
+  send({ type: 'BOOKMARK_DRAFT', url: pageUrl(), title: document.title }).then(
+    (response) => {
+      if (response?.draft) bookmarkDraft = response.draft;
+    },
+    () => {},
+  );
+};
+
 const bookmarkPage = async (url: string, title: string, tags: string[]) => {
   const saved = await send({ type: 'ADD_BOOKMARK', url, title, tags });
   return `Bookmarked “${saved.title}”`;
@@ -36,9 +53,9 @@ const paletteActions = (): PaletteAction[] => [
     // and editable, and ⏎ keeps what is there.
     prompts: [
       { label: 'URL', initial: pageUrl },
-      { label: 'Title', initial: () => document.title },
+      { label: 'Title', initial: () => bookmarkDraft?.title || document.title },
       // Kept short: the label doubles as the breadcrumb's field name.
-      { label: 'Tags' },
+      { label: 'Tags', initial: () => bookmarkDraft?.tags.join(', ') ?? '' },
     ],
     run: ([url = '', title = '', tags = '']: string[]) => bookmarkPage(url, title, splitTags(tags)),
   },
@@ -105,6 +122,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return false;
   }
   if (msg.type === 'TOGGLE_COMMAND_PALETTE') {
+    requestBookmarkDraft();
     getPalette().toggle();
     sendResponse({ success: true });
     return false;
