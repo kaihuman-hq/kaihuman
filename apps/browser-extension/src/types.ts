@@ -35,6 +35,8 @@ export interface Message {
     | 'READ_ENTRY_FILE'
     | 'WRITE_ENTRY_FILE'
     | 'LIST_IDEAS'
+    | 'LIST_NOTES'
+    | 'RERANK'
     | 'SAVE_IDEA'
     | 'BRAINDUMP_DIGEST'
     | 'TRANSLATE'
@@ -76,6 +78,8 @@ export interface Message {
   title?: string;
   text?: string;
   repo?: string;
+  /** `RERANK`: the candidates to order against `query`. */
+  items?: { id: string; text: string }[];
   entry?: { id: string; title: string; subtitle?: string; url?: string };
   bookmarkId?: string;
   /** `SET_BOOKMARK_PINNED`: the state to set, not a toggle, so a double click cannot undo itself. */

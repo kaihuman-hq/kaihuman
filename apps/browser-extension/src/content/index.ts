@@ -9,6 +9,7 @@ import {
   repoActions,
   splitTags,
 } from '@kaihuman/palette';
+import { notesMode } from '../palette/notes-mode';
 import { send, workerPort } from '../palette/port';
 import { openWorkPanelAction } from '../palette/work-panel';
 import { extractArticle } from './extract';
@@ -122,7 +123,11 @@ function getPalette(): CommandPalette {
       },
       actions: paletteActions,
       // The browser cannot run commands, so `>x` only copies them.
-      modes: [...paletteModes(workerPort), commandsMode(workerPort, { canRun: false })],
+      modes: [
+        ...paletteModes(workerPort),
+        commandsMode(workerPort, { canRun: false }),
+        notesMode(send),
+      ],
       copy: copyToClipboard,
     });
   }
