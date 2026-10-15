@@ -1,4 +1,5 @@
 import { type GithubRef, itemRefOf, type StreamOp, type StreamsFile } from '@kaihuman/formats';
+import { readMutedKeys } from '../ai/labels.js';
 import { runWorkQueries } from './graphql.js';
 import { autoDoneOps, type Dismissed, pinnedKeys, workSummary } from './inbox.js';
 import { pollNotifications } from './notifications.js';
@@ -77,7 +78,13 @@ async function setBadge(snapshot: WorkSnapshot, file: StreamsFile | null): Promi
   if (snapshot.problem?.kind === 'auth') text = '!';
   else if (snapshot.problem?.kind !== 'signed-out') {
     const dismissed = (await getStored<Dismissed>(WORK_KEYS.dismissed)) ?? {};
-    const { waiting } = workSummary(snapshot, file, dismissed);
+    const { waiting } = workSummary(
+      snapshot,
+      file,
+      dismissed,
+      // Labels are optional: a failed read must not leave the badge stale.
+      await readMutedKeys().catch(() => new Set<string>()),
+    );
     text = waiting ? String(waiting) : '';
   }
   await chrome.action.setBadgeText({ text });

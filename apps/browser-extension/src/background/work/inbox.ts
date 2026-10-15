@@ -109,6 +109,7 @@ export const buildInbox = (
   file: StreamsFile | null,
   dismissed: Dismissed,
   now: Date = new Date(),
+  muted: Set<string> = new Set(),
 ): { waiting: InboxRow[]; activity: InboxRow[]; mine: WorkItemStatus[] } => {
   const pinned = file ? pinnedKeys(file) : new Set<string>();
   const rows = new Map<string, InboxRow>();
@@ -141,7 +142,7 @@ export const buildInbox = (
   const activity: InboxRow[] = [];
   const waitingKeys = new Set<string>();
   for (const row of rows.values()) {
-    if (pinned.has(row.key)) continue;
+    if (pinned.has(row.key) || muted.has(row.key)) continue;
     const isWaiting = row.reasons.some(isInboxReason);
     // Dismissal hides the row but must not resurface it under "mine".
     if (isWaiting) waitingKeys.add(row.key);
@@ -167,8 +168,9 @@ export const workSummary = (
   snapshot: WorkSnapshot,
   file: StreamsFile | null,
   dismissed: Dismissed,
+  muted: Set<string> = new Set(),
 ): { waiting: number; activity: number; redCiInStreams: number } => {
-  const { waiting, activity } = buildInbox(snapshot, file, dismissed);
+  const { waiting, activity } = buildInbox(snapshot, file, dismissed, new Date(), muted);
   let redCiInStreams = 0;
   for (const item of pinnedItems(file)) {
     const key = githubKeyOf(item.url);

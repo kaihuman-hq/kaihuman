@@ -176,6 +176,33 @@ describe('InboxSection', () => {
     expect(row.textContent).toContain('CI ✓');
   });
 
+  it("filter chips show only that label's rows", async () => {
+    store.aiSettings = {
+      inboxLabels: [
+        { name: 'Mine', hint: 'mine', mute: false },
+        { name: 'Other', hint: 'other', mute: false },
+        { name: 'Noise', hint: 'noise', mute: true },
+      ],
+    };
+    store.aiCache = {
+      'inbox:labels': {
+        value: { 'acme/web#1': 'Mine', 'acme/web#2': 'Other', 'acme/web#3': 'Noise' },
+        at: Date.now(),
+        ttl: 60_000,
+      },
+    };
+    // PR 3 (new activity) is muted away; PR 1 and 2 wait.
+    await mount('Waiting on you (2)');
+    expect(headings()).toEqual(['Waiting on you (2)', 'New activity (0)', 'My open PRs (1)']);
+    expect(section('Waiting on you (2)').querySelectorAll('[data-label]')).toHaveLength(2);
+    const chips = [...host.querySelectorAll('fieldset button')].map((b) => b.textContent);
+    expect(chips).toEqual(['All', 'Mine', 'Other']);
+    clickText(host as Element, 'Mine');
+    await waitFor(() => headings().includes('Waiting on you (1)'));
+    expect(section('Waiting on you (1)').textContent).toContain('PR 1');
+    expect(section('Waiting on you (1)').textContent).not.toContain('PR 2');
+  });
+
   it('pins a row into a stream', async () => {
     await mount('Waiting on you (2)');
     const waiting = section('Waiting on you (2)');
