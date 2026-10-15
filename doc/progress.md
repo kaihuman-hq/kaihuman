@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-10-15 — On-device AI: final review fixes
+
+- Background model jobs now stop after 60 s, so a hung job can no longer block the queue. Precompute runs at most every 10 minutes after repo syncs as well as after work polls.
+- The palette keeps one "Ask kaihuman" request in flight. Bookmark hints are asked for only when the palette opens, and are cached per page.
+- Stream suggestions and "Find related" go through the worker's queue, with an 8 s limit.
+- The On-device AI switches fully gate their features, including cached labels, mutes and TL;DRs. The settings show which models the service worker itself can reach (`AI_AVAILABILITY`).
+- Still to check by hand in Chrome 155: whether the service worker exposes `Translator`, `LanguageDetector` and `Summarizer`. If not, the settings show them as unavailable, and an offscreen document would be the follow-up.
+
 ## 2026-10-15 — On-device AI, phases 2–6: saving, new tab cards, side panel, palette, tabs
 
 - **Capture box (Auto):** the start page capture box files a note, todo (file, milestone, tags), log entry or event on its own, with a preview; Tab cycles the alternatives. Answers within 4 s, else a note. Only the latest text is classified (`ai/capture.ts`, `ADD_EVENT`, `ADD_TODO` with path/tags).
