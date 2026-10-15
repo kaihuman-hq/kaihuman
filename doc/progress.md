@@ -2,7 +2,7 @@
 
 ## 2026-10-15 — On-device AI features: design
 
-- **Design for 21 on-device AI features** in the browser extension (`doc/ai-features.md`): a shared AI layer (one model queue, a cache, precomputing in the worker), ranking rules for the new tab page, enrichment at save time, side panel triage, palette actions and tidying tabs, in six phases with parallel lanes. Nothing is built yet.
+- **Design for 21 on-device AI features** in the browser extension (`doc/ai-features.md`): a shared AI layer (one model queue, a cache, precomputing in the worker), ranking rules for the new tab page, enrichment at save time, side panel triage, palette actions and tidying tabs, in six phases with parallel lanes. Approved with everything in one PR; implementation plan in 22 tasks with parallel lanes per phase: `doc/ai-features-plan.md`. Nothing is built yet.
 
 ## 2026-10-15 — Work streams: stream and label suggestions from Chrome's on-device model
 

@@ -1,6 +1,6 @@
 # On-device AI in the browser extension: design
 
-Status: draft for review, 2026-10-15. Builds on stream and label suggestions (`apps/browser-extension/src/background/work/suggest.ts`), which already run on Chrome's built-in model.
+Status: approved 2026-10-15. Builds on stream and label suggestions (`apps/browser-extension/src/background/work/suggest.ts`), which already run on Chrome's built-in model.
 
 ## Goal
 
@@ -115,7 +115,7 @@ IDs match the brainstorm. "Rules" is the fallback without the model.
 
 ## Execution: parallel lanes, models, token budget
 
-- **Branch and PRs.** The PR for the side panel work (kaihuman-hq/kaihuman#158) should merge first. Each phase then becomes one PR from `claude/cool-darwin-65w5u1`, restarted from `main`. That gives six reviewable PRs, not one with 8,000 lines.
+- **Branch and PR.** All phases land on `claude/cool-darwin-65w5u1`, in kaihuman-hq/kaihuman#158, as at least one commit per phase.
 - **Lanes inside a phase.** Features touching different files run as parallel subagents, each in its own git worktree. The orchestrator (this session) owns the shared files: `service-worker.ts` message routing, the `types.ts` message union, `manifest.ts`, and docs. It merges the lanes and runs the full checks once per phase.
   - Phase 1: F1 + F6 + trackers (`bookmarks.ts`, `today.ts`) ‖ F5 (`inbox.ts`) ‖ F4a (`today.ts` todo part, sequenced after lane 1).
   - Phase 2: F9 ‖ F10 + F12 ‖ F11.
@@ -151,9 +151,9 @@ Ranking rules get pure unit tests with fixed clocks. Each UI change gets a compo
 - Desktop palette changes.
 - Mobile.
 
-## Decisions I made that you may want to change
+## Decisions (confirmed 2026-10-15)
 
-1. **One PR per phase**, after kaihuman-hq/kaihuman#158 merges (see Execution).
+1. ~~One PR per phase~~: everything stays in kaihuman-hq/kaihuman#158 (decided 2026-10-15).
 2. **F13 adds `bodyText` to the GitHub query** for waiting rows only: about 1 KB per row per poll.
 3. **F17 keeps DeepL as the default when a key is set**, with Chrome's Translator as the fallback.
 4. **F16 and F8 write to the repo only through their Save buttons.**
