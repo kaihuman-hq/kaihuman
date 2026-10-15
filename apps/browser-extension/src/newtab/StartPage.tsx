@@ -11,6 +11,7 @@ import {
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { CaptureGuess } from '../background/ai/capture';
 import { availability } from '../background/ai/model';
+import { applyRanking, type Ranking } from '../background/ai/rank';
 import {
   type Bookmark,
   bookmarkEnvironment,
@@ -86,6 +87,9 @@ const GUESS_LABEL: Record<CaptureGuess['kind'], string> = {
 };
 
 /** The timer shows seconds while it runs, so the page redraws once a second. */
+/** The links the ranking job picks among, and the ones the page shows of them. */
+const LIKELY_CANDIDATES = 20;
+const LIKELY_SHOWN = 12;
 const TICK_MS = 1000;
 
 /** Pinned bookmarks the number keys reach: `1` to `9`. */
@@ -160,6 +164,7 @@ export function StartPage() {
   const classifyRef = useRef<{ text: string; result: Promise<CaptureGuess[]> } | null>(null);
   const [captureLog, setCaptureLog] = useState<CaptureLog>(EMPTY_CAPTURE_LOG);
   const [today, setToday] = useState<TodaySummary | null>(null);
+  const [likely, setLikely] = useState<Ranking | undefined>(undefined);
   const [todayError, setTodayError] = useState<string | null>(null);
   // One commit at a time, as with the pins: two would race each other for the file's sha.
   const [busyPath, setBusyPath] = useState<string | null>(null);
@@ -230,6 +235,8 @@ export function StartPage() {
           (response) => {
             setToday(response.today);
             setTodayError(null);
+            // Kept from the first answer only: a ranking never reorders a page that is open.
+            setLikely((current) => current ?? response.ranking?.likely);
           },
           (e: Error) => setTodayError(e.message),
         )
@@ -637,7 +644,10 @@ export function StartPage() {
     );
   }
 
-  const { pinned, recent } = startPageBookmarks(bookmarks, query);
+  // The rule order, reordered by the hour-old ranking when there is one: the model has the
+  // first twelve of its twenty candidates, so the rest only fill in when the query hides some.
+  const { pinned, recent: ruled } = startPageBookmarks(bookmarks, query, LIKELY_CANDIDATES);
+  const recent = applyRanking(ruled, likely).slice(0, LIKELY_SHOWN);
   const pinKey = (bookmark: Bookmark) => allPinned.indexOf(bookmark) + 1;
   const noMatch = query.trim() !== '' && pinned.length === 0 && recent.length === 0;
   const error = (message: string) => <p class="text-[12px] text-nt-prod break-words">{message}</p>;
@@ -845,7 +855,7 @@ export function StartPage() {
             </section>
 
             <section class="flex flex-col gap-[10px]">
-              <SectionHead title="Recently used" meta={`${recent.length} links`} />
+              <SectionHead title="Likely next" meta={`${recent.length} links`} />
               {bookmarksError ? (
                 error(bookmarksError)
               ) : bookmarks.length === 0 ? (
@@ -855,7 +865,7 @@ export function StartPage() {
               ) : (
                 recent.length > 0 && (
                   <ul
-                    aria-label="Recently used"
+                    aria-label="Likely next"
                     class="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-x-6 border-t border-nt-divider"
                   >
                     {recent.map((bookmark) => {

@@ -169,6 +169,33 @@ describe('read it later', () => {
     expect(today.unreadCount).toBe(2);
   });
 
+  it('orders the list by the cached ranking and names its reasons', () => {
+    const ranking = {
+      ids: ['a', 'gone'],
+      reasons: { a: 'About Payments', gone: 'unlisted' },
+      computedAt: 1,
+    };
+    const today = buildToday(cache({ 'x.readitlater.json': json }), NOW, ranking);
+    expect(today.readLater.map((item) => item.id)).toEqual(['a', 'c']);
+    expect(today.readLaterReasons).toEqual({ a: 'About Payments' });
+  });
+
+  it('flags unread items saved over 60 days ago for archiving', () => {
+    const old = JSON.stringify({
+      items: [
+        {
+          id: 'old',
+          url: 'https://o.example',
+          name: 'O',
+          status: 'new',
+          createdAt: NOW.getTime() - 61 * 86_400_000,
+        },
+        { id: 'new', url: 'https://n.example', name: 'N', status: 'new', createdAt: NOW.getTime() },
+      ],
+    });
+    expect(buildToday(cache({ 'x.readitlater.json': old }), NOW).archive).toEqual(['old']);
+  });
+
   it('counts every unread item, not only the ones listed', () => {
     const many = JSON.stringify({
       items: ['a', 'b', 'c', 'd'].map((id) => ({

@@ -363,7 +363,7 @@ export function ReadLater(props: {
   onOpenUrl: (url: string) => void;
   onReadDone: (path: string, id: string) => void;
 }) {
-  const { readLater, unreadCount } = props.today;
+  const { readLater, unreadCount, readLaterReasons, archive } = props.today;
   const { busyPath, onOpenUrl } = props;
   return (
     <section class="flex flex-col gap-[10px]">
@@ -384,6 +384,11 @@ export function ReadLater(props: {
                 title={item.url}
               >
                 <span class="text-[14px] truncate group-hover:text-nt-accent">{item.name}</span>
+                {readLaterReasons[item.id] && (
+                  <span class="text-[12px] text-nt-accent truncate">
+                    {readLaterReasons[item.id]}
+                  </span>
+                )}
                 {item.summary && (
                   <span class="text-[12px] text-nt-muted line-clamp-2">{item.summary}</span>
                 )}
@@ -396,6 +401,18 @@ export function ReadLater(props: {
                   </span>
                 )}
               </button>
+              {archive.includes(item.id) && (
+                <button
+                  type="button"
+                  onClick={() => props.onReadDone(item.path, item.id)}
+                  disabled={busyPath !== null}
+                  aria-label={`Archive ${item.name}`}
+                  title="Unread for over two months: mark as read"
+                  class="shrink-0 whitespace-nowrap text-[12px] text-nt-muted hover:text-nt-accent disabled:opacity-50"
+                >
+                  Archive?
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => props.onReadDone(item.path, item.id)}

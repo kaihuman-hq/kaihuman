@@ -34,6 +34,8 @@ let activeGroup: string | null;
 /** What the worker says to a pin; a string is answered as an error. */
 let pinReply: string | null;
 let TODAY: TodaySummary | undefined;
+/** The cached rankings the worker attaches to GET_TODAY; empty until a precompute has run. */
+let RANKING: { likely?: { ids: string[]; reasons: Record<string, string>; computedAt: number } };
 let STATUSES: ServiceStatus[];
 
 const emptyToday = (): TodaySummary => ({
@@ -42,6 +44,8 @@ const emptyToday = (): TodaySummary => ({
   overdue: [],
   inbox: { path: '.kh/inbox.todos.md', count: 0 },
   readLater: [],
+  readLaterReasons: {},
+  archive: [],
   unreadCount: 0,
   habits: [],
   timers: [],
@@ -105,7 +109,8 @@ const reply = (message: { type?: string; bookmarkId?: string; pinned?: boolean }
   }
   if (message.type === 'GET_RECENTS') return { recents: [] };
   if (message.type === 'GET_SERVICE_STATUS') return { statuses: STATUSES };
-  if (message.type === 'GET_TODAY') return TODAY ? { today: TODAY } : { error: 'offline' };
+  if (message.type === 'GET_TODAY')
+    return TODAY ? { today: TODAY, ranking: RANKING } : { error: 'offline' };
   if (message.type === 'GET_SYNC_STATUS')
     return { syncedAt: Date.now() - 12.5 * 60_000, pendingOpens: 2 };
   if (message.type === 'TODAY_CHECK_IN' && TODAY) {
@@ -152,7 +157,7 @@ const titlesIn = (list: string) =>
     ),
   ].map((span) => span.textContent);
 const pinnedTitles = () => titlesIn('Pinned');
-const recentTitles = () => titlesIn('Recently used');
+const recentTitles = () => titlesIn('Likely next');
 
 /** The capture box's own button, not the tab of the same name. */
 const clickSubmit = (label: string) => {
@@ -202,6 +207,7 @@ beforeEach(() => {
   activeGroup = 'home';
   pinReply = null;
   TODAY = undefined;
+  RANKING = {};
   STATUSES = [];
   deleteReply = null;
   FRESHER = null;
@@ -265,6 +271,24 @@ describe('StartPage', () => {
     const title = host.querySelector('a[href="https://app.kaihuman.com"]');
     expect(title?.textContent).toBe('kaihuman');
     expect(host.textContent).toContain('owner/repo');
+  });
+
+  it('renders rule order with an empty cache', async () => {
+    RANKING = {};
+    TODAY = emptyToday();
+    await mount(() => host.textContent?.includes('newer') ?? false);
+    await waitFor(() => sent.some((message) => message.type === 'REFRESH_TODAY'));
+
+    expect(recentTitles()).toEqual(['newer', 'older']);
+  });
+
+  it('lists the likely next bookmarks in the cached order', async () => {
+    RANKING = { likely: { ids: ['older', 'gone', 'newer'], reasons: {}, computedAt: 1 } };
+    TODAY = emptyToday();
+    await mount(() => host.textContent?.includes('newer') ?? false);
+    await waitFor(() => recentTitles()[0] === 'older');
+
+    expect(recentTitles()).toEqual(['older', 'newer']);
   });
 
   it('lists the bookmarks used most recently first', async () => {
@@ -358,7 +382,7 @@ describe('StartPage', () => {
     expect(groups?.textContent).toContain('1 tab');
     const headings = [...host.querySelectorAll('h2')].map((h) => h.textContent);
     expect(headings.indexOf('Pinned')).toBeLessThan(headings.indexOf('Tab groups'));
-    expect(headings.indexOf('Tab groups')).toBeLessThan(headings.indexOf('Recently used'));
+    expect(headings.indexOf('Tab groups')).toBeLessThan(headings.indexOf('Likely next'));
     const current = groups?.querySelectorAll('button[aria-current="true"]');
     expect([...(current ?? [])].map((b) => b.textContent)).toEqual(['Home1 tab']);
   });
@@ -530,6 +554,41 @@ describe('StartPage', () => {
     expect(sent.find((message) => message.type === 'TODAY_CHECK_IN')).toEqual({
       type: 'TODAY_CHECK_IN',
       path: '.kh/health.habit.csv',
+    });
+  });
+
+  it('shows the reasons and offers to archive an old item', async () => {
+    TODAY = {
+      ...emptyToday(),
+      readLater: [
+        {
+          id: 'r1',
+          url: 'https://read.example/',
+          name: 'Long read',
+          createdAt: 0,
+          path: 'r.readitlater.json',
+        },
+        {
+          id: 'r2',
+          url: 'https://other.example/',
+          name: 'Other read',
+          createdAt: 0,
+          path: 'r.readitlater.json',
+        },
+      ],
+      readLaterReasons: { r1: 'About the Payments stream' },
+      archive: ['r2'],
+    };
+    await mount(() => host.textContent?.includes('Long read') ?? false);
+
+    expect(host.textContent).toContain('About the Payments stream');
+    expect(host.querySelector('button[aria-label="Archive Long read"]')).toBeNull();
+    (host.querySelector('button[aria-label="Archive Other read"]') as HTMLButtonElement).click();
+    await waitFor(() => sent.some((message) => message.type === 'READ_LATER_DONE'));
+    expect(sent.find((message) => message.type === 'READ_LATER_DONE')).toEqual({
+      type: 'READ_LATER_DONE',
+      path: 'r.readitlater.json',
+      id: 'r2',
     });
   });
 
@@ -793,7 +852,7 @@ describe('StartPage', () => {
     ];
     await mount(() => host.textContent?.includes('Wiki') ?? false);
 
-    const tags = [...host.querySelectorAll('ul[aria-label="Recently used"] li button')]
+    const tags = [...host.querySelectorAll('ul[aria-label="Likely next"] li button')]
       .filter((button) => !button.hasAttribute('aria-pressed'))
       .map((button) => button.querySelector('span')?.textContent);
     expect(tags).toEqual(['PROD', 'INT', '—']);
