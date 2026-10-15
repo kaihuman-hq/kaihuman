@@ -57,6 +57,7 @@ import {
   withAltText,
   within,
 } from './ai/enrich.js';
+import { bulletsOf, draftReview, type ReviewRange, reviewSources } from './ai/review.js';
 import { readAiSettings } from './ai/settings.js';
 import { openWorkPanel } from './work/side-panel';
 import { loadStreams } from './work/streams-store';
@@ -1450,6 +1451,40 @@ async function addActionLog(path: string, description: string, tags: string[]) {
   return {};
 }
 
+/**
+ * The standup or week review draft. Action logs are read from the repo, since the cache keeps
+ * only their paths; the model writes the prose unless the side panel's AI switch is off.
+ */
+async function reviewDraft(range: ReviewRange) {
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const todayCache = await readTodayCache();
+  if (!todayCache || !isTodayCacheUsable(todayCache, repo)) {
+    throw new Error('Nothing synced yet. Open the console once, then try again.');
+  }
+  const [logs, streams, stored, settings] = await Promise.all([
+    Promise.all(
+      todayCache.actionLogPaths.map((path) =>
+        githubReadFile(token, repo, encodePath(path)).then(
+          (file) => file?.content ?? '',
+          () => '',
+        ),
+      ),
+    ),
+    loadStreams().catch(() => undefined),
+    chrome.storage.local.get('workSnapshot'),
+    readAiSettings(),
+  ]);
+  const sources = reviewSources(range, new Date(), {
+    logs,
+    streams: streams?.state.ok ? streams.state.file : null,
+    snapshot: stored.workSnapshot as WorkSnapshot | undefined,
+    todayCache,
+  });
+  const drafted = settings.sidePanel ? await draftReview(sources, range) : null;
+  return { text: drafted ?? bulletsOf(sources), drafted: drafted !== null };
+}
+
 /** The files `>f` lists, each with its console link, as a repo search lists its hits. */
 async function listEntryFiles() {
   const { token, repo } = await credentials();
@@ -2084,6 +2119,10 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       readTodayCache().then(async (cache) => ({ themes: (await digestToday(cache)) ?? [] })),
       sendResponse,
     );
+  }
+
+  if (message.type === 'REVIEW_DRAFT') {
+    return answer(reviewDraft(message.range === 'week' ? 'week' : 'standup'), sendResponse);
   }
 
   if (message.type === 'CAPTURE_CLASSIFY') {
