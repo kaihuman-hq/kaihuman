@@ -21,7 +21,7 @@
   - capture classify: 4,000 ms
   - save enrichment (read later, knowledge base, bookmark draft): 8,000 ms
   - palette summarize and ask: 30,000 ms
-  - background jobs: no timeout, `background` priority
+  - background jobs: 60,000 ms ceiling, `background` priority (interactive calls jump queued background jobs)
 - Input caps:
   - page text: 12,000 characters
   - PR body: 1,000 characters
