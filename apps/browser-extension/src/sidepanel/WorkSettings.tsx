@@ -143,7 +143,7 @@ function AiGroupSettings() {
           checked={settings[group]}
           label={label}
           onChange={(on) => {
-            setSettings({ ...settings, [group]: on });
+            setSettings((current) => current && { ...current, [group]: on });
             void writeAiSettings({ [group]: on });
           }}
         />

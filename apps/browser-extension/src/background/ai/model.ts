@@ -36,7 +36,6 @@ interface SummarizerOptions {
   type: SummaryType;
   length: SummaryLength;
   format: 'plain-text';
-  sharedContext?: string;
 }
 
 interface SummarizerApi {
@@ -197,11 +196,15 @@ export async function promptJson<T>(task: {
   return runJob(
     'answer',
     async (track) => {
-      if ((await availability('prompt')) !== 'available') return null;
+      // The languages the session declares: an extra one may still need downloading.
+      const declared = languages(task.languages);
+      if ((await model.availability(declared).catch(() => 'unavailable')) !== 'available') {
+        return null;
+      }
       // A fresh session per task: earlier tasks would otherwise crowd the context and sway it.
       const session = track(
         await model.create({
-          ...languages(task.languages),
+          ...declared,
           initialPrompts: [{ role: 'system', content: task.system }],
         }),
       );

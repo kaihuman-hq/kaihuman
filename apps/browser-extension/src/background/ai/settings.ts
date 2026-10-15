@@ -34,11 +34,19 @@ export async function readAiSettings(): Promise<AiSettings> {
     ...DEFAULTS,
     ...(typeof stored === 'object' && stored !== null ? (stored as Partial<AiSettings>) : {}),
   };
-  return { ...merged, inboxLabels: merged.inboxLabels.slice(0, MAX_INBOX_LABELS) };
+  const labels = Array.isArray(merged.inboxLabels) ? merged.inboxLabels : [];
+  return { ...merged, inboxLabels: labels.slice(0, MAX_INBOX_LABELS) };
 }
 
-export async function writeAiSettings(patch: Partial<AiSettings>): Promise<void> {
-  const next = { ...(await readAiSettings()), ...patch };
-  next.inboxLabels = next.inboxLabels.slice(0, MAX_INBOX_LABELS);
-  await chrome.storage.local.set({ [AI_SETTINGS_KEY]: next });
+// Read-modify-write on one storage key: writes are chained so two quick toggles both land.
+let writing: Promise<void> = Promise.resolve();
+
+export function writeAiSettings(patch: Partial<AiSettings>): Promise<void> {
+  const write = writing.then(async () => {
+    const next = { ...(await readAiSettings()), ...patch };
+    next.inboxLabels = next.inboxLabels.slice(0, MAX_INBOX_LABELS);
+    await chrome.storage.local.set({ [AI_SETTINGS_KEY]: next });
+  });
+  writing = write.catch(() => {});
+  return write;
 }

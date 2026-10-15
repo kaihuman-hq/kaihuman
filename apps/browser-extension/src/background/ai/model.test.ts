@@ -49,8 +49,13 @@ describe('promptJson', () => {
   });
 
   it('declares the languages it is given', async () => {
-    const { created } = fakeModel(JSON.stringify({ pick: 'a' }));
+    const { created, model } = fakeModel(JSON.stringify({ pick: 'a' }));
     await promptJson({ ...task, languages: ['en', 'de'] });
+    // Availability is asked for the same languages the session declares.
+    expect(model.availability).toHaveBeenCalledWith({
+      expectedInputs: [{ type: 'text', languages: ['en', 'de'] }],
+      expectedOutputs: [{ type: 'text', languages: ['en', 'de'] }],
+    });
     expect(created[0]).toMatchObject({
       expectedInputs: [{ type: 'text', languages: ['en', 'de'] }],
     });

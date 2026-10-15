@@ -327,4 +327,18 @@ describe('suggestion settings', () => {
     expect(store.aiSettings).toMatchObject({ newTab: false, tabs: true });
     expect(checkbox('Rank and summarize on the new tab page')?.checked).toBe(false);
   });
+
+  it('keeps both of two AI switches flipped back to back', async () => {
+    await mount('Work');
+    byLabel('Settings').click();
+    await waitFor(() => checkbox('Tidy tabs') !== undefined);
+    checkbox('Tidy tabs')?.click();
+    checkbox('Palette actions')?.click();
+    await waitFor(() => {
+      const ai = store.aiSettings as { tabs?: boolean; palette?: boolean } | undefined;
+      return ai?.tabs === false && ai?.palette === false;
+    });
+    expect(checkbox('Tidy tabs')?.checked).toBe(false);
+    expect(checkbox('Palette actions')?.checked).toBe(false);
+  });
 });

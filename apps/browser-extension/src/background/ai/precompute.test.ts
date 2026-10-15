@@ -25,6 +25,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -79,18 +80,57 @@ describe('runPrecompute', () => {
           finish = resolve;
         }),
     });
+    const started = async (count: number) => {
+      while (runs < count) await new Promise((resolve) => setTimeout(resolve, 0));
+    };
     const first = runPrecompute('alarm');
     const second = runPrecompute('today');
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await started(1);
     finish();
     await Promise.all([first, second]);
     expect(runs).toBe(1);
     // Once it is done, the next call runs again.
-    const third = runPrecompute('work');
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    const third = runPrecompute('alarm');
+    await started(2);
     finish();
     await third;
     expect(runs).toBe(2);
+  });
+});
+
+describe('the work throttle', () => {
+  it('work triggers run at most once per 10 minutes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const start = new Date('2026-10-15T10:00:00.000Z').getTime();
+    vi.setSystemTime(start);
+    const { registerPrecompute, runPrecompute } = await load();
+    let runs = 0;
+    registerPrecompute({ id: 'a', group: 'newTab', run: async () => void runs++ });
+    await runPrecompute('work');
+    vi.setSystemTime(start + 60_000);
+    await runPrecompute('work');
+    expect(runs).toBe(1);
+    // The hourly alarm and a start page sync are not throttled.
+    await runPrecompute('alarm');
+    expect(runs).toBe(2);
+    await runPrecompute('today');
+    expect(runs).toBe(3);
+    // Any run restarts the clock; eleven minutes after the last one, work runs again.
+    vi.setSystemTime(start + 11 * 60_000);
+    await runPrecompute('work');
+    expect(runs).toBe(4);
+    vi.useRealTimers();
+  });
+
+  it('remembers the last run across a worker restart', async () => {
+    const first = await load();
+    let runs = 0;
+    first.registerPrecompute({ id: 'a', group: 'newTab', run: async () => void runs++ });
+    await first.runPrecompute('work');
+    const restarted = await load();
+    restarted.registerPrecompute({ id: 'a', group: 'newTab', run: async () => void runs++ });
+    await restarted.runPrecompute('work');
+    expect(runs).toBe(1);
   });
 });
 
@@ -116,6 +156,18 @@ describe('AI settings', () => {
     const labels = Array.from({ length: 8 }, (_, i) => ({ name: `l${i}`, hint: '', mute: false }));
     await writeAiSettings({ inboxLabels: labels });
     expect((await readAiSettings()).inboxLabels).toHaveLength(6);
+  });
+
+  it('reads stored inbox labels that are not a list as none', async () => {
+    const { readAiSettings, AI_SETTINGS_KEY } = await load();
+    store[AI_SETTINGS_KEY] = { inboxLabels: 'oops', tabs: false };
+    expect(await readAiSettings()).toMatchObject({ inboxLabels: [], tabs: false });
+  });
+
+  it('keeps both of two writes made back to back', async () => {
+    const { readAiSettings, writeAiSettings } = await load();
+    await Promise.all([writeAiSettings({ tabs: false }), writeAiSettings({ palette: false })]);
+    expect(await readAiSettings()).toMatchObject({ tabs: false, palette: false });
   });
 });
 
