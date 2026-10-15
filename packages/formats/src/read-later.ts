@@ -4,6 +4,9 @@ export interface ReadItLaterItem {
   status: 'read' | 'new';
   name: string;
   tags: string[];
+  /** Written on device when the page was saved. */
+  summary?: string;
+  readMinutes?: number;
   createdAt: number;
   updatedAt: number;
 }

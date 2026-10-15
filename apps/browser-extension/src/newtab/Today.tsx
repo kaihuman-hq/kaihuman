@@ -4,8 +4,12 @@
  * the worker builds out of its hourly cache, so a new tab costs no GitHub request.
  */
 import type { ComponentChildren } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
+import type { Theme } from '../background/ai/digest';
+import { availability } from '../background/ai/model';
+import { readAiSettings } from '../background/ai/settings';
 import { EVENTS_HORIZON_DAYS, HABIT_WEEK_DAYS, type TodaySummary } from '../background/today';
+import { send } from '../palette/port';
 
 const linkButton = 'text-left hover:text-nt-accent truncate';
 
@@ -120,6 +124,49 @@ export function Clocks({ clocks, now }: { clocks: TodaySummary['clocks']; now: D
         </li>
       ))}
     </ul>
+  );
+}
+
+/** The one thing to focus on, as the worker's model last put it; nothing when none is cached. */
+export function FocusLine(props: { focus: string | undefined }) {
+  if (!props.focus) return null;
+  return (
+    <p data-testid="focus-line" class="text-[16px] text-nt-fg border-l-2 border-nt-accent pl-3">
+      {props.focus}
+    </p>
+  );
+}
+
+/** Three sentences on the day; dismissing folds it away until tomorrow, not for good. */
+export function MorningBrief(props: {
+  sentences: string[];
+  collapsed: boolean;
+  onDismiss: () => void;
+  onShow: () => void;
+}) {
+  const { sentences, collapsed } = props;
+  return (
+    <section class="border border-nt-control p-4 flex flex-col gap-2">
+      <SectionHead
+        title="Morning brief"
+        meta={
+          <button
+            type="button"
+            class="hover:text-nt-accent"
+            onClick={collapsed ? props.onShow : props.onDismiss}
+          >
+            {collapsed ? 'Show' : 'Dismiss'}
+          </button>
+        }
+      />
+      {!collapsed && (
+        <ul class="flex flex-col gap-1 text-[16px]">
+          {sentences.map((sentence) => (
+            <li key={sentence}>{sentence}</li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -298,6 +345,11 @@ export function Trackers(props: {
               <span class="flex-1 min-w-0 text-[13px] truncate" title={habit.name}>
                 {habit.name}
               </span>
+              {habit.atRisk && (
+                <span class="shrink-0 text-[11px] text-nt-prod" title="Check in to keep the streak">
+                  at risk
+                </span>
+              )}
               <span
                 role="img"
                 aria-label={`${reached} of the last ${HABIT_WEEK_DAYS} days`}
@@ -323,13 +375,42 @@ export function Trackers(props: {
   );
 }
 
+/** Ideas gone quiet, offered back: a click opens the palette's `>id` search on the title. */
+export function Resurface(props: { today: TodaySummary; onOpenIdea: (title: string) => void }) {
+  const { resurface } = props.today;
+  if (resurface.length === 0) return null;
+  return (
+    <section class="flex flex-col gap-[10px]">
+      <SectionHead title="Resurface" />
+      <ul aria-label="Resurface" class="flex flex-col border-t border-nt-divider">
+        {resurface.map((idea) => (
+          <li
+            key={idea.path}
+            class="flex items-center gap-[10px] py-[10px] border-b border-nt-row min-w-0"
+          >
+            <button
+              type="button"
+              class={`flex-1 ${linkButton}`}
+              onClick={() => props.onOpenIdea(idea.title)}
+              title={`${idea.status} since ${idea.lastActivity}`}
+            >
+              {idea.title}
+            </button>
+            <span class="shrink-0 text-[11px] text-nt-muted tabular-nums">{idea.lastActivity}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function ReadLater(props: {
   today: TodaySummary;
   busyPath: string | null;
   onOpenUrl: (url: string) => void;
   onReadDone: (path: string, id: string) => void;
 }) {
-  const { readLater, unreadCount } = props.today;
+  const { readLater, unreadCount, readLaterReasons, archive } = props.today;
   const { busyPath, onOpenUrl } = props;
   return (
     <section class="flex flex-col gap-[10px]">
@@ -350,12 +431,35 @@ export function ReadLater(props: {
                 title={item.url}
               >
                 <span class="text-[14px] truncate group-hover:text-nt-accent">{item.name}</span>
-                {item.createdAt > 0 && (
+                {readLaterReasons[item.id] && (
+                  <span class="text-[12px] text-nt-accent truncate">
+                    {readLaterReasons[item.id]}
+                  </span>
+                )}
+                {item.summary && (
+                  <span class="text-[12px] text-nt-muted line-clamp-2">{item.summary}</span>
+                )}
+                {(item.createdAt > 0 || item.readMinutes) && (
                   <span class="text-[11px] text-nt-muted">
-                    saved {new Date(item.createdAt).toLocaleDateString('en-US')}
+                    {item.createdAt > 0 &&
+                      `saved ${new Date(item.createdAt).toLocaleDateString('en-US')}`}
+                    {item.createdAt > 0 && item.readMinutes ? ' · ' : ''}
+                    {item.readMinutes ? `${item.readMinutes} min` : ''}
                   </span>
                 )}
               </button>
+              {archive.includes(item.id) && (
+                <button
+                  type="button"
+                  onClick={() => props.onReadDone(item.path, item.id)}
+                  disabled={busyPath !== null}
+                  aria-label={`Archive ${item.name}`}
+                  title="Unread for over two months: mark as read"
+                  class="shrink-0 whitespace-nowrap text-[12px] text-nt-muted hover:text-nt-accent disabled:opacity-50"
+                >
+                  Archive?
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => props.onReadDone(item.path, item.id)}
@@ -404,21 +508,110 @@ export function Braindumps(props: {
   busyPath: string | null;
   onOpenFile: (path: string) => void;
   onDelete: (path: string, sha: string) => void;
+  /** Puts a theme's todo into the capture box. */
+  onMakeTodo: (text: string) => void;
+  /** Saves a theme as a seed idea; rejects with the reason it could not. */
+  onMakeIdea: (title: string) => Promise<void>;
 }) {
   const { braindumps, braindumpCount } = props.today;
   const { busyPath } = props;
   const [open, setOpen] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [canDigest, setCanDigest] = useState(false);
+  const [themes, setThemes] = useState<Theme[] | null>(null);
+  const [digesting, setDigesting] = useState(false);
+  const [madeIdeas, setMadeIdeas] = useState<string[]>([]);
+  const [digestError, setDigestError] = useState<string | null>(null);
+
+  // The button exists only when a digest can be made: the model is ready and the switch is on.
+  useEffect(() => {
+    void Promise.all([availability('prompt'), readAiSettings()]).then(
+      ([state, settings]) => setCanDigest(state === 'available' && settings.newTab),
+      () => setCanDigest(false),
+    );
+  }, []);
+
+  const digest = async () => {
+    setDigesting(true);
+    setDigestError(null);
+    try {
+      const response = await send({ type: 'BRAINDUMP_DIGEST' });
+      const found: Theme[] = Array.isArray(response?.themes) ? response.themes : [];
+      setThemes(found);
+      setMadeIdeas([]);
+      if (!found.length) setDigestError('No themes found.');
+    } catch (e) {
+      setDigestError(e instanceof Error ? e.message : 'The digest failed.');
+    } finally {
+      setDigesting(false);
+    }
+  };
+
+  const makeIdea = async (title: string) => {
+    setDigestError(null);
+    try {
+      await props.onMakeIdea(title);
+      setMadeIdeas((made) => [...made, title]);
+    } catch (e) {
+      setDigestError(e instanceof Error ? e.message : 'Could not save the idea.');
+    }
+  };
+
   return (
     <section class="flex flex-col gap-[10px]">
       <SectionHead
         title="Braindumps"
         meta={
-          braindumpCount > braindumps.length
-            ? `${braindumps.length} of ${braindumpCount}`
-            : undefined
+          <>
+            {braindumpCount > braindumps.length
+              ? `${braindumps.length} of ${braindumpCount}`
+              : undefined}
+            {canDigest && braindumps.length > 0 && (
+              <button
+                type="button"
+                disabled={digesting}
+                onClick={() => void digest()}
+                class="ml-3 text-nt-muted hover:text-nt-accent disabled:opacity-50"
+              >
+                {digesting ? 'Digesting…' : 'Digest'}
+              </button>
+            )}
+          </>
         }
       />
+      {digestError && <p class="text-[12px] text-nt-prod">{digestError}</p>}
+      {themes && themes.length > 0 && (
+        <ul aria-label="Themes" class="flex flex-col gap-[10px]">
+          {themes.map((theme) => (
+            <li
+              key={theme.title}
+              class="flex flex-col gap-1 border border-nt-control px-[14px] py-3"
+            >
+              <span class="text-[14px]">{theme.title}</span>
+              <span class="text-[12px] text-nt-muted">
+                {theme.todo} · {theme.ids.length} {theme.ids.length === 1 ? 'dump' : 'dumps'}
+              </span>
+              <span class="flex gap-4 text-[12px]">
+                <button
+                  type="button"
+                  onClick={() => props.onMakeTodo(theme.todo)}
+                  class="text-nt-muted hover:text-nt-accent"
+                >
+                  Make a todo
+                </button>
+                <button
+                  type="button"
+                  disabled={madeIdeas.includes(theme.title)}
+                  onClick={() => void makeIdea(theme.title)}
+                  class="text-nt-muted hover:text-nt-accent disabled:opacity-50"
+                >
+                  {madeIdeas.includes(theme.title) ? 'Idea saved' : 'Make an idea'}
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       {braindumps.length === 0 ? (
         <p class="text-[13px] text-nt-faint">Nothing waiting.</p>
       ) : (

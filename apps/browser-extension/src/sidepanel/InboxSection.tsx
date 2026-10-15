@@ -1,29 +1,76 @@
 import { newItemId, newStreamId, type StreamOp, type StreamsFile } from '@kaihuman/formats';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
+import { AI_CACHE_KEY } from '../background/ai/cache.js';
 import type { InboxRow } from '../background/work/inbox.js';
 import type { WorkItemStatus } from '../background/work/types.js';
 import { send } from '../palette/port.js';
 import { age } from './age.js';
-import { chip, StatusChips } from './StatusChips.js';
+import { Choice, errorText, Heading, iconButton, NewStreamInput } from './controls.js';
+import { chipClass, Rail, StatusChips, type Tone, toneOf } from './StatusChips.js';
+import { fileAsSuggested, suggestionName, useSuggestion } from './useSuggestion.js';
 
-const REASON_LABELS: Record<string, string> = {
-  'review-requested': 'review requested',
-  assigned: 'assigned',
-  failing: 'CI failing',
-  'changes-requested': 'changes requested',
-  'ready-to-merge': 'ready to merge',
+const REASONS: Record<string, readonly [label: string, tone: Tone]> = {
+  'review-requested': ['review requested', 'warn'],
+  assigned: ['assigned', 'plain'],
+  failing: ['CI failing', 'bad'],
+  'changes-requested': ['changes requested', 'bad'],
+  'ready-to-merge': ['ready to merge', 'good'],
 };
-const reasonLabel = (reason: string) => REASON_LABELS[reason] ?? reason.replaceAll('_', ' ');
-
-const iconButton = 'px-1 text-[13px] text-[#999] disabled:opacity-40';
+const reasonOf = (reason: string) =>
+  REASONS[reason] ?? ([reason.replaceAll('_', ' '), 'plain'] as const);
 
 interface Props {
   file: StreamsFile | null;
   readOnly: boolean;
+  /** row key → the user's label for it. */
+  labels?: Record<string, string>;
+  /** One-line summaries by item key; absent while the model has not written them. */
+  tldrs?: Record<string, string>;
+}
+
+/**
+ * The TL;DRs the worker has written, asked for once per snapshot (`stamp` changes with it) and
+ * again when the AI cache changes: the summaries are written after the snapshot, by the precompute
+ * run, and should show without waiting for the next snapshot.
+ */
+export function useTldrs(stamp: number | undefined): Record<string, string> {
+  const [tldrs, setTldrs] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (stamp === undefined) return;
+    let live = true;
+    const ask = () =>
+      send({ type: 'GET_TLDRS' }).then(
+        (response) => {
+          if (!live || typeof response !== 'object' || response === null) return;
+          const next: Record<string, string> = {};
+          for (const [key, value] of Object.entries(response)) {
+            if (typeof value === 'string' && value !== '') next[key] = value;
+          }
+          setTldrs(next);
+        },
+        () => {},
+      );
+    // A precompute run writes many cache entries in a row; one question covers the burst.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onChanged = (changes: Record<string, unknown>, area: string) => {
+      if (area !== 'local' || !(AI_CACHE_KEY in changes)) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => void ask(), 100);
+    };
+    void ask();
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+      chrome.storage.onChanged.removeListener(onChanged);
+    };
+  }, [stamp]);
+  return tldrs;
 }
 
 function PinMenu({ row, file, onDone }: { row: InboxRow; file: StreamsFile; onDone: () => void }) {
   const [error, setError] = useState<string>();
+  const [naming, setNaming] = useState(file.streams.length === 0);
   const pin = async (streamId: ReturnType<typeof newStreamId>, extra: StreamOp[] = []) => {
     const at = new Date().toISOString();
     const op: StreamOp = {
@@ -39,26 +86,33 @@ function PinMenu({ row, file, onDone }: { row: InboxRow; file: StreamsFile; onDo
       await send({ type: 'WORK_OPS', ops: [...extra, op] });
       onDone();
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
+      setError(errorText(failure));
     }
   };
-  const create = () => {
-    const name = window.prompt('Name of the new stream')?.trim();
-    if (!name) return;
+  const create = (name: string) => {
     const streamId = newStreamId();
     void pin(streamId, [{ op: 'addStream', streamId, name, at: new Date().toISOString() }]);
   };
   return (
-    <div class="flex flex-wrap gap-1 pt-1">
-      {file.streams.map((stream) => (
-        <button key={stream.id} type="button" class={chip} onClick={() => void pin(stream.id)}>
-          {stream.name}
-        </button>
-      ))}
-      <button type="button" class={chip} onClick={create}>
-        New stream…
-      </button>
-      {error && <span class="text-red-400 text-[12px] break-words">{error}</span>}
+    <div class="flex flex-col gap-1.5 border-t border-nt-row pt-2">
+      <span class="text-[11px] text-nt-muted">Pin to a stream</span>
+      {naming ? (
+        <NewStreamInput
+          submit="Add and pin"
+          onCreate={create}
+          onCancel={() => (file.streams.length === 0 ? onDone() : setNaming(false))}
+        />
+      ) : (
+        <div class="flex flex-wrap gap-1">
+          {file.streams.map((stream) => (
+            <Choice key={stream.id} title={stream.name} onClick={() => void pin(stream.id)}>
+              {stream.name}
+            </Choice>
+          ))}
+          <Choice onClick={() => setNaming(true)}>+ New stream</Choice>
+        </div>
+      )}
+      {error && <p class="text-[12px] text-nt-prod [overflow-wrap:anywhere]">{error}</p>}
     </div>
   );
 }
@@ -71,6 +125,8 @@ function Row({
   onDismiss,
   file,
   readOnly,
+  labels,
+  tldrs,
 }: {
   row: InboxRow;
   unread: boolean;
@@ -79,50 +135,120 @@ function Row({
   onDismiss: () => void;
 } & Props) {
   const [menu, setMenu] = useState(false);
+  const [pinError, setPinError] = useState<string>();
+  const suggestion = useSuggestion(
+    file,
+    file && !readOnly ? { url: row.url, title: row.title } : undefined,
+  );
+  const suggested = suggestion && file ? suggestionName(file, suggestion) : undefined;
   const open = () => {
     const message: Record<string, string> = { type: 'WORK_OPEN', url: row.url };
     if (row.threadId) message.threadId = row.threadId;
     void send(message).catch(() => {});
   };
   const ref = row.number === undefined ? row.repo : `${row.repo}#${row.number}`;
+  const reasons = row.reasons.map(reasonOf);
+  const tone = toneOf(
+    row.status,
+    unread,
+    reasons.map(([, t]) => t),
+  );
   return (
-    <li class="flex flex-col gap-1 border-t border-[#222] py-2 text-[13px]">
-      <div class="flex items-start gap-1">
-        <button type="button" class="flex-1 text-left underline break-words" onClick={open}>
-          {row.title}
-        </button>
-        <button
-          type="button"
-          class={iconButton}
-          aria-label={`Pin ${row.title}`}
-          disabled={readOnly || !file}
-          onClick={() => setMenu(!menu)}
-        >
-          📌
-        </button>
-        {dismissible && (
+    <li class="group flex gap-2.5 py-2">
+      <Rail tone={tone} />
+      <div class="flex min-w-0 flex-1 flex-col gap-1">
+        <div class="flex items-start gap-1">
+          <button
+            type="button"
+            title={row.title}
+            class="min-w-0 flex-1 text-left text-[13px] leading-[18px] line-clamp-2 [overflow-wrap:anywhere] hover:text-nt-accent"
+            onClick={open}
+          >
+            {row.title}
+          </button>
+          <span class="shrink-0 pt-px text-[11px] text-nt-faint">
+            {age(Date.parse(row.updatedAt))}
+          </span>
+        </div>
+        {tldrs?.[row.key] && (
+          <p class="text-[11px] leading-4 text-nt-muted line-clamp-2 [overflow-wrap:anywhere]">
+            {tldrs[row.key]}
+          </p>
+        )}
+        <div class="flex items-center gap-1">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+            <span class="min-w-0 max-w-full truncate text-[11px] text-nt-muted" title={ref}>
+              {ref}
+            </span>
+            {reasons.map(([label, t]) => (
+              <span key={label} class={chipClass(t)}>
+                {label}
+              </span>
+            ))}
+            {labels?.[row.key] && (
+              <span class={chipClass('plain')} data-label>
+                {labels[row.key]}
+              </span>
+            )}
+            <StatusChips status={row.status} unread={unread} />
+          </div>
           <button
             type="button"
             class={iconButton}
-            aria-label={`Dismiss ${row.title}`}
-            onClick={onDismiss}
+            aria-label={`Pin ${row.title}`}
+            aria-expanded={menu}
+            title="Pin to a stream"
+            disabled={readOnly || !file}
+            onClick={() => setMenu(!menu)}
           >
-            ✕
+            +
+          </button>
+          {dismissible && (
+            <button
+              type="button"
+              class={iconButton}
+              aria-label={`Dismiss ${row.title}`}
+              title="Dismiss until it changes"
+              onClick={onDismiss}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {suggestion && suggested && !menu && (
+          <button
+            type="button"
+            aria-label={`Pin ${row.title} to ${suggested}`}
+            title={
+              suggestion.reason ??
+              (suggestion.source === 'model'
+                ? "Suggested by Chrome's on-device model"
+                : 'Most items from this repository are in this stream')
+            }
+            class="flex min-w-0 max-w-full items-baseline gap-1.5 self-start text-left text-[11px] text-nt-muted hover:text-nt-accent"
+            onClick={() => {
+              setPinError(undefined);
+              fileAsSuggested(suggestion, row).catch((failure) => setPinError(errorText(failure)));
+            }}
+          >
+            <span aria-hidden="true" class="shrink-0">
+              →
+            </span>
+            <span class="truncate">
+              {suggestion.stream.kind === 'new' ? `New stream “${suggested}”` : suggested}
+            </span>
+            {suggestion.labels.length > 0 && (
+              <span class="shrink-0 text-nt-faint">{suggestion.labels.join(', ')}</span>
+            )}
+            {suggestion.reason && <span class="truncate text-nt-faint">{suggestion.reason}</span>}
           </button>
         )}
+        {pinError && <p class="text-[12px] text-nt-prod [overflow-wrap:anywhere]">{pinError}</p>}
+        {menu && file && !readOnly && (
+          <PinMenu row={row} file={file} onDone={() => setMenu(false)} />
+        )}
+        {failed && <p class="text-[12px] text-nt-prod">Could not dismiss. Try again.</p>}
       </div>
-      <div class="flex flex-wrap items-center gap-1 text-[12px] text-[#999]">
-        <span>{ref}</span>
-        {row.reasons.map((reason) => (
-          <span key={reason} class={chip}>
-            {reasonLabel(reason)}
-          </span>
-        ))}
-        <StatusChips status={row.status} unread={unread} />
-        <span class="ml-auto">{age(Date.parse(row.updatedAt))}</span>
-      </div>
-      {menu && file && !readOnly && <PinMenu row={row} file={file} onDone={() => setMenu(false)} />}
-      {failed && <p class="text-red-400 text-[12px]">could not dismiss — retry</p>}
     </li>
   );
 }
@@ -134,6 +260,8 @@ function Section({
   unread,
   file,
   readOnly,
+  labels,
+  tldrs,
 }: { title: string; rows: InboxRow[]; dismissible: boolean; unread?: Set<string> } & Props) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [failed, setFailed] = useState<Set<string>>(new Set());
@@ -161,18 +289,18 @@ function Section({
     });
   };
   return (
-    <section class="flex flex-col">
-      <h2 class="text-[13px] font-bold">{`${title} (${shown.length})`}</h2>
-      {shown.length === 0 ? (
-        <p class="text-[12px] text-[#999]">Nothing here.</p>
-      ) : (
-        <ul>
+    <section class="flex flex-col" data-section={title}>
+      <Heading title={title} count={shown.length} />
+      {shown.length > 0 && (
+        <ul class="flex flex-col divide-y divide-nt-row">
           {shown.map((row) => (
             <Row
               key={row.key}
               row={row}
               file={file}
               readOnly={readOnly}
+              labels={labels}
+              tldrs={tldrs}
               dismissible={dismissible}
               failed={failed.has(slot(row))}
               unread={unread?.has(row.key) ?? row.threadId !== undefined}

@@ -1,13 +1,17 @@
 import {
   addActionLogEntry,
+  addEventEntry,
   addReadLaterEntry,
   addTodoEntry,
   braindumpIdOf,
+  braindumpTitle,
   checkIn,
   ideaSlugOf,
+  isSafeUrl,
   localDate,
   markReadItLaterRead,
   PALETTE_SETTINGS_PATH,
+  parseIdea,
   parseTimeTracking,
   serializeTimeTracking,
   toggleStartStop,
@@ -18,51 +22,46 @@ import {
   withModeRecent,
   withTranslationText,
 } from '@kaihuman/palette';
-import { type Message } from '../types';
-import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
-import {
-  connectWorkPanel,
-  ensureWorkAlarm,
-  isPanelOpen,
-  runWorkCycle,
-  watchWorkTokens,
-} from './work/poller';
-import {
-  handlePinMenuClick,
-  handleWorkMessage,
-  pinCurrentTab,
-  pinMenuFile,
-  rebuildPinMenu,
-  watchPinMenu,
-} from './work/messages';
-import { type StreamsCache, WORK_KEYS } from './work/types';
 import { consoleFileUrl, isConsolePage } from '../console';
 // The bundled loader's path, for injecting the page script on demand (CRXJS `?script` import).
 import PAGE_SCRIPT from '../content/index.ts?script';
-import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
+import type { Message } from '../types';
+import { draftBookmark, findDuplicates, findExactDuplicates } from './ai/bookmark-draft.js';
+import { precomputeBrief, precomputeFocus, readAiCards } from './ai/brief.js';
+import { peek, put } from './ai/cache.js';
+import { captureContext, classifyCapture } from './ai/capture.js';
+import { buildWorkContext } from './ai/context.js';
+import { digestToday } from './ai/digest.js';
 import {
-  encodePath,
-  fetchEntryFilePaths,
-  fetchPromptFiles,
-  isEntryFilePath,
-  isGithubWorkFilter,
-  isPromptsCacheStale,
-  listGithubRepos,
-  type PromptsCache,
-  searchGithubWork,
-  translateWithDeepl,
-} from './palette-modes';
+  enrichCapture,
+  enrichReadLater,
+  fetchImageBlobs,
+  readMinutes,
+  withAltText,
+  within,
+} from './ai/enrich.js';
 import {
-  buildRawNote,
-  imagesEnabled,
-  KB_ASSET_DIR,
-  KB_IMAGES_SETTING,
-  KB_RAW_DIR,
-  localizeImages,
-  selectionText,
-  slugify,
-  urlToSlug,
-} from './kb-capture';
+  type IntentContext,
+  intentContext,
+  intentMessages,
+  parseIntent,
+  previewOf,
+  validateIntent,
+} from './ai/intent.js';
+import { precomputeInboxLabels, readMutedKeys } from './ai/labels.js';
+import { askPage, pageSummary } from './ai/page.js';
+import {
+  AI_ALARM,
+  ensureAiAlarm,
+  precomputeInBackground,
+  registerPrecompute,
+} from './ai/precompute.js';
+import { likelyNext, type Ranking, readLaterForToday, rerank } from './ai/rank.js';
+import { bulletsOf, draftReview, type ReviewRange, reviewSources } from './ai/review.js';
+import { readAiSettings } from './ai/settings.js';
+import { MAX_TABS, proposeGroups } from './ai/tidy.js';
+import { precomputeTldrs, readTldrs } from './ai/tldr.js';
+import { translateOnDevice } from './ai/translate.js';
 import {
   addBookmark,
   applyUsage,
@@ -81,6 +80,31 @@ import {
   setBookmarkPinned,
   settleUsage,
 } from './bookmarks';
+import { type ChromeBookmarkNode, flattenChromeBookmarks } from './chrome-bookmarks';
+import {
+  buildRawNote,
+  type CaptureType,
+  imagesEnabled,
+  KB_ASSET_DIR,
+  KB_IMAGES_SETTING,
+  KB_RAW_DIR,
+  localizeImages,
+  selectionText,
+  slugify,
+  urlToSlug,
+} from './kb-capture';
+import {
+  encodePath,
+  fetchEntryFilePaths,
+  fetchPromptFiles,
+  isEntryFilePath,
+  isGithubWorkFilter,
+  isPromptsCacheStale,
+  listGithubRepos,
+  type PromptsCache,
+  searchGithubWork,
+  translateWithDeepl,
+} from './palette-modes';
 import {
   findGroup,
   isOpenableUrl,
@@ -96,33 +120,54 @@ import {
   parsePinnedTabs,
   putGroup,
   removeGroup,
-  setGroupFavorite,
   serializePinnedTabs,
+  setGroupFavorite,
   tabsToOpen,
   tabsToUnpin,
   toPinnedTabs,
 } from './pinned-tabs';
+import { syncRepoWithDesktop, watchRepoChanges } from './repo-sync';
 import {
   checkServices,
   DEFAULT_SERVICES,
   isStatusCacheFresh,
   parseStatusConfig,
-  STATUS_CONFIG_PATH,
   type ServiceStatusCache,
+  STATUS_CONFIG_PATH,
 } from './service-status';
 import {
+  actionLogPath,
   buildToday,
   DEFAULT_ACTION_LOG_PATH,
   fetchToday,
   inboxPath,
   isTodayCacheStale,
   isTodayCacheUsable,
+  knownReadLaterTags,
   readLaterPath,
   type TodayCache,
+  unreadItems,
   withFile,
   withoutFile,
 } from './today';
-
+import {
+  handlePinMenuClick,
+  handleWorkMessage,
+  pinCurrentTab,
+  pinMenuFile,
+  rebuildPinMenu,
+  watchPinMenu,
+} from './work/messages';
+import {
+  connectWorkPanel,
+  ensureWorkAlarm,
+  isPanelOpen,
+  runWorkCycle,
+  watchWorkTokens,
+} from './work/poller';
+import { openWorkPanel } from './work/side-panel';
+import { loadStreams } from './work/streams-store';
+import { type StreamsCache, WORK_KEYS, type WorkSnapshot } from './work/types';
 
 // Keep the service worker alive to prevent the HMR port (crx-client-port.js)
 // from disconnecting. Chrome suspends MV3 service workers after ~30s of
@@ -138,6 +183,16 @@ chrome.alarms.create('repoSync', { periodInMinutes: 60 });
 
 // Work streams poll GitHub on their own schedule; the cycle decides each minute what is due.
 ensureWorkAlarm().catch((e) => console.warn('kaihuman: creating the work alarm failed', e));
+// On-device AI fills its cache hourly, and after each start page sync and work cycle.
+ensureAiAlarm().catch((e) => console.warn('kaihuman: creating the AI alarm failed', e));
+// The cards first: the page reads them once, and the ranking and inbox jobs behind them can
+// take minutes of model time.
+registerPrecompute({ id: 'card:focus', group: 'newTab', run: () => precomputeFocus(cardInputs) });
+registerPrecompute({ id: 'card:brief', group: 'newTab', run: () => precomputeBrief(cardInputs) });
+registerPrecompute({ id: 'rank:likely', group: 'newTab', run: precomputeLikelyNext });
+registerPrecompute({ id: 'rank:readLater', group: 'newTab', run: precomputeReadLater });
+registerPrecompute({ id: 'inbox:labels', group: 'sidePanel', run: precomputeLabels });
+registerPrecompute({ id: 'inbox:tldr', group: 'sidePanel', run: precomputeTldrs });
 watchWorkTokens();
 watchPinMenu();
 
@@ -153,9 +208,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'swKeepAlive') {
     // Also a backstop for the work alarm: the cycle is time-gated by its poll state, so this
     // costs no extra GitHub calls.
-    runWorkCycle({ panelOpen: isPanelOpen() }).catch((e) =>
-      console.warn('kaihuman: work polling failed', e),
-    );
+    runWorkCycle({ panelOpen: isPanelOpen() })
+      .then(() => precomputeInBackground('work'))
+      .catch((e) => console.warn('kaihuman: work polling failed', e));
   }
   if (alarm.name === 'repoSync') {
     syncRepoWithDesktop().catch((e) =>
@@ -165,10 +220,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     syncPinnedTabs().catch((e) => console.warn('kaihuman: pinned tab sync failed', e));
     syncToday().catch((e) => console.warn('kaihuman: start page sync failed', e));
   }
+  if (alarm.name === AI_ALARM) precomputeInBackground('alarm');
   if (alarm.name === 'work') {
-    runWorkCycle({ panelOpen: isPanelOpen() }).catch((e) =>
-      console.warn('kaihuman: work polling failed', e),
-    );
+    runWorkCycle({ panelOpen: isPanelOpen() })
+      .then(() => precomputeInBackground('work'))
+      .catch((e) => console.warn('kaihuman: work polling failed', e));
   }
 });
 
@@ -183,7 +239,6 @@ chrome.runtime.onConnect.addListener((port) => {
     connectWorkPanel(port).catch((e) => console.warn('kaihuman: work panel refresh failed', e));
   }
 });
-
 
 /** Whether the tab is showing a page of this extension's own — the start page, in practice. */
 async function isExtensionPage(tabId: number): Promise<boolean> {
@@ -283,9 +338,7 @@ async function syncIfStale(force = false) {
   const synced = await syncBookmarks();
   if (force) {
     // Best effort: a hand-broken pinnedtabs file should not take "Sync now" down with it.
-    await syncPinnedTabs().catch((e) =>
-      console.warn('kaihuman: pinned tab sync failed', e),
-    );
+    await syncPinnedTabs().catch((e) => console.warn('kaihuman: pinned tab sync failed', e));
     await syncToday().catch((e) => console.warn('kaihuman: start page sync failed', e));
   }
   return { synced: true, bookmarks: synced?.bookmarks.length ?? 0 };
@@ -357,6 +410,14 @@ chrome.commands.onCommand.addListener(async (command) => {
   await flagPaletteFailure(tab.id);
 });
 
+// The shortcut counts as the user's action, which `sidePanel.open` needs, so the panel opens here.
+chrome.commands.onCommand.addListener((command, tab) => {
+  if (command !== 'open-work-panel') return;
+  openWorkPanel(tab?.windowId).catch((e) =>
+    console.warn('kaihuman: opening the work panel failed', e),
+  );
+});
+
 chrome.commands.onCommand.addListener((command) => {
   if (command !== 'pin-current-tab') return;
   pinCurrentTab().catch((e) => console.warn('kaihuman: pinning the tab failed', e));
@@ -399,7 +460,13 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 // Add comprehensive GitHub API helper
-async function githubUpsertFile(token: string, repoUrl: string, filePath: string, newContentLines: string, position: 'top' | 'bottom' = 'bottom') {
+async function githubUpsertFile(
+  token: string,
+  repoUrl: string,
+  filePath: string,
+  newContentLines: string,
+  position: 'top' | 'bottom' = 'bottom',
+) {
   const url = `https://api.github.com/repos/${repoUrl}/contents/${filePath}`;
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -424,7 +491,9 @@ async function githubUpsertFile(token: string, repoUrl: string, filePath: string
     }
 
     const updatedContent = currentContent
-      ? (position === 'top' ? `${newContentLines}\n\n${currentContent}` : `${currentContent}\n\n${newContentLines}`)
+      ? position === 'top'
+        ? `${newContentLines}\n\n${currentContent}`
+        : `${currentContent}\n\n${newContentLines}`
       : newContentLines;
 
     // Encode base64
@@ -629,9 +698,7 @@ async function readConfig(token: string, repo: string, fresh = false) {
     const cache = await readPinnedTabsCache();
     if (isPinnedTabsCacheUsable(cache, repo) && cache) {
       if (isPinnedTabsCacheStale(cache)) {
-        syncPinnedTabs().catch((e) =>
-          console.warn('kaihuman: pinned tab refresh failed', e),
-        );
+        syncPinnedTabs().catch((e) => console.warn('kaihuman: pinned tab refresh failed', e));
       }
       return { config: cache.config, sha: cache.sha ?? undefined };
     }
@@ -959,7 +1026,11 @@ interface PaletteSettingsCache {
 
 async function refreshPaletteSettings(token: string, repo: string) {
   const file = await githubReadFile(token, repo, PALETTE_SETTINGS_PATH);
-  const cache: PaletteSettingsCache = { repo, content: file?.content ?? null, fetchedAt: Date.now() };
+  const cache: PaletteSettingsCache = {
+    repo,
+    content: file?.content ?? null,
+    fetchedAt: Date.now(),
+  };
   await chrome.storage.local.set({ paletteSettingsCache: cache });
   return cache;
 }
@@ -984,8 +1055,22 @@ async function paletteSettings() {
 
 async function translate(text: string, targets: string[]) {
   const { deepl_key: key } = await chrome.storage.local.get('deepl_key');
-  if (!key) throw new Error('No DeepL API key yet — run “Set the DeepL API key…” first');
-  return { translations: await translateWithDeepl(key as string, text, targets) };
+  // The on-device Translator covers a missing key and an offline DeepL, unless palette AI is off.
+  const onDevice = (await readAiSettings()).palette !== false;
+  if (!key) {
+    if (!onDevice) throw new Error('No DeepL API key yet — run “Set the DeepL API key…” first');
+    return { translations: await translateOnDevice(text, targets) };
+  }
+  try {
+    return { translations: await translateWithDeepl(key as string, text, targets) };
+  } catch (failure) {
+    if (!onDevice) throw failure;
+    try {
+      return { translations: await translateOnDevice(text, targets) };
+    } catch {
+      throw failure;
+    }
+  }
 }
 
 async function readTranslationHistory(): Promise<string[]> {
@@ -1014,6 +1099,48 @@ async function githubRepos() {
   const { token } = await credentials();
   if (!token) throw new Error(NOT_LOGGED_IN);
   return { repos: await listGithubRepos(token) };
+}
+
+/**
+ * The open tabs of a window (the sender's, else the current one) as the tidy view groups them.
+ * Pinned tabs are already arranged, so they are left out, as are pages that cannot be pinned.
+ */
+async function tidyTabs(windowId: number | undefined) {
+  const open = await chrome.tabs.query(
+    windowId === undefined ? { currentWindow: true } : { windowId },
+  );
+  const tabs = open
+    .filter((tab) => tab.id !== undefined && !tab.pinned && !!tab.url && isSafeUrl(tab.url))
+    .slice(0, MAX_TABS)
+    .map((tab) => ({
+      id: tab.id as number,
+      title: tab.title || (tab.url as string),
+      url: tab.url as string,
+    }));
+  const proposals = await proposeGroups(tabs);
+  const parsed = (await loadStreams().catch(() => undefined))?.state;
+  const streams = parsed?.ok ? parsed.file.streams.map(({ id, name }) => ({ id, name })) : [];
+  return { tabs, proposals, streams };
+}
+
+/**
+ * Closes tabs the user chose in the tidy view; the only place tidy closes anything. The ids come
+ * from a page, so only tabs that still exist, are unpinned and sit in the asking window go.
+ */
+async function closeTabs(ids: unknown, windowId: number | undefined) {
+  const asked = new Set(
+    Array.isArray(ids) ? ids.filter((id): id is number => Number.isInteger(id)) : [],
+  );
+  if (asked.size === 0) return { closed: 0 };
+  const open = await chrome.tabs.query(
+    windowId === undefined ? { currentWindow: true } : { windowId },
+  );
+  const tabIds = open.flatMap((tab) =>
+    tab.id !== undefined && asked.has(tab.id) && !tab.pinned ? [tab.id] : [],
+  );
+  // One at a time: a tab the user closed meanwhile must not fail the rest.
+  const results = await Promise.allSettled(tabIds.map((id) => chrome.tabs.remove(id)));
+  return { closed: results.filter((result) => result.status === 'fulfilled').length };
 }
 
 /** The window the popup belongs to, plus its pinned tabs in one round-trip. */
@@ -1084,10 +1211,12 @@ async function savePinnedTabGroup(
   repo: string,
   groupId: string | undefined,
   name: string | undefined,
+  given?: { url?: string; title?: string }[],
 ) {
   const { config, sha } = await readConfig(token, repo, true);
   const { windowId, pinned } = await currentWindow();
-  const tabs = toPinnedTabs(pinned);
+  // Tidy hands over the tabs of a proposal; they are not what the window has pinned.
+  const tabs = toPinnedTabs(given ?? pinned);
   const now = new Date().toISOString();
 
   let group: PinnedTabGroup;
@@ -1098,7 +1227,7 @@ async function savePinnedTabGroup(
   }
 
   await writeConfig(token, repo, putGroup(config, group, now), sha);
-  if (windowId !== undefined) await rememberActiveGroup(windowId, group.id);
+  if (windowId !== undefined && !given) await rememberActiveGroup(windowId, group.id);
   return { count: tabs.length, name: group.name };
 }
 
@@ -1139,9 +1268,63 @@ async function deletePinnedTabGroup(token: string, repo: string, groupId: string
   return { name };
 }
 
+/** What is already saved, for finding duplicates; read-only. */
+async function savedEntries(bookmarks: Bookmark[]) {
+  const today = await readTodayCache();
+  const readLater = (today?.files ?? [])
+    .filter((file) => file.path.endsWith('.readitlater.json'))
+    .flatMap((file) => unreadItems(file.content));
+  // Streams are a nicety here: signed out or a failed read only means fewer duplicates found.
+  const streams = await loadStreams().catch(() => undefined);
+  return { bookmarks, readLater, streams: streams?.state.ok ? streams.state.file : null };
+}
+
+/** Exact duplicates only: no model, so the form can show them at once (spec F12). */
+async function bookmarkDuplicates(url: string) {
+  const { bookmarks } = await getBookmarks();
+  return { duplicates: findExactDuplicates({ url }, await savedEntries(bookmarks)) };
+}
+
+/**
+ * A title, tags and environment for the page being bookmarked, and where it is already saved
+ * (near copies too). Read-only: the repo is only written when the user saves.
+ */
+async function bookmarkDraft(url: string, title: string) {
+  const { bookmarks } = await getBookmarks();
+  const counts = new Map<string, number>();
+  for (const tag of bookmarks.flatMap((bookmark) => bookmark.tags)) {
+    counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  }
+  const knownTags = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 50)
+    .map(([tag]) => tag);
+  const page = { url, title };
+  const [draft, duplicates] = await Promise.all([
+    draftBookmark(page, knownTags),
+    savedEntries(bookmarks).then((saved) => findDuplicates(page, saved)),
+  ]);
+  return { draft, duplicates };
+}
+
 async function readTodayCache(): Promise<TodayCache | undefined> {
   const stored = await chrome.storage.local.get('todayCache');
   return stored.todayCache as TodayCache | undefined;
+}
+
+/** What the on-device cards are written from; null while signed out or before the first sync. */
+async function cardInputs() {
+  const todayCache = await readTodayCache();
+  if (!todayCache) return null;
+  const streams = await loadStreams().catch(() => undefined);
+  const snapshot = (await chrome.storage.local.get(WORK_KEYS.snapshot))[WORK_KEYS.snapshot];
+  return {
+    today: buildToday(todayCache, new Date()),
+    todayCache,
+    streams: streams?.state.ok ? streams.state.file : null,
+    snapshot: snapshot as WorkSnapshot | undefined,
+    muted: await readMutedKeys().catch(() => new Set<string>()),
+  };
 }
 
 /** The start page's files, on the same hourly budget as the bookmarks. */
@@ -1150,7 +1333,70 @@ async function syncToday(): Promise<TodayCache | undefined> {
   if (!token) return undefined;
   const next = await fetchToday(token, repo, await readTodayCache());
   await chrome.storage.local.set({ todayCache: next });
+  precomputeInBackground('today');
   return next;
+}
+
+const LIKELY_KEY = 'rank:likely';
+const READ_LATER_KEY = 'rank:readLater';
+const RANKING_TTL_MS = 60 * 60 * 1000;
+
+/** The summary with the cached read-later order. The model is never called from here (D2). */
+async function todayWithRanking(cache: TodayCache) {
+  // Switched off means the rule order, even while an answer is still cached (D6).
+  const ranking = (await readAiSettings()).newTab ? await peek<Ranking>(READ_LATER_KEY) : undefined;
+  return buildToday(cache, new Date(), ranking);
+}
+
+/** What the ranking jobs tell the model about the user's work; undefined until there is a cache. */
+async function rankingContext() {
+  const cache = await readTodayCache();
+  if (!cache) return undefined;
+  const streams = await loadStreams().catch(() => undefined);
+  const snapshot = (await chrome.storage.local.get(WORK_KEYS.snapshot))[WORK_KEYS.snapshot];
+  return {
+    cache,
+    ctx: buildWorkContext({
+      today: buildToday(cache, new Date()),
+      todayCache: cache,
+      streams: streams?.state.ok ? streams.state.file : null,
+      snapshot: snapshot as WorkSnapshot | undefined,
+      muted: await readMutedKeys().catch(() => new Set<string>()),
+    }),
+  };
+}
+
+async function precomputeLikelyNext() {
+  // At most hourly (D7): a fresh answer means no model prompt.
+  if ((await peek(LIKELY_KEY)) !== undefined) return;
+  const work = await rankingContext();
+  if (!work) return;
+  // The cache only: `getBookmarks` could start a GitHub sync and a usage commit (D5).
+  const { repo } = await credentials();
+  const cache = await readBookmarksCache();
+  if (!cache || !isCacheUsable(cache, repo)) return;
+  const bookmarks = applyUsage(cache.bookmarks, await readUsage(repo));
+  await put(LIKELY_KEY, await likelyNext(bookmarks, work.ctx, new Date()), RANKING_TTL_MS);
+}
+
+async function precomputeLabels() {
+  const snapshot = (await chrome.storage.local.get(WORK_KEYS.snapshot))[WORK_KEYS.snapshot];
+  if (!snapshot) return;
+  const streams = await loadStreams().catch(() => undefined);
+  await precomputeInboxLabels(
+    snapshot as WorkSnapshot,
+    streams?.state.ok ? streams.state.file : null,
+  );
+}
+
+async function precomputeReadLater() {
+  if ((await peek(READ_LATER_KEY)) !== undefined) return;
+  const work = await rankingContext();
+  if (!work) return;
+  const items = work.cache.files
+    .filter((file) => file.path.toLowerCase().endsWith('.readitlater.json'))
+    .flatMap((file) => unreadItems(file.content));
+  await put(READ_LATER_KEY, await readLaterForToday(items, work.ctx), RANKING_TTL_MS);
 }
 
 /** Cache first, like the bookmarks: a new tab never waits on GitHub unless there is no cache. */
@@ -1165,7 +1411,12 @@ async function getToday() {
     cache = await syncToday();
     if (!cache) throw new Error(NOT_LOGGED_IN);
   }
-  return { today: buildToday(cache, new Date()) };
+  return {
+    today: await todayWithRanking(cache),
+    ranking: {
+      likely: (await readAiSettings()).newTab ? await peek<Ranking>(LIKELY_KEY) : undefined,
+    },
+  };
 }
 
 /**
@@ -1184,7 +1435,7 @@ async function refreshToday() {
   }
   const next = await syncToday();
   if (!next) throw new Error(NOT_LOGGED_IN);
-  return { today: buildToday(next, new Date()) };
+  return { today: await todayWithRanking(next) };
 }
 
 /**
@@ -1204,8 +1455,12 @@ async function getServiceStatus(refresh = false) {
   const cache = stored.serviceStatusCache as ServiceStatusCache | undefined;
   if (!refresh && cache && isStatusCacheFresh(cache, services)) return { statuses: cache.statuses };
 
-  const statuses = await checkServices(services, cache?.statuses ?? [], fetch, Date.now(), (pattern) =>
-    chrome.permissions.contains({ origins: [pattern] }),
+  const statuses = await checkServices(
+    services,
+    cache?.statuses ?? [],
+    fetch,
+    Date.now(),
+    (pattern) => chrome.permissions.contains({ origins: [pattern] }),
   );
   const next: ServiceStatusCache = { services, statuses, fetchedAt: Date.now() };
   await chrome.storage.local.set({ serviceStatusCache: next });
@@ -1231,13 +1486,13 @@ async function deleteBraindump(path: string, sha: string) {
     next = withFile(cache, { path, sha: file.sha, content: file.content });
     await chrome.storage.local.set({ todayCache: next });
     return {
-      today: buildToday(next, new Date()),
+      today: await todayWithRanking(next),
       refused: 'It changed since — this is the new text. Delete again to remove it.',
     };
   }
   if (file) await githubDeleteFile(token, repo, path, sha, `braindump: delete ${path}`);
   await chrome.storage.local.set({ todayCache: next });
-  return { today: buildToday(next, new Date()) };
+  return { today: await todayWithRanking(next) };
 }
 
 /**
@@ -1275,7 +1530,114 @@ async function commitTodayFile(
 
   const next = withFile(cache, { path: target, sha: sha ?? '', content });
   await chrome.storage.local.set({ todayCache: next });
-  return { today: buildToday(next, new Date()) };
+  return { today: await todayWithRanking(next) };
+}
+
+/**
+ * Where a todo from the start page goes: the inbox, or another todo list the page knows. The inbox
+ * may not exist yet, which is why it is not held to the cache's files.
+ */
+function todoTarget(cache: TodayCache, path: string | undefined): string {
+  const inbox = inboxPath(cache);
+  if (!path || path === inbox) return inbox;
+  if (!path.toLowerCase().endsWith('.todos.md') || !cache.files.some((f) => f.path === path)) {
+    throw new Error(`${path} is not one of the start page's .todos.md files`);
+  }
+  return path;
+}
+
+/** The capture box's guesses, from the synced files only: a new tab must not cost a request. */
+async function captureGuesses(text: string) {
+  const { repo } = await credentials();
+  const cache = await readTodayCache();
+  if (!cache || !isTodayCacheUsable(cache, repo)) return { guesses: [] };
+  return { guesses: await classifyCapture(text, captureContext(cache, new Date())) };
+}
+
+const MODEL_UNAVAILABLE = 'The on-device model is not available.';
+
+/** Key points of the page text for the palette; an error message when the model cannot give them. */
+async function summarizePage(text: string) {
+  if (!(await readAiSettings()).palette) throw new Error(MODEL_UNAVAILABLE);
+  const lines = await pageSummary(text);
+  if (!lines) throw new Error(MODEL_UNAVAILABLE);
+  return { lines };
+}
+
+async function askAboutPage(text: string, question: string) {
+  if (!(await readAiSettings()).palette) throw new Error(MODEL_UNAVAILABLE);
+  const answer = await askPage(text, question);
+  if (!answer) throw new Error(MODEL_UNAVAILABLE);
+  return { answer };
+}
+
+/**
+ * What the palette's ask may pick from: the synced files, the cached bookmarks and the streams.
+ * Streams only on a web page, since pinning needs one; null while signed out or before a sync.
+ */
+async function currentIntentContext(onPage: boolean) {
+  const { repo } = await credentials();
+  const cache = await readTodayCache();
+  if (!cache || !isTodayCacheUsable(cache, repo)) return null;
+  const bookmarksCache = await readBookmarksCache();
+  const bookmarks =
+    bookmarksCache && isCacheUsable(bookmarksCache, repo)
+      ? applyUsage(bookmarksCache.bookmarks, await readUsage(repo))
+      : [];
+  const streams = onPage ? await loadStreams().catch(() => undefined) : undefined;
+  const named = streams?.state.ok
+    ? streams.state.file.streams.map(({ id, name }) => ({ id, name }))
+    : [];
+  const ctx: IntentContext = intentContext(cache, named, bookmarks, new Date());
+  return { ctx, cache, bookmarks };
+}
+
+/** The palette's ask: one action and its preview, or none. */
+async function intentParse(text: string, url: string) {
+  const none = { intent: null, preview: '' };
+  if ((await readAiSettings()).palette === false) return none;
+  const onPage = isOpenableUrl(url);
+  const found = await currentIntentContext(onPage);
+  if (!found) return none;
+  const intent = await parseIntent(text, found.ctx);
+  // Off a web page (the start page) there is nothing to save for later.
+  if (!intent || (intent.action === 'read-later' && !onPage)) return none;
+  return { intent, preview: previewOf(intent, found.ctx) };
+}
+
+/** Runs an intent the palette's ask previewed, through the handlers its messages name. */
+async function intentRun(
+  raw: unknown,
+  page: { url: string; title: string },
+  opts: { tabId?: number; reuse: boolean; dispatch: (message: object) => Promise<unknown> },
+) {
+  const onPage = isOpenableUrl(page.url);
+  const found = await currentIntentContext(onPage);
+  if (!found) throw new Error('Sync the start page first');
+  // It comes back from the page, and the repo may have moved on: checked again before writing.
+  const intent = validateIntent(raw, found.ctx);
+  if (!intent || (intent.action === 'read-later' && !onPage)) {
+    throw new Error('That no longer fits — try again');
+  }
+  const text =
+    intent.action === 'read-later' && opts.tabId !== undefined
+      ? await chrome.tabs
+          .sendMessage(opts.tabId, { type: 'EXTRACT_ARTICLE' })
+          .then((article) => String(article?.text ?? ''))
+          .catch(() => '')
+      : '';
+  const bookmarkUrl =
+    intent.action === 'open-bookmark'
+      ? found.bookmarks.find((bookmark) => bookmark.id === intent.bookmarkId)?.url
+      : undefined;
+  const messages = intentMessages(intent, {
+    page: { ...page, text },
+    logPath: actionLogPath(found.cache),
+    bookmarkUrl,
+    reuse: opts.reuse,
+  });
+  for (const next of messages) await opts.dispatch(next);
+  return { preview: previewOf(intent, found.ctx) };
 }
 
 /**
@@ -1293,6 +1655,40 @@ async function addActionLog(path: string, description: string, tags: string[]) {
   const content = addActionLogEntry(file?.content ?? '', { description, tags });
   await githubWriteFile(token, repo, encodePath(path), content, file?.sha);
   return {};
+}
+
+/**
+ * The standup or week review draft. Action logs are read from the repo, since the cache keeps
+ * only their paths; the model writes the prose unless the side panel's AI switch is off.
+ */
+async function reviewDraft(range: ReviewRange) {
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const todayCache = await readTodayCache();
+  if (!todayCache || !isTodayCacheUsable(todayCache, repo)) {
+    throw new Error('Nothing synced yet. Open the console once, then try again.');
+  }
+  const [logs, streams, stored, settings] = await Promise.all([
+    Promise.all(
+      todayCache.actionLogPaths.map((path) =>
+        githubReadFile(token, repo, encodePath(path)).then(
+          (file) => file?.content ?? '',
+          () => '',
+        ),
+      ),
+    ),
+    loadStreams().catch(() => undefined),
+    chrome.storage.local.get('workSnapshot'),
+    readAiSettings(),
+  ]);
+  const sources = reviewSources(range, new Date(), {
+    logs,
+    streams: streams?.state.ok ? streams.state.file : null,
+    snapshot: stored.workSnapshot as WorkSnapshot | undefined,
+    todayCache,
+  });
+  const drafted = settings.sidePanel ? await draftReview(sources, range) : null;
+  return { text: drafted ?? bulletsOf(sources), drafted: drafted !== null };
 }
 
 /** The files `>f` lists, each with its console link, as a repo search lists its hits. */
@@ -1361,6 +1757,60 @@ async function listIdeas() {
   return { ideas };
 }
 
+/** A braindump can be long; twenty of them would overflow the model's context. */
+const NOTE_TEXT_LIMIT = 500;
+/** `>n` waits for this answer with the palette open, so it gets a short deadline. */
+const RERANK_TIMEOUT_MS = 8_000;
+
+/** Braindumps and ideas from the start page's cache, for `>n`; nothing is fetched. */
+async function listNotes() {
+  const { repo } = await credentials();
+  const cache = await readTodayCache();
+  // A cache of another repo would list notes the person is no longer working in.
+  if (!cache || !isTodayCacheUsable(cache, repo)) throw new Error(NOT_LOGGED_IN);
+  const notes = cache.files.flatMap(({ path, content }) => {
+    const url = consoleFileUrl(path, cache.repo);
+    if (braindumpIdOf(path) !== null) {
+      const text = content.slice(0, NOTE_TEXT_LIMIT);
+      return [{ id: path, title: braindumpTitle(content), text, path, url }];
+    }
+    if (ideaSlugOf(path)) {
+      const idea = parseIdea(content);
+      const text = `${idea.title}\n${idea.summary}`.slice(0, NOTE_TEXT_LIMIT);
+      return [{ id: path, title: idea.title, text, path, url }];
+    }
+    return [];
+  });
+  return { notes };
+}
+
+/** The model's order for `>n`; `ids` is null when it is switched off or unavailable. */
+async function rerankNotes(query: string, items: { id: string; text: string }[] | undefined) {
+  const candidates = Array.isArray(items)
+    ? items.filter((item) => typeof item?.id === 'string' && typeof item.text === 'string')
+    : [];
+  if (!(await readAiSettings()).palette || candidates.length === 0) return { ids: null };
+  // Without a cache there is no work context, but the question still has an answer.
+  const work = await rankingContext();
+  const empty = {
+    streams: [],
+    todos: [],
+    todoTags: [],
+    eventsToday: [],
+    waiting: [],
+    redCi: [],
+    openIdeas: [],
+  };
+  const ranking = await rerank(
+    `Which of these notes best match what the user describes: "${query.slice(0, 200)}"?`,
+    // Capped here too: the items come from a page, and `listNotes` caps only its own.
+    candidates.map((item) => ({ id: item.id, text: item.text.slice(0, NOTE_TEXT_LIMIT) })),
+    work?.ctx ?? empty,
+    { priority: 'interactive', timeoutMs: RERANK_TIMEOUT_MS },
+  ).catch(() => null);
+  return { ids: ranking?.ids ?? null };
+}
+
 /**
  * Writes an idea: without `sha` only as a new file (GitHub refuses one that exists), with it only
  * over that version. The start page's cache takes the new text, so the next list has its sha.
@@ -1420,7 +1870,20 @@ const answer = (work: Promise<object>, sendResponse: (response: unknown) => void
 };
 
 // Message Handling
-chrome.runtime.onMessage.addListener((message: Message | any, sender, sendResponse) => {
+// Named, so INTENT_RUN can hand the messages it builds to the handlers below.
+chrome.runtime.onMessage.addListener(function onMessage(
+  message: Message | any,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: unknown) => void,
+): boolean | undefined {
+  // First and synchronous: the palette's ⏎ still counts as the user's action only until an await.
+  if (message.type === 'OPEN_WORK_PANEL') {
+    return answer(
+      openWorkPanel(sender.tab?.windowId).then(() => ({})),
+      sendResponse,
+    );
+  }
+
   const work = handleWorkMessage(message);
   if (work) return answer(work as Promise<object>, sendResponse);
 
@@ -1439,7 +1902,7 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     chrome.storage.local.set({
       lifeos_token: message.token,
       lifeos_repo: message.repo,
-      lifeos_repos: message.repos || []
+      lifeos_repos: message.repos || [],
     });
     // A new token can mean a different account, whose repo file is a different list.
     chrome.storage.local.remove('bookmarksCache');
@@ -1511,6 +1974,22 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'GET_BOOKMARKS') {
     getBookmarks().then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'BOOKMARK_DUPLICATES') {
+    bookmarkDuplicates(String(message.url || '')).then(
+      (result) => sendResponse({ success: true, ...result }),
+      (error) => sendResponse({ error: error.message }),
+    );
+    return true; // Indicate async response
+  }
+
+  if (message.type === 'BOOKMARK_DRAFT') {
+    bookmarkDraft(String(message.url || ''), String(message.title || '')).then(
       (result) => sendResponse({ success: true, ...result }),
       (error) => sendResponse({ error: error.message }),
     );
@@ -1664,6 +2143,12 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'LIST_IDEAS') return answer(listIdeas(), sendResponse);
 
+  if (message.type === 'LIST_NOTES') return answer(listNotes(), sendResponse);
+
+  if (message.type === 'RERANK') {
+    return answer(rerankNotes(message.query || '', message.items), sendResponse);
+  }
+
   if (message.type === 'SAVE_IDEA') {
     return answer(
       saveIdea(message.path || '', message.content ?? '', message.sha || undefined),
@@ -1773,7 +2258,20 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
         } else if (message.type === 'SAVE_PINNED_TAB_GROUP') {
           sendResponse({
             success: true,
-            ...(await savePinnedTabGroup(token, repo, message.groupId, message.name)),
+            ...(await savePinnedTabGroup(
+              token,
+              repo,
+              message.groupId,
+              message.name,
+              Array.isArray(message.tabs)
+                ? message.tabs.filter(
+                    (tab: unknown): tab is { url: string; title: string } =>
+                      typeof tab === 'object' &&
+                      tab !== null &&
+                      typeof (tab as { url?: unknown }).url === 'string',
+                  )
+                : undefined,
+            )),
           });
         } else if (message.type === 'RENAME_PINNED_TAB_GROUP') {
           sendResponse({
@@ -1810,6 +2308,15 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
 
   if (message.type === 'GET_TODAY') return answer(getToday(), sendResponse);
 
+  if (message.type === 'GET_AI_CARDS') {
+    return answer(
+      readAiSettings().then((settings) => (settings.newTab ? readAiCards() : {})),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'GET_TLDRS') return answer(readTldrs(), sendResponse);
+
   if (message.type === 'REFRESH_TODAY') return answer(refreshToday(), sendResponse);
 
   if (message.type === 'GET_SERVICE_STATUS') {
@@ -1826,7 +2333,8 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
     const date = localDate(new Date());
     return answer(
       commitTodayFile({ path: message.path || '', suffix: '.habit.csv' }, (csv) =>
-        checkIn(csv, date)),
+        checkIn(csv, date),
+      ),
       sendResponse,
     );
   }
@@ -1855,54 +2363,217 @@ chrome.runtime.onMessage.addListener((message: Message | any, sender, sendRespon
       sendResponse({ error: 'Only web pages can be saved for later' });
       return false;
     }
-    const page = { url: message.url, title: message.title || '' };
+    const page = {
+      url: message.url,
+      title: message.title || '',
+      text: (message.text || '').trim(),
+    };
     return answer(
-      commitTodayFile(readLaterPath, (json) =>
-        addReadLaterEntry(json, page, crypto.randomUUID()),
-      ),
+      // A page already on the list is refused before the model is asked about it; the commit
+      // below still checks the file itself.
+      readTodayCache()
+        .then((cache) => {
+          const onList = (cache?.files ?? [])
+            .filter((file) => file.path.toLowerCase().endsWith('.readitlater.json'))
+            .some((file) => unreadItems(file.content).some((item) => item.url === page.url));
+          if (onList) throw new Error('Already on the read-later list');
+        })
+        // Enriched first and committed after, so the file is not held open while the model works.
+        .then(() => readLaterExtras(page))
+        .then((extras) =>
+          commitTodayFile(readLaterPath, (json) =>
+            addReadLaterEntry(
+              json,
+              { url: page.url, title: page.title, ...extras },
+              crypto.randomUUID(),
+            ),
+          ),
+        ),
       sendResponse,
     );
   }
 
   if (message.type === 'ADD_TODO') {
     const now = new Date();
+    const entry = {
+      text: message.text || '',
+      tags: (message.tags ?? []).filter((tag: unknown) => typeof tag === 'string'),
+      milestoneId: message.milestoneId || undefined,
+    };
     return answer(
-      commitTodayFile(inboxPath, (md) => addTodoEntry(md, { text: message.text || '' }, now)),
+      commitTodayFile(
+        (cache) => todoTarget(cache, message.path),
+        (md) => addTodoEntry(md, entry, now),
+      ),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'ADD_EVENT') {
+    const entry = {
+      name: message.name || '',
+      type: message.eventType || 'general',
+      startDate: message.startDate || '',
+      endDate: message.endDate,
+    };
+    return answer(
+      commitTodayFile({ path: message.path || '', suffix: '.events.csv' }, (csv) =>
+        addEventEntry(csv, entry),
+      ),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'BRAINDUMP_DIGEST') {
+    return answer(
+      readTodayCache().then(async (cache) => ({ themes: (await digestToday(cache)) ?? [] })),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'REVIEW_DRAFT') {
+    return answer(reviewDraft(message.range === 'week' ? 'week' : 'standup'), sendResponse);
+  }
+
+  if (message.type === 'CAPTURE_CLASSIFY') {
+    return answer(captureGuesses(message.text || ''), sendResponse);
+  }
+
+  if (message.type === 'PAGE_SUMMARIZE') {
+    return answer(summarizePage(String(message.text || '')), sendResponse);
+  }
+
+  if (message.type === 'TIDY_TABS') {
+    return answer(tidyTabs(sender.tab?.windowId), sendResponse);
+  }
+
+  if (message.type === 'TIDY_CLOSE_TABS') {
+    return answer(closeTabs(message.tabIds, sender.tab?.windowId), sendResponse);
+  }
+
+  if (message.type === 'PAGE_ASK') {
+    return answer(
+      askAboutPage(String(message.text || ''), String(message.question || '')),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'INTENT_PARSE') {
+    return answer(intentParse(String(message.text || ''), String(message.url || '')), sendResponse);
+  }
+
+  if (message.type === 'INTENT_RUN') {
+    const dispatch = (next: object) =>
+      new Promise<unknown>((resolve, reject) => {
+        let replied = false;
+        const reply = (response?: any) => {
+          replied = true;
+          if (response?.error) reject(new Error(response.error));
+          else resolve(response);
+        };
+        if (onMessage(next, sender, reply) !== true && !replied) resolve(undefined);
+      });
+    return answer(
+      intentRun(
+        message.intent,
+        { url: String(message.url || ''), title: String(message.title || '') },
+        { tabId: sender.tab?.id, reuse: message.reuse === true, dispatch },
+      ),
       sendResponse,
     );
   }
 
   if (message.type === 'PIN_ARTICLE') {
-    chrome.storage.local.get(['lifeos_token', 'lifeos_repo', KB_IMAGES_SETTING], async (data: any) => {
-      const token = data.lifeos_token;
-      const repo = data.lifeos_repo;
-      if (!token || !repo) {
-        sendResponse({ error: 'No token found' });
-        return;
-      }
-      try {
-        const { title, url, text, images } = message as {
-          title: string;
-          url: string;
-          text: string;
-          images?: string[];
-        };
-        const stamp = `${Date.now()}-${urlToSlug(url)}`;
-        const toStore = imagesEnabled(data[KB_IMAGES_SETTING]) ? (images ?? []) : [];
-        const body = await localizeImages(text, toStore, `${KB_ASSET_DIR}/${stamp}`, (path, base64) =>
-          githubPutBase64(token, repo, path, base64),
-        );
-        const date = new Date().toISOString().slice(0, 10);
-        const content = buildRawNote({ title, url, text: body, tags: ['general'], date });
-        await githubUpsertFile(token, repo, `${KB_RAW_DIR}/${stamp}.md`, content);
-        sendResponse({ success: true });
-      } catch (error: any) {
-        sendResponse({ error: error.message });
-      }
-    });
+    chrome.storage.local.get(
+      ['lifeos_token', 'lifeos_repo', KB_IMAGES_SETTING],
+      async (data: any) => {
+        const token = data.lifeos_token;
+        const repo = data.lifeos_repo;
+        if (!token || !repo) {
+          sendResponse({ error: 'No token found' });
+          return;
+        }
+        try {
+          const { title, url, text, images } = message as {
+            title: string;
+            url: string;
+            text: string;
+            images?: string[];
+          };
+          const stamp = `${Date.now()}-${urlToSlug(url)}`;
+          const toStore = imagesEnabled(data[KB_IMAGES_SETTING]) ? (images ?? []) : [];
+          const { alts, ...extras } = await captureExtras({ title, text, imageUrls: toStore });
+          // Alt text first: localizing rewrites the urls it is matched by.
+          const described = withAltText(text, alts.srcs, alts.texts);
+          const body = await localizeImages(
+            described,
+            toStore,
+            `${KB_ASSET_DIR}/${stamp}`,
+            (path, base64) => githubPutBase64(token, repo, path, base64),
+          );
+          const date = new Date().toISOString().slice(0, 10);
+          const content = buildRawNote({
+            title,
+            url,
+            text: body,
+            tags: ['general', ...extras.tags],
+            date,
+            type: extras.type,
+            summary: extras.summary,
+          });
+          await githubUpsertFile(token, repo, `${KB_RAW_DIR}/${stamp}.md`, content);
+          sendResponse({ success: true });
+        } catch (error: any) {
+          sendResponse({ error: error.message });
+        }
+      },
+    );
     return true;
   }
 });
+
+const ENRICH_BUDGET_MS = 8_000;
+
+/** What a page saved for later gains on device; only the read time without the model. */
+async function readLaterExtras(page: { url: string; title: string; text: string }) {
+  if (!page.text) return {};
+  const minutes = { readMinutes: readMinutes(page.text) };
+  if (!(await readAiSettings()).enrichment) return minutes;
+  const known = knownReadLaterTags(await readTodayCache());
+  const { summary, tags } = await within<Awaited<ReturnType<typeof enrichReadLater>>>(
+    ENRICH_BUDGET_MS,
+    enrichReadLater(page, known),
+    { tags: [] },
+  );
+  return { ...minutes, ...(summary ? { summary } : {}), tags };
+}
+
+/**
+ * Summary, type, tags and image alt text for a knowledge base note. Tags come from those already
+ * on the read-later list: the notes themselves live in the repo and are not read here.
+ */
+async function captureExtras(note: { title: string; text: string; imageUrls: string[] }) {
+  const none = {
+    summary: undefined as string[] | undefined,
+    type: undefined as CaptureType | undefined,
+    tags: [] as string[],
+    alts: { srcs: [] as string[], texts: [] as string[] },
+  };
+  if (!(await readAiSettings()).enrichment) return none;
+  const known = knownReadLaterTags(await readTodayCache());
+  return within(
+    ENRICH_BUDGET_MS,
+    (async () => {
+      const { srcs, blobs } = await fetchImageBlobs(note.imageUrls);
+      const result = await enrichCapture(
+        { title: note.title, text: note.text, images: blobs },
+        known,
+      );
+      return { ...none, ...result, alts: { srcs, texts: result.alts } };
+    })(),
+    none,
+  );
+}
 
 async function saveToKnowledgeBase(text: string, url: string, pageTitle: string) {
   const { token, repo } = await credentials();
@@ -1910,12 +2581,15 @@ async function saveToKnowledgeBase(text: string, url: string, pageTitle: string)
   if (!text.trim()) throw new Error('Select some text first');
 
   const date = new Date().toISOString().slice(0, 10);
+  const extras = await captureExtras({ title: pageTitle || url, text, imageUrls: [] });
   const content = buildRawNote({
     title: `Clipping: ${pageTitle || url}`,
     url,
     text: selectionText(text, url, pageTitle),
-    tags: ['clipping'],
+    tags: ['clipping', ...extras.tags],
     date,
+    type: extras.type,
+    summary: extras.summary,
   });
   const path = `${KB_RAW_DIR}/${Date.now()}-${slugify(pageTitle, 'clipping')}.md`;
   await githubUpsertFile(token, repo, path, content);

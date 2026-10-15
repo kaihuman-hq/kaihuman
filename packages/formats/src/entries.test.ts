@@ -6,6 +6,7 @@ import {
   addCommandEntry,
   addEventEntry,
   addPromptEntry,
+  addReadLaterEntry,
   addTodoEntry,
   splitInlineTags,
 } from './entries.js';
@@ -130,5 +131,27 @@ describe('addCommandEntry', () => {
       { title: 'Serve', tags: ['dev'], command: 'npx serve -p {{port}}', note: '' },
     ]);
     expect(() => addCommandEntry('', { title: 'T', command: '' })).toThrow('Nothing to add');
+  });
+});
+
+describe('addReadLaterEntry', () => {
+  it('keeps summary, tags and readMinutes', () => {
+    const json = addReadLaterEntry(
+      '',
+      { url: 'https://a.b', title: 'A', summary: 'Short.', tags: ['rust'], readMinutes: 4 },
+      'id1',
+      5,
+    );
+    expect(JSON.parse(json).items[0]).toEqual({
+      id: 'id1',
+      url: 'https://a.b',
+      name: 'A',
+      status: 'new',
+      tags: ['rust'],
+      summary: 'Short.',
+      readMinutes: 4,
+      createdAt: 5,
+      updatedAt: 5,
+    });
   });
 });

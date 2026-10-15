@@ -497,6 +497,18 @@ describe('runWorkCycle', () => {
     expect(badgeText).toHaveBeenLastCalledWith({ text: '' });
   });
 
+  it('a muted label removes rows from the badge count', async () => {
+    store.aiSettings = { inboxLabels: [{ name: 'Noise', hint: 'bots', mute: true }] };
+    store.aiCache = {
+      'inbox:labels': { value: { 'o/r#5': 'Noise' }, at: T0, ttl: 60_000 },
+    };
+    const { runWorkCycle } = await load();
+    notifResponses.push(notifChanged());
+    gqlResponses.push(gqlOk({ reviewRequested: [prNode(5), prNode(6)] }));
+    await runWorkCycle({ panelOpen: false, now: at(T0) });
+    expect(badgeText).toHaveBeenLastCalledWith({ text: '1' });
+  });
+
   it('shares one running cycle between concurrent callers', async () => {
     const { runWorkCycle } = await load();
     notifResponses.push(notifChanged());

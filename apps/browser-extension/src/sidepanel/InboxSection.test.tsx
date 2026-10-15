@@ -1,8 +1,10 @@
 import type { StreamsFile } from '@kaihuman/formats';
 import { render } from 'preact';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { suggestStream } from '../background/work/suggest';
 import type { StreamsCache, WorkItemStatus, WorkSnapshot } from '../background/work/types';
 import { SidePanel } from './SidePanel';
+import { resetSuggestions } from './useSuggestion';
 
 const NOW = '2026-10-14T10:00:00.000Z';
 const FETCHED = new Date('2026-10-14T09:45:00.000Z').getTime();
@@ -88,12 +90,18 @@ const mount = async (settled: string) => {
   host = document.createElement('div');
   document.body.appendChild(host);
   render(<SidePanel />, host);
-  await waitFor(() => host.textContent?.includes(settled) ?? false);
+  await waitFor(() => headings().includes(settled));
 };
+/** A section by its heading as people read it, e.g. "Waiting on you (2)". */
+const headingOf = (el: Element) =>
+  `${el.querySelector('h2 span')?.textContent} (${el.querySelector('[data-count]')?.textContent})`;
+const headings = () => [...host.querySelectorAll('section[data-section]')].map(headingOf);
 const section = (heading: string) => {
-  const h = [...host.querySelectorAll('h2')].find((el) => el.textContent === heading);
-  if (!h?.parentElement) throw new Error(`No section "${heading}"`);
-  return h.parentElement;
+  const found = [...host.querySelectorAll('section[data-section]')].find(
+    (el) => headingOf(el) === heading,
+  );
+  if (!found) throw new Error(`No section "${heading}"; have ${headings().join(', ')}`);
+  return found;
 };
 const byLabel = (root: Element, label: string) => {
   const el = root.querySelector(`[aria-label="${label}"]`) as HTMLElement | null;
@@ -107,6 +115,8 @@ const clickText = (root: Element, text: string) => {
 };
 
 beforeEach(() => {
+  // Earlier mounts cached "no suggestion" for these rows.
+  resetSuggestions();
   store = { streamsCache: cache(), workSnapshot: snapshot() };
   sent = [];
   failNext = undefined;
@@ -135,16 +145,22 @@ beforeEach(() => {
       connect: () => ({ disconnect: () => {}, onDisconnect: { addListener: () => {} } }),
       sendMessage: (message: Record<string, unknown>, respond?: (response: unknown) => void) => {
         sent.push(message);
-        if (failNext) respond?.({ error: failNext });
+        if (message.type === 'GET_TLDRS') respond?.({ 'acme/web#2': 'Retries flaky uploads.' });
+        // The worker's side, run here against the stubbed model.
+        else if (message.type === 'SUGGEST_STREAM') {
+          void suggestStream(message.file as never, message.candidate as never).then((suggestion) =>
+            respond?.({ ok: true, suggestion }),
+          );
+        } else if (failNext) respond?.({ error: failNext });
         else respond?.({ ok: true });
       },
       lastError: undefined,
     },
   };
-  window.prompt = () => null;
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   render(null, host);
   host.remove();
 });
@@ -152,12 +168,59 @@ afterEach(() => {
 describe('InboxSection', () => {
   it('lists waiting before activity with counts in the headings', async () => {
     await mount('Waiting on you (2)');
-    const headings = [...host.querySelectorAll('h2')].map((h) => h.textContent);
-    expect(headings).toEqual(['Waiting on you (2)', 'New activity (1)', 'My open PRs (1)']);
+    expect(headings()).toEqual(['Waiting on you (2)', 'New activity (1)', 'My open PRs (1)']);
     expect(section('Waiting on you (2)').textContent).toContain('PR 2');
     expect(section('New activity (1)').textContent).toContain('review requested by');
     expect(section('My open PRs (1)').textContent).toContain('draft');
     expect(section('My open PRs (1)').querySelector('[aria-label="Dismiss"]')).toBeNull();
+  });
+
+  it('shows the TL;DR line', async () => {
+    await mount('Waiting on you (2)');
+    await waitFor(
+      () => section('Waiting on you (2)').textContent?.includes('Retries flaky') ?? false,
+    );
+    const rows = [...section('Waiting on you (2)').querySelectorAll('li')];
+    expect(rows.find((li) => li.textContent?.includes('PR 2'))?.textContent).toContain(
+      'Retries flaky uploads.',
+    );
+    expect(rows.find((li) => li.textContent?.includes('PR 1'))?.textContent).not.toContain(
+      'Retries',
+    );
+    expect(sent.filter((m) => m.type === 'GET_TLDRS')).toHaveLength(1);
+  });
+
+  it('asks for the TL;DRs again when the AI cache changes', async () => {
+    await mount('Waiting on you (2)');
+    await waitFor(() => sent.some((m) => m.type === 'GET_TLDRS'));
+    const asked = () => sent.filter((m) => m.type === 'GET_TLDRS').length;
+    // Other storage keys are none of its business.
+    for (const l of listeners) l({ somethingElse: {} }, 'local');
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(asked()).toBe(1);
+    for (const l of listeners) l({ aiCache: {} }, 'local');
+    for (const l of listeners) l({ aiCache: {} }, 'local');
+    await waitFor(() => asked() > 1);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    // Writes that come in a burst are asked for once.
+    expect(asked()).toBe(2);
+  });
+
+  it("puts the suggestion's reason in the button's title", async () => {
+    store.aiSettings = { inboxLabels: [] };
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async () =>
+          JSON.stringify({ stream: 'Alpha', labels: [], reason: 'Same repo as Alpha' }),
+        destroy: () => {},
+      }),
+    });
+    await mount('Waiting on you (2)');
+    await waitFor(() => host.querySelector('button[aria-label^="Pin PR 2 to"]') !== null);
+    expect(host.querySelector('button[aria-label^="Pin PR 2 to"]')?.getAttribute('title')).toBe(
+      'Same repo as Alpha',
+    );
   });
 
   it('shows one row with two reason chips', async () => {
@@ -170,6 +233,54 @@ describe('InboxSection', () => {
     expect(row.textContent).toContain('review requested');
     expect(row.textContent).toContain('assigned');
     expect(row.textContent).toContain('CI ✓');
+  });
+
+  it("filter chips show only that label's rows", async () => {
+    store.aiSettings = {
+      inboxLabels: [
+        { name: 'Mine', hint: 'mine', mute: false },
+        { name: 'Other', hint: 'other', mute: false },
+        { name: 'Noise', hint: 'noise', mute: true },
+      ],
+    };
+    store.aiCache = {
+      'inbox:labels': {
+        value: { 'acme/web#1': 'Mine', 'acme/web#2': 'Other', 'acme/web#3': 'Noise' },
+        at: Date.now(),
+        ttl: 60_000,
+      },
+    };
+    // PR 3 (new activity) is muted away; PR 1 and 2 wait.
+    await mount('Waiting on you (2)');
+    expect(headings()).toEqual(['Waiting on you (2)', 'New activity (0)', 'My open PRs (1)']);
+    expect(section('Waiting on you (2)').querySelectorAll('[data-label]')).toHaveLength(2);
+    const chips = [...host.querySelectorAll('fieldset button')].map((b) => b.textContent);
+    expect(chips).toEqual(['All', 'Mine', 'Other']);
+    clickText(host as Element, 'Mine');
+    await waitFor(() => headings().includes('Waiting on you (1)'));
+    expect(section('Waiting on you (1)').textContent).toContain('PR 1');
+    expect(section('Waiting on you (1)').textContent).not.toContain('PR 2');
+  });
+
+  it('ignores cached labels and mutes while the side panel AI is off', async () => {
+    store.aiSettings = {
+      sidePanel: false,
+      inboxLabels: [
+        { name: 'Mine', hint: 'mine', mute: false },
+        { name: 'Noise', hint: 'noise', mute: true },
+      ],
+    };
+    store.aiCache = {
+      'inbox:labels': {
+        value: { 'acme/web#1': 'Mine', 'acme/web#3': 'Noise' },
+        at: Date.now(),
+        ttl: 60_000,
+      },
+    };
+    await mount('Waiting on you (2)');
+    await tick();
+    expect(headings()).toEqual(['Waiting on you (2)', 'New activity (1)', 'My open PRs (1)']);
+    expect(host.querySelectorAll('[data-label]')).toHaveLength(0);
   });
 
   it('pins a row into a stream', async () => {
@@ -195,7 +306,7 @@ describe('InboxSection', () => {
     failNext = 'nope';
     await mount('Waiting on you (2)');
     byLabel(section('Waiting on you (2)'), 'Dismiss PR 2').click();
-    await waitFor(() => host.textContent?.includes('could not dismiss — retry') ?? false);
+    await waitFor(() => host.textContent?.includes('Could not dismiss. Try again.') ?? false);
     expect(sent.find((m) => m.type === 'WORK_DISMISS')).toEqual({
       type: 'WORK_DISMISS',
       key: 'acme/web#2',
@@ -204,8 +315,8 @@ describe('InboxSection', () => {
     expect(section('Waiting on you (2)').textContent).toContain('PR 2');
     failNext = undefined;
     byLabel(section('Waiting on you (2)'), 'Dismiss PR 2').click();
-    await waitFor(() => host.textContent?.includes('Waiting on you (1)') ?? false);
-    expect(host.textContent).not.toContain('could not dismiss');
+    await waitFor(() => headings().includes('Waiting on you (1)'));
+    expect(host.textContent).not.toContain('Could not dismiss');
   });
 
   it('opens a row and passes its thread id', async () => {
@@ -222,30 +333,58 @@ describe('InboxSection', () => {
   it('shows a dismissed row again when it comes back newer', async () => {
     await mount('Waiting on you (2)');
     byLabel(section('Waiting on you (2)'), 'Dismiss PR 2').click();
-    await waitFor(() => host.textContent?.includes('Waiting on you (1)') ?? false);
+    await waitFor(() => headings().includes('Waiting on you (1)'));
     const snap = snapshot();
     snap.searches.assigned = [status(2, { updatedAt: '2026-10-14T09:50:00.000Z' }), status(1)];
     store = { ...store, workSnapshot: snap };
     for (const l of listeners) l({ workSnapshot: {} }, 'local');
-    await waitFor(() => host.textContent?.includes('Waiting on you (2)') ?? false);
+    await waitFor(() => headings().includes('Waiting on you (2)'));
     expect(section('Waiting on you (2)').textContent).toContain('PR 2');
   });
 
-  it('creates a stream and pins in one message from New stream…, and cancel sends nothing', async () => {
+  it('creates a stream and pins in one message from + New stream, and cancel sends nothing', async () => {
     await mount('Waiting on you (2)');
     const waiting = section('Waiting on you (2)');
     byLabel(waiting, 'Pin PR 2').click();
     await tick();
-    clickText(waiting, 'New stream…');
+    clickText(waiting, '+ New stream');
     await tick();
+    const input = byLabel(waiting, 'New stream name') as HTMLInputElement;
+    await waitFor(() => document.activeElement === input);
+    // A blank name keeps the input open and sends nothing.
+    clickText(waiting, 'Add and pin');
+    await tick();
+    byLabel(waiting, 'Cancel').click();
+    await tick();
+    expect(waiting.querySelector('[aria-label="New stream name"]')).toBeNull();
     expect(sent.filter((m) => m.type === 'WORK_OPS')).toHaveLength(0);
-    window.prompt = () => 'Fresh';
-    clickText(waiting, 'New stream…');
+    clickText(waiting, '+ New stream');
+    await tick();
+    const name = byLabel(waiting, 'New stream name') as HTMLInputElement;
+    name.value = ' Fresh ';
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    clickText(waiting, 'Add and pin');
     await waitFor(() => sent.some((m) => m.type === 'WORK_OPS'));
     const message = sent.find((m) => m.type === 'WORK_OPS') as { ops: Record<string, unknown>[] };
     expect(message.ops).toHaveLength(2);
     expect(message.ops[0]).toMatchObject({ op: 'addStream', name: 'Fresh' });
     expect(message.ops[1]).toMatchObject({ op: 'pin', streamId: message.ops[0]?.streamId });
+  });
+
+  it('never opens a browser dialog', async () => {
+    const dialogs: string[] = [];
+    window.prompt = () => {
+      dialogs.push('prompt');
+      return null;
+    };
+    await mount('Waiting on you (2)');
+    const waiting = section('Waiting on you (2)');
+    byLabel(waiting, 'Pin PR 2').click();
+    await tick();
+    clickText(waiting, '+ New stream');
+    await tick();
+    expect(dialogs).toEqual([]);
   });
 
   it('closes the pin menu after pinning', async () => {
@@ -254,7 +393,7 @@ describe('InboxSection', () => {
     byLabel(waiting, 'Pin PR 2').click();
     await tick();
     clickText(waiting, 'Alpha');
-    await waitFor(() => !section('Waiting on you (2)').textContent?.includes('New stream…'));
+    await waitFor(() => !section('Waiting on you (2)').textContent?.includes('+ New stream'));
   });
 
   it('disables pinning without a file', async () => {

@@ -55,6 +55,14 @@
 | Feature | Location | Added |
 |---------|----------|-------|
 | Work side panel: pinned streams with labels, Waiting on you / New activity inbox from GitHub, My open PRs, live CI and review status, merged or closed items done by themselves | side panel (popup → **Open work panel**, or the start page card) | 2026-10-14 |
+| One capture box that files notes, todos, log entries and events (on-device model) | start page | 2026-10-15 |
+| Bookmark and save suggestions: tidy titles, tags, environment, duplicate warning, read-later and knowledge base summaries, types and image alt text | popup, palette | 2026-10-15 |
+| New tab cards: likely-next bookmarks, read later for today, focus line, morning brief, braindump digest | start page | 2026-10-15 |
+| Side panel triage: suggestion reasons, find related, inbox labels in your own words with mute, PR/issue TL;DR, standup and week review | side panel | 2026-10-15 |
+| Palette: on-device translation, summarize/ask this page, plain-language actions (Ask kaihuman), `>n` meaning search, tidy open tabs | palette, popup | 2026-10-15 |
+| New tab ranking: frecency bookmarks, inbox and work card by urgency, overdue todos by due date, habits at risk first, resurfaced idle ideas | start page, side panel | 2026-10-15 |
+| Stream and label suggestions from Chrome's on-device model: preselected in the This-tab card, one click on inbox rows, `Alt+Shift+P` and **Suggested stream** file there (new streams included), optional auto-filing of new inbox items | side panel, shortcut, context menu | 2026-10-15 |
+| Open the work side panel with Alt+Shift+W or **Open work panel** in the command palette | all pages, start page | 2026-10-14 |
 | Pin any tab to a stream: Alt+Shift+P, right-click **Pin to stream ▸**, or the This-tab bar; stored in .kh/browser.streams.json | all pages | 2026-10-14 |
 | Work summary card and toolbar badge with the Waiting-on-you count | start page, toolbar icon | 2026-10-14 |
 | Service status traffic lights (GitHub, Claude, AWS, Cloudflare, GCP by default; any Statuspage, AWS regions, GCP products via `.kh/browser.status.json`), checked at most every five minutes, no proxy | start page | 2026-10-07 |

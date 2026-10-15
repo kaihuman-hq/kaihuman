@@ -1,5 +1,6 @@
 import { buildInbox, workSummary } from '../background/work/inbox';
 import { useOpenSidePanel } from '../sidepanel/open-panel';
+import { useInboxLabels } from '../sidepanel/useInboxLabels';
 import { useWorkState } from '../sidepanel/useWorkState';
 import { SectionHead } from './Today';
 
@@ -16,6 +17,8 @@ const SHOWN_ROWS = 3;
 /** What waits on the user in GitHub; a click opens the side panel where it is worked through. */
 export function WorkCard() {
   const { snapshot, streams, file, dismissed } = useWorkState();
+  // Muted rows leave the card as they leave the badge. Read from the cache, never asked of the model.
+  const { muted } = useInboxLabels();
   // Opened from the click itself: the worker cannot open the panel on the page's behalf.
   const openSidePanel = useOpenSidePanel();
   // Signed in as the side panel decides it: the worker polls with a work token alone.
@@ -23,7 +26,7 @@ export function WorkCard() {
   if (!signedIn) return null;
 
   const summary = snapshot
-    ? workSummary(snapshot, file, dismissed)
+    ? workSummary(snapshot, file, dismissed, muted)
     : { waiting: 0, activity: 0, redCiInStreams: 0 };
   const parts = [
     summary.waiting > 0 && `${summary.waiting} waiting on you`,
@@ -38,7 +41,9 @@ export function WorkCard() {
       : snapshot?.problem?.kind === 'auth'
         ? 'GitHub refused the token — open the side panel.'
         : 'Nothing waiting — open work panel';
-  const rows = snapshot ? buildInbox(snapshot, file, dismissed).waiting.slice(0, SHOWN_ROWS) : [];
+  const rows = snapshot
+    ? buildInbox(snapshot, file, dismissed, new Date(), muted).waiting.slice(0, SHOWN_ROWS)
+    : [];
   return (
     <section class="flex flex-col gap-[10px]">
       <SectionHead title="Work" />

@@ -7,16 +7,21 @@ import {
   type StreamsFile,
 } from '@kaihuman/formats';
 import type { Message } from '../../types.js';
+import { relatedTo } from '../ai/grow.js';
+import { aiAvailability } from '../ai/model.js';
 import type { Dismissed } from './inbox.js';
 import { markThreadDone, markThreadRead } from './notifications.js';
 import { applyPending } from './pending.js';
 import { isPanelOpen, patchSnapshotThreads, runWorkCycle, workPollingToken } from './poller.js';
 import { GithubHttpError } from './repo-file.js';
 import { enqueueStreamOps, loadStreams } from './streams-store.js';
+import { suggestionOps, suggestStream } from './suggest.js';
 import { EMPTY_WORK_UI, type StreamsCache, WORK_KEYS, type WorkUi } from './types.js';
 
 export const PIN_MENU_ID = 'kaihuman-pin';
 const PIN_MENU_PREFIX = `${PIN_MENU_ID}:`;
+/** Not a stream id: ids start with `st_`. */
+const PIN_MENU_SUGGESTED = `${PIN_MENU_PREFIX}suggested`;
 const FIRST_STREAM_NAME = 'Inbox';
 const BADGE_FLASH_MS = 2000;
 const DISMISS_FAILED = 'could not dismiss — retry';
@@ -47,10 +52,20 @@ async function pendingFile(): Promise<StreamsFile> {
 async function pinUrl(
   url: string,
   title: string,
-  opts: { streamId?: StreamId; labels?: string[] } = {},
+  opts: { streamId?: StreamId; labels?: string[]; suggest?: boolean } = {},
 ): Promise<StreamId> {
   if (!isSafeUrl(url)) throw new Error('This page cannot be pinned');
   const file = await pendingFile();
+  if (opts.suggest && opts.streamId === undefined) {
+    // No suggestion (no model here and no repository match) falls through to the last stream.
+    const suggestion = await suggestStream(file, { url, title });
+    if (suggestion) {
+      const { streamId, ops } = suggestionOps(suggestion, { url, title }, new Date().toISOString());
+      await enqueueStreamOps(ops);
+      await rememberStream(streamId);
+      return streamId;
+    }
+  }
   const known = (id: StreamId | undefined) =>
     id !== undefined && file.streams.some((stream) => stream.id === id);
   const lastStreamId = (await getStored<WorkUi>(WORK_KEYS.ui))?.lastStreamId;
@@ -85,6 +100,7 @@ async function pinTab(opts: {
   tabId?: number;
   streamId?: StreamId;
   labels?: string[];
+  suggest?: boolean;
 }): Promise<StreamId> {
   const tab =
     opts.tabId === undefined
@@ -188,6 +204,19 @@ export function handleWorkMessage(message: Message): Promise<unknown> | undefine
       return open(message.url ?? '', message.threadId).then(() => OK);
     case 'WORK_SET_TOKEN':
       return setWorkToken((message.key ?? '').trim()).then(() => OK);
+    // The side panel's model questions run here, in the worker's one queue (D1), not beside it.
+    case 'SUGGEST_STREAM': {
+      const { file, candidate } = message;
+      if (!file || !candidate) return Promise.reject(new Error('Nothing to suggest for'));
+      return suggestStream(file, candidate).then((suggestion) => ({ ...OK, suggestion }));
+    }
+    case 'RELATED_TO': {
+      const { profile, candidates } = message;
+      if (!profile || !Array.isArray(candidates)) return Promise.resolve({ ...OK, related: [] });
+      return relatedTo(profile, candidates).then((related) => ({ ...OK, related }));
+    }
+    case 'AI_AVAILABILITY':
+      return aiAvailability().then((availability) => ({ ...OK, availability }));
     case 'WORK_PIN_TAB':
       return pinTab({
         tabId: message.tabId,
@@ -213,7 +242,8 @@ export async function pinCurrentTab(): Promise<void> {
   if (tab?.id === undefined) return;
   let text = '✓';
   try {
-    await pinTab({ tabId: tab.id });
+    const ui = await getStored<WorkUi>(WORK_KEYS.ui);
+    await pinTab({ tabId: tab.id, suggest: ui?.autoFile !== false });
   } catch (error) {
     console.warn('kaihuman: pinning the tab failed', error);
     text = '!';
@@ -228,13 +258,15 @@ export function handlePinMenuClick(
 ): Promise<void> | undefined {
   const id = String(info.menuItemId);
   if (id !== PIN_MENU_ID && !id.startsWith(PIN_MENU_PREFIX)) return undefined;
-  const streamId = id.startsWith(PIN_MENU_PREFIX)
-    ? (id.slice(PIN_MENU_PREFIX.length) as StreamId)
-    : undefined;
+  const suggest = id === PIN_MENU_SUGGESTED;
+  const streamId =
+    id.startsWith(PIN_MENU_PREFIX) && !suggest
+      ? (id.slice(PIN_MENU_PREFIX.length) as StreamId)
+      : undefined;
   const [url, title] = info.linkUrl
     ? [info.linkUrl, info.selectionText || info.linkUrl]
     : [tab?.url ?? '', tab?.title ?? ''];
-  return pinUrl(url, title, { streamId }).then(
+  return pinUrl(url, title, { streamId, suggest }).then(
     () => (tab?.id === undefined ? undefined : flashBadge(tab.id, '✓')),
     async (error) => {
       console.warn('kaihuman: pinning from the menu failed', error);
@@ -270,6 +302,30 @@ export function rebuildPinMenu(file: StreamsFile | null): Promise<void> {
         done,
       ),
     );
+    if (file.streams.length > 0) {
+      await menuCall((done) =>
+        chrome.contextMenus.create(
+          {
+            id: PIN_MENU_SUGGESTED,
+            parentId: PIN_MENU_ID,
+            title: 'Suggested stream',
+            contexts: ['page', 'link'],
+          },
+          done,
+        ),
+      );
+      await menuCall((done) =>
+        chrome.contextMenus.create(
+          {
+            id: `${PIN_MENU_PREFIX}separator`,
+            parentId: PIN_MENU_ID,
+            type: 'separator',
+            contexts: ['page', 'link'],
+          },
+          done,
+        ),
+      );
+    }
     for (const stream of file.streams) {
       await menuCall((done) =>
         chrome.contextMenus.create(

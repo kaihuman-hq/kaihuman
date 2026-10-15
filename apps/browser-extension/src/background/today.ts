@@ -17,6 +17,7 @@ import {
   localDate,
   parseEvents,
   parseHabitData,
+  parseIdea,
   parseReadItLater,
   parseTimeTracking,
   parseTimezones,
@@ -24,6 +25,7 @@ import {
   type ReadItLaterItem,
   type TodoItem,
 } from '@kaihuman/formats';
+import { applyRanking, archiveCandidates, type Ranking } from './ai/rank.js';
 import { CACHE_TTL_MS } from './bookmarks';
 import { STATUS_CONFIG_PATH } from './service-status';
 
@@ -302,19 +304,29 @@ export const unreadItems = (json: string): ReadItLaterItem[] =>
 
 export interface TodaySummary {
   events: UpcomingEvent[];
-  inProgress: { text: string; path: string }[];
+  /** Most overdue first; a todo without a milestone date comes last. */
+  inProgress: { text: string; path: string; dueDate?: string }[];
   /** Open todos whose milestone is already due. */
-  overdue: { text: string; path: string; milestone: string }[];
+  overdue: { text: string; path: string; milestone: string; dueDate: string }[];
   milestone?: { name: string; dueDate: string; daysUntil: number; open: number; path: string };
   inbox: { path: string; count: number };
-  readLater: (Pick<ReadItLaterItem, 'id' | 'url' | 'name' | 'createdAt'> & { path: string })[];
-  /** Every unread item, where `readLater` is cut to the oldest few. */
+  readLater: (Pick<
+    ReadItLaterItem,
+    'id' | 'url' | 'name' | 'createdAt' | 'summary' | 'readMinutes'
+  > & { path: string })[];
+  /** Why the model put an item on the list, by item id; empty until a ranking is cached. */
+  readLaterReasons: Record<string, string>;
+  /** Ids of unread items left so long that archiving them is worth asking about. */
+  archive: string[];
+  /** Every unread item, where `readLater` is cut to a few. */
   unreadCount: number;
   habits: {
     path: string;
     name: string;
     checkedToday: boolean;
     streak: number;
+    /** A streak still running that today's check-in has yet to keep. */
+    atRisk: boolean;
     /** The last seven days, the oldest first — today is the last. */
     week: boolean[];
   }[];
@@ -324,12 +336,42 @@ export interface TodaySummary {
   /** The newest braindumps first, cut to the newest few; `sha` is what a delete must name. */
   braindumps: { path: string; sha: string; title: string; text: string; createdAt: number }[];
   braindumpCount: number;
+  /** Seed or exploring ideas untouched for a month, the longest idle first. */
+  resurface: {
+    slug: string;
+    title: string;
+    status: 'seed' | 'exploring';
+    lastActivity: string;
+    path: string;
+  }[];
   fetchedAt: number;
 }
 
 const LIST_LIMIT = 5;
 const READ_LATER_LIMIT = 3;
 const BRAINDUMP_LIMIT = 10;
+
+/** Every braindump in the synced files, newest first and not cut to what the page shows. */
+export function allBraindumps(cache: TodayCache): TodaySummary['braindumps'] {
+  return cache.files
+    .flatMap(({ path, sha, content }) => {
+      const id = braindumpIdOf(path);
+      return id
+        ? [
+            {
+              path,
+              sha,
+              title: braindumpTitle(content),
+              text: content,
+              createdAt: braindumpCreatedAt(id),
+            },
+          ]
+        : [];
+    })
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+const RESURFACE_LIMIT = 2;
+const RESURFACE_IDLE_DAYS = 30;
 
 /** The inbox the console's quick-todo page writes to. */
 export const inboxPath = (cache: Pick<TodayCache, 'appFolder'>) =>
@@ -340,19 +382,36 @@ export const readLaterPath = (cache: TodayCache) =>
   cache.files.find((file) => file.path.toLowerCase().endsWith('.readitlater.json'))?.path ??
   `${cache.appFolder}/reading.readitlater.json`;
 
+/** Every tag already on a read-later item, so a new page is only filed under those. */
+export const knownReadLaterTags = (cache: TodayCache | undefined): string[] => {
+  const tags = new Set<string>();
+  for (const file of cache?.files ?? []) {
+    if (!file.path.toLowerCase().endsWith('.readitlater.json')) continue;
+    for (const item of parseReadItLater(file.content).items) {
+      if (Array.isArray(item?.tags)) {
+        for (const tag of item.tags) if (typeof tag === 'string' && tag) tags.add(tag);
+      }
+    }
+  }
+  return [...tags];
+};
+
 /** The first action log, preferring the app folder's own — the log box has one target. */
 export const actionLogPath = (cache: TodayCache) =>
   cache.actionLogPaths.find((path) => path.startsWith(`${cache.appFolder}/`)) ??
   cache.actionLogPaths[0] ??
   DEFAULT_ACTION_LOG_PATH;
 
-export function buildToday(cache: TodayCache, now: Date): TodaySummary {
+export function buildToday(cache: TodayCache, now: Date, readLaterRanking?: Ranking): TodaySummary {
+  const unread: ReadItLaterItem[] = [];
   const summary: TodaySummary = {
     events: [],
     inProgress: [],
     overdue: [],
     inbox: { path: inboxPath(cache), count: 0 },
     readLater: [],
+    readLaterReasons: {},
+    archive: [],
     unreadCount: 0,
     habits: [],
     timers: [],
@@ -360,15 +419,36 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
     actionLogPath: actionLogPath(cache),
     braindumps: [],
     braindumpCount: 0,
+    resurface: [],
     fetchedAt: cache.fetchedAt,
   };
   const today = localDate(now);
+  const idleSince = localDate(
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() - RESURFACE_IDLE_DAYS),
+  );
   const files = [...cache.files].sort((a, b) => a.path.localeCompare(b.path));
 
   for (const { path, sha, content } of files) {
     const lower = path.toLowerCase();
     const braindump = braindumpIdOf(path);
-    if (braindump) {
+    const slug = ideaSlugOf(path);
+    if (slug) {
+      const idea = parseIdea(content);
+      if (idea.status !== 'seed' && idea.status !== 'exploring') continue;
+      // Timestamps come as `2026-10-13T09:12+02:00` or `2026-10-13 09:12`; the date is what counts.
+      const lastActivity = [idea.updated, idea.created, ...idea.log.map((entry) => entry.at)]
+        .map((at) => at?.slice(0, 10) ?? '')
+        .reduce((latest, day) => (day > latest ? day : latest), '');
+      if (lastActivity && lastActivity <= idleSince) {
+        summary.resurface.push({
+          slug,
+          title: idea.title,
+          status: idea.status,
+          lastActivity,
+          path,
+        });
+      }
+    } else if (braindump) {
       summary.braindumps.push({
         path,
         sha,
@@ -380,18 +460,29 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
       summary.events.push(...upcomingEvents(path, content, now));
     } else if (lower.endsWith('.todos.md')) {
       const { items: todos, milestones } = parseTodos(content);
+      const dueDates = new Map(milestones.map((milestone) => [milestone.id, milestone.dueDate]));
       if (path === summary.inbox.path) {
         summary.inbox.count = todos.filter((todo) => todo.status === 'backlog').length;
       }
       for (const todo of todos) {
-        if (todo.status === 'in-progress') summary.inProgress.push({ text: todo.text, path });
+        if (todo.status === 'in-progress')
+          summary.inProgress.push({
+            text: todo.text,
+            path,
+            dueDate: todo.milestoneId ? dueDates.get(todo.milestoneId) : undefined,
+          });
       }
       for (const milestone of milestones) {
         if (!milestone.dueDate) continue;
         const open = todos.filter((todo) => todo.milestoneId === milestone.id && isOpen(todo));
         if (milestone.dueDate < today) {
           for (const todo of open) {
-            summary.overdue.push({ text: todo.text, path, milestone: milestone.name });
+            summary.overdue.push({
+              text: todo.text,
+              path,
+              milestone: milestone.name,
+              dueDate: milestone.dueDate,
+            });
           }
         } else if (!summary.milestone || milestone.dueDate < summary.milestone.dueDate) {
           const due = parseLocalDate(milestone.dueDate);
@@ -405,11 +496,14 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
         }
       }
     } else if (lower.endsWith('.habit.csv')) {
+      const checkedToday = isCheckedIn(content, today);
+      const streak = calculateStats(parseHabitData(content), now).currentStreak;
       summary.habits.push({
         path,
         name: fileLabel(path),
-        checkedToday: isCheckedIn(content, today),
-        streak: calculateStats(parseHabitData(content), now).currentStreak,
+        checkedToday,
+        streak,
+        atRisk: streak > 0 && !checkedToday,
         week: habitWeek(content, now),
       });
     } else if (lower.endsWith('.timetracking.csv')) {
@@ -418,12 +512,15 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
       summary.clocks.push(...worldClocks(content));
     } else if (lower.endsWith('.readitlater.json')) {
       for (const item of unreadItems(content)) {
+        unread.push(item);
         const { id, url, name, createdAt } = item;
         summary.readLater.push({
           id,
           url,
           name: name || url,
           createdAt: Number(createdAt) || 0,
+          ...(typeof item.summary === 'string' && item.summary ? { summary: item.summary } : {}),
+          ...(Number(item.readMinutes) > 0 ? { readMinutes: Number(item.readMinutes) } : {}),
           path,
         });
       }
@@ -432,12 +529,25 @@ export function buildToday(cache: TodayCache, now: Date): TodaySummary {
 
   summary.events.sort((a, b) => a.daysUntil - b.daysUntil);
   summary.events = summary.events.slice(0, LIST_LIMIT);
+  // The ones that have waited longest, and the habits about to lose a streak, are the ones to see.
+  const byDue = (a: string | undefined, b: string | undefined) =>
+    a === b ? 0 : !a ? 1 : !b ? -1 : a < b ? -1 : 1;
+  summary.inProgress.sort((a, b) => byDue(a.dueDate, b.dueDate));
   summary.inProgress = summary.inProgress.slice(0, LIST_LIMIT);
+  summary.overdue.sort((a, b) => byDue(a.dueDate, b.dueDate));
   summary.overdue = summary.overdue.slice(0, LIST_LIMIT);
-  // The oldest first: they are the ones the list is for.
+  summary.habits.sort((a, b) => Number(b.atRisk) - Number(a.atRisk));
+  summary.resurface.sort((a, b) => a.lastActivity.localeCompare(b.lastActivity));
+  summary.resurface = summary.resurface.slice(0, RESURFACE_LIMIT);
+  // The oldest first is the rule; a cached ranking (never computed here) may reorder it.
   summary.unreadCount = summary.readLater.length;
   summary.readLater.sort((a, b) => a.createdAt - b.createdAt);
-  summary.readLater = summary.readLater.slice(0, READ_LATER_LIMIT);
+  summary.readLater = applyRanking(summary.readLater, readLaterRanking).slice(0, READ_LATER_LIMIT);
+  for (const { id } of summary.readLater) {
+    const reason = readLaterRanking?.reasons[id];
+    if (reason) summary.readLaterReasons[id] = reason;
+  }
+  summary.archive = archiveCandidates(unread, now);
   summary.braindumpCount = summary.braindumps.length;
   summary.braindumps.sort((a, b) => b.createdAt - a.createdAt);
   summary.braindumps = summary.braindumps.slice(0, BRAINDUMP_LIMIT);

@@ -1,5 +1,79 @@
 # Progress
 
+## 2026-10-15 — On-device AI: final review fixes
+
+- Background model jobs now stop after 60 s, so a hung job can no longer block the queue. Precompute runs at most every 10 minutes after repo syncs as well as after work polls.
+- The palette keeps one "Ask kaihuman" request in flight. Bookmark hints are asked for only when the palette opens, and are cached per page.
+- Stream suggestions and "Find related" go through the worker's queue, with an 8 s limit.
+- The On-device AI switches fully gate their features, including cached labels, mutes and TL;DRs. The settings show which models the service worker itself can reach (`AI_AVAILABILITY`).
+- Still to check by hand in Chrome 155: whether the service worker exposes `Translator`, `LanguageDetector` and `Summarizer`. If not, the settings show them as unavailable, and an offscreen document would be the follow-up.
+
+## 2026-10-15 — On-device AI, phases 2–6: saving, new tab cards, side panel, palette, tabs
+
+- **Capture box (Auto):** the start page capture box files a note, todo (file, milestone, tags), log entry or event on its own, with a preview; Tab cycles the alternatives. Answers within 4 s, else a note. Only the latest text is classified (`ai/capture.ts`, `ADD_EVENT`, `ADD_TODO` with path/tags).
+- **Bookmarks and duplicates:** "Bookmark this page" comes prefilled with a tidied title, tags from existing tags and a prod/int/dev guess (`BOOKMARK_DRAFT`). Exact duplicates (bookmark, read later, stream) show at once without the model (`BOOKMARK_DUPLICATES`), near duplicates after the model confirms them.
+- **Saving:** read-later items get a TL;DR, tags and read time. Knowledge base captures get key points, a type (snippet, decision, how-to, reference, idea), quoted and deduped tags, and alt text for up to 3 images. Saves never wait more than 8 s for the model (`ai/enrich.ts`).
+- **New tab:**
+  - "Likely next" bookmarks: frecency boosted by active streams, re-ranked by the model.
+  - Read later for today: three items, each with a reason, plus "Archive?" for unread items older than 60 days.
+  - A focus line and a morning brief (once per day after 05:00).
+  - A braindump digest that groups up to 30 braindumps into themes, each offering "Make a todo" or "Make an idea".
+  - All computed in the background (`ai/rank.ts`, `ai/brief.ts`, `ai/digest.ts`, `ai/context.ts`). An open page never reorders.
+- **Side panel:**
+  - Suggestions say why.
+  - "Find related" grows a stream from open tabs and inbox rows.
+  - Inbox labels can be written in your own words, with filter chips; a muted label hides its rows from Waiting on you, the badge and the work card (`ai/labels.ts`).
+  - A one-line TL;DR shows under waiting PRs and issues (`bodyText` for waiting searches only, `ai/tldr.ts`).
+  - Standup and week review drafts can be saved to the action log (`ai/review.ts`).
+- **Palette:**
+  - `>t` translates on-device without a DeepL key, and after a DeepL failure.
+  - "Summarize this page" and "Ask this page…" can save to the knowledge base.
+  - An "Ask kaihuman" row turns 3+ words into a typed action with a preview. It never takes the selection from a listed row, and it is checked again before it runs (`ai/intent.ts`, `palette/ask.ts`).
+  - `>n` searches braindumps and ideas by meaning.
+- **Tabs:** "Tidy open tabs" (popup and palette) proposes up to 4 groups, one at a time. Each can be saved as a pinned-tab group or pinned to a stream; tabs close only on "Close these tabs" (`ai/tidy.ts`).
+- Settings → On-device AI has switches for each of these groups, the inbox label editor and an English ↔ German language pack download.
+- Not yet checked by hand in Chrome 155:
+  1. Real model answers, and how long they take.
+  2. Whether the service worker exposes `Translator` and `LanguageDetector` (the tests stub them).
+  3. Whether one click is enough user activation for both language-pack downloads.
+
+## 2026-10-15 — On-device AI, phase 1: ranking without the model
+
+- **Bookmarks:** "Recently used" ranks by frecency, `(1 + useCount) × 2^(−days since last use / 14)` (`background/ranking.ts`).
+- **Inbox:** "Waiting on you" and "New activity" are ordered by urgency, then newest first (`urgencyOf` in `work/inbox.ts`). The order is: failing CI, then a review request older than 24 h, then changes requested, then a fresh review request, then ready to merge, then assigned, then threads. The start page work card follows the same order.
+- **Doing and Trackers:** overdue todos come most overdue first, and in-progress todos by milestone due date. Habits with a streak at risk come first.
+- **Resurface:** a new section shows up to 2 seed or exploring ideas that have been idle for 30 days. A click opens `>id` in the palette.
+
+## 2026-10-15 — On-device AI, phase 0: shared AI layer
+
+- `apps/browser-extension/src/background/ai/`: one model queue (interactive before background), `promptJson` with schema, validation and timeouts, Summarizer, Translator and Language Detector wrappers, and an `aiCache` with TTL and a 500-entry cap. Stream suggestions run on it unchanged.
+- AI settings (`aiSettings`: new tab, saving, side panel, palette and tabs switches) under **On-device AI** in the side panel settings, and a background precompute pipeline: an hourly `ai` alarm, after each repo sync, and after work polls at most every 10 minutes.
+
+## 2026-10-15 — On-device AI features: design
+
+- **Design for 21 on-device AI features** in the browser extension (`doc/ai-features.md`): a shared AI layer (one model queue, a cache, precomputing in the worker), ranking rules for the new tab page, enrichment at save time, side panel triage, palette actions and tidying tabs, in six phases with parallel lanes. Approved with everything in one PR; implementation plan in 22 tasks with parallel lanes per phase: `doc/ai-features-plan.md`. Nothing is built yet.
+
+## 2026-10-15 — Work streams: stream and label suggestions from Chrome's on-device model
+
+- **Suggestions** (`background/work/suggest.ts`): Chrome's built-in model (the Prompt API, Gemini Nano) picks the stream an item belongs to and up to three labels, or names a new stream when none fits. The answer is held to a JSON schema whose stream list is the user's streams plus `(new stream)`, and is checked again before use: an unknown stream, an unnamed new stream or broken JSON counts as no answer. Each item gets a fresh session, so earlier items cannot sway it. Without the model (unsupported device, not downloaded, or an error) the pick falls back to the stream that holds most of the item's repository; with neither, the old behaviour stands.
+- **Where they show**: the This-tab card preselects the suggested stream and labels (marked **Suggested**, or a new stream with its name filled in), and the user's own pick wins; every inbox row gets a one-click **→ stream** line (`sidepanel/useSuggestion.ts`, one question to the model at a time, answers cached per stream list).
+- **Filing**: `Alt+Shift+P` files into the suggested stream, creating it when the model names a new one (setting, on by default), and the right-click menu has a **Suggested stream** entry. New Waiting-on-you items can be filed on their own while the panel is open (setting, off by default, since filed items leave the inbox and the badge count); each item is filed once, so one taken back out stays in the inbox (`workAutoFiled`).
+- **Settings → Suggestions**: the model's state, a **Download the model** button with progress (Chrome only starts the download from a click), and both filing switches.
+- Not yet checked by hand in Chrome 155: the model's answers on real streams, the download, and whether the service worker can run the model (if it cannot, the shortcut and the menu use the repository rule).
+
+## 2026-10-14 — Open the work side panel with a shortcut or from the command palette
+
+- **`Alt+Shift+W`** (`open-work-panel` in `manifest.ts`) opens the work panel in the current window; it can be changed at chrome://extensions/shortcuts. The worker opens the panel straight from the command, since `sidePanel.open` only works while Chrome counts the key press as the user's (`background/work/side-panel.ts`).
+- **Open work panel** in the command palette, on any page and on the start page (`src/palette/work-panel.ts`). The palette sends `OPEN_WORK_PANEL`; the worker handles it first and without awaiting, and opens the panel in the palette's window. A refusal shows in the palette.
+- Not yet checked by hand in Chrome: that the palette's ⏎ still counts as the user's action when the message reaches the worker.
+
+## 2026-10-14 — Work side panel: everything in place, no dialogs, and a cleaner layout
+
+- **Fix: a new stream from the panel did nothing.** Chrome side panels block `window.prompt` and `window.confirm`: the panel dimmed to grey and the call returned nothing, so **New stream…** never created a stream. Every dialog is now inline (`src/sidepanel/controls.tsx`): the stream name is typed in the This-tab card, the inbox pin menu and under **Streams**; labels are edited in the item's row; deleting a stream with items asks in place (**Delete stream** / **Keep**). The tests fail if any panel code calls `prompt` or `confirm`.
+- **Redesign** on the start page's palette and Noto Sans Mono (`src/sidepanel/sidepanel.css`): a sticky header with refresh and a settings toggle (the work token form opens under it), a This-tab card with the streams as choices, and a colour rail on every row: red for failing CI, conflicts or changes requested, amber for pending CI or a requested review, green for approved or green CI (`toneOf` in `StatusChips.tsx`). Merged and closed items show their state and go quiet.
+- **Long titles**: item, inbox and tab titles are cut at two lines and shown whole on hover; stream names, labels and stream choices are cut with an ellipsis, so nothing widens the panel. Counts are kept apart from titles, so a long name never hides them.
+- **Tidier rows**: ✓ stays on the row; move, labels and remove sit behind ⋯ in the row; rename, reorder and delete sit behind ⋯ on the stream. The label filter is a row of choices, and an item can be dropped anywhere on a stream.
+
 ## 2026-10-14 — Work streams: side panel, inbox and pinned streams in the browser extension
 
 - **Streams format** `.kh/browser.streams.json` in `@kaihuman/formats` (`streams.ts`): item refs and URL normalisation (one PR, many URL spellings), parse/serialize that keeps unknown entries, pure idempotent operations and a strict 14-day prune of done items.

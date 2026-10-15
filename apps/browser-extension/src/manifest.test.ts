@@ -34,6 +34,15 @@ describe('manifest permissions', () => {
     expect(m.side_panel?.default_path).toBe('sidepanel.html');
   });
 
+  it('binds open-work-panel', () => {
+    expect(m.commands['open-work-panel']?.suggested_key?.default).toBe('Alt+Shift+W');
+  });
+
+  it('stays within the four suggested shortcuts Chrome allows', () => {
+    const bound = Object.values(m.commands).filter((command) => command.suggested_key);
+    expect(bound.length).toBeLessThanOrEqual(4);
+  });
+
   it('binds pin-current-tab', () => {
     expect(m.commands['pin-current-tab']?.suggested_key?.default).toBe('Alt+Shift+P');
   });

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Listener = (msg: any, sender: any, sendResponse: (r: any) => void) => unknown;
 let listener: Listener;
@@ -16,6 +16,7 @@ const file = {
 };
 
 beforeEach(async () => {
+  vi.unstubAllGlobals();
   vi.resetModules();
   storedExtras = {};
   vi.stubGlobal('chrome', {
@@ -68,6 +69,20 @@ beforeEach(async () => {
   );
   await import('./service-worker');
 });
+
+const stubOnDevice = () => {
+  vi.stubGlobal('Translator', {
+    availability: async () => 'available',
+    create: async () => ({ translate: async (t: string) => `on-device ${t}`, destroy: () => {} }),
+  });
+  vi.stubGlobal('LanguageDetector', {
+    availability: async () => 'available',
+    create: async () => ({
+      detect: async () => [{ detectedLanguage: 'de', confidence: 0.9 }],
+      destroy: () => {},
+    }),
+  });
+};
 
 const call = (msg: any) =>
   new Promise<any>((resolve, reject) => {
@@ -169,7 +184,7 @@ describe('knowledge base captures', () => {
     const [put] = puts();
     expect(put.path).toMatch(/^\.kh\/raw\/\d+-page\.md$/);
     expect(put.body).toContain('processed: false');
-    expect(put.body).toContain('tags: [clipping]');
+    expect(put.body).toContain('tags: ["clipping"]');
     expect(put.body).toContain('> a quote');
   });
 
@@ -243,13 +258,44 @@ describe('knowledge base captures', () => {
 });
 
 describe('palette mode messages', () => {
-  it('asks for a DeepL key before translating anything', async () => {
+  it('explains a missing language pack', async () => {
+    expect(await call({ type: 'TRANSLATE', text: 'Hallo', targets: ['EN-US'] })).toEqual({
+      error:
+        'On-device translation needs the language pack: download it in the side panel settings, or set a DeepL key.',
+    });
+  });
+
+  it('asks for a DeepL key when palette AI is off', async () => {
+    storedExtras = { aiSettings: { palette: false } };
     expect(await call({ type: 'TRANSLATE', text: 'Hallo', targets: ['EN-US'] })).toEqual({
       error: 'No DeepL API key yet — run “Set the DeepL API key…” first',
     });
   });
 
-  it('translates with the stored key', async () => {
+  it('uses on-device without a key', async () => {
+    stubOnDevice();
+    expect(await call({ type: 'TRANSLATE', text: 'Hallo', targets: ['EN-US'] })).toEqual({
+      success: true,
+      translations: [{ target: 'EN-US', text: 'on-device Hallo', detectedSource: 'DE' }],
+    });
+  });
+
+  it('falls back to on-device when DeepL fails offline', async () => {
+    storedExtras = { deepl_key: 'k:fx' };
+    stubOnDevice();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+    expect(await call({ type: 'TRANSLATE', text: 'Hallo', targets: ['EN-US'] })).toEqual({
+      success: true,
+      translations: [{ target: 'EN-US', text: 'on-device Hallo', detectedSource: 'DE' }],
+    });
+  });
+
+  it('uses DeepL when a key is set', async () => {
     storedExtras = { deepl_key: 'k:fx' };
     vi.stubGlobal(
       'fetch',
@@ -357,5 +403,41 @@ describe('without a repository', () => {
 
   it('reports no repository to the popup', async () => {
     await expect(call({ type: 'GET_REPOS' })).resolves.toMatchObject({ repo: '' });
+  });
+});
+
+describe('page summarize and ask', () => {
+  afterEach(() => vi.stubGlobal('Summarizer', undefined));
+
+  const unavailable = { error: 'The on-device model is not available.' };
+
+  it('answer "The on-device model is not available." without the model', async () => {
+    expect(await call({ type: 'PAGE_SUMMARIZE', title: 't', url: 'u', text: 'x' })).toEqual(
+      unavailable,
+    );
+    expect(
+      await call({ type: 'PAGE_ASK', title: 't', url: 'u', text: 'x', question: 'q' }),
+    ).toEqual(unavailable);
+  });
+
+  it('does not use the model when the palette switch is off', async () => {
+    storedExtras = { aiSettings: { palette: false } };
+    const availability = vi.fn(async () => 'available');
+    vi.stubGlobal('Summarizer', { availability });
+    expect(await call({ type: 'PAGE_SUMMARIZE', title: 't', url: 'u', text: 'x' })).toEqual(
+      unavailable,
+    );
+    expect(availability).not.toHaveBeenCalled();
+  });
+
+  it('answers a summary as lines', async () => {
+    vi.stubGlobal('Summarizer', {
+      availability: async () => 'available',
+      create: async () => ({ summarize: async () => '- One\n- Two', destroy: () => {} }),
+    });
+    expect(await call({ type: 'PAGE_SUMMARIZE', title: 't', url: 'u', text: 'x' })).toEqual({
+      success: true,
+      lines: ['One', 'Two'],
+    });
   });
 });

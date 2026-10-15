@@ -1,6 +1,14 @@
 import type { GithubKey, StreamsFile } from '@kaihuman/formats';
 import { describe, expect, it } from 'vitest';
-import { autoDoneOps, buildInbox, pinnedKeys, unreadKeys, workSummary } from './inbox.js';
+import {
+  autoDoneOps,
+  buildInbox,
+  type InboxRow,
+  pinnedKeys,
+  unreadKeys,
+  urgencyOf,
+  workSummary,
+} from './inbox.js';
 import type {
   InboxReason,
   NotificationThread,
@@ -156,6 +164,46 @@ describe('buildInbox', () => {
   });
 });
 
+describe('inbox urgency', () => {
+  const now = new Date('2026-02-01T00:00:00Z');
+  const old = '2026-01-01T00:00:00Z';
+  const fresh = '2026-01-31T20:00:00Z';
+
+  it('failing CI outranks an old review request, which outranks changes requested', () => {
+    const snap = snapshot({
+      'changes-requested': [status(3, { updatedAt: fresh })],
+      'review-requested': [status(2, { updatedAt: old })],
+      failing: [status(1, { updatedAt: old })],
+    });
+    const { waiting } = buildInbox(snap, null, {}, now);
+    expect(waiting.map((row) => row.key)).toEqual([key(1), key(2), key(3)]);
+  });
+
+  it('a fresh review request ranks below changes requested', () => {
+    const snap = snapshot({
+      'review-requested': [status(1, { updatedAt: fresh })],
+      'changes-requested': [status(2, { updatedAt: old })],
+    });
+    const { waiting } = buildInbox(snap, null, {}, now);
+    expect(waiting.map((row) => row.key)).toEqual([key(2), key(1)]);
+  });
+
+  it('equal urgency keeps newest first', () => {
+    const snap = snapshot({
+      assigned: [status(1, { updatedAt: old }), status(2, { updatedAt: fresh })],
+    });
+    const { waiting } = buildInbox(snap, null, {}, now);
+    expect(waiting.map((row) => row.key)).toEqual([key(2), key(1)]);
+  });
+
+  it('scores a thread-only row 20 and takes the maximum over reasons', () => {
+    const snap = snapshot({ assigned: [status(1)] }, [thread(1), thread(2)]);
+    const { waiting, activity } = buildInbox(snap, null, {}, now);
+    expect(urgencyOf(waiting[0] as InboxRow, now)).toBe(25);
+    expect(urgencyOf(activity[0] as InboxRow, now)).toBe(20);
+  });
+});
+
 describe('unreadKeys', () => {
   it('lists keys with an unread thread', () => {
     const snap = snapshot({}, [thread(1), thread(2, { unread: false })]);
@@ -188,6 +236,17 @@ describe('workSummary', () => {
       { url: 'https://github.com/o/r/pull/6' },
     ]);
     expect(workSummary(snap, file, {})).toEqual({ waiting: 1, activity: 1, redCiInStreams: 1 });
+  });
+});
+
+describe('muted keys', () => {
+  it('a muted label removes rows from waiting and activity and the summary', () => {
+    const snap = snapshot({ assigned: [status(1), status(2)] }, [thread(3)]);
+    const muted = new Set([key(1), key(3)]);
+    const inbox = buildInbox(snap, null, {}, new Date(), muted);
+    expect(inbox.waiting.map((r) => r.key)).toEqual([key(2)]);
+    expect(inbox.activity).toEqual([]);
+    expect(workSummary(snap, null, {}, muted)).toMatchObject({ waiting: 1, activity: 0 });
   });
 });
 

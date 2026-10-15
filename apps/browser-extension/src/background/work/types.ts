@@ -10,6 +10,7 @@ export const WORK_KEYS = {
   dismissed: 'workDismissed',
   workToken: 'workToken',
   ui: 'workUi',
+  autoFiled: 'workAutoFiled',
 } as const;
 
 /** The streams file as last read; reads are served from here, writes always re-read. */
@@ -38,6 +39,8 @@ export interface WorkItemStatus {
   ci: CiState;
   conflict: boolean;
   updatedAt: string;
+  /** Start of the description; only the waiting searches ask for it, as input for the TL;DR. */
+  body?: string;
 }
 
 export type PinnedStatus =
@@ -90,6 +93,13 @@ export interface WorkUi {
   lastStreamId?: StreamId;
   collapsed: string[];
   label?: string;
+  /**
+   * Whether the shortcut and the menu's pins go to the suggested stream rather than the last one
+   * used; unset means on.
+   */
+  autoFile?: boolean;
+  /** Whether new Waiting-on-you items are filed into their suggested stream as the panel shows them. */
+  autoFileInbox?: boolean;
 }
 
 export const EMPTY_WORK_UI: WorkUi = { collapsed: [] };

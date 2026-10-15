@@ -1,6 +1,6 @@
 import { PALETTE_HOST_ID } from '@kaihuman/palette';
 import { render } from 'preact';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Bookmark } from '../background/bookmarks';
 import type { ServiceStatus } from '../background/service-status';
 import type { TodaySummary } from '../background/today';
@@ -34,7 +34,11 @@ let activeGroup: string | null;
 /** What the worker says to a pin; a string is answered as an error. */
 let pinReply: string | null;
 let TODAY: TodaySummary | undefined;
+/** The cached rankings the worker attaches to GET_TODAY; empty until a precompute has run. */
+let RANKING: { likely?: { ids: string[]; reasons: Record<string, string>; computedAt: number } };
 let STATUSES: ServiceStatus[];
+/** What the worker has cached for the focus line and the morning brief. */
+let AI_CARDS: { focus?: string; brief?: string[]; briefDate?: string };
 
 const emptyToday = (): TodaySummary => ({
   events: [],
@@ -42,6 +46,8 @@ const emptyToday = (): TodaySummary => ({
   overdue: [],
   inbox: { path: '.kh/inbox.todos.md', count: 0 },
   readLater: [],
+  readLaterReasons: {},
+  archive: [],
   unreadCount: 0,
   habits: [],
   timers: [],
@@ -49,6 +55,7 @@ const emptyToday = (): TodaySummary => ({
   actionLogPath: '.kh/daily.actionlog.md',
   braindumps: [],
   braindumpCount: 0,
+  resurface: [],
   fetchedAt: 0,
 });
 
@@ -56,6 +63,8 @@ const emptyToday = (): TodaySummary => ({
 let deleteReply: { error: string } | { refused: string } | null;
 /** What a refresh behind the cached page brings; `null` when the cache was fresh enough. */
 let FRESHER: TodaySummary | null;
+/** The themes the worker digests the braindumps into. */
+let DIGEST: { title: string; ids: string[]; todo: string }[] | null;
 
 type Listener = (
   message: unknown,
@@ -102,9 +111,11 @@ const reply = (message: { type?: string; bookmarkId?: string; pinned?: boolean }
     activeGroup = (message as { groupId: string }).groupId;
     return { opened: 1, unpinned: 0, name: 'Work' };
   }
+  if (message.type === 'GET_AI_CARDS') return AI_CARDS;
   if (message.type === 'GET_RECENTS') return { recents: [] };
   if (message.type === 'GET_SERVICE_STATUS') return { statuses: STATUSES };
-  if (message.type === 'GET_TODAY') return TODAY ? { today: TODAY } : { error: 'offline' };
+  if (message.type === 'GET_TODAY')
+    return TODAY ? { today: TODAY, ranking: RANKING } : { error: 'offline' };
   if (message.type === 'GET_SYNC_STATUS')
     return { syncedAt: Date.now() - 12.5 * 60_000, pendingOpens: 2 };
   if (message.type === 'TODAY_CHECK_IN' && TODAY) {
@@ -115,6 +126,7 @@ const reply = (message: { type?: string; bookmarkId?: string; pinned?: boolean }
     return { today: TODAY };
   }
   if (message.type === 'REFRESH_TODAY') return { today: FRESHER };
+  if (message.type === 'BRAINDUMP_DIGEST') return { themes: DIGEST };
   if (message.type === 'DELETE_BRAINDUMP' && TODAY) {
     if (deleteReply && 'error' in deleteReply) return deleteReply;
     if (deleteReply) return { today: TODAY, ...deleteReply };
@@ -151,7 +163,7 @@ const titlesIn = (list: string) =>
     ),
   ].map((span) => span.textContent);
 const pinnedTitles = () => titlesIn('Pinned');
-const recentTitles = () => titlesIn('Recently used');
+const recentTitles = () => titlesIn('Likely next');
 
 /** The capture box's own button, not the tab of the same name. */
 const clickSubmit = (label: string) => {
@@ -176,6 +188,7 @@ const habit = (name: string, checkedToday: boolean, streak: number) => ({
   name,
   checkedToday,
   streak,
+  atRisk: streak > 0 && !checkedToday,
   week: [true, false, true, true, false, true, checkedToday],
 });
 
@@ -200,9 +213,12 @@ beforeEach(() => {
   activeGroup = 'home';
   pinReply = null;
   TODAY = undefined;
+  RANKING = {};
   STATUSES = [];
+  AI_CARDS = {};
   deleteReply = null;
   FRESHER = null;
+  DIGEST = null;
   store = { lifeos_token: 'token', lifeos_repo: 'owner/repo' };
   sent = [];
   panelOpened = [];
@@ -263,6 +279,24 @@ describe('StartPage', () => {
     const title = host.querySelector('a[href="https://app.kaihuman.com"]');
     expect(title?.textContent).toBe('kaihuman');
     expect(host.textContent).toContain('owner/repo');
+  });
+
+  it('renders rule order with an empty cache', async () => {
+    RANKING = {};
+    TODAY = emptyToday();
+    await mount(() => host.textContent?.includes('newer') ?? false);
+    await waitFor(() => sent.some((message) => message.type === 'REFRESH_TODAY'));
+
+    expect(recentTitles()).toEqual(['newer', 'older']);
+  });
+
+  it('lists the likely next bookmarks in the cached order', async () => {
+    RANKING = { likely: { ids: ['older', 'gone', 'newer'], reasons: {}, computedAt: 1 } };
+    TODAY = emptyToday();
+    await mount(() => host.textContent?.includes('newer') ?? false);
+    await waitFor(() => recentTitles()[0] === 'older');
+
+    expect(recentTitles()).toEqual(['older', 'newer']);
   });
 
   it('lists the bookmarks used most recently first', async () => {
@@ -356,7 +390,7 @@ describe('StartPage', () => {
     expect(groups?.textContent).toContain('1 tab');
     const headings = [...host.querySelectorAll('h2')].map((h) => h.textContent);
     expect(headings.indexOf('Pinned')).toBeLessThan(headings.indexOf('Tab groups'));
-    expect(headings.indexOf('Tab groups')).toBeLessThan(headings.indexOf('Recently used'));
+    expect(headings.indexOf('Tab groups')).toBeLessThan(headings.indexOf('Likely next'));
     const current = groups?.querySelectorAll('button[aria-current="true"]');
     expect([...(current ?? [])].map((b) => b.textContent)).toEqual(['Home1 tab']);
   });
@@ -463,7 +497,9 @@ describe('StartPage', () => {
         path: 'p.todos.md',
       },
       inProgress: [{ text: 'Implement demo mode', path: 'p.todos.md' }],
-      overdue: [{ text: 'Fix alpha', path: 'p.todos.md', milestone: 'Alpha' }],
+      overdue: [
+        { text: 'Fix alpha', path: 'p.todos.md', milestone: 'Alpha', dueDate: '2026-09-01' },
+      ],
       inbox: { path: '.kh/inbox.todos.md', count: 3 },
       habits: [habit('health', false, 4)],
       timers: [
@@ -527,6 +563,66 @@ describe('StartPage', () => {
       type: 'TODAY_CHECK_IN',
       path: '.kh/health.habit.csv',
     });
+  });
+
+  it('shows the reasons and offers to archive an old item', async () => {
+    TODAY = {
+      ...emptyToday(),
+      readLater: [
+        {
+          id: 'r1',
+          url: 'https://read.example/',
+          name: 'Long read',
+          createdAt: 0,
+          path: 'r.readitlater.json',
+        },
+        {
+          id: 'r2',
+          url: 'https://other.example/',
+          name: 'Other read',
+          createdAt: 0,
+          path: 'r.readitlater.json',
+        },
+      ],
+      readLaterReasons: { r1: 'About the Payments stream' },
+      archive: ['r2'],
+    };
+    await mount(() => host.textContent?.includes('Long read') ?? false);
+
+    expect(host.textContent).toContain('About the Payments stream');
+    expect(host.querySelector('button[aria-label="Archive Long read"]')).toBeNull();
+    (host.querySelector('button[aria-label="Archive Other read"]') as HTMLButtonElement).click();
+    await waitFor(() => sent.some((message) => message.type === 'READ_LATER_DONE'));
+    expect(sent.find((message) => message.type === 'READ_LATER_DONE')).toEqual({
+      type: 'READ_LATER_DONE',
+      path: 'r.readitlater.json',
+      id: 'r2',
+    });
+  });
+
+  it('keeps the read-later order it first drew, whatever a later summary ranks', async () => {
+    const item = (id: string) => ({
+      id,
+      url: `https://${id}.example/`,
+      name: `Read ${id}`,
+      createdAt: 0,
+      path: 'r.readitlater.json',
+    });
+    const readLaterNames = () =>
+      [...host.querySelectorAll('ul[aria-label="Read later"] > li > button:first-child')].map(
+        (button) => button.getAttribute('title'),
+      );
+    TODAY = { ...emptyToday(), readLater: [item('r2'), item('r1'), item('r3')] };
+    // A refresh lands after a new ranking: r3 gone, r4 new, the rest in another order.
+    FRESHER = { ...emptyToday(), readLater: [item('r1'), item('r4'), item('r2')] };
+    await mount(() => host.textContent?.includes('Read r2') ?? false);
+    await waitFor(() => readLaterNames().includes('https://r4.example/'));
+
+    expect(readLaterNames()).toEqual([
+      'https://r2.example/',
+      'https://r1.example/',
+      'https://r4.example/',
+    ]);
   });
 
   it('marks a read-later item read', async () => {
@@ -632,6 +728,61 @@ describe('StartPage', () => {
       await mount(() => host.textContent?.includes('Call the bank') ?? false);
       expect(sent.map((message) => message.type)).toContain('REFRESH_TODAY');
     });
+
+    describe('digest', () => {
+      beforeEach(() => {
+        DIGEST = [{ title: 'Bank errands', ids: ['.kh/braindumps/1.md'], todo: 'Call the bank' }];
+      });
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      it('shows no Digest button without the model', async () => {
+        TODAY = withBraindump();
+        await mount(() => host.textContent?.includes('Call the bank') ?? false);
+        await tick();
+        expect(buttons().some((b) => b.textContent === 'Digest')).toBe(false);
+      });
+
+      it('lists the themes, and Make a todo fills the capture box', async () => {
+        vi.stubGlobal('LanguageModel', { availability: async () => 'available' });
+        TODAY = withBraindump();
+        await mount(() => buttons().some((b) => b.textContent === 'Digest'));
+        click('Digest');
+        await waitFor(() => host.textContent?.includes('Bank errands') ?? false);
+        expect(sent.find((m) => m.type === 'BRAINDUMP_DIGEST')).toEqual({
+          type: 'BRAINDUMP_DIGEST',
+        });
+
+        click('Make a todo');
+        const textarea = host.querySelector('textarea') as HTMLTextAreaElement;
+        await waitFor(() => textarea.value === 'Call the bank');
+        expect(
+          buttons()
+            .find((b) => b.textContent === 'Todo')
+            ?.getAttribute('aria-pressed'),
+        ).toBe('true');
+      });
+
+      it('Make an idea saves a seed idea under the theme title', async () => {
+        vi.stubGlobal('LanguageModel', { availability: async () => 'available' });
+        TODAY = withBraindump();
+        await mount(() => buttons().some((b) => b.textContent === 'Digest'));
+        click('Digest');
+        await waitFor(() => host.textContent?.includes('Bank errands') ?? false);
+        click('Make an idea');
+        await waitFor(() => sent.some((m) => m.type === 'SAVE_IDEA'));
+        const message = sent.find((m) => m.type === 'SAVE_IDEA') as {
+          path: string;
+          content: string;
+          sha?: string;
+        };
+        expect(message.path).toBe('.kh/ideas/bank-errands.md');
+        expect(message.sha).toBeUndefined();
+        expect(message.content).toContain('title: "Bank errands"');
+        expect(message.content).toContain('status: seed');
+      });
+    });
   });
 
   it('turns the note box into a todo for the inbox or an action log entry', async () => {
@@ -736,6 +887,31 @@ describe('StartPage', () => {
     expect(palette?.shadowRoot?.querySelector('input')?.value).toBe('deploy notes');
   });
 
+  it('shows Resurface and opens the palette with >id', async () => {
+    TODAY = {
+      ...emptyToday(),
+      resurface: [
+        {
+          slug: 'old-idea',
+          title: 'Old idea',
+          status: 'seed',
+          lastActivity: '2026-07-01',
+          path: '.kh/ideas/old-idea.md',
+        },
+      ],
+    };
+    await mount(() => host.textContent?.includes('Old idea') ?? false);
+    expect(host.textContent).toContain('Resurface');
+
+    click('Old idea');
+    await tick();
+
+    // The palette takes `>id` as its mode and leaves the words in the field.
+    const palette = document.getElementById(PALETTE_HOST_ID);
+    expect(palette?.shadowRoot?.querySelector('input')?.value).toBe('Old idea');
+    expect(palette?.shadowRoot?.textContent).toMatch(/idea/i);
+  });
+
   it('filters the pinned and recent bookmarks as the search is typed', async () => {
     BOOKMARKS = [
       bookmark('mail', '', true),
@@ -764,7 +940,7 @@ describe('StartPage', () => {
     ];
     await mount(() => host.textContent?.includes('Wiki') ?? false);
 
-    const tags = [...host.querySelectorAll('ul[aria-label="Recently used"] li button')]
+    const tags = [...host.querySelectorAll('ul[aria-label="Likely next"] li button')]
       .filter((button) => !button.hasAttribute('aria-pressed'))
       .map((button) => button.querySelector('span')?.textContent);
     expect(tags).toEqual(['PROD', 'INT', '—']);
@@ -825,6 +1001,196 @@ describe('StartPage', () => {
     await waitFor(() => captures().length === 0);
   });
 
+  describe('auto capture', () => {
+    const TODO_GUESS = {
+      kind: 'todo',
+      text: 'Call the bank',
+      tags: ['bank'],
+      path: 'work.todos.md',
+    };
+    const LOG_GUESS = { kind: 'log', description: 'Call the bank', tags: [] };
+
+    beforeEach(() => {
+      TODAY = emptyToday();
+      vi.stubGlobal('LanguageModel', { availability: async () => 'available' });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    // The page asks 400 ms after the last keystroke, longer than `waitFor`'s ticks add up to.
+    const waitLong = async (condition: () => boolean) => {
+      for (let i = 0; i < 100; i++) {
+        if (condition()) return;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      throw new Error('Timed out waiting for the capture box');
+    };
+
+    /** Answers `CAPTURE_CLASSIFY` with `guesses`, or never when null. */
+    const classifyWith = (guesses: unknown[] | null) => {
+      const sendMessage = (globalThis as any).chrome.runtime.sendMessage;
+      (globalThis as any).chrome.runtime.sendMessage = (
+        message: Record<string, unknown>,
+        respond?: (response: unknown) => void,
+      ) => {
+        if (message.type !== 'CAPTURE_CLASSIFY') return sendMessage(message, respond);
+        sent.push(message);
+        if (guesses) respond?.({ success: true, guesses });
+      };
+    };
+
+    const mountAuto = async () => {
+      await mount(() => host.textContent?.includes('newer') ?? false);
+      await waitFor(
+        () =>
+          buttons()
+            .find((b) => b.textContent === 'Auto')
+            ?.getAttribute('aria-pressed') === 'true',
+      );
+      return host.querySelector('textarea') as HTMLTextAreaElement;
+    };
+
+    it('offers no Auto mode while Suggest when saving is off', async () => {
+      store.aiSettings = { enrichment: false };
+      await mount(() => host.textContent?.includes('newer') ?? false);
+      await tick();
+      await tick();
+      expect(buttons().some((b) => b.textContent === 'Auto')).toBe(false);
+      expect(
+        buttons()
+          .find((b) => b.textContent === 'Note')
+          ?.getAttribute('aria-pressed'),
+      ).toBe('true');
+    });
+
+    it('Auto shows a preview and saves the top guess', async () => {
+      classifyWith([TODO_GUESS, LOG_GUESS]);
+      const textarea = await mountAuto();
+      await type(textarea, 'Call the bank #bank');
+      await waitLong(() => host.textContent?.includes('Todo → work.todos.md · #bank') ?? false);
+      expect(sent.find((m) => m.type === 'CAPTURE_CLASSIFY')).toEqual({
+        type: 'CAPTURE_CLASSIFY',
+        text: 'Call the bank #bank',
+      });
+
+      press(textarea, 'Enter');
+      await waitFor(() => sent.some((m) => m.type === 'ADD_TODO'));
+      expect(sent.find((m) => m.type === 'ADD_TODO')).toMatchObject({
+        type: 'ADD_TODO',
+        text: 'Call the bank',
+        path: 'work.todos.md',
+        tags: ['bank'],
+      });
+      await waitFor(() => textarea.value === '');
+    });
+
+    it('asks once, 400 ms after the last keystroke', async () => {
+      classifyWith([TODO_GUESS]);
+      const textarea = await mountAuto();
+      await type(textarea, 'Call');
+      await type(textarea, 'Call the bank');
+      await waitLong(() => host.textContent?.includes('Todo →') ?? false);
+      expect(sent.filter((m) => m.type === 'CAPTURE_CLASSIFY')).toEqual([
+        { type: 'CAPTURE_CLASSIFY', text: 'Call the bank' },
+      ]);
+    });
+
+    /** Holds every `CAPTURE_CLASSIFY` answer until the test releases it. */
+    const heldClassify = () => {
+      const held: ((guesses: unknown[]) => void)[] = [];
+      const sendMessage = (globalThis as any).chrome.runtime.sendMessage;
+      (globalThis as any).chrome.runtime.sendMessage = (
+        message: Record<string, unknown>,
+        respond?: (response: unknown) => void,
+      ) => {
+        if (message.type !== 'CAPTURE_CLASSIFY') return sendMessage(message, respond);
+        sent.push(message);
+        held.push((guesses) => respond?.({ success: true, guesses }));
+      };
+      return held;
+    };
+
+    it('sends at most one question at a time and applies only the latest answer', async () => {
+      const held = heldClassify();
+      const textarea = await mountAuto();
+      await type(textarea, 'Call');
+      await waitLong(() => sent.filter((m) => m.type === 'CAPTURE_CLASSIFY').length === 1);
+      await type(textarea, 'Call the');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await type(textarea, 'Call the bank');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      // The first is still out, so nothing else was sent.
+      expect(sent.filter((m) => m.type === 'CAPTURE_CLASSIFY')).toHaveLength(1);
+
+      held[0]?.([LOG_GUESS]);
+      await waitLong(() => sent.filter((m) => m.type === 'CAPTURE_CLASSIFY').length === 2);
+      expect(sent.filter((m) => m.type === 'CAPTURE_CLASSIFY').map((m) => m.text)).toEqual([
+        'Call',
+        'Call the bank',
+      ]);
+      expect(host.textContent).not.toContain('Log →');
+      held[1]?.([TODO_GUESS]);
+      await waitLong(() => host.textContent?.includes('Todo → work.todos.md') ?? false);
+      expect(host.textContent).not.toContain('Log →');
+    });
+
+    it('Enter within 400 ms sends one question and one save', async () => {
+      const held = heldClassify();
+      const textarea = await mountAuto();
+      await type(textarea, 'Call the bank');
+      press(textarea, 'Enter');
+      // The answer is slow, so the debounce timer would fire while the save waits.
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      held[0]?.([TODO_GUESS]);
+      await waitFor(() => sent.some((m) => m.type === 'ADD_TODO'));
+      expect(sent.filter((m) => m.type === 'CAPTURE_CLASSIFY')).toHaveLength(1);
+      expect(sent.filter((m) => m.type === 'ADD_TODO')).toHaveLength(1);
+    });
+
+    it('Tab cycles guesses', async () => {
+      classifyWith([TODO_GUESS, LOG_GUESS]);
+      const textarea = await mountAuto();
+      await type(textarea, 'Call the bank');
+      await waitLong(() => host.textContent?.includes('Todo → work.todos.md') ?? false);
+
+      press(textarea, 'Tab');
+      await waitFor(() => host.textContent?.includes('Log → .kh/daily.actionlog.md') ?? false);
+      press(textarea, 'Tab');
+      await waitLong(() => host.textContent?.includes('Todo → work.todos.md') ?? false);
+      press(textarea, 'Tab');
+      await waitFor(() => host.textContent?.includes('Log →') ?? false);
+
+      press(textarea, 'Enter');
+      await waitFor(() => sent.some((m) => m.type === 'ADD_ACTION_LOG'));
+      expect(sent.find((m) => m.type === 'ADD_ACTION_LOG')).toEqual({
+        type: 'ADD_ACTION_LOG',
+        path: '.kh/daily.actionlog.md',
+        description: 'Call the bank',
+        tags: [],
+      });
+    });
+
+    it('falls back to Note when nothing comes back within 4 s', async () => {
+      classifyWith(null);
+      const textarea = await mountAuto();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      await type(textarea, 'remember this');
+      press(textarea, 'Enter');
+      await tick();
+      expect(sent.some((m) => m.type === 'DUMP_NOTE')).toBe(false);
+
+      vi.advanceTimersByTime(4000);
+      await waitFor(() => sent.some((m) => m.type === 'DUMP_NOTE'));
+      expect(sent.find((m) => m.type === 'DUMP_NOTE')).toMatchObject({
+        path: '.lifeos/dump.md',
+        note: 'remember this',
+      });
+    });
+  });
+
   describe('work card', () => {
     const status = (number: number, title: string) => ({
       key: `github:o/r#${number}`,
@@ -860,6 +1226,25 @@ describe('StartPage', () => {
     const card = () => host.querySelector('button[aria-label="Open work in the side panel"]');
     const settled = () => host.textContent?.includes('newer') ?? false;
 
+    it('leaves rows with a muted label off the card, count and list alike', async () => {
+      store.workSnapshot = snapshot({
+        failing: [status(4, 'Bot bump')],
+        assigned: [status(5, 'Mine to do')],
+      });
+      store.aiSettings = { inboxLabels: [{ name: 'Noise', hint: 'bots', mute: true }] };
+      store.aiCache = {
+        'inbox:labels': {
+          value: { 'github:o/r#4': 'Noise' },
+          at: Date.now(),
+          ttl: 60_000,
+        },
+      };
+      await mount(() => card() !== null);
+      await waitFor(() => !(card()?.textContent ?? '').includes('Bot bump'));
+      expect(card()?.textContent).toContain('1 waiting on you');
+      expect(card()?.textContent).toContain('Mine to do');
+    });
+
     it('shows the work summary and the first three waiting rows', async () => {
       store.workSnapshot = snapshot({
         'review-requested': [status(1, 'Add parser'), status(2, 'Fix cache'), status(3, 'Docs')],
@@ -872,10 +1257,21 @@ describe('StartPage', () => {
       expect(card()?.textContent).toContain('Flaky build');
       expect(card()?.textContent).toContain('CI failing');
       expect(card()?.textContent).toContain('review requested');
-      // Newest first, three rows: 5 (assigned), 4, 3.
-      expect(card()?.textContent).toContain('Fifth');
-      expect(card()?.textContent).toContain('assigned');
+      // Most urgent first, three rows: 4 and 2 (failing), 3 (old review request).
+      expect(card()?.textContent).toContain('Docs');
       expect(card()?.textContent).not.toContain('Add parser');
+      expect(card()?.textContent).not.toContain('Fifth');
+    });
+
+    it('shows the most urgent first', async () => {
+      store.workSnapshot = snapshot({
+        assigned: [status(5, 'Newest but mild')],
+        failing: [status(1, 'Oldest but red')],
+      });
+      await mount(() => card() !== null);
+
+      const text = card()?.textContent ?? '';
+      expect(text.indexOf('Oldest but red')).toBeLessThan(text.indexOf('Newest but mild'));
     });
 
     it('leaves out zero counts', async () => {
@@ -933,6 +1329,55 @@ describe('StartPage', () => {
       await mount(() => host.textContent?.includes('GitHub refused the token') ?? false);
 
       expect(host.textContent).toContain('open the side panel');
+    });
+  });
+  describe('AI cards', () => {
+    const brief = ['Standup at ten.', 'Two reviews wait on you.', 'CI is red on payments.'];
+    const today = () => new Date().toLocaleDateString('sv');
+    const hasBrief = () => host.textContent?.includes('Standup at ten.') ?? false;
+
+    it('shows no focus line without a cached focus', async () => {
+      TODAY = emptyToday();
+      await mount(() => sent.some((m) => m.type === 'GET_AI_CARDS'));
+      await tick();
+
+      expect(host.querySelector('[data-testid="focus-line"]')).toBeNull();
+      expect(host.textContent).not.toContain('Morning brief');
+    });
+
+    it('shows the cached focus line and asks for the cards once', async () => {
+      TODAY = emptyToday();
+      AI_CARDS = { focus: 'Finish the ledger review' };
+      await mount(() => host.textContent?.includes('Finish the ledger review') ?? false);
+
+      expect(sent.filter((m) => m.type === 'GET_AI_CARDS')).toHaveLength(1);
+    });
+
+    it('collapses the brief card and keeps it dismissed for the day', async () => {
+      AI_CARDS = { brief, briefDate: today() };
+      await mount(hasBrief);
+
+      click('Dismiss');
+      await tick();
+      expect(hasBrief()).toBe(false);
+      expect(store.briefDismissed).toBe(today());
+      expect(host.textContent).toContain('Morning brief');
+
+      render(null, host);
+      host.remove();
+      await mount(() => host.textContent?.includes('Morning brief') ?? false);
+      await tick();
+      expect(hasBrief()).toBe(false);
+
+      click('Show');
+      await tick();
+      expect(hasBrief()).toBe(true);
+    });
+
+    it('shows the brief again on a new day', async () => {
+      store.briefDismissed = '2000-01-01';
+      AI_CARDS = { brief, briefDate: today() };
+      await mount(hasBrief);
     });
   });
 });

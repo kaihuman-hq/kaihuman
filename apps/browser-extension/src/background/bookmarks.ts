@@ -7,6 +7,7 @@
  */
 import type { Bookmark } from '@kaihuman/palette';
 import { isOpenableUrl, normalizeUrl } from './pinned-tabs';
+import { frecency } from './ranking';
 
 // The shape and the search are shared with the desktop palette; re-exported so the rest of the
 // extension keeps importing bookmarks from one place.
@@ -153,12 +154,18 @@ export function isCacheStale(cache: BookmarksCache, now = Date.now()): boolean {
 }
 
 /**
- * What the start page lists: the bookmarks opened most recently, then the rest in the file's own
- * order (newest first). The sort is stable, so a repo whose bookmarks have never been opened still
- * shows its latest ones rather than an empty grid.
+ * What the start page lists: the bookmarks with the best frecency, ties broken by the later
+ * `lastUsedAt`, then the file's own order (newest first). The sort is stable, so a repo whose
+ * bookmarks have never been opened still shows its latest ones rather than an empty grid.
  */
-export function recentlyUsedBookmarks(bookmarks: Bookmark[], limit = 12): Bookmark[] {
-  return [...bookmarks].sort((a, b) => b.lastUsedAt.localeCompare(a.lastUsedAt)).slice(0, limit);
+export function recentlyUsedBookmarks(
+  bookmarks: Bookmark[],
+  limit = 12,
+  now = new Date(),
+): Bookmark[] {
+  return [...bookmarks]
+    .sort((a, b) => frecency(b, now) - frecency(a, now) || b.lastUsedAt.localeCompare(a.lastUsedAt))
+    .slice(0, limit);
 }
 
 /** `https://www.x.com/a` → `x.com`: what a card shows under the title. */
@@ -179,6 +186,7 @@ export function startPageBookmarks(
   bookmarks: Bookmark[],
   query = '',
   limit = 12,
+  now = new Date(),
 ): { pinned: Bookmark[]; recent: Bookmark[] } {
   const needle = query.trim().toLowerCase();
   const matching = needle
@@ -191,6 +199,7 @@ export function startPageBookmarks(
     recent: recentlyUsedBookmarks(
       matching.filter((bookmark) => !bookmark.pinned),
       limit,
+      now,
     ),
   };
 }

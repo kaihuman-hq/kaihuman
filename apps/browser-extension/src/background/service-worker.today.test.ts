@@ -162,6 +162,8 @@ describe('GET_TODAY', () => {
     expect(first.today.inbox).toEqual({ path: '.kh/inbox.todos.md', count: 1 });
     expect(first.today.habits[0]).toMatchObject({ name: 'health', checkedToday: false });
 
+    // The sync starts the AI jobs behind the answer; they read the bookmarks, so let them finish.
+    for (let i = 0; i < 20; i++) await settle();
     const requests = fetchMock.mock.calls.length;
     await call({ type: 'GET_TODAY' });
     expect(fetchMock.mock.calls.length).toBe(requests);
@@ -213,6 +215,61 @@ describe('writes from the start page', () => {
     expect(remote['.kh/inbox.todos.md']).toMatch(
       /^- \[ \] existing\n- \[ \] Buy milk #home\n::updated:: \d+ ::created:: \S+\n$/,
     );
+  });
+
+  it('adds a todo to another known list, with its tags and milestone', async () => {
+    remote['work.todos.md'] = '- [ ] existing\n';
+    seedCache();
+    const response = await call({
+      type: 'ADD_TODO',
+      text: 'Call the bank #urgent',
+      path: 'work.todos.md',
+      tags: ['bank'],
+      milestoneId: 'q4',
+    });
+    expect(response.success).toBe(true);
+    expect(remote['work.todos.md']).toMatch(/- \[ \] Call the bank #bank #urgent !q4\n/);
+    expect(remote['.kh/inbox.todos.md']).toBe('- [ ] existing\n');
+  });
+
+  it('refuses a todo for a list the page does not know', async () => {
+    seedCache();
+    for (const path of ['secret.todos.md', '.kh/health.habit.csv']) {
+      const response = await call({ type: 'ADD_TODO', text: 'x', path });
+      expect(response.error).toContain('not one of the start page');
+    }
+    expect(writes()).toHaveLength(0);
+  });
+
+  it('adds an event to a known events file, and only there', async () => {
+    remote['.kh/dates.events.csv'] = 'name;type;start;end\nOld;general;2026-01-01;2026-01-01\n';
+    seedCache();
+    const response = await call({
+      type: 'ADD_EVENT',
+      path: '.kh/dates.events.csv',
+      name: 'Lunch with Anna',
+      eventType: 'general',
+      startDate: '2026-10-16',
+      endDate: '2026-10-16',
+    });
+    expect(response.success).toBe(true);
+    expect(remote['.kh/dates.events.csv']).toContain(
+      'Lunch with Anna;general;2026-10-16;2026-10-16',
+    );
+
+    const refused = await call({
+      type: 'ADD_EVENT',
+      path: '.kh/inbox.todos.md',
+      name: 'x',
+      startDate: '2026-10-16',
+    });
+    expect(refused.error).toContain('not one of the start page');
+  });
+
+  it('classifies a capture to no guesses without the model', async () => {
+    seedCache();
+    const response = await call({ type: 'CAPTURE_CLASSIFY', text: 'Call the bank' });
+    expect(response).toEqual({ success: true, guesses: [] });
   });
 
   it('adds an action log entry as the console does, over the version read', async () => {
@@ -308,6 +365,86 @@ describe('writes from the start page', () => {
     expect(response.error).toBe(
       'Failed to write .kh/reading.readitlater.json: 404 Not Found — check that the token may write to this repository',
     );
+  });
+
+  it('saves the summary, known tags and read time with the page', async () => {
+    remote['.kh/a.readitlater.json'] = JSON.stringify({
+      items: [
+        { id: 'old', url: 'https://example.com/old', name: 'Old', status: 'read', tags: ['rust'] },
+      ],
+    });
+    seedCache();
+    vi.stubGlobal('Summarizer', {
+      availability: async () => 'available',
+      create: async () => ({ summarize: async () => 'A tldr.', destroy: () => {} }),
+    });
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async () => JSON.stringify({ tags: ['rust'] }),
+        destroy: () => {},
+      }),
+    });
+    const response = await call({
+      type: 'READ_LATER_ADD',
+      url: 'https://example.com/a',
+      title: 'An article',
+      text: 'word '.repeat(500),
+    });
+    expect(response.error).toBeUndefined();
+    const added = JSON.parse(remote['.kh/a.readitlater.json'] ?? '').items[1];
+    expect(added).toMatchObject({ summary: 'A tldr.', tags: ['rust'], readMinutes: 3 });
+    vi.unstubAllGlobals();
+  });
+
+  it('READ_LATER_ADD commits after 8 s even if the Summarizer hangs', async () => {
+    seedCache();
+    vi.stubGlobal('Summarizer', {
+      availability: async () => 'available',
+      create: async () => ({ summarize: () => new Promise<string>(() => {}), destroy: () => {} }),
+    });
+    vi.useFakeTimers();
+    try {
+      const pending = new Promise<any>((resolve) => {
+        listener(
+          { type: 'READ_LATER_ADD', url: 'https://example.com/a', title: 'A', text: 'some text' },
+          {},
+          resolve,
+        );
+      });
+      await vi.advanceTimersByTimeAsync(7_900);
+      expect(writes()).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(200);
+      const response = await pending;
+      expect(response.error).toBeUndefined();
+      const item = JSON.parse(remote['.kh/reading.readitlater.json'] ?? '').items[0];
+      expect(item).toMatchObject({ url: 'https://example.com/a', readMinutes: 1 });
+      expect(item.summary).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('refuses a page already on the list before asking the model', async () => {
+    remote['.kh/a.readitlater.json'] = JSON.stringify({
+      items: [{ id: 'old', url: 'https://example.com/a', name: 'A', status: 'new' }],
+    });
+    seedCache();
+    const create = vi.fn(async () => ({ summarize: async () => 'x', destroy: () => {} }));
+    vi.stubGlobal('Summarizer', { availability: async () => 'available', create });
+    try {
+      const response = await call({
+        type: 'READ_LATER_ADD',
+        url: 'https://example.com/a',
+        title: 'A',
+        text: 'some text',
+      });
+      expect(response.error).toBe('Already on the read-later list');
+      expect(create).not.toHaveBeenCalled();
+      expect(writes()).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('only saves web pages for later', async () => {
@@ -628,5 +765,76 @@ describe('the palette’s ideas', () => {
       });
     }
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('AI precompute jobs', () => {
+  const rankPrompts = () => {
+    const prompts: string[] = [];
+    vi.stubGlobal('LanguageModel', {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async (input: string) => {
+          prompts.push(input);
+          return JSON.stringify({
+            ranked: [
+              { id: 'b', reason: 'Short' },
+              { id: 'a', reason: 'Long' },
+            ],
+          });
+        },
+        destroy: () => {},
+      }),
+    });
+    return prompts;
+  };
+  const twoItems = () => {
+    remote['.kh/reading.readitlater.json'] = JSON.stringify({
+      items: [
+        { id: 'a', url: 'https://example.com/a', name: 'A', status: 'new', createdAt: 1 },
+        { id: 'b', url: 'https://example.com/b', name: 'B', status: 'new', createdAt: 2 },
+      ],
+    });
+    seedCache();
+  };
+  const runAlarm = async () => {
+    alarmListener({ name: 'ai' });
+    for (let i = 0; i < 20; i++) await settle();
+  };
+
+  it('asks the model for the read-later ranking once while the cache is fresh', async () => {
+    twoItems();
+    const prompts = rankPrompts();
+    await runAlarm();
+    await runAlarm();
+    expect(prompts.filter((input) => input.includes('saved pages'))).toHaveLength(1);
+    vi.unstubAllGlobals();
+  });
+
+  it('GET_TODAY shows the cached read-later order with its reasons', async () => {
+    twoItems();
+    rankPrompts();
+    await runAlarm();
+    const response = await call({ type: 'GET_TODAY' });
+    expect(response.today.readLater.map((item: any) => item.id)).toEqual(['b', 'a']);
+    expect(response.today.readLaterReasons).toEqual({ b: 'Short', a: 'Long' });
+    vi.unstubAllGlobals();
+  });
+
+  it('shows no ranking and no cards when the new tab group is off, even if cached', async () => {
+    twoItems();
+    rankPrompts();
+    await runAlarm();
+    store.aiSettings = { newTab: false };
+    const response = await call({ type: 'GET_TODAY' });
+    expect(response.today.readLater.map((item: any) => item.id)).toEqual(['a', 'b']);
+    expect(response.ranking.likely).toBeUndefined();
+    store.aiCache = { 'card:focus': { value: 'Do it', at: Date.now(), ttl: 3_600_000 } };
+    const cards = await call({ type: 'GET_AI_CARDS' });
+    expect(cards.success).toBe(true);
+    expect(cards.focus).toBeUndefined();
+    store.aiSettings = { newTab: true };
+    expect((await call({ type: 'GET_AI_CARDS' })).focus).toBe('Do it');
+    vi.unstubAllGlobals();
   });
 });

@@ -246,9 +246,26 @@ describe('work messages', () => {
     expect(menuRemove).toHaveBeenCalledWith('kaihuman-pin', expect.any(Function));
     expect(menuCreate.mock.calls.map(([props]) => props)).toEqual([
       { id: 'kaihuman-pin', title: 'Pin to stream', contexts: ['page', 'link'] },
+      {
+        id: 'kaihuman-pin:suggested',
+        parentId: 'kaihuman-pin',
+        title: 'Suggested stream',
+        contexts: ['page', 'link'],
+      },
+      {
+        id: 'kaihuman-pin:separator',
+        parentId: 'kaihuman-pin',
+        type: 'separator',
+        contexts: ['page', 'link'],
+      },
       { id: 'kaihuman-pin:st_a', parentId: 'kaihuman-pin', title: 'A', contexts: ['page', 'link'] },
       { id: 'kaihuman-pin:st_b', parentId: 'kaihuman-pin', title: 'B', contexts: ['page', 'link'] },
     ]);
+
+    // Without streams there is nothing to suggest: the parent alone pins into a new `Inbox`.
+    menuCreate.mockClear();
+    await rebuildPinMenu(fileWith());
+    expect(menuCreate.mock.calls.map(([props]) => props.id)).toEqual(['kaihuman-pin']);
 
     menuCreate.mockClear();
     await rebuildPinMenu(null);
@@ -370,5 +387,104 @@ describe('work messages', () => {
     ] satisfies StreamOp[];
     await send({ type: 'WORK_PIN_TAB', streamId: 'st_new' });
     expect(enqueued()[0]?.[0]).toMatchObject({ op: 'pin', streamId: 'st_new' });
+  });
+
+  describe('model questions from the side panel', () => {
+    it('answers SUGGEST_STREAM from the worker, with the model', async () => {
+      vi.stubGlobal('LanguageModel', {
+        availability: async () => 'available',
+        create: async () => ({
+          prompt: async () => JSON.stringify({ stream: 'B', labels: ['docs'] }),
+          destroy: () => {},
+        }),
+      });
+      const answer = await send({
+        type: 'SUGGEST_STREAM',
+        file: fileWith(['st_a', 'A'], ['st_b', 'B']),
+        candidate: { url: 'https://example.com/x', title: 'X' },
+      });
+      expect(answer).toMatchObject({
+        suggestion: { stream: { kind: 'existing', id: 'st_b' }, labels: ['docs'] },
+      });
+    });
+
+    it('answers RELATED_TO with candidate ids', async () => {
+      const answer = await send({
+        type: 'RELATED_TO',
+        profile: { name: 'A', titles: [], repos: [], hosts: ['docs.example.com'] },
+        candidates: [
+          { id: 'a', title: 'Docs', url: 'https://docs.example.com/x' },
+          { id: 'b', title: 'Other', url: 'https://other.example.org/' },
+        ],
+      });
+      expect(answer).toMatchObject({ related: ['a'] });
+    });
+
+    it('answers AI_AVAILABILITY with what this context can use', async () => {
+      vi.stubGlobal('LanguageModel', { availability: async () => 'downloadable' });
+      vi.stubGlobal('Summarizer', { availability: async () => 'available' });
+      const answer = await send({ type: 'AI_AVAILABILITY' });
+      expect(answer).toMatchObject({
+        availability: {
+          prompt: 'downloadable',
+          summarizer: 'available',
+          translator: 'unavailable',
+          detector: 'unavailable',
+        },
+      });
+    });
+  });
+
+  describe('filing into the suggested stream', () => {
+    const answer = (value: object) => {
+      vi.stubGlobal('LanguageModel', {
+        availability: async () => 'available',
+        create: async () => ({ prompt: async () => JSON.stringify(value), destroy: () => {} }),
+      });
+    };
+
+    it('files the shortcut pin where the model suggests, with its labels', async () => {
+      answer({ stream: 'B', labels: ['docs'] });
+      store[WORK_KEYS.ui] = { lastStreamId: 'st_a', collapsed: [] };
+      await pinCurrentTab();
+      expect(enqueued()).toEqual([
+        [expect.objectContaining({ op: 'pin', streamId: 'st_b', labels: ['docs'] })],
+      ]);
+      expect(store[WORK_KEYS.ui]).toMatchObject({ lastStreamId: 'st_b' });
+    });
+
+    it('creates the stream the model names when none fits', async () => {
+      answer({ stream: '(new stream)', newStreamName: 'Hiring', labels: [] });
+      await pinCurrentTab();
+      const [ops] = enqueued();
+      expect(ops?.[0]).toMatchObject({ op: 'addStream', name: 'Hiring' });
+      expect(ops?.[1]).toMatchObject({
+        op: 'pin',
+        streamId: ops?.[0] && (ops[0] as { streamId: string }).streamId,
+      });
+    });
+
+    it('keeps the last stream when filing is turned off', async () => {
+      answer({ stream: 'B', labels: [] });
+      store[WORK_KEYS.ui] = { lastStreamId: 'st_a', collapsed: [], autoFile: false };
+      await pinCurrentTab();
+      expect(enqueued()).toEqual([[expect.objectContaining({ op: 'pin', streamId: 'st_a' })]]);
+    });
+
+    it('falls back to the last stream when nothing can be suggested', async () => {
+      store[WORK_KEYS.ui] = { lastStreamId: 'st_b', collapsed: [] };
+      await pinCurrentTab();
+      expect(enqueued()).toEqual([[expect.objectContaining({ op: 'pin', streamId: 'st_b' })]]);
+    });
+
+    it('files from the menu’s Suggested stream entry even with filing off', async () => {
+      answer({ stream: 'B', labels: [] });
+      store[WORK_KEYS.ui] = { lastStreamId: 'st_a', collapsed: [], autoFile: false };
+      await handlePinMenuClick(
+        { menuItemId: 'kaihuman-pin:suggested' } as chrome.contextMenus.OnClickData,
+        { id: 7, url: 'https://example.com/a', title: 'Page A' } as chrome.tabs.Tab,
+      );
+      expect(enqueued()).toEqual([[expect.objectContaining({ op: 'pin', streamId: 'st_b' })]]);
+    });
   });
 });

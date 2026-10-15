@@ -1,3 +1,4 @@
+import { newIdea } from '@kaihuman/formats';
 import {
   type CommandPalette,
   commandsMode,
@@ -8,7 +9,12 @@ import {
   repoActions,
   splitTags,
 } from '@kaihuman/palette';
+import type { Dispatch, StateUpdater } from 'preact/hooks';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import type { CaptureGuess } from '../background/ai/capture';
+import { availability } from '../background/ai/model';
+import { applyRanking, type Ranking } from '../background/ai/rank';
+import { readAiSettings } from '../background/ai/settings';
 import {
   type Bookmark,
   bookmarkEnvironment,
@@ -19,7 +25,10 @@ import {
 import { type ServiceStatus, STATUS_CACHE_TTL_MS } from '../background/service-status';
 import { DEFAULT_ACTION_LOG_PATH, type TodaySummary } from '../background/today';
 import { CONSOLE_URL, consoleFileUrl } from '../console';
+import { askHandler } from '../palette/ask';
+import { notesMode } from '../palette/notes-mode';
 import { send, workerPort } from '../palette/port';
+import { openWorkPanelAction } from '../palette/work-panel';
 import { ServiceStatusStrip } from './ServiceStatus';
 import {
   Braindumps,
@@ -27,7 +36,10 @@ import {
   ComingUp,
   Doing,
   dateLine,
+  FocusLine,
+  MorningBrief,
   ReadLater,
+  Resurface,
   SectionHead,
   SyncStatus,
   Trackers,
@@ -39,10 +51,18 @@ import { WorkCard } from './WorkCard';
  * to spend a GitHub request on it. */
 const DUMP_PATH = '.lifeos/dump.md';
 
-/** What the capture box writes: a note to the dump, a todo to the inbox, or an action log entry. */
-type CaptureKind = 'note' | 'todo' | 'log';
+/**
+ * What the capture box writes: a note to the dump, a todo to the inbox, or an action log entry —
+ * or, with the built-in model, whichever of those or an event the model guesses.
+ */
+type CaptureKind = 'auto' | 'note' | 'todo' | 'log';
 
 const CAPTURE: Record<CaptureKind, { label: string; placeholder: string; submit: string }> = {
+  auto: {
+    label: 'Auto',
+    placeholder: 'A note, a todo, something done, or a date… #tags',
+    submit: 'Save',
+  },
   note: { label: 'Note', placeholder: 'Something to write down…', submit: 'Add note' },
   todo: { label: 'Todo', placeholder: 'Something to do… #tags', submit: 'Add todo' },
   log: { label: 'Log', placeholder: 'What happened? #tags', submit: 'Log' },
@@ -59,9 +79,24 @@ type CaptureLog = Record<CaptureKind, Captured[]>;
 /** `chrome.storage.local` key of the latest captures, so the list outlives the tab. */
 const CAPTURE_LOG_KEY = 'startPageCaptures';
 const CAPTURE_LOG_LIMIT = 5;
-const EMPTY_CAPTURE_LOG: CaptureLog = { note: [], todo: [], log: [] };
+const EMPTY_CAPTURE_LOG: CaptureLog = { auto: [], note: [], todo: [], log: [] };
+
+/** Auto asks once typing pauses, not on every keystroke. */
+const CLASSIFY_DEBOUNCE_MS = 400;
+/** The worker's own limit; past it the box files a note rather than keep anyone waiting. */
+const CLASSIFY_TIMEOUT_MS = 4000;
+
+const GUESS_LABEL: Record<CaptureGuess['kind'], string> = {
+  note: 'Note',
+  todo: 'Todo',
+  log: 'Log',
+  event: 'Event',
+};
 
 /** The timer shows seconds while it runs, so the page redraws once a second. */
+/** The links the ranking job picks among, and the ones the page shows of them. */
+const LIKELY_CANDIDATES = 20;
+const LIKELY_SHOWN = 12;
 const TICK_MS = 1000;
 
 /** Pinned bookmarks the number keys reach: `1` to `9`. */
@@ -129,9 +164,41 @@ export function StartPage() {
   const [noteStatus, setNoteStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [noteError, setNoteError] = useState<string | null>(null);
   const [capture, setCapture] = useState<CaptureKind>('note');
+  const [autoAvailable, setAutoAvailable] = useState(false);
+  const [guesses, setGuesses] = useState<CaptureGuess[]>([]);
+  const [guessIndex, setGuessIndex] = useState(0);
+  // The latest question asked, so a save can wait for its answer and a stale answer is dropped.
+  const classifyRef = useRef<{ text: string; result: Promise<CaptureGuess[]> } | null>(null);
+  const generationRef = useRef(0);
+  const inFlightRef = useRef<Promise<CaptureGuess[]> | null>(null);
+  const waitingRef = useRef<(() => void) | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [captureLog, setCaptureLog] = useState<CaptureLog>(EMPTY_CAPTURE_LOG);
-  const [today, setToday] = useState<TodaySummary | null>(null);
+  const [today, setTodayState] = useState<TodaySummary | null>(null);
+  // Read later keeps the order it was first drawn in: a ranking computed since must not reshuffle
+  // an open page, whichever action brought the new summary (D7).
+  const readLaterOrder = useRef<string[]>([]);
+  const setToday: Dispatch<StateUpdater<TodaySummary | null>> = (next) =>
+    setTodayState((current) => {
+      const value = typeof next === 'function' ? next(current) : next;
+      if (!value) return value;
+      const readLater = applyRanking(value.readLater, {
+        ids: readLaterOrder.current,
+        reasons: {},
+        computedAt: 0,
+      });
+      // New items go after those already shown.
+      readLaterOrder.current = readLater.map((item) => item.id);
+      return { ...value, readLater };
+    });
+  const [likely, setLikely] = useState<Ranking | undefined>(undefined);
   const [todayError, setTodayError] = useState<string | null>(null);
+  // Cached model cards: read once on load, never recomputed here (the worker owns the model).
+  const [aiCards, setAiCards] = useState<{ focus?: string; brief?: string[]; briefDate?: string }>(
+    {},
+  );
+  const [briefDismissed, setBriefDismissed] = useState<string | null>(null);
+  const [briefShown, setBriefShown] = useState(false);
   // One commit at a time, as with the pins: two would race each other for the file's sha.
   const [busyPath, setBusyPath] = useState<string | null>(null);
   const [sync, setSync] = useState<{ syncedAt: number | null; pendingOpens: number }>({
@@ -153,10 +220,18 @@ export function StartPage() {
         ...portHandlers(workerPort),
         // This tab is a blank start page, so a hit takes it over rather than leaving it behind.
         open: openInThisTab,
-        actions: () => repoActions(workerPort),
+        actions: () => [openWorkPanelAction(send), ...repoActions(workerPort)],
         // The browser cannot run commands, so `>x` only copies them.
-        modes: [...paletteModes(workerPort), commandsMode(workerPort, { canRun: false })],
+        modes: [
+          ...paletteModes(workerPort),
+          commandsMode(workerPort, { canRun: false }),
+          notesMode(send),
+        ],
         copy: copyToClipboard,
+        // No page here to pin or save, and a bookmark takes this blank tab over like any hit.
+        ask: askHandler(send, () => ({ url: location.href, title: document.title }), {
+          reuse: true,
+        }),
       });
     }
     return paletteRef.current;
@@ -201,6 +276,8 @@ export function StartPage() {
           (response) => {
             setToday(response.today);
             setTodayError(null);
+            // Kept from the first answer only: a ranking never reorders a page that is open.
+            setLikely((current) => current ?? response.ranking?.likely);
           },
           (e: Error) => setTodayError(e.message),
         )
@@ -217,6 +294,77 @@ export function StartPage() {
     return Promise.all(loads).then(refreshSyncStatus);
   };
 
+  // Auto only when the model is ready and "Suggest when saving" is on: otherwise every guess
+  // would come back empty and Auto would quietly save everything as a note.
+  useEffect(() => {
+    void Promise.all([availability('prompt'), readAiSettings()]).then(([state, settings]) => {
+      if (state !== 'available' || !settings.enrichment) return;
+      setAutoAvailable(true);
+      setCapture((current) => (current === 'note' ? 'auto' : current));
+    });
+  }, []);
+
+  // Only the newest question matters. The worker runs every request it gets, one at a time, so
+  // asking again while one is out would queue behind it and time out; the newest text waits for
+  // the one in flight instead, and older waiting ones are dropped.
+  const classify = (text: string) => {
+    const generation = ++generationRef.current;
+    const stale = () => generationRef.current !== generation;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const result = new Promise<CaptureGuess[]>((resolve) => {
+      timer = setTimeout(() => resolve([]), CLASSIFY_TIMEOUT_MS);
+      const start = () => {
+        if (stale()) return resolve([]);
+        const request = send({ type: 'CAPTURE_CLASSIFY', text }).then(
+          (response) =>
+            Array.isArray(response?.guesses) ? (response.guesses as CaptureGuess[]) : [],
+          (): CaptureGuess[] => [],
+        );
+        const flight = Promise.race([
+          request,
+          new Promise<CaptureGuess[]>((r) => setTimeout(() => r([]), CLASSIFY_TIMEOUT_MS)),
+        ]);
+        inFlightRef.current = flight;
+        void flight.then((list) => {
+          resolve(list);
+          if (inFlightRef.current === flight) inFlightRef.current = null;
+          const next = waitingRef.current;
+          waitingRef.current = null;
+          next?.();
+        });
+      };
+      if (inFlightRef.current) waitingRef.current = start;
+      else start();
+    }).finally(() => clearTimeout(timer));
+    classifyRef.current = { text, result };
+    void result.then((list) => {
+      if (stale()) return;
+      setGuesses(list);
+      setGuessIndex(0);
+    });
+    return result;
+  };
+
+  useEffect(() => {
+    // A save already asked about this very text (effects run after the keystroke has painted).
+    if (capture === 'auto' && note.trim() && classifyRef.current?.text === note.trim()) return;
+    setGuesses([]);
+    setGuessIndex(0);
+    // Whatever was asked about the previous text is out of date from here on.
+    generationRef.current++;
+    const text = note.trim();
+    if (capture !== 'auto' || !text) {
+      classifyRef.current = null;
+      return;
+    }
+    const timer = setTimeout(() => {
+      debounceRef.current = undefined;
+      void classify(text);
+    }, CLASSIFY_DEBOUNCE_MS);
+    debounceRef.current = timer;
+    return () => clearTimeout(timer);
+  }, [note, capture]);
+
   useEffect(() => {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', CAPTURE_LOG_KEY], (result) => {
       const storedToken = (result.lifeos_token as string) || null;
@@ -225,6 +373,13 @@ export function StartPage() {
       setCaptureLog({ ...EMPTY_CAPTURE_LOG, ...(result[CAPTURE_LOG_KEY] as Partial<CaptureLog>) });
       if (storedToken) void loadAll();
     });
+    send({ type: 'GET_AI_CARDS' }).then(
+      (response) => setAiCards(response ?? {}),
+      (e: Error) => console.warn('kaihuman: could not read the AI cards', e),
+    );
+    chrome.storage.local.get('briefDismissed', (result) =>
+      setBriefDismissed(typeof result.briefDismissed === 'string' ? result.briefDismissed : null),
+    );
     // Status pages need no login. Asked again as often as the worker's cache allows, for a start
     // page left open.
     void refreshServiceStatus();
@@ -425,12 +580,68 @@ export function StartPage() {
 
   const openFile = (path: string) => openInThisTab(consoleFileUrl(path, repo));
 
+  const logTarget = today?.actionLogPath ?? DEFAULT_ACTION_LOG_PATH;
   const captureTarget =
-    capture === 'note'
+    capture === 'note' || capture === 'auto'
       ? DUMP_PATH
       : capture === 'todo'
         ? (today?.inbox.path ?? 'inbox.todos.md')
-        : (today?.actionLogPath ?? DEFAULT_ACTION_LOG_PATH);
+        : logTarget;
+
+  const captureKinds = (Object.keys(CAPTURE) as CaptureKind[]).filter(
+    (kind) => kind !== 'auto' || autoAvailable,
+  );
+  const guess = guesses[guessIndex];
+  /** `Todo → work.todos.md · #bank`: what Enter will do with the text. */
+  const preview = (g: CaptureGuess) => {
+    const target = g.kind === 'note' ? DUMP_PATH : g.kind === 'log' ? logTarget : g.path;
+    const parts = [`${GUESS_LABEL[g.kind]} → ${target}`];
+    if (g.kind === 'event') {
+      parts.push(
+        g.endDate === g.startDate
+          ? `${g.name}, ${g.startDate}`
+          : `${g.name}, ${g.startDate} – ${g.endDate}`,
+      );
+    }
+    if (g.kind === 'todo' && g.milestoneId) parts.push(`!${g.milestoneId}`);
+    if ((g.kind === 'todo' || g.kind === 'log') && g.tags.length) {
+      parts.push(g.tags.map((tag) => `#${tag}`).join(' '));
+    }
+    return parts.join(' · ');
+  };
+
+  /** Writes one guess; the summary comes back for the files the start page shows. */
+  const saveGuess = async (g: CaptureGuess) => {
+    if (g.kind === 'note') {
+      await send({ type: 'DUMP_NOTE', path: DUMP_PATH, note: g.text });
+    } else if (g.kind === 'todo') {
+      const response = await send({
+        type: 'ADD_TODO',
+        text: g.text,
+        path: g.path,
+        tags: g.tags,
+        milestoneId: g.milestoneId,
+      });
+      setToday(response.today);
+    } else if (g.kind === 'log') {
+      await send({
+        type: 'ADD_ACTION_LOG',
+        path: today?.actionLogPath,
+        description: g.description,
+        tags: g.tags,
+      });
+    } else {
+      const response = await send({
+        type: 'ADD_EVENT',
+        path: g.path,
+        name: g.name,
+        eventType: g.type,
+        startDate: g.startDate,
+        endDate: g.endDate,
+      });
+      setToday(response.today);
+    }
+  };
 
   /** Remembers a saved capture for the list under the box, here and in every later tab. */
   const rememberCapture = (kind: CaptureKind, text: string) => {
@@ -445,6 +656,22 @@ export function StartPage() {
       .catch((e: Error) => console.warn('kaihuman: could not remember the capture', e));
   };
 
+  /** A digest theme's todo goes into the capture box; saving it stays the user's click. */
+  const makeTodoFrom = (text: string) => {
+    setCapture('todo');
+    setNote(text);
+    setNoteStatus('idle');
+  };
+
+  /** Creates the idea file only; GitHub refuses a slug that exists, and that reaches the user. */
+  const makeSeedIdea = async (ideaTitle: string) => {
+    const idea = newIdea(
+      { title: ideaTitle, status: 'seed' },
+      { now: new Date(), author: 'human' },
+    );
+    await send({ type: 'SAVE_IDEA', path: idea.path, content: idea.content });
+  };
+
   const addNote = async () => {
     const text = note.trim();
     if (!text || noteStatus === 'saving') return;
@@ -452,7 +679,16 @@ export function StartPage() {
     setNoteStatus('saving');
     setNoteError(null);
     try {
-      if (kind === 'note') {
+      if (kind === 'auto') {
+        // A save before the answer waits for it, up to the timeout, then files a note. The
+        // pending debounce is cancelled so the same text is not sent a second time.
+        clearTimeout(debounceRef.current);
+        debounceRef.current = undefined;
+        const pending =
+          classifyRef.current?.text === text ? classifyRef.current.result : classify(text);
+        const list = await pending;
+        await saveGuess(list[guessIndex] ?? list[0] ?? { kind: 'note', text: note });
+      } else if (kind === 'note') {
         await send({ type: 'DUMP_NOTE', path: DUMP_PATH, note });
       } else if (kind === 'todo') {
         const response = await send({ type: 'ADD_TODO', text: note });
@@ -504,7 +740,10 @@ export function StartPage() {
     );
   }
 
-  const { pinned, recent } = startPageBookmarks(bookmarks, query);
+  // The rule order, reordered by the hour-old ranking when there is one: the model has the
+  // first twelve of its twenty candidates, so the rest only fill in when the query hides some.
+  const { pinned, recent: ruled } = startPageBookmarks(bookmarks, query, LIKELY_CANDIDATES);
+  const recent = applyRanking(ruled, likely).slice(0, LIKELY_SHOWN);
   const pinKey = (bookmark: Bookmark) => allPinned.indexOf(bookmark) + 1;
   const noMatch = query.trim() !== '' && pinned.length === 0 && recent.length === 0;
   const error = (message: string) => <p class="text-[12px] text-nt-prod break-words">{message}</p>;
@@ -528,6 +767,20 @@ export function StartPage() {
   return (
     <div class={root}>
       <div class="mx-auto w-full max-w-[1240px] px-8 pt-8 pb-16 flex flex-col gap-7">
+        {aiCards.brief && aiCards.briefDate && (
+          <MorningBrief
+            sentences={aiCards.brief}
+            collapsed={briefDismissed === aiCards.briefDate && !briefShown}
+            onDismiss={() => {
+              const date = aiCards.briefDate;
+              if (!date) return;
+              setBriefDismissed(date);
+              setBriefShown(false);
+              void chrome.storage.local.set({ briefDismissed: date });
+            }}
+            onShow={() => setBriefShown(true)}
+          />
+        )}
         <header class="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 pb-5 border-b border-nt-divider">
           <div class="flex flex-wrap items-center gap-x-7 gap-y-2">
             {title}
@@ -712,7 +965,7 @@ export function StartPage() {
             </section>
 
             <section class="flex flex-col gap-[10px]">
-              <SectionHead title="Recently used" meta={`${recent.length} links`} />
+              <SectionHead title="Likely next" meta={`${recent.length} links`} />
               {bookmarksError ? (
                 error(bookmarksError)
               ) : bookmarks.length === 0 ? (
@@ -722,7 +975,7 @@ export function StartPage() {
               ) : (
                 recent.length > 0 && (
                   <ul
-                    aria-label="Recently used"
+                    aria-label="Likely next"
                     class="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-x-6 border-t border-nt-divider"
                   >
                     {recent.map((bookmark) => {
@@ -781,6 +1034,7 @@ export function StartPage() {
             <WorkCard />
             {today && (
               <>
+                <FocusLine focus={aiCards.focus} />
                 <Doing
                   today={today}
                   now={now}
@@ -802,7 +1056,10 @@ export function StartPage() {
                   busyPath={busyPath}
                   onOpenFile={openFile}
                   onDelete={(path, sha) => void deleteBraindump(path, sha)}
+                  onMakeTodo={makeTodoFrom}
+                  onMakeIdea={makeSeedIdea}
                 />
+                <Resurface today={today} onOpenIdea={(title) => palette().open(`>id ${title}`)} />
               </>
             )}
 
@@ -810,7 +1067,7 @@ export function StartPage() {
               <div class="flex items-baseline justify-between gap-4">
                 <fieldset class="flex gap-[14px]">
                   <legend class="sr-only">Capture as</legend>
-                  {(Object.keys(CAPTURE) as CaptureKind[]).map((kind) => (
+                  {captureKinds.map((kind) => (
                     <button
                       key={kind}
                       type="button"
@@ -828,17 +1085,33 @@ export function StartPage() {
                     </button>
                   ))}
                 </fieldset>
-                <span class="text-[11px] text-nt-faint truncate" title={`${repo}/${captureTarget}`}>
-                  {captureTarget}
-                </span>
+                {capture === 'auto' ? (
+                  <span class="text-[11px] text-nt-faint truncate" aria-live="polite">
+                    {guess ? preview(guess) : ''}
+                    {guesses.length > 1 && ` (${guessIndex + 1}/${guesses.length}, Tab for next)`}
+                  </span>
+                ) : (
+                  <span
+                    class="text-[11px] text-nt-faint truncate"
+                    title={`${repo}/${captureTarget}`}
+                  >
+                    {captureTarget}
+                  </span>
+                )}
               </div>
               <textarea
                 value={note}
                 onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)}
                 onKeyDown={(e) => {
-                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                  // In Auto a line is the whole capture, so Enter saves; Shift+Enter still breaks it.
+                  const autoEnter = capture === 'auto' && e.key === 'Enter' && !e.shiftKey;
+                  if (((e.ctrlKey || e.metaKey) && e.key === 'Enter') || autoEnter) {
                     e.preventDefault();
                     void addNote();
+                  } else if (capture === 'auto' && e.key === 'Tab' && guesses.length > 1) {
+                    e.preventDefault();
+                    const step = e.shiftKey ? guesses.length - 1 : 1;
+                    setGuessIndex((index) => (index + step) % guesses.length);
                   }
                 }}
                 aria-label={`${CAPTURE[capture].label} text`}

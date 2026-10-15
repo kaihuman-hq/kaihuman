@@ -1,0 +1,7 @@
+@import "../newtab/newtab.css";
+
+/* The panel shares the start page's palette and face; only the focus ring is its own. */
+:where(button, input, a, select):focus-visible {
+  outline: 1px solid var(--color-nt-accent);
+  outline-offset: 1px;
+}

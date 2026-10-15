@@ -85,10 +85,31 @@ const rowFromThread = (thread: NotificationThread): InboxRow => {
   return row;
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** How pressing a row is: its most urgent reason wins, so a merged-in mention never lowers it. */
+export function urgencyOf(row: InboxRow, now: Date): number {
+  let score = 0;
+  for (const reason of row.reasons) {
+    let reasonScore = 20;
+    if (reason === 'failing') reasonScore = 60;
+    else if (reason === 'review-requested') {
+      // An unparseable date makes the age NaN, which ranks as a fresh request.
+      reasonScore = now.getTime() - Date.parse(row.updatedAt) >= DAY_MS ? 50 : 35;
+    } else if (reason === 'changes-requested') reasonScore = 40;
+    else if (reason === 'ready-to-merge') reasonScore = 30;
+    else if (reason === 'assigned') reasonScore = 25;
+    if (reasonScore > score) score = reasonScore;
+  }
+  return score;
+}
+
 export const buildInbox = (
   snapshot: WorkSnapshot,
   file: StreamsFile | null,
   dismissed: Dismissed,
+  now: Date = new Date(),
+  muted: Set<string> = new Set(),
 ): { waiting: InboxRow[]; activity: InboxRow[]; mine: WorkItemStatus[] } => {
   const pinned = file ? pinnedKeys(file) : new Set<string>();
   const rows = new Map<string, InboxRow>();
@@ -115,11 +136,13 @@ export const buildInbox = (
 
   const newestFirst = (a: { updatedAt: string }, b: { updatedAt: string }) =>
     a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0;
+  const byUrgency = (a: InboxRow, b: InboxRow) =>
+    urgencyOf(b, now) - urgencyOf(a, now) || newestFirst(a, b);
   const waiting: InboxRow[] = [];
   const activity: InboxRow[] = [];
   const waitingKeys = new Set<string>();
   for (const row of rows.values()) {
-    if (pinned.has(row.key)) continue;
+    if (pinned.has(row.key) || muted.has(row.key)) continue;
     const isWaiting = row.reasons.some(isInboxReason);
     // Dismissal hides the row but must not resurface it under "mine".
     if (isWaiting) waitingKeys.add(row.key);
@@ -132,8 +155,8 @@ export const buildInbox = (
     (status) => !pinned.has(status.key) && !waitingKeys.has(status.key),
   );
   return {
-    waiting: waiting.sort(newestFirst),
-    activity: activity.sort(newestFirst),
+    waiting: waiting.sort(byUrgency),
+    activity: activity.sort(byUrgency),
     mine: mine.sort(newestFirst),
   };
 };
@@ -145,8 +168,9 @@ export const workSummary = (
   snapshot: WorkSnapshot,
   file: StreamsFile | null,
   dismissed: Dismissed,
+  muted: Set<string> = new Set(),
 ): { waiting: number; activity: number; redCiInStreams: number } => {
-  const { waiting, activity } = buildInbox(snapshot, file, dismissed);
+  const { waiting, activity } = buildInbox(snapshot, file, dismissed, new Date(), muted);
   let redCiInStreams = 0;
   for (const item of pinnedItems(file)) {
     const key = githubKeyOf(item.url);

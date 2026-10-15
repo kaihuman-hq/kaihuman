@@ -1,4 +1,5 @@
-import type { StreamOp } from '@kaihuman/formats';
+import type { StreamOp, StreamsFile } from '@kaihuman/formats';
+import type { Candidate, StreamProfile } from './background/ai/grow.js';
 
 export interface Message {
   type:
@@ -13,6 +14,7 @@ export interface Message {
     | 'DELETE_PINNED_TAB_GROUP'
     | 'GET_BOOKMARKS'
     | 'ADD_BOOKMARK'
+    | 'BOOKMARK_DUPLICATES'
     | 'IMPORT_CHROME_BOOKMARKS'
     | 'RECORD_BOOKMARK_USE'
     | 'SET_BOOKMARK_PINNED'
@@ -34,7 +36,10 @@ export interface Message {
     | 'READ_ENTRY_FILE'
     | 'WRITE_ENTRY_FILE'
     | 'LIST_IDEAS'
+    | 'LIST_NOTES'
+    | 'RERANK'
     | 'SAVE_IDEA'
+    | 'BRAINDUMP_DIGEST'
     | 'TRANSLATE'
     | 'GET_TRANSLATION_HISTORY'
     | 'ADD_TRANSLATION_HISTORY'
@@ -44,6 +49,8 @@ export interface Message {
     | 'GET_PALETTE_SETTINGS'
     | 'TOGGLE_COMMAND_PALETTE'
     | 'GET_TODAY'
+    | 'GET_AI_CARDS'
+    | 'GET_TLDRS'
     | 'REFRESH_TODAY'
     | 'GET_SERVICE_STATUS'
     | 'DELETE_BRAINDUMP'
@@ -53,12 +60,22 @@ export interface Message {
     | 'READ_LATER_DONE'
     | 'READ_LATER_ADD'
     | 'ADD_TODO'
+    | 'ADD_EVENT'
+    | 'CAPTURE_CLASSIFY'
+    | 'PAGE_SUMMARIZE'
+    | 'PAGE_ASK'
+    | 'TIDY_TABS'
+    | 'TIDY_CLOSE_TABS'
     | 'WORK_OPS'
     | 'WORK_REFRESH'
     | 'WORK_DISMISS'
     | 'WORK_OPEN'
     | 'WORK_SET_TOKEN'
-    | 'WORK_PIN_TAB';
+    | 'WORK_PIN_TAB'
+    | 'SUGGEST_STREAM'
+    | 'RELATED_TO'
+    | 'AI_AVAILABILITY'
+    | 'OPEN_WORK_PANEL';
   token?: string;
   path?: string;
   note?: string;
@@ -69,6 +86,8 @@ export interface Message {
   title?: string;
   text?: string;
   repo?: string;
+  /** `RERANK`: the candidates to order against `query`. */
+  items?: { id: string; text: string }[];
   entry?: { id: string; title: string; subtitle?: string; url?: string };
   bookmarkId?: string;
   /** `SET_BOOKMARK_PINNED`: the state to set, not a toggle, so a double click cannot undo itself. */
@@ -89,6 +108,14 @@ export interface Message {
   key?: string;
   /** `WORK_OPS`: stream changes from the side panel. */
   ops?: StreamOp[];
+  /** `SUGGEST_STREAM`: the streams to choose from, as the panel sees them. */
+  file?: StreamsFile;
+  /** `SUGGEST_STREAM`: what is about to be pinned. */
+  candidate?: { url: string; title: string };
+  /** `RELATED_TO`: the stream to grow. */
+  profile?: StreamProfile;
+  /** `RELATED_TO`: open tabs and inbox rows that might belong to it. */
+  candidates?: Candidate[];
   /** `WORK_DISMISS`: the row's `updatedAt`, so a later change brings it back. */
   updatedAt?: string;
   /** `WORK_DISMISS`, `WORK_OPEN`: the GitHub notification thread to mark done or read. */
@@ -107,6 +134,19 @@ export interface Message {
   sha?: string;
   /** `LIST_GITHUB_WORK`: which search; checked, since it comes from the page. */
   filter?: string;
+  /** `PAGE_ASK`: what to ask about the page text. */
+  question?: string;
+  /** `SAVE_PINNED_TAB_GROUP`: the tabs to save, in place of the window's pinned ones. */
+  tabs?: { url: string; title: string }[];
+  /** `TIDY_CLOSE_TABS`: the tabs to close. */
+  tabIds?: number[];
+  /** `ADD_TODO`: the milestone the todo belongs to. */
+  milestoneId?: string;
+  /** `ADD_EVENT`: the event's name, type, and first and last day (YYYY-MM-DD). */
+  name?: string;
+  eventType?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface MessageResponse {

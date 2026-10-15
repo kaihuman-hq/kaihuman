@@ -115,16 +115,20 @@ const waitFor = async (condition: () => boolean) => {
   }
   throw new Error(`Timed out; panel shows: ${host.textContent}`);
 };
-const mount = async (settled: string) => {
+const findStream = (name: string) =>
+  host.querySelector(`section[aria-label="${name}"]`) as HTMLElement | null;
+const stream = (name: string) => {
+  const found = findStream(name);
+  if (!found) throw new Error(`No stream "${name}"`);
+  return found;
+};
+const countOf = (name: string) => findStream(name)?.querySelector('h3 [data-count]')?.textContent;
+/** Waits for a stream to show this many open items, e.g. `mount('Alpha', 3)`. */
+const mount = async (name: string, count: number) => {
   host = document.createElement('div');
   document.body.appendChild(host);
   render(<SidePanel />, host);
-  await waitFor(() => host.textContent?.includes(settled) ?? false);
-};
-const stream = (name: string) => {
-  const h = [...host.querySelectorAll('h3')].find((el) => el.textContent?.includes(name));
-  if (!h?.parentElement) throw new Error(`No stream "${name}"`);
-  return h.parentElement;
+  await waitFor(() => countOf(name) === String(count));
 };
 const header = (name: string) => stream(name).querySelector('h3') as HTMLElement;
 const rowOf = (title: string) => {
@@ -132,10 +136,30 @@ const rowOf = (title: string) => {
   if (!li) throw new Error(`No row "${title}"`);
   return li as HTMLElement;
 };
-const clickText = (root: Element, text: string) => {
+const byLabel = (root: Element, label: string) => {
+  const el = root.querySelector(`[aria-label="${label}"]`) as HTMLElement | null;
+  if (!el) throw new Error(`No control "${label}"`);
+  return el;
+};
+const buttonOf = (root: Element, text: string) => {
   const el = [...root.querySelectorAll('button')].find((b) => b.textContent === text);
   if (!el) throw new Error(`No button "${text}"`);
-  el.click();
+  return el;
+};
+const clickText = (root: Element, text: string) => buttonOf(root, text).click();
+const type = (input: HTMLInputElement, value: string) => {
+  input.value = value;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+};
+const options = async (name: string) => {
+  byLabel(header(name), `Options for ${name}`).click();
+  await waitFor(() =>
+    [...stream(name).querySelectorAll('button')].some((b) => b.textContent === 'Rename'),
+  );
+};
+const more = async (title: string) => {
+  byLabel(rowOf(title), `More for ${title}`).click();
+  await waitFor(() => rowOf(title).textContent?.includes('Edit labels') ?? false);
 };
 const ops = () => sent.filter((m) => m.type === 'WORK_OPS').flatMap((m) => m.ops as never[]);
 
@@ -178,8 +202,13 @@ beforeEach(() => {
       lastError: undefined,
     },
   };
-  window.prompt = () => null;
-  window.confirm = () => true;
+  // Side panels block these: calling one dims the panel and returns nothing.
+  window.prompt = () => {
+    throw new Error('window.prompt does not work in a side panel');
+  };
+  window.confirm = () => {
+    throw new Error('window.confirm does not work in a side panel');
+  };
 });
 
 afterEach(() => {
@@ -189,7 +218,7 @@ afterEach(() => {
 
 describe('StreamSection', () => {
   it('shows open items with status and labels, and done items folded', async () => {
-    await mount('Alpha (3)');
+    await mount('Alpha', 3);
     const pr = rowOf('Live title');
     expect(pr.textContent).toContain('⇄');
     expect(pr.textContent).toContain('acme/web#7');
@@ -198,11 +227,13 @@ describe('StreamSection', () => {
     expect(pr.textContent).toContain('• new');
     expect(pr.textContent).toContain('urgent');
     expect(pr.textContent).toMatch(/just now|\d+[mhd] ago/);
+    // Failing CI outranks the approval: the row's rail is red.
+    expect(pr.querySelector('[data-tone]')?.getAttribute('data-tone')).toBe('bad');
     expect(rowOf('A doc').textContent).toContain('↗');
+    expect(rowOf('A doc').textContent).toContain('example.com');
     expect(rowOf('Slack chat').textContent).toContain('#');
     expect(host.textContent).not.toContain('Old issue');
-    expect(host.textContent).toContain('Done (1)');
-    clickText(stream('Alpha'), 'Done (1)');
+    clickText(stream('Alpha'), '▸ Done 1');
     await waitFor(() => host.textContent?.includes('Old issue') ?? false);
     expect(rowOf('Old issue').textContent).toContain('◎');
     clickText(rowOf('Old issue'), 'Undo');
@@ -210,8 +241,18 @@ describe('StreamSection', () => {
     expect(ops()[0]).toEqual({ op: 'undone', itemId: 'it_4' });
   });
 
+  it('opens the related picker from the options menu', async () => {
+    await mount('Alpha', 3);
+    await options('Alpha');
+    clickText(stream('Alpha'), 'Find related');
+    const picker = () => host.querySelector('[aria-label="Related to Alpha"]');
+    // The picker opens on "Looking for related tabs…" and fills in once its async search returns.
+    await waitFor(() => picker()?.textContent?.includes('No other open tabs') ?? false);
+    expect(picker()?.textContent).toContain('No other open tabs');
+  });
+
   it('uses the live title for GitHub items', async () => {
-    await mount('Alpha (3)');
+    await mount('Alpha', 3);
     expect(host.textContent).toContain('Live title');
     expect(host.textContent).not.toContain('Stored title');
     clickText(rowOf('Live title'), 'Live title');
@@ -223,8 +264,22 @@ describe('StreamSection', () => {
     });
   });
 
+  it('clamps a long title and keeps it whole on hover', async () => {
+    const long = `Investigate ${'flaky integration test in the payments service '.repeat(6)}`;
+    const f = file();
+    const first = f.streams[1]?.items[0];
+    if (first) first.title = long;
+    store = { ...store, streamsCache: { ...cache(), state: { ok: true, file: f } } };
+    await mount('Beta', 1);
+    const title = [...rowOf('Investigate').querySelectorAll('button')].find(
+      (el) => el.textContent === long,
+    );
+    expect(title?.getAttribute('title')).toBe(long);
+    expect(title?.className).toContain('line-clamp-2');
+  });
+
   it('sends move when an item is dropped on another stream', async () => {
-    await mount('Alpha (3)');
+    await mount('Alpha', 3);
     const data = new Map<string, string>();
     const dataTransfer = {
       setData: (type: string, value: string) => data.set(type, value),
@@ -248,64 +303,84 @@ describe('StreamSection', () => {
     expect(ops()[0]).toEqual({ op: 'move', itemId: 'it_2', streamId: 'st_b' });
   });
 
-  it('asks before deleting a stream with items', async () => {
-    await mount('Alpha (3)');
-    const asked: string[] = [];
-    window.confirm = (message?: string) => {
-      asked.push(message ?? '');
-      return false;
-    };
-    clickText(header('Alpha'), 'Delete');
-    expect(asked).toEqual(['Delete "Alpha" and its 4 items?']);
+  it('asks in place before deleting a stream with items', async () => {
+    await mount('Alpha', 3);
+    await options('Alpha');
+    clickText(stream('Alpha'), 'Delete');
+    await waitFor(
+      () => stream('Alpha').textContent?.includes('Delete “Alpha” and its 4 items?') ?? false,
+    );
     expect(ops()).toHaveLength(0);
-    window.confirm = (message?: string) => {
-      asked.push(message ?? '');
-      return true;
-    };
-    clickText(header('Alpha'), 'Delete');
+    clickText(stream('Alpha'), 'Keep');
+    await waitFor(() => !stream('Alpha').textContent?.includes('Delete “Alpha”'));
+    expect(ops()).toHaveLength(0);
+    await options('Alpha');
+    clickText(stream('Alpha'), 'Delete');
+    await waitFor(() => stream('Alpha').textContent?.includes('Delete stream') ?? false);
+    clickText(stream('Alpha'), 'Delete stream');
     await waitFor(() => ops().length > 0);
     expect(ops()[0]).toEqual({ op: 'deleteStream', streamId: 'st_a' });
-    clickText(header('Empty'), 'Delete');
+    // An empty stream loses nothing, so it goes at once.
+    await options('Empty');
+    clickText(stream('Empty'), 'Delete');
     await waitFor(() => ops().length > 1);
-    expect(asked).toHaveLength(2);
     expect(ops()[1]).toEqual({ op: 'deleteStream', streamId: 'st_c' });
   });
 
   it('filters by label across streams', async () => {
-    await mount('Alpha (3)');
-    const select = host.querySelector('select[aria-label="Filter by label"]') as HTMLSelectElement;
-    expect([...select.options].map((o) => o.value)).toEqual(['', 'later', 'urgent']);
-    select.value = 'urgent';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    await waitFor(() => host.textContent?.includes('Alpha (1)') ?? false);
-    expect(host.textContent).toContain('Beta (1)');
+    await mount('Alpha', 3);
+    const filter = host.querySelector('fieldset') as HTMLElement;
+    expect(filter.querySelector('legend')?.textContent).toBe('Filter by label');
+    expect([...filter.querySelectorAll('button')].map((b) => b.textContent)).toEqual([
+      'All',
+      'later',
+      'urgent',
+    ]);
+    clickText(filter, 'urgent');
+    await waitFor(() => countOf('Alpha') === '1');
+    expect(countOf('Beta')).toBe('1');
     expect(host.textContent).not.toContain('A doc');
-    expect([...host.querySelectorAll('h3')].some((h) => h.textContent?.includes('Empty'))).toBe(
-      false,
-    );
+    expect(findStream('Empty')).toBeNull();
     expect((store.workUi as { label?: string }).label).toBe('urgent');
+    expect(buttonOf(filter, 'urgent').getAttribute('aria-pressed')).toBe('true');
+    // Clicking the active label again clears the filter.
+    clickText(filter, 'urgent');
+    await waitFor(() => countOf('Alpha') === '3');
   });
 
-  it('edits labels, renames, reorders and adds streams', async () => {
-    await mount('Alpha (3)');
-    window.prompt = () => 'a, b ,a';
-    clickText(rowOf('A doc'), 'Labels');
+  it('edits labels, marks done, removes, reorders and adds streams', async () => {
+    await mount('Alpha', 3);
+    await more('A doc');
+    clickText(rowOf('A doc'), 'Edit labels');
+    await waitFor(() => rowOf('A doc').querySelector('input[aria-label="Labels"]') !== null);
+    const labels = byLabel(rowOf('A doc'), 'Labels') as HTMLInputElement;
+    expect(labels.value).toBe('later');
+    type(labels, 'a, b ,a');
+    await tick();
+    clickText(rowOf('A doc'), 'Save');
     await waitFor(() => ops().length > 0);
-    expect(ops()[0]).toMatchObject({ op: 'setLabels', itemId: 'it_2' });
-    clickText(rowOf('A doc'), '✓');
-    clickText(rowOf('A doc'), '✕');
+    expect(ops()[0]).toMatchObject({ op: 'setLabels', itemId: 'it_2', labels: ['a', 'b', 'a'] });
+    byLabel(rowOf('A doc'), 'Done A doc').click();
+    await waitFor(() => rowOf('A doc').textContent?.includes('Remove') ?? false);
+    clickText(rowOf('A doc'), 'Remove');
     await waitFor(() => ops().length > 2);
     expect(ops()[1]).toMatchObject({ op: 'markDone', itemId: 'it_2' });
     expect(ops()[2]).toEqual({ op: 'remove', itemId: 'it_2' });
-    clickText(header('Beta'), '↑');
+    await options('Beta');
+    byLabel(stream('Beta'), 'Move Beta up').click();
     await waitFor(() => ops().length > 3);
     expect(ops()[3]).toEqual({ op: 'reorderStreams', order: ['st_b', 'st_a', 'st_c'] });
-    window.prompt = () => 'Fresh';
     clickText(host, '+ New stream');
+    await waitFor(() => host.querySelector('input[aria-label="New stream name"]') !== null);
+    const name = host.querySelector('input[aria-label="New stream name"]') as HTMLInputElement;
+    type(name, ' Fresh ');
+    await tick();
+    clickText(host, 'Add');
     await waitFor(() => ops().length > 4);
     expect(ops()[4]).toMatchObject({ op: 'addStream', name: 'Fresh' });
+    await waitFor(() => host.querySelector('input[aria-label="New stream name"]') === null);
     header('Beta')
-      .querySelector('span,button')
+      .querySelector('button')
       ?.dispatchEvent(new Event('dblclick', { bubbles: true }));
     await waitFor(() => host.querySelector('input[aria-label="Stream name"]') !== null);
     const input = host.querySelector('input[aria-label="Stream name"]') as HTMLInputElement;
@@ -315,11 +390,34 @@ describe('StreamSection', () => {
     expect(ops()[5]).toEqual({ op: 'renameStream', streamId: 'st_b', name: 'Gamma' });
   });
 
+  it('renames from the options menu too', async () => {
+    await mount('Alpha', 3);
+    await options('Beta');
+    clickText(stream('Beta'), 'Rename');
+    await waitFor(() => host.querySelector('input[aria-label="Stream name"]') !== null);
+    const input = host.querySelector('input[aria-label="Stream name"]') as HTMLInputElement;
+    input.value = 'Delta';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await waitFor(() => ops().length > 0);
+    expect(ops()[0]).toEqual({ op: 'renameStream', streamId: 'st_b', name: 'Delta' });
+  });
+
+  it('cancels a new stream with Escape', async () => {
+    await mount('Alpha', 3);
+    clickText(host, '+ New stream');
+    await waitFor(() => host.querySelector('input[aria-label="New stream name"]') !== null);
+    const name = host.querySelector('input[aria-label="New stream name"]') as HTMLInputElement;
+    type(name, 'Nope');
+    name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await waitFor(() => host.querySelector('input[aria-label="New stream name"]') === null);
+    expect(ops()).toHaveLength(0);
+  });
+
   it('keeps a rename on blur, and drops it on Escape', async () => {
-    await mount('Alpha (3)');
+    await mount('Alpha', 3);
     const rename = async (name: string) => {
       header('Beta')
-        .querySelector('span,button')
+        .querySelector('button')
         ?.dispatchEvent(new Event('dblclick', { bubbles: true }));
       await waitFor(() => host.querySelector('input[aria-label="Stream name"]') !== null);
       const input = host.querySelector('input[aria-label="Stream name"]') as HTMLInputElement;
@@ -339,7 +437,7 @@ describe('StreamSection', () => {
   });
 
   it('double click renames without toggling collapse', async () => {
-    await mount('Alpha (3)');
+    await mount('Alpha', 3);
     const button = header('Alpha').querySelector('button') as HTMLElement;
     const mouse = (type: string, detail: number) =>
       button.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, detail }));
@@ -353,45 +451,51 @@ describe('StreamSection', () => {
   });
 
   it('persists collapse on a header click', async () => {
-    await mount('Alpha (3)');
+    await mount('Alpha', 3);
     (header('Alpha').querySelector('button') as HTMLElement).click();
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect((store.workUi as { collapsed: string[] }).collapsed).toEqual(['st_a']);
-    await waitFor(() => host.textContent?.includes('▸ Alpha') ?? false);
+    await waitFor(
+      () => header('Alpha').querySelector('button')?.getAttribute('aria-expanded') === 'false',
+    );
+    expect(header('Alpha').textContent).toContain('▸');
+    expect(host.textContent).not.toContain('Live title');
   });
 
   it('keeps both toggles when two streams are collapsed at once', async () => {
-    await mount('Alpha (3)');
+    await mount('Alpha', 3);
     (header('Alpha').querySelector('button') as HTMLElement).click();
     (header('Beta').querySelector('button') as HTMLElement).click();
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect((store.workUi as { collapsed: string[] }).collapsed.sort()).toEqual(['st_a', 'st_b']);
   });
 
-  it('moves an item with the Move select', async () => {
-    await mount('Alpha (3)');
-    const select = rowOf('A doc').querySelector('select') as HTMLSelectElement;
-    select.value = 'st_c';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+  it('moves an item to another stream from its actions', async () => {
+    await mount('Alpha', 3);
+    await more('A doc');
+    const row = rowOf('A doc');
+    expect(row.textContent).toContain('Move to');
+    expect(() => buttonOf(row, 'Alpha')).toThrow();
+    clickText(row, 'Empty');
     await waitFor(() => ops().length > 0);
     expect(ops()[0]).toEqual({ op: 'move', itemId: 'it_2', streamId: 'st_c' });
   });
 
   it('moves a stream down, with the end buttons disabled', async () => {
-    await mount('Alpha (3)');
-    const btn = (name: string, text: string) =>
-      [...header(name).querySelectorAll('button')].find(
-        (b) => b.textContent === text,
-      ) as HTMLButtonElement;
-    expect(btn('Alpha', '↑').disabled).toBe(true);
-    expect(btn('Empty', '↓').disabled).toBe(true);
-    btn('Alpha', '↓').click();
+    await mount('Alpha', 3);
+    await options('Alpha');
+    await options('Empty');
+    const btn = (name: string, dir: string) =>
+      byLabel(stream(name), `Move ${name} ${dir}`) as HTMLButtonElement;
+    expect(btn('Alpha', 'up').disabled).toBe(true);
+    expect(btn('Empty', 'down').disabled).toBe(true);
+    btn('Alpha', 'down').click();
     await waitFor(() => ops().length > 0);
     expect(ops()[0]).toEqual({ op: 'reorderStreams', order: ['st_b', 'st_a', 'st_c'] });
   });
 
   it('ignores a drop that is not an item or lands on its own stream', async () => {
-    await mount('Alpha (3)');
+    await mount('Alpha', 3);
     const drop = (name: string, value: string) => {
       const event = new Event('drop', { bubbles: true, cancelable: true });
       Object.assign(event, { dataTransfer: { getData: () => value } });
@@ -422,26 +526,33 @@ describe('StreamSection', () => {
       />,
       host,
     );
-    const buttons = [...host.querySelectorAll('button')].filter((b) =>
-      ['Delete', '↑', '↓', 'Labels', '✓', '✕'].includes(b.textContent ?? ''),
+    await options('Alpha');
+    await more('A doc');
+    const controls = [...host.querySelectorAll('button')].filter(
+      (b) =>
+        ['Rename', 'Delete', 'Edit labels', 'Remove', 'Beta', 'Empty'].includes(
+          b.textContent ?? '',
+        ) || /^(Done|Move) /.test(b.getAttribute('aria-label') ?? ''),
     );
-    expect(buttons.length).toBeGreaterThan(6);
-    expect(buttons.every((b) => b.disabled)).toBe(true);
-    expect([...host.querySelectorAll('select')].every((s) => s.disabled)).toBe(true);
+    expect(controls.length).toBeGreaterThan(8);
+    expect(controls.every((b) => b.disabled)).toBe(true);
     expect(host.querySelector('li')?.getAttribute('draggable')).toBe('false');
   });
 
   it('hides streams and + New stream without a data repo', async () => {
     store = { workSnapshot: snapshot() };
-    await mount('Settings');
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    render(<SidePanel />, host);
+    await waitFor(() => host.textContent?.includes('Waiting on you') ?? false);
     expect(host.textContent).not.toContain('+ New stream');
-    expect(host.querySelector('select[aria-label="Filter by label"]')).toBeNull();
+    expect(host.querySelector('fieldset')).toBeNull();
   });
 
   it('saves and removes the work token', async () => {
     store.workToken = 'ghp_secret';
-    await mount('Settings');
-    clickText(host, 'Settings');
+    await mount('Alpha', 3);
+    byLabel(host, 'Settings').click();
     await waitFor(() => host.querySelector('input[type="password"]') !== null);
     await waitFor(() => host.textContent?.includes('A work token is set') ?? false);
     expect(host.innerHTML).not.toContain('ghp_secret');

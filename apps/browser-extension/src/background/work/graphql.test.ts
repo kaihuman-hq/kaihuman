@@ -50,6 +50,23 @@ describe('buildWorkQueries', () => {
     expect(first.variables).toEqual({ o0: 'a', r0: 'b', n0: 1, o1: 'c', r1: 'd', n1: 2 });
   });
 
+  it('waiting searches request bodyText, mine does not', () => {
+    const [q] = buildWorkQueries([ref('a', 'b', 1)]);
+    const block = (alias: string) =>
+      q.query.split(`${alias}: search(`)[1].split(/\n\w+: (?:search|repository)\(/)[0];
+    for (const alias of [
+      'reviewRequested',
+      'assigned',
+      'failing',
+      'changesRequested',
+      'readyToMerge',
+    ]) {
+      expect(block(alias)).toContain('bodyText');
+    }
+    expect(block('mine')).not.toContain('bodyText');
+    expect(q.query.split('p0: repository(')[1]).not.toContain('bodyText');
+  });
+
   it('passes owner, repo and number as variables', () => {
     const [q] = buildWorkQueries([ref('a"b', 'r}', 5)]);
     expect(q.query).not.toContain('a"b');
@@ -120,6 +137,21 @@ describe('parseWorkResponses', () => {
     expect(out.searches.failing).toEqual([]);
     expect(out.searches.mine).toEqual([]);
     expect(out.pinned[pinned[0].key]).toEqual(expected);
+  });
+
+  it('body is cut to 1,000 characters', () => {
+    const out = parseWorkResponses(
+      [
+        {
+          data: {
+            assigned: searchData([prNode({ bodyText: `  ${'x'.repeat(1500)}` }), issueNode]),
+          },
+        },
+      ],
+      [],
+    );
+    expect(out.searches.assigned[0].body).toBe('x'.repeat(1000));
+    expect(out.searches.assigned[1].body).toBeUndefined();
   });
 
   it('maps CI states', () => {

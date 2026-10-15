@@ -42,16 +42,28 @@ export function urlToSlug(url: string): string {
   }
 }
 
+export type CaptureType = 'snippet' | 'decision' | 'how-to' | 'reference' | 'idea';
+
 export function buildRawNote(note: {
   title: string;
   url: string;
   text: string;
   tags: string[];
   date: string;
+  type?: CaptureType;
+  summary?: string[];
 }): string {
   const title = note.title.replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"');
   const url = note.url.replace(/'/g, "''");
-  return `---\ntitle: "${title}"\nurl: '${url}'\ndate: ${note.date}\nprocessed: false\ntags: [${note.tags.join(', ')}]\n---\n\n${note.text}`;
+  const type = note.type ? `type: ${note.type}\n` : '';
+  // JSON strings are valid YAML double-quoted scalars, so quotes and backslashes need no more care.
+  const points = (note.summary ?? []).map((point) => point.replace(/\s+/g, ' ').trim());
+  const summary = points.length
+    ? `summary:\n${points.map((point) => `  - ${JSON.stringify(point)}\n`).join('')}`
+    : '';
+  // Quoted like the title: a tag with a comma, colon or bracket would otherwise break the list.
+  const tags = [...new Set(note.tags)].map((tag) => JSON.stringify(tag)).join(', ');
+  return `---\ntitle: "${title}"\nurl: '${url}'\ndate: ${note.date}\nprocessed: false\n${type}tags: [${tags}]\n${summary}---\n\n${note.text}`;
 }
 
 export function selectionText(text: string, url: string, pageTitle: string): string {
