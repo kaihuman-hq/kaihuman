@@ -9,6 +9,8 @@ import {
   splitTags,
 } from '@kaihuman/palette';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import type { CaptureGuess } from '../background/ai/capture';
+import { availability } from '../background/ai/model';
 import {
   type Bookmark,
   bookmarkEnvironment,
@@ -40,10 +42,18 @@ import { WorkCard } from './WorkCard';
  * to spend a GitHub request on it. */
 const DUMP_PATH = '.lifeos/dump.md';
 
-/** What the capture box writes: a note to the dump, a todo to the inbox, or an action log entry. */
-type CaptureKind = 'note' | 'todo' | 'log';
+/**
+ * What the capture box writes: a note to the dump, a todo to the inbox, or an action log entry —
+ * or, with the built-in model, whichever of those or an event the model guesses.
+ */
+type CaptureKind = 'auto' | 'note' | 'todo' | 'log';
 
 const CAPTURE: Record<CaptureKind, { label: string; placeholder: string; submit: string }> = {
+  auto: {
+    label: 'Auto',
+    placeholder: 'A note, a todo, something done, or a date… #tags',
+    submit: 'Save',
+  },
   note: { label: 'Note', placeholder: 'Something to write down…', submit: 'Add note' },
   todo: { label: 'Todo', placeholder: 'Something to do… #tags', submit: 'Add todo' },
   log: { label: 'Log', placeholder: 'What happened? #tags', submit: 'Log' },
@@ -60,7 +70,19 @@ type CaptureLog = Record<CaptureKind, Captured[]>;
 /** `chrome.storage.local` key of the latest captures, so the list outlives the tab. */
 const CAPTURE_LOG_KEY = 'startPageCaptures';
 const CAPTURE_LOG_LIMIT = 5;
-const EMPTY_CAPTURE_LOG: CaptureLog = { note: [], todo: [], log: [] };
+const EMPTY_CAPTURE_LOG: CaptureLog = { auto: [], note: [], todo: [], log: [] };
+
+/** Auto asks once typing pauses, not on every keystroke. */
+const CLASSIFY_DEBOUNCE_MS = 400;
+/** The worker's own limit; past it the box files a note rather than keep anyone waiting. */
+const CLASSIFY_TIMEOUT_MS = 4000;
+
+const GUESS_LABEL: Record<CaptureGuess['kind'], string> = {
+  note: 'Note',
+  todo: 'Todo',
+  log: 'Log',
+  event: 'Event',
+};
 
 /** The timer shows seconds while it runs, so the page redraws once a second. */
 const TICK_MS = 1000;
@@ -130,6 +152,11 @@ export function StartPage() {
   const [noteStatus, setNoteStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [noteError, setNoteError] = useState<string | null>(null);
   const [capture, setCapture] = useState<CaptureKind>('note');
+  const [autoAvailable, setAutoAvailable] = useState(false);
+  const [guesses, setGuesses] = useState<CaptureGuess[]>([]);
+  const [guessIndex, setGuessIndex] = useState(0);
+  // The latest question asked, so a save can wait for its answer and a stale answer is dropped.
+  const classifyRef = useRef<{ text: string; result: Promise<CaptureGuess[]> } | null>(null);
   const [captureLog, setCaptureLog] = useState<CaptureLog>(EMPTY_CAPTURE_LOG);
   const [today, setToday] = useState<TodaySummary | null>(null);
   const [todayError, setTodayError] = useState<string | null>(null);
@@ -217,6 +244,48 @@ export function StartPage() {
     // Asked last, so it reports on whatever the loads above just fetched.
     return Promise.all(loads).then(refreshSyncStatus);
   };
+
+  // Auto only when the model is ready: until then a guess would always time out into a note.
+  useEffect(() => {
+    void availability('prompt').then((state) => {
+      if (state !== 'available') return;
+      setAutoAvailable(true);
+      setCapture((current) => (current === 'note' ? 'auto' : current));
+    });
+  }, []);
+
+  const classify = (text: string) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const result = Promise.race([
+      send({ type: 'CAPTURE_CLASSIFY', text }).then(
+        (response) =>
+          Array.isArray(response?.guesses) ? (response.guesses as CaptureGuess[]) : [],
+        (): CaptureGuess[] => [],
+      ),
+      new Promise<CaptureGuess[]>((resolve) => {
+        timer = setTimeout(() => resolve([]), CLASSIFY_TIMEOUT_MS);
+      }),
+    ]).finally(() => clearTimeout(timer));
+    classifyRef.current = { text, result };
+    void result.then((list) => {
+      if (classifyRef.current?.text !== text) return;
+      setGuesses(list);
+      setGuessIndex(0);
+    });
+    return result;
+  };
+
+  useEffect(() => {
+    setGuesses([]);
+    setGuessIndex(0);
+    const text = note.trim();
+    if (capture !== 'auto' || !text) {
+      classifyRef.current = null;
+      return;
+    }
+    const timer = setTimeout(() => void classify(text), CLASSIFY_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [note, capture]);
 
   useEffect(() => {
     chrome.storage.local.get(['lifeos_token', 'lifeos_repo', CAPTURE_LOG_KEY], (result) => {
@@ -426,12 +495,68 @@ export function StartPage() {
 
   const openFile = (path: string) => openInThisTab(consoleFileUrl(path, repo));
 
+  const logTarget = today?.actionLogPath ?? DEFAULT_ACTION_LOG_PATH;
   const captureTarget =
-    capture === 'note'
+    capture === 'note' || capture === 'auto'
       ? DUMP_PATH
       : capture === 'todo'
         ? (today?.inbox.path ?? 'inbox.todos.md')
-        : (today?.actionLogPath ?? DEFAULT_ACTION_LOG_PATH);
+        : logTarget;
+
+  const captureKinds = (Object.keys(CAPTURE) as CaptureKind[]).filter(
+    (kind) => kind !== 'auto' || autoAvailable,
+  );
+  const guess = guesses[guessIndex];
+  /** `Todo → work.todos.md · #bank`: what Enter will do with the text. */
+  const preview = (g: CaptureGuess) => {
+    const target = g.kind === 'note' ? DUMP_PATH : g.kind === 'log' ? logTarget : g.path;
+    const parts = [`${GUESS_LABEL[g.kind]} → ${target}`];
+    if (g.kind === 'event') {
+      parts.push(
+        g.endDate === g.startDate
+          ? `${g.name}, ${g.startDate}`
+          : `${g.name}, ${g.startDate} – ${g.endDate}`,
+      );
+    }
+    if (g.kind === 'todo' && g.milestoneId) parts.push(`!${g.milestoneId}`);
+    if ((g.kind === 'todo' || g.kind === 'log') && g.tags.length) {
+      parts.push(g.tags.map((tag) => `#${tag}`).join(' '));
+    }
+    return parts.join(' · ');
+  };
+
+  /** Writes one guess; the summary comes back for the files the start page shows. */
+  const saveGuess = async (g: CaptureGuess) => {
+    if (g.kind === 'note') {
+      await send({ type: 'DUMP_NOTE', path: DUMP_PATH, note: g.text });
+    } else if (g.kind === 'todo') {
+      const response = await send({
+        type: 'ADD_TODO',
+        text: g.text,
+        path: g.path,
+        tags: g.tags,
+        milestoneId: g.milestoneId,
+      });
+      setToday(response.today);
+    } else if (g.kind === 'log') {
+      await send({
+        type: 'ADD_ACTION_LOG',
+        path: today?.actionLogPath,
+        description: g.description,
+        tags: g.tags,
+      });
+    } else {
+      const response = await send({
+        type: 'ADD_EVENT',
+        path: g.path,
+        name: g.name,
+        eventType: g.type,
+        startDate: g.startDate,
+        endDate: g.endDate,
+      });
+      setToday(response.today);
+    }
+  };
 
   /** Remembers a saved capture for the list under the box, here and in every later tab. */
   const rememberCapture = (kind: CaptureKind, text: string) => {
@@ -453,7 +578,13 @@ export function StartPage() {
     setNoteStatus('saving');
     setNoteError(null);
     try {
-      if (kind === 'note') {
+      if (kind === 'auto') {
+        // A save before the answer waits for it, up to the timeout, then files a note.
+        const pending =
+          classifyRef.current?.text === text ? classifyRef.current.result : classify(text);
+        const list = await pending;
+        await saveGuess(list[guessIndex] ?? list[0] ?? { kind: 'note', text: note });
+      } else if (kind === 'note') {
         await send({ type: 'DUMP_NOTE', path: DUMP_PATH, note });
       } else if (kind === 'todo') {
         const response = await send({ type: 'ADD_TODO', text: note });
@@ -811,7 +942,7 @@ export function StartPage() {
               <div class="flex items-baseline justify-between gap-4">
                 <fieldset class="flex gap-[14px]">
                   <legend class="sr-only">Capture as</legend>
-                  {(Object.keys(CAPTURE) as CaptureKind[]).map((kind) => (
+                  {captureKinds.map((kind) => (
                     <button
                       key={kind}
                       type="button"
@@ -829,17 +960,33 @@ export function StartPage() {
                     </button>
                   ))}
                 </fieldset>
-                <span class="text-[11px] text-nt-faint truncate" title={`${repo}/${captureTarget}`}>
-                  {captureTarget}
-                </span>
+                {capture === 'auto' ? (
+                  <span class="text-[11px] text-nt-faint truncate" aria-live="polite">
+                    {guess ? preview(guess) : ''}
+                    {guesses.length > 1 && ` (${guessIndex + 1}/${guesses.length}, Tab for next)`}
+                  </span>
+                ) : (
+                  <span
+                    class="text-[11px] text-nt-faint truncate"
+                    title={`${repo}/${captureTarget}`}
+                  >
+                    {captureTarget}
+                  </span>
+                )}
               </div>
               <textarea
                 value={note}
                 onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)}
                 onKeyDown={(e) => {
-                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                  // In Auto a line is the whole capture, so Enter saves; Shift+Enter still breaks it.
+                  const autoEnter = capture === 'auto' && e.key === 'Enter' && !e.shiftKey;
+                  if (((e.ctrlKey || e.metaKey) && e.key === 'Enter') || autoEnter) {
                     e.preventDefault();
                     void addNote();
+                  } else if (capture === 'auto' && e.key === 'Tab' && guesses.length > 1) {
+                    e.preventDefault();
+                    const step = e.shiftKey ? guesses.length - 1 : 1;
+                    setGuessIndex((index) => (index + step) % guesses.length);
                   }
                 }}
                 aria-label={`${CAPTURE[capture].label} text`}
