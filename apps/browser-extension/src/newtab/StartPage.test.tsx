@@ -35,6 +35,8 @@ let activeGroup: string | null;
 let pinReply: string | null;
 let TODAY: TodaySummary | undefined;
 let STATUSES: ServiceStatus[];
+/** What the worker has cached for the focus line and the morning brief. */
+let AI_CARDS: { focus?: string; brief?: string[]; briefDate?: string };
 
 const emptyToday = (): TodaySummary => ({
   events: [],
@@ -103,6 +105,7 @@ const reply = (message: { type?: string; bookmarkId?: string; pinned?: boolean }
     activeGroup = (message as { groupId: string }).groupId;
     return { opened: 1, unpinned: 0, name: 'Work' };
   }
+  if (message.type === 'GET_AI_CARDS') return AI_CARDS;
   if (message.type === 'GET_RECENTS') return { recents: [] };
   if (message.type === 'GET_SERVICE_STATUS') return { statuses: STATUSES };
   if (message.type === 'GET_TODAY') return TODAY ? { today: TODAY } : { error: 'offline' };
@@ -203,6 +206,7 @@ beforeEach(() => {
   pinReply = null;
   TODAY = undefined;
   STATUSES = [];
+  AI_CARDS = {};
   deleteReply = null;
   FRESHER = null;
   store = { lifeos_token: 'token', lifeos_repo: 'owner/repo' };
@@ -1098,6 +1102,55 @@ describe('StartPage', () => {
       await mount(() => host.textContent?.includes('GitHub refused the token') ?? false);
 
       expect(host.textContent).toContain('open the side panel');
+    });
+  });
+  describe('AI cards', () => {
+    const brief = ['Standup at ten.', 'Two reviews wait on you.', 'CI is red on payments.'];
+    const today = () => new Date().toLocaleDateString('sv');
+    const hasBrief = () => host.textContent?.includes('Standup at ten.') ?? false;
+
+    it('shows no focus line without a cached focus', async () => {
+      TODAY = emptyToday();
+      await mount(() => sent.some((m) => m.type === 'GET_AI_CARDS'));
+      await tick();
+
+      expect(host.querySelector('[data-testid="focus-line"]')).toBeNull();
+      expect(host.textContent).not.toContain('Morning brief');
+    });
+
+    it('shows the cached focus line and asks for the cards once', async () => {
+      TODAY = emptyToday();
+      AI_CARDS = { focus: 'Finish the ledger review' };
+      await mount(() => host.textContent?.includes('Finish the ledger review') ?? false);
+
+      expect(sent.filter((m) => m.type === 'GET_AI_CARDS')).toHaveLength(1);
+    });
+
+    it('collapses the brief card and keeps it dismissed for the day', async () => {
+      AI_CARDS = { brief, briefDate: today() };
+      await mount(hasBrief);
+
+      click('Dismiss');
+      await tick();
+      expect(hasBrief()).toBe(false);
+      expect(store.briefDismissed).toBe(today());
+      expect(host.textContent).toContain('Morning brief');
+
+      render(null, host);
+      host.remove();
+      await mount(() => host.textContent?.includes('Morning brief') ?? false);
+      await tick();
+      expect(hasBrief()).toBe(false);
+
+      click('Show');
+      await tick();
+      expect(hasBrief()).toBe(true);
+    });
+
+    it('shows the brief again on a new day', async () => {
+      store.briefDismissed = '2000-01-01';
+      AI_CARDS = { brief, briefDate: today() };
+      await mount(hasBrief);
     });
   });
 });
