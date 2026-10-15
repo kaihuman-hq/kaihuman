@@ -3,7 +3,7 @@ import {
   DEFAULT_PALETTE_SETTINGS,
   type PaletteToolSetting,
 } from '@kaihuman/formats';
-import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { Bookmark } from './bookmarks.js';
 import {
   type CommandPalette,
@@ -1997,5 +1997,88 @@ describe('modes that refresh what they loaded', () => {
     expect(input().value).toBe('');
     expect(crumbText()).toBe('U');
     expect(rowTitles()).toEqual(['Scan again', 'Scan 2']);
+  });
+});
+
+describe('ask', () => {
+  let ask: Mock<(query: string) => Promise<ModeItem | null>>;
+  let askRun: Mock<(inputs: string[]) => Promise<string>>;
+
+  beforeEach(async () => {
+    palette.destroy();
+    document.body.replaceChildren();
+    askRun = vi.fn(async () => 'Logged');
+    ask = vi.fn(async (query: string) => ({
+      id: `ask:${query}`,
+      title: 'Log: 30m on payments',
+      subtitle: 'Ask kaihuman',
+      action: { id: 'ask', title: 'Log: 30m on payments', recent: false, run: askRun },
+    }));
+    palette = createCommandPalette({
+      loadBookmarks: loadBookmarks as any,
+      searchRepo: searchRepo as any,
+      open: open as any,
+      actions: () => actions,
+      loadRecents: loadRecents as any,
+      rememberRecent: rememberRecent as any,
+      countBookmarkUse: countBookmarkUse as any,
+      modes,
+      copy: copy as any,
+      ask,
+    });
+    palette.toggle();
+    await settle();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('ask row appears for 3+ words without a prefix and not for URLs', async () => {
+    type('log payments');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(ask).not.toHaveBeenCalled();
+
+    type('https://example.com/a b c');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(ask).not.toHaveBeenCalled();
+
+    type('>p log 30m payments');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(ask).not.toHaveBeenCalled();
+    press('Escape');
+
+    type('log 30m on');
+    type('log 30m on payments');
+    await vi.advanceTimersByTimeAsync(299);
+    expect(ask).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    // Only once typing stops: the earlier text was never asked about.
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(ask).toHaveBeenCalledWith('log 30m on payments');
+    expect(rowTitles()[0]).toBe('Log: 30m on payments');
+    expect(groupLabels()[0]).toBe('Ask kaihuman');
+
+    type('log 30m on payments today');
+    expect(rowTitles()).not.toContain('Log: 30m on payments');
+  });
+
+  it('Enter on the ask row runs its action', async () => {
+    type('log 30m on payments');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(selectedTitle()).toBe('Log: 30m on payments');
+    press('Enter');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(askRun).toHaveBeenCalledTimes(1);
+    expect(statusText()).toBe('Logged');
+  });
+
+  it('shows no row when ask has nothing', async () => {
+    ask.mockResolvedValueOnce(null);
+    type('what is this even');
+    await vi.advanceTimersByTimeAsync(300);
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(groupLabels()).not.toContain('Ask kaihuman');
   });
 });

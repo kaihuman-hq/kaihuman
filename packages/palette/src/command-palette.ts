@@ -184,6 +184,12 @@ export interface PaletteHandlers {
   /** The ids last chosen in the mode behind `prefix`, newest first (`MODE_RECENTS_LIMIT`). */
   loadModeRecents?: (prefix: string) => Promise<string[]>;
   rememberModeRecent?: (prefix: string, id: string) => void;
+  /**
+   * Plain language turned into one thing to do — "log 30m on payments" — listed first as a row
+   * that previews it. Asked once typing stops, for queries of `ASK_MIN_WORDS` or more without a
+   * prefix or a URL; null offers nothing. Without it the palette never asks.
+   */
+  ask?: (query: string) => Promise<ModeItem | null>;
 }
 
 /** How many recently chosen entries each prefix mode keeps. */
@@ -370,6 +376,19 @@ const helpTopics = (engines: readonly { name: string }[]): [string, string][] =>
 /** Typing pauses this long before the editor saves, so a paste or a burst of keys is one save. */
 const EDITOR_SAVE_DELAY_MS = 400;
 
+/** Each ask can cost a model call, so it waits until typing stops. */
+const ASK_DELAY_MS = 300;
+/** Shorter queries are names to find — a bookmark, an action — rather than things to do. */
+const ASK_MIN_WORDS = 3;
+const LOOKS_LIKE_URL = /^(?:[a-z][\w+.-]*:\/\/|www\.)/i;
+
+/** Whether a query outside any mode is worth asking about. */
+const isAskable = (query: string) =>
+  !query.startsWith(MODE_MARK) &&
+  !query.startsWith(HELP_PREFIX) &&
+  !LOOKS_LIKE_URL.test(query) &&
+  query.split(/\s+/).filter(Boolean).length >= ASK_MIN_WORDS;
+
 /** Enough to scroll through; a prompt library of hundreds is found by typing, not scrolling. */
 const MODE_ROW_LIMIT = 50;
 
@@ -508,6 +527,11 @@ export function createCommandPalette(
    */
   let saving: Promise<void> = Promise.resolve();
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  /** What `ask` offered, for the query it was asked about; a newer query hides it. */
+  let asked: { query: string; item: ModeItem } | null = null;
+  let askTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Guards against a slow answer landing after the query moved on, like `searchToken`. */
+  let askToken = 0;
 
   const needle = () => input.value.trim().toLowerCase();
 
@@ -1063,6 +1087,39 @@ export function createCommandPalette(
     }));
   };
 
+  /** The one thing `ask` made of the query, while the query is still what it was asked about. */
+  const askRows = (): Row[] => {
+    if (trail.length > 0 || !asked || asked.query !== input.value.trim()) return [];
+    const { item } = asked;
+    return [
+      { title: item.title, subtitle: item.subtitle ?? '', activate: () => void chooseItem(item) },
+    ];
+  };
+
+  const cancelAsk = () => {
+    clearTimeout(askTimer);
+    askToken++;
+    asked = null;
+  };
+
+  /** Asks about the query once typing has paused, unless it moved on by then. */
+  const scheduleAsk = () => {
+    cancelAsk();
+    const { ask } = handlers;
+    const query = input.value.trim();
+    if (!ask || mode || pending || trail.length > 0 || !isAskable(query)) return;
+    const token = askToken;
+    askTimer = setTimeout(async () => {
+      const item = await ask(query).catch(() => null);
+      // A mode, a field or a submenu entered meanwhile has rows of its own.
+      if (token !== askToken || !open || !item || mode || pending || trail.length > 0) return;
+      asked = { query, item };
+      // The row arrives above the rest, so a row already arrowed to stays the selected one.
+      if (selected > 0) selected++;
+      render();
+    }, ASK_DELAY_MS);
+  };
+
   /** One row per engine for whatever is typed; opening one is opening its results page. */
   const webRows = (): Row[] => {
     const query = input.value.trim();
@@ -1103,6 +1160,7 @@ export function createCommandPalette(
     if (pending) return [];
     if (mode) return modeRows();
     return [
+      ...askRows(),
       ...recentRows(),
       ...bookmarkRows(),
       ...repoRows(),
@@ -1231,6 +1289,7 @@ export function createCommandPalette(
     else if (here) input.placeholder = `Search ${here.title.replace(/…$/, '')}…`;
     else input.placeholder = 'Search bookmarks or the web…';
 
+    const askMatches = askRows();
     const recent = recentRows();
     const bookmarkMatches = bookmarkRows();
     const repoMatches = repoRows();
@@ -1243,6 +1302,7 @@ export function createCommandPalette(
     if (mode) total = listed.length;
     else if (!pending)
       total =
+        askMatches.length +
         recent.length +
         bookmarkMatches.length +
         repoMatches.length +
@@ -1318,6 +1378,7 @@ export function createCommandPalette(
       }
       if (listed.length === 0 && (mode.items || mode.parent)) addNote('No matches.');
     } else {
+      addGroup('Ask kaihuman', askMatches);
       addGroup('Recent', recent);
       addGroup('Bookmarks', bookmarkMatches);
       addGroup('Repo', repoMatches);
@@ -1528,6 +1589,7 @@ export function createCommandPalette(
     searchToken++;
     selected = 0;
     setStatus(null);
+    scheduleAsk();
     render();
   });
   backdrop.addEventListener('mousedown', (e) => {
@@ -1535,6 +1597,7 @@ export function createCommandPalette(
   });
 
   function close() {
+    cancelAsk();
     void flushEditor();
     editor = null;
     const wasOpen = open;
@@ -1554,6 +1617,7 @@ export function createCommandPalette(
     mode = null;
     editor = null;
     submitToken++;
+    cancelAsk();
     selected = 0;
     setStatus(null);
     render();
