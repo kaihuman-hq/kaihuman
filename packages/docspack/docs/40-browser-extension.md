@@ -350,7 +350,7 @@ On-device AI everywhere (Settings → On-device AI switches each group on or off
   - The capture box's Auto mode files notes, todos, log entries and events.
   - "Likely next" bookmarks.
   - Read later for today, with reasons.
-  - A focus line and a morning brief.
+  - A focus line.
   - A braindump digest.
 - **Saving:** bookmark drafts with duplicate warnings; read-later TL;DRs; knowledge base key points, type and alt text.
 - **Side panel:**

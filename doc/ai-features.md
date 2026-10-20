@@ -77,7 +77,7 @@ IDs match the brainstorm. "Rules" is the fallback without the model.
 - **F2 Likely next.** "Recently used" becomes "Likely next". Candidates are the top 20 by F1 frecency, boosted when the bookmark's host or path matches repos or hosts in active streams, or tags match the labels in use. The model re-ranks the top 12 against the open streams and today's todos. Rules: F1 plus the stream-match boost.
 - **F3 Read later "for today".** The 3 shown become the top 3 by relevance to active streams, open ideas and todo tags (model re-rank of up to 20 unread), with a one-line reason under each. Items older than 60 days and never opened get an "Archive?" action, which sets status `read`. Rules: oldest first, as today.
 - **F4b Focus line.** One sentence above Doing: "Focus: …", picked from overdue todos, the waiting-on-you top 3, red CI in streams and today's events. Rules: no line.
-- **F7 Morning brief.** A collapsible card on the first new tab after 05:00: three sentences covering events today, overdue todos, waiting on you, red CI and streaks at risk. Generated once per day. Rules: no card.
+- **F7 Morning brief (removed 2026-10-20: not useful enough).** A collapsible card on the first new tab after 05:00: three sentences covering events today, overdue todos, waiting on you, red CI and streaks at risk. Generated once per day. Rules: no card.
 - **F8 Braindump digest.** In the Braindumps section, "Digest" groups the last 30 braindumps into up to 5 themes (titles and member ids, schema-checked). Each theme offers "Make a todo" (prefilled F9 capture) and "Make an idea" (`SAVE_IDEA` with the theme as seed). Computed when asked, then cached.
 
 ### Phase 4 – side panel

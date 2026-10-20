@@ -266,9 +266,10 @@ describe('RERANK', () => {
 });
 
 describe('the precompute jobs', () => {
-  it('registers the focus and brief cards before the heavier ranking and inbox jobs', () => {
+  it('registers the focus card before the heavier ranking and inbox jobs', () => {
     const ids = precomputeJobs.map((job) => job.id);
-    expect(ids.slice(0, 2)).toEqual(['card:focus', 'card:brief']);
+    expect(ids[0]).toBe('card:focus');
+    expect(ids).not.toContain('card:brief');
     expect(ids).toContain('rank:likely');
   });
 

@@ -137,39 +137,6 @@ export function FocusLine(props: { focus: string | undefined }) {
   );
 }
 
-/** Three sentences on the day; dismissing folds it away until tomorrow, not for good. */
-export function MorningBrief(props: {
-  sentences: string[];
-  collapsed: boolean;
-  onDismiss: () => void;
-  onShow: () => void;
-}) {
-  const { sentences, collapsed } = props;
-  return (
-    <section class="border border-nt-control p-4 flex flex-col gap-2">
-      <SectionHead
-        title="Morning brief"
-        meta={
-          <button
-            type="button"
-            class="hover:text-nt-accent"
-            onClick={collapsed ? props.onShow : props.onDismiss}
-          >
-            {collapsed ? 'Show' : 'Dismiss'}
-          </button>
-        }
-      />
-      {!collapsed && (
-        <ul class="flex flex-col gap-1 text-[16px]">
-          {sentences.map((sentence) => (
-            <li key={sentence}>{sentence}</li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 /** What is in progress, what is overdue, and today's working time. */
 export function Doing(props: {
   today: TodaySummary;

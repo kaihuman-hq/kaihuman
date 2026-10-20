@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-10-20 — Browser extension: morning brief removed
+
+- The AI-generated morning brief card is gone from the top of the start page. The worker no longer generates it, so it costs no model time. The focus line stays.
+
 ## 2026-10-15 — On-device AI: final review fixes
 
 - Background model jobs now stop after 60 s, so a hung job can no longer block the queue. Precompute runs at most every 10 minutes after repo syncs as well as after work polls.
