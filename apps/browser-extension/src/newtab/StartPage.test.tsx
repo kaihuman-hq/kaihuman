@@ -37,8 +37,8 @@ let TODAY: TodaySummary | undefined;
 /** The cached rankings the worker attaches to GET_TODAY; empty until a precompute has run. */
 let RANKING: { likely?: { ids: string[]; reasons: Record<string, string>; computedAt: number } };
 let STATUSES: ServiceStatus[];
-/** What the worker has cached for the focus line and the morning brief. */
-let AI_CARDS: { focus?: string; brief?: string[]; briefDate?: string };
+/** What the worker has cached for the focus line. */
+let AI_CARDS: { focus?: string };
 
 const emptyToday = (): TodaySummary => ({
   events: [],
@@ -1332,10 +1332,6 @@ describe('StartPage', () => {
     });
   });
   describe('AI cards', () => {
-    const brief = ['Standup at ten.', 'Two reviews wait on you.', 'CI is red on payments.'];
-    const today = () => new Date().toLocaleDateString('sv');
-    const hasBrief = () => host.textContent?.includes('Standup at ten.') ?? false;
-
     it('shows no focus line without a cached focus', async () => {
       TODAY = emptyToday();
       await mount(() => sent.some((m) => m.type === 'GET_AI_CARDS'));
@@ -1353,31 +1349,13 @@ describe('StartPage', () => {
       expect(sent.filter((m) => m.type === 'GET_AI_CARDS')).toHaveLength(1);
     });
 
-    it('collapses the brief card and keeps it dismissed for the day', async () => {
-      AI_CARDS = { brief, briefDate: today() };
-      await mount(hasBrief);
+    it('shows no morning brief, even if an older worker still sends one', async () => {
+      TODAY = emptyToday();
+      AI_CARDS = { focus: 'Finish the ledger review', brief: ['Standup at ten.'] } as never;
+      await mount(() => host.textContent?.includes('Finish the ledger review') ?? false);
 
-      click('Dismiss');
-      await tick();
-      expect(hasBrief()).toBe(false);
-      expect(store.briefDismissed).toBe(today());
-      expect(host.textContent).toContain('Morning brief');
-
-      render(null, host);
-      host.remove();
-      await mount(() => host.textContent?.includes('Morning brief') ?? false);
-      await tick();
-      expect(hasBrief()).toBe(false);
-
-      click('Show');
-      await tick();
-      expect(hasBrief()).toBe(true);
-    });
-
-    it('shows the brief again on a new day', async () => {
-      store.briefDismissed = '2000-01-01';
-      AI_CARDS = { brief, briefDate: today() };
-      await mount(hasBrief);
+      expect(host.textContent).not.toContain('Morning brief');
+      expect(host.textContent).not.toContain('Standup at ten.');
     });
   });
 });

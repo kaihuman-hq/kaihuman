@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { focusLine, morningBrief, precomputeBrief, precomputeFocus, readAiCards } from './brief.js';
+import { focusLine, precomputeFocus, readAiCards } from './brief.js';
 import type { WorkContext } from './context.js';
 
 let store: Record<string, unknown>;
@@ -60,51 +60,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const sentences = ['One.', 'Two.', 'Three.'];
-
-describe('brief', () => {
-  it('is generated once per date after 05:00', async () => {
-    answers = [JSON.stringify({ sentences }), JSON.stringify({ sentences })];
-
-    await precomputeBrief(inputs, new Date(2026, 9, 15, 4, 30));
-    expect(prompts).toHaveLength(0);
-
-    await precomputeBrief(inputs, new Date(2026, 9, 15, 6, 0));
-    await precomputeBrief(inputs, new Date(2026, 9, 15, 9, 0));
-    expect(prompts).toHaveLength(1);
-    expect(prompts[0]?.constraint).toMatchObject({
-      properties: { sentences: { minItems: 3, maxItems: 3, items: { maxLength: 160 } } },
-    });
-    expect(await readAiCards(new Date(2026, 9, 15, 9, 0))).toMatchObject({
-      brief: sentences,
-      briefDate: '2026-10-15',
-    });
-    // Another day: yesterday's brief is not served as today's.
-    expect(await readAiCards(new Date(2026, 9, 16, 9, 0))).toEqual({});
-  });
-
-  it('is refused unless it is three non-empty sentences within 160 characters', async () => {
-    answers = [
-      JSON.stringify({ sentences: ['a', 'b'] }),
-      JSON.stringify({ sentences: ['a', '', 'c'] }),
-      JSON.stringify({ sentences: ['a', 'b', 'x'.repeat(161)] }),
-    ];
-    expect(await morningBrief(ctx)).toBeNull();
-    expect(await morningBrief(ctx)).toBeNull();
-    expect(await morningBrief(ctx)).toBeNull();
-  });
-
+describe('focus', () => {
   it('gives nothing without the model or without any work to talk about', async () => {
     vi.stubGlobal('LanguageModel', undefined);
-    expect(await morningBrief(ctx)).toBeNull();
     expect(await focusLine(ctx)).toBeNull();
     stubModel();
     expect(await focusLine({ ...ctx, todos: [], eventsToday: [] })).toBeNull();
     expect(prompts).toHaveLength(0);
   });
-});
 
-describe('focus', () => {
   it('is accepted within 120 characters', async () => {
     answers = [JSON.stringify({ focus: ' Finish the report ' })];
     expect(await focusLine(ctx)).toBe('Finish the report');
@@ -132,22 +96,19 @@ describe('focus', () => {
 });
 
 describe('a refused answer', () => {
-  it('is not asked for again within 15 minutes, focus or brief', async () => {
-    answers = [JSON.stringify({ focus: '' }), JSON.stringify({ sentences: ['a'] })];
-    const at = new Date(2026, 9, 15, 9, 0);
+  it('is not asked for again within 15 minutes', async () => {
+    answers = [JSON.stringify({ focus: '' })];
     await precomputeFocus(inputs);
     await precomputeFocus(inputs);
-    await precomputeBrief(inputs, at);
-    await precomputeBrief(inputs, at);
-    expect(prompts).toHaveLength(2);
-    expect(await readAiCards(at)).toEqual({});
+    expect(prompts).toHaveLength(1);
+    expect(await readAiCards()).toEqual({});
 
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
       vi.setSystemTime(Date.now() + 16 * 60_000);
       answers = [JSON.stringify({ focus: 'Finish the report' })];
       await precomputeFocus(inputs);
-      expect(prompts).toHaveLength(3);
+      expect(prompts).toHaveLength(2);
     } finally {
       vi.useRealTimers();
     }

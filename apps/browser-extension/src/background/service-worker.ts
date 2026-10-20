@@ -27,7 +27,7 @@ import { consoleFileUrl, isConsolePage } from '../console';
 import PAGE_SCRIPT from '../content/index.ts?script';
 import type { Message } from '../types';
 import { draftBookmark, findDuplicates, findExactDuplicates } from './ai/bookmark-draft.js';
-import { precomputeBrief, precomputeFocus, readAiCards } from './ai/brief.js';
+import { precomputeFocus, readAiCards } from './ai/brief.js';
 import { peek, put } from './ai/cache.js';
 import { captureContext, classifyCapture } from './ai/capture.js';
 import { buildWorkContext } from './ai/context.js';
@@ -185,10 +185,9 @@ chrome.alarms.create('repoSync', { periodInMinutes: 60 });
 ensureWorkAlarm().catch((e) => console.warn('kaihuman: creating the work alarm failed', e));
 // On-device AI fills its cache hourly, and after each start page sync and work cycle.
 ensureAiAlarm().catch((e) => console.warn('kaihuman: creating the AI alarm failed', e));
-// The cards first: the page reads them once, and the ranking and inbox jobs behind them can
+// The focus card first: the page reads it once, and the ranking and inbox jobs behind it can
 // take minutes of model time.
 registerPrecompute({ id: 'card:focus', group: 'newTab', run: () => precomputeFocus(cardInputs) });
-registerPrecompute({ id: 'card:brief', group: 'newTab', run: () => precomputeBrief(cardInputs) });
 registerPrecompute({ id: 'rank:likely', group: 'newTab', run: precomputeLikelyNext });
 registerPrecompute({ id: 'rank:readLater', group: 'newTab', run: precomputeReadLater });
 registerPrecompute({ id: 'inbox:labels', group: 'sidePanel', run: precomputeLabels });

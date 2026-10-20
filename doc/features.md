@@ -57,7 +57,7 @@
 | Work side panel: pinned streams with labels, Waiting on you / New activity inbox from GitHub, My open PRs, live CI and review status, merged or closed items done by themselves | side panel (popup → **Open work panel**, or the start page card) | 2026-10-14 |
 | One capture box that files notes, todos, log entries and events (on-device model) | start page | 2026-10-15 |
 | Bookmark and save suggestions: tidy titles, tags, environment, duplicate warning, read-later and knowledge base summaries, types and image alt text | popup, palette | 2026-10-15 |
-| New tab cards: likely-next bookmarks, read later for today, focus line, morning brief, braindump digest | start page | 2026-10-15 |
+| New tab cards: likely-next bookmarks, read later for today, focus line, braindump digest | start page | 2026-10-15 |
 | Side panel triage: suggestion reasons, find related, inbox labels in your own words with mute, PR/issue TL;DR, standup and week review | side panel | 2026-10-15 |
 | Palette: on-device translation, summarize/ask this page, plain-language actions (Ask kaihuman), `>n` meaning search, tidy open tabs | palette, popup | 2026-10-15 |
 | New tab ranking: frecency bookmarks, inbox and work card by urgency, overdue todos by due date, habits at risk first, resurfaced idle ideas | start page, side panel | 2026-10-15 |
