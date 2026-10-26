@@ -1,10 +1,19 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runCheck } from './check-cli.js';
+import { isMain, runCheck } from './check-cli.js';
 
 const fixture = join(dirname(fileURLToPath(import.meta.url)), '../../fixtures/business/repo');
 const dirs: string[] = [];
@@ -65,5 +74,41 @@ describe('runCheck', () => {
     const dir = makeRepo();
     rmSync(join(dir, '.kh/business/clients'), { recursive: true });
     expect(await runCheck([], dir)).toBe(1);
+  });
+
+  it('treats a type change of an issued file (symlink swap) as a modification', async () => {
+    const dir = makeRepo();
+    const first = git(dir, 'rev-parse', 'HEAD');
+    const file = join(dir, '.kh/business/invoices/2026/RE-2026-0001.yaml');
+    renameSync(file, join(dir, 'real.yaml'));
+    symlinkSync(join(dir, 'real.yaml'), file);
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-qm', 'symlink');
+    expect(git(dir, 'diff', '--name-status', first, 'HEAD')).toContain('T\t');
+    expect(await runCheck(['--base', first], dir)).toBe(1);
+    expect(await runCheck([], dir)).toBe(1);
+  });
+
+  it('fails when git itself fails instead of skipping the frozen-file rule', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kh-nogit-'));
+    dirs.push(dir);
+    cpSync(fixture, join(dir, '.kh/business'), { recursive: true });
+    expect(await runCheck(['--base', 'a'.repeat(40)], dir)).toBe(1);
+  });
+});
+
+describe('isMain', () => {
+  it('recognises the entry file through a symlink', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kh-main-'));
+    dirs.push(dir);
+    const real = join(dir, 'a.mjs');
+    writeFileSync(real, '');
+    const link = join(dir, 'b.mjs');
+    symlinkSync(real, link);
+    const url = pathToFileURL(real).href;
+    expect(isMain(link, url)).toBe(true);
+    expect(isMain(real, url)).toBe(true);
+    expect(isMain(join(dir, 'other.mjs'), url)).toBe(false);
+    expect(isMain(undefined, url)).toBe(false);
   });
 });

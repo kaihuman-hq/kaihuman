@@ -1,8 +1,7 @@
 import { parseJsonl } from './jsonl.js';
-import { jurisdictionFor } from './jurisdiction.js';
 import { DEFAULT_NUMBERING, findGaps, formatNumber } from './numbering.js';
 import { BUSINESS_ROOT, type BusinessPath, classifyBusinessPath } from './paths.js';
-import type { BusinessProfile, Draft, Issued } from './records.js';
+import type { BusinessProfile, Draft, Issued, VatCategory } from './records.js';
 import { computeTotals } from './totals.js';
 import {
   validateClient,
@@ -45,6 +44,8 @@ export const checkBusinessRepo = (input: {
   files: ReadonlyMap<string, string>;
   /** null = no usable base commit, so the frozen-file rule cannot be checked. */
   changes: readonly Change[] | null;
+  /** Symlinks found on disk; one under invoices/ or offers/ could hide a changed issued document. */
+  symlinks?: readonly string[];
   today: string;
 }): Finding[] => {
   const { files, changes } = input;
@@ -143,12 +144,13 @@ export const checkBusinessRepo = (input: {
         if (!r.value.issue_date.startsWith(`${p.year}-`)) {
           fail(file, 'issue_date', `${r.value.issue_date} is not in the year folder ${p.year}`);
         }
-        const expected = computeTotals(
-          r.value.lines,
-          jurisdictionFor(r.value.jurisdiction).exemptionReasons(
-            profile ?? ({ vat_regime: 'regular' } as BusinessProfile),
-          ),
-        );
+        // Reasons come from the document itself: the profile's vat_regime may change later,
+        // and that must not turn frozen history red. Amounts, categories and rates are still verified.
+        const reasons: Partial<Record<VatCategory, string>> = {};
+        for (const b of r.value.totals.breakdown) {
+          if (b.exemption_reason !== undefined) reasons[b.category] = b.exemption_reason;
+        }
+        const expected = computeTotals(r.value.lines, reasons);
         if (canonical(expected) !== canonical(r.value.totals)) {
           fail(file, 'totals', 'stored totals differ from the totals computed from the lines');
         }
@@ -273,6 +275,13 @@ export const checkBusinessRepo = (input: {
         'number',
         `gap in ${series} numbers for ${year}: missing ${missing}`,
       );
+    }
+  }
+
+  for (const link of input.symlinks ?? []) {
+    const p = link.slice(BUSINESS_ROOT.length + 1);
+    if (p.startsWith('invoices/') || p.startsWith('offers/')) {
+      fail(link, '', 'symbolic links are not allowed among issued documents');
     }
   }
 

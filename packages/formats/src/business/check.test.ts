@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { type Change, checkBusinessRepo, formatFinding } from './check.js';
 import { loadFixtureRepo } from './fixture-repo.test-helper.js';
+import { KEY_ORDER } from './records.js';
+import { parseYaml, stringifyYaml } from './yaml.js';
 
 const today = '2026-10-26';
 const INVOICE = '.kh/business/invoices/2026/RE-2026-0001.yaml';
@@ -114,16 +116,94 @@ describe('checkBusinessRepo', () => {
     expect(errors(ev)).toEqual([]);
   });
 
-  it('reports invalid records and a missing profile but still checks the rest', () => {
+  it('without business.yaml still validates other files and uses default numbering', () => {
     const noProfile = new Map(base);
     noProfile.delete('.kh/business/business.yaml');
     expect(run(noProfile)).toContainEqual(
       expect.objectContaining({ file: '.kh/business/business.yaml' }),
     );
-    const bad = withFile(INVOICE, invoiceText.replace('vat_rate: "7"', 'vat_rate: 7'));
-    expect(errors(bad)).toContainEqual(
-      expect.objectContaining({ message: expect.stringContaining('quote') }),
+    noProfile.set(INVOICE, invoiceText.replace('vat_rate: "7"', 'vat_rate: 7'));
+    noProfile.set(
+      '.kh/business/invoices/2026/RE-2026-0003.yaml',
+      invoiceText.replace('number: RE-2026-0001', 'number: RE-2026-0003'),
     );
+    const found = errors(noProfile);
+    expect(found).toContainEqual(
+      expect.objectContaining({ file: INVOICE, message: expect.stringContaining('quote') }),
+    );
+    expect(found).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('RE-2026-0002') }),
+    );
+  });
+
+  it('counts credit notes in the invoice series when looking for gaps', () => {
+    const creditNote = invoiceText
+      .replace('number: RE-2026-0001', 'number: RE-2026-0003')
+      .replace('kind: invoice', 'kind: credit-note\ncorrects: RE-2026-0001')
+      .replace('type_code: 380', 'type_code: 381');
+    const files = withFile('.kh/business/invoices/2026/RE-2026-0003.yaml', creditNote);
+    expect(errors(files).map((f) => f.message)).toEqual([expect.stringContaining('RE-2026-0002')]);
+    const fixed = withFile(
+      '.kh/business/invoices/2026/RE-2026-0002.yaml',
+      creditNote.replace('number: RE-2026-0003', 'number: RE-2026-0002'),
+    );
+    fixed.set('.kh/business/invoices/2026/RE-2026-0003.yaml', creditNote);
+    expect(errors(fixed).filter((f) => f.message.includes('gap'))).toEqual([]);
+  });
+
+  it('verifies totals against the stored exemption reasons, not the current profile', () => {
+    const doc = parseYaml(invoiceText);
+    if (!doc.ok) throw new Error('fixture');
+    const small = {
+      ...(doc.value as object),
+      lines: [
+        {
+          description: 'Dev',
+          quantity: '1',
+          unit: 'C62',
+          unit_price: 10000,
+          vat_category: 'E',
+          vat_rate: '0',
+        },
+      ],
+      totals: {
+        net: 10000,
+        vat: 0,
+        gross: 10000,
+        breakdown: [
+          {
+            category: 'E',
+            rate: '0',
+            taxable: 10000,
+            tax: 0,
+            exemption_reason: 'Kleinunternehmer gemäß § 19 UStG',
+          },
+        ],
+      },
+    };
+    const text = stringifyYaml(small, KEY_ORDER.issued);
+    // The fixture profile is `regular`: the invoice was issued under small-business rules.
+    expect(errors(withFile(INVOICE, text))).toEqual([]);
+    expect(
+      errors(withFile(INVOICE, text.replace('unit_price: 10000', 'unit_price: 10001'))),
+    ).toContainEqual(expect.objectContaining({ path: 'totals' }));
+  });
+
+  it('rejects symbolic links among issued documents but not elsewhere', () => {
+    const symlinks = [INVOICE, '.kh/business/offers/2026/AN-2026-001.pdf'];
+    expect(
+      checkBusinessRepo({ files: base, changes: null, today, symlinks }).filter(
+        (f) => f.level === 'error',
+      ),
+    ).toHaveLength(2);
+    expect(
+      checkBusinessRepo({
+        files: base,
+        changes: null,
+        today,
+        symlinks: ['.kh/business/notes.md'],
+      }).filter((f) => f.level === 'error'),
+    ).toEqual([]);
   });
 });
 
