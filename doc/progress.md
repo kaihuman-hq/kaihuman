@@ -7,6 +7,7 @@
 - Record types, key orders, validators (unknown keys, "quote it" for numeric decimals, credit-note/offer/minutes/gross rules) and path classification for `.kh/business/`, with a small valid fixture repo under `packages/formats/fixtures/business/repo`.
 - Totals (`computeTotals`: line nets summed per VAT category and rate, then the rate applied) and jurisdiction rules (`jurisdictionFor`: `de` issue checks, legal notes and exemption reasons; `generic` checks nothing).
 - Numbering (`nextNumber`, `findGaps`, per-year gap-free series; credit notes share the invoice series) and `issue`: a pure function that numbers a draft, freezes it into an issued document (seller, buyer, totals, due date, legal notes, retention) and returns every file change (new document, draft removed, time entries billed, client action log line) plus the commit message.
+- Derived status (`deriveInvoiceStatus`, `deriveOfferStatus`: issued, sent, part-paid, paid, overdue, credited; overpayment gives `paid` with `open: 0` and `overpaid > 0`) and `toEn16931`, plain BT/BG-annotated invoice data that phase 6 turns into XRechnung XML.
 
 ## 2026-10-26 — Business: design spec
 
