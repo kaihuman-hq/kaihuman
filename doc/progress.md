@@ -3,6 +3,7 @@
 ## 2026-10-26 — Business, phase 1: formats and repo check
 
 - `@kaihuman/formats` has a `business` module (`@kaihuman/formats/business`). It starts with exact decimals and money in integer minor units (half-up rounding, away from zero), ULIDs and client/project slugs.
+- Strict YAML (1.2 core schema, unique keys, stable key order), JSONL helpers that survive hand edits (CRLF, blank lines, no final newline) and the field readers record validators are built on. Numbers where a decimal string is expected get a "quote it" error.
 
 ## 2026-10-26 — Business: design spec
 
