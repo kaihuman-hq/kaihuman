@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-10-26 — Business, phase 1: formats and repo check
+
+- `@kaihuman/formats` has a `business` module (`@kaihuman/formats/business`). It starts with exact decimals and money in integer minor units (half-up rounding, away from zero), ULIDs and client/project slugs.
+
 ## 2026-10-26 — Business: design spec
 
 - Design for tracking a solo business in a private GitHub repo: clients, offers, invoices, payments, time, expenses, projects, contracts and a per-client overview page. Includes end-to-end encrypted, revocable share links for clients. Data lives in the Life OS repo under `.kh/business/` and works with the existing todos, action log, time, quick capture, wiki and agent. Spec: `docs/superpowers/specs/2026-10-26-business-design.md`. No code yet.
