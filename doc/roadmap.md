@@ -37,6 +37,15 @@
 - [x] Palette `>id` and braindump "Promote to idea"
 - [ ] Gemini app skill, once its format is published
 
+## Business (`doc/business.md`)
+
+- [x] Phase 1: formats, repo check, agent skill, set-up (`enableBusiness`) and `syncKB` wiring
+- [ ] Phase 2: read-only console (enable form, `/clients`, client page, `/business` dashboard)
+- [ ] Phase 3: daily forms (time, payments, drafts, issue, credit notes, offer accept/decline)
+- [ ] Phase 4: share service (encrypted, revocable links)
+- [ ] Phase 5: money admin (expenses, VAT summary, year export, retainers, contract reminders)
+- [ ] Phase 6: e-invoice XML (XRechnung, ZUGFeRD), before 2028-01-01
+
 ## Documentation
 
 - [x] Document every app, package, file format and CLI command as a docspack package (`packages/docspack`)

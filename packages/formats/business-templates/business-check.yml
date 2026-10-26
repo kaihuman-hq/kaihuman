@@ -1,0 +1,23 @@
+name: business-check
+
+on:
+  push:
+    paths:
+      - '.kh/business/**'
+      - '.github/workflows/business-check.yml'
+  pull_request:
+    paths:
+      - '.kh/business/**'
+      - '.github/workflows/business-check.yml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node .kh/business/.tools/business-check.mjs --base "${{ github.event.pull_request.base.sha || github.event.before }}"

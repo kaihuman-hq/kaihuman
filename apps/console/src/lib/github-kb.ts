@@ -1,5 +1,10 @@
 import { authStore, githubService } from '@kaihuman/core';
 import {
+  BUSINESS_PROFILE_PATH,
+  BUSINESS_TOOLS_VERSION,
+  getBusinessToolFiles,
+} from './business-setup';
+import {
   AGENT_INSTRUCTION_FILES,
   getScaffoldFiles,
   getSkillOnlyFiles,
@@ -10,6 +15,7 @@ import {
 export type KBFile = { name: string; path: string; sha: string };
 
 const VERSION_FILE = '.kh/.skill-version';
+const BUSINESS_VERSION_FILE = '.kh/business/.tools/version';
 
 function parseRepo(fullName: string): { owner: string; repo: string } {
   const slash = fullName.indexOf('/');
@@ -24,7 +30,8 @@ export type KBRepo = { full_name: string; default_branch: string };
  * Brings kaihuman's files in the repo up to date in one commit, so a write that fails halfway
  * leaves nothing behind. Creates set-up files that are missing (never overwriting the user's
  * notes, log or schema), rewrites skills an older version installed, and adds or updates the
- * kaihuman section of `CLAUDE.md` and `AGENTS.md`, keeping the user's own text in both.
+ * kaihuman section of `CLAUDE.md` and `AGENTS.md`, keeping the user's own text in both. A repo with
+ * business data also gets its check, workflow and skill refreshed.
  *
  * A repo that was never set up gets nothing unless `install` is set: setting up stays the
  * user's choice. Returns `missing` for such a repo, `updated` when it committed, else `current`.
@@ -57,6 +64,13 @@ export async function syncKB(
       const merged = mergeAgentInstructions(existing);
       if (merged !== existing) writes[path] = merged;
     }
+  }
+  // Only a repo that enabled business gets its tools, so everyone else's commits stay unchanged.
+  if (
+    present.has(BUSINESS_PROFILE_PATH) &&
+    (await read(BUSINESS_VERSION_FILE))?.trim() !== BUSINESS_TOOLS_VERSION
+  ) {
+    Object.assign(writes, getBusinessToolFiles());
   }
   if (Object.keys(writes).length === 0) return 'current';
 

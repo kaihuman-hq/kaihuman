@@ -9,6 +9,7 @@
 - Numbering (`nextNumber`, `findGaps`, per-year gap-free series; credit notes share the invoice series) and `issue`: a pure function that numbers a draft, freezes it into an issued document (seller, buyer, totals, due date, legal notes, retention) and returns every file change (new document, draft removed, time entries billed, client action log line) plus the commit message.
 - Derived status (`deriveInvoiceStatus`, `deriveOfferStatus`: issued, sent, part-paid, paid, overdue, credited; overpayment gives `paid` with `open: 0` and `overpaid > 0`) and `toEn16931`, plain BT/BG-annotated invoice data that phase 6 turns into XRechnung XML.
 - Repo check (`checkBusinessRepo`: classifies and validates every file under `.kh/business/`, number/year/totals/gap checks, reference checks, frozen issued files) and its CLI `runCheck`, bundled by Vite into one dependency-free `dist/business-check.mjs` for GitHub Actions. Without a usable base commit it validates the tree and skips the frozen-file rule.
+- Console `enableBusiness` (private repo only, one commit) creates the `.kh/business/` skeleton, the `business-check` workflow, the bundled check and the `kh-business` agent skill; `syncKB` refreshes them when `BUSINESS_TOOLS_VERSION` changes, and only for repos with business data. `KB_SKILL_VERSION` is 1.9.0 and `CLAUDE.md` points to the skill. Reference: `doc/business.md`.
 
 ## 2026-10-26 — Business: design spec
 
