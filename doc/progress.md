@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-10-26 — Business: design spec
+
+- Design for tracking a solo business in a private GitHub repo: clients, offers, invoices, payments, time, expenses, projects, contracts and a per-client overview page. Includes end-to-end encrypted, revocable share links for clients. Spec: `docs/superpowers/specs/2026-10-26-business-design.md`. No code yet.
+
 ## 2026-10-20 — Browser extension: morning brief removed
 
 - The AI-generated morning brief card is gone from the top of the start page. The worker no longer generates it, so it costs no model time. The focus line stays.
