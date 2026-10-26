@@ -10,9 +10,13 @@ offers, invoices, payments, time, todos, the action log, contracts and
 projects. Clients can download offers and invoices at any time through
 end-to-end encrypted, revocable links.
 
-kaihuman has other users, so everything here works per user: each user has
-their own business repo, and the share service separates and limits
-accounts.
+kaihuman has other users, so everything here works per user: each user keeps
+business data in their own Life OS repo, and the share service separates and
+limits accounts.
+
+Business data lives inside the user's regular Life OS repo (`.kh/business/`),
+so client todos, logs, time and notes work with the dashboard, kanban, quick
+capture, palette, wiki and agent like all other Life OS data (section 6).
 
 ### Decisions so far
 
@@ -20,7 +24,7 @@ accounts.
 |---|---|
 | First user | Germany, VAT-registered (regular USt) |
 | System of record | kaihuman files. An external generator renders PDFs (and later e-invoice XML) from them. Numbering lives in the repo. |
-| Location | A separate private repo per user (e.g. `you/business`), with the main branch protected against force-push and deletion |
+| Location | The user's Life OS repo, folder `.kh/business/`. The repo must be private. Its main branch should be protected against force-push and deletion. |
 | Formats | YAML records, Markdown for prose, JSONL for append-only streams. Todos and the action log use the existing formats. |
 | Input | Console forms for daily actions, plus an agent skill for drafting by editing files |
 | Share links | A Cloudflare Worker. Files are encrypted in the browser, the key sits in the URL fragment, and the server-side token can be revoked. |
@@ -36,6 +40,9 @@ accounts.
 - No multi-currency accounting. Records carry a currency, and v1 assumes one currency per business.
 
 ## 2. Repository layout
+
+All paths are relative to `.kh/business/` in the Life OS repo. Repo-level
+files are marked with `/`.
 
 ```
 business.yaml                  profile: legal name, address, USt-IdNr, Steuernummer,
@@ -64,8 +71,9 @@ expenses/<year>/<ulid>.<ext>   receipt file
 links.jsonl                    share links: {id, doc, url, created, expires?, revoked?}
 events.jsonl                   dated document events: sent, accepted, declined,
                                downloaded (pulled from the share service)
-.github/workflows/business-check.yml
 VERFAHRENSDOKUMENTATION.md     template the user completes (GoBD)
+SKILL.md                       agent skill for business files
+/.github/workflows/business-check.yml   runs only on changes under .kh/business/
 ```
 
 - **IDs:** clients and projects use slugs (`/^[a-z0-9][a-z0-9-]{1,39}$/`, the same rule as ideas). Drafts, expenses, time and payment entries use ULIDs. Issued documents use their number.
@@ -88,7 +96,7 @@ VERFAHRENSDOKUMENTATION.md     template the user completes (GoBD)
    - Copies seller and buyer details into the document and calculates the totals.
    - Makes one atomic commit with `commitFiles`: issued file, draft removed, time entries tagged with `invoice`, action-log line.
    - If the branch moved meanwhile, the commit fails and is retried with a fresh number check.
-3. **Frozen:** an issued file never changes. CI fails on any modification or deletion under `offers/` and `invoices/`. Adding the generated PDF/XML and a `<number>.sha256` file is allowed.
+3. **Frozen:** an issued file never changes. CI fails on any modification or deletion under `.kh/business/offers/` and `.kh/business/invoices/`. Adding the generated PDF/XML and a `<number>.sha256` file is allowed.
 4. **Correction:** a credit note (type 381, gets the next number from the invoice series, references the original), then a new invoice if needed.
 5. **Status is calculated, never stored:**
    - From payments: open, part-paid, paid.
@@ -129,14 +137,19 @@ Pure, dependency-light, fully tested. Every surface uses it: console, CI check, 
 - `toEn16931(invoice)`: plain object for generators. XML serialisation comes in phase 6.
 - Reading and appending JSONL streams without touching unrelated lines.
 - Shared fixtures in `packages/formats/fixtures/business/`.
-- A `business-check` CLI entry (Node, ESM) that CI in the business repo runs. It validates schemas and refuses changes to issued files compared with the base commit.
+- A `business-check` CLI entry (Node, ESM) that the CI workflow in the Life OS repo runs on `.kh/business/`. It validates schemas and refuses changes to issued files compared with the base commit.
 - Adds a YAML 1.2 parser dependency (`yaml`) to `packages/formats`. The existing hand-written frontmatter parser cannot hold nested data.
 
 ## 5. Console
 
 ### Setup
-- A "Business repo" setting, separate from the current repo, stored like the current repo choice.
-- "Set up business repo" works like the knowledge-base setup. It creates the skeleton in one commit: `business.yaml` from a short form, the CI workflow, the agent skill and the Verfahrensdokumentation template. It also explains how to turn on branch protection.
+- No separate repo setting. Business works on the currently selected Life OS repo.
+- "Enable business" works like the knowledge-base setup (`syncKB`). It creates the skeleton in one commit: `.kh/business/business.yaml` from a short form, the CI workflow, the agent skill and the Verfahrensdokumentation template.
+- Setup refuses a public repo (GitHub `private` flag), because the repo then holds invoices, client data and share-link keys. The console re-checks visibility on load and shows a blocking warning if the repo became public.
+- Setup explains, and the user must confirm:
+  - the whole repo now holds tax records for 8 years, so it must not be deleted or have its history rewritten
+  - how to protect the main branch (no force-push, no deletion)
+  - that anyone with access to the repo sees the business data
 
 ### Pages
 - **`/business`:**
@@ -179,10 +192,23 @@ Each form writes through `commitFiles` with a readable commit message.
 - Routes go in `App.tsx`. Nav entries need both the `NavItemId` union and `NAVBAR_ITEMS`.
 
 ### Agent skill
-- `SKILL.md` in the business repo describes the formats, the rule that drafts are the only thing an agent creates for numbered documents, and how to add clients, time and notes.
+- `.kh/business/SKILL.md` describes the formats, the rule that drafts are the only thing an agent creates for numbered documents, and how to add clients, time and notes.
 - Issuing stays in the console, so numbering always runs through the same code.
 
-## 6. Share service (`apps/share-worker`)
+## 6. Working with Life OS data
+
+Business files are normal Life OS files, so the existing features see them.
+
+- **Todos and action log:** every client's `todos.todos.md` and `log.actionlog.md` show up in the dashboard, kanban (`BoardOverview`), todo analytics and the action-log view like any other file. These views get a "client" label from the path, and a filter "business / personal / all".
+- **Time:** business time stays in `time/<yyyy-mm>.jsonl`, because it needs client, project and billed links that `*.timetracking.csv` cannot hold. The time-tracking views and the start page "today" view add business hours to the personal totals, labelled by client. The existing CSV format and widget stay unchanged.
+- **Quick capture:** the Quick todo/log/time pages, the command palette, the desktop palette and the browser extension get an optional client target. Examples: "todo acme: send draft", "log acme: call with Jana", "start timer acme/website". The target resolves to that client's files. The client list comes from `.kh/business/clients/`.
+- **Wiki and ideas:** a wiki page or idea links to a client with `[[client:acme]]`. The client page lists pages that link to it, and the link opens the client page.
+- **Knowledge base agent:** `syncKB` adds the business skill to the agent skills and to the repo's `CLAUDE.md`/`AGENTS.md` section, so one agent session can work across notes, todos and clients.
+- **kb-mcp:** read-only tools (`business_clients`, `business_client`, `business_open_invoices`) and draft-only write tools. Issuing stays in the console.
+- **Search:** client notes and names go into `.kh/search.kb.json`. Issued documents and expenses do not.
+- **Separation:** business pages read only `.kh/business/`. The generic file browser shows the folder, but opening an issued document there is read-only, with a link to its business page.
+
+## 7. Share service (`apps/share-worker`)
 
 A Cloudflare Worker with D1 (records) and R2 (encrypted files, EU jurisdiction), at a host such as `docs.kaihuman.com`.
 
@@ -195,7 +221,7 @@ A Cloudflare Worker with D1 (records) and R2 (encrypted files, EU jurisdiction),
    - The Worker checks the token with GitHub `GET /user` and keys everything by the numeric GitHub user id.
    - It stores the ciphertext in R2.
    - It returns a random 128-bit token.
-4. The link is `https://docs.kaihuman.com/d/<token>#<key>`. The console appends it to `links.jsonl` in the private business repo, so the owner can copy it again.
+4. The link is `https://docs.kaihuman.com/d/<token>#<key>`. The console appends it to `.kh/business/links.jsonl` in the private Life OS repo, so the owner can copy it again.
 5. The client opens the link.
    - The Worker serves a static page: document label, "shared by <business name>", Download button, report-abuse link.
    - On click, the page fetches the ciphertext, decrypts it locally with the key from the fragment, and saves the PDF.
@@ -214,40 +240,43 @@ A Cloudflare Worker with D1 (records) and R2 (encrypted files, EU jurisdiction),
 - The privacy policy gets a share-service section.
 - The console marks online documents with an "Online · link active" badge.
 
-## 7. Generator contract
+## 8. Generator contract
 
 - The external generator reads an issued `<number>.yaml` and should use `computeTotals` / `toEn16931` from the module, never its own tax maths.
 - It writes `<number>.pdf` (and from phase 6 `<number>.xml`) next to it, plus `<number>.sha256`.
 - The console shows "PDF missing" until the file exists.
 - Template version and generator name go into the sha256 file for traceability.
 
-## 8. Errors, compliance, retention
+## 9. Errors, compliance, retention
 
 - **Concurrent edits:** writes use `commitFiles`. If the remote ref moved, the console reloads and retries once, then shows the conflict.
 - **Validation:** forms validate before writing, and CI validates after.
 - **Invalid files written by hand or by the agent:** shown in a per-file error list (as on the Ideas page) and never crash a page.
+- **Shared repo history:** personal and business data share history. Rewriting history to remove a personal file would also touch tax records. The setup text and the Verfahrensdokumentation say not to, and branch protection blocks force-pushes.
+- **Steuerberater access:** GitHub cannot grant access to one folder. Instead, the console offers a "year export" (zip of `.kh/business/` for a year, with CSV summaries and the hash list). The user hands that over.
 - **Retention:** each issued document has `retain_until` (end of issue year + jurisdiction years). The UI warns before deleting anything that is not yet past it.
 - **GoBD position:** branch protection, frozen issued files enforced in CI, file hashes, git history and a completed Verfahrensdokumentation make a reasonable setup, but not a certified one. The owner should have their Steuerberater review it.
 
-## 9. Phases
+## 10. Phases
 
 Each phase gets its own implementation plan and ships on its own.
 
-1. **Formats and scaffold:** `business` module (parse, validate, totals, VAT, numbering, issue, status), fixtures, `business-check` CLI, scaffold templates, agent skill.
-2. **Read-only console:** business repo setting and setup, `/clients`, client page, `/business` dashboard.
-3. **Daily forms:** time and timer, todo and log, payments, drafts, issue, credit notes, offer accept/decline.
+1. **Formats and scaffold:** `business` module (parse, validate, totals, VAT, numbering, issue, status), fixtures, `business-check` CLI, scaffold templates, agent skill wired into `syncKB`.
+2. **Read-only console:** "Enable business" setup with the private-repo check, `/clients`, client page, `/business` dashboard, client labels and the business/personal filter in the existing todo and action-log views, `[[client:…]]` links.
+3. **Daily forms:** time and timer (including the business hours in time views and today view), todo and log, payments, drafts, issue, credit notes, offer accept/decline. Client targets in Quick capture and the command palette.
 4. **Share service:** Worker, D1/R2, encryption, consent flow, `/business/shared`, download events.
-5. **Money admin:** expenses and receipts, VAT summary and export, retainer drafts, contract reminders, pipeline board.
+5. **Money admin:** expenses and receipts, VAT summary and export, year export for the Steuerberater, retainer drafts, contract reminders, pipeline board. Client targets in the browser extension and desktop palette, kb-mcp business tools.
 6. **E-invoice:** XRechnung (UBL/CII) and ZUGFeRD output from `toEn16931`, checked with the KoSIT validator. Must be done before 2028-01-01.
 
-## 10. Testing
+## 11. Testing
 
 - **Module:** totals and rounding, reverse charge, Kleinunternehmer note, numbering (gaps, collisions, year rollover), issue snapshot, credit notes, derived status, strict YAML edge cases, JSONL append. Uses shared fixtures.
 - **`business-check`:** accepts valid repos, rejects edits to issued files, accepts added PDF/XML/sha256.
-- **Console `lib/business`:** loaders, timeline merge, dashboard aggregates, commit composition for issue and payment.
+- **Console `lib/business`:** loaders, timeline merge, dashboard aggregates, commit composition for issue and payment, private-repo gate, client label from path, client-target parsing for quick capture, `[[client:…]]` backlinks.
+- **`business-check` in a mixed repo:** ignores changes outside `.kh/business/`.
 - **Share Worker:** auth and user scoping, quota and type limits, token lookup, revoke, expiry, account deletion. Plus a round-trip test of the encryption helper (encrypt in Node, decrypt with the landing-page code).
 
-## 11. Open points for planning
+## 12. Open points for planning
 
 - Exact number format default (`RE-{yyyy}-{nnnn}` / `AN-{yyyy}-{nnn}`), which can be changed in `business.yaml`.
 - Default quota and rate limits for the hosted share service.

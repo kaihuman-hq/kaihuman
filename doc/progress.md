@@ -2,7 +2,7 @@
 
 ## 2026-10-26 — Business: design spec
 
-- Design for tracking a solo business in a private GitHub repo: clients, offers, invoices, payments, time, expenses, projects, contracts and a per-client overview page. Includes end-to-end encrypted, revocable share links for clients. Spec: `docs/superpowers/specs/2026-10-26-business-design.md`. No code yet.
+- Design for tracking a solo business in a private GitHub repo: clients, offers, invoices, payments, time, expenses, projects, contracts and a per-client overview page. Includes end-to-end encrypted, revocable share links for clients. Data lives in the Life OS repo under `.kh/business/` and works with the existing todos, action log, time, quick capture, wiki and agent. Spec: `docs/superpowers/specs/2026-10-26-business-design.md`. No code yet.
 
 ## 2026-10-20 — Browser extension: morning brief removed
 
