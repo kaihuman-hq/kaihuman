@@ -1,0 +1,7 @@
+client: acme-gmbh
+name: Website relaunch
+status: active
+rate:
+  per: hour
+  amount: 9500
+budget_minutes: 6000

@@ -1,0 +1,28 @@
+id: 01M50ARQ007CHPV05AFMSY38DJ
+kind: invoice
+client: acme-gmbh
+project: website
+service_period:
+  start: "2026-10-01"
+  end: "2026-10-25"
+lines:
+  - description: Dev
+    quantity: "7.5"
+    unit: HUR
+    unit_price: 9500
+    vat_category: S
+    vat_rate: "19"
+  - description: Setup
+    quantity: "1"
+    unit: C62
+    unit_price: 12000
+    vat_category: S
+    vat_rate: "19"
+  - description: Book
+    quantity: "1"
+    unit: C62
+    unit_price: 1000
+    vat_category: S
+    vat_rate: "7"
+time_entries:
+  - 01M581YW00W16BGNTZ49EKRX27

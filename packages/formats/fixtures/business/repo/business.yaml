@@ -1,0 +1,20 @@
+name: Kai Mustermann
+address:
+  street: Musterstrasse 1
+  postcode: "10115"
+  city: Berlin
+  country: DE
+vat_id: DE123456789
+contact:
+  name: Kai Mustermann
+  email: kai@example.com
+bank:
+  iban: DE89370400440532013000
+  bic: COBADEFFXXX
+  account_holder: Kai Mustermann
+jurisdiction: de
+vat_regime: regular
+currency: EUR
+language: de
+payment_terms_days: 14
+default_vat_rate: "19"
