@@ -24,6 +24,12 @@ const blank = (value: string | undefined): boolean => value === undefined || val
 
 const isZero = (rate: string): boolean => parseDecimal(rate)?.units === 0n;
 
+/**
+ * Under the regular regime these need a note naming the exemption (§ 14 Abs. 4 Nr. 8 UStG), and
+ * there is no field for that note yet, so issuing them is refused.
+ */
+const NEEDS_EXEMPTION_NOTE: readonly VatCategory[] = ['E', 'K', 'O', 'Z'];
+
 export const SMALL_BUSINESS_NOTE = 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.';
 export const REVERSE_CHARGE_NOTE =
   'Steuerschuldnerschaft des Leistungsempfängers (Reverse Charge).';
@@ -55,6 +61,18 @@ const de: JurisdictionRules = {
             issue(
               `lines[${i}].vat_category`,
               'small-business lines must be category E with rate "0"',
+            ),
+          );
+        }
+      });
+    }
+    if (doc.kind !== 'offer' && profile.vat_regime === 'regular') {
+      doc.lines.forEach((line, i) => {
+        if (NEEDS_EXEMPTION_NOTE.includes(line.vat_category)) {
+          issues.push(
+            issue(
+              `lines[${i}].vat_category`,
+              `category ${line.vat_category} needs an exemption note (§ 14 Abs. 4 Nr. 8 UStG), which is not supported yet; use S, or AE for reverse charge`,
             ),
           );
         }

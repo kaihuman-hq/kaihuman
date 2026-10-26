@@ -4,8 +4,9 @@
  * with 2 places; a credit note keeps positive amounts and says so with type code 381.
  */
 
-import { formatMinor, mulMinor, parseDecimal } from './money.js';
+import { formatMinor } from './money.js';
 import type { Address, Issued, Party, VatCategory } from './records.js';
+import { lineNet } from './totals.js';
 
 export type En16931Address = {
   street: string; // BT-35 / BT-50
@@ -83,12 +84,6 @@ const party = (p: Party): En16931Party => ({
   ...(p.contact ? { contact: p.contact } : {}),
 });
 
-const decimal = (text: string): ReturnType<typeof parseDecimal> & object => {
-  const d = parseDecimal(text);
-  if (!d) throw new Error(`not a decimal: ${text}`);
-  return d;
-};
-
 export const toEn16931 = (invoice: Issued): En16931Invoice => {
   if (invoice.type_code === null) {
     throw new Error(`${invoice.number} is an offer; EN 16931 covers invoices and credit notes`);
@@ -125,7 +120,7 @@ export const toEn16931 = (invoice: Issued): En16931Invoice => {
       name: l.description,
       quantity: l.quantity,
       unitCode: l.unit,
-      netAmount: m(mulMinor(decimal(l.quantity), l.unit_price)),
+      netAmount: m(lineNet(l)),
       unitPrice: m(l.unit_price),
       vatCategory: l.vat_category,
       vatRate: l.vat_rate,

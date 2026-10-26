@@ -40,6 +40,11 @@ const event = (doc: string, type: DocEvent['type'], at = '2026-10-27T10:00:00Z')
 });
 
 describe('deriveInvoiceStatus', () => {
+  it('does not call a zero-gross invoice credited without a credit note', () => {
+    const zero: Issued = { ...inv, totals: { net: 0, vat: 0, gross: 0, breakdown: [] } };
+    expect(deriveInvoiceStatus(zero, [], [], [], '2026-10-27').state).toBe('paid');
+  });
+
   it('is issued, then sent, once an event exists', () => {
     expect(deriveInvoiceStatus(inv, [], [], [], '2026-11-01')).toMatchObject({
       state: 'issued',

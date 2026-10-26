@@ -51,4 +51,13 @@ describe('numbering', () => {
     expect(isValidPattern('{yyyy}-{yyyy}-{nnn}')).toBe(false);
     expect(isValidPattern('{yyyy}-{n}-{nn}')).toBe(false);
   });
+
+  it('rejects patterns whose numbers are not valid issued file names', () => {
+    for (const p of ['RE.{yyyy}.{nnnn}', 'RE {yyyy} {nnnn}', '{yyyy}/{nnnn}', '-{yyyy}-{nnnn}']) {
+      expect(isValidPattern(p), p).toBe(false);
+    }
+    for (const p of [DEFAULT_NUMBERING.invoice, DEFAULT_NUMBERING.offer, 'R_{yyyy}{nnnnn}']) {
+      expect(isValidPattern(p), p).toBe(true);
+    }
+  });
 });

@@ -1,4 +1,4 @@
-import { mulMinor, parseDecimal, percentOfMinor } from './money.js';
+import { formatDecimal, mulMinor, parseDecimal, percentOfMinor } from './money.js';
 import type { Line, Totals, VatCategory } from './records.js';
 
 const decimal = (text: string, what: string) => {
@@ -16,10 +16,23 @@ const NO_VAT: readonly VatCategory[] = ['E', 'AE', 'K', 'O', 'Z'];
 
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
+/** `"19.0"` → `"19"`, `"7.50"` → `"7.5"`: one text per value, so equal rates form one group. */
+const canonicalRate = (text: string): string => {
+  let { units, scale } = decimal(text, 'vat_rate');
+  while (scale > 0 && units % 10n === 0n) {
+    units /= 10n;
+    scale -= 1;
+  }
+  return formatDecimal({ units, scale });
+};
+
 /**
- * Line nets are summed per (category, rate) and the rate is applied to that sum, so the VAT on an
- * invoice never depends on how it was split into lines. The breakdown is sorted by category, then
- * rate as text.
+ * Line nets are summed per (category, rate value) and the rate is applied to that sum, so the VAT
+ * on an invoice never depends on how it was split into lines. The breakdown rate is written
+ * canonically (no trailing zeros) and sorted by category, then rate as text.
+ *
+ * Frozen: the rounding, grouping, rate text and sort order must never change, because the repo
+ * check re-verifies every issued document against this function forever.
  */
 export const computeTotals = (
   lines: readonly Line[],
@@ -27,12 +40,9 @@ export const computeTotals = (
 ): Totals => {
   const groups = new Map<string, { category: VatCategory; rate: string; taxable: number }>();
   for (const line of lines) {
-    const key = `${line.vat_category}\u0000${line.vat_rate}`;
-    const group = groups.get(key) ?? {
-      category: line.vat_category,
-      rate: line.vat_rate,
-      taxable: 0,
-    };
+    const rate = canonicalRate(line.vat_rate);
+    const key = `${line.vat_category}\u0000${rate}`;
+    const group = groups.get(key) ?? { category: line.vat_category, rate, taxable: 0 };
     group.taxable += lineNet(line);
     groups.set(key, group);
   }

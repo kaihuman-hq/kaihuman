@@ -12,6 +12,14 @@ const s = (quantity: string, unit_price: number, vat_rate = '19'): Line => ({
 });
 
 describe('computeTotals', () => {
+  it('groups rates by value, not text, and writes the rate canonically', () => {
+    const t = computeTotals([s('1', 10000, '19'), s('1', 10000, '19.0'), s('1', 1000, '7.50')]);
+    expect(t.breakdown).toEqual([
+      { category: 'S', rate: '19', taxable: 20000, tax: 3800 },
+      { category: 'S', rate: '7.5', taxable: 1000, tax: 75 },
+    ]);
+  });
+
   it('sums line nets per category and rate before applying the percentage', () => {
     const t = computeTotals([
       { ...s('7.5', 9500), description: 'Dev', unit: 'HUR' },

@@ -11,5 +11,5 @@ export * from './records.js';
 export * from './status.js';
 export * from './totals.js';
 export * from './validate.js';
-export * from './validate-kit.js';
+export type { Issue, Result } from './validate-kit.js';
 export * from './yaml.js';

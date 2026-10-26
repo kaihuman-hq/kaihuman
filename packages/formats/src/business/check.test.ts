@@ -189,6 +189,102 @@ describe('checkBusinessRepo', () => {
     ).toContainEqual(expect.objectContaining({ path: 'totals' }));
   });
 
+  it('reports a record id that differs from the file name', () => {
+    const files = [
+      '.kh/business/drafts/01M5KA3Q00W16BGNTZ49EKRX27.yaml',
+      '.kh/business/expenses/2026/01M55FJ500NTZ49EKRX27CHPV0.yaml',
+      '.kh/business/clients/acme-gmbh/contracts/01M52X5E00EKRX27CHPV05AFMS.yaml',
+    ];
+    for (const file of files) {
+      const id = file.slice(file.lastIndexOf('/') + 1, -'.yaml'.length);
+      const other = withFile(
+        file,
+        (base.get(file) ?? '').replace(`id: ${id}`, 'id: 01M5KA3Q00W16BGNTZ49EKRX99'),
+      );
+      expect(errors(other), file).toEqual([expect.objectContaining({ file, path: 'id' })]);
+    }
+  });
+
+  it('reports a retain_until that does not follow the jurisdiction', () => {
+    const files = withFile(
+      INVOICE,
+      invoiceText.replace('retain_until: "2034-12-31"', 'retain_until: "2036-12-31"'),
+    );
+    expect(errors(files)).toEqual([
+      expect.objectContaining({
+        path: 'retain_until',
+        message: expect.stringContaining('2034-12-31'),
+      }),
+    ]);
+    const generic = withFile(
+      INVOICE,
+      invoiceText.replace('jurisdiction: de', 'jurisdiction: generic'),
+    );
+    expect(errors(generic)).toEqual([
+      expect.objectContaining({
+        path: 'retain_until',
+        message: expect.stringContaining('2036-12-31'),
+      }),
+    ]);
+  });
+
+  it('reports an issued number outside the series pattern or year', () => {
+    const foo = '.kh/business/invoices/2026/FOO-1.yaml';
+    const files = withFile(foo, invoiceText.replace('number: RE-2026-0001', 'number: FOO-1'));
+    expect(errors(files)).toContainEqual(expect.objectContaining({ file: foo, path: 'number' }));
+    const wrongYear = '.kh/business/invoices/2026/RE-2025-0001.yaml';
+    const other = withFile(
+      wrongYear,
+      invoiceText.replace('number: RE-2026-0001', 'number: RE-2025-0001'),
+    );
+    expect(errors(other)).toContainEqual(
+      expect.objectContaining({ file: wrongYear, path: 'number' }),
+    );
+  });
+
+  it('reports a document kind in the wrong folder', () => {
+    const offerPath = '.kh/business/offers/2026/AN-2026-001.yaml';
+    const asInvoice = '.kh/business/invoices/2026/RE-2026-0002.yaml';
+    const moved = withFile(
+      asInvoice,
+      (base.get(offerPath) ?? '').replace('number: AN-2026-001', 'number: RE-2026-0002'),
+    );
+    expect(errors(moved)).toContainEqual(
+      expect.objectContaining({ file: asInvoice, path: 'kind' }),
+    );
+    const asOffer = '.kh/business/offers/2026/AN-2026-002.yaml';
+    const misplaced = withFile(
+      asOffer,
+      invoiceText.replace('number: RE-2026-0001', 'number: AN-2026-002'),
+    );
+    expect(errors(misplaced)).toContainEqual(
+      expect.objectContaining({ file: asOffer, path: 'kind' }),
+    );
+  });
+
+  it('reports corrects that names a credit note', () => {
+    const creditNote = (number: string, corrects: string) =>
+      invoiceText
+        .replace('number: RE-2026-0001', `number: ${number}`)
+        .replace('kind: invoice', `kind: credit-note\ncorrects: ${corrects}`)
+        .replace('type_code: 380', 'type_code: 381');
+    const files = withFile(
+      '.kh/business/invoices/2026/RE-2026-0002.yaml',
+      creditNote('RE-2026-0002', 'RE-2026-0001'),
+    );
+    expect(errors(files)).toEqual([]);
+    files.set(
+      '.kh/business/invoices/2026/RE-2026-0003.yaml',
+      creditNote('RE-2026-0003', 'RE-2026-0002'),
+    );
+    expect(errors(files)).toEqual([
+      expect.objectContaining({
+        file: '.kh/business/invoices/2026/RE-2026-0003.yaml',
+        path: 'corrects',
+      }),
+    ]);
+  });
+
   it('rejects symbolic links among issued documents but not elsewhere', () => {
     const symlinks = [INVOICE, '.kh/business/offers/2026/AN-2026-001.pdf'];
     expect(

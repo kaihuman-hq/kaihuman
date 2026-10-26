@@ -15,7 +15,9 @@ const serialize = (entry: object, keyOrder: readonly string[]): string => {
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** Tolerates CRLF, blank lines and a missing final newline; `line` is 1-based. */
+const BOM = '\uFEFF';
+
+/** Tolerates a leading BOM, CRLF, blank lines and a missing final newline; `line` is 1-based. */
 export const parseJsonl = <T>(
   text: string,
   validate: (raw: unknown, path: string) => Result<T>,
@@ -24,7 +26,7 @@ export const parseJsonl = <T>(
   const issues: Issue[] = [];
   text.split('\n').forEach((rawLine, i) => {
     const line = i + 1;
-    const body = rawLine.replace(/\r$/, '');
+    const body = (i === 0 ? rawLine.replace(/^\uFEFF/, '') : rawLine).replace(/\r$/, '');
     if (body.trim() === '') return;
     let raw: unknown;
     try {
@@ -44,7 +46,10 @@ export const parseJsonl = <T>(
 export const appendJsonl = (text: string, entry: object, keyOrder: readonly string[]): string =>
   `${text === '' || text.endsWith('\n') ? text : `${text}\n`}${serialize(entry, keyOrder)}\n`;
 
-/** Only lines whose callback returns an object are rewritten; the rest stay byte-for-byte. */
+/**
+ * Only lines whose callback returns an object are rewritten; the rest stay byte-for-byte, and a
+ * leading BOM is kept in front of line 1.
+ */
 export const replaceJsonlLines = (
   text: string,
   replace: (raw: Record<string, unknown>, line: number) => Record<string, unknown> | null,
@@ -53,8 +58,9 @@ export const replaceJsonlLines = (
   text
     .split('\n')
     .map((rawLine, i) => {
+      const bom = i === 0 && rawLine.startsWith(BOM) ? BOM : '';
       const cr = rawLine.endsWith('\r') ? '\r' : '';
-      const body = cr ? rawLine.slice(0, -1) : rawLine;
+      const body = rawLine.slice(bom.length, cr ? -1 : undefined);
       if (body.trim() === '') return rawLine;
       let raw: unknown;
       try {
@@ -64,6 +70,6 @@ export const replaceJsonlLines = (
       }
       if (!isRecord(raw)) return rawLine;
       const next = replace(raw, i + 1);
-      return next ? serialize(next, keyOrder) + cr : rawLine;
+      return next ? bom + serialize(next, keyOrder) + cr : rawLine;
     })
     .join('\n');

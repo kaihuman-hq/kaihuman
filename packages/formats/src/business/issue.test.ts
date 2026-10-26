@@ -122,6 +122,20 @@ describe('issue errors', () => {
     });
   });
 
+  it('rejects a credit note that corrects another credit note', () => {
+    const r = issue({
+      ...ctx,
+      draft: creditDraft,
+      timeFiles: {},
+      creditNoteNumbers: ['RE-2026-0042'],
+    });
+    expect(r).toMatchObject({ ok: false, issues: [{ path: 'corrects' }] });
+    expect(
+      ok({ ...ctx, draft: creditDraft, timeFiles: {}, creditNoteNumbers: ['RE-2026-0041'] })
+        .document.corrects,
+    ).toBe('RE-2026-0042');
+  });
+
   it('rejects a credit note that corrects an unknown invoice', () => {
     expect(issue({ ...ctx, draft: { ...creditDraft, corrects: 'RE-2026-0099' } })).toMatchObject({
       ok: false,

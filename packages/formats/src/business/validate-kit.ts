@@ -36,7 +36,11 @@ export const obj = (
 };
 
 export const str = (raw: unknown, path: string, issues: Issue[]): string | undefined =>
-  typeof raw === 'string' && raw !== '' ? raw : fail(issues, path, 'expected a non-empty string');
+  typeof raw === 'string' && raw !== ''
+    ? raw
+    : typeof raw === 'number'
+      ? fail(issues, path, `quote it, e.g. "${raw}"`)
+      : fail(issues, path, 'expected a non-empty string');
 
 export const optStr = (raw: unknown, path: string, issues: Issue[]): string | undefined =>
   raw === undefined || raw === null

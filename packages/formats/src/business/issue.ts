@@ -26,6 +26,11 @@ export type IssueContext = {
   client: Client;
   /** Numbers already issued in this document's series, any year. */
   existingNumbers: readonly string[];
+  /**
+   * Which of `existingNumbers` are credit notes. A credit note may correct only an invoice, so
+   * `corrects` naming one of these is refused. Omitted means none are.
+   */
+  creditNoteNumbers?: readonly string[];
   issueDate: string;
   /** Path → content for the months of `draft.time_entries`. */
   timeFiles: Readonly<Record<string, string>>;
@@ -157,6 +162,11 @@ export const issue = (
     !(draft.corrects && ctx.existingNumbers.includes(draft.corrects))
   ) {
     issues.push(problem('corrects', `${draft.corrects ?? ''} is not an issued invoice`));
+  } else if (
+    draft.kind === 'credit-note' &&
+    ctx.creditNoteNumbers?.includes(draft.corrects ?? '')
+  ) {
+    issues.push(problem('corrects', `${draft.corrects} is a credit note; correct the invoice`));
   }
 
   const series = seriesOf(draft.kind);

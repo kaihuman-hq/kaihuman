@@ -31,7 +31,10 @@ export const paymentsPath = (year: number): string => `${BUSINESS_ROOT}/payments
 const UNKNOWN: BusinessPath = { kind: 'unknown' };
 const YEAR = /^\d{4}$/;
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
-const NUMBER = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+/** What an issued file name (without `.yaml`) may be; numbering patterns must produce it. */
+export const ISSUED_NUMBER = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+/** Folders the scaffold creates with a `.gitkeep`. */
+const DATA_DIRS = ['clients', 'drafts', 'offers', 'invoices', 'time', 'payments', 'expenses'];
 const ARTIFACT_EXT = ['pdf', 'xml', 'sha256'] as const;
 
 const split = (name: string): [string, string] | null => {
@@ -42,7 +45,7 @@ const split = (name: string): [string, string] | null => {
 const issuedDir = (doc: 'invoice' | 'offer', year: string, file: string): BusinessPath => {
   if (!YEAR.test(year)) return UNKNOWN;
   const parts = split(file);
-  if (!parts || !NUMBER.test(parts[0])) return UNKNOWN;
+  if (!parts || !ISSUED_NUMBER.test(parts[0])) return UNKNOWN;
   const [number, ext] = parts;
   if (ext === 'yaml') return { kind: 'issued', doc, year: Number(year), number };
   const artifact = ARTIFACT_EXT.find((e) => e === ext);
@@ -96,6 +99,9 @@ export const classifyBusinessPath = (path: string): BusinessPath => {
     }
   }
   if (top === '.tools') return { kind: 'meta' };
+  if (parts.length === 2 && a === '.gitkeep' && top !== undefined && DATA_DIRS.includes(top)) {
+    return { kind: 'meta' };
+  }
   if (top === 'clients' && a !== undefined) {
     const client = asSlug(a);
     return client ? clientFile(client, parts.slice(2)) : UNKNOWN;

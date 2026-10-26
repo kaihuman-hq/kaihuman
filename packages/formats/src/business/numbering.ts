@@ -1,3 +1,4 @@
+import { ISSUED_NUMBER } from './paths.js';
 import type { DocKind } from './records.js';
 
 export const DEFAULT_NUMBERING = {
@@ -36,9 +37,18 @@ const matcher = (pattern: string): { regex: RegExp; order: ('year' | 'seq')[] } 
   return { regex: new RegExp(`^${source}$`), order };
 };
 
-/** Exactly one `{yyyy}` and one `{n…}`; anything else cannot give unique, increasing numbers. */
+const LITERAL = /^[A-Za-z0-9_-]*$/;
+
+/**
+ * Exactly one `{yyyy}` and one `{n…}`, else numbers are not unique and increasing; literal text
+ * only from `[A-Za-z0-9_-]`, so every number is a valid issued file name (`ISSUED_NUMBER`) and the
+ * check can find, validate and freeze it.
+ */
 export const isValidPattern = (pattern: string): boolean =>
-  (pattern.match(/\{yyyy\}/g) ?? []).length === 1 && (pattern.match(/\{n+\}/g) ?? []).length === 1;
+  (pattern.match(/\{yyyy\}/g) ?? []).length === 1 &&
+  (pattern.match(/\{n+\}/g) ?? []).length === 1 &&
+  LITERAL.test(pattern.replace(PLACEHOLDER, '')) &&
+  ISSUED_NUMBER.test(formatNumber(pattern, 2026, 1));
 
 /** Accepts any width: the width is a minimum for formatting only, so hand-typed `RE-2026-42` still counts as 42. */
 export const parseNumber = (

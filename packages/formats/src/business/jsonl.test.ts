@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { asSlug } from './ids.js';
 import { appendJsonl, parseJsonl, replaceJsonlLines } from './jsonl.js';
-import { arr, date, decimalStr, type Issue, obj, type Result, slug } from './validate-kit.js';
+import { arr, date, decimalStr, type Issue, obj, type Result, slug, str } from './validate-kit.js';
 
 const okValidator = (raw: unknown): Result<unknown> => ({ ok: true, value: raw });
 const text = '{"id":"a"}\r\n\r\n{"id":"b"}'; // CRLF, blank line, no final newline
@@ -49,6 +49,30 @@ describe('jsonl', () => {
       ),
     ).toBe('{ "id": "a" }\r\n\r\n{"id":"B"}');
   });
+
+  it('ignores a leading byte order mark on line 1', () => {
+    const bom = '\uFEFF{"id":"a"}\n{"id":"b"}\n';
+    const r = parseJsonl(bom, (raw) => ({ ok: true, value: raw as { id: string } }));
+    expect(r.issues).toEqual([]);
+    expect(r.entries.map((e) => [e.line, e.value.id])).toEqual([
+      [1, 'a'],
+      [2, 'b'],
+    ]);
+    const seen: unknown[] = [];
+    const untouched = replaceJsonlLines(
+      bom,
+      (o) => {
+        seen.push(o.id);
+        return null;
+      },
+      ['id'],
+    );
+    expect(seen).toEqual(['a', 'b']);
+    expect(untouched).toBe(bom);
+    expect(replaceJsonlLines(bom, (o) => (o.id === 'a' ? { id: 'A' } : null), ['id'])).toBe(
+      '\uFEFF{"id":"A"}\n{"id":"b"}\n',
+    );
+  });
 });
 
 describe('validate-kit', () => {
@@ -57,6 +81,12 @@ describe('validate-kit', () => {
     expect(decimalStr(19, 'lines[0].vat_rate', issues)).toBeUndefined();
     expect(issues[0]?.message).toBe('lines[0].vat_rate: quote it, e.g. "19"');
     expect(decimalStr('7.5', 'q', issues)).toBe('7.5');
+  });
+
+  it('tells the user to quote a number where a string is expected', () => {
+    const issues: Issue[] = [];
+    expect(str(10115, 'address.postcode', issues)).toBeUndefined();
+    expect(issues[0]?.message).toBe('address.postcode: quote it, e.g. "10115"');
   });
 
   it('reports unknown keys', () => {

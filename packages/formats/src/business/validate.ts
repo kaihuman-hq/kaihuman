@@ -8,6 +8,7 @@ import {
   type Contract,
   DOC_KINDS,
   type DocEvent,
+  type DocKind,
   type Draft,
   EVENT_TYPES,
   type Expense,
@@ -178,7 +179,7 @@ export const validateProfile = (raw: unknown): Result<BusinessProfile> => {
         note(
           iss,
           path,
-          'must contain exactly one {yyyy} and one {nnnn}-style sequence, e.g. "RE-{yyyy}-{nnnn}"',
+          'must contain exactly one {yyyy} and one {nnnn}-style sequence, other text only letters, digits, - and _, starting with a letter or digit, e.g. "RE-{yyyy}-{nnnn}"',
         );
         return undefined;
       }
@@ -414,6 +415,12 @@ const totals: Reader<Totals> = (raw, path, issues) => {
   }) as Totals;
 };
 
+const TYPE_CODES: Record<DocKind, 380 | 381 | null> = {
+  invoice: 380,
+  'credit-note': 381,
+  offer: null,
+};
+
 /** Checks shape and `gross === net + vat`; recomputing totals from the lines is `computeTotals`' job. */
 export const validateIssued = (raw: unknown): Result<Issued> => {
   const issues: Issue[] = [];
@@ -423,8 +430,12 @@ export const validateIssued = (raw: unknown): Result<Issued> => {
   const typeCode = r.type_code;
   if (typeCode !== 380 && typeCode !== 381 && typeCode !== null) {
     note(issues, 'type_code', 'expected 380, 381 or null');
-  } else if ((typeCode === null) !== (body.kind === 'offer') && body.kind !== undefined) {
-    note(issues, 'type_code', 'is null for offers and 380 or 381 otherwise');
+  } else if (body.kind !== undefined && TYPE_CODES[body.kind as DocKind] !== typeCode) {
+    note(
+      issues,
+      'type_code',
+      'must be 380 for an invoice, 381 for a credit-note, null for an offer',
+    );
   }
   const value = {
     number: req(r, '', 'number', issues, str),

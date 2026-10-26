@@ -170,6 +170,14 @@ describe('rules', () => {
     expect(validateIssued({ ...(offer as object), type_code: 380 }).ok).toBe(false);
   });
 
+  it('ties 380 to invoices and 381 to credit notes', () => {
+    const paths = (r: Result<unknown>) => (r.ok ? [] : r.issues.map((i) => i.path));
+    expect(paths(validateIssued({ ...invoice, type_code: 381 }))).toEqual(['type_code']);
+    const credit = { ...invoice, kind: 'credit-note', corrects: 'RE-2026-0001' };
+    expect(paths(validateIssued({ ...credit, type_code: 380 }))).toEqual(['type_code']);
+    expect(paths(validateIssued({ ...credit, type_code: 381 }))).toEqual([]);
+  });
+
   it('rejects a non-ULID id and a bad datetime', () => {
     expect(validateTimeEntry({ ...time, id: 'nope' }).ok).toBe(false);
     expect(validateEvent({ ...(event as object), at: '2026-10-26' }).ok).toBe(false);
@@ -312,5 +320,19 @@ describe('numbering patterns', () => {
       'numbering.invoice',
       'numbering.offer',
     ]);
+  });
+
+  it('rejects patterns whose numbers the check could not classify', () => {
+    const base = parseYaml(loadFixtureRepo().get('.kh/business/business.yaml') ?? '');
+    for (const invoice of ['RE.{yyyy}.{nnnn}', 'RE {yyyy} {nnnn}', '{yyyy}/{nnnn}']) {
+      const r = validateProfile({
+        ...(base.ok ? (base.value as object) : {}),
+        numbering: { invoice },
+      });
+      expect(
+        issuesOf(r).map((i) => i.path),
+        invoice,
+      ).toEqual(['numbering.invoice']);
+    }
   });
 });

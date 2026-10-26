@@ -53,6 +53,29 @@ describe('de', () => {
     ]);
   });
 
+  it('refuses E, K, O and Z on regular invoices and credit notes, not on offers', () => {
+    for (const vat_category of ['E', 'K', 'O', 'Z'] as const) {
+      const lines = [line, { ...line, vat_category, vat_rate: '0' }];
+      for (const kind of ['invoice', 'credit-note'] as const) {
+        const found = de.checkIssue({ ...invoiceDraft, kind, lines }, profile, client);
+        expect(found, `${kind} ${vat_category}`).toEqual([
+          expect.objectContaining({
+            path: 'lines[1].vat_category',
+            message: expect.stringContaining('§ 14 Abs. 4 Nr. 8 UStG'),
+          }),
+        ]);
+      }
+      const offer: Draft = { ...invoiceDraft, kind: 'offer', valid_until: '2026-12-01', lines };
+      expect(de.checkIssue(offer, profile, client)).toEqual([]);
+    }
+  });
+
+  it('keeps E allowed under small-business', () => {
+    const small = { ...profile, vat_regime: 'small-business' as const };
+    const lines = [{ ...line, vat_category: 'E' as const, vat_rate: '0' }];
+    expect(de.checkIssue({ ...invoiceDraft, lines }, small, client)).toEqual([]);
+  });
+
   it('needs a service period or date', () => {
     const doc = { ...invoiceDraft, service_period: undefined, service_date: undefined };
     expect(de.checkIssue(doc, profile, client)).toContainEqual(

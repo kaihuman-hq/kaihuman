@@ -1,5 +1,6 @@
 import { parseJsonl } from './jsonl.js';
-import { DEFAULT_NUMBERING, findGaps, formatNumber } from './numbering.js';
+import { jurisdictionFor } from './jurisdiction.js';
+import { DEFAULT_NUMBERING, findGaps, formatNumber, parseNumber } from './numbering.js';
 import { BUSINESS_ROOT, type BusinessPath, classifyBusinessPath } from './paths.js';
 import type { BusinessProfile, Draft, Issued, VatCategory } from './records.js';
 import { computeTotals } from './totals.js';
@@ -57,6 +58,9 @@ export const checkBusinessRepo = (input: {
   };
   const fail = (file: string, path: string, message: string, level: Finding['level'] = 'error') =>
     add(file, level, { path, message });
+  const sameId = (file: string, id: string, expected: string) => {
+    if (id !== expected) fail(file, 'id', `"${id}" does not match the file name "${expected}"`);
+  };
 
   const paths = [...files.keys()].filter((p) => p.startsWith(`${BUSINESS_ROOT}/`)).sort();
 
@@ -114,13 +118,17 @@ export const checkBusinessRepo = (input: {
       case 'contract': {
         const r = readYaml(text, validateContract);
         if (!r.ok) addIssues(file, r.issues);
-        else refs.push({ file, path: 'client', client: r.value.client });
+        else {
+          sameId(file, r.value.id, p.id);
+          refs.push({ file, path: 'client', client: r.value.client });
+        }
         break;
       }
       case 'draft': {
         const r = readYaml(text, validateDraft);
         if (!r.ok) addIssues(file, r.issues);
         else {
+          sameId(file, r.value.id, p.id);
           drafts.push({ file, doc: r.value });
           refs.push({
             file,
@@ -137,12 +145,34 @@ export const checkBusinessRepo = (input: {
           addIssues(file, r.issues);
           break;
         }
-        issued.push({ file, series: p.doc, year: p.year, doc: r.value });
-        if (r.value.number !== p.number) {
-          fail(file, 'number', `"${r.value.number}" does not match the file name "${p.number}"`);
+        const doc = r.value;
+        issued.push({ file, series: p.doc, year: p.year, doc });
+        if (doc.number !== p.number) {
+          fail(file, 'number', `"${doc.number}" does not match the file name "${p.number}"`);
         }
-        if (!r.value.issue_date.startsWith(`${p.year}-`)) {
-          fail(file, 'issue_date', `${r.value.issue_date} is not in the year folder ${p.year}`);
+        const parsed = parseNumber(patterns[p.doc], p.number);
+        if (!parsed || parsed.year !== p.year) {
+          fail(
+            file,
+            'number',
+            `"${p.number}" is not a ${p.year} number of the pattern "${patterns[p.doc]}"`,
+          );
+        }
+        if (!doc.issue_date.startsWith(`${p.year}-`)) {
+          fail(file, 'issue_date', `${doc.issue_date} is not in the year folder ${p.year}`);
+        }
+        if ((p.doc === 'offer') !== (doc.kind === 'offer')) {
+          fail(
+            file,
+            'kind',
+            p.doc === 'offer'
+              ? `a ${doc.kind} belongs under invoices/, not offers/`
+              : 'an offer belongs under offers/, not invoices/',
+          );
+        }
+        const retainUntil = `${Number(doc.issue_date.slice(0, 4)) + jurisdictionFor(doc.jurisdiction).retentionYears}-12-31`;
+        if (doc.retain_until !== retainUntil) {
+          fail(file, 'retain_until', `must be ${retainUntil} for ${doc.jurisdiction}`);
         }
         // Reasons come from the document itself: the profile's vat_regime may change later,
         // and that must not turn frozen history red. Amounts, categories and rates are still verified.
@@ -179,13 +209,16 @@ export const checkBusinessRepo = (input: {
       case 'expense': {
         const r = readYaml(text, validateExpense);
         if (!r.ok) addIssues(file, r.issues);
-        else if (r.value.client) {
-          refs.push({
-            file,
-            path: 'client',
-            client: r.value.client,
-            ...(r.value.project ? { project: r.value.project } : {}),
-          });
+        else {
+          sameId(file, r.value.id, p.id);
+          if (r.value.client) {
+            refs.push({
+              file,
+              path: 'client',
+              client: r.value.client,
+              ...(r.value.project ? { project: r.value.project } : {}),
+            });
+          }
         }
         break;
       }
@@ -244,7 +277,7 @@ export const checkBusinessRepo = (input: {
     }
   }
   for (const { file, doc } of [...issued.map((i) => ({ file: i.file, doc: i.doc })), ...drafts]) {
-    if (doc.corrects !== undefined && !invoices.has(doc.corrects)) {
+    if (doc.corrects !== undefined && invoices.get(doc.corrects)?.doc.kind !== 'invoice') {
       fail(file, 'corrects', `"${doc.corrects}" is not an issued invoice`);
     }
     if (doc.from_offer !== undefined && !offers.has(doc.from_offer)) {
@@ -307,4 +340,3 @@ export const formatFinding = (f: Finding): string => {
   const line = f.line === undefined ? '' : `,line=${f.line}`;
   return `::${f.level} file=${f.file}${line}::${prefixed(f)}`;
 };
-export const BUSINESS_CHECK_BUNDLE = '@kaihuman/formats/dist/business-check.mjs';

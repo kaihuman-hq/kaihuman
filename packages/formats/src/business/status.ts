@@ -31,7 +31,7 @@ export const deriveInvoiceStatus = (
   const open = Math.max(0, gross - paid - credited);
   const overpaid = Math.max(0, paid + credited - gross);
   const base = { open, paid, credited, overpaid };
-  if (credited >= gross) return { state: 'credited', ...base };
+  if (credited > 0 && credited >= gross) return { state: 'credited', ...base };
   if (open === 0) return { state: 'paid', ...base };
   if (invoice.due_date !== undefined && invoice.due_date < today) {
     return { state: 'overdue', ...base };

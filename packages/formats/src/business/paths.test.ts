@@ -89,6 +89,14 @@ describe('classifyBusinessPath', () => {
     }
   });
 
+  it('classifies the scaffold .gitkeep files in data folders as meta, not elsewhere', () => {
+    for (const dir of ['clients', 'drafts', 'offers', 'invoices', 'time', 'payments', 'expenses']) {
+      expect(b(`${dir}/.gitkeep`)).toEqual({ kind: 'meta' });
+    }
+    expect(b('other/.gitkeep').kind).toBe('unknown');
+    expect(b('invoices/2026/.gitkeep').kind).toBe('unknown');
+  });
+
   it('treats paths outside the business root as unknown', () => {
     expect(classifyBusinessPath('notes/business.yaml').kind).toBe('unknown');
     expect(classifyBusinessPath('.kh/businessx/business.yaml').kind).toBe('unknown');
