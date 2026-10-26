@@ -1,0 +1,45 @@
+number: AN-2026-001
+draft_id: 01M52X5E00EKRX27CHPV05AFMT
+type_code: null
+issue_date: "2026-09-15"
+jurisdiction: de
+kind: offer
+client: acme-gmbh
+valid_until: "2026-10-15"
+lines:
+  - description: Website relaunch
+    quantity: "1"
+    unit: C62
+    unit_price: 500000
+    vat_category: S
+    vat_rate: "19"
+seller:
+  name: Kai Mustermann
+  address:
+    street: Musterstrasse 1
+    postcode: "10115"
+    city: Berlin
+    country: DE
+  vat_id: DE123456789
+  contact:
+    name: Kai Mustermann
+    email: kai@example.com
+buyer:
+  name: Acme GmbH
+  address:
+    street: Hauptstrasse 5
+    postcode: "80331"
+    city: Muenchen
+    country: DE
+  vat_id: DE987654321
+totals:
+  net: 500000
+  vat: 95000
+  gross: 595000
+  breakdown:
+    - category: S
+      rate: "19"
+      taxable: 500000
+      tax: 95000
+legal_notes: []
+retain_until: "2034-12-31"

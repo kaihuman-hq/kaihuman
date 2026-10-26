@@ -1,0 +1,15 @@
+name: Acme GmbH
+address:
+  street: Hauptstrasse 5
+  postcode: "80331"
+  city: Muenchen
+  country: DE
+vat_id: DE987654321
+contacts:
+  - name: Erika Beispiel
+    email: erika@acme.example
+    role: Einkauf
+payment_terms_days: 14
+stage: active
+tags:
+  - web

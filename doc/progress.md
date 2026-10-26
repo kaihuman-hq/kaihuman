@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-10-26 — Business, phase 1: formats and repo check
+
+- `@kaihuman/formats` has a `business` module (`@kaihuman/formats/business`). It starts with exact decimals and money in integer minor units (half-up rounding, away from zero), ULIDs and client/project slugs.
+- Strict YAML (1.2 core schema, unique keys, stable key order), JSONL helpers that survive hand edits (CRLF, blank lines, no final newline) and the field readers record validators are built on. Numbers where a decimal string is expected get a "quote it" error.
+- Record types, key orders, validators (unknown keys, "quote it" for numeric decimals, credit-note/offer/minutes/gross rules) and path classification for `.kh/business/`, with a small valid fixture repo under `packages/formats/fixtures/business/repo`.
+- Totals (`computeTotals`: line nets summed per VAT category and rate, then the rate applied) and jurisdiction rules (`jurisdictionFor`: `de` issue checks, legal notes and exemption reasons; `generic` checks nothing).
+- Numbering (`nextNumber`, `findGaps`, per-year gap-free series; credit notes share the invoice series) and `issue`: a pure function that numbers a draft, freezes it into an issued document (seller, buyer, totals, due date, legal notes, retention) and returns every file change (new document, draft removed, time entries billed, client action log line) plus the commit message.
+- Derived status (`deriveInvoiceStatus`, `deriveOfferStatus`: issued, sent, part-paid, paid, overdue, credited; overpayment gives `paid` with `open: 0` and `overpaid > 0`) and `toEn16931`, plain BT/BG-annotated invoice data that phase 6 turns into XRechnung XML.
+- Repo check (`checkBusinessRepo`: classifies and validates every file under `.kh/business/`, number/year/totals/gap checks, reference checks, frozen issued files) and its CLI `runCheck`, bundled by Vite into one dependency-free `dist/business-check.mjs` for GitHub Actions. Without a usable base commit it validates the tree and skips the frozen-file rule.
+- Console `enableBusiness` (private repo only, one commit) creates the `.kh/business/` skeleton, the `business-check` workflow, the bundled check and the `kh-business` agent skill; `syncKB` refreshes them when `BUSINESS_TOOLS_VERSION` changes, and only for repos with business data. `KB_SKILL_VERSION` is 1.9.0 and `CLAUDE.md` points to the skill. Reference: `doc/business.md`.
+- Final review fixes: a fresh scaffold checks clean (data-folder `.gitkeep` files are meta); numbering patterns must give valid file names; the check now verifies `id` = file name, `retain_until`, number against the series pattern and year, kind against folder, `type_code` against kind, and `corrects` naming an invoice (also in `issue`, via `creditNoteNumbers`); `de` refuses E/K/O/Z lines on regular invoices until exemption notes exist; totals group rates by value ("19" = "19.0") and are documented as frozen; JSONL ignores a leading BOM; a zero-gross invoice is not "credited"; the workflow reads only and passes the base via `env`. A seam test issues an invoice, credit note and offer from the fixture repo and checks the commit.
+
+## 2026-10-26 — Business: design spec
+
+- Design for tracking a solo business in a private GitHub repo: clients, offers, invoices, payments, time, expenses, projects, contracts and a per-client overview page. Includes end-to-end encrypted, revocable share links for clients. Data lives in the Life OS repo under `.kh/business/` and works with the existing todos, action log, time, quick capture, wiki and agent. Spec: `docs/superpowers/specs/2026-10-26-business-design.md`. No code yet.
+
 ## 2026-10-20 — Browser extension: morning brief removed
 
 - The AI-generated morning brief card is gone from the top of the start page. The worker no longer generates it, so it costs no model time. The focus line stays.

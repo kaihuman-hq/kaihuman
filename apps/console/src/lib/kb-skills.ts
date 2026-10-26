@@ -1,6 +1,6 @@
 import KH_IDEAS_SKILL_SOURCE from '@kaihuman/formats/skills/kh-ideas/SKILL.md?raw';
 
-export const KB_SKILL_VERSION = '1.8.0';
+export const KB_SKILL_VERSION = '1.9.0';
 
 /** The kh-ideas Agent Skill, as shipped in `@kaihuman/formats`. */
 export const KH_IDEAS_SKILL = KH_IDEAS_SKILL_SOURCE;
@@ -520,6 +520,12 @@ another branch stays invisible until it is merged. Before you commit a change th
 branch>?" If they agree, commit those changes on top of the latest default branch and push there,
 with no extra branch or pull request. If they decline, or the push is refused, keep the change on
 your branch and say in one line that it needs a merge. Never put other files in such a commit.
+
+## Business
+
+If \`.kh/business/\` exists, it holds clients, time, payments and invoice drafts as plain files. Follow
+the \`kh-business\` skill (\`.agents/skills/kh-business/SKILL.md\`) before you touch them: agents write
+drafts only, and never change issued files under \`offers/\` or \`invoices/\`.
 
 ## Guidelines
 

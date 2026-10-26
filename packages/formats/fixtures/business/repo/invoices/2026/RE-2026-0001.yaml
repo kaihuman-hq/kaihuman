@@ -1,0 +1,72 @@
+number: RE-2026-0001
+draft_id: 01M50ARQ007CHPV05AFMSY38DJ
+type_code: 380
+issue_date: "2026-10-26"
+due_date: "2026-11-09"
+jurisdiction: de
+kind: invoice
+client: acme-gmbh
+project: website
+service_period:
+  start: "2026-10-01"
+  end: "2026-10-25"
+lines:
+  - description: Dev
+    quantity: "7.5"
+    unit: HUR
+    unit_price: 9500
+    vat_category: S
+    vat_rate: "19"
+  - description: Setup
+    quantity: "1"
+    unit: C62
+    unit_price: 12000
+    vat_category: S
+    vat_rate: "19"
+  - description: Book
+    quantity: "1"
+    unit: C62
+    unit_price: 1000
+    vat_category: S
+    vat_rate: "7"
+time_entries:
+  - 01M581YW00W16BGNTZ49EKRX27
+seller:
+  name: Kai Mustermann
+  address:
+    street: Musterstrasse 1
+    postcode: "10115"
+    city: Berlin
+    country: DE
+  vat_id: DE123456789
+  contact:
+    name: Kai Mustermann
+    email: kai@example.com
+buyer:
+  name: Acme GmbH
+  address:
+    street: Hauptstrasse 5
+    postcode: "80331"
+    city: Muenchen
+    country: DE
+  vat_id: DE987654321
+payment:
+  means_code: "58"
+  iban: DE89370400440532013000
+  bic: COBADEFFXXX
+  reference: RE-2026-0001
+totals:
+  net: 84250
+  vat: 15888
+  gross: 100138
+  breakdown:
+    - category: S
+      rate: "19"
+      taxable: 83250
+      tax: 15818
+    - category: S
+      rate: "7"
+      taxable: 1000
+      tax: 70
+legal_notes: []
+retain_until: "2034-12-31"

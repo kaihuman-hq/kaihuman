@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BUSINESS_TOOLS_VERSION } from './business-setup';
 import { listKBDir, syncKB } from './github-kb';
 import { getScaffoldFiles, KB_AGENT_SECTION, KB_SKILL_VERSION } from './kb-skills';
 
@@ -45,6 +46,34 @@ beforeEach(() => {
 });
 
 describe('syncKB', () => {
+  it('updates the business tools of a repo that has business, in the same commit', async () => {
+    givenRepo({
+      ...fullySetUp(),
+      '.kh/business/business.yaml': 'x',
+      '.kh/business/.tools/version': '0.9.0',
+    });
+    expect(await syncKB(repo)).toBe('updated');
+    const written = committed();
+    expect(written).toHaveProperty('.kh/business/.tools/version', BUSINESS_TOOLS_VERSION);
+    expect(written).toHaveProperty('.github/workflows/business-check.yml');
+    expect(written).not.toHaveProperty('.kh/business/business.yaml');
+  });
+
+  it('leaves current business tools alone', async () => {
+    givenRepo({
+      ...fullySetUp(),
+      '.kh/business/business.yaml': 'x',
+      '.kh/business/.tools/version': BUSINESS_TOOLS_VERSION,
+    });
+    expect(await syncKB(repo)).toBe('current');
+  });
+
+  it('adds no business files to a repo without business', async () => {
+    givenRepo(fullySetUp());
+    expect(await syncKB(repo)).toBe('current');
+    expect(githubService.commitFiles).not.toHaveBeenCalled();
+  });
+
   it('installs nothing into a repo that was never set up', async () => {
     givenRepo({ 'README.md': '# Notes' });
     expect(await syncKB(repo)).toBe('missing');
