@@ -32,7 +32,16 @@ the right place.
 ```
 
 Client and project slugs match `^[a-z0-9][a-z0-9-]{1,39}$`. Records name their client by slug.
-Drafts, time entries, payments, expenses and events get a ULID as `id`.
+Drafts, time entries, payments, expenses, contracts and events get a ULID as `id`. A ULID is 26
+characters of Crockford base32 (`0-9` and `A-Z` without `I`, `L`, `O`, `U`; the first character
+`0`-`7`), time first so it sorts by creation. Make a fresh one with:
+
+```
+node -e 'const A="0123456789ABCDEFGHJKMNPQRSTVWXYZ";let t=Date.now(),s="";for(let i=0;i<10;i++){s=A[t%32]+s;t=Math.floor(t/32)}for(let i=0;i<16;i++)s+=A[Math.floor(Math.random()*32)];console.log(s)'
+```
+
+For a file named by its ULID (`drafts/<ulid>.yaml`, `expenses/<year>/<ulid>.yaml`,
+`contracts/<ulid>.yaml`), the `id` inside must equal the file name; the check fails otherwise.
 
 ## Rules
 
@@ -58,7 +67,7 @@ Drafts, time entries, payments, expenses and events get a ULID as `id`.
   `{"id":"<ulid>","date":"2026-10-12","minutes":450,"client":"acme-gmbh","project":"website","note":"Implementation"}`
 - **Draft an invoice or offer:** create `drafts/<ulid>.yaml` with `kind`, `client`, `lines`
   (`description`, `quantity`, `unit`, `unit_price`, `vat_category`, `vat_rate`) and, for unbilled time,
-  `time_entries: [<ulid>, …]`. Copy the shape of an existing draft or issued file.
+  `time_entries: [<ulid>, …]`. Copy the shape of an existing draft.
 - **What does a client owe:** read the client's issued invoices and `payments/<year>.jsonl`. An invoice
   is open until its payments cover `totals.gross`. Report the number and the amount open.
 - **Add a payment:** append to `payments/<year>.jsonl`:

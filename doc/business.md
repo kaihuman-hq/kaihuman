@@ -29,7 +29,8 @@ and the console share the files. A GitHub Action checks them on every push.
 ```
 
 Client and project slugs match `^[a-z0-9][a-z0-9-]{1,39}$`. Drafts, time entries, payments,
-expenses and events use ULIDs. Issued documents use their number.
+expenses, contracts and events use ULIDs; a file named by its ULID has that ULID as `id`. Issued
+documents use their number.
 
 ## Record formats
 
@@ -74,7 +75,9 @@ append only: one object per line, and hand edits (CRLF, blank lines, no final ne
 ## Numbering
 
 - Invoices and credit notes share one series, `RE-{yyyy}-{nnnn}`. Offers use `AN-{yyyy}-{nnn}`.
-  Change either in `business.yaml` under `numbering`.
+  Change either in `business.yaml` under `numbering`: a pattern has exactly one `{yyyy}` and one
+  `{n…}`, and its other text is letters, digits, `-` and `_`, starting with a letter or digit, so
+  every number is a valid file name.
 - The number is the highest existing number of the year plus one. The year comes from `issue_date`:
   a draft issued on 2027-01-02 gets `RE-2027-0001`, whatever else exists.
 - The check reports gaps in a year's series.
@@ -86,8 +89,11 @@ append only: one object per line, and hand edits (CRLF, blank lines, no final ne
   `generic`), in one commit.
 - Files under `offers/` and `invoices/` never change and are never deleted. Adding
   `<number>.pdf`, `<number>.xml` and `<number>.sha256` is allowed.
-- Corrections are credit notes (type 381, next number of the invoice series, reference to the
-  original), then a new invoice if needed.
+- Corrections are credit notes (type 381, next number of the invoice series, `corrects` names the
+  original invoice, never another credit note), then a new invoice if needed.
+- Under `de` with `vat_regime: regular`, invoices and credit notes with lines in category E, K, O
+  or Z are refused: they need an exemption note (§ 14 Abs. 4 Nr. 8 UStG) that is not supported
+  yet. E is the category for small-business (§ 19 UStG); AE (reverse charge) gets its note.
 - Status (open, part-paid, paid, overdue, credited) is calculated from payments and dates, never stored.
 
 ## The check
@@ -99,11 +105,26 @@ node .kh/business/.tools/business-check.mjs                # validate the tree
 node .kh/business/.tools/business-check.mjs --base <sha>   # also compare issued files with <sha>
 ```
 
-It exits 1 on any error. It flags: invalid or unknown-key records, unquoted numeric decimals,
-wrong totals or retention dates, numbers that do not match the year or the pattern, gaps in a
-series, references to unknown clients, projects or invoices, and any change or deletion of
-issued files since the base. Without a usable base (first push, all-zero sha) it checks the tree
-and skips the frozen rule. The workflow runs it on pushes and pull requests that touch
+It exits 1 on any error. Errors:
+
+- invalid records: unknown keys, missing fields, unquoted numbers where a string or decimal is
+  expected, a missing or invalid `business.yaml`;
+- an `id` that differs from the file name (drafts, expenses, contracts);
+- issued documents: a `number` that differs from the file name or does not parse under the
+  series pattern (`business.yaml` `numbering`, else the default) with the folder's year; an
+  `issue_date` outside the year folder; an offer outside `offers/` or an invoice or credit note
+  outside `invoices/`; a `type_code` other than 380 for an invoice, 381 for a credit note, null
+  for an offer; stored totals that differ from the totals computed from the lines;
+  `retain_until` other than 31 Dec of issue year plus the jurisdiction's retention years;
+- gaps in a year's series;
+- references to unknown clients or projects, payments for anything but an issued invoice,
+  `corrects` that is not an issued invoice, `from_offer` that is not an issued offer;
+- symbolic links under `invoices/` or `offers/`;
+- any change or deletion since the base of an issued file or of its pdf, xml or sha256.
+
+Warnings: unrecognised files in `.kh/business/`, and events or links for a document that is not
+issued. Without a usable base (first push, all-zero sha) it checks the tree and skips the frozen
+rule. The workflow runs it on pushes and pull requests that touch
 `.kh/business/**`. The bundle is built by `pnpm --filter @kaihuman/formats build`.
 
 ## Enable

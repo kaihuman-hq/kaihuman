@@ -7,7 +7,7 @@ Diese Vorlage beschreibt, wie Angebote, Rechnungen und Zahlungen mit kaihuman er
 ## 1. Allgemeine Beschreibung
 
 - Unternehmen und Tätigkeit: […]
-- Zweck des Verfahrens: Erstellen, Nummerieren, Archivieren und Nachverfolgen von Angeboten, Rechnungen, Gutschriften, Zahlungen und Ausgaben.
+- Zweck des Verfahrens: Erstellen, Nummerieren, Archivieren und Nachverfolgen von Angeboten, Rechnungen, Stornorechnungen / Rechnungskorrekturen, Zahlungen und Ausgaben.
 - Eingesetzte Software: kaihuman (Konsole und Prüf-Workflow), Git, GitHub, Generator für PDF […] (und E-Rechnung-XML […]).
 - Zeitraum, für den diese Fassung gilt: […]
 
@@ -21,7 +21,7 @@ Belegfluss: Entwurf → Ausstellung → PDF/XML → Versand → Zahlung.
 4. **Versand:** Versandweg: […] (E-Mail, Freigabelink). Der Versand wird in `events.jsonl` festgehalten.
 5. **Zahlung:** Zahlungseingänge werden in `payments/<Jahr>.jsonl` erfasst. Offen, teilbezahlt, bezahlt und überfällig werden daraus berechnet, nie gespeichert. Abgleich mit dem Bankkonto: […] (Rhythmus).
 
-Nummernkreise: Rechnungen und Gutschriften `RE-{jjjj}-{nnnn}`, Angebote `AN-{jjjj}-{nnn}` (Änderung in `business.yaml`: […]).
+Nummernkreise: Rechnungen und Stornorechnungen / Rechnungskorrekturen `RE-{jjjj}-{nnnn}`, Angebote `AN-{jjjj}-{nnn}` (Änderung in `business.yaml`: […]).
 
 ## 3. Technische Systemdokumentation
 
@@ -44,7 +44,7 @@ Nummernkreise: Rechnungen und Gutschriften `RE-{jjjj}-{nnnn}`, Angebote `AN-{jjj
 ## 5. Internes Kontrollsystem
 
 - **Unveränderliche Rechnungen:** Ausgestellte Dateien unter `offers/` und `invoices/` werden nie geändert oder gelöscht. Der Prüf-Workflow schlägt bei jeder Änderung fehl. Erlaubt ist nur das Hinzufügen von `<Nummer>.pdf`, `<Nummer>.xml` und `<Nummer>.sha256`.
-- **Stornorechnung statt Änderung:** Fehler werden mit einer Gutschrift (Typ 381, eigene Nummer aus der Rechnungsreihe, Verweis auf das Original) korrigiert, danach folgt bei Bedarf eine neue Rechnung.
+- **Stornorechnung statt Änderung:** Fehler werden mit einer Stornorechnung / Rechnungskorrektur (Typ 381, eigene Nummer aus der Rechnungsreihe, Verweis auf das Original) korrigiert, danach folgt bei Bedarf eine neue Rechnung.
 - **Lückenlose Nummern:** Die Nummer ist die höchste vorhandene Nummer des Jahres plus eins. Der Prüf-Workflow meldet Lücken.
 - **SHA-256:** Zu jedem erzeugten PDF liegt die Prüfsumme in `<Nummer>.sha256`. Abweichungen sind an der Prüfsumme erkennbar.
 - **Kontrolle:** Der Prüf-Workflow wird […] (Rhythmus) auf Fehler kontrolliert. Verantwortlich: […]

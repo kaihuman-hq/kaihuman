@@ -117,7 +117,11 @@ describe('business files', () => {
     expect(workflow).toContain("'.kh/business/**'");
     expect(workflow).toContain('fetch-depth: 0');
     expect(workflow).toContain('node-version: 22');
-    expect(workflow).toContain('node .kh/business/.tools/business-check.mjs --base');
+    expect(workflow).toContain('permissions:\n  contents: read');
+    expect(workflow).toMatch(
+      /BASE: \$\{\{ github\.event\.pull_request\.base\.sha \|\| github\.event\.before \}\}/,
+    );
+    expect(workflow).toContain('node .kh/business/.tools/business-check.mjs --base "$BASE"');
   });
 
   it('scaffold adds the tool files to the data skeleton', () => {
