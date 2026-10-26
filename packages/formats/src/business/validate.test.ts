@@ -300,3 +300,17 @@ describe('whole fixture repo', () => {
 });
 
 const issuesOf = (r: Result<unknown>) => (r.ok ? [] : r.issues);
+
+describe('numbering patterns', () => {
+  it('rejects patterns that cannot give unique numbers', () => {
+    const base = parseYaml(loadFixtureRepo().get('.kh/business/business.yaml') ?? '');
+    const make = (numbering: unknown) =>
+      validateProfile({ ...(base.ok ? (base.value as object) : {}), numbering });
+    expect(make({ invoice: 'RE-{yyyy}-{nnnn}', offer: 'AN-{yyyy}-{nnn}' }).ok).toBe(true);
+    const bad = make({ invoice: 'RE-{nnnn}', offer: 'AN-{yyyy}' });
+    expect(bad.ok ? [] : bad.issues.map((i) => i.path)).toEqual([
+      'numbering.invoice',
+      'numbering.offer',
+    ]);
+  });
+});

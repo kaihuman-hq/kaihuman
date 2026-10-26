@@ -1,3 +1,4 @@
+import { isValidPattern } from './numbering.js';
 import {
   ADDRESS_KEYS,
   type Address,
@@ -171,10 +172,22 @@ export const validateProfile = (raw: unknown): Result<BusinessProfile> => {
   });
   const numbering = opt(r, '', 'numbering', issues, (n, p, i) => {
     const k = obj(n, p, ['invoice', 'offer'], i);
+    const pattern = (raw: unknown, path: string, iss: Issue[]) => {
+      const v = str(raw, path, iss);
+      if (v !== undefined && !isValidPattern(v)) {
+        note(
+          iss,
+          path,
+          'must contain exactly one {yyyy} and one {nnnn}-style sequence, e.g. "RE-{yyyy}-{nnnn}"',
+        );
+        return undefined;
+      }
+      return v;
+    };
     return k
       ? (compact({
-          invoice: opt(k, p, 'invoice', i, str),
-          offer: opt(k, p, 'offer', i, str),
+          invoice: opt(k, p, 'invoice', i, pattern),
+          offer: opt(k, p, 'offer', i, pattern),
         }) as NonNullable<BusinessProfile['numbering']>)
       : undefined;
   });

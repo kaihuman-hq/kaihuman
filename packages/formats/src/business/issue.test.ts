@@ -183,4 +183,40 @@ describe('issue credit note and offer', () => {
     const valid = validateIssued(parsed.ok ? parsed.value : null);
     expect(valid.ok ? [] : valid.issues).toEqual([]);
   });
+
+  it('rejects time entries of another client', () => {
+    const other = entry.replace('"acme-gmbh"', '"other-gmbh"');
+    expect(issue({ ...ctx, timeFiles: { [timeFile]: other } })).toMatchObject({
+      ok: false,
+      issues: [{ path: 'time_entries[0]' }],
+    });
+  });
+
+  it('rejects time entries on an offer', () => {
+    const offer: Draft = { ...draft, kind: 'offer', valid_until: '2027-02-01' };
+    const r = issue({ ...ctx, draft: offer });
+    expect(r.ok ? [] : r.issues.map((i) => i.path)).toContain('time_entries');
+  });
+
+  it('rejects an impossible issue date', () => {
+    const r = issue({ ...ctx, issueDate: '2027-02-31' });
+    expect(r.ok ? [] : r.issues.map((i) => i.path)).toContain('issue_date');
+  });
+
+  it('refuses to reuse a number even if the pattern is broken', () => {
+    const broken = { ...profile, numbering: { invoice: 'RE-{nnnn}' } };
+    expect(issue({ ...ctx, profile: broken, existingNumbers: ['RE-0001'] })).toMatchObject({
+      ok: false,
+      issues: [{ path: 'number' }],
+    });
+  });
+
+  it('keeps an existing log byte-for-byte and adds one line', () => {
+    const log =
+      '---\ntags:\n  - a\n---\n\n# Kunde Acme\n\nSome prose.\n\n- a bullet without timestamp\n- 2026-12-01 10:00:00 Called #call';
+    const out = ok({ ...ctx, clientLog: log }).changes[
+      `${root}/clients/acme-gmbh/log.actionlog.md`
+    ] as string;
+    expect(out).toBe(`${log}\n- 2027-01-02 09:05:07 Issued RE-2027-0001 (1001.38 EUR) #business\n`);
+  });
 });

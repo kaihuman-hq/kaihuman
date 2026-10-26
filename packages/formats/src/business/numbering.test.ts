@@ -3,6 +3,7 @@ import {
   DEFAULT_NUMBERING,
   findGaps,
   formatNumber,
+  isValidPattern,
   nextNumber,
   parseNumber,
   seriesOf,
@@ -19,7 +20,7 @@ describe('numbering', () => {
   it('parses its own output and rejects other formats', () => {
     expect(parseNumber(RE, 'RE-2026-0042')).toEqual({ year: 2026, seq: 42 });
     expect(parseNumber(RE, 'AN-2026-001')).toBeNull();
-    expect(parseNumber(RE, 'RE-2026-42')).toBeNull();
+    expect(parseNumber(RE, 'RE-2026-42')).toEqual({ year: 2026, seq: 42 });
     expect(parseNumber('{nnn}/{yyyy}', '007/2026')).toEqual({ year: 2026, seq: 7 });
   });
 
@@ -27,6 +28,7 @@ describe('numbering', () => {
     expect(nextNumber(RE, 2026, ['RE-2026-0001', 'RE-2026-0002'])).toBe('RE-2026-0003');
     expect(nextNumber(RE, 2027, ['RE-2026-0042'])).toBe('RE-2027-0001');
     expect(nextNumber(RE, 2026, [])).toBe('RE-2026-0001');
+    expect(nextNumber(RE, 2026, ['RE-2026-42', 'RE-2026-0001'])).toBe('RE-2026-0043');
     expect(nextNumber(RE, 2026, ['RE-2026-0001', 'RE-2026-0005'])).toBe('RE-2026-0006');
   });
 
@@ -40,5 +42,13 @@ describe('numbering', () => {
     expect(seriesOf('credit-note')).toBe('invoice');
     expect(seriesOf('invoice')).toBe('invoice');
     expect(seriesOf('offer')).toBe('offer');
+  });
+
+  it('accepts only patterns with one year and one sequence placeholder', () => {
+    expect(isValidPattern(RE)).toBe(true);
+    expect(isValidPattern('RE-{nnnn}')).toBe(false);
+    expect(isValidPattern('RE-{yyyy}')).toBe(false);
+    expect(isValidPattern('{yyyy}-{yyyy}-{nnn}')).toBe(false);
+    expect(isValidPattern('{yyyy}-{n}-{nn}')).toBe(false);
   });
 });

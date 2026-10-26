@@ -29,13 +29,18 @@ const matcher = (pattern: string): { regex: RegExp; order: ('year' | 'seq')[] } 
     source += escapeRegExp(pattern.slice(last, m.index));
     const isYear = m[0] === '{yyyy}';
     order.push(isYear ? 'year' : 'seq');
-    source += isYear ? '(\\d{4})' : `(\\d{${m[0].length - 2},})`;
+    source += isYear ? '(\\d{4})' : '(\\d+)';
     last = m.index + m[0].length;
   }
   source += escapeRegExp(pattern.slice(last));
   return { regex: new RegExp(`^${source}$`), order };
 };
 
+/** Exactly one `{yyyy}` and one `{n…}`; anything else cannot give unique, increasing numbers. */
+export const isValidPattern = (pattern: string): boolean =>
+  (pattern.match(/\{yyyy\}/g) ?? []).length === 1 && (pattern.match(/\{n+\}/g) ?? []).length === 1;
+
+/** Accepts any width: the width is a minimum for formatting only, so hand-typed `RE-2026-42` still counts as 42. */
 export const parseNumber = (
   pattern: string,
   number: string,

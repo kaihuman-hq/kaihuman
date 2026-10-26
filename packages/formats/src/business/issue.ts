@@ -2,7 +2,7 @@ import { appendAction, parseActionLog, serializeActionLog } from '../action-log.
 import { parseJsonl, replaceJsonlLines } from './jsonl.js';
 import { jurisdictionFor } from './jurisdiction.js';
 import { formatMinor } from './money.js';
-import { DEFAULT_NUMBERING, nextNumber, seriesOf } from './numbering.js';
+import { DEFAULT_NUMBERING, nextNumber, parseNumber, seriesOf } from './numbering.js';
 import { clientDir, draftPath, issuedPath } from './paths.js';
 import {
   type BusinessProfile,
@@ -14,7 +14,7 @@ import {
 } from './records.js';
 import { computeTotals } from './totals.js';
 import { validateDraft, validateTimeEntry } from './validate.js';
-import type { Issue, Result } from './validate-kit.js';
+import { date, type Issue, type Result } from './validate-kit.js';
 import { stringifyYaml } from './yaml.js';
 
 /** Repo-root path → new content; `null` deletes the file. */
@@ -85,17 +85,24 @@ const billTimeEntries = (
   timeFiles: Readonly<Record<string, string>>,
 ): { changes: FileChanges; issues: Issue[] } => {
   const ids = draft.time_entries ?? [];
-  const found = new Map<string, { file: string; invoice: string | undefined }>();
+  const found = new Map<string, { file: string; invoice: string | undefined; client: string }>();
   for (const [file, text] of Object.entries(timeFiles)) {
     for (const { value } of parseJsonl(text, (raw) => validateTimeEntry(raw)).entries) {
-      found.set(value.id, { file, invoice: value.invoice });
+      found.set(value.id, { file, invoice: value.invoice, client: value.client });
     }
   }
   const issues: Issue[] = [];
   ids.forEach((id, i) => {
     const entry = found.get(id);
     if (!entry) issues.push(problem(`time_entries[${i}]`, `time entry ${id} was not found`));
-    else if (entry.invoice !== undefined) {
+    else if (entry.client !== draft.client) {
+      issues.push(
+        problem(
+          `time_entries[${i}]`,
+          `time entry ${id} belongs to ${entry.client}, not ${draft.client}`,
+        ),
+      );
+    } else if (entry.invoice !== undefined) {
       issues.push(
         problem(`time_entries[${i}]`, `time entry ${id} is already billed on ${entry.invoice}`),
       );
@@ -124,7 +131,10 @@ const logText = (draft: Draft, number: string, gross: number, currency: string):
       ? `Issued credit note ${number} for ${draft.corrects}`
       : `Issued ${number} (${formatMinor(gross, currency)} ${currency})`;
 
-/** Pure: everything it needs is in `ctx`; the caller writes `changes` in one commit. */
+/**
+ * Pure: everything it needs is in `ctx`; the caller writes `changes` in one commit. The action-log
+ * timestamp is the local time of `ctx.now`, matching the action-log convention.
+ */
 export const issue = (
   ctx: IssueContext,
 ): Result<{ document: Issued; changes: FileChanges; commitMessage: string }> => {
@@ -135,8 +145,9 @@ export const issue = (
   const valid = validateDraft(draft);
   if (!valid.ok) issues.push(...valid.issues);
   issues.push(...rules.checkIssue(draft, profile, client));
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(issueDate)) {
-    issues.push(problem('issue_date', 'expected a date as YYYY-MM-DD'));
+  date(issueDate, 'issue_date', issues);
+  if (draft.kind === 'offer' && (draft.time_entries?.length ?? 0) > 0) {
+    issues.push(problem('time_entries', 'an offer cannot bill time entries'));
   }
   if (draft.client !== client.slug) {
     issues.push(problem('client', `draft is for ${draft.client}, not ${client.slug}`));
@@ -152,6 +163,13 @@ export const issue = (
   const pattern = profile.numbering?.[series] ?? DEFAULT_NUMBERING[series];
   const year = Number(issueDate.slice(0, 4));
   const number = nextNumber(pattern, year, ctx.existingNumbers);
+  const taken = parseNumber(pattern, number);
+  const clash = ctx.existingNumbers.some((n) => {
+    const p = parseNumber(pattern, n);
+    return n === number || (taken && p && p.year === taken.year && p.seq === taken.seq);
+  });
+  if (clash)
+    issues.push(problem('number', `${number} already exists; check numbering in business.yaml`));
   const billed = billTimeEntries(draft, number, ctx.timeFiles);
   issues.push(...billed.issues);
   if (issues.length > 0) return { ok: false, issues };
@@ -188,17 +206,24 @@ export const issue = (
   };
 
   const logPath = `${clientDir(client.slug)}/log.actionlog.md`;
-  const log = appendAction(
-    parseActionLog(ctx.clientLog ?? ''),
+  // Same timestamp format as action-log.ts: appending to an empty log yields the formatted line.
+  const added = appendAction(
+    parseActionLog(''),
     logText(draft, number, totals.gross, currency),
     ['business'],
     ctx.now,
   );
+  const line = `- ${added.entries[0]?.timestamp} ${added.entries[0]?.description}\n`;
+  // An existing log is kept byte-for-byte; re-serializing would drop prose and custom headings.
+  const logContent =
+    ctx.clientLog === null
+      ? `${serializeActionLog(added)}\n`
+      : `${ctx.clientLog}${ctx.clientLog === '' || ctx.clientLog.endsWith('\n') ? '' : '\n'}${line}`;
   const changes: FileChanges = {
     [issuedPath(series, year, number)]: stringifyYaml(document, KEY_ORDER.issued),
     [draftPath(draft.id)]: null,
     ...billed.changes,
-    [logPath]: `${serializeActionLog(log)}\n`,
+    [logPath]: logContent,
   };
   return {
     ok: true,
