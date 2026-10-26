@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { loadFixtureRepo } from './fixture-repo.test-helper.js';
 import { parseJsonl } from './jsonl.js';
-import { KEY_ORDER } from './records.js';
+import { classifyBusinessPath } from './paths.js';
+import { KEY_ORDER, type RecordKind } from './records.js';
 import {
   validateClient,
   validateContract,
@@ -17,6 +19,7 @@ import {
   validateProject,
   validateTimeEntry,
 } from './validate.js';
+import type { Result } from './validate-kit.js';
 import { parseYaml } from './yaml.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../fixtures/business/repo');
@@ -34,7 +37,7 @@ const profile = yaml('business.yaml');
 const client = yaml('clients/acme-gmbh/client.yaml') as Record<string, unknown>;
 const project = yaml('clients/acme-gmbh/projects/website.yaml');
 const contract = yaml('clients/acme-gmbh/contracts/01M52X5E00EKRX27CHPV05AFMS.yaml');
-const draft = yaml('drafts/01M50ARQ007CHPV05AFMSY38DJ.yaml') as Record<string, unknown>;
+const draft = yaml('drafts/01M5KA3Q00W16BGNTZ49EKRX27.yaml') as Record<string, unknown>;
 const invoice = yaml('invoices/2026/RE-2026-0001.yaml') as Record<string, unknown>;
 const offer = yaml('offers/2026/AN-2026-001.yaml');
 const expense = yaml('expenses/2026/01M55FJ500NTZ49EKRX27CHPV0.yaml') as Record<string, unknown>;
@@ -179,8 +182,121 @@ describe('rules', () => {
 });
 
 describe('KEY_ORDER', () => {
-  it('lists every key the validators accept for each record', () => {
-    expect(KEY_ORDER.issued).toEqual(expect.arrayContaining(['number', 'lines', 'totals']));
-    expect(new Set(KEY_ORDER.issued).size).toBe(KEY_ORDER.issued.length);
+  const validators: Record<
+    RecordKind,
+    (raw: unknown) => { ok: boolean; issues?: { message: string }[] }
+  > = {
+    profile: validateProfile,
+    client: (r) => validateClient(r, 'acme-gmbh'),
+    project: (r) => validateProject(r, 'website', 'acme-gmbh'),
+    contract: validateContract,
+    draft: validateDraft,
+    issued: validateIssued,
+    time: validateTimeEntry,
+    payment: validatePayment,
+    event: validateEvent,
+    link: validateLink,
+    expense: validateExpense,
+  };
+  const fixtureRecords: Record<RecordKind, unknown[]> = {
+    profile: [profile],
+    client: [client],
+    project: [project],
+    contract: [contract],
+    draft: [draft],
+    issued: [invoice, offer],
+    time: [time],
+    payment: [payment],
+    event: [event],
+    link: [link],
+    expense: [expense],
+  };
+  const unknownKeys = (kind: RecordKind, keys: string[]) => {
+    const r = validators[kind](Object.fromEntries(keys.map((k) => [k, 'x'])));
+    return (r.issues ?? [])
+      .filter((i) => i.message.startsWith('unknown key'))
+      .map((i) => i.message);
+  };
+
+  it.each(
+    Object.keys(KEY_ORDER) as RecordKind[],
+  )('%s: validator accepts exactly KEY_ORDER', (kind) => {
+    expect(new Set(KEY_ORDER[kind]).size).toBe(KEY_ORDER[kind].length);
+    expect(unknownKeys(kind, [...KEY_ORDER[kind]])).toEqual([]);
+    expect(unknownKeys(kind, ['zzz'])).toEqual(['unknown key "zzz"']);
+  });
+
+  it.each(
+    Object.keys(KEY_ORDER) as RecordKind[],
+  )('%s: every fixture key is in KEY_ORDER', (kind) => {
+    for (const rec of fixtureRecords[kind]) {
+      for (const key of Object.keys(rec as object)) expect(KEY_ORDER[kind]).toContain(key);
+    }
   });
 });
+
+describe('whole fixture repo', () => {
+  const files = loadFixtureRepo();
+
+  it('classifies every file and validates each by kind', () => {
+    expect(files.size).toBe(12);
+    for (const [path, text] of files) {
+      const c = classifyBusinessPath(path);
+      expect(c.kind, path).not.toBe('unknown');
+      const issues: unknown[] = [];
+      const yamlValue = () => {
+        const r = parseYaml(text);
+        if (!r.ok) throw new Error(`${path}: ${r.issues[0]?.message}`);
+        return r.value;
+      };
+      const jsonlIssues = (v: (raw: unknown, p: string) => Result<unknown>) =>
+        parseJsonl(text, v).issues;
+      switch (c.kind) {
+        case 'profile':
+          issues.push(...issuesOf(validateProfile(yamlValue())));
+          break;
+        case 'client':
+          issues.push(...issuesOf(validateClient(yamlValue(), c.client)));
+          break;
+        case 'project':
+          issues.push(...issuesOf(validateProject(yamlValue(), c.project, c.client)));
+          break;
+        case 'contract':
+          issues.push(...issuesOf(validateContract(yamlValue())));
+          break;
+        case 'draft':
+          issues.push(...issuesOf(validateDraft(yamlValue())));
+          break;
+        case 'issued':
+          issues.push(...issuesOf(validateIssued(yamlValue())));
+          break;
+        case 'expense':
+          issues.push(...issuesOf(validateExpense(yamlValue())));
+          break;
+        case 'time':
+          issues.push(...jsonlIssues(validateTimeEntry));
+          break;
+        case 'payments':
+          issues.push(...jsonlIssues(validatePayment));
+          break;
+        case 'events':
+          issues.push(...jsonlIssues(validateEvent));
+          break;
+        case 'links':
+          issues.push(...jsonlIssues(validateLink));
+          break;
+        default:
+          throw new Error(`fixture file of unexpected kind: ${path}`);
+      }
+      expect(issues, path).toEqual([]);
+    }
+  });
+
+  it('ties the invoice to a draft that no longer exists and to the billed time', () => {
+    const inv = invoice as { draft_id: string };
+    expect([...files.keys()].some((p) => p.endsWith(`${inv.draft_id}.yaml`))).toBe(false);
+    expect((time as { minutes: number }).minutes).toBe(450);
+  });
+});
+
+const issuesOf = (r: Result<unknown>) => (r.ok ? [] : r.issues);
