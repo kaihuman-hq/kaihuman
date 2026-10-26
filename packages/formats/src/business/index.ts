@@ -1,3 +1,4 @@
+export * from './check.js';
 export * from './en16931.js';
 export * from './ids.js';
 export * from './issue.js';
