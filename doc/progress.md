@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-01 — Mobile app (iOS & Android): design spec and autonomous implementation plan
+
+- Design for `@kaihuman/mobile` (`apps/mobile`, Option B: Expo + React Native) with full console feature parity and interactive iOS (SwiftUI WidgetKit + AppIntents) and Android (Jetpack Glance) Todo widgets: `doc/mobile.md`.
+- 5-phase autonomous implementation plan (`doc/mobile-plan.md`) and Antigravity workspace orchestrator skill (`.agents/skills/mobile-orchestrator/SKILL.md`) so each phase runs in a fresh subagent context window with zero breaking changes to `apps/console`. No code yet.
+
 ## 2026-10-26 — Business, phase 1: formats and repo check
 
 - `@kaihuman/formats` has a `business` module (`@kaihuman/formats/business`). It starts with exact decimals and money in integer minor units (half-up rounding, away from zero), ULIDs and client/project slugs.
