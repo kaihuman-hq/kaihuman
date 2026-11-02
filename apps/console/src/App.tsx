@@ -6,6 +6,7 @@ import { DemoBanner } from './components/DemoBanner';
 import { ExtensionAuthBridge } from './components/ExtensionAuthBridge';
 import { ActionLogViewPage } from './pages/ActionLogViewPage';
 import { AuthCli } from './pages/AuthCli';
+import { BusinessEnablePage } from './pages/BusinessEnablePage';
 import { CheatsheetPage } from './pages/CheatsheetPage';
 import { Dashboard } from './pages/Dashboard';
 import { DemoEntry } from './pages/DemoEntry';
@@ -78,6 +79,7 @@ export const App = () => {
         <ProtectedRoute path="/cheatsheet" component={CheatsheetPage} />
         <ProtectedRoute path="/knowledge" component={KnowledgeBasePage} />
         <ProtectedRoute path="/wiki" component={WikiPage} />
+        <ProtectedRoute path="/business/enable" component={BusinessEnablePage} />
         <ProtectedRoute path="/files" component={Dashboard} />
         <ProtectedRoute path="/files/:rest*" component={Dashboard} />
         <ProtectedRoute path="/new" component={Dashboard} />
