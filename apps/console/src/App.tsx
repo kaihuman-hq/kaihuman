@@ -7,7 +7,9 @@ import { ExtensionAuthBridge } from './components/ExtensionAuthBridge';
 import { ActionLogViewPage } from './pages/ActionLogViewPage';
 import { AuthCli } from './pages/AuthCli';
 import { BusinessEnablePage } from './pages/BusinessEnablePage';
+import { BusinessPage } from './pages/BusinessPage';
 import { CheatsheetPage } from './pages/CheatsheetPage';
+import { ClientsPage } from './pages/ClientsPage';
 import { Dashboard } from './pages/Dashboard';
 import { DemoEntry } from './pages/DemoEntry';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
@@ -79,6 +81,8 @@ export const App = () => {
         <ProtectedRoute path="/cheatsheet" component={CheatsheetPage} />
         <ProtectedRoute path="/knowledge" component={KnowledgeBasePage} />
         <ProtectedRoute path="/wiki" component={WikiPage} />
+        <ProtectedRoute path="/business" component={BusinessPage} />
+        <ProtectedRoute path="/clients" component={ClientsPage} />
         <ProtectedRoute path="/business/enable" component={BusinessEnablePage} />
         <ProtectedRoute path="/files" component={Dashboard} />
         <ProtectedRoute path="/files/:rest*" component={Dashboard} />

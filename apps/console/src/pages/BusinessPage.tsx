@@ -1,0 +1,152 @@
+import { CLIENT_STAGES } from '@kaihuman/formats/business';
+import { Card } from '../components/business/Card';
+import { hours, money } from '../components/business/money';
+import { PageShell } from '../components/business/PageShell';
+import { ProblemsList } from '../components/business/ProblemsList';
+import { Stat } from '../components/business/Stat';
+import { StatusPill } from '../components/business/StatusPill';
+import { todayLocal } from '../lib/business/dates';
+import { businessDashboard } from '../lib/business/overview';
+import { useBusinessRepo } from '../lib/business/use-business-repo';
+
+const th =
+  'text-left text-[10px] uppercase tracking-widest text-[var(--los-muted)] font-normal py-1 pr-3';
+const td = 'py-1 pr-3 align-top';
+const clientLink = (slug: string, text = slug) => (
+  <a href={`/clients/${slug}`} class="text-[var(--los-accent)] hover:underline">
+    {text}
+  </a>
+);
+
+export function BusinessPage() {
+  const state = useBusinessRepo();
+  return (
+    <PageShell state={state} title="Business">
+      {({ data, loadErrors }) => {
+        const d = businessDashboard(data, todayLocal());
+        const cur = d.currency;
+        return (
+          <>
+            <dl class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <Stat label="Open" value={money(d.openTotal, cur)} />
+              <Stat
+                label="Overdue"
+                value={money(d.overdueTotal, cur)}
+                tone={d.overdueTotal > 0 ? 'warning' : undefined}
+              />
+              <Stat label={`VAT ${d.vat.month.period}`} value={money(d.vat.month.due, cur)} />
+              <Stat label={`VAT ${d.vat.quarter.period}`} value={money(d.vat.quarter.due, cur)} />
+            </dl>
+
+            <Card
+              title="Who owes me"
+              empty={d.receivables.length === 0 ? 'Nothing outstanding.' : undefined}
+            >
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                  <thead>
+                    <tr>
+                      <th class={th}>Client</th>
+                      <th class={th}>Number</th>
+                      <th class={th}>Due</th>
+                      <th class={th}>Status</th>
+                      <th class={`${th} text-right`}>Open</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.receivables.map((r) => (
+                      <tr key={r.number}>
+                        <td class={td}>{clientLink(r.client)}</td>
+                        <td class={td}>{r.number}</td>
+                        <td class={td}>{r.dueDate ?? '-'}</td>
+                        <td class={td}>
+                          <StatusPill state={r.status.state} />
+                        </td>
+                        <td class={`${td} text-right whitespace-nowrap`}>
+                          {money(r.status.open, r.currency)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Card
+                title="Unbilled time"
+                empty={d.unbilled.length === 0 ? 'No unbilled time.' : undefined}
+              >
+                <ul class="text-xs space-y-1">
+                  {d.unbilled.map((u) => (
+                    <li key={u.client} class="flex justify-between gap-2">
+                      {clientLink(u.client)}
+                      <span>{hours(u.minutes)} h</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+
+              <Card
+                title="Contracts due"
+                empty={
+                  d.contractsDue.length === 0 ? 'No contract dates in the next 60 days.' : undefined
+                }
+              >
+                <ul class="text-xs space-y-1">
+                  {d.contractsDue.map((c) => (
+                    <li key={`${c.contract.id}:${c.what}`} class="flex justify-between gap-2">
+                      <span class="min-w-0 break-words">
+                        {c.contract.title} ({c.what}), {clientLink(c.contract.client)}
+                      </span>
+                      <span class="shrink-0">{c.date}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </div>
+
+            <Card
+              title="Drafts"
+              empty={d.drafts.length === 0 ? 'No drafts waiting to be issued.' : undefined}
+            >
+              <ul class="text-xs space-y-1">
+                {d.drafts.map((draft) => (
+                  <li key={draft.id}>
+                    {clientLink(draft.client)}: {draft.kind}, {draft.lines.length}{' '}
+                    {draft.lines.length === 1 ? 'line' : 'lines'}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+
+            <Card title="Pipeline">
+              <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {CLIENT_STAGES.map((stage) => (
+                  <div key={stage} class="min-w-0">
+                    <h3 class="text-[10px] uppercase tracking-widest text-[var(--los-muted)] mb-1">
+                      {stage}
+                    </h3>
+                    {d.pipeline[stage].length === 0 ? (
+                      <p class="text-xs italic text-[var(--los-muted)]">None</p>
+                    ) : (
+                      <ul class="text-xs space-y-1">
+                        {d.pipeline[stage].map((c) => (
+                          <li key={c.slug} class="break-words">
+                            {clientLink(c.slug, c.name)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <ProblemsList findings={data.findings} loadErrors={loadErrors} />
+          </>
+        );
+      }}
+    </PageShell>
+  );
+}

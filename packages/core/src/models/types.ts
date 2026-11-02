@@ -80,6 +80,7 @@ export type NavItemId =
   | 'knowledge'
   | 'actionLog'
   | 'ideas'
+  | 'business'
   | 'graph'
   | 'commits';
 
