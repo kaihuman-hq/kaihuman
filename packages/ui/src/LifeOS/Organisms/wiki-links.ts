@@ -8,6 +8,17 @@ const WIKILINK = /\[\[([^[\]\n]+?)\]\]/g;
 const CODE = /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/;
 
 export const WIKILINK_SCHEME = 'wiki:';
+export const CLIENT_LINK_PREFIX = 'client:';
+
+const CLIENT_SLUG = /^[a-z0-9][a-z0-9-]{1,39}$/;
+
+/** `client:acme-gmbh` → `acme-gmbh`; null for other targets and for slugs no client can have. */
+export function clientLinkSlug(target: string): string | null {
+  if (!target.startsWith(CLIENT_LINK_PREFIX)) return null;
+  const { target: page } = splitLink(target);
+  const slug = page.slice(CLIENT_LINK_PREFIX.length).trim();
+  return CLIENT_SLUG.test(slug) ? slug : null;
+}
 
 function unquote(value: string): string {
   return value.trim().replace(/^(["'])(.*)\1$/, '$2');
@@ -98,7 +109,7 @@ export function resolveWikilink(
   fromPath = '',
 ): string | null {
   const wanted = target.trim();
-  if (!wanted) return null;
+  if (!wanted || wanted.startsWith(CLIENT_LINK_PREFIX)) return null;
   const exact = paths.find((p) => p === wanted || p === `${wanted}.md`);
   if (exact) return exact;
 

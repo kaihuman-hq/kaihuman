@@ -1,4 +1,7 @@
-import { wikilinkTargets } from '../../../../../packages/ui/src/LifeOS/Organisms/wiki-links';
+import {
+  clientLinkSlug,
+  wikilinkTargets,
+} from '../../../../../packages/ui/src/LifeOS/Organisms/wiki-links';
 
 /** Paths whose Markdown links to the client with `[[client:<slug>]]` (code examples don't count), sorted. */
 export const clientBacklinks = (
@@ -6,6 +9,8 @@ export const clientBacklinks = (
   contents: Readonly<Record<string, string>>,
 ): string[] =>
   Object.entries(contents)
-    .filter(([, content]) => wikilinkTargets(content).includes(`client:${slug}`))
+    .filter(([, content]) =>
+      wikilinkTargets(content).some((target) => clientLinkSlug(target) === slug),
+    )
     .map(([path]) => path)
     .sort();

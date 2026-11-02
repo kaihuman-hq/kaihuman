@@ -15,6 +15,7 @@ export const WikiPage = () => {
     <>
       <div class="h-[calc(100vh-2rem)]">
         <WikiView
+          onClientLink={(slug) => route(`/clients/${slug}`)}
           onEdit={(path) => {
             // Route to the file's URL so MainApp's URL→State resolver opens it in
             // the editor. Routing to '/' would reset activeTileId to null on mount.
