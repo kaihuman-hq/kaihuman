@@ -76,6 +76,7 @@ describe('classifyBusinessPath', () => {
     expect(b(`drafts/${id}.yaml`)).toEqual({ kind: 'draft', id });
     expect(b('time/2026-10.jsonl')).toEqual({ kind: 'time', month: '2026-10' });
     expect(b('time/2026-13.jsonl').kind).toBe('unknown');
+    expect(b('time/running.yaml')).toEqual({ kind: 'timer' });
     expect(b('payments/2026.jsonl')).toEqual({ kind: 'payments', year: 2026 });
     expect(b('events.jsonl')).toEqual({ kind: 'events' });
     expect(b('links.jsonl')).toEqual({ kind: 'links' });

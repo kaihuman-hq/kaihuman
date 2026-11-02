@@ -21,6 +21,7 @@ import {
   type Party,
   type Payment,
   type Project,
+  type RunningTimer,
   type TimeEntry,
   type Totals,
   VAT_CATEGORIES,
@@ -481,6 +482,28 @@ export const validateTimeEntry = (raw: unknown): Result<TimeEntry> => {
     project: opt(r, '', 'project', issues, slug),
     note: req(r, '', 'note', issues, str),
     invoice: opt(r, '', 'invoice', issues, str),
+  });
+  return finish(issues, value);
+};
+
+const OFFSET_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
+const offsetDatetime: Reader<string> = (raw, path, issues) => {
+  if (typeof raw === 'string' && OFFSET_DATETIME.test(raw) && !Number.isNaN(Date.parse(raw))) {
+    return raw;
+  }
+  note(issues, path, 'expected an ISO datetime with offset, e.g. 2026-11-02T09:30:00+01:00');
+  return undefined;
+};
+
+export const validateTimer = (raw: unknown): Result<RunningTimer> => {
+  const issues: Issue[] = [];
+  const r = obj(raw, '', KEY_ORDER.timer, issues);
+  if (!r) return { ok: false, issues };
+  const value = compact({
+    client: req(r, '', 'client', issues, slug),
+    project: opt(r, '', 'project', issues, slug),
+    started_at: req(r, '', 'started_at', issues, offsetDatetime),
+    note: opt(r, '', 'note', issues, str),
   });
   return finish(issues, value);
 };

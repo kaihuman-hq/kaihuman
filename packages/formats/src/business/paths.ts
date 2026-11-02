@@ -11,6 +11,7 @@ export type BusinessPath =
   | { kind: 'issued'; doc: 'invoice' | 'offer'; year: number; number: string }
   | { kind: 'artifact'; doc: 'invoice' | 'offer' | 'contract'; ext: 'pdf' | 'xml' | 'sha256' }
   | { kind: 'time'; month: string }
+  | { kind: 'timer' }
   | { kind: 'payments'; year: number }
   | { kind: 'events' }
   | { kind: 'links' }
@@ -26,6 +27,7 @@ export const draftPath = (id: Ulid): string => `${BUSINESS_ROOT}/drafts/${id}.ya
 export const issuedPath = (doc: 'invoice' | 'offer', year: number, number: string): string =>
   `${BUSINESS_ROOT}/${doc === 'invoice' ? 'invoices' : 'offers'}/${year}/${number}.yaml`;
 export const timePath = (month: string): string => `${BUSINESS_ROOT}/time/${month}.jsonl`;
+export const TIMER_PATH = `${BUSINESS_ROOT}/time/running.yaml`;
 export const paymentsPath = (year: number): string => `${BUSINESS_ROOT}/payments/${year}.jsonl`;
 
 const UNKNOWN: BusinessPath = { kind: 'unknown' };
@@ -115,6 +117,7 @@ export const classifyBusinessPath = (path: string): BusinessPath => {
   if ((top === 'invoices' || top === 'offers') && parts.length === 3 && a && b) {
     return issuedDir(top === 'invoices' ? 'invoice' : 'offer', a, b);
   }
+  if (top === 'time' && parts.length === 2 && a === 'running.yaml') return { kind: 'timer' };
   if (top === 'time' && parts.length === 2 && a?.endsWith('.jsonl')) {
     const month = a.slice(0, -'.jsonl'.length);
     return MONTH.test(month) ? { kind: 'time', month } : UNKNOWN;

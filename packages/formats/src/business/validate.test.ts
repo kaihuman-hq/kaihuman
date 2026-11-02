@@ -18,6 +18,7 @@ import {
   validateProfile,
   validateProject,
   validateTimeEntry,
+  validateTimer,
 } from './validate.js';
 import type { Result } from './validate-kit.js';
 import { parseYaml } from './yaml.js';
@@ -201,6 +202,7 @@ describe('KEY_ORDER', () => {
     draft: validateDraft,
     issued: validateIssued,
     time: validateTimeEntry,
+    timer: validateTimer,
     payment: validatePayment,
     event: validateEvent,
     link: validateLink,
@@ -214,6 +216,7 @@ describe('KEY_ORDER', () => {
     draft: [draft],
     issued: [invoice, offer],
     time: [time],
+    timer: [{ client: 'acme-gmbh', started_at: '2026-11-02T09:00:00+01:00', note: 'x' }],
     payment: [payment],
     event: [event],
     link: [link],

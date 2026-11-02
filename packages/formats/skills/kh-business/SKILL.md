@@ -26,6 +26,7 @@ the right place.
   offers/<year>/<number>.yaml    issued offers          (frozen)
   invoices/<year>/<number>.yaml  issued invoices        (frozen)
   time/<yyyy-mm>.jsonl           one line per time entry
+  time/running.yaml              the running timer (at most one)
   payments/<year>.jsonl          one line per payment
   expenses/<year>/<ulid>.yaml    expenses (+ receipt file)
   events.jsonl, links.jsonl      document events and share links
@@ -65,6 +66,12 @@ For a file named by its ULID (`drafts/<ulid>.yaml`, `expenses/<year>/<ulid>.yaml
   Ask for what you do not know instead of guessing.
 - **Log time:** append to `time/<yyyy-mm>.jsonl`:
   `{"id":"<ulid>","date":"2026-10-12","minutes":450,"client":"acme-gmbh","project":"website","note":"Implementation"}`
+- **Start or stop a timer:** `time/running.yaml` is the one running timer:
+  `client`, optional `project` and `note`, and `started_at` as an ISO datetime with offset
+  (`2026-11-02T09:30:00+01:00`). There is never more than one; if the file exists, tell the user which
+  client it runs for instead of replacing it. Start: create the file. Stop: in the same commit, append a
+  time entry (`date` = the local day of `started_at`, `minutes` = elapsed minutes rounded, at least 1 and
+  at most 1440) and delete `running.yaml`. Cancel: delete the file only.
 - **Draft an invoice or offer:** create `drafts/<ulid>.yaml` with `kind`, `client`, `lines`
   (`description`, `quantity`, `unit`, `unit_price`, `vat_category`, `vat_rate`) and, for unbilled time,
   `time_entries: [<ulid>, …]`. Copy the shape of an existing draft.

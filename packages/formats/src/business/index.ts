@@ -1,3 +1,4 @@
+export * from './actions/time.js';
 export * from './check.js';
 export * from './en16931.js';
 export * from './ids.js';
