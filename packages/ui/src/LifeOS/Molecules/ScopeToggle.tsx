@@ -25,7 +25,8 @@ export const ScopeToggle = ({
         aria-pressed={value === s.value}
         onClick={() => onChange(s.value)}
         className={cn(
-          'text-[10px] font-mono px-2 py-1 transition-colors',
+          'text-[10px] font-mono px-2 py-1.5 min-h-[28px] transition-colors',
+          'focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--los-accent)]',
           value === s.value
             ? 'text-[var(--los-accent)] bg-[var(--los-accent)]/5'
             : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',

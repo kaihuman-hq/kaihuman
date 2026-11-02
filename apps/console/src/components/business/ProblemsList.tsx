@@ -1,11 +1,13 @@
 import type { Finding } from '@kaihuman/formats/business';
+import { parseLoadError } from '../../lib/business/load';
 
 /** Files that failed validation or could not be fetched. Cross-file checks are not included. */
 export function ProblemsList(props: {
   findings: readonly Finding[];
   loadErrors: readonly string[];
 }) {
-  const files = new Set([...props.findings.map((f) => f.file), ...props.loadErrors]);
+  const loadErrors = props.loadErrors.map(parseLoadError);
+  const files = new Set([...props.findings.map((f) => f.file), ...loadErrors.map((e) => e.path)]);
   if (files.size === 0) return null;
   return (
     <details class="border border-[var(--los-border)] p-3 text-xs">
@@ -20,9 +22,10 @@ export function ProblemsList(props: {
             {f.message}
           </li>
         ))}
-        {props.loadErrors.map((path) => (
-          <li key={`load:${path}`} class="break-words">
-            <span class="text-[var(--los-accent)]">{path}</span> could not be loaded.
+        {loadErrors.map(({ path, message }) => (
+          <li key={`load:${path}:${message}`} class="break-words">
+            <span class="text-[var(--los-accent)]">{path}</span>
+            {message ? `: ${message}` : ' could not be loaded.'}
           </li>
         ))}
       </ul>

@@ -10,12 +10,13 @@ import VERFAHRENSDOKUMENTATION from '@kaihuman/formats/business-templates/VERFAH
 import BUSINESS_CHECK from '@kaihuman/formats/dist/business-check.mjs?raw';
 import KH_BUSINESS_SKILL from '@kaihuman/formats/skills/kh-business/SKILL.md?raw';
 import { AlreadyEnabledError, PublicRepoError } from './business/errors';
+import { BUSINESS_PROFILE_PATH } from './business/load';
 import type { KBRepo } from './github-kb';
 
 /** Bump when the check, workflow or skill changes: `syncKB` then rewrites the tool files. */
 export const BUSINESS_TOOLS_VERSION = '1.0.0';
 
-export const BUSINESS_PROFILE_PATH = '.kh/business/business.yaml';
+export { BUSINESS_PROFILE_PATH };
 
 const DATA_DIRS = ['clients', 'drafts', 'offers', 'invoices', 'time', 'payments', 'expenses'];
 

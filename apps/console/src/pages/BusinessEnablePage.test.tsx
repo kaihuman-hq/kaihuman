@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const core = vi.hoisted(() => ({
   currentRepo: undefined as unknown as ReturnType<typeof signal<unknown>>,
   loadTree: vi.fn(),
+  loadedRepo: undefined as unknown as ReturnType<typeof signal<string | null>>,
+  tree: undefined as unknown as ReturnType<typeof signal<{ path: string }[]>>,
 }));
 const setup = vi.hoisted(() => ({ enableBusiness: vi.fn() }));
 const kb = vi.hoisted(() => ({ syncKB: vi.fn() }));
@@ -14,9 +16,11 @@ const router = vi.hoisted(() => ({ route: vi.fn() }));
 vi.mock('@kaihuman/core', async () => {
   const { signal } = await import('@preact/signals');
   core.currentRepo = signal<unknown>(null);
+  core.tree = signal<{ path: string }[]>([]);
+  core.loadedRepo = signal<string | null>('me/biz');
   return {
     githubProfileStore: { currentRepo: core.currentRepo },
-    githubFileStore: { loadTree: core.loadTree },
+    githubFileStore: { loadTree: core.loadTree, tree: core.tree, loadedRepo: core.loadedRepo },
   };
 });
 vi.mock('@kaihuman/ui', () => ({ StatusBar: () => <div data-testid="status-bar" /> }));
@@ -36,6 +40,7 @@ beforeEach(() => {
   setup.enableBusiness.mockResolvedValue(undefined);
   core.loadTree.mockResolvedValue(undefined);
   core.currentRepo.value = repo;
+  core.tree.value = [];
   host = document.createElement('div');
   document.body.appendChild(host);
   act(() => render(<BusinessEnablePage />, host));
@@ -76,6 +81,14 @@ describe('BusinessEnablePage', () => {
       core.currentRepo.value = null;
     });
     expect(host.textContent).toContain('Select a repository');
+    expect(host.querySelector('form')).toBeNull();
+  });
+
+  it('shows a link to /business instead of the form when business is already enabled', () => {
+    core.tree.value = [{ path: '.kh/business/business.yaml' }];
+    act(() => render(<BusinessEnablePage />, host));
+    expect(host.textContent).toContain('Business is already enabled in this repository.');
+    expect(host.querySelector('a[href="/business"]')).not.toBeNull();
     expect(host.querySelector('form')).toBeNull();
   });
 

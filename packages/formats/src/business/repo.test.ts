@@ -38,6 +38,17 @@ describe('loadBusinessRepo', () => {
     expect(repo.findings).toContainEqual(expect.objectContaining({ file: CLIENT, level: 'error' }));
   });
 
+  it('reports a missing profile only when it is not in the tree', () => {
+    const without = new Map(loadFixtureRepo());
+    without.delete('.kh/business/business.yaml');
+    const missing = (treePaths?: string[]) =>
+      loadBusinessRepo(without, treePaths).findings.some((f) => f.message.includes('is missing'));
+    expect(missing([])).toBe(true);
+    expect(missing()).toBe(true);
+    // In the tree but not fetched: a load failure the caller already lists.
+    expect(missing(['.kh/business/business.yaml'])).toBe(false);
+  });
+
   it('warns about unrecognised paths, also from the tree', () => {
     const repo = loadBusinessRepo(loadFixtureRepo(), ['.kh/business/stray.txt']);
     expect(repo.findings).toContainEqual(

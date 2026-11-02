@@ -128,7 +128,9 @@ export const loadBusinessRepoDetailed = (
   // Profile first: numbering patterns and exemption reasons depend on it.
   const profileText = files.get(PROFILE_PATH);
   if (profileText === undefined) {
-    fail(PROFILE_PATH, '', 'business.yaml is missing; default numbering patterns are used');
+    // In the tree but not fetched: a load failure the caller reports, not a missing file.
+    if (!treePaths.includes(PROFILE_PATH))
+      fail(PROFILE_PATH, '', 'business.yaml is missing; default numbering patterns are used');
   } else {
     const r = readYaml(profileText, validateProfile);
     if (r.ok) repo.profile = r.value;

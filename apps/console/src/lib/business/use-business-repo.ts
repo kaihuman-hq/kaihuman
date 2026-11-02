@@ -57,6 +57,11 @@ export function useBusinessRepo(): BusinessState {
     [tree, treeIsCurrent],
   );
   const itemsKey = keyOf(items);
+  // Artifacts are not fetched, but a new PDF changes `data.artifacts`, so it must reload.
+  const pathsKey = tree
+    .filter((item) => item.type === 'blob')
+    .map((item) => item.path)
+    .join('|');
   const wanted = `${repo?.full_name}|${itemsKey}`;
 
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -77,7 +82,7 @@ export function useBusinessRepo(): BusinessState {
     return () => {
       cancelled = true;
     };
-  }, [repo?.full_name, itemsKey, enabled]);
+  }, [repo?.full_name, itemsKey, pathsKey, enabled]);
 
   if (!repo) return { status: 'no-repo' };
   if (treeError) return { status: 'error', message: treeError };
@@ -95,7 +100,7 @@ export function useBusinessRepo(): BusinessState {
 }
 
 /** Wiki and idea Markdown for the client page's backlinks; fetched only once `enabled`. */
-export function useBacklinkContents(enabled: boolean): Record<string, string> {
+export function useBacklinkContents(enabled: boolean): Record<string, string> | null {
   const repo = githubProfileStore.currentRepo.value;
   const tree = githubFileStore.tree.value;
   const treeIsCurrent = githubFileStore.loadedRepo.value === repo?.full_name;
@@ -109,8 +114,12 @@ export function useBacklinkContents(enabled: boolean): Record<string, string> {
   );
 
   useEffect(() => {
-    if (!enabled || !repo || items.length === 0) {
+    if (!enabled || !repo || !treeIsCurrent) {
       setLoaded(null);
+      return;
+    }
+    if (items.length === 0) {
+      setLoaded({ repo: repo.full_name, contents: {} });
       return;
     }
     let cancelled = false;
@@ -120,9 +129,7 @@ export function useBacklinkContents(enabled: boolean): Record<string, string> {
     return () => {
       cancelled = true;
     };
-  }, [enabled, repo?.full_name, itemsKey]);
+  }, [enabled, repo?.full_name, itemsKey, treeIsCurrent]);
 
-  return loaded && loaded.repo === repo?.full_name ? loaded.contents : NONE;
+  return loaded && loaded.repo === repo?.full_name ? loaded.contents : null;
 }
-
-const NONE: Record<string, string> = {};

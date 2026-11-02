@@ -51,7 +51,7 @@ const fixture = loadFixtureRepo();
 
 let host: HTMLDivElement;
 let state: BusinessState;
-let links: Record<string, string>;
+let links: Record<string, string> | null;
 let linksEnabled = true;
 const Probe = () => {
   state = useBusinessRepo();
@@ -224,6 +224,24 @@ describe('useBusinessRepo tree handling', () => {
   });
 });
 
+describe('useBusinessRepo artifacts', () => {
+  it('picks up a PDF added to the tree without a remount', async () => {
+    const pdf = '.kh/business/invoices/2026/RE-2026-0001.pdf';
+    core.tree.value = fixtureTree();
+    await mount();
+    if (state.status !== 'ready') throw new Error(`status ${state.status}`);
+    expect(state.data.artifacts.has(pdf)).toBe(false);
+
+    await act(async () => {
+      core.tree.value = [...fixtureTree(), blob(pdf)];
+    });
+    await settle();
+    const after = state as BusinessState;
+    if (after.status !== 'ready') throw new Error(`status ${after.status}`);
+    expect(after.data.artifacts.has(pdf)).toBe(true);
+  });
+});
+
 describe('useBacklinkContents', () => {
   const markdown = () => [
     blob('.kh/wiki/a.md'),
@@ -238,7 +256,7 @@ describe('useBacklinkContents', () => {
     core.tree.value = markdown();
     await mount();
     await settle();
-    expect(links).toEqual({});
+    expect(links).toBeNull();
     expect(fetched().filter((p) => p.endsWith('.md'))).toEqual([]);
   });
 
@@ -251,7 +269,7 @@ describe('useBacklinkContents', () => {
         .filter((p) => p.endsWith('.md'))
         .sort(),
     ).toEqual(['.kh/ideas/b.md', '.kh/wiki/a.md']);
-    expect(Object.keys(links).sort()).toEqual(['.kh/ideas/b.md', '.kh/wiki/a.md']);
+    expect(Object.keys(links ?? {}).sort()).toEqual(['.kh/ideas/b.md', '.kh/wiki/a.md']);
   });
 
   it('respects the 300 file cap', async () => {
@@ -265,15 +283,38 @@ describe('useBacklinkContents', () => {
     core.tree.value = markdown();
     await mount();
     await settle();
-    expect(Object.keys(links)).toHaveLength(2);
+    expect(Object.keys(links ?? {})).toHaveLength(2);
 
     await act(async () => {
       core.currentRepo.value = { full_name: 'o/other' };
     });
-    expect(links).toEqual({});
+    expect(links).toBeNull();
     core.loadedRepo.value = 'o/other';
     core.tree.value = [blob('.kh/wiki/z.md')];
     await settle();
-    expect(Object.keys(links)).toEqual(['.kh/wiki/z.md']);
+    expect(Object.keys(links ?? {})).toEqual(['.kh/wiki/z.md']);
+  });
+
+  it('is null while loading and an empty record when there is nothing to link from', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    core.tree.value = markdown();
+    core.getFileContent.mockImplementation(async (_o: string, _r: string, path: string) => {
+      await gate;
+      return { content: fixture.get(path) ?? '' };
+    });
+    await mount();
+    expect(links).toBeNull();
+    release();
+    await settle();
+    expect(links).not.toBeNull();
+
+    act(() => render(null, host));
+    core.tree.value = [blob('.kh/business/business.yaml')];
+    await mount();
+    await settle();
+    expect(links).toEqual({});
   });
 });

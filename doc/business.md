@@ -143,12 +143,13 @@ rewrite its history, and protect the main branch (no force-push, no deletion).
 ## Console
 
 The console reads the business files and never writes them (the one exception is the "Enable
-business" commit). It needs a private repo with business enabled.
+business" commit). It needs business enabled, and the pages warn when the repository is public (business data belongs
+in a private repo).
 
 | Page | What it shows |
 |------|---------------|
-| `/business` | Dashboard: receivables and overdue invoices, billed this year, VAT of the month and quarter, unbilled time, contracts ending soon, offer and client pipeline |
-| `/clients` | Client list with stage, open amount and unbilled time |
+| `/business` | Dashboard: open and overdue invoices, VAT this month and quarter, who owes me, unbilled time, contracts with a renewal or notice date in the next 60 days, drafts, clients by stage |
+| `/clients` | Client list with name, stage, billed this year, open amount and unbilled hours; filter by stage |
 | `/clients/:slug` | One page per client: timeline, offers, invoices, projects with budget use, time by week, todos, action log, contracts, notes and pages that link to the client |
 | `/business/enable` | Set-up form; explains why it is blocked on a public repo |
 

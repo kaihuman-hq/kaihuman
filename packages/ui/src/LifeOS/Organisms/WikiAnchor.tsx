@@ -31,7 +31,18 @@ export const WikiAnchor = ({
           href={`/clients/${encodeURIComponent(slug)}`}
           className={LINK}
           onClick={(e: MouseEvent) => {
-            if (!onClientLink) return;
+            // New-tab and middle clicks keep their browser meaning.
+            if (
+              !onClientLink ||
+              e.defaultPrevented ||
+              e.button !== 0 ||
+              e.metaKey ||
+              e.ctrlKey ||
+              e.shiftKey ||
+              e.altKey
+            ) {
+              return;
+            }
             e.preventDefault();
             onClientLink(slug);
           }}

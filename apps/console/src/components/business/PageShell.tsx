@@ -1,6 +1,8 @@
 import { StatusBar } from '@kaihuman/ui';
 import type { ComponentChildren } from 'preact';
 import { route } from 'preact-router';
+import { enableErrorMessage } from '../../lib/business/enable-form';
+import { PublicRepoError } from '../../lib/business/errors';
 import type { BusinessState } from '../../lib/business/use-business-repo';
 import { EnableCallout } from './EnableCallout';
 
@@ -26,6 +28,11 @@ export function PageShell(props: {
           {state.status === 'error' && (
             <p role="alert" class="text-xs text-[var(--los-warning)]">
               {state.message}
+            </p>
+          )}
+          {state.status === 'ready' && state.repo.private !== true && (
+            <p role="alert" class="text-xs text-[var(--los-warning)]">
+              {enableErrorMessage(new PublicRepoError(state.repo.full_name))}
             </p>
           )}
           {state.status === 'ready' && props.children(state)}

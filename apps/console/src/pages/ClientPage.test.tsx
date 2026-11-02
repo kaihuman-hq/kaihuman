@@ -7,7 +7,7 @@ import type { BusinessState } from '../lib/business/use-business-repo';
 
 const hooks = vi.hoisted(() => ({
   state: { status: 'loading' } as unknown,
-  backlinks: {} as Record<string, string>,
+  backlinks: {} as Record<string, string> | null,
   enabled: [] as boolean[],
 }));
 vi.mock('../lib/business/use-business-repo', () => ({
@@ -199,6 +199,39 @@ describe('ClientPage', () => {
     expect(host.textContent).toContain('.kh/wiki/a.md');
     expect(host.textContent).not.toContain('.kh/wiki/b.md');
     expect(host.querySelector('a[href="/wiki"]')).not.toBeNull();
+  });
+
+  it('shows load errors of this client and the profile, not of others', () => {
+    show({
+      ...ready(load()),
+      loadErrors: [
+        `${dir}projects/p.yaml: offline`,
+        '.kh/business/business.yaml: rate limited',
+        '.kh/business/clients/other/client.yaml: offline',
+      ],
+    } as BusinessState);
+    expect(host.textContent).toContain('2 files have problems');
+    expect(host.textContent).toContain(`${dir}projects/p.yaml: offline`);
+    expect(host.textContent).toContain('.kh/business/business.yaml: rate limited');
+    expect(host.textContent).not.toContain('clients/other');
+    expect(host.textContent).not.toContain('could not be loaded');
+  });
+
+  it('counts a file with a finding and a load error once', () => {
+    const data = load((m) => m.set(`${dir}projects/broken.yaml`, 'name: [unclosed'));
+    show({ ...ready(data), loadErrors: [`${dir}projects/broken.yaml: offline`] } as BusinessState);
+    expect(host.textContent).toContain('1 file has problems');
+  });
+
+  it('says it is looking for links while backlinks load, then shows the result', () => {
+    hooks.backlinks = null as never;
+    show(ready(load()));
+    expect(host.textContent).toContain('Looking for links');
+    expect(host.textContent).not.toContain('No wiki or idea page links here.');
+    hooks.backlinks = {};
+    show(ready(load()));
+    expect(host.textContent).not.toContain('Looking for links');
+    expect(host.textContent).toContain('No wiki or idea page links here.');
   });
 
   it("lists only this client's problems", () => {

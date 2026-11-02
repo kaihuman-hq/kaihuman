@@ -3,6 +3,14 @@ import { BUSINESS_ROOT, classifyBusinessPath } from '@kaihuman/formats/business'
 
 export const BUSINESS_PROFILE_PATH = `${BUSINESS_ROOT}/business.yaml`;
 
+/** `repo-files` reports a failed fetch as "path: message". */
+export const parseLoadError = (entry: string): { path: string; message: string } => {
+  const at = entry.indexOf(': ');
+  return at < 0
+    ? { path: entry, message: '' }
+    : { path: entry.slice(0, at), message: entry.slice(at + 2) };
+};
+
 // Artifacts and receipts are known from the tree alone; meta files carry no data.
 const SKIPPED_KINDS = new Set(['meta', 'artifact', 'receipt']);
 

@@ -12,6 +12,7 @@ import {
   profileFromForm,
 } from '../lib/business/enable-form';
 import { AlreadyEnabledError, PublicRepoError } from '../lib/business/errors';
+import { BUSINESS_PROFILE_PATH } from '../lib/business/load';
 import { syncKB } from '../lib/github-kb';
 
 const INPUT =
@@ -93,6 +94,23 @@ export function BusinessEnablePage() {
       <>
         <div class="h-[calc(100vh-2rem)] p-6 text-[var(--los-fg-dim)] text-sm font-mono">
           Select a repository to enable business in.
+        </div>
+        {bar}
+      </>
+    );
+  }
+
+  const alreadyEnabled =
+    githubFileStore.loadedRepo.value === repo.full_name &&
+    githubFileStore.tree.value.some((item) => item.path === BUSINESS_PROFILE_PATH);
+  if (alreadyEnabled) {
+    return (
+      <>
+        <div class="h-[calc(100vh-2rem)] p-6 text-sm font-mono text-[var(--los-fg)]">
+          <p>Business is already enabled in this repository.</p>
+          <a href="/business" class="text-[var(--los-accent)] hover:underline">
+            Open the business dashboard
+          </a>
         </div>
         {bar}
       </>

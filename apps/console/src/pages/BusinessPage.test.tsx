@@ -56,6 +56,16 @@ describe('BusinessPage', () => {
     expect(host.textContent).toContain('boom');
   });
 
+  it('warns above the content when the repository is public, still rendering it', () => {
+    const data = loadBusinessRepo(unpaid());
+    show({ ...ready(data), repo: { full_name: 'me/biz', private: false } } as never);
+    const alert = host.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain('This repository is public');
+    expect(host.textContent).toContain('RE-2026-0001');
+    show({ ...ready(data), repo: { full_name: 'me/biz', private: true } } as never);
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+
   it('offers to enable business when it is not set up', () => {
     show({ status: 'disabled', repo });
     expect(host.textContent).toContain('Enable business');

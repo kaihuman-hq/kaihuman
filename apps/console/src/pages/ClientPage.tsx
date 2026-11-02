@@ -10,7 +10,7 @@ import { Stat } from '../components/business/Stat';
 import { StatusPill } from '../components/business/StatusPill';
 import { clientBacklinks } from '../lib/business/backlinks';
 import { addDays, isoWeek, todayLocal } from '../lib/business/dates';
-import { BUSINESS_PROFILE_PATH } from '../lib/business/load';
+import { BUSINESS_PROFILE_PATH, parseLoadError } from '../lib/business/load';
 import { type ClientOverview, clientOverview } from '../lib/business/overview';
 import { useBacklinkContents, useBusinessRepo } from '../lib/business/use-business-repo';
 
@@ -79,7 +79,7 @@ function Overview(props: {
   o: ClientOverview;
   today: string;
   contents: Record<string, string>;
-  backlinks: string[];
+  backlinks: string[] | null;
 }) {
   const { o, today, contents, backlinks } = props;
   const { client, summary: s } = o;
@@ -258,10 +258,16 @@ function Overview(props: {
 
       <Card
         title="Linked from"
-        empty={backlinks.length === 0 ? 'No wiki or idea page links here.' : undefined}
+        empty={
+          backlinks === null
+            ? 'Looking for links…'
+            : backlinks.length === 0
+              ? 'No wiki or idea page links here.'
+              : undefined
+        }
       >
         <ul class="space-y-1 text-xs">
-          {backlinks.map((path) => (
+          {(backlinks ?? []).map((path) => (
             <li key={path} class="break-words">
               {/* The wiki keeps its open file in component state, so it cannot be deep-linked. */}
               <a href="/wiki" class={link} title="Open the wiki and choose this page">
@@ -308,11 +314,11 @@ export function ClientPage({ slug }: { slug?: string }) {
               o={o}
               today={today}
               contents={contents}
-              backlinks={clientBacklinks(o.client.slug, backlinkContents)}
+              backlinks={backlinkContents && clientBacklinks(o.client.slug, backlinkContents)}
             />
             <ProblemsList
               findings={data.findings.filter((f) => mine(f.file))}
-              loadErrors={loadErrors.filter(mine)}
+              loadErrors={loadErrors.filter((e) => mine(parseLoadError(e).path))}
             />
           </>
         );
