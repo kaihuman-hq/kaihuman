@@ -19,7 +19,8 @@ export type UserToken = keyof typeof USERS | 'gho_down' | 'gho_unknown';
 export interface CallOptions {
   token?: UserToken | null;
   headers?: Record<string, string>;
-  body?: Uint8Array;
+  /** A Uint8Array gets a matching Content-Length unless `headers` sets one; a stream gets none. */
+  body?: Uint8Array | ReadableStream<Uint8Array>;
 }
 
 export function makeWorld() {
@@ -49,19 +50,18 @@ export function makeWorld() {
     const headers = new Headers({ Origin: CONSOLE, ...options.headers });
     const token = options.token === undefined ? 'gho_alice' : options.token;
     if (token) headers.set('Authorization', `Bearer ${token}`);
-    const request = new Request(`${BASE}${path}`, {
-      method,
-      headers,
-      body: options.body as BodyInit | undefined,
-    });
+    const body = options.body;
+    if (body instanceof Uint8Array && !headers.has('Content-Length')) {
+      headers.set('Content-Length', String(body.byteLength));
+    }
+    // `duplex` is required by Node for stream bodies and missing from the DOM typings.
+    const init = { method, headers, body: body as BodyInit | undefined, duplex: 'half' };
+    const request = new Request(`${BASE}${path}`, init as RequestInit);
     return handle(request, env, { fetch: gitHub as typeof fetch, now: () => clock.now });
   }
 
   /** Uploads `size` bytes (or the given body) with valid headers unless overridden. */
-  function upload(
-    size: number,
-    options: Omit<CallOptions, 'body'> & { body?: Uint8Array } = {},
-  ): Promise<Response> {
+  function upload(size: number, options: CallOptions = {}): Promise<Response> {
     return call('POST', '/api/files', {
       ...options,
       body: options.body ?? new Uint8Array(size).fill(7),
@@ -75,6 +75,28 @@ export function makeWorld() {
   }
 
   return { db, files, env, clock, gitHub, call, upload };
+}
+
+/**
+ * A body stream that yields `chunks` chunks of `chunkSize` bytes and counts how many were
+ * pulled; a zero high-water mark means nothing is pulled until the worker reads.
+ */
+export function countingStream(chunks: number, chunkSize: number) {
+  const counter = { pulls: 0 };
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        if (counter.pulls >= chunks) {
+          controller.close();
+          return;
+        }
+        counter.pulls++;
+        controller.enqueue(new Uint8Array(chunkSize).fill(9));
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return { stream, counter };
 }
 
 export type World = ReturnType<typeof makeWorld>;

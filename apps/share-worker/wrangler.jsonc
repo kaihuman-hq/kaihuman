@@ -21,5 +21,8 @@
     "UPLOADS_PER_HOUR": "30",
     "ABUSE_EMAIL": "abuse@kaihuman.com"
   },
-  "dev": { "port": 8788 }
+  // As in auth-worker: without host and upstream_protocol, `wrangler dev` rewrites request
+  // URLs to https://docs.kaihuman.com, so any absolute URL built from request.url would
+  // point at production instead of localhost.
+  "dev": { "port": 8788, "host": "localhost:8788", "upstream_protocol": "http" }
 }

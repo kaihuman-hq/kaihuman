@@ -7,15 +7,24 @@ import type { Env } from './env.js';
 import { error } from './respond.js';
 
 const CACHE_MS = 5 * 60_000;
+const REJECTED_MS = 60_000;
 const CACHE_LIMIT = 1000;
 const SIGN_IN_AGAIN = 'Sign in to kaihuman again.';
 const GITHUB_DOWN = 'GitHub is not reachable.';
 
-const cache = new Map<string, { id: number; until: number }>();
+interface Entry<T> {
+  value: T;
+  until: number;
+}
+
+const users = new Map<string, Entry<number>>();
+// Tokens GitHub refused, so a client retrying a garbage bearer does not reach GitHub each time.
+const rejected = new Map<string, Entry<true>>();
 
 /** For tests: the cache lives in module memory, as it does per isolate in production. */
 export function clearAuthCache(): void {
-  cache.clear();
+  users.clear();
+  rejected.clear();
 }
 
 async function sha256(text: string): Promise<string> {
@@ -28,13 +37,24 @@ function bearer(request: Request): string | null {
   return match?.[1] ?? null;
 }
 
-function remember(key: string, id: number, now: number): void {
+function remember<T>(
+  cache: Map<string, Entry<T>>,
+  key: string,
+  value: T,
+  now: number,
+  ttl: number,
+): void {
   if (cache.size >= CACHE_LIMIT) {
     for (const [k, entry] of cache) if (entry.until <= now) cache.delete(k);
     // Still full of live entries: drop the oldest rather than grow without bound.
     if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
   }
-  cache.set(key, { id, until: now + CACHE_MS });
+  cache.set(key, { value, until: now + ttl });
+}
+
+function lookup<T>(cache: Map<string, Entry<T>>, key: string, now: number): T | undefined {
+  const entry = cache.get(key);
+  return entry && entry.until > now ? entry.value : undefined;
 }
 
 export async function authUser(
@@ -47,8 +67,9 @@ export async function authUser(
   if (!token) return error(SIGN_IN_AGAIN, 401);
 
   const key = await sha256(token);
-  const cached = cache.get(key);
-  if (cached && cached.until > now()) return { id: cached.id };
+  const cachedId = lookup(users, key, now());
+  if (cachedId !== undefined) return { id: cachedId };
+  if (lookup(rejected, key, now())) return error(SIGN_IN_AGAIN, 401);
 
   let response: Response;
   try {
@@ -62,13 +83,16 @@ export async function authUser(
   } catch {
     return error(GITHUB_DOWN, 502);
   }
-  if (response.status === 401) return error(SIGN_IN_AGAIN, 401);
+  if (response.status === 401) {
+    remember(rejected, key, true as const, now(), REJECTED_MS);
+    return error(SIGN_IN_AGAIN, 401);
+  }
   if (!response.ok) return error(GITHUB_DOWN, 502);
 
   const body = (await response.json().catch(() => null)) as { id?: unknown } | null;
   const id = body?.id;
   if (typeof id !== 'number' || !Number.isSafeInteger(id)) return error(GITHUB_DOWN, 502);
 
-  remember(key, id, now());
+  remember(users, key, id, now(), CACHE_MS);
   return { id };
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FileRow } from './db.js';
-import { CONSOLE, makeWorld, type World } from './testing/world.js';
+import { CONSOLE, countingStream, makeWorld, type World } from './testing/world.js';
 
 const MAX = 10_485_760;
 const QUOTA = 524_288_000;
@@ -128,6 +128,83 @@ describe('POST /api/files', () => {
     const world = makeWorld();
     const response = await world.upload(10, { headers: { 'Content-Length': String(MAX + 29) } });
     expect(response.status).toBe(413);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['non-numeric', 'abc'],
+    ['negative', '-5'],
+    ['fractional', '100.5'],
+  ])('refuses a %s Content-Length with 411 without reading the body', async (_, length) => {
+    const world = makeWorld();
+    const { stream, counter } = countingStream(4, 100);
+    const headers: Record<string, string> =
+      length === undefined ? {} : { 'Content-Length': length };
+
+    const response = await world.upload(0, { body: stream, headers });
+
+    expect(response.status).toBe(411);
+    expect(await errorOf(response)).toBe('Content length required.');
+    expect(counter.pulls).toBe(0);
+    expect(world.files.objects.size).toBe(0);
+    expect(world.db.tables.files).toHaveLength(0);
+  });
+
+  it('stops reading with 413 when the stream runs past the limit despite a small Content-Length', async () => {
+    const world = makeWorld();
+    const chunk = 1_048_576;
+    const { stream, counter } = countingStream(20, chunk);
+
+    const response = await world.upload(0, { body: stream, headers: { 'Content-Length': '100' } });
+
+    expect(response.status).toBe(413);
+    expect(await errorOf(response)).toBe('File too large (max 10 MB).');
+    // 11 chunks pass MAX + 28; the rest is never pulled.
+    expect(counter.pulls).toBe(11);
+    expect(world.files.objects.size).toBe(0);
+    expect(world.db.tables.files).toHaveLength(0);
+  });
+
+  it('refuses a body that does not match its Content-Length', async () => {
+    const world = makeWorld();
+    const { stream } = countingStream(1, 100);
+    const response = await world.upload(0, { body: stream, headers: { 'Content-Length': '200' } });
+    expect(response.status).toBe(400);
+    expect(await errorOf(response)).toBe('The upload does not match its Content-Length.');
+    expect(world.files.objects.size).toBe(0);
+  });
+
+  it('refuses an over-quota upload by its Content-Length without reading the body', async () => {
+    const world = makeWorld();
+    seed(world, { token: 'seed-a', user_id: 101, size: QUOTA - 999 });
+    const { stream, counter } = countingStream(10, 100);
+
+    const response = await world.upload(0, { body: stream, headers: { 'Content-Length': '1000' } });
+
+    expect(response.status).toBe(413);
+    expect(await errorOf(response)).toBe('Storage limit reached (500 MB).');
+    expect(counter.pulls).toBe(0);
+  });
+
+  it('refuses a rate-limited upload without reading the body', async () => {
+    const world = makeWorld();
+    for (let i = 0; i < 30; i++) await created(await world.upload(100));
+    const { stream, counter } = countingStream(1, 100);
+
+    const response = await world.upload(0, { body: stream, headers: { 'Content-Length': '100' } });
+
+    expect(response.status).toBe(429);
+    expect(counter.pulls).toBe(0);
+  });
+
+  it('stores a streamed upload whose length matches its Content-Length', async () => {
+    const world = makeWorld();
+    const { stream } = countingStream(3, 100);
+    const file = await created(
+      await world.upload(0, { body: stream, headers: { 'Content-Length': '300' } }),
+    );
+    expect(file.size).toBe(300);
+    expect(world.files.objects.get(`101/${file.token}`)?.byteLength).toBe(300);
   });
 
   it('accepts an upload that fills the quota exactly and refuses one byte more', async () => {

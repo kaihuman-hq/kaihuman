@@ -18,6 +18,36 @@ import {
 } from './limits.js';
 import { empty, error, json, notFound } from './respond.js';
 
+const NOT_ENCRYPTED = 'The upload is not an encrypted file.';
+
+/** Reads at most `max` bytes; null (and the stream cancelled) as soon as there are more. */
+async function readCapped(
+  stream: ReadableStream<Uint8Array> | null,
+  max: number,
+): Promise<Uint8Array | null> {
+  if (!stream) return new Uint8Array(0);
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
+}
+
 interface UploadMeta {
   kind: Kind;
   label: string;
@@ -73,11 +103,13 @@ export async function uploadFile(
   if (typeof meta === 'string') return error(meta, 400);
 
   const limits = limitsOf(env);
-  const declared = Number(request.headers.get('Content-Length'));
+  // The length is checked before anything is read, so an upload cannot fill the isolate's
+  // memory; the stream is still counted in case the header lies.
+  const lengthHeader = request.headers.get('Content-Length') ?? '';
+  if (!/^\d{1,15}$/.test(lengthHeader)) return error('Content length required.', 411);
+  const declared = Number(lengthHeader);
   if (declared > limits.maxCipherBytes) return error(tooLarge(limits), 413);
-  const body = new Uint8Array(await request.arrayBuffer());
-  if (body.byteLength > limits.maxCipherBytes) return error(tooLarge(limits), 413);
-  if (body.byteLength <= CIPHER_OVERHEAD) return error('The upload is not an encrypted file.', 400);
+  if (declared <= CIPHER_OVERHEAD) return error(NOT_ENCRYPTED, 400);
 
   const now = deps.now();
   const since = new Date(now - RATE_WINDOW_MS).toISOString();
@@ -85,8 +117,14 @@ export async function uploadFile(
     return error(TOO_MANY_UPLOADS, 429);
   }
   // Two parallel uploads can both pass this check; the overshoot is at most one file.
-  if (!fitsQuota(await usedBytes(env.DB, userId), body.byteLength, limits)) {
+  if (!fitsQuota(await usedBytes(env.DB, userId), declared, limits)) {
     return error(quotaReached(limits), 413);
+  }
+
+  const body = await readCapped(request.body, limits.maxCipherBytes);
+  if (body === null) return error(tooLarge(limits), 413);
+  if (body.byteLength !== declared) {
+    return error('The upload does not match its Content-Length.', 400);
   }
 
   const token = newShareToken();

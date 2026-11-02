@@ -88,15 +88,43 @@ describe('authUser', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('keys the cache by token and does not cache failures', async () => {
+  it('keys the cache by token', async () => {
     const ok = gitHub(200, { id: 7 });
     await authUser(request('Bearer one'), env, ok);
     await authUser(request('Bearer two'), env, ok);
     expect(ok).toHaveBeenCalledTimes(2);
+  });
 
+  it('remembers a token GitHub refused for 60 seconds', async () => {
+    let now = 1_000_000;
+    const clock = () => now;
     const refused = gitHub(401);
-    await authUser(request('Bearer three'), env, refused);
-    await authUser(request('Bearer three'), env, refused);
+
+    await authUser(request('Bearer garbage'), env, refused, clock);
+    now += 60_000 - 1;
+    expect(await errorOf(await authUser(request('Bearer garbage'), env, refused, clock))).toEqual([
+      401,
+      'Sign in to kaihuman again.',
+    ]);
+    expect(refused).toHaveBeenCalledTimes(1);
+
+    now += 1;
+    await authUser(request('Bearer garbage'), env, refused, clock);
     expect(refused).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not cache GitHub outages', async () => {
+    const down = gitHub(500);
+    await authUser(request('Bearer t'), env, down);
+    await authUser(request('Bearer t'), env, down);
+    expect(down).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps both caches bounded', async () => {
+    const refused = gitHub(401);
+    for (let i = 0; i < 1001; i++) await authUser(request(`Bearer bad${i}`), env, refused);
+    // The first entry was evicted to make room, so GitHub is asked again.
+    await authUser(request('Bearer bad0'), env, refused);
+    expect(refused).toHaveBeenCalledTimes(1002);
   });
 });
