@@ -30,6 +30,7 @@ import { QuickKnowledgePage } from './pages/QuickKnowledgePage';
 import { QuickLogPage } from './pages/QuickLogPage';
 import { QuickNotePage } from './pages/QuickNotePage';
 import { QuickTodoPage } from './pages/QuickTodoPage';
+import { SharedPage } from './pages/SharedPage';
 import { ShortcutsPage } from './pages/ShortcutsPage';
 import { TodoAnalyticsPage } from './pages/TodoAnalyticsPage';
 import { WikiPage } from './pages/WikiPage';
@@ -94,6 +95,7 @@ export const App = () => {
         <ProtectedRoute path="/clients/new" component={ClientFormPage} />
         <ProtectedRoute path="/clients/:slug" component={ClientPage} />
         <ProtectedRoute path="/clients/:slug/projects/new" component={ProjectFormPage} />
+        <ProtectedRoute path="/business/shared" component={SharedPage} />
         <ProtectedRoute path="/business/enable" component={BusinessEnablePage} />
         <ProtectedRoute path="/business/time/new" component={LogTimePage} />
         <ProtectedRoute path="/business/payments/new" component={PaymentFormPage} />

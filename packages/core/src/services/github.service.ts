@@ -119,6 +119,68 @@ export class GithubService {
     return { content, sha: data.sha };
   }
 
+  /**
+   * Raw bytes of a file, binary-safe (getFileContent decodes UTF-8 and caps at 1 MB).
+   * The blob sha comes from the git trees, walked from the ref's root tree down to the parent
+   * folder: the contents API refuses files over 1 MB with the default JSON media type, and its
+   * folder listing stops at 1000 entries (S12). A tree lists every entry with its sha and no body;
+   * the blob API then serves up to 100 MB.
+   */
+  async getFileBytes(
+    owner: string,
+    repo: string,
+    path: string,
+    opts?: { ref?: string },
+  ): Promise<Uint8Array> {
+    const client = this.getClient();
+    const segments = path.split('/');
+    const name = segments.pop() ?? '';
+    const notFound = () => new Error(`Not found: ${path}`);
+    const is404 = (e: unknown) => (e as { status?: number }).status === 404;
+
+    // `tree_sha` takes a commit sha or a branch or tag name and resolves it to its root tree.
+    let treeSha = opts?.ref ?? (await client.repos.get({ owner, repo })).data.default_branch;
+    const treeOf = async (sha: string) => {
+      try {
+        return (await client.git.getTree({ owner, repo, tree_sha: sha })).data.tree;
+      } catch (e) {
+        throw is404(e) ? notFound() : e;
+      }
+    };
+    for (const segment of segments) {
+      const folder = (await treeOf(treeSha)).find((item) => item.path === segment);
+      if (!folder || folder.type !== 'tree' || !folder.sha) throw notFound();
+      treeSha = folder.sha;
+    }
+    const entry = (await treeOf(treeSha)).find((item) => item.path === name);
+    if (!entry?.sha) throw notFound();
+    // Named as the contents API names them, which callers and messages already know.
+    const kind =
+      entry.type === 'tree'
+        ? 'dir'
+        : entry.type === 'commit'
+          ? 'submodule'
+          : entry.mode === '120000'
+            ? 'symlink'
+            : 'file';
+    if (kind !== 'file') throw new Error(`Path is not a file: ${kind}`);
+
+    let blob: { content: string; encoding: string };
+    try {
+      ({ data: blob } = await client.git.getBlob({ owner, repo, file_sha: entry.sha }));
+    } catch (e) {
+      throw is404(e) ? notFound() : e;
+    }
+    if (blob.encoding !== 'base64') {
+      throw new Error(`Unexpected blob encoding: ${blob.encoding}`);
+    }
+    // atob, not TextDecoder: the bytes are not text.
+    const binary = atob(blob.content.replace(/\s/g, ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
   async saveFile(
     owner: string,
     repo: string,

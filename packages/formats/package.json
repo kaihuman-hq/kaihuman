@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./skills/*": "./skills/*",
     "./business": "./src/business/index.ts",
+    "./share": "./src/share/index.ts",
     "./dist/*": "./dist/*",
     "./business-templates/*": "./business-templates/*"
   },

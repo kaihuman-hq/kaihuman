@@ -1,4 +1,5 @@
-import type { BusinessRepo, Draft, Issue, Result } from '@kaihuman/formats/business';
+import { authStore, demoMode } from '@kaihuman/core';
+import type { BusinessRepo, Draft, Issue, LinkRecord, Result } from '@kaihuman/formats/business';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { a11y, Field, INPUT } from '../components/business/FormField';
@@ -14,6 +15,8 @@ import {
 } from '../lib/business/issue-flow';
 import { parseLoadError } from '../lib/business/load';
 import { showNotice } from '../lib/business/notice';
+import { latestLink } from '../lib/business/overview';
+import { revokeShareLink, shareApi, shareServiceUrl } from '../lib/business/share';
 import { useBusinessRepo } from '../lib/business/use-business-repo';
 import { writeBusiness, writeErrorMessage } from '../lib/business/write';
 import type { KBRepo } from '../lib/github-kb';
@@ -24,6 +27,15 @@ const KIND: Record<Draft['kind'], string> = {
   invoice: 'Invoice',
   'credit-note': 'Credit note',
   offer: 'Offer',
+};
+
+/** The corrected invoice's share link, when a credit note would leave it live. */
+const linkToRevoke = (data: BusinessRepo, draft: Draft): LinkRecord | null => {
+  if (draft.kind !== 'credit-note' || !draft.corrects) return null;
+  const l = latestLink(data.links, draft.corrects);
+  if (!l || l.revoked) return null;
+  if (l.expires !== undefined && l.expires.slice(0, 10) < todayLocal()) return null;
+  return l;
 };
 
 const Row = (props: { label: string; value: string; strong?: boolean }) => (
@@ -90,6 +102,19 @@ function Preview({ p }: { p: IssuePreview }) {
   );
 }
 
+async function revokeAfterIssue(target: KBRepo, link: LinkRecord): Promise<string | null> {
+  try {
+    const token = authStore.token.value;
+    if (!token) return 'Sign in with GitHub first.';
+    const result = await revokeShareLink(target, link, {
+      api: shareApi(shareServiceUrl(), token),
+    });
+    return result.ok ? null : (result.issues[0]?.message ?? 'Nothing was saved.');
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
 function IssueForm(props: {
   target: KBRepo;
   data: BusinessRepo;
@@ -108,6 +133,8 @@ function IssueForm(props: {
   // Set synchronously: `busy` only changes after the next render.
   const submitting = useRef(false);
   const dateOk = isRealDate(issueDate);
+  const shareLink = demoMode.value ? null : linkToRevoke(data, draft);
+  const [revokeLink, setRevokeLink] = useState(true);
 
   useEffect(() => {
     setConfirming(false);
@@ -159,7 +186,15 @@ function IssueForm(props: {
         return;
       }
       const clientPage = `/clients/${draft.client}`;
-      showNotice(issuedNotice(committed), clientPage);
+      let text = issuedNotice(committed);
+      if (shareLink && revokeLink) {
+        // The credit note is issued for good; a failed revoke only adds a notice.
+        const why = await revokeAfterIssue(target, shareLink);
+        if (why) {
+          text += ` The share link of ${shareLink.doc} could not be revoked: ${why} Revoke it on the client page.`;
+        }
+      }
+      showNotice(text, clientPage);
       route(clientPage);
     } catch (err) {
       setProblems([{ path: 'write', message: writeErrorMessage(err) }]);
@@ -217,6 +252,17 @@ function IssueForm(props: {
           Issuing is final: the document cannot be changed afterwards, only corrected by a credit
           note. If another device issues first, the next free number is used.
         </p>
+      )}
+      {ready && shareLink && (
+        <label class="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={revokeLink}
+            disabled={busy}
+            onChange={(e) => setRevokeLink((e.target as HTMLInputElement).checked)}
+          />
+          Also revoke the share link of {shareLink.doc}
+        </label>
       )}
       <button
         type="submit"

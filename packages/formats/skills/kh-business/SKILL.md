@@ -32,6 +32,9 @@ the right place.
   events.jsonl, links.jsonl      document events and share links
 ```
 
+Never create share links or edit `links.jsonl`: links are made and revoked by the kaihuman console
+(they hold an encryption key and need the share service). Reading it is fine.
+
 Client and project slugs match `^[a-z0-9][a-z0-9-]{1,39}$`. Records name their client by slug.
 Drafts, time entries, payments, expenses, contracts and events get a ULID as `id`. A ULID is 26
 characters of Crockford base32 (`0-9` and `A-Z` without `I`, `L`, `O`, `U`; the first character

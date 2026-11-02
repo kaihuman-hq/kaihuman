@@ -359,6 +359,12 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
 
+  apps/share-worker:
+    dependencies:
+      '@kaihuman/formats':
+        specifier: workspace:*
+        version: link:../../packages/formats
+
   packages/config:
     devDependencies:
       '@biomejs/biome':

@@ -23,6 +23,10 @@ vi.mock('../lib/business/dates', async (importOriginal) => ({
 }));
 vi.mock('@kaihuman/ui', () => ({ StatusBar: () => <div data-testid="status-bar" /> }));
 vi.mock('preact-router', () => ({ route: vi.fn() }));
+// Stands in for the share buttons so the tests can read what the page hands them.
+vi.mock('../components/business/ShareActions', () => ({
+  ShareActions: (props: object) => <span data-share={JSON.stringify(props)} />,
+}));
 
 const { ClientPage } = await import('./ClientPage');
 
@@ -365,5 +369,60 @@ describe('ClientPage', () => {
     expect(host.textContent).toContain('1 file has problems');
     expect(host.textContent).toContain('projects/broken.yaml');
     expect(host.textContent).not.toContain('clients/other');
+  });
+});
+
+describe('ClientPage share wiring', () => {
+  const LINKS = '.kh/business/links.jsonl';
+  const shareOf = (number: string) => {
+    const el = [...host.querySelectorAll<HTMLElement>('[data-share]')].find(
+      (e) => JSON.parse(e.dataset.share ?? '{}').doc.number === number,
+    );
+    return JSON.parse(el?.dataset.share ?? 'null') as {
+      doc: { number: string; path: string; pdf: boolean; expires?: string };
+      link: { id: string } | null;
+      expired?: { id: string } | null;
+    } | null;
+  };
+
+  it('passes the active link, and none once it expired (so Share… shows)', () => {
+    show(ready(load()));
+    expect(shareOf('RE-2026-0001')?.link?.id).toBe('01M5FS5100HPV05AFMSY38DJQW');
+    expect(shareOf('RE-2026-0001')?.doc).toEqual({
+      number: 'RE-2026-0001',
+      path: '.kh/business/invoices/2026/RE-2026-0001.yaml',
+      pdf: false,
+    });
+    show(
+      ready(
+        load((m) =>
+          m.set(
+            LINKS,
+            (m.get(LINKS) ?? '').replace('2026-11-26T09:31:00Z', '2026-11-01T09:31:00Z'),
+          ),
+        ),
+      ),
+    );
+    expect(shareOf('RE-2026-0001')?.link).toBeNull();
+    // Expired but not revoked: its file is still on the service, so it can be revoked.
+    expect(shareOf('RE-2026-0001')?.expired?.id).toBe('01M5FS5100HPV05AFMSY38DJQW');
+  });
+
+  it("passes an offer's future valid_until as expiry, and none when it is past", () => {
+    const OFFER = '.kh/business/offers/2026/AN-2026-001.yaml';
+    show(ready(load()));
+    expect(shareOf('AN-2026-001')?.doc.expires).toBeUndefined();
+    show(
+      ready(
+        load((m) => {
+          m.set(
+            OFFER,
+            (m.get(OFFER) ?? '').replace('valid_until: "2026-10-15"', 'valid_until: "2026-12-01"'),
+          );
+          m.set('.kh/business/offers/2026/AN-2026-001.pdf', '');
+        }),
+      ),
+    );
+    expect(shareOf('AN-2026-001')?.doc).toMatchObject({ expires: '2026-12-01', pdf: true });
   });
 });
