@@ -381,3 +381,19 @@ export const businessDashboard = (repo: BusinessRepo, today: string): Dashboard 
     currency: currencyOf(repo),
   };
 };
+
+/** Minutes logged today and since Monday of `today`'s week (Monday-based, inclusive). */
+export const hoursSummary = (
+  repo: BusinessRepo,
+  today: string,
+): { todayMinutes: number; weekMinutes: number } => {
+  const weekday = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7; // Monday = 0
+  const monday = addDays(today, -weekday);
+  let todayMinutes = 0;
+  let weekMinutes = 0;
+  for (const e of repo.time) {
+    if (e.date === today) todayMinutes += e.minutes;
+    if (e.date >= monday && e.date <= today) weekMinutes += e.minutes;
+  }
+  return { todayMinutes, weekMinutes };
+};

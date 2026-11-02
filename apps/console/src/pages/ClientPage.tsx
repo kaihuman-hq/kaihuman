@@ -8,6 +8,7 @@ import { PageShell } from '../components/business/PageShell';
 import { ProblemsList } from '../components/business/ProblemsList';
 import { Stat } from '../components/business/Stat';
 import { StatusPill } from '../components/business/StatusPill';
+import { TimerCard } from '../components/business/TimerCard';
 import { clientBacklinks } from '../lib/business/backlinks';
 import { addDays, isoWeek, todayLocal } from '../lib/business/dates';
 import { BUSINESS_PROFILE_PATH, parseLoadError } from '../lib/business/load';
@@ -131,7 +132,14 @@ function Overview(props: {
           <Stat label="Unbilled hours" value={`${hours(s.unbilledMinutes)} h`} />
           <Stat label="Hours this month" value={`${hours(s.minutesThisMonth)} h`} />
         </dl>
+        <p class="text-xs">
+          <a href={`/business/time/new?client=${client.slug}`} class={link}>
+            Log time
+          </a>
+        </p>
       </header>
+
+      <TimerCard client={client.slug} />
 
       <Timeline items={o.timeline} />
 

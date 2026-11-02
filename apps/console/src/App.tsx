@@ -17,6 +17,7 @@ import { ExtensionSuccess } from './pages/ExtensionSuccess';
 import { IdeasPage } from './pages/IdeasPage';
 import { KanbanBoardPage } from './pages/KanbanBoardPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
+import { LogTimePage } from './pages/LogTimePage';
 import { Login } from './pages/login';
 import { QuickIdeaPage } from './pages/QuickIdeaPage';
 import { QuickKnowledgePage } from './pages/QuickKnowledgePage';
@@ -86,6 +87,7 @@ export const App = () => {
         <ProtectedRoute path="/clients" component={ClientsPage} />
         <ProtectedRoute path="/clients/:slug" component={ClientPage} />
         <ProtectedRoute path="/business/enable" component={BusinessEnablePage} />
+        <ProtectedRoute path="/business/time/new" component={LogTimePage} />
         <ProtectedRoute path="/files" component={Dashboard} />
         <ProtectedRoute path="/files/:rest*" component={Dashboard} />
         <ProtectedRoute path="/new" component={Dashboard} />
