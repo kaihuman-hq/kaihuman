@@ -6,11 +6,14 @@ import {
   parseActionLog,
   serializeActionLog,
 } from '@kaihuman/formats';
+import { clientOfPath } from '@kaihuman/formats/business';
 import { ArrowLeft, Plus, Search, Tag, X } from 'lucide-preact';
 import { Fragment } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
+import { ScopeToggle } from '../Molecules/ScopeToggle';
+import { usePersistedScope, withBusinessFiles } from '../scope-files';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -114,7 +117,7 @@ const EntryRow = ({
   otherFilePaths: string[];
   onMove?: (targetPath: string) => void;
 }) => {
-  const { name: fileName } = formatActionLogPath(agg.filePath);
+  const fileName = clientOfPath(agg.filePath) ?? formatActionLogPath(agg.filePath).name;
   const time = agg.entry.timestamp.slice(11, 16); // HH:mm
 
   return (
@@ -262,6 +265,7 @@ export const ActionLogView = ({ onNavigateBack }: ActionLogViewProps) => {
   const remoteConfig = layoutStore.remoteConfig.value;
 
   const [search, setSearch] = useState('');
+  const [scope, setScope] = usePersistedScope('actionlog');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
@@ -321,8 +325,8 @@ export const ActionLogView = ({ onNavigateBack }: ActionLogViewProps) => {
     if ((tree ?? []).some((t) => t.path === inboxPath) && !paths.includes(inboxPath)) {
       paths = [inboxPath, ...paths];
     }
-    return paths;
-  }, [remoteConfig, tree, inboxPath]);
+    return withBusinessFiles(paths, tree ?? [], '.actionlog.md', scope);
+  }, [remoteConfig, tree, inboxPath, scope]);
 
   // Files available for the "add" form: all loaded + inbox (even if not yet created)
   const addableFiles = useMemo(() => {
@@ -473,6 +477,7 @@ export const ActionLogView = ({ onNavigateBack }: ActionLogViewProps) => {
 
       {/* Search + tag filter */}
       <div className="border-b border-[var(--los-border)] px-4 py-3 flex flex-col gap-2 shrink-0">
+        <ScopeToggle value={scope} onChange={setScope} />
         <div className="flex items-center gap-2 border border-[var(--los-border)] px-3 py-1.5 focus-within:border-[var(--los-accent)] transition-colors">
           <Search size={12} className="text-[var(--los-muted)] shrink-0" />
           <input
