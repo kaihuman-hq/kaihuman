@@ -219,7 +219,9 @@ affected. The README lists the setup steps.
 - **Who can open it:** anyone who has the full link, until it expires or you revoke it. Treat the
   link like the document. Offers expire at the end of their `valid_until` day (UTC); an offer whose
   `valid_until` is already past is shared without expiry. Invoices and credit notes do not expire.
-  An expired or revoked link shows `This link is no longer available.`
+  An expired or revoked link shows `This link is no longer available.` An expired link stops
+  working, but its encrypted file stays stored, and counts toward your storage, until you revoke it
+  or delete all shared files.
 - **Where the link is kept:** `.kh/business/links.jsonl` in your private repository gets one line
   per link (`id`, `doc`, `url` including the key, `created`, optional `expires`, `revoked`).
   Agents never create share links; only the console writes this file.
@@ -238,8 +240,10 @@ affected. The README lists the setup steps.
 - **What the service stores:** the encrypted file, its label, kind, your business name, size,
   created and expiry dates, your numeric GitHub user id, and per download the time, the token and
   the client class. No IP address, no full User-Agent, no GitHub token. It cannot read the files.
-  Data stays until you revoke the link or delete your shared files (`/business/shared`, "Delete all
-  my shared files…").
+  Your GitHub token is sent to the service with every call (the Worker checks it with GitHub and
+  keeps only a SHA-256 of it in memory for up to 5 minutes, 60 seconds if refused). The file stays
+  until you revoke the link; the records of a revoked link (label, business name, download events)
+  stay until you delete your shared files (`/business/shared`, "Delete all my shared files…").
 - **Self-hosting:** deploy your own copy of the worker, then enter its URL on `/business/shared`
   (saved on this device as `lifeos_share_url`). Only `https://` URLs are accepted; an
   `http://localhost` override is ignored. For local development build or start the console with
