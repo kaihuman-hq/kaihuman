@@ -90,9 +90,14 @@ export function ShareActions({ doc, link }: { doc: ShareDoc; link: LinkRecord | 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The page's state catches up after a reload; until then these keep the row truthful.
-  const [created, setCreated] = useState<string | null>(null);
+  const [created, setCreated] = useState<LinkRecord | null>(null);
   const [revokedId, setRevokedId] = useState<string | null>(null);
   const submitting = useRef(false);
+  // The confirm's own button takes focus whenever a confirm opens, also right after the consent.
+  const confirmButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (phase === 'confirm' || phase === 'confirm-revoke') confirmButton.current?.focus();
+  }, [phase]);
 
   if (!doc.pdf || state.status !== 'ready') return null;
   const { repo, data } = state;
@@ -110,8 +115,8 @@ export function ShareActions({ doc, link }: { doc: ShareDoc; link: LinkRecord | 
     );
   }
 
-  const active = link && link.id !== revokedId ? link : null;
-  const url = active?.url ?? created;
+  const active = [link, created].find((l) => l && l.id !== revokedId) ?? null;
+  const url = active?.url;
 
   async function run(task: () => Promise<void>): Promise<void> {
     if (submitting.current) return;
@@ -142,10 +147,11 @@ export function ShareActions({ doc, link }: { doc: ShareDoc; link: LinkRecord | 
           {
             api: api(),
             baseUrl,
-            business: data.profile?.name ?? repo.full_name.split('/')[0] ?? '',
+            // An empty name would be refused by the service.
+            business: data.profile?.name || repo.full_name.split('/')[0] || '',
           },
         );
-        setCreated(result.url);
+        setCreated(result.link);
         setRevokedId(null);
         setPhase('idle');
       } catch (e) {
@@ -204,8 +210,8 @@ export function ShareActions({ doc, link }: { doc: ShareDoc; link: LinkRecord | 
               Revoke…
             </button>
           )}
-          {created && !active && (
-            <code class="w-full text-[10px] break-all text-[var(--los-muted)]">{created}</code>
+          {active === created && (
+            <code class="w-full text-[10px] break-all text-[var(--los-muted)]">{url}</code>
           )}
         </>
       ) : (
@@ -225,7 +231,7 @@ export function ShareActions({ doc, link }: { doc: ShareDoc; link: LinkRecord | 
       {phase === 'confirm' && !url && (
         <div class="w-full flex flex-wrap items-center gap-1 text-xs">
           <span>Upload {doc.number}.pdf (encrypted) to create a share link?</span>
-          <button type="button" class={BUTTON} disabled={busy} onClick={share}>
+          <button ref={confirmButton} type="button" class={BUTTON} disabled={busy} onClick={share}>
             {busy ? 'Uploading…' : 'Upload'}
           </button>
           <button type="button" class={BUTTON} disabled={busy} onClick={() => setPhase('idle')}>
@@ -237,7 +243,7 @@ export function ShareActions({ doc, link }: { doc: ShareDoc; link: LinkRecord | 
       {phase === 'confirm-revoke' && active && (
         <div class="w-full flex flex-wrap items-center gap-1 text-xs">
           <span>Revoke the link for {doc.number}? It stops working for everyone who has it.</span>
-          <button type="button" class={BUTTON} disabled={busy} onClick={revoke}>
+          <button ref={confirmButton} type="button" class={BUTTON} disabled={busy} onClick={revoke}>
             {busy ? 'Revoking…' : 'Revoke'}
           </button>
           <button type="button" class={BUTTON} disabled={busy} onClick={() => setPhase('idle')}>

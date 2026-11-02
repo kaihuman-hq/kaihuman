@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'preact/hooks';
+import { customShareHost } from '../../lib/business/share';
 
 const BUTTON =
   'px-3 py-1 text-xs rounded border border-[var(--los-border)] text-[var(--los-fg)] hover:opacity-90';
 
 /**
  * The one-time explanation before sharing is enabled. A modal dialog: focus moves in, Tab stays
- * inside, Escape cancels, and focus returns to where it was when the dialog closes.
+ * inside, Escape cancels, and focus returns to where it was when the dialog closes. Keys are
+ * handled on the document so a click that moved focus away cannot break Escape or the trap.
  */
 export function ShareConsent({
   onAccept,
@@ -16,6 +18,7 @@ export function ShareConsent({
 }) {
   const dialog = useRef<HTMLDivElement>(null);
   const first = useRef<HTMLButtonElement>(null);
+  const host = customShareHost();
 
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -23,44 +26,63 @@ export function ShareConsent({
     return () => opener?.focus();
   }, []);
 
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onCancel();
-      return;
-    }
-    if (e.key !== 'Tab') return;
-    const buttons = [...(dialog.current?.querySelectorAll('button') ?? [])];
-    const start = buttons[0];
-    const end = buttons[buttons.length - 1];
-    if (e.shiftKey && document.activeElement === start) {
-      e.preventDefault();
-      end?.focus();
-    } else if (!e.shiftKey && document.activeElement === end) {
-      e.preventDefault();
-      start?.focus();
-    }
-  };
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCancel();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const buttons = [...(dialog.current?.querySelectorAll('button') ?? [])];
+      const start = buttons[0];
+      const end = buttons[buttons.length - 1];
+      const inside = dialog.current?.contains(document.activeElement) ?? false;
+      if (!inside || (e.shiftKey && document.activeElement === start)) {
+        e.preventDefault();
+        (e.shiftKey ? end : start)?.focus();
+      } else if (!e.shiftKey && document.activeElement === end) {
+        e.preventDefault();
+        start?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onCancel]);
 
   return (
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    // A click on the backdrop keeps focus in the dialog instead of dropping it on the body.
+    // biome-ignore lint/a11y/noStaticElementInteractions: the backdrop only prevents focus loss
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) e.preventDefault();
+      }}
+    >
       <div
         ref={dialog}
         role="dialog"
         aria-modal="true"
         aria-labelledby="share-consent-title"
         aria-describedby="share-consent-body"
-        onKeyDown={onKeyDown}
         class="max-w-md w-full rounded border border-[var(--los-border)] bg-[var(--los-bg)] p-4 space-y-3 text-xs text-[var(--los-fg)]"
       >
         <h2 id="share-consent-title" class="text-sm font-bold">
           Share documents by link
         </h2>
         <div id="share-consent-body" class="space-y-2">
-          <p>
-            Sharing uploads the PDF of a document you choose to the kaihuman share service, which
-            runs on Cloudflare and stores files in the EU.
-          </p>
+          {host ? (
+            <p>
+              Sharing uploads the PDF of a document you choose to <strong>{host}</strong>, the share
+              service set on this device instead of kaihuman's. Your GitHub sign-in is sent to{' '}
+              {host} with every request so it can tell your files apart.
+            </p>
+          ) : (
+            <p>
+              Sharing uploads the PDF of a document you choose to the kaihuman share service, which
+              runs on Cloudflare and stores files in the EU.
+            </p>
+          )}
           <p>
             The file is encrypted in your browser before it is uploaded. The key is only in the
             link, so the service cannot read the file.

@@ -25,6 +25,7 @@ const doc = {
   pdf: true,
   expires: '2026-12-01',
 };
+const NEW_ID = '01M50ARQ007CHPV05AFMSY38DK' as Ulid;
 const LINK: LinkRecord = {
   id: '01M50ARQ007CHPV05AFMSY38DJ' as Ulid,
   doc: doc.number,
@@ -94,6 +95,54 @@ describe('ShareActions', () => {
     expect(share.createShareLink).not.toHaveBeenCalled();
   });
 
+  it('moves focus to Upload after the consent, and to Revoke when revoking', () => {
+    show({ doc, link: null });
+    click('Share…');
+    click('I understand, enable sharing');
+    expect(document.activeElement).toBe(button('Upload'));
+    act(() => render(null, host));
+    show({ doc, link: LINK });
+    click('Revoke…');
+    expect(document.activeElement).toBe(button('Revoke'));
+  });
+
+  it('names a self-hosted service and that the GitHub sign-in goes to it', () => {
+    localStorage.setItem('lifeos_share_url', 'https://self.example/share');
+    show({ doc, link: null });
+    click('Share…');
+    const text = host.querySelector('[role="dialog"]')?.textContent ?? '';
+    expect(text).toContain('self.example');
+    expect(text).toContain('Your GitHub sign-in is sent to self.example');
+    expect(text).not.toContain('kaihuman share service');
+  });
+
+  it('keeps Escape working after a click on the backdrop', () => {
+    show({ doc, link: null });
+    click('Share…');
+    const backdrop = host.querySelector('[role="dialog"]')?.parentElement as HTMLElement;
+    const down = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    act(() => {
+      backdrop.dispatchEvent(down);
+    });
+    expect(down.defaultPrevented).toBe(true);
+    (document.activeElement as HTMLElement | null)?.blur();
+    act(() => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('sends the repo owner as the business when the profile name is empty', async () => {
+    localStorage.setItem('lifeos_share_consent_v1', 'yes');
+    share.createShareLink.mockResolvedValue({ url: URL_, link: LINK });
+    hooks.state = { ...(hooks.state as object), data: { profile: { name: '' } } } as BusinessState;
+    show({ doc, link: null });
+    click('Share…');
+    click('Upload');
+    await flush();
+    expect(share.createShareLink.mock.calls[0]?.[2].business).toBe('me');
+  });
+
   it('Escape and Cancel close the consent without enabling sharing', () => {
     show({ doc, link: null });
     click('Share…');
@@ -110,7 +159,7 @@ describe('ShareActions', () => {
 
   it('skips the dialog once consent is given; Upload creates the link once', async () => {
     localStorage.setItem('lifeos_share_consent_v1', 'yes');
-    let resolve: (v: { url: string }) => void = () => {};
+    let resolve: (v: { url: string; link: LinkRecord }) => void = () => {};
     share.createShareLink.mockImplementation(
       () =>
         new Promise((r) => {
@@ -130,11 +179,19 @@ describe('ShareActions', () => {
     expect(repo).toBe(target);
     expect(sent).toEqual({ number: doc.number, path: doc.path, expires: '2026-12-01' });
     expect(deps.business).toBe('Acme Studio');
-    resolve({ url: URL_ });
+    resolve({ url: URL_, link: { ...LINK, id: NEW_ID } });
     await flush();
     expect(host.textContent).toContain('Online · link active');
     expect(host.textContent).toContain(URL_);
     expect(button('Copy link')).toBeDefined();
+
+    // The new link can be revoked before the page has reloaded.
+    share.revokeShareLink.mockResolvedValue({ ok: true, value: { commitSha: 'c' } });
+    click('Revoke…');
+    click('Revoke');
+    await flush();
+    expect(share.revokeShareLink.mock.calls[0]?.[1]).toEqual({ ...LINK, id: NEW_ID });
+    expect(button('Share…')).toBeDefined();
   });
 
   it('shows a service error as an alert and commits nothing', async () => {

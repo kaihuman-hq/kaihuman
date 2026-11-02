@@ -16,6 +16,8 @@ export const SHARE_URL_KEY = 'lifeos_share_url';
 export const SHARE_CONSENT_KEY = 'lifeos_share_consent_v1';
 export const DEFAULT_SHARE_URL = 'https://docs.kaihuman.com';
 export const UNREACHABLE_MESSAGE = 'The share service is not reachable.';
+export const INVALID_ANSWER_MESSAGE =
+  'The share service sent an answer that could not be used. Nothing was saved.';
 export const NOT_SAVED_MESSAGE =
   'The link could not be saved in the repository and was removed again.';
 
@@ -75,20 +77,37 @@ const readStorage = (key: string): string | null => {
   }
 };
 
-const isHttpsUrl = (value: string): boolean => {
+/** The origin of an `https:` URL, else null. */
+const httpsOrigin = (value: string): string | null => {
   try {
-    return new URL(value).protocol === 'https:';
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.origin : null;
   } catch {
-    return false;
+    return null;
   }
 };
 
-/** The per-device override (for self-hosters) wins over the build's default. */
+/**
+ * The per-device override (for self-hosters) wins over the build's default. Only its origin counts,
+ * so API calls and links are always `<origin>/api/…` and `<origin>/d/<token>`.
+ */
 export function shareServiceUrl(): string {
   const override = readStorage(SHARE_URL_KEY);
-  if (override && isHttpsUrl(override)) return override;
+  const origin = override ? httpsOrigin(override) : null;
+  if (origin) return origin;
   return import.meta.env.VITE_SHARE_URL || DEFAULT_SHARE_URL;
 }
+
+/** The host of a configured service other than kaihuman's own, else null; the consent names it. */
+export function customShareHost(): string | null {
+  const current = new URL(shareServiceUrl());
+  const own = [DEFAULT_SHARE_URL, import.meta.env.VITE_SHARE_URL || DEFAULT_SHARE_URL].map(
+    (u: string) => httpsOrigin(u) ?? u,
+  );
+  return own.includes(current.origin) ? null : current.host;
+}
+
+const TOKEN = /^[A-Za-z0-9_-]{22}$/;
 
 export const hasShareConsent = (): boolean => readStorage(SHARE_CONSENT_KEY) !== null;
 
@@ -201,7 +220,7 @@ export async function createShareLink(
   target: KBRepo,
   doc: { number: string; path: string; expires?: string },
   deps: ShareDeps,
-): Promise<{ url: string }> {
+): Promise<{ url: string; link: LinkRecord }> {
   const [owner, name] = repoParts(target);
   const headSha = await githubService.getHeadSha(owner, name, target.default_branch);
   const pdf = await githubService.getFileBytes(owner, name, doc.path.replace(/\.ya?ml$/, '.pdf'), {
@@ -215,6 +234,12 @@ export async function createShareLink(
     business: deps.business,
     ...(doc.expires ? { expires: doc.expires } : {}),
   });
+
+  // A token outside the format would put whatever the service said into the link and the repo.
+  if (!TOKEN.test(uploaded.token)) {
+    await revokeQuietly(deps.api, uploaded.token);
+    throw new ShareError(INVALID_ANSWER_MESSAGE);
+  }
 
   const url = shareUrl(deps.baseUrl, uploaded.token, key);
   const record: LinkRecord = {
@@ -240,14 +265,18 @@ export async function createShareLink(
     saved = false;
   }
   if (!saved) {
-    try {
-      await deps.api.revoke(uploaded.token);
-    } catch {
-      // Best effort: the file stays unreachable without the key, which nobody has.
-    }
+    await revokeQuietly(deps.api, uploaded.token);
     throw new ShareError(NOT_SAVED_MESSAGE);
   }
-  return { url };
+  return { url, link: record };
+}
+
+async function revokeQuietly(api: ShareApi, token: string): Promise<void> {
+  try {
+    await api.revoke(token);
+  } catch {
+    // Best effort: the file stays unreachable without the key, which nobody has.
+  }
 }
 
 /** Revokes on the service first (404 = already gone), then marks that line `revoked` in one commit. */
@@ -258,6 +287,15 @@ export async function revokeShareLink(
 ): Promise<Result<{ commitSha: string }>> {
   const parsed = parseShareUrl(link.url);
   if (!parsed) throw new ShareError('This link in the repository is not a share link.');
+  // A 404 from another service would read as "already revoked" while the link stays live, and a
+  // host read from the repository is never called.
+  const service = new URL(shareServiceUrl()).origin;
+  if (parsed.host !== service) {
+    const host = new URL(parsed.host).host;
+    throw new ShareError(
+      `This link was created on ${host}. Switch the share service to ${host} to revoke it.`,
+    );
+  }
   try {
     await deps.api.revoke(parsed.token);
   } catch (e) {

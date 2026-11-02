@@ -19,6 +19,7 @@ import { githubService } from '@kaihuman/core';
 import {
   acceptShareConsent,
   createShareLink,
+  customShareHost,
   hasShareConsent,
   revokeShareLink,
   type ShareApi,
@@ -92,6 +93,22 @@ describe('shareServiceUrl', () => {
     expect(shareServiceUrl()).toBe('https://env.example');
     localStorage.setItem('lifeos_share_url', 'not a url');
     expect(shareServiceUrl()).toBe('https://env.example');
+  });
+
+  it('keeps only the origin of an override', () => {
+    localStorage.setItem('lifeos_share_url', 'https://host.example/share?x=1#frag');
+    expect(shareServiceUrl()).toBe('https://host.example');
+  });
+
+  it('names only a service that is not the configured default', () => {
+    vi.stubEnv('VITE_SHARE_URL', '');
+    expect(customShareHost()).toBeNull();
+    vi.stubEnv('VITE_SHARE_URL', 'https://env.example');
+    expect(customShareHost()).toBeNull();
+    localStorage.setItem('lifeos_share_url', 'https://docs.kaihuman.com/');
+    expect(customShareHost()).toBeNull();
+    localStorage.setItem('lifeos_share_url', 'https://self.example/x');
+    expect(customShareHost()).toBe('self.example');
   });
 
   it('survives a localStorage that throws', () => {
@@ -316,6 +333,28 @@ describe('createShareLink', () => {
     expect(api.revoke).toHaveBeenCalledWith(TOKEN);
   });
 
+  it('refuses a malformed token from the service before committing', async () => {
+    commitSucceeds();
+    const api: ShareApi = {
+      upload: vi.fn(async () => ({ token: '../../evil', created: 'c' })),
+      list: vi.fn(),
+      revoke: vi.fn(async () => {}),
+      events: vi.fn(),
+      deleteAccount: vi.fn(),
+    };
+    await expect(
+      createShareLink(
+        target,
+        { number: 'RE-2026-0001', path: ISSUED },
+        { api, baseUrl: BASE, business: 'A' },
+      ),
+    ).rejects.toThrow(
+      'The share service sent an answer that could not be used. Nothing was saved.',
+    );
+    expect(api.revoke).toHaveBeenCalledWith('../../evil');
+    expect(writes.writeBusiness).not.toHaveBeenCalled();
+  });
+
   it('commits nothing when the upload fails', async () => {
     commitSucceeds();
     const api = shareApi(BASE, GH_TOKEN, fetchFor(429));
@@ -358,6 +397,22 @@ describe('revokeShareLink', () => {
   const A = link('01M50ARQ007CHPV05AFMSY38DA', 'RE-2026-0001');
   const B = link('01M50ARQ007CHPV05AFMSY38DB', 'RE-2026-0001');
   const linesOf = (...ls: LinkRecord[]) => ls.map((l) => `${JSON.stringify(l)}\n`).join('');
+  beforeEach(() => vi.stubEnv('VITE_SHARE_URL', BASE));
+
+  it('refuses a link from another service: nothing sent, nothing committed (S8)', async () => {
+    commitSucceeds();
+    vi.stubEnv('VITE_SHARE_URL', 'https://b.test');
+    const onA = { ...A, url: `https://a.test/d/${TOKEN}#${KEY}` };
+    links = linesOf(onA);
+    const fetchImpl = vi.fn<typeof fetch>(async () => new Response(null, { status: 404 }));
+    await expect(
+      revokeShareLink(target, onA, { api: shareApi('https://b.test', GH_TOKEN, fetchImpl) }),
+    ).rejects.toThrow(
+      'This link was created on a.test. Switch the share service to a.test to revoke it.',
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(writes.writeBusiness).not.toHaveBeenCalled();
+  });
 
   it('treats a 404 as already revoked and sets revoked on the right line only', async () => {
     commitSucceeds();
