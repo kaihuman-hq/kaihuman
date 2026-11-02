@@ -3,10 +3,16 @@ import { loadFixtureRepo } from '../fixture-repo.test-helper.js';
 import type { Slug, Ulid } from '../ids.js';
 import { draftPath } from '../paths.js';
 import type { Project } from '../records.js';
-import { type BusinessRepo, loadBusinessRepo } from '../repo.js';
+import { loadBusinessRepo } from '../repo.js';
 import { validateDraft } from '../validate.js';
 import { parseYaml } from '../yaml.js';
-import { deleteDraft, draftFromRetainer, draftFromUnbilled, saveDraft } from './drafts.js';
+import {
+  defaultVat,
+  deleteDraft,
+  draftFromRetainer,
+  draftFromUnbilled,
+  saveDraft,
+} from './drafts.js';
 
 const id = '01M5AMBK0038DJQW16BGNTZ49F' as Ulid;
 const E1 = '01M5AMBK0038DJQW16BGNTZ4A1' as Ulid;
@@ -136,6 +142,61 @@ describe('draftFromUnbilled', () => {
   });
 });
 
+describe('draftFromUnbilled, drafts and regimes', () => {
+  const twoEntries =
+    entry(E1, '2026-11-03', 60, 'website') + entry(E2, '2026-11-04', 30, 'website');
+  const draftWith = (ids: Ulid[]) => (m: Map<string, string>) =>
+    m.set(
+      '.kh/business/drafts/01M5AMBK0038DJQW16BGNTZ4B1.yaml',
+      `id: 01M5AMBK0038DJQW16BGNTZ4B1\nkind: invoice\nclient: acme-gmbh\nlines:\n  - description: x\n    quantity: "1"\n    unit: C62\n    unit_price: 100\n    vat_category: S\n    vat_rate: "19"\ntime_entries:\n${ids.map((i) => `  - ${i}`).join('\n')}\n`,
+    );
+
+  it('leaves out entries that are already in a draft', () => {
+    const d = ok(draftFromUnbilled(withTime(twoEntries, draftWith([E1])), client, {}, id, today));
+    expect(d.time_entries).toEqual([E2]);
+  });
+
+  it('refuses when all unbilled time is in drafts', () => {
+    const r = draftFromUnbilled(withTime(twoEntries, draftWith([E1, E2])), client, {}, id, today);
+    expect(r).toEqual({
+      ok: false,
+      issues: [{ path: 'time_entries', message: 'All unbilled time is already in a draft.' }],
+    });
+  });
+
+  it('takes explicitly named entries even when they are in a draft', () => {
+    const d = ok(
+      draftFromUnbilled(
+        withTime(twoEntries, draftWith([E1])),
+        client,
+        { entryIds: [E1] },
+        id,
+        today,
+      ),
+    );
+    expect(d.time_entries).toEqual([E1]);
+  });
+
+  it('uses E at 0 for a small-business profile', () => {
+    const repo = withTime(twoEntries, (m) => {
+      const key = '.kh/business/business.yaml';
+      m.set(key, (m.get(key) ?? '').replace('vat_regime: regular', 'vat_regime: small-business'));
+    });
+    const d = ok(draftFromUnbilled(repo, client, {}, id, today));
+    expect(d.lines[0]).toMatchObject({ vat_category: 'E', vat_rate: '0' });
+  });
+
+  it('bills at least 0.01 for a one-minute day-rate entry', () => {
+    const repo = withTime(entry(E1, '2026-11-03', 1, 'dev'), (m) =>
+      m.set(
+        '.kh/business/clients/acme-gmbh/projects/dev.yaml',
+        'client: acme-gmbh\nname: Dev days\nstatus: active\nrate:\n  per: day\n  amount: 80000\n',
+      ),
+    );
+    expect(ok(draftFromUnbilled(repo, client, {}, id, today)).lines[0]?.quantity).toBe('0.01');
+  });
+});
+
 describe('draftFromRetainer', () => {
   const project = (retainer?: Project['retainer']): Project => ({
     slug: 'hosting' as Slug,
@@ -190,7 +251,41 @@ describe('draftFromRetainer', () => {
 
   it('refuses a project without a retainer', () => {
     const res = draftFromRetainer(repo, project(), id, today);
-    expect(res.ok).toBe(false);
+    expect(res).toEqual({
+      ok: false,
+      issues: [{ path: 'retainer', message: 'Hosting has no retainer.' }],
+    });
+  });
+
+  it('uses E at 0 for a small-business profile', () => {
+    const files = loadFixtureRepo();
+    const key = '.kh/business/business.yaml';
+    files.set(
+      key,
+      (files.get(key) ?? '').replace('vat_regime: regular', 'vat_regime: small-business'),
+    );
+    const d = ok(
+      draftFromRetainer(
+        loadBusinessRepo(files),
+        project({ amount: 5000, interval: 'monthly', next_date: '2026-12-01', description: 'H' }),
+        id,
+        today,
+      ),
+    );
+    expect(d.lines[0]).toMatchObject({ vat_category: 'E', vat_rate: '0' });
+  });
+});
+
+describe('defaultVat', () => {
+  it('is S at the profile rate when regular, E at 0 for small business', () => {
+    expect(defaultVat({ vat_regime: 'regular', default_vat_rate: '19' })).toEqual({
+      vat_category: 'S',
+      vat_rate: '19',
+    });
+    expect(defaultVat({ vat_regime: 'small-business', default_vat_rate: '19' })).toEqual({
+      vat_category: 'E',
+      vat_rate: '0',
+    });
   });
 });
 
@@ -235,9 +330,15 @@ describe('saveDraft and deleteDraft', () => {
   it('deletes by setting the path to null, and only for a known, unissued draft', () => {
     if (!existing) throw new Error('fixture');
     expect(ok(deleteDraft(repo, existing.id)).changes).toEqual({ [draftPath(existing.id)]: null });
-    expect(deleteDraft(repo, id).ok).toBe(false);
+    expect(deleteDraft(repo, id)).toEqual({
+      ok: false,
+      issues: [{ path: 'id', message: 'This draft does not exist any more.' }],
+    });
     const issuedDraftId = repo.issued[0]?.doc.draft_id;
     if (!issuedDraftId) throw new Error('fixture');
-    expect(deleteDraft(repo as BusinessRepo, issuedDraftId).ok).toBe(false);
+    expect(deleteDraft(repo, issuedDraftId)).toEqual({
+      ok: false,
+      issues: [{ path: 'id', message: 'This draft was already issued.' }],
+    });
   });
 });

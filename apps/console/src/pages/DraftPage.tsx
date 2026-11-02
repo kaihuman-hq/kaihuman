@@ -3,6 +3,7 @@ import {
   DOC_KINDS,
   type DocKind,
   type Draft,
+  defaultVat,
   deleteDraft,
   draftFromRetainer,
   draftFromUnbilled,
@@ -38,6 +39,8 @@ type Props = {
 };
 
 const OFFER_VALID_DAYS = 30;
+const vatOf = (data: BusinessRepo) =>
+  data.profile ? defaultVat(data.profile) : { vat_category: 'S' as const, vat_rate: '19' };
 const back = (path: string, text: string) => (
   <a href={path} class="text-[var(--los-accent)] hover:underline">
     {text}
@@ -53,6 +56,9 @@ const message = (text: string, link: preact.ComponentChildren) => (
 function ClientChooser({ data }: { data: BusinessRepo }) {
   const [client, setClient] = useState(data.clients[0]?.slug ?? '');
   const [kind, setKind] = useState('invoice');
+  if (data.clients.length === 0) {
+    return message('No clients yet.', back('/clients/new', 'Add a client'));
+  }
   return (
     <form
       class="max-w-xl space-y-3"
@@ -131,10 +137,10 @@ function startingDraft(
     return { draft: r.value, form: formFromDraft(r.value, currency) };
   }
   const kind = DOC_KINDS.find((k) => k === props.kind && k !== 'credit-note') ?? 'invoice';
-  const rate = data.profile?.default_vat_rate ?? '19';
+  const vat = vatOf(data);
   return {
     draft: { id: newId, kind, client: client.slug, lines: [] },
-    form: emptyDraftForm(kind, rate, addDays(today, OFFER_VALID_DAYS)),
+    form: emptyDraftForm(kind, vat, addDays(today, OFFER_VALID_DAYS)),
   };
 }
 
@@ -274,13 +280,14 @@ function DraftEditor(props: {
               onInput={(e) => set('serviceStart', (e.target as HTMLInputElement).value)}
             />
           </Field>
-          <Field id="service-end" label="Service period end">
+          <Field id="service-end" label="Service period end" error={errors.service_period}>
             <input
               id="service-end"
               type="date"
               class={INPUT}
               value={form.serviceEnd}
               disabled={busy}
+              {...a11y('service-end', errors.service_period)}
               onInput={(e) => set('serviceEnd', (e.target as HTMLInputElement).value)}
             />
           </Field>
@@ -291,7 +298,7 @@ function DraftEditor(props: {
         onChange={(lines) => set('lines', lines)}
         errors={errors}
         currency={currency}
-        defaultVatRate={data.profile?.default_vat_rate ?? '19'}
+        defaultVat={vatOf(data)}
         disabled={busy}
         unsupported={unsupported}
       />

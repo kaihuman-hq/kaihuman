@@ -90,6 +90,26 @@ describe('ClientPage actions', () => {
     expect(hrefs()).toContain('/business/drafts/new?client=acme-gmbh&kind=invoice&from=unbilled');
   });
 
+  it('hides the unbilled-time link when all unbilled time is already in a draft', () => {
+    const entry =
+      '{"id":"01M5AMBK0038DJQW16BGNTZ4A1","date":"2026-11-03","minutes":90,"client":"acme-gmbh","note":"a"}\n';
+    const draft = (ids: string) =>
+      `id: 01M5AMBK0038DJQW16BGNTZ4B1\nkind: invoice\nclient: acme-gmbh\nlines:\n  - description: x\n    quantity: "1"\n    unit: C62\n    unit_price: 100\n    vat_category: S\n    vat_rate: "19"\ntime_entries:\n  - ${ids}\n`;
+    const hrefs = () => [...host.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    const link = '/business/drafts/new?client=acme-gmbh&kind=invoice&from=unbilled';
+    const withDraft = (ids: string) =>
+      ready(
+        load((m) => {
+          m.set('.kh/business/time/2026-11.jsonl', entry);
+          m.set('.kh/business/drafts/01M5AMBK0038DJQW16BGNTZ4B1.yaml', draft(ids));
+        }),
+      );
+    show(withDraft('01M5AMBK0038DJQW16BGNTZ4A1'));
+    expect(hrefs()).not.toContain(link);
+    show(withDraft('01M581YW00W16BGNTZ49EKRX27'));
+    expect(hrefs()).toContain(link);
+  });
+
   it('links a new invoice from a retainer', () => {
     const key = `${dir}projects/website.yaml`;
     const retainer =

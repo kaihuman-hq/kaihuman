@@ -1,5 +1,6 @@
 import { VAT_CATEGORIES, type VatCategory } from '@kaihuman/formats/business';
 import {
+  type DefaultVat,
   EXEMPTION_HINT,
   emptyLine,
   type LineForm,
@@ -20,7 +21,7 @@ export function LinesEditor(props: {
   onChange: (lines: LineForm[]) => void;
   errors: Record<string, string>;
   currency: string;
-  defaultVatRate: string;
+  defaultVat: DefaultVat;
   disabled?: boolean;
   /** Shown disabled, with the exemption hint. */
   unsupported?: readonly VatCategory[];
@@ -42,7 +43,7 @@ export function LinesEditor(props: {
           label: string,
           extra: { inputMode?: 'decimal' } = {},
         ) => (
-          <div class={name === 'description' ? 'sm:col-span-6' : 'sm:col-span-2'}>
+          <div class={name === 'description' ? 'col-span-2 sm:col-span-6' : 'sm:col-span-2'}>
             <label for={id(name)} class={LABEL}>
               {label}
             </label>
@@ -135,7 +136,7 @@ export function LinesEditor(props: {
       <button
         type="button"
         class="text-xs text-[var(--los-accent)] hover:underline"
-        onClick={() => props.onChange([...lines, emptyLine(props.defaultVatRate)])}
+        onClick={() => props.onChange([...lines, emptyLine(props.defaultVat)])}
       >
         Add line
       </button>

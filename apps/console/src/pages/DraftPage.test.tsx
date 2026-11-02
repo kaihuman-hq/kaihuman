@@ -216,6 +216,42 @@ describe('DraftPage on an existing draft', () => {
 });
 
 describe('DraftPage new', () => {
+  it('says so, with a link to add one, when there are no clients', () => {
+    const data = load((m) => {
+      for (const k of [...m.keys()])
+        if (k.includes('/clients/') || k.includes('/drafts/')) m.delete(k);
+    });
+    show(ready(data), {});
+    expect(host.textContent).toContain('No clients yet.');
+    expect(host.querySelector('a[href="/clients/new"]')).not.toBeNull();
+    expect(button('Start draft')).toBeUndefined();
+  });
+
+  it('starts new lines as E at 0 for a small-business profile', () => {
+    const data = load((m) => {
+      const key = '.kh/business/business.yaml';
+      m.set(key, (m.get(key) ?? '').replace('vat_regime: regular', 'vat_regime: small-business'));
+    });
+    show(ready(data), { client: 'acme-gmbh', kind: 'invoice' });
+    expect(field('line-0-vatCategory').value).toBe('E');
+    expect(field('line-0-vatRate').value).toBe('0');
+    act(() => button('Add line')?.click());
+    expect(field('line-1-vatCategory').value).toBe('E');
+    expect(field('line-1-vatRate').value).toBe('0');
+  });
+
+  it('shows a service period error under both date fields', async () => {
+    show(ready(load()), { client: 'acme-gmbh', kind: 'invoice' });
+    type('line-0-description', 'x');
+    type('line-0-unitPrice', '1');
+    type('service-start', '2026-11-05');
+    type('service-end', '2026-11-01');
+    await click('Save draft');
+    expect(field('service-start').getAttribute('aria-describedby')).toBe('service-start-error');
+    expect(field('service-end').getAttribute('aria-describedby')).toBe('service-end-error');
+    expect(host.textContent).toContain('The end is before the start.');
+  });
+
   it('lets the user pick a client first', () => {
     show(ready(load()), {});
     act(() => button('Start draft')?.click());

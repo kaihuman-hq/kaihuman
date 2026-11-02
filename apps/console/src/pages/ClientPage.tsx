@@ -83,6 +83,8 @@ function Overview(props: {
   today: string;
   contents: Record<string, string>;
   backlinks: string[] | null;
+  /** Unbilled time that is in no draft yet. */
+  canDraftUnbilled: boolean;
 }) {
   const { o, today, contents, backlinks } = props;
   const { client, summary: s } = o;
@@ -138,7 +140,7 @@ function Overview(props: {
           <a href={`/business/time/new?client=${client.slug}`} class={link}>
             Log time
           </a>
-          {s.unbilledMinutes > 0 && (
+          {props.canDraftUnbilled && (
             <>
               {' · '}
               <a
@@ -363,12 +365,17 @@ export function ClientPage({ slug }: { slug?: string }) {
         }
         const dir = `${BUSINESS_ROOT}/clients/${o.client.slug}/`;
         const mine = (file: string) => file === BUSINESS_PROFILE_PATH || file.startsWith(dir);
+        const drafted = new Set(data.drafts.flatMap((d) => d.time_entries ?? []));
+        const canDraftUnbilled = data.time.some(
+          (t) => t.client === slug && t.invoice === undefined && !drafted.has(t.id),
+        );
         return (
           <>
             <a href="/clients" class={`text-xs ${link}`}>
               All clients
             </a>
             <Overview
+              canDraftUnbilled={canDraftUnbilled}
               o={o}
               today={today}
               contents={contents}

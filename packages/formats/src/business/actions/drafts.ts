@@ -1,7 +1,15 @@
 import type { Slug, Ulid } from '../ids.js';
 import type { FileChanges } from '../issue.js';
 import { draftPath } from '../paths.js';
-import { type Draft, KEY_ORDER, type Line, type Project, type TimeEntry } from '../records.js';
+import {
+  type BusinessProfile,
+  type Draft,
+  KEY_ORDER,
+  type Line,
+  type Project,
+  type TimeEntry,
+  type VatCategory,
+} from '../records.js';
 import type { BusinessRepo } from '../repo.js';
 import { validateDraft } from '../validate.js';
 import type { Result } from '../validate-kit.js';
@@ -39,9 +47,21 @@ const refuse = (path: string, message: string) => ({
 
 /** Integer `value / divisor` rounded half up, as a decimal string with 2 places; no floats touch quantities. */
 const twoPlaces = (value: number, divisor: number): string => {
-  const hundredths = Math.floor((value * 200 + divisor) / (divisor * 2));
+  // A booked minute is never billed as nothing: the smallest quantity is 0.01.
+  const hundredths = Math.max(
+    value > 0 ? 1 : 0,
+    Math.floor((value * 200 + divisor) / (divisor * 2)),
+  );
   return `${Math.floor(hundredths / 100)}.${String(hundredths % 100).padStart(2, '0')}`;
 };
+
+/** Small-business sellers charge no VAT: category E at 0 (what the `de` rules require); otherwise S at the profile rate. */
+export const defaultVat = (
+  profile: Pick<BusinessProfile, 'vat_regime' | 'default_vat_rate'>,
+): { vat_category: VatCategory; vat_rate: string } =>
+  profile.vat_regime === 'small-business'
+    ? { vat_category: 'E', vat_rate: '0' }
+    : { vat_category: 'S', vat_rate: profile.default_vat_rate };
 
 const WITHOUT_RATE = 'Time without rate — set a price';
 
@@ -57,16 +77,26 @@ export const draftFromUnbilled = (
   id: Ulid,
   _today: string,
 ): Result<Draft> => {
-  const entries = repo.time.filter(
+  // Time already in a draft is not offered again, unless the caller names the entries.
+  const drafted = new Set(repo.drafts.flatMap((d) => d.time_entries ?? []));
+  const unbilled = repo.time.filter(
     (t) =>
       t.client === client &&
       t.invoice === undefined &&
       (opts.project === undefined || t.project === opts.project) &&
       (opts.entryIds === undefined || opts.entryIds.includes(t.id)),
   );
-  if (entries.length === 0) return refuse('time_entries', 'There is no unbilled time to invoice.');
+  const entries = opts.entryIds ? unbilled : unbilled.filter((t) => !drafted.has(t.id));
+  if (entries.length === 0) {
+    return refuse(
+      'time_entries',
+      unbilled.length > 0
+        ? 'All unbilled time is already in a draft.'
+        : 'There is no unbilled time to invoice.',
+    );
+  }
   if (!repo.profile) return refuse('profile', 'Set up the business profile first.');
-  const rate = repo.profile.default_vat_rate;
+  const vat = defaultVat(repo.profile);
 
   const byProject = new Map<string, TimeEntry[]>();
   const unrated: TimeEntry[] = [];
@@ -89,8 +119,7 @@ export const draftFromUnbilled = (
       quantity: twoPlaces(sum(list), daily ? 480 : 60),
       unit: daily ? 'DAY' : 'HUR',
       unit_price: project.rate.amount,
-      vat_category: 'S',
-      vat_rate: rate,
+      ...vat,
     });
   }
   if (unrated.length > 0) {
@@ -99,8 +128,7 @@ export const draftFromUnbilled = (
       quantity: twoPlaces(sum(unrated), 60),
       unit: 'HUR',
       unit_price: 0,
-      vat_category: 'S',
-      vat_rate: rate,
+      ...vat,
     });
   }
   const dates = entries.map((e) => e.date).sort();
@@ -159,8 +187,7 @@ export const draftFromRetainer = (
         quantity: '1',
         unit: 'C62',
         unit_price: retainer.amount,
-        vat_category: 'S',
-        vat_rate: repo.profile.default_vat_rate,
+        ...defaultVat(repo.profile),
       },
     ],
   });

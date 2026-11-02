@@ -34,22 +34,24 @@ export type DraftForm = {
 export const UNITS = ['HUR', 'DAY', 'C62'] as const;
 export const EXEMPTION_HINT = 'needs an exemption note — not supported yet';
 
-export const emptyLine = (vatRate: string): LineForm => ({
+export type DefaultVat = { vat_category: VatCategory; vat_rate: string };
+
+export const emptyLine = (vat: DefaultVat): LineForm => ({
   description: '',
   quantity: '1',
   unit: 'C62',
   unitPrice: '',
-  vatCategory: 'S',
-  vatRate,
+  vatCategory: vat.vat_category,
+  vatRate: vat.vat_rate,
 });
 
-export const emptyDraftForm = (kind: DocKind, vatRate: string, validUntil: string): DraftForm => ({
+export const emptyDraftForm = (kind: DocKind, vat: DefaultVat, validUntil: string): DraftForm => ({
   project: '',
   serviceStart: '',
   serviceEnd: '',
   validUntil: kind === 'offer' ? validUntil : '',
   notes: '',
-  lines: [emptyLine(vatRate)],
+  lines: [emptyLine(vat)],
 });
 
 export const formFromDraft = (draft: Draft, currency: string): DraftForm => ({

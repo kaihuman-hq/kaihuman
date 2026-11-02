@@ -31,7 +31,7 @@ const first = (f: { lines: LineForm[] }): LineForm => {
   return l;
 };
 const valid = () => {
-  const f = emptyDraftForm('invoice', '19', '');
+  const f = emptyDraftForm('invoice', { vat_category: 'S', vat_rate: '19' }, '');
   const [line] = f.lines;
   if (!line) throw new Error('line');
   f.lines = [{ ...line, description: 'Dev', quantity: '1,5', unitPrice: '95', unit: 'HUR' }];
@@ -136,6 +136,13 @@ describe('draftFromForm', () => {
     const text = Object.values(saved.value.changes)[0] ?? '';
     const parsed = parseYaml(text);
     expect(parsed.ok && validateDraft(parsed.value).ok).toBe(true);
+  });
+});
+
+describe('emptyDraftForm', () => {
+  it('starts the first line with the given VAT default', () => {
+    const f = emptyDraftForm('invoice', { vat_category: 'E', vat_rate: '0' }, '');
+    expect(f.lines[0]).toMatchObject({ vatCategory: 'E', vatRate: '0' });
   });
 });
 
