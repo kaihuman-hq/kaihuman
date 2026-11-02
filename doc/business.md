@@ -1,7 +1,7 @@
 # Business — file format reference
 
-Status: phase 1 built (2026-10-26): formats, repo check, skill, set-up function. Console pages
-come in later phases. Design: `docs/superpowers/specs/2026-10-26-business-design.md`.
+Status: phase 1 built (2026-10-26): formats, repo check, skill, set-up function. Phase 2 built
+(2026-10-27): read-only console pages. Design: `docs/superpowers/specs/2026-10-26-business-design.md`.
 
 ## Goal
 
@@ -133,12 +133,35 @@ rule. The workflow runs it on pushes and pull requests that touch
 profile, refuses a public repo (`PublicRepoError`) or one that already has
 `.kh/business/business.yaml` (`AlreadyEnabledError`), and makes one commit,
 `chore: enable kaihuman business`, with the profile, empty data folders, the check, the workflow,
-the skill and the Verfahrensdokumentation template. The console form for it comes in phase 2.
+the skill and the Verfahrensdokumentation template. The console form for it is `/business/enable`.
 `syncKB` refreshes the tool files when `.kh/business/.tools/version` differs from
 `BUSINESS_TOOLS_VERSION`. Repos without business get nothing.
 
 Before you enable: the whole repo now holds tax records for 8 years, so do not delete it or
 rewrite its history, and protect the main branch (no force-push, no deletion).
+
+## Console
+
+The console reads the business files and never writes them (the one exception is the "Enable
+business" commit). It needs a private repo with business enabled.
+
+| Page | What it shows |
+|------|---------------|
+| `/business` | Dashboard: receivables and overdue invoices, billed this year, VAT of the month and quarter, unbilled time, contracts ending soon, offer and client pipeline |
+| `/clients` | Client list with stage, open amount and unbilled time |
+| `/clients/:slug` | One page per client: timeline, offers, invoices, projects with budget use, time by week, todos, action log, contracts, notes and pages that link to the client |
+| `/business/enable` | Set-up form; explains why it is blocked on a public repo |
+
+- The Kanban board, the todo analytics and the action log have an All / Business / Personal toggle.
+  Client todos (`clients/<slug>/todos.todos.md`) and logs (`log.actionlog.md`) count as Business.
+- `[[client:slug]]` in a wiki page or idea links to `/clients/<slug>`; the client page lists these
+  backlinks.
+- A file with errors shows up in a collapsible "N files have problems" list; the rest still renders.
+- Demo mode seeds a sample business ("Demo Studio", fake IBAN and VAT ID) with three clients, a paid
+  and an overdue invoice, an offer, time entries and a wiki page linking to the active client.
+
+Warning: do not change `numbering` in `business.yaml` once you have issued documents. The check
+reads the format of every issued number from it, and a changed format breaks the gap-free series.
 
 ## GoBD caveat
 

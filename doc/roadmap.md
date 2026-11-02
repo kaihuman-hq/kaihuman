@@ -40,7 +40,7 @@
 ## Business (`doc/business.md`)
 
 - [x] Phase 1: formats, repo check, agent skill, set-up (`enableBusiness`) and `syncKB` wiring
-- [ ] Phase 2: read-only console (enable form, `/clients`, client page, `/business` dashboard)
+- [x] Phase 2: read-only console (enable form, `/clients`, client page, `/business` dashboard)
 - [ ] Phase 3: daily forms (time, payments, drafts, issue, credit notes, offer accept/decline)
 - [ ] Phase 4: share service (encrypted, revocable links)
 - [ ] Phase 5: money admin (expenses, VAT summary, year export, retainers, contract reminders)

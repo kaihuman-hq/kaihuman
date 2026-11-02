@@ -1,6 +1,8 @@
 import { buildDemoSeed, type DashboardConfig, InMemoryGithubService } from '@kaihuman/core';
 import { ideaActivity, ideaSlugOf, parseIdea } from '@kaihuman/formats';
+import { checkBusinessRepo, loadBusinessRepo } from '@kaihuman/formats/business';
 import { describe, expect, it } from 'vitest';
+import { businessDashboard } from './lib/business/overview.js';
 
 const CONFIG_PATH = '.kh/.dashboard.config.json';
 
@@ -163,5 +165,24 @@ describe('demo ideas', () => {
     expect(levels.has('dormant')).toBe(true);
     // One idea has no log yet, so the overview shows its "no activity yet" state.
     expect(ideas.some((idea) => idea.log.length === 0)).toBe(true);
+  });
+});
+
+describe('demo business', () => {
+  // The January case catches year-boundary date maths: issue dates fall in the previous year.
+  it.each([
+    [new Date(2026, 9, 27), '2026-10-27'],
+    [new Date(2027, 0, 8), '2027-01-08'],
+    [new Date(2027, 1, 5), '2027-02-05'],
+  ])('passes the business check for now=%s', (now, today) => {
+    const seed = buildDemoSeed(now);
+    const files = new Map(
+      Object.entries(seed.files).filter(([path]) => path.startsWith('.kh/business/')),
+    );
+    expect(checkBusinessRepo({ files, changes: null, today })).toEqual([]);
+    const repo = loadBusinessRepo(files);
+    expect(repo.clients).toHaveLength(3);
+    expect(businessDashboard(repo, today).overdueTotal).toBeGreaterThan(0);
+    expect(seed.files['.kh/wiki/clients.md']).toContain('[[client:northwind-labs]]');
   });
 });
