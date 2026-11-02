@@ -1,7 +1,7 @@
 import { CLIENT_STAGES } from '@kaihuman/formats/business';
 import { Card } from '../components/business/Card';
 import { RecordPaymentLink } from '../components/business/DocActions';
-import { hours, money } from '../components/business/money';
+import { hours, money, STAGE_LABEL } from '../components/business/money';
 import { PageShell } from '../components/business/PageShell';
 import { ProblemsList } from '../components/business/ProblemsList';
 import { Stat } from '../components/business/Stat';
@@ -233,7 +233,7 @@ export function BusinessPage() {
                 {CLIENT_STAGES.map((stage) => (
                   <div key={stage} class="min-w-0">
                     <h3 class="text-[10px] uppercase tracking-widest text-[var(--los-muted)] mb-1">
-                      {stage}
+                      {STAGE_LABEL[stage]}
                     </h3>
                     {d.pipeline[stage].length === 0 ? (
                       <p class="text-xs italic text-[var(--los-muted)]">None</p>

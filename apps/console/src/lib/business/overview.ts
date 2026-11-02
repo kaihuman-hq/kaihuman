@@ -59,7 +59,10 @@ export type ClientSummary = {
   unbilledMinutes: number;
   minutesThisMonth: number;
   currency: string;
-  /** Newest timeline date that is not in the future; undefined without any activity. */
+  /**
+   * Newest date of the client's documents, payments, events and contracts that is not in the
+   * future. Log entries and time entries are not counted. Undefined without any activity.
+   */
   lastActivity?: string;
 };
 
@@ -202,7 +205,6 @@ const billedIn = (issued: readonly Issued[], clientSlug: string, year: string): 
 /** Offers, invoices, payments, events, log entries and contract dates of one client, newest first. */
 const clientTimeline = (
   repo: BusinessRepo,
-  _slug: string,
   today: string,
   offers: OfferRow[],
   invoices: InvoiceRow[],
@@ -269,7 +271,7 @@ const summarize = (repo: BusinessRepo, client: Client, today: string): ClientSum
   const rows = mineAll.filter((r) => r.kind === 'invoice');
   const offers = offerRows(repo, today).filter((r) => r.client === client.slug);
   const contracts = repo.contracts.filter((c) => c.client === client.slug);
-  const lastActivity = clientTimeline(repo, client.slug, today, offers, mineAll, contracts).find(
+  const lastActivity = clientTimeline(repo, today, offers, mineAll, contracts).find(
     (t) => t.date <= today,
   )?.date;
   return {
@@ -335,7 +337,7 @@ export const clientOverview = (
     (a, b) => a.week.localeCompare(b.week) || (a.project ?? '').localeCompare(b.project ?? ''),
   );
 
-  const timeline = clientTimeline(repo, slug, today, offers, invoices, contracts, logContent);
+  const timeline = clientTimeline(repo, today, offers, invoices, contracts, logContent);
 
   const files: ClientOverview['files'] = {};
   for (const f of repo.clientFiles) if (f.client === slug) files[f.kind] = f.path;

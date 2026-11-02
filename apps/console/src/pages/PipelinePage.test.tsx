@@ -109,6 +109,7 @@ describe('PipelinePage', () => {
       return { ok: true, value: { commitSha: 'c' } };
     });
     await choose('past');
+    expect(Object.keys(built.value?.changes ?? {})).toEqual([CLIENT]);
     expect(built.value?.changes[CLIENT]).toBe(original.replace(/stage: active/, 'stage: past'));
     expect(built.value?.message).toBe('business: acme-gmbh → past');
     expect(host.querySelector('output')?.textContent).toBe('Acme GmbH moved to Past.');
@@ -126,10 +127,33 @@ describe('PipelinePage', () => {
     expect(document.activeElement).toBe(moved);
   });
 
+  it('focuses the toggle when the client moves into the collapsed columns', async () => {
+    show(ready(fixture()));
+    writes.writeBusiness.mockResolvedValue({ ok: true, value: { commitSha: 'c' } });
+    await choose('lost');
+    const toggle = host.querySelector('button') as HTMLButtonElement;
+    expect(toggle.textContent).toBe('Show past and lost (1)');
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it('does not pull focus back when the data reloads later', async () => {
+    const m = fixture();
+    show(ready(m));
+    writes.writeBusiness.mockResolvedValue({ ok: true, value: { commitSha: 'c' } });
+    await choose('contacted');
+    const other = host.querySelector('a') as HTMLAnchorElement;
+    act(() => other.focus());
+    show(ready(m));
+    await flush();
+    expect(document.activeElement).toBe(other);
+  });
+
   it('keeps the card in place and alerts when saving fails', async () => {
     show(ready(fixture()));
     writes.writeBusiness.mockRejectedValue(new Error('offline'));
     await choose('past');
+    expect(document.activeElement).toBe(select());
+    expect(select().value).toBe('active');
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('nothing was written');
     expect(heading('Active (1)')).toBeDefined();
     expect(host.querySelector('output')?.textContent).toBe('');
@@ -142,6 +166,8 @@ describe('PipelinePage', () => {
       issues: [{ path: 'stage', message: 'acme-gmbh is already past.' }],
     });
     await choose('past');
+    expect(document.activeElement).toBe(select());
+    expect(select().value).toBe('active');
     expect(host.querySelector('[role="alert"]')?.textContent).toBe('acme-gmbh is already past.');
     expect(heading('Active (1)')).toBeDefined();
   });

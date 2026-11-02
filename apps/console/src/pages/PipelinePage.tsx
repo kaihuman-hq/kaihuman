@@ -7,7 +7,7 @@ import {
   setClientStage,
 } from '@kaihuman/formats/business';
 import { useEffect, useState } from 'preact/hooks';
-import { money } from '../components/business/money';
+import { money, STAGE_LABEL } from '../components/business/money';
 import { PageShell } from '../components/business/PageShell';
 import { ProblemsList } from '../components/business/ProblemsList';
 import { todayLocal } from '../lib/business/dates';
@@ -16,18 +16,10 @@ import { useBusinessRepo } from '../lib/business/use-business-repo';
 import { writeBusiness, writeErrorMessage } from '../lib/business/write';
 import type { KBRepo } from '../lib/github-kb';
 
-export const STAGE_LABEL: Record<ClientStage, string> = {
-  lead: 'Lead',
-  contacted: 'Contacted',
-  'offer-sent': 'Offer sent',
-  active: 'Active',
-  past: 'Past',
-  lost: 'Lost',
-};
-
 const INPUT =
   'bg-transparent border border-[var(--los-border)] px-1 py-0.5 text-xs w-full min-w-0 text-[var(--los-fg)]';
 const COLLAPSED: readonly ClientStage[] = ['past', 'lost'];
+const TOGGLE_ID = 'pipeline-archive-toggle';
 const selectId = (slug: string) => `move-${slug}`;
 
 export function PipelinePage() {
@@ -38,18 +30,31 @@ export function PipelinePage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [focusSlug, setFocusSlug] = useState<string | null>(null);
+  // Each move request asks for focus once; the effect clears it so reloads never steal focus.
+  const [focusReq, setFocusReq] = useState<string | null>(null);
   const data = state.status === 'ready' ? state.data : null;
 
   // New repository data already contains the moves.
   useEffect(() => setMoved({}), [data]);
-  // A card remounts in its new column, so focus goes back to its select.
+  // The card remounts in its new column; in a collapsed column the toggle is the nearest control.
   useEffect(() => {
-    if (focusSlug) document.getElementById(selectId(focusSlug))?.focus();
-  }, [focusSlug, moved, data]);
+    if (focusReq === null) return;
+    (document.getElementById(selectId(focusReq)) ?? document.getElementById(TOGGLE_ID))?.focus();
+    setFocusReq(null);
+  }, [focusReq]);
 
-  async function move(target: KBRepo, client: ClientSummary, stage: ClientStage) {
-    if (busy || demoMode.value || stage === client.stage) return;
+  /** The select shows what the user picked; a failed move puts it back and returns focus to it. */
+  function revert(select: HTMLSelectElement, client: ClientSummary) {
+    select.value = client.stage;
+    setFocusReq(client.slug);
+  }
+
+  async function move(target: KBRepo, client: ClientSummary, select: HTMLSelectElement) {
+    const stage = select.value as ClientStage;
+    if (busy || demoMode.value || stage === client.stage) {
+      select.value = client.stage;
+      return;
+    }
     setBusy(true);
     setError(null);
     setAnnouncement('');
@@ -65,13 +70,15 @@ export function PipelinePage() {
       });
       if (!result.ok) {
         setError(result.issues[0]?.message ?? 'Nothing was saved.');
+        revert(select, client);
         return;
       }
       setMoved((m) => ({ ...m, [slug]: stage }));
       setAnnouncement(`${client.name} moved to ${STAGE_LABEL[stage]}.`);
-      setFocusSlug(slug);
+      setFocusReq(slug);
     } catch (e) {
       setError(writeErrorMessage(e));
+      revert(select, client);
     } finally {
       setBusy(false);
     }
@@ -138,13 +145,8 @@ export function PipelinePage() {
                                   id={selectId(c.slug)}
                                   class={INPUT}
                                   value={c.stage}
-                                  disabled={busy}
                                   onChange={(e) =>
-                                    move(
-                                      target,
-                                      c,
-                                      (e.currentTarget as HTMLSelectElement).value as ClientStage,
-                                    )
+                                    move(target, c, e.currentTarget as HTMLSelectElement)
                                   }
                                 >
                                   {CLIENT_STAGES.map((s) => (
@@ -164,6 +166,7 @@ export function PipelinePage() {
               })}
             </div>
             <button
+              id={TOGGLE_ID}
               type="button"
               aria-expanded={showArchived}
               onClick={() => setShowArchived((v) => !v)}
