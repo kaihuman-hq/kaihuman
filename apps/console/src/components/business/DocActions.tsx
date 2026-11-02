@@ -1,5 +1,6 @@
 import {
   convertOffer,
+  creditInvoice,
   decideOffer,
   EVENTS_PATH,
   type Ulid,
@@ -7,6 +8,7 @@ import {
 } from '@kaihuman/formats/business';
 import { useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { todayLocal } from '../../lib/business/dates';
 import { useBusinessRepo } from '../../lib/business/use-business-repo';
 import { writeBusiness, writeErrorMessage } from '../../lib/business/write';
 
@@ -101,6 +103,55 @@ export function OfferActions({ offer, decided = false }: { offer: string; decide
         onClick={convert}
       >
         Convert to invoice
+      </button>
+      {error && (
+        <p role="alert" class="w-full text-xs text-[var(--los-warning)]">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** "Credit note…": saves a credit note draft with the invoice's lines and opens it in the editor. */
+export function CreditNoteAction({ invoice }: { invoice: string }) {
+  const state = useBusinessRepo();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submitting = useRef(false);
+  if (state.status !== 'ready') return null;
+  const { repo } = state;
+
+  async function credit() {
+    if (submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    setError(null);
+    const id: Ulid = ulid();
+    try {
+      const result = await writeBusiness(repo, async (fresh) =>
+        creditInvoice(fresh.repo, invoice, id, todayLocal()),
+      );
+      if (!result.ok) setError(result.issues[0]?.message ?? 'Nothing was saved.');
+      else route(`/business/drafts/${id}`);
+    } catch (err) {
+      setError(writeErrorMessage(err));
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div class="flex flex-wrap gap-1">
+      <button
+        type="button"
+        class={BUTTON}
+        disabled={busy}
+        aria-label={`Credit note for ${invoice}`}
+        onClick={credit}
+      >
+        Credit note…
       </button>
       {error && (
         <p role="alert" class="w-full text-xs text-[var(--los-warning)]">

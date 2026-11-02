@@ -15,7 +15,7 @@ vi.mock('../../lib/business/write', async (importOriginal) => ({
 }));
 vi.mock('preact-router', () => router);
 
-const { OfferActions } = await import('./DocActions');
+const { CreditNoteAction, OfferActions } = await import('./DocActions');
 
 const target = { full_name: 'me/biz', default_branch: 'main' } as never;
 const CLIENT = '.kh/business/clients/acme-gmbh/client.yaml';
@@ -99,6 +99,47 @@ describe('OfferActions', () => {
     act(() => button('Accepted').click());
     await flush();
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('already declined');
+    expect(router.route).not.toHaveBeenCalled();
+  });
+});
+
+describe('CreditNoteAction', () => {
+  const INVOICE = '.kh/business/invoices/2026/RE-2026-0001.yaml';
+  const showCredit = () => act(() => render(<CreditNoteAction invoice="RE-2026-0001" />, host));
+
+  it('saves a credit note draft with the invoice lines and routes to the editor', async () => {
+    showCredit();
+    writeAgainst(load('active'));
+    act(() => button('Credit note…').click());
+    await flush();
+    const [path, text] = Object.entries(built.value?.changes ?? {})[0] ?? [];
+    expect(path).toMatch(/^\.kh\/business\/drafts\/[0-9A-Z]{26}\.yaml$/);
+    expect(text).toContain('kind: credit-note');
+    expect(text).toContain('corrects: RE-2026-0001');
+    expect(text).toContain('description: Dev');
+    expect(text).not.toContain('time_entries');
+    const id = /drafts\/(.*)\.yaml/.exec(path ?? '')?.[1];
+    expect(router.route).toHaveBeenCalledWith(`/business/drafts/${id}`);
+  });
+
+  it('shows the refusal when the invoice was fully credited elsewhere', async () => {
+    showCredit();
+    const m = loadFixtureRepo();
+    m.set(
+      '.kh/business/invoices/2026/RE-2026-0002.yaml',
+      (m.get(INVOICE) ?? '')
+        .replaceAll('RE-2026-0001', 'RE-2026-0002')
+        .replace(/^draft_id: .*$/m, 'draft_id: 01M50ARQ007CHPV05AFMSY38DK')
+        .replace('type_code: 380', 'type_code: 381')
+        .replace(/^due_date: .*\n/m, '')
+        .replace('kind: invoice', 'kind: credit-note\ncorrects: RE-2026-0001'),
+    );
+    writeAgainst(loadBusinessRepo(m));
+    act(() => button('Credit note…').click());
+    await flush();
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(
+      'RE-2026-0001 is already fully credited.',
+    );
     expect(router.route).not.toHaveBeenCalled();
   });
 });

@@ -3,7 +3,11 @@ import { BUSINESS_ROOT } from '@kaihuman/formats/business';
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { Card } from '../components/business/Card';
-import { OfferActions, RecordPaymentLink } from '../components/business/DocActions';
+import {
+  CreditNoteAction,
+  OfferActions,
+  RecordPaymentLink,
+} from '../components/business/DocActions';
 import { hours, money } from '../components/business/money';
 import { PageShell } from '../components/business/PageShell';
 import { ProblemsList } from '../components/business/ProblemsList';
@@ -205,9 +209,14 @@ function Overview(props: {
               </td>
               <td class={td}>{r.link ?? 'no link'}</td>
               <td class={td}>
-                {r.kind === 'invoice' && r.status.open > 0 && (
-                  <RecordPaymentLink invoice={r.number} />
-                )}
+                <div class="flex flex-wrap items-center gap-2">
+                  {r.kind === 'invoice' && r.status.open > 0 && (
+                    <RecordPaymentLink invoice={r.number} />
+                  )}
+                  {r.kind === 'invoice' && r.status.state !== 'credited' && (
+                    <CreditNoteAction invoice={r.number} />
+                  )}
+                </div>
               </td>
             </tr>
           ))}

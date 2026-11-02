@@ -60,6 +60,19 @@ afterEach(() => {
 
 const buttons = () => [...host.querySelectorAll('button')].map((b) => b.textContent);
 const unpaid = (m: Map<string, string>) => m.delete('.kh/business/payments/2026.jsonl');
+/** Adds RE-2026-0002, a credit note for the whole of RE-2026-0001. */
+const fullyCredited = (m: Map<string, string>) => {
+  const invoice = m.get('.kh/business/invoices/2026/RE-2026-0001.yaml') ?? '';
+  m.set(
+    '.kh/business/invoices/2026/RE-2026-0002.yaml',
+    invoice
+      .replaceAll('RE-2026-0001', 'RE-2026-0002')
+      .replace(/^draft_id: .*$/m, 'draft_id: 01M50ARQ007CHPV05AFMSY38DK')
+      .replace('type_code: 380', 'type_code: 381')
+      .replace(/^due_date: .*\n/m, '')
+      .replace('kind: invoice', 'kind: credit-note\ncorrects: RE-2026-0001'),
+  );
+};
 
 describe('ClientPage actions', () => {
   it('offers Accepted, Declined and Convert to invoice for an undecided offer, and no payment link for a paid invoice', () => {
@@ -136,6 +149,13 @@ describe('ClientPage actions', () => {
     expect(buttons()).toContain('Convert to invoice');
     expect(buttons()).not.toContain('Accepted');
     expect(buttons()).not.toContain('Declined');
+  });
+
+  it('offers Credit note… for an invoice, and none once it is fully credited', () => {
+    show(ready(load()));
+    expect(buttons()).toContain('Credit note…');
+    show(ready(load(fullyCredited)));
+    expect(buttons()).not.toContain('Credit note…');
   });
 
   it('shows no offer buttons for a declined offer', () => {
