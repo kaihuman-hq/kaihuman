@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, isoWeek, quarterOf } from './dates.js';
+import { addDays, isoWeek, isRealDate, quarterOf } from './dates.js';
 
 describe('dates', () => {
   it('finds the calendar quarter', () => {
@@ -20,5 +20,19 @@ describe('dates', () => {
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
     expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
     expect(addDays('2026-10-27', 0)).toBe('2026-10-27');
+  });
+});
+
+describe('isRealDate', () => {
+  it.each([
+    ['2026-11-02', true],
+    ['2028-02-29', true],
+    ['2026-02-29', false],
+    ['2026-13-01', false],
+    ['2026-00-10', false],
+    ['2026-1-2', false],
+    ['', false],
+  ])('%s → %s', (text, expected) => {
+    expect(isRealDate(text)).toBe(expected);
   });
 });

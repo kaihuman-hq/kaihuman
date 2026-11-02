@@ -11,6 +11,7 @@ import {
   validateDraft,
 } from '@kaihuman/formats/business';
 import { parseMoney } from './client-form';
+import { isRealDate } from './dates';
 
 export type LineForm = {
   description: string;
@@ -69,10 +70,6 @@ export const formFromDraft = (draft: Draft, currency: string): DraftForm => ({
     vatRate: l.vat_rate,
   })),
 });
-
-/** Round-trips through Date so 2026-02-31 is refused rather than rolled into March. */
-const isRealDate = (text: string): boolean =>
-  /^\d{4}-\d{2}-\d{2}$/.test(text) && new Date(`${text}T00:00:00Z`).toISOString().startsWith(text);
 
 /** `1,5` → `1.5`; `null` when the text is not a positive decimal. */
 export const parseQuantity = (input: string): string | null => {

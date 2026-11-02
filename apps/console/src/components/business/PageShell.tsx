@@ -23,7 +23,7 @@ export function PageShell(props: {
           <h1 class="text-base font-bold">{props.title}</h1>
           {businessNotice.value && (
             <output class="flex flex-wrap items-start gap-2 border border-[var(--los-accent)] rounded p-2 text-xs">
-              <p class="min-w-0 flex-1 break-words">{businessNotice.value}</p>
+              <p class="min-w-0 flex-1 break-words">{businessNotice.value.text}</p>
               <button
                 type="button"
                 class="text-[var(--los-accent)] hover:underline"

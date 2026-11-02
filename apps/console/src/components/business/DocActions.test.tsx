@@ -122,6 +122,20 @@ describe('CreditNoteAction', () => {
     expect(router.route).toHaveBeenCalledWith(`/business/drafts/${id}`);
   });
 
+  it('links to the existing credit note draft instead of making another', () => {
+    const m = loadFixtureRepo();
+    const draft = '01M5AMBK0038DJQW16BGNTZ4C1';
+    m.set(
+      `.kh/business/drafts/${draft}.yaml`,
+      `id: ${draft}\nkind: credit-note\nclient: acme-gmbh\ncorrects: RE-2026-0001\nlines:\n  - description: Dev\n    quantity: "1"\n    unit: HUR\n    unit_price: 9500\n    vat_category: S\n    vat_rate: "19"\n`,
+    );
+    hooks.state = { ...(hooks.state as object), data: loadBusinessRepo(m) } as BusinessState;
+    showCredit();
+    const a = host.querySelector(`a[href="/business/drafts/${draft}"]`);
+    expect(a?.textContent).toBe('Credit note…');
+    expect(button('Credit note…')).toBeUndefined();
+  });
+
   it('shows the refusal when the invoice was fully credited elsewhere', async () => {
     showCredit();
     const m = loadFixtureRepo();

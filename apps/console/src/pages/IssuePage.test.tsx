@@ -3,7 +3,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadFixtureRepo } from '../lib/business/fixture.test-helper';
-import { businessNotice } from '../lib/business/notice';
+import { businessNotice, showNotice } from '../lib/business/notice';
 import type { BusinessState } from '../lib/business/use-business-repo';
 
 const hooks = vi.hoisted(() => ({ state: { status: 'loading' } as unknown }));
@@ -66,9 +66,20 @@ const issueButton = () =>
   [...host.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Issue')) as
     | HTMLButtonElement
     | undefined;
+const setDate = async (value: string) => {
+  const input = host.querySelector('#issue-date') as HTMLInputElement;
+  act(() => {
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await flush();
+};
+const submit = () => host.querySelector('button[type="submit"]') as HTMLButtonElement;
 const alerts = () => [...host.querySelectorAll('[role="alert"]')].map((a) => a.textContent);
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(2026, 10, 10, 12, 0, 0));
   vi.clearAllMocks();
   committed = [];
   businessNotice.value = null;
@@ -76,6 +87,7 @@ beforeEach(() => {
   document.body.appendChild(host);
 });
 afterEach(() => {
+  vi.useRealTimers();
   act(() => render(null, host));
   host.remove();
 });
@@ -155,7 +167,7 @@ describe('IssuePage preview', () => {
 
 describe('business notice', () => {
   it('is shown on the next business page until dismissed', async () => {
-    businessNotice.value = 'Issued RE-2026-0002.';
+    showNotice('Issued RE-2026-0002.', '/business/drafts/x/issue');
     await show(ready(files()));
     const notice = host.querySelector('output');
     expect(notice?.textContent).toContain('Issued RE-2026-0002.');
@@ -183,9 +195,10 @@ describe('IssuePage issue', () => {
       '.kh/business/invoices/2026/RE-2026-0003.yaml',
     );
     expect(committed[0]?.[DRAFT]).toBeNull();
-    expect(businessNotice.value).toBe(
-      'Issued RE-2026-0003. Generate the PDF with your generator; kaihuman shows "PDF missing" until it is in the repo.',
-    );
+    expect(businessNotice.value).toEqual({
+      path: '/clients/acme-gmbh',
+      text: 'Issued RE-2026-0003. Generate the PDF with your generator; kaihuman shows "PDF missing" until it is in the repo.',
+    });
     expect(router.route).toHaveBeenCalledWith('/clients/acme-gmbh');
   });
 
@@ -235,5 +248,67 @@ describe('IssuePage issue', () => {
     expect(submit.disabled).toBe(true);
     release();
     await flush();
+  });
+});
+
+describe('IssuePage confirmations', () => {
+  it('asks before issuing with a future date, then issues on the second click', async () => {
+    const m = files();
+    await show(ready(m));
+    await setDate('2026-11-20');
+    writeAgainst(m);
+    act(() => submit().click());
+    await flush();
+    expect(writes.writeBusiness).not.toHaveBeenCalled();
+    expect(alerts().join(' ')).toContain('The issue date is in the future. Issue anyway?');
+    expect(submit().textContent).toBe('Issue RE-2026-0002 anyway');
+    act(() => submit().click());
+    await flush();
+    expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
+    expect(router.route).toHaveBeenCalledWith('/clients/acme-gmbh');
+  });
+
+  it('asks again after the date changes', async () => {
+    await show(ready(files()));
+    await setDate('2026-11-20');
+    act(() => submit().click());
+    await flush();
+    await setDate('2026-11-21');
+    expect(submit().textContent).toBe('Issue RE-2026-0002');
+  });
+
+  it('warns when a credit note is more than the uncredited rest of the invoice', async () => {
+    const m = files((f) =>
+      f.set(
+        DRAFT,
+        (f.get(DRAFT) ?? '')
+          .replace('kind: invoice', 'kind: credit-note\ncorrects: RE-2026-0001')
+          .replace('quantity: "7.5"', 'quantity: "8.5"'),
+      ),
+    );
+    await show(ready(m));
+    expect(host.textContent).toContain(
+      'This credit note is 113.05 EUR more than the amount still open on RE-2026-0001.',
+    );
+    writeAgainst(m);
+    act(() => submit().click());
+    await flush();
+    expect(writes.writeBusiness).not.toHaveBeenCalled();
+    act(() => submit().click());
+    await flush();
+    expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
+  });
+
+  it('wraps refusals in one alert that keeps the list', async () => {
+    await show(
+      ready(
+        files((m) =>
+          m.set(DRAFT, (m.get(DRAFT) ?? '').replace('vat_category: S', 'vat_category: Z')),
+        ),
+      ),
+    );
+    const alert = host.querySelector('[role="alert"]');
+    expect(alert?.tagName).toBe('DIV');
+    expect(alert?.querySelector('ul li')).not.toBeNull();
   });
 });

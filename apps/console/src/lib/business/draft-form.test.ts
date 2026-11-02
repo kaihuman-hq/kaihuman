@@ -168,3 +168,16 @@ describe('unsupportedCategories', () => {
     ).toEqual([]);
   });
 });
+
+describe('impossible dates', () => {
+  it('reports 2026-13-01 as a field error instead of throwing', () => {
+    const r = draftFromForm(
+      { ...valid(), serviceStart: '2026-13-01', serviceEnd: '2026-12-01' },
+      base,
+    );
+    expect(r.ok).toBe(false);
+    expect(draftFieldErrors(r).service_period).toBe(
+      'Enter both dates as YYYY-MM-DD, or leave both empty.',
+    );
+  });
+});

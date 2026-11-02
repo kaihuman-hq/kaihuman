@@ -29,3 +29,10 @@ export const isoWeek = (date: string): string => {
 };
 
 export const addDays = (date: string, days: number): string => fromUtc(toUtc(date) + days * DAY);
+
+/** Round-trips through Date so 2026-02-31 is refused; an impossible month never reaches toISOString. */
+export const isRealDate = (text: string): boolean => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+  const d = new Date(`${text}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(text);
+};

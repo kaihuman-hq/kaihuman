@@ -61,3 +61,13 @@ describe('overpayment', () => {
     );
   });
 });
+
+describe('impossible dates', () => {
+  it('reports 2026-13-01 as a field error instead of throwing', () => {
+    const r = paymentFromForm({ amount: '5', date: '2026-13-01', method: '', ref: '' }, 100);
+    expect(r).toEqual({
+      ok: false,
+      issues: [{ path: 'date', message: 'Enter a date as YYYY-MM-DD.' }],
+    });
+  });
+});

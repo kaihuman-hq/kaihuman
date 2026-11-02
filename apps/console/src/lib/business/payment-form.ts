@@ -1,6 +1,7 @@
 import { formatMinor, type Payment, type Result } from '@kaihuman/formats/business';
 import { money } from '../../components/business/money';
 import { parseMoney } from './client-form';
+import { isRealDate } from './dates';
 
 export type PaymentForm = {
   amount: string;
@@ -8,10 +9,6 @@ export type PaymentForm = {
   method: string;
   ref: string;
 };
-
-/** Round-trips through Date so 2026-02-31 is refused rather than rolled into March. */
-const isRealDate = (text: string): boolean =>
-  /^\d{4}-\d{2}-\d{2}$/.test(text) && new Date(`${text}T00:00:00Z`).toISOString().startsWith(text);
 
 export type PaymentField = keyof PaymentForm;
 

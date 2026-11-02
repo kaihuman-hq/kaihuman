@@ -4,17 +4,16 @@ import { route } from 'preact-router';
 import { a11y, Field, INPUT } from '../components/business/FormField';
 import { money } from '../components/business/money';
 import { PageShell } from '../components/business/PageShell';
-import { todayLocal } from '../lib/business/dates';
+import { isRealDate, todayLocal } from '../lib/business/dates';
 import {
   type IssuePreview,
-  isRealDate,
   issuedNotice,
   issueFromFresh,
   loadedSource,
   previewIssue,
 } from '../lib/business/issue-flow';
 import { parseLoadError } from '../lib/business/load';
-import { businessNotice } from '../lib/business/notice';
+import { showNotice } from '../lib/business/notice';
 import { useBusinessRepo } from '../lib/business/use-business-repo';
 import { writeBusiness, writeErrorMessage } from '../lib/business/write';
 import type { KBRepo } from '../lib/github-kb';
@@ -35,11 +34,13 @@ const Row = (props: { label: string; value: string; strong?: boolean }) => (
 );
 
 const Problems = ({ issues }: { issues: Issue[] }) => (
-  <ul role="alert" class="text-xs text-[var(--los-warning)] list-disc pl-4 space-y-1">
-    {issues.map((i) => (
-      <li key={`${i.path}:${i.message}`}>{i.message}</li>
-    ))}
-  </ul>
+  <div role="alert">
+    <ul class="text-xs text-[var(--los-warning)] list-disc pl-4 space-y-1">
+      {issues.map((i) => (
+        <li key={`${i.path}:${i.message}`}>{i.message}</li>
+      ))}
+    </ul>
+  </div>
 );
 
 function Preview({ p }: { p: IssuePreview }) {
@@ -71,6 +72,13 @@ function Preview({ p }: { p: IssuePreview }) {
         <Row label="VAT" value={money(p.totals.vat, p.currency)} />
         <Row label="Gross" value={money(p.totals.gross, p.currency)} strong />
       </dl>
+      {p.warnings.length > 0 && (
+        <ul aria-label="Warnings" class="space-y-1 text-[var(--los-warning)]">
+          {p.warnings.map((w) => (
+            <li key={w}>{w}</li>
+          ))}
+        </ul>
+      )}
       {p.legalNotes.length > 0 && (
         <ul aria-label="Legal notes" class="space-y-1 text-[var(--los-muted)]">
           {p.legalNotes.map((n) => (
@@ -94,12 +102,15 @@ function IssueForm(props: {
   const [issueDate, setIssueDate] = useState(todayLocal);
   const [preview, setPreview] = useState<Result<IssuePreview> | null>(null);
   const [problems, setProblems] = useState<Issue[]>([]);
+  // The warnings the user has been asked about; issuing waits for a second click.
+  const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   // Set synchronously: `busy` only changes after the next render.
   const submitting = useRef(false);
   const dateOk = isRealDate(issueDate);
 
   useEffect(() => {
+    setConfirming(false);
     if (!dateOk) {
       setPreview(null);
       return;
@@ -117,7 +128,11 @@ function IssueForm(props: {
   }, [data, contents, loadErrors, draft.id, issueDate, dateOk]);
 
   async function handleIssue() {
-    if (submitting.current || !dateOk) return;
+    if (submitting.current || !dateOk || !preview?.ok) return;
+    if (preview.value.warnings.length > 0 && !confirming) {
+      setConfirming(true);
+      return;
+    }
     submitting.current = true;
     setBusy(true);
     setProblems([]);
@@ -129,12 +144,19 @@ function IssueForm(props: {
         committed = r.ok ? r.value.number : null;
         return r;
       });
-      if (!result.ok || committed === null) {
-        setProblems(result.ok ? [] : result.issues);
+      if (!result.ok) {
+        setProblems(result.issues);
         return;
       }
-      businessNotice.value = issuedNotice(committed);
-      route(`/clients/${draft.client}`);
+      if (committed === null) {
+        setProblems([
+          { path: 'write', message: 'Issuing failed; reload and check the documents.' },
+        ]);
+        return;
+      }
+      const clientPage = `/clients/${draft.client}`;
+      showNotice(issuedNotice(committed), clientPage);
+      route(clientPage);
     } catch (err) {
       setProblems([{ path: 'write', message: writeErrorMessage(err) }]);
     } finally {
@@ -179,6 +201,13 @@ function IssueForm(props: {
       )}
       {dateOk && preview?.ok === false && <Problems issues={preview.issues} />}
       {ready && preview.ok && <Preview p={preview.value} />}
+      {ready && confirming && preview.ok && (
+        <div role="alert" class="text-xs text-[var(--los-warning)] space-y-1">
+          {preview.value.warnings.map((w) => (
+            <p key={w}>{w}</p>
+          ))}
+        </div>
+      )}
       {ready && (
         <p class="text-xs text-[var(--los-muted)]">
           Issuing is final: the document cannot be changed afterwards, only corrected by a credit
@@ -190,7 +219,9 @@ function IssueForm(props: {
         disabled={busy || !ready}
         class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50"
       >
-        {busy ? 'Issuing...' : `Issue ${preview?.ok ? preview.value.number : ''}`.trim()}
+        {busy
+          ? 'Issuing...'
+          : `Issue ${preview?.ok ? preview.value.number : ''}${confirming ? ' anyway' : ''}`.trim()}
       </button>
       {problems.length > 0 && <Problems issues={problems} />}
     </form>

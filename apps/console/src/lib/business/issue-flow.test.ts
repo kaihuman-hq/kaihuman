@@ -5,13 +5,26 @@ import { loadFixtureRepo } from './fixture.test-helper';
 import {
   buildIssueContext,
   frozenClashes,
-  isRealDate,
   issuedNotice,
   issueFromFresh,
   loadedSource,
   previewIssue,
 } from './issue-flow';
 import { type FileChanges, writeBusiness } from './write';
+
+// Lets a test make issue() return an extra change, to prove the frozen-file guard stops it.
+const force = vi.hoisted(() => ({ extra: null as string | null }));
+vi.mock('@kaihuman/formats/business', async (importOriginal) => {
+  const m = await importOriginal<typeof import('@kaihuman/formats/business')>();
+  return {
+    ...m,
+    issue: (ctx: Parameters<typeof m.issue>[0]) => {
+      const r = m.issue(ctx);
+      if (!r.ok || force.extra === null) return r;
+      return { ...r, value: { ...r.value, changes: { ...r.value.changes, [force.extra]: 'x' } } };
+    },
+  };
+});
 
 vi.mock('@kaihuman/core', () => {
   class ConflictError extends Error {}
@@ -76,6 +89,7 @@ const commits = () =>
 
 beforeEach(() => {
   vi.resetAllMocks();
+  force.extra = null;
   __resetRepoFilesCacheForTests();
   files = baseFiles();
   head = 1;
@@ -100,19 +114,6 @@ const commit = async (issueDate = '2026-11-02') => {
   });
   return { result, number };
 };
-
-describe('isRealDate', () => {
-  it.each([
-    ['2026-11-02', true],
-    ['2028-02-29', true],
-    ['2026-02-29', false],
-    ['2026-13-01', false],
-    ['2026-1-2', false],
-    ['', false],
-  ])('%s → %s', (text, expected) => {
-    expect(isRealDate(text)).toBe(expected);
-  });
-});
 
 describe('buildIssueContext', () => {
   it('collects the series numbers of every year from the tree, and the credit notes', async () => {
@@ -213,6 +214,66 @@ describe('previewIssue', () => {
   });
 });
 
+describe('previewIssue warnings (Q12, over-crediting)', () => {
+  const warningsFor = async (f: Record<string, string>, date: string) => {
+    const p = await previewIssue(sourceOf(f), DRAFT_ID, date, now);
+    if (!p.ok) throw new Error(JSON.stringify(p.issues));
+    return p.value.warnings;
+  };
+
+  it('none for an ordinary issue date', async () => {
+    expect(await warningsFor(baseFiles(), '2026-11-02')).toEqual([]);
+  });
+
+  it('an issue date before the latest of the series and year is out of order', async () => {
+    const f = baseFiles();
+    f[issuedAt('RE-2026-0042')] = (f[issuedAt('RE-2026-0042')] ?? '')
+      .replace(/^issue_date: .*$/m, 'issue_date: "2026-10-30"')
+      .replace(/^due_date: .*$/m, 'due_date: "2026-11-13"');
+    expect(await warningsFor(f, '2026-10-28')).toEqual([
+      'The issue date is out of order with RE-2026-0042 (2026-10-30). Issue anyway?',
+    ]);
+    expect(await warningsFor(f, '2026-10-30')).toEqual([]);
+  });
+
+  it('more than 7 days ahead is in the future', async () => {
+    expect(await warningsFor(baseFiles(), '2026-11-09')).toEqual([]);
+    expect(await warningsFor(baseFiles(), '2026-11-10')).toEqual([
+      'The issue date is in the future. Issue anyway?',
+    ]);
+  });
+
+  const creditFiles = (alreadyCredited: number | null) => {
+    const f = baseFiles();
+    f[DRAFT] = (f[DRAFT] ?? '')
+      .replace('kind: invoice', 'kind: credit-note\ncorrects: RE-2026-0001')
+      .replace(/time_entries:\n(\s+- .*\n?)+/, '');
+    if (alreadyCredited === null) delete f[issuedAt('RE-2026-0042')];
+    else {
+      f[issuedAt('RE-2026-0042')] = (f[issuedAt('RE-2026-0042')] ?? '')
+        .replace('type_code: 380', 'type_code: 381')
+        .replace(/^due_date: .*\n/m, '')
+        .replace('kind: invoice', 'kind: credit-note\ncorrects: RE-2026-0001')
+        .replace(
+          /^lines:\n[\s\S]*?(?=^\w)/m,
+          `lines:\n  - description: Part\n    quantity: "1"\n    unit: C62\n    unit_price: ${alreadyCredited}\n    vat_category: S\n    vat_rate: "0"\n`,
+        )
+        .replace(
+          /^totals:\n[\s\S]*?(?=^\w)/m,
+          `totals:\n  net: ${alreadyCredited}\n  vat: 0\n  gross: ${alreadyCredited}\n  breakdown:\n    - category: S\n      rate: "0"\n      taxable: ${alreadyCredited}\n      tax: 0\n`,
+        );
+    }
+    return f;
+  };
+
+  it('a credit note larger than the uncredited rest of the invoice is flagged', async () => {
+    expect(await warningsFor(creditFiles(null), '2026-11-02')).toEqual([]);
+    expect(await warningsFor(creditFiles(100), '2026-11-02')).toEqual([
+      'This credit note is 1.00 EUR more than the amount still open on RE-2026-0001.',
+    ]);
+  });
+});
+
 describe('issuing through writeBusiness', () => {
   it('writes the document, deletes the draft, bills the time and logs, in one commit', async () => {
     const { result, number } = await commit();
@@ -297,7 +358,56 @@ describe('issuing through writeBusiness', () => {
   });
 });
 
+describe('numbers held only by an artifact (Q11)', () => {
+  const PDF = `${ROOT}/invoices/2026/RE-2026-0043.pdf`;
+
+  it('count as taken in buildIssueContext', async () => {
+    const f = { ...baseFiles(), [PDF]: '%PDF' };
+    const ctx = await buildIssueContext(sourceOf(f), DRAFT_ID, '2026-11-02', now);
+    expect(ctx.ok && ctx.value.existingNumbers).toContain('RE-2026-0043');
+  });
+
+  it('are skipped by the commit: only RE-2026-0043.pdf exists → RE-2026-0044', async () => {
+    otherDeviceWrites(PDF, '%PDF');
+    const { result, number } = await commit();
+    expect(result.ok).toBe(true);
+    expect(number).toBe('RE-2026-0044');
+    const [only] = commits();
+    expect(Object.keys(only?.changes ?? {}).some((p) => p.includes('RE-2026-0043'))).toBe(false);
+    expect(files[PDF]).toBe('%PDF');
+  });
+
+  it('a frozen clash reaches the caller as a refusal and nothing is committed', async () => {
+    force.extra = issuedAt('RE-2026-0042');
+    const { result } = await commit();
+    expect(result).toEqual({
+      ok: false,
+      issues: [
+        {
+          path: 'number',
+          message: `${issuedAt('RE-2026-0042')} already exists; nothing was written.`,
+        },
+      ],
+    });
+    expect(githubService.commitFiles).not.toHaveBeenCalled();
+  });
+});
+
 describe('frozenClashes', () => {
+  it('refuses an issued document whose number exists as any frozen file', () => {
+    const tree = [
+      { path: `${ROOT}/invoices/2026/RE-2026-0043.xml`, type: 'blob' as const },
+      { path: `${ROOT}/offers/2026/AN-2026-002.sha256`, type: 'blob' as const },
+    ];
+    expect(frozenClashes(tree, { [issuedAt('RE-2026-0043')]: 'new' })).toEqual([
+      issuedAt('RE-2026-0043'),
+    ]);
+    expect(frozenClashes(tree, { [`${ROOT}/offers/2026/AN-2026-002.yaml`]: 'new' })).toEqual([
+      `${ROOT}/offers/2026/AN-2026-002.yaml`,
+    ]);
+    expect(frozenClashes(tree, { [issuedAt('RE-2026-0044')]: 'new' })).toEqual([]);
+  });
+
   const tree = [{ path: issuedAt('RE-2026-0042'), type: 'blob' as const }];
   it('reports an existing issued file and any deletion under invoices/ or offers/', () => {
     expect(

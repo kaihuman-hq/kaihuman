@@ -4,6 +4,7 @@ import { NotFound } from '@kaihuman/ui';
 import { Route, Router, route } from 'preact-router';
 import { DemoBanner } from './components/DemoBanner';
 import { ExtensionAuthBridge } from './components/ExtensionAuthBridge';
+import { noticeAfterRoute } from './lib/business/notice';
 import { ActionLogViewPage } from './pages/ActionLogViewPage';
 import { AuthCli } from './pages/AuthCli';
 import { BusinessEnablePage } from './pages/BusinessEnablePage';
@@ -69,7 +70,7 @@ export const App = () => {
     >
       <ExtensionAuthBridge />
       <DemoBanner />
-      <Router>
+      <Router onChange={(e) => noticeAfterRoute(e.url)}>
         <Route path="/login" component={Login} />
         <Route path="/demo" component={DemoEntry} />
         <Route path="/auth/cli" component={AuthCli} />

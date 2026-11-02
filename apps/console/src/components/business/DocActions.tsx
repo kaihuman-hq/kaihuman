@@ -113,14 +113,29 @@ export function OfferActions({ offer, decided = false }: { offer: string; decide
   );
 }
 
-/** "Credit note…": saves a credit note draft with the invoice's lines and opens it in the editor. */
+/**
+ * "Credit note…": saves a credit note draft with the invoice's lines and opens it in the editor; when
+ * one already exists, it links to that draft instead.
+ */
 export function CreditNoteAction({ invoice }: { invoice: string }) {
   const state = useBusinessRepo();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitting = useRef(false);
   if (state.status !== 'ready') return null;
-  const { repo } = state;
+  const { repo, data } = state;
+  const existing = data.drafts.find((d) => d.kind === 'credit-note' && d.corrects === invoice);
+  if (existing) {
+    return (
+      <a
+        href={`/business/drafts/${existing.id}`}
+        class="text-xs text-[var(--los-accent)] hover:underline whitespace-nowrap"
+        aria-label={`Open the credit note draft for ${invoice}`}
+      >
+        Credit note…
+      </a>
+    );
+  }
 
   async function credit() {
     if (submitting.current) return;
