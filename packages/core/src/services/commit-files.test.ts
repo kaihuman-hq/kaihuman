@@ -1,13 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { gitBlobSha } from '../utils/git-blob-sha.js';
 import { ConflictError } from './conflict.js';
 import { GithubService } from './github.service.js';
 import { InMemoryGithubService } from './github.service.memory.js';
+
+describe('gitBlobSha', () => {
+  it('matches git', () => {
+    expect(gitBlobSha('hello\n')).toBe('ce013625030ba8dba906f756967f9e9ca394464a');
+    expect(gitBlobSha('')).toBe('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391');
+    // byte length, not string length
+    expect(gitBlobSha('é')).toBe(gitBlobSha('é'));
+  });
+});
 
 describe('InMemoryGithubService.commitFiles', () => {
   it('deletes null paths, guards on the head and returns blob shas', async () => {
     const svc = new InMemoryGithubService();
     const first = await svc.commitFiles('o', 'r', 'main', { 'a.md': 'x', 'b.md': 'y' }, 'm1');
     expect(Object.keys(first.blobShas).sort()).toEqual(['a.md', 'b.md']);
+    expect(first.blobShas['a.md']).toBe(gitBlobSha('x'));
     const head = await svc.getHeadSha('o', 'r', 'main');
     expect(first.commitSha).toBe(head);
 
@@ -56,14 +67,22 @@ describe('GithubService.commitFiles', () => {
   });
 
   it('turns null into a sha:null entry and returns written blob shas', async () => {
-    const res = await svc.commitFiles('o', 'r', 'main', { 'a.md': 'x', 'd.md': null }, 'msg', {
-      expectedHeadSha: 'head1',
-    });
+    const res = await svc.commitFiles(
+      'o',
+      'r',
+      'main',
+      { '.kh/business/a.md': 'x', 'd.md': null },
+      'msg',
+      { expectedHeadSha: 'head1' },
+    );
     expect(git.createTree.mock.calls[0]?.[0].tree).toEqual([
-      { path: 'a.md', mode: '100644', type: 'blob', content: 'x' },
+      { path: '.kh/business/a.md', mode: '100644', type: 'blob', content: 'x' },
       { path: 'd.md', mode: '100644', type: 'blob', sha: null },
     ]);
-    expect(res).toEqual({ commitSha: 'commit2', blobShas: { 'a.md': 'blobA' } });
+    expect(res).toEqual({
+      commitSha: 'commit2',
+      blobShas: { '.kh/business/a.md': gitBlobSha('x') },
+    });
   });
 
   it('throws ConflictError before creating anything when the head moved', async () => {

@@ -1,4 +1,5 @@
 import '../db.js';
+import { openDB } from 'idb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const remote = vi.hoisted(() => ({ tree: [] as unknown[] }));
@@ -40,12 +41,33 @@ describe('githubFileStore.applyCommit', () => {
     await store.applyCommit({ [DRAFT]: null, 'new.md': 'n' }, { 'new.md': 'n1' });
     expect(store.tree.value.map((t) => t.path)).toEqual(['keep.md', 'new.md']);
 
-    // Stale API still lists the draft and not the new file.
-    remote.tree = [blob(DRAFT, 's1'), blob('keep.md', 'k1')];
+    // Stale API still lists the draft (as last committed, s2) and not the new file.
+    remote.tree = [blob(DRAFT, 's2'), blob('keep.md', 'k1')];
     await store.loadTree();
     const paths = store.tree.value.map((t) => t.path);
     expect(paths).not.toContain(DRAFT);
     expect(paths).toContain('new.md');
+  });
+
+  it('shows a path another device re-created with a different sha', async () => {
+    remote.tree = [blob(DRAFT, 's1')];
+    await store.loadTree();
+    await store.applyCommit({ [DRAFT]: null }, {});
+    remote.tree = [blob(DRAFT, 'other-device')];
+    await store.loadTree();
+    expect(store.tree.value.map((t) => t.path)).toContain(DRAFT);
+    // tombstone is gone: it stays visible on the next load too
+    await store.loadTree();
+    expect(store.tree.value.map((t) => t.path)).toContain(DRAFT);
+  });
+
+  it('removes the deleted path from the IDB files cache', async () => {
+    await store.applyCommit({ [DRAFT]: 'd' }, { [DRAFT]: 's' });
+    const db = await openDB('life-os-db', 1);
+    expect(await db.get('files', `o/r:${DRAFT}`)).toBeDefined();
+    await store.applyCommit({ [DRAFT]: null }, {});
+    expect(await db.get('files', `o/r:${DRAFT}`)).toBeUndefined();
+    db.close();
   });
 
   it('replaces open files and closes deleted ones', async () => {

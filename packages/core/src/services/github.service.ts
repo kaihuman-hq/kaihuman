@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { demoMode } from '../demo-mode.js';
 import { authStore } from '../stores/auth.store.js';
+import { gitBlobSha } from '../utils/git-blob-sha.js';
 import { ConflictError } from './conflict.js';
 import { inMemoryGithubService } from './github.service.memory.js';
 
@@ -275,14 +276,16 @@ export class GithubService {
       await client.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommit.sha });
     } catch (e) {
       const status = (e as { status?: number }).status;
+      // 422 can also be another ref validation error; treating it as a conflict only costs a retry.
       if (status === 409 || status === 422) {
         throw new ConflictError(`${branch} moved while the commit was built`);
       }
       throw e;
     }
+    // createTree lists only top-level entries, so compute the blob SHAs locally.
     const blobShas: Record<string, string> = {};
-    for (const entry of newTree.tree) {
-      if (entry.path && entry.sha && files[entry.path] != null) blobShas[entry.path] = entry.sha;
+    for (const [path, content] of Object.entries(files)) {
+      if (content !== null) blobShas[path] = gitBlobSha(content);
     }
     return { commitSha: newCommit.sha, blobShas };
   }

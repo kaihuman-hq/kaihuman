@@ -47,7 +47,8 @@ export class GithubFileStore {
   openFiles = signal<Record<string, FileContent>>({});
   // Paths deleted by applyCommit. GitHub's API can keep listing them for a while, so loadTree
   // drops them from the remote tree until the remote stops listing them.
-  private deletedPaths = new Set<string>();
+  // Maps `repo:path` to the deleted blob's sha ('' when unknown).
+  private deletedPaths = new Map<string, string>();
   private idbWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
   activeFile = signal<string | null>(null);
   dirtyFiles = signal<Set<string>>(new Set());
@@ -75,6 +76,11 @@ export class GithubFileStore {
     if (tree.some((t) => t.path.startsWith('.lifeos/'))) return '.lifeos';
     return '.kh';
   });
+
+  private clearTombstone(path: string) {
+    const repo = githubProfileStore.currentRepo.peek();
+    if (repo) this.deletedPaths.delete(`${repo.full_name}:${path}`);
+  }
 
   async loadTree() {
     const repo = githubProfileStore.currentRepo.value;
@@ -116,9 +122,15 @@ export class GithubFileStore {
         repo.owner.login,
         repo.name,
       )) as TreeItem[];
-      const fetchedPaths = new Set(fetchedTree.map((t) => t.path));
-      for (const key of this.deletedPaths) {
-        if (!fetchedPaths.has(key.slice(repo.full_name.length + 1))) this.deletedPaths.delete(key);
+      const fetchedBySha = new Map(fetchedTree.map((t) => [t.path, t.sha]));
+      const prefix = `${repo.full_name}:`;
+      for (const [key, deletedSha] of this.deletedPaths) {
+        if (!key.startsWith(prefix)) continue;
+        const remoteSha = fetchedBySha.get(key.slice(prefix.length));
+        // Gone, or re-created elsewhere with different content: stop hiding it.
+        if (remoteSha === undefined || (deletedSha !== '' && remoteSha !== deletedSha)) {
+          this.deletedPaths.delete(key);
+        }
       }
       const remoteTree = fetchedTree.filter(
         (t) => !this.deletedPaths.has(`${repo.full_name}:${t.path}`),
@@ -381,6 +393,7 @@ export class GithubFileStore {
   savingFiles = signal<Set<string>>(new Set());
 
   async saveFile(path: string) {
+    this.clearTombstone(path);
     const repo = githubProfileStore.currentRepo.value;
     // We get file from latest state
     let file = this.openFiles.value[path];
@@ -523,6 +536,7 @@ export class GithubFileStore {
   }
 
   async createFile(path: string, content: string) {
+    this.clearTombstone(path);
     if (this.openFiles.value[path]) {
       throw new Error(`File already exists: ${path} `);
     }
@@ -699,8 +713,10 @@ export class GithubFileStore {
     const paths = new Set(Object.keys(changes));
     for (const [path, content] of Object.entries(changes)) {
       const key = `${repo.full_name}:${path}`;
-      if (content === null) this.deletedPaths.add(key);
-      else this.deletedPaths.delete(key);
+      if (content === null) {
+        const item = this.tree.peek().find((t) => t.path === path && t.type === 'blob');
+        this.deletedPaths.set(key, this.openFiles.peek()[path]?.sha || item?.sha || '');
+      } else this.deletedPaths.delete(key);
     }
     const written = Object.entries(changes).filter((e): e is [string, string] => e[1] !== null);
     const known = new Map(this.tree.peek().map((t) => [t.path, t]));

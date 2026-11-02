@@ -2,6 +2,7 @@ import { Logger } from '../logger.js';
 import type { TreeItem } from '../stores/github-file.store.js';
 import type { GithubRepo } from '../stores/github-profile.store.js';
 
+import { gitBlobSha } from '../utils/git-blob-sha.js';
 import { ConflictError } from './conflict.js';
 
 const logger = new Logger('InMemoryGithubService');
@@ -146,7 +147,8 @@ export class InMemoryGithubService {
         this.files.delete(path);
         continue;
       }
-      const sha = contentSha(path, content);
+      // Same sha the real service reports, so the tree and blobShas agree.
+      const sha = gitBlobSha(content);
       this.files.set(path, { content, sha });
       blobShas[path] = sha;
     }
