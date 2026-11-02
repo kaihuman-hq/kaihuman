@@ -24,7 +24,12 @@ import { TimerCard } from '../components/business/TimerCard';
 import { clientBacklinks } from '../lib/business/backlinks';
 import { addDays, isoWeek, todayLocal } from '../lib/business/dates';
 import { BUSINESS_PROFILE_PATH, parseLoadError } from '../lib/business/load';
-import { type ClientOverview, clientOverview, latestLink } from '../lib/business/overview';
+import {
+  type ClientOverview,
+  CONTRACT_WHAT,
+  clientOverview,
+  latestLink,
+} from '../lib/business/overview';
 import { openAttachment } from '../lib/business/receipt';
 import { useBacklinkContents, useBusinessRepo } from '../lib/business/use-business-repo';
 import type { KBRepo } from '../lib/github-kb';
@@ -366,7 +371,7 @@ function Overview(props: {
                   {c.notice_period_days !== undefined ? `${c.notice_period_days} days` : '-'}
                 </td>
                 <td class={`${td} whitespace-nowrap`} data-testid="contract-next">
-                  {next ? `${next.date} (${next.what})` : '-'}
+                  {next ? `${next.date} (${CONTRACT_WHAT[next.what]})` : '-'}
                 </td>
                 <td class={td}>
                   {c.file ? (

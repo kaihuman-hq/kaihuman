@@ -223,7 +223,7 @@ describe('BusinessPage', () => {
 
   it('shows an empty note without retainers due', () => {
     show(ready(loadBusinessRepo(files())));
-    expect(host.textContent).toContain('No retainers due in the next 14 days.');
+    expect(host.textContent).toContain('No retainers due.');
   });
 
   it('shows an ending contract in the reminders', () => {

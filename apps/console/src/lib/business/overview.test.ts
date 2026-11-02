@@ -9,6 +9,7 @@ import {
   hoursSummary,
   invoiceRows,
   offerRows,
+  type VatStat,
 } from './overview.js';
 
 const repo = loadBusinessRepo(loadFixtureRepo());
@@ -122,10 +123,10 @@ describe('businessDashboard', () => {
       const s = vatSummary(repo, period);
       return s.applicable ? s.payable : null;
     };
-    const of = (stat: { applicable: boolean; payable?: number }) => stat.payable;
-    expect(of(d.vat.month as never)).toBe(payable('2026-10'));
-    expect(of(d.vat.quarter as never)).toBe(payable('2026-Q4'));
-    expect(of(businessDashboard(repo, '2026-11-02').vat.month as never)).toBe(payable('2026-11'));
+    const of = (stat: VatStat): number | null => (stat.applicable ? stat.payable : null);
+    expect(of(d.vat.month)).toBe(payable('2026-10'));
+    expect(of(d.vat.quarter)).toBe(payable('2026-Q4'));
+    expect(of(businessDashboard(repo, '2026-11-02').vat.month)).toBe(payable('2026-11'));
   });
 
   it('reports the cash basis and a refund as a negative payable', () => {
@@ -135,7 +136,7 @@ describe('businessDashboard', () => {
     } as BusinessRepo;
     const d = businessDashboard({ ...cash, payments: [] }, '2026-10-27');
     expect(d.vat.month).toMatchObject({ applicable: true, basis: 'cash' });
-    expect((d.vat.month as { payable: number }).payable).toBeLessThan(0);
+    expect(d.vat.month.applicable && d.vat.month.payable).toBeLessThan(0);
   });
 
   it('is not applicable for the small-business regime', () => {

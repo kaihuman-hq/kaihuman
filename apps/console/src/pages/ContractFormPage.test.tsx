@@ -268,6 +268,17 @@ describe('ContractFormPage edit', () => {
     expect(changes[YAML]).not.toContain('file:');
   });
 
+  it('drops the removed note when a new file is chosen', async () => {
+    show(ready(withFile()), { id: ID });
+    writeAgainst(withFile());
+    act(() => buttonNamed('Remove file').click());
+    choose('new.pdf', new Uint8Array([4]));
+    expect(host.textContent).not.toContain('The file is removed when you save.');
+    expect(host.textContent).toContain('(replaced when you save)');
+    await click();
+    expect([...(built.value?.changes?.[PDF] as Uint8Array)]).toEqual([4]);
+  });
+
   it('opens the stored PDF', () => {
     show(ready(withFile()), { id: ID });
     act(() => buttonNamed('Open').click());

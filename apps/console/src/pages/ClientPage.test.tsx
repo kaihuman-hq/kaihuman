@@ -451,7 +451,7 @@ describe('ClientPage share wiring', () => {
     it('shows the next reminder with date and what', () => {
       show(ready(load(withFile)));
       // Today is 2026-11-10; renewal 2026-12-01 and its notice (30 days before) on 2026-11-01 is past.
-      expect(host.textContent).toContain('2026-12-01 (renewal)');
+      expect(host.textContent).toContain('2026-12-01 (renews)');
     });
 
     it('shows a dash without an upcoming reminder', () => {

@@ -100,6 +100,7 @@ function ExpenseEditor(props: {
       return;
     }
     setFile({ ext: checked.value.ext, file: picked });
+    setRemoved(false);
     set({ receipt: `${form.id}.${checked.value.ext}` });
     setErrors((x) => ({ ...x, receipt: undefined }));
   }

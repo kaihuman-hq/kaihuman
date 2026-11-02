@@ -102,6 +102,8 @@ export type Dashboard = {
 const TIMELINE_CAP = 100;
 const CONTRACT_WINDOW_DAYS = 60;
 const RETAINER_WINDOW_DAYS = 14;
+/** How a contract reminder reads next to its date. */
+export const CONTRACT_WHAT = { renewal: 'renews', notice: 'notice deadline', end: 'ends' } as const;
 const CONTRACT_DATE_TITLES: Record<ContractDate['what'], string> = {
   renewal: 'Renewal due',
   notice: 'Notice deadline',

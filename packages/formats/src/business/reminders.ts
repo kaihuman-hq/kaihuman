@@ -1,4 +1,5 @@
 import { addMonths } from './actions/drafts.js';
+import type { Ulid } from './ids.js';
 import { jurisdictionFor } from './jurisdiction.js';
 import type { Contract, Project } from './records.js';
 import type { BusinessRepo } from './repo.js';
@@ -27,7 +28,12 @@ export const nextRetainerDate = (retainer: NonNullable<Project['retainer']>): st
   return addDays(addMonths(addDays(date, 1), months), -1);
 };
 
-export type RetainerDue = { project: Project; date: string; hasDraft: boolean };
+export type RetainerDue = {
+  project: Project;
+  date: string;
+  hasDraft: boolean /** The draft that bills the period, when `hasDraft`. */;
+  draftId?: Ulid;
+};
 
 /**
  * Retainers of active projects whose `next_date` is at most `windowDays` away, overdue ones included, by date.
@@ -40,11 +46,13 @@ export const retainersDue = (repo: BusinessRepo, today: string, windowDays = 14)
       const date = project.retainer?.next_date;
       // Paused and done projects are not billed.
       if (project.status !== 'active' || date === undefined || date > until) return [];
-      const hasDraft = repo.drafts.some(
+      const draft = repo.drafts.find(
         (d) =>
           d.client === project.client && d.project === project.slug && d.from_retainer === date,
       );
-      return [{ project, date, hasDraft }];
+      return [
+        { project, date, hasDraft: draft !== undefined, ...(draft ? { draftId: draft.id } : {}) },
+      ];
     })
     .sort((a, b) => a.date.localeCompare(b.date));
 };

@@ -89,6 +89,7 @@ function ContractEditor(props: {
       return;
     }
     setFile(picked);
+    setRemoved(false);
     set({ file: `${form.id}.pdf` });
     setErrors((x) => ({ ...x, file: undefined }));
   }

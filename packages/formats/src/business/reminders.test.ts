@@ -70,6 +70,12 @@ describe('retainersDue', () => {
     drafts: [draft('edge', '2026-11-16'), draft('past', '2026-09-01'), draft('late')],
   };
 
+  it('names the draft that bills the period', () => {
+    const [past, edge] = retainersDue(repo, '2026-11-02');
+    expect(past?.draftId).toBeUndefined();
+    expect(edge?.draftId).toBe('01M5AMBK0038DJQW16BGNTZ49F');
+  });
+
   it('lists active retainers due within the window, sorted, overdue included', () => {
     expect(
       retainersDue(repo, '2026-11-02').map((r) => [r.project.slug, r.date, r.hasDraft]),

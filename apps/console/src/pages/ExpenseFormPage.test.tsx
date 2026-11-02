@@ -377,6 +377,14 @@ describe('ExpenseFormPage existing expense', () => {
     expect(Object.keys(changes)).toHaveLength(2);
   });
 
+  it('drops the removed note when a new receipt is chosen', () => {
+    show(ready(withReceipt()), ID);
+    act(() => buttonNamed('Remove receipt').click());
+    choose('new.pdf', new Uint8Array([4]));
+    expect(host.textContent).not.toContain('The receipt is removed when you save.');
+    expect(host.textContent).toContain('(replaced when you save)');
+  });
+
   it('offers no Remove receipt without a receipt', () => {
     show(ready(load()), ID);
     expect(buttonNamed('Remove receipt')).toBeUndefined();

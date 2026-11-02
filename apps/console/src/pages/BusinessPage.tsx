@@ -8,7 +8,12 @@ import { Stat } from '../components/business/Stat';
 import { StatusPill } from '../components/business/StatusPill';
 import { TimerCard } from '../components/business/TimerCard';
 import { todayLocal } from '../lib/business/dates';
-import { businessDashboard, hoursSummary, type VatStat } from '../lib/business/overview';
+import {
+  businessDashboard,
+  CONTRACT_WHAT,
+  hoursSummary,
+  type VatStat,
+} from '../lib/business/overview';
 import { useBusinessRepo } from '../lib/business/use-business-repo';
 
 const th =
@@ -20,7 +25,6 @@ const clientLink = (slug: string, text = slug) => (
   </a>
 );
 
-const CONTRACT_WHAT = { renewal: 'renews', notice: 'notice deadline', end: 'ends' } as const;
 const BASIS_LABEL = { accrual: 'Soll', cash: 'Ist' } as const;
 
 /** Month and quarter VAT; a negative payable is a refund. One note replaces both for the small-business regime. */
@@ -119,48 +123,33 @@ export function BusinessPage() {
 
             <Card
               title="Retainers due"
-              empty={
-                d.retainersDue.length === 0 ? 'No retainers due in the next 14 days.' : undefined
-              }
+              empty={d.retainersDue.length === 0 ? 'No retainers due.' : undefined}
             >
               <ul class="text-xs space-y-1">
-                {d.retainersDue.map(({ project, date, hasDraft }) => {
-                  const draft = data.drafts.find(
-                    (x) =>
-                      x.client === project.client &&
-                      x.project === project.slug &&
-                      x.from_retainer === date,
-                  );
-                  return (
-                    <li
-                      key={`${project.client}/${project.slug}`}
-                      class="flex justify-between gap-2"
-                    >
-                      <span class="min-w-0 break-words">
-                        {project.name}, {clientLink(project.client)}: {date}
-                      </span>
-                      <span class="shrink-0">
-                        {hasDraft && draft ? (
-                          <a
-                            href={`/business/drafts/${draft.id}`}
-                            class="text-[var(--los-accent)] hover:underline"
-                          >
-                            Draft ready
-                          </a>
-                        ) : hasDraft ? (
-                          'Draft ready'
-                        ) : (
-                          <a
-                            href={`/business/drafts/new?client=${project.client}&kind=invoice&from=retainer&project=${project.slug}`}
-                            class="text-[var(--los-accent)] hover:underline"
-                          >
-                            Create draft
-                          </a>
-                        )}
-                      </span>
-                    </li>
-                  );
-                })}
+                {d.retainersDue.map(({ project, date, draftId }) => (
+                  <li key={`${project.client}/${project.slug}`} class="flex justify-between gap-2">
+                    <span class="min-w-0 break-words">
+                      {project.name}, {clientLink(project.client)}: {date}
+                    </span>
+                    <span class="shrink-0">
+                      {draftId ? (
+                        <a
+                          href={`/business/drafts/${draftId}`}
+                          class="text-[var(--los-accent)] hover:underline"
+                        >
+                          Draft ready
+                        </a>
+                      ) : (
+                        <a
+                          href={`/business/drafts/new?client=${project.client}&kind=invoice&from=retainer&project=${project.slug}`}
+                          class="text-[var(--los-accent)] hover:underline"
+                        >
+                          Create draft
+                        </a>
+                      )}
+                    </span>
+                  </li>
+                ))}
               </ul>
             </Card>
 
