@@ -57,7 +57,7 @@ const Timeline = ({ items }: { items: ClientOverview['timeline'] }) => {
   const shown = all ? items : items.slice(0, TIMELINE_SHOWN);
   return (
     <Card title="Timeline" empty={items.length === 0 ? 'Nothing has happened yet.' : undefined}>
-      <ul class="space-y-1 text-xs">
+      <ul class="space-y-1 text-xs" data-testid="timeline">
         {shown.map((item, i) => (
           // The same document can appear several times on one day.
           <li key={i} class="flex gap-3">
@@ -211,7 +211,12 @@ function Overview(props: {
         <ul class="space-y-1 text-xs">
           {todos.map((t) => (
             <li key={t.id} class="flex gap-2">
-              <input type="checkbox" disabled checked={t.status === 'done'} aria-label={t.status} />
+              <input
+                type="checkbox"
+                disabled
+                checked={t.status === 'done'}
+                aria-label={`${t.text} (${t.status})`}
+              />
               <span class="break-words">{t.text}</span>
             </li>
           ))}
@@ -220,8 +225,8 @@ function Overview(props: {
 
       <Card title="Action log" empty={log.length === 0 ? 'No log entries.' : undefined}>
         <ul class="space-y-1 text-xs">
-          {log.map((e) => (
-            <li key={`${e.timestamp}:${e.description}`} class="flex gap-3">
+          {log.map((e, i) => (
+            <li key={`${i}:${e.timestamp}:${e.description}`} class="flex gap-3">
               <span class="text-[var(--los-muted)] whitespace-nowrap">
                 {e.timestamp.slice(0, 16).replace('T', ' ')}
               </span>

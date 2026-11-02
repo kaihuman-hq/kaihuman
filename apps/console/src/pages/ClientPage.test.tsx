@@ -92,18 +92,79 @@ describe('ClientPage', () => {
       (_, i) => `- 2026-10-${String((i % 28) + 1).padStart(2, '0')} 10:00:00 entry-${i}`,
     ).join('\n');
     const logPath = `${dir}log.actionlog.md`;
-    const data = load((m) => m.set(logPath, `# Log\n\n${lines}\n`));
-    show(ready(data, { [logPath]: `# Log\n\n${lines}\n` }));
-    const count = () => host.querySelectorAll('section:first-of-type li, li.flex').length;
-    expect(host.textContent).toContain('Show all');
-    expect(host.textContent).not.toContain('entry-0 ');
+    const content = `# Log\n\n${lines}\n`;
+    show(
+      ready(
+        load((m) => m.set(logPath, content)),
+        { [logPath]: content },
+      ),
+    );
+    const items = () => host.querySelectorAll('[data-testid="timeline"] li').length;
+    expect(items()).toBe(20);
     const button = [...host.querySelectorAll('button')].find((b) =>
       b.textContent?.startsWith('Show all'),
     ) as HTMLButtonElement;
-    const before = count();
+    // 30 log entries plus the fixture's offer, invoice, payment, event and contract items.
+    const total = Number(/\((\d+)\)/.exec(button.textContent ?? '')?.[1]);
+    expect(total).toBeGreaterThan(30);
     act(() => button.click());
-    expect(count()).toBeGreaterThan(before);
+    expect(items()).toBe(total);
     expect(host.textContent).not.toContain('Show all');
+  });
+
+  it('shows budget used in hours, falling back to billed amount', () => {
+    show(ready(load()));
+    expect(host.textContent).toContain('7.5 of 100.0 h');
+    const key = `${dir}projects/website.yaml`;
+    show(
+      ready(
+        load((m) =>
+          m.set(key, (m.get(key) ?? '').replace('budget_minutes: 6000', 'budget_amount: 500000')),
+        ),
+      ),
+    );
+    expect(host.textContent).toContain('1001.38 EUR of 5000.00 EUR');
+  });
+
+  it('summarises a retainer', () => {
+    const key = `${dir}projects/website.yaml`;
+    const retainer =
+      'retainer:\n  amount: 120000\n  interval: monthly\n  next_date: "2026-12-01"\n  description: Hosting\n';
+    show(ready(load((m) => m.set(key, `${m.get(key) ?? ''}${retainer}`))));
+    expect(host.textContent).toContain('1200.00 EUR monthly, next 2026-12-01');
+  });
+
+  it('shows the last 8 ISO weeks only', () => {
+    // today 2026-11-10 is in W46; W39 is the 8th week, W38 is older.
+    const entry = (id: string, date: string, note: string) =>
+      `{"id":"${id}","date":"${date}","minutes":60,"client":"acme-gmbh","project":"website","note":"${note}"}`;
+    const key = '.kh/business/time/2026-10.jsonl';
+    const data = load((m) =>
+      m.set(
+        key,
+        `${m.get(key)?.trimEnd()}\n${entry('01M581YW00W16BGNTZ49EKRX28', '2026-09-22', 'a')}\n${entry('01M581YW00W16BGNTZ49EKRX29', '2026-09-14', 'b')}\n`,
+      ),
+    );
+    show(ready(data));
+    const text = host.textContent ?? '';
+    expect(text).toContain('2026-W39');
+    expect(text).not.toContain('2026-W38');
+    expect(text).toContain('2026-W42');
+  });
+
+  it('links the phone with non-digits stripped and a leading plus kept', () => {
+    const key = `${dir}client.yaml`;
+    const data = load((m) =>
+      m.set(
+        key,
+        (m.get(key) ?? '').replace(
+          'email: erika@acme.example',
+          'email: erika@acme.example\n    phone: "+49 (89) 123-456"',
+        ),
+      ),
+    );
+    show(ready(data));
+    expect(host.querySelector('header a[href="tel:+4989123456"]')).not.toBeNull();
   });
 
   it('renders todos read-only and the action log', () => {
@@ -123,6 +184,7 @@ describe('ClientPage', () => {
     expect(boxes.length).toBe(2);
     expect(boxes.every((b) => b.disabled)).toBe(true);
     expect(boxes.map((b) => b.checked)).toEqual([true, false]);
+    expect(boxes[0]?.getAttribute('aria-label')).toContain('Ship it');
   });
 
   it('shows notes and linked wiki pages', () => {
