@@ -1,5 +1,6 @@
-import { githubFileStore, githubService, type TreeItem } from '@kaihuman/core';
+import { githubFileStore, type TreeItem } from '@kaihuman/core';
 import { ideaSlugOf } from '@kaihuman/formats';
+import { loadRepoFiles, rememberRepoFile } from './repo-files';
 
 /** The idea files in a repo tree: `.kh/ideas/<slug>.md`, no subfolders. */
 export const ideaTreeItems = (tree: readonly TreeItem[]) =>
@@ -8,52 +9,15 @@ export const ideaTreeItems = (tree: readonly TreeItem[]) =>
 export const ideaFileExists = (path: string) =>
   githubFileStore.tree.peek().some((item) => item.path === path);
 
-// Contents by `repo:path`, valid while the tree still lists the same blob sha. Survives
-// navigating away and back, so the overview does not refetch unchanged ideas.
-const contentCache = new Map<string, { sha: string; content: string }>();
-const cacheKey = (repo: string, path: string) => `${repo}:${path}`;
-
-export interface LoadedIdeas {
-  contents: Record<string, string>;
-  /** One message per file that could not be read. */
-  errors: string[];
-}
-
-/** Reads the given idea files, four at a time, skipping those cached for the same sha. */
-export async function loadIdeaContents(
-  repoFullName: string,
-  items: readonly TreeItem[],
-): Promise<LoadedIdeas> {
-  const [owner = '', name = ''] = repoFullName.split('/');
-  const contents: Record<string, string> = {};
-  const errors: string[] = [];
-  const queue = [...items];
-  const worker = async () => {
-    for (let item = queue.shift(); item; item = queue.shift()) {
-      const key = cacheKey(repoFullName, item.path);
-      const cached = contentCache.get(key);
-      if (cached && cached.sha === item.sha) {
-        contents[item.path] = cached.content;
-        continue;
-      }
-      try {
-        const { content } = await githubService.getFileContent(owner, name, item.path);
-        contentCache.set(key, { sha: item.sha, content });
-        contents[item.path] = content;
-      } catch (err) {
-        errors.push(`${item.path}: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: 4 }, worker));
-  return { contents, errors };
-}
+/** Reads the given idea files, skipping those cached for the same sha. */
+export const loadIdeaContents = (repoFullName: string, items: readonly TreeItem[]) =>
+  loadRepoFiles(repoFullName, items);
 
 /** Records a write so the overview shows it until the tree is reloaded with the new sha. */
 const remember = (path: string, content: string) => {
   const repo = githubFileStore.loadedRepo.peek();
   const sha = githubFileStore.tree.peek().find((item) => item.path === path)?.sha ?? '';
-  if (repo) contentCache.set(cacheKey(repo, path), { sha, content });
+  if (repo) rememberRepoFile(repo, path, sha, content);
 };
 
 /** Waits for the store's save and turns its error signal back into an exception. */

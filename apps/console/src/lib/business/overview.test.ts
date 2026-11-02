@@ -1,7 +1,7 @@
 import type { BusinessRepo, Contract, TimeEntry } from '@kaihuman/formats/business';
 import { loadBusinessRepo } from '@kaihuman/formats/business';
 import { describe, expect, it } from 'vitest';
-import { loadFixtureRepo } from '../../../../../packages/formats/src/business/fixture-repo.test-helper.js';
+import { loadFixtureRepo } from './fixture.test-helper.js';
 import {
   businessDashboard,
   clientOverview,
