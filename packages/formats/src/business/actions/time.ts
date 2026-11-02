@@ -73,12 +73,21 @@ export const timerToEntry = (timer: RunningTimer, now: Date): Omit<TimeEntry, 'i
 
 /** Appends the entry to its month file; `stopTimer` deletes the running timer in the same change set. */
 export const logTime = (
-  _repo: BusinessRepo,
+  repo: BusinessRepo,
   timeFiles: Readonly<Record<string, string>>,
   entry: Omit<TimeEntry, 'id'>,
   opts: { id: Ulid; stopTimer?: boolean },
 ): Action => {
-  const full: TimeEntry = { id: opts.id, ...entry };
+  if (!repo.clients.some((c) => c.slug === entry.client)) {
+    return refuse('client', `unknown client "${entry.client}"`);
+  }
+  if (
+    entry.project &&
+    !repo.projects.some((p) => p.client === entry.client && p.slug === entry.project)
+  ) {
+    return refuse('project', `unknown project "${entry.project}" of client "${entry.client}"`);
+  }
+  const full: TimeEntry = { id: opts.id, ...entry, note: entry.note.trim() };
   const checked = validateTimeEntry(full);
   if (!checked.ok) return checked;
   const file = timePath(entry.date.slice(0, 7));
@@ -90,7 +99,7 @@ export const logTime = (
     ok: true,
     value: {
       changes,
-      message: `business: log ${(entry.minutes / 60).toFixed(1)} h for ${entry.client}`,
+      message: `business: log ${Math.max(0.1, Math.round(entry.minutes / 6) / 10).toFixed(1)} h for ${entry.client}`,
     },
   };
 };

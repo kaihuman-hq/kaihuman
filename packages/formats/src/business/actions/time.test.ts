@@ -100,6 +100,25 @@ describe('logTime', () => {
     expect(Object.keys(r.value.changes)).toEqual([MONTH]);
   });
 
+  it('refuses an unknown client or project', () => {
+    expect(logTime(repo, {}, { ...entry, client: 'nobody' as Slug }, { id: ulid0 })).toMatchObject({
+      ok: false,
+      issues: [{ path: 'client' }],
+    });
+    expect(logTime(repo, {}, { ...entry, project: 'nope' as Slug }, { id: ulid0 })).toMatchObject({
+      ok: false,
+      issues: [{ path: 'project' }],
+    });
+  });
+
+  it('trims the note, rejects a blank one and never says 0.0 h', () => {
+    const r = logTime(repo, {}, { ...entry, minutes: 1, note: '  x ' }, { id: ulid0 });
+    if (!r.ok) throw new Error('expected ok');
+    expect(r.value.changes[MONTH]).toContain('"note":"x"');
+    expect(r.value.message).toBe('business: log 0.1 h for acme-gmbh');
+    expect(logTime(repo, {}, { ...entry, note: '   ' }, { id: ulid0 }).ok).toBe(false);
+  });
+
   it('refuses an invalid entry', () => {
     expect(logTime(repo, {}, { ...entry, minutes: 0 }, { id: ulid0 }).ok).toBe(false);
     expect(logTime(repo, {}, { ...entry, note: '' }, { id: ulid0 }).ok).toBe(false);

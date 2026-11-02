@@ -68,7 +68,7 @@ For a file named by its ULID (`drafts/<ulid>.yaml`, `expenses/<year>/<ulid>.yaml
   `{"id":"<ulid>","date":"2026-10-12","minutes":450,"client":"acme-gmbh","project":"website","note":"Implementation"}`
 - **Start or stop a timer:** `time/running.yaml` is the one running timer:
   `client`, optional `project` and `note`, and `started_at` as an ISO datetime with offset
-  (`2026-11-02T09:30:00+01:00`). There is never more than one; if the file exists, tell the user which
+  (`2026-11-02T09:30:00+01:00`); it may end in `Z` instead of an offset. There is never more than one; if the file exists, tell the user which
   client it runs for instead of replacing it. Start: create the file. Stop: in the same commit, append a
   time entry (`date` = the local day of `started_at`, `minutes` = elapsed minutes rounded, at least 1 and
   at most 1440) and delete `running.yaml`. Cancel: delete the file only.
