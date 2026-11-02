@@ -1,4 +1,5 @@
 import {
+  type BusinessRepo,
   type Expense,
   expensesCsv,
   type VatSummary,
@@ -15,6 +16,7 @@ import { todayLocal } from '../lib/business/dates';
 import { csvBlob, downloadBlob } from '../lib/business/download';
 import { openReceipt } from '../lib/business/receipt';
 import { useBusinessRepo } from '../lib/business/use-business-repo';
+import { buildYearExport } from '../lib/business/year-export';
 import type { KBRepo } from '../lib/github-kb';
 
 type Kind = 'month' | 'quarter' | 'year';
@@ -97,6 +99,64 @@ function VatBlock(props: { summary: VatSummary; currency: string }) {
         <dd class="text-right font-bold">{money(Math.abs(due), currency)}</dd>
       </dl>
     </div>
+  );
+}
+
+type ExportState =
+  | { status: 'idle' }
+  | { status: 'running'; done: number; total: number }
+  | { status: 'done'; name: string }
+  | { status: 'failed'; message: string };
+
+/** Reads the year's files from the repo and downloads them, with CSV summaries, as one zip. */
+function YearExport(props: { target: KBRepo; data: BusinessRepo; year: string }) {
+  const { target, data, year } = props;
+  const [state, setState] = useState<ExportState>({ status: 'idle' });
+  const running = state.status === 'running';
+
+  async function run() {
+    setState({ status: 'running', done: 0, total: 0 });
+    try {
+      const zip = await buildYearExport(target, data, year, (done, total) =>
+        setState({ status: 'running', done, total }),
+      );
+      const name = `business-${year}.zip`;
+      downloadBlob(name, new Blob([zip as BlobPart], { type: 'application/zip' }));
+      setState({ status: 'done', name });
+    } catch (e) {
+      setState({ status: 'failed', message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  return (
+    <section
+      aria-label="Year export"
+      class="border border-[var(--los-border)] p-3 min-w-0 space-y-2"
+    >
+      <h2 class="text-[10px] uppercase tracking-widest text-[var(--los-muted)]">Year export</h2>
+      <p class="text-xs text-[var(--los-fg-dim)]">
+        One zip for {year}: invoices, offers, expenses with receipts, payments, time, the clients
+        involved and their contracts, CSV summaries and SHA-256 checksums. Uses the year selected
+        above.
+      </p>
+      <button type="button" class={BUTTON} disabled={running} onClick={run}>
+        Export year for Steuerberater…
+      </button>
+      <output class="block text-xs">
+        {state.status === 'running'
+          ? state.total === 0
+            ? 'Listing files…'
+            : `Reading ${state.done} of ${state.total} files…`
+          : state.status === 'done'
+            ? `Downloaded ${state.name}.`
+            : ''}
+      </output>
+      {state.status === 'failed' && (
+        <p role="alert" class="text-xs text-[var(--los-warning)]">
+          {state.message}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -289,6 +349,8 @@ function ExpensesBody(props: { target: KBRepo; data: Parameters<typeof vatSummar
         </div>
         <VatBlock summary={summary} currency={currency} />
       </section>
+
+      <YearExport target={target} data={data} year={year} />
     </>
   );
 }

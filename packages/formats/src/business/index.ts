@@ -27,3 +27,4 @@ export * from './validate.js';
 export type { Issue, Result } from './validate-kit.js';
 export * from './vat.js';
 export * from './yaml.js';
+export * from './year-export.js';

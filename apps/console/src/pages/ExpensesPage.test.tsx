@@ -14,6 +14,8 @@ vi.mock('../lib/business/download', async (importOriginal) => ({
   downloadBlob: downloads.downloadBlob,
 }));
 vi.mock('../lib/business/receipt', () => receipts);
+const yearExport = vi.hoisted(() => ({ buildYearExport: vi.fn() }));
+vi.mock('../lib/business/year-export', () => yearExport);
 vi.mock('../lib/business/dates', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/business/dates')>()),
   todayLocal: () => '2026-11-10',
@@ -261,5 +263,47 @@ describe('ExpensesPage exports', () => {
     const text = await textOf(blob);
     expect(text).toContain(';Ist;');
     expect(text).not.toContain(';Soll;');
+  });
+});
+
+describe('ExpensesPage year export', () => {
+  const exportButton = () => button('Export year for Steuerberater…');
+  const status = () => host.querySelector('[aria-label="Year export"] output')?.textContent;
+
+  it('builds the selected year, shows progress, then downloads business-<year>.zip', async () => {
+    let report: (done: number, total: number) => void = () => {};
+    let finish: (zip: Uint8Array) => void = () => {};
+    yearExport.buildYearExport.mockImplementation(
+      (_t, _d, _y, onProgress: (d: number, t: number) => void) =>
+        new Promise<Uint8Array>((resolve) => {
+          report = onProgress;
+          finish = resolve;
+        }),
+    );
+    show(load());
+    pick('year', '2025');
+    act(() => exportButton().click());
+    expect(yearExport.buildYearExport.mock.calls[0]?.[0]).toBe(target);
+    expect(yearExport.buildYearExport.mock.calls[0]?.[2]).toBe('2025');
+    expect(exportButton().disabled).toBe(true);
+    act(() => report(12, 87));
+    expect(status()).toBe('Reading 12 of 87 files…');
+    await act(async () => finish(new Uint8Array([80, 75])));
+    const [name, blob] = downloads.downloadBlob.mock.calls[0] as [string, Blob];
+    expect(name).toBe('business-2025.zip');
+    expect(blob.type).toBe('application/zip');
+    expect(exportButton().disabled).toBe(false);
+    expect(status()).toBe('Downloaded business-2025.zip.');
+  });
+
+  it('shows a failed read as an alert and downloads nothing', async () => {
+    yearExport.buildYearExport.mockRejectedValue(new Error('Could not read x.pdf.'));
+    show(load());
+    await act(async () => exportButton().click());
+    expect(downloads.downloadBlob).not.toHaveBeenCalled();
+    expect(host.querySelector('[aria-label="Year export"] [role="alert"]')?.textContent).toBe(
+      'Could not read x.pdf.',
+    );
+    expect(exportButton().disabled).toBe(false);
   });
 });
