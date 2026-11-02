@@ -202,6 +202,7 @@ export const validateProfile = (raw: unknown): Result<BusinessProfile> => {
     bank,
     jurisdiction: req(r, '', 'jurisdiction', issues, jurisdiction),
     vat_regime: req(r, '', 'vat_regime', issues, oneOf(['regular', 'small-business'] as const)),
+    vat_basis: opt(r, '', 'vat_basis', issues, oneOf(['accrual', 'cash'] as const)),
     currency: req(r, '', 'currency', issues, currency),
     language: req(r, '', 'language', issues, language),
     payment_terms_days: req(r, '', 'payment_terms_days', issues, nonNegInt),

@@ -15,6 +15,8 @@ export type BusinessProfile = {
   bank: { iban: string; bic?: string; account_holder?: string };
   jurisdiction: Jurisdiction;
   vat_regime: 'regular' | 'small-business';
+  /** Missing means `accrual` (Soll): output VAT by issue date. `cash` (Ist) counts it when paid. */
+  vat_basis?: 'accrual' | 'cash';
   currency: string;
   language: 'de' | 'en';
   payment_terms_days: number;
@@ -275,6 +277,7 @@ export const KEY_ORDER: Record<RecordKind, readonly string[]> = {
     'bank',
     'jurisdiction',
     'vat_regime',
+    'vat_basis',
     'currency',
     'language',
     'payment_terms_days',
