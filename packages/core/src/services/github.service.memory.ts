@@ -113,6 +113,12 @@ export class InMemoryGithubService {
     return file.bytes ?? new TextEncoder().encode(file.content);
   }
 
+  async getBlobBytes(_owner: string, _repo: string, sha: string): Promise<Uint8Array> {
+    const file = [...this.files.values()].find((f) => f.sha === sha);
+    if (!file) throw new Error(`Not found: blob ${sha}`);
+    return file.bytes ?? new TextEncoder().encode(file.content);
+  }
+
   async saveFile(
     _owner: string,
     _repo: string,

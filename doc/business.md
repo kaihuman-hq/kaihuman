@@ -145,10 +145,13 @@ It exits 1 on any error. Errors:
 - invalid records: unknown keys, missing fields, unquoted numbers where a string or decimal is
   expected, a missing or invalid `business.yaml`;
 - an `id` that differs from the file name (drafts, expenses, contracts), an expense whose `date`
-  is not in its year folder, or an id used twice;
-- an expense `receipt` or contract `file` that is not exactly `<id>.<ext>` (`<id>.pdf` for contracts)
-  or names a missing file (from tools version 1.3.0 on: records with other names are load errors,
-  rename the file and the field to match the id);
+  is not in its year folder, a contract whose `client` differs from its client folder, or an
+  expense or contract id used twice (the console leaves such an expense or contract out and lists
+  it under load problems);
+- an expense `receipt` or contract `file` that is not exactly `<id>.<ext>` (`<id>.pdf` for
+  contracts), or that names a file not beside the record in the tree (from tools version 1.3.0 on;
+  a record with another name is a load error, so rename the file and the field to match the id;
+  a record whose file is missing stays loaded so the form can remove or replace it);
 - issued documents: a `number` that differs from the file name or does not parse under the
   series pattern (`business.yaml` `numbering`, else the default) with the folder's year; an
   `issue_date` outside the year folder; an offer outside `offers/` or an invoice or credit note
@@ -173,9 +176,10 @@ profile, refuses a public repo (`PublicRepoError`) or one that already has
 `.kh/business/business.yaml` (`AlreadyEnabledError`), and makes one commit,
 `chore: enable kaihuman business`, with the profile, empty data folders, the check, the workflow,
 the skill and the Verfahrensdokumentation template. The console form for it is `/business/enable`.
-`syncKB` refreshes the tool files when `.kh/business/.tools/version` differs from
-`BUSINESS_TOOLS_VERSION` (`1.3.0` since phase 5a: the check, skill and validators changed, so a
-repo set up earlier is updated on the next sync). Repos without business get nothing.
+The next business write (any console action that commits under `.kh/business/`) or KB sync
+refreshes the tool files when `.kh/business/.tools/version` differs from `BUSINESS_TOOLS_VERSION`
+(`1.3.0` since phase 5a: the check, skill and validators changed, so a repo set up earlier is
+upgraded with its next business write or KB sync). Repos without business get nothing.
 
 The form has a `VAT basis` select next to the VAT regime: Soll (default, nothing written) or Ist
 (writes `vat_basis: cash`). Edit `business.yaml` to change it later.
@@ -257,18 +261,24 @@ refuses to leave a kept receipt behind. Delete asks
 
 **VAT summary.** On `/business/expenses` for a month, quarter or year, and as `VAT payable
 <period> (Soll|Ist)` on the dashboard (`VAT refund` when negative).
-- Soll (accrual): invoices count by issue date.
-- Ist (cash): each payment carries its share of the invoice VAT, in proportion to the invoice
-  gross, capped at the gross; the payment that completes the invoice takes the exact remainder, so
-  the parts sum to the invoice VAT. Payments on credit notes are ignored.
-- Both bases: credit notes count negative by their issue date; input VAT is the VAT of expenses by
-  expense date; net of reverse-charge (`AE`) lines is shown separately. Payable = output − input.
+- Soll (accrual): invoices count by issue date, credit notes negative by their issue date.
+- Ist (cash): credit notes are netted into the invoice they correct (effective gross and VAT per
+  category and rate = invoice − credit notes). Each payment carries its share of the effective VAT,
+  in proportion to the effective gross, capped at it; the payment that completes the invoice takes
+  the exact remainder, so the parts sum to the effective VAT. A credit note issued after payments
+  already exceed the new effective gross counts negative on its issue date only for that excess
+  (VAT already taxed). A credit note whose invoice is unknown counts by its issue date. Payments
+  on credit notes are ignored.
+- Both bases: input VAT is the VAT of expenses by expense date; net of reverse-charge (`AE`)
+  lines is shown separately. Payable = output − input.
 - With `vat_regime: small-business` it shows `No VAT: small-business regime (§19 UStG).`
 
 **CSV.** `expenses-<year>.csv` and `vat-<year>.csv` (12 months, 4 quarters, the year) are
 downloaded from the expenses page; the year export has more. UTF-8 with BOM, `;` separator, CRLF,
 fields with `;`, `"`, CR or LF quoted with `"` doubled, amounts as `1234,56` (`-` for negatives),
-dates `YYYY-MM-DD`. Columns:
+dates `YYYY-MM-DD`. Text fields (supplier, description, category, client, project, receipt,
+method, reference) that start with `=`, `+`, `@`, tab or CR get a leading `'`, so a spreadsheet
+does not run them as a formula. Columns:
 - expenses: `Datum;Lieferant;Beschreibung;Kategorie;Netto;USt-Satz;USt;Brutto;Kunde;Projekt;Beleg`,
   oldest first;
 - invoices: `Nummer;Typ;Datum;Kunde;Netto;USt;Brutto;Bezahlt;Offen` (`Rechnung`, or
@@ -285,7 +295,7 @@ year's expenses with receipts; `payments/<year>.jsonl`; `time/<year>-*.jsonl`; t
 of every client named by the year's documents, expenses or time, and their contracts active that
 year with the PDF (start on or before 31 Dec, no end or end on or after 1 Jan); `summary/`
 (`invoices.csv`, `payments.csv`, `expenses.csv`, `vat.csv`, `README.txt`); and `SHA256SUMS`. No
-drafts, links or events. Raw files come from the head commit; paid and open amounts are those of
+drafts, links or events. Raw files come from the head commit, one request per file (the blob named by the head tree); paid and open amounts are those of
 the generation date, not the year end (the README says so). Files are fetched 4 at a time; one
 failure stops the export with `Could not read <path>.` and no zip. A repository tree too large
 for GitHub's listing is refused (`The repository is too large to export in one go.`). The zip uses
@@ -306,8 +316,9 @@ or its start when open-ended.
 
 **Pipeline.** `/business/pipeline` ("Open board" on the dashboard): Lead, Contacted, Offer sent and
 Active columns; Past and Lost sit behind `Show past and lost (n)`. Cards show the open amount and
-the last activity. A `Move <name> to…` select changes the stage (one commit, `business: <slug> →
-<stage>`); there is no drag-and-drop. Demo mode is read-only.
+the last activity. Pick the stage in the `Move <name> to…` select, then press `Move` (one commit,
+`business: <slug> → <stage>`; changing the select alone saves nothing); there is no drag-and-drop.
+Demo mode is read-only.
 
 ## Share links (phase 4)
 

@@ -1,5 +1,5 @@
 import { authStore, githubService } from '@kaihuman/core';
-import { BUSINESS_PROFILE_PATH } from './business/load';
+import { BUSINESS_PROFILE_PATH, BUSINESS_TOOLS_VERSION_PATH } from './business/load';
 import {
   AGENT_INSTRUCTION_FILES,
   getScaffoldFiles,
@@ -11,7 +11,6 @@ import {
 export type KBFile = { name: string; path: string; sha: string };
 
 const VERSION_FILE = '.kh/.skill-version';
-const BUSINESS_VERSION_FILE = '.kh/business/.tools/version';
 
 function parseRepo(fullName: string): { owner: string; repo: string } {
   const slash = fullName.indexOf('/');
@@ -64,10 +63,8 @@ export async function syncKB(
   // Only a repo that enabled business gets its tools, so everyone else's commits stay unchanged.
   // The bundled check is large, so it loads only when a repo needs it.
   if (present.has(BUSINESS_PROFILE_PATH)) {
-    const { BUSINESS_TOOLS_VERSION, getBusinessToolFiles } = await import('./business-setup');
-    if ((await read(BUSINESS_VERSION_FILE))?.trim() !== BUSINESS_TOOLS_VERSION) {
-      Object.assign(writes, getBusinessToolFiles());
-    }
+    const { businessToolUpgrade } = await import('./business-setup');
+    Object.assign(writes, businessToolUpgrade(await read(BUSINESS_TOOLS_VERSION_PATH)));
   }
   if (Object.keys(writes).length === 0) return 'current';
 

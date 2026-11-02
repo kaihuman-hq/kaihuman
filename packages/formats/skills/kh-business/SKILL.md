@@ -89,7 +89,9 @@ For a file named by its ULID (`drafts/<ulid>.yaml`, `expenses/<year>/<ulid>.yaml
   `vat_rate`; optional `client`, `project`. A receipt sits next to it as `<ulid>.<ext>` with the
   same ULID and a lower-case `ext` of `pdf`, `jpg`, `jpeg`, `png`, `webp` or `heic`, at most 10 MB,
   and the expense names it exactly: `receipt: <ulid>.<ext>`. A contract file is likewise
-  `contracts/<id>.pdf` with `file: <id>.pdf` (PDF only, at most 10 MB). Expenses and contracts must be
+  `contracts/<id>.pdf` with `file: <id>.pdf` (PDF only, at most 10 MB), in the folder of the
+  contract's `client`. Never name a receipt or file that is not committed: the check fails on a
+  missing one. Expenses and contracts must be
   kept for the retention period (8 years after the record's year in Germany); ask before deleting one.
 - **Retainers:** a project's `retainer.next_date` is the start of the next period to bill. A draft
   for it carries `from_retainer: <next_date>`; issuing it in the console moves `next_date` on by one

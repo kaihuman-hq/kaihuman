@@ -42,11 +42,16 @@ const flush = () => act(() => new Promise((r) => setTimeout(r, 0)));
 const heading = (text: string) =>
   [...host.querySelectorAll('h2')].find((h) => h.textContent?.startsWith(text));
 const select = () => host.querySelector('select') as HTMLSelectElement;
-const choose = async (value: string) => {
+const pick = (value: string) =>
   act(() => {
     select().value = value;
     select().dispatchEvent(new Event('change', { bubbles: true }));
   });
+const moveButton = () => host.querySelector('li button') as HTMLButtonElement;
+const toggle = () => host.querySelector('#pipeline-archive-toggle') as HTMLButtonElement;
+const choose = async (value: string) => {
+  pick(value);
+  act(() => moveButton().click());
   await flush();
 };
 
@@ -82,13 +87,12 @@ describe('PipelinePage', () => {
 
   it('expands past and lost behind the toggle', () => {
     show(ready(fixture()));
-    const toggle = host.querySelector('button') as HTMLButtonElement;
-    expect(toggle.textContent).toBe('Show past and lost (0)');
-    act(() => toggle.click());
+    expect(toggle().textContent).toBe('Show past and lost (0)');
+    act(() => toggle().click());
     expect(heading('Past (0)')).toBeDefined();
     expect(heading('Lost (0)')).toBeDefined();
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
-    act(() => toggle.click());
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    act(() => toggle().click());
     expect(heading('Past')).toBeUndefined();
   });
 
@@ -115,7 +119,22 @@ describe('PipelinePage', () => {
     expect(host.querySelector('output')?.textContent).toBe('Acme GmbH moved to Past.');
     expect(heading('Active (0)')).toBeDefined();
     expect(host.querySelector('[role="alert"]')).toBeNull();
-    expect(host.querySelector('button')?.textContent).toBe('Show past and lost (1)');
+    expect(toggle().textContent).toBe('Show past and lost (1)');
+  });
+
+  it('does not move on a select change alone (arrow keys fire change)', async () => {
+    show(ready(fixture()));
+    pick('past');
+    await flush();
+    expect(writes.writeBusiness).not.toHaveBeenCalled();
+    expect(select().value).toBe('past');
+    expect(heading('Active (1)')).toBeDefined();
+  });
+
+  it('names the Move button after the client', () => {
+    show(ready(fixture()));
+    expect(moveButton().textContent).toBe('Move');
+    expect(moveButton().getAttribute('aria-label')).toBe('Move Acme GmbH');
   });
 
   it('keeps focus on the moved card select in its new column', async () => {
@@ -131,9 +150,8 @@ describe('PipelinePage', () => {
     show(ready(fixture()));
     writes.writeBusiness.mockResolvedValue({ ok: true, value: { commitSha: 'c' } });
     await choose('lost');
-    const toggle = host.querySelector('button') as HTMLButtonElement;
-    expect(toggle.textContent).toBe('Show past and lost (1)');
-    expect(document.activeElement).toBe(toggle);
+    expect(toggle().textContent).toBe('Show past and lost (1)');
+    expect(document.activeElement).toBe(toggle());
   });
 
   it('does not pull focus back when the data reloads later', async () => {
@@ -172,10 +190,11 @@ describe('PipelinePage', () => {
     expect(heading('Active (1)')).toBeDefined();
   });
 
-  it('has no selects in demo mode', () => {
+  it('has no selects or Move buttons in demo mode', () => {
     demoMode.value = true;
     show(ready(fixture()));
     expect(host.querySelector('select')).toBeNull();
+    expect(host.querySelector('li button')).toBeNull();
     expect(host.textContent).toContain('not available in demo mode');
     expect(host.querySelector('li a')?.textContent).toBe('Acme GmbH');
   });

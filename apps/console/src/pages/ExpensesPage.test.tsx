@@ -296,6 +296,36 @@ describe('ExpensesPage year export', () => {
     expect(status()).toBe('Downloaded business-2025.zip.');
   });
 
+  it('updates the live progress text at most every 10% and on the final count', async () => {
+    let report: (done: number, total: number) => void = () => {};
+    yearExport.buildYearExport.mockImplementation(
+      (_t, _d, _y, onProgress: (d: number, t: number) => void) =>
+        new Promise<Uint8Array>(() => {
+          report = onProgress;
+        }),
+    );
+    show(load());
+    act(() => exportButton().click());
+    const seen: (string | undefined)[] = [];
+    for (let done = 0; done <= 25; done++) {
+      act(() => report(done, 25));
+      if (seen.at(-1) !== status()) seen.push(status());
+    }
+    expect(seen).toEqual([
+      'Reading 0 of 25 files…',
+      'Reading 3 of 25 files…',
+      'Reading 5 of 25 files…',
+      'Reading 8 of 25 files…',
+      'Reading 10 of 25 files…',
+      'Reading 13 of 25 files…',
+      'Reading 15 of 25 files…',
+      'Reading 18 of 25 files…',
+      'Reading 20 of 25 files…',
+      'Reading 23 of 25 files…',
+      'Reading 25 of 25 files…',
+    ]);
+  });
+
   it('shows a failed read as an alert and downloads nothing', async () => {
     yearExport.buildYearExport.mockRejectedValue(new Error('Could not read x.pdf.'));
     show(load());
@@ -339,5 +369,19 @@ describe('ExpensesPage year export', () => {
     );
     const years = [...host.querySelectorAll('#year option')].map((o) => o.textContent);
     expect(years).toEqual(['2026', '2025', '2021', '2019']);
+  });
+});
+
+describe('ExpensesPage load problems', () => {
+  it('lists an expense whose receipt is not in the repository (ruling S6)', () => {
+    show(
+      load((m) =>
+        m.set(EXPENSE, `${m.get(EXPENSE) ?? ''}receipt: 01M55FJ500NTZ49EKRX27CHPV0.pdf\n`),
+      ),
+    );
+    expect(host.textContent).toContain(
+      'receipt: 01M55FJ500NTZ49EKRX27CHPV0.pdf is not in the repository',
+    );
+    expect(host.textContent).toContain(EXPENSE);
   });
 });

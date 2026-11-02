@@ -8,7 +8,7 @@ import {
 } from '@kaihuman/formats/business';
 import type { KBRepo } from '../github-kb';
 import { loadRepoFiles, rememberRepoFile } from '../repo-files';
-import { businessTreeItems } from './load';
+import { BUSINESS_PROFILE_PATH, BUSINESS_TOOLS_VERSION_PATH, businessTreeItems } from './load';
 
 export const CONFLICT_MESSAGE =
   'Someone else changed the repository at the same time. Reload and try again.';
@@ -64,6 +64,25 @@ async function readFresh(owner: string, name: string, target: KBRepo): Promise<F
   return { headSha, tree, repo, read };
 }
 
+/** GitHub can refuse a tree that deletes a path it does not have, so such deletions are dropped. */
+function withoutMissingDeletes(fresh: Fresh, changes: FileChanges): FileChanges {
+  const present = new Set(fresh.tree.filter((t) => t.type === 'blob').map((t) => t.path));
+  return Object.fromEntries(
+    Object.entries(changes).filter(([path, content]) => content !== null || present.has(path)),
+  );
+}
+
+/**
+ * A repo with business on older tools gets the current ones in the same commit (ruling S5); a
+ * change the builder made to a tool path wins. The check bundle is large, so it loads only here.
+ */
+async function withToolUpgrade(fresh: Fresh, changes: FileChanges): Promise<FileChanges> {
+  if (!fresh.tree.some((t) => t.type === 'blob' && t.path === BUSINESS_PROFILE_PATH))
+    return changes;
+  const { businessToolUpgrade } = await import('../business-setup');
+  return { ...businessToolUpgrade(await fresh.read(BUSINESS_TOOLS_VERSION_PATH)), ...changes };
+}
+
 /**
  * Builds a change from fresh repository state and commits it in one commit. If the branch moved
  * meanwhile, it rebuilds from the new state and tries once more; a second conflict throws
@@ -81,7 +100,11 @@ export async function writeBusiness(
       const fresh = await readFresh(owner, name, target);
       const built = await build(fresh);
       if (!built.ok) return built;
-      const { changes, message } = built.value;
+      const { message } = built.value;
+      const changes = await withToolUpgrade(
+        fresh,
+        withoutMissingDeletes(fresh, built.value.changes),
+      );
       const res = await githubService.commitFiles(
         owner,
         name,

@@ -216,3 +216,55 @@ describe('invoiceCsvRows', () => {
     );
   });
 });
+
+describe('formula injection', () => {
+  it('prefixes text fields that a spreadsheet would run as a formula with an apostrophe', () => {
+    const row = lines(
+      expensesCsv([
+        {
+          id: '01M55FJ500NTZ49EKRX27CHPV0' as Ulid,
+          date: '2026-10-03',
+          supplier: '=HYPERLINK("x")',
+          description: '+1 cable',
+          category: '@sum',
+          net: -1000,
+          vat: 0,
+          gross: -1000,
+          vat_rate: '0',
+          client: '\tacme' as Issued['client'],
+          project: '\rweb' as Issued['client'],
+          receipt: '01M55FJ500NTZ49EKRX27CHPV0.pdf',
+        },
+      ]),
+    )[1];
+    expect(row).toBe(
+      `2026-10-03;"'=HYPERLINK(""x"")";'+1 cable;'@sum;-10,00;0;0,00;-10,00;'\tacme;"'\rweb";01M55FJ500NTZ49EKRX27CHPV0.pdf`,
+    );
+  });
+
+  it('guards client names, payment methods and references, but not amounts', () => {
+    const invoices = lines(
+      invoicesCsv([
+        { issued: { ...inv, buyer: { ...inv.buyer, name: '=cmd' } }, paid: 0, open: 1 },
+      ]),
+    )[1];
+    expect(invoices?.split(';')[3]).toBe("'=cmd");
+    const payments = lines(
+      paymentsCsv([
+        {
+          id: '01M5KA3Q00W16BGNTZ49EKRX28' as Ulid,
+          date: '2026-11-02',
+          invoice: 'RE-2026-0001',
+          amount: -5,
+          method: '+bank',
+          ref: '@ref',
+        },
+      ]),
+    )[1];
+    expect(payments).toBe("2026-11-02;RE-2026-0001;-0,05;'+bank;'@ref");
+  });
+
+  it('leaves csvTable itself unchanged', () => {
+    expect(csvTable([['=a']])).toBe(`${BOM}=a\r\n`);
+  });
+});

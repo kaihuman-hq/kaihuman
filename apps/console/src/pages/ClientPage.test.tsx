@@ -448,6 +448,18 @@ describe('ClientPage share wiring', () => {
       ).toBe('Edit');
     });
 
+    it('names the PDF and Edit controls after the contract', () => {
+      show(ready(load(withFile)));
+      expect(
+        host.querySelector('[aria-label="Open PDF for Rahmenvertrag Webentwicklung"]')?.textContent,
+      ).toBe('Open PDF');
+      expect(
+        host
+          .querySelector('[aria-label="Edit Rahmenvertrag Webentwicklung"]')
+          ?.getAttribute('href'),
+      ).toBe('/clients/acme-gmbh/contracts/01M52X5E00EKRX27CHPV05AFMS');
+    });
+
     it('shows the next reminder with date and what', () => {
       show(ready(load(withFile)));
       // Today is 2026-11-10; renewal 2026-12-01 and its notice (30 days before) on 2026-11-01 is past.

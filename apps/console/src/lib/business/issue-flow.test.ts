@@ -1,5 +1,6 @@
 import { loadBusinessRepo, type TextChanges, type Ulid } from '@kaihuman/formats/business';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BUSINESS_TOOLS_VERSION } from '../business-setup';
 import { __resetRepoFilesCacheForTests } from '../repo-files';
 import { loadFixtureRepo } from './fixture.test-helper';
 import {
@@ -62,6 +63,8 @@ const baseFiles = (): Record<string, string> => {
   m.set(DRAFT, (m.get(DRAFT) ?? '').replace('01M581YW00W16BGNTZ49EKRX27', ENTRY));
   m.set(issuedAt('RE-2026-0042'), otherInvoice(invoice, 'RE-2026-0042'));
   m.set(LOG, OLD_LOG);
+  // Current tools, so the commit holds only the issue's own changes (no tool upgrade).
+  m.set('.kh/business/.tools/version', BUSINESS_TOOLS_VERSION);
   return Object.fromEntries(m);
 };
 const otherInvoice = (template: string, number: string) =>

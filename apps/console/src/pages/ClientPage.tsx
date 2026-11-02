@@ -378,6 +378,7 @@ function Overview(props: {
                     <button
                       type="button"
                       class={link}
+                      aria-label={`Open PDF for ${c.title}`}
                       onClick={() => {
                         setFileError(null);
                         const file = c.file;
@@ -399,7 +400,11 @@ function Overview(props: {
                   )}
                 </td>
                 <td class={td}>
-                  <a href={`/clients/${client.slug}/contracts/${c.id}`} class={link}>
+                  <a
+                    href={`/clients/${client.slug}/contracts/${c.id}`}
+                    class={link}
+                    aria-label={`Edit ${c.title}`}
+                  >
                     Edit
                   </a>
                 </td>

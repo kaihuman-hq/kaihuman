@@ -119,10 +119,17 @@ function YearExport(props: { target: KBRepo; data: BusinessRepo; year: string })
   async function run() {
     const id = ++currentRun.current;
     let ended = false;
+    // The progress text is a live region: it changes in 10% steps and on the final count, so a
+    // screen reader is not flooded with one announcement per file.
+    let step = -1;
     setState({ status: 'running', done: 0, total: 0 });
     try {
       const zip = await buildYearExport(target, data, year, (done, total) => {
-        if (!ended && currentRun.current === id) setState({ status: 'running', done, total });
+        if (ended || currentRun.current !== id) return;
+        const now = total === 0 ? 0 : Math.floor((done * 10) / total);
+        if (now <= step && done !== total) return;
+        step = now;
+        setState({ status: 'running', done, total });
       });
       ended = true;
       const name = `business-${year}.zip`;

@@ -13,7 +13,10 @@ import { AlreadyEnabledError, PublicRepoError } from './business/errors';
 import { BUSINESS_PROFILE_PATH } from './business/load';
 import type { KBRepo } from './github-kb';
 
-/** Bump when the check, workflow or skill changes: `syncKB` then rewrites the tool files. */
+/**
+ * Bump when the check, workflow or skill changes: the next `syncKB` or business write then
+ * rewrites the tool files.
+ */
 export const BUSINESS_TOOLS_VERSION = '1.3.0';
 
 export { BUSINESS_PROFILE_PATH };
@@ -32,6 +35,15 @@ export function getBusinessToolFiles(): Record<string, string> {
     '.claude/skills/kh-business/SKILL.md': KH_BUSINESS_SKILL,
     '.github/workflows/business-check.yml': BUSINESS_WORKFLOW,
   };
+}
+
+/**
+ * The tool files to write for a repo whose `.kh/business/.tools/version` reads `installed` (null
+ * when absent): all of them when it is not the current version, else none. Shared by `syncKB`
+ * and `writeBusiness`, so any of them upgrades an older repo (ruling S5).
+ */
+export function businessToolUpgrade(installed: string | null): Record<string, string> {
+  return installed?.trim() === BUSINESS_TOOLS_VERSION ? {} : getBusinessToolFiles();
 }
 
 /** Everything a new business needs: tool files plus the user's own data skeleton. */

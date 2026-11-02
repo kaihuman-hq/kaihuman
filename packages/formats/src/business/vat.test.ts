@@ -205,6 +205,45 @@ describe('vatSummary, cash', () => {
     expect(vatSummary(repo, '2026')).toMatchObject({ outputTax: 1900 - 190 });
   });
 
+  it('cash basis nets a cancelling credit note into an unpaid invoice', () => {
+    const inv = invoice('RE-2026-0001', '2026-01-10', s19(1000, 190));
+    const cn = credit('RE-2026-0002', '2026-01-20', s19(1000, 190));
+    const re = invoice('RE-2026-0003', '2026-01-21', s19(1000, 190));
+    const repo = repoOf([inv, cn, re], {
+      profile: cash,
+      payments: [pay('2026-02-01', re.number, 1190)],
+    });
+    expect(vatSummary(repo, '2026-Q1')).toMatchObject({
+      output: [{ category: 'S', rate: '19', taxable: 1000, tax: 190 }],
+      outputTax: 190,
+    });
+  });
+
+  it('cash basis shares payments against the gross left after a credit note', () => {
+    const inv = invoice('RE-2026-0001', '2026-01-10', s19(1000, 190));
+    const cn = credit('RE-2026-0002', '2026-01-20', s19(500, 95));
+    const repo = repoOf([inv, cn], {
+      profile: cash,
+      payments: [pay('2026-02-01', inv.number, 595)],
+    });
+    expect(vatSummary(repo, '2026-Q1')).toMatchObject({
+      output: [{ category: 'S', rate: '19', taxable: 500, tax: 95 }],
+      outputTax: 95,
+    });
+  });
+
+  it('cash basis counts a credit note only for VAT already taxed beyond the new gross', () => {
+    const inv = invoice('RE-2026-0001', '2026-01-10', s19(1000, 190));
+    const cn = credit('RE-2026-0002', '2026-04-20', s19(500, 95));
+    const repo = repoOf([inv, cn], {
+      profile: cash,
+      payments: [pay('2026-02-01', inv.number, 714)], // 114 VAT taxed in Q1
+    });
+    expect(vatSummary(repo, '2026-Q1')).toMatchObject({ outputTax: 114 });
+    // Only 595 gross (95 VAT) remain: the 19 already taxed beyond it comes back in Q2.
+    expect(vatSummary(repo, '2026-Q2')).toMatchObject({ outputTax: -19 });
+  });
+
   it('ignores payments outside the period but counts them as paid before', () => {
     const inv = invoice('RE-2026-0002', '2025-12-10', s19(10000, 1900));
     const repo = repoOf([inv], {

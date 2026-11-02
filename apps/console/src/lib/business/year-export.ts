@@ -39,11 +39,10 @@ export async function buildYearExport(
   const { tree, truncated } = await githubService.fetchCommitTree(owner, name, head);
   // A partial tree would silently leave files out of a record the Steuerberater relies on.
   if (truncated) throw new Error(TOO_LARGE);
-  const paths = yearExportPaths(
-    repo,
-    tree.filter((item) => item.type === 'blob').map((item) => item.path),
-    year,
+  const blobs = new Map(
+    tree.filter((item) => item.type === 'blob').map((item) => [item.path, item.sha]),
   );
+  const paths = yearExportPaths(repo, [...blobs.keys()], year);
 
   const read: Uint8Array[] = new Array(paths.length);
   let next = 0;
@@ -55,7 +54,8 @@ export async function buildYearExport(
       const i = next++;
       const path = paths[i] as string;
       try {
-        read[i] = await githubService.getFileBytes(owner, name, path, { ref: head });
+        // One request per file: the head tree already names each blob, so no tree walk.
+        read[i] = await githubService.getBlobBytes(owner, name, blobs.get(path) ?? '');
       } catch {
         if (failed) return;
         failed = true;

@@ -12,6 +12,17 @@ const field = (value: string | number): string => {
   return NEEDS_QUOTES.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 };
 
+const FORMULA_START = /^[=+@\t\r]/;
+
+/**
+ * A free-text field that a spreadsheet would run as a formula gets a leading `'`. Only text
+ * fields: amounts start with `-` and must stay numbers.
+ */
+const text = (value: string | undefined): string => {
+  const v = value ?? '';
+  return FORMULA_START.test(v) ? `'${v}` : v;
+};
+
 export const csvTable = (rows: (string | number)[][]): string =>
   `﻿${rows.map((r) => `${r.map(field).join(';')}\r\n`).join('')}`;
 
@@ -41,16 +52,16 @@ export const expensesCsv = (expenses: readonly Expense[]): string =>
     ],
     ...expenses.map((e) => [
       e.date,
-      e.supplier,
-      e.description,
-      e.category,
+      text(e.supplier),
+      text(e.description),
+      text(e.category),
       csvAmount(e.net),
       csvRate(e.vat_rate),
       csvAmount(e.vat),
       csvAmount(e.gross),
-      e.client ?? '',
-      e.project ?? '',
-      e.receipt ?? '',
+      text(e.client),
+      text(e.project),
+      text(e.receipt),
     ]),
   ]);
 
@@ -92,7 +103,7 @@ export const invoicesCsv = (rows: readonly InvoiceCsvRow[]): string =>
         d.number,
         DOC_TYPE[d.kind],
         d.issue_date,
-        d.buyer.name,
+        text(d.buyer.name),
         csvAmount(sign * d.totals.net),
         csvAmount(sign * d.totals.vat),
         csvAmount(sign * d.totals.gross),
@@ -105,7 +116,7 @@ export const invoicesCsv = (rows: readonly InvoiceCsvRow[]): string =>
 export const paymentsCsv = (payments: readonly Payment[]): string =>
   csvTable([
     ['Datum', 'Rechnung', 'Betrag', 'Methode', 'Referenz'],
-    ...payments.map((p) => [p.date, p.invoice, csvAmount(p.amount), p.method ?? '', p.ref ?? '']),
+    ...payments.map((p) => [p.date, p.invoice, csvAmount(p.amount), text(p.method), text(p.ref)]),
   ]);
 
 const BASIS = { accrual: 'Soll', cash: 'Ist' } as const;

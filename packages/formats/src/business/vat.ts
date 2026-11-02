@@ -56,7 +56,7 @@ const share = (amount: number, part: number, whole: number): number => {
  * whole amount, so the payment that completes an invoice takes the exact remainder.
  */
 const allocated = (amount: number, paid: number, gross: number): number =>
-  paid >= gross ? amount : share(amount, paid, gross);
+  paid >= gross || gross <= 0 ? amount : share(amount, paid, gross);
 
 export const vatSummary = (repo: BusinessRepo, period: VatPeriod): VatSummary => {
   const { start, end } = periodRange(period);
@@ -79,36 +79,96 @@ export const vatSummary = (repo: BusinessRepo, period: VatPeriod): VatSummary =>
   };
 
   const invoices = new Map<string, Issued>();
+  const creditNotes: Issued[] = [];
   for (const { doc } of repo.issued) {
     if (doc.kind === 'invoice') invoices.set(doc.number, doc);
-    // Credit notes count by issue date in both bases.
-    else if (doc.kind === 'credit-note' && inPeriod(doc.issue_date)) addDoc(doc, -1);
+    else if (doc.kind === 'credit-note') creditNotes.push(doc);
   }
+  // Ist nets a credit note into the invoice it corrects (ruling S4); one without a known
+  // invoice, and every credit note under Soll, counts by its issue date.
+  const netted = (c: Issued) => basis === 'cash' && !!c.corrects && invoices.has(c.corrects);
+  for (const c of creditNotes) if (!netted(c) && inPeriod(c.issue_date)) addDoc(c, -1);
 
   if (basis === 'accrual') {
     for (const doc of invoices.values()) if (inPeriod(doc.issue_date)) addDoc(doc, 1);
   } else {
-    const paidSoFar = new Map<string, number>();
-    const payments = [...repo.payments].sort(
-      (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
+    type Event = { date: string; order: string; invoice: string } & (
+      | { kind: 'payment'; amount: number }
+      | { kind: 'credit'; doc: Issued }
     );
-    for (const p of payments) {
-      if (p.date > end) break;
-      const doc = invoices.get(p.invoice);
-      if (!doc) continue;
-      const gross = doc.totals.gross;
-      const before = Math.min(paidSoFar.get(p.invoice) ?? 0, gross);
-      const total = (paidSoFar.get(p.invoice) ?? 0) + p.amount;
-      paidSoFar.set(p.invoice, total);
-      const after = Math.min(total, gross);
-      if (!inPeriod(p.date) || gross <= 0 || after === before) continue;
+    const events: Event[] = [
+      ...repo.payments
+        .filter((p) => invoices.has(p.invoice))
+        .map(
+          (p): Event => ({
+            kind: 'payment',
+            date: p.date,
+            order: p.id,
+            invoice: p.invoice,
+            amount: p.amount,
+          }),
+        ),
+      ...creditNotes.filter(netted).map(
+        (c): Event => ({
+          kind: 'credit',
+          date: c.issue_date,
+          order: c.number,
+          invoice: c.corrects ?? '',
+          doc: c,
+        }),
+      ),
+    ].sort((a, b) => a.date.localeCompare(b.date) || a.order.localeCompare(b.order));
+
+    type State = {
+      gross: number;
+      paid: number;
+      rows: Map<string, { category: VatCategory; rate: string; taxable: number; tax: number }>;
+      taxed: Map<string, { taxable: number; tax: number }>;
+    };
+    const states = new Map<string, State>();
+    const addRows = (state: State, doc: Issued, sign: 1 | -1) => {
+      state.gross += sign * doc.totals.gross;
       for (const b of doc.totals.breakdown) {
-        add(
-          b.category,
-          b.rate,
-          allocated(b.taxable, after, gross) - allocated(b.taxable, before, gross),
-          allocated(b.tax, after, gross) - allocated(b.tax, before, gross),
-        );
+        const key = `${b.category}|${b.rate}`;
+        const row = state.rows.get(key) ?? {
+          category: b.category,
+          rate: b.rate,
+          taxable: 0,
+          tax: 0,
+        };
+        row.taxable += sign * b.taxable;
+        row.tax += sign * b.tax;
+        state.rows.set(key, row);
+      }
+    };
+    const stateOf = (number: string): State => {
+      const known = states.get(number);
+      if (known) return known;
+      const state: State = { gross: 0, paid: 0, rows: new Map(), taxed: new Map() };
+      addRows(state, invoices.get(number) as Issued, 1);
+      states.set(number, state);
+      return state;
+    };
+
+    for (const e of events) {
+      if (e.date > end) break;
+      const state = stateOf(e.invoice);
+      if (e.kind === 'payment') state.paid += e.amount;
+      else addRows(state, e.doc, -1);
+      // What payments so far cover of the effective invoice; a credit note that drops the gross
+      // below what was already paid gives back only the VAT taxed beyond it.
+      const paid = Math.min(state.paid, state.gross);
+      for (const [key, row] of state.rows) {
+        const done = state.taxed.get(key) ?? { taxable: 0, tax: 0 };
+        const target = {
+          taxable: allocated(row.taxable, paid, state.gross),
+          tax: allocated(row.tax, paid, state.gross),
+        };
+        const taxable = target.taxable - done.taxable;
+        const tax = target.tax - done.tax;
+        state.taxed.set(key, target);
+        if (inPeriod(e.date) && (taxable !== 0 || tax !== 0))
+          add(row.category, row.rate, taxable, tax);
       }
     }
   }

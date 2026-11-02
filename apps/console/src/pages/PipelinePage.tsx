@@ -26,6 +26,9 @@ export function PipelinePage() {
   const state = useBusinessRepo();
   // Stages shown right after a move, until the reloaded repository carries the committed change.
   const [moved, setMoved] = useState<Record<string, ClientStage>>({});
+  // What each card's select shows before Move is pressed. A select change alone never commits:
+  // arrow keys on a focused select fire change on some platforms.
+  const [picked, setPicked] = useState<Record<string, ClientStage>>({});
   const [announcement, setAnnouncement] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -43,18 +46,17 @@ export function PipelinePage() {
     setFocusReq(null);
   }, [focusReq]);
 
-  /** The select shows what the user picked; a failed move puts it back and returns focus to it. */
-  function revert(select: HTMLSelectElement, client: ClientSummary) {
-    select.value = client.stage;
+  const unpick = (slug: string) => setPicked(({ [slug]: _, ...rest }) => rest);
+
+  /** A failed move puts the select back and returns focus to it. */
+  function revert(client: ClientSummary) {
+    unpick(client.slug);
     setFocusReq(client.slug);
   }
 
-  async function move(target: KBRepo, client: ClientSummary, select: HTMLSelectElement) {
-    const stage = select.value as ClientStage;
-    if (busy || demoMode.value || stage === client.stage) {
-      select.value = client.stage;
-      return;
-    }
+  async function move(target: KBRepo, client: ClientSummary) {
+    const stage = picked[client.slug] ?? client.stage;
+    if (busy || demoMode.value || stage === client.stage) return;
     setBusy(true);
     setError(null);
     setAnnouncement('');
@@ -70,15 +72,16 @@ export function PipelinePage() {
       });
       if (!result.ok) {
         setError(result.issues[0]?.message ?? 'Nothing was saved.');
-        revert(select, client);
+        revert(client);
         return;
       }
       setMoved((m) => ({ ...m, [slug]: stage }));
+      unpick(slug);
       setAnnouncement(`${client.name} moved to ${STAGE_LABEL[stage]}.`);
       setFocusReq(slug);
     } catch (e) {
       setError(writeErrorMessage(e));
-      revert(select, client);
+      revert(client);
     } finally {
       setBusy(false);
     }
@@ -137,17 +140,18 @@ export function PipelinePage() {
                               Last activity {c.lastActivity ?? 'none'}
                             </p>
                             {!demoMode.value && (
-                              <div class="mt-1">
+                              <div class="mt-1 flex gap-1">
                                 <label for={selectId(c.slug)} class="sr-only">
                                   Move {c.name} to…
                                 </label>
                                 <select
                                   id={selectId(c.slug)}
                                   class={INPUT}
-                                  value={c.stage}
-                                  onChange={(e) =>
-                                    move(target, c, e.currentTarget as HTMLSelectElement)
-                                  }
+                                  value={picked[c.slug] ?? c.stage}
+                                  onChange={(e) => {
+                                    const stage = e.currentTarget.value as ClientStage;
+                                    setPicked((p) => ({ ...p, [c.slug]: stage }));
+                                  }}
                                 >
                                   {CLIENT_STAGES.map((s) => (
                                     <option key={s} value={s}>
@@ -155,6 +159,15 @@ export function PipelinePage() {
                                     </option>
                                   ))}
                                 </select>
+                                <button
+                                  type="button"
+                                  aria-label={`Move ${c.name}`}
+                                  disabled={busy}
+                                  onClick={() => move(target, c)}
+                                  class="text-xs border border-[var(--los-border)] px-2 text-[var(--los-accent)] hover:underline"
+                                >
+                                  Move
+                                </button>
                               </div>
                             )}
                           </li>

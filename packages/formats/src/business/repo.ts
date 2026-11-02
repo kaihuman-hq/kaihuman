@@ -111,6 +111,14 @@ export const loadBusinessRepoDetailed = (
     ...new Set([...files.keys(), ...treePaths].filter((p) => p.startsWith(`${BUSINESS_ROOT}/`))),
   ].sort();
 
+  const present = new Set(paths);
+  /** A receipt or contract file sits beside its record (ruling S6: one absent is an error). */
+  const attachmentPresent = (file: string, field: 'receipt' | 'file', name: string | undefined) => {
+    if (name && !present.has(`${file.slice(0, file.lastIndexOf('/'))}/${name}`)) {
+      fail(file, field, `${field}: ${name} is not in the repository`);
+    }
+  };
+
   const repo: BusinessRepo = {
     profile: null,
     clients: [],
@@ -199,12 +207,28 @@ export const loadBusinessRepoDetailed = (
       case 'contract': {
         if (text === undefined) break;
         const r = readYaml(text, validateContract);
-        if (!r.ok) addIssues(file, r.issues);
-        else {
-          repo.contracts.push(r.value);
-          sameId(file, r.value.id, p.id);
-          refs.push({ file, path: 'client', client: r.value.client });
+        if (!r.ok) {
+          addIssues(file, r.issues);
+          break;
         }
+        // As for expenses: writers derive the paths from client and id, so a record that
+        // disagrees with its path is reported and left out.
+        const before = findings.length;
+        sameId(file, r.value.id, p.id);
+        if (r.value.client !== p.client) {
+          fail(
+            file,
+            'client',
+            `client: "${r.value.client}" does not match the folder "${p.client}"`,
+          );
+        }
+        if (repo.contracts.some((c) => c.id === r.value.id)) {
+          fail(file, 'id', `another contract already has the id ${r.value.id}`);
+        }
+        if (findings.length > before) break;
+        attachmentPresent(file, 'file', r.value.file);
+        repo.contracts.push(r.value);
+        refs.push({ file, path: 'client', client: r.value.client });
         break;
       }
       case 'draft': {
@@ -328,6 +352,7 @@ export const loadBusinessRepoDetailed = (
           fail(file, 'id', `another expense already has the id ${r.value.id}`);
         }
         if (findings.length > before) break;
+        attachmentPresent(file, 'receipt', r.value.receipt);
         repo.expenses.push(r.value);
         if (r.value.client) {
           refs.push({

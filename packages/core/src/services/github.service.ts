@@ -186,11 +186,28 @@ export class GithubService {
             : 'file';
     if (kind !== 'file') throw new Error(`Path is not a file: ${kind}`);
 
+    return this.readBlob(owner, repo, entry.sha, notFound);
+  }
+
+  /**
+   * Raw bytes of one blob by its sha, in one request: for a caller that already holds a tree
+   * (a year export), where `getFileBytes` would walk the trees again for every file.
+   */
+  async getBlobBytes(owner: string, repo: string, sha: string): Promise<Uint8Array> {
+    return this.readBlob(owner, repo, sha, () => new Error(`Not found: blob ${sha}`));
+  }
+
+  private async readBlob(
+    owner: string,
+    repo: string,
+    sha: string,
+    notFound: () => Error,
+  ): Promise<Uint8Array> {
     let blob: { content: string; encoding: string };
     try {
-      ({ data: blob } = await client.git.getBlob({ owner, repo, file_sha: entry.sha }));
+      ({ data: blob } = await this.getClient().git.getBlob({ owner, repo, file_sha: sha }));
     } catch (e) {
-      throw is404(e) ? notFound() : e;
+      throw (e as { status?: number }).status === 404 ? notFound() : e;
     }
     if (blob.encoding !== 'base64') {
       throw new Error(`Unexpected blob encoding: ${blob.encoding}`);
