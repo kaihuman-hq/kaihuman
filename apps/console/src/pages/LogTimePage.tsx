@@ -26,11 +26,23 @@ const INPUT =
 
 type Query = { client?: string; project?: string; from?: string };
 
-function initialForm(data: BusinessRepo, query: Query): { form: TimeForm; stopping: boolean } {
+type Initial = {
+  form: TimeForm;
+  stopping: boolean;
+  /** `started_at` of the timer the form was prefilled from; stopping must still find that timer. */
+  timerStart: string | null;
+};
+
+function initialForm(data: BusinessRepo, query: Query): Initial {
   if (query.from === 'timer' && data.timer) {
-    return { form: formFromEntry(timerToEntry(data.timer, new Date())), stopping: true };
+    return {
+      form: formFromEntry(timerToEntry(data.timer, new Date())),
+      stopping: true,
+      timerStart: data.timer.started_at,
+    };
   }
   return {
+    timerStart: null,
     form: {
       ...emptyTimeForm(todayLocal()),
       client: query.client ?? '',
@@ -43,7 +55,7 @@ function initialForm(data: BusinessRepo, query: Query): { form: TimeForm; stoppi
 function LogTimeForm(props: { target: KBRepo; data: BusinessRepo; query: Query }) {
   const { target, data, query } = props;
   const [init] = useState(() => initialForm(data, query));
-  const { stopping } = init;
+  const { stopping, timerStart } = init;
   const [form, setForm] = useState<TimeForm>(init.form);
   const [errors, setErrors] = useState<Partial<Record<keyof TimeForm, string>>>({});
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +65,10 @@ function LogTimeForm(props: { target: KBRepo; data: BusinessRepo; query: Query }
 
   const set = <K extends keyof TimeForm>(key: K, value: TimeForm[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
-  const projects = data.projects.filter((p) => p.client === form.client);
+  // Archived projects take no new time, but a prefilled one stays selectable.
+  const projects = data.projects.filter(
+    (p) => p.client === form.client && (p.status === 'active' || p.slug === form.project),
+  );
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
@@ -75,6 +90,18 @@ function LogTimeForm(props: { target: KBRepo; data: BusinessRepo; query: Query }
           return {
             ok: false,
             issues: [{ path: 'timer', message: 'The timer was already stopped elsewhere.' }],
+          };
+        }
+        // Stopped and restarted elsewhere: this form's minutes belong to the old timer.
+        if (stopping && fresh.repo.timer?.started_at !== timerStart) {
+          return {
+            ok: false,
+            issues: [
+              {
+                path: 'timer',
+                message: 'The timer changed on another device. Reload and check.',
+              },
+            ],
           };
         }
         const file = timePath(entry.value.date.slice(0, 7));
@@ -184,7 +211,7 @@ function LogTimeForm(props: { target: KBRepo; data: BusinessRepo; query: Query }
           <input
             id="hours"
             type="text"
-            inputMode="decimal"
+            inputMode="text"
             class={INPUT}
             value={form.hours}
             disabled={busy}

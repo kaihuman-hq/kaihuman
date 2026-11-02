@@ -74,7 +74,11 @@ export const offerToInvoiceDraft = (offer: Issued, id: Ulid): Draft => {
   };
 };
 
-/** Event, draft and save in one: refuses a superseded offer and a second draft for the same offer. */
+/**
+ * Draft and save in one (no `accepted` event: converting is allowed from any open or accepted offer).
+ * Refuses a declined or superseded offer, and a second invoice for the same offer, whether that
+ * invoice is still a draft or already issued.
+ */
 export const convertOffer = (
   repo: BusinessRepo,
   offer: string,
@@ -85,6 +89,11 @@ export const convertOffer = (
   if (repo.issued.some((i) => i.doc.supersedes === offer)) {
     return refuse(`${offer} was replaced by a newer offer.`);
   }
+  if (repo.events.some((e) => e.doc === offer && e.type === 'declined')) {
+    return refuse(`${offer} was declined.`);
+  }
+  const invoiced = repo.issued.find((i) => i.doc.from_offer === offer)?.doc;
+  if (invoiced) return refuse(`${offer} was already invoiced as ${invoiced.number}.`);
   if (repo.drafts.some((d) => d.from_offer === offer)) {
     return refuse(`An invoice draft for ${offer} already exists.`);
   }

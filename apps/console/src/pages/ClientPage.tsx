@@ -89,8 +89,10 @@ function Overview(props: {
   backlinks: string[] | null;
   /** Unbilled time that is in no draft yet. */
   canDraftUnbilled: boolean;
+  /** Offers that already have an issued invoice; converting them again would bill twice. */
+  invoicedOffers: ReadonlySet<string>;
 }) {
-  const { o, today, contents, backlinks } = props;
+  const { o, today, contents, backlinks, invoicedOffers } = props;
   const { client, summary: s } = o;
   const currency = s.currency;
   const contact = client.contacts[0];
@@ -183,9 +185,11 @@ function Overview(props: {
               <td class={td}>
                 {/* Accepted offers can still be converted; declined and replaced ones are history. Expired ones can be accepted late. */}
                 {['issued', 'sent', 'expired'].includes(r.status) && (
-                  <OfferActions offer={r.number} />
+                  <OfferActions offer={r.number} canConvert={!invoicedOffers.has(r.number)} />
                 )}
-                {r.status === 'accepted' && <OfferActions offer={r.number} decided />}
+                {r.status === 'accepted' && !invoicedOffers.has(r.number) && (
+                  <OfferActions offer={r.number} decided />
+                )}
               </td>
             </tr>
           ))}
@@ -378,6 +382,9 @@ export function ClientPage({ slug }: { slug?: string }) {
         const canDraftUnbilled = data.time.some(
           (t) => t.client === slug && t.invoice === undefined && !drafted.has(t.id),
         );
+        const invoicedOffers = new Set(
+          data.issued.flatMap((i) => (i.doc.from_offer ? [i.doc.from_offer] : [])),
+        );
         return (
           <>
             <a href="/clients" class={`text-xs ${link}`}>
@@ -385,6 +392,7 @@ export function ClientPage({ slug }: { slug?: string }) {
             </a>
             <Overview
               canDraftUnbilled={canDraftUnbilled}
+              invoicedOffers={invoicedOffers}
               o={o}
               today={today}
               contents={contents}

@@ -8,8 +8,8 @@ describe('gitBlobSha', () => {
   it('matches git', () => {
     expect(gitBlobSha('hello\n')).toBe('ce013625030ba8dba906f756967f9e9ca394464a');
     expect(gitBlobSha('')).toBe('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391');
-    // byte length, not string length
-    expect(gitBlobSha('é')).toBe(gitBlobSha('é'));
+    // byte length (2 bytes), not string length; from `git hash-object`
+    expect(gitBlobSha('ä')).toBe('9d3f0460de61d6fec8d9ff9a0f06dcc9926e3b7e');
   });
 });
 

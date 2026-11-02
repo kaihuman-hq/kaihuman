@@ -131,6 +131,16 @@ describe('Dashboard refuses to change issued documents', () => {
     expect(h.store.createFile).not.toHaveBeenCalled();
   });
 
+  it('refuses to create, rename or move to a new issued-document path, though nothing exists there', async () => {
+    const fresh = `${B}/invoices/2026/RE-2026-0099.yaml`;
+    await call('onCreateFile', fresh, 'x');
+    await call('onRenameFile', 'notes/a.md', fresh);
+    await call('onMoveFile', 'notes/a.md', fresh);
+    expect(h.store.createFile).not.toHaveBeenCalled();
+    expect(h.store.renameFile).not.toHaveBeenCalled();
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(MESSAGE);
+  });
+
   it('still creates a new artifact next to issued files', async () => {
     await call('onCreateFile', `${B}/invoices/2026/RE-2026-0002.pdf`, '');
     expect(h.store.createFile).toHaveBeenCalled();

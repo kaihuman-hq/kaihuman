@@ -158,6 +158,21 @@ describe('ClientPage actions', () => {
     expect(buttons()).not.toContain('Credit note…');
   });
 
+  it('hides Convert to invoice once an invoice was issued from the offer', () => {
+    const invoiced = (m: Map<string, string>) => {
+      const path = '.kh/business/invoices/2026/RE-2026-0001.yaml';
+      m.set(path, `${m.get(path) ?? ''}from_offer: AN-2026-001\n`);
+    };
+    show(ready(load(invoiced)));
+    expect(buttons()).not.toContain('Convert to invoice');
+    const acceptedAndInvoiced = (m: Map<string, string>) => {
+      invoiced(m);
+      m.set('.kh/business/events.jsonl', event('accepted'));
+    };
+    show(ready(load(acceptedAndInvoiced)));
+    expect(buttons()).not.toContain('Convert to invoice');
+  });
+
   it('shows no offer buttons for a declined offer', () => {
     show(ready(load((m) => m.set('.kh/business/events.jsonl', event('declined')))));
     expect(buttons()).not.toContain('Convert to invoice');

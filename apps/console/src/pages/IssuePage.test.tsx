@@ -109,6 +109,16 @@ describe('IssuePage preview', () => {
     expect(writes.writeBusiness).not.toHaveBeenCalled();
   });
 
+  it('counts a PDF without its yaml in the previewed number', async () => {
+    const m = files();
+    const orphan = '.kh/business/invoices/2026/RE-2026-0002.pdf';
+    await show({
+      ...ready(m),
+      data: loadBusinessRepo(m, [...m.keys(), orphan]),
+    } as BusinessState);
+    expect(issueButton()?.textContent).toBe('Issue RE-2026-0003');
+  });
+
   it('follows the issue date into the next year', async () => {
     await show(ready(files()));
     const input = host.querySelector('#issue-date') as HTMLInputElement;

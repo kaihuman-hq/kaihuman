@@ -117,11 +117,15 @@ function IssueForm(props: {
     }
     let cancelled = false;
     const failed = loadErrors.map((e) => parseLoadError(e).path);
-    previewIssue(loadedSource(data, contents, failed), draft.id, issueDate, new Date()).then(
-      (r) => {
-        if (!cancelled) setPreview(r);
-      },
-    );
+    // Artifacts (a PDF without its yaml) are not fetched but still hold their number, as at commit.
+    previewIssue(
+      loadedSource(data, contents, [...failed, ...data.artifacts]),
+      draft.id,
+      issueDate,
+      new Date(),
+    ).then((r) => {
+      if (!cancelled) setPreview(r);
+    });
     return () => {
       cancelled = true;
     };

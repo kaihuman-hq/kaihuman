@@ -27,9 +27,19 @@ export function RecordPaymentLink({ invoice }: { invoice: string }) {
   );
 }
 
-/** Accepted, Declined and Convert to invoice for one issued offer. */
-/** `decided`: the offer was accepted, so only the conversion is left. */
-export function OfferActions({ offer, decided = false }: { offer: string; decided?: boolean }) {
+/**
+ * Accepted, Declined and Convert to invoice for one issued offer. `decided`: the offer was
+ * accepted, so only the conversion is left. `canConvert`: false once an invoice was issued for it.
+ */
+export function OfferActions({
+  offer,
+  decided = false,
+  canConvert = true,
+}: {
+  offer: string;
+  decided?: boolean;
+  canConvert?: boolean;
+}) {
   const state = useBusinessRepo();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,15 +105,17 @@ export function OfferActions({ offer, decided = false }: { offer: string; decide
           </button>
         </>
       )}
-      <button
-        type="button"
-        class={BUTTON}
-        disabled={busy}
-        aria-label={`Convert ${offer} to invoice`}
-        onClick={convert}
-      >
-        Convert to invoice
-      </button>
+      {canConvert && (
+        <button
+          type="button"
+          class={BUTTON}
+          disabled={busy}
+          aria-label={`Convert ${offer} to invoice`}
+          onClick={convert}
+        >
+          Convert to invoice
+        </button>
+      )}
       {error && (
         <p role="alert" class="w-full text-xs text-[var(--los-warning)]">
           {error}

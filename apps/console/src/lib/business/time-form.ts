@@ -1,4 +1,5 @@
 import { asSlug, type Result, type TimeEntry } from '@kaihuman/formats/business';
+import { isRealDate } from './dates';
 
 export type TimeForm = {
   client: string;
@@ -42,7 +43,7 @@ export function entryFromForm(form: TimeForm): Result<Omit<TimeEntry, 'id'>> {
   const projectText = form.project.trim();
   const project = projectText ? asSlug(projectText) : null;
   if (projectText && !project) issues.push({ path: 'project', message: 'Choose a valid project.' });
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(form.date) || Number.isNaN(Date.parse(form.date))) {
+  if (!isRealDate(form.date)) {
     issues.push({ path: 'date', message: 'Enter a date as YYYY-MM-DD.' });
   }
   const minutes = parseHours(form.hours);

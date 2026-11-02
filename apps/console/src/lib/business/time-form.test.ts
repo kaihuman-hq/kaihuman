@@ -57,6 +57,11 @@ describe('entryFromForm', () => {
     expect(timeFieldErrors(entryFromForm({ ...valid, note: '  ' })).note).toContain('note');
   });
 
+  it('rejects a date that does not exist', () => {
+    const errors = timeFieldErrors(entryFromForm({ ...valid, date: '2026-02-31' }));
+    expect(errors.date).toBe('Enter a date as YYYY-MM-DD.');
+  });
+
   it('reports client and date errors together', () => {
     const errors = timeFieldErrors(entryFromForm({ ...valid, client: '', date: '2026-13-40' }));
     expect(Object.keys(errors).sort()).toEqual(['client', 'date']);

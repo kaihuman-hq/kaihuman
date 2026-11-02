@@ -217,6 +217,31 @@ describe('convertOffer', () => {
     );
     expect(r).toMatchObject({ ok: false, issues: [{ path: 'offer' }] });
   });
+  it('refuses an offer that was already invoiced after the draft was issued', () => {
+    const invoice = repo.issued.find((i) => i.doc.kind === 'invoice');
+    if (!invoice) throw new Error('fixture');
+    const issuedInvoice = {
+      path: 'x',
+      doc: { ...invoice.doc, number: 'RE-2026-0009', from_offer: 'AN-2026-001' },
+    };
+    const r = convertOffer({ ...repo, issued: [...repo.issued, issuedInvoice] }, 'AN-2026-001', id);
+    expect(r).toMatchObject({
+      ok: false,
+      issues: [{ path: 'offer', message: 'AN-2026-001 was already invoiced as RE-2026-0009.' }],
+    });
+  });
+  it('refuses a declined offer', () => {
+    const declined = withStage('active', (m) =>
+      m.set(
+        '.kh/business/events.jsonl',
+        '{"id":"01M5D6RA00AFMSY38DJQW16BGN","at":"2026-10-30T09:30:00Z","doc":"AN-2026-001","type":"declined"}\n',
+      ),
+    );
+    expect(convertOffer(declined, 'AN-2026-001', id)).toMatchObject({
+      ok: false,
+      issues: [{ message: 'AN-2026-001 was declined.' }],
+    });
+  });
   it('refuses a second draft for the same offer', () => {
     const d = offerToInvoiceDraft(offer(repo), draftId);
     const r = convertOffer({ ...repo, drafts: [...repo.drafts, d] }, 'AN-2026-001', id);

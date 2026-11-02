@@ -181,6 +181,46 @@ describe('LogTimePage', () => {
     expect(router.route).not.toHaveBeenCalled();
   });
 
+  it('writes nothing when the timer was stopped and restarted on another device', async () => {
+    const restarted = load(true);
+    const m = loadFixtureRepo();
+    m.set(TIMER, 'client: acme-gmbh\nproject: website\nstarted_at: 2026-11-02T10:00:00Z\n');
+    writeAgainst(loadBusinessRepo(m));
+    show(ready(restarted), { from: 'timer' });
+    act(() => submit().click());
+    await flush();
+    expect(built.ok).toBe(false);
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(
+      'The timer changed on another device. Reload and check.',
+    );
+    expect(router.route).not.toHaveBeenCalled();
+  });
+
+  it('lets the hours field take 1:30 and 90m (no numeric keypad)', () => {
+    show(ready(load(false)), { client: 'acme-gmbh' });
+    expect(field('hours').getAttribute('inputmode')).toBe('text');
+  });
+
+  it('lists only active projects, but keeps a prefilled finished one', () => {
+    const m = loadFixtureRepo();
+    const P = '.kh/business/clients/acme-gmbh/projects/';
+    const website = m.get(`${P}website.yaml`) ?? '';
+    m.set(
+      `${P}old-site.yaml`,
+      website.replace(/^status: .*$/m, 'status: done').replace(/^name: .*$/m, 'name: Old site'),
+    );
+    const data = loadBusinessRepo(m);
+    expect(data.projects.find((p) => p.slug === 'old-site')?.status).toBe('done');
+    const options = () =>
+      [...host.querySelectorAll('#project option')].map((o) => (o as HTMLOptionElement).value);
+    show(ready(data), { client: 'acme-gmbh' });
+    expect(options()).toContain('website');
+    expect(options()).not.toContain('old-site');
+    act(() => render(null, host)); // the form reads its query once, on mount
+    show(ready(data), { client: 'acme-gmbh', project: 'old-site' });
+    expect(options()).toContain('old-site');
+  });
+
   it('shows the write error and stays on the page with the input intact', async () => {
     writes.writeBusiness.mockRejectedValue(new Error('boom'));
     show(ready(load(false)), { client: 'acme-gmbh' });

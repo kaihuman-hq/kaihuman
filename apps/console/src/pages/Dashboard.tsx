@@ -5,7 +5,7 @@ import {
   Logger,
   layoutStore,
 } from '@kaihuman/core';
-import type { Capture } from '@kaihuman/formats/business';
+import { type Capture, classifyBusinessPath } from '@kaihuman/formats/business';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 
@@ -56,8 +56,15 @@ export const Dashboard = () => {
   // True (after telling the user) when the path, or a folder's content, is an issued document.
   const refuseFrozen = useCallback((path: string, target = false): boolean => {
     const treePaths = githubFileStore.tree.peek().map((t) => t.path);
-    // A target only clashes with what already exists there (a new path may be anywhere).
-    if (target && !treePaths.some((p) => p === path || p.startsWith(`${path}/`))) return false;
+    // A target only clashes with what already exists there (a new artifact may sit anywhere), but
+    // a new issued-document path is never allowed: issuing is the only way to create one.
+    if (
+      target &&
+      classifyBusinessPath(path).kind !== 'issued' &&
+      !treePaths.some((p) => p === path || p.startsWith(`${path}/`))
+    ) {
+      return false;
+    }
     if (!touchesFrozen(path, treePaths)) return false;
     clearTimeout(captureTimer.current); // a pending success timeout must not clear this message
     setCaptureStatus({ ok: false, message: frozenMessage(path) });

@@ -3,10 +3,21 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The real editor needs the vite React-to-preact alias; this stand-in keeps its textarea contract.
+const editor = vi.hoisted(() => ({ emit: (_value: string) => {} }));
 vi.mock('@cascivo/editor', () => ({
-  CodeEditor: ({ readOnly, defaultValue }: { readOnly?: boolean; defaultValue?: string }) => (
-    <textarea readOnly={!!readOnly} value={defaultValue} />
-  ),
+  CodeEditor: ({
+    readOnly,
+    defaultValue,
+    onValueChange,
+  }: {
+    readOnly?: boolean;
+    defaultValue?: string;
+    onValueChange?: (value: string) => void;
+  }) => {
+    // Lets a test type into the editor, even a read-only one: the component must not trust the editor to refuse.
+    editor.emit = (value) => onValueChange?.(value);
+    return <textarea readOnly={!!readOnly} value={defaultValue} />;
+  },
 }));
 vi.mock('@kaihuman/core', async () => {
   const { signal } = await import('@preact/signals');
@@ -43,6 +54,19 @@ describe('CodeMirrorEditor readOnly', () => {
     expect(host.textContent).not.toContain('SAVE CHANGES');
   });
 
+  it('control: a dirty editor without readOnly auto-saves', () => {
+    vi.useFakeTimers();
+    const onSave = vi.fn();
+    act(() =>
+      render(<CodeMirrorEditor path="a.yaml" initialContent="a: 1" onSave={onSave} />, host),
+    );
+    act(() => editor.emit('a: 2'));
+    act(() => {
+      vi.advanceTimersByTime(2 * 60 * 1000);
+    });
+    expect(onSave).toHaveBeenCalledWith('a: 2');
+  });
+
   it('never auto-saves', () => {
     vi.useFakeTimers();
     const onSave = vi.fn();
@@ -52,6 +76,7 @@ describe('CodeMirrorEditor readOnly', () => {
         host,
       ),
     );
+    act(() => editor.emit('a: 2'));
     act(() => {
       vi.advanceTimersByTime(10 * 60 * 1000);
     });
