@@ -24,13 +24,12 @@ export const newShareToken = (): string => randomB64url(16);
 
 export async function encryptShareBlob(plain: Uint8Array, key: string): Promise<Uint8Array> {
   const subtle = globalThis.crypto.subtle;
-  const cryptoKey = await subtle.importKey(
-    'raw',
-    b64urlDecode(key) as BufferSource,
-    'AES-GCM',
-    false,
-    ['encrypt'],
-  );
+  const raw = b64urlDecode(key);
+  // WebCrypto would silently accept 16/24-byte keys and downgrade to AES-128/192.
+  if (raw.length !== 32) throw new Error('Invalid share key');
+  const cryptoKey = await subtle.importKey('raw', raw as BufferSource, 'AES-GCM', false, [
+    'encrypt',
+  ]);
   const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
   const ct = new Uint8Array(
     await subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, plain as BufferSource),
@@ -48,6 +47,7 @@ export async function decryptShareBlob(blob: Uint8Array, key: string): Promise<U
     const bin = atob(key.replace(/-/g, '+').replace(/_/g, '/'));
     const raw = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) raw[i] = bin.charCodeAt(i);
+    if (raw.length !== 32) throw new Error('bad key length');
     const cryptoKey = await globalThis.crypto.subtle.importKey(
       'raw',
       raw as BufferSource,
@@ -77,8 +77,9 @@ export function parseShareUrl(url: string): { host: string; token: string; key: 
   } catch {
     return null;
   }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
   const m = /^\/d\/([A-Za-z0-9_-]+)$/.exec(u.pathname);
   const key = u.hash.slice(1);
-  if (!m?.[1] || !key) return null;
+  if (!m?.[1] || !/^[A-Za-z0-9_-]{43}$/.test(key)) return null;
   return { host: u.origin, token: m[1], key };
 }

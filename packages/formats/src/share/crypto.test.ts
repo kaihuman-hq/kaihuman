@@ -49,17 +49,40 @@ describe('share crypto', () => {
     await expect(inlined(blob, newShareKey())).rejects.toThrow('Wrong key or damaged file');
   });
 
+  it('rejects keys that are not 32 bytes', async () => {
+    const short = b64urlEncode(new Uint8Array(16));
+    const blob = await encryptShareBlob(new Uint8Array([1]), newShareKey());
+    await expect(encryptShareBlob(new Uint8Array([1]), short)).rejects.toThrow('Invalid share key');
+    await expect(encryptShareBlob(new Uint8Array([1]), 'a+b')).rejects.toThrow();
+    await expect(decryptShareBlob(blob, short)).rejects.toThrow('Wrong key or damaged file');
+    await expect(decryptShareBlob(blob, '%%%')).rejects.toThrow('Wrong key or damaged file');
+    await expect(decryptShareBlob(new Uint8Array(5), newShareKey())).rejects.toThrow(
+      'Wrong key or damaged file',
+    );
+  });
+
+  it('inlined decryptShareBlob has no injected helpers', () => {
+    expect(decryptShareBlob.toString()).not.toMatch(/__name|\bimport\b|\brequire\b/);
+  });
+
   it('builds and parses share urls', () => {
     const key = newShareKey();
     const token = 't'.repeat(22);
     expect(shareUrl('https://docs.kaihuman.com/', token, key)).toBe(
       `https://docs.kaihuman.com/d/${token}#${key}`,
     );
-    expect(parseShareUrl(shareUrl('https://x.test', 'abc', key))).toEqual({
+    expect(parseShareUrl(shareUrl('https://x.test/', 'abc', key))).toEqual({
       host: 'https://x.test',
       token: 'abc',
       key,
     });
+    expect(parseShareUrl(`https://x.test/d/abc?q=1#${key}`)).toEqual({
+      host: 'https://x.test',
+      token: 'abc',
+      key,
+    });
+    expect(parseShareUrl(`ftp://x.test/d/abc#${key}`)).toBeNull();
+    expect(parseShareUrl('https://x.test/d/abc#short')).toBeNull();
     expect(parseShareUrl('https://x.test/d/abc')).toBeNull();
     expect(parseShareUrl('https://x.test/other/abc#k')).toBeNull();
     expect(parseShareUrl('not a url')).toBeNull();
@@ -69,6 +92,11 @@ describe('share crypto', () => {
     const bytes = new Uint8Array([0, 255, 62, 63]);
     expect(b64urlEncode(bytes)).toBe('AP8-Pw');
     expect(b64urlDecode(b64urlEncode(bytes))).toEqual(bytes);
+    for (const n of [1, 2, 32]) {
+      const b = Uint8Array.from({ length: n }, (_, i) => 255 - i);
+      expect(b64urlDecode(b64urlEncode(b))).toEqual(b);
+    }
+    expect(b64urlEncode(new Uint8Array(32))).toHaveLength(43);
     expect(() => b64urlDecode('ab+/')).toThrow();
     expect(() => b64urlDecode('a b')).toThrow();
   });
