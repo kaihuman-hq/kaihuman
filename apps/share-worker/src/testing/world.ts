@@ -5,6 +5,7 @@
 
 import { vi } from 'vitest';
 import { clearAuthCache } from '../auth.js';
+import type { EventRow, FileRow } from '../db.js';
 import type { Env } from '../env.js';
 import { handle } from '../index.js';
 import { FakeD1, FakeR2 } from './fakes.js';
@@ -74,8 +75,41 @@ export function makeWorld() {
     });
   }
 
-  return { db, files, env, clock, gitHub, call, upload };
+  /** A files row (and, unless `object` is null, its R2 object) written straight to the fakes. */
+  function seedFile(
+    row: Partial<FileRow> & Pick<FileRow, 'token' | 'user_id'>,
+    object: Uint8Array | null = new Uint8Array(40).fill(3),
+  ): FileRow {
+    const file: FileRow = {
+      label: '2026-001',
+      business: 'Acme GmbH',
+      kind: 'pdf',
+      size: object?.byteLength ?? 40,
+      created_at: '2026-11-01T09:00:00.000Z',
+      expires_at: null,
+      revoked_at: null,
+      ...row,
+    };
+    db.tables.files.push(file);
+    if (object) files.objects.set(`${file.user_id}/${file.token}`, object);
+    return file;
+  }
+
+  function seedEvent(row: Partial<EventRow> & Pick<EventRow, 'id' | 'token' | 'user_id'>) {
+    db.tables.events.push({ at: '2026-11-01T12:00:00.000Z', client: 'browser', ...row });
+  }
+
+  /** A public request: no Origin, no Authorization. */
+  function visit(method: string, path: string, headers: Record<string, string> = {}) {
+    const request = new Request(`${BASE}${path}`, { method, headers });
+    return handle(request, env, { fetch: gitHub as typeof fetch, now: () => clock.now });
+  }
+
+  return { db, files, env, clock, gitHub, call, upload, seedFile, seedEvent, visit };
 }
+
+/** A 22-character token made of one repeated character, for seeded files. */
+export const tokenOf = (c: string): string => c.repeat(22);
 
 /**
  * A body stream that yields `chunks` chunks of `chunkSize` bytes and counts how many were

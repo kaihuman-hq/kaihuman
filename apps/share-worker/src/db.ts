@@ -42,7 +42,22 @@ export const SQL = {
   // COALESCE keeps the first revoke time when a file is revoked twice.
   revokeFile:
     'UPDATE files SET revoked_at = COALESCE(revoked_at, ?3) WHERE token = ?1 AND user_id = ?2',
+  findFile:
+    'SELECT token, user_id, label, business, kind, size, created_at, expires_at, revoked_at FROM files WHERE token = ?1',
+  insertEvent: 'INSERT INTO events (id, token, user_id, at, client) VALUES (?1, ?2, ?3, ?4, ?5)',
+  // Joined on the owner too, so an event can only ever be listed with its owner's file.
+  listEvents:
+    'SELECT e.id, e.token, f.label, e.at, e.client FROM events e JOIN files f ON f.token = e.token AND f.user_id = e.user_id WHERE e.user_id = ?1 AND e.at > ?2 ORDER BY e.at, e.id LIMIT ?3',
+  fileTokens: 'SELECT token FROM files WHERE user_id = ?1',
+  deleteEvents: 'DELETE FROM events WHERE user_id = ?1',
+  deleteFiles: 'DELETE FROM files WHERE user_id = ?1',
 } as const;
+
+export type Client = EventRow['client'];
+
+export interface EventListRow extends Omit<EventRow, 'user_id'> {
+  label: string;
+}
 
 export type NewFile = Omit<FileRow, 'revoked_at'>;
 
@@ -93,4 +108,42 @@ export async function revokeFile(
 ): Promise<boolean> {
   const { meta } = await db.prepare(SQL.revokeFile).bind(token, userId, atIso).run();
   return meta.changes > 0;
+}
+
+/** Any user's file by token: share links are public, so this lookup is not scoped. */
+export async function findFile(db: D1Database, token: string): Promise<FileRow | null> {
+  return db.prepare(SQL.findFile).bind(token).first<FileRow>();
+}
+
+export async function insertEvent(db: D1Database, event: EventRow): Promise<void> {
+  await db
+    .prepare(SQL.insertEvent)
+    .bind(event.id, event.token, event.user_id, event.at, event.client)
+    .run();
+}
+
+/** The user's download events after `sinceIso`, oldest first, at most `limit`. */
+export async function listEvents(
+  db: D1Database,
+  userId: number,
+  sinceIso: string,
+  limit: number,
+): Promise<EventListRow[]> {
+  const { results } = await db
+    .prepare(SQL.listEvents)
+    .bind(userId, sinceIso, limit)
+    .all<EventListRow>();
+  return results;
+}
+
+/** Tokens of all the user's files, revoked ones included. */
+export async function fileTokens(db: D1Database, userId: number): Promise<string[]> {
+  const { results } = await db.prepare(SQL.fileTokens).bind(userId).all<{ token: string }>();
+  return results.map((row) => row.token);
+}
+
+/** Removes every events and files row of the user. */
+export async function deleteUserRows(db: D1Database, userId: number): Promise<void> {
+  await db.prepare(SQL.deleteEvents).bind(userId).run();
+  await db.prepare(SQL.deleteFiles).bind(userId).run();
 }

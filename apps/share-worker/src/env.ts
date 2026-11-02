@@ -29,7 +29,8 @@ export interface R2ObjectBody {
 export interface R2Bucket {
   put(key: string, value: ArrayBuffer | Uint8Array): Promise<unknown>;
   get(key: string): Promise<R2ObjectBody | null>;
-  delete(key: string): Promise<void>;
+  /** Up to 1000 keys per call; missing keys are not an error. */
+  delete(keys: string | string[]): Promise<void>;
 }
 
 export interface Env {

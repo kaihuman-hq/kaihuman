@@ -21,6 +21,24 @@ export const error = (message: string, status: number, headers?: HeadersInit): R
 export const empty = (status: number, headers?: HeadersInit): Response =>
   finish(new Response(null, { status, headers }));
 
+/** An HTML page; a HEAD request gets the same status and headers without the body. */
+export function html(
+  request: Request,
+  body: string,
+  status: number,
+  headers: HeadersInit,
+): Response {
+  const out = new Headers(headers);
+  out.set('Content-Type', 'text/html; charset=utf-8');
+  out.set('X-Content-Type-Options', 'nosniff');
+  const content = request.method === 'HEAD' ? null : body;
+  return finish(new Response(content, { status, headers: out }));
+}
+
+/** A response with a body stream built elsewhere, e.g. an R2 object. */
+export const stream = (body: ReadableStream<Uint8Array>, headers: HeadersInit): Response =>
+  finish(new Response(body, { status: 200, headers }));
+
 export const notFound = (): Response => error('Not found', 404);
 
 function finish(response: Response): Response {
