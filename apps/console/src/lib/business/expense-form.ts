@@ -101,11 +101,11 @@ export function suggestVat(net: number, rate: string): number | null {
 }
 
 /** Fills the VAT from net and rate unless the user has typed one. */
-export function withSuggestedVat(form: ExpenseForm): ExpenseForm {
+export function withSuggestedVat(form: ExpenseForm, currency: string): ExpenseForm {
   if (form.vatTouched) return form;
   const net = parseMoney(form.net.trim());
   const vat = net === null ? null : suggestVat(net, form.vatRate);
-  return { ...form, vat: vat === null ? '' : formatMinor(vat, 'EUR') };
+  return { ...form, vat: vat === null ? '' : formatMinor(vat, currency) };
 }
 
 const text = (s: string) => s.trim();

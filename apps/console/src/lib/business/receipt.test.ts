@@ -1,7 +1,9 @@
 import { githubService } from '@kaihuman/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { downloadBlob } from './download';
 import { openReceipt, RECEIPT_URL_LIFETIME_MS, receiptMime } from './receipt';
 
+vi.mock('./download', () => ({ downloadBlob: vi.fn() }));
 vi.mock('@kaihuman/core', () => ({ githubService: { getFileBytes: vi.fn() } }));
 
 const target = { full_name: 'me/biz', default_branch: 'main' } as never;
@@ -62,5 +64,19 @@ describe('openReceipt', () => {
     vi.spyOn(window, 'open').mockReturnValue(null);
     await expect(openReceipt(target, expense)).rejects.toThrow(/blocked/);
     expect(githubService.getFileBytes).not.toHaveBeenCalled();
+  });
+
+  it('downloads a HEIC receipt under its name instead of opening a tab', async () => {
+    vi.mocked(githubService.getFileBytes).mockResolvedValue(new Uint8Array([7]));
+    const open = vi.spyOn(window, 'open');
+    await openReceipt(target, {
+      ...(expense as object),
+      receipt: '01M55FJ500NTZ49EKRX27CHPV0.heic',
+    } as never);
+    expect(open).not.toHaveBeenCalled();
+    expect(downloadBlob).toHaveBeenCalledTimes(1);
+    const [name, blob] = vi.mocked(downloadBlob).mock.calls[0] as [string, Blob];
+    expect(name).toBe('01M55FJ500NTZ49EKRX27CHPV0.heic');
+    expect(blob.type).toBe('image/heic');
   });
 });

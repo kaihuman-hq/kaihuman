@@ -54,13 +54,15 @@ describe('emptyExpenseForm', () => {
 
 describe('withSuggestedVat', () => {
   it('fills VAT from net and rate until the user types a VAT', () => {
-    expect(withSuggestedVat({ ...form, vat: '', net: '100', vatRate: '19' }).vat).toBe('19.00');
+    expect(withSuggestedVat({ ...form, vat: '', net: '100', vatRate: '19' }, 'EUR').vat).toBe(
+      '19.00',
+    );
   });
   it('leaves a typed VAT alone', () => {
-    expect(withSuggestedVat({ ...form, vatTouched: true, vat: '1.89' }).vat).toBe('1.89');
+    expect(withSuggestedVat({ ...form, vatTouched: true, vat: '1.89' }, 'EUR').vat).toBe('1.89');
   });
   it('clears the suggestion when the net is not an amount', () => {
-    expect(withSuggestedVat({ ...form, net: 'x' }).vat).toBe('');
+    expect(withSuggestedVat({ ...form, net: 'x' }, 'EUR').vat).toBe('');
   });
 });
 

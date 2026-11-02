@@ -178,24 +178,44 @@ describe('ExpenseFormPage new expense', () => {
     expect(Object.keys(built.value?.changes ?? {})).toHaveLength(1);
   });
 
-  it('refuses an 11 MB file on select with the formats message and never writes', async () => {
+  it('refuses an 11 MB file on select with the formats message and never writes', () => {
     show(ready(load()));
     writeAgainst(load());
     fillValid();
     choose('big.pdf', 11 * 1024 * 1024);
     expect(host.textContent).toContain('Receipts can be up to 10 MB.');
     expect(field('receipt').getAttribute('aria-invalid')).toBe('true');
-    await click();
+    expect(field('receipt').value).toBe('');
     expect(writes.writeBusiness).not.toHaveBeenCalled();
   });
 
-  it('refuses a wrong type on select and never writes', async () => {
+  it('announces a refused file as an alert', () => {
+    show(ready(load()));
+    choose('big.pdf', 11 * 1024 * 1024);
+    expect(host.querySelector('#receipt-error')?.getAttribute('role')).toBe('alert');
+  });
+
+  it('still saves without a receipt after a refused file', async () => {
+    show(ready(load()));
+    writeAgainst(load());
+    fillValid();
+    choose('big.pdf', 11 * 1024 * 1024);
+    expect(writes.writeBusiness).not.toHaveBeenCalled();
+    await click();
+    expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
+    const keys = Object.keys(built.value?.changes ?? {});
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).toMatch(/\.yaml$/);
+    expect(built.value?.changes[keys[0] ?? '']).not.toContain('receipt:');
+    expect(host.querySelector('#receipt-error')).toBeNull();
+  });
+
+  it('refuses a wrong type on select and never writes', () => {
     show(ready(load()));
     writeAgainst(load());
     fillValid();
     choose('notes.txt', 10);
     expect(host.textContent).toContain('Receipts must be PDF, JPG, PNG, WEBP or HEIC.');
-    await click();
     expect(writes.writeBusiness).not.toHaveBeenCalled();
   });
 
@@ -314,5 +334,57 @@ describe('ExpenseFormPage existing expense', () => {
     const changes = built.value?.changes ?? {};
     expect(changes[`.kh/business/expenses/2026/${ID}.pdf`]).toBeNull();
     expect([...(changes[`.kh/business/expenses/2026/${ID}.jpg`] as Uint8Array)]).toEqual([9]);
+  });
+
+  const withReceipt = () =>
+    load((m) => {
+      const p = '.kh/business/expenses/2026/01M55FJ500NTZ49EKRX27CHPV0.yaml';
+      m.set(p, `${m.get(p) ?? ''}receipt: ${ID}.pdf\n`);
+    });
+  const YAML = `.kh/business/expenses/2026/${ID}.yaml`;
+
+  it('saves an edit without a new file as the YAML only', async () => {
+    show(ready(withReceipt()), ID);
+    writeAgainst(withReceipt());
+    type('description', 'Server October, corrected');
+    await click();
+    expect(built.ok).toBe(true);
+    expect(Object.keys(built.value?.changes ?? {})).toEqual([YAML]);
+    expect(built.value?.changes[YAML]).toContain(`receipt: ${ID}.pdf`);
+    expect(router.route).toHaveBeenCalledWith('/business/expenses');
+  });
+
+  it('shows the date error when a year change would strand the receipt', async () => {
+    show(ready(withReceipt()), ID);
+    writeAgainst(withReceipt());
+    type('date', '2027-01-02');
+    await click();
+    expect(router.route).not.toHaveBeenCalled();
+    expect(host.querySelector('#date-error')?.textContent).toBe(
+      'Upload the receipt again to move the expense to another year.',
+    );
+  });
+
+  it('removes the receipt: YAML without it and the file deleted in one write', async () => {
+    show(ready(withReceipt()), ID);
+    writeAgainst(withReceipt());
+    act(() => buttonNamed('Remove receipt').click());
+    expect(buttonNamed('Remove receipt')).toBeUndefined();
+    await click();
+    const changes = built.value?.changes ?? {};
+    expect(changes[`.kh/business/expenses/2026/${ID}.pdf`]).toBeNull();
+    expect(changes[YAML]).not.toContain('receipt:');
+    expect(Object.keys(changes)).toHaveLength(2);
+  });
+
+  it('offers no Remove receipt without a receipt', () => {
+    show(ready(load()), ID);
+    expect(buttonNamed('Remove receipt')).toBeUndefined();
+  });
+
+  it('moves focus to Keep it when the delete confirm opens', () => {
+    show(ready(load()), ID);
+    act(() => buttonNamed('Delete').click());
+    expect(document.activeElement).toBe(buttonNamed('Keep it'));
   });
 });

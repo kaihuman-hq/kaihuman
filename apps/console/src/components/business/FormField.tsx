@@ -9,6 +9,8 @@ export function Field(props: {
   label: string;
   hint?: string;
   error?: string;
+  /** Announce the error when it appears (for errors that follow a user action, not typing). */
+  alert?: boolean;
   children: ComponentChildren;
 }) {
   return (
@@ -21,7 +23,11 @@ export function Field(props: {
         <p class="text-[10px] text-[var(--los-fg-dim)] mt-1">{props.hint}</p>
       )}
       {props.error && (
-        <p id={`${props.id}-error`} class="text-xs text-[var(--los-warning)] mt-1">
+        <p
+          id={`${props.id}-error`}
+          role={props.alert ? 'alert' : undefined}
+          class="text-xs text-[var(--los-warning)] mt-1"
+        >
           {props.error}
         </p>
       )}

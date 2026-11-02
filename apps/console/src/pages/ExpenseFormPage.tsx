@@ -8,7 +8,7 @@ import {
   retentionEnd,
   saveExpense,
 } from '@kaihuman/formats/business';
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { a11y, Field, INPUT } from '../components/business/FormField';
 import { PageShell } from '../components/business/PageShell';
@@ -49,12 +49,22 @@ function ExpenseEditor(props: {
   const [errors, setErrors] = useState<Partial<Record<ExpenseField, string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [removed, setRemoved] = useState(false);
+  const keepRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   // Set synchronously: `busy` only changes after the next render.
   const submitting = useRef(false);
   const locked = busy || demoMode.value;
 
-  const set = (patch: Partial<ExpenseForm>) => setForm((f) => withSuggestedVat({ ...f, ...patch }));
+  // The delete question is a new, urgent control: focus goes to the safe answer.
+  useEffect(() => {
+    if (confirmDelete) keepRef.current?.focus();
+  }, [confirmDelete]);
+
+  const set = (patch: Partial<ExpenseForm>) =>
+    setForm((f) => withSuggestedVat({ ...f, ...patch }, currency));
+  /** The receipt the form names when no file is chosen. */
+  const storedReceipt = removed ? '' : (existing?.receipt ?? '');
   const bind = (key: ExpenseField) => ({
     id: key,
     value: form[key],
@@ -76,7 +86,7 @@ function ExpenseEditor(props: {
     const picked = input.files?.[0];
     if (!picked) {
       setFile(null);
-      set({ receipt: existing?.receipt ?? '' });
+      set({ receipt: storedReceipt });
       setErrors((x) => ({ ...x, receipt: undefined }));
       return;
     }
@@ -85,7 +95,7 @@ function ExpenseEditor(props: {
     if (!checked.ok) {
       input.value = '';
       setFile(null);
-      set({ receipt: existing?.receipt ?? '' });
+      set({ receipt: storedReceipt });
       setErrors((x) => ({ ...x, receipt: checked.issues[0]?.message }));
       return;
     }
@@ -120,9 +130,8 @@ function ExpenseEditor(props: {
     if (submitting.current || demoMode.value) return;
     const expense = expenseFromForm(form);
     const fieldErrors = expenseFieldErrors(expense);
-    if (errors.receipt) fieldErrors.receipt = errors.receipt;
     setErrors(fieldErrors);
-    if (!expense.ok || errors.receipt) {
+    if (!expense.ok) {
       setError('Some fields need attention.');
       return;
     }
@@ -241,6 +250,7 @@ function ExpenseEditor(props: {
           label="Receipt (optional)"
           hint="PDF, JPG, PNG, WEBP or HEIC, up to 10 MB."
           error={errors.receipt}
+          alert
         >
           <input
             id="receipt"
@@ -251,7 +261,7 @@ function ExpenseEditor(props: {
             onChange={chooseFile}
           />
         </Field>
-        {existing?.receipt && (
+        {existing?.receipt && !removed && (
           <p class="text-xs">
             Current receipt: {existing.receipt}{' '}
             <button
@@ -268,6 +278,33 @@ function ExpenseEditor(props: {
               Open
             </button>
             {file && ' (replaced when you save)'}
+            {!file && (
+              <button
+                type="button"
+                class="text-[var(--los-accent)] hover:underline"
+                onClick={() => {
+                  setRemoved(true);
+                  set({ receipt: '' });
+                }}
+              >
+                Remove receipt
+              </button>
+            )}
+          </p>
+        )}
+        {existing?.receipt && removed && (
+          <p class="text-xs">
+            The receipt is removed when you save.{' '}
+            <button
+              type="button"
+              class="text-[var(--los-accent)] hover:underline"
+              onClick={() => {
+                setRemoved(false);
+                set({ receipt: existing.receipt ?? '' });
+              }}
+            >
+              Keep receipt
+            </button>
           </p>
         )}
         <div class="flex flex-wrap gap-2">
@@ -298,7 +335,12 @@ function ExpenseEditor(props: {
             <button type="button" class={BUTTON} onClick={remove}>
               Yes, delete expense
             </button>
-            <button type="button" class={BUTTON} onClick={() => setConfirmDelete(false)}>
+            <button
+              ref={keepRef}
+              type="button"
+              class={BUTTON}
+              onClick={() => setConfirmDelete(false)}
+            >
               Keep it
             </button>
           </p>

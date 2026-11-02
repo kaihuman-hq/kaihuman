@@ -100,12 +100,9 @@ function VatBlock(props: { summary: VatSummary; currency: string }) {
   );
 }
 
-function ExpensesBody(props: {
-  target: KBRepo;
-  expenses: readonly Expense[];
-  data: Parameters<typeof vatSummary>[0];
-}) {
-  const { target, expenses, data } = props;
+function ExpensesBody(props: { target: KBRepo; data: Parameters<typeof vatSummary>[0] }) {
+  const { target, data } = props;
+  const { expenses } = data;
   const today = todayLocal();
   const currency = data.profile?.currency ?? 'EUR';
   const thisYear = today.slice(0, 4);
@@ -302,7 +299,7 @@ export function ExpensesPage() {
     <PageShell state={state} title="Expenses">
       {({ repo, data, loadErrors }) => (
         <>
-          <ExpensesBody target={repo} expenses={data.expenses} data={data} />
+          <ExpensesBody target={repo} data={data} />
           <ProblemsList findings={data.findings} loadErrors={loadErrors} />
         </>
       )}
