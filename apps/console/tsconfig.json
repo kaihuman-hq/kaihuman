@@ -6,7 +6,7 @@
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
     "allowJs": true,
-    "types": ["vite/client", "vitest/globals"]
+    "types": ["vite/client", "vitest/globals", "node"]
   },
   "include": ["src/**/*"]
 }

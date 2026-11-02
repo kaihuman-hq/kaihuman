@@ -148,6 +148,15 @@ describe('deriveOfferStatus', () => {
     );
   });
 
+  it('compares event times as instants, not as text', () => {
+    const events = [
+      event(offer.number, 'accepted', '2026-10-20T10:00:00+02:00'),
+      event(offer.number, 'declined', '2026-10-20T09:30:00Z'),
+    ];
+    expect(deriveOfferStatus(offer, events, [], '2027-01-01')).toBe('declined');
+    expect(deriveOfferStatus(offer, [...events].reverse(), [], '2027-01-01')).toBe('declined');
+  });
+
   it('expires after valid_until, not on it', () => {
     expect(deriveOfferStatus(offer, [], [], '2027-01-01')).toBe('expired');
     expect(deriveOfferStatus(offer, [], [], '2026-10-15')).toBe('issued');

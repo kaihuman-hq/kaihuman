@@ -3,6 +3,7 @@
 ## 2026-10-27 — Business, phase 2: console pages
 
 - `loadBusinessRepo(files, treePaths?)` in `@kaihuman/formats/business` parses and validates every business file into typed records, client file lists, artifact paths and findings; one broken file never stops the rest. `checkBusinessRepo` now uses it and keeps only its cross-file rules. New path helpers `isBusinessPath`, `clientOfPath`, `Scope` and `inScope`.
+- Console view models in `apps/console/src/lib/business/`: `invoiceRows`, `offerRows`, `clientSummaries`, `clientOverview` and `businessDashboard` (receivables, VAT of the month and quarter, unbilled time, contracts due, pipeline) plus `dates.ts` (`quarterOf`, `isoWeek`, `addDays`, `todayLocal`). All take `today` as a parameter. `deriveOfferStatus` now compares event times with `Date.parse`.
 
 ## 2026-10-26 — Business, phase 1: formats and repo check
 
