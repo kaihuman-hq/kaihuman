@@ -80,6 +80,7 @@ describe('BusinessPage', () => {
     expect(host.querySelector('a[href="/clients/acme-gmbh"]')).not.toBeNull();
     expect(host.textContent).toContain('Who owes me');
     expect(host.textContent).toContain('Pipeline');
+    expect(host.querySelector('a[href="/business/pipeline"]')?.textContent).toBe('Open board');
     expect(host.textContent).not.toContain('files have problems');
   });
 

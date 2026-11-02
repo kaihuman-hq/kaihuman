@@ -224,6 +224,11 @@ export function BusinessPage() {
             </p>
 
             <Card title="Pipeline">
+              <p class="text-xs mb-2">
+                <a href="/business/pipeline" class="text-[var(--los-accent)] hover:underline">
+                  Open board
+                </a>
+              </p>
               <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {CLIENT_STAGES.map((stage) => (
                   <div key={stage} class="min-w-0">

@@ -27,6 +27,7 @@ import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { LogTimePage } from './pages/LogTimePage';
 import { Login } from './pages/login';
 import { PaymentFormPage } from './pages/PaymentFormPage';
+import { PipelinePage } from './pages/PipelinePage';
 import { ProjectFormPage } from './pages/ProjectFormPage';
 import { QuickIdeaPage } from './pages/QuickIdeaPage';
 import { QuickKnowledgePage } from './pages/QuickKnowledgePage';
@@ -100,6 +101,7 @@ export const App = () => {
         <ProtectedRoute path="/clients/:slug/projects/new" component={ProjectFormPage} />
         <ProtectedRoute path="/clients/:slug/contracts/new" component={ContractFormPage} />
         <ProtectedRoute path="/clients/:slug/contracts/:id" component={ContractFormPage} />
+        <ProtectedRoute path="/business/pipeline" component={PipelinePage} />
         <ProtectedRoute path="/business/shared" component={SharedPage} />
         <ProtectedRoute path="/business/enable" component={BusinessEnablePage} />
         <ProtectedRoute path="/business/time/new" component={LogTimePage} />
