@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { demoMode } from '../demo-mode.js';
 import { authStore } from '../stores/auth.store.js';
+import type { TreeItem } from '../stores/github-file.store.js';
 import { bytesToBase64 } from '../utils/base64.js';
 import { gitBlobSha } from '../utils/git-blob-sha.js';
 import { ConflictError } from './conflict.js';
@@ -92,6 +93,25 @@ export class GithubService {
     });
 
     return treeData.tree;
+  }
+
+  /**
+   * The recursive tree of one commit with GitHub's `truncated` flag, which `fetchRepoTree` drops:
+   * past GitHub's limit (100,000 entries or 7 MB) the list is partial, and a caller that must see
+   * every file has to know.
+   */
+  async fetchCommitTree(
+    owner: string,
+    repo: string,
+    commitSha: string,
+  ): Promise<{ tree: TreeItem[]; truncated: boolean }> {
+    const { data } = await this.getClient().git.getTree({
+      owner,
+      repo,
+      tree_sha: commitSha,
+      recursive: 'true',
+    });
+    return { tree: data.tree as TreeItem[], truncated: data.truncated };
   }
 
   /** With `ref` (a commit sha) the file is read as of that commit, which never changes. */

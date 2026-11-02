@@ -6,7 +6,7 @@ import {
   vatCsv,
   vatSummary,
 } from '@kaihuman/formats/business';
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { Card } from '../components/business/Card';
 import { INPUT } from '../components/business/FormField';
 import { money } from '../components/business/money';
@@ -113,17 +113,23 @@ function YearExport(props: { target: KBRepo; data: BusinessRepo; year: string })
   const { target, data, year } = props;
   const [state, setState] = useState<ExportState>({ status: 'idle' });
   const running = state.status === 'running';
+  // Each run's id; progress from a run that has ended must not overwrite its result.
+  const currentRun = useRef(0);
 
   async function run() {
+    const id = ++currentRun.current;
+    let ended = false;
     setState({ status: 'running', done: 0, total: 0 });
     try {
-      const zip = await buildYearExport(target, data, year, (done, total) =>
-        setState({ status: 'running', done, total }),
-      );
+      const zip = await buildYearExport(target, data, year, (done, total) => {
+        if (!ended && currentRun.current === id) setState({ status: 'running', done, total });
+      });
+      ended = true;
       const name = `business-${year}.zip`;
       downloadBlob(name, new Blob([zip as BlobPart], { type: 'application/zip' }));
       setState({ status: 'done', name });
     } catch (e) {
+      ended = true;
       setState({ status: 'failed', message: e instanceof Error ? e.message : String(e) });
     }
   }
@@ -167,11 +173,15 @@ function ExpensesBody(props: { target: KBRepo; data: Parameters<typeof vatSummar
   const currency = data.profile?.currency ?? 'EUR';
   const thisYear = today.slice(0, 4);
   // The current and the previous year are always there, so a new year or a first import has a target.
+  // Any year with records is offered, so the year export can reach a year without expenses.
   const years = [
     ...new Set([
       thisYear,
       String(Number(thisYear) - 1),
       ...expenses.map((e) => e.date.slice(0, 4)),
+      ...data.issued.map(({ doc }) => doc.issue_date.slice(0, 4)),
+      ...data.payments.map((p) => p.date.slice(0, 4)),
+      ...data.time.map((t) => t.date.slice(0, 4)),
     ]),
   ].sort((a, b) => b.localeCompare(a));
   const [year, setYear] = useState(today.slice(0, 4));

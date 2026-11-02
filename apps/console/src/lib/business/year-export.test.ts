@@ -5,7 +5,7 @@ import { loadFixtureRepo } from './fixture.test-helper';
 import { buildYearExport } from './year-export';
 
 vi.mock('@kaihuman/core', () => ({
-  githubService: { getHeadSha: vi.fn(), fetchRepoTree: vi.fn(), getFileBytes: vi.fn() },
+  githubService: { getHeadSha: vi.fn(), fetchCommitTree: vi.fn(), getFileBytes: vi.fn() },
 }));
 
 const R = '.kh/business';
@@ -57,7 +57,7 @@ beforeEach(() => {
   inFlight = 0;
   maxInFlight = 0;
   vi.mocked(githubService.getHeadSha).mockResolvedValue('head1');
-  vi.mocked(githubService.fetchRepoTree).mockResolvedValue(tree as never);
+  vi.mocked(githubService.fetchCommitTree).mockResolvedValue({ tree, truncated: false } as never);
   vi.mocked(githubService.getFileBytes).mockImplementation(async (_o, _r, path) => {
     inFlight++;
     maxInFlight = Math.max(maxInFlight, inFlight);
@@ -72,9 +72,7 @@ describe('buildYearExport', () => {
     const progress: [number, number][] = [];
     const zip = await buildYearExport(target, repo, '2026', (d, t) => progress.push([d, t]));
 
-    expect(githubService.fetchRepoTree).toHaveBeenCalledWith('me', 'biz', 'main', {
-      commitSha: 'head1',
-    });
+    expect(githubService.fetchCommitTree).toHaveBeenCalledWith('me', 'biz', 'head1');
     const reads = vi.mocked(githubService.getFileBytes).mock.calls;
     expect(reads.map((c) => c[2]).sort()).toEqual(SIX);
     for (const c of reads) expect(c[3]).toEqual({ ref: 'head1' });
@@ -114,5 +112,40 @@ describe('buildYearExport', () => {
     await expect(buildYearExport(target, repo, '2026', () => {})).rejects.toThrow(
       `Could not read ${failing}.`,
     );
+  });
+
+  it('reports no progress after a failed read and starts no further reads', async () => {
+    const failing = `${R}/expenses/2026/01M55FJ500NTZ49EKRX27CHPV0.yaml`;
+    let releaseSlow: () => void = () => {};
+    vi.mocked(githubService.getFileBytes).mockImplementation(async (_o, _r, path) => {
+      if (path === `${R}/business.yaml`) {
+        await new Promise<void>((r) => {
+          releaseSlow = r;
+        });
+        return bytesOf(path);
+      }
+      if (path === failing) throw new Error('boom');
+      await new Promise(() => {});
+      return bytesOf(path);
+    });
+    const progress: [number, number][] = [];
+    await expect(
+      buildYearExport(target, repo, '2026', (d, t) => progress.push([d, t])),
+    ).rejects.toThrow(`Could not read ${failing}.`);
+    const seen = progress.length;
+    const reads = vi.mocked(githubService.getFileBytes).mock.calls.length;
+    releaseSlow();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(progress).toHaveLength(seen);
+    expect(progress).toEqual([[0, 6]]);
+    expect(vi.mocked(githubService.getFileBytes).mock.calls.length).toBe(reads);
+  });
+
+  it('refuses a repository whose tree GitHub truncated', async () => {
+    vi.mocked(githubService.fetchCommitTree).mockResolvedValue({ tree, truncated: true } as never);
+    await expect(buildYearExport(target, repo, '2026', () => {})).rejects.toThrow(
+      'The repository is too large to export in one go.',
+    );
+    expect(githubService.getFileBytes).not.toHaveBeenCalled();
   });
 });

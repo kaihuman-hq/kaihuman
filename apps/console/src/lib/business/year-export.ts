@@ -11,6 +11,7 @@ import { type ZipEntry, zipStore } from './zip';
 
 /** Parallel reads; enough to hide latency without tripping GitHub's secondary rate limits. */
 export const READ_CONCURRENCY = 4;
+export const TOO_LARGE = 'The repository is too large to export in one go.';
 
 const hex = (buf: ArrayBuffer): string =>
   [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -22,8 +23,10 @@ const sha256 = async (bytes: Uint8Array): Promise<string> =>
 const zipPath = (path: string): string => path.slice(BUSINESS_ROOT.length + 1);
 
 /**
- * Builds the Steuerberater zip for `year` from one commit, so files and summaries agree. A read
- * that fails stops the queue and rejects; nothing is returned, so there is never a partial zip.
+ * Builds the Steuerberater zip for `year`. The raw files are read from the head commit; the
+ * summaries and the choice of clients and contracts come from `repo`, the state the page loaded.
+ * Known limitation: a commit made after the page loaded can make the two differ slightly.
+ * A read that fails stops the queue and rejects, so there is never a partial zip.
  */
 export async function buildYearExport(
   target: KBRepo,
@@ -33,9 +36,9 @@ export async function buildYearExport(
 ): Promise<Uint8Array> {
   const [owner = '', name = ''] = target.full_name.split('/');
   const head = await githubService.getHeadSha(owner, name, target.default_branch);
-  const tree = await githubService.fetchRepoTree(owner, name, target.default_branch, {
-    commitSha: head,
-  });
+  const { tree, truncated } = await githubService.fetchCommitTree(owner, name, head);
+  // A partial tree would silently leave files out of a record the Steuerberater relies on.
+  if (truncated) throw new Error(TOO_LARGE);
   const paths = yearExportPaths(
     repo,
     tree.filter((item) => item.type === 'blob').map((item) => item.path),
@@ -54,9 +57,12 @@ export async function buildYearExport(
       try {
         read[i] = await githubService.getFileBytes(owner, name, path, { ref: head });
       } catch {
+        if (failed) return;
         failed = true;
         throw new Error(`Could not read ${path}.`);
       }
+      // Another read failed meanwhile: the export has already rejected, so stay silent.
+      if (failed) return;
       done++;
       onProgress(done, paths.length);
     }

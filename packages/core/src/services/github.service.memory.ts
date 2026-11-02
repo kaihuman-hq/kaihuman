@@ -76,6 +76,14 @@ export class InMemoryGithubService {
     return this.buildTree();
   }
 
+  async fetchCommitTree(
+    _owner: string,
+    _repo: string,
+    _commitSha: string,
+  ): Promise<{ tree: TreeItem[]; truncated: boolean }> {
+    return { tree: this.buildTree(), truncated: false };
+  }
+
   async getFileContent(
     _owner: string,
     _repo: string,

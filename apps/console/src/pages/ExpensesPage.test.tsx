@@ -306,4 +306,38 @@ describe('ExpensesPage year export', () => {
     );
     expect(exportButton().disabled).toBe(false);
   });
+
+  it('keeps the failure shown when a late progress report arrives', async () => {
+    let report: (done: number, total: number) => void = () => {};
+    yearExport.buildYearExport.mockImplementation(
+      async (_t, _d, _y, onProgress: (d: number, t: number) => void) => {
+        report = onProgress;
+        throw new Error('Could not read x.pdf.');
+      },
+    );
+    show(load());
+    await act(async () => exportButton().click());
+    act(() => report(3, 6));
+    expect(status()).toBe('');
+    expect(host.querySelector('[aria-label="Year export"] [role="alert"]')?.textContent).toBe(
+      'Could not read x.pdf.',
+    );
+  });
+
+  it('offers the years of documents, payments and time entries too, newest first', () => {
+    show(
+      load((m) => {
+        m.set(
+          '.kh/business/payments/2019.jsonl',
+          '{"id":"01M5AMBK0038DJQW16BGNTZ49F","date":"2019-02-01","invoice":"RE-2026-0001","amount":1}\n',
+        );
+        m.set(
+          '.kh/business/time/2021-03.jsonl',
+          '{"id":"01M581YW00W16BGNTZ49EKRX28","date":"2021-03-04","minutes":30,"client":"acme-gmbh","note":"x"}\n',
+        );
+      }),
+    );
+    const years = [...host.querySelectorAll('#year option')].map((o) => o.textContent);
+    expect(years).toEqual(['2026', '2025', '2021', '2019']);
+  });
 });
