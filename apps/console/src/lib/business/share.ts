@@ -18,6 +18,7 @@ export const DEFAULT_SHARE_URL = 'https://docs.kaihuman.com';
 export const UNREACHABLE_MESSAGE = 'The share service is not reachable.';
 export const INVALID_ANSWER_MESSAGE =
   'The share service sent an answer that could not be used. Nothing was saved.';
+export const LINK_GONE_MESSAGE = 'This link is no longer in the repository.';
 export const NOT_SAVED_MESSAGE =
   'The link could not be saved in the repository and was removed again.';
 
@@ -317,7 +318,7 @@ export async function revokeShareLink(
     if (!found) {
       return {
         ok: false,
-        issues: [{ path: LINKS_PATH, message: 'This link is no longer in the repository.' }],
+        issues: [{ path: LINKS_PATH, message: LINK_GONE_MESSAGE }],
       };
     }
     return {

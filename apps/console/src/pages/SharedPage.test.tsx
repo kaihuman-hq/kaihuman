@@ -73,7 +73,7 @@ const GONE = rec(
   `https://docs.kaihuman.com/d/${T3}#${KEY}`,
   '2026-11-02T00:00:00.000Z',
 );
-const target = { full_name: 'me/biz', default_branch: 'main' };
+const target = { full_name: 'me/biz', default_branch: 'main', private: true };
 const FILES = {
   files: [
     {
@@ -263,5 +263,67 @@ describe('SharedPage', () => {
     expect(host.textContent).toContain('Sharing is not available in demo mode.');
     expect(mocks.api.list).not.toHaveBeenCalled();
     expect(mocks.syncDownloads).not.toHaveBeenCalled();
+  });
+
+  it('moves focus into an inline confirm and back to its trigger on Cancel', async () => {
+    await show(ready([L1]));
+    await click('Revoke…');
+    expect(document.activeElement).toBe(button('Revoke'));
+    await click('Cancel');
+    expect((document.activeElement as HTMLElement).textContent).toBe('Revoke…');
+    await click('Delete all my shared files…');
+    expect(document.activeElement).toBe(button('Yes, delete everything'));
+    await click('Cancel');
+    expect((document.activeElement as HTMLElement).textContent).toBe('Delete all my shared files…');
+  });
+
+  it('keeps the visible text in the confirm button name', async () => {
+    await show(ready([L1]));
+    await click('Revoke…');
+    expect(button('Revoke')?.getAttribute('aria-label')).toBe('Revoke RE-2026-0001');
+    expect(host.querySelector('table')?.getAttribute('aria-label')).toBe('Shared files');
+  });
+
+  it('says nothing about downloads when the automatic sync found none', async () => {
+    await show(ready([L1]));
+    expect(host.textContent).not.toContain('new downloads recorded');
+  });
+
+  it('focuses Sync downloads after the consent, when its opener is gone', async () => {
+    localStorage.removeItem(SHARE_CONSENT_KEY);
+    await show(ready([L1]));
+    await click('Enable sharing…');
+    await click('I understand, enable sharing');
+    expect(document.activeElement).toBe(button('Sync downloads'));
+  });
+
+  it('treats "no longer in the repository" as a neutral outcome and reloads', async () => {
+    mocks.revokeShareLink.mockResolvedValue({
+      ok: false,
+      issues: [{ path: LINKS_PATH, message: 'This link is no longer in the repository.' }],
+    });
+    await show(ready([L1]));
+    await click('Revoke…');
+    await click('Revoke');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.textContent).toContain('The link was revoked.');
+    expect(mocks.api.list).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses to revoke a file whose repo record is on another host, calling nothing', async () => {
+    const { revokeShareLink } =
+      await vi.importActual<typeof import('../lib/business/share')>('../lib/business/share');
+    mocks.revokeShareLink.mockImplementation(revokeShareLink);
+    const foreign = rec(
+      '01M50ARQ007CHPV05AFMSY38D5',
+      'RE-2026-0001',
+      `https://other.example/d/${T1}#${KEY}`,
+    );
+    await show(ready([foreign]));
+    await click('Revoke…');
+    await click('Revoke');
+    expect(mocks.api.revoke).not.toHaveBeenCalled();
+    expect(mocks.writeBusiness).not.toHaveBeenCalled();
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('other.example');
   });
 });

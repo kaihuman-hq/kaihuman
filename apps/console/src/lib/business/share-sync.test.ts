@@ -125,4 +125,56 @@ describe('syncDownloads', () => {
       note: 'browser',
     });
   });
+
+  it("pages past a full page of other repositories' tokens (S9)", async () => {
+    run({});
+    const UNKNOWN = 'B'.repeat(22);
+    const full = Array.from({ length: 500 }, (_, i) =>
+      ev(
+        `01M50ARQ00${String(i).padStart(16, '0')}`,
+        `2026-11-02T10:00:${String(i % 60).padStart(2, '0')}.${String(i).padStart(3, '0')}Z`,
+        UNKNOWN,
+      ),
+    );
+    const last = full[499]?.at ?? '';
+    const fn = vi
+      .fn<(since?: string) => Promise<SharedEvent[]>>()
+      .mockResolvedValueOnce(full)
+      .mockResolvedValueOnce([ev(E2, '2026-11-02T12:00:00.000Z')]);
+    expect(await syncDownloads(target, { events: fn } as unknown as ShareApi)).toEqual({
+      added: 1,
+    });
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(fn.mock.calls[1]?.[0]).toBe(new Date(Date.parse(last) - 1).toISOString());
+    expect(lastWrite?.changes[EVENTS_PATH]).toContain(E2);
+  });
+
+  it('stops after 20 pages', async () => {
+    run({});
+    const full = Array.from({ length: 500 }, (_, i) =>
+      ev(`01M50ARQ00${String(i).padStart(16, '0')}`, '2026-11-02T10:00:00.000Z', 'B'.repeat(22)),
+    );
+    const fn = vi.fn(async (_since?: string) => full);
+    expect(await syncDownloads(target, { events: fn } as unknown as ShareApi)).toEqual({
+      added: 0,
+    });
+    expect(fn).toHaveBeenCalledTimes(20);
+  });
+
+  it('re-reads and re-dedupes when the commit is retried after a conflict', async () => {
+    const winner = `${EXISTING}{"id":"${E2}","at":"2026-11-02T11:00:00.000Z","doc":"RE-2026-0001","type":"downloaded","note":"browser"}\n`;
+    const builds: (string | null)[] = [];
+    writes.writeBusiness.mockImplementation(async (_t, build) => {
+      for (const text of [EXISTING, winner]) {
+        const built = await build({ repo: { links: LINKS }, read: async () => text });
+        builds.push(built.ok ? (built.value.changes[EVENTS_PATH] ?? null) : null);
+      }
+      return { ok: true, value: { commitSha: 'c' } };
+    });
+    const { api: a, fn } = api([ev(E2, '2026-11-02T11:00:00.000Z')]);
+    await syncDownloads(target, a);
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(builds[0]).toContain(E2);
+    expect(builds[1]).toBeNull();
+  });
 });

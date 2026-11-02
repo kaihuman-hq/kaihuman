@@ -13,6 +13,7 @@ import {
   acceptShareConsent,
   DEFAULT_SHARE_URL,
   hasShareConsent,
+  LINK_GONE_MESSAGE,
   revokeShareLink,
   SHARE_URL_KEY,
   type ShareApi,
@@ -135,22 +136,55 @@ function Files({
   links,
   consent,
   version,
+  focusSync,
 }: {
   repo: KBRepo;
   links: LinkRecord[];
   consent: boolean;
   version: number;
+  /** Consent was just given: the button that opened it is gone, so focus lands here. */
+  focusSync: boolean;
 }) {
   const [list, setList] = useState<{ files: SharedFile[]; used: number; quota: number } | null>(
     null,
   );
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [confirm, setConfirm] = useState<string | 'all' | null>(null);
-  const [reload, setReload] = useState(0);
+  const [error, setErrorRaw] = useState<string | null>(null);
+  const [info, setInfoRaw] = useState<string | null>(null);
+  const [busy, setBusyRaw] = useState(false);
+  const [confirm, setConfirmRaw] = useState<string | 'all' | null>(null);
+  const [reload, setReloadRaw] = useState(0);
   const synced = useRef(false);
   const working = useRef(false);
+  const alive = useRef(true);
+  useEffect(
+    () => () => {
+      alive.current = false;
+    },
+    [],
+  );
+  // A request can finish after the page was left; its result must not touch state then.
+  const setError = (v: string | null) => alive.current && setErrorRaw(v);
+  const setInfo = (v: string | null) => alive.current && setInfoRaw(v);
+  const setBusy = (v: boolean) => alive.current && setBusyRaw(v);
+  const setConfirm = (v: string | null) => alive.current && setConfirmRaw(v);
+  const refresh = () => alive.current && setReloadRaw((n) => n + 1);
+
+  // Keyboard focus follows an inline confirm: into it when it opens, back to its trigger when it closes.
+  const confirmButton = useRef<HTMLButtonElement>(null);
+  const lastTrigger = useRef<string | null>(null);
+  useEffect(() => {
+    if (confirm !== null) {
+      lastTrigger.current = confirm;
+      confirmButton.current?.focus();
+    } else if (lastTrigger.current !== null) {
+      document.querySelector<HTMLElement>(`[data-trigger="${lastTrigger.current}"]`)?.focus();
+      lastTrigger.current = null;
+    }
+  }, [confirm]);
+  const syncButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (consent && focusSync) syncButton.current?.focus();
+  }, [consent, focusSync]);
 
   const api = (): ShareApi => {
     const token = authStore.token.value;
@@ -158,10 +192,13 @@ function Files({
     return shareApi(shareServiceUrl(), token);
   };
 
-  async function sync(): Promise<void> {
+  async function sync(auto = false): Promise<void> {
     try {
       const { added } = await syncDownloads(repo, api());
-      setInfo(added === 1 ? '1 new download recorded.' : `${added} new downloads recorded.`);
+      // Opening the page says nothing when nothing changed.
+      if (added > 0 || !auto) {
+        setInfo(added === 1 ? '1 new download recorded.' : `${added} new downloads recorded.`);
+      }
     } catch (e) {
       setError(messageOf(e));
     }
@@ -174,16 +211,19 @@ function Files({
     (async () => {
       try {
         const result = await api().list();
-        if (!cancelled) setList(result);
+        if (cancelled) return;
+        setList(result);
       } catch (e) {
         if (!cancelled) {
           setList(null);
           setError(messageOf(e));
         }
+        return;
       }
-      if (!synced.current && !cancelled) {
+      // Once per visit, through the same guard as the buttons so they never overlap.
+      if (!synced.current) {
         synced.current = true;
-        await sync();
+        await run(() => sync(true));
       }
     })();
     return () => {
@@ -209,20 +249,23 @@ function Files({
   const revoke = (file: SharedFile) =>
     run(async () => {
       try {
-        const service = new URL(shareServiceUrl()).origin;
-        const link = links.find(
-          (l) => !l.revoked && onService(l, service) && parseShareUrl(l.url)?.token === file.token,
-        );
+        // Matched by token alone: a record on another host is refused by revokeShareLink, not skipped.
+        const link = links.find((l) => !l.revoked && parseShareUrl(l.url)?.token === file.token);
         if (link) {
           const result = await revokeShareLink(repo, link, { api: api() });
           if (!result.ok) {
-            setError(result.issues[0]?.message ?? 'Nothing was saved.');
+            const message = result.issues[0]?.message ?? 'Nothing was saved.';
+            if (message === LINK_GONE_MESSAGE) {
+              // The file is revoked on the service; only the repo had no line left to mark.
+              setInfo('The link was revoked. The repository had no record of it to update.');
+              refresh();
+            } else setError(message);
             return;
           }
         } else {
           await api().revoke(file.token);
         }
-        setReload((n) => n + 1);
+        refresh();
       } catch (e) {
         setError(
           e instanceof ShareError
@@ -272,7 +315,7 @@ function Files({
         setError(
           `All shared files were deleted, but the repository was not updated. ${writeErrorMessage(e)}`,
         );
-        setReload((n) => n + 1);
+        refresh();
         return;
       }
       setInfo(
@@ -282,7 +325,7 @@ function Files({
             : ''
         }`,
       );
-      setReload((n) => n + 1);
+      refresh();
     });
 
   if (!consent) return null;
@@ -294,7 +337,13 @@ function Files({
             Storage used: {megabytes(list.used)} of {megabytes(list.quota)}
           </span>
         )}
-        <button type="button" class={BUTTON} disabled={busy} onClick={() => run(sync)}>
+        <button
+          ref={syncButton}
+          type="button"
+          class={BUTTON}
+          disabled={busy}
+          onClick={() => run(() => sync())}
+        >
           Sync downloads
         </button>
         <span class="text-[var(--los-muted)]">
@@ -310,7 +359,7 @@ function Files({
       {info && <output class="block text-xs">{info}</output>}
       {list && (
         <div class="overflow-x-auto">
-          <table class="w-full text-xs">
+          <table aria-label="Shared files" class="w-full text-xs">
             <thead>
               <tr>
                 <th class={th}>Document</th>
@@ -341,12 +390,18 @@ function Files({
                             type="button"
                             class={BUTTON}
                             disabled={busy}
-                            aria-label={`Confirm revoking ${f.label}`}
+                            ref={confirmButton}
+                            aria-label={`Revoke ${f.label}`}
                             onClick={() => revoke(f)}
                           >
                             Revoke
                           </button>
-                          <button type="button" class={BUTTON} onClick={() => setConfirm(null)}>
+                          <button
+                            type="button"
+                            class={BUTTON}
+                            aria-label={`Cancel revoking ${f.label}`}
+                            onClick={() => setConfirm(null)}
+                          >
                             Cancel
                           </button>
                         </span>
@@ -355,6 +410,7 @@ function Files({
                           type="button"
                           class={BUTTON}
                           disabled={busy}
+                          data-trigger={f.token}
                           aria-label={`Revoke the share link for ${f.label}`}
                           onClick={() => setConfirm(f.token)}
                         >
@@ -375,15 +431,32 @@ function Files({
         {confirm === 'all' ? (
           <div class="flex flex-wrap items-center gap-1">
             <span>Delete every file you shared and revoke all links? This cannot be undone.</span>
-            <button type="button" class={BUTTON} disabled={busy} onClick={deleteAll}>
+            <button
+              ref={confirmButton}
+              type="button"
+              class={BUTTON}
+              disabled={busy}
+              onClick={deleteAll}
+            >
               Yes, delete everything
             </button>
-            <button type="button" class={BUTTON} onClick={() => setConfirm(null)}>
+            <button
+              type="button"
+              class={BUTTON}
+              aria-label="Cancel deleting all shared files"
+              onClick={() => setConfirm(null)}
+            >
               Cancel
             </button>
           </div>
         ) : (
-          <button type="button" class={BUTTON} disabled={busy} onClick={() => setConfirm('all')}>
+          <button
+            type="button"
+            class={BUTTON}
+            disabled={busy}
+            data-trigger="all"
+            onClick={() => setConfirm('all')}
+          >
             Delete all my shared files…
           </button>
         )}
@@ -396,6 +469,7 @@ export function SharedPage() {
   const state = useBusinessRepo();
   const [consent, setConsent] = useState(hasShareConsent);
   const [asking, setAsking] = useState(false);
+  const [accepted, setAccepted] = useState(false);
   const [version, setVersion] = useState(0);
   return (
     <PageShell state={state} title="Shared files">
@@ -423,12 +497,19 @@ export function SharedPage() {
                 onAccept={() => {
                   acceptShareConsent();
                   setConsent(true);
+                  setAccepted(true);
                   setAsking(false);
                 }}
                 onCancel={() => setAsking(false)}
               />
             )}
-            <Files repo={repo} links={data.links} consent={consent} version={version} />
+            <Files
+              repo={repo}
+              links={data.links}
+              consent={consent}
+              version={version}
+              focusSync={accepted}
+            />
           </>
         )
       }

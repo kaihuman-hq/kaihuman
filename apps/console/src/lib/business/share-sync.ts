@@ -45,10 +45,15 @@ export function downloadEvents(
   return out;
 }
 
+const PAGE = 500;
+const MAX_PAGES = 20;
+
 /**
  * Appends the service's new download events to `events.jsonl` in one commit; nothing new, no commit.
- * The service answers at most 500 events per call. A longer backlog is not paged: the next sync
- * starts from the newest event stored here, so it catches up over several syncs.
+ * The service lists events of all the user's repositories, in pages of at most 500, so a full page
+ * can hold nothing of this repo. A full page is therefore followed by the next one (from its last
+ * event, 1 ms back so ties are not lost; ids dedupe the overlap) until a short page or 20 pages.
+ * Reading happens inside the builder, so a retry after a conflict re-reads and re-dedupes.
  */
 export async function syncDownloads(target: KBRepo, api: ShareApi): Promise<{ added: number }> {
   let added = 0;
@@ -58,7 +63,16 @@ export async function syncDownloads(target: KBRepo, api: ShareApi): Promise<{ ad
       .filter((e) => e.type === 'downloaded')
       .reduce<number>((best, e) => Math.max(best, Date.parse(e.at)), Number.NEGATIVE_INFINITY);
     const since = Number.isFinite(latest) ? new Date(latest - OVERLAP_MS).toISOString() : undefined;
-    const news = downloadEvents(text, await api.events(since), fresh.repo.links);
+    const fetched: SharedEvent[] = [];
+    let cursor = since;
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const events = await api.events(cursor);
+      fetched.push(...events);
+      const last = events[events.length - 1];
+      if (events.length < PAGE || !last) break;
+      cursor = new Date(Date.parse(last.at) - 1).toISOString();
+    }
+    const news = downloadEvents(text, fetched, fresh.repo.links);
     added = news.length;
     if (added === 0) return { ok: false, issues: [] };
     return {
