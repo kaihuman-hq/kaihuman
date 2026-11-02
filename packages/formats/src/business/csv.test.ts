@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { csvAmount, csvTable, expensesCsv, invoicesCsv, paymentsCsv, vatCsv } from './csv.js';
+import {
+  csvAmount,
+  csvTable,
+  expensesCsv,
+  invoiceCsvRows,
+  invoicesCsv,
+  paymentsCsv,
+  vatCsv,
+} from './csv.js';
 import { loadFixtureRepo } from './fixture-repo.test-helper.js';
 import type { Ulid } from './ids.js';
-import type { Issued } from './records.js';
+import type { Issued, Payment } from './records.js';
+import type { BusinessRepo } from './repo.js';
 import { validateIssued } from './validate.js';
 import { parseYaml } from './yaml.js';
 
@@ -31,6 +40,8 @@ describe('csvAmount', () => {
     expect(csvAmount(123456)).toBe('1234,56');
     expect(csvAmount(0)).toBe('0,00');
     expect(csvAmount(-123456789)).toBe('-1234567,89');
+    expect(csvAmount(5)).toBe('0,05');
+    expect(csvAmount(100000000)).toBe('1000000,00');
   });
 });
 
@@ -91,14 +102,14 @@ describe('invoicesCsv', () => {
     expect(
       lines(
         invoicesCsv([
-          { issued: inv, paid: 50000 },
-          { issued: cn, paid: 0 },
+          { issued: inv, paid: 50000, open: 49948 },
+          { issued: cn, paid: 0, open: 0 },
         ]),
       ),
     ).toEqual([
       'Nummer;Typ;Datum;Kunde;Netto;USt;Brutto;Bezahlt;Offen',
-      'RE-2026-0001;Rechnung;2026-10-26;Acme GmbH;842,50;158,88;1001,38;500,00;501,38',
-      'RE-2026-0002;Gutschrift;2026-11-01;Acme GmbH;-10,00;-1,90;-11,90;0,00;0,00',
+      'RE-2026-0001;Rechnung;2026-10-26;Acme GmbH;842,50;158,88;1001,38;500,00;499,48',
+      'RE-2026-0002;Rechnungskorrektur;2026-11-01;Acme GmbH;-10,00;-1,90;-11,90;0,00;0,00',
       '',
     ]);
   });
@@ -169,5 +180,39 @@ describe('vatCsv', () => {
       '2026;Kleinunternehmer;0,00;0,00;0,00;0,00',
       '',
     ]);
+  });
+});
+
+describe('invoiceCsvRows', () => {
+  it('takes paid and open from the derived status, credit notes included', () => {
+    const cn: Issued = {
+      ...inv,
+      number: 'RE-2026-0002',
+      kind: 'credit-note',
+      type_code: 381,
+      issue_date: '2026-11-01',
+      corrects: inv.number,
+      totals: { net: 10000, vat: 1900, gross: 11900, breakdown: [] },
+    };
+    const offer: Issued = { ...inv, number: 'AN-2026-001', kind: 'offer', type_code: null };
+    const old: Issued = { ...inv, number: 'RE-2025-0009', issue_date: '2025-12-30' };
+    const payment: Payment = {
+      id: '01M5KA3Q00W16BGNTZ49EKRX28' as Ulid,
+      date: '2026-11-02',
+      invoice: inv.number,
+      amount: 50000,
+    };
+    const repo = {
+      issued: [cn, offer, old, inv].map((doc) => ({ path: doc.number, doc })),
+      payments: [payment],
+    } as unknown as BusinessRepo;
+    const rows = invoiceCsvRows(repo, 2026);
+    expect(rows.map((r) => [r.issued.number, r.paid, r.open])).toEqual([
+      ['RE-2026-0001', 50000, 100138 - 50000 - 11900],
+      ['RE-2026-0002', 0, 0],
+    ]);
+    expect(lines(invoicesCsv(rows))[1]).toBe(
+      'RE-2026-0001;Rechnung;2026-10-26;Acme GmbH;842,50;158,88;1001,38;500,00;382,38',
+    );
   });
 });

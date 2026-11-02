@@ -1,6 +1,8 @@
 /** CSV for a German Steuerberater: UTF-8 with BOM, `;`, CRLF, decimal comma. */
 
 import type { Expense, Issued, Payment } from './records.js';
+import type { BusinessRepo } from './repo.js';
+import { deriveInvoiceStatus } from './status.js';
 import type { VatSummary } from './vat.js';
 
 const NEEDS_QUOTES = /[;"\r\n]/;
@@ -54,15 +56,36 @@ export const expensesCsv = (expenses: readonly Expense[]): string =>
 
 const DOC_TYPE: Record<Issued['kind'], string> = {
   invoice: 'Rechnung',
-  'credit-note': 'Gutschrift',
+  'credit-note': 'Rechnungskorrektur',
   offer: 'Angebot',
 };
 
-/** Credit notes are written negative and never open; `paid` is what the caller counts as received. */
-export const invoicesCsv = (rows: readonly { issued: Issued; paid: number }[]): string =>
+/** `paid` and `open` come from `deriveInvoiceStatus`, so the CSV never re-derives status. */
+export type InvoiceCsvRow = { issued: Issued; paid: number; open: number };
+
+/** Invoices and credit notes issued in `year`, by issue date then number; credit notes are never open. */
+export const invoiceCsvRows = (repo: BusinessRepo, year: number): InvoiceCsvRow[] => {
+  const docs = repo.issued
+    .map(({ doc }) => doc)
+    .filter((d) => d.kind !== 'offer' && d.issue_date.startsWith(`${year}-`))
+    .sort((a, b) => a.issue_date.localeCompare(b.issue_date) || a.number.localeCompare(b.number));
+  const creditNotes = repo.issued.map(({ doc }) => doc).filter((d) => d.kind === 'credit-note');
+  return docs.map((issued) => {
+    // `today` only decides overdue/sent states; paid and open do not depend on it.
+    const status = deriveInvoiceStatus(issued, repo.payments, creditNotes, [], issued.issue_date);
+    return {
+      issued,
+      paid: status.paid,
+      open: issued.kind === 'credit-note' ? 0 : status.open,
+    };
+  });
+};
+
+/** Credit notes are written negative and never open. */
+export const invoicesCsv = (rows: readonly InvoiceCsvRow[]): string =>
   csvTable([
     ['Nummer', 'Typ', 'Datum', 'Kunde', 'Netto', 'USt', 'Brutto', 'Bezahlt', 'Offen'],
-    ...rows.map(({ issued: d, paid }) => {
+    ...rows.map(({ issued: d, paid, open }) => {
       const credit = d.kind === 'credit-note';
       const sign = credit ? -1 : 1;
       return [
@@ -74,7 +97,7 @@ export const invoicesCsv = (rows: readonly { issued: Issued; paid: number }[]): 
         csvAmount(sign * d.totals.vat),
         csvAmount(sign * d.totals.gross),
         csvAmount(paid),
-        csvAmount(credit ? 0 : Math.max(0, d.totals.gross - paid)),
+        csvAmount(credit ? 0 : open),
       ];
     }),
   ]);
