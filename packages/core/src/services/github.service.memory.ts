@@ -89,6 +89,17 @@ export class InMemoryGithubService {
     return { content: file.content, sha: file.sha };
   }
 
+  async getFileBytes(
+    _owner: string,
+    _repo: string,
+    path: string,
+    _opts?: { ref?: string },
+  ): Promise<Uint8Array> {
+    const file = this.files.get(path);
+    if (!file) throw new Error(`Not found: ${path}`);
+    return new TextEncoder().encode(file.content);
+  }
+
   async saveFile(
     _owner: string,
     _repo: string,

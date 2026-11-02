@@ -119,6 +119,45 @@ export class GithubService {
     return { content, sha: data.sha };
   }
 
+  /**
+   * Raw bytes of a file, binary-safe (getFileContent decodes UTF-8 and the contents API drops
+   * the body above 1 MB). The contents endpoint is used only for the blob sha, which it
+   * returns at any size; the blob API then serves up to 100 MB.
+   */
+  async getFileBytes(
+    owner: string,
+    repo: string,
+    path: string,
+    opts?: { ref?: string },
+  ): Promise<Uint8Array> {
+    const client = this.getClient();
+    let sha: string;
+    try {
+      const { data } = await client.repos.getContent({
+        owner,
+        repo,
+        path,
+        ...(opts?.ref ? { ref: opts.ref } : {}),
+      });
+      if (Array.isArray(data)) {
+        throw new Error('Path is a directory, expected a file');
+      }
+      if (data.type !== 'file') {
+        throw new Error(`Path is not a file: ${data.type}`);
+      }
+      sha = data.sha;
+    } catch (e) {
+      if ((e as { status?: number }).status === 404) throw new Error(`Not found: ${path}`);
+      throw e;
+    }
+    const { data: blob } = await client.git.getBlob({ owner, repo, file_sha: sha });
+    // atob, not TextDecoder: the bytes are not text.
+    const binary = atob(blob.content.replace(/\s/g, ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
   async saveFile(
     owner: string,
     repo: string,
