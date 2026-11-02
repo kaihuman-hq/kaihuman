@@ -5,6 +5,7 @@ import {
   Logger,
   layoutStore,
 } from '@kaihuman/core';
+import type { Capture } from '@kaihuman/formats/business';
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 
@@ -21,15 +22,32 @@ import {
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FileViewer } from '../components/FileViewer';
 import { KBCommandsModal } from '../components/KBCommandsModal';
+import { runBusinessCapture } from '../lib/business/capture-write';
+import { BUSINESS_PROFILE_PATH, businessClientSlugs } from '../lib/business/load';
 import { VERSION } from '../version';
 import { QUICK_ROUTES } from './ShortcutsPage';
 
 export const Dashboard = () => {
   const [showKBCommands, setShowKBCommands] = useState(false);
+  const [captureStatus, setCaptureStatus] = useState<{ ok: boolean; message: string } | null>(null);
 
   /* original repo/repos declarations removed for mock */
   const tree = githubFileStore.tree.value;
   const openFiles = githubFileStore.openFiles.value;
+
+  // Palette capture needs business set up; clients come from folder names, so no file is loaded.
+  const businessEnabled = tree.some((t) => t.path === BUSINESS_PROFILE_PATH);
+  const businessClients = useMemo(
+    () => (businessEnabled ? businessClientSlugs(tree) : []),
+    [tree, businessEnabled],
+  );
+  const handleBusinessCapture = useCallback(async (capture: Capture) => {
+    const target = githubProfileStore.currentRepo.peek();
+    if (!target) return;
+    const outcome = await runBusinessCapture(target, capture, route);
+    setCaptureStatus(outcome);
+    if (outcome.ok) setTimeout(() => setCaptureStatus(null), 2500);
+  }, []);
 
   // --- STORE ACCESS ---
   // --- STORE ACCESS ---
@@ -317,6 +335,8 @@ export const Dashboard = () => {
           onKnowledgeClick={() => route('/knowledge')}
           onIdeasClick={() => route('/ideas')}
           onBusinessClick={() => route('/business')}
+          businessClients={businessClients}
+          onBusinessCapture={businessEnabled ? handleBusinessCapture : undefined}
           onWikiClick={() => route('/wiki')}
           onCheatsheetClick={() => route('/cheatsheet')}
           onKBCommandsClick={() => setShowKBCommands(true)}
@@ -538,6 +558,19 @@ export const Dashboard = () => {
           version={VERSION}
         />
       </ErrorBoundary>
+      {captureStatus && (
+        <div
+          role={captureStatus.ok ? 'status' : 'alert'}
+          class={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[300] max-w-[90vw] px-3 py-2 text-xs font-mono border bg-[var(--los-bg)] ${captureStatus.ok ? 'border-[var(--los-accent)] text-[var(--los-accent)]' : 'border-[var(--los-warning)] text-[var(--los-warning)]'}`}
+        >
+          {captureStatus.message}
+          {!captureStatus.ok && (
+            <button type="button" class="ml-3 underline" onClick={() => setCaptureStatus(null)}>
+              Dismiss
+            </button>
+          )}
+        </div>
+      )}
       <KBCommandsModal isOpen={showKBCommands} onClose={() => setShowKBCommands(false)} />
     </div>
   );

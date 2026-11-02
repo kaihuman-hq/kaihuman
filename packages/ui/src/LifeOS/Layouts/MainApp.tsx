@@ -130,6 +130,9 @@ export interface MainAppProps {
   currentRepository?: import('../Organisms/StatusBar').Repository;
   repositories?: import('../Organisms/StatusBar').Repository[];
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
+  /** Client slugs and handler for business capture lines in the palette. */
+  businessClients?: string[];
+  onBusinessCapture?: (capture: import('@kaihuman/formats/business').Capture) => void;
 
   renderEditor?: (
     path: string,
@@ -1521,6 +1524,8 @@ abbreviations: undefined
         onOpenActionLog={onActionLogClick}
         onOpenKnowledge={onKnowledgeClick}
         onOpenKBCommands={onKBCommandsClick}
+        businessClients={props.businessClients}
+        onBusinessCapture={props.onBusinessCapture}
         onSelect={(item) => {
           if (item.type === 'FILE') {
             logger.debug(`Opening file from search: ${item.path}`);

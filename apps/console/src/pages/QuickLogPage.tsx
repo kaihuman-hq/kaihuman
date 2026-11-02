@@ -1,10 +1,14 @@
 import { githubFileStore } from '@kaihuman/core';
 import { addActionLogEntry } from '@kaihuman/formats';
+import type { Slug } from '@kaihuman/formats/business';
 import { StatusBar } from '@kaihuman/ui';
 import { ArrowLeft } from 'lucide-preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { useManifest } from '../hooks/useManifest';
+import { writeClientLine } from '../lib/business/capture-write';
+import { useBusinessRepo } from '../lib/business/use-business-repo';
+import { writeErrorMessage } from '../lib/business/write';
 
 export const QuickLogPage = () => {
   useManifest('/manifest-quick-log.webmanifest');
@@ -17,6 +21,11 @@ export const QuickLogPage = () => {
   const [tags, setTags] = useState('');
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState(false);
+  const [client, setClient] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const submitting = useRef(false);
+  const business = useBusinessRepo();
+  const clients = business.status === 'ready' ? business.data.clients : [];
 
   useEffect(() => {
     if (githubFileStore.tree.peek().length === 0) {
@@ -42,9 +51,29 @@ export const QuickLogPage = () => {
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     const trimmed = text.trim();
-    if (!trimmed || saving) return;
+    if (!trimmed || saving || submitting.current) return;
+    submitting.current = true;
     setSaving(true);
+    setError(null);
     try {
+      if (client && business.status === 'ready') {
+        const parsed = tags
+          .split(/[\s,]+/)
+          .map((t) => t.replace(/^#/, '').trim().toLowerCase())
+          .filter(Boolean);
+        // Tags travel as inline `#tag`, which the client helpers read like the inbox does.
+        const line = [trimmed, ...parsed.map((t) => `#${t}`)].join(' ');
+        const result = await writeClientLine(business.repo, 'log', client as Slug, line);
+        if (!result.ok) {
+          setError(result.issues[0]?.message ?? 'Nothing was saved.');
+          return;
+        }
+        setText('');
+        setTags('');
+        setFlash(true);
+        setTimeout(() => setFlash(false), 1500);
+        return;
+      }
       const folder = githubFileStore.appFolder.peek();
       const path = `${folder}/inbox.actionlog.md`;
       const existingFile = githubFileStore.openFiles.peek()[path];
@@ -66,7 +95,12 @@ export const QuickLogPage = () => {
       setTags('');
       setFlash(true);
       setTimeout(() => setFlash(false), 1500);
+    } catch (err) {
+      // Only client writes are caught: the inbox path keeps surfacing errors through the store.
+      if (!client) throw err;
+      setError(writeErrorMessage(err));
     } finally {
+      submitting.current = false;
       setSaving(false);
     }
   };
@@ -95,6 +129,31 @@ export const QuickLogPage = () => {
             <span class="text-xs text-[var(--los-muted)]">Loading...</span>
           ) : (
             <form onSubmit={handleSubmit} class="w-full max-w-lg flex flex-col gap-4">
+              {clients.length > 0 && (
+                <div class="flex flex-col gap-1.5">
+                  <label
+                    for="quick-log-client"
+                    class="text-[10px] text-[var(--los-muted)] uppercase tracking-widest"
+                  >
+                    For client <span class="opacity-50 normal-case">(optional)</span>
+                  </label>
+                  <select
+                    id="quick-log-client"
+                    value={client}
+                    disabled={saving}
+                    onChange={(e) => setClient(e.currentTarget.value)}
+                    class="bg-[var(--los-bg)] border border-[var(--los-border)] px-3 py-2 text-sm font-mono focus:border-[var(--los-accent)] outline-none transition-colors"
+                  >
+                    <option value="">None (inbox)</option>
+                    {clients.map((c) => (
+                      <option key={c.slug} value={c.slug}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div class="flex flex-col gap-1.5">
                 <label
                   for="quick-log-text"
@@ -154,9 +213,15 @@ export const QuickLogPage = () => {
                 </button>
               </div>
 
+              {error && (
+                <div role="alert" class="text-xs font-mono text-[var(--los-warning)]">
+                  {error}
+                </div>
+              )}
+
               {flash && (
                 <div class="text-xs font-mono text-[var(--los-accent)] text-center py-1 border border-[var(--los-accent)]/30 bg-[var(--los-accent)]/5">
-                  Logged
+                  {client ? `Logged for ${client}` : 'Logged'}
                 </div>
               )}
             </form>

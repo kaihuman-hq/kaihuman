@@ -1,3 +1,4 @@
+export * from './actions/capture.js';
 export * from './actions/clients.js';
 export * from './actions/credit.js';
 export * from './actions/drafts.js';

@@ -1,4 +1,5 @@
 import { githubFileStore, Logger, layoutStore } from '@kaihuman/core';
+import type { Capture } from '@kaihuman/formats/business';
 import {
   Command,
   CornerDownLeft,
@@ -11,6 +12,7 @@ import {
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoText } from '../Atoms/Typography';
+import { businessCaptureFor } from './search-business';
 import { matchFilenames } from './search-filename-matcher';
 
 const logger = new Logger('SearchModal');
@@ -50,7 +52,7 @@ async function fetchGithubSearchWithRetry(
   throw lastError;
 }
 
-export type SearchResultType = 'FILE' | 'COMMAND' | 'REPO' | 'WORKSPACE';
+export type SearchResultType = 'FILE' | 'COMMAND' | 'REPO' | 'WORKSPACE' | 'BUSINESS';
 
 export interface SearchResult {
   name: string;
@@ -84,6 +86,9 @@ export interface SearchModalProps {
   onOpenActionLog?: () => void;
   onOpenKnowledge?: () => void;
   onOpenKBCommands?: () => void;
+  /** Client slugs for `todo|log|timer <client>` lines; with `onBusinessCapture`, enables them. */
+  businessClients?: string[];
+  onBusinessCapture?: (capture: Capture) => void;
 }
 
 export const SearchModal = ({
@@ -102,6 +107,8 @@ export const SearchModal = ({
   onOpenActionLog,
   onOpenKnowledge,
   onOpenKBCommands,
+  businessClients = [],
+  onBusinessCapture,
 }: SearchModalProps) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -121,6 +128,16 @@ export const SearchModal = ({
   const getCommands = (q: string): SearchResult[] => {
     const cmds: SearchResult[] = [];
     const lowerQ = q.toLowerCase();
+
+    const captured = onBusinessCapture && businessCaptureFor(q, businessClients);
+    if (captured) {
+      cmds.push({
+        name: captured.name,
+        path: 'business:capture',
+        type: 'BUSINESS',
+        onSelect: () => onBusinessCapture(captured.capture),
+      });
+    }
 
     // Static Commands
     const staticCommands = [
