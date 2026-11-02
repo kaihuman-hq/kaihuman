@@ -1,0 +1,317 @@
+import { parseActionLog, parseTodos } from '@kaihuman/formats';
+import { BUSINESS_ROOT } from '@kaihuman/formats/business';
+import type { ComponentChildren } from 'preact';
+import { useState } from 'preact/hooks';
+import { Card } from '../components/business/Card';
+import { hours, money } from '../components/business/money';
+import { PageShell } from '../components/business/PageShell';
+import { ProblemsList } from '../components/business/ProblemsList';
+import { Stat } from '../components/business/Stat';
+import { StatusPill } from '../components/business/StatusPill';
+import { clientBacklinks } from '../lib/business/backlinks';
+import { addDays, isoWeek, todayLocal } from '../lib/business/dates';
+import { BUSINESS_PROFILE_PATH } from '../lib/business/load';
+import { type ClientOverview, clientOverview } from '../lib/business/overview';
+import { useBacklinkContents, useBusinessRepo } from '../lib/business/use-business-repo';
+
+const TIMELINE_SHOWN = 20;
+const WEEKS_SHOWN = 8;
+const th =
+  'text-left text-[10px] uppercase tracking-widest text-[var(--los-muted)] font-normal py-1 pr-3';
+const td = 'py-1 pr-3 align-top';
+const link = 'text-[var(--los-accent)] hover:underline';
+
+const Table = (props: { head: string[]; children: ComponentChildren }) => (
+  <div class="overflow-x-auto">
+    <table class="w-full text-xs">
+      <thead>
+        <tr>
+          {props.head.map((h) => (
+            <th key={h} class={th}>
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>{props.children}</tbody>
+    </table>
+  </div>
+);
+
+const Pdf = ({ present }: { present: boolean }) =>
+  present ? <span>PDF</span> : <span class="text-[var(--los-warning)]">PDF missing</span>;
+
+const budgetText = (p: ClientOverview['projects'][number], currency: string): string => {
+  const { project, minutesUsed, amountBilled } = p;
+  if (project.budget_minutes !== undefined) {
+    return `${hours(minutesUsed)} of ${hours(project.budget_minutes)} h`;
+  }
+  if (project.budget_amount !== undefined) {
+    return `${money(amountBilled, currency)} of ${money(project.budget_amount, currency)}`;
+  }
+  return `${hours(minutesUsed)} h`;
+};
+
+const Timeline = ({ items }: { items: ClientOverview['timeline'] }) => {
+  const [all, setAll] = useState(false);
+  const shown = all ? items : items.slice(0, TIMELINE_SHOWN);
+  return (
+    <Card title="Timeline" empty={items.length === 0 ? 'Nothing has happened yet.' : undefined}>
+      <ul class="space-y-1 text-xs">
+        {shown.map((item, i) => (
+          // The same document can appear several times on one day.
+          <li key={i} class="flex gap-3">
+            <span class="text-[var(--los-muted)] whitespace-nowrap">{item.date}</span>
+            <span class="min-w-0 break-words">{item.title}</span>
+          </li>
+        ))}
+      </ul>
+      {!all && items.length > TIMELINE_SHOWN && (
+        <button type="button" class={`mt-2 text-xs ${link}`} onClick={() => setAll(true)}>
+          Show all ({items.length})
+        </button>
+      )}
+    </Card>
+  );
+};
+
+function Overview(props: {
+  o: ClientOverview;
+  today: string;
+  contents: Record<string, string>;
+  backlinks: string[];
+}) {
+  const { o, today, contents, backlinks } = props;
+  const { client, summary: s } = o;
+  const currency = s.currency;
+  const contact = client.contacts[0];
+  const minWeek = isoWeek(addDays(today, -7 * (WEEKS_SHOWN - 1)));
+  const weeks = o.timeByWeek.filter((w) => w.week >= minWeek);
+  const todos = o.files.todos ? parseTodos(contents[o.files.todos] ?? '').items : [];
+  const log = o.files.log ? parseActionLog(contents[o.files.log] ?? '').entries : [];
+  const notes = o.files.notes ? contents[o.files.notes] : undefined;
+
+  return (
+    <>
+      <header class="space-y-2">
+        <div class="flex flex-wrap items-baseline gap-3">
+          <h2 class="text-base font-bold break-words">{client.name}</h2>
+          <span class="text-xs uppercase tracking-widest text-[var(--los-muted)]">
+            {client.stage}
+          </span>
+        </div>
+        {contact && (
+          <p class="text-xs break-words">
+            {contact.name}
+            {contact.email && (
+              <>
+                {' '}
+                <a class={link} href={`mailto:${contact.email}`}>
+                  {contact.email}
+                </a>
+              </>
+            )}
+            {contact.phone && (
+              <>
+                {' '}
+                <a class={link} href={`tel:${contact.phone.replace(/[^\d+]/g, '')}`}>
+                  {contact.phone}
+                </a>
+              </>
+            )}
+          </p>
+        )}
+        <dl class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <Stat label="Billed this year" value={money(s.billedThisYear, currency)} />
+          <Stat
+            label="Open"
+            value={money(s.open, currency)}
+            {...(s.open > 0 ? { tone: 'warning' as const } : {})}
+          />
+          <Stat label="Unbilled hours" value={`${hours(s.unbilledMinutes)} h`} />
+          <Stat label="Hours this month" value={`${hours(s.minutesThisMonth)} h`} />
+        </dl>
+      </header>
+
+      <Timeline items={o.timeline} />
+
+      <Card title="Offers" empty={o.offers.length === 0 ? 'No offers.' : undefined}>
+        <Table head={['Number', 'Date', 'Status', 'Amount', 'PDF', 'Link']}>
+          {o.offers.map((r) => (
+            <tr key={r.number}>
+              <td class={td}>{r.number}</td>
+              <td class={`${td} whitespace-nowrap`}>{r.issueDate}</td>
+              <td class={td}>
+                <StatusPill state={r.status} />
+              </td>
+              <td class={`${td} whitespace-nowrap`}>{money(r.gross, r.currency)}</td>
+              <td class={td}>
+                <Pdf present={r.pdf} />
+              </td>
+              <td class={td}>{r.link ?? 'no link'}</td>
+            </tr>
+          ))}
+        </Table>
+      </Card>
+
+      <Card title="Invoices" empty={o.invoices.length === 0 ? 'No invoices.' : undefined}>
+        <Table head={['Number', 'Date', 'Status', 'Amount', 'PDF', 'Link']}>
+          {o.invoices.map((r) => (
+            <tr key={r.number}>
+              <td class={td}>{r.number}</td>
+              <td class={`${td} whitespace-nowrap`}>{r.issueDate}</td>
+              <td class={td}>
+                <StatusPill state={r.status.state} />
+              </td>
+              <td class={`${td} whitespace-nowrap`}>
+                {money(r.kind === 'credit-note' ? -r.gross : r.gross, r.currency)}
+              </td>
+              <td class={td}>
+                <Pdf present={r.pdf} />
+              </td>
+              <td class={td}>{r.link ?? 'no link'}</td>
+            </tr>
+          ))}
+        </Table>
+      </Card>
+
+      <Card title="Projects" empty={o.projects.length === 0 ? 'No projects.' : undefined}>
+        <Table head={['Project', 'Status', 'Budget used', 'Retainer']}>
+          {o.projects.map((p) => (
+            <tr key={p.project.slug}>
+              <td class={td}>{p.project.name}</td>
+              <td class={td}>{p.project.status}</td>
+              <td class={`${td} whitespace-nowrap`}>{budgetText(p, currency)}</td>
+              <td class={td}>
+                {p.project.retainer
+                  ? `${money(p.project.retainer.amount, currency)} ${p.project.retainer.interval}, next ${p.project.retainer.next_date}`
+                  : '-'}
+              </td>
+            </tr>
+          ))}
+        </Table>
+      </Card>
+
+      <Card
+        title="Time by week and project"
+        empty={weeks.length === 0 ? 'No time logged in the last 8 weeks.' : undefined}
+      >
+        <Table head={['Week', 'Project', 'Hours']}>
+          {weeks.map((w) => (
+            <tr key={`${w.week}:${w.project ?? ''}`}>
+              <td class={td}>{w.week}</td>
+              <td class={td}>{w.project ?? '-'}</td>
+              <td class={td}>{hours(w.minutes)} h</td>
+            </tr>
+          ))}
+        </Table>
+      </Card>
+
+      <Card title="Todos" empty={todos.length === 0 ? 'No todos.' : undefined}>
+        <ul class="space-y-1 text-xs">
+          {todos.map((t) => (
+            <li key={t.id} class="flex gap-2">
+              <input type="checkbox" disabled checked={t.status === 'done'} aria-label={t.status} />
+              <span class="break-words">{t.text}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      <Card title="Action log" empty={log.length === 0 ? 'No log entries.' : undefined}>
+        <ul class="space-y-1 text-xs">
+          {log.map((e) => (
+            <li key={`${e.timestamp}:${e.description}`} class="flex gap-3">
+              <span class="text-[var(--los-muted)] whitespace-nowrap">
+                {e.timestamp.slice(0, 16).replace('T', ' ')}
+              </span>
+              <span class="min-w-0 break-words">{e.description}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      <Card title="Contracts" empty={o.contracts.length === 0 ? 'No contracts.' : undefined}>
+        <Table head={['Title', 'Kind', 'Start', 'End', 'Notice']}>
+          {o.contracts.map((c) => (
+            <tr key={c.id}>
+              <td class={td}>{c.title}</td>
+              <td class={td}>{c.kind}</td>
+              <td class={`${td} whitespace-nowrap`}>{c.start}</td>
+              <td class={`${td} whitespace-nowrap`}>{c.end ?? '-'}</td>
+              <td class={td}>
+                {c.notice_period_days !== undefined ? `${c.notice_period_days} days` : '-'}
+              </td>
+            </tr>
+          ))}
+        </Table>
+      </Card>
+
+      <Card title="Notes" empty={!notes?.trim() ? 'No notes.' : undefined}>
+        <div class="text-xs whitespace-pre-wrap break-words">{notes}</div>
+      </Card>
+
+      <Card
+        title="Linked from"
+        empty={backlinks.length === 0 ? 'No wiki or idea page links here.' : undefined}
+      >
+        <ul class="space-y-1 text-xs">
+          {backlinks.map((path) => (
+            <li key={path} class="break-words">
+              {/* The wiki keeps its open file in component state, so it cannot be deep-linked. */}
+              <a href="/wiki" class={link} title="Open the wiki and choose this page">
+                {path}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </>
+  );
+}
+
+export function ClientPage({ slug }: { slug?: string }) {
+  const state = useBusinessRepo();
+  const known = state.status === 'ready' && state.data.clients.some((c) => c.slug === slug);
+  const backlinkContents = useBacklinkContents(known);
+  const today = todayLocal();
+  return (
+    <PageShell state={state} title="Client">
+      {({ data, contents, loadErrors }) => {
+        const log = data.clientFiles.find((f) => f.client === slug && f.kind === 'log');
+        const o = slug
+          ? clientOverview(data, slug, today, log ? contents[log.path] : undefined)
+          : null;
+        if (!o) {
+          return (
+            <p class="text-xs">
+              No client <code>{slug}</code>.{' '}
+              <a href="/clients" class={link}>
+                Back to clients
+              </a>
+            </p>
+          );
+        }
+        const dir = `${BUSINESS_ROOT}/clients/${o.client.slug}/`;
+        const mine = (file: string) => file === BUSINESS_PROFILE_PATH || file.startsWith(dir);
+        return (
+          <>
+            <a href="/clients" class={`text-xs ${link}`}>
+              All clients
+            </a>
+            <Overview
+              o={o}
+              today={today}
+              contents={contents}
+              backlinks={clientBacklinks(o.client.slug, backlinkContents)}
+            />
+            <ProblemsList
+              findings={data.findings.filter((f) => mine(f.file))}
+              loadErrors={loadErrors.filter(mine)}
+            />
+          </>
+        );
+      }}
+    </PageShell>
+  );
+}
