@@ -1,3 +1,4 @@
+import { authStore, demoMode } from '@kaihuman/core';
 import { loadBusinessRepo } from '@kaihuman/formats/business';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
@@ -20,6 +21,12 @@ vi.mock('../lib/business/dates', async (importOriginal) => ({
 }));
 vi.mock('@kaihuman/ui', () => ({ StatusBar: () => <div data-testid="status-bar" /> }));
 vi.mock('preact-router', () => router);
+const shares = vi.hoisted(() => ({ revokeShareLink: vi.fn(), shareApi: vi.fn(() => ({})) }));
+vi.mock('../lib/business/share', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/business/share')>()),
+  revokeShareLink: shares.revokeShareLink,
+  shareApi: shares.shareApi,
+}));
 
 const { IssuePage } = await import('./IssuePage');
 
@@ -78,6 +85,9 @@ const submit = () => host.querySelector('button[type="submit"]') as HTMLButtonEl
 const alerts = () => [...host.querySelectorAll('[role="alert"]')].map((a) => a.textContent);
 
 beforeEach(() => {
+  demoMode.value = false;
+  vi.spyOn(authStore as unknown as { fetchUser(): Promise<void> }, 'fetchUser').mockResolvedValue();
+  authStore.token.value = 'gho_test';
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(2026, 10, 10, 12, 0, 0));
   vi.clearAllMocks();
@@ -320,5 +330,78 @@ describe('IssuePage confirmations', () => {
     const alert = host.querySelector('[role="alert"]');
     expect(alert?.tagName).toBe('DIV');
     expect(alert?.querySelector('ul li')).not.toBeNull();
+  });
+});
+
+describe('IssuePage credit note and share link', () => {
+  const LINK = `{"id":"01M50ARQ007CHPV05AFMSY38DJ","doc":"RE-2026-0001","url":"https://docs.kaihuman.com/d/AAAAAAAAAAAAAAAAAAAAAA#${'k'.repeat(43)}","created":"2026-11-01T00:00:00.000Z"}\n`;
+  const creditNote = (links = LINK) =>
+    files((f) => {
+      f.set(
+        DRAFT,
+        (f.get(DRAFT) ?? '').replace('kind: invoice', 'kind: credit-note\ncorrects: RE-2026-0001'),
+      );
+      f.set('.kh/business/links.jsonl', links);
+    });
+  const checkbox = () => host.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+
+  it('offers to revoke the share link of the corrected invoice, checked by default', async () => {
+    await show(ready(creditNote()));
+    expect(checkbox()?.checked).toBe(true);
+    expect(host.textContent).toContain('Also revoke the share link of RE-2026-0001');
+  });
+
+  it('offers nothing without an active link, or for an invoice', async () => {
+    await show(
+      ready(creditNote(`${LINK.trimEnd().slice(0, -1)},"revoked":"2026-11-02T00:00:00.000Z"}\n`)),
+    );
+    expect(checkbox()).toBeNull();
+    await show(ready(files((f) => f.set('.kh/business/links.jsonl', LINK))));
+    expect(checkbox()).toBeNull();
+  });
+
+  it('revokes the link after a successful issue', async () => {
+    const m = creditNote();
+    shares.revokeShareLink.mockResolvedValue({ ok: true, value: { commitSha: 'r' } });
+    await show(ready(m));
+    writeAgainst(m);
+    act(() => submit().click());
+    await flush();
+    expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
+    expect(shares.revokeShareLink).toHaveBeenCalledTimes(1);
+    expect(shares.revokeShareLink.mock.calls[0]?.[1]).toMatchObject({ doc: 'RE-2026-0001' });
+    expect(router.route).toHaveBeenCalled();
+  });
+
+  it('does not revoke when the box is unchecked', async () => {
+    const m = creditNote();
+    await show(ready(m));
+    act(() => checkbox()?.click());
+    writeAgainst(m);
+    act(() => submit().click());
+    await flush();
+    expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
+    expect(shares.revokeShareLink).not.toHaveBeenCalled();
+  });
+
+  it('does not revoke when issuing fails', async () => {
+    const m = creditNote();
+    await show(ready(m));
+    writes.writeBusiness.mockResolvedValue({ ok: false, issues: [{ path: 'x', message: 'no' }] });
+    act(() => submit().click());
+    await flush();
+    expect(shares.revokeShareLink).not.toHaveBeenCalled();
+  });
+
+  it('keeps the issue and says so in a notice when the revoke fails', async () => {
+    const m = creditNote();
+    shares.revokeShareLink.mockRejectedValue(new Error('The share service is not reachable.'));
+    await show(ready(m));
+    writeAgainst(m);
+    act(() => submit().click());
+    await flush();
+    expect(router.route).toHaveBeenCalled();
+    expect(businessNotice.value?.text).toContain('could not be revoked');
+    expect(businessNotice.value?.text).toContain('RE-2026-0001');
   });
 });

@@ -137,6 +137,11 @@ export function BusinessPage() {
               </ul>
             </Card>
             <p class="text-xs">
+              <a href="/business/shared" class="text-[var(--los-accent)] hover:underline">
+                Shared files
+              </a>
+            </p>
+            <p class="text-xs">
               <a href="/business/drafts/new" class="text-[var(--los-accent)] hover:underline">
                 New draft
               </a>
