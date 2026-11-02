@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildToday,
+  businessToday,
   DEFAULT_ACTION_LOG_PATH,
   fetchToday,
   habitWeek,
@@ -386,5 +387,70 @@ describe('fetchToday', () => {
     });
     expect(next.files).toEqual(previous.files);
     expect(next.fetchedAt).toBeGreaterThan(previous.fetchedAt);
+  });
+});
+
+describe('businessToday', () => {
+  const entry = (date: string, minutes: number) =>
+    JSON.stringify({
+      id: '01J8ZK3V5E7Q9R2T4W6Y8A0C2E',
+      date,
+      minutes,
+      client: 'acme-gmbh',
+      note: 'x',
+    });
+  const month = [entry('2026-09-23', 90), entry('2026-09-22', 200), entry('2026-09-23', 60)].join(
+    '\n',
+  );
+
+  it('sums only today’s entries', () => {
+    expect(businessToday(month, null, '2026-09-23', NOW)).toEqual({
+      minutesToday: 150,
+      running: null,
+    });
+  });
+
+  it('adds the minutes a running timer has elapsed, rounded down', () => {
+    const startedAt = new Date(2026, 8, 23, 9, 0, 30).toISOString();
+    const now = new Date(2026, 8, 23, 10, 30, 29); // 89m59s later
+    const result = businessToday(
+      month,
+      `client: acme-gmbh\nstarted_at: ${startedAt}\n`,
+      '2026-09-23',
+      now,
+    );
+    expect(result).toEqual({
+      minutesToday: 150 + 89,
+      running: { client: 'acme-gmbh', since: startedAt },
+    });
+  });
+
+  it('counts a timer started yesterday from local midnight', () => {
+    const now = new Date(2026, 8, 23, 1, 30);
+    const startedAt = new Date(2026, 8, 22, 22, 0).toISOString();
+    const result = businessToday(
+      null,
+      `client: acme-gmbh\nstarted_at: ${startedAt}\n`,
+      '2026-09-23',
+      now,
+    );
+    expect(result.minutesToday).toBe(90);
+  });
+
+  it('is null when the repo has no business files', () => {
+    expect(buildToday(cache({}), NOW).business).toBeNull();
+  });
+
+  it('reads this month’s file and the timer from the synced files', () => {
+    const summary = buildToday(
+      cache({
+        '.kh/business/time/2026-09.jsonl': month,
+        '.kh/business/time/2026-08.jsonl': entry('2026-09-23', 999),
+        '.kh/business/time/running.yaml': `client: acme-gmbh\nstarted_at: ${new Date(2026, 8, 23, 9, 0).toISOString()}\n`,
+      }),
+      NOW,
+    );
+    expect(summary.business?.minutesToday).toBe(150 + 90);
+    expect(summary.business?.running?.client).toBe('acme-gmbh');
   });
 });

@@ -52,6 +52,7 @@ const emptyToday = (): TodaySummary => ({
   habits: [],
   timers: [],
   clocks: [],
+  business: null,
   actionLogPath: '.kh/daily.actionlog.md',
   braindumps: [],
   braindumpCount: 0,
@@ -543,6 +544,27 @@ describe('StartPage', () => {
       url: 'https://app.kaihuman.com/files/p.todos.md?repo=owner%2Frepo',
       reuse: true,
     });
+  });
+
+  it('shows business hours, and the running timer, only when the repo has business files', async () => {
+    TODAY = {
+      ...emptyToday(),
+      inbox: { path: '.kh/inbox.todos.md', count: 1 },
+      business: {
+        minutesToday: 150,
+        running: { client: 'acme-gmbh', since: '2026-09-23T09:00:00Z' },
+      },
+    };
+    await mount(() => host.textContent?.includes('1 in the inbox') ?? false);
+    expect(host.querySelector('[data-testid="business-today"]')?.textContent).toBe(
+      'Business today: 2.5 h · timer running for acme-gmbh',
+    );
+  });
+
+  it('shows no business line without business files', async () => {
+    TODAY = { ...emptyToday(), inbox: { path: '.kh/inbox.todos.md', count: 1 } };
+    await mount(() => host.textContent?.includes('1 in the inbox') ?? false);
+    expect(host.querySelector('[data-testid="business-today"]')).toBeNull();
   });
 
   it('checks a habit in from its card', async () => {

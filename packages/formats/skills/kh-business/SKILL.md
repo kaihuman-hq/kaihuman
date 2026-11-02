@@ -48,8 +48,9 @@ For a file named by its ULID (`drafts/<ulid>.yaml`, `expenses/<year>/<ulid>.yaml
 
 1. **Drafts only.** You create and edit files in `drafts/`. Never write, edit or delete anything under
    `offers/` or `invoices/`: issued documents are frozen, and the check fails on any change.
-   Issuing (numbering, totals, freezing) happens in the kaihuman console. Tell the user to
-   issue the draft there.
+   Issuing (numbering, totals, freezing) happens only in the kaihuman console. Tell the user to
+   issue the draft there. The console's forms and the user's timer write the same files, so re-read
+   `time/running.yaml` and the month file right before you write.
 2. **Money is integer cents** with the currency from `business.yaml`: `12500` means 125.00. Never use
    decimals for money.
 3. **Rates and quantities are quoted strings**: `quantity: "7.5"`, `vat_rate: "19"`. An unquoted

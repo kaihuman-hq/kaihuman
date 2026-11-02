@@ -25,6 +25,15 @@ import {
   type ReadItLaterItem,
   type TodoItem,
 } from '@kaihuman/formats';
+import {
+  BUSINESS_ROOT,
+  parseJsonl,
+  parseYaml,
+  TIMER_PATH,
+  timePath,
+  validateTimeEntry,
+  validateTimer,
+} from '@kaihuman/formats/business';
 import { applyRanking, archiveCandidates, type Ranking } from './ai/rank.js';
 import { CACHE_TTL_MS } from './bookmarks';
 import { STATUS_CONFIG_PATH } from './service-status';
@@ -78,12 +87,17 @@ interface TreeEntry {
  * list of services whose status it shows — which rides along so it costs no request of its own.
  * The palette's ideas (`>id`, doc/ideas.md) ride along too; the start page itself shows none.
  */
+/** Business hours need only the time files and the timer; nothing else under `.kh/business`. */
+const isBusinessTodayPath = (path: string) =>
+  path === TIMER_PATH || (path.startsWith(`${BUSINESS_ROOT}/time/`) && path.endsWith('.jsonl'));
+
 const isTodayPath = (path: string) => {
   const lower = path.toLowerCase();
   return (
     TODAY_SUFFIXES.some((suffix) => lower.endsWith(suffix)) ||
     braindumpIdOf(path) !== null ||
     ideaSlugOf(path) !== null ||
+    isBusinessTodayPath(path) ||
     path === STATUS_CONFIG_PATH
   );
 };
@@ -275,6 +289,43 @@ export function timerState(csv: string, now: Date): TimerState {
     : { running: false, closedMinutes };
 }
 
+// ─── Business hours (.kh/business/time) ─────────────────────────────────────
+
+export interface BusinessToday {
+  /** Logged entries dated today plus the running timer's share of today, rounded down. */
+  minutesToday: number;
+  running: { client: string; since: string } | null;
+}
+
+/**
+ * Read-only: a malformed line or timer file counts as absent rather than failing the page.
+ * A timer started on an earlier day counts only from local midnight, as its entry would be
+ * dated on the start day.
+ */
+export function businessToday(
+  timeJsonl: string | null,
+  timerYaml: string | null,
+  today: string,
+  now: Date,
+): BusinessToday {
+  let minutesToday = 0;
+  if (timeJsonl) {
+    for (const { value } of parseJsonl(timeJsonl, validateTimeEntry).entries) {
+      if (value.date === today) minutesToday += value.minutes;
+    }
+  }
+  let running: BusinessToday['running'] = null;
+  const parsed = timerYaml ? parseYaml(timerYaml) : null;
+  const timer = parsed?.ok ? validateTimer(parsed.value) : null;
+  if (timer?.ok) {
+    const started = new Date(timer.value.started_at).getTime();
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    minutesToday += Math.max(0, Math.floor((now.getTime() - Math.max(started, midnight)) / 60_000));
+    running = { client: timer.value.client, since: timer.value.started_at };
+  }
+  return { minutesToday, running };
+}
+
 // ─── World clocks (.timezones.json) ─────────────────────────────────────────
 
 export interface Clock {
@@ -332,6 +383,8 @@ export interface TodaySummary {
   }[];
   timers: ({ path: string; name: string } & TimerState)[];
   clocks: Clock[];
+  /** `null` when the repo has no business time files, so the view stays as it was. */
+  business: BusinessToday | null;
   actionLogPath: string;
   /** The newest braindumps first, cut to the newest few; `sha` is what a delete must name. */
   braindumps: { path: string; sha: string; title: string; text: string; createdAt: number }[];
@@ -416,6 +469,7 @@ export function buildToday(cache: TodayCache, now: Date, readLaterRanking?: Rank
     habits: [],
     timers: [],
     clocks: [],
+    business: null,
     actionLogPath: actionLogPath(cache),
     braindumps: [],
     braindumpCount: 0,
@@ -427,6 +481,16 @@ export function buildToday(cache: TodayCache, now: Date, readLaterRanking?: Rank
     new Date(now.getFullYear(), now.getMonth(), now.getDate() - RESURFACE_IDLE_DAYS),
   );
   const files = [...cache.files].sort((a, b) => a.path.localeCompare(b.path));
+  const timeFile = files.find((file) => file.path === timePath(today.slice(0, 7)));
+  const timerFile = files.find((file) => file.path === TIMER_PATH);
+  if (timeFile || timerFile) {
+    summary.business = businessToday(
+      timeFile?.content ?? null,
+      timerFile?.content ?? null,
+      today,
+      now,
+    );
+  }
 
   for (const { path, sha, content } of files) {
     const lower = path.toLowerCase();
