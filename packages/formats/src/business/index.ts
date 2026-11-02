@@ -8,6 +8,7 @@ export * from './money.js';
 export * from './numbering.js';
 export * from './paths.js';
 export * from './records.js';
+export * from './repo.js';
 export * from './status.js';
 export * from './totals.js';
 export * from './validate.js';
