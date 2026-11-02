@@ -4,6 +4,7 @@
 
 - `commitFiles` (real and demo service) takes `null` to delete a path, an optional `expectedHeadSha` (mismatch or a 409/422 from `updateRef` throws the new `ConflictError`, exported from `@kaihuman/core`) and returns `{ commitSha, blobShas }`; new `getHeadSha`. `githubFileStore.applyCommit(changes, blobShas)` mirrors a commit into the tree, open files and the IndexedDB cache, and remembers deleted paths so a stale API tree cannot bring them back in `loadTree`. `@kaihuman/core` now has a vitest setup (`pnpm --filter @kaihuman/core test`).
 - Running timer: `time/running.yaml` (`RunningTimer`, path kind `timer`, `TIMER_PATH`, `validateTimer`, `BusinessRepo.timer`; the check reports an unknown client or project as an error at that file) and pure actions `startTimer`, `timerToEntry` (start-day local date, 1 to 1440 minutes), `logTime` and `cancelTimer` in `@kaihuman/formats/business`. The `kh-business` skill documents the file.
+- Console write layer `lib/business/write.ts`: `writeBusiness(target, build)` reads the head sha, the tree and the business files (sha-cached), runs a pure builder on that `Fresh` state, commits once with `expectedHeadSha`, rebuilds and retries once on `ConflictError`, then mirrors the commit into `githubFileStore` and the content cache. `writeErrorMessage` gives forms the conflict or `Saving failed` text.
 
 ## 2026-10-27 — Business, phase 2: console pages
 
