@@ -8,7 +8,7 @@ import { Stat } from '../components/business/Stat';
 import { StatusPill } from '../components/business/StatusPill';
 import { TimerCard } from '../components/business/TimerCard';
 import { todayLocal } from '../lib/business/dates';
-import { businessDashboard, hoursSummary } from '../lib/business/overview';
+import { businessDashboard, hoursSummary, type VatStat } from '../lib/business/overview';
 import { useBusinessRepo } from '../lib/business/use-business-repo';
 
 const th =
@@ -19,6 +19,41 @@ const clientLink = (slug: string, text = slug) => (
     {text}
   </a>
 );
+
+const CONTRACT_WHAT = { renewal: 'renews', notice: 'notice deadline', end: 'ends' } as const;
+const BASIS_LABEL = { accrual: 'Soll', cash: 'Ist' } as const;
+
+/** Month and quarter VAT; a negative payable is a refund. One note replaces both for the small-business regime. */
+function VatStats({
+  month,
+  quarter,
+  currency,
+}: {
+  month: VatStat;
+  quarter: VatStat;
+  currency: string;
+}) {
+  if (!month.applicable || !quarter.applicable) {
+    return (
+      <div class="col-span-2 lg:col-span-1">
+        <Stat label="VAT" value="No VAT: small-business regime (§19 UStG)." />
+      </div>
+    );
+  }
+  return (
+    <>
+      {[month, quarter].map((v) =>
+        v.applicable ? (
+          <Stat
+            key={v.period}
+            label={`${v.payable < 0 ? 'VAT refund' : 'VAT payable'} ${v.period} (${BASIS_LABEL[v.basis]})`}
+            value={money(Math.abs(v.payable), currency)}
+          />
+        ) : null,
+      )}
+    </>
+  );
+}
 
 export function BusinessPage() {
   const state = useBusinessRepo();
@@ -37,8 +72,7 @@ export function BusinessPage() {
                 value={money(d.overdueTotal, cur)}
                 tone={d.overdueTotal > 0 ? 'warning' : undefined}
               />
-              <Stat label={`VAT ${d.vat.month.period}`} value={money(d.vat.month.due, cur)} />
-              <Stat label={`VAT ${d.vat.quarter.period}`} value={money(d.vat.quarter.due, cur)} />
+              <VatStats month={d.vat.month} quarter={d.vat.quarter} currency={cur} />
               <Stat label="Hours today" value={`${hours(h.todayMinutes)} h`} />
               <Stat label="Hours this week" value={`${hours(h.weekMinutes)} h`} />
             </dl>
@@ -83,6 +117,53 @@ export function BusinessPage() {
               </div>
             </Card>
 
+            <Card
+              title="Retainers due"
+              empty={
+                d.retainersDue.length === 0 ? 'No retainers due in the next 14 days.' : undefined
+              }
+            >
+              <ul class="text-xs space-y-1">
+                {d.retainersDue.map(({ project, date, hasDraft }) => {
+                  const draft = data.drafts.find(
+                    (x) =>
+                      x.client === project.client &&
+                      x.project === project.slug &&
+                      x.from_retainer === date,
+                  );
+                  return (
+                    <li
+                      key={`${project.client}/${project.slug}`}
+                      class="flex justify-between gap-2"
+                    >
+                      <span class="min-w-0 break-words">
+                        {project.name}, {clientLink(project.client)}: {date}
+                      </span>
+                      <span class="shrink-0">
+                        {hasDraft && draft ? (
+                          <a
+                            href={`/business/drafts/${draft.id}`}
+                            class="text-[var(--los-accent)] hover:underline"
+                          >
+                            Draft ready
+                          </a>
+                        ) : hasDraft ? (
+                          'Draft ready'
+                        ) : (
+                          <a
+                            href={`/business/drafts/new?client=${project.client}&kind=invoice&from=retainer&project=${project.slug}`}
+                            class="text-[var(--los-accent)] hover:underline"
+                          >
+                            Create draft
+                          </a>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Card
                 title="Unbilled time"
@@ -108,7 +189,8 @@ export function BusinessPage() {
                   {d.contractsDue.map((c) => (
                     <li key={`${c.contract.id}:${c.what}`} class="flex justify-between gap-2">
                       <span class="min-w-0 break-words">
-                        {c.contract.title} ({c.what}), {clientLink(c.contract.client)}
+                        {c.contract.title} ({CONTRACT_WHAT[c.what]}),{' '}
+                        {clientLink(c.contract.client)}
                       </span>
                       <span class="shrink-0">{c.date}</span>
                     </li>

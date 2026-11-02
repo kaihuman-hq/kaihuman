@@ -1,5 +1,5 @@
-import type { BusinessRepo, Contract, TimeEntry } from '@kaihuman/formats/business';
-import { loadBusinessRepo } from '@kaihuman/formats/business';
+import type { BusinessRepo, Contract, Draft, Project, TimeEntry } from '@kaihuman/formats/business';
+import { loadBusinessRepo, vatSummary } from '@kaihuman/formats/business';
 import { describe, expect, it } from 'vitest';
 import { loadFixtureRepo } from './fixture.test-helper.js';
 import {
@@ -102,34 +102,80 @@ describe('businessDashboard', () => {
     expect(businessDashboard(unpaid, '2026-11-09').receivables).toHaveLength(1);
   });
 
-  it('sums VAT of the month and quarter, minus credit notes', () => {
-    expect(businessDashboard(repo, '2026-10-27').vat).toEqual({
-      month: { period: '2026-10', due: 15888 },
-      quarter: { period: '2026-Q4', due: 15888 },
+  it('shows the VAT payable of the month and quarter, input VAT included', () => {
+    const expense = must(repo.expenses[0]);
+    expect(expense.vat).toBeGreaterThan(0);
+    const d = businessDashboard(repo, '2026-10-27');
+    expect(d.vat.month).toEqual({
+      period: '2026-10',
+      applicable: true,
+      basis: 'accrual',
+      payable: 15888 - expense.vat,
     });
-    expect(businessDashboard(repo, '2026-11-02').vat).toEqual({
-      month: { period: '2026-11', due: 0 },
-      quarter: { period: '2026-Q4', due: 15888 },
+    expect(d.vat.quarter).toEqual({
+      period: '2026-Q4',
+      applicable: true,
+      basis: 'accrual',
+      payable: 15888 - expense.vat,
     });
-    const inv = fixtureInvoice();
-    const credit = {
-      path: 'x',
-      doc: {
-        ...inv.doc,
-        kind: 'credit-note' as const,
-        number: 'GS-2026-0001',
-        corrects: inv.doc.number,
-        issue_date: '2026-10-28',
-        totals: {
-          ...inv.doc.totals,
-          breakdown: inv.doc.totals.breakdown.map((b) => ({ ...b, tax: 1000 })),
-        },
-      },
+    const payable = (period: string): number | null => {
+      const s = vatSummary(repo, period);
+      return s.applicable ? s.payable : null;
     };
-    const credited = { ...repo, issued: [...repo.issued, credit] };
-    expect(businessDashboard(credited, '2026-10-29').vat.month.due).toBe(
-      15888 - 1000 * inv.doc.totals.breakdown.length,
-    );
+    const of = (stat: { applicable: boolean; payable?: number }) => stat.payable;
+    expect(of(d.vat.month as never)).toBe(payable('2026-10'));
+    expect(of(d.vat.quarter as never)).toBe(payable('2026-Q4'));
+    expect(of(businessDashboard(repo, '2026-11-02').vat.month as never)).toBe(payable('2026-11'));
+  });
+
+  it('reports the cash basis and a refund as a negative payable', () => {
+    const cash = {
+      ...repo,
+      profile: { ...must(repo.profile), vat_basis: 'cash' as const },
+    } as BusinessRepo;
+    const d = businessDashboard({ ...cash, payments: [] }, '2026-10-27');
+    expect(d.vat.month).toMatchObject({ applicable: true, basis: 'cash' });
+    expect((d.vat.month as { payable: number }).payable).toBeLessThan(0);
+  });
+
+  it('is not applicable for the small-business regime', () => {
+    const small = {
+      ...repo,
+      profile: { ...must(repo.profile), vat_regime: 'small-business' as const },
+    } as BusinessRepo;
+    expect(businessDashboard(small, '2026-10-27').vat.month).toEqual({
+      period: '2026-10',
+      applicable: false,
+    });
+  });
+
+  it('lists retainers due within 14 days, flagging those that already have a draft', () => {
+    const project = {
+      client: 'acme-gmbh',
+      slug: 'hosting',
+      name: 'Hosting',
+      status: 'active',
+      retainer: { amount: 1000, interval: 'monthly', next_date: '2026-11-05', description: 'x' },
+    } as never as Project;
+    const r = { ...repo, projects: [...repo.projects, project] };
+    expect(businessDashboard(r, '2026-11-02').retainersDue).toEqual([
+      { project, date: '2026-11-05', hasDraft: false },
+    ]);
+    expect(businessDashboard(r, '2026-10-01').retainersDue).toEqual([]);
+    const drafted = {
+      ...r,
+      drafts: [
+        {
+          id: 'D',
+          kind: 'invoice',
+          client: 'acme-gmbh',
+          project: 'hosting',
+          lines: [],
+          from_retainer: '2026-11-05',
+        },
+      ] as never as Draft[],
+    };
+    expect(businessDashboard(drafted, '2026-11-02').retainersDue[0]?.hasDraft).toBe(true);
   });
 
   it('lists unbilled minutes per client', () => {

@@ -23,6 +23,8 @@ vi.mock('../lib/business/dates', async (importOriginal) => ({
 }));
 vi.mock('@kaihuman/ui', () => ({ StatusBar: () => <div data-testid="status-bar" /> }));
 vi.mock('preact-router', () => ({ route: vi.fn() }));
+const receipt = vi.hoisted(() => ({ openAttachment: vi.fn(() => Promise.resolve()) }));
+vi.mock('../lib/business/receipt', () => receipt);
 // Stands in for the share buttons so the tests can read what the page hands them.
 vi.mock('../components/business/ShareActions', () => ({
   ShareActions: (props: object) => <span data-share={JSON.stringify(props)} />,
@@ -424,5 +426,52 @@ describe('ClientPage share wiring', () => {
       ),
     );
     expect(shareOf('AN-2026-001')?.doc).toMatchObject({ expires: '2026-12-01', pdf: true });
+  });
+
+  describe('contracts', () => {
+    const CPATH = `${dir}contracts/01M52X5E00EKRX27CHPV05AFMS.yaml`;
+    const withFile = (m: Map<string, string>) => {
+      m.set(
+        CPATH,
+        `${m.get(CPATH) ?? ''}file: 01M52X5E00EKRX27CHPV05AFMS.pdf\nrenewal_date: "2026-12-01"\n`,
+      );
+    };
+
+    it('links Add contract and Edit', () => {
+      show(ready(load()));
+      expect(host.querySelector('a[href="/clients/acme-gmbh/contracts/new"]')?.textContent).toBe(
+        'Add contract',
+      );
+      expect(
+        host.querySelector('a[href="/clients/acme-gmbh/contracts/01M52X5E00EKRX27CHPV05AFMS"]')
+          ?.textContent,
+      ).toBe('Edit');
+    });
+
+    it('shows the next reminder with date and what', () => {
+      show(ready(load(withFile)));
+      // Today is 2026-11-10; renewal 2026-12-01 and its notice (30 days before) on 2026-11-01 is past.
+      expect(host.textContent).toContain('2026-12-01 (renewal)');
+    });
+
+    it('shows a dash without an upcoming reminder', () => {
+      show(ready(load()));
+      expect(host.querySelector('[data-testid="contract-next"]')?.textContent).toBe('-');
+    });
+
+    it('opens the contract PDF through the attachment helper', () => {
+      show(ready(load(withFile)));
+      const open = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Open PDF');
+      act(() => open?.click());
+      expect(receipt.openAttachment).toHaveBeenCalledWith(repo, {
+        path: `${dir}contracts/01M52X5E00EKRX27CHPV05AFMS.pdf`,
+        name: '01M52X5E00EKRX27CHPV05AFMS.pdf',
+      });
+    });
+
+    it('offers no PDF link without a file', () => {
+      show(ready(load()));
+      expect(buttons()).not.toContain('Open PDF');
+    });
   });
 });

@@ -13,6 +13,7 @@ import { CheatsheetPage } from './pages/CheatsheetPage';
 import { ClientFormPage } from './pages/ClientFormPage';
 import { ClientPage } from './pages/ClientPage';
 import { ClientsPage } from './pages/ClientsPage';
+import { ContractFormPage } from './pages/ContractFormPage';
 import { Dashboard } from './pages/Dashboard';
 import { DemoEntry } from './pages/DemoEntry';
 import { DraftPage } from './pages/DraftPage';
@@ -97,6 +98,8 @@ export const App = () => {
         <ProtectedRoute path="/clients/new" component={ClientFormPage} />
         <ProtectedRoute path="/clients/:slug" component={ClientPage} />
         <ProtectedRoute path="/clients/:slug/projects/new" component={ProjectFormPage} />
+        <ProtectedRoute path="/clients/:slug/contracts/new" component={ContractFormPage} />
+        <ProtectedRoute path="/clients/:slug/contracts/:id" component={ContractFormPage} />
         <ProtectedRoute path="/business/shared" component={SharedPage} />
         <ProtectedRoute path="/business/enable" component={BusinessEnablePage} />
         <ProtectedRoute path="/business/time/new" component={LogTimePage} />

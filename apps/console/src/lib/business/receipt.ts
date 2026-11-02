@@ -19,31 +19,28 @@ export const receiptMime = (file: string): string =>
 export const RECEIPT_URL_LIFETIME_MS = 60_000;
 
 /**
- * Fetches the receipt's bytes and shows them in a new tab through a short-lived blob URL. The tab
- * is opened first, inside the click, because browsers block a tab opened after the network wait.
- * HEIC is saved as a file instead: browsers mostly cannot display it, so a tab would stay blank.
+ * Fetches a stored attachment's bytes and shows them in a new tab through a short-lived blob URL.
+ * The tab is opened first, inside the click, because browsers block a tab opened after the network
+ * wait. HEIC is saved as a file instead: browsers mostly cannot display it, so a tab would stay blank.
  */
-export async function openReceipt(target: KBRepo, expense: Expense): Promise<void> {
-  const file = expense.receipt;
-  if (!file) return;
-  const saveAs = receiptMime(file) === 'image/heic';
+export async function openAttachment(
+  target: KBRepo,
+  attachment: { path: string; name: string },
+): Promise<void> {
+  const { path, name } = attachment;
+  const saveAs = receiptMime(name) === 'image/heic';
   const tab = saveAs ? null : window.open('', '_blank');
   if (!saveAs && !tab) {
     throw new Error('Your browser blocked the new tab. Allow pop-ups and try again.');
   }
   try {
-    const [owner = '', name = ''] = target.full_name.split('/');
-    const path = receiptPath(
-      expense.date.slice(0, 4),
-      expense.id,
-      file.slice(file.lastIndexOf('.') + 1),
-    );
-    const bytes = await githubService.getFileBytes(owner, name, path, {
+    const [owner = '', repoName = ''] = target.full_name.split('/');
+    const bytes = await githubService.getFileBytes(owner, repoName, path, {
       ref: target.default_branch,
     });
     const blob = new Blob([bytes as BlobPart], { type: receiptMime(path) });
     if (saveAs) {
-      downloadBlob(file, blob);
+      downloadBlob(name, blob);
       return;
     }
     const url = URL.createObjectURL(blob);
@@ -53,4 +50,13 @@ export async function openReceipt(target: KBRepo, expense: Expense): Promise<voi
     tab?.close();
     throw e;
   }
+}
+
+export async function openReceipt(target: KBRepo, expense: Expense): Promise<void> {
+  const file = expense.receipt;
+  if (!file) return;
+  await openAttachment(target, {
+    path: receiptPath(expense.date.slice(0, 4), expense.id, file.slice(file.lastIndexOf('.') + 1)),
+    name: file,
+  });
 }

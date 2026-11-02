@@ -11,6 +11,7 @@ import type {
   LinkRecord,
   OfferStatus,
   Project,
+  RetainerDue,
   Slug,
 } from '@kaihuman/formats/business';
 import {
@@ -19,6 +20,8 @@ import {
   contractReminders,
   deriveInvoiceStatus,
   deriveOfferStatus,
+  retainersDue,
+  vatSummary,
 } from '@kaihuman/formats/business';
 import { addDays, isoWeek, quarterOf } from './dates.js';
 
@@ -77,16 +80,19 @@ export type ClientOverview = {
   files: { notes?: string; todos?: string; log?: string };
 };
 
+/** The VAT to pay for a period; negative is a refund. */
+export type VatStat =
+  | { period: string; applicable: false }
+  | { period: string; applicable: true; basis: 'accrual' | 'cash'; payable: number };
+
 export type Dashboard = {
   /** Open > 0; overdue first, then by due date. */
   receivables: InvoiceRow[];
   openTotal: number;
   overdueTotal: number;
   unbilled: { client: Slug; minutes: number }[];
-  vat: {
-    month: { period: string; due: number };
-    quarter: { period: string; due: number };
-  };
+  vat: { month: VatStat; quarter: VatStat };
+  retainersDue: RetainerDue[];
   contractsDue: ({ contract: Contract } & ContractDate)[];
   drafts: Draft[];
   pipeline: Record<ClientStage, ClientSummary[]>;
@@ -95,6 +101,7 @@ export type Dashboard = {
 
 const TIMELINE_CAP = 100;
 const CONTRACT_WINDOW_DAYS = 60;
+const RETAINER_WINDOW_DAYS = 14;
 const CONTRACT_DATE_TITLES: Record<ContractDate['what'], string> = {
   renewal: 'Renewal due',
   notice: 'Notice deadline',
@@ -343,20 +350,13 @@ export const businessDashboard = (repo: BusinessRepo, today: string): Dashboard 
     .map(([client, m]) => ({ client, minutes: m }))
     .sort((a, b) => b.minutes - a.minutes || a.client.localeCompare(b.client));
 
-  const vatOf = (inPeriod: (date: string) => boolean): number =>
-    sum(
-      repo.issued
-        .filter(({ doc }) => inPeriod(doc.issue_date))
-        .map(({ doc }) => {
-          const tax = sum(doc.totals.breakdown.map((b) => b.tax));
-          return doc.kind === 'invoice' ? tax : doc.kind === 'credit-note' ? -tax : 0;
-        }),
-    );
   const month = today.slice(0, 7);
   const { year, q } = quarterOf(today);
-  const quarter = (date: string) => {
-    const d = quarterOf(date);
-    return d.year === year && d.q === q;
+  const vatStat = (period: string): VatStat => {
+    const v = vatSummary(repo, period);
+    return v.applicable
+      ? { period, applicable: true, basis: v.basis, payable: v.payable }
+      : { period, applicable: false };
   };
 
   const contractsDue = contractReminders(repo, today, CONTRACT_WINDOW_DAYS);
@@ -373,10 +373,8 @@ export const businessDashboard = (repo: BusinessRepo, today: string): Dashboard 
       receivables.filter((r) => r.status.state === 'overdue').map((r) => r.status.open),
     ),
     unbilled,
-    vat: {
-      month: { period: month, due: vatOf((d) => d.startsWith(month)) },
-      quarter: { period: `${year}-Q${q}`, due: vatOf(quarter) },
-    },
+    vat: { month: vatStat(month), quarter: vatStat(`${year}-Q${q}`) },
+    retainersDue: retainersDue(repo, today, RETAINER_WINDOW_DAYS),
     contractsDue,
     drafts: repo.drafts,
     pipeline,
