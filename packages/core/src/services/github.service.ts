@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { demoMode } from '../demo-mode.js';
 import { authStore } from '../stores/auth.store.js';
+import { ConflictError } from './conflict.js';
 import { inMemoryGithubService } from './github.service.memory.js';
 
 export class GithubService {
@@ -220,20 +221,34 @@ export class GithubService {
     });
   }
 
+  /** Current commit SHA of a branch. */
+  async getHeadSha(owner: string, repo: string, branch: string): Promise<string> {
+    const client = this.getClient();
+    const { data } = await client.git.getRef({ owner, repo, ref: `heads/${branch}` });
+    return data.object.sha;
+  }
+
   /**
-   * Writes several files in a single commit, so the branch gets all of them or none: a write
-   * that fails halfway leaves nothing behind. Fails if the branch moved while the commit was built.
+   * Writes and deletes (`null`) several files in a single commit, so the branch gets all of them
+   * or none: a write that fails halfway leaves nothing behind. With `expectedHeadSha` it throws
+   * {@link ConflictError} before creating anything when the branch has moved; a ref update GitHub
+   * rejects as non-fast-forward is a ConflictError too. `blobShas` maps each written path to its
+   * new blob SHA.
    */
   async commitFiles(
     owner: string,
     repo: string,
     branch: string,
-    files: Record<string, string>,
+    files: Record<string, string | null>,
     message: string,
-  ) {
+    opts?: { expectedHeadSha?: string },
+  ): Promise<{ commitSha: string; blobShas: Record<string, string> }> {
     const client = this.getClient();
     const { data: refData } = await client.git.getRef({ owner, repo, ref: `heads/${branch}` });
     const headSha = refData.object.sha;
+    if (opts?.expectedHeadSha !== undefined && opts.expectedHeadSha !== headSha) {
+      throw new ConflictError(`${branch} moved from ${opts.expectedHeadSha} to ${headSha}`);
+    }
     const { data: commitData } = await client.git.getCommit({
       owner,
       repo,
@@ -243,12 +258,11 @@ export class GithubService {
       owner,
       repo,
       base_tree: commitData.tree.sha,
-      tree: Object.entries(files).map(([path, content]) => ({
-        path,
-        mode: '100644' as const,
-        type: 'blob' as const,
-        content,
-      })),
+      tree: Object.entries(files).map(([path, content]) =>
+        content === null
+          ? { path, mode: '100644' as const, type: 'blob' as const, sha: null }
+          : { path, mode: '100644' as const, type: 'blob' as const, content },
+      ),
     });
     const { data: newCommit } = await client.git.createCommit({
       owner,
@@ -257,7 +271,20 @@ export class GithubService {
       tree: newTree.sha,
       parents: [headSha],
     });
-    await client.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommit.sha });
+    try {
+      await client.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommit.sha });
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      if (status === 409 || status === 422) {
+        throw new ConflictError(`${branch} moved while the commit was built`);
+      }
+      throw e;
+    }
+    const blobShas: Record<string, string> = {};
+    for (const entry of newTree.tree) {
+      if (entry.path && entry.sha && files[entry.path] != null) blobShas[entry.path] = entry.sha;
+    }
+    return { commitSha: newCommit.sha, blobShas };
   }
 
   /** Create or update a file, fetching the current SHA automatically when needed. */

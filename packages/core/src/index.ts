@@ -2,6 +2,7 @@ export * from './demo/seed.js';
 export * from './demo-mode.js';
 export * from './logger.js';
 export * from './models/types.js';
+export * from './services/conflict.js';
 export * from './services/github.service.js';
 export * from './services/github.service.memory.js';
 export * from './stores/ai.store.js';

@@ -1,0 +1,61 @@
+import '../db.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const remote = vi.hoisted(() => ({ tree: [] as unknown[] }));
+vi.mock('../services/github.service.js', () => ({
+  githubService: { fetchRepoTree: async () => remote.tree },
+}));
+
+import { GithubFileStore } from './github-file.store.js';
+import { githubProfileStore } from './github-profile.store.js';
+
+const DRAFT = '.kh/business/drafts/X.yaml';
+const blob = (path: string, sha: string) => ({
+  path,
+  mode: '100644',
+  type: 'blob',
+  sha,
+  url: '',
+});
+
+describe('githubFileStore.applyCommit', () => {
+  let store: GithubFileStore;
+  beforeEach(() => {
+    githubProfileStore.currentRepo.value = {
+      full_name: 'o/r',
+      name: 'r',
+      owner: { login: 'o' },
+      default_branch: 'main',
+    } as never;
+    store = new GithubFileStore();
+  });
+
+  it('does not resurrect a deleted draft when loadTree sees a stale remote tree', async () => {
+    remote.tree = [blob(DRAFT, 's1'), blob('keep.md', 'k1')];
+    await store.loadTree();
+    // The draft was opened once, so IDB holds its content (the case the merge keys on).
+    await store.applyCommit({ [DRAFT]: 'draft: 1' }, { [DRAFT]: 's2' });
+    expect(store.tree.value.find((t) => t.path === DRAFT)?.sha).toBe('s2');
+
+    await store.applyCommit({ [DRAFT]: null, 'new.md': 'n' }, { 'new.md': 'n1' });
+    expect(store.tree.value.map((t) => t.path)).toEqual(['keep.md', 'new.md']);
+
+    // Stale API still lists the draft and not the new file.
+    remote.tree = [blob(DRAFT, 's1'), blob('keep.md', 'k1')];
+    await store.loadTree();
+    const paths = store.tree.value.map((t) => t.path);
+    expect(paths).not.toContain(DRAFT);
+    expect(paths).toContain('new.md');
+  });
+
+  it('replaces open files and closes deleted ones', async () => {
+    store.openFiles.value = {
+      'a.md': { content: 'old', sha: 'o' },
+      'b.md': { content: 'b', sha: 'b' },
+    };
+    store.activeFile.value = 'b.md';
+    await store.applyCommit({ 'a.md': 'new', 'b.md': null }, { 'a.md': 'sha-a' });
+    expect(store.openFiles.value).toEqual({ 'a.md': { content: 'new', sha: 'sha-a' } });
+    expect(store.activeFile.value).toBeNull();
+  });
+});

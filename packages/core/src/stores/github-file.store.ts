@@ -45,6 +45,9 @@ export class GithubFileStore {
   // State
   tree = signal<TreeItem[]>([]);
   openFiles = signal<Record<string, FileContent>>({});
+  // Paths deleted by applyCommit. GitHub's API can keep listing them for a while, so loadTree
+  // drops them from the remote tree until the remote stops listing them.
+  private deletedPaths = new Set<string>();
   private idbWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
   activeFile = signal<string | null>(null);
   dirtyFiles = signal<Set<string>>(new Set());
@@ -109,10 +112,17 @@ export class GithubFileStore {
       }
 
       // 2. Fetch fresh from network
-      const remoteTree = (await githubService.fetchRepoTree(
+      const fetchedTree = (await githubService.fetchRepoTree(
         repo.owner.login,
         repo.name,
       )) as TreeItem[];
+      const fetchedPaths = new Set(fetchedTree.map((t) => t.path));
+      for (const key of this.deletedPaths) {
+        if (!fetchedPaths.has(key.slice(repo.full_name.length + 1))) this.deletedPaths.delete(key);
+      }
+      const remoteTree = fetchedTree.filter(
+        (t) => !this.deletedPaths.has(`${repo.full_name}:${t.path}`),
+      );
 
       // 3. Smart Merge: Keep items from Cache that are NOT in Remote but have Local Content
       // This handles the "Eventual Consistency" of GitHub API after creation
@@ -674,6 +684,82 @@ export class GithubFileStore {
     logger.info('[Migration] IDB cleaned. Reloading tree...');
     // Reload tree so appFolder recomputes to '.kh'
     await this.loadTree();
+  }
+
+  /**
+   * Mirrors a multi-file commit (`githubService.commitFiles`) into local state: tree, open files
+   * and the IndexedDB cache. Trusts the commit instead of reloading, because GitHub's API can
+   * return the old tree for a while. Deleted paths are removed from the cached `files` entries
+   * and the cached tree, otherwise `loadTree`'s merge would bring them back.
+   */
+  async applyCommit(changes: Record<string, string | null>, blobShas: Record<string, string>) {
+    const repo = githubProfileStore.currentRepo.peek();
+    if (!repo) return;
+
+    const paths = new Set(Object.keys(changes));
+    for (const [path, content] of Object.entries(changes)) {
+      const key = `${repo.full_name}:${path}`;
+      if (content === null) this.deletedPaths.add(key);
+      else this.deletedPaths.delete(key);
+    }
+    const written = Object.entries(changes).filter((e): e is [string, string] => e[1] !== null);
+    const known = new Map(this.tree.peek().map((t) => [t.path, t]));
+    for (const [path] of written) {
+      known.set(path, {
+        ...known.get(path),
+        path,
+        mode: '100644',
+        type: 'blob',
+        sha: blobShas[path] ?? '',
+        url: known.get(path)?.url ?? '',
+      });
+    }
+    const newTree = [...known.values()]
+      .filter((t) => !(t.type === 'blob' && changes[t.path] === null))
+      .sort((a, b) => {
+        if (a.type === 'tree' && b.type !== 'tree') return -1;
+        if (a.type !== 'tree' && b.type === 'tree') return 1;
+        return a.path.localeCompare(b.path);
+      });
+    this.tree.value = newTree;
+
+    const open = { ...this.openFiles.peek() };
+    for (const [path, content] of Object.entries(changes)) {
+      if (content === null) delete open[path];
+      else if (path in open) open[path] = { content, sha: blobShas[path] ?? '' };
+    }
+    this.openFiles.value = open;
+
+    const active = this.activeFile.peek();
+    if (active && changes[active] === null) this.activeFile.value = null;
+
+    if (this.dirtyFiles.peek().size > 0) {
+      const dirty = new Set(this.dirtyFiles.peek());
+      for (const p of paths) dirty.delete(p);
+      this.dirtyFiles.value = dirty;
+    }
+
+    // Awaited: a stale `files` entry would let loadTree's merge resurrect a deleted path.
+    try {
+      const db = await dbPromise;
+      for (const [path, content] of Object.entries(changes)) {
+        const cacheKey = `${repo.full_name}:${path}`;
+        if (content === null) {
+          await db.delete('files', cacheKey);
+          await db.delete('files', `${cacheKey} `);
+        } else {
+          await db.put('files', {
+            path: cacheKey,
+            content,
+            sha: blobShas[path] ?? '',
+            timestamp: Date.now(),
+          });
+        }
+      }
+      await db.put('trees', newTree, `tree:${repo.full_name} `);
+    } catch (e) {
+      logger.error('Failed to update IDB cache after commit', e);
+    }
   }
 
   async deleteFile(path: string) {

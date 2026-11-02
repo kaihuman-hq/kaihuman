@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-02 — Business, phase 3: daily forms
+
+- `commitFiles` (real and demo service) takes `null` to delete a path, an optional `expectedHeadSha` (mismatch or a 409/422 from `updateRef` throws the new `ConflictError`, exported from `@kaihuman/core`) and returns `{ commitSha, blobShas }`; new `getHeadSha`. `githubFileStore.applyCommit(changes, blobShas)` mirrors a commit into the tree, open files and the IndexedDB cache, and remembers deleted paths so a stale API tree cannot bring them back in `loadTree`. `@kaihuman/core` now has a vitest setup (`pnpm --filter @kaihuman/core test`).
+
 ## 2026-10-27 — Business, phase 2: console pages
 
 - `loadBusinessRepo(files, treePaths?)` in `@kaihuman/formats/business` parses and validates every business file into typed records, client file lists, artifact paths and findings; one broken file never stops the rest. `checkBusinessRepo` now uses it and keeps only its cross-file rules. New path helpers `isBusinessPath`, `clientOfPath`, `Scope` and `inScope`.
