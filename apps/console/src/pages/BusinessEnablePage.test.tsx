@@ -22,12 +22,9 @@ vi.mock('@kaihuman/core', async () => {
 vi.mock('@kaihuman/ui', () => ({ StatusBar: () => <div data-testid="status-bar" /> }));
 vi.mock('preact-router', () => router);
 vi.mock('../lib/github-kb', () => kb);
-vi.mock('../lib/business-setup', () => {
-  class PublicRepoError extends Error {}
-  class AlreadyEnabledError extends Error {}
-  return { enableBusiness: setup.enableBusiness, PublicRepoError, AlreadyEnabledError };
-});
+vi.mock('../lib/business-setup', () => ({ enableBusiness: setup.enableBusiness }));
 
+const { AlreadyEnabledError, PublicRepoError } = await import('../lib/business/errors');
 const { BusinessEnablePage } = await import('./BusinessEnablePage');
 
 const repo = { full_name: 'me/biz', default_branch: 'main', private: true };
@@ -82,19 +79,27 @@ describe('BusinessEnablePage', () => {
     expect(host.querySelector('form')).toBeNull();
   });
 
-  it('blocks a public repo and writes nothing', async () => {
+  it('blocks a public repo: form and submit disabled', () => {
     act(() => {
       core.currentRepo.value = { ...repo, private: false };
     });
     expect(host.textContent).toContain('This repository is public.');
     expect(submit().disabled).toBe(true);
     expect(input('name').disabled).toBe(true);
+  });
+
+  it('writes nothing when the repo turns out to be public after the form was filled', async () => {
+    fillValid();
+    act(() => {
+      core.currentRepo.value = { ...repo, private: false };
+    });
     act(() => {
       host.querySelector('form')?.dispatchEvent(new Event('submit', { cancelable: true }));
     });
     await flush();
-    expect(setup.enableBusiness).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('This repository is public.');
     expect(kb.syncKB).not.toHaveBeenCalled();
+    expect(setup.enableBusiness).not.toHaveBeenCalled();
   });
 
   it('has labelled fields and keeps submit disabled until all confirmations are ticked', () => {
@@ -151,5 +156,57 @@ describe('BusinessEnablePage', () => {
     await flush();
     expect(host.textContent).toContain('Setup failed, nothing was written: boom');
     expect(router.route).not.toHaveBeenCalled();
+  });
+
+  it('shows nothing written and skips business when the KB install fails', async () => {
+    kb.syncKB.mockResolvedValueOnce('missing').mockRejectedValueOnce(new Error('no access'));
+    fillValid();
+    act(() => submit().click());
+    await flush();
+    expect(setup.enableBusiness).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('Setup failed, nothing was written: no access');
+  });
+
+  it('shows the exact copy for an already enabled repo', async () => {
+    setup.enableBusiness.mockRejectedValue(new AlreadyEnabledError('x'));
+    fillValid();
+    act(() => submit().click());
+    await flush();
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(
+      'Business is already enabled in this repository.',
+    );
+  });
+
+  it('shows the exact copy when the repo is public according to GitHub', async () => {
+    setup.enableBusiness.mockRejectedValue(new PublicRepoError('x'));
+    fillValid();
+    act(() => submit().click());
+    await flush();
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(
+      'This repository is public. Business data (invoices, client details, share links) needs a private repository. Make it private on GitHub, then try again.',
+    );
+  });
+
+  it('says the KB was set up when business fails after its install', async () => {
+    kb.syncKB.mockResolvedValueOnce('missing').mockResolvedValueOnce('updated');
+    setup.enableBusiness.mockRejectedValue(new Error('boom'));
+    fillValid();
+    act(() => submit().click());
+    await flush();
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(
+      'The knowledge base was set up, but enabling business failed: boom',
+    );
+  });
+
+  it('ignores a second submit while the first is running', async () => {
+    fillValid();
+    const form = host.querySelector('form') as HTMLFormElement;
+    act(() => {
+      form.dispatchEvent(new Event('submit', { cancelable: true }));
+      form.dispatchEvent(new Event('submit', { cancelable: true }));
+    });
+    await flush();
+    expect(kb.syncKB).toHaveBeenCalledTimes(1);
+    expect(setup.enableBusiness).toHaveBeenCalledTimes(1);
   });
 });

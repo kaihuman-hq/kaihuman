@@ -1,5 +1,5 @@
 import { type BusinessProfile, type Result, validateProfile } from '@kaihuman/formats/business';
-import { AlreadyEnabledError, PublicRepoError } from '../business-setup';
+import { AlreadyEnabledError, PublicRepoError } from './errors';
 
 export type EnableForm = {
   name: string;

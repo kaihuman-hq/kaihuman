@@ -1,7 +1,7 @@
 import { githubFileStore, githubProfileStore } from '@kaihuman/core';
 import { StatusBar } from '@kaihuman/ui';
 import type { ComponentChildren } from 'preact';
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import {
   canSubmit,
@@ -11,7 +11,7 @@ import {
   fieldErrors,
   profileFromForm,
 } from '../lib/business/enable-form';
-import { enableBusiness, PublicRepoError } from '../lib/business-setup';
+import { AlreadyEnabledError, PublicRepoError } from '../lib/business/errors';
 import { syncKB } from '../lib/github-kb';
 
 const INPUT =
@@ -75,6 +75,8 @@ export function BusinessEnablePage() {
   const [errors, setErrors] = useState<Partial<Record<keyof EnableForm, string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Set synchronously: `busy` only changes after the next render, so two quick submits could both pass.
+  const submitting = useRef(false);
 
   const bar = (
     <StatusBar
@@ -118,24 +120,38 @@ export function BusinessEnablePage() {
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
-    if (!repo || isPublic || busy || !canSubmit(form)) return;
+    if (!repo || isPublic || submitting.current || !canSubmit(form)) return;
     const result = profileFromForm(form);
     setErrors(fieldErrors(result));
     if (!result.ok) {
       setError('Some fields need attention.');
       return;
     }
+    submitting.current = true;
     setBusy(true);
     setError(null);
+    let kbInstalled = false;
     try {
-      // Two commits for a repo without a knowledge base: its setup, then business.
-      if ((await syncKB(repo)) === 'missing') await syncKB(repo, { install: true });
+      // Two commits for a repo without a knowledge base: its setup, then business. The probe
+      // may also commit pending skill updates, as on the other pages.
+      if ((await syncKB(repo)) === 'missing') {
+        await syncKB(repo, { install: true });
+        kbInstalled = true;
+      }
+      // Loaded here so the bundled check stays out of the main chunk.
+      const { enableBusiness } = await import('../lib/business-setup');
       await enableBusiness(repo, result.value);
       await githubFileStore.loadTree();
       route('/business');
     } catch (err) {
-      setError(enableErrorMessage(err));
+      const known = err instanceof PublicRepoError || err instanceof AlreadyEnabledError;
+      setError(
+        kbInstalled && !known
+          ? `The knowledge base was set up, but enabling business failed: ${err instanceof Error ? err.message : String(err)}`
+          : enableErrorMessage(err),
+      );
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }

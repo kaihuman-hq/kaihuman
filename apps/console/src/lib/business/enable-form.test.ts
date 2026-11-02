@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@kaihuman/core', () => ({ githubService: {} }));
 
-const { AlreadyEnabledError, PublicRepoError } = await import('../business-setup');
+const { AlreadyEnabledError, PublicRepoError } = await import('./errors');
 const { EMPTY_FORM, canSubmit, enableErrorMessage, fieldErrors, profileFromForm } = await import(
   './enable-form'
 );
