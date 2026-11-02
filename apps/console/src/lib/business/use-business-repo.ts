@@ -21,28 +21,46 @@ export type BusinessState =
 const keyOf = (items: readonly { path: string; sha: string }[]) =>
   items.map((item) => `${item.path}@${item.sha}`).join('|');
 
-/** Loads the tree when nothing has (direct navigation), as IdeasPage does. */
-const useTreeLoaded = () => {
+/**
+ * Loads the tree when it is empty (direct navigation) or still belongs to another repo.
+ * `loadTree` itself clears the old repo's tree before fetching.
+ */
+const useTreeLoaded = (repoName: string | undefined) => {
   useEffect(() => {
-    if (githubFileStore.tree.peek().length === 0) githubFileStore.loadTree();
-  }, []);
+    if (!repoName) return;
+    if (
+      githubFileStore.tree.peek().length === 0 ||
+      githubFileStore.loadedRepo.peek() !== repoName
+    ) {
+      githubFileStore.loadTree();
+    }
+  }, [repoName]);
 };
+
+interface Loaded extends LoadedFiles {
+  repo: string;
+  key: string;
+  data: BusinessRepo;
+}
 
 export function useBusinessRepo(): BusinessState {
   const repo = githubProfileStore.currentRepo.value;
   const tree = githubFileStore.tree.value;
-  const treeLoading =
-    tree.length === 0 &&
-    (githubFileStore.isLoading.value || githubFileStore.loadedRepo.value !== repo?.full_name);
-  const treeError = tree.length === 0 ? githubFileStore.error.value : null;
+  // After a repo switch the store still holds the old repo's tree until loadTree clears it.
+  const treeIsCurrent = githubFileStore.loadedRepo.value === repo?.full_name;
+  const treeLoading = !treeIsCurrent || (tree.length === 0 && githubFileStore.isLoading.value);
+  const treeError = treeIsCurrent && tree.length === 0 ? githubFileStore.error.value : null;
 
-  const enabled = tree.some((item) => item.path === BUSINESS_PROFILE_PATH);
-  const items = useMemo(() => businessTreeItems(tree), [tree]);
+  const enabled = treeIsCurrent && tree.some((item) => item.path === BUSINESS_PROFILE_PATH);
+  const items = useMemo(
+    () => (treeIsCurrent ? businessTreeItems(tree) : []),
+    [tree, treeIsCurrent],
+  );
   const itemsKey = keyOf(items);
   const wanted = `${repo?.full_name}|${itemsKey}`;
 
-  const [loaded, setLoaded] = useState<(LoadedFiles & { key: string }) | null>(null);
-  useTreeLoaded();
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  useTreeLoaded(repo?.full_name);
 
   useEffect(() => {
     if (!repo || !enabled) {
@@ -50,36 +68,29 @@ export function useBusinessRepo(): BusinessState {
       return;
     }
     let cancelled = false;
+    const treePaths = tree.filter((item) => item.type === 'blob').map((item) => item.path);
     loadRepoFiles(repo.full_name, items).then((result) => {
-      if (!cancelled) setLoaded({ ...result, key: wanted });
+      if (cancelled) return;
+      const data = loadBusinessRepo(new Map(Object.entries(result.contents)), treePaths);
+      setLoaded({ ...result, repo: repo.full_name, key: wanted, data });
     });
     return () => {
       cancelled = true;
     };
   }, [repo?.full_name, itemsKey, enabled]);
 
-  const current = loaded?.key === wanted ? loaded : null;
-  const data = useMemo(
-    () =>
-      current &&
-      loadBusinessRepo(
-        new Map(Object.entries(current.contents)),
-        tree.filter((item) => item.type === 'blob').map((item) => item.path),
-      ),
-    [current, tree],
-  );
-
   if (!repo) return { status: 'no-repo' };
   if (treeError) return { status: 'error', message: treeError };
   if (treeLoading) return { status: 'loading' };
   if (!enabled) return { status: 'disabled', repo };
-  if (!current || !data) return { status: 'loading' };
+  // Same repo, new shas: keep showing the previous data while the reload runs.
+  if (!loaded || loaded.repo !== repo.full_name) return { status: 'loading' };
   return {
     status: 'ready',
     repo,
-    data,
-    contents: current.contents,
-    loadErrors: current.errors,
+    data: loaded.data,
+    contents: loaded.contents,
+    loadErrors: loaded.errors,
   };
 }
 
@@ -87,23 +98,31 @@ export function useBusinessRepo(): BusinessState {
 export function useBacklinkContents(enabled: boolean): Record<string, string> {
   const repo = githubProfileStore.currentRepo.value;
   const tree = githubFileStore.tree.value;
-  const items = useMemo(() => backlinkTreeItems(tree), [tree]);
+  const treeIsCurrent = githubFileStore.loadedRepo.value === repo?.full_name;
+  const items = useMemo(
+    () => (treeIsCurrent ? backlinkTreeItems(tree) : []),
+    [tree, treeIsCurrent],
+  );
   const itemsKey = keyOf(items);
-  const [contents, setContents] = useState<Record<string, string>>({});
+  const [loaded, setLoaded] = useState<{ repo: string; contents: Record<string, string> } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!enabled || !repo || items.length === 0) {
-      setContents({});
+      setLoaded(null);
       return;
     }
     let cancelled = false;
     loadRepoFiles(repo.full_name, items).then((result) => {
-      if (!cancelled) setContents(result.contents);
+      if (!cancelled) setLoaded({ repo: repo.full_name, contents: result.contents });
     });
     return () => {
       cancelled = true;
     };
   }, [enabled, repo?.full_name, itemsKey]);
 
-  return contents;
+  return loaded && loaded.repo === repo?.full_name ? loaded.contents : NONE;
 }
+
+const NONE: Record<string, string> = {};
