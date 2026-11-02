@@ -1,5 +1,5 @@
 import { buildDemoSeed, type DashboardConfig, InMemoryGithubService } from '@kaihuman/core';
-import { ideaActivity, ideaSlugOf, parseIdea } from '@kaihuman/formats';
+import { ideaActivity, ideaSlugOf, parseActionLog, parseIdea, parseTodos } from '@kaihuman/formats';
 import { checkBusinessRepo, loadBusinessRepo } from '@kaihuman/formats/business';
 import { describe, expect, it } from 'vitest';
 import { businessDashboard } from './lib/business/overview.js';
@@ -174,6 +174,7 @@ describe('demo business', () => {
     [new Date(2026, 9, 27), '2026-10-27'],
     [new Date(2027, 0, 8), '2027-01-08'],
     [new Date(2027, 1, 5), '2027-02-05'],
+    [new Date(2027, 2, 31), '2027-03-31'],
   ])('passes the business check for now=%s', (now, today) => {
     const seed = buildDemoSeed(now);
     const files = new Map(
@@ -183,6 +184,19 @@ describe('demo business', () => {
     const repo = loadBusinessRepo(files);
     expect(repo.clients).toHaveLength(3);
     expect(businessDashboard(repo, today).overdueTotal).toBeGreaterThan(0);
+    expect(repo.clients.map((c) => c.stage).sort()).toEqual(['active', 'lead', 'offer-sent']);
+    expect(businessDashboard(repo, today).contractsDue.length).toBeGreaterThan(0);
+    expect(repo.events.some((e) => e.type === 'sent')).toBe(true);
+    const log = parseActionLog(
+      seed.files['.kh/business/clients/northwind-labs/log.actionlog.md'] as string,
+    );
+    expect(log.entries.length).toBeGreaterThanOrEqual(3);
+    expect(log.entries.length).toBeLessThanOrEqual(5);
+    const todos = parseTodos(
+      seed.files['.kh/business/clients/northwind-labs/todos.todos.md'] as string,
+    );
+    expect(todos.items).toHaveLength(4);
+    expect(todos.items.every((i) => i.createdAt)).toBe(true);
     expect(seed.files['.kh/wiki/clients.md']).toContain('[[client:northwind-labs]]');
   });
 });

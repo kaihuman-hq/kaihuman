@@ -154,8 +154,8 @@ business" commit). It needs a private repo with business enabled.
 
 - The Kanban board, the todo analytics and the action log have an All / Business / Personal toggle.
   Client todos (`clients/<slug>/todos.todos.md`) and logs (`log.actionlog.md`) count as Business.
-- `[[client:slug]]` in a wiki page or idea links to `/clients/<slug>`; the client page lists these
-  backlinks.
+- `[[client:slug]]` in a wiki page is a link to `/clients/<slug>`. The client page lists the wiki
+  pages and ideas that contain it under "Linked from".
 - A file with errors shows up in a collapsible "N files have problems" list; the rest still renders.
 - Demo mode seeds a sample business ("Demo Studio", fake IBAN and VAT ID) with three clients, a paid
   and an overdue invoice, an offer, time entries and a wiki page linking to the active client.

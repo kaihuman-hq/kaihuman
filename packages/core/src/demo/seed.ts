@@ -653,7 +653,7 @@ interface DemoDoc {
 
 function issuedDoc(d: DemoDoc, number: string, draftId: string): string {
   const net = d.quantity * d.unitPrice;
-  const vat = net * 0.19;
+  const vat = Math.round((net * 19) / 100);
   const year = d.issued.getFullYear();
   const lines = [
     `number: ${number}`,
@@ -775,20 +775,16 @@ function business(now: Date): Record<string, string> {
 
   const stamp = (d: number, h: number, m: number) =>
     `${isoDate(addDays(now, d))} ${pad(h)}:${pad(m)}:00`;
-  put(
-    `clients/${northwind[0]}/todos.todos.md`,
-    [
-      `- [>] Plan the launch checklist with Nora #website`,
-      `::created:: ${addDays(now, -6).toISOString()}`,
-      `- [ ] Send the updated sitemap #website`,
-      `::created:: ${addDays(now, -2).toISOString()}`,
-      `- [ ] Remind about the overdue invoice #billing`,
-      `::created:: ${addDays(now, -1).toISOString()}`,
-      `- [x] Collect brand assets #website`,
-      `::created:: ${addDays(now, -30).toISOString()}`,
-      '',
-    ].slice(0, -1),
-  );
+  put(`clients/${northwind[0]}/todos.todos.md`, [
+    `- [>] Plan the launch checklist with Nora #website`,
+    `::created:: ${addDays(now, -6).toISOString()}`,
+    `- [ ] Send the updated sitemap #website`,
+    `::created:: ${addDays(now, -2).toISOString()}`,
+    `- [ ] Remind about the overdue invoice #billing`,
+    `::created:: ${addDays(now, -1).toISOString()}`,
+    `- [x] Collect brand assets #website`,
+    `::created:: ${addDays(now, -30).toISOString()}`,
+  ]);
   put(`clients/${northwind[0]}/log.actionlog.md`, [
     '# Action Log',
     '',
@@ -802,10 +798,9 @@ function business(now: Date): Record<string, string> {
   const buyer = party('buyer', northwind[1], northwind[2], northwind[3], northwind[4]);
   const paidIds = [ulid(2), ulid(3)];
   const overdueIds = [ulid(4)];
-  const docs: { path: string; year: number; doc: DemoDoc }[] = [
+  const docs: { path: string; doc: DemoDoc }[] = [
     {
       path: 'paid',
-      year: 0,
       doc: {
         kind: 'invoice',
         issued: addDays(now, -40),
@@ -822,7 +817,6 @@ function business(now: Date): Record<string, string> {
     },
     {
       path: 'overdue',
-      year: 0,
       doc: {
         kind: 'invoice',
         issued: addDays(now, -30),
@@ -839,7 +833,6 @@ function business(now: Date): Record<string, string> {
     },
     {
       path: 'offer',
-      year: 0,
       doc: {
         kind: 'offer',
         issued: addDays(now, -5),
