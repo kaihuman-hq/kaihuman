@@ -169,8 +169,12 @@ describe('ClientFormPage', () => {
     );
     show();
     fillClient();
-    act(() => submit().click());
-    act(() => submit().click());
+    // Two submit events before any re-render: only the ref guard can stop the second.
+    act(() => {
+      const form = host.querySelector('form') as HTMLFormElement;
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
     expect(submit().disabled).toBe(true);
     expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
     release();

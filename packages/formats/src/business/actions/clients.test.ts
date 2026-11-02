@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { addActionLogEntry, addTodoEntry } from '../../entries.js';
+import { parseActionLog } from '../../action-log.js';
+import { parseTodos } from '../../todos.js';
 import { loadFixtureRepo } from '../fixture-repo.test-helper.js';
 import type { Slug } from '../ids.js';
 import type { Client, Project } from '../records.js';
@@ -97,26 +98,45 @@ describe('createProject', () => {
 
 describe('addClientTodo / addClientLog', () => {
   const acme = 'acme-gmbh' as Slug;
-  // The helpers re-serialise, so "old text" is what they themselves wrote earlier.
-  it('keeps the old log byte for byte and adds one line', () => {
-    const old = addActionLogEntry('', { description: 'Earlier #x' }, new Date(2026, 9, 1, 8, 0, 0));
+  // Hand-written files: a custom heading, prose, blank lines, an item without tags.
+  const nl = (s: string) => (s.endsWith('\n') ? s : `${s}\n`);
+  const lines = (s: string) => s.split('\n').filter(Boolean).length;
+
+  it.each([
+    ['trailing newline', '# Acme log\n\nCalls go here.\n\n- 2026-10-01 08:00:00 Earlier\n'],
+    ['no trailing newline', '# Acme log\n\nProse.\n- 2026-10-01 08:00:00 Earlier'],
+    ['empty file', ''],
+  ])('appends one log line and keeps the old text (%s)', (_n, old) => {
     const r = addClientLog(repo, old, acme, 'Called about the offer', now);
     if (!r.ok) throw new Error('expected ok');
     const text = r.value.changes[`${DIR}/acme-gmbh/log.actionlog.md`] ?? '';
-    expect(text.startsWith(old)).toBe(true);
-    expect(text.slice(old.length).trim().split('\n')).toEqual([
-      '- 2026-11-02 09:05:07 Called about the offer',
-    ]);
+    const prefix = old === '' ? '' : nl(old);
+    expect(text.startsWith(prefix)).toBe(true);
+    expect(text.slice(prefix.length)).toBe('- 2026-11-02 09:05:07 Called about the offer\n');
+    const entries = parseActionLog(text).entries;
+    expect(entries.at(-1)?.description).toBe('Called about the offer');
     expect(r.value.message).toBe('business: log for acme-gmbh');
   });
-  it('keeps the old todos and adds one', () => {
-    const old = addTodoEntry('', { text: 'Earlier todo' }, new Date(2026, 9, 1));
+
+  it.each([
+    ['trailing newline', '# Acme todos\n\nSome prose.\n\n- [ ] Earlier, no tags\n'],
+    ['no trailing newline', '# Acme todos\n- [ ] Earlier, no tags'],
+    ['empty file', ''],
+  ])('appends one todo item and keeps the old text (%s)', (_n, old) => {
     const r = addClientTodo(repo, old, acme, 'Send invoice #billing', now);
     if (!r.ok) throw new Error('expected ok');
     const text = r.value.changes[`${DIR}/acme-gmbh/todos.todos.md`] ?? '';
-    expect(text).toContain('- [ ] Earlier todo');
-    expect(text).toContain('- [ ] Send invoice #billing');
-    expect(text.split('\n').filter((l) => l.startsWith('- [ ]'))).toHaveLength(2);
+    const prefix = old === '' ? '' : nl(old);
+    expect(text.startsWith(prefix)).toBe(true);
+    const added = text.slice(prefix.length);
+    expect(added.startsWith('- [ ] Send invoice #billing\n')).toBe(true);
+    expect(lines(added)).toBeLessThanOrEqual(2);
+    const before = parseTodos(old).items.length;
+    const after = parseTodos(text).items;
+    expect(after).toHaveLength(before + 1);
+    // A `# heading` makes the parser add a group tag on read; the file itself is untouched.
+    expect(after.at(-1)?.text).toBe('Send invoice');
+    expect(after.at(-1)?.tags).toContain('billing');
   });
   it('creates the files when missing', () => {
     const t = addClientTodo(repo, null, acme, 'First', now);

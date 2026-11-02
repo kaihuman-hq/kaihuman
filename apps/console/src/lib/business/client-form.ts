@@ -11,7 +11,7 @@ import {
 } from '@kaihuman/formats/business';
 import { HOURS_HINT, parseHours } from './time-form';
 
-export const MONEY_HINT = 'Use 1200, 1200.50 or 1.200,50.';
+export const MONEY_HINT = 'Use 1200, 1200.50 or 1.200,50. Note that 12.345 reads as 12345.';
 const SLUG_MESSAGE = 'Use 2 to 40 lowercase letters, digits or -.';
 
 /**
@@ -69,6 +69,11 @@ export const withSlug = <T extends SlugState>(form: T, slug: string): T => ({
 
 const slugIssue = (form: SlugState, issues: Issues) => {
   const slug = asSlug(form.slug.trim());
+  // `/clients/new` is the new-client form, so a client of that name could never be opened.
+  if (slug === 'new') {
+    issues.push({ path: 'slug', message: '"new" is reserved. Choose another slug.' });
+    return null;
+  }
   if (!slug) {
     issues.push({
       path: 'slug',

@@ -1,3 +1,4 @@
+import { appendAction, parseActionLog } from '../../action-log.js';
 import { addActionLogEntry, addTodoEntry, splitInlineTags } from '../../entries.js';
 import { slugifyWords } from '../../ideas.js';
 import { asSlug, type Slug } from '../ids.js';
@@ -65,6 +66,18 @@ export const createProject = (repo: BusinessRepo, project: Project): Action => {
   };
 };
 
+/** An existing file is kept byte for byte: re-serialising would drop headings, prose and blank lines. */
+const appendTo = (existing: string | null, block: string): string =>
+  existing === null
+    ? block
+    : `${existing}${existing === '' || existing.endsWith('\n') ? '' : '\n'}${block}`;
+
+const logContent = (existing: string | null, description: string, now: Date): string => {
+  if (existing === null) return addActionLogEntry('', { description }, now);
+  const added = appendAction(parseActionLog(''), description.trim(), [], now).entries[0];
+  return appendTo(existing, `- ${added?.timestamp} ${added?.description}\n`);
+};
+
 const refusal = (repo: BusinessRepo, client: Slug, text: string): Issue[] | null => {
   if (!repo.clients.some((c) => c.slug === client)) {
     return [{ path: 'client', message: `unknown client "${client}"` }];
@@ -89,7 +102,11 @@ export const addClientTodo = (
     ok: true,
     value: {
       changes: {
-        [`${clientDir(client)}/todos.todos.md`]: addTodoEntry(todosText ?? '', { text }, now),
+        [`${clientDir(client)}/todos.todos.md`]: appendTo(
+          todosText,
+          // On an empty file the helper writes just the new item (two lines), no group tags.
+          addTodoEntry('', { text }, now),
+        ),
       },
       message: `business: todo for ${client}`,
     },
@@ -110,11 +127,7 @@ export const addClientLog = (
     ok: true,
     value: {
       changes: {
-        [`${clientDir(client)}/log.actionlog.md`]: addActionLogEntry(
-          logText ?? '',
-          { description: text },
-          now,
-        ),
+        [`${clientDir(client)}/log.actionlog.md`]: logContent(logText, text, now),
       },
       message: `business: log for ${client}`,
     },

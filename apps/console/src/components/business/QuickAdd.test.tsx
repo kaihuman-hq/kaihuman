@@ -74,7 +74,7 @@ describe('QuickAdd', () => {
   });
 
   it('adds a todo to the fresh file text in one write and clears the input', async () => {
-    const old = '- [ ] Earlier\n::updated:: 1 ::created:: 2026-10-01T00:00:00.000Z\n';
+    const old = '# Acme todos\n\nProse stays.\n\n- [ ] Earlier, no tags\n';
     writeAgainst({ [TODOS]: old });
     show('todo');
     type('Send invoice');
@@ -82,10 +82,27 @@ describe('QuickAdd', () => {
     await flush();
     expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
     expect(Object.keys(built.value?.changes ?? {})).toEqual([TODOS]);
-    expect(built.value?.changes[TODOS]).toContain('Earlier');
-    expect(built.value?.changes[TODOS]).toContain('- [ ] Send invoice');
+    expect(built.value?.changes[TODOS]?.startsWith(old)).toBe(true);
+    expect(built.value?.changes[TODOS]).toContain('\n- [ ] Send invoice\n');
     expect(built.value?.message).toBe('business: todo for acme-gmbh');
     expect(input().value).toBe('');
+  });
+
+  it('keeps the whole old log text and adds one line', async () => {
+    const old = '# Acme log\n\nProse.\n- 2026-10-01 08:00:00 Earlier';
+    writeAgainst({ [LOG]: old });
+    show('log');
+    type('Called Erika');
+    act(() => submit().click());
+    await flush();
+    const text = built.value?.changes[LOG] ?? '';
+    expect(text.startsWith(`${old}\n- `)).toBe(true);
+    expect(
+      text
+        .slice(old.length + 1)
+        .trim()
+        .split('\n'),
+    ).toHaveLength(1);
   });
 
   it('creates the log file when the client has none', async () => {

@@ -30,8 +30,18 @@ describe('parseMoney', () => {
     ['0,05', 5],
     [' 1 200,00 ', 120000],
   ])('%s -> %s', (input, minor) => expect(parseMoney(input)).toBe(minor));
-  it.each(['x', '', '12,345', '1.2.3', '-5', '1e3', '12,5€', '1,20,0'])('rejects %j', (input) =>
-    expect(parseMoney(input)).toBeNull());
+  it.each([
+    'x',
+    '',
+    '12,345',
+    '1.2.3',
+    '-5',
+    '1e3',
+    '12,5€',
+    '1,20,0',
+    '90071992547409.93',
+    '99999999999999999',
+  ])('rejects %j', (input) => expect(parseMoney(input)).toBeNull());
 });
 
 describe('slug following the name', () => {
@@ -101,6 +111,12 @@ describe('clientFromForm', () => {
       ].sort(),
     );
     expect(e.email).toContain('email');
+  });
+  it('reserves the slug new', () => {
+    expect(clientFieldErrors(clientFromForm(withName(client, 'New'))).slug).toContain('reserved');
+    expect(
+      clientFieldErrors(projectFromForm(withName(emptyProjectForm(), 'New'), acme)).slug,
+    ).toContain('reserved');
   });
   it('refuses a slug that is not valid', () => {
     expect(clientFieldErrors(clientFromForm(withSlug(client, 'Bad Slug'))).slug).toBeDefined();
