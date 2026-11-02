@@ -14,7 +14,7 @@ import { BUSINESS_PROFILE_PATH } from './business/load';
 import type { KBRepo } from './github-kb';
 
 /** Bump when the check, workflow or skill changes: `syncKB` then rewrites the tool files. */
-export const BUSINESS_TOOLS_VERSION = '1.1.0';
+export const BUSINESS_TOOLS_VERSION = '1.2.0';
 
 export { BUSINESS_PROFILE_PATH };
 

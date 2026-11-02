@@ -158,6 +158,7 @@ private repo).
 | `/business/payments/new?invoice=` | Record a payment |
 | `/business/drafts/new`, `/business/drafts/:id` | Draft editor (invoice, offer, credit note) |
 | `/business/drafts/:id/issue` | Issue preview and the "Issue <number>" button |
+| `/business/shared` | Shared files: every share link on the service with size, dates, downloads and status; revoke; storage used |
 
 - The Kanban board, the todo analytics and the action log have an All / Business / Personal toggle.
   Client todos (`clients/<slug>/todos.todos.md`) and logs (`log.actionlog.md`) count as Business.
@@ -193,6 +194,57 @@ Every form makes one commit per action, with a message starting `business: `
   unique prefix. Quick todo and quick log also have a "For client" select.
 - **File browser:** issued yaml and offer/invoice pdf, xml and sha256 files open read-only and
   cannot be changed, renamed, moved or deleted there.
+
+## Share links (phase 4)
+
+An issued offer, invoice or credit note with a PDF can be sent as a link instead of an email
+attachment. The link opens a page with a Download button, no sign-in needed.
+
+**The Worker must be deployed by the operator.** Share links need the
+[share worker](../apps/share-worker/README.md) (`apps/share-worker`, Cloudflare Worker with D1 and
+an R2 bucket in the EU). The default service is `https://docs.kaihuman.com`. Without a running
+worker, sharing shows `The share service is not reachable.`; the rest of the business pages are not
+affected. The README lists the setup steps.
+
+- **How it works:** on the client page, "Share…" on an issued document asks
+  `Upload <number>.pdf (encrypted) to create a share link?`. The console reads the PDF from the
+  repository, encrypts it in the browser (AES-GCM 256, a new random key per document), uploads only
+  the ciphertext and builds `https://docs.kaihuman.com/d/<token>#<key>`. The key is in the part
+  after `#`, which browsers never send to a server, and the console never sends it either. The
+  landing page decrypts in the visitor's browser. Nothing uploads automatically.
+- **Consent:** sharing stays off until you accept a one-time explanation (stored on this device in
+  `lifeos_share_consent_v1`). It says what is uploaded, that the service runs on Cloudflare in the
+  EU, that the file is encrypted in the browser and who can open it. Every upload needs its own
+  confirm. Sharing is not available in demo mode.
+- **Who can open it:** anyone who has the full link, until it expires or you revoke it. Treat the
+  link like the document. Offers expire at the end of their `valid_until` day (UTC); an offer whose
+  `valid_until` is already past is shared without expiry. Invoices and credit notes do not expire.
+  An expired or revoked link shows `This link is no longer available.`
+- **Where the link is kept:** `.kh/business/links.jsonl` in your private repository gets one line
+  per link (`id`, `doc`, `url` including the key, `created`, optional `expires`, `revoked`).
+  Agents never create share links; only the console writes this file.
+- **Revoke:** "Revoke…" next to the link, or on `/business/shared`. The Worker deletes the file
+  and the console sets `revoked` on the line, in one commit. Revoking works only while the console
+  points at the service that created the link; otherwise it says
+  `This link was created on <host>. Switch the share service to <host> to revoke it.` Issuing a
+  credit note offers to revoke the link of the invoice it corrects.
+- **Downloads:** each download of the file adds a `downloaded` event to `events.jsonl` (the next
+  sync, on opening `/business/shared` or "Sync downloads"). Opening the landing page counts
+  nothing, because mail scanners open links first, so counts are approximate. The note on an event
+  is the client class: `browser`, `bot` or `other`.
+- **Limits:** 10 MB per file, 500 MB per GitHub user (revoked files do not count), 30 uploads per
+  hour. Over the quota the service answers `Storage limit reached (500 MB).`; over the hourly limit
+  `Too many uploads. Try again later.`
+- **What the service stores:** the encrypted file, its label, kind, your business name, size,
+  created and expiry dates, your numeric GitHub user id, and per download the time, the token and
+  the client class. No IP address, no full User-Agent, no GitHub token. It cannot read the files.
+  Data stays until you revoke the link or delete your shared files (`/business/shared`, "Delete all
+  my shared files…").
+- **Self-hosting:** deploy your own copy of the worker, then enter its URL on `/business/shared`
+  (saved on this device as `lifeos_share_url`). Only `https://` URLs are accepted; an
+  `http://localhost` override is ignored. For local development build or start the console with
+  `VITE_SHARE_URL=http://localhost:8788`. Add the console's origin to `CONSOLE_ORIGINS`. Your GitHub
+  sign-in token goes to that service, and the consent names it.
 
 ## Browser extension
 

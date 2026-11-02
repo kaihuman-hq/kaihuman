@@ -1,7 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 
-const EFFECTIVE = '9 October 2026';
+const EFFECTIVE = '2 November 2026';
 const CONTACT = 'privacy@kaihuman.com';
 ---
 
@@ -18,7 +18,9 @@ const CONTACT = 'privacy@kaihuman.com';
     <ul>
       <li>
         Your notes, todos, bookmarks and other content are stored as files in <strong>your own
-        GitHub repositories</strong>. kaihuman has no server that stores your content.
+        GitHub repositories</strong>. kaihuman has no server that stores your content, with one optional exception: if you share a
+        business document by link, the encrypted file is stored on the share service (see
+        “Share links” below).
       </li>
       <li>
         The apps talk directly to GitHub from your browser or computer, using your GitHub access
@@ -107,6 +109,42 @@ const CONTACT = 'privacy@kaihuman.com';
         reminders through your browser vendor's push service.
       </li>
     </ul>
+
+    <h2>Share links (business documents)</h2>
+    <p>
+      This is optional and off until you accept an explanation in the console. When you choose to
+      share an invoice, offer or credit note, the console encrypts the PDF in your browser and
+      uploads only the encrypted file to the share service at docs.kaihuman.com. The key is in
+      the link, after the “#”, which browsers do not send to servers, so the operator cannot read
+      the file. Anyone who has the whole link can open it until it expires or you revoke it.
+    </p>
+    <h3>What the share service stores</h3>
+    <ul>
+      <li>the encrypted file, its label (for example the document number) and type;</li>
+      <li>the business name from your profile, shown on the download page;</li>
+      <li>the file size, the creation date and the expiry date;</li>
+      <li>your numeric GitHub user id, to tell your files apart and apply limits;</li>
+      <li>for each download: the time, the link's identifier and a coarse client class
+        (browser, bot or other).</li>
+    </ul>
+    <p>
+      The service does not store IP addresses, full browser identifiers or your GitHub token. The
+      token is sent to GitHub to find out who you are, and not kept. Cloudflare, which runs the
+      service, processes technical request data such as IP addresses to deliver and protect it.
+    </p>
+    <h3>Where and how long</h3>
+    <p>
+      Files are kept in Cloudflare R2 in the EU jurisdiction, the records in Cloudflare D1. They
+      stay until you revoke the link, which deletes the file, or delete all your shared files in the
+      console, which removes the files and records. The records of a revoked link are kept so your
+      list stays correct.
+    </p>
+    <h3>Abuse</h3>
+    <p>
+      Every download page has a “Report abuse” link to
+      <a href="mailto:abuse@kaihuman.com">abuse@kaihuman.com</a>. The operator cannot read the
+      files, so a report is handled by disabling the link.
+    </p>
 
     <h2>Hosting</h2>
     <p>

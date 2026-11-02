@@ -101,9 +101,9 @@ pnpm exec wrangler d1 migrations apply kaihuman-share --local
 pnpm dev                                # wrangler dev on http://localhost:8788
 ```
 
-`wrangler dev` uses local D1 and R2 storage. To point a console on this device at it, set
-localStorage `lifeos_share_url` to `http://localhost:8788` (or build the console with
-`VITE_SHARE_URL=http://localhost:8788`).
+`wrangler dev` uses local D1 and R2 storage. To point a console at it, start or build the console
+with `VITE_SHARE_URL=http://localhost:8788`. The per-device `lifeos_share_url` override accepts
+only `https://` URLs, so it cannot point at `http://localhost`.
 
 Tests run against in-memory D1 and R2 fakes: `pnpm --filter @kaihuman/share-worker test`.
 
