@@ -26,7 +26,6 @@ import {
   type TodoItem,
 } from '@kaihuman/formats';
 import {
-  BUSINESS_ROOT,
   parseJsonl,
   parseYaml,
   TIMER_PATH,
@@ -83,21 +82,24 @@ interface TreeEntry {
 }
 
 /**
+ * Business hours need only this month's time file and the timer; older months stay unfetched and
+ * out of the cache, since they would be business records held in the browser for nothing.
+ */
+const isBusinessTodayPath = (path: string, month: string) =>
+  path === TIMER_PATH || path === timePath(month);
+
+/**
  * The files the start page reads: its widgets' kinds, the braindumps (doc/braindump.md), and the
  * list of services whose status it shows — which rides along so it costs no request of its own.
  * The palette's ideas (`>id`, doc/ideas.md) ride along too; the start page itself shows none.
  */
-/** Business hours need only the time files and the timer; nothing else under `.kh/business`. */
-const isBusinessTodayPath = (path: string) =>
-  path === TIMER_PATH || (path.startsWith(`${BUSINESS_ROOT}/time/`) && path.endsWith('.jsonl'));
-
-const isTodayPath = (path: string) => {
+const isTodayPath = (path: string, month: string) => {
   const lower = path.toLowerCase();
   return (
     TODAY_SUFFIXES.some((suffix) => lower.endsWith(suffix)) ||
     braindumpIdOf(path) !== null ||
     ideaSlugOf(path) !== null ||
-    isBusinessTodayPath(path) ||
+    isBusinessTodayPath(path, month) ||
     path === STATUS_CONFIG_PATH
   );
 };
@@ -124,7 +126,11 @@ export async function fetchToday(
   repo: string,
   previous: TodayCache | undefined,
 ): Promise<TodayCache> {
-  const known = isTodayCacheUsable(previous, repo) ? previous : undefined;
+  const month = localDate(new Date()).slice(0, 7);
+  const known: TodayCache | undefined =
+    previous && isTodayCacheUsable(previous, repo)
+      ? { ...previous, files: previous.files.filter((file) => isTodayPath(file.path, month)) }
+      : undefined;
   const headers: Record<string, string> = githubHeaders(token);
   if (known?.etag) headers['If-None-Match'] = known.etag;
 
@@ -151,7 +157,7 @@ export async function fetchToday(
 
   const files = await Promise.all(
     blobs
-      .filter((entry) => isTodayPath(entry.path))
+      .filter((entry) => isTodayPath(entry.path, month))
       .map(async (entry): Promise<TodayFile> => {
         const cached = byPath.get(entry.path);
         if (cached?.sha === entry.sha) return cached;

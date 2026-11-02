@@ -184,7 +184,9 @@ Every form makes one commit per action, with a message starting `business: `
   the branch moved, it rebuilds from fresh contents and retries once. If that fails too, nothing is
   written and the form says `Someone else changed the repository at the same time. Reload and try
   again.` Your input stays in the form.
-- **Issuing:** issued offers and invoices are written only by "Issue" (`issue()`). The next number
+- **Issuing:** do not change `numbering` in `business.yaml` once you have issued documents. The
+  check reads the format of every issued number from it, and a changed format breaks the gap-free
+  series. Issued offers and invoices are written only by "Issue" (`issue()`). The next number
   is taken from fresh state, so a number issued on another device is never overwritten.
 - **Palette** (console `SearchModal`, when business is enabled): `todo <client>: text`,
   `log <client>: text`, `timer <client>[/project]`, `stop timer`. The client is an exact slug or a
@@ -197,11 +199,9 @@ Every form makes one commit per action, with a message starting `business: `
 The start page's "Doing" section shows `Business today: 2.5 h`, plus `· timer running for <client>`
 while a timer runs. It reads only the current month's `time/<yyyy-mm>.jsonl` and `time/running.yaml`
 (the same sync as the other start-page files); a timer started on an earlier day counts from local
-midnight, and minutes are rounded down. Without those files the page is unchanged. It is read-only:
+midnight, and minutes are rounded down. The line updates when the start page syncs, not live; older
+months' time files are never fetched or cached. Without those files the page is unchanged. It is read-only:
 start and stop happen in the console.
-
-Warning: do not change `numbering` in `business.yaml` once you have issued documents. The check
-reads the format of every issued number from it, and a changed format breaks the gap-free series.
 
 ## GoBD caveat
 

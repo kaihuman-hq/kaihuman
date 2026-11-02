@@ -374,6 +374,36 @@ describe('fetchToday', () => {
     expect(next.etag).toBe('etag-2');
   });
 
+  it('fetches and keeps only this month’s business time file and the timer', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 2, 12));
+    try {
+      const t = [
+        '.kh/business/time/2026-10.jsonl',
+        '.kh/business/time/2026-11.jsonl',
+        '.kh/business/time/running.yaml',
+        '.kh/business/business.yaml',
+      ].map((path, i) => ({ path, type: 'blob', sha: `b${i}` }));
+      const fetchMock = vi.fn(async (url: string) =>
+        url.includes('/git/trees/')
+          ? { ok: true, status: 200, json: async () => ({ tree: t }), headers: { get: () => 'e' } }
+          : { ok: true, status: 200, text: async () => 'x' },
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const previous = cache({ '.kh/business/time/2026-10.jsonl': 'old' });
+
+      const next = await fetchToday('t', 'o/r', previous);
+
+      expect(next.files.map((f) => f.path)).toEqual([
+        '.kh/business/time/2026-11.jsonl',
+        '.kh/business/time/running.yaml',
+      ]);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('replays the ETag and keeps the cache on a 304', async () => {
     const fetchMock = vi.fn(async () => ({ ok: false, status: 304 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -435,6 +465,13 @@ describe('businessToday', () => {
       now,
     );
     expect(result.minutesToday).toBe(90);
+  });
+
+  it('tolerates a malformed line and an invalid timer', () => {
+    const jsonl = `${entry('2026-09-23', 30)}\nnot json\n`;
+    expect(
+      businessToday(jsonl, 'client: acme-gmbh\nstarted_at: yesterday\n', '2026-09-23', NOW),
+    ).toEqual({ minutesToday: 30, running: null });
   });
 
   it('is null when the repo has no business files', () => {
