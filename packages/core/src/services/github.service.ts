@@ -120,9 +120,11 @@ export class GithubService {
   }
 
   /**
-   * Raw bytes of a file, binary-safe (getFileContent decodes UTF-8 and the contents API drops
-   * the body above 1 MB). The contents endpoint is used only for the blob sha, which it
-   * returns at any size; the blob API then serves up to 100 MB.
+   * Raw bytes of a file, binary-safe (getFileContent decodes UTF-8 and caps at 1 MB).
+   * The blob sha comes from the parent directory listing, not from the file's own contents
+   * response: the contents API with the default JSON media type refuses files over 1 MB,
+   * exactly the sizes this method exists for. Directory entries carry the sha without the
+   * body. The blob API then serves up to 100 MB.
    */
   async getFileBytes(
     owner: string,
@@ -131,26 +133,37 @@ export class GithubService {
     opts?: { ref?: string },
   ): Promise<Uint8Array> {
     const client = this.getClient();
-    let sha: string;
+    const slash = path.lastIndexOf('/');
+    const parent = slash < 0 ? '' : path.slice(0, slash);
+    const name = path.slice(slash + 1);
+    const notFound = () => new Error(`Not found: ${path}`);
+    const is404 = (e: unknown) => (e as { status?: number }).status === 404;
+
+    let listing: Awaited<ReturnType<Octokit['repos']['getContent']>>['data'];
     try {
-      const { data } = await client.repos.getContent({
+      ({ data: listing } = await client.repos.getContent({
         owner,
         repo,
-        path,
+        path: parent,
         ...(opts?.ref ? { ref: opts.ref } : {}),
-      });
-      if (Array.isArray(data)) {
-        throw new Error('Path is a directory, expected a file');
-      }
-      if (data.type !== 'file') {
-        throw new Error(`Path is not a file: ${data.type}`);
-      }
-      sha = data.sha;
+      }));
     } catch (e) {
-      if ((e as { status?: number }).status === 404) throw new Error(`Not found: ${path}`);
-      throw e;
+      throw is404(e) ? notFound() : e;
     }
-    const { data: blob } = await client.git.getBlob({ owner, repo, file_sha: sha });
+    if (!Array.isArray(listing)) throw notFound();
+    const entry = listing.find((item) => item.name === name);
+    if (!entry) throw notFound();
+    if (entry.type !== 'file') throw new Error(`Path is not a file: ${entry.type}`);
+
+    let blob: { content: string; encoding: string };
+    try {
+      ({ data: blob } = await client.git.getBlob({ owner, repo, file_sha: entry.sha }));
+    } catch (e) {
+      throw is404(e) ? notFound() : e;
+    }
+    if (blob.encoding !== 'base64') {
+      throw new Error(`Unexpected blob encoding: ${blob.encoding}`);
+    }
     // atob, not TextDecoder: the bytes are not text.
     const binary = atob(blob.content.replace(/\s/g, ''));
     const bytes = new Uint8Array(binary.length);

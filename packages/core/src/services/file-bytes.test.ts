@@ -16,10 +16,17 @@ describe('GithubService.getFileBytes', () => {
   const git = { getBlob: vi.fn() };
   let svc: GithubService;
 
+  const listing = (type = 'file') => ({
+    data: [
+      { name: 'other.pdf', type: 'file', sha: 'wrong' },
+      { name: 'doc.pdf', type, sha: 'blob1' },
+    ],
+  });
+
   beforeEach(() => {
     repos.getContent.mockReset();
     git.getBlob.mockReset();
-    repos.getContent.mockResolvedValue({ data: { type: 'file', sha: 'blob1', content: '' } });
+    repos.getContent.mockResolvedValue(listing());
     git.getBlob.mockResolvedValue({
       data: { content: wrapBase64(PDF_BYTES), encoding: 'base64' },
     });
@@ -30,19 +37,27 @@ describe('GithubService.getFileBytes', () => {
     });
   });
 
-  it('round-trips bytes exactly, including invalid UTF-8', async () => {
-    const bytes = await svc.getFileBytes('o', 'r', 'doc.pdf');
+  it('round-trips bytes exactly, picking the sha from the parent listing', async () => {
+    const bytes = await svc.getFileBytes('o', 'r', 'dir/sub/doc.pdf');
     expect(bytes).toBeInstanceOf(Uint8Array);
     expect([...bytes]).toEqual(PDF_BYTES);
     expect(git.getBlob).toHaveBeenCalledWith({ owner: 'o', repo: 'r', file_sha: 'blob1' });
+    // Never the file itself: the contents API refuses files over 1 MB.
+    expect(repos.getContent).toHaveBeenCalledTimes(1);
+    expect(repos.getContent.mock.calls[0]?.[0].path).toBe('dir/sub');
+  });
+
+  it('lists the repo root for a root-level file', async () => {
+    await svc.getFileBytes('o', 'r', 'doc.pdf');
+    expect(repos.getContent.mock.calls[0]?.[0].path).toBe('');
   });
 
   it('passes the ref through to the lookup', async () => {
-    await svc.getFileBytes('o', 'r', 'doc.pdf', { ref: 'abc123' });
+    await svc.getFileBytes('o', 'r', 'a/doc.pdf', { ref: 'abc123' });
     expect(repos.getContent).toHaveBeenCalledWith({
       owner: 'o',
       repo: 'r',
-      path: 'doc.pdf',
+      path: 'a',
       ref: 'abc123',
     });
   });
@@ -52,15 +67,31 @@ describe('GithubService.getFileBytes', () => {
     expect(repos.getContent.mock.calls[0]?.[0]).not.toHaveProperty('ref');
   });
 
-  it('reports a missing path', async () => {
-    repos.getContent.mockRejectedValue(Object.assign(new Error('Not Found'), { status: 404 }));
+  it('reports a missing entry, parent or blob', async () => {
     await expect(svc.getFileBytes('o', 'r', 'gone.pdf')).rejects.toThrow('Not found: gone.pdf');
+    repos.getContent.mockRejectedValue(Object.assign(new Error('Not Found'), { status: 404 }));
+    await expect(svc.getFileBytes('o', 'r', 'x/doc.pdf')).rejects.toThrow('Not found: x/doc.pdf');
+    repos.getContent.mockResolvedValue(listing());
+    git.getBlob.mockRejectedValue(Object.assign(new Error('Not Found'), { status: 404 }));
+    await expect(svc.getFileBytes('o', 'r', 'doc.pdf')).rejects.toThrow('Not found: doc.pdf');
+  });
+
+  it('rejects a parent that is a file', async () => {
+    repos.getContent.mockResolvedValue({ data: { type: 'file', sha: 's' } });
+    await expect(svc.getFileBytes('o', 'r', 'doc.pdf/x')).rejects.toThrow('Not found');
+  });
+
+  it.each(['symlink', 'submodule', 'dir'])('rejects an entry of type %s', async (type) => {
+    repos.getContent.mockResolvedValue(listing(type));
+    await expect(svc.getFileBytes('o', 'r', 'doc.pdf')).rejects.toThrow(
+      `Path is not a file: ${type}`,
+    );
     expect(git.getBlob).not.toHaveBeenCalled();
   });
 
-  it('rejects a directory', async () => {
-    repos.getContent.mockResolvedValue({ data: [] });
-    await expect(svc.getFileBytes('o', 'r', 'dir')).rejects.toThrow(/directory/);
+  it('rejects a non-base64 blob', async () => {
+    git.getBlob.mockResolvedValue({ data: { content: 'x', encoding: 'utf-8' } });
+    await expect(svc.getFileBytes('o', 'r', 'doc.pdf')).rejects.toThrow(/encoding/);
   });
 });
 
