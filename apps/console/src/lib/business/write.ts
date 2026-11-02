@@ -1,5 +1,10 @@
 import { ConflictError, githubFileStore, githubService, type TreeItem } from '@kaihuman/core';
-import { type BusinessRepo, loadBusinessRepo, type Result } from '@kaihuman/formats/business';
+import {
+  type BusinessRepo,
+  type FileChanges,
+  loadBusinessRepo,
+  type Result,
+} from '@kaihuman/formats/business';
 import type { KBRepo } from '../github-kb';
 import { loadRepoFiles, rememberRepoFile } from '../repo-files';
 import { businessTreeItems } from './load';
@@ -7,8 +12,7 @@ import { businessTreeItems } from './load';
 export const CONFLICT_MESSAGE =
   'Someone else changed the repository at the same time. Reload and try again.';
 
-/** `null` deletes the path. */
-export type FileChanges = Record<string, string | null>;
+export type { FileChanges };
 
 /** What a builder sees: the repository as it is right now, not as the page last loaded it. */
 export type Fresh = {
@@ -91,7 +95,9 @@ export async function writeBusiness(
     }
     for (const [path, content] of Object.entries(done.changes)) {
       const sha = done.blobShas[path];
-      if (content !== null && sha) rememberRepoFile(target.full_name, path, sha, content);
+      // Binary has no text form; the cache holds text only, so it is read back from GitHub.
+      if (typeof content === 'string' && sha)
+        rememberRepoFile(target.full_name, path, sha, content);
     }
     return { ok: true, value: { commitSha: done.commitSha } };
   }

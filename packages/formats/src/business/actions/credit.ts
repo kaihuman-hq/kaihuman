@@ -1,5 +1,5 @@
 import type { Ulid } from '../ids.js';
-import type { FileChanges } from '../issue.js';
+import type { TextChanges } from '../issue.js';
 import type { Draft, Issued } from '../records.js';
 import type { BusinessRepo } from '../repo.js';
 import { deriveInvoiceStatus } from '../status.js';
@@ -38,7 +38,7 @@ export const creditInvoice = (
   number: string,
   id: Ulid,
   today: string,
-): Result<{ changes: FileChanges; message: string }> => {
+): Result<{ changes: TextChanges; message: string }> => {
   const invoice = repo.issued.find((i) => i.doc.number === number)?.doc;
   if (!invoice || invoice.kind !== 'invoice') return refuse(`unknown invoice "${number}"`);
   const creditNotes = repo.issued.filter((i) => i.doc.kind === 'credit-note').map((i) => i.doc);

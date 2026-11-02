@@ -17,8 +17,10 @@ import { validateDraft, validateTimeEntry } from './validate.js';
 import { date, type Issue, type Result } from './validate-kit.js';
 import { stringifyYaml } from './yaml.js';
 
-/** Repo-root path → new content; `null` deletes the file. */
-export type FileChanges = Record<string, string | null>;
+/** Repo-root path → new text; `null` deletes the file. What every text-only action produces. */
+export type TextChanges = Record<string, string | null>;
+/** As {@link TextChanges}, plus raw bytes (a receipt, a contract PDF) that must not be read as text. */
+export type FileChanges = Record<string, string | Uint8Array | null>;
 
 export type IssueContext = {
   draft: Draft;
@@ -88,7 +90,7 @@ const billTimeEntries = (
   draft: Draft,
   number: string,
   timeFiles: Readonly<Record<string, string>>,
-): { changes: FileChanges; issues: Issue[] } => {
+): { changes: TextChanges; issues: Issue[] } => {
   const ids = draft.time_entries ?? [];
   const found = new Map<string, { file: string; invoice: string | undefined; client: string }>();
   for (const [file, text] of Object.entries(timeFiles)) {
@@ -113,7 +115,7 @@ const billTimeEntries = (
       );
     }
   });
-  const changes: FileChanges = {};
+  const changes: TextChanges = {};
   for (const file of new Set([...found.values()].map((e) => e.file))) {
     const text = timeFiles[file] as string;
     const next = replaceJsonlLines(
@@ -142,7 +144,7 @@ const logText = (draft: Draft, number: string, gross: number, currency: string):
  */
 export const issue = (
   ctx: IssueContext,
-): Result<{ document: Issued; changes: FileChanges; commitMessage: string }> => {
+): Result<{ document: Issued; changes: TextChanges; commitMessage: string }> => {
   const { draft, profile, client, issueDate } = ctx;
   const rules = jurisdictionFor(profile.jurisdiction);
   const issues: Issue[] = [];
@@ -229,7 +231,7 @@ export const issue = (
     ctx.clientLog === null
       ? `${serializeActionLog(added)}\n`
       : `${ctx.clientLog}${ctx.clientLog === '' || ctx.clientLog.endsWith('\n') ? '' : '\n'}${line}`;
-  const changes: FileChanges = {
+  const changes: TextChanges = {
     [issuedPath(series, year, number)]: stringifyYaml(document, KEY_ORDER.issued),
     [draftPath(draft.id)]: null,
     ...billed.changes,

@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-02 — Business, phase 5a: money admin
+
+- Binary files in commits: `githubService.commitFiles` takes `Record<string, string | Uint8Array | null>`; a `Uint8Array` is uploaded with `git.createBlob({ encoding: 'base64' })` (chunked encoding in `utils/base64.ts`, so 10 MB does not overflow the stack) and put in the tree by `sha`, text stays inline `content`. `gitBlobSha` hashes raw bytes (pinned against `git hash-object`). The demo service stores bytes (`getFileBytes` returns them). `githubFileStore.applyCommit` records the binary file's sha in the tree but drops any open text copy and the IndexedDB `files` entry; `writeBusiness` seeds `rememberRepoFile` for text only. `FileChanges` (formats `issue.ts`, re-exported by `lib/business/write.ts`) is widened to bytes; the existing text-only actions keep the new `TextChanges` type so their consumers stay `string`-typed.
+
 ## 2026-11-02 — Business, phase 4: share links
 
 - Share crypto in `@kaihuman/formats/share` (`src/share/crypto.ts`, dependency-free, `globalThis.crypto`): `b64urlEncode`/`b64urlDecode` (decode throws on invalid characters), `newShareKey` (32 bytes, 43 chars), `newShareToken` (16 bytes, 22 chars), `encryptShareBlob`/`decryptShareBlob` (AES-GCM 256, blob = 12-byte IV + ciphertext+tag, auth failure throws `Wrong key or damaged file`), `shareUrl`/`parseShareUrl` (`<host>/d/<token>#<key>`). `decryptShareBlob` is self-contained (own base64url decode) because the landing page inlines it with `.toString()`; a test recreates it with `new Function` and decrypts.

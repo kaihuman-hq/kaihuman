@@ -1,5 +1,5 @@
 import type { Ulid } from '../ids.js';
-import type { FileChanges } from '../issue.js';
+import type { TextChanges } from '../issue.js';
 import { appendJsonl } from '../jsonl.js';
 import { formatMinor } from '../money.js';
 import { paymentsPath } from '../paths.js';
@@ -17,7 +17,7 @@ export const recordPayment = (
   paymentsText: string | null,
   payment: Omit<Payment, 'id'>,
   id: Ulid,
-): Result<{ changes: FileChanges; message: string }> => {
+): Result<{ changes: TextChanges; message: string }> => {
   const invoice = repo.issued.find((i) => i.doc.number === payment.invoice)?.doc;
   // Credit notes reduce what is owed through `corrects`; a payment against one would be counted twice.
   if (!invoice || invoice.kind !== 'invoice') {

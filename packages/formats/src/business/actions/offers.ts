@@ -1,6 +1,6 @@
 import { localDate } from '../../dates.js';
 import type { Ulid } from '../ids.js';
-import type { FileChanges } from '../issue.js';
+import type { TextChanges } from '../issue.js';
 import { appendJsonl } from '../jsonl.js';
 import { clientDir, EVENTS_PATH } from '../paths.js';
 import { type ClientStage, type DocEvent, type Draft, type Issued, KEY_ORDER } from '../records.js';
@@ -27,7 +27,7 @@ export const decideOffer = (
   decision: 'accepted' | 'declined',
   now: Date,
   id: Ulid,
-): Result<{ changes: FileChanges; message: string }> => {
+): Result<{ changes: TextChanges; message: string }> => {
   const doc = repo.issued.find((i) => i.doc.number === offer)?.doc;
   if (!doc || doc.kind !== 'offer') return refuse(`unknown offer "${offer}"`);
   const status = deriveOfferStatus(
@@ -43,7 +43,7 @@ export const decideOffer = (
   const event: DocEvent = { id, at: now.toISOString(), doc: offer, type: decision };
   const checked = validateEvent(event);
   if (!checked.ok) return checked;
-  const changes: FileChanges = {
+  const changes: TextChanges = {
     [EVENTS_PATH]: appendJsonl(eventsText ?? '', checked.value, KEY_ORDER.event),
   };
   // An invalid client.yaml is not in `repo.clients`: the decision is still recorded, the stage is left for the user to fix.
@@ -83,7 +83,7 @@ export const convertOffer = (
   repo: BusinessRepo,
   offer: string,
   id: Ulid,
-): Result<{ changes: FileChanges; message: string }> => {
+): Result<{ changes: TextChanges; message: string }> => {
   const doc = repo.issued.find((i) => i.doc.number === offer)?.doc;
   if (!doc || doc.kind !== 'offer') return refuse(`unknown offer "${offer}"`);
   if (repo.issued.some((i) => i.doc.supersedes === offer)) {

@@ -1,4 +1,4 @@
-import { loadBusinessRepo, type Ulid } from '@kaihuman/formats/business';
+import { loadBusinessRepo, type TextChanges, type Ulid } from '@kaihuman/formats/business';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetRepoFilesCacheForTests } from '../repo-files';
 import { loadFixtureRepo } from './fixture.test-helper';
@@ -10,7 +10,7 @@ import {
   loadedSource,
   previewIssue,
 } from './issue-flow';
-import { type FileChanges, writeBusiness } from './write';
+import { writeBusiness } from './write';
 
 // Lets a test make issue() return an extra change, to prove the frozen-file guard stops it.
 const force = vi.hoisted(() => ({ extra: null as string | null }));
@@ -82,7 +82,7 @@ const otherDeviceWrites = (path: string, content: string) => {
 };
 const commits = () =>
   vi.mocked(githubService.commitFiles).mock.calls.map((c) => ({
-    changes: c[3] as FileChanges,
+    changes: c[3] as TextChanges,
     message: c[4],
     expected: c[5],
   }));

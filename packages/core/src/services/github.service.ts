@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { demoMode } from '../demo-mode.js';
 import { authStore } from '../stores/auth.store.js';
+import { bytesToBase64 } from '../utils/base64.js';
 import { gitBlobSha } from '../utils/git-blob-sha.js';
 import { ConflictError } from './conflict.js';
 import { inMemoryGithubService } from './github.service.memory.js';
@@ -329,7 +330,7 @@ export class GithubService {
     owner: string,
     repo: string,
     branch: string,
-    files: Record<string, string | null>,
+    files: Record<string, string | Uint8Array | null>,
     message: string,
     opts?: { expectedHeadSha?: string },
   ): Promise<{ commitSha: string; blobShas: Record<string, string> }> {
@@ -349,15 +350,28 @@ export class GithubService {
       repo,
       commit_sha: headSha,
     });
+    // Binary content cannot travel as tree `content` (that is UTF-8 text), so it is uploaded as a
+    // blob first and referenced by sha. All blobs exist before the tree, so a failed upload leaves
+    // the branch untouched.
+    const entries = await Promise.all(
+      Object.entries(files).map(async ([path, content]) => {
+        const base = { path, mode: '100644' as const, type: 'blob' as const };
+        if (content === null) return { ...base, sha: null };
+        if (typeof content === 'string') return { ...base, content };
+        const { data: blob } = await client.git.createBlob({
+          owner,
+          repo,
+          content: bytesToBase64(content),
+          encoding: 'base64',
+        });
+        return { ...base, sha: blob.sha };
+      }),
+    );
     const { data: newTree } = await client.git.createTree({
       owner,
       repo,
       base_tree: commitData.tree.sha,
-      tree: Object.entries(files).map(([path, content]) =>
-        content === null
-          ? { path, mode: '100644' as const, type: 'blob' as const, sha: null }
-          : { path, mode: '100644' as const, type: 'blob' as const, content },
-      ),
+      tree: entries,
     });
     const { data: newCommit } = await client.git.createCommit({
       owner,

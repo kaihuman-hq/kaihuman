@@ -1,6 +1,6 @@
 import { localDate } from '../../dates.js';
 import { asSlug, type Slug, type Ulid } from '../ids.js';
-import type { FileChanges } from '../issue.js';
+import type { TextChanges } from '../issue.js';
 import { appendJsonl } from '../jsonl.js';
 import { TIMER_PATH, timePath } from '../paths.js';
 import { KEY_ORDER, type RunningTimer, type TimeEntry } from '../records.js';
@@ -9,7 +9,7 @@ import { validateTimeEntry, validateTimer } from '../validate.js';
 import type { Issue, Result } from '../validate-kit.js';
 import { stringifyYaml } from '../yaml.js';
 
-type Action = Result<{ changes: FileChanges; message: string }>;
+type Action = Result<{ changes: TextChanges; message: string }>;
 
 const refuse = (path: string, message: string): { ok: false; issues: Issue[] } => ({
   ok: false,
@@ -91,7 +91,7 @@ export const logTime = (
   const checked = validateTimeEntry(full);
   if (!checked.ok) return checked;
   const file = timePath(entry.date.slice(0, 7));
-  const changes: FileChanges = {
+  const changes: TextChanges = {
     [file]: appendJsonl(timeFiles[file] ?? '', checked.value, KEY_ORDER.time),
   };
   if (opts.stopTimer) changes[TIMER_PATH] = null;

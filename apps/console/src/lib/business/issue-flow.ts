@@ -12,6 +12,7 @@ import {
   type Line,
   type Result,
   seriesOf,
+  type TextChanges,
   type Totals,
   timePath,
   type Ulid,
@@ -247,7 +248,7 @@ export async function issueFromFresh(
   draftId: Ulid,
   issueDate: string,
   now: Date,
-): Promise<Result<{ changes: FileChanges; message: string; number: string }>> {
+): Promise<Result<{ changes: TextChanges; message: string; number: string }>> {
   const ctx = await buildIssueContext(fresh, draftId, issueDate, now);
   if (!ctx.ok) return ctx;
   const r = issue(ctx.value);

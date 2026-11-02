@@ -13,7 +13,28 @@ describe('gitBlobSha', () => {
   });
 });
 
+describe('gitBlobSha of bytes', () => {
+  it('hashes the raw bytes, matching git hash-object', () => {
+    // printf '\x00\xff\x01' | git hash-object --stdin
+    expect(gitBlobSha(new Uint8Array([0, 255, 1]))).toBe(
+      '046f393ee9d8a6a0754b8ddadce727b4ce35f272',
+    );
+    expect(gitBlobSha(new TextEncoder().encode('ä'))).toBe(gitBlobSha('ä'));
+  });
+});
+
 describe('InMemoryGithubService.commitFiles', () => {
+  it('stores binary files as bytes and returns their git sha', async () => {
+    const svc = new InMemoryGithubService();
+    const bytes = new Uint8Array([0, 255, 1]);
+    const res = await svc.commitFiles('o', 'r', 'main', { 'a/r.png': bytes }, 'm');
+    expect(res.blobShas['a/r.png']).toBe(gitBlobSha(bytes));
+    expect([...(await svc.getFileBytes('o', 'r', 'a/r.png'))]).toEqual([0, 255, 1]);
+    expect((await svc.fetchRepoTree('o', 'r', 'main')).find((t) => t.path === 'a/r.png')?.sha).toBe(
+      gitBlobSha(bytes),
+    );
+  });
+
   it('deletes null paths, guards on the head and returns blob shas', async () => {
     const svc = new InMemoryGithubService();
     const first = await svc.commitFiles('o', 'r', 'main', { 'a.md': 'x', 'b.md': 'y' }, 'm1');
@@ -40,6 +61,7 @@ describe('GithubService.commitFiles', () => {
   const git = {
     getRef: vi.fn(),
     getCommit: vi.fn(),
+    createBlob: vi.fn(),
     createTree: vi.fn(),
     createCommit: vi.fn(),
     updateRef: vi.fn(),
@@ -83,6 +105,42 @@ describe('GithubService.commitFiles', () => {
       commitSha: 'commit2',
       blobShas: { '.kh/business/a.md': gitBlobSha('x') },
     });
+  });
+
+  it('uploads bytes as a base64 blob and puts it in the tree by sha', async () => {
+    git.createBlob.mockResolvedValue({ data: { sha: 'blobPng' } });
+    const bytes = new Uint8Array([0, 255, 1]);
+    const res = await svc.commitFiles('o', 'r', 'main', { 'a/r.png': bytes, 'n.md': 'x' }, 'msg');
+    expect(git.createBlob).toHaveBeenCalledTimes(1);
+    expect(git.createBlob).toHaveBeenCalledWith({
+      owner: 'o',
+      repo: 'r',
+      content: 'AP8B',
+      encoding: 'base64',
+    });
+    expect(git.createTree.mock.calls[0]?.[0].tree).toEqual([
+      { path: 'a/r.png', mode: '100644', type: 'blob', sha: 'blobPng' },
+      { path: 'n.md', mode: '100644', type: 'blob', content: 'x' },
+    ]);
+    expect(res.blobShas['a/r.png']).toBe(gitBlobSha(bytes));
+  });
+
+  it('base64-encodes 10 MB without overflowing the stack', async () => {
+    git.createBlob.mockResolvedValue({ data: { sha: 'big' } });
+    const big = new Uint8Array(10 * 1024 * 1024).fill(7);
+    await svc.commitFiles('o', 'r', 'main', { 'big.pdf': big }, 'msg');
+    const sent = git.createBlob.mock.calls[0]?.[0].content as string;
+    expect(sent.length).toBe(Math.ceil(big.length / 3) * 4);
+    expect(atob(sent.slice(0, 8))).toBe('\x07'.repeat(6));
+  });
+
+  it('creates no tree when a blob upload fails', async () => {
+    git.createBlob.mockRejectedValue(new Error('boom'));
+    await expect(
+      svc.commitFiles('o', 'r', 'main', { 'a.png': new Uint8Array([1]) }, 'msg'),
+    ).rejects.toThrow('boom');
+    expect(git.createTree).not.toHaveBeenCalled();
+    expect(git.updateRef).not.toHaveBeenCalled();
   });
 
   it('throws ConflictError before creating anything when the head moved', async () => {

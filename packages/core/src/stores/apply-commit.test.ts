@@ -80,4 +80,20 @@ describe('githubFileStore.applyCommit', () => {
     expect(store.openFiles.value).toEqual({ 'a.md': { content: 'new', sha: 'sha-a' } });
     expect(store.activeFile.value).toBeNull();
   });
+
+  it('records a binary file in the tree and caches no text for it', async () => {
+    remote.tree = [];
+    await store.loadTree();
+    const png = 'expenses/2026/X.png';
+    store.openFiles.value = { [png]: { content: 'stale text', sha: 'old' } };
+    await store.applyCommit({ [png]: new Uint8Array([0, 255, 1]) }, { [png]: 'binsha' });
+    expect(store.tree.value.find((t) => t.path === png)?.sha).toBe('binsha');
+    expect(store.openFiles.value[png]).toBeUndefined();
+    // IDB held text for the path before; binary must not leave it (or add any) there.
+    const db = await openDB('life-os-db', 1);
+    await db.put('files', { path: `o/r:${png}`, content: 'stale', sha: 'old', timestamp: 1 });
+    await store.applyCommit({ [png]: new Uint8Array([9]) }, { [png]: 'binsha2' });
+    expect(await db.get('files', `o/r:${png}`)).toBeUndefined();
+    db.close();
+  });
 });

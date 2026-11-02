@@ -205,6 +205,38 @@ describe('writeBusiness reads at the head it commits against', () => {
   });
 });
 
+describe('writeBusiness with binary changes', () => {
+  const PNG = 'expenses/2026/X.png';
+
+  it('commits bytes as they are and never caches them as text', async () => {
+    const bytes = new Uint8Array([0, 255, 1]);
+    vi.mocked(githubService.commitFiles).mockResolvedValue({
+      commitSha: 'c1',
+      blobShas: { [PNG]: 'bin-sha', [TIME]: 'time-sha' },
+    });
+    const result = await writeBusiness(target, async () => ({
+      ok: true as const,
+      value: { changes: { [PNG]: bytes, [TIME]: entry('x') }, message: 'business: add receipt' },
+    }));
+    expect(result.ok).toBe(true);
+    const sent = vi.mocked(githubService.commitFiles).mock.calls[0]?.[3] as FileChanges;
+    expect(sent[PNG]).toBe(bytes);
+    expect(githubFileStore.applyCommit).toHaveBeenCalledWith(sent, {
+      [PNG]: 'bin-sha',
+      [TIME]: 'time-sha',
+    });
+    // A page load for the new blob must go to GitHub: the write seeded text for TIME only.
+    vi.mocked(githubService.getFileContent).mockClear();
+    const item = (path: string, sha: string) => ({ path, type: 'blob', sha, url: '' }) as never;
+    await loadRepoFiles(target.full_name, [item(PNG, 'bin-sha')]);
+    expect(githubService.getFileContent).toHaveBeenCalledTimes(1);
+    vi.mocked(githubService.getFileContent).mockClear();
+    const text = await loadRepoFiles(target.full_name, [item(TIME, 'time-sha')]);
+    expect(githubService.getFileContent).not.toHaveBeenCalled();
+    expect(text.contents[TIME]).toBe(entry('x'));
+  });
+});
+
 describe('writeBusiness after the commit', () => {
   it('still succeeds when the local store update fails', async () => {
     vi.mocked(githubService.commitFiles).mockResolvedValue({ commitSha: 'c1', blobShas: {} });

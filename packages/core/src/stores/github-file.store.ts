@@ -706,7 +706,10 @@ export class GithubFileStore {
    * return the old tree for a while. Deleted paths are removed from the cached `files` entries
    * and the cached tree, otherwise `loadTree`'s merge would bring them back.
    */
-  async applyCommit(changes: Record<string, string | null>, blobShas: Record<string, string>) {
+  async applyCommit(
+    changes: Record<string, string | Uint8Array | null>,
+    blobShas: Record<string, string>,
+  ) {
     const repo = githubProfileStore.currentRepo.peek();
     if (!repo) return;
 
@@ -718,7 +721,7 @@ export class GithubFileStore {
         this.deletedPaths.set(key, this.openFiles.peek()[path]?.sha || item?.sha || '');
       } else this.deletedPaths.delete(key);
     }
-    const written = Object.entries(changes).filter((e): e is [string, string] => e[1] !== null);
+    const written = Object.entries(changes).filter(([, content]) => content !== null);
     const known = new Map(this.tree.peek().map((t) => [t.path, t]));
     for (const [path] of written) {
       known.set(path, {
@@ -741,7 +744,8 @@ export class GithubFileStore {
 
     const open = { ...this.openFiles.peek() };
     for (const [path, content] of Object.entries(changes)) {
-      if (content === null) delete open[path];
+      // Binary has no text form: drop the open copy so it is read from the repo, not shown stale.
+      if (content === null || typeof content !== 'string') delete open[path];
       else if (path in open) open[path] = { content, sha: blobShas[path] ?? '' };
     }
     this.openFiles.value = open;
@@ -760,7 +764,7 @@ export class GithubFileStore {
       const db = await dbPromise;
       for (const [path, content] of Object.entries(changes)) {
         const cacheKey = `${repo.full_name}:${path}`;
-        if (content === null) {
+        if (content === null || typeof content !== 'string') {
           await db.delete('files', cacheKey);
           await db.delete('files', `${cacheKey} `);
         } else {
