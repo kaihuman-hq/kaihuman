@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-02 — Business, phase 4: share links
+
+- Share crypto in `@kaihuman/formats/share` (`src/share/crypto.ts`, dependency-free, `globalThis.crypto`): `b64urlEncode`/`b64urlDecode` (decode throws on invalid characters), `newShareKey` (32 bytes, 43 chars), `newShareToken` (16 bytes, 22 chars), `encryptShareBlob`/`decryptShareBlob` (AES-GCM 256, blob = 12-byte IV + ciphertext+tag, auth failure throws `Wrong key or damaged file`), `shareUrl`/`parseShareUrl` (`<host>/d/<token>#<key>`). `decryptShareBlob` is self-contained (own base64url decode) because the landing page inlines it with `.toString()`; a test recreates it with `new Function` and decrypts.
+
 ## 2026-11-02 — Business, phase 3: daily forms
 
 - `commitFiles` (real and demo service) takes `null` to delete a path, an optional `expectedHeadSha` (mismatch or a 409/422 from `updateRef` throws the new `ConflictError`, exported from `@kaihuman/core`) and returns `{ commitSha, blobShas }`; new `getHeadSha`. `githubFileStore.applyCommit(changes, blobShas)` mirrors a commit into the tree, open files and the IndexedDB cache, and remembers deleted paths so a stale API tree cannot bring them back in `loadTree`. `@kaihuman/core` now has a vitest setup (`pnpm --filter @kaihuman/core test`).
