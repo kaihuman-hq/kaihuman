@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { __resetRepoFilesCacheForTests, loadRepoFiles } from '../repo-files';
 import { CONFLICT_MESSAGE, type FileChanges, writeBusiness, writeErrorMessage } from './write';
 
 vi.mock('@kaihuman/core', () => {
@@ -31,7 +32,8 @@ const otherDeviceWrites = (path: string, content: string) => {
 };
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
+  __resetRepoFilesCacheForTests();
   files = { [TIME]: entry('phone') };
   head = 1;
   vi.mocked(githubService.getHeadSha).mockImplementation(async () => `head-${head}`);
@@ -161,16 +163,45 @@ describe('writeBusiness reads at the head it commits against', () => {
   });
 
   it('does not cache stale content under the new sha', async () => {
-    files = { [TIME]: entry('phone') + entry('tablet') };
-    vi.mocked(githubService.getFileContent).mockImplementationOnce((async () => ({
-      content: entry('phone'),
-      sha: shaOf(entry('phone')),
-    })) as never);
+    const stale = entry('phone');
+    files = { [TIME]: stale + entry('tablet') };
+    const item = { path: TIME, type: 'blob', sha: shaOf(files[TIME] ?? ''), url: '' } as never;
+    vi.mocked(githubService.getFileContent).mockResolvedValue({
+      content: stale,
+      sha: shaOf(stale),
+    } as never);
+    // A page-style load (no ref) shows what it got, but must not cache it.
+    const page = await loadRepoFiles(target.full_name, [item]);
+    expect(page.contents[TIME]).toBe(stale);
+    vi.mocked(githubService.getFileContent).mockClear();
+    await loadRepoFiles(target.full_name, [item]);
+    expect(githubService.getFileContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('a stale page load does not feed stale content into a write', async () => {
+    const stale = entry('phone');
+    files = { [TIME]: stale + entry('tablet') };
+    const item = { path: TIME, type: 'blob', sha: shaOf(files[TIME] ?? ''), url: '' } as never;
+    const fresh = files[TIME] ?? '';
+    // The page fetched by path and got the old blob.
+    vi.mocked(githubService.getFileContent).mockResolvedValueOnce({
+      content: stale,
+      sha: shaOf(stale),
+    } as never);
+    await loadRepoFiles(target.full_name, [item]);
+    vi.mocked(githubService.getFileContent).mockImplementation((async (
+      _o: string,
+      _r: string,
+      _p: string,
+      opts?: { ref?: string },
+    ) => ({ content: fresh, sha: shaOf(fresh), ref: opts?.ref })) as never);
     vi.mocked(githubService.commitFiles).mockResolvedValue({ commitSha: 'c', blobShas: {} });
-    const build = appendOurs();
-    await writeBusiness(target, build);
+    await writeBusiness(target, appendOurs());
+    expect(githubService.getFileContent).toHaveBeenCalledWith('owner', 'write-test', TIME, {
+      ref: 'head-1',
+    });
     const sent = vi.mocked(githubService.commitFiles).mock.calls[0]?.[3] as FileChanges;
-    expect(sent[TIME]).toContain('tablet');
+    expect(sent[TIME]).toBe(fresh + entry('laptop'));
   });
 });
 

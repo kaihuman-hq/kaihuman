@@ -10,6 +10,9 @@ export const rememberRepoFile = (repo: string, path: string, sha: string, conten
   contentCache.set(cacheKey(repo, path), { sha, content });
 };
 
+/** Test-only: the cache is module state that outlives a test. */
+export const __resetRepoFilesCacheForTests = () => contentCache.clear();
+
 export interface LoadedFiles {
   contents: Record<string, string>;
   /** One `path: message` per file that could not be read. */
@@ -50,7 +53,10 @@ export async function loadRepoFiles(
           mismatched.push(item.path);
           continue;
         }
-        contentCache.set(key, { sha: item.sha, content });
+        // By-path reads can be served from the browser HTTP cache, so `content` may be older than
+        // the tree's blob. Cache only what GitHub says is the listed blob; a pinned write reads
+        // this cache and must never get stale content from it.
+        if (sha === item.sha) contentCache.set(key, { sha, content });
         contents[item.path] = content;
       } catch (err) {
         errors.push(`${item.path}: ${err instanceof Error ? err.message : String(err)}`);

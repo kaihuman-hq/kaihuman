@@ -4,7 +4,7 @@ vi.mock('@kaihuman/core', () => ({ githubService: { getFileContent: vi.fn() } })
 
 import { githubService, type TreeItem } from '@kaihuman/core';
 import { backlinkTreeItems, businessTreeItems } from './business/load';
-import { loadRepoFiles } from './repo-files';
+import { __resetRepoFilesCacheForTests, loadRepoFiles } from './repo-files';
 
 const blob = (path: string, sha: string): TreeItem =>
   ({ path, sha, type: 'blob', mode: '100644', url: '' }) as TreeItem;
@@ -18,9 +18,18 @@ const tree = [
   { ...blob('.kh/business/clients', 's6'), type: 'tree' },
 ];
 
+// What GitHub reports for a path: the listed blob, as a fresh read does.
+let served: Record<string, string>;
+
 beforeEach(() => {
+  __resetRepoFilesCacheForTests();
+  served = Object.fromEntries(tree.map((t) => [t.path, t.sha]));
   vi.mocked(githubService.getFileContent).mockReset();
-  vi.mocked(githubService.getFileContent).mockResolvedValue({ content: 'x' } as never);
+  vi.mocked(githubService.getFileContent).mockImplementation((async (
+    _o: string,
+    _r: string,
+    path: string,
+  ) => ({ content: 'x', sha: served[path] })) as never);
 });
 
 describe('tree selection', () => {
@@ -46,8 +55,18 @@ describe('loadRepoFiles', () => {
   });
 
   it('refetches a file whose sha changed', async () => {
+    served['a.md'] = '1';
     await loadRepoFiles('o/c', [blob('a.md', '1')]);
+    served['a.md'] = '2';
     await loadRepoFiles('o/c', [blob('a.md', '2')]);
+    expect(githubService.getFileContent).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns content for a stale read but does not cache it', async () => {
+    served['a.md'] = 'old';
+    const r = await loadRepoFiles('o/s', [blob('a.md', 'new')]);
+    expect(r.contents['a.md']).toBe('x');
+    await loadRepoFiles('o/s', [blob('a.md', 'new')]);
     expect(githubService.getFileContent).toHaveBeenCalledTimes(2);
   });
 
