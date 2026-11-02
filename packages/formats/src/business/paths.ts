@@ -28,6 +28,7 @@ export const issuedPath = (doc: 'invoice' | 'offer', year: number, number: strin
   `${BUSINESS_ROOT}/${doc === 'invoice' ? 'invoices' : 'offers'}/${year}/${number}.yaml`;
 export const timePath = (month: string): string => `${BUSINESS_ROOT}/time/${month}.jsonl`;
 export const TIMER_PATH = `${BUSINESS_ROOT}/time/running.yaml`;
+export const EVENTS_PATH = `${BUSINESS_ROOT}/events.jsonl`;
 export const paymentsPath = (year: number): string => `${BUSINESS_ROOT}/payments/${year}.jsonl`;
 
 const UNKNOWN: BusinessPath = { kind: 'unknown' };

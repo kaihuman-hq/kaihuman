@@ -58,6 +58,34 @@ afterEach(() => {
   host.remove();
 });
 
+const buttons = () => [...host.querySelectorAll('button')].map((b) => b.textContent);
+const unpaid = (m: Map<string, string>) => m.delete('.kh/business/payments/2026.jsonl');
+
+describe('ClientPage actions', () => {
+  it('offers Accepted, Declined and Convert to invoice for an undecided offer, and no payment link for a paid invoice', () => {
+    show(ready(load()));
+    expect(buttons()).toEqual(
+      expect.arrayContaining(['Accepted', 'Declined', 'Convert to invoice']),
+    );
+    expect(host.querySelector('a[href^="/business/payments/new"]')).toBeNull();
+  });
+
+  it('links Record payment for an open invoice', () => {
+    show(ready(load(unpaid)));
+    expect(
+      host.querySelector('a[href="/business/payments/new?invoice=RE-2026-0001"]')?.textContent,
+    ).toBe('Record payment');
+  });
+
+  it('hides the offer buttons once the offer is decided', () => {
+    const decided =
+      '{"id":"01M5D6RA00AFMSY38DJQW16BGN","at":"2026-10-30T09:30:00Z","doc":"AN-2026-001","type":"accepted"}\n';
+    show(ready(load((m) => m.set('.kh/business/events.jsonl', decided))));
+    expect(buttons()).not.toContain('Accepted');
+    expect(buttons()).not.toContain('Convert to invoice');
+  });
+});
+
 describe('ClientPage', () => {
   it('says so and links back for an unknown client, without fetching backlinks', () => {
     show(ready(load()), 'nope');

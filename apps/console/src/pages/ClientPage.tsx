@@ -3,6 +3,7 @@ import { BUSINESS_ROOT } from '@kaihuman/formats/business';
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { Card } from '../components/business/Card';
+import { OfferActions, RecordPaymentLink } from '../components/business/DocActions';
 import { hours, money } from '../components/business/money';
 import { PageShell } from '../components/business/PageShell';
 import { ProblemsList } from '../components/business/ProblemsList';
@@ -145,7 +146,7 @@ function Overview(props: {
       <Timeline items={o.timeline} />
 
       <Card title="Offers" empty={o.offers.length === 0 ? 'No offers.' : undefined}>
-        <Table head={['Number', 'Date', 'Status', 'Amount', 'PDF', 'Link']}>
+        <Table head={['Number', 'Date', 'Status', 'Amount', 'PDF', 'Link', 'Actions']}>
           {o.offers.map((r) => (
             <tr key={r.number}>
               <td class={td}>{r.number}</td>
@@ -158,13 +159,19 @@ function Overview(props: {
                 <Pdf present={r.pdf} />
               </td>
               <td class={td}>{r.link ?? 'no link'}</td>
+              <td class={td}>
+                {/* Decided and replaced offers are history; expired ones can still be accepted late. */}
+                {['issued', 'sent', 'expired'].includes(r.status) && (
+                  <OfferActions offer={r.number} />
+                )}
+              </td>
             </tr>
           ))}
         </Table>
       </Card>
 
       <Card title="Invoices" empty={o.invoices.length === 0 ? 'No invoices.' : undefined}>
-        <Table head={['Number', 'Date', 'Status', 'Amount', 'PDF', 'Link']}>
+        <Table head={['Number', 'Date', 'Status', 'Amount', 'PDF', 'Link', 'Actions']}>
           {o.invoices.map((r) => (
             <tr key={r.number}>
               <td class={td}>{r.number}</td>
@@ -179,6 +186,11 @@ function Overview(props: {
                 <Pdf present={r.pdf} />
               </td>
               <td class={td}>{r.link ?? 'no link'}</td>
+              <td class={td}>
+                {r.kind === 'invoice' && r.status.open > 0 && (
+                  <RecordPaymentLink invoice={r.number} />
+                )}
+              </td>
             </tr>
           ))}
         </Table>

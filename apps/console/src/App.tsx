@@ -20,6 +20,7 @@ import { KanbanBoardPage } from './pages/KanbanBoardPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { LogTimePage } from './pages/LogTimePage';
 import { Login } from './pages/login';
+import { PaymentFormPage } from './pages/PaymentFormPage';
 import { ProjectFormPage } from './pages/ProjectFormPage';
 import { QuickIdeaPage } from './pages/QuickIdeaPage';
 import { QuickKnowledgePage } from './pages/QuickKnowledgePage';
@@ -92,6 +93,7 @@ export const App = () => {
         <ProtectedRoute path="/clients/:slug/projects/new" component={ProjectFormPage} />
         <ProtectedRoute path="/business/enable" component={BusinessEnablePage} />
         <ProtectedRoute path="/business/time/new" component={LogTimePage} />
+        <ProtectedRoute path="/business/payments/new" component={PaymentFormPage} />
         <ProtectedRoute path="/files" component={Dashboard} />
         <ProtectedRoute path="/files/:rest*" component={Dashboard} />
         <ProtectedRoute path="/new" component={Dashboard} />

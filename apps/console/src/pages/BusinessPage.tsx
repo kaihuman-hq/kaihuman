@@ -1,5 +1,6 @@
 import { CLIENT_STAGES } from '@kaihuman/formats/business';
 import { Card } from '../components/business/Card';
+import { RecordPaymentLink } from '../components/business/DocActions';
 import { hours, money } from '../components/business/money';
 import { PageShell } from '../components/business/PageShell';
 import { ProblemsList } from '../components/business/ProblemsList';
@@ -57,6 +58,7 @@ export function BusinessPage() {
                       <th class={th}>Due</th>
                       <th class={th}>Status</th>
                       <th class={`${th} text-right`}>Open</th>
+                      <th class={th}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -70,6 +72,9 @@ export function BusinessPage() {
                         </td>
                         <td class={`${td} text-right whitespace-nowrap`}>
                           {money(r.status.open, r.currency)}
+                        </td>
+                        <td class={td}>
+                          {r.kind === 'invoice' && <RecordPaymentLink invoice={r.number} />}
                         </td>
                       </tr>
                     ))}

@@ -103,4 +103,11 @@ describe('BusinessPage', () => {
     expect(host.textContent).toContain('clients/bad/client.yaml');
     expect(host.textContent).toContain('Acme GmbH');
   });
+
+  it('links Record payment on an open receivable', () => {
+    show(ready(loadBusinessRepo(files((m) => m.delete('.kh/business/payments/2026.jsonl')))));
+    expect(
+      host.querySelector('a[href="/business/payments/new?invoice=RE-2026-0001"]'),
+    ).not.toBeNull();
+  });
 });
