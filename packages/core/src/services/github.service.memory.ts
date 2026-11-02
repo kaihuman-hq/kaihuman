@@ -65,7 +65,12 @@ export class InMemoryGithubService {
     return this.repos;
   }
 
-  async fetchRepoTree(_owner: string, _repo: string, _branch = 'main'): Promise<TreeItem[]> {
+  async fetchRepoTree(
+    _owner: string,
+    _repo: string,
+    _branch = 'main',
+    _opts?: { commitSha?: string },
+  ): Promise<TreeItem[]> {
     return this.buildTree();
   }
 
@@ -73,6 +78,7 @@ export class InMemoryGithubService {
     _owner: string,
     _repo: string,
     path: string,
+    _opts?: { ref?: string },
   ): Promise<{ content: string; sha: string }> {
     const file = this.files.get(path);
     if (!file) {

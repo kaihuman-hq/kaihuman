@@ -26,22 +26,28 @@ export const writeErrorMessage = (e: unknown): string =>
 
 async function readFresh(owner: string, name: string, target: KBRepo): Promise<Fresh> {
   const headSha = await githubService.getHeadSha(owner, name, target.default_branch);
-  // The branch may move between these two calls. The tree is then newer than `headSha`, and the
-  // commit below conflicts on `expectedHeadSha`, so a builder never commits on stale data.
+  // The tree and every file are read at `headSha`, so what the builder sees is exactly the state
+  // `expectedHeadSha` guards. Content by commit never changes, and a blob that differs from the
+  // tree (a stale HTTP cache) is treated as a conflict instead of being built on.
   // The API types `url` as optional; `TreeItem` requires it.
   const tree: TreeItem[] = (
-    await githubService.fetchRepoTree(owner, name, target.default_branch)
+    await githubService.fetchRepoTree(owner, name, target.default_branch, { commitSha: headSha })
   ).map((item) => ({ ...item, url: item.url ?? '' }));
-  const loaded = await loadRepoFiles(target.full_name, businessTreeItems(tree));
-  if (loaded.errors.length > 0) throw new Error(loaded.errors.join('; '));
+  const load = async (items: TreeItem[]) => {
+    const loaded = await loadRepoFiles(target.full_name, items, 4, { ref: headSha });
+    if (loaded.errors.length > 0) throw new Error(loaded.errors.join('; '));
+    if (loaded.mismatched.length > 0) {
+      throw new ConflictError(`${loaded.mismatched.join(', ')} changed while reading`);
+    }
+    return loaded.contents;
+  };
+  const contents = await load(businessTreeItems(tree));
   const blobPaths = tree.filter((item) => item.type === 'blob').map((item) => item.path);
-  const repo = loadBusinessRepo(new Map(Object.entries(loaded.contents)), blobPaths);
+  const repo = loadBusinessRepo(new Map(Object.entries(contents)), blobPaths);
   const read = async (path: string) => {
     const item = tree.find((t) => t.type === 'blob' && t.path === path);
     if (!item) return null;
-    const result = await loadRepoFiles(target.full_name, [item]);
-    if (result.errors.length > 0) throw new Error(result.errors.join('; '));
-    return result.contents[path] ?? null;
+    return (await load([item]))[path] ?? null;
   };
   return { headSha, tree, repo, read };
 }
@@ -55,17 +61,16 @@ export async function writeBusiness(
   target: KBRepo,
   build: (fresh: Fresh) => Promise<Result<{ changes: FileChanges; message: string }>>,
 ): Promise<Result<{ commitSha: string }>> {
-  const slash = target.full_name.indexOf('/');
-  const owner = target.full_name.slice(0, slash);
-  const name = target.full_name.slice(slash + 1);
+  const [owner = '', name = ''] = target.full_name.split('/');
 
   for (let attempt = 0; ; attempt++) {
-    const fresh = await readFresh(owner, name, target);
-    const built = await build(fresh);
-    if (!built.ok) return built;
-    const { changes, message } = built.value;
+    let done: { commitSha: string; blobShas: Record<string, string>; changes: FileChanges };
     try {
-      const { commitSha, blobShas } = await githubService.commitFiles(
+      const fresh = await readFresh(owner, name, target);
+      const built = await build(fresh);
+      if (!built.ok) return built;
+      const { changes, message } = built.value;
+      const res = await githubService.commitFiles(
         owner,
         name,
         target.default_branch,
@@ -73,14 +78,21 @@ export async function writeBusiness(
         message,
         { expectedHeadSha: fresh.headSha },
       );
-      await githubFileStore.applyCommit(changes, blobShas);
-      for (const [path, content] of Object.entries(changes)) {
-        const sha = blobShas[path];
-        if (content !== null && sha) rememberRepoFile(target.full_name, path, sha, content);
-      }
-      return { ok: true, value: { commitSha } };
+      done = { ...res, changes };
     } catch (e) {
       if (!(e instanceof ConflictError) || attempt >= 1) throw e;
+      continue;
     }
+    // The commit is on GitHub; a failure mirroring it locally must not look like a failed save.
+    try {
+      await githubFileStore.applyCommit(done.changes, done.blobShas);
+    } catch (e) {
+      console.warn('Saved, but the local file tree could not be updated:', e);
+    }
+    for (const [path, content] of Object.entries(done.changes)) {
+      const sha = done.blobShas[path];
+      if (content !== null && sha) rememberRepoFile(target.full_name, path, sha, content);
+    }
+    return { ok: true, value: { commitSha: done.commitSha } };
   }
 }

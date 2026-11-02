@@ -22,6 +22,7 @@ const TIME = '.kh/business/time/2026-11.jsonl';
 const entry = (id: string) => `{"id":"${id}"}\n`;
 
 // A tiny remote: file contents by path, a head that changes on every other-device write.
+const shaOf = (c: string) => `sha-${c.length}-${c}`;
 let files: Record<string, string>;
 let head: number;
 const otherDeviceWrites = (path: string, content: string) => {
@@ -38,13 +39,13 @@ beforeEach(() => {
     Object.entries(files).map(([path, c]) => ({
       path,
       type: 'blob',
-      sha: `sha-${path}-${c.length}`,
+      sha: shaOf(c),
     }))) as never);
   vi.mocked(githubService.getFileContent).mockImplementation((async (
     _o: string,
     _r: string,
     path: string,
-  ) => ({ content: files[path] ?? '', sha: 's' })) as never);
+  ) => ({ content: files[path] ?? '', sha: shaOf(files[path] ?? '') })) as never);
 });
 
 const appendOurs = (changesOut: FileChanges[] = []) =>
@@ -115,6 +116,105 @@ describe('writeBusiness', () => {
       return { ok: true, value: { changes: {}, message: 'business: noop' } };
     });
     expect(seen).toBeNull();
+  });
+});
+
+describe('writeBusiness reads at the head it commits against', () => {
+  it('asks for the tree and files at that head', async () => {
+    vi.mocked(githubService.commitFiles).mockResolvedValue({ commitSha: 'c', blobShas: {} });
+    await writeBusiness(target, appendOurs());
+    expect(vi.mocked(githubService.fetchRepoTree).mock.calls[0]?.[3]).toEqual({
+      commitSha: 'head-1',
+    });
+    for (const call of vi.mocked(githubService.getFileContent).mock.calls) {
+      expect(call[3]).toEqual({ ref: 'head-1' });
+    }
+  });
+
+  it('never commits content older than the tree (stale HTTP cache)', async () => {
+    const stale = entry('phone');
+    files = { [TIME]: stale + entry('tablet') };
+    // The tree lists the new blob, but the content endpoint answers from a stale cache.
+    vi.mocked(githubService.getFileContent).mockImplementation((async () => ({
+      content: stale,
+      sha: shaOf(stale),
+    })) as never);
+    const build = appendOurs();
+    await expect(writeBusiness(target, build)).rejects.toBeInstanceOf(ConflictError);
+    expect(build).not.toHaveBeenCalled();
+    expect(githubService.commitFiles).not.toHaveBeenCalled();
+  });
+
+  it('recovers when the stale answer is gone on the retry', async () => {
+    const stale = entry('phone');
+    files = { [TIME]: stale + entry('tablet') };
+    vi.mocked(githubService.getFileContent)
+      .mockImplementationOnce((async () => ({ content: stale, sha: shaOf(stale) })) as never)
+      .mockImplementation((async (_o: string, _r: string, path: string) => ({
+        content: files[path] ?? '',
+        sha: shaOf(files[path] ?? ''),
+      })) as never);
+    vi.mocked(githubService.commitFiles).mockResolvedValue({ commitSha: 'c', blobShas: {} });
+    expect((await writeBusiness(target, appendOurs())).ok).toBe(true);
+    const sent = vi.mocked(githubService.commitFiles).mock.calls[0]?.[3] as FileChanges;
+    expect(sent[TIME]).toBe(entry('phone') + entry('tablet') + entry('laptop'));
+  });
+
+  it('does not cache stale content under the new sha', async () => {
+    files = { [TIME]: entry('phone') + entry('tablet') };
+    vi.mocked(githubService.getFileContent).mockImplementationOnce((async () => ({
+      content: entry('phone'),
+      sha: shaOf(entry('phone')),
+    })) as never);
+    vi.mocked(githubService.commitFiles).mockResolvedValue({ commitSha: 'c', blobShas: {} });
+    const build = appendOurs();
+    await writeBusiness(target, build);
+    const sent = vi.mocked(githubService.commitFiles).mock.calls[0]?.[3] as FileChanges;
+    expect(sent[TIME]).toContain('tablet');
+  });
+});
+
+describe('writeBusiness after the commit', () => {
+  it('still succeeds when the local store update fails', async () => {
+    vi.mocked(githubService.commitFiles).mockResolvedValue({ commitSha: 'c1', blobShas: {} });
+    vi.mocked(githubFileStore.applyCommit).mockRejectedValue(new Error('idb'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await writeBusiness(target, appendOurs());
+    expect(result).toEqual({ ok: true, value: { commitSha: 'c1' } });
+    expect(githubService.commitFiles).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('seeds the content cache with the commit blob shas', async () => {
+    const written = entry('phone') + entry('laptop');
+    vi.mocked(githubService.commitFiles).mockResolvedValue({
+      commitSha: 'c1',
+      blobShas: { [TIME]: 'new-blob' },
+    });
+    await writeBusiness(target, appendOurs());
+    // Next write: the tree now lists new-blob, so the cached content is used, not refetched.
+    files = { [TIME]: written };
+    vi.mocked(githubService.fetchRepoTree).mockResolvedValue([
+      { path: TIME, type: 'blob', sha: 'new-blob', url: '' },
+    ] as never);
+    vi.mocked(githubService.getFileContent).mockClear();
+    let seen: string | null = null;
+    await writeBusiness(target, async (fresh) => {
+      seen = await fresh.read(TIME);
+      return { ok: true, value: { changes: {}, message: 'business: noop' } };
+    });
+    expect(seen).toBe(written);
+    expect(githubService.getFileContent).not.toHaveBeenCalled();
+  });
+
+  it('reports a file fetch error while reading as a saving failure', async () => {
+    vi.mocked(githubService.getFileContent).mockRejectedValue(new Error('rate limited'));
+    const err = await writeBusiness(target, appendOurs()).catch((e) => e);
+    expect(writeErrorMessage(err)).toBe(
+      `Saving failed, nothing was written: ${TIME}: rate limited`,
+    );
+    expect(githubService.commitFiles).not.toHaveBeenCalled();
   });
 });
 

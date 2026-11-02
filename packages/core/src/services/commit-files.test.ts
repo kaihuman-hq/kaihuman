@@ -107,6 +107,35 @@ describe('GithubService.commitFiles', () => {
     ).rejects.not.toBeInstanceOf(ConflictError);
   });
 
+  it('reads refs without the HTTP cache', async () => {
+    await svc.getHeadSha('o', 'r', 'main');
+    await svc.commitFiles('o', 'r', 'main', { 'a.md': 'x' }, 'msg');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    for (const call of git.getRef.mock.calls) {
+      await call[0].request.fetch('https://x', {});
+    }
+    expect(git.getRef).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    for (const call of fetchSpy.mock.calls) expect(call[1]).toMatchObject({ cache: 'no-store' });
+    fetchSpy.mockRestore();
+  });
+
+  it('fetches the tree and files of a given commit', async () => {
+    const getTree = vi.fn().mockResolvedValue({ data: { tree: [] } });
+    const getContent = vi
+      .fn()
+      .mockResolvedValue({ data: { type: 'file', content: btoa('x'), sha: 's' } });
+    vi.spyOn(svc as unknown as { getClient: () => unknown }, 'getClient').mockReturnValue({
+      git: { getRef: git.getRef, getTree },
+      repos: { getContent },
+    });
+    await svc.fetchRepoTree('o', 'r', 'main', { commitSha: 'c1' });
+    expect(git.getRef).not.toHaveBeenCalled();
+    expect(getTree.mock.calls[0]?.[0]).toMatchObject({ tree_sha: 'c1', recursive: 'true' });
+    await svc.getFileContent('o', 'r', 'a.md', { ref: 'c1' });
+    expect(getContent.mock.calls[0]?.[0]).toMatchObject({ path: 'a.md', ref: 'c1' });
+  });
+
   it('getHeadSha reads the ref', async () => {
     expect(await svc.getHeadSha('o', 'r', 'main')).toBe('head1');
   });

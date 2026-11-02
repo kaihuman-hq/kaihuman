@@ -14,6 +14,8 @@ export interface LoadedFiles {
   contents: Record<string, string>;
   /** One `path: message` per file that could not be read. */
   errors: string[];
+  /** Paths whose fetched blob differs from the listed sha (only checked with `opts.ref`). */
+  mismatched: string[];
 }
 
 /** Reads the given files `concurrency` at a time, skipping those cached for the same sha. */
@@ -21,10 +23,13 @@ export async function loadRepoFiles(
   repoFullName: string,
   items: readonly TreeItem[],
   concurrency = 4,
+  /** `ref`: read each file as of this commit and cache nothing that does not match the item. */
+  opts: { ref?: string } = {},
 ): Promise<LoadedFiles> {
   const [owner = '', name = ''] = repoFullName.split('/');
   const contents: Record<string, string> = {};
   const errors: string[] = [];
+  const mismatched: string[] = [];
   const queue = [...items];
   const worker = async () => {
     for (let item = queue.shift(); item; item = queue.shift()) {
@@ -35,7 +40,16 @@ export async function loadRepoFiles(
         continue;
       }
       try {
-        const { content } = await githubService.getFileContent(owner, name, item.path);
+        const { content, sha } = await githubService.getFileContent(
+          owner,
+          name,
+          item.path,
+          opts.ref ? { ref: opts.ref } : undefined,
+        );
+        if (opts.ref && sha !== item.sha) {
+          mismatched.push(item.path);
+          continue;
+        }
         contentCache.set(key, { sha: item.sha, content });
         contents[item.path] = content;
       } catch (err) {
@@ -44,5 +58,5 @@ export async function loadRepoFiles(
     }
   };
   await Promise.all(Array.from({ length: concurrency }, worker));
-  return { contents, errors };
+  return { contents, errors, mismatched };
 }
