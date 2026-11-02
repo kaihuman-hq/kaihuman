@@ -22,12 +22,15 @@ export const CodeMirrorEditor = ({
   initialContent,
   onChange,
   onSave,
+  readOnly = false,
 }: {
   path?: string;
   zenMode?: boolean;
   initialContent?: string;
   onChange?: (content: string) => void;
   onSave?: (content: string) => void;
+  /** No edits and no saving; selecting and copying still work. */
+  readOnly?: boolean;
 }) => {
   const editorRef = useRef<CodeEditorHandle | null>(null);
   // Latest editor text — kept current via onValueChange so external syncs can
@@ -59,7 +62,7 @@ export const CodeMirrorEditor = ({
 
   const handleChange = (value: string) => {
     docRef.current = value;
-    if (isUpdatingFromStore.current) return; // external sync, not a user edit
+    if (isUpdatingFromStore.current || readOnly) return; // external sync or read-only, not a user edit
     setHasUnsavedChanges(true);
     if (controlled) {
       onChange?.(value);
@@ -70,6 +73,7 @@ export const CodeMirrorEditor = ({
   };
 
   const handleSave = async (value: string) => {
+    if (readOnly) return;
     setIsSaving(true);
     try {
       if (controlled) {
@@ -94,7 +98,7 @@ export const CodeMirrorEditor = ({
     const id = setInterval(
       () => {
         const s = stateRef.current;
-        if (s.hasUnsavedChanges && !s.isSaving) {
+        if (!readOnly && s.hasUnsavedChanges && !s.isSaving) {
           logger.debug('Auto-saving...');
           s.handleSave(docRef.current);
         }
@@ -102,7 +106,7 @@ export const CodeMirrorEditor = ({
       2 * 60 * 1000,
     );
     return () => clearInterval(id);
-  }, []);
+  }, [readOnly]);
 
   // Controlled mode: sync when the parent pushes new content (e.g. a late
   // contentOverride or decrypted plaintext).
@@ -146,7 +150,8 @@ export const CodeMirrorEditor = ({
         language={languageForPath(effectivePath)}
         defaultValue={docRef.current}
         onValueChange={handleChange}
-        onSave={handleSave}
+        onSave={readOnly ? undefined : handleSave}
+        readOnly={readOnly}
         wrap={effectivePath ? effectivePath.endsWith('.md') : true}
         bracketMatching
         theme={zenMode ? ZEN_THEME : undefined}
@@ -154,25 +159,27 @@ export const CodeMirrorEditor = ({
       />
 
       {/* Save Button Overlay */}
-      <div
-        className={`absolute top-4 right-8 transition-opacity duration-300 ${hasUnsavedChanges ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-      >
-        <button
-          type="button"
-          onClick={() => handleSave(docRef.current)}
-          disabled={isSaving}
-          className="bg-[var(--los-accent)] text-black px-4 py-1.5 rounded-sm shadow-lg text-xs font-bold font-mono tracking-wider hover:opacity-90 active:scale-95 transition-all flex items-center gap-2"
+      {!readOnly && (
+        <div
+          className={`absolute top-4 right-8 transition-opacity duration-300 ${hasUnsavedChanges ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         >
-          {isSaving ? (
-            <>
-              <div className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-              SAVING...
-            </>
-          ) : (
-            'SAVE CHANGES'
-          )}
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => handleSave(docRef.current)}
+            disabled={isSaving}
+            className="bg-[var(--los-accent)] text-black px-4 py-1.5 rounded-sm shadow-lg text-xs font-bold font-mono tracking-wider hover:opacity-90 active:scale-95 transition-all flex items-center gap-2"
+          >
+            {isSaving ? (
+              <>
+                <div className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                SAVING...
+              </>
+            ) : (
+              'SAVE CHANGES'
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

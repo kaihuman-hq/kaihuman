@@ -5,6 +5,7 @@ const logger = new Logger('FileViewer');
 
 import { githubFileStore } from '@kaihuman/core';
 import { EncryptedTileWrapper, type TileDef } from '@kaihuman/ui';
+import { frozenMessage, isFrozenPath } from '../lib/business/guards';
 import { CodeMirrorEditor } from './editor/CodeMirrorEditor';
 
 interface FileViewerProps {
@@ -14,7 +15,21 @@ interface FileViewerProps {
   onSaveOverride?: (newContent: string) => void;
 }
 
+const FrozenBanner = ({ path }: { path: string }) => (
+  <div
+    role="note"
+    className="absolute top-0 inset-x-0 z-10 flex flex-wrap items-center gap-x-3 px-3 py-1.5 text-xs font-mono border-b border-[var(--los-warning)] text-[var(--los-warning)] bg-[var(--los-bg)]"
+  >
+    <span>{frozenMessage(path)}</span>
+    <a href="/business" className="underline">
+      Open Business
+    </a>
+  </div>
+);
+
 export const FileViewer = ({ path, zenMode, contentOverride, onSaveOverride }: FileViewerProps) => {
+  const frozen = isFrozenPath(path);
+
   // When this component mounts (tile focused), load the file ONLY if no content override is provided
   useEffect(() => {
     if (contentOverride !== undefined) return;
@@ -29,7 +44,9 @@ export const FileViewer = ({ path, zenMode, contentOverride, onSaveOverride }: F
   if (contentOverride !== undefined) {
     return (
       <div className="h-full w-full relative">
+        {frozen && <FrozenBanner path={path} />}
         <CodeMirrorEditor
+          readOnly={frozen}
           path={path}
           zenMode={zenMode}
           initialContent={contentOverride}
@@ -46,6 +63,7 @@ export const FileViewer = ({ path, zenMode, contentOverride, onSaveOverride }: F
   // for githubFileStore.activeFile
   return (
     <div className="h-full w-full relative">
+      {frozen && <FrozenBanner path={path} />}
       {isEncrypted ? (
         <EncryptedTileWrapper
           tile={
@@ -64,6 +82,7 @@ export const FileViewer = ({ path, zenMode, contentOverride, onSaveOverride }: F
         >
           {(decryptedContent: string, handleSave: (newContent: string) => void) => (
             <CodeMirrorEditor
+              readOnly={frozen}
               path={path}
               zenMode={zenMode}
               initialContent={decryptedContent}
@@ -73,7 +92,7 @@ export const FileViewer = ({ path, zenMode, contentOverride, onSaveOverride }: F
           )}
         </EncryptedTileWrapper>
       ) : (
-        <CodeMirrorEditor path={path} zenMode={zenMode} />
+        <CodeMirrorEditor path={path} zenMode={zenMode} readOnly={frozen} />
       )}
     </div>
   );

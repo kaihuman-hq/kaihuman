@@ -23,6 +23,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FileViewer } from '../components/FileViewer';
 import { KBCommandsModal } from '../components/KBCommandsModal';
 import { runBusinessCapture } from '../lib/business/capture-write';
+import { frozenMessage, touchesFrozen } from '../lib/business/guards';
 import { BUSINESS_PROFILE_PATH, businessClientSlugs } from '../lib/business/load';
 import { VERSION } from '../version';
 import { QUICK_ROUTES } from './ShortcutsPage';
@@ -52,7 +53,14 @@ export const Dashboard = () => {
     if (outcome.ok) captureTimer.current = setTimeout(() => setCaptureStatus(null), 2500);
   }, []);
 
-  // --- STORE ACCESS ---
+  // True (after telling the user) when the path, or a folder's content, is an issued document.
+  const refuseFrozen = useCallback((path: string): boolean => {
+    const treePaths = githubFileStore.tree.peek().map((t) => t.path);
+    if (!touchesFrozen(path, treePaths)) return false;
+    setCaptureStatus({ ok: false, message: frozenMessage(path) });
+    return true;
+  }, []);
+
   // --- STORE ACCESS ---
   // Using layoutStore directly for everything
   const columns = layoutStore.columns.value;
@@ -419,10 +427,14 @@ export const Dashboard = () => {
               </div>
             );
           }, [])}
-          onFileChange={useCallback((path: string, newContent: string) => {
-            githubFileStore.updateFileContent(path, newContent);
-            githubFileStore.saveFile(path);
-          }, [])}
+          onFileChange={useCallback(
+            (path: string, newContent: string) => {
+              if (refuseFrozen(path)) return;
+              githubFileStore.updateFileContent(path, newContent);
+              githubFileStore.saveFile(path);
+            },
+            [refuseFrozen],
+          )}
           renderEditor={useCallback(
             (
               path: string,
@@ -510,38 +522,54 @@ export const Dashboard = () => {
               logger.error('Failed to create file:', e);
             }
           }, [])}
-          onDeleteFile={useCallback(async (path: string) => {
-            if (!confirm(`Are you sure you want to delete ${path}?`)) return;
+          onDeleteFile={useCallback(
+            async (path: string) => {
+              if (refuseFrozen(path)) return;
+              if (!confirm(`Are you sure you want to delete ${path}?`)) return;
 
-            await githubFileStore.deleteFile(path);
+              await githubFileStore.deleteFile(path);
 
-            // Remove the deleted file from the dashboard config immediately
-            const current = layoutStore.remoteConfig.value;
-            if (!current) return;
+              // Remove the deleted file from the dashboard config immediately
+              const current = layoutStore.remoteConfig.value;
+              if (!current) return;
 
-            const CONFIG_PATH = `${githubFileStore.appFolder.peek()}/.dashboard.config.json`;
-            const newConfig = {
-              ...current,
-              entries: current.entries.filter((e) => e.path !== path),
-              files: {
-                ...current.files,
-                recentlyOpened: (current.files?.recentlyOpened ?? []).filter((p) => p !== path),
-              },
-            };
+              const CONFIG_PATH = `${githubFileStore.appFolder.peek()}/.dashboard.config.json`;
+              const newConfig = {
+                ...current,
+                entries: current.entries.filter((e) => e.path !== path),
+                files: {
+                  ...current.files,
+                  recentlyOpened: (current.files?.recentlyOpened ?? []).filter((p) => p !== path),
+                },
+              };
 
-            layoutStore.remoteConfig.value = newConfig;
-            githubFileStore.updateFileContent(CONFIG_PATH, JSON.stringify(newConfig, null, 2));
-            githubFileStore.saveFile(CONFIG_PATH);
-          }, [])}
-          onRenameFile={useCallback(async (path: string, newPath: string) => {
-            await githubFileStore.renameFile(path, newPath);
-          }, [])}
-          onRenameFolder={useCallback(async (path: string, newPath: string) => {
-            await githubFileStore.renameFolder(path, newPath);
-          }, [])}
-          onMoveFile={useCallback(async (path: string, newPath: string) => {
-            await githubFileStore.renameFile(path, newPath);
-          }, [])}
+              layoutStore.remoteConfig.value = newConfig;
+              githubFileStore.updateFileContent(CONFIG_PATH, JSON.stringify(newConfig, null, 2));
+              githubFileStore.saveFile(CONFIG_PATH);
+            },
+            [refuseFrozen],
+          )}
+          onRenameFile={useCallback(
+            async (path: string, newPath: string) => {
+              if (refuseFrozen(path)) return;
+              await githubFileStore.renameFile(path, newPath);
+            },
+            [refuseFrozen],
+          )}
+          onRenameFolder={useCallback(
+            async (path: string, newPath: string) => {
+              if (refuseFrozen(path)) return;
+              await githubFileStore.renameFolder(path, newPath);
+            },
+            [refuseFrozen],
+          )}
+          onMoveFile={useCallback(
+            async (path: string, newPath: string) => {
+              if (refuseFrozen(path)) return;
+              await githubFileStore.renameFile(path, newPath);
+            },
+            [refuseFrozen],
+          )}
           // Data Props
           existingFiles={tree ? tree.map((t) => t.path) : []}
           onLoadFolder={async (path: string) => {
