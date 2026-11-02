@@ -122,7 +122,10 @@ export function BusinessEnablePage() {
   const set = <K extends keyof EnableForm>(key: K, value: EnableForm[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  const text = (key: Exclude<keyof EnableForm, 'vatRegime' | `confirm${string}`>, props = {}) => (
+  const text = (
+    key: Exclude<keyof EnableForm, 'vatRegime' | 'vatBasis' | `confirm${string}`>,
+    props = {},
+  ) => (
     <input
       id={key}
       type="text"
@@ -242,6 +245,25 @@ export function BusinessEnablePage() {
               >
                 <option value="regular">Regular (charges VAT)</option>
                 <option value="small-business">Small business (§19 UStG, no VAT)</option>
+              </select>
+            </Field>
+            <Field
+              id="vatBasis"
+              label="VAT basis"
+              class="sm:col-span-2"
+              hint="Soll: VAT is due for the quarter of the invoice date. Ist: for the quarter the payment arrives (needs approval by the Finanzamt). Only matters for the regular regime."
+            >
+              <select
+                id="vatBasis"
+                value={form.vatBasis}
+                disabled={disabled}
+                onChange={(e) =>
+                  set('vatBasis', (e.target as HTMLSelectElement).value as EnableForm['vatBasis'])
+                }
+                class={INPUT}
+              >
+                <option value="accrual">Soll (accrual, by invoice date)</option>
+                <option value="cash">Ist (cash, by payment date)</option>
               </select>
             </Field>
           </Group>

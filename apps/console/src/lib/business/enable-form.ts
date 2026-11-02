@@ -15,6 +15,7 @@ export type EnableForm = {
   iban: string;
   bic: string;
   vatRegime: 'regular' | 'small-business';
+  vatBasis: 'accrual' | 'cash';
   paymentTermsDays: string;
   confirmRetention: boolean;
   confirmBranchProtection: boolean;
@@ -35,6 +36,7 @@ export const EMPTY_FORM: EnableForm = {
   iban: '',
   bic: '',
   vatRegime: 'regular',
+  vatBasis: 'accrual',
   paymentTermsDays: '14',
   confirmRetention: false,
   confirmBranchProtection: false,
@@ -69,6 +71,8 @@ export function profileFromForm(form: EnableForm): Result<BusinessProfile> {
     },
     jurisdiction: country === 'DE' ? 'de' : 'generic',
     vat_regime: form.vatRegime,
+    // Soll is the default, so only Ist is written.
+    ...(form.vatBasis === 'cash' ? { vat_basis: 'cash' } : {}),
     currency: 'EUR',
     language: 'de',
     // A non-number stays a string so the validator reports it on this field.
@@ -92,6 +96,7 @@ const FIELD_OF_PATH: Record<string, keyof EnableForm> = {
   'bank.iban': 'iban',
   'bank.bic': 'bic',
   vat_regime: 'vatRegime',
+  vat_basis: 'vatBasis',
   payment_terms_days: 'paymentTermsDays',
 };
 
