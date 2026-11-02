@@ -8,6 +8,13 @@ describe('BoardOverview config scope', () => {
     );
   });
   it('defaults to all', () => {
-    expect(parseConfig('{}').scope ?? 'all').toBe('all');
+    expect(parseConfig('{}').scope).toBe('all');
+  });
+  it('keeps other fields of an old config without scope', () => {
+    const cfg = parseConfig('{"showDone":true,"overdueDays":3}');
+    expect(cfg).toMatchObject({ showDone: true, overdueDays: 3, scope: 'all' });
+  });
+  it('falls back to all for an invalid scope', () => {
+    expect(parseConfig('{"scope":"work"}').scope).toBe('all');
   });
 });

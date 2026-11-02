@@ -26,7 +26,8 @@ export const DEFAULT_CONFIG: BoardOverviewConfig = {
 export function parseConfig(raw: string): BoardOverviewConfig {
   try {
     const parsed = JSON.parse(raw || '{}');
-    return { ...DEFAULT_CONFIG, ...parsed };
+    const scope = parsed.scope === 'business' || parsed.scope === 'personal' ? parsed.scope : 'all';
+    return { ...DEFAULT_CONFIG, ...parsed, scope };
   } catch {
     return { ...DEFAULT_CONFIG };
   }

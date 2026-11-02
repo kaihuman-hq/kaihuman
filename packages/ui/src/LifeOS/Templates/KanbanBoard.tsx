@@ -37,7 +37,13 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
 import { ScopeToggle } from '../Molecules/ScopeToggle';
-import { fileLabel, formatFilePath, usePersistedScope, withBusinessFiles } from '../scope-files';
+import {
+  fileLabel,
+  formatFilePath,
+  pruneFocus,
+  usePersistedScope,
+  withBusinessFiles,
+} from '../scope-files';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1160,6 +1166,10 @@ export const KanbanBoard = ({
     }
     return withBusinessFiles(paths, tree ?? [], '.todos.md', scope);
   }, [remoteConfig, tree, scope]);
+
+  useEffect(() => {
+    setFocusedFiles((prev) => pruneFocus(prev, todoFilePaths));
+  }, [todoFilePaths]);
 
   useEffect(() => {
     for (const path of todoFilePaths) {

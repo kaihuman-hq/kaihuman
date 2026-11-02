@@ -14,6 +14,29 @@ export function formatFilePath(fp: string): { dir: string; name: string } {
   return { dir, name };
 }
 
+/** Splits an action-log path into its directory prefix and display name. */
+export function formatActionLogPath(fp: string): { dir: string; name: string } {
+  const parts = fp.split('/');
+  const raw = parts.pop() ?? fp;
+  const name = raw.replace('.actionlog.md', '');
+  const dir = parts.length > 0 ? `${parts.join('/')}/` : '';
+  return { dir, name };
+}
+
+/** Client slug for client action logs, else the usual file name. */
+export function actionLogLabel(path: string): string {
+  return clientOfPath(path) ?? formatActionLogPath(path).name;
+}
+
+/**
+ * Drops focused files that left the scoped list, so a scope change cannot leave a blank
+ * board. Returns the same set when nothing changed, which keeps state updates idempotent.
+ */
+export function pruneFocus(focused: ReadonlySet<string>, paths: readonly string[]): Set<string> {
+  const kept = new Set([...focused].filter((p) => paths.includes(p)));
+  return kept.size === focused.size ? (focused as Set<string>) : kept;
+}
+
 /** Client slug for client files, else the usual file name. */
 export function fileLabel(path: string): string {
   return clientOfPath(path) ?? formatFilePath(path).name;

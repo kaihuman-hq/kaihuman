@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { fileLabel, formatFilePath, withBusinessFiles } from './scope-files';
+import {
+  actionLogLabel,
+  fileLabel,
+  formatFilePath,
+  pruneFocus,
+  withBusinessFiles,
+} from './scope-files';
 
 const tree = [
   { path: 'todos/work.todos.md', type: 'blob' },
@@ -45,5 +51,25 @@ describe('fileLabel', () => {
   it('falls back to formatFilePath for other files', () => {
     expect(fileLabel('todos/work.todos.md')).toBe(formatFilePath('todos/work.todos.md').name);
     expect(fileLabel('todos/work.todos.md')).toBe('work');
+  });
+});
+
+describe('actionLogLabel', () => {
+  it('labels client logs by slug', () => {
+    expect(actionLogLabel('.kh/business/clients/acme-gmbh/log.actionlog.md')).toBe('acme-gmbh');
+  });
+  it('strips the suffix for other logs', () => {
+    expect(actionLogLabel('logs/work.actionlog.md')).toBe('work');
+  });
+});
+
+describe('pruneFocus', () => {
+  const personal = ['todos/work.todos.md'];
+  it('drops focused files outside the list', () => {
+    expect(pruneFocus(new Set([client]), personal).size).toBe(0);
+  });
+  it('keeps focus that is still valid, as the same set', () => {
+    const focused = new Set(['todos/work.todos.md']);
+    expect(pruneFocus(focused, personal)).toBe(focused);
   });
 });

@@ -6,14 +6,18 @@ import {
   parseActionLog,
   serializeActionLog,
 } from '@kaihuman/formats';
-import { clientOfPath } from '@kaihuman/formats/business';
 import { ArrowLeft, Plus, Search, Tag, X } from 'lucide-preact';
 import { Fragment } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoHeader, MonoText } from '../Atoms/Typography';
 import { ScopeToggle } from '../Molecules/ScopeToggle';
-import { usePersistedScope, withBusinessFiles } from '../scope-files';
+import {
+  actionLogLabel,
+  formatActionLogPath,
+  usePersistedScope,
+  withBusinessFiles,
+} from '../scope-files';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,14 +32,6 @@ export interface ActionLogViewProps {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatActionLogPath(fp: string): { dir: string; name: string } {
-  const parts = fp.split('/');
-  const raw = parts.pop() ?? fp;
-  const name = raw.replace('.actionlog.md', '');
-  const dir = parts.length > 0 ? `${parts.join('/')}/` : '';
-  return { dir, name };
-}
 
 function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-');
@@ -117,7 +113,7 @@ const EntryRow = ({
   otherFilePaths: string[];
   onMove?: (targetPath: string) => void;
 }) => {
-  const fileName = clientOfPath(agg.filePath) ?? formatActionLogPath(agg.filePath).name;
+  const fileName = actionLogLabel(agg.filePath);
   const time = agg.entry.timestamp.slice(11, 16); // HH:mm
 
   return (
