@@ -1,5 +1,5 @@
 import { parseActionLog, parseTodos } from '@kaihuman/formats';
-import { BUSINESS_ROOT } from '@kaihuman/formats/business';
+import { BUSINESS_ROOT, type LinkRecord } from '@kaihuman/formats/business';
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { Card } from '../components/business/Card';
@@ -12,13 +12,14 @@ import { hours, money } from '../components/business/money';
 import { PageShell } from '../components/business/PageShell';
 import { ProblemsList } from '../components/business/ProblemsList';
 import { QuickAdd } from '../components/business/QuickAdd';
+import { ShareActions } from '../components/business/ShareActions';
 import { Stat } from '../components/business/Stat';
 import { StatusPill } from '../components/business/StatusPill';
 import { TimerCard } from '../components/business/TimerCard';
 import { clientBacklinks } from '../lib/business/backlinks';
 import { addDays, isoWeek, todayLocal } from '../lib/business/dates';
 import { BUSINESS_PROFILE_PATH, parseLoadError } from '../lib/business/load';
-import { type ClientOverview, clientOverview } from '../lib/business/overview';
+import { type ClientOverview, clientOverview, latestLink } from '../lib/business/overview';
 import { useBacklinkContents, useBusinessRepo } from '../lib/business/use-business-repo';
 
 const TIMELINE_SHOWN = 20;
@@ -91,8 +92,13 @@ function Overview(props: {
   canDraftUnbilled: boolean;
   /** Offers that already have an issued invoice; converting them again would bill twice. */
   invoicedOffers: ReadonlySet<string>;
+  /** Issued yaml path by document number. */
+  issuedPaths: ReadonlyMap<string, string>;
+  links: readonly LinkRecord[];
 }) {
-  const { o, today, contents, backlinks, invoicedOffers } = props;
+  const { o, today, contents, backlinks, invoicedOffers, issuedPaths, links } = props;
+  const activeLink = (row: { number: string; link: ClientOverview['invoices'][number]['link'] }) =>
+    row.link === 'active' ? latestLink(links, row.number) : null;
   const { client, summary: s } = o;
   const currency = s.currency;
   const contact = client.contacts[0];
@@ -190,6 +196,16 @@ function Overview(props: {
                 {r.status === 'accepted' && !invoicedOffers.has(r.number) && (
                   <OfferActions offer={r.number} decided />
                 )}
+                <ShareActions
+                  doc={{
+                    number: r.number,
+                    path: issuedPaths.get(r.number) ?? '',
+                    pdf: r.pdf && issuedPaths.has(r.number),
+                    // A past valid_until would make the link dead on arrival.
+                    ...(r.validUntil >= today ? { expires: r.validUntil } : {}),
+                  }}
+                  link={activeLink(r)}
+                />
               </td>
             </tr>
           ))}
@@ -220,6 +236,14 @@ function Overview(props: {
                   {r.kind === 'invoice' && r.status.state !== 'credited' && (
                     <CreditNoteAction invoice={r.number} />
                   )}
+                  <ShareActions
+                    doc={{
+                      number: r.number,
+                      path: issuedPaths.get(r.number) ?? '',
+                      pdf: r.pdf && issuedPaths.has(r.number),
+                    }}
+                    link={activeLink(r)}
+                  />
                 </div>
               </td>
             </tr>
@@ -393,6 +417,8 @@ export function ClientPage({ slug }: { slug?: string }) {
             <Overview
               canDraftUnbilled={canDraftUnbilled}
               invoicedOffers={invoicedOffers}
+              issuedPaths={new Map(data.issued.map((i) => [i.doc.number, i.path]))}
+              links={data.links}
               o={o}
               today={today}
               contents={contents}

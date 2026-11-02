@@ -102,18 +102,22 @@ const newestFirst = <T extends { issueDate: string; number: string }>(rows: T[])
       : b.issueDate.localeCompare(a.issueDate),
   );
 
+/** The newest link record of a document, or null. */
+export const latestLink = (links: readonly LinkRecord[], doc: string): LinkRecord | null =>
+  links
+    .filter((l) => l.doc === doc)
+    .reduce<LinkRecord | null>(
+      (best, l) => (best && Date.parse(best.created) > Date.parse(l.created) ? best : l),
+      null,
+    );
+
 /** The latest link of a document decides; an expiry on the `expires` day itself still counts as active. */
 const linkState = (
   links: readonly LinkRecord[],
   doc: string,
   today: string,
 ): InvoiceRow['link'] => {
-  const latest = links
-    .filter((l) => l.doc === doc)
-    .reduce<LinkRecord | null>(
-      (best, l) => (best && Date.parse(best.created) > Date.parse(l.created) ? best : l),
-      null,
-    );
+  const latest = latestLink(links, doc);
   if (!latest) return null;
   if (latest.revoked) return 'revoked';
   if (latest.expires !== undefined && latest.expires.slice(0, 10) < today) return 'expired';

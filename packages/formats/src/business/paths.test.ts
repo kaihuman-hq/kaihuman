@@ -6,6 +6,7 @@ import {
   clientDir,
   draftPath,
   issuedPath,
+  LINKS_PATH,
   paymentsPath,
   timePath,
 } from './paths.js';
@@ -14,6 +15,10 @@ const id = '01M50ARQ007CHPV05AFMSY38DJ' as Ulid;
 const b = (p: string) => classifyBusinessPath(`${BUSINESS_ROOT}/${p}`);
 
 describe('classifyBusinessPath', () => {
+  it('classifies LINKS_PATH as the links file', () => {
+    expect(classifyBusinessPath(LINKS_PATH)).toEqual({ kind: 'links' });
+  });
+
   it('classifies issued documents and their artifacts', () => {
     expect(b('invoices/2026/RE-2026-0001.yaml')).toEqual({
       kind: 'issued',
