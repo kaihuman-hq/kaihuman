@@ -15,6 +15,7 @@ import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
 import { cn } from '../../utils';
+import { WikiAnchor } from './WikiAnchor';
 import {
   findBacklinks,
   linkifyWikilinks,
@@ -155,9 +156,10 @@ function parseCsv(text: string): string[][] {
 interface WikiViewProps {
   rootPath?: string; // optional — defaults to '' (whole repo)
   onEdit?: (path: string) => void; // caller handles navigation
+  onClientLink?: (slug: string) => void; // `[[client:slug]]` clicks; default is a plain /clients/<slug> link
 }
 
-export const WikiView = ({ rootPath = '', onEdit }: WikiViewProps) => {
+export const WikiView = ({ rootPath = '', onEdit, onClientLink }: WikiViewProps) => {
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
@@ -374,32 +376,18 @@ export const WikiView = ({ rootPath = '', onEdit }: WikiViewProps) => {
                   url.startsWith(WIKILINK_SCHEME) ? url : defaultUrlTransform(url)
                 }
                 components={{
-                  a: (({ href, children }: any) => {
-                    if (!href?.startsWith(WIKILINK_SCHEME)) {
-                      return <a href={href}>{children}</a>;
-                    }
-                    const target = decodeURIComponent(href.slice(WIKILINK_SCHEME.length));
-                    const path = resolveWikilink(target, mdPaths, titles, activeFile ?? '');
-                    return path ? (
-                      <a
-                        href={`#${path}`}
-                        className="text-[#58a6ff] hover:underline"
-                        onClick={(e: MouseEvent) => {
-                          e.preventDefault();
-                          setActiveFile(path);
-                        }}
-                      >
-                        {children}
-                      </a>
-                    ) : (
-                      <span
-                        className="text-[#f85149] cursor-help"
-                        title={`No page for "${target}" yet`}
-                      >
-                        {children}
-                      </span>
-                    );
-                  }) as any,
+                  a: (({ href, children }: any) => (
+                    <WikiAnchor
+                      href={href}
+                      resolve={(target) =>
+                        resolveWikilink(target, mdPaths, titles, activeFile ?? '')
+                      }
+                      onOpenPage={setActiveFile}
+                      onClientLink={onClientLink}
+                    >
+                      {children}
+                    </WikiAnchor>
+                  )) as any,
                   img: (({ src, alt }: any) => <RepoImage src={src} alt={alt} />) as any,
                   code: (({ node, inline, className, children, ...props }: any) => {
                     const match = /language-(\w+)/.exec(className || '');

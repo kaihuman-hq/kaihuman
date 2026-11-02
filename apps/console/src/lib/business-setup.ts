@@ -9,17 +9,18 @@ import BUSINESS_WORKFLOW from '@kaihuman/formats/business-templates/business-che
 import VERFAHRENSDOKUMENTATION from '@kaihuman/formats/business-templates/VERFAHRENSDOKUMENTATION.md?raw';
 import BUSINESS_CHECK from '@kaihuman/formats/dist/business-check.mjs?raw';
 import KH_BUSINESS_SKILL from '@kaihuman/formats/skills/kh-business/SKILL.md?raw';
+import { AlreadyEnabledError, PublicRepoError } from './business/errors';
+import { BUSINESS_PROFILE_PATH } from './business/load';
 import type { KBRepo } from './github-kb';
 
 /** Bump when the check, workflow or skill changes: `syncKB` then rewrites the tool files. */
 export const BUSINESS_TOOLS_VERSION = '1.0.0';
 
-export const BUSINESS_PROFILE_PATH = '.kh/business/business.yaml';
+export { BUSINESS_PROFILE_PATH };
 
 const DATA_DIRS = ['clients', 'drafts', 'offers', 'invoices', 'time', 'payments', 'expenses'];
 
-export class PublicRepoError extends Error {}
-export class AlreadyEnabledError extends Error {}
+export { AlreadyEnabledError, PublicRepoError };
 
 /** The files an update rewrites: the check, its workflow and the agent skill. */
 export function getBusinessToolFiles(): Record<string, string> {

@@ -130,3 +130,19 @@ export const classifyBusinessPath = (path: string): BusinessPath => {
   }
   return UNKNOWN;
 };
+
+export const isBusinessPath = (path: string): boolean => path.startsWith(`${BUSINESS_ROOT}/`);
+
+/** The client slug of any path under `.kh/business/clients/<slug>/`, else null. */
+export const clientOfPath = (path: string): Slug | null => {
+  const prefix = `${BUSINESS_ROOT}/clients/`;
+  if (!path.startsWith(prefix)) return null;
+  const rest = path.slice(prefix.length);
+  const slash = rest.indexOf('/');
+  return slash < 0 ? null : asSlug(rest.slice(0, slash));
+};
+
+export type Scope = 'all' | 'business' | 'personal';
+
+export const inScope = (path: string, scope: Scope): boolean =>
+  scope === 'all' || isBusinessPath(path) === (scope === 'business');

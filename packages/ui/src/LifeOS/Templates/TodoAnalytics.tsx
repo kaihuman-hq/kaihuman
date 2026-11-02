@@ -13,6 +13,8 @@ import { cn } from '../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
 import { DonutChart } from '../Charts/DonutChart';
 import { StackedBarChart, type StackedBarData } from '../Charts/StackedBarChart';
+import { ScopeToggle } from '../Molecules/ScopeToggle';
+import { usePersistedScope, withBusinessFiles } from '../scope-files';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -142,6 +144,7 @@ export const TodoAnalytics = ({ onNavigateBack }: TodoAnalyticsProps) => {
   const openFiles = githubFileStore.openFiles.value;
   const tree = githubFileStore.tree.value;
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('13W');
+  const [scope, setScope] = usePersistedScope('analytics');
 
   // Load tree if empty (direct navigation)
   useEffect(() => {
@@ -151,8 +154,14 @@ export const TodoAnalytics = ({ onNavigateBack }: TodoAnalyticsProps) => {
   }, []);
 
   const todoFilePaths = useMemo(
-    () => (tree ?? []).filter((t) => t.path.endsWith('.todos.md')).map((t) => t.path),
-    [tree],
+    () =>
+      withBusinessFiles(
+        (tree ?? []).filter((t) => t.path.endsWith('.todos.md')).map((t) => t.path),
+        tree ?? [],
+        '.todos.md',
+        scope,
+      ),
+    [tree, scope],
   );
 
   useEffect(() => {
@@ -445,6 +454,7 @@ export const TodoAnalytics = ({ onNavigateBack }: TodoAnalyticsProps) => {
             {todoFilePaths.length} file{todoFilePaths.length !== 1 ? 's' : ''} · {allItems.length}{' '}
             tasks
           </MonoText>
+          <ScopeToggle value={scope} onChange={setScope} />
         </div>
 
         {/* Time frame selector */}

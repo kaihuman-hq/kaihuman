@@ -2,6 +2,7 @@ import type { NavItemId } from '@kaihuman/core';
 import {
   Archive,
   BookOpen,
+  Briefcase,
   GitCommit,
   Kanban,
   Keyboard,
@@ -28,6 +29,7 @@ export const NAVBAR_ITEMS: NavbarItemDef[] = [
   { id: 'knowledge', label: 'Knowledge Base', icon: Library },
   { id: 'actionLog', label: 'Action Log', icon: ScrollText },
   { id: 'ideas', label: 'Ideas', icon: Lightbulb },
+  { id: 'business', label: 'Business', icon: Briefcase },
   { id: 'graph', label: 'Graph', icon: Network },
   { id: 'commits', label: 'Commits', icon: GitCommit },
 ];

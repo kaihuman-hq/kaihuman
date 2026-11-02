@@ -316,6 +316,7 @@ export const Dashboard = () => {
           onShortcutsClick={() => route('/shortcuts')}
           onKnowledgeClick={() => route('/knowledge')}
           onIdeasClick={() => route('/ideas')}
+          onBusinessClick={() => route('/business')}
           onWikiClick={() => route('/wiki')}
           onCheatsheetClick={() => route('/cheatsheet')}
           onKBCommandsClick={() => setShowKBCommands(true)}

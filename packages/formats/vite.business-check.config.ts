@@ -8,6 +8,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: false,
+    minify: true,
     rollupOptions: {
       output: { format: 'es', entryFileNames: 'business-check.mjs', inlineDynamicImports: true },
     },

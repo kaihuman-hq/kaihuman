@@ -36,6 +36,14 @@ import type { JSX } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
+import { ScopeToggle } from '../Molecules/ScopeToggle';
+import {
+  fileLabel,
+  formatFilePath,
+  pruneFocus,
+  usePersistedScope,
+  withBusinessFiles,
+} from '../scope-files';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,14 +83,6 @@ const BADGE_COLORS = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatFilePath(fp: string): { dir: string; name: string } {
-  const parts = fp.split('/');
-  const raw = parts.pop() ?? fp;
-  const dir = parts.length > 0 ? `${parts.join('/')}/` : '';
-  const name = raw.replace(/\.todos\.md$/, '');
-  return { dir, name };
-}
 
 function filterByAge(items: AggregatedItem[], recentOnly: boolean): AggregatedItem[] {
   if (!recentOnly) return items;
@@ -755,7 +755,7 @@ const KanbanCard = ({
   borderColor?: string;
 }) => {
   const { item, filePath } = agg;
-  const { name: fileName } = formatFilePath(filePath);
+  const fileName = fileLabel(filePath);
   const promptRefFile = item.prompt?.refFile;
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -963,7 +963,7 @@ const AssignMilestonePanel = ({
     .map((item, idx) => ({ item, idx }))
     .filter(({ item }) => item.status === 'backlog' || item.status === 'in-progress');
 
-  const { name: fileName } = formatFilePath(filePath);
+  const fileName = fileLabel(filePath);
   const selectedMilestone = data.milestones.find((m) => m.id === selectedMilestoneId);
 
   return (
@@ -1142,6 +1142,7 @@ export const KanbanBoard = ({
     rejected: true,
   });
   const [colorMode, setColorMode] = useState(false);
+  const [scope, setScope] = usePersistedScope('board');
 
   // Find .todos.md files assigned to any workspace in the dashboard config.
   // Falls back to scanning the full tree only when no config is available.
@@ -1163,8 +1164,12 @@ export const KanbanBoard = ({
     if ((tree ?? []).some((t) => t.path === inboxPath) && !paths.includes(inboxPath)) {
       paths = [inboxPath, ...paths];
     }
-    return paths;
-  }, [remoteConfig, tree]);
+    return withBusinessFiles(paths, tree ?? [], '.todos.md', scope);
+  }, [remoteConfig, tree, scope]);
+
+  useEffect(() => {
+    setFocusedFiles((prev) => pruneFocus(prev, todoFilePaths));
+  }, [todoFilePaths]);
 
   useEffect(() => {
     for (const path of todoFilePaths) {
@@ -1363,6 +1368,8 @@ export const KanbanBoard = ({
           )}
         </div>
 
+        <ScopeToggle value={scope} onChange={setScope} />
+
         {/* Search */}
         <div className="flex-1 flex items-center gap-1.5 border border-[var(--los-border)] px-2 py-1 focus-within:border-[var(--los-accent)] transition-colors min-w-0 max-w-xs">
           <Search size={11} className="text-[var(--los-muted)] shrink-0" />
@@ -1476,7 +1483,7 @@ export const KanbanBoard = ({
           </button>
           <div className="w-px h-4 bg-[var(--los-border)] shrink-0" />
           {sortedFilePaths.map((fp) => {
-            const { name } = formatFilePath(fp);
+            const name = fileLabel(fp);
             const isActive = focusedFiles.has(fp);
             const color = colorMode ? fileColors[fp] : undefined;
             return (

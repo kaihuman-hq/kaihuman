@@ -34,6 +34,11 @@ describe('navbar catalog', () => {
     expect(ids.has('ideas')).toBe(true);
   });
 
+  it('offers Business in settings but not in the default navbar', () => {
+    expect(NAVBAR_ITEMS.find((item) => item.id === 'business')?.label).toBe('Business');
+    expect(DEFAULT_NAVBAR).not.toContain('business');
+  });
+
   it('getNavbarItem resolves known ids and ignores unknown ones', () => {
     expect(getNavbarItem('wiki')?.label).toBe('Wiki');
     // @ts-expect-error — exercising the unknown-id branch at runtime
