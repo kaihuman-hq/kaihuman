@@ -39,5 +39,6 @@ describe('touchesFrozen', () => {
     expect(touchesFrozen(`${B}/drafts`, tree)).toBe(false);
     expect(touchesFrozen('notes', tree)).toBe(false);
     expect(touchesFrozen(`${B}/invoices/20`, tree)).toBe(false);
+    expect(touchesFrozen(`${B}/invoices2`, [`${B}/invoices2/x.md`, ...tree])).toBe(false);
   });
 });

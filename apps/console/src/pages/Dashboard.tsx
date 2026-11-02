@@ -54,9 +54,12 @@ export const Dashboard = () => {
   }, []);
 
   // True (after telling the user) when the path, or a folder's content, is an issued document.
-  const refuseFrozen = useCallback((path: string): boolean => {
+  const refuseFrozen = useCallback((path: string, target = false): boolean => {
     const treePaths = githubFileStore.tree.peek().map((t) => t.path);
+    // A target only clashes with what already exists there (a new path may be anywhere).
+    if (target && !treePaths.some((p) => p === path || p.startsWith(`${path}/`))) return false;
     if (!touchesFrozen(path, treePaths)) return false;
+    clearTimeout(captureTimer.current); // a pending success timeout must not clear this message
     setCaptureStatus({ ok: false, message: frozenMessage(path) });
     return true;
   }, []);
@@ -512,16 +515,20 @@ export const Dashboard = () => {
             }
           }}
           // Handlers
-          onCreateFile={useCallback(async (path: string, content: string) => {
-            try {
-              await githubFileStore.createFile(path, content);
-              await githubFileStore.openFile(path);
-              addToRecentFiles(path); // Update recent files on create
-              layoutStore.navigate(path);
-            } catch (e) {
-              logger.error('Failed to create file:', e);
-            }
-          }, [])}
+          onCreateFile={useCallback(
+            async (path: string, content: string) => {
+              if (refuseFrozen(path, true)) return;
+              try {
+                await githubFileStore.createFile(path, content);
+                await githubFileStore.openFile(path);
+                addToRecentFiles(path); // Update recent files on create
+                layoutStore.navigate(path);
+              } catch (e) {
+                logger.error('Failed to create file:', e);
+              }
+            },
+            [refuseFrozen],
+          )}
           onDeleteFile={useCallback(
             async (path: string) => {
               if (refuseFrozen(path)) return;
@@ -551,21 +558,21 @@ export const Dashboard = () => {
           )}
           onRenameFile={useCallback(
             async (path: string, newPath: string) => {
-              if (refuseFrozen(path)) return;
+              if (refuseFrozen(path) || refuseFrozen(newPath, true)) return;
               await githubFileStore.renameFile(path, newPath);
             },
             [refuseFrozen],
           )}
           onRenameFolder={useCallback(
             async (path: string, newPath: string) => {
-              if (refuseFrozen(path)) return;
+              if (refuseFrozen(path) || refuseFrozen(newPath, true)) return;
               await githubFileStore.renameFolder(path, newPath);
             },
             [refuseFrozen],
           )}
           onMoveFile={useCallback(
             async (path: string, newPath: string) => {
-              if (refuseFrozen(path)) return;
+              if (refuseFrozen(path) || refuseFrozen(newPath, true)) return;
               await githubFileStore.renameFile(path, newPath);
             },
             [refuseFrozen],

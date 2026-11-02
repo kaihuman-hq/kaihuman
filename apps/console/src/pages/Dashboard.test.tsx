@@ -8,6 +8,8 @@ const h = vi.hoisted(() => ({
   main: {} as Record<string, (...a: unknown[]) => Promise<void> | void>,
   store: {
     deleteFile: vi.fn(),
+    createFile: vi.fn(),
+    openFile: vi.fn(),
     renameFile: vi.fn(),
     renameFolder: vi.fn(),
     updateFileContent: vi.fn(),
@@ -117,6 +119,21 @@ describe('Dashboard refuses to change issued documents', () => {
     await call('onDeleteFile', `${B}/invoices`);
     expect(h.store.renameFolder).not.toHaveBeenCalled();
     expect(h.store.deleteFile).not.toHaveBeenCalled();
+  });
+
+  it('refuses a destination or new file that would overwrite issued documents', async () => {
+    await call('onRenameFolder', 'notes', `${B}/invoices/2026`);
+    await call('onRenameFile', 'notes/a.md', FROZEN);
+    await call('onMoveFile', 'notes/a.md', FROZEN);
+    await call('onCreateFile', FROZEN, 'x');
+    expect(h.store.renameFolder).not.toHaveBeenCalled();
+    expect(h.store.renameFile).not.toHaveBeenCalled();
+    expect(h.store.createFile).not.toHaveBeenCalled();
+  });
+
+  it('still creates a new artifact next to issued files', async () => {
+    await call('onCreateFile', `${B}/invoices/2026/RE-2026-0002.pdf`, '');
+    expect(h.store.createFile).toHaveBeenCalled();
   });
 
   it('other files still change, rename, move and delete', async () => {

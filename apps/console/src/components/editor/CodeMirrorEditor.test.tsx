@@ -43,6 +43,21 @@ describe('CodeMirrorEditor readOnly', () => {
     expect(host.textContent).not.toContain('SAVE CHANGES');
   });
 
+  it('never auto-saves', () => {
+    vi.useFakeTimers();
+    const onSave = vi.fn();
+    act(() =>
+      render(
+        <CodeMirrorEditor path="a.yaml" initialContent="a: 1" onSave={onSave} readOnly />,
+        host,
+      ),
+    );
+    act(() => {
+      vi.advanceTimersByTime(10 * 60 * 1000);
+    });
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it('stays editable by default', () => {
     act(() => render(<CodeMirrorEditor path="a.yaml" initialContent="a: 1" />, host));
     expect(host.querySelector('textarea')?.readOnly).toBe(false);
