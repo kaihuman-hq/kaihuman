@@ -162,7 +162,12 @@ describe('rules', () => {
     for (const receipt of ['scan.pdf', `${id}.PDF`, `${id}.exe`, `${id}`, `x/${id}.pdf`]) {
       expect(validateExpense({ ...expense, receipt })).toMatchObject({
         ok: false,
-        issues: [{ path: 'receipt' }],
+        issues: [
+          {
+            path: 'receipt',
+            message: expect.stringContaining('rename the file to match the expense id'),
+          },
+        ],
       });
     }
   });
@@ -173,7 +178,12 @@ describe('rules', () => {
     for (const file of ['nda.pdf', `${id}.docx`, `${id}.PDF`]) {
       expect(validateContract({ ...(contract as object), file })).toMatchObject({
         ok: false,
-        issues: [{ path: 'file' }],
+        issues: [
+          {
+            path: 'file',
+            message: expect.stringContaining('rename the file to match the contract id'),
+          },
+        ],
       });
     }
   });

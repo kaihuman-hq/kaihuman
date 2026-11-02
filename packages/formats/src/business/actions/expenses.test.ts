@@ -90,6 +90,18 @@ describe('saveExpense', () => {
     expect(Object.keys(v.changes)).toEqual([`${DIR}/2026/${id}.yaml`]);
   });
 
+  it('refuses a receipt name without its file unless the expense already had it', () => {
+    expect(saveExpense(repo, { ...expense, receipt: `${id}.pdf` })).toEqual({
+      ok: false,
+      issues: [{ path: 'receipt', message: 'Upload the receipt file.' }],
+    });
+    const stored = { ...expense, receipt: `${id}.png` };
+    expect(saveExpense(repoWith(stored), { ...stored, receipt: `${id}.pdf` })).toEqual({
+      ok: false,
+      issues: [{ path: 'receipt', message: 'Upload the receipt file.' }],
+    });
+  });
+
   it('refuses a receipt file without the receipt field', () => {
     expect(saveExpense(repo, expense, { ext: 'pdf', bytes }).ok).toBe(false);
   });

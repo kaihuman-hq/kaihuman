@@ -16,14 +16,21 @@ const addDays = (date: string, days: number): string => {
 export const retentionEnd = (repo: BusinessRepo, date: string): string =>
   `${Number(date.slice(0, 4)) + jurisdictionFor(repo.profile?.jurisdiction ?? 'generic').retentionYears}-12-31`;
 
-/** The `next_date` after this period: one or three months on, the day clamped to the month end. */
-export const nextRetainerDate = (retainer: NonNullable<Project['retainer']>): string =>
-  addMonths(retainer.next_date, retainer.interval === 'monthly' ? 1 : 3);
+/**
+ * The `next_date` after this period: one or three months on, the day clamped to the month end.
+ * A retainer on a month's last day stays on the last day (31 Jan → 28 Feb → 31 Mar), not drifting to the 28th.
+ */
+export const nextRetainerDate = (retainer: NonNullable<Project['retainer']>): string => {
+  const months = retainer.interval === 'monthly' ? 1 : 3;
+  const date = retainer.next_date;
+  if (addDays(date, 1).slice(8) !== '01') return addMonths(date, months);
+  return addDays(addMonths(addDays(date, 1), months), -1);
+};
 
 export type RetainerDue = { project: Project; date: string; hasDraft: boolean };
 
 /**
- * Retainers whose `next_date` is at most `windowDays` away, overdue ones included, by date.
+ * Retainers of active projects whose `next_date` is at most `windowDays` away, overdue ones included, by date.
  * `hasDraft`: a draft for that project already bills that period.
  */
 export const retainersDue = (repo: BusinessRepo, today: string, windowDays = 14): RetainerDue[] => {
@@ -31,7 +38,8 @@ export const retainersDue = (repo: BusinessRepo, today: string, windowDays = 14)
   return repo.projects
     .flatMap((project) => {
       const date = project.retainer?.next_date;
-      if (date === undefined || date > until) return [];
+      // Paused and done projects are not billed.
+      if (project.status !== 'active' || date === undefined || date > until) return [];
       const hasDraft = repo.drafts.some(
         (d) =>
           d.client === project.client && d.project === project.slug && d.from_retainer === date,

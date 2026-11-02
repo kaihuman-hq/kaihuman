@@ -19,11 +19,15 @@ const retainer = (next_date: string, interval: 'monthly' | 'quarterly' = 'monthl
   next_date,
   description: 'Care',
 });
-const project = (slug: string, next_date?: string): Project => ({
+const project = (
+  slug: string,
+  next_date?: string,
+  status: Project['status'] = 'active',
+): Project => ({
   slug: slug as Slug,
   client: acme,
   name: slug,
-  status: 'active',
+  status,
   ...(next_date ? { retainer: retainer(next_date) } : {}),
 });
 
@@ -33,6 +37,14 @@ describe('nextRetainerDate', () => {
     expect(nextRetainerDate(retainer('2026-12-01'))).toBe('2027-01-01');
     expect(nextRetainerDate(retainer('2026-11-30', 'quarterly'))).toBe('2027-02-28');
     expect(nextRetainerDate(retainer('2026-10-01', 'quarterly'))).toBe('2027-01-01');
+    expect(nextRetainerDate(retainer('2026-02-27'))).toBe('2026-03-27');
+  });
+
+  it('keeps a month-end retainer on the month end', () => {
+    expect(nextRetainerDate(retainer('2026-02-28'))).toBe('2026-03-31');
+    expect(nextRetainerDate(retainer('2026-04-30'))).toBe('2026-05-31');
+    expect(nextRetainerDate(retainer('2026-04-30', 'quarterly'))).toBe('2026-07-31');
+    expect(nextRetainerDate(retainer('2028-02-29'))).toBe('2028-03-31');
   });
 });
 
@@ -52,11 +64,13 @@ describe('retainersDue', () => {
       project('edge', '2026-11-16'),
       project('past', '2026-10-01'),
       project('none'),
+      project('paused', '2026-11-03', 'paused'),
+      project('done', '2026-11-03', 'done'),
     ],
     drafts: [draft('edge', '2026-11-16'), draft('past', '2026-09-01'), draft('late')],
   };
 
-  it('lists retainers due within the window, sorted, overdue included', () => {
+  it('lists active retainers due within the window, sorted, overdue included', () => {
     expect(
       retainersDue(repo, '2026-11-02').map((r) => [r.project.slug, r.date, r.hasDraft]),
     ).toEqual([

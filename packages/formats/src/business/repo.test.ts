@@ -76,3 +76,34 @@ describe('path scope helpers', () => {
     expect(inScope('todos/work.todos.md', 'all')).toBe(true);
   });
 });
+
+describe('expense paths in the loader', () => {
+  it('reports an expense outside its year folder, under another id or duplicated, and does not load it', () => {
+    const files = new Map(loadFixtureRepo());
+    const DIR = '.kh/business/expenses';
+    const id = '01M55FJ500NTZ49EKRX27CHPV0';
+    const other = '01M55FJ500NTZ49EKRX27CHPV1';
+    const text = files.get(`${DIR}/2026/${id}.yaml`) ?? '';
+    files.set(`${DIR}/2027/${id}.yaml`, text);
+    files.set(`${DIR}/2026/${other}.yaml`, text);
+    const repo = loadBusinessRepo(files);
+    expect(repo.expenses.map((e) => e.id)).toEqual([id]);
+    const duplicate = `another expense already has the id ${id}`;
+    expect(repo.findings.map((f) => [f.file, f.path, f.level, f.message])).toEqual([
+      [
+        `${DIR}/2026/${other}.yaml`,
+        'id',
+        'error',
+        `"${id}" does not match the file name "${other}"`,
+      ],
+      [`${DIR}/2026/${other}.yaml`, 'id', 'error', duplicate],
+      [
+        `${DIR}/2027/${id}.yaml`,
+        'date',
+        'error',
+        'date: 2026-10-03 is not in the year folder 2027',
+      ],
+      [`${DIR}/2027/${id}.yaml`, 'id', 'error', duplicate],
+    ]);
+  });
+});

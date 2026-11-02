@@ -250,9 +250,22 @@ describe('issue a retainer draft', () => {
     status: 'active',
     retainer: { amount: 1000, interval: 'monthly', next_date: '2027-01-31', description: 'Care' },
   };
+  // Hand-edited: a comment, a custom nested order and a quoted date must all survive.
+  const text = [
+    'client: acme-gmbh',
+    'name: Hosting',
+    'status: active',
+    '# billed on the last day',
+    'retainer:',
+    '  description: Care',
+    '  next_date: "2027-01-31" # moves on issue',
+    '  interval: monthly',
+    '  amount: 1000',
+    '',
+  ].join('\n');
   const projectPath = `${root}/clients/acme-gmbh/projects/hosting.yaml`;
   const retainerDraft: Draft = { ...plain, project: project.slug, from_retainer: '2027-01-31' };
-  const base = { ...ctx, draft: retainerDraft, timeFiles: {}, project };
+  const base = { ...ctx, draft: retainerDraft, timeFiles: {}, project: { value: project, text } };
 
   it('advances next_date in the same commit and drops from_retainer from the document', () => {
     const { document, changes } = ok(base);
@@ -260,15 +273,7 @@ describe('issue a retainer draft', () => {
     const issuedYaml = Object.entries(changes).find(([p]) => p.includes('/invoices/'))?.[1];
     expect(issuedYaml).not.toContain('from_retainer');
     expect(changes[projectPath]).toBe(
-      stringifyYaml(
-        {
-          client: 'acme-gmbh',
-          name: 'Hosting',
-          status: 'active',
-          retainer: { ...project.retainer, next_date: '2027-02-28' },
-        },
-        KEY_ORDER.project,
-      ),
+      text.replace('next_date: "2027-01-31"', 'next_date: "2027-02-28"'),
     );
   });
 
@@ -280,12 +285,18 @@ describe('issue a retainer draft', () => {
         next_date: '2027-02-28',
       },
     };
-    const { changes } = ok({ ...base, project: advanced });
+    const { changes } = ok({ ...base, project: { value: advanced, text } });
     expect(Object.keys(changes)).not.toContain(projectPath);
   });
 
   it('leaves the project alone without a project in the context', () => {
     const { project: _p, ...noProject } = base;
     expect(Object.keys(ok(noProject).changes)).not.toContain(projectPath);
+  });
+
+  it('advances only for an invoice', () => {
+    const credit: Draft = { ...creditDraft, project: project.slug, from_retainer: '2027-01-31' };
+    const { changes } = ok({ ...base, draft: credit });
+    expect(Object.keys(changes)).not.toContain(projectPath);
   });
 });

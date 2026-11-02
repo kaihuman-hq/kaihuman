@@ -54,6 +54,10 @@ export const saveExpense = (
 
   const changes: FileChanges = {};
   const old = repo.expenses.find((e) => e.id === value.id);
+  // A name with no bytes must be the file already stored, or the expense would point at nothing.
+  if (!receipt && value.receipt !== undefined && old?.receipt !== value.receipt) {
+    return refuse('receipt', 'Upload the receipt file.');
+  }
   if (old) {
     const oldYear = yearOf(old.date);
     if (old.receipt !== undefined) {

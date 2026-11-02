@@ -129,7 +129,15 @@ export async function buildIssueContext(
     if (text !== null) timeFiles[timePath(month)] = text;
   }
   const clientLog = await source.read(`${clientDir(client.slug)}/log.actionlog.md`);
-  const project = repo.projects.find((p) => p.client === draft.client && p.slug === draft.project);
+  // The file text too: advancing a retainer edits only `next_date`, keeping the person's comments.
+  const projectRecord = repo.projects.find(
+    (p) => p.client === draft.client && p.slug === draft.project,
+  );
+  const projectText = projectRecord
+    ? await source.read(`${clientDir(client.slug)}/projects/${projectRecord.slug}.yaml`)
+    : null;
+  const project =
+    projectRecord && projectText !== null ? { value: projectRecord, text: projectText } : undefined;
 
   return {
     ok: true,

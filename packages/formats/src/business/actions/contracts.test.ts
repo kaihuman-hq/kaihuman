@@ -65,6 +65,15 @@ describe('saveContract', () => {
     expect(saveContract(repo, { ...contract, client: 'nobody' as Slug }).ok).toBe(false);
   });
 
+  it('refuses a file name without its file unless the contract already had it', () => {
+    expect(saveContract(repo, { ...contract, file: `${id}.pdf` })).toEqual({
+      ok: false,
+      issues: [{ path: 'file', message: 'Upload the contract file.' }],
+    });
+    const stored = { ...contract, file: `${id}.pdf` };
+    expect(saveContract(repoWith(stored), { ...stored, title: 'NDA 2' }).ok).toBe(true);
+  });
+
   it('deletes the file when the field is removed', () => {
     const v = ok(saveContract(repoWith({ ...contract, file: `${id}.pdf` }), contract));
     expect(v.changes).toEqual({

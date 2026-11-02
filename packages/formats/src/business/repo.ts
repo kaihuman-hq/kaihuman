@@ -313,18 +313,29 @@ export const loadBusinessRepoDetailed = (
       case 'expense': {
         if (text === undefined) break;
         const r = readYaml(text, validateExpense);
-        if (!r.ok) addIssues(file, r.issues);
-        else {
-          repo.expenses.push(r.value);
-          sameId(file, r.value.id, p.id);
-          if (r.value.client) {
-            refs.push({
-              file,
-              path: 'client',
-              client: r.value.client,
-              ...(r.value.project ? { project: r.value.project } : {}),
-            });
-          }
+        if (!r.ok) {
+          addIssues(file, r.issues);
+          break;
+        }
+        // Writers derive the YAML and receipt paths from id and date, so a record that disagrees
+        // with its path is reported and left out: saving or deleting it would miss the real file.
+        const before = findings.length;
+        sameId(file, r.value.id, p.id);
+        if (!r.value.date.startsWith(`${p.year}-`)) {
+          fail(file, 'date', `date: ${r.value.date} is not in the year folder ${p.year}`);
+        }
+        if (repo.expenses.some((e) => e.id === r.value.id)) {
+          fail(file, 'id', `another expense already has the id ${r.value.id}`);
+        }
+        if (findings.length > before) break;
+        repo.expenses.push(r.value);
+        if (r.value.client) {
+          refs.push({
+            file,
+            path: 'client',
+            client: r.value.client,
+            ...(r.value.project ? { project: r.value.project } : {}),
+          });
         }
         break;
       }

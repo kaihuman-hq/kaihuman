@@ -15,9 +15,9 @@ import {
 } from './records.js';
 import { nextRetainerDate } from './reminders.js';
 import { computeTotals } from './totals.js';
-import { validateDraft, validateTimeEntry } from './validate.js';
+import { validateDraft, validateProject, validateTimeEntry } from './validate.js';
 import { date, type Issue, type Result } from './validate-kit.js';
-import { stringifyYaml } from './yaml.js';
+import { editYaml, parseYaml, stringifyYaml } from './yaml.js';
 
 /** Repo-root path → new text; `null` deletes the file. What every text-only action produces. */
 export type TextChanges = Record<string, string | null>;
@@ -42,11 +42,11 @@ export type IssueContext = {
   clientLog: string | null;
   now: Date;
   /**
-   * The draft's project as it is now. A retainer draft (`from_retainer`) advances its `next_date`
-   * in the same commit, but only while it still equals `from_retainer`: a stale second draft for the
-   * same period must not skip a period.
+   * The draft's project as it is now, record and file text. A retainer invoice (`from_retainer`)
+   * advances its `next_date` in the same commit, but only while it still equals `from_retainer`:
+   * a stale second draft for the same period must not skip a period.
    */
-  project?: Project;
+  project?: { value: Project; text: string };
 };
 
 const problem = (path: string, message: string): Issue => ({
@@ -63,26 +63,32 @@ const addDays = (date: string, days: number): string => {
 const without = <T extends object>(value: T, ...keys: string[]): Omit<T, never> =>
   Object.fromEntries(Object.entries(value).filter(([k]) => !keys.includes(k))) as T;
 
-/** The project file with the retainer moved to its next period, or nothing when the draft does not bill the current one. */
-const advanceRetainer = (draft: Draft, project: Project | undefined): TextChanges => {
-  const retainer = project?.retainer;
+/**
+ * The project file with the retainer moved to its next period, or nothing when the draft is not
+ * an invoice for the period the project is at now. Only `next_date` changes in the file's text.
+ */
+const advanceRetainer = (draft: Draft, project: IssueContext['project']): Result<TextChanges> => {
+  const retainer = project?.value.retainer;
   if (
     !project ||
     !retainer ||
+    draft.kind !== 'invoice' ||
     draft.from_retainer === undefined ||
-    project.client !== draft.client ||
-    project.slug !== draft.project ||
+    project.value.client !== draft.client ||
+    project.value.slug !== draft.project ||
     retainer.next_date !== draft.from_retainer
   ) {
-    return {};
+    return { ok: true, value: {} };
   }
-  const { slug, ...body } = project;
-  return {
-    [`${clientDir(project.client)}/projects/${slug}.yaml`]: stringifyYaml(
-      { ...body, retainer: { ...retainer, next_date: nextRetainerDate(retainer) } },
-      KEY_ORDER.project,
-    ),
-  };
+  const { client, slug } = project.value;
+  const edited = editYaml(project.text, [
+    { path: ['retainer', 'next_date'], value: nextRetainerDate(retainer) },
+  ]);
+  if (!edited.ok) return edited;
+  const parsed = parseYaml(edited.value);
+  const checked = parsed.ok ? validateProject(parsed.value, slug, client) : parsed;
+  if (!checked.ok) return checked;
+  return { ok: true, value: { [`${clientDir(client)}/projects/${slug}.yaml`]: edited.value } };
 };
 
 const seller = (p: BusinessProfile): Party => ({
@@ -214,6 +220,8 @@ export const issue = (
     issues.push(problem('number', `${number} already exists; check numbering in business.yaml`));
   const billed = billTimeEntries(draft, number, ctx.timeFiles);
   issues.push(...billed.issues);
+  const advanced = advanceRetainer(draft, ctx.project);
+  if (!advanced.ok) issues.push(...advanced.issues.map((i) => problem('project', i.message)));
   if (issues.length > 0) return { ok: false, issues };
 
   const currency = draft.currency ?? client.currency ?? profile.currency;
@@ -265,7 +273,7 @@ export const issue = (
     [issuedPath(series, year, number)]: stringifyYaml(document, KEY_ORDER.issued),
     [draftPath(draft.id)]: null,
     ...billed.changes,
-    ...advanceRetainer(draft, ctx.project),
+    ...(advanced.ok ? advanced.value : {}),
     [logPath]: logContent,
   };
   return {

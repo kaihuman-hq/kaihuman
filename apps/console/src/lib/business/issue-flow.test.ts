@@ -301,12 +301,14 @@ describe('issuing through writeBusiness', () => {
   it('Review Focus 4: a retainer draft advances next_date in the issuing commit, once', async () => {
     const PROJECT = `${ROOT}/clients/acme-gmbh/projects/website.yaml`;
     files[PROJECT] =
-      `${files[PROJECT]}retainer:\n  amount: 1000\n  interval: monthly\n  next_date: "2026-11-01"\n  description: Care\n`;
+      `# hand-edited\n${files[PROJECT]}retainer:\n  amount: 1000\n  interval: monthly\n  next_date: "2026-11-01"\n  description: Care\n`;
     files[DRAFT] = `${files[DRAFT]}from_retainer: "2026-11-01"\n`;
     const first = await commit();
     expect(first.result.ok).toBe(true);
     const [one] = commits();
-    expect(one?.changes[PROJECT]).toContain('next_date: 2026-12-01');
+    expect(one?.changes[PROJECT]).toBe(
+      files[PROJECT]?.replace('next_date: "2026-11-01"', 'next_date: "2026-12-01"'),
+    );
     expect(one?.changes[issuedAt('RE-2026-0043')]).not.toContain('from_retainer');
 
     // A stale second draft for the same period: the project has moved on, so it stays.

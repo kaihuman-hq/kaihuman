@@ -51,6 +51,10 @@ export const saveContract = (
 
   const changes: FileChanges = {};
   const old = repo.contracts.find((c) => c.id === value.id);
+  // A name with no bytes must be the file already stored, or the contract would point at nothing.
+  if (!file && value.file !== undefined && old?.file !== value.file) {
+    return refuse('file', 'Upload the contract file.');
+  }
   if (old) {
     if (old.file !== undefined) {
       // Same name and no new bytes: the stored file stays. A re-upload overwrites it below.

@@ -298,13 +298,17 @@ export const validateProject = (
 
 /** A receipt or contract file sits next to its record and is named by the record's id: `<id>.<ext>`. */
 const attachmentName =
-  (id: unknown, exts: readonly string[]): Reader<string> =>
+  (id: unknown, exts: readonly string[], record: string): Reader<string> =>
   (raw, path, issues) => {
     const name = str(raw, path, issues);
     if (name === undefined) return undefined;
     const dot = name.lastIndexOf('.');
     if (name.slice(0, dot) === id && exts.includes(name.slice(dot + 1))) return name;
-    note(issues, path, `must be "<id>.<ext>" with the record's id and ext ${exts.join(', ')}`);
+    note(
+      issues,
+      path,
+      `must be "<id>.<ext>", ext ${exts.join('/')} (rename the file to match the ${record} id)`,
+    );
     return undefined;
   };
 
@@ -321,7 +325,7 @@ export const validateContract = (raw: unknown): Result<Contract> => {
     end: opt(r, '', 'end', issues, date),
     notice_period_days: opt(r, '', 'notice_period_days', issues, nonNegInt),
     renewal_date: opt(r, '', 'renewal_date', issues, date),
-    file: opt(r, '', 'file', issues, attachmentName(r.id, CONTRACT_EXTENSIONS)),
+    file: opt(r, '', 'file', issues, attachmentName(r.id, CONTRACT_EXTENSIONS, 'contract')),
   });
   return finish(issues, value);
 };
@@ -592,7 +596,7 @@ export const validateExpense = (raw: unknown): Result<Expense> => {
     vat_rate: req(r, '', 'vat_rate', issues, decimalStr),
     client: opt(r, '', 'client', issues, slug),
     project: opt(r, '', 'project', issues, slug),
-    receipt: opt(r, '', 'receipt', issues, attachmentName(r.id, RECEIPT_EXTENSIONS)),
+    receipt: opt(r, '', 'receipt', issues, attachmentName(r.id, RECEIPT_EXTENSIONS, 'expense')),
   });
   return finish(issues, value);
 };
