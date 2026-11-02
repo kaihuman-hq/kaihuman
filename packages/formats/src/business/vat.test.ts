@@ -187,7 +187,7 @@ describe('vatSummary, cash', () => {
 
   it('cash basis caps at invoice gross', () => {
     const inv = invoice('RE-2026-0002', '2026-01-10', s19(10000, 1900));
-    const cn = credit('RE-2026-0003', '2026-05-02', s19(1000, 190));
+    const cn = { ...credit('RE-2026-0003', '2026-05-02', s19(1000, 190)), corrects: inv.number };
     const repo = repoOf([inv, cn], {
       profile: cash,
       payments: [

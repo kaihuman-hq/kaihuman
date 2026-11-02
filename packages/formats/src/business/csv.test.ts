@@ -225,7 +225,7 @@ describe('formula injection', () => {
           id: '01M55FJ500NTZ49EKRX27CHPV0' as Ulid,
           date: '2026-10-03',
           supplier: '=HYPERLINK("x")',
-          description: '+1 cable',
+          description: '-1+cmd',
           category: '@sum',
           net: -1000,
           vat: 0,
@@ -238,7 +238,7 @@ describe('formula injection', () => {
       ]),
     )[1];
     expect(row).toBe(
-      `2026-10-03;"'=HYPERLINK(""x"")";'+1 cable;'@sum;-10,00;0;0,00;-10,00;'\tacme;"'\rweb";01M55FJ500NTZ49EKRX27CHPV0.pdf`,
+      `2026-10-03;"'=HYPERLINK(""x"")";'-1+cmd;'@sum;-10,00;0;0,00;-10,00;'\tacme;"'\rweb";01M55FJ500NTZ49EKRX27CHPV0.pdf`,
     );
   });
 

@@ -105,6 +105,9 @@ export async function writeBusiness(
         fresh,
         withoutMissingDeletes(fresh, built.value.changes),
       );
+      // Nothing left to change (e.g. only deletions of files already gone): the head is the result.
+      if (Object.keys(changes).length === 0)
+        return { ok: true, value: { commitSha: fresh.headSha } };
       const res = await githubService.commitFiles(
         owner,
         name,

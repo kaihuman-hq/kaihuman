@@ -12,11 +12,11 @@ const field = (value: string | number): string => {
   return NEEDS_QUOTES.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 };
 
-const FORMULA_START = /^[=+@\t\r]/;
+const FORMULA_START = /^[=+\-@\t\r]/;
 
 /**
- * A free-text field that a spreadsheet would run as a formula gets a leading `'`. Only text
- * fields: amounts start with `-` and must stay numbers.
+ * A free-text field that a spreadsheet would run as a formula gets a leading `'`. Applied to text
+ * fields only, so negative amounts (`-10,00`) stay numbers.
  */
 const text = (value: string | undefined): string => {
   const v = value ?? '';

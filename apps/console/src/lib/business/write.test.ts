@@ -362,4 +362,14 @@ describe('writeBusiness deletions', () => {
     const sent = vi.mocked(githubService.commitFiles).mock.calls[0]?.[3] as FileChanges;
     expect(sent).toEqual({ [TIME]: null });
   });
+
+  it('makes no commit when only deletions of missing paths remain', async () => {
+    const GONE = '.kh/business/expenses/2026/01JABCDEFGHJKMNPQRSTVWXYZ0.pdf';
+    const res = await writeBusiness(target, async () => ({
+      ok: true as const,
+      value: { changes: { [GONE]: null }, message: 'business: delete' },
+    }));
+    expect(githubService.commitFiles).not.toHaveBeenCalled();
+    expect(res).toEqual({ ok: true, value: { commitSha: 'head-1' } });
+  });
 });
