@@ -7,7 +7,7 @@ fragment: browsers never send it, the console never sends it to the worker, and 
 script passes it only to the decrypt function. The worker can store and serve files but never
 read them.
 
-Storage: D1 (`files`, `events`; schema in [`migrations/0001_init.sql`](migrations/0001_init.sql))
+Storage: D1 (`files`, `events`; schema in [`migrations/`](migrations/))
 and an R2 bucket in the EU jurisdiction, one object per file under `<github user id>/<token>`.
 Download events keep the time, the token and a coarse client class (`browser`, `bot`, `other`).
 The worker stores no IP address, no full User-Agent and no GitHub token.
@@ -19,8 +19,8 @@ The worker stores no IP address, no full User-Agent and no GitHub token.
 | `GET`, `HEAD /d/:token` | anyone | Landing page with a Download button. Counts nothing and changes nothing, because email scanners open links first. 404 `This link does not exist.`, 410 `This link is no longer available.` for revoked or expired links |
 | `GET /d/:token/blob` | anyone | The ciphertext, and one download event. 404/410 as above, with nothing recorded |
 | `POST /api/files` | console | Upload ciphertext (`X-KH-Kind`, `X-KH-Label`, `X-KH-Business` percent-encoded, optional `X-KH-Expires`) |
-| `GET /api/files` | console | Own files with download counts, used bytes and quota |
-| `DELETE /api/files/:token` | console | Revoke: deletes the R2 object and marks the file revoked |
+| `GET /api/files` | console | Own files (label, business, kind, size, dates, download count), used bytes and quota |
+| `DELETE /api/files/:token` | console | Revoke: deletes the R2 object and marks the file revoked; 403 for another user's token, 404 for an unknown one |
 | `GET /api/events?since=<ISO>` | console | Own download events after `since`, oldest first, at most 500 |
 | `DELETE /api/account` | console | Deletes all the caller's R2 objects, files and events |
 
@@ -81,7 +81,7 @@ root. Run the commands in `apps/share-worker`.
 7. **Deploy:**
 
    ```sh
-   pnpm --filter @kaihuman/share-worker deploy
+   pnpm --filter @kaihuman/share-worker run deploy
    ```
 
 8. **Add the custom domain:** the `routes` entry (`docs.kaihuman.com`, `custom_domain: true`)

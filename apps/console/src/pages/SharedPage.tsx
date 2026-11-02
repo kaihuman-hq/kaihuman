@@ -323,7 +323,7 @@ function Files({
           left > 0
             ? ` ${left} ${left === 1 ? 'link' : 'links'} on another share service ${left === 1 ? 'was' : 'were'} not changed.`
             : ''
-        }`,
+        } Records in other repositories are not updated.`,
       );
       refresh();
     });
@@ -363,6 +363,7 @@ function Files({
             <thead>
               <tr>
                 <th class={th}>Document</th>
+                <th class={th}>Business</th>
                 <th class={th}>Kind</th>
                 <th class={th}>Size</th>
                 <th class={th}>Created</th>
@@ -376,6 +377,7 @@ function Files({
               {list.files.map((f) => (
                 <tr key={f.token}>
                   <td class={td}>{f.label}</td>
+                  <td class={td}>{f.business}</td>
                   <td class={td}>{f.kind}</td>
                   <td class={td}>{formatSize(f.size)}</td>
                   <td class={td}>{f.created.slice(0, 10)}</td>
@@ -383,7 +385,8 @@ function Files({
                   <td class={td}>{f.downloads}</td>
                   <td class={td}>{statusOf(f)}</td>
                   <td class={td}>
-                    {statusOf(f) === 'Active' &&
+                    {/* An expired file still takes storage until it is revoked. */}
+                    {statusOf(f) !== 'Revoked' &&
                       (confirm === f.token ? (
                         <span class="flex flex-wrap items-center gap-1">
                           <button

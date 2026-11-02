@@ -96,7 +96,10 @@ export class InMemoryGithubService {
     _opts?: { ref?: string },
   ): Promise<Uint8Array> {
     const file = this.files.get(path);
-    if (!file) throw new Error(`Not found: ${path}`);
+    if (!file) {
+      const isFolder = [...this.files.keys()].some((p) => p.startsWith(`${path}/`));
+      throw new Error(isFolder ? 'Path is not a file: dir' : `Not found: ${path}`);
+    }
     return new TextEncoder().encode(file.content);
   }
 

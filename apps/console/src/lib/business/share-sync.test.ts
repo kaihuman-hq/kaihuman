@@ -1,4 +1,10 @@
-import { EVENTS_PATH, type LinkRecord, type Ulid } from '@kaihuman/formats/business';
+import {
+  EVENTS_PATH,
+  type LinkRecord,
+  parseJsonl,
+  type Ulid,
+  validateEvent,
+} from '@kaihuman/formats/business';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const writes = vi.hoisted(() => ({ writeBusiness: vi.fn() }));
@@ -124,6 +130,10 @@ describe('syncDownloads', () => {
       type: 'downloaded',
       note: 'browser',
     });
+    // The repo loader reads the file back with the same validator.
+    const parsed = parseJsonl(lastWrite?.changes[EVENTS_PATH] ?? '', validateEvent);
+    expect(parsed.issues).toEqual([]);
+    expect(parsed.entries).toHaveLength(2);
   });
 
   it("pages past a full page of other repositories' tokens (S9)", async () => {

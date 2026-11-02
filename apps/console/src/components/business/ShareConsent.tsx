@@ -80,7 +80,8 @@ export function ShareConsent({
           ) : (
             <p>
               Sharing uploads the PDF of a document you choose to the kaihuman share service, which
-              runs on Cloudflare and stores files in the EU.
+              runs on Cloudflare and stores files in the EU. Your GitHub sign-in is sent to the
+              kaihuman share service (docs.kaihuman.com) to identify you.
             </p>
           )}
           <p>

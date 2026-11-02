@@ -99,6 +99,10 @@ function Overview(props: {
   const { o, today, contents, backlinks, invoicedOffers, issuedPaths, links } = props;
   const activeLink = (row: { number: string; link: ClientOverview['invoices'][number]['link'] }) =>
     row.link === 'active' ? latestLink(links, row.number) : null;
+  const expiredLink = (row: {
+    number: string;
+    link: ClientOverview['invoices'][number]['link'];
+  }) => (row.link === 'expired' ? latestLink(links, row.number) : null);
   const { client, summary: s } = o;
   const currency = s.currency;
   const contact = client.contacts[0];
@@ -205,6 +209,7 @@ function Overview(props: {
                     ...(r.validUntil >= today ? { expires: r.validUntil } : {}),
                   }}
                   link={activeLink(r)}
+                  expired={expiredLink(r)}
                 />
               </td>
             </tr>
@@ -243,6 +248,7 @@ function Overview(props: {
                       pdf: r.pdf && issuedPaths.has(r.number),
                     }}
                     link={activeLink(r)}
+                    expired={expiredLink(r)}
                   />
                 </div>
               </td>

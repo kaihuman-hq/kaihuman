@@ -82,9 +82,20 @@ function CopyLink({ url, number }: { url: string; number: string }) {
 
 /**
  * Share…, Copy link and Revoke… for one issued document with a PDF. Nothing uploads without the
- * one-time consent and a confirm per document.
+ * one-time consent and a confirm per document. An expired link that was never revoked still holds
+ * its file on the service, so it keeps a Revoke… next to Share….
  */
-export function ShareActions({ doc, link }: { doc: ShareDoc; link: LinkRecord | null }) {
+export function ShareActions({
+  doc,
+  link,
+  expired = null,
+}: {
+  doc: ShareDoc;
+  /** The document's active link. */
+  link: LinkRecord | null;
+  /** The document's latest link when it expired without being revoked. */
+  expired?: LinkRecord | null;
+}) {
   const state = useBusinessRepo();
   const [phase, setPhase] = useState<Phase>('idle');
   const [busy, setBusy] = useState(false);
@@ -117,6 +128,8 @@ export function ShareActions({ doc, link }: { doc: ShareDoc; link: LinkRecord | 
 
   const active = [link, created].find((l) => l && l.id !== revokedId) ?? null;
   const url = active?.url;
+  const lapsed = !active && expired && expired.id !== revokedId ? expired : null;
+  const revocable = active ?? lapsed;
 
   async function run(task: () => Promise<void>): Promise<void> {
     if (submitting.current) return;
@@ -167,14 +180,14 @@ export function ShareActions({ doc, link }: { doc: ShareDoc; link: LinkRecord | 
 
   const revoke = () =>
     run(async () => {
-      if (!active) return;
+      if (!revocable) return;
       try {
-        const result = await revokeShareLink(repo, active, { api: api() });
+        const result = await revokeShareLink(repo, revocable, { api: api() });
         if (!result.ok) {
           setError(result.issues[0]?.message ?? 'Nothing was saved.');
           return;
         }
-        setRevokedId(active.id);
+        setRevokedId(revocable.id);
         setCreated(null);
         setPhase('idle');
       } catch (e) {
@@ -215,17 +228,31 @@ export function ShareActions({ doc, link }: { doc: ShareDoc; link: LinkRecord | 
           )}
         </>
       ) : (
-        phase !== 'confirm' && (
-          <button
-            type="button"
-            class={BUTTON}
-            disabled={busy}
-            aria-label={`Share ${doc.number}`}
-            onClick={startShare}
-          >
-            Share…
-          </button>
-        )
+        <>
+          {lapsed && <span class="text-xs text-[var(--los-muted)]">Link expired</span>}
+          {phase !== 'confirm' && (
+            <button
+              type="button"
+              class={BUTTON}
+              disabled={busy}
+              aria-label={`Share ${doc.number}`}
+              onClick={startShare}
+            >
+              Share…
+            </button>
+          )}
+          {lapsed && phase !== 'confirm-revoke' && (
+            <button
+              type="button"
+              class={BUTTON}
+              disabled={busy}
+              aria-label={`Revoke the expired share link for ${doc.number}`}
+              onClick={() => setPhase('confirm-revoke')}
+            >
+              Revoke…
+            </button>
+          )}
+        </>
       )}
 
       {phase === 'confirm' && !url && (
@@ -240,7 +267,7 @@ export function ShareActions({ doc, link }: { doc: ShareDoc; link: LinkRecord | 
         </div>
       )}
 
-      {phase === 'confirm-revoke' && active && (
+      {phase === 'confirm-revoke' && revocable && (
         <div class="w-full flex flex-wrap items-center gap-1 text-xs">
           <span>Revoke the link for {doc.number}? It stops working for everyone who has it.</span>
           <button ref={confirmButton} type="button" class={BUTTON} disabled={busy} onClick={revoke}>

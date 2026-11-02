@@ -1,6 +1,7 @@
 import { decryptShareBlob, encryptShareBlob, newShareKey } from '@kaihuman/formats/share';
 import { describe, expect, it } from 'vitest';
 import { SQL } from './db.js';
+import { inlinableDecrypt } from './landing.js';
 import { inlineScript, runPage } from './testing/page.js';
 import { makeWorld, tokenOf, type World } from './testing/world.js';
 
@@ -210,5 +211,24 @@ describe('landing page script (Review Focus 1)', () => {
     const gone = runPage(text, { pathname: PAGE, hash: `#${key}` }, answer);
     await gone.download();
     expect(gone.status.textContent).toBe(INCOMPLETE);
+  });
+});
+
+describe('inlinableDecrypt (module-load guard)', () => {
+  it('accepts the real decryptShareBlob source', () => {
+    const source = decryptShareBlob.toString();
+    expect(inlinableDecrypt(source)).toBe(source);
+  });
+
+  it('refuses a renamed, non-async or unsafe source, which the page script could not call', () => {
+    for (const source of [
+      'async function decryptShareBlob2(blob, key) {}',
+      'function decryptShareBlob(blob, key) {}',
+      'async (blob, key) => {}',
+      'async function decryptShareBlob(blob, key) { "</script>" }',
+      'async function decryptShareBlob(blob, key) { "<!--" }',
+    ]) {
+      expect(() => inlinableDecrypt(source)).toThrow('decryptShareBlob cannot be inlined');
+    }
   });
 });

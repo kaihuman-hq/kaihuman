@@ -87,6 +87,7 @@ const handlers: Record<string, Handler> = {
           (f): FileListRow => ({
             token: f.token,
             label: f.label,
+            business: f.business,
             kind: f.kind,
             size: f.size,
             created_at: f.created_at,
@@ -142,7 +143,7 @@ const handlers: Record<string, Handler> = {
 class FakeStatement implements D1PreparedStatement {
   constructor(
     private readonly db: FakeD1,
-    private readonly sql: string,
+    readonly sql: string,
     private readonly handler: Handler,
     private readonly params: unknown[] = [],
   ) {}
@@ -163,7 +164,9 @@ class FakeStatement implements D1PreparedStatement {
     return { ...this.exec(), results: [] };
   }
 
-  private exec(): D1Result<unknown> {
+  /** Runs the statement; used by `run`/`all`/`first` and by `FakeD1.batch`. */
+  exec(): D1Result<unknown> {
+    if (this.db.failOn === this.sql) throw new Error(`FakeD1 failure injected: ${this.sql}`);
     this.db.queries.push(this.params);
     this.db.statements.push(this.sql);
     // Copies, so a caller can never mutate the store through a returned row.
@@ -178,11 +181,32 @@ export class FakeD1 implements D1Database {
   readonly queries: unknown[][] = [];
   /** The SQL of every executed statement, in order. */
   readonly statements: string[] = [];
+  /** The SQL of every batch, one array per `batch` call. */
+  readonly batches: string[][] = [];
+  /** Executing this statement throws, to test failure paths. */
+  failOn: string | null = null;
 
   prepare(query: string): D1PreparedStatement {
     const handler = handlers[query];
     if (!handler) throw new Error(`FakeD1 does not implement: ${query}`);
     return new FakeStatement(this, query, handler);
+  }
+
+  /** Like D1, all or nothing: a failing statement restores the tables as they were. */
+  async batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
+    const fakes = statements.map((s) => {
+      if (!(s instanceof FakeStatement)) throw new Error('FakeD1.batch takes FakeD1 statements');
+      return s;
+    });
+    this.batches.push(fakes.map((s) => s.sql));
+    const before = structuredClone(this.tables);
+    try {
+      return fakes.map((s) => s.exec() as D1Result<T>);
+    } catch (e) {
+      this.tables.files.splice(0, this.tables.files.length, ...before.files);
+      this.tables.events.splice(0, this.tables.events.length, ...before.events);
+      throw e;
+    }
   }
 }
 

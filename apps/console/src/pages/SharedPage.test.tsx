@@ -79,6 +79,7 @@ const FILES = {
     {
       token: T1,
       label: 'RE-2026-0001',
+      business: 'Acme Studio',
       kind: 'pdf',
       size: 2048,
       created: '2026-11-01T08:00:00.000Z',
@@ -89,6 +90,7 @@ const FILES = {
     {
       token: T2,
       label: 'RE-2026-0002',
+      business: 'Other Ltd',
       kind: 'pdf',
       size: 3 * 1048576,
       created: '2026-10-01T08:00:00.000Z',
@@ -99,6 +101,7 @@ const FILES = {
     {
       token: T3,
       label: 'RE-2026-0004',
+      business: 'Acme Studio',
       kind: 'pdf',
       size: 1000,
       created: '2026-10-01T08:00:00.000Z',
@@ -163,9 +166,38 @@ describe('SharedPage', () => {
     expect(rows[1]).toContain('Expired');
     expect(rows[2]).toContain('Revoked');
     expect(button('Revoke')).toBeUndefined();
-    expect(host.querySelectorAll('tbody button')).toHaveLength(1);
+    // Active and expired files can be revoked (an expired file still takes storage); revoked cannot.
+    const actions = [...host.querySelectorAll('tbody button')].map((b) =>
+      b.getAttribute('aria-label'),
+    );
+    expect(actions).toEqual([
+      'Revoke the share link for RE-2026-0001',
+      'Revoke the share link for RE-2026-0002',
+    ]);
     expect(text).toContain('approximate');
     expect(mocks.syncDownloads).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the business of each file, since the service lists every repository', async () => {
+    await show(ready([L1, L2]));
+    const headers = [...host.querySelectorAll('thead th')].map((h) => h.textContent);
+    expect(headers).toContain('Business');
+    const cells = [...host.querySelectorAll('tbody tr')].map(
+      (r) => r.children[headers.indexOf('Business')]?.textContent,
+    );
+    expect(cells).toEqual(['Acme Studio', 'Other Ltd', 'Acme Studio']);
+  });
+
+  it('revokes an expired file after a confirm', async () => {
+    mocks.revokeShareLink.mockResolvedValue({ ok: true, value: { commitSha: 'c' } });
+    await show(ready([L1, L2]));
+    const trigger = host.querySelector<HTMLButtonElement>(
+      'button[aria-label="Revoke the share link for RE-2026-0002"]',
+    );
+    act(() => trigger?.click());
+    await flush();
+    await click('Revoke');
+    expect(mocks.revokeShareLink).toHaveBeenCalledWith(target, L2, { api: mocks.api });
   });
 
   it('syncs again on request and reports what was added', async () => {
@@ -218,6 +250,7 @@ describe('SharedPage', () => {
     expect(lines[2].revoked).toBeUndefined();
     expect(lines[3].revoked).toBe('2026-11-02T00:00:00.000Z');
     expect(host.textContent).toContain('1 link on another share service was not changed.');
+    expect(host.textContent).toContain('Records in other repositories are not updated.');
   });
 
   it('delete all: leaves the repo alone when the service refuses', async () => {

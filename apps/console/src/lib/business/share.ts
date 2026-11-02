@@ -42,6 +42,7 @@ export class ShareUnavailableError extends ShareError {
 export type SharedFile = {
   token: string;
   label: string;
+  business: string;
   kind: 'pdf' | 'xml';
   size: number;
   created: string;
@@ -248,7 +249,8 @@ export async function createShareLink(
     doc: doc.number,
     url,
     created: (deps.now?.() ?? new Date()).toISOString(),
-    ...(doc.expires ? { expires: doc.expires } : {}),
+    // S10: the service keeps a link through the end of its expiry day in UTC; the record says so.
+    ...(doc.expires ? { expires: `${doc.expires}T23:59:59Z` } : {}),
   };
   let saved = false;
   try {

@@ -116,6 +116,15 @@ describe('ShareActions', () => {
     expect(text).not.toContain('kaihuman share service');
   });
 
+  it('says on the default host that the GitHub sign-in goes to the kaihuman share service', () => {
+    show({ doc, link: null });
+    click('Share…');
+    const text = host.querySelector('[role="dialog"]')?.textContent ?? '';
+    expect(text).toContain(
+      'Your GitHub sign-in is sent to the kaihuman share service (docs.kaihuman.com) to identify you.',
+    );
+  });
+
   it('keeps Escape working after a click on the backdrop', () => {
     show({ doc, link: null });
     click('Share…');
@@ -242,6 +251,23 @@ describe('ShareActions', () => {
     expect(share.revokeShareLink).toHaveBeenCalledTimes(1);
     expect(share.revokeShareLink.mock.calls[0]?.[1]).toBe(LINK);
     expect(host.textContent).not.toContain('Online · link active');
+    expect(button('Share…')).toBeDefined();
+  });
+
+  it('expired link: offers Share… and Revoke… for the expired link, which still holds the file', async () => {
+    share.revokeShareLink.mockResolvedValue({ ok: true, value: { commitSha: 'c' } });
+    show({ doc, link: null, expired: LINK });
+    expect(host.textContent).toContain('Link expired');
+    expect(host.textContent).not.toContain('Online · link active');
+    expect(button('Share…')).toBeDefined();
+    expect(button('Copy link')).toBeUndefined();
+    click('Revoke…');
+    expect(document.activeElement).toBe(button('Revoke'));
+    click('Revoke');
+    await flush();
+    expect(share.revokeShareLink.mock.calls[0]?.[1]).toBe(LINK);
+    expect(button('Revoke…')).toBeUndefined();
+    expect(host.textContent).not.toContain('Link expired');
     expect(button('Share…')).toBeDefined();
   });
 

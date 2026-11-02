@@ -27,7 +27,7 @@ export interface EventRow {
   client: 'browser' | 'bot' | 'other';
 }
 
-export interface FileListRow extends Omit<FileRow, 'user_id' | 'business'> {
+export interface FileListRow extends Omit<FileRow, 'user_id'> {
   downloads: number;
 }
 
@@ -38,7 +38,7 @@ export const SQL = {
     'SELECT COALESCE(SUM(size), 0) AS used FROM files WHERE user_id = ?1 AND revoked_at IS NULL',
   uploadsSince: 'SELECT COUNT(*) AS n FROM files WHERE user_id = ?1 AND created_at > ?2',
   listFiles:
-    'SELECT f.token, f.label, f.kind, f.size, f.created_at, f.expires_at, f.revoked_at, (SELECT COUNT(*) FROM events e WHERE e.token = f.token) AS downloads FROM files f WHERE f.user_id = ?1 ORDER BY f.created_at DESC, f.token',
+    'SELECT f.token, f.label, f.business, f.kind, f.size, f.created_at, f.expires_at, f.revoked_at, (SELECT COUNT(*) FROM events e WHERE e.token = f.token) AS downloads FROM files f WHERE f.user_id = ?1 ORDER BY f.created_at DESC, f.token',
   // COALESCE keeps the first revoke time when a file is revoked twice.
   revokeFile:
     'UPDATE files SET revoked_at = COALESCE(revoked_at, ?3) WHERE token = ?1 AND user_id = ?2',
@@ -142,8 +142,10 @@ export async function fileTokens(db: D1Database, userId: number): Promise<string
   return results.map((row) => row.token);
 }
 
-/** Removes every events and files row of the user. */
+/** Removes every events and files row of the user, atomically: all or nothing. */
 export async function deleteUserRows(db: D1Database, userId: number): Promise<void> {
-  await db.prepare(SQL.deleteEvents).bind(userId).run();
-  await db.prepare(SQL.deleteFiles).bind(userId).run();
+  await db.batch([
+    db.prepare(SQL.deleteEvents).bind(userId),
+    db.prepare(SQL.deleteFiles).bind(userId),
+  ]);
 }

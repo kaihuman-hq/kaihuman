@@ -21,12 +21,19 @@ vi.mock('../lib/business/dates', async (importOriginal) => ({
 }));
 vi.mock('@kaihuman/ui', () => ({ StatusBar: () => <div data-testid="status-bar" /> }));
 vi.mock('preact-router', () => router);
-const shares = vi.hoisted(() => ({ revokeShareLink: vi.fn(), shareApi: vi.fn(() => ({})) }));
-vi.mock('../lib/business/share', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../lib/business/share')>()),
-  revokeShareLink: shares.revokeShareLink,
-  shareApi: shares.shareApi,
+const shares = vi.hoisted(() => ({
+  revokeShareLink: vi.fn(),
+  shareApi: vi.fn((): unknown => ({})),
+  actual: {} as typeof import('../lib/business/share'),
 }));
+vi.mock('../lib/business/share', async (importOriginal) => {
+  shares.actual = await importOriginal<typeof import('../lib/business/share')>();
+  return {
+    ...shares.actual,
+    revokeShareLink: shares.revokeShareLink,
+    shareApi: shares.shareApi,
+  };
+});
 
 const { IssuePage } = await import('./IssuePage');
 
@@ -403,5 +410,26 @@ describe('IssuePage credit note and share link', () => {
     expect(router.route).toHaveBeenCalled();
     expect(businessNotice.value?.text).toContain('could not be revoked');
     expect(businessNotice.value?.text).toContain('RE-2026-0001');
+  });
+
+  it('says so and records no revoke when the link belongs to another GitHub account (S11)', async () => {
+    const m = creditNote();
+    shares.revokeShareLink.mockImplementation(shares.actual.revokeShareLink);
+    const revoke = vi.fn(async () => {
+      throw new shares.actual.ShareError('This link belongs to another GitHub account.', 403);
+    });
+    shares.shareApi.mockReturnValue({ revoke });
+    await show(ready(m));
+    writeAgainst(m);
+    act(() => submit().click());
+    await flush();
+    await flush();
+    expect(revoke).toHaveBeenCalledWith('AAAAAAAAAAAAAAAAAAAAAA');
+    expect(businessNotice.value?.text).toContain(
+      'could not be revoked: This link belongs to another GitHub account.',
+    );
+    // Only the credit note was committed; links.jsonl was not touched.
+    expect(committed).toHaveLength(1);
+    expect(Object.keys(committed[0] ?? {})).not.toContain('.kh/business/links.jsonl');
   });
 });

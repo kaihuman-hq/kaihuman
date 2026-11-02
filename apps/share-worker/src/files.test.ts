@@ -17,6 +17,7 @@ interface Listed {
   files: {
     token: string;
     label: string;
+    business: string;
     kind: string;
     size: number;
     created: string;
@@ -84,6 +85,7 @@ describe('POST /api/files', () => {
         {
           token: file.token,
           label: 'RE-2026-001.pdf',
+          business: 'Acme GmbH',
           kind: 'pdf',
           size: 43,
           created: '2026-11-02T10:00:00.000Z',
@@ -328,6 +330,14 @@ describe('GET /api/files', () => {
     expect(listed.used).toBe(300);
   });
 
+  it('names the business of each file, so files of several businesses can be told apart', async () => {
+    const world = makeWorld();
+    await created(await world.upload(100));
+    await created(await world.upload(100, { headers: { 'X-KH-Business': 'Other%20Ltd' } }));
+    const businesses = (await list(world)).files.map((f) => f.business).sort();
+    expect(businesses).toEqual(['Acme GmbH', 'Other Ltd']);
+  });
+
   it('counts download events per file', async () => {
     const world = makeWorld();
     const file = await created(await world.upload(100));
@@ -372,6 +382,16 @@ describe('DELETE /api/files/:token', () => {
     expect(await errorOf(response)).toBe('Not found');
   });
 
+  it("returns 403 for another user's token and leaves the file live (S11)", async () => {
+    const world = makeWorld();
+    const file = await created(await world.upload(100));
+    const response = await world.call('DELETE', `/api/files/${file.token}`, { token: 'gho_bob' });
+    expect(response.status).toBe(403);
+    expect(await errorOf(response)).toBe('This link belongs to another GitHub account.');
+    expect(world.files.objects.has(`101/${file.token}`)).toBe(true);
+    expect((await list(world)).files[0]?.revoked).toBeNull();
+  });
+
   it('returns 404 for a malformed token', async () => {
     const world = makeWorld();
     expect((await world.call('DELETE', '/api/files/short')).status).toBe(404);
@@ -387,7 +407,7 @@ describe('isolation between users', () => {
     expect(bobs).toEqual({ files: [], used: 0, quota: QUOTA });
 
     const revoke = await world.call('DELETE', `/api/files/${file.token}`, { token: 'gho_bob' });
-    expect(revoke.status).toBe(404);
+    expect(revoke.status).toBe(403);
     expect(world.files.objects.has(`101/${file.token}`)).toBe(true);
     expect((await list(world)).files[0]?.revoked).toBeNull();
   });

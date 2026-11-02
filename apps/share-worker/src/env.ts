@@ -18,6 +18,8 @@ export interface D1PreparedStatement {
 
 export interface D1Database {
   prepare(query: string): D1PreparedStatement;
+  /** Runs the statements in one transaction: if one fails, none take effect. */
+  batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]>;
 }
 
 export interface R2ObjectBody {

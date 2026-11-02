@@ -4,7 +4,15 @@
  */
 
 import { newShareToken } from '@kaihuman/formats/share';
-import { insertFile, type Kind, listFiles, revokeFile, uploadsSince, usedBytes } from './db.js';
+import {
+  findFile,
+  insertFile,
+  type Kind,
+  listFiles,
+  revokeFile,
+  uploadsSince,
+  usedBytes,
+} from './db.js';
 import { type Deps, type Env, objectKey } from './env.js';
 import {
   CIPHER_OVERHEAD,
@@ -157,6 +165,7 @@ export async function listOwnFiles(env: Env, userId: number): Promise<Response> 
     files: rows.map((row) => ({
       token: row.token,
       label: row.label,
+      business: row.business,
       kind: row.kind,
       size: row.size,
       created: row.created_at,
@@ -176,7 +185,12 @@ export async function revokeOwnFile(
   deps: Deps,
 ): Promise<Response> {
   const revoked = await revokeFile(env.DB, userId, token, new Date(deps.now()).toISOString());
-  if (!revoked) return notFound();
+  if (!revoked) {
+    // The token is public to anyone holding the link, so saying it exists leaks nothing; a 404
+    // here would make the console record a revoke while the file stays live (S11).
+    const other = await findFile(env.DB, token);
+    return other ? error('This link belongs to another GitHub account.', 403) : notFound();
+  }
   await env.FILES.delete(objectKey(userId, token));
   return empty(204);
 }

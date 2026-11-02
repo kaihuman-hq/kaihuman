@@ -214,7 +214,8 @@ affected. The README lists the setup steps.
   landing page decrypts in the visitor's browser. Nothing uploads automatically.
 - **Consent:** sharing stays off until you accept a one-time explanation (stored on this device in
   `lifeos_share_consent_v1`). It says what is uploaded, that the service runs on Cloudflare in the
-  EU, that the file is encrypted in the browser and who can open it. Every upload needs its own
+  EU, that your GitHub sign-in is sent to it to identify you, that the file is encrypted in the
+  browser and who can open it. Every upload needs its own
   confirm. Sharing is not available in demo mode.
 - **Who can open it:** anyone who has the full link, until it expires or you revoke it. Treat the
   link like the document. Offers expire at the end of their `valid_until` day (UTC); an offer whose
@@ -223,13 +224,17 @@ affected. The README lists the setup steps.
   working, but its encrypted file stays stored, and counts toward your storage, until you revoke it
   or delete all shared files.
 - **Where the link is kept:** `.kh/business/links.jsonl` in your private repository gets one line
-  per link (`id`, `doc`, `url` including the key, `created`, optional `expires`, `revoked`).
+  per link (`id`, `doc`, `url` including the key, `created`, optional `expires` as the end of the
+  expiry day in UTC, e.g. `2026-12-01T23:59:59Z`, and `revoked`).
   Agents never create share links; only the console writes this file.
-- **Revoke:** "Revoke…" next to the link, or on `/business/shared`. The Worker deletes the file
+- **Revoke:** "Revoke…" next to the link, or on `/business/shared`; an expired link that was never
+  revoked keeps a "Revoke…" too, because its file is still stored. The Worker deletes the file
   and the console sets `revoked` on the line, in one commit. Revoking works only while the console
   points at the service that created the link; otherwise it says
   `This link was created on <host>. Switch the share service to <host> to revoke it.` Issuing a
-  credit note offers to revoke the link of the invoice it corrects.
+  credit note offers to revoke the link of the invoice it corrects. A link created while signed in
+  with another GitHub account is refused with `This link belongs to another GitHub account.` and
+  nothing is committed.
 - **Downloads:** each download of the file adds a `downloaded` event to `events.jsonl` (the next
   sync, on opening `/business/shared` or "Sync downloads"). Opening the landing page counts
   nothing, because mail scanners open links first, so counts are approximate. The note on an event

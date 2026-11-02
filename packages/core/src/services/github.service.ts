@@ -121,10 +121,10 @@ export class GithubService {
 
   /**
    * Raw bytes of a file, binary-safe (getFileContent decodes UTF-8 and caps at 1 MB).
-   * The blob sha comes from the parent directory listing, not from the file's own contents
-   * response: the contents API with the default JSON media type refuses files over 1 MB,
-   * exactly the sizes this method exists for. Directory entries carry the sha without the
-   * body. The blob API then serves up to 100 MB.
+   * The blob sha comes from the git trees, walked from the ref's root tree down to the parent
+   * folder: the contents API refuses files over 1 MB with the default JSON media type, and its
+   * folder listing stops at 1000 entries (S12). A tree lists every entry with its sha and no body;
+   * the blob API then serves up to 100 MB.
    */
   async getFileBytes(
     owner: string,
@@ -133,27 +133,37 @@ export class GithubService {
     opts?: { ref?: string },
   ): Promise<Uint8Array> {
     const client = this.getClient();
-    const slash = path.lastIndexOf('/');
-    const parent = slash < 0 ? '' : path.slice(0, slash);
-    const name = path.slice(slash + 1);
+    const segments = path.split('/');
+    const name = segments.pop() ?? '';
     const notFound = () => new Error(`Not found: ${path}`);
     const is404 = (e: unknown) => (e as { status?: number }).status === 404;
 
-    let listing: Awaited<ReturnType<Octokit['repos']['getContent']>>['data'];
-    try {
-      ({ data: listing } = await client.repos.getContent({
-        owner,
-        repo,
-        path: parent,
-        ...(opts?.ref ? { ref: opts.ref } : {}),
-      }));
-    } catch (e) {
-      throw is404(e) ? notFound() : e;
+    // `tree_sha` takes a commit sha or a branch or tag name and resolves it to its root tree.
+    let treeSha = opts?.ref ?? (await client.repos.get({ owner, repo })).data.default_branch;
+    const treeOf = async (sha: string) => {
+      try {
+        return (await client.git.getTree({ owner, repo, tree_sha: sha })).data.tree;
+      } catch (e) {
+        throw is404(e) ? notFound() : e;
+      }
+    };
+    for (const segment of segments) {
+      const folder = (await treeOf(treeSha)).find((item) => item.path === segment);
+      if (!folder || folder.type !== 'tree' || !folder.sha) throw notFound();
+      treeSha = folder.sha;
     }
-    if (!Array.isArray(listing)) throw notFound();
-    const entry = listing.find((item) => item.name === name);
-    if (!entry) throw notFound();
-    if (entry.type !== 'file') throw new Error(`Path is not a file: ${entry.type}`);
+    const entry = (await treeOf(treeSha)).find((item) => item.path === name);
+    if (!entry?.sha) throw notFound();
+    // Named as the contents API names them, which callers and messages already know.
+    const kind =
+      entry.type === 'tree'
+        ? 'dir'
+        : entry.type === 'commit'
+          ? 'submodule'
+          : entry.mode === '120000'
+            ? 'symlink'
+            : 'file';
+    if (kind !== 'file') throw new Error(`Path is not a file: ${kind}`);
 
     let blob: { content: string; encoding: string };
     try {

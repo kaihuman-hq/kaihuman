@@ -1,4 +1,11 @@
-import { KEY_ORDER, LINKS_PATH, type LinkRecord, type Ulid } from '@kaihuman/formats/business';
+import {
+  KEY_ORDER,
+  LINKS_PATH,
+  type LinkRecord,
+  parseJsonl,
+  type Ulid,
+  validateLink,
+} from '@kaihuman/formats/business';
 import { decryptShareBlob, parseShareUrl } from '@kaihuman/formats/share';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -290,7 +297,27 @@ describe('createShareLink', () => {
     );
     const init = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1];
     expect((init.headers as Record<string, string>)['X-KH-Expires']).toBe('2026-12-01');
-    expect(JSON.parse(built?.changes[LINKS_PATH] ?? '{}').expires).toBe('2026-12-01');
+    // S10: the service keeps the link through the end of that UTC day; the repo says the same.
+    expect(JSON.parse(built?.changes[LINKS_PATH] ?? '{}').expires).toBe('2026-12-01T23:59:59Z');
+  });
+
+  it('writes link lines the repo loader accepts, with and without an expiry (S10)', async () => {
+    commitSucceeds();
+    const deps = { api: shareApi(BASE, GH_TOKEN, fetchFor()), baseUrl: BASE, business: 'Acme' };
+    await createShareLink(target, { number: 'RE-2026-0001', path: ISSUED }, deps);
+    links = built?.changes[LINKS_PATH] ?? '';
+    await createShareLink(
+      target,
+      {
+        number: 'AN-2026-001',
+        path: '.kh/business/offers/2026/AN-2026-001.yaml',
+        expires: '2026-12-01',
+      },
+      deps,
+    );
+    const parsed = parseJsonl(built?.changes[LINKS_PATH] ?? '', validateLink);
+    expect(parsed.issues).toEqual([]);
+    expect(parsed.entries.map((e) => e.value.doc)).toEqual(['RE-2026-0001', 'AN-2026-001']);
   });
 
   it('revokes the upload again when the commit fails (Review Focus 4)', async () => {
@@ -428,6 +455,23 @@ describe('revokeShareLink', () => {
     const [first, second] = (built?.changes[LINKS_PATH] ?? '').trimEnd().split('\n');
     expect(first).toBe(JSON.stringify(A));
     expect(JSON.parse(second ?? '')).toEqual({ ...B, revoked: '2026-11-02T12:00:00.000Z' });
+  });
+
+  it('refuses a link of another GitHub account with 403: not treated as revoked (S11)', async () => {
+    commitSucceeds();
+    links = linesOf(A);
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      jsonResponse({ error: 'This link belongs to another GitHub account.' }, 403),
+    );
+    const err = await revokeShareLink(target, A, {
+      api: shareApi(BASE, GH_TOKEN, fetchImpl),
+    }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ShareError);
+    expect(err).toMatchObject({
+      message: 'This link belongs to another GitHub account.',
+      status: 403,
+    });
+    expect(writes.writeBusiness).not.toHaveBeenCalled();
   });
 
   it('commits nothing when the service refuses or is down', async () => {

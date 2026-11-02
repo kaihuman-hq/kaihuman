@@ -11,9 +11,19 @@ import { GONE, NOT_FOUND, openLink } from './download.js';
 import type { Deps, Env } from './env.js';
 import { html } from './respond.js';
 
-const DECRYPT = decryptShareBlob.toString();
-// The function is inlined verbatim into a <script>; these sequences would end it early.
-if (/<\/script|<!--/i.test(DECRYPT)) throw new Error('decryptShareBlob cannot be inlined');
+/**
+ * The function is inlined verbatim into a <script> that calls it by name: a bundler renaming it, or
+ * a sequence that ends the script early, would break every landing page, so the worker refuses to
+ * load instead.
+ */
+export function inlinableDecrypt(source: string): string {
+  if (!source.startsWith('async function decryptShareBlob(') || /<\/script|<!--/i.test(source)) {
+    throw new Error('decryptShareBlob cannot be inlined');
+  }
+  return source;
+}
+
+const DECRYPT = inlinableDecrypt(decryptShareBlob.toString());
 
 const MIME: Record<FileRow['kind'], string> = { pdf: 'application/pdf', xml: 'application/xml' };
 
