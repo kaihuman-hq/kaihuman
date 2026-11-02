@@ -21,6 +21,11 @@ export function ClientsPage() {
         const shown = stage === 'all' ? all : all.filter((c) => c.stage === stage);
         return (
           <>
+            <p class="text-xs">
+              <a href="/clients/new" class="text-[var(--los-accent)] hover:underline">
+                New client
+              </a>
+            </p>
             {all.length === 0 ? (
               <p class="text-xs italic text-[var(--los-muted)]">
                 No clients yet. Ask the agent to add one, or create{' '}

@@ -6,6 +6,7 @@ import { Card } from '../components/business/Card';
 import { hours, money } from '../components/business/money';
 import { PageShell } from '../components/business/PageShell';
 import { ProblemsList } from '../components/business/ProblemsList';
+import { QuickAdd } from '../components/business/QuickAdd';
 import { Stat } from '../components/business/Stat';
 import { StatusPill } from '../components/business/StatusPill';
 import { TimerCard } from '../components/business/TimerCard';
@@ -200,6 +201,12 @@ function Overview(props: {
         </Table>
       </Card>
 
+      <p class="text-xs">
+        <a href={`/clients/${client.slug}/projects/new`} class={link}>
+          New project
+        </a>
+      </p>
+
       <Card
         title="Time by week and project"
         empty={weeks.length === 0 ? 'No time logged in the last 8 weeks.' : undefined}
@@ -215,7 +222,8 @@ function Overview(props: {
         </Table>
       </Card>
 
-      <Card title="Todos" empty={todos.length === 0 ? 'No todos.' : undefined}>
+      <Card title="Todos">
+        {todos.length === 0 && <p class="text-xs italic text-[var(--los-muted)]">No todos.</p>}
         <ul class="space-y-1 text-xs">
           {todos.map((t) => (
             <li key={t.id} class="flex gap-2">
@@ -229,9 +237,11 @@ function Overview(props: {
             </li>
           ))}
         </ul>
+        <QuickAdd client={client.slug} kind="todo" />
       </Card>
 
-      <Card title="Action log" empty={log.length === 0 ? 'No log entries.' : undefined}>
+      <Card title="Action log">
+        {log.length === 0 && <p class="text-xs italic text-[var(--los-muted)]">No log entries.</p>}
         <ul class="space-y-1 text-xs">
           {log.map((e, i) => (
             <li key={`${i}:${e.timestamp}:${e.description}`} class="flex gap-3">
@@ -242,6 +252,7 @@ function Overview(props: {
             </li>
           ))}
         </ul>
+        <QuickAdd client={client.slug} kind="log" />
       </Card>
 
       <Card title="Contracts" empty={o.contracts.length === 0 ? 'No contracts.' : undefined}>
