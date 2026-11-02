@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { loadFixtureRepo } from './fixture-repo.test-helper.js';
-import type { Ulid } from './ids.js';
+import type { Slug, Ulid } from './ids.js';
 import { type IssueContext, issue } from './issue.js';
 import { jurisdictionFor } from './jurisdiction.js';
-import { type BusinessProfile, type Client, type Draft, KEY_ORDER } from './records.js';
+import {
+  type BusinessProfile,
+  type Client,
+  type Draft,
+  KEY_ORDER,
+  type Project,
+} from './records.js';
 import { computeTotals } from './totals.js';
 import { validateClient, validateDraft, validateIssued, validateProfile } from './validate.js';
 import { parseYaml, stringifyYaml } from './yaml.js';
@@ -232,5 +238,54 @@ describe('issue credit note and offer', () => {
       `${root}/clients/acme-gmbh/log.actionlog.md`
     ] as string;
     expect(out).toBe(`${log}\n- 2027-01-02 09:05:07 Issued RE-2027-0001 (1001.38 EUR) #business\n`);
+  });
+});
+
+describe('issue a retainer draft', () => {
+  const { time_entries: _t, ...plain } = fixtureDraft;
+  const project: Project = {
+    slug: 'hosting' as Slug,
+    client: 'acme-gmbh' as Slug,
+    name: 'Hosting',
+    status: 'active',
+    retainer: { amount: 1000, interval: 'monthly', next_date: '2027-01-31', description: 'Care' },
+  };
+  const projectPath = `${root}/clients/acme-gmbh/projects/hosting.yaml`;
+  const retainerDraft: Draft = { ...plain, project: project.slug, from_retainer: '2027-01-31' };
+  const base = { ...ctx, draft: retainerDraft, timeFiles: {}, project };
+
+  it('advances next_date in the same commit and drops from_retainer from the document', () => {
+    const { document, changes } = ok(base);
+    expect('from_retainer' in document).toBe(false);
+    const issuedYaml = Object.entries(changes).find(([p]) => p.includes('/invoices/'))?.[1];
+    expect(issuedYaml).not.toContain('from_retainer');
+    expect(changes[projectPath]).toBe(
+      stringifyYaml(
+        {
+          client: 'acme-gmbh',
+          name: 'Hosting',
+          status: 'active',
+          retainer: { ...project.retainer, next_date: '2027-02-28' },
+        },
+        KEY_ORDER.project,
+      ),
+    );
+  });
+
+  it('leaves the project alone for a stale draft of an already advanced period', () => {
+    const advanced: Project = {
+      ...project,
+      retainer: {
+        ...(project.retainer as NonNullable<Project['retainer']>),
+        next_date: '2027-02-28',
+      },
+    };
+    const { changes } = ok({ ...base, project: advanced });
+    expect(Object.keys(changes)).not.toContain(projectPath);
+  });
+
+  it('leaves the project alone without a project in the context', () => {
+    const { project: _p, ...noProject } = base;
+    expect(Object.keys(ok(noProject).changes)).not.toContain(projectPath);
   });
 });

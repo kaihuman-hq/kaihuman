@@ -14,21 +14,24 @@ the right place.
 
 ```
 .kh/business/
-  business.yaml                  the user's profile: name, address, VAT ID, bank, defaults
+  business.yaml                  the user's profile: name, address, VAT ID, bank, defaults,
+                                 vat_basis (accrual, the default, or cash)
   clients/<slug>/
     client.yaml                  name, address, VAT ID, contacts, payment terms, stage
     notes.md                     free text
     todos.todos.md               todos (existing todos format)
     log.actionlog.md             action log (existing action-log format)
     projects/<slug>.yaml         status, rate, budget, retainer
-    contracts/<id>.yaml          contracts, NDAs, with start, end, notice period
+    contracts/<id>.yaml          contracts, NDAs, with start, end, notice period, renewal date
+    contracts/<id>.pdf           the signed contract (optional; `file: <id>.pdf`)
   drafts/<ulid>.yaml             unnumbered offer / invoice / credit-note drafts
   offers/<year>/<number>.yaml    issued offers          (frozen)
   invoices/<year>/<number>.yaml  issued invoices        (frozen)
   time/<yyyy-mm>.jsonl           one line per time entry
   time/running.yaml              the running timer (at most one)
   payments/<year>.jsonl          one line per payment
-  expenses/<year>/<ulid>.yaml    expenses (+ receipt file)
+  expenses/<year>/<ulid>.yaml    expenses
+  expenses/<year>/<ulid>.<ext>   the receipt (optional; `receipt: <ulid>.<ext>`)
   events.jsonl, links.jsonl      document events and share links
 ```
 
@@ -81,6 +84,16 @@ For a file named by its ULID (`drafts/<ulid>.yaml`, `expenses/<year>/<ulid>.yaml
   `time_entries: [<ulid>, …]`. Copy the shape of an existing draft.
 - **What does a client owe:** read the client's issued invoices and `payments/<year>.jsonl`. An invoice
   is open until its payments cover `totals.gross`. Report the number and the amount open.
+- **Record an expense:** create `expenses/<year>/<ulid>.yaml` (`<year>` from `date`) with `id`,
+  `date`, `supplier`, `description`, `category`, `net`, `vat`, `gross` (= net + vat, all cents) and
+  `vat_rate`; optional `client`, `project`. A receipt sits next to it as `<ulid>.<ext>` with the
+  same ULID and a lower-case `ext` of `pdf`, `jpg`, `jpeg`, `png`, `webp` or `heic`, at most 10 MB,
+  and the expense names it exactly: `receipt: <ulid>.<ext>`. A contract file is likewise
+  `contracts/<id>.pdf` with `file: <id>.pdf` (PDF only, at most 10 MB). Expenses and contracts must be
+  kept for the retention period (8 years after the record's year in Germany); ask before deleting one.
+- **Retainers:** a project's `retainer.next_date` is the start of the next period to bill. A draft
+  for it carries `from_retainer: <next_date>`; issuing it in the console moves `next_date` on by one
+  period. Never change `next_date` yourself when you only draft the invoice.
 - **Add a payment:** append to `payments/<year>.jsonl`:
   `{"id":"<ulid>","date":"2026-11-05","invoice":"RE-2026-0001","amount":100138,"method":"transfer"}`
 

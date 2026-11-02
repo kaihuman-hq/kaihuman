@@ -129,6 +129,7 @@ export async function buildIssueContext(
     if (text !== null) timeFiles[timePath(month)] = text;
   }
   const clientLog = await source.read(`${clientDir(client.slug)}/log.actionlog.md`);
+  const project = repo.projects.find((p) => p.client === draft.client && p.slug === draft.project);
 
   return {
     ok: true,
@@ -142,6 +143,7 @@ export async function buildIssueContext(
       timeFiles,
       clientLog,
       now,
+      ...(project ? { project } : {}),
     },
   };
 }

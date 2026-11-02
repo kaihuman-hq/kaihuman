@@ -229,7 +229,12 @@ describe('draftFromRetainer', () => {
       },
     ]);
     expect(d.service_period).toEqual({ start: '2026-12-01', end: '2026-12-31' });
-    expect(d).toMatchObject({ kind: 'invoice', client, project: 'hosting' });
+    expect(d).toMatchObject({
+      kind: 'invoice',
+      client,
+      project: 'hosting',
+      from_retainer: '2026-12-01',
+    });
   });
 
   it('ends a monthly period on the last day of that month, leap years included', () => {

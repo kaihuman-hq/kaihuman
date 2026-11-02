@@ -298,6 +298,32 @@ describe('issuing through writeBusiness', () => {
     );
   });
 
+  it('Review Focus 4: a retainer draft advances next_date in the issuing commit, once', async () => {
+    const PROJECT = `${ROOT}/clients/acme-gmbh/projects/website.yaml`;
+    files[PROJECT] =
+      `${files[PROJECT]}retainer:\n  amount: 1000\n  interval: monthly\n  next_date: "2026-11-01"\n  description: Care\n`;
+    files[DRAFT] = `${files[DRAFT]}from_retainer: "2026-11-01"\n`;
+    const first = await commit();
+    expect(first.result.ok).toBe(true);
+    const [one] = commits();
+    expect(one?.changes[PROJECT]).toContain('next_date: 2026-12-01');
+    expect(one?.changes[issuedAt('RE-2026-0043')]).not.toContain('from_retainer');
+
+    // A stale second draft for the same period: the project has moved on, so it stays.
+    files[PROJECT] = one?.changes[PROJECT] ?? '';
+    files[issuedAt('RE-2026-0043')] = one?.changes[issuedAt('RE-2026-0043')] ?? '';
+    const second = '01M5KA3Q00W16BGNTZ49EKRX29' as Ulid;
+    files[`${ROOT}/drafts/${second}.yaml`] = (baseFiles()[DRAFT] ?? '')
+      .replace(DRAFT_ID, second)
+      .replace(/time_entries:[\s\S]*$/, 'from_retainer: "2026-11-01"\n');
+    head++;
+    const again = await writeBusiness(target, (fresh) =>
+      issueFromFresh(fresh, second, '2026-11-02', now),
+    );
+    expect(again.ok).toBe(true);
+    expect(Object.keys(commits()[1]?.changes ?? {})).not.toContain(PROJECT);
+  });
+
   it('Review Focus 3: a number taken after the preview yields the next, never an overwrite', async () => {
     const preview = await previewIssue(sourceOf(files), DRAFT_ID, '2026-11-02', now);
     expect(preview.ok && preview.value.number).toBe('RE-2026-0043');

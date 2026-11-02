@@ -150,7 +150,7 @@ const utc = (date: string): Date => new Date(`${date}T00:00:00Z`);
 const iso = (d: Date): string => d.toISOString().slice(0, 10);
 
 /** `date` plus whole months, the day clamped to the target month's length (31 Nov-30 → 28 Feb). */
-const addMonths = (date: string, months: number): string => {
+export const addMonths = (date: string, months: number): string => {
   const d = utc(date);
   const target = d.getUTCMonth() + months;
   const lastDay = new Date(Date.UTC(d.getUTCFullYear(), target + 1, 0)).getUTCDate();
@@ -181,6 +181,7 @@ export const draftFromRetainer = (
     client: project.client,
     project: project.slug,
     service_period: { start, end },
+    from_retainer: start,
     lines: [
       {
         description: retainer.description,

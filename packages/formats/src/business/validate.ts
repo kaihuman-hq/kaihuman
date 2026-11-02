@@ -1,4 +1,5 @@
 import { isValidPattern } from './numbering.js';
+import { CONTRACT_EXTENSIONS, RECEIPT_EXTENSIONS } from './paths.js';
 import {
   ADDRESS_KEYS,
   type Address,
@@ -295,6 +296,18 @@ export const validateProject = (
   return finish(issues, value);
 };
 
+/** A receipt or contract file sits next to its record and is named by the record's id: `<id>.<ext>`. */
+const attachmentName =
+  (id: unknown, exts: readonly string[]): Reader<string> =>
+  (raw, path, issues) => {
+    const name = str(raw, path, issues);
+    if (name === undefined) return undefined;
+    const dot = name.lastIndexOf('.');
+    if (name.slice(0, dot) === id && exts.includes(name.slice(dot + 1))) return name;
+    note(issues, path, `must be "<id>.<ext>" with the record's id and ext ${exts.join(', ')}`);
+    return undefined;
+  };
+
 export const validateContract = (raw: unknown): Result<Contract> => {
   const issues: Issue[] = [];
   const r = obj(raw, '', KEY_ORDER.contract, issues);
@@ -308,7 +321,7 @@ export const validateContract = (raw: unknown): Result<Contract> => {
     end: opt(r, '', 'end', issues, date),
     notice_period_days: opt(r, '', 'notice_period_days', issues, nonNegInt),
     renewal_date: opt(r, '', 'renewal_date', issues, date),
-    file: opt(r, '', 'file', issues, str),
+    file: opt(r, '', 'file', issues, attachmentName(r.id, CONTRACT_EXTENSIONS)),
   });
   return finish(issues, value);
 };
@@ -369,7 +382,11 @@ export const validateDraft = (raw: unknown): Result<Draft> => {
   const r = obj(raw, '', KEY_ORDER.draft, issues);
   if (!r) return { ok: false, issues };
   const id = req(r, '', 'id', issues, ulidField);
-  return finish(issues, { id, ...docBody(r, issues) });
+  return finish(issues, {
+    id,
+    ...docBody(r, issues),
+    ...compact({ from_retainer: opt(r, '', 'from_retainer', issues, date) }),
+  });
 };
 
 const party: Reader<Party> = (raw, path, issues) => {
@@ -575,7 +592,7 @@ export const validateExpense = (raw: unknown): Result<Expense> => {
     vat_rate: req(r, '', 'vat_rate', issues, decimalStr),
     client: opt(r, '', 'client', issues, slug),
     project: opt(r, '', 'project', issues, slug),
-    receipt: opt(r, '', 'receipt', issues, str),
+    receipt: opt(r, '', 'receipt', issues, attachmentName(r.id, RECEIPT_EXTENSIONS)),
   });
   return finish(issues, value);
 };

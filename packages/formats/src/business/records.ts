@@ -110,6 +110,8 @@ export type Draft = {
   corrects?: string;
   buyer_reference?: string;
   time_entries?: Ulid[];
+  /** Retainer drafts only: the `next_date` the draft bills; issuing advances it once. Not issued. */
+  from_retainer?: string;
 };
 
 export type Party = {
@@ -136,7 +138,7 @@ export type Totals = {
   }[];
 };
 
-export type Issued = Omit<Draft, 'id'> & {
+export type Issued = Omit<Draft, 'id' | 'from_retainer'> & {
   number: string;
   draft_id: Ulid;
   /** Offers have no EN 16931 type code. */
@@ -320,7 +322,7 @@ export const KEY_ORDER: Record<RecordKind, readonly string[]> = {
     'renewal_date',
     'file',
   ],
-  draft: ['id', ...DRAFT_BODY_KEYS],
+  draft: ['id', ...DRAFT_BODY_KEYS, 'from_retainer'],
   issued: [
     'number',
     'draft_id',

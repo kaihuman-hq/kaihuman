@@ -151,11 +151,13 @@ describe('businessDashboard', () => {
       { contract, date: '2026-12-01', what: 'notice' },
     ]);
     expect(businessDashboard(r, '2026-09-01').contractsDue).toEqual([]);
-    expect(businessDashboard(r, '2026-12-02').contractsDue).toEqual([]);
+    expect(businessDashboard(r, '2026-12-02').contractsDue).toEqual([
+      { contract, date: '2026-12-31', what: 'end' },
+    ]);
+    // With a renewal date the notice counts back from it: 2026-10-16, already past.
     const renewing = { ...repo, contracts: [{ ...contract, renewal_date: '2026-11-15' }] };
     expect(businessDashboard(renewing, '2026-10-27').contractsDue.map((c) => c.what)).toEqual([
       'renewal',
-      'notice',
     ]);
   });
 
@@ -234,7 +236,7 @@ describe('clientOverview', () => {
     expect(o?.offers[0]?.number).toBe('AN-2026-001');
   });
 
-  it('adds future renewal and notice dates to the timeline', () => {
+  it('adds future renewal, notice and end dates to the timeline', () => {
     const contract: Contract = {
       ...must(repo.contracts[0]),
       end: '2026-12-31',
@@ -244,10 +246,10 @@ describe('clientOverview', () => {
     const o = clientOverview({ ...repo, contracts: [contract] }, 'acme-gmbh', '2026-10-27');
     expect(
       o?.timeline
-        .filter((t) => t.title === 'Renewal due' || t.title === 'Notice deadline')
+        .filter((t) => ['Renewal due', 'Notice deadline', 'Contract ends'].includes(t.title))
         .map((t) => [t.date, t.title]),
     ).toEqual([
-      ['2026-12-01', 'Notice deadline'],
+      ['2026-12-31', 'Contract ends'],
       ['2026-11-15', 'Renewal due'],
     ]);
     const past = clientOverview({ ...repo, contracts: [contract] }, 'acme-gmbh', '2027-02-01');

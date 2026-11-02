@@ -4,6 +4,7 @@ import type {
   Client,
   ClientStage,
   Contract,
+  ContractDate,
   Draft,
   InvoiceStatus,
   Issued,
@@ -12,7 +13,13 @@ import type {
   Project,
   Slug,
 } from '@kaihuman/formats/business';
-import { CLIENT_STAGES, deriveInvoiceStatus, deriveOfferStatus } from '@kaihuman/formats/business';
+import {
+  CLIENT_STAGES,
+  contractDates,
+  contractReminders,
+  deriveInvoiceStatus,
+  deriveOfferStatus,
+} from '@kaihuman/formats/business';
 import { addDays, isoWeek, quarterOf } from './dates.js';
 
 export type InvoiceRow = {
@@ -80,7 +87,7 @@ export type Dashboard = {
     month: { period: string; due: number };
     quarter: { period: string; due: number };
   };
-  contractsDue: { contract: Contract; date: string; what: 'renewal' | 'notice' }[];
+  contractsDue: ({ contract: Contract } & ContractDate)[];
   drafts: Draft[];
   pipeline: Record<ClientStage, ClientSummary[]>;
   currency: string;
@@ -88,6 +95,11 @@ export type Dashboard = {
 
 const TIMELINE_CAP = 100;
 const CONTRACT_WINDOW_DAYS = 60;
+const CONTRACT_DATE_TITLES: Record<ContractDate['what'], string> = {
+  renewal: 'Renewal due',
+  notice: 'Notice deadline',
+  end: 'Contract ends',
+};
 
 const currencyOf = (repo: BusinessRepo): string => repo.profile?.currency ?? 'EUR';
 const sum = (values: Iterable<number>): number => {
@@ -201,16 +213,6 @@ const summarize = (repo: BusinessRepo, client: Client, today: string): ClientSum
 export const clientSummaries = (repo: BusinessRepo, today: string): ClientSummary[] =>
   repo.clients.map((c) => summarize(repo, c, today)).sort((a, b) => a.name.localeCompare(b.name));
 
-/** Renewal and notice dates of a contract; the notice date is `end - notice_period_days`. */
-const contractDates = (c: Contract): { date: string; what: 'renewal' | 'notice' }[] => {
-  const out: { date: string; what: 'renewal' | 'notice' }[] = [];
-  if (c.renewal_date !== undefined) out.push({ date: c.renewal_date, what: 'renewal' });
-  if (c.end !== undefined && c.notice_period_days !== undefined) {
-    out.push({ date: addDays(c.end, -c.notice_period_days), what: 'notice' });
-  }
-  return out;
-};
-
 export const clientOverview = (
   repo: BusinessRepo,
   slug: string,
@@ -298,7 +300,7 @@ export const clientOverview = (
         .map((d) => ({
           date: d.date,
           kind: 'contract' as const,
-          title: d.what === 'renewal' ? 'Renewal due' : 'Notice deadline',
+          title: CONTRACT_DATE_TITLES[d.what],
           ref: c.id,
         })),
     ]),
@@ -357,11 +359,7 @@ export const businessDashboard = (repo: BusinessRepo, today: string): Dashboard 
     return d.year === year && d.q === q;
   };
 
-  const windowEnd = addDays(today, CONTRACT_WINDOW_DAYS);
-  const contractsDue = repo.contracts
-    .flatMap((contract) => contractDates(contract).map((d) => ({ contract, ...d })))
-    .filter((d) => d.date >= today && d.date <= windowEnd)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const contractsDue = contractReminders(repo, today, CONTRACT_WINDOW_DAYS);
 
   const pipeline = Object.fromEntries(
     CLIENT_STAGES.map((s) => [s, [] as ClientSummary[]]),

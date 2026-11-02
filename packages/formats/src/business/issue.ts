@@ -11,7 +11,9 @@ import {
   type Issued,
   KEY_ORDER,
   type Party,
+  type Project,
 } from './records.js';
+import { nextRetainerDate } from './reminders.js';
 import { computeTotals } from './totals.js';
 import { validateDraft, validateTimeEntry } from './validate.js';
 import { date, type Issue, type Result } from './validate-kit.js';
@@ -39,6 +41,12 @@ export type IssueContext = {
   /** Current `log.actionlog.md` of the client, or null when there is none yet. */
   clientLog: string | null;
   now: Date;
+  /**
+   * The draft's project as it is now. A retainer draft (`from_retainer`) advances its `next_date`
+   * in the same commit, but only while it still equals `from_retainer`: a stale second draft for the
+   * same period must not skip a period.
+   */
+  project?: Project;
 };
 
 const problem = (path: string, message: string): Issue => ({
@@ -52,8 +60,30 @@ const addDays = (date: string, days: number): string => {
   return d.toISOString().slice(0, 10);
 };
 
-const without = <T extends object>(value: T, key: string): Omit<T, never> =>
-  Object.fromEntries(Object.entries(value).filter(([k]) => k !== key)) as T;
+const without = <T extends object>(value: T, ...keys: string[]): Omit<T, never> =>
+  Object.fromEntries(Object.entries(value).filter(([k]) => !keys.includes(k))) as T;
+
+/** The project file with the retainer moved to its next period, or nothing when the draft does not bill the current one. */
+const advanceRetainer = (draft: Draft, project: Project | undefined): TextChanges => {
+  const retainer = project?.retainer;
+  if (
+    !project ||
+    !retainer ||
+    draft.from_retainer === undefined ||
+    project.client !== draft.client ||
+    project.slug !== draft.project ||
+    retainer.next_date !== draft.from_retainer
+  ) {
+    return {};
+  }
+  const { slug, ...body } = project;
+  return {
+    [`${clientDir(project.client)}/projects/${slug}.yaml`]: stringifyYaml(
+      { ...body, retainer: { ...retainer, next_date: nextRetainerDate(retainer) } },
+      KEY_ORDER.project,
+    ),
+  };
+};
 
 const seller = (p: BusinessProfile): Party => ({
   name: p.name,
@@ -191,7 +221,7 @@ export const issue = (
   const terms = draft.payment_terms_days ?? client.payment_terms_days ?? profile.payment_terms_days;
   const totals = computeTotals(draft.lines, rules.exemptionReasons(profile));
   const document: Issued = {
-    ...(without(draft, 'id') as Omit<Draft, 'id'>),
+    ...(without(draft, 'id', 'from_retainer') as Omit<Draft, 'id' | 'from_retainer'>),
     currency,
     language: draft.language ?? client.language ?? profile.language,
     number,
@@ -235,6 +265,7 @@ export const issue = (
     [issuedPath(series, year, number)]: stringifyYaml(document, KEY_ORDER.issued),
     [draftPath(draft.id)]: null,
     ...billed.changes,
+    ...advanceRetainer(draft, ctx.project),
     [logPath]: logContent,
   };
   return {
