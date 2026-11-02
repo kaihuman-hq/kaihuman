@@ -6,6 +6,7 @@ import {
   businessDashboard,
   clientOverview,
   clientSummaries,
+  hoursSummary,
   invoiceRows,
   offerRows,
 } from './overview.js';
@@ -293,5 +294,27 @@ describe('clientOverview', () => {
     expect(clientOverview(r, 'acme-gmbh', '2026-10-27')?.files).toEqual({
       notes: '.kh/business/clients/acme-gmbh/notes.md',
     });
+  });
+});
+
+describe('hoursSummary', () => {
+  // 2026-11-02 is a Monday.
+  const r = withTime(repo, [
+    { date: '2026-11-01', minutes: 600 }, // Sunday before: previous week
+    { date: '2026-11-02', minutes: 60 },
+    { date: '2026-11-04', minutes: 30 },
+    { date: '2026-11-05', minutes: 15 }, // after today: ignored
+  ]);
+
+  it('counts today and the Monday-based week', () => {
+    expect(hoursSummary(r, '2026-11-04')).toEqual({ todayMinutes: 30, weekMinutes: 90 });
+  });
+
+  it('starts the week on Monday itself and leaves out the Sunday before', () => {
+    expect(hoursSummary(r, '2026-11-02')).toEqual({ todayMinutes: 60, weekMinutes: 60 });
+  });
+
+  it('counts a Sunday in the week that began the Monday before', () => {
+    expect(hoursSummary(r, '2026-11-08')).toEqual({ todayMinutes: 0, weekMinutes: 105 });
   });
 });

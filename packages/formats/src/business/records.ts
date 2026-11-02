@@ -160,6 +160,15 @@ export type TimeEntry = {
   invoice?: string;
 };
 
+/** The one running timer (`time/running.yaml`); stopping turns it into a `TimeEntry`. */
+export type RunningTimer = {
+  client: Slug;
+  project?: Slug;
+  /** ISO 8601 datetime with an explicit offset, as written. */
+  started_at: string;
+  note?: string;
+};
+
 export type Payment = {
   id: Ulid;
   date: string;
@@ -211,6 +220,7 @@ export type RecordKind =
   | 'draft'
   | 'issued'
   | 'time'
+  | 'timer'
   | 'payment'
   | 'event'
   | 'link'
@@ -324,6 +334,7 @@ export const KEY_ORDER: Record<RecordKind, readonly string[]> = {
     'retain_until',
   ],
   time: ['id', 'date', 'minutes', 'client', 'project', 'note', 'invoice'],
+  timer: ['client', 'project', 'started_at', 'note'],
   payment: ['id', 'date', 'invoice', 'amount', 'method', 'ref'],
   event: ['id', 'at', 'doc', 'type', 'note'],
   link: ['id', 'doc', 'url', 'created', 'expires', 'revoked'],

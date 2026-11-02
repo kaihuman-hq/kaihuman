@@ -3,11 +3,18 @@ import { BUSINESS_ROOT } from '@kaihuman/formats/business';
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { Card } from '../components/business/Card';
+import {
+  CreditNoteAction,
+  OfferActions,
+  RecordPaymentLink,
+} from '../components/business/DocActions';
 import { hours, money } from '../components/business/money';
 import { PageShell } from '../components/business/PageShell';
 import { ProblemsList } from '../components/business/ProblemsList';
+import { QuickAdd } from '../components/business/QuickAdd';
 import { Stat } from '../components/business/Stat';
 import { StatusPill } from '../components/business/StatusPill';
+import { TimerCard } from '../components/business/TimerCard';
 import { clientBacklinks } from '../lib/business/backlinks';
 import { addDays, isoWeek, todayLocal } from '../lib/business/dates';
 import { BUSINESS_PROFILE_PATH, parseLoadError } from '../lib/business/load';
@@ -80,8 +87,12 @@ function Overview(props: {
   today: string;
   contents: Record<string, string>;
   backlinks: string[] | null;
+  /** Unbilled time that is in no draft yet. */
+  canDraftUnbilled: boolean;
+  /** Offers that already have an issued invoice; converting them again would bill twice. */
+  invoicedOffers: ReadonlySet<string>;
 }) {
-  const { o, today, contents, backlinks } = props;
+  const { o, today, contents, backlinks, invoicedOffers } = props;
   const { client, summary: s } = o;
   const currency = s.currency;
   const contact = client.contacts[0];
@@ -131,12 +142,34 @@ function Overview(props: {
           <Stat label="Unbilled hours" value={`${hours(s.unbilledMinutes)} h`} />
           <Stat label="Hours this month" value={`${hours(s.minutesThisMonth)} h`} />
         </dl>
+        <p class="text-xs">
+          <a href={`/business/time/new?client=${client.slug}`} class={link}>
+            Log time
+          </a>
+          {props.canDraftUnbilled && (
+            <>
+              {' · '}
+              <a
+                href={`/business/drafts/new?client=${client.slug}&kind=invoice&from=unbilled`}
+                class={link}
+              >
+                New invoice from unbilled time
+              </a>
+            </>
+          )}
+          {' · '}
+          <a href={`/business/drafts/new?client=${client.slug}&kind=offer`} class={link}>
+            New offer
+          </a>
+        </p>
       </header>
+
+      <TimerCard client={client.slug} />
 
       <Timeline items={o.timeline} />
 
       <Card title="Offers" empty={o.offers.length === 0 ? 'No offers.' : undefined}>
-        <Table head={['Number', 'Date', 'Status', 'Amount', 'PDF', 'Link']}>
+        <Table head={['Number', 'Date', 'Status', 'Amount', 'PDF', 'Link', 'Actions']}>
           {o.offers.map((r) => (
             <tr key={r.number}>
               <td class={td}>{r.number}</td>
@@ -149,13 +182,22 @@ function Overview(props: {
                 <Pdf present={r.pdf} />
               </td>
               <td class={td}>{r.link ?? 'no link'}</td>
+              <td class={td}>
+                {/* Accepted offers can still be converted; declined and replaced ones are history. Expired ones can be accepted late. */}
+                {['issued', 'sent', 'expired'].includes(r.status) && (
+                  <OfferActions offer={r.number} canConvert={!invoicedOffers.has(r.number)} />
+                )}
+                {r.status === 'accepted' && !invoicedOffers.has(r.number) && (
+                  <OfferActions offer={r.number} decided />
+                )}
+              </td>
             </tr>
           ))}
         </Table>
       </Card>
 
       <Card title="Invoices" empty={o.invoices.length === 0 ? 'No invoices.' : undefined}>
-        <Table head={['Number', 'Date', 'Status', 'Amount', 'PDF', 'Link']}>
+        <Table head={['Number', 'Date', 'Status', 'Amount', 'PDF', 'Link', 'Actions']}>
           {o.invoices.map((r) => (
             <tr key={r.number}>
               <td class={td}>{r.number}</td>
@@ -170,6 +212,16 @@ function Overview(props: {
                 <Pdf present={r.pdf} />
               </td>
               <td class={td}>{r.link ?? 'no link'}</td>
+              <td class={td}>
+                <div class="flex flex-wrap items-center gap-2">
+                  {r.kind === 'invoice' && r.status.open > 0 && (
+                    <RecordPaymentLink invoice={r.number} />
+                  )}
+                  {r.kind === 'invoice' && r.status.state !== 'credited' && (
+                    <CreditNoteAction invoice={r.number} />
+                  )}
+                </div>
+              </td>
             </tr>
           ))}
         </Table>
@@ -186,11 +238,28 @@ function Overview(props: {
                 {p.project.retainer
                   ? `${money(p.project.retainer.amount, currency)} ${p.project.retainer.interval}, next ${p.project.retainer.next_date}`
                   : '-'}
+                {p.project.retainer && (
+                  <>
+                    {' '}
+                    <a
+                      href={`/business/drafts/new?client=${client.slug}&kind=invoice&from=retainer&project=${p.project.slug}`}
+                      class={link}
+                    >
+                      Invoice retainer
+                    </a>
+                  </>
+                )}
               </td>
             </tr>
           ))}
         </Table>
       </Card>
+
+      <p class="text-xs">
+        <a href={`/clients/${client.slug}/projects/new`} class={link}>
+          New project
+        </a>
+      </p>
 
       <Card
         title="Time by week and project"
@@ -207,7 +276,8 @@ function Overview(props: {
         </Table>
       </Card>
 
-      <Card title="Todos" empty={todos.length === 0 ? 'No todos.' : undefined}>
+      <Card title="Todos">
+        {todos.length === 0 && <p class="text-xs italic text-[var(--los-muted)]">No todos.</p>}
         <ul class="space-y-1 text-xs">
           {todos.map((t) => (
             <li key={t.id} class="flex gap-2">
@@ -221,9 +291,11 @@ function Overview(props: {
             </li>
           ))}
         </ul>
+        <QuickAdd client={client.slug} kind="todo" />
       </Card>
 
-      <Card title="Action log" empty={log.length === 0 ? 'No log entries.' : undefined}>
+      <Card title="Action log">
+        {log.length === 0 && <p class="text-xs italic text-[var(--los-muted)]">No log entries.</p>}
         <ul class="space-y-1 text-xs">
           {log.map((e, i) => (
             <li key={`${i}:${e.timestamp}:${e.description}`} class="flex gap-3">
@@ -234,6 +306,7 @@ function Overview(props: {
             </li>
           ))}
         </ul>
+        <QuickAdd client={client.slug} kind="log" />
       </Card>
 
       <Card title="Contracts" empty={o.contracts.length === 0 ? 'No contracts.' : undefined}>
@@ -305,12 +378,21 @@ export function ClientPage({ slug }: { slug?: string }) {
         }
         const dir = `${BUSINESS_ROOT}/clients/${o.client.slug}/`;
         const mine = (file: string) => file === BUSINESS_PROFILE_PATH || file.startsWith(dir);
+        const drafted = new Set(data.drafts.flatMap((d) => d.time_entries ?? []));
+        const canDraftUnbilled = data.time.some(
+          (t) => t.client === slug && t.invoice === undefined && !drafted.has(t.id),
+        );
+        const invoicedOffers = new Set(
+          data.issued.flatMap((i) => (i.doc.from_offer ? [i.doc.from_offer] : [])),
+        );
         return (
           <>
             <a href="/clients" class={`text-xs ${link}`}>
               All clients
             </a>
             <Overview
+              canDraftUnbilled={canDraftUnbilled}
+              invoicedOffers={invoicedOffers}
               o={o}
               today={today}
               contents={contents}

@@ -1,12 +1,14 @@
 import { CLIENT_STAGES } from '@kaihuman/formats/business';
 import { Card } from '../components/business/Card';
+import { RecordPaymentLink } from '../components/business/DocActions';
 import { hours, money } from '../components/business/money';
 import { PageShell } from '../components/business/PageShell';
 import { ProblemsList } from '../components/business/ProblemsList';
 import { Stat } from '../components/business/Stat';
 import { StatusPill } from '../components/business/StatusPill';
+import { TimerCard } from '../components/business/TimerCard';
 import { todayLocal } from '../lib/business/dates';
-import { businessDashboard } from '../lib/business/overview';
+import { businessDashboard, hoursSummary } from '../lib/business/overview';
 import { useBusinessRepo } from '../lib/business/use-business-repo';
 
 const th =
@@ -25,9 +27,10 @@ export function BusinessPage() {
       {({ data, loadErrors }) => {
         const d = businessDashboard(data, todayLocal());
         const cur = d.currency;
+        const h = hoursSummary(data, todayLocal());
         return (
           <>
-            <dl class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <dl class="grid grid-cols-2 lg:grid-cols-3 gap-3">
               <Stat label="Open" value={money(d.openTotal, cur)} />
               <Stat
                 label="Overdue"
@@ -36,7 +39,11 @@ export function BusinessPage() {
               />
               <Stat label={`VAT ${d.vat.month.period}`} value={money(d.vat.month.due, cur)} />
               <Stat label={`VAT ${d.vat.quarter.period}`} value={money(d.vat.quarter.due, cur)} />
+              <Stat label="Hours today" value={`${hours(h.todayMinutes)} h`} />
+              <Stat label="Hours this week" value={`${hours(h.weekMinutes)} h`} />
             </dl>
+
+            <TimerCard />
 
             <Card
               title="Who owes me"
@@ -51,6 +58,7 @@ export function BusinessPage() {
                       <th class={th}>Due</th>
                       <th class={th}>Status</th>
                       <th class={`${th} text-right`}>Open</th>
+                      <th class={th}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -64,6 +72,9 @@ export function BusinessPage() {
                         </td>
                         <td class={`${td} text-right whitespace-nowrap`}>
                           {money(r.status.open, r.currency)}
+                        </td>
+                        <td class={td}>
+                          {r.kind === 'invoice' && <RecordPaymentLink invoice={r.number} />}
                         </td>
                       </tr>
                     ))}
@@ -113,12 +124,23 @@ export function BusinessPage() {
               <ul class="text-xs space-y-1">
                 {d.drafts.map((draft) => (
                   <li key={draft.id}>
-                    {clientLink(draft.client)}: {draft.kind}, {draft.lines.length}{' '}
-                    {draft.lines.length === 1 ? 'line' : 'lines'}
+                    {clientLink(draft.client)}:{' '}
+                    <a
+                      href={`/business/drafts/${draft.id}`}
+                      class="text-[var(--los-accent)] hover:underline"
+                    >
+                      {draft.kind}, {draft.lines.length}{' '}
+                      {draft.lines.length === 1 ? 'line' : 'lines'}
+                    </a>
                   </li>
                 ))}
               </ul>
             </Card>
+            <p class="text-xs">
+              <a href="/business/drafts/new" class="text-[var(--los-accent)] hover:underline">
+                New draft
+              </a>
+            </p>
 
             <Card title="Pipeline">
               <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

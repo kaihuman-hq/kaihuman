@@ -58,6 +58,128 @@ afterEach(() => {
   host.remove();
 });
 
+const buttons = () => [...host.querySelectorAll('button')].map((b) => b.textContent);
+const unpaid = (m: Map<string, string>) => m.delete('.kh/business/payments/2026.jsonl');
+/** Adds RE-2026-0002, a credit note for the whole of RE-2026-0001. */
+const fullyCredited = (m: Map<string, string>) => {
+  const invoice = m.get('.kh/business/invoices/2026/RE-2026-0001.yaml') ?? '';
+  m.set(
+    '.kh/business/invoices/2026/RE-2026-0002.yaml',
+    invoice
+      .replaceAll('RE-2026-0001', 'RE-2026-0002')
+      .replace(/^draft_id: .*$/m, 'draft_id: 01M50ARQ007CHPV05AFMSY38DK')
+      .replace('type_code: 380', 'type_code: 381')
+      .replace(/^due_date: .*\n/m, '')
+      .replace('kind: invoice', 'kind: credit-note\ncorrects: RE-2026-0001'),
+  );
+};
+
+describe('ClientPage actions', () => {
+  it('offers Accepted, Declined and Convert to invoice for an undecided offer, and no payment link for a paid invoice', () => {
+    show(ready(load()));
+    expect(buttons()).toEqual(
+      expect.arrayContaining(['Accepted', 'Declined', 'Convert to invoice']),
+    );
+    expect(host.querySelector('a[href^="/business/payments/new"]')).toBeNull();
+  });
+
+  it('links a new offer always, and an invoice from unbilled time only when there is some', () => {
+    const hrefs = () => [...host.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    show(ready(load()));
+    expect(hrefs()).toContain('/business/drafts/new?client=acme-gmbh&kind=offer');
+    expect(hrefs()).not.toContain(
+      '/business/drafts/new?client=acme-gmbh&kind=invoice&from=unbilled',
+    );
+    show(
+      ready(
+        load((m) =>
+          m.set(
+            '.kh/business/time/2026-11.jsonl',
+            '{"id":"01M5AMBK0038DJQW16BGNTZ4A1","date":"2026-11-03","minutes":90,"client":"acme-gmbh","note":"a"}\n',
+          ),
+        ),
+      ),
+    );
+    expect(hrefs()).toContain('/business/drafts/new?client=acme-gmbh&kind=invoice&from=unbilled');
+  });
+
+  it('hides the unbilled-time link when all unbilled time is already in a draft', () => {
+    const entry =
+      '{"id":"01M5AMBK0038DJQW16BGNTZ4A1","date":"2026-11-03","minutes":90,"client":"acme-gmbh","note":"a"}\n';
+    const draft = (ids: string) =>
+      `id: 01M5AMBK0038DJQW16BGNTZ4B1\nkind: invoice\nclient: acme-gmbh\nlines:\n  - description: x\n    quantity: "1"\n    unit: C62\n    unit_price: 100\n    vat_category: S\n    vat_rate: "19"\ntime_entries:\n  - ${ids}\n`;
+    const hrefs = () => [...host.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    const link = '/business/drafts/new?client=acme-gmbh&kind=invoice&from=unbilled';
+    const withDraft = (ids: string) =>
+      ready(
+        load((m) => {
+          m.set('.kh/business/time/2026-11.jsonl', entry);
+          m.set('.kh/business/drafts/01M5AMBK0038DJQW16BGNTZ4B1.yaml', draft(ids));
+        }),
+      );
+    show(withDraft('01M5AMBK0038DJQW16BGNTZ4A1'));
+    expect(hrefs()).not.toContain(link);
+    show(withDraft('01M581YW00W16BGNTZ49EKRX27'));
+    expect(hrefs()).toContain(link);
+  });
+
+  it('links a new invoice from a retainer', () => {
+    const key = `${dir}projects/website.yaml`;
+    const retainer =
+      'retainer:\n  amount: 120000\n  interval: monthly\n  next_date: "2026-12-01"\n  description: Hosting\n';
+    show(ready(load((m) => m.set(key, `${m.get(key) ?? ''}${retainer}`))));
+    const hrefs = [...host.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(hrefs).toContain(
+      '/business/drafts/new?client=acme-gmbh&kind=invoice&from=retainer&project=website',
+    );
+  });
+
+  it('links Record payment for an open invoice', () => {
+    show(ready(load(unpaid)));
+    expect(
+      host.querySelector('a[href="/business/payments/new?invoice=RE-2026-0001"]')?.textContent,
+    ).toBe('Record payment');
+  });
+
+  const event = (type: string) =>
+    `{"id":"01M5D6RA00AFMSY38DJQW16BGN","at":"2026-10-30T09:30:00Z","doc":"AN-2026-001","type":"${type}"}\n`;
+
+  it('leaves only Convert to invoice for an accepted offer', () => {
+    show(ready(load((m) => m.set('.kh/business/events.jsonl', event('accepted')))));
+    expect(buttons()).toContain('Convert to invoice');
+    expect(buttons()).not.toContain('Accepted');
+    expect(buttons()).not.toContain('Declined');
+  });
+
+  it('offers Credit note… for an invoice, and none once it is fully credited', () => {
+    show(ready(load()));
+    expect(buttons()).toContain('Credit note…');
+    show(ready(load(fullyCredited)));
+    expect(buttons()).not.toContain('Credit note…');
+  });
+
+  it('hides Convert to invoice once an invoice was issued from the offer', () => {
+    const invoiced = (m: Map<string, string>) => {
+      const path = '.kh/business/invoices/2026/RE-2026-0001.yaml';
+      m.set(path, `${m.get(path) ?? ''}from_offer: AN-2026-001\n`);
+    };
+    show(ready(load(invoiced)));
+    expect(buttons()).not.toContain('Convert to invoice');
+    const acceptedAndInvoiced = (m: Map<string, string>) => {
+      invoiced(m);
+      m.set('.kh/business/events.jsonl', event('accepted'));
+    };
+    show(ready(load(acceptedAndInvoiced)));
+    expect(buttons()).not.toContain('Convert to invoice');
+  });
+
+  it('shows no offer buttons for a declined offer', () => {
+    show(ready(load((m) => m.set('.kh/business/events.jsonl', event('declined')))));
+    expect(buttons()).not.toContain('Convert to invoice');
+    expect(buttons()).not.toContain('Accepted');
+  });
+});
+
 describe('ClientPage', () => {
   it('says so and links back for an unknown client, without fetching backlinks', () => {
     show(ready(load()), 'nope');

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildToday,
+  businessToday,
   DEFAULT_ACTION_LOG_PATH,
   fetchToday,
   habitWeek,
@@ -373,6 +374,36 @@ describe('fetchToday', () => {
     expect(next.etag).toBe('etag-2');
   });
 
+  it('fetches and keeps only this month’s business time file and the timer', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 2, 12));
+    try {
+      const t = [
+        '.kh/business/time/2026-10.jsonl',
+        '.kh/business/time/2026-11.jsonl',
+        '.kh/business/time/running.yaml',
+        '.kh/business/business.yaml',
+      ].map((path, i) => ({ path, type: 'blob', sha: `b${i}` }));
+      const fetchMock = vi.fn(async (url: string) =>
+        url.includes('/git/trees/')
+          ? { ok: true, status: 200, json: async () => ({ tree: t }), headers: { get: () => 'e' } }
+          : { ok: true, status: 200, text: async () => 'x' },
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const previous = cache({ '.kh/business/time/2026-10.jsonl': 'old' });
+
+      const next = await fetchToday('t', 'o/r', previous);
+
+      expect(next.files.map((f) => f.path)).toEqual([
+        '.kh/business/time/2026-11.jsonl',
+        '.kh/business/time/running.yaml',
+      ]);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('replays the ETag and keeps the cache on a 304', async () => {
     const fetchMock = vi.fn(async () => ({ ok: false, status: 304 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -386,5 +417,77 @@ describe('fetchToday', () => {
     });
     expect(next.files).toEqual(previous.files);
     expect(next.fetchedAt).toBeGreaterThan(previous.fetchedAt);
+  });
+});
+
+describe('businessToday', () => {
+  const entry = (date: string, minutes: number) =>
+    JSON.stringify({
+      id: '01J8ZK3V5E7Q9R2T4W6Y8A0C2E',
+      date,
+      minutes,
+      client: 'acme-gmbh',
+      note: 'x',
+    });
+  const month = [entry('2026-09-23', 90), entry('2026-09-22', 200), entry('2026-09-23', 60)].join(
+    '\n',
+  );
+
+  it('sums only today’s entries', () => {
+    expect(businessToday(month, null, '2026-09-23', NOW)).toEqual({
+      minutesToday: 150,
+      running: null,
+    });
+  });
+
+  it('adds the minutes a running timer has elapsed, rounded down', () => {
+    const startedAt = new Date(2026, 8, 23, 9, 0, 30).toISOString();
+    const now = new Date(2026, 8, 23, 10, 30, 29); // 89m59s later
+    const result = businessToday(
+      month,
+      `client: acme-gmbh\nstarted_at: ${startedAt}\n`,
+      '2026-09-23',
+      now,
+    );
+    expect(result).toEqual({
+      minutesToday: 150 + 89,
+      running: { client: 'acme-gmbh', since: startedAt },
+    });
+  });
+
+  it('counts a timer started yesterday from local midnight', () => {
+    const now = new Date(2026, 8, 23, 1, 30);
+    const startedAt = new Date(2026, 8, 22, 22, 0).toISOString();
+    const result = businessToday(
+      null,
+      `client: acme-gmbh\nstarted_at: ${startedAt}\n`,
+      '2026-09-23',
+      now,
+    );
+    expect(result.minutesToday).toBe(90);
+  });
+
+  it('tolerates a malformed line and an invalid timer', () => {
+    const jsonl = `${entry('2026-09-23', 30)}\nnot json\n`;
+    expect(
+      businessToday(jsonl, 'client: acme-gmbh\nstarted_at: yesterday\n', '2026-09-23', NOW),
+    ).toEqual({ minutesToday: 30, running: null });
+  });
+
+  it('is null when the repo has no business files', () => {
+    expect(buildToday(cache({}), NOW).business).toBeNull();
+  });
+
+  it('reads this month’s file and the timer from the synced files', () => {
+    const summary = buildToday(
+      cache({
+        '.kh/business/time/2026-09.jsonl': month,
+        '.kh/business/time/2026-08.jsonl': entry('2026-09-23', 999),
+        '.kh/business/time/running.yaml': `client: acme-gmbh\nstarted_at: ${new Date(2026, 8, 23, 9, 0).toISOString()}\n`,
+      }),
+      NOW,
+    );
+    expect(summary.business?.minutesToday).toBe(150 + 90);
+    expect(summary.business?.running?.client).toBe('acme-gmbh');
   });
 });

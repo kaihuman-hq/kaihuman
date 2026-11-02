@@ -14,6 +14,7 @@ import type {
   LinkRecord,
   Payment,
   Project,
+  RunningTimer,
   TimeEntry,
   VatCategory,
 } from './records.js';
@@ -30,6 +31,7 @@ import {
   validateProfile,
   validateProject,
   validateTimeEntry,
+  validateTimer,
 } from './validate.js';
 import type { Issue, Result } from './validate-kit.js';
 import { parseYaml } from './yaml.js';
@@ -47,6 +49,8 @@ export type BusinessRepo = {
   drafts: Draft[];
   issued: LoadedIssued[];
   time: TimeEntry[];
+  /** The running timer, or null when none runs (or its file is invalid; see `findings`). */
+  timer: RunningTimer | null;
   payments: Payment[];
   events: DocEvent[];
   links: LinkRecord[];
@@ -115,6 +119,7 @@ export const loadBusinessRepoDetailed = (
     drafts: [],
     issued: [],
     time: [],
+    timer: null,
     payments: [],
     events: [],
     links: [],
@@ -286,6 +291,21 @@ export const loadBusinessRepoDetailed = (
             path: 'client',
             client: e.value.client,
             ...(e.value.project ? { project: e.value.project } : {}),
+          });
+        }
+        break;
+      }
+      case 'timer': {
+        if (text === undefined) break;
+        const r = readYaml(text, validateTimer);
+        if (!r.ok) addIssues(file, r.issues);
+        else {
+          repo.timer = r.value;
+          refs.push({
+            file,
+            path: 'client',
+            client: r.value.client,
+            ...(r.value.project ? { project: r.value.project } : {}),
           });
         }
         break;

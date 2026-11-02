@@ -5,7 +5,8 @@ import {
   Logger,
   layoutStore,
 } from '@kaihuman/core';
-import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
+import { type Capture, classifyBusinessPath } from '@kaihuman/formats/business';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 
 const logger = new Logger('Dashboard');
@@ -21,17 +22,55 @@ import {
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { FileViewer } from '../components/FileViewer';
 import { KBCommandsModal } from '../components/KBCommandsModal';
+import { runBusinessCapture } from '../lib/business/capture-write';
+import { frozenMessage, touchesFrozen } from '../lib/business/guards';
+import { BUSINESS_PROFILE_PATH, businessClientSlugs } from '../lib/business/load';
 import { VERSION } from '../version';
 import { QUICK_ROUTES } from './ShortcutsPage';
 
 export const Dashboard = () => {
   const [showKBCommands, setShowKBCommands] = useState(false);
+  const [captureStatus, setCaptureStatus] = useState<{ ok: boolean; message: string } | null>(null);
 
   /* original repo/repos declarations removed for mock */
   const tree = githubFileStore.tree.value;
   const openFiles = githubFileStore.openFiles.value;
 
-  // --- STORE ACCESS ---
+  // Palette capture needs business set up; clients come from folder names, so no file is loaded.
+  const businessEnabled = tree.some((t) => t.path === BUSINESS_PROFILE_PATH);
+  const businessClients = useMemo(
+    () => (businessEnabled ? businessClientSlugs(tree) : []),
+    [tree, businessEnabled],
+  );
+  const captureTimer = useRef<ReturnType<typeof setTimeout>>();
+  const handleBusinessCapture = useCallback(async (capture: Capture) => {
+    const target = githubProfileStore.currentRepo.peek();
+    const outcome = target
+      ? await runBusinessCapture(target, capture, route)
+      : { ok: false as const, message: 'No repository selected. Nothing was saved.' };
+    clearTimeout(captureTimer.current);
+    setCaptureStatus(outcome);
+    if (outcome.ok) captureTimer.current = setTimeout(() => setCaptureStatus(null), 2500);
+  }, []);
+
+  // True (after telling the user) when the path, or a folder's content, is an issued document.
+  const refuseFrozen = useCallback((path: string, target = false): boolean => {
+    const treePaths = githubFileStore.tree.peek().map((t) => t.path);
+    // A target only clashes with what already exists there (a new artifact may sit anywhere), but
+    // a new issued-document path is never allowed: issuing is the only way to create one.
+    if (
+      target &&
+      classifyBusinessPath(path).kind !== 'issued' &&
+      !treePaths.some((p) => p === path || p.startsWith(`${path}/`))
+    ) {
+      return false;
+    }
+    if (!touchesFrozen(path, treePaths)) return false;
+    clearTimeout(captureTimer.current); // a pending success timeout must not clear this message
+    setCaptureStatus({ ok: false, message: frozenMessage(path) });
+    return true;
+  }, []);
+
   // --- STORE ACCESS ---
   // Using layoutStore directly for everything
   const columns = layoutStore.columns.value;
@@ -317,6 +356,8 @@ export const Dashboard = () => {
           onKnowledgeClick={() => route('/knowledge')}
           onIdeasClick={() => route('/ideas')}
           onBusinessClick={() => route('/business')}
+          businessClients={businessClients}
+          onBusinessCapture={businessEnabled ? handleBusinessCapture : undefined}
           onWikiClick={() => route('/wiki')}
           onCheatsheetClick={() => route('/cheatsheet')}
           onKBCommandsClick={() => setShowKBCommands(true)}
@@ -396,10 +437,14 @@ export const Dashboard = () => {
               </div>
             );
           }, [])}
-          onFileChange={useCallback((path: string, newContent: string) => {
-            githubFileStore.updateFileContent(path, newContent);
-            githubFileStore.saveFile(path);
-          }, [])}
+          onFileChange={useCallback(
+            (path: string, newContent: string) => {
+              if (refuseFrozen(path)) return;
+              githubFileStore.updateFileContent(path, newContent);
+              githubFileStore.saveFile(path);
+            },
+            [refuseFrozen],
+          )}
           renderEditor={useCallback(
             (
               path: string,
@@ -477,48 +522,68 @@ export const Dashboard = () => {
             }
           }}
           // Handlers
-          onCreateFile={useCallback(async (path: string, content: string) => {
-            try {
-              await githubFileStore.createFile(path, content);
-              await githubFileStore.openFile(path);
-              addToRecentFiles(path); // Update recent files on create
-              layoutStore.navigate(path);
-            } catch (e) {
-              logger.error('Failed to create file:', e);
-            }
-          }, [])}
-          onDeleteFile={useCallback(async (path: string) => {
-            if (!confirm(`Are you sure you want to delete ${path}?`)) return;
+          onCreateFile={useCallback(
+            async (path: string, content: string) => {
+              if (refuseFrozen(path, true)) return;
+              try {
+                await githubFileStore.createFile(path, content);
+                await githubFileStore.openFile(path);
+                addToRecentFiles(path); // Update recent files on create
+                layoutStore.navigate(path);
+              } catch (e) {
+                logger.error('Failed to create file:', e);
+              }
+            },
+            [refuseFrozen],
+          )}
+          onDeleteFile={useCallback(
+            async (path: string) => {
+              if (refuseFrozen(path)) return;
+              if (!confirm(`Are you sure you want to delete ${path}?`)) return;
 
-            await githubFileStore.deleteFile(path);
+              await githubFileStore.deleteFile(path);
 
-            // Remove the deleted file from the dashboard config immediately
-            const current = layoutStore.remoteConfig.value;
-            if (!current) return;
+              // Remove the deleted file from the dashboard config immediately
+              const current = layoutStore.remoteConfig.value;
+              if (!current) return;
 
-            const CONFIG_PATH = `${githubFileStore.appFolder.peek()}/.dashboard.config.json`;
-            const newConfig = {
-              ...current,
-              entries: current.entries.filter((e) => e.path !== path),
-              files: {
-                ...current.files,
-                recentlyOpened: (current.files?.recentlyOpened ?? []).filter((p) => p !== path),
-              },
-            };
+              const CONFIG_PATH = `${githubFileStore.appFolder.peek()}/.dashboard.config.json`;
+              const newConfig = {
+                ...current,
+                entries: current.entries.filter((e) => e.path !== path),
+                files: {
+                  ...current.files,
+                  recentlyOpened: (current.files?.recentlyOpened ?? []).filter((p) => p !== path),
+                },
+              };
 
-            layoutStore.remoteConfig.value = newConfig;
-            githubFileStore.updateFileContent(CONFIG_PATH, JSON.stringify(newConfig, null, 2));
-            githubFileStore.saveFile(CONFIG_PATH);
-          }, [])}
-          onRenameFile={useCallback(async (path: string, newPath: string) => {
-            await githubFileStore.renameFile(path, newPath);
-          }, [])}
-          onRenameFolder={useCallback(async (path: string, newPath: string) => {
-            await githubFileStore.renameFolder(path, newPath);
-          }, [])}
-          onMoveFile={useCallback(async (path: string, newPath: string) => {
-            await githubFileStore.renameFile(path, newPath);
-          }, [])}
+              layoutStore.remoteConfig.value = newConfig;
+              githubFileStore.updateFileContent(CONFIG_PATH, JSON.stringify(newConfig, null, 2));
+              githubFileStore.saveFile(CONFIG_PATH);
+            },
+            [refuseFrozen],
+          )}
+          onRenameFile={useCallback(
+            async (path: string, newPath: string) => {
+              if (refuseFrozen(path) || refuseFrozen(newPath, true)) return;
+              await githubFileStore.renameFile(path, newPath);
+            },
+            [refuseFrozen],
+          )}
+          onRenameFolder={useCallback(
+            async (path: string, newPath: string) => {
+              if (refuseFrozen(path) || refuseFrozen(newPath, true)) return;
+              await githubFileStore.renameFolder(path, newPath);
+            },
+            [refuseFrozen],
+          )}
+          onMoveFile={useCallback(
+            async (path: string, newPath: string) => {
+              if (refuseFrozen(path) || refuseFrozen(newPath, true)) return;
+              await githubFileStore.renameFile(path, newPath);
+            },
+            [refuseFrozen],
+          )}
           // Data Props
           existingFiles={tree ? tree.map((t) => t.path) : []}
           onLoadFolder={async (path: string) => {
@@ -538,6 +603,19 @@ export const Dashboard = () => {
           version={VERSION}
         />
       </ErrorBoundary>
+      {captureStatus && (
+        <div
+          role={captureStatus.ok ? 'status' : 'alert'}
+          class={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[300] max-w-[90vw] px-3 py-2 text-xs font-mono border bg-[var(--los-bg)] ${captureStatus.ok ? 'border-[var(--los-accent)] text-[var(--los-accent)]' : 'border-[var(--los-warning)] text-[var(--los-warning)]'}`}
+        >
+          {captureStatus.message}
+          {!captureStatus.ok && (
+            <button type="button" class="ml-3 underline" onClick={() => setCaptureStatus(null)}>
+              Dismiss
+            </button>
+          )}
+        </div>
+      )}
       <KBCommandsModal isOpen={showKBCommands} onClose={() => setShowKBCommands(false)} />
     </div>
   );

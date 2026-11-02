@@ -1,7 +1,8 @@
 # Business — file format reference
 
 Status: phase 1 built (2026-10-26): formats, repo check, skill, set-up function. Phase 2 built
-(2026-10-27): read-only console pages. Design: `docs/superpowers/specs/2026-10-26-business-design.md`.
+(2026-10-27): read-only console pages. Phase 3 built (2026-11-02): daily forms, running timer,
+palette commands, read-only issued files, business hours on the browser extension's start page. Design: `docs/superpowers/specs/2026-10-26-business-design.md`.
 
 ## Goal
 
@@ -142,9 +143,9 @@ rewrite its history, and protect the main branch (no force-push, no deletion).
 
 ## Console
 
-The console reads the business files and never writes them (the one exception is the "Enable
-business" commit). It needs business enabled, and the pages warn when the repository is public (business data belongs
-in a private repo).
+The console reads the business files and, since phase 3, writes them through forms. It needs
+business enabled, and the pages warn when the repository is public (business data belongs in a
+private repo).
 
 | Page | What it shows |
 |------|---------------|
@@ -152,6 +153,11 @@ in a private repo).
 | `/clients` | Client list with name, stage, billed this year, open amount and unbilled hours; filter by stage |
 | `/clients/:slug` | One page per client: timeline, offers, invoices, projects with budget use, time by week, todos, action log, contracts, notes and pages that link to the client |
 | `/business/enable` | Set-up form; explains why it is blocked on a public repo |
+| `/business/time/new` | Log time (also the stop-timer form, prefilled) |
+| `/clients/new`, `/clients/:slug/projects/new` | New client, new project |
+| `/business/payments/new?invoice=` | Record a payment |
+| `/business/drafts/new`, `/business/drafts/:id` | Draft editor (invoice, offer, credit note) |
+| `/business/drafts/:id/issue` | Issue preview and the "Issue <number>" button |
 
 - The Kanban board, the todo analytics and the action log have an All / Business / Personal toggle.
   Client todos (`clients/<slug>/todos.todos.md`) and logs (`log.actionlog.md`) count as Business.
@@ -161,8 +167,41 @@ in a private repo).
 - Demo mode seeds a sample business ("Demo Studio", fake IBAN and VAT ID) with three clients, a paid
   and an overdue invoice, an offer, time entries and a wiki page linking to the active client.
 
-Warning: do not change `numbering` in `business.yaml` once you have issued documents. The check
-reads the format of every issued number from it, and a changed format breaks the gap-free series.
+## Writing (phase 3)
+
+Every form makes one commit per action, with a message starting `business: `
+(`writeBusiness`, `apps/console/src/lib/business/write.ts`).
+
+- **Forms:** log time; start, stop and cancel the timer; new client and project; client todo and log
+  lines (quick add on the client page); record a payment; offer accepted, declined or converted to
+  an invoice draft; draft editor (from unbilled time, a retainer or empty); issue; credit note
+  (a draft of kind `credit-note` with `corrects`, lines prefilled from the invoice).
+- **Timer:** `time/running.yaml` holds the one running timer (`client`, optional `project` and
+  `note`, `started_at` with offset). Starting while one runs is refused. Stop opens the log-time form
+  prefilled (date = day of `started_at`, minutes rounded, 1 to 1440); saving appends the entry and
+  deletes `running.yaml` in one commit.
+- **Conflicts:** a write re-reads the files it touches and commits against the head sha it read. If
+  the branch moved, it rebuilds from fresh contents and retries once. If that fails too, nothing is
+  written and the form says `Someone else changed the repository at the same time. Reload and try
+  again.` Your input stays in the form.
+- **Issuing:** do not change `numbering` in `business.yaml` once you have issued documents. The
+  check reads the format of every issued number from it, and a changed format breaks the gap-free
+  series. Issued offers and invoices are written only by "Issue" (`issue()`). The next number
+  is taken from fresh state, so a number issued on another device is never overwritten.
+- **Palette** (console `SearchModal`, when business is enabled): `todo <client>: text`,
+  `log <client>: text`, `timer <client>[/project]`, `stop timer`. The client is an exact slug or a
+  unique prefix. Quick todo and quick log also have a "For client" select.
+- **File browser:** issued yaml and offer/invoice pdf, xml and sha256 files open read-only and
+  cannot be changed, renamed, moved or deleted there.
+
+## Browser extension
+
+The start page's "Doing" section shows `Business today: 2.5 h`, plus `· timer running for <client>`
+while a timer runs. It reads only the current month's `time/<yyyy-mm>.jsonl` and `time/running.yaml`
+(the same sync as the other start-page files); a timer started on an earlier day counts from local
+midnight, and minutes are rounded down. The line updates when the start page syncs, not live; older
+months' time files are never fetched or cached. Without those files the page is unchanged. It is read-only:
+start and stop happen in the console.
 
 ## GoBD caveat
 

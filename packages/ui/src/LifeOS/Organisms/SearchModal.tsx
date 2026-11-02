@@ -1,4 +1,5 @@
 import { githubFileStore, Logger, layoutStore } from '@kaihuman/core';
+import type { Capture } from '@kaihuman/formats/business';
 import {
   Command,
   CornerDownLeft,
@@ -8,9 +9,10 @@ import {
   Loader2,
   Search,
 } from 'lucide-preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoText } from '../Atoms/Typography';
+import { businessCaptureFor } from './search-business';
 import { matchFilenames } from './search-filename-matcher';
 
 const logger = new Logger('SearchModal');
@@ -50,7 +52,7 @@ async function fetchGithubSearchWithRetry(
   throw lastError;
 }
 
-export type SearchResultType = 'FILE' | 'COMMAND' | 'REPO' | 'WORKSPACE';
+export type SearchResultType = 'FILE' | 'COMMAND' | 'REPO' | 'WORKSPACE' | 'BUSINESS';
 
 export interface SearchResult {
   name: string;
@@ -84,6 +86,9 @@ export interface SearchModalProps {
   onOpenActionLog?: () => void;
   onOpenKnowledge?: () => void;
   onOpenKBCommands?: () => void;
+  /** Client slugs for `todo|log|timer <client>` lines; with `onBusinessCapture`, enables them. */
+  businessClients?: string[];
+  onBusinessCapture?: (capture: Capture) => void;
 }
 
 export const SearchModal = ({
@@ -102,9 +107,31 @@ export const SearchModal = ({
   onOpenActionLog,
   onOpenKnowledge,
   onOpenKBCommands,
+  businessClients = [],
+  onBusinessCapture,
 }: SearchModalProps) => {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [found, setFound] = useState<SearchResult[]>([]);
+  // Derived at render, not in the debounced search: new clients or handler apply to the same query.
+  const captured = useMemo(
+    () => (onBusinessCapture ? businessCaptureFor(query, businessClients) : null),
+    [query, businessClients, onBusinessCapture],
+  );
+  const results = useMemo<SearchResult[]>(
+    () =>
+      captured
+        ? [
+            {
+              name: captured.name,
+              path: 'business:capture',
+              type: 'BUSINESS',
+              onSelect: () => onBusinessCapture?.(captured.capture),
+            },
+            ...found,
+          ]
+        : found,
+    [captured, found, onBusinessCapture],
+  );
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -113,7 +140,7 @@ export const SearchModal = ({
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
       setQuery('');
-      setResults([]);
+      setFound([]);
     }
   }, [isOpen]);
 
@@ -233,7 +260,7 @@ export const SearchModal = ({
 
     if (!query) {
       setLoading(false);
-      setResults(cmds.slice(0, 50));
+      setFound(cmds.slice(0, 50));
       return;
     }
 
@@ -242,7 +269,7 @@ export const SearchModal = ({
     const filenameMatches: SearchResult[] = matchFilenames(githubFileStore.tree.value, query).map(
       (f) => ({ ...f, type: 'FILE' }),
     );
-    setResults([...cmds, ...filenameMatches].slice(0, 50));
+    setFound([...cmds, ...filenameMatches].slice(0, 50));
     setSelectedIndex(0);
     // No repository picked yet: there is nothing to run a content search against.
     if (!currentRepository) {
@@ -288,7 +315,7 @@ export const SearchModal = ({
           return true;
         });
 
-        setResults([...cmds, ...uniqueFiles].slice(0, 50));
+        setFound([...cmds, ...uniqueFiles].slice(0, 50));
         setSelectedIndex(0);
       } catch (e) {
         if (!controller.signal.aborted) logger.error('Search error', e);

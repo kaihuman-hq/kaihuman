@@ -1,4 +1,4 @@
-import { githubFileStore, type TreeItem } from '@kaihuman/core';
+import { gitBlobSha, githubFileStore, type TreeItem } from '@kaihuman/core';
 import { ideaSlugOf } from '@kaihuman/formats';
 import { loadRepoFiles, rememberRepoFile } from './repo-files';
 
@@ -13,11 +13,14 @@ export const ideaFileExists = (path: string) =>
 export const loadIdeaContents = (repoFullName: string, items: readonly TreeItem[]) =>
   loadRepoFiles(repoFullName, items);
 
-/** Records a write so the overview shows it until the tree is reloaded with the new sha. */
+/**
+ * Records a write so the overview shows it until the tree is reloaded with the new sha. The
+ * cache is keyed by the content's own blob sha: the tree still holds the old sha, which would
+ * pair the new text with the old version.
+ */
 const remember = (path: string, content: string) => {
   const repo = githubFileStore.loadedRepo.peek();
-  const sha = githubFileStore.tree.peek().find((item) => item.path === path)?.sha ?? '';
-  if (repo) rememberRepoFile(repo, path, sha, content);
+  if (repo) rememberRepoFile(repo, path, gitBlobSha(content), content);
 };
 
 /** Waits for the store's save and turns its error signal back into an exception. */

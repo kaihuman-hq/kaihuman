@@ -42,7 +42,7 @@ const fullySetUp = (): Record<string, string> => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(githubService.commitFiles).mockResolvedValue(undefined);
+  vi.mocked(githubService.commitFiles).mockResolvedValue({ commitSha: 'c', blobShas: {} });
 });
 
 describe('syncKB', () => {

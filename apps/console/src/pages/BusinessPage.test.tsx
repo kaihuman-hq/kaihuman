@@ -103,4 +103,27 @@ describe('BusinessPage', () => {
     expect(host.textContent).toContain('clients/bad/client.yaml');
     expect(host.textContent).toContain('Acme GmbH');
   });
+
+  it('links drafts to the editor and offers a new draft, even with no drafts', () => {
+    show(ready(loadBusinessRepo(files())));
+    const hrefs = [...host.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(hrefs).toContain('/business/drafts/01M5KA3Q00W16BGNTZ49EKRX27');
+    expect(hrefs).toContain('/business/drafts/new');
+    show(
+      ready(
+        loadBusinessRepo(
+          files((m) => m.delete('.kh/business/drafts/01M5KA3Q00W16BGNTZ49EKRX27.yaml')),
+        ),
+      ),
+    );
+    expect(host.textContent).toContain('No drafts waiting');
+    expect(host.textContent).toContain('New draft');
+  });
+
+  it('links Record payment on an open receivable', () => {
+    show(ready(loadBusinessRepo(unpaid())));
+    expect(
+      host.querySelector('a[href="/business/payments/new?invoice=RE-2026-0001"]'),
+    ).not.toBeNull();
+  });
 });

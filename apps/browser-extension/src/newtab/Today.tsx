@@ -37,6 +37,9 @@ const formatWorked = (seconds: number, running: boolean) =>
     running ? ` ${pad(seconds % 60)}s` : ''
   }`;
 
+/** `2.5 h`: one decimal, none when whole. */
+const hoursLabel = (minutes: number) => `${Number((minutes / 60).toFixed(1))} h`;
+
 const whenLabel = (daysUntil: number) =>
   daysUntil === 0 ? 'today' : daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`;
 
@@ -147,9 +150,9 @@ export function Doing(props: {
   onToggleTimer: (path: string) => void;
 }) {
   const { today, now, busyPath, onOpenFile } = props;
-  const { inProgress, overdue, inbox, timers } = today;
+  const { inProgress, overdue, inbox, timers, business } = today;
   const tasks = overdue.length > 0 || inProgress.length > 0;
-  if (!tasks && timers.length === 0 && inbox.count === 0) return null;
+  if (!tasks && timers.length === 0 && inbox.count === 0 && !business) return null;
 
   return (
     <section class="border border-nt-control p-4 flex flex-col gap-[14px]">
@@ -195,6 +198,12 @@ export function Doing(props: {
             </li>
           ))}
         </ul>
+      )}
+      {business && (
+        <p data-testid="business-today" class="text-[13px] text-nt-muted">
+          Business today: {hoursLabel(business.minutesToday)}
+          {business.running && ` · timer running for ${business.running.client}`}
+        </p>
       )}
       {timers.map((timer) => {
         const seconds =

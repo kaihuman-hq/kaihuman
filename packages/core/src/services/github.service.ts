@@ -1,7 +1,18 @@
 import { Octokit } from '@octokit/rest';
 import { demoMode } from '../demo-mode.js';
 import { authStore } from '../stores/auth.store.js';
+import { gitBlobSha } from '../utils/git-blob-sha.js';
+import { ConflictError } from './conflict.js';
 import { inMemoryGithubService } from './github.service.memory.js';
+
+// GitHub's GETs are cacheable for 60s. A branch head read through that cache is stale, which
+// makes a write think the branch moved (or, worse, build on old state), so refs skip it.
+const noStore = {
+  request: {
+    fetch: (url: string | URL | Request, init?: RequestInit) =>
+      fetch(url, { ...init, cache: 'no-store' }),
+  },
+};
 
 export class GithubService {
   private octokit: Octokit | null = null;
@@ -46,8 +57,19 @@ export class GithubService {
     return data;
   }
 
-  async fetchRepoTree(owner: string, repo: string, branch = 'main') {
+  /** With `commitSha` the tree of that commit is fetched and the branch ref is not read. */
+  async fetchRepoTree(owner: string, repo: string, branch = 'main', opts?: { commitSha?: string }) {
     const client = this.getClient();
+    if (opts?.commitSha) {
+      // The tree endpoint resolves a commit sha to its tree.
+      const { data } = await client.git.getTree({
+        owner,
+        repo,
+        tree_sha: opts.commitSha,
+        recursive: 'true',
+      });
+      return data.tree;
+    }
     // Get the reference for the branch to find the commit SHA
     // Or just use the branch name in getTree if supported?
     // git/trees/:tree_sha supports recursive=true
@@ -71,12 +93,14 @@ export class GithubService {
     return treeData.tree;
   }
 
-  async getFileContent(owner: string, repo: string, path: string) {
+  /** With `ref` (a commit sha) the file is read as of that commit, which never changes. */
+  async getFileContent(owner: string, repo: string, path: string, opts?: { ref?: string }) {
     const client = this.getClient();
     const { data } = await client.repos.getContent({
       owner,
       repo,
       path,
+      ...(opts?.ref ? { ref: opts.ref } : {}),
     });
 
     if (Array.isArray(data)) {
@@ -220,20 +244,44 @@ export class GithubService {
     });
   }
 
+  /** Current commit SHA of a branch. */
+  async getHeadSha(owner: string, repo: string, branch: string): Promise<string> {
+    const client = this.getClient();
+    const { data } = await client.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+      ...noStore,
+    });
+    return data.object.sha;
+  }
+
   /**
-   * Writes several files in a single commit, so the branch gets all of them or none: a write
-   * that fails halfway leaves nothing behind. Fails if the branch moved while the commit was built.
+   * Writes and deletes (`null`) several files in a single commit, so the branch gets all of them
+   * or none: a write that fails halfway leaves nothing behind. With `expectedHeadSha` it throws
+   * {@link ConflictError} before creating anything when the branch has moved; a ref update GitHub
+   * rejects as non-fast-forward is a ConflictError too. `blobShas` maps each written path to its
+   * new blob SHA.
    */
   async commitFiles(
     owner: string,
     repo: string,
     branch: string,
-    files: Record<string, string>,
+    files: Record<string, string | null>,
     message: string,
-  ) {
+    opts?: { expectedHeadSha?: string },
+  ): Promise<{ commitSha: string; blobShas: Record<string, string> }> {
     const client = this.getClient();
-    const { data: refData } = await client.git.getRef({ owner, repo, ref: `heads/${branch}` });
+    const { data: refData } = await client.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+      ...noStore,
+    });
     const headSha = refData.object.sha;
+    if (opts?.expectedHeadSha !== undefined && opts.expectedHeadSha !== headSha) {
+      throw new ConflictError(`${branch} moved from ${opts.expectedHeadSha} to ${headSha}`);
+    }
     const { data: commitData } = await client.git.getCommit({
       owner,
       repo,
@@ -243,12 +291,11 @@ export class GithubService {
       owner,
       repo,
       base_tree: commitData.tree.sha,
-      tree: Object.entries(files).map(([path, content]) => ({
-        path,
-        mode: '100644' as const,
-        type: 'blob' as const,
-        content,
-      })),
+      tree: Object.entries(files).map(([path, content]) =>
+        content === null
+          ? { path, mode: '100644' as const, type: 'blob' as const, sha: null }
+          : { path, mode: '100644' as const, type: 'blob' as const, content },
+      ),
     });
     const { data: newCommit } = await client.git.createCommit({
       owner,
@@ -257,7 +304,22 @@ export class GithubService {
       tree: newTree.sha,
       parents: [headSha],
     });
-    await client.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommit.sha });
+    try {
+      await client.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommit.sha });
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      // 422 can also be another ref validation error; treating it as a conflict only costs a retry.
+      if (status === 409 || status === 422) {
+        throw new ConflictError(`${branch} moved while the commit was built`);
+      }
+      throw e;
+    }
+    // createTree lists only top-level entries, so compute the blob SHAs locally.
+    const blobShas: Record<string, string> = {};
+    for (const [path, content] of Object.entries(files)) {
+      if (content !== null) blobShas[path] = gitBlobSha(content);
+    }
+    return { commitSha: newCommit.sha, blobShas };
   }
 
   /** Create or update a file, fetching the current SHA automatically when needed. */

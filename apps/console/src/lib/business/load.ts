@@ -33,3 +33,16 @@ export const backlinkTreeItems = (tree: readonly TreeItem[], cap = 300): TreeIte
         (item.path.startsWith('.kh/wiki/') || item.path.startsWith('.kh/ideas/')),
     )
     .slice(0, cap);
+
+const CLIENT_DIR = new RegExp(`^${BUSINESS_ROOT.replace('.', '\\.')}/clients/([^/]+)/`);
+
+/** Client slugs from the folder names alone, for the palette; no file is loaded. */
+export const businessClientSlugs = (tree: readonly TreeItem[]): string[] =>
+  [
+    ...new Set(
+      tree.flatMap((item) => {
+        const slug = CLIENT_DIR.exec(item.path)?.[1];
+        return slug ? [slug] : [];
+      }),
+    ),
+  ].sort();

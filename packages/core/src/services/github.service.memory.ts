@@ -2,6 +2,9 @@ import { Logger } from '../logger.js';
 import type { TreeItem } from '../stores/github-file.store.js';
 import type { GithubRepo } from '../stores/github-profile.store.js';
 
+import { gitBlobSha } from '../utils/git-blob-sha.js';
+import { ConflictError } from './conflict.js';
+
 const logger = new Logger('InMemoryGithubService');
 
 interface MemoryFile {
@@ -34,6 +37,7 @@ function contentSha(path: string, content: string): string {
 export class InMemoryGithubService {
   private files = new Map<string, MemoryFile>();
   private repos: GithubRepo[] = [];
+  private commitCount = 0;
 
   /** Install seed data. Replaces any previously loaded state. */
   load(files: Record<string, string>, repos: GithubRepo[]): void {
@@ -61,7 +65,12 @@ export class InMemoryGithubService {
     return this.repos;
   }
 
-  async fetchRepoTree(_owner: string, _repo: string, _branch = 'main'): Promise<TreeItem[]> {
+  async fetchRepoTree(
+    _owner: string,
+    _repo: string,
+    _branch = 'main',
+    _opts?: { commitSha?: string },
+  ): Promise<TreeItem[]> {
     return this.buildTree();
   }
 
@@ -69,6 +78,7 @@ export class InMemoryGithubService {
     _owner: string,
     _repo: string,
     path: string,
+    _opts?: { ref?: string },
   ): Promise<{ content: string; sha: string }> {
     const file = this.files.get(path);
     if (!file) {
@@ -120,16 +130,36 @@ export class InMemoryGithubService {
     }
   }
 
+  /** Counter-based fake head: changes on every commit, like a real branch head. */
+  async getHeadSha(_owner: string, _repo: string, _branch: string): Promise<string> {
+    return String(this.commitCount).padStart(40, '0');
+  }
+
   async commitFiles(
-    _owner: string,
-    _repo: string,
-    _branch: string,
-    files: Record<string, string>,
+    owner: string,
+    repo: string,
+    branch: string,
+    files: Record<string, string | null>,
     _message: string,
-  ): Promise<void> {
-    for (const [path, content] of Object.entries(files)) {
-      this.files.set(path, { content, sha: contentSha(path, content) });
+    opts?: { expectedHeadSha?: string },
+  ): Promise<{ commitSha: string; blobShas: Record<string, string> }> {
+    const head = await this.getHeadSha(owner, repo, branch);
+    if (opts?.expectedHeadSha !== undefined && opts.expectedHeadSha !== head) {
+      throw new ConflictError(`${branch} moved from ${opts.expectedHeadSha} to ${head}`);
     }
+    const blobShas: Record<string, string> = {};
+    for (const [path, content] of Object.entries(files)) {
+      if (content === null) {
+        this.files.delete(path);
+        continue;
+      }
+      // Same sha the real service reports, so the tree and blobShas agree.
+      const sha = gitBlobSha(content);
+      this.files.set(path, { content, sha });
+      blobShas[path] = sha;
+    }
+    this.commitCount++;
+    return { commitSha: await this.getHeadSha(owner, repo, branch), blobShas };
   }
 
   async upsertRepoFile(

@@ -8,7 +8,8 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "fix": "biome check --write --unsafe .",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@octokit/rest": "^22.0.1",
