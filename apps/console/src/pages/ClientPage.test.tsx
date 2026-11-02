@@ -70,6 +70,37 @@ describe('ClientPage actions', () => {
     expect(host.querySelector('a[href^="/business/payments/new"]')).toBeNull();
   });
 
+  it('links a new offer always, and an invoice from unbilled time only when there is some', () => {
+    const hrefs = () => [...host.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    show(ready(load()));
+    expect(hrefs()).toContain('/business/drafts/new?client=acme-gmbh&kind=offer');
+    expect(hrefs()).not.toContain(
+      '/business/drafts/new?client=acme-gmbh&kind=invoice&from=unbilled',
+    );
+    show(
+      ready(
+        load((m) =>
+          m.set(
+            '.kh/business/time/2026-11.jsonl',
+            '{"id":"01M5AMBK0038DJQW16BGNTZ4A1","date":"2026-11-03","minutes":90,"client":"acme-gmbh","note":"a"}\n',
+          ),
+        ),
+      ),
+    );
+    expect(hrefs()).toContain('/business/drafts/new?client=acme-gmbh&kind=invoice&from=unbilled');
+  });
+
+  it('links a new invoice from a retainer', () => {
+    const key = `${dir}projects/website.yaml`;
+    const retainer =
+      'retainer:\n  amount: 120000\n  interval: monthly\n  next_date: "2026-12-01"\n  description: Hosting\n';
+    show(ready(load((m) => m.set(key, `${m.get(key) ?? ''}${retainer}`))));
+    const hrefs = [...host.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(hrefs).toContain(
+      '/business/drafts/new?client=acme-gmbh&kind=invoice&from=retainer&project=website',
+    );
+  });
+
   it('links Record payment for an open invoice', () => {
     show(ready(load(unpaid)));
     expect(

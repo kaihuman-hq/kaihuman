@@ -138,6 +138,21 @@ function Overview(props: {
           <a href={`/business/time/new?client=${client.slug}`} class={link}>
             Log time
           </a>
+          {s.unbilledMinutes > 0 && (
+            <>
+              {' · '}
+              <a
+                href={`/business/drafts/new?client=${client.slug}&kind=invoice&from=unbilled`}
+                class={link}
+              >
+                New invoice from unbilled time
+              </a>
+            </>
+          )}
+          {' · '}
+          <a href={`/business/drafts/new?client=${client.slug}&kind=offer`} class={link}>
+            New offer
+          </a>
         </p>
       </header>
 
@@ -208,6 +223,17 @@ function Overview(props: {
                 {p.project.retainer
                   ? `${money(p.project.retainer.amount, currency)} ${p.project.retainer.interval}, next ${p.project.retainer.next_date}`
                   : '-'}
+                {p.project.retainer && (
+                  <>
+                    {' '}
+                    <a
+                      href={`/business/drafts/new?client=${client.slug}&kind=invoice&from=retainer&project=${p.project.slug}`}
+                      class={link}
+                    >
+                      Invoice retainer
+                    </a>
+                  </>
+                )}
               </td>
             </tr>
           ))}

@@ -124,12 +124,23 @@ export function BusinessPage() {
               <ul class="text-xs space-y-1">
                 {d.drafts.map((draft) => (
                   <li key={draft.id}>
-                    {clientLink(draft.client)}: {draft.kind}, {draft.lines.length}{' '}
-                    {draft.lines.length === 1 ? 'line' : 'lines'}
+                    {clientLink(draft.client)}:{' '}
+                    <a
+                      href={`/business/drafts/${draft.id}`}
+                      class="text-[var(--los-accent)] hover:underline"
+                    >
+                      {draft.kind}, {draft.lines.length}{' '}
+                      {draft.lines.length === 1 ? 'line' : 'lines'}
+                    </a>
                   </li>
                 ))}
               </ul>
             </Card>
+            <p class="text-xs">
+              <a href="/business/drafts/new" class="text-[var(--los-accent)] hover:underline">
+                New draft
+              </a>
+            </p>
 
             <Card title="Pipeline">
               <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

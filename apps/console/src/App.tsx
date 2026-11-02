@@ -14,6 +14,7 @@ import { ClientPage } from './pages/ClientPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { Dashboard } from './pages/Dashboard';
 import { DemoEntry } from './pages/DemoEntry';
+import { DraftPage } from './pages/DraftPage';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
 import { IdeasPage } from './pages/IdeasPage';
 import { KanbanBoardPage } from './pages/KanbanBoardPage';
@@ -94,6 +95,8 @@ export const App = () => {
         <ProtectedRoute path="/business/enable" component={BusinessEnablePage} />
         <ProtectedRoute path="/business/time/new" component={LogTimePage} />
         <ProtectedRoute path="/business/payments/new" component={PaymentFormPage} />
+        <ProtectedRoute path="/business/drafts/new" component={DraftPage} />
+        <ProtectedRoute path="/business/drafts/:id" component={DraftPage} />
         <ProtectedRoute path="/files" component={Dashboard} />
         <ProtectedRoute path="/files/:rest*" component={Dashboard} />
         <ProtectedRoute path="/new" component={Dashboard} />
