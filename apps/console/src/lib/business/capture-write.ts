@@ -10,6 +10,8 @@ import {
 import type { KBRepo } from '../github-kb';
 import { writeBusiness, writeErrorMessage } from './write';
 
+export const STILL_LOADING = 'Business data is still loading. Try again in a moment.';
+
 const FILES = { todo: 'todos.todos.md', log: 'log.actionlog.md' } as const;
 
 /** One todo or log line into a client's file, committed through the business write layer. */
@@ -60,3 +62,14 @@ export async function runBusinessCapture(
   } as const;
   return { ok: true, message: done[capture.kind] };
 }
+
+/** Text plus a tags field (`#a, b c`) as one line with inline `#tags`, which the client helpers read. */
+export const lineWithTags = (text: string, tags: string): string =>
+  [
+    text.trim(),
+    ...tags
+      .split(/[\s,]+/)
+      .map((t) => t.replace(/^#/, '').trim().toLowerCase())
+      .filter(Boolean)
+      .map((t) => `#${t}`),
+  ].join(' ');

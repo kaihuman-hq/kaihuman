@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { useManifest } from '../hooks/useManifest';
-import { writeClientLine } from '../lib/business/capture-write';
+import { lineWithTags, STILL_LOADING, writeClientLine } from '../lib/business/capture-write';
 import { useBusinessRepo } from '../lib/business/use-business-repo';
 import { writeErrorMessage } from '../lib/business/write';
 
@@ -26,6 +26,12 @@ export const QuickTodoPage = () => {
   const submitting = useRef(false);
   const business = useBusinessRepo();
   const clients = business.status === 'ready' ? business.data.clients : [];
+  // The chosen client can vanish after a repo switch or reload; do not keep writing to it.
+  useEffect(() => {
+    if (business.status === 'ready' && client && !clients.some((c) => c.slug === client)) {
+      setClient('');
+    }
+  }, [business.status, client, clients]);
 
   // Load tree if needed (direct navigation to /quick-todo)
   useEffect(() => {
@@ -58,14 +64,17 @@ export const QuickTodoPage = () => {
     setSaving(true);
     setError(null);
     try {
-      if (client && business.status === 'ready') {
-        const parsed = tags
-          .split(/[\s,]+/)
-          .map((t) => t.replace(/^#/, '').trim().toLowerCase())
-          .filter(Boolean);
-        // Tags travel as inline `#tag`, which the client helpers read like the inbox does.
-        const line = [trimmed, ...parsed.map((t) => `#${t}`)].join(' ');
-        const result = await writeClientLine(business.repo, 'todo', client as Slug, line);
+      if (client) {
+        if (business.status !== 'ready') {
+          setError(STILL_LOADING);
+          return;
+        }
+        const result = await writeClientLine(
+          business.repo,
+          'todo',
+          client as Slug,
+          lineWithTags(trimmed, tags),
+        );
         if (!result.ok) {
           setError(result.issues[0]?.message ?? 'Nothing was saved.');
           return;

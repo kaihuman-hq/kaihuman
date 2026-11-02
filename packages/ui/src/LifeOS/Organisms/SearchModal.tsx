@@ -9,7 +9,7 @@ import {
   Loader2,
   Search,
 } from 'lucide-preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoText } from '../Atoms/Typography';
 import { businessCaptureFor } from './search-business';
@@ -111,7 +111,27 @@ export const SearchModal = ({
   onBusinessCapture,
 }: SearchModalProps) => {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [found, setFound] = useState<SearchResult[]>([]);
+  // Derived at render, not in the debounced search: new clients or handler apply to the same query.
+  const captured = useMemo(
+    () => (onBusinessCapture ? businessCaptureFor(query, businessClients) : null),
+    [query, businessClients, onBusinessCapture],
+  );
+  const results = useMemo<SearchResult[]>(
+    () =>
+      captured
+        ? [
+            {
+              name: captured.name,
+              path: 'business:capture',
+              type: 'BUSINESS',
+              onSelect: () => onBusinessCapture?.(captured.capture),
+            },
+            ...found,
+          ]
+        : found,
+    [captured, found, onBusinessCapture],
+  );
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -120,7 +140,7 @@ export const SearchModal = ({
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
       setQuery('');
-      setResults([]);
+      setFound([]);
     }
   }, [isOpen]);
 
@@ -128,16 +148,6 @@ export const SearchModal = ({
   const getCommands = (q: string): SearchResult[] => {
     const cmds: SearchResult[] = [];
     const lowerQ = q.toLowerCase();
-
-    const captured = onBusinessCapture && businessCaptureFor(q, businessClients);
-    if (captured) {
-      cmds.push({
-        name: captured.name,
-        path: 'business:capture',
-        type: 'BUSINESS',
-        onSelect: () => onBusinessCapture(captured.capture),
-      });
-    }
 
     // Static Commands
     const staticCommands = [
@@ -250,7 +260,7 @@ export const SearchModal = ({
 
     if (!query) {
       setLoading(false);
-      setResults(cmds.slice(0, 50));
+      setFound(cmds.slice(0, 50));
       return;
     }
 
@@ -259,7 +269,7 @@ export const SearchModal = ({
     const filenameMatches: SearchResult[] = matchFilenames(githubFileStore.tree.value, query).map(
       (f) => ({ ...f, type: 'FILE' }),
     );
-    setResults([...cmds, ...filenameMatches].slice(0, 50));
+    setFound([...cmds, ...filenameMatches].slice(0, 50));
     setSelectedIndex(0);
     // No repository picked yet: there is nothing to run a content search against.
     if (!currentRepository) {
@@ -305,7 +315,7 @@ export const SearchModal = ({
           return true;
         });
 
-        setResults([...cmds, ...uniqueFiles].slice(0, 50));
+        setFound([...cmds, ...uniqueFiles].slice(0, 50));
         setSelectedIndex(0);
       } catch (e) {
         if (!controller.signal.aborted) logger.error('Search error', e);

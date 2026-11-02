@@ -6,7 +6,7 @@ import {
   layoutStore,
 } from '@kaihuman/core';
 import type { Capture } from '@kaihuman/formats/business';
-import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 
 const logger = new Logger('Dashboard');
@@ -41,12 +41,15 @@ export const Dashboard = () => {
     () => (businessEnabled ? businessClientSlugs(tree) : []),
     [tree, businessEnabled],
   );
+  const captureTimer = useRef<ReturnType<typeof setTimeout>>();
   const handleBusinessCapture = useCallback(async (capture: Capture) => {
     const target = githubProfileStore.currentRepo.peek();
-    if (!target) return;
-    const outcome = await runBusinessCapture(target, capture, route);
+    const outcome = target
+      ? await runBusinessCapture(target, capture, route)
+      : { ok: false as const, message: 'No repository selected. Nothing was saved.' };
+    clearTimeout(captureTimer.current);
     setCaptureStatus(outcome);
-    if (outcome.ok) setTimeout(() => setCaptureStatus(null), 2500);
+    if (outcome.ok) captureTimer.current = setTimeout(() => setCaptureStatus(null), 2500);
   }, []);
 
   // --- STORE ACCESS ---

@@ -131,4 +131,42 @@ describe('QuickTodoPage', () => {
     act(() => render(<QuickTodoPage />, host));
     expect(host.querySelector('#quick-todo-client')).toBeNull();
   });
+
+  it('refuses a chosen client while business data is not ready, instead of using the inbox', async () => {
+    set('quick-todo-client', 'acme-gmbh');
+    hooks.state = { status: 'loading' };
+    set('quick-todo-task', 'send draft');
+    await submit();
+
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(
+      'Business data is still loading. Try again in a moment.',
+    );
+    expect(store.createFile).not.toHaveBeenCalled();
+    expect(writes.writeBusiness).not.toHaveBeenCalled();
+    expect(field('quick-todo-task').value).toBe('send draft');
+  });
+
+  it('drops a selected client that is no longer listed', async () => {
+    set('quick-todo-client', 'acme-gmbh');
+    hooks.state = { ...ready, data: { ...data, clients: [] } };
+    set('quick-todo-tags', 'x'); // re-renders the page with the new hook state
+    hooks.state = ready;
+    set('quick-todo-tags', 'y');
+    expect(field('quick-todo-client').value).toBe('');
+  });
+
+  it('writes tags as inline #tags on the client line', async () => {
+    let text = '';
+    writes.writeBusiness.mockImplementation(async (_t, build) => {
+      const r = await build({ repo: data, headSha: 'h', tree: [], read: async () => null });
+      text = r.ok ? String(Object.values(r.value.changes)[0] ?? '') : '';
+      return { ok: true, value: { commitSha: 'c' } };
+    });
+    set('quick-todo-client', 'acme-gmbh');
+    set('quick-todo-task', 'send draft');
+    set('quick-todo-tags', '#Urgent, billing');
+    await submit();
+    expect(text).toContain('#urgent');
+    expect(text).toContain('#billing');
+  });
 });
