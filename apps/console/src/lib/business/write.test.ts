@@ -205,6 +205,25 @@ describe('writeBusiness reads at the head it commits against', () => {
   });
 });
 
+describe('Fresh.read', () => {
+  it.each([
+    '.kh/business/expenses/2026/01JABCDEFGHJKMNPQRSTVWXYZ0.png',
+    '.kh/business/invoices/2026/RE-2026-001.pdf',
+  ])('refuses binary path %s', async (path) => {
+    files[path] = 'x';
+    let error = '';
+    await writeBusiness(target, async (fresh) => {
+      try {
+        await fresh.read(path);
+      } catch (e) {
+        error = (e as Error).message;
+      }
+      return { ok: false as const, issues: [] } as never;
+    });
+    expect(error).toMatch(/binary/i);
+  });
+});
+
 describe('writeBusiness with binary changes', () => {
   const PNG = 'expenses/2026/X.png';
 

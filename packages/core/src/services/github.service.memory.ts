@@ -142,7 +142,9 @@ export class InMemoryGithubService {
       if (!file) continue;
       const newPath = newPrefix + item.path.slice(oldPrefix.length);
       this.files.delete(item.path);
-      this.files.set(newPath, { ...file, sha: contentSha(newPath, file.content) });
+      // Binary content is hashed as bytes; text keeps the demo's path-derived pseudo sha.
+      const sha = file.bytes ? gitBlobSha(file.bytes) : contentSha(newPath, file.content);
+      this.files.set(newPath, { ...file, sha });
     }
   }
 

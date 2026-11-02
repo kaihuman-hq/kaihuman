@@ -1,6 +1,7 @@
 import { ConflictError, githubFileStore, githubService, type TreeItem } from '@kaihuman/core';
 import {
   type BusinessRepo,
+  classifyBusinessPath,
   type FileChanges,
   loadBusinessRepo,
   type Result,
@@ -19,7 +20,10 @@ export type Fresh = {
   headSha: string;
   tree: TreeItem[];
   repo: BusinessRepo;
-  /** Current content, or `null` when the path is not in the fresh tree. */
+  /**
+   * Current content as text, or `null` when the path is not in the fresh tree. Text files only:
+   * receipts and PDFs are binary and throw here; read them with `githubService.getFileBytes`.
+   */
   read: (path: string) => Promise<string | null>;
 };
 
@@ -49,6 +53,10 @@ async function readFresh(owner: string, name: string, target: KBRepo): Promise<F
   const blobPaths = tree.filter((item) => item.type === 'blob').map((item) => item.path);
   const repo = loadBusinessRepo(new Map(Object.entries(contents)), blobPaths);
   const read = async (path: string) => {
+    const kind = classifyBusinessPath(path);
+    if (kind.kind === 'receipt' || (kind.kind === 'artifact' && kind.ext === 'pdf')) {
+      throw new Error(`Cannot read ${path} as text: it is a binary file (use getFileBytes).`);
+    }
     const item = tree.find((t) => t.type === 'blob' && t.path === path);
     if (!item) return null;
     return (await load([item]))[path] ?? null;

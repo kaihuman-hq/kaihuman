@@ -24,6 +24,25 @@ describe('gitBlobSha of bytes', () => {
 });
 
 describe('InMemoryGithubService.commitFiles', () => {
+  it('renaming a folder keeps binaries intact with a new, distinct sha', async () => {
+    const svc = new InMemoryGithubService();
+    const bytes = new Uint8Array([0, 255, 1]);
+    await svc.commitFiles(
+      'o',
+      'r',
+      'main',
+      { 'a/r.png': bytes, 'a/s.png': new Uint8Array([9]) },
+      'm',
+    );
+    const items = (await svc.fetchRepoTree('o', 'r', 'main')).filter((t) => t.type === 'blob');
+    await svc.renameFolder('o', 'r', 'main', 'a/', 'b/', items);
+    expect([...(await svc.getFileBytes('o', 'r', 'b/r.png'))]).toEqual([0, 255, 1]);
+    const tree = await svc.fetchRepoTree('o', 'r', 'main');
+    const shaOf = (p: string) => tree.find((t) => t.path === p)?.sha;
+    expect(shaOf('b/r.png')).toBe(gitBlobSha(bytes));
+    expect(shaOf('b/r.png')).not.toBe(shaOf('b/s.png'));
+  });
+
   it('stores binary files as bytes and returns their git sha', async () => {
     const svc = new InMemoryGithubService();
     const bytes = new Uint8Array([0, 255, 1]);
@@ -127,11 +146,14 @@ describe('GithubService.commitFiles', () => {
 
   it('base64-encodes 10 MB without overflowing the stack', async () => {
     git.createBlob.mockResolvedValue({ data: { sha: 'big' } });
-    const big = new Uint8Array(10 * 1024 * 1024).fill(7);
+    // Patterned, so a dropped or repeated chunk shows up (0x6000 is the encoder's chunk size).
+    const big = Uint8Array.from({ length: 10 * 1024 * 1024 }, (_, i) => i % 256);
     await svc.commitFiles('o', 'r', 'main', { 'big.pdf': big }, 'msg');
     const sent = git.createBlob.mock.calls[0]?.[0].content as string;
     expect(sent.length).toBe(Math.ceil(big.length / 3) * 4);
-    expect(atob(sent.slice(0, 8))).toBe('\x07'.repeat(6));
+    const back = Uint8Array.from(atob(sent), (c) => c.charCodeAt(0));
+    expect(back.length).toBe(big.length);
+    expect(back.every((b, i) => b === big[i])).toBe(true);
   });
 
   it('creates no tree when a blob upload fails', async () => {

@@ -96,4 +96,22 @@ describe('githubFileStore.applyCommit', () => {
     expect(await db.get('files', `o/r:${png}`)).toBeUndefined();
     db.close();
   });
+
+  it('keeps a just-committed binary file through a lagging listing, then stops tracking it', async () => {
+    const png = 'expenses/2026/X.png';
+    remote.tree = [blob('keep.md', 'k1')];
+    await store.loadTree();
+    await store.applyCommit({ [png]: new Uint8Array([0, 255, 1]) }, { [png]: 'binsha' });
+    // GitHub's listing does not have it yet.
+    await store.loadTree();
+    expect(store.tree.value.find((t) => t.path === png)?.sha).toBe('binsha');
+    // Now it does: listed once, no duplicate.
+    remote.tree = [blob('keep.md', 'k1'), blob(png, 'binsha')];
+    await store.loadTree();
+    expect(store.tree.value.filter((t) => t.path === png)).toHaveLength(1);
+    // Marker cleared: if the file is later gone remotely, it is not resurrected.
+    remote.tree = [blob('keep.md', 'k1')];
+    await store.loadTree();
+    expect(store.tree.value.map((t) => t.path)).not.toContain(png);
+  });
 });

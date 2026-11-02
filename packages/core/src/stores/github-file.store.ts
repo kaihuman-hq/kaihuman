@@ -49,6 +49,9 @@ export class GithubFileStore {
   // drops them from the remote tree until the remote stops listing them.
   // Maps `repo:path` to the deleted blob's sha ('' when unknown).
   private deletedPaths = new Map<string, string>();
+  // Binary files committed by applyCommit, `repo:path` to sha. They have no `files` (text) entry, so
+  // loadTree's merge needs this to keep them while GitHub's listing lags; cleared once it lists them.
+  private pendingBinary = new Map<string, string>();
   private idbWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
   activeFile = signal<string | null>(null);
   dirtyFiles = signal<Set<string>>(new Set());
@@ -132,6 +135,11 @@ export class GithubFileStore {
           this.deletedPaths.delete(key);
         }
       }
+      for (const key of this.pendingBinary.keys()) {
+        if (key.startsWith(prefix) && fetchedBySha.has(key.slice(prefix.length))) {
+          this.pendingBinary.delete(key);
+        }
+      }
       const remoteTree = fetchedTree.filter(
         (t) => !this.deletedPaths.has(`${repo.full_name}:${t.path}`),
       );
@@ -152,7 +160,7 @@ export class GithubFileStore {
           const cacheKey = `${repo.full_name}:${item.path}`;
           const hasFile = await db.getKey('files', cacheKey);
 
-          if (hasFile) {
+          if (hasFile || this.pendingBinary.has(cacheKey)) {
             logger.debug(`Preserving local file not(yet) in remote: ${item.path} `);
             mergedTree.push(item);
           }
@@ -716,6 +724,8 @@ export class GithubFileStore {
     const paths = new Set(Object.keys(changes));
     for (const [path, content] of Object.entries(changes)) {
       const key = `${repo.full_name}:${path}`;
+      if (typeof content === 'string' || content === null) this.pendingBinary.delete(key);
+      else this.pendingBinary.set(key, blobShas[path] ?? '');
       if (content === null) {
         const item = this.tree.peek().find((t) => t.path === path && t.type === 'blob');
         this.deletedPaths.set(key, this.openFiles.peek()[path]?.sha || item?.sha || '');
