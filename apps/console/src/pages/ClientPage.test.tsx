@@ -77,12 +77,20 @@ describe('ClientPage actions', () => {
     ).toBe('Record payment');
   });
 
-  it('hides the offer buttons once the offer is decided', () => {
-    const decided =
-      '{"id":"01M5D6RA00AFMSY38DJQW16BGN","at":"2026-10-30T09:30:00Z","doc":"AN-2026-001","type":"accepted"}\n';
-    show(ready(load((m) => m.set('.kh/business/events.jsonl', decided))));
+  const event = (type: string) =>
+    `{"id":"01M5D6RA00AFMSY38DJQW16BGN","at":"2026-10-30T09:30:00Z","doc":"AN-2026-001","type":"${type}"}\n`;
+
+  it('leaves only Convert to invoice for an accepted offer', () => {
+    show(ready(load((m) => m.set('.kh/business/events.jsonl', event('accepted')))));
+    expect(buttons()).toContain('Convert to invoice');
     expect(buttons()).not.toContain('Accepted');
+    expect(buttons()).not.toContain('Declined');
+  });
+
+  it('shows no offer buttons for a declined offer', () => {
+    show(ready(load((m) => m.set('.kh/business/events.jsonl', event('declined')))));
     expect(buttons()).not.toContain('Convert to invoice');
+    expect(buttons()).not.toContain('Accepted');
   });
 });
 

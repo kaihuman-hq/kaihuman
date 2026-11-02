@@ -1,8 +1,7 @@
 import {
+  convertOffer,
   decideOffer,
   EVENTS_PATH,
-  offerToInvoiceDraft,
-  saveDraft,
   type Ulid,
   ulid,
 } from '@kaihuman/formats/business';
@@ -27,7 +26,8 @@ export function RecordPaymentLink({ invoice }: { invoice: string }) {
 }
 
 /** Accepted, Declined and Convert to invoice for one issued offer. */
-export function OfferActions({ offer }: { offer: string }) {
+/** `decided`: the offer was accepted, so only the conversion is left. */
+export function OfferActions({ offer, decided = false }: { offer: string; decided?: boolean }) {
   const state = useBusinessRepo();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,36 +64,35 @@ export function OfferActions({ offer }: { offer: string }) {
   const convert = () => {
     const id: Ulid = ulid();
     return run(
-      async (fresh) => {
-        const doc = fresh.repo.issued.find((i) => i.doc.number === offer)?.doc;
-        if (!doc)
-          return { ok: false, issues: [{ path: 'offer', message: `unknown offer "${offer}"` }] };
-        return saveDraft(fresh.repo, offerToInvoiceDraft(doc, id));
-      },
+      async (fresh) => convertOffer(fresh.repo, offer, id),
       () => route(`/business/drafts/${id}`),
     );
   };
 
   return (
     <div class="flex flex-wrap gap-1">
-      <button
-        type="button"
-        class={BUTTON}
-        disabled={busy}
-        aria-label={`Mark ${offer} accepted`}
-        onClick={() => decide('accepted')}
-      >
-        Accepted
-      </button>
-      <button
-        type="button"
-        class={BUTTON}
-        disabled={busy}
-        aria-label={`Mark ${offer} declined`}
-        onClick={() => decide('declined')}
-      >
-        Declined
-      </button>
+      {!decided && (
+        <>
+          <button
+            type="button"
+            class={BUTTON}
+            disabled={busy}
+            aria-label={`Mark ${offer} accepted`}
+            onClick={() => decide('accepted')}
+          >
+            Accepted
+          </button>
+          <button
+            type="button"
+            class={BUTTON}
+            disabled={busy}
+            aria-label={`Mark ${offer} declined`}
+            onClick={() => decide('declined')}
+          >
+            Declined
+          </button>
+        </>
+      )}
       <button
         type="button"
         class={BUTTON}

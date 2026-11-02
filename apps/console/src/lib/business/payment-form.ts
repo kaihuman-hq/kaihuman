@@ -9,6 +9,10 @@ export type PaymentForm = {
   ref: string;
 };
 
+/** Round-trips through Date so 2026-02-31 is refused rather than rolled into March. */
+const isRealDate = (text: string): boolean =>
+  /^\d{4}-\d{2}-\d{2}$/.test(text) && new Date(`${text}T00:00:00Z`).toISOString().startsWith(text);
+
 export type PaymentField = keyof PaymentForm;
 
 /** The amount starts at what is still open, so paying in full is one click; a settled invoice starts empty. */
@@ -37,7 +41,7 @@ export function paymentFromForm(
   if (amount === null)
     issues.push({ path: 'amount', message: 'Enter an amount like 500 or 500.00.' });
   else if (amount < 1) issues.push({ path: 'amount', message: 'The amount must be more than 0.' });
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(form.date) || Number.isNaN(Date.parse(form.date))) {
+  if (!isRealDate(form.date)) {
     issues.push({ path: 'date', message: 'Enter a date as YYYY-MM-DD.' });
   }
   if (issues.length > 0 || amount === null) return { ok: false, issues };

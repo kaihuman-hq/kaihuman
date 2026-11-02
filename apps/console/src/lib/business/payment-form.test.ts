@@ -34,6 +34,11 @@ describe('paymentFromForm', () => {
       value: { amount: 100138 },
     });
   });
+  it('refuses a day that does not exist', () => {
+    expect(paymentFieldErrors(paymentFromForm({ ...form, date: '2026-02-31' }, 100)).date).toBe(
+      'Enter a date as YYYY-MM-DD.',
+    );
+  });
   it('reports field errors and keeps nothing else', () => {
     const r = paymentFromForm({ ...form, amount: '12,345', date: 'soon' }, 100);
     expect(paymentFieldErrors(r)).toEqual({

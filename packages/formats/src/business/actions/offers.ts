@@ -9,6 +9,7 @@ import { deriveOfferStatus } from '../status.js';
 import { validateEvent } from '../validate.js';
 import type { Result } from '../validate-kit.js';
 import { stringifyYaml } from '../yaml.js';
+import { saveDraft } from './drafts.js';
 
 const refuse = (message: string) => ({ ok: false as const, issues: [{ path: 'offer', message }] });
 
@@ -45,6 +46,7 @@ export const decideOffer = (
   const changes: FileChanges = {
     [EVENTS_PATH]: appendJsonl(eventsText ?? '', checked.value, KEY_ORDER.event),
   };
+  // An invalid client.yaml is not in `repo.clients`: the decision is still recorded, the stage is left for the user to fix.
   const client = repo.clients.find((c) => c.slug === doc.client);
   if (decision === 'accepted' && client && BECOMES_ACTIVE.includes(client.stage)) {
     const { slug: _slug, ...body } = client;
@@ -70,4 +72,21 @@ export const offerToInvoiceDraft = (offer: Issued, id: Ulid): Draft => {
     from_offer: offer.number,
     ...(buyerReference ? { buyer_reference: buyerReference } : {}),
   };
+};
+
+/** Event, draft and save in one: refuses a superseded offer and a second draft for the same offer. */
+export const convertOffer = (
+  repo: BusinessRepo,
+  offer: string,
+  id: Ulid,
+): Result<{ changes: FileChanges; message: string }> => {
+  const doc = repo.issued.find((i) => i.doc.number === offer)?.doc;
+  if (!doc || doc.kind !== 'offer') return refuse(`unknown offer "${offer}"`);
+  if (repo.issued.some((i) => i.doc.supersedes === offer)) {
+    return refuse(`${offer} was replaced by a newer offer.`);
+  }
+  if (repo.drafts.some((d) => d.from_offer === offer)) {
+    return refuse(`An invoice draft for ${offer} already exists.`);
+  }
+  return saveDraft(repo, offerToInvoiceDraft(doc, id));
 };

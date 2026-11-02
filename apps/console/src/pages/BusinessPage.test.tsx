@@ -105,7 +105,7 @@ describe('BusinessPage', () => {
   });
 
   it('links Record payment on an open receivable', () => {
-    show(ready(loadBusinessRepo(files((m) => m.delete('.kh/business/payments/2026.jsonl')))));
+    show(ready(loadBusinessRepo(unpaid())));
     expect(
       host.querySelector('a[href="/business/payments/new?invoice=RE-2026-0001"]'),
     ).not.toBeNull();

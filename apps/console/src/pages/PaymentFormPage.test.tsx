@@ -24,10 +24,11 @@ const { PaymentFormPage } = await import('./PaymentFormPage');
 
 const PAYMENTS = '.kh/business/payments/2026.jsonl';
 const target = { full_name: 'me/biz', default_branch: 'main', private: true } as never;
+const unpaid = (m: Map<string, string>) => m.delete(PAYMENTS);
 /** The fixture invoice is fully paid; without its payment 1001.38 EUR are open. */
 const load = (paid: boolean): BusinessRepo => {
   const m = loadFixtureRepo();
-  if (!paid) m.delete(PAYMENTS);
+  if (!paid) unpaid(m);
   return loadBusinessRepo(m);
 };
 const ready = (data: BusinessRepo): BusinessState => ({

@@ -7,7 +7,7 @@ import { type BusinessRepo, loadBusinessRepo } from '../repo.js';
 import { validateDraft } from '../validate.js';
 import { parseYaml } from '../yaml.js';
 import { saveDraft } from './drafts.js';
-import { decideOffer, offerToInvoiceDraft } from './offers.js';
+import { convertOffer, decideOffer, offerToInvoiceDraft } from './offers.js';
 
 const id = '01M5AMBK0038DJQW16BGNTZ49F' as Ulid;
 const draftId = '01M5AMBK0038DJQW16BGNTZ49G' as Ulid;
@@ -151,5 +151,78 @@ describe('saveDraft', () => {
     if (!existing) throw new Error('fixture');
     const v = ok(saveDraft(repo, { ...existing, notes: 'changed' }));
     expect(v.changes[`.kh/business/drafts/${existing.id}.yaml`]).toContain('notes: changed');
+  });
+});
+
+describe('decideOffer client rewrite', () => {
+  it('keeps every optional client field; only the stage changes', () => {
+    const full = `name: Full AG
+address:
+  street: A 1
+  postcode: "10115"
+  city: Berlin
+  country: DE
+vat_id: DE123456789
+buyer_reference: BR-1
+leitweg_id: 991-01234-56
+electronic_address: bill@full.example
+contacts:
+  - name: Ann
+    email: ann@full.example
+    phone: "+49 30 1234"
+    role: CFO
+  - name: Bob
+payment_terms_days: 21
+language: en
+currency: CHF
+stage: lead
+tags:
+  - vip
+  - berlin
+`;
+    const files = loadFixtureRepo();
+    files.set(CLIENT, full);
+    const repo = loadBusinessRepo(files);
+    const before = repo.clients.find((c) => c.slug === 'acme-gmbh');
+    const v = ok(decideOffer(repo, null, 'AN-2026-001', 'accepted', now, id));
+    const after = parseYaml(v.changes[CLIENT] ?? '');
+    if (!after.ok || !before) throw new Error('expected parse');
+    const { slug: _s, ...original } = before;
+    expect(after.value).toEqual({ ...original, stage: 'active' });
+    expect(original).toMatchObject({
+      currency: 'CHF',
+      tags: ['vip', 'berlin'],
+      leitweg_id: '991-01234-56',
+    });
+  });
+});
+
+describe('convertOffer', () => {
+  const repo = withStage('active');
+  it('saves the draft', () => {
+    expect(convertOffer(repo, 'AN-2026-001', draftId).ok).toBe(true);
+  });
+  it('refuses a superseded offer', () => {
+    const o = offer(repo);
+    const r = convertOffer(
+      {
+        ...repo,
+        issued: [
+          ...repo.issued,
+          { path: 'x', doc: { ...o, number: 'AN-2026-002', supersedes: o.number } },
+        ],
+      },
+      'AN-2026-001',
+      draftId,
+    );
+    expect(r).toMatchObject({ ok: false, issues: [{ path: 'offer' }] });
+  });
+  it('refuses a second draft for the same offer', () => {
+    const d = offerToInvoiceDraft(offer(repo), draftId);
+    const r = convertOffer({ ...repo, drafts: [...repo.drafts, d] }, 'AN-2026-001', id);
+    expect(r).toMatchObject({
+      ok: false,
+      issues: [{ path: 'offer', message: 'An invoice draft for AN-2026-001 already exists.' }],
+    });
   });
 });

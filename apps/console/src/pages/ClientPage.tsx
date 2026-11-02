@@ -160,10 +160,11 @@ function Overview(props: {
               </td>
               <td class={td}>{r.link ?? 'no link'}</td>
               <td class={td}>
-                {/* Decided and replaced offers are history; expired ones can still be accepted late. */}
+                {/* Accepted offers can still be converted; declined and replaced ones are history. Expired ones can be accepted late. */}
                 {['issued', 'sent', 'expired'].includes(r.status) && (
                   <OfferActions offer={r.number} />
                 )}
+                {r.status === 'accepted' && <OfferActions offer={r.number} decided />}
               </td>
             </tr>
           ))}
