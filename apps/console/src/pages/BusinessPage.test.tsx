@@ -120,6 +120,12 @@ describe('BusinessPage', () => {
     expect(host.textContent).toContain('New draft');
   });
 
+  it('links to the expenses page', () => {
+    show(ready(loadBusinessRepo(unpaid())));
+    const link = host.querySelector('a[href="/business/expenses"]');
+    expect(link?.textContent).toBe('Expenses');
+  });
+
   it('links Record payment on an open receivable', () => {
     show(ready(loadBusinessRepo(unpaid())));
     expect(

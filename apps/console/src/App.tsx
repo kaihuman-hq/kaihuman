@@ -16,6 +16,8 @@ import { ClientsPage } from './pages/ClientsPage';
 import { Dashboard } from './pages/Dashboard';
 import { DemoEntry } from './pages/DemoEntry';
 import { DraftPage } from './pages/DraftPage';
+import { ExpenseFormPage } from './pages/ExpenseFormPage';
+import { ExpensesPage } from './pages/ExpensesPage';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
 import { IdeasPage } from './pages/IdeasPage';
 import { IssuePage } from './pages/IssuePage';
@@ -99,6 +101,9 @@ export const App = () => {
         <ProtectedRoute path="/business/enable" component={BusinessEnablePage} />
         <ProtectedRoute path="/business/time/new" component={LogTimePage} />
         <ProtectedRoute path="/business/payments/new" component={PaymentFormPage} />
+        <ProtectedRoute path="/business/expenses" component={ExpensesPage} />
+        <ProtectedRoute path="/business/expenses/new" component={ExpenseFormPage} />
+        <ProtectedRoute path="/business/expenses/:id" component={ExpenseFormPage} />
         <ProtectedRoute path="/business/drafts/new" component={DraftPage} />
         <ProtectedRoute path="/business/drafts/:id" component={DraftPage} />
         <ProtectedRoute path="/business/drafts/:id/issue" component={IssuePage} />
