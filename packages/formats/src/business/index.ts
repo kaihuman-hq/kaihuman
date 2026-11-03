@@ -26,5 +26,7 @@ export * from './totals.js';
 export * from './validate.js';
 export type { Issue, Result } from './validate-kit.js';
 export * from './vat.js';
+export * from './xml.js';
+export * from './xrechnung.js';
 export * from './yaml.js';
 export * from './year-export.js';

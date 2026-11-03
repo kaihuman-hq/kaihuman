@@ -30,6 +30,9 @@ vi.mock('../components/business/ShareActions', () => ({
   ShareActions: (props: object) => <span data-share={JSON.stringify(props)} />,
 }));
 
+const download = vi.hoisted(() => ({ downloadBlob: vi.fn() }));
+vi.mock('../lib/business/download', () => download);
+
 const { ClientPage } = await import('./ClientPage');
 
 const repo = { full_name: 'me/biz' } as never;
@@ -485,5 +488,56 @@ describe('ClientPage share wiring', () => {
       show(ready(load()));
       expect(buttons()).not.toContain('Open PDF');
     });
+  });
+});
+
+describe('ClientPage e-invoice', () => {
+  const click = (label: string) =>
+    act(() => host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.click());
+
+  it('shows XML missing, muted, and present once the artifact is in the tree', () => {
+    show(ready(load()));
+    const cell = [...host.querySelectorAll('span')].find((e) => e.textContent === 'XML missing');
+    expect(cell?.className).toContain('--los-muted');
+    const withXml = loadBusinessRepo(loadFixtureRepo(), [
+      '.kh/business/invoices/2026/RE-2026-0001.xml',
+    ]);
+    show(ready(withXml));
+    expect([...host.querySelectorAll('span')].some((e) => e.textContent === 'XML')).toBe(true);
+    expect(host.textContent).not.toContain('XML missing');
+  });
+
+  it('downloads XRechnung (UBL) and CII for an invoice row', () => {
+    download.downloadBlob.mockClear();
+    show(ready(load()));
+    click('Download XRechnung (UBL) for RE-2026-0001');
+    click('Download CII for RE-2026-0001');
+    const calls = download.downloadBlob.mock.calls as [string, Blob][];
+    expect(calls.map((c) => c[0])).toEqual(['RE-2026-0001.xrechnung.xml', 'RE-2026-0001.cii.xml']);
+    expect(calls[0]?.[1].type).toBe('application/xml');
+  });
+
+  it('offers the downloads on credit notes too, but not on offers', () => {
+    show(ready(load(fullyCredited)));
+    expect(host.querySelector('button[aria-label="Download CII for RE-2026-0002"]')).not.toBeNull();
+    expect(host.querySelector('button[aria-label="Download CII for AN-2026-001"]')).toBeNull();
+  });
+
+  it('shows an error on the row instead of crashing when a document cannot be mapped', () => {
+    // The loader rejects such a record before it gets here; the guard is for anything it lets through.
+    const data = load(fullyCredited);
+    for (const i of data.issued) {
+      if (i.doc.number === 'RE-2026-0002') {
+        i.doc = {
+          ...i.doc,
+          lines: i.doc.lines.map((l) => ({ ...l, quantity: '99999999999999999999' })),
+        };
+      }
+    }
+    show(ready(data));
+    expect(
+      host.querySelector('[data-testid="einvoice-error-RE-2026-0002"]')?.textContent,
+    ).toContain('safe integer');
+    expect(host.querySelector('button[aria-label="Download CII for RE-2026-0001"]')).not.toBeNull();
   });
 });

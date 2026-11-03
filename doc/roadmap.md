@@ -48,7 +48,7 @@
   - [x] Part A: client targets in the browser extension and desktop palette (2026-11-03)
   - [x] Part B: kb-mcp business tools (read clients/invoices/VAT/reminders/check; draft-only writes)
 - [ ] Refund (negative) expenses with receipts
-- [ ] Phase 6: e-invoice XML (XRechnung, ZUGFeRD), before 2028-01-01
+- [x] Phase 6: e-invoice XML (XRechnung, ZUGFeRD), before 2028-01-01
 
 ## Documentation
 
