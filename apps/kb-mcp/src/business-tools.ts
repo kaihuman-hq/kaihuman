@@ -143,11 +143,12 @@ export function registerBusinessTools(server: McpServer, deps: BusinessToolDeps)
         'Overview of the clients in .kh/business: slug, name, stage, tags, currency, open invoice amount (minor units), overdue invoice count and unbilled minutes. Optionally filtered by stage.',
       inputSchema: {
         stage: z.enum(['lead', 'contacted', 'offer-sent', 'active', 'past', 'lost']).optional(),
+        today: TODAY,
       },
     },
-    run(async ({ stage }: { stage?: string }) => {
+    run(async ({ stage, today: given }: { stage?: string; today?: string }) => {
       const b = await load();
-      const today = localDate(new Date());
+      const today = given ?? localDate(new Date());
       const rows = b.repo.clients
         .filter((c) => !stage || c.stage === stage)
         .map((c) => {
@@ -425,9 +426,8 @@ export function registerBusinessTools(server: McpServer, deps: BusinessToolDeps)
         note: string;
       }) => {
         const b = await load();
-        const client = asSlug(a.client);
+        const client = findClient(b, a.client).slug;
         const project = a.project === undefined ? undefined : asSlug(a.project);
-        if (!client) throw new KbError(`Unknown client ${a.client}. Use business_clients.`);
         if (a.project !== undefined && !project) {
           throw new KbError(`Unknown project ${a.project} of client ${a.client}.`);
         }

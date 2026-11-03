@@ -1,5 +1,7 @@
-import { lstat, mkdir, readdir, readFile, realpath, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import type { Dirent } from 'node:fs';
+import { constants } from 'node:fs';
+import { lstat, mkdir, open, readdir, readFile, realpath } from 'node:fs/promises';
+import { dirname, join, sep } from 'node:path';
 import {
   BUSINESS_ROOT,
   type BusinessRepo,
@@ -49,25 +51,32 @@ export class BusinessFiles {
     const files = new Map<string, string>();
     const tree: string[] = [];
     const symlinks: string[] = [];
-    let entries: string[];
-    try {
-      entries = await readdir(this.root, { recursive: true, encoding: 'utf8' });
-    } catch (error) {
-      if (isNotFound(error)) return { repo: loadBusinessRepo(files, tree), files, tree, symlinks };
-      throw error;
-    }
-    for (const rel of entries.sort()) {
-      const key = `${BUSINESS_ROOT}/${rel.split('\\').join('/')}`;
-      const info = await lstat(join(this.root, rel));
-      if (info.isSymbolicLink()) {
-        symlinks.push(key);
-        continue;
+    // Walks by hand: a symlinked folder is listed, never entered (it could point anywhere or loop).
+    const walk = async (rel: string): Promise<void> => {
+      let entries: Dirent[];
+      try {
+        entries = await readdir(join(this.root, rel), { withFileTypes: true });
+      } catch (error) {
+        if (isNotFound(error) && rel === '') return;
+        throw error;
       }
-      if (!info.isFile()) continue;
-      tree.push(key);
-      if (BINARY.has(classifyBusinessPath(key).kind)) continue;
-      files.set(key, await readFile(join(this.root, rel), 'utf8'));
-    }
+      for (const entry of entries.sort((x, y) =>
+        x.name < y.name ? -1 : x.name > y.name ? 1 : 0,
+      )) {
+        const next = rel ? `${rel}/${entry.name}` : entry.name;
+        const key = `${BUSINESS_ROOT}/${next}`;
+        if (entry.isSymbolicLink()) symlinks.push(key);
+        else if (entry.isDirectory()) await walk(next);
+        else if (entry.isFile()) {
+          tree.push(key);
+          if (!BINARY.has(classifyBusinessPath(key).kind)) {
+            files.set(key, await readFile(join(this.root, next), 'utf8'));
+          }
+        }
+      }
+    };
+    await walk('');
+    tree.sort();
     return { repo: loadBusinessRepo(files, tree), files, tree, symlinks };
   }
 
@@ -94,11 +103,24 @@ export class BusinessFiles {
     }
     if (bad.length) throw new KbError(`Refused to write: ${bad.join('; ')}`);
     const base = await this.realBase();
-    for (const path of paths) await this.checkTarget(base, join(this.kb.repoRoot, path), path);
+    for (const path of paths) {
+      const full = join(this.kb.repoRoot, path);
+      await this.checkTarget(base, full, path);
+      await this.refuseLinks(full, path);
+    }
     for (const path of paths) {
       const full = join(this.kb.repoRoot, path);
       await mkdir(dirname(full), { recursive: true });
-      await writeFile(full, changes[path] as string, 'utf8');
+      // O_NOFOLLOW: a link swapped in after the check still cannot redirect the write.
+      const handle = await open(
+        full,
+        constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW,
+      );
+      try {
+        await handle.writeFile(changes[path] as string, 'utf8');
+      } finally {
+        await handle.close();
+      }
     }
     return paths;
   }
@@ -111,6 +133,23 @@ export class BusinessFiles {
       throw new KbError(`${BUSINESS_ROOT} resolves outside the repository`);
     }
     return real;
+  }
+
+  /** Refuses when the business folder, a folder below it or the file itself is a symlink. */
+  private async refuseLinks(full: string, path: string): Promise<void> {
+    const rel = full.slice(this.root.length + 1).split(sep);
+    let current = this.root;
+    for (const part of ['', ...rel]) {
+      current = part ? join(current, part) : current;
+      try {
+        if ((await lstat(current)).isSymbolicLink()) {
+          throw new KbError(`${path} is behind a symlink; refusing to write through links`);
+        }
+      } catch (error) {
+        if (isNotFound(error)) return;
+        throw error;
+      }
+    }
   }
 
   private async checkTarget(base: string, full: string, path: string): Promise<void> {

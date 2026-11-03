@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -148,6 +147,56 @@ describe('business read tools', () => {
     expect(r.contracts).toEqual([]);
   });
 
+  it('business_reminders maps a retainer and a contract date in the window', async () => {
+    const { call } = await connect({
+      '.kh/business/clients/acme-gmbh/projects/support.yaml': [
+        'client: acme-gmbh',
+        'name: Support',
+        'status: active',
+        'retainer:',
+        '  amount: 50000',
+        '  interval: monthly',
+        '  next_date: "2026-11-10"',
+        '  description: Monthly support',
+        '',
+      ].join('\n'),
+      '.kh/business/clients/acme-gmbh/contracts/01M52X5E00EKRX27CHPV05AFMT.yaml': [
+        'id: 01M52X5E00EKRX27CHPV05AFMT',
+        'client: acme-gmbh',
+        'kind: nda',
+        'title: NDA',
+        'start: "2026-01-01"',
+        'end: "2026-12-01"',
+        '',
+      ].join('\n'),
+    });
+    const r = parse(await call('business_reminders', { today: '2026-11-03' }));
+    expect(r.retainers).toEqual([
+      {
+        client: 'acme-gmbh',
+        project: 'support',
+        date: '2026-11-10',
+        amount: 50000,
+        hasDraft: false,
+        draftId: null,
+      },
+    ]);
+    expect(r.contracts).toEqual([
+      {
+        client: 'acme-gmbh',
+        id: '01M52X5E00EKRX27CHPV05AFMT',
+        title: 'NDA',
+        date: '2026-12-01',
+        what: 'end',
+      },
+    ]);
+    const narrow = parse(
+      await call('business_reminders', { today: '2026-11-03', retainerDays: 1, contractDays: 5 }),
+    );
+    expect(narrow.retainers).toEqual([]);
+    expect(narrow.contracts).toEqual([]);
+  });
+
   it('business_check reports findings and the frozen-rule note', async () => {
     const { call } = await connect();
     const r = parse(await call('business_check'));
@@ -247,7 +296,7 @@ describe('business write tools', () => {
     const bad = await call('business_add_time', { client: 'acme-gmbh', minutes: 0, note: 'x' });
     expect(bad.isError).toBe(true);
     const unknown = await call('business_add_time', { client: 'nobody', minutes: 5, note: 'x' });
-    expect(text(unknown)).toContain('unknown client');
+    expect(text(unknown)).toContain('Unknown client nobody');
   });
 
   it('business_add_todo and business_add_log write the client files', async () => {
@@ -299,12 +348,37 @@ describe('business write tools', () => {
     expect(bad.isError).toBe(true);
   });
 
-  it('never touches issued documents or links, and has no delete or issue tool', async () => {
+  it('never changes existing files when writing, and has no delete or issue tool', async () => {
     const { root, call } = await connect();
-    const before = await readFile(join(root, '.kh/business/links.jsonl'), 'utf8');
-    await call('business_create_draft', { kind: 'offer', client: 'acme-gmbh', lines: [LINE] });
-    expect(await readFile(join(root, '.kh/business/links.jsonl'), 'utf8')).toBe(before);
-    expect(existsSync(join(root, '.kh/business/invoices/2026/RE-2026-0001.yaml'))).toBe(true);
+    const snapshot = async () =>
+      Object.fromEntries(
+        await Promise.all(
+          (await readdir(join(root, '.kh/business'), { recursive: true, withFileTypes: true }))
+            .filter((e) => e.isFile())
+            .map(async (e) => {
+              const full = join(e.parentPath, e.name);
+              return [full, (await readFile(full)).toString('base64')] as const;
+            }),
+        ),
+      );
+    const before = await snapshot();
+    expect(
+      (await call('business_create_draft', { kind: 'invoice', client: 'acme-gmbh', lines: [LINE] }))
+        .isError,
+    ).toBeFalsy();
+    await call('business_add_expense', {
+      date: '2026-10-30',
+      supplier: 'S',
+      description: 'd',
+      category: 'c',
+      net: 100,
+      vat: 19,
+      gross: 119,
+      vat_rate: '19',
+    });
+    const after = await snapshot();
+    for (const [path, bytes] of Object.entries(before)) expect(after[path]).toBe(bytes);
+    expect(Object.keys(after).length).toBe(Object.keys(before).length + 2);
     const names = (await (client as Client).listTools()).tools.map((t) => t.name);
     expect(names.filter((n) => /issue|delete|payment|link/.test(n))).toEqual([]);
   });

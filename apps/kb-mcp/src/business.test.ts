@@ -123,6 +123,47 @@ describe('BusinessFiles.write', () => {
   });
 });
 
+describe('symlinks inside the business folder', () => {
+  const ISSUED = '.kh/business/invoices/2026/RE-2026-0001.yaml';
+
+  it('refuses a file link to an issued document', async () => {
+    const root = await makeBusinessRepo();
+    const before = await readFile(join(root, ISSUED), 'utf8');
+    await symlink(
+      '../invoices/2026/RE-2026-0001.yaml',
+      join(root, '.kh/business/time/2030-01.jsonl'),
+    );
+    const business = await open(root);
+    await expect(business.write({ '.kh/business/time/2030-01.jsonl': 'x\n' })).rejects.toThrow(
+      /symlink/,
+    );
+    expect(await readFile(join(root, ISSUED), 'utf8')).toBe(before);
+  });
+
+  it('refuses a linked parent folder', async () => {
+    const root = await makeBusinessRepo();
+    const before = await readFile(join(root, ISSUED), 'utf8');
+    await rm(join(root, '.kh/business/time'), { recursive: true });
+    await symlink('invoices/2026', join(root, '.kh/business/time'));
+    const business = await open(root);
+    // time/RE-2026-0001.yaml is not a writable kind, so aim at a path both ways: a month file.
+    await expect(business.write({ '.kh/business/time/2026-10.jsonl': 'x\n' })).rejects.toThrow(
+      /symlink/,
+    );
+    expect(await readFile(join(root, ISSUED), 'utf8')).toBe(before);
+  });
+
+  it('does not read through a linked folder, and survives a loop', async () => {
+    const root = await makeBusinessRepo();
+    const outside = await makeRepo({ 'drafts/01M5KA3Q00W16BGNTZ49EKRX29.yaml': 'id: x\n' });
+    await symlink(outside, join(root, '.kh/business/ext'));
+    await symlink('.', join(root, '.kh/business/loop'));
+    const loaded = await (await open(root)).load();
+    expect(loaded.symlinks).toEqual(['.kh/business/ext', '.kh/business/loop']);
+    expect(loaded.tree.some((p) => p.includes('/ext/') || p.includes('/loop/'))).toBe(false);
+  });
+});
+
 describe('refusal', () => {
   it('lists path: message pairs', () => {
     expect(
