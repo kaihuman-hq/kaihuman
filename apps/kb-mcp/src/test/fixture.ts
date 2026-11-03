@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { afterEach } from 'vitest';
 
@@ -22,6 +23,17 @@ export async function makeRepo(files: Record<string, string>): Promise<string> {
     await mkdir(dirname(full), { recursive: true });
     await writeFile(full, content);
   }
+  return root;
+}
+
+const BUSINESS_FIXTURE = fileURLToPath(
+  new URL('../../../../packages/formats/fixtures/business/repo', import.meta.url),
+);
+
+/** A temp repo whose `.kh/business` is a copy of the formats fixture, plus `extra` files. */
+export async function makeBusinessRepo(extra: Record<string, string> = {}): Promise<string> {
+  const root = await makeRepo(extra);
+  await cp(BUSINESS_FIXTURE, join(root, '.kh/business'), { recursive: true });
   return root;
 }
 

@@ -17,6 +17,8 @@ import {
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { BusinessFiles } from './business.js';
+import { registerBusinessTools } from './business-tools.js';
 import type { GitSync } from './git.js';
 import { IdeaFiles, requireSlug } from './ideas.js';
 import { KbError, type KnowledgeBase } from './repo.js';
@@ -76,10 +78,11 @@ export function createKbServer(kb: KnowledgeBase, options: KbServerOptions = {})
     };
   };
 
-  // Ideas tools run one at a time: a client may send calls concurrently, and each edit is a
-  // read-modify-write of a file followed by git commands that would collide on the index lock.
+  // Ideas and business tools run one at a time: a client may send calls concurrently, and each
+  // edit is a read-modify-write of a file followed by git commands that would collide on the
+  // index lock.
   let queue: Promise<unknown> = Promise.resolve();
-  const ideasTool =
+  const queued =
     <A>(handler: (args: A) => Promise<CallToolResult>) =>
     (args: A): Promise<CallToolResult> => {
       const result = queue.then(async () => {
@@ -89,14 +92,19 @@ export function createKbServer(kb: KnowledgeBase, options: KbServerOptions = {})
       queue = result.catch(() => undefined);
       return result;
     };
+  const ideasTool = queued;
+
+  /** Commits the written paths when git sync is on, and says what happened to them. */
+  const commitPaths = async (paths: string[], message: string) =>
+    git
+      ? git.commit(paths, message)
+      : 'Written but not committed: git sync is off (start the server with --git).';
 
   /** Commits the written ideas when git sync is on, and says what happened to them. */
   const saved = async (slugs: IdeaSlug[], op: string) => {
     const paths = slugs.map((slug) => ideas.path(slug));
     const message = `kaihuman: idea ${slugs.join(', ')} — ${op}`;
-    return git
-      ? git.commit(paths, message)
-      : 'Written but not committed: git sync is off (start the server with --git).';
+    return commitPaths(paths, message);
   };
 
   /** Reads an idea, applies one edit and writes it back. */
@@ -389,6 +397,12 @@ export function createKbServer(kb: KnowledgeBase, options: KbServerOptions = {})
       });
     }),
   );
+
+  registerBusinessTools(server, {
+    files: new BusinessFiles(kb),
+    run: queued,
+    commit: commitPaths,
+  });
 
   return server;
 }

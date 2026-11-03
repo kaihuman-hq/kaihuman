@@ -448,6 +448,15 @@ affected. The README lists the setup steps.
   `VITE_SHARE_URL=http://localhost:8788`. Add the console's origin to `CONSOLE_ORIGINS`. Your GitHub
   sign-in token goes to that service, and the consent names it.
 
+## kb-mcp tools
+
+The MCP server in `apps/kb-mcp` gives an agent without a shell (Claude Desktop) access to the business data. It always reads `.kh/business`, even when the knowledge base uses the legacy `.lifeos`.
+
+- Read: `business_clients`, `business_client` (client by slug or name), `business_open_invoices`, `business_vat_summary` (period `YYYY`, `YYYY-MM`, `YYYY-Qn`), `business_reminders` and `business_check`. Status, VAT and the check come from the same library as the console. The check works without a profile and does not check the frozen-file rule, which needs git history.
+- Write: `business_create_draft`, `business_update_draft` (replaces the whole draft), `business_add_time`, `business_add_todo`, `business_add_log` and `business_add_expense` (no receipt). Each returns `{ paths, id?, git }`.
+- The server never issues or numbers a document and never deletes. A write to any path that is not a draft, time entry, expense, todos or log file is refused. Issuing stays in the console.
+- With `--git`, a write is committed (message `business: …`) and pushed, in the same queue as the ideas tools. See `apps/kb-mcp/README.md`.
+
 ## Browser extension
 
 The start page's "Doing" section shows `Business today: 2.5 h`, plus `· timer running for <client>`

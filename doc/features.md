@@ -121,6 +121,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Business tools: `business_clients`, `business_client`, `business_open_invoices`, `business_vat_summary`, `business_reminders`, `business_check` (read) and `business_create_draft`, `business_update_draft`, `business_add_time`, `business_add_todo`, `business_add_log`, `business_add_expense` (draft-only writes, never issue) | `kaihuman-kb-mcp --repo <path>` | 2026-11-03 |
 | Ideas tools (`ideas_list`, `ideas_find`, `ideas_read`, `ideas_create`, `ideas_append`, `ideas_set_summary`, `ideas_set_status`, `ideas_import`) and opt-in `--git` commit and push, for Claude Desktop | `kaihuman-kb-mcp --repo <path> --git` | 2026-10-13 |
 | stdio MCP server: `kb_search`, `kb_read`, `kb_list`, `kb_index`, `kb_log`, `kb_add_raw` over a local clone | `kaihuman-kb-mcp --repo <path>` | 2026-09-23 |
 
