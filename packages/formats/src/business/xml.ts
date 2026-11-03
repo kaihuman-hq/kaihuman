@@ -15,13 +15,18 @@ export const el = (
   ...children: XmlChild[]
 ): XmlNode => ({ name, ...(attrs ? { attrs } : {}), children });
 
-/** An element holding text, or null when there is no text to write. */
+/**
+ * An element holding text, or null when there is no text to write. Blank text counts as none: an
+ * empty optional element is worse than a missing one, and a blank mandatory one fails either way.
+ */
 export const txt = (
   name: string,
   text: string | undefined | null,
   attrs?: Record<string, string>,
 ): XmlNode | null =>
-  text === undefined || text === null ? null : { name, ...(attrs ? { attrs } : {}), text };
+  text === undefined || text === null || text.trim() === ''
+    ? null
+    : { name, ...(attrs ? { attrs } : {}), text };
 
 /** XML 1.0 allows tab, LF, CR and everything from U+0020 except U+FFFE/U+FFFF (and lone surrogates). */
 const legal = (code: number): boolean =>

@@ -69,7 +69,7 @@
     <cbc:PaymentMeansCode>1</cbc:PaymentMeansCode>
   </cac:PaymentMeans>
   <cac:PaymentTerms>
-    <cbc:Note>Credit note: the amount is refunded or offset; no payment is due.</cbc:Note>
+    <cbc:Note>Credit note: the seller refunds the amount or offsets it against open invoices.</cbc:Note>
   </cac:PaymentTerms>
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="EUR">158.88</cbc:TaxAmount>

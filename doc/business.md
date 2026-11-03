@@ -147,7 +147,8 @@ PDFs. Everything is generated from the issued YAML, so nothing new is stored.
   Payment means are SEPA credit transfer `58` with IBAN, BIC and the invoice number as reference.
   A credit note without payment details gets code `1` and a refund note (BT-20). Reverse charge is
   category `AE` with `VATEX-EU-AE` and the reason text; small business is category `E` with the
-  § 19 UStG reason. Units are UN/ECE recommendation 20 codes from the line (`HUR`, `C62`, …).
+  § 19 UStG reason. A seller without VAT id also gets its tax number as seller identifier (BT-29),
+  because EN 16931 rule BR-CO-26 does not accept the tax number (BT-32) alone. Units are UN/ECE recommendation 20 codes from the line (`HUR`, `C62`, …).
 - Electronic addresses (BT-34 seller, BT-49 buyer): `electronic_address` written as
   `SCHEME:value` (for example `0204:991-12345-67` or `9930:DE123456789`) is used as written; an
   e-mail address gets scheme `EM`; a Leitweg-ID gets `0204`. Without one, the seller falls back to

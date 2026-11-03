@@ -109,7 +109,7 @@ describe('toUbl', () => {
     expect(x).toContain('<cbc:PaymentMeansCode>1</cbc:PaymentMeansCode>');
     expect(x).not.toContain('PayeeFinancialAccount');
     expect(x).toContain(
-      '<cbc:Note>Credit note: the amount is refunded or offset; no payment is due.</cbc:Note>',
+      '<cbc:Note>Credit note: the seller refunds the amount or offsets it against open invoices.</cbc:Note>',
     );
     const noDue = toUbl({ ...inv, dueDate: undefined, paymentMeans: undefined });
     expect(noDue).toContain('Payable on receipt.');
@@ -141,6 +141,35 @@ describe('toUbl', () => {
       lines: inv.lines.map((l) => ({ ...l, vatCategory: 'O' as const })),
     });
     expect(o).not.toContain('<cbc:Percent>');
+    expect(o).toContain('<cbc:TaxExemptionReasonCode>VATEX-EU-O</cbc:TaxExemptionReasonCode>');
+  });
+
+  it('writes the tax number as BT-29 for a seller without VAT id (BR-CO-26)', () => {
+    const s = toUbl(sb);
+    order(
+      s,
+      '<cbc:EndpointID schemeID="EM">kai@',
+      '<cac:PartyIdentification>\n        <cbc:ID>12/345/67890</cbc:ID>',
+      '<cac:PostalAddress>',
+    );
+    expect(toUbl(inv)).not.toContain('<cac:PartyIdentification>');
+    expect(toCii(sb)).toContain(
+      '<ram:SellerTradeParty>\n        <ram:ID>12/345/67890</ram:ID>\n        <ram:Name>',
+    );
+    expect(toCii(inv)).not.toContain('<ram:SellerTradeParty>\n        <ram:ID>');
+  });
+
+  it('writes no tax number for the buyer, for which EN 16931 has no such term', () => {
+    const e = { ...inv, buyer: { ...inv.buyer, taxNumber: '99/999/99999' } };
+    expect(toUbl(e)).not.toContain('99/999/99999');
+    expect(toCii(e)).not.toContain('99/999/99999');
+  });
+
+  it('omits optional elements with blank text', () => {
+    const pm = inv.paymentMeans;
+    if (!pm) throw new Error('fixture has payment');
+    const x = toUbl({ ...inv, paymentMeans: { ...pm, reference: '' } });
+    expect(x).not.toContain('<cbc:PaymentID');
   });
 
   it('writes line and breakdown rates the same way', () => {
@@ -228,7 +257,7 @@ describe('toCii', () => {
     expect(x).toContain('<ram:IssuerAssignedID>RE-2026-0001</ram:IssuerAssignedID>');
     expect(x).toContain('<ram:TypeCode>1</ram:TypeCode>');
     expect(x).toContain(
-      '<ram:Description>Credit note: the amount is refunded or offset; no payment is due.</ram:Description>',
+      '<ram:Description>Credit note: the seller refunds the amount or offsets it against open invoices.</ram:Description>',
     );
     expect(x).not.toContain('DueDateDateTime');
   });
@@ -296,6 +325,11 @@ describe('xrechnungGaps', () => {
     expect(gaps.join('\n')).toMatch(/phone/);
     expect(gaps.join('\n')).toMatch(/BT-49/);
     expect(gaps.join('\n')).not.toMatch(/BT-34/);
+  });
+
+  it('reports a seller with neither VAT id nor tax number (BR-CO-26)', () => {
+    const e = { ...sb, seller: { ...sb.seller, taxNumber: undefined } };
+    expect(xrechnungGaps(e).join('\n')).toMatch(/BR-CO-26/);
   });
 
   it('reports an E category without exemption reason', () => {

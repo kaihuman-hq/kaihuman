@@ -6,7 +6,7 @@
 
 import type { En16931Invoice, En16931Line, En16931Party } from './en16931.js';
 import type { VatCategory } from './records.js';
-import { el, renderXml, txt, type XmlChild, type XmlNode } from './xml.js';
+import { el, renderXml, txt, type XmlNode } from './xml.js';
 
 const XRECHNUNG_ID = 'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
 const EN16931_ID = 'urn:cen.eu:en16931:2017';
@@ -48,6 +48,8 @@ export const xrechnungGaps = (e: En16931Invoice): string[] => {
   const gaps: string[] = [];
   if (!e.buyerReference)
     gaps.push('Buyer reference (BT-10, BR-DE-15): set buyer_reference or the client Leitweg-ID.');
+  if (!e.seller.vatId && !e.seller.taxNumber)
+    gaps.push('Seller VAT id or tax number (BT-31 / BT-32, BR-CO-26, BR-DE-16).');
   const c = e.seller.contact;
   if (!c?.name) gaps.push('Seller contact name (BT-41, BR-DE-5).');
   if (!c?.phone) gaps.push('Seller contact phone (BT-42, BR-DE-6).');
@@ -78,9 +80,11 @@ const canonical = (rate: string): string =>
 const rateText = (category: VatCategory, rate: string): string | undefined =>
   category === 'O' ? undefined : NO_VAT.includes(category) ? '0' : canonical(rate);
 
+/** BR-AE-10, BR-IC-10 and BR-O-10 need a reason code or text; these categories have a fixed code. */
 const EXEMPTION_CODES: Partial<Record<VatCategory, string>> = {
   AE: 'VATEX-EU-AE',
   K: 'VATEX-EU-IC',
+  O: 'VATEX-EU-O',
 };
 
 const isZero = (amount: string): boolean => /^0+(\.0+)?$/.test(amount);
@@ -92,7 +96,7 @@ const paymentCode = (e: En16931Invoice): string => e.paymentMeans?.code ?? '1';
 const paymentTermsNote = (e: En16931Invoice): string | undefined => {
   if (e.dueDate || isZero(e.totals.payable)) return undefined;
   return e.typeCode === '381'
-    ? 'Credit note: the amount is refunded or offset; no payment is due.'
+    ? 'Credit note: the seller refunds the amount or offsets it against open invoices.'
     : 'Payable on receipt.';
 };
 
@@ -109,15 +113,21 @@ const NS_UBL = {
 
 const taxScheme = (id: string): XmlNode => el('cac:TaxScheme', undefined, txt('cbc:ID', id));
 
-const ublParty = (
-  p: En16931Party,
-  endpoint: ElectronicAddress | null,
-  withContact: boolean,
-): XmlNode =>
+/**
+ * BT-29 for a seller without VAT id: BR-CO-26 accepts only BT-29, BT-30 or BT-31, and a small
+ * business often has nothing but its tax number, which does identify it.
+ */
+const sellerId = (p: En16931Party, seller: boolean): string | undefined =>
+  seller && !p.vatId ? p.taxNumber : undefined;
+
+/** `seller` adds what EN 16931 defines only for the seller: BT-29, BT-32 and the contact (BG-6). */
+const ublParty = (p: En16931Party, endpoint: ElectronicAddress | null, seller: boolean): XmlNode =>
   el(
     'cac:Party',
     undefined,
     endpoint && txt('cbc:EndpointID', endpoint.id, { schemeID: endpoint.scheme }),
+    sellerId(p, seller) &&
+      el('cac:PartyIdentification', undefined, txt('cbc:ID', sellerId(p, seller))),
     el(
       'cac:PostalAddress',
       undefined,
@@ -127,10 +137,11 @@ const ublParty = (
       el('cac:Country', undefined, txt('cbc:IdentificationCode', p.address.country)),
     ),
     p.vatId && el('cac:PartyTaxScheme', undefined, txt('cbc:CompanyID', p.vatId), taxScheme('VAT')),
-    p.taxNumber &&
+    seller &&
+      p.taxNumber &&
       el('cac:PartyTaxScheme', undefined, txt('cbc:CompanyID', p.taxNumber), taxScheme('FC')),
     el('cac:PartyLegalEntity', undefined, txt('cbc:RegistrationName', p.name)),
-    withContact &&
+    seller &&
       p.contact &&
       el(
         'cac:Contact',
@@ -169,24 +180,22 @@ export const toUbl = (e: En16931Invoice): string => {
   const credit = e.typeCode === '381';
   const cur = { currencyID: e.currency };
   const note = paymentTermsNote(e);
-  const means: XmlChild =
-    e.paymentMeans || (credit && e.dueDate)
-      ? el(
-          'cac:PaymentMeans',
-          undefined,
-          txt('cbc:PaymentMeansCode', paymentCode(e)),
-          credit ? txt('cbc:PaymentDueDate', e.dueDate) : null,
-          txt('cbc:PaymentID', e.paymentMeans?.reference),
-          e.paymentMeans &&
-            el(
-              'cac:PayeeFinancialAccount',
-              undefined,
-              txt('cbc:ID', e.paymentMeans.iban),
-              e.paymentMeans.bic &&
-                el('cac:FinancialInstitutionBranch', undefined, txt('cbc:ID', e.paymentMeans.bic)),
-            ),
-        )
-      : el('cac:PaymentMeans', undefined, txt('cbc:PaymentMeansCode', '1'));
+  const pm = e.paymentMeans;
+  // A CreditNote has no root DueDate; its BT-9 lives in PaymentMeans.
+  const means = el(
+    'cac:PaymentMeans',
+    undefined,
+    txt('cbc:PaymentMeansCode', paymentCode(e)),
+    credit ? txt('cbc:PaymentDueDate', e.dueDate) : null,
+    txt('cbc:PaymentID', pm?.reference),
+    pm &&
+      el(
+        'cac:PayeeFinancialAccount',
+        undefined,
+        txt('cbc:ID', pm.iban),
+        pm.bic && el('cac:FinancialInstitutionBranch', undefined, txt('cbc:ID', pm.bic)),
+      ),
+  );
   const root = el(
     credit ? 'CreditNote' : 'Invoice',
     undefined,
@@ -272,13 +281,14 @@ const ciiParty = (
   name: string,
   p: En16931Party,
   endpoint: ElectronicAddress | null,
-  withContact: boolean,
+  seller: boolean,
 ): XmlNode =>
   el(
     name,
     undefined,
+    txt('ram:ID', sellerId(p, seller)),
     txt('ram:Name', p.name),
-    withContact &&
+    seller &&
       p.contact &&
       el(
         'ram:DefinedTradeContact',
@@ -309,7 +319,8 @@ const ciiParty = (
       ),
     p.vatId &&
       el('ram:SpecifiedTaxRegistration', undefined, txt('ram:ID', p.vatId, { schemeID: 'VA' })),
-    p.taxNumber &&
+    seller &&
+      p.taxNumber &&
       el('ram:SpecifiedTaxRegistration', undefined, txt('ram:ID', p.taxNumber, { schemeID: 'FC' })),
   );
 

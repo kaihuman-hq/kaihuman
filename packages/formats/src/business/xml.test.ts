@@ -30,8 +30,10 @@ describe('xml builder', () => {
     expect(escapeXml('a\u0000b\u0008c\u000bd￾e\tf\ng\u{1F600}')).toBe('abcde\tf\ng\u{1F600}');
   });
 
-  it('txt returns null without text', () => {
+  it('txt returns null without text, including blank text', () => {
     expect(txt('a', undefined)).toBeNull();
-    expect(txt('a', '')).toEqual({ name: 'a', text: '' });
+    expect(txt('a', '')).toBeNull();
+    expect(txt('a', '  ')).toBeNull();
+    expect(txt('a', '0')).toEqual({ name: 'a', text: '0' });
   });
 });

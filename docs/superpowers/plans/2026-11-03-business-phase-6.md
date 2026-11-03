@@ -29,6 +29,10 @@ Goal: pure serialisers `toEn16931` → XRechnung 3.0 UBL 2.1 (Invoice/CreditNote
   then contact e-mail (EM) — cost: heuristic, documented.
 - Ruling: credit notes without payment instructions get BT-81 = `1` (instrument not defined) to satisfy BR-DE-1,
   and BT-20 "refund" text when there is no due date (BR-CO-25) — cost: generic wording.
+- Ruling: a seller without VAT id gets its tax number as BT-29 (UBL `PartyIdentification`, CII
+  `SellerTradeParty/ID`) besides BT-32, because BR-CO-26 (fatal) accepts only BT-29/30/31; a seller with
+  neither is a gap. Tax number is written for the seller only (EN 16931 has none for the buyer); category O
+  gets `VATEX-EU-O` (BR-O-10); blank text writes no element — cost: the tax number appears twice.
 - Ruling: CII guideline option `xrechnung` (default) | `en16931` (ZUGFeRD/Factur-X EN 16931 profile) — the body is
   the same, so one serialiser covers both.
 - Ruling: `toEn16931` and computeTotals unchanged; serialisers only format its strings — rounding identical by

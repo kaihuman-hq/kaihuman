@@ -165,7 +165,7 @@
         </ram:EndDateTime>
       </ram:BillingSpecifiedPeriod>
       <ram:SpecifiedTradePaymentTerms>
-        <ram:Description>Credit note: the amount is refunded or offset; no payment is due.</ram:Description>
+        <ram:Description>Credit note: the seller refunds the amount or offsets it against open invoices.</ram:Description>
       </ram:SpecifiedTradePaymentTerms>
       <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
         <ram:LineTotalAmount>842.50</ram:LineTotalAmount>
