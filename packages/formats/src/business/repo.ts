@@ -291,8 +291,14 @@ export const loadBusinessRepoDetailed = (
         for (const b of doc.totals.breakdown) {
           if (b.exemption_reason !== undefined) reasons[b.category] = b.exemption_reason;
         }
-        const expected = computeTotals(doc.lines, reasons);
-        if (canonical(expected) !== canonical(doc.totals)) {
+        // A hand-edited line can overflow the amount range; that is one bad file, not a failed load.
+        let expected: ReturnType<typeof computeTotals> | undefined;
+        try {
+          expected = computeTotals(doc.lines, reasons);
+        } catch (e) {
+          fail(file, 'totals', `totals cannot be computed: ${(e as Error).message}`);
+        }
+        if (expected && canonical(expected) !== canonical(doc.totals)) {
           fail(file, 'totals', 'stored totals differ from the totals computed from the lines');
         }
         refs.push({

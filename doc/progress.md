@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-03 — Business: loader survives uncomputable totals
+
+- `loadBusinessRepo` no longer throws when an issued file's lines overflow the amount range in `computeTotals`; it reports a `totals` error for that file and loads the rest (regression test in `repo.test.ts`).
+
 ## 2026-11-03 — Business, phase 5b part B: kb-mcp business tools
 
 - `apps/kb-mcp` gets business tools (`src/business-tools.ts`, `src/business.ts`) on top of `@kaihuman/formats/business`; status, VAT, reminders and the check come from the library. Read: `business_clients`, `business_client`, `business_open_invoices` (every `client` input takes the slug or the name, case-insensitive), `business_vat_summary`, `business_reminders`, `business_check` (works without a profile; says the frozen-file rule is not checked). Write: `business_create_draft`, `business_update_draft` (replaces the whole draft), `business_add_time`, `business_add_todo`, `business_add_log`, `business_add_expense` (no receipt). Writes return `{ paths, id?, git }`.

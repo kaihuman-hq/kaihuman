@@ -38,6 +38,18 @@ describe('loadBusinessRepo', () => {
     expect(repo.findings).toContainEqual(expect.objectContaining({ file: CLIENT, level: 'error' }));
   });
 
+  it('reports an issued file whose totals cannot be computed instead of failing to load', () => {
+    const INVOICE = '.kh/business/invoices/2026/RE-2026-0001.yaml';
+    const files = new Map(loadFixtureRepo());
+    const text = files.get(INVOICE) ?? '';
+    files.set(INVOICE, text.replace('quantity: "7.5"', 'quantity: "99999999999999999999"'));
+    const repo = loadBusinessRepo(files);
+    expect(repo.clients.map((c) => c.slug)).toEqual(['acme-gmbh']);
+    expect(repo.findings).toContainEqual(
+      expect.objectContaining({ file: INVOICE, path: 'totals', level: 'error' }),
+    );
+  });
+
   it('reports a missing profile only when it is not in the tree', () => {
     const without = new Map(loadFixtureRepo());
     without.delete('.kh/business/business.yaml');
