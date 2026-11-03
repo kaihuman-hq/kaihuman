@@ -50,6 +50,7 @@ describe('invoiceRows / offerRows', () => {
       gross: 100138,
       currency: 'EUR',
       pdf: false,
+      xml: false,
       link: 'active',
     });
   });
@@ -77,6 +78,14 @@ describe('invoiceRows / offerRows', () => {
       '.kh/business/invoices/2026/RE-2026-0001.pdf',
     ]);
     expect(invoiceRows(withPdf, '2026-10-27')[0]?.pdf).toBe(true);
+  });
+
+  it('marks an xml artifact present in the tree', () => {
+    const withXml = loadBusinessRepo(loadFixtureRepo(), [
+      '.kh/business/invoices/2026/RE-2026-0001.xml',
+    ]);
+    expect(invoiceRows(withXml, '2026-10-27')[0]?.xml).toBe(true);
+    expect(invoiceRows(repo, '2026-10-27')[0]?.xml).toBe(false);
   });
 
   it('derives offer status from the date', () => {

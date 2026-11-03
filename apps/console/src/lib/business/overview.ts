@@ -35,6 +35,8 @@ export type InvoiceRow = {
   currency: string;
   status: InvoiceStatus;
   pdf: boolean;
+  /** `<number>.xml` next to the issued yaml; optional, the console can generate it. */
+  xml: boolean;
   link: 'active' | 'revoked' | 'expired' | null;
 };
 
@@ -150,8 +152,9 @@ const linkState = (
   return 'active';
 };
 
-const hasPdf = (repo: BusinessRepo, path: string): boolean =>
-  repo.artifacts.has(path.replace(/\.ya?ml$/, '.pdf'));
+const hasArtifact = (repo: BusinessRepo, path: string, ext: 'pdf' | 'xml'): boolean =>
+  repo.artifacts.has(path.replace(/\.ya?ml$/, `.${ext}`));
+const hasPdf = (repo: BusinessRepo, path: string): boolean => hasArtifact(repo, path, 'pdf');
 
 export const invoiceRows = (repo: BusinessRepo, today: string): InvoiceRow[] => {
   const docs = repo.issued.filter((i) => i.doc.kind === 'invoice' || i.doc.kind === 'credit-note');
@@ -168,6 +171,7 @@ export const invoiceRows = (repo: BusinessRepo, today: string): InvoiceRow[] => 
       currency: doc.currency ?? currency,
       status: deriveInvoiceStatus(doc, repo.payments, creditNotes, repo.events, today),
       pdf: hasPdf(repo, path),
+      xml: hasArtifact(repo, path, 'xml'),
       link: linkState(repo.links, doc.number, today),
     })),
   );

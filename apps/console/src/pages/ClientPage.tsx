@@ -3,6 +3,7 @@ import {
   BUSINESS_ROOT,
   contractDates,
   contractFilePath,
+  type Issued,
   type LinkRecord,
 } from '@kaihuman/formats/business';
 import type { ComponentChildren } from 'preact';
@@ -23,6 +24,8 @@ import { StatusPill } from '../components/business/StatusPill';
 import { TimerCard } from '../components/business/TimerCard';
 import { clientBacklinks } from '../lib/business/backlinks';
 import { addDays, isoWeek, todayLocal } from '../lib/business/dates';
+import { downloadBlob } from '../lib/business/download';
+import { einvoiceFiles } from '../lib/business/einvoice';
 import { BUSINESS_PROFILE_PATH, parseLoadError } from '../lib/business/load';
 import {
   type ClientOverview,
@@ -60,6 +63,47 @@ const Table = (props: { head: string[]; children: ComponentChildren }) => (
 
 const Pdf = ({ present }: { present: boolean }) =>
   present ? <span>PDF</span> : <span class="text-[var(--los-warning)]">PDF missing</span>;
+
+const Xml = ({ present }: { present: boolean }) =>
+  present ? <span>XML</span> : <span class="text-[var(--los-muted)]">XML missing</span>;
+
+const EINVOICE_BUTTON =
+  'px-2 py-1 text-xs rounded border border-[var(--los-border)] text-[var(--los-fg)] hover:opacity-90';
+
+/** XRechnung and CII are generated here from the issued document, so they work read only too. */
+const EinvoiceActions = ({ doc }: { doc: Issued }) => {
+  const files = einvoiceFiles(doc);
+  const save = (f: { name: string; blob: Blob }) => downloadBlob(f.name, f.blob);
+  return (
+    <>
+      <button
+        type="button"
+        class={EINVOICE_BUTTON}
+        aria-label={`Download XRechnung (UBL) for ${doc.number}`}
+        onClick={() => save(files.ubl())}
+      >
+        Download XRechnung (UBL)
+      </button>
+      <button
+        type="button"
+        class={EINVOICE_BUTTON}
+        aria-label={`Download CII for ${doc.number}`}
+        onClick={() => save(files.cii())}
+      >
+        Download CII
+      </button>
+      {files.gaps.length > 0 && (
+        <span
+          class="text-[var(--los-warning)]"
+          title={files.gaps.join('; ')}
+          data-testid={`xrechnung-gaps-${doc.number}`}
+        >
+          XRechnung incomplete: {files.gaps.join('; ')}
+        </span>
+      )}
+    </>
+  );
+};
 
 const budgetText = (p: ClientOverview['projects'][number], currency: string): string => {
   const { project, minutesUsed, amountBilled } = p;
@@ -107,9 +151,12 @@ function Overview(props: {
   invoicedOffers: ReadonlySet<string>;
   /** Issued yaml path by document number. */
   issuedPaths: ReadonlyMap<string, string>;
+  /** Issued documents by number. */
+  issuedDocs: ReadonlyMap<string, Issued>;
   links: readonly LinkRecord[];
 }) {
-  const { target, o, today, contents, backlinks, invoicedOffers, issuedPaths, links } = props;
+  const { target, o, today, contents, backlinks, invoicedOffers, issuedPaths, issuedDocs, links } =
+    props;
   const [fileError, setFileError] = useState<string | null>(null);
   const activeLink = (row: { number: string; link: ClientOverview['invoices'][number]['link'] }) =>
     row.link === 'active' ? latestLink(links, row.number) : null;
@@ -232,7 +279,7 @@ function Overview(props: {
       </Card>
 
       <Card title="Invoices" empty={o.invoices.length === 0 ? 'No invoices.' : undefined}>
-        <Table head={['Number', 'Date', 'Status', 'Amount', 'PDF', 'Link', 'Actions']}>
+        <Table head={['Number', 'Date', 'Status', 'Amount', 'PDF', 'XML', 'Link', 'Actions']}>
           {o.invoices.map((r) => (
             <tr key={r.number}>
               <td class={td}>{r.number}</td>
@@ -246,6 +293,9 @@ function Overview(props: {
               <td class={td}>
                 <Pdf present={r.pdf} />
               </td>
+              <td class={td}>
+                <Xml present={r.xml} />
+              </td>
               <td class={td}>{r.link ?? 'no link'}</td>
               <td class={td}>
                 <div class="flex flex-wrap items-center gap-2">
@@ -254,6 +304,9 @@ function Overview(props: {
                   )}
                   {r.kind === 'invoice' && r.status.state !== 'credited' && (
                     <CreditNoteAction invoice={r.number} />
+                  )}
+                  {issuedDocs.has(r.number) && (
+                    <EinvoiceActions doc={issuedDocs.get(r.number) as Issued} />
                   )}
                   <ShareActions
                     doc={{
@@ -494,6 +547,7 @@ export function ClientPage({ slug }: { slug?: string }) {
               canDraftUnbilled={canDraftUnbilled}
               invoicedOffers={invoicedOffers}
               issuedPaths={new Map(data.issued.map((i) => [i.doc.number, i.path]))}
+              issuedDocs={new Map(data.issued.map((i) => [i.doc.number, i.doc]))}
               links={data.links}
               o={o}
               today={today}
