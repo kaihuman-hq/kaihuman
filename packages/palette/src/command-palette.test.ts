@@ -2212,7 +2212,12 @@ describe('business capture', () => {
 
   it('a late capture row does not take Enter from the row that was selected', async () => {
     let resolve: (lookup: (query: string) => ModeItem | null) => void = () => {};
-    create(() => new Promise((r) => (resolve = r)));
+    create(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
     loadBookmarks.mockResolvedValue([bookmark('todo acme: send draft', 'https://a.example/')]);
     palette.toggle();
     await settle();
