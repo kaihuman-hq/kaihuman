@@ -13,6 +13,7 @@ import {
   type ModeItem,
   PALETTE_HOST_ID,
   type PaletteAction,
+  type PaletteHandlers,
   type PaletteMode,
   type RecentEntry,
   type RepoResult,
@@ -2160,5 +2161,64 @@ describe('ask', () => {
     await vi.advanceTimersByTimeAsync(300);
     expect(ask).toHaveBeenCalledTimes(1);
     expect(groupLabels()).not.toContain('Ask kaihuman');
+  });
+});
+
+describe('business capture', () => {
+  let captureRun: Mock<(inputs: string[]) => Promise<string>>;
+
+  const create = (loadCapture: PaletteHandlers['loadCapture']) => {
+    palette.destroy();
+    document.body.replaceChildren();
+    palette = createCommandPalette({
+      loadBookmarks: loadBookmarks as any,
+      searchRepo: searchRepo as any,
+      open: open as any,
+      actions: () => actions,
+      loadRecents: loadRecents as any,
+      rememberRecent: rememberRecent as any,
+      countBookmarkUse: countBookmarkUse as any,
+      modes,
+      copy: copy as any,
+      ...(loadCapture ? { loadCapture } : {}),
+    });
+  };
+
+  beforeEach(() => {
+    captureRun = vi.fn(async () => 'Todo added for acme');
+    create(
+      async () => (query) =>
+        query.startsWith('todo acme:')
+          ? {
+              id: 'business:todo',
+              title: `Add todo for acme: ${query.slice(10).trim()}`,
+              action: { id: 'business:todo', title: 'Add todo', recent: false, run: captureRun },
+            }
+          : null,
+    );
+  });
+
+  it('lists the capture first and Enter writes it', async () => {
+    palette.toggle();
+    await settle();
+    type('todo acme: send draft');
+    expect(rowTitles()[0]).toBe('Add todo for acme: send draft');
+    expect(groupLabels()[0]).toBe('Business');
+    press('Enter');
+    await settle();
+    expect(captureRun).toHaveBeenCalledTimes(1);
+    expect(statusText()).toBe('Todo added for acme');
+  });
+
+  it('offers nothing for other text, or when business is not set up', async () => {
+    palette.toggle();
+    await settle();
+    type('send draft');
+    expect(groupLabels()).not.toContain('Business');
+    create(async () => null);
+    palette.toggle();
+    await settle();
+    type('todo acme: send draft');
+    expect(groupLabels()).not.toContain('Business');
   });
 });

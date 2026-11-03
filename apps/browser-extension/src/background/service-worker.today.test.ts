@@ -538,6 +538,67 @@ describe('the palette’s widget entries', () => {
   });
 });
 
+describe('the palette’s business captures', () => {
+  const TODOS = '.kh/business/clients/acme/todos.todos.md';
+
+  it('reads no context without business set up, and the capture files with it', async () => {
+    remote['.kh/business/clients/acme/client.yaml'] = 'name: Acme\n';
+    expect((await call({ type: 'READ_BUSINESS_CONTEXT' })).files).toEqual([]);
+    remote['.kh/business/business.yaml'] = 'name: Me\n';
+    remote['.kh/business/clients/acme/notes.md'] = 'private';
+    const { files } = await call({ type: 'READ_BUSINESS_CONTEXT' });
+    expect(files.map((f: any) => f.path).sort()).toEqual([
+      '.kh/business/business.yaml',
+      '.kh/business/clients/acme/client.yaml',
+    ]);
+  });
+
+  it('reads a capture file with its version, a missing one as null', async () => {
+    remote[TODOS] = '- [ ] x\n';
+    expect(await call({ type: 'READ_BUSINESS_FILE', path: TODOS })).toMatchObject({
+      content: '- [ ] x\n',
+      sha: `sha-${TODOS}`,
+    });
+    const missing = await call({
+      type: 'READ_BUSINESS_FILE',
+      path: '.kh/business/time/running.yaml',
+    });
+    expect(missing).toMatchObject({ success: true, content: null });
+  });
+
+  it('writes in one commit with the capture’s message, over the version read', async () => {
+    const response = await call({
+      type: 'WRITE_BUSINESS_FILE',
+      path: TODOS,
+      content: 'new\n',
+      message: 'business: todo for acme',
+      sha: 'v1',
+    });
+    expect(response.success).toBe(true);
+    expect(remote[TODOS]).toBe('new\n');
+    expect(writes()).toHaveLength(1);
+    expect(JSON.parse(writes()[0]?.[1].body)).toMatchObject({
+      message: 'business: todo for acme',
+      sha: 'v1',
+    });
+  });
+
+  it('refuses any file a capture does not write', async () => {
+    for (const path of [
+      '.kh/business/clients/acme/client.yaml',
+      '.kh/business/clients/../todos.todos.md',
+      '.kh/business/time/2026-11.jsonl',
+      '.kh/inbox.todos.md',
+    ]) {
+      expect((await call({ type: 'READ_BUSINESS_FILE', path })).error).toContain('Refusing');
+      expect(
+        (await call({ type: 'WRITE_BUSINESS_FILE', path, content: 'x', message: 'm' })).error,
+      ).toContain('Refusing');
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('GET_PALETTE_SETTINGS', () => {
   const reads = () =>
     fetchMock.mock.calls.filter(([url]) => pathOf(url) === '.kh/command-palette.settings.json');

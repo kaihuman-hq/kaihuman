@@ -17,8 +17,8 @@ use crate::config::{
 use crate::github::{Client, Read, WorkFilter, console_file_url, encode_path};
 use crate::recents::{self, RecentEntry};
 use crate::{
-    braindumps, claude, commands, dumps, entries, files, ideas, palette_settings, prompts, repos,
-    translate, wifi,
+    braindumps, business, claude, commands, dumps, entries, files, ideas, palette_settings,
+    prompts, repos, translate, wifi,
 };
 
 /// Mirrors `PaletteProtocol`'s request names and fields.
@@ -85,6 +85,17 @@ pub enum Request {
     WriteEntryFile {
         path: String,
         content: String,
+        #[serde(default)]
+        sha: Option<String>,
+    },
+    ReadBusinessContext,
+    ReadBusinessFile {
+        path: String,
+    },
+    WriteBusinessFile {
+        path: String,
+        content: String,
+        message: String,
         #[serde(default)]
         sha: Option<String>,
     },
@@ -421,6 +432,48 @@ async fn write_entry_file(path: &str, content: &str, sha: Option<&str>) -> Resul
     Ok(json!({}))
 }
 
+/// Nothing is read when the repository has no business profile: business is not set up there.
+async fn read_business_context() -> Result<Value, String> {
+    let client = client()?;
+    let paths = business::context_file_paths(&client.tree().await?);
+    if !paths.iter().any(|path| path == business::PROFILE_PATH) {
+        return Ok(json!({ "files": [] }));
+    }
+    let mut files = Vec::new();
+    for path in paths {
+        if let Read::Found { content, .. } = client.read(&encode_path(&path), None).await? {
+            files.push(json!({ "path": path, "content": content }));
+        }
+    }
+    Ok(json!({ "files": files }))
+}
+
+/// A file not there reads as null, so a capture knows to create it rather than write over a version.
+async fn read_business_file(path: &str) -> Result<Value, String> {
+    if !business::is_capture_write_path(path) {
+        return Err(format!("Refusing to read {path}"));
+    }
+    match client()?.read(&encode_path(path), None).await? {
+        Read::Found { content, sha, .. } => Ok(json!({ "content": content, "sha": sha })),
+        Read::Missing | Read::NotModified => Ok(json!({ "content": null })),
+    }
+}
+
+async fn write_business_file(
+    path: &str,
+    content: &str,
+    message: &str,
+    sha: Option<&str>,
+) -> Result<Value, String> {
+    if !business::is_capture_write_path(path) {
+        return Err(format!("Refusing to write {path}"));
+    }
+    client()?
+        .write(&encode_path(path), content, sha, message)
+        .await?;
+    Ok(json!({}))
+}
+
 /// `cached` answers from the last fetch alone; otherwise the endpoint is asked and an answer with
 /// usage in it replaces the cache. Failing to write the cache never hides the usage.
 async fn claude_usage(cached: bool) -> Result<Value, String> {
@@ -602,6 +655,14 @@ pub async fn handle(request: Value) -> Result<Value, String> {
         Request::WriteEntryFile { path, content, sha } => {
             write_entry_file(&path, &content, sha.as_deref()).await
         }
+        Request::ReadBusinessContext => read_business_context().await,
+        Request::ReadBusinessFile { path } => read_business_file(&path).await,
+        Request::WriteBusinessFile {
+            path,
+            content,
+            message,
+            sha,
+        } => write_business_file(&path, &content, &message, sha.as_deref()).await,
         Request::CaptureKnowledge { path, content } => capture_knowledge(&path, &content).await,
         Request::ListIdeas => list_ideas().await,
         Request::SaveIdea { path, content, sha } => {
@@ -879,6 +940,61 @@ mod tests {
             .await
             .unwrap_err();
         assert_eq!(error, "Refusing to write a.md");
+    }
+
+    #[test]
+    fn reads_business_requests() {
+        assert_eq!(
+            parse(json!({ "type": "READ_BUSINESS_CONTEXT" })),
+            Request::ReadBusinessContext
+        );
+        assert_eq!(
+            parse(json!({ "type": "READ_BUSINESS_FILE", "path": "p" })),
+            Request::ReadBusinessFile { path: "p".into() }
+        );
+        assert_eq!(
+            parse(
+                json!({ "type": "WRITE_BUSINESS_FILE", "path": "p", "content": "x", "message": "m" })
+            ),
+            Request::WriteBusinessFile {
+                path: "p".into(),
+                content: "x".into(),
+                message: "m".into(),
+                sha: None
+            }
+        );
+        assert_eq!(
+            parse(
+                json!({ "type": "WRITE_BUSINESS_FILE", "path": "p", "content": "x", "message": "m", "sha": "v1" })
+            ),
+            Request::WriteBusinessFile {
+                path: "p".into(),
+                content: "x".into(),
+                message: "m".into(),
+                sha: Some("v1".into())
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn refuses_business_files_a_capture_does_not_write() {
+        let error =
+            handle(json!({ "type": "READ_BUSINESS_FILE", "path": ".kh/business/business.yaml" }))
+                .await
+                .unwrap_err();
+        assert_eq!(error, "Refusing to read .kh/business/business.yaml");
+        let error = handle(json!({
+            "type": "WRITE_BUSINESS_FILE",
+            "path": ".kh/business/clients/acme/notes.md",
+            "content": "x",
+            "message": "m"
+        }))
+        .await
+        .unwrap_err();
+        assert_eq!(
+            error,
+            "Refusing to write .kh/business/clients/acme/notes.md"
+        );
     }
 
     #[test]

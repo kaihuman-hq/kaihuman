@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-03 — Business, phase 5b part A: client targets in the extension and desktop palette
+
+- Shared palette (`packages/palette/src/business.ts`): `loadBusinessCapture(port, consoleUrl)` reads `READ_BUSINESS_CONTEXT` once per palette open (in the background) and, when `.kh/business/business.yaml` exists, turns `todo <client>: text`, `log <client>: text`, `timer <client>[/project]` and `stop timer` into one row under **Business**, listed first (`PaletteHandlers.loadCapture`, wired in `portHandlers`, so the extension's in-page and start-page palettes and the desktop palette all get it). Parsing is the console's `parseCapture` (exact slug or unique prefix). ⏎ reads the target file fresh (`READ_BUSINESS_FILE`), builds the change with the new formats `buildCapture` (the console's `addClientTodo` / `addClientLog` / `startTimer`) and writes it in one commit with the console's message (`WRITE_BUSINESS_FILE`, over the version read; a new file is never written over an existing one). `stop timer` opens the console's time form. Without business set up nothing changes.
+- `@kaihuman/formats` business `actions/capture.ts`: `isCaptureContextPath` (profile, client, project, timer), `isCaptureWritePath` (client `todos.todos.md`, `log.actionlog.md`, `time/running.yaml`), `capturePath`, `buildCapture` (refuses a running timer read fresh).
+- Backends: the extension's service worker (`fetchBusinessContext` in `palette-modes.ts`; `githubWriteFile` takes a commit message) and the desktop's Rust (`src-tauri/src/business.rs`, requests in `requests.rs`) answer the three requests and refuse any other path.
+
 ## 2026-11-02 — Business, phase 5a: money admin
 
 - Final nits: a write left with nothing to change makes no commit; CSV text starting with `-` is guarded too; the Ist test for a credit note after full payment now goes through the netting path.

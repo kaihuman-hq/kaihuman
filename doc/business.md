@@ -4,7 +4,8 @@ Status: phase 1 built (2026-10-26): formats, repo check, skill, set-up function.
 (2026-10-27): read-only console pages. Phase 3 built (2026-11-02): daily forms, running timer,
 palette commands, read-only issued files, business hours on the browser extension's start page. Phase 4 built
 (2026-11-02): share links. Phase 5a built (2026-11-02): money admin (expenses and receipts, VAT summary,
-CSV, year export, retainers due, contract reminders and form, pipeline board). Design: `docs/superpowers/specs/2026-10-26-business-design.md`.
+CSV, year export, retainers due, contract reminders and form, pipeline board). Phase 5b part A built (2026-11-03): client targets in the browser extension and
+desktop palette. Design: `docs/superpowers/specs/2026-10-26-business-design.md`.
 
 ## Goal
 
@@ -241,6 +242,14 @@ Every form makes one commit per action, with a message starting `business: `
 - **Palette** (console `SearchModal`, when business is enabled): `todo <client>: text`,
   `log <client>: text`, `timer <client>[/project]`, `stop timer`. The client is an exact slug or a
   unique prefix. Quick todo and quick log also have a "For client" select.
+- **Browser extension and desktop palette** (phase 5b): the same four commands in the shared
+  palette, listed first under "Business" when `.kh/business/business.yaml` exists. The clients come
+  from `.kh/business/clients/` (each `client.yaml`), read each time the palette opens. A todo or
+  log line goes to the client's `todos.todos.md` / `log.actionlog.md` and `timer` writes
+  `time/running.yaml`, each in one commit with the console's message (`business: todo for acme`)
+  and over the version just read, so a change made meanwhile fails instead of being overwritten.
+  `stop timer` opens the console's time form. Unlike a console save, a palette capture does not
+  upgrade outdated business tool files and does not retry on a conflict.
 - **File browser:** issued yaml and offer/invoice pdf, xml and sha256 files open read-only and
   cannot be changed, renamed, moved or deleted there.
 
