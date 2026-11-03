@@ -75,7 +75,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/kosit
-          key: kosit-${{ env.KOSIT_VALIDATOR }}-${{ env.XRECHNUNG_CONFIG }}
+          key: kosit-${{ env.KOSIT_VALIDATOR_SHA256 }}-${{ env.XRECHNUNG_CONFIG_SHA256 }}
 
       - name: Download validator and configuration
         run: |

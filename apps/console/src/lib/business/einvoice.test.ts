@@ -14,6 +14,7 @@ const doc = () => {
 describe('einvoiceFiles', () => {
   it('names the files after the document number and types them as XML', async () => {
     const f = einvoiceFiles(doc());
+    if (!f.ok) throw new Error(f.error);
     const ubl = f.ubl();
     const cii = f.cii();
     expect(ubl.name).toBe('RE-2026-0001.xrechnung.xml');
@@ -24,6 +25,16 @@ describe('einvoiceFiles', () => {
   });
 
   it('reports gaps as strings', () => {
-    expect(Array.isArray(einvoiceFiles(doc()).gaps)).toBe(true);
+    const f = einvoiceFiles(doc());
+    expect(f.ok && Array.isArray(f.gaps)).toBe(true);
+  });
+
+  it('returns an error instead of throwing when the amounts cannot be computed', () => {
+    const d = doc();
+    const huge = { ...d, lines: d.lines.map((l) => ({ ...l, quantity: '99999999999999999999' })) };
+    expect(einvoiceFiles(huge)).toEqual({
+      ok: false,
+      error: expect.stringContaining('safe integer'),
+    });
   });
 });

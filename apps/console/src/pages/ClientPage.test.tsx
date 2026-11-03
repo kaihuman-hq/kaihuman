@@ -522,4 +522,22 @@ describe('ClientPage e-invoice', () => {
     expect(host.querySelector('button[aria-label="Download CII for RE-2026-0002"]')).not.toBeNull();
     expect(host.querySelector('button[aria-label="Download CII for AN-2026-001"]')).toBeNull();
   });
+
+  it('shows an error on the row instead of crashing when a document cannot be mapped', () => {
+    // The loader rejects such a record before it gets here; the guard is for anything it lets through.
+    const data = load(fullyCredited);
+    for (const i of data.issued) {
+      if (i.doc.number === 'RE-2026-0002') {
+        i.doc = {
+          ...i.doc,
+          lines: i.doc.lines.map((l) => ({ ...l, quantity: '99999999999999999999' })),
+        };
+      }
+    }
+    show(ready(data));
+    expect(
+      host.querySelector('[data-testid="einvoice-error-RE-2026-0002"]')?.textContent,
+    ).toContain('safe integer');
+    expect(host.querySelector('button[aria-label="Download CII for RE-2026-0001"]')).not.toBeNull();
+  });
 });

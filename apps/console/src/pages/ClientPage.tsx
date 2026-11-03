@@ -73,6 +73,13 @@ const EINVOICE_BUTTON =
 /** XRechnung and CII are generated here from the issued document, so they work read only too. */
 const EinvoiceActions = ({ doc }: { doc: Issued }) => {
   const files = einvoiceFiles(doc);
+  if (!files.ok) {
+    return (
+      <span class="text-[var(--los-warning)]" data-testid={`einvoice-error-${doc.number}`}>
+        No e-invoice: {files.error}
+      </span>
+    );
+  }
   const save = (f: { name: string; blob: Blob }) => downloadBlob(f.name, f.blob);
   return (
     <>
