@@ -7,6 +7,7 @@
 
 mod bookmarks;
 mod braindumps;
+mod business;
 mod claude;
 mod commands;
 mod config;

@@ -16,6 +16,7 @@ import {
   parsePrompts,
   usablePaletteSettings,
 } from '@kaihuman/formats';
+import { loadBusinessCapture } from './business.js';
 import { usageNeedsSync, usageRows, usageStatusRow } from './claude-usage.js';
 import type {
   EditableText,
@@ -869,6 +870,7 @@ export const portHandlers = (
   loadSettings: async () =>
     usablePaletteSettings((await port.send({ type: 'GET_PALETTE_SETTINGS' })).content),
   searchRepo: async (query) => (await port.send({ type: 'SEARCH_REPO', query })).results,
+  loadCapture: () => loadBusinessCapture(port, CONSOLE_URL),
   fileChoices: (file) => fileChoices(port, file),
   loadRecents: async () => (await port.send({ type: 'GET_RECENTS' })).recents,
   rememberRecent: (entry) => {

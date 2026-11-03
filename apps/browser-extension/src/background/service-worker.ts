@@ -16,6 +16,7 @@ import {
   serializeTimeTracking,
   toggleStartStop,
 } from '@kaihuman/formats';
+import { isCaptureWritePath } from '@kaihuman/formats/business';
 import {
   type GithubWorkFilter,
   isKnowledgePath,
@@ -95,6 +96,7 @@ import {
 } from './kb-capture';
 import {
   encodePath,
+  fetchBusinessContext,
   fetchEntryFilePaths,
   fetchPromptFiles,
   isEntryFilePath,
@@ -562,6 +564,9 @@ async function githubReadFile(
   if (res.status === 404) return null;
   if (!res.ok) throw await githubFailure(res, `Failed to read ${filePath}`);
   const data = await res.json();
+  // Over 1 MB GitHub sends no content; reading it as empty would let a write wipe the file.
+  if (data.encoding === 'none')
+    throw new Error(`${filePath} is too large to read here (over 1 MB)`);
   return { content: decodeBase64(data.content || ''), sha: data.sha };
 }
 
@@ -571,12 +576,13 @@ async function githubWriteFile(
   filePath: string,
   content: string,
   sha?: string,
+  message = `Update ${filePath} via Extension`,
 ): Promise<string | null> {
   const res = await fetch(`https://api.github.com/repos/${repoUrl}/contents/${filePath}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
     body: JSON.stringify({
-      message: `Update ${filePath} via Extension`,
+      message,
       content: encodeBase64(content),
       sha,
     }),
@@ -1726,6 +1732,36 @@ async function writeEntryFile(path: string, content: string, sha?: string) {
   return {};
 }
 
+async function readBusinessContext() {
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  return { files: await fetchBusinessContext(token, repo) };
+}
+
+/** A missing file reads as null, so the capture builds it as the console would a new one. */
+async function readBusinessFile(path: string) {
+  if (!isCaptureWritePath(path)) throw new Error(`Refusing to read ${path}`);
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  return (await githubReadFile(token, repo, encodePath(path))) ?? { content: null };
+}
+
+/** One commit with the capture's own message; without `sha` GitHub refuses an existing file. */
+async function writeBusinessFile(path: string, content: string, message: string, sha?: string) {
+  if (!isCaptureWritePath(path)) throw new Error(`Refusing to write ${path}`);
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const written = await githubWriteFile(token, repo, encodePath(path), content, sha, message);
+  // As `writeEntryFile`: the start page lists client todo files and the timer from this cache.
+  const cache = await readTodayCache();
+  if (cache && isTodayCacheUsable(cache, repo)) {
+    await chrome.storage.local.set({
+      todayCache: withFile(cache, { path, sha: written ?? '', content }),
+    });
+  }
+  return {};
+}
+
 /** Creates the palette's capture — no `sha`, so GitHub refuses to write over an existing file. */
 async function captureKnowledge(path: string, content: string) {
   if (!isKnowledgePath(path)) throw new Error(`Refusing to write ${path}`);
@@ -2132,6 +2168,24 @@ chrome.runtime.onMessage.addListener(function onMessage(
   if (message.type === 'WRITE_ENTRY_FILE') {
     return answer(
       writeEntryFile(message.path || '', message.content ?? '', message.sha),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'READ_BUSINESS_CONTEXT') return answer(readBusinessContext(), sendResponse);
+
+  if (message.type === 'READ_BUSINESS_FILE') {
+    return answer(readBusinessFile(message.path || ''), sendResponse);
+  }
+
+  if (message.type === 'WRITE_BUSINESS_FILE') {
+    return answer(
+      writeBusinessFile(
+        message.path || '',
+        message.content ?? '',
+        message.message || 'business: capture',
+        message.sha || undefined,
+      ),
       sendResponse,
     );
   }

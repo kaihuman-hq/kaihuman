@@ -5,6 +5,7 @@
  * The desktop palette answers the same requests from Rust (apps/desktop-palette/src-tauri), so the
  * two stay in step: same files, same endpoints, same error messages.
  */
+import { classifyBusinessPath, isCaptureContextPath } from '@kaihuman/formats/business';
 import {
   ENTRY_SUFFIXES,
   entryKindOf,
@@ -90,15 +91,31 @@ export async function fetchPromptFiles(
   suffix = '.prompts.md',
 ): Promise<PromptFile[]> {
   return Promise.all(
-    promptFilePaths(await fetchTree(token, repo), suffix).map(async (path) => {
-      const response = await fetch(
-        `https://api.github.com/repos/${repo}/contents/${encodePath(path)}`,
-        { headers: githubHeaders(token, 'application/vnd.github.raw+json') },
-      );
-      if (!response.ok) throw new Error(`Could not read ${path}: ${response.status}`);
-      return { path, content: await response.text() };
-    }),
+    promptFilePaths(await fetchTree(token, repo), suffix).map((path) => readRaw(token, repo, path)),
   );
+}
+
+async function readRaw(token: string, repo: string, path: string): Promise<PromptFile> {
+  const response = await fetch(
+    `https://api.github.com/repos/${repo}/contents/${encodePath(path)}`,
+    {
+      headers: githubHeaders(token, 'application/vnd.github.raw+json'),
+    },
+  );
+  if (!response.ok) throw new Error(`Could not read ${path}: ${response.status}`);
+  return { path, content: await response.text() };
+}
+
+/**
+ * What a client target needs (`READ_BUSINESS_CONTEXT`): the profile, clients, projects and the
+ * running timer, from one tree listing; none when business is not set up.
+ */
+export async function fetchBusinessContext(token: string, repo: string): Promise<PromptFile[]> {
+  const blobs = (await fetchTree(token, repo))
+    .filter((entry) => entry.type === 'blob')
+    .map((entry) => entry.path);
+  if (!blobs.some((path) => classifyBusinessPath(path).kind === 'profile')) return [];
+  return Promise.all(blobs.filter(isCaptureContextPath).map((path) => readRaw(token, repo, path)));
 }
 
 /** DeepL's free keys end in `:fx` and only work against the free endpoint. */
