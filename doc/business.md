@@ -132,6 +132,64 @@ A draft made from a retainer carries `from_retainer: <next_date>`.
   yet. E is the category for small-business (§ 19 UStG); AE (reverse charge) gets its note.
 - Status (open, part-paid, paid, overdue, credited) is calculated from payments and dates, never stored.
 
+## E-invoices (phase 6)
+
+kaihuman writes the EN 16931 data of an issued invoice or credit note as XML. It does not render
+PDFs. Everything is generated from the issued YAML, so nothing new is stored.
+
+- `toEn16931(issued)` maps the record to EN 16931 business terms. `toUbl(e)` writes XRechnung 3.0
+  UBL 2.1 (`Invoice` for type 380, `CreditNote` for 381). `toCii(e, { guideline })` writes
+  UN/CEFACT CII D16B. `guideline: 'xrechnung'` (default) uses the XRechnung CIUS identifier;
+  `guideline: 'en16931'` gives the ZUGFeRD / Factur-X EN 16931 profile XML. The serialisers only
+  format the strings of `toEn16931`, so amounts and rounding are those of `computeTotals`.
+- Mapping notes: a credit note references the corrected invoice (BG-3). The buyer reference (BT-10)
+  is the document's `buyer_reference`, else the client's Leitweg-ID, else its buyer reference.
+  Payment means are SEPA credit transfer `58` with IBAN, BIC and the invoice number as reference.
+  A credit note without payment details gets code `1` and a refund note (BT-20). Reverse charge is
+  category `AE` with `VATEX-EU-AE` and the reason text; small business is category `E` with the
+  § 19 UStG reason. Units are UN/ECE recommendation 20 codes from the line (`HUR`, `C62`, …).
+- Electronic addresses (BT-34 seller, BT-49 buyer): `electronic_address` written as
+  `SCHEME:value` (for example `0204:991-12345-67` or `9930:DE123456789`) is used as written; an
+  e-mail address gets scheme `EM`; a Leitweg-ID gets `0204`. Without one, the seller falls back to
+  the contact e-mail and the buyer to a Leitweg-ID buyer reference, then the contact e-mail.
+- XRechnung needs data that EN 16931 and ZUGFeRD do not: a buyer reference, a seller contact with
+  phone and e-mail, and both electronic addresses. `xrechnungGaps(e)` lists what is missing; the
+  console shows it next to the download buttons. Add the missing data to `business.yaml` or the
+  client before issuing; an issued file never changes.
+- Console: the client page's invoice table has an XML column (`XML` when `<number>.xml` is in the
+  repository, else `XML missing`) and the buttons **Download XRechnung (UBL)** and **Download CII**
+  on every invoice and credit note. Both are generated in the browser.
+- Validation: golden files in `packages/formats/fixtures/business/einvoice/` (standard invoice,
+  reverse charge, small business, credit note; UBL and CII) are compared with the serialiser output
+  in the tests (`UPDATE_GOLDEN=1` rewrites them) and checked in CI by the KoSIT validator with the
+  XRechnung configuration (job `einvoice`, versions and checksums pinned in
+  `.github/workflows/ci.yml`).
+
+### ZUGFeRD / Factur-X for external PDF generators
+
+The generator contract (`<number>.pdf`, `<number>.xml`, `<number>.sha256` next to the issued
+YAML) stays the same. A generator that wants a ZUGFeRD 2.x / Factur-X invoice:
+
+1. Reads `<number>.yaml`, validates it with `validateIssued`, and calls
+   `toCii(toEn16931(doc), { guideline: 'en16931' })`. It never computes tax itself.
+2. Renders the PDF as **PDF/A-3** (PDF/A-3b is enough) with embedded fonts and an sRGB output
+   intent.
+3. Embeds the XML as file `factur-x.xml` (ZUGFeRD 2.x and Factur-X use this name) with MIME type
+   `text/xml`, `AFRelationship` `Alternative` (or `Data`), lists it in the document catalog's `AF`
+   array and in the `EmbeddedFiles` name tree.
+4. Adds the XMP metadata of the Factur-X extension schema
+   (`urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`): `DocumentType` `INVOICE`,
+   `DocumentFileName` `factur-x.xml`, `Version` `1.0`, `ConformanceLevel` `EN 16931`, with the
+   matching `pdfaExtension` schema description.
+5. Writes the same XML as `<number>.xml` (or the XRechnung UBL from `toUbl` when the recipient wants
+   pure XRechnung) and the hashes of both files plus generator name and template version into
+   `<number>.sha256`.
+6. Checks the result with a PDF/A validator (veraPDF) and the XML with the KoSIT validator or
+   Mustang.
+
+For German public buyers (B2G) send the pure XRechnung XML (`toUbl` or `toCii` with the
+default guideline); a ZUGFeRD PDF is accepted there only in the XRechnung profile.
+
 ## The check
 
 Run it from the repo root:

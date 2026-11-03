@@ -51,3 +51,63 @@ jobs:
 
       - name: Test
         run: pnpm -r test
+
+  # Phase 6: every golden e-invoice must pass the KoSIT validator with the XRechnung configuration.
+  # The goldens are what the serialisers produce (a Vitest test keeps them in sync), so this checks
+  # the serialisers against the official Schematron and schemas.
+  einvoice:
+    runs-on: ubuntu-latest
+    env:
+      KOSIT_VALIDATOR: 1.6.3
+      KOSIT_VALIDATOR_SHA256: 799e64befca97d4080e03608c80b85dd5a5ecc5f4ae4f35d1116ec2855b9a7c9
+      XRECHNUNG_CONFIG: xrechnung-3.0.2-validator-configuration-2026-08-31
+      XRECHNUNG_CONFIG_TAG: v2026-08-31
+      XRECHNUNG_CONFIG_SHA256: 2530cd107c414511c5d0462ec10f886910395abfca820db82e83d70bf01221a8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Cache KoSIT downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/kosit
+          key: kosit-${{ env.KOSIT_VALIDATOR }}-${{ env.XRECHNUNG_CONFIG }}
+
+      - name: Download validator and configuration
+        run: |
+          mkdir -p ~/kosit && cd ~/kosit
+          [ -f validator.jar ] || curl -fsSL -o validator.jar \
+            "https://repo1.maven.org/maven2/org/kosit/validator/${KOSIT_VALIDATOR}/validator-${KOSIT_VALIDATOR}-standalone.jar"
+          [ -f config.zip ] || curl -fsSL -o config.zip \
+            "https://github.com/itplr-kosit/validator-configuration-xrechnung/releases/download/${XRECHNUNG_CONFIG_TAG}/${XRECHNUNG_CONFIG}.zip"
+          echo "${KOSIT_VALIDATOR_SHA256}  validator.jar" | sha256sum -c -
+          echo "${XRECHNUNG_CONFIG_SHA256}  config.zip" | sha256sum -c -
+          rm -rf config && unzip -q config.zip -d config
+
+      - name: Validate golden e-invoices
+        run: |
+          mkdir -p reports
+          java -jar ~/kosit/validator.jar -s ~/kosit/config/scenarios.xml -r ~/kosit/config \
+            -o reports -h packages/formats/fixtures/business/einvoice/*.xml || true
+          failed=0
+          for f in packages/formats/fixtures/business/einvoice/*.xml; do
+            report="reports/$(basename "${f%.xml}")-report.xml"
+            if [ -f "$report" ] && grep -Eq '<([A-Za-z]+:)?accept[ />]' "$report"; then
+              echo "accepted: $f"
+            else
+              echo "::error file=$f::KoSIT did not accept $f (see the kosit-reports artifact)"
+              failed=1
+            fi
+          done
+          exit $failed
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kosit-reports
+          path: reports/
