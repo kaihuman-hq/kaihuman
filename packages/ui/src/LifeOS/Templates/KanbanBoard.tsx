@@ -44,6 +44,7 @@ import {
   usePersistedScope,
   withBusinessFiles,
 } from '../scope-files';
+import { groupByStream, StreamView } from './StreamView';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1071,6 +1072,7 @@ export interface KanbanBoardProps {
   onAnalyticsClick?: () => void;
   onCreateFile?: (path: string, content: string) => Promise<void>;
   onOpenFile?: (path: string) => void;
+  initialMode?: 'board' | 'stream';
 }
 
 export const KanbanBoard = ({
@@ -1078,6 +1080,7 @@ export const KanbanBoard = ({
   onAnalyticsClick,
   onCreateFile,
   onOpenFile,
+  initialMode = 'board',
 }: KanbanBoardProps) => {
   const openFiles = githubFileStore.openFiles.value;
   const tree = githubFileStore.tree.value;
@@ -1129,6 +1132,7 @@ export const KanbanBoard = ({
 
   const [milestoneFilter, setMilestoneFilter] = useState<string>('');
   const [showUpcoming, setShowUpcoming] = useState(false);
+  const [mode, setMode] = useState<'board' | 'stream'>(initialMode);
   const [showMilestoneManager, setShowMilestoneManager] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [dragOverStatus, setDragOverStatus] = useState<TodoStatus | null>(null);
@@ -1204,25 +1208,42 @@ export const KanbanBoard = ({
   const upcomingMilestone = useMemo(() => getUpcomingMilestone(allMilestones), [allMilestones]);
 
   // Aggregate all items
-  const allItems = useMemo<AggregatedItem[]>(() => {
+  // Shared by the board and the stream view so both honour the same filters.
+  const itemFilter = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    return (item: TodoItem): boolean => {
+      if (milestoneFilter && item.milestoneId !== milestoneFilter) return false;
+      if (showUpcoming && upcomingMilestone && item.milestoneId !== upcomingMilestone.id)
+        return false;
+      if (q) {
+        const matchesText = item.text.toLowerCase().includes(q);
+        const matchesTag = item.tags.some((t) => t.toLowerCase().includes(q));
+        const matchesMilestone = !!item.milestoneId?.toLowerCase().includes(q);
+        if (!matchesText && !matchesTag && !matchesMilestone) return false;
+      }
+      return true;
+    };
+  }, [milestoneFilter, showUpcoming, upcomingMilestone, searchQuery]);
+
+  const allItems = useMemo<AggregatedItem[]>(() => {
     const result: AggregatedItem[] = [];
     for (const { path, data } of parsedFiles) {
       if (focusedFiles.size > 0 && !focusedFiles.has(path)) continue;
       data.items.forEach((item, idx) => {
-        if (milestoneFilter && item.milestoneId !== milestoneFilter) return;
-        if (showUpcoming && upcomingMilestone && item.milestoneId !== upcomingMilestone.id) return;
-        if (q) {
-          const matchesText = item.text.toLowerCase().includes(q);
-          const matchesTag = item.tags.some((t) => t.toLowerCase().includes(q));
-          const matchesMilestone = !!item.milestoneId?.toLowerCase().includes(q);
-          if (!matchesText && !matchesTag && !matchesMilestone) return;
-        }
-        result.push({ item, itemIndex: idx, filePath: path });
+        if (itemFilter(item)) result.push({ item, itemIndex: idx, filePath: path });
       });
     }
     return result;
-  }, [parsedFiles, milestoneFilter, showUpcoming, upcomingMilestone, focusedFiles, searchQuery]);
+  }, [parsedFiles, focusedFiles, itemFilter]);
+
+  const streamLanes = useMemo(
+    () =>
+      groupByStream(
+        parsedFiles.filter((f) => focusedFiles.size === 0 || focusedFiles.has(f.path)),
+        { showFinished: true, filter: itemFilter, label: fileLabel },
+      ),
+    [parsedFiles, focusedFiles, itemFilter],
+  );
 
   const focusedFileData = useMemo(() => {
     if (focusedFiles.size !== 1) return null;
@@ -1428,6 +1449,25 @@ export const KanbanBoard = ({
             </select>
           )}
 
+          <div className="flex border border-[var(--los-border)]">
+            {(['board', 'stream'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={mode === m}
+                onClick={() => setMode(m)}
+                className={cn(
+                  'text-[10px] font-mono px-2 py-1 uppercase transition-colors',
+                  mode === m
+                    ? 'text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                    : 'text-[var(--los-muted)] hover:text-[var(--los-accent)]',
+                )}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+
           <button
             type="button"
             onClick={() => setColorMode((v) => !v)}
@@ -1539,6 +1579,12 @@ export const KanbanBoard = ({
         <div className="flex-1 flex items-center justify-center text-[var(--los-muted)]">
           <MonoText>No .todos.md files found in this repository.</MonoText>
         </div>
+      ) : !assignMode && mode === 'stream' ? (
+        <StreamView
+          lanes={streamLanes}
+          fileColors={fileColors}
+          onStatusChange={handleStatusChange}
+        />
       ) : !assignMode ? (
         <div className="flex-1 overflow-x-auto overflow-y-hidden flex">
           {COLUMNS.map((col) => {

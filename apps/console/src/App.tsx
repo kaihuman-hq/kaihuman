@@ -22,7 +22,7 @@ import { ExpensesPage } from './pages/ExpensesPage';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
 import { IdeasPage } from './pages/IdeasPage';
 import { IssuePage } from './pages/IssuePage';
-import { KanbanBoardPage } from './pages/KanbanBoardPage';
+import { KanbanBoardPage, StreamsPage } from './pages/KanbanBoardPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { LogTimePage } from './pages/LogTimePage';
 import { Login } from './pages/login';
@@ -82,6 +82,7 @@ export const App = () => {
         <ProtectedRoute path="/extension-onboarded" component={ExtensionSuccess} />
         <ProtectedRoute path="/" component={Dashboard} />
         <ProtectedRoute path="/board" component={KanbanBoardPage} />
+        <ProtectedRoute path="/streams" component={StreamsPage} />
         <ProtectedRoute path="/analytics" component={TodoAnalyticsPage} />
         <ProtectedRoute path="/action-log" component={ActionLogViewPage} />
         <ProtectedRoute path="/quick-todo" component={QuickTodoPage} />

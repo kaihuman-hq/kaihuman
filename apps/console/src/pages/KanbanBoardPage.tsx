@@ -2,9 +2,10 @@ import { githubFileStore } from '@kaihuman/core';
 import { KanbanBoard, StatusBar } from '@kaihuman/ui';
 import { route } from 'preact-router';
 
-export const KanbanBoardPage = () => (
+export const KanbanBoardPage = ({ initialMode }: { initialMode?: 'board' | 'stream' }) => (
   <>
     <KanbanBoard
+      initialMode={initialMode}
       onNavigateBack={() => route('/')}
       onAnalyticsClick={() => route('/analytics')}
       onCreateFile={async (path, content) => {
@@ -22,3 +23,5 @@ export const KanbanBoardPage = () => (
     />
   </>
 );
+
+export const StreamsPage = () => <KanbanBoardPage initialMode="stream" />;

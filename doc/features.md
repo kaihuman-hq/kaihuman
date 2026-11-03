@@ -55,6 +55,7 @@
 | Quick note to dump.md | `/quick-note` | 2026-03-28 |
 | Shortcuts setup guide | `/shortcuts` | 2026-03-28 |
 | Android long-press shortcuts | manifest.webmanifest | 2026-03-28 |
+| Stream view: one lane per todo file with open and in-progress items, finished behind "Show finished", one-click status dot; Board / Stream toggle on the board | `/streams`, KanbanBoard | 2026-11-03 |
 | Inbox always on board | KanbanBoard | 2026-03-28 |
 | Move todo between files | KanbanBoard card hover | 2026-03-28 |
 
