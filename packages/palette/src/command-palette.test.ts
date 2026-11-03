@@ -2210,6 +2210,37 @@ describe('business capture', () => {
     expect(statusText()).toBe('Todo added for acme');
   });
 
+  it('a late capture row does not take Enter from the row that was selected', async () => {
+    let resolve: (lookup: (query: string) => ModeItem | null) => void = () => {};
+    create(() => new Promise((r) => (resolve = r)));
+    loadBookmarks.mockResolvedValue([bookmark('todo acme: send draft', 'https://a.example/')]);
+    palette.toggle();
+    await settle();
+    type('todo acme: send draft');
+    expect(selectedTitle()).toBe('todo acme: send draft');
+    resolve((query) => ({
+      id: 'business:todo',
+      title: `Add todo for acme: ${query.slice(10).trim()}`,
+      action: { id: 'business:todo', title: 'Add todo', recent: false, run: captureRun },
+    }));
+    await settle();
+    expect(rowTitles()[0]).toBe('Add todo for acme: send draft');
+    expect(selectedTitle()).toBe('todo acme: send draft');
+  });
+
+  it('forgets the last open’s clients when the next load fails', async () => {
+    palette.toggle();
+    await settle();
+    palette.toggle();
+    create(async () => {
+      throw new Error('offline');
+    });
+    palette.toggle();
+    await settle();
+    type('todo acme: send draft');
+    expect(groupLabels()).not.toContain('Business');
+  });
+
   it('offers nothing for other text, or when business is not set up', async () => {
     palette.toggle();
     await settle();

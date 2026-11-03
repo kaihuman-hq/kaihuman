@@ -564,6 +564,9 @@ async function githubReadFile(
   if (res.status === 404) return null;
   if (!res.ok) throw await githubFailure(res, `Failed to read ${filePath}`);
   const data = await res.json();
+  // Over 1 MB GitHub sends no content; reading it as empty would let a write wipe the file.
+  if (data.encoding === 'none')
+    throw new Error(`${filePath} is too large to read here (over 1 MB)`);
   return { content: decodeBase64(data.content || ''), sha: data.sha };
 }
 
@@ -1748,7 +1751,14 @@ async function writeBusinessFile(path: string, content: string, message: string,
   if (!isCaptureWritePath(path)) throw new Error(`Refusing to write ${path}`);
   const { token, repo } = await credentials();
   if (!token) throw new Error(NOT_LOGGED_IN);
-  await githubWriteFile(token, repo, encodePath(path), content, sha, message);
+  const written = await githubWriteFile(token, repo, encodePath(path), content, sha, message);
+  // As `writeEntryFile`: the start page lists client todo files and the timer from this cache.
+  const cache = await readTodayCache();
+  if (cache && isTodayCacheUsable(cache, repo)) {
+    await chrome.storage.local.set({
+      todayCache: withFile(cache, { path, sha: written ?? '', content }),
+    });
+  }
   return {};
 }
 

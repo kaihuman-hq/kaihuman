@@ -538,6 +538,7 @@ export function createCommandPalette(
   /** What `ask` offered, for the query it was asked about; a newer query hides it. */
   let asked: { query: string; item: ModeItem } | null = null;
   let captureFor: ((query: string) => ModeItem | null) | null = null;
+  let captureLoads = 0;
   let askTimer: ReturnType<typeof setTimeout> | undefined;
   /** Guards against a slow answer landing after the query moved on, like `searchToken`. */
   let askToken = 0;
@@ -1671,11 +1672,19 @@ export function createCommandPalette(
     input.focus();
 
     // Not awaited with the rest: the clients take several reads, and nothing else waits for them.
+    // Another repository's clients must never stay live, so each open starts without any.
+    captureFor = null;
+    const captureToken = ++captureLoads;
     handlers
       .loadCapture?.()
       .then((loaded) => {
+        if (captureToken !== captureLoads || !open) return;
+        // Like an ask row it lands above the rest, so the selection moves down with its row.
+        const before = captureRows().length;
         captureFor = loaded;
-        if (open) render();
+        const added = captureRows().length - before;
+        if (added > 0 && allRows().length > added) selected += added;
+        render();
       })
       .catch((e: any) => console.warn('LifeOS palette: could not load the business clients', e));
     const [loadedBookmarks, loadedRecents, loadedSettings] = await Promise.all([

@@ -583,6 +583,33 @@ describe('the palette’s business captures', () => {
     });
   });
 
+  it('puts the written file into the start page’s cache', async () => {
+    seedCache();
+    await call({
+      type: 'WRITE_BUSINESS_FILE',
+      path: '.kh/business/time/running.yaml',
+      content: 'client: acme\n',
+      message: 'business: start timer for acme',
+    });
+    expect(
+      store.todayCache.files.find((f: any) => f.path === '.kh/business/time/running.yaml'),
+    ).toEqual({
+      path: '.kh/business/time/running.yaml',
+      sha: 'new-sha',
+      content: 'client: acme\n',
+    });
+  });
+
+  it('refuses to read a file GitHub sends without content (over 1 MB)', async () => {
+    remote[TODOS] = 'big';
+    fetchMock.mockImplementationOnce(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ content: '', encoding: 'none', sha: 'v1' }),
+    }));
+    expect((await call({ type: 'READ_BUSINESS_FILE', path: TODOS })).error).toContain('too large');
+  });
+
   it('refuses any file a capture does not write', async () => {
     for (const path of [
       '.kh/business/clients/acme/client.yaml',
