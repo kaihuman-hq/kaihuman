@@ -17,7 +17,7 @@ import type { KBRepo } from './github-kb';
  * Bump when the check, workflow or skill changes: the next `syncKB` or business write then
  * rewrites the tool files.
  */
-export const BUSINESS_TOOLS_VERSION = '1.3.0';
+export const BUSINESS_TOOLS_VERSION = '1.4.0';
 
 export { BUSINESS_PROFILE_PATH };
 
