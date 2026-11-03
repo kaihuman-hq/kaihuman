@@ -43,6 +43,18 @@ describe('kb-mcp server', () => {
     const { client } = await connect();
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
+      'business_add_expense',
+      'business_add_log',
+      'business_add_time',
+      'business_add_todo',
+      'business_check',
+      'business_client',
+      'business_clients',
+      'business_create_draft',
+      'business_open_invoices',
+      'business_reminders',
+      'business_update_draft',
+      'business_vat_summary',
       'ideas_append',
       'ideas_create',
       'ideas_find',

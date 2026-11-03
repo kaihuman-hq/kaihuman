@@ -10,6 +10,10 @@ life-OS repo, which must be private). If the repository you work in has `.kh/bus
 this is the data repo. Many agents and the user share these files, so write little and write it in
 the right place.
 
+## With the kaihuman-kb MCP tools
+
+When the `kaihuman-kb` MCP tools (`business_*`) are available, prefer them to editing files. They read clients, invoices, VAT, reminders and the check (`business_clients`, `business_client`, `business_open_invoices`, `business_vat_summary`, `business_reminders`, `business_check`). They write only drafts (`business_create_draft`, `business_update_draft`), time entries, todo and log lines, and expenses without receipts (`business_add_time`, `business_add_todo`, `business_add_log`, `business_add_expense`). They never issue, number or delete anything. Everything else (payments, clients, projects, contracts, receipts) is still done by editing files, or by the user in the console.
+
 ## Layout
 
 ```

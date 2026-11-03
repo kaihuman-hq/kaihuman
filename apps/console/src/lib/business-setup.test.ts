@@ -86,8 +86,8 @@ describe('enableBusiness', () => {
         '.kh/business/invoices/.gitkeep',
       ]),
     );
-    // Bumped with the phase-3 skill and check so syncKB refreshes existing repos.
-    expect(BUSINESS_TOOLS_VERSION).toBe('1.3.0');
+    // Bumped with the kb-mcp business tools skill section so syncKB refreshes existing repos.
+    expect(BUSINESS_TOOLS_VERSION).toBe('1.4.0');
     expect(files['.kh/business/.tools/version']).toBe(BUSINESS_TOOLS_VERSION);
     const parsed = parseYaml(files['.kh/business/business.yaml'] as string);
     expect(parsed.ok && validateProfile(parsed.value).ok).toBe(true);
