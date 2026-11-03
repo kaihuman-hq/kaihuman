@@ -1,5 +1,5 @@
 import type { Slug, Ulid } from '../ids.js';
-import type { FileChanges } from '../issue.js';
+import type { TextChanges } from '../issue.js';
 import { draftPath } from '../paths.js';
 import {
   type BusinessProfile,
@@ -22,7 +22,7 @@ import { stringifyYaml } from '../yaml.js';
 export const saveDraft = (
   repo: BusinessRepo,
   draft: Draft,
-): Result<{ changes: FileChanges; message: string }> => {
+): Result<{ changes: TextChanges; message: string }> => {
   if (!repo.clients.some((c) => c.slug === draft.client)) {
     return { ok: false, issues: [{ path: 'client', message: `unknown client "${draft.client}"` }] };
   }
@@ -150,7 +150,7 @@ const utc = (date: string): Date => new Date(`${date}T00:00:00Z`);
 const iso = (d: Date): string => d.toISOString().slice(0, 10);
 
 /** `date` plus whole months, the day clamped to the target month's length (31 Nov-30 → 28 Feb). */
-const addMonths = (date: string, months: number): string => {
+export const addMonths = (date: string, months: number): string => {
   const d = utc(date);
   const target = d.getUTCMonth() + months;
   const lastDay = new Date(Date.UTC(d.getUTCFullYear(), target + 1, 0)).getUTCDate();
@@ -181,6 +181,7 @@ export const draftFromRetainer = (
     client: project.client,
     project: project.slug,
     service_period: { start, end },
+    from_retainer: start,
     lines: [
       {
         description: retainer.description,
@@ -197,7 +198,7 @@ export const draftFromRetainer = (
 export const deleteDraft = (
   repo: BusinessRepo,
   id: Ulid,
-): Result<{ changes: FileChanges; message: string }> => {
+): Result<{ changes: TextChanges; message: string }> => {
   if (repo.issued.some((i) => i.doc.draft_id === id)) {
     return refuse('id', 'This draft was already issued.');
   }

@@ -8,7 +8,9 @@ import { ConflictError } from './conflict.js';
 const logger = new Logger('InMemoryGithubService');
 
 interface MemoryFile {
+  /** '' for a binary file; read it with `getFileBytes`. */
   content: string;
+  bytes?: Uint8Array;
   sha: string;
 }
 
@@ -74,6 +76,14 @@ export class InMemoryGithubService {
     return this.buildTree();
   }
 
+  async fetchCommitTree(
+    _owner: string,
+    _repo: string,
+    _commitSha: string,
+  ): Promise<{ tree: TreeItem[]; truncated: boolean }> {
+    return { tree: this.buildTree(), truncated: false };
+  }
+
   async getFileContent(
     _owner: string,
     _repo: string,
@@ -100,7 +110,13 @@ export class InMemoryGithubService {
       const isFolder = [...this.files.keys()].some((p) => p.startsWith(`${path}/`));
       throw new Error(isFolder ? 'Path is not a file: dir' : `Not found: ${path}`);
     }
-    return new TextEncoder().encode(file.content);
+    return file.bytes ?? new TextEncoder().encode(file.content);
+  }
+
+  async getBlobBytes(_owner: string, _repo: string, sha: string): Promise<Uint8Array> {
+    const file = [...this.files.values()].find((f) => f.sha === sha);
+    if (!file) throw new Error(`Not found: blob ${sha}`);
+    return file.bytes ?? new TextEncoder().encode(file.content);
   }
 
   async saveFile(
@@ -140,7 +156,9 @@ export class InMemoryGithubService {
       if (!file) continue;
       const newPath = newPrefix + item.path.slice(oldPrefix.length);
       this.files.delete(item.path);
-      this.files.set(newPath, { content: file.content, sha: contentSha(newPath, file.content) });
+      // Binary content is hashed as bytes; text keeps the demo's path-derived pseudo sha.
+      const sha = file.bytes ? gitBlobSha(file.bytes) : contentSha(newPath, file.content);
+      this.files.set(newPath, { ...file, sha });
     }
   }
 
@@ -153,7 +171,7 @@ export class InMemoryGithubService {
     owner: string,
     repo: string,
     branch: string,
-    files: Record<string, string | null>,
+    files: Record<string, string | Uint8Array | null>,
     _message: string,
     opts?: { expectedHeadSha?: string },
   ): Promise<{ commitSha: string; blobShas: Record<string, string> }> {
@@ -169,7 +187,10 @@ export class InMemoryGithubService {
       }
       // Same sha the real service reports, so the tree and blobShas agree.
       const sha = gitBlobSha(content);
-      this.files.set(path, { content, sha });
+      this.files.set(
+        path,
+        typeof content === 'string' ? { content, sha } : { content: '', bytes: content, sha },
+      );
       blobShas[path] = sha;
     }
     this.commitCount++;

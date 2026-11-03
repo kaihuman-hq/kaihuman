@@ -173,3 +173,43 @@ describe('InMemoryGithubService.getFileBytes', () => {
     await expect(svc.getFileBytes('o', 'r', 'docs')).rejects.toThrow('Path is not a file: dir');
   });
 });
+
+describe('GithubService.getBlobBytes', () => {
+  it('reads one blob by sha in one request, binary-safe', async () => {
+    const git = {
+      getBlob: vi.fn().mockResolvedValue({
+        data: { content: wrapBase64(PDF_BYTES), encoding: 'base64' },
+      }),
+      getTree: vi.fn(),
+    };
+    const svc = new GithubService();
+    vi.spyOn(svc as unknown as { getClient: () => unknown }, 'getClient').mockReturnValue({ git });
+    expect([...(await svc.getBlobBytes('o', 'r', 'blob1'))]).toEqual(PDF_BYTES);
+    expect(git.getBlob).toHaveBeenCalledTimes(1);
+    expect(git.getBlob).toHaveBeenCalledWith({ owner: 'o', repo: 'r', file_sha: 'blob1' });
+    expect(git.getTree).not.toHaveBeenCalled();
+  });
+
+  it('turns a 404 into Not found', async () => {
+    const git = {
+      getBlob: vi.fn().mockRejectedValue(Object.assign(new Error('x'), { status: 404 })),
+    };
+    const svc = new GithubService();
+    vi.spyOn(svc as unknown as { getClient: () => unknown }, 'getClient').mockReturnValue({ git });
+    await expect(svc.getBlobBytes('o', 'r', 'nope')).rejects.toThrow('Not found: blob nope');
+  });
+});
+
+describe('InMemoryGithubService.getBlobBytes', () => {
+  it('reads a file by the sha its tree lists', async () => {
+    const svc = new InMemoryGithubService();
+    await svc.saveFile('o', 'r', 'a/b.txt', 'hello', 'm');
+    const item = (await svc.fetchCommitTree('o', 'r', 'head')).tree.find(
+      (t) => t.path === 'a/b.txt',
+    );
+    expect(new TextDecoder().decode(await svc.getBlobBytes('o', 'r', item?.sha ?? ''))).toBe(
+      'hello',
+    );
+    await expect(svc.getBlobBytes('o', 'r', 'nope')).rejects.toThrow('Not found: blob nope');
+  });
+});

@@ -1,5 +1,10 @@
 import { parseActionLog, parseTodos } from '@kaihuman/formats';
-import { BUSINESS_ROOT, type LinkRecord } from '@kaihuman/formats/business';
+import {
+  BUSINESS_ROOT,
+  contractDates,
+  contractFilePath,
+  type LinkRecord,
+} from '@kaihuman/formats/business';
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { Card } from '../components/business/Card';
@@ -19,8 +24,15 @@ import { TimerCard } from '../components/business/TimerCard';
 import { clientBacklinks } from '../lib/business/backlinks';
 import { addDays, isoWeek, todayLocal } from '../lib/business/dates';
 import { BUSINESS_PROFILE_PATH, parseLoadError } from '../lib/business/load';
-import { type ClientOverview, clientOverview, latestLink } from '../lib/business/overview';
+import {
+  type ClientOverview,
+  CONTRACT_WHAT,
+  clientOverview,
+  latestLink,
+} from '../lib/business/overview';
+import { openAttachment } from '../lib/business/receipt';
 import { useBacklinkContents, useBusinessRepo } from '../lib/business/use-business-repo';
+import type { KBRepo } from '../lib/github-kb';
 
 const TIMELINE_SHOWN = 20;
 const WEEKS_SHOWN = 8;
@@ -84,6 +96,7 @@ const Timeline = ({ items }: { items: ClientOverview['timeline'] }) => {
 };
 
 function Overview(props: {
+  target: KBRepo;
   o: ClientOverview;
   today: string;
   contents: Record<string, string>;
@@ -96,7 +109,8 @@ function Overview(props: {
   issuedPaths: ReadonlyMap<string, string>;
   links: readonly LinkRecord[];
 }) {
-  const { o, today, contents, backlinks, invoicedOffers, issuedPaths, links } = props;
+  const { target, o, today, contents, backlinks, invoicedOffers, issuedPaths, links } = props;
+  const [fileError, setFileError] = useState<string | null>(null);
   const activeLink = (row: { number: string; link: ClientOverview['invoices'][number]['link'] }) =>
     row.link === 'active' ? latestLink(links, row.number) : null;
   const expiredLink = (row: {
@@ -340,20 +354,75 @@ function Overview(props: {
       </Card>
 
       <Card title="Contracts" empty={o.contracts.length === 0 ? 'No contracts.' : undefined}>
-        <Table head={['Title', 'Kind', 'Start', 'End', 'Notice']}>
-          {o.contracts.map((c) => (
-            <tr key={c.id}>
-              <td class={td}>{c.title}</td>
-              <td class={td}>{c.kind}</td>
-              <td class={`${td} whitespace-nowrap`}>{c.start}</td>
-              <td class={`${td} whitespace-nowrap`}>{c.end ?? '-'}</td>
-              <td class={td}>
-                {c.notice_period_days !== undefined ? `${c.notice_period_days} days` : '-'}
-              </td>
-            </tr>
-          ))}
+        <Table
+          head={['Title', 'Kind', 'Start', 'End', 'Notice', 'Next reminder', 'File', 'Actions']}
+        >
+          {o.contracts.map((c) => {
+            const next = contractDates(c)
+              .filter((d) => d.date >= today)
+              .sort((a, b) => a.date.localeCompare(b.date))[0];
+            return (
+              <tr key={c.id}>
+                <td class={td}>{c.title}</td>
+                <td class={td}>{c.kind}</td>
+                <td class={`${td} whitespace-nowrap`}>{c.start}</td>
+                <td class={`${td} whitespace-nowrap`}>{c.end ?? '-'}</td>
+                <td class={td}>
+                  {c.notice_period_days !== undefined ? `${c.notice_period_days} days` : '-'}
+                </td>
+                <td class={`${td} whitespace-nowrap`} data-testid="contract-next">
+                  {next ? `${next.date} (${CONTRACT_WHAT[next.what]})` : '-'}
+                </td>
+                <td class={td}>
+                  {c.file ? (
+                    <button
+                      type="button"
+                      class={link}
+                      aria-label={`Open PDF for ${c.title}`}
+                      onClick={() => {
+                        setFileError(null);
+                        const file = c.file;
+                        if (!file) return;
+                        openAttachment(target, {
+                          path: contractFilePath(c.client, c.id),
+                          name: file,
+                        }).catch((e) =>
+                          setFileError(
+                            `Could not open the contract: ${e instanceof Error ? e.message : String(e)}`,
+                          ),
+                        );
+                      }}
+                    >
+                      Open PDF
+                    </button>
+                  ) : (
+                    '-'
+                  )}
+                </td>
+                <td class={td}>
+                  <a
+                    href={`/clients/${client.slug}/contracts/${c.id}`}
+                    class={link}
+                    aria-label={`Edit ${c.title}`}
+                  >
+                    Edit
+                  </a>
+                </td>
+              </tr>
+            );
+          })}
         </Table>
       </Card>
+      {fileError && (
+        <p role="alert" class="text-xs text-[var(--los-warning)]">
+          {fileError}
+        </p>
+      )}
+      <p class="text-xs">
+        <a href={`/clients/${client.slug}/contracts/new`} class={link}>
+          Add contract
+        </a>
+      </p>
 
       <Card title="Notes" empty={!notes?.trim() ? 'No notes.' : undefined}>
         <div class="text-xs whitespace-pre-wrap break-words">{notes}</div>
@@ -391,7 +460,7 @@ export function ClientPage({ slug }: { slug?: string }) {
   const today = todayLocal();
   return (
     <PageShell state={state} title="Client">
-      {({ data, contents, loadErrors }) => {
+      {({ repo, data, contents, loadErrors }) => {
         const log = data.clientFiles.find((f) => f.client === slug && f.kind === 'log');
         const o = slug
           ? clientOverview(data, slug, today, log ? contents[log.path] : undefined)
@@ -421,6 +490,7 @@ export function ClientPage({ slug }: { slug?: string }) {
               All clients
             </a>
             <Overview
+              target={repo}
               canDraftUnbilled={canDraftUnbilled}
               invoicedOffers={invoicedOffers}
               issuedPaths={new Map(data.issued.map((i) => [i.doc.number, i.path]))}

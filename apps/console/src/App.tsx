@@ -13,9 +13,12 @@ import { CheatsheetPage } from './pages/CheatsheetPage';
 import { ClientFormPage } from './pages/ClientFormPage';
 import { ClientPage } from './pages/ClientPage';
 import { ClientsPage } from './pages/ClientsPage';
+import { ContractFormPage } from './pages/ContractFormPage';
 import { Dashboard } from './pages/Dashboard';
 import { DemoEntry } from './pages/DemoEntry';
 import { DraftPage } from './pages/DraftPage';
+import { ExpenseFormPage } from './pages/ExpenseFormPage';
+import { ExpensesPage } from './pages/ExpensesPage';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
 import { IdeasPage } from './pages/IdeasPage';
 import { IssuePage } from './pages/IssuePage';
@@ -24,6 +27,7 @@ import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
 import { LogTimePage } from './pages/LogTimePage';
 import { Login } from './pages/login';
 import { PaymentFormPage } from './pages/PaymentFormPage';
+import { PipelinePage } from './pages/PipelinePage';
 import { ProjectFormPage } from './pages/ProjectFormPage';
 import { QuickIdeaPage } from './pages/QuickIdeaPage';
 import { QuickKnowledgePage } from './pages/QuickKnowledgePage';
@@ -95,10 +99,16 @@ export const App = () => {
         <ProtectedRoute path="/clients/new" component={ClientFormPage} />
         <ProtectedRoute path="/clients/:slug" component={ClientPage} />
         <ProtectedRoute path="/clients/:slug/projects/new" component={ProjectFormPage} />
+        <ProtectedRoute path="/clients/:slug/contracts/new" component={ContractFormPage} />
+        <ProtectedRoute path="/clients/:slug/contracts/:id" component={ContractFormPage} />
+        <ProtectedRoute path="/business/pipeline" component={PipelinePage} />
         <ProtectedRoute path="/business/shared" component={SharedPage} />
         <ProtectedRoute path="/business/enable" component={BusinessEnablePage} />
         <ProtectedRoute path="/business/time/new" component={LogTimePage} />
         <ProtectedRoute path="/business/payments/new" component={PaymentFormPage} />
+        <ProtectedRoute path="/business/expenses" component={ExpensesPage} />
+        <ProtectedRoute path="/business/expenses/new" component={ExpenseFormPage} />
+        <ProtectedRoute path="/business/expenses/:id" component={ExpenseFormPage} />
         <ProtectedRoute path="/business/drafts/new" component={DraftPage} />
         <ProtectedRoute path="/business/drafts/:id" component={DraftPage} />
         <ProtectedRoute path="/business/drafts/:id/issue" component={IssuePage} />

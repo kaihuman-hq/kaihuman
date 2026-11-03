@@ -4,15 +4,25 @@ import type {
   Client,
   ClientStage,
   Contract,
+  ContractDate,
   Draft,
   InvoiceStatus,
   Issued,
   LinkRecord,
   OfferStatus,
   Project,
+  RetainerDue,
   Slug,
 } from '@kaihuman/formats/business';
-import { CLIENT_STAGES, deriveInvoiceStatus, deriveOfferStatus } from '@kaihuman/formats/business';
+import {
+  CLIENT_STAGES,
+  contractDates,
+  contractReminders,
+  deriveInvoiceStatus,
+  deriveOfferStatus,
+  retainersDue,
+  vatSummary,
+} from '@kaihuman/formats/business';
 import { addDays, isoWeek, quarterOf } from './dates.js';
 
 export type InvoiceRow = {
@@ -49,6 +59,11 @@ export type ClientSummary = {
   unbilledMinutes: number;
   minutesThisMonth: number;
   currency: string;
+  /**
+   * Newest date of the client's documents, payments, events and contracts that is not in the
+   * future. Log entries and time entries are not counted. Undefined without any activity.
+   */
+  lastActivity?: string;
 };
 
 export type TimelineItem = {
@@ -70,17 +85,20 @@ export type ClientOverview = {
   files: { notes?: string; todos?: string; log?: string };
 };
 
+/** The VAT to pay for a period; negative is a refund. */
+export type VatStat =
+  | { period: string; applicable: false }
+  | { period: string; applicable: true; basis: 'accrual' | 'cash'; payable: number };
+
 export type Dashboard = {
   /** Open > 0; overdue first, then by due date. */
   receivables: InvoiceRow[];
   openTotal: number;
   overdueTotal: number;
   unbilled: { client: Slug; minutes: number }[];
-  vat: {
-    month: { period: string; due: number };
-    quarter: { period: string; due: number };
-  };
-  contractsDue: { contract: Contract; date: string; what: 'renewal' | 'notice' }[];
+  vat: { month: VatStat; quarter: VatStat };
+  retainersDue: RetainerDue[];
+  contractsDue: ({ contract: Contract } & ContractDate)[];
   drafts: Draft[];
   pipeline: Record<ClientStage, ClientSummary[]>;
   currency: string;
@@ -88,6 +106,14 @@ export type Dashboard = {
 
 const TIMELINE_CAP = 100;
 const CONTRACT_WINDOW_DAYS = 60;
+const RETAINER_WINDOW_DAYS = 14;
+/** How a contract reminder reads next to its date. */
+export const CONTRACT_WHAT = { renewal: 'renews', notice: 'notice deadline', end: 'ends' } as const;
+const CONTRACT_DATE_TITLES: Record<ContractDate['what'], string> = {
+  renewal: 'Renewal due',
+  notice: 'Notice deadline',
+  end: 'Contract ends',
+};
 
 const currencyOf = (repo: BusinessRepo): string => repo.profile?.currency ?? 'EUR';
 const sum = (values: Iterable<number>): number => {
@@ -176,86 +202,17 @@ const billedIn = (issued: readonly Issued[], clientSlug: string, year: string): 
       ),
   );
 
-const summarize = (repo: BusinessRepo, client: Client, today: string): ClientSummary => {
-  const month = today.slice(0, 7);
-  const time = repo.time.filter((t) => t.client === client.slug);
-  const rows = invoiceRows(repo, today).filter(
-    (r) => r.client === client.slug && r.kind === 'invoice',
-  );
-  return {
-    slug: client.slug,
-    name: client.name,
-    stage: client.stage,
-    billedThisYear: billedIn(
-      repo.issued.map((i) => i.doc),
-      client.slug,
-      today.slice(0, 4),
-    ),
-    open: sum(rows.map((r) => r.status.open)),
-    unbilledMinutes: sum(time.filter((t) => t.invoice === undefined).map((t) => t.minutes)),
-    minutesThisMonth: sum(time.filter((t) => t.date.startsWith(month)).map((t) => t.minutes)),
-    currency: currencyOf(repo),
-  };
-};
-
-export const clientSummaries = (repo: BusinessRepo, today: string): ClientSummary[] =>
-  repo.clients.map((c) => summarize(repo, c, today)).sort((a, b) => a.name.localeCompare(b.name));
-
-/** Renewal and notice dates of a contract; the notice date is `end - notice_period_days`. */
-const contractDates = (c: Contract): { date: string; what: 'renewal' | 'notice' }[] => {
-  const out: { date: string; what: 'renewal' | 'notice' }[] = [];
-  if (c.renewal_date !== undefined) out.push({ date: c.renewal_date, what: 'renewal' });
-  if (c.end !== undefined && c.notice_period_days !== undefined) {
-    out.push({ date: addDays(c.end, -c.notice_period_days), what: 'notice' });
-  }
-  return out;
-};
-
-export const clientOverview = (
+/** Offers, invoices, payments, events, log entries and contract dates of one client, newest first. */
+const clientTimeline = (
   repo: BusinessRepo,
-  slug: string,
   today: string,
+  offers: OfferRow[],
+  invoices: InvoiceRow[],
+  contracts: Contract[],
   logContent?: string,
-): ClientOverview | null => {
-  const client = repo.clients.find((c) => c.slug === slug);
-  if (!client) return null;
-  const invoices = invoiceRows(repo, today).filter((r) => r.client === slug);
-  const offers = offerRows(repo, today).filter((r) => r.client === slug);
+): TimelineItem[] => {
   const mine = new Set([...invoices, ...offers].map((r) => r.number));
-  const time = repo.time.filter((t) => t.client === slug);
-  const contracts = repo.contracts.filter((c) => c.client === slug);
-
-  const projects = repo.projects
-    .filter((p) => p.client === slug)
-    .map((project) => ({
-      project,
-      minutesUsed: sum(time.filter((t) => t.project === project.slug).map((t) => t.minutes)),
-      amountBilled: sum(
-        repo.issued
-          .filter((i) => i.doc.client === slug && i.doc.project === project.slug)
-          .map(({ doc }) =>
-            doc.kind === 'invoice'
-              ? doc.totals.gross
-              : doc.kind === 'credit-note'
-                ? -doc.totals.gross
-                : 0,
-          ),
-      ),
-    }));
-
-  const weeks = new Map<string, { week: string; project: string | null; minutes: number }>();
-  for (const t of time) {
-    const week = isoWeek(t.date);
-    const key = `${week}\u0000${t.project ?? ''}`;
-    const row = weeks.get(key) ?? { week, project: t.project ?? null, minutes: 0 };
-    row.minutes += t.minutes;
-    weeks.set(key, row);
-  }
-  const timeByWeek = [...weeks.values()].sort(
-    (a, b) => a.week.localeCompare(b.week) || (a.project ?? '').localeCompare(b.project ?? ''),
-  );
-
-  const timeline: TimelineItem[] = [
+  return [
     ...offers.map((o) => ({
       date: o.issueDate,
       kind: 'offer' as const,
@@ -298,13 +255,89 @@ export const clientOverview = (
         .map((d) => ({
           date: d.date,
           kind: 'contract' as const,
-          title: d.what === 'renewal' ? 'Renewal due' : 'Notice deadline',
+          title: CONTRACT_DATE_TITLES[d.what],
           ref: c.id,
         })),
     ]),
   ]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, TIMELINE_CAP);
+};
+
+const summarize = (repo: BusinessRepo, client: Client, today: string): ClientSummary => {
+  const month = today.slice(0, 7);
+  const time = repo.time.filter((t) => t.client === client.slug);
+  const mineAll = invoiceRows(repo, today).filter((r) => r.client === client.slug);
+  const rows = mineAll.filter((r) => r.kind === 'invoice');
+  const offers = offerRows(repo, today).filter((r) => r.client === client.slug);
+  const contracts = repo.contracts.filter((c) => c.client === client.slug);
+  const lastActivity = clientTimeline(repo, today, offers, mineAll, contracts).find(
+    (t) => t.date <= today,
+  )?.date;
+  return {
+    slug: client.slug,
+    name: client.name,
+    stage: client.stage,
+    billedThisYear: billedIn(
+      repo.issued.map((i) => i.doc),
+      client.slug,
+      today.slice(0, 4),
+    ),
+    open: sum(rows.map((r) => r.status.open)),
+    unbilledMinutes: sum(time.filter((t) => t.invoice === undefined).map((t) => t.minutes)),
+    minutesThisMonth: sum(time.filter((t) => t.date.startsWith(month)).map((t) => t.minutes)),
+    currency: currencyOf(repo),
+    ...(lastActivity !== undefined ? { lastActivity } : {}),
+  };
+};
+
+export const clientSummaries = (repo: BusinessRepo, today: string): ClientSummary[] =>
+  repo.clients.map((c) => summarize(repo, c, today)).sort((a, b) => a.name.localeCompare(b.name));
+
+export const clientOverview = (
+  repo: BusinessRepo,
+  slug: string,
+  today: string,
+  logContent?: string,
+): ClientOverview | null => {
+  const client = repo.clients.find((c) => c.slug === slug);
+  if (!client) return null;
+  const invoices = invoiceRows(repo, today).filter((r) => r.client === slug);
+  const offers = offerRows(repo, today).filter((r) => r.client === slug);
+  const time = repo.time.filter((t) => t.client === slug);
+  const contracts = repo.contracts.filter((c) => c.client === slug);
+
+  const projects = repo.projects
+    .filter((p) => p.client === slug)
+    .map((project) => ({
+      project,
+      minutesUsed: sum(time.filter((t) => t.project === project.slug).map((t) => t.minutes)),
+      amountBilled: sum(
+        repo.issued
+          .filter((i) => i.doc.client === slug && i.doc.project === project.slug)
+          .map(({ doc }) =>
+            doc.kind === 'invoice'
+              ? doc.totals.gross
+              : doc.kind === 'credit-note'
+                ? -doc.totals.gross
+                : 0,
+          ),
+      ),
+    }));
+
+  const weeks = new Map<string, { week: string; project: string | null; minutes: number }>();
+  for (const t of time) {
+    const week = isoWeek(t.date);
+    const key = `${week}\u0000${t.project ?? ''}`;
+    const row = weeks.get(key) ?? { week, project: t.project ?? null, minutes: 0 };
+    row.minutes += t.minutes;
+    weeks.set(key, row);
+  }
+  const timeByWeek = [...weeks.values()].sort(
+    (a, b) => a.week.localeCompare(b.week) || (a.project ?? '').localeCompare(b.project ?? ''),
+  );
+
+  const timeline = clientTimeline(repo, today, offers, invoices, contracts, logContent);
 
   const files: ClientOverview['files'] = {};
   for (const f of repo.clientFiles) if (f.client === slug) files[f.kind] = f.path;
@@ -341,27 +374,16 @@ export const businessDashboard = (repo: BusinessRepo, today: string): Dashboard 
     .map(([client, m]) => ({ client, minutes: m }))
     .sort((a, b) => b.minutes - a.minutes || a.client.localeCompare(b.client));
 
-  const vatOf = (inPeriod: (date: string) => boolean): number =>
-    sum(
-      repo.issued
-        .filter(({ doc }) => inPeriod(doc.issue_date))
-        .map(({ doc }) => {
-          const tax = sum(doc.totals.breakdown.map((b) => b.tax));
-          return doc.kind === 'invoice' ? tax : doc.kind === 'credit-note' ? -tax : 0;
-        }),
-    );
   const month = today.slice(0, 7);
   const { year, q } = quarterOf(today);
-  const quarter = (date: string) => {
-    const d = quarterOf(date);
-    return d.year === year && d.q === q;
+  const vatStat = (period: string): VatStat => {
+    const v = vatSummary(repo, period);
+    return v.applicable
+      ? { period, applicable: true, basis: v.basis, payable: v.payable }
+      : { period, applicable: false };
   };
 
-  const windowEnd = addDays(today, CONTRACT_WINDOW_DAYS);
-  const contractsDue = repo.contracts
-    .flatMap((contract) => contractDates(contract).map((d) => ({ contract, ...d })))
-    .filter((d) => d.date >= today && d.date <= windowEnd)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const contractsDue = contractReminders(repo, today, CONTRACT_WINDOW_DAYS);
 
   const pipeline = Object.fromEntries(
     CLIENT_STAGES.map((s) => [s, [] as ClientSummary[]]),
@@ -375,10 +397,8 @@ export const businessDashboard = (repo: BusinessRepo, today: string): Dashboard 
       receivables.filter((r) => r.status.state === 'overdue').map((r) => r.status.open),
     ),
     unbilled,
-    vat: {
-      month: { period: month, due: vatOf((d) => d.startsWith(month)) },
-      quarter: { period: `${year}-Q${q}`, due: vatOf(quarter) },
-    },
+    vat: { month: vatStat(month), quarter: vatStat(`${year}-Q${q}`) },
+    retainersDue: retainersDue(repo, today, RETAINER_WINDOW_DAYS),
     contractsDue,
     drafts: repo.drafts,
     pipeline,

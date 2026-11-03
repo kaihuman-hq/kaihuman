@@ -154,6 +154,49 @@ describe('rules', () => {
     });
   });
 
+  it('takes a receipt only as <id>.<ext> of an allowed lower-case type', () => {
+    const id = expense.id as string;
+    for (const receipt of [`${id}.pdf`, `${id}.jpeg`, `${id}.heic`]) {
+      expect(validateExpense({ ...expense, receipt }).ok).toBe(true);
+    }
+    for (const receipt of ['scan.pdf', `${id}.PDF`, `${id}.exe`, `${id}`, `x/${id}.pdf`]) {
+      expect(validateExpense({ ...expense, receipt })).toMatchObject({
+        ok: false,
+        issues: [
+          {
+            path: 'receipt',
+            message: expect.stringContaining('rename the file to match the expense id'),
+          },
+        ],
+      });
+    }
+  });
+
+  it('takes a contract file only as <id>.pdf', () => {
+    const id = (contract as Record<string, unknown>).id as string;
+    expect(validateContract({ ...(contract as object), file: `${id}.pdf` }).ok).toBe(true);
+    for (const file of ['nda.pdf', `${id}.docx`, `${id}.PDF`]) {
+      expect(validateContract({ ...(contract as object), file })).toMatchObject({
+        ok: false,
+        issues: [
+          {
+            path: 'file',
+            message: expect.stringContaining('rename the file to match the contract id'),
+          },
+        ],
+      });
+    }
+  });
+
+  it('takes from_retainer on a draft but not on an issued document', () => {
+    expect(validateDraft({ ...draft, from_retainer: '2026-12-01' }).ok).toBe(true);
+    expect(validateDraft({ ...draft, from_retainer: 'soon' }).ok).toBe(false);
+    expect(validateIssued({ ...invoice, from_retainer: '2026-12-01' })).toMatchObject({
+      ok: false,
+      issues: [{ message: 'unknown key "from_retainer"' }],
+    });
+  });
+
   it('requires gross = net + vat in issued totals but does not recompute from lines', () => {
     const totals = invoice.totals as Record<string, unknown>;
     expect(validateIssued({ ...invoice, totals: { ...totals, gross: 1 } })).toMatchObject({

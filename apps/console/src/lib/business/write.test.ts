@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BUSINESS_TOOLS_VERSION, getBusinessToolFiles } from '../business-setup';
 import { __resetRepoFilesCacheForTests, loadRepoFiles } from '../repo-files';
 import { CONFLICT_MESSAGE, type FileChanges, writeBusiness, writeErrorMessage } from './write';
 
@@ -205,6 +206,57 @@ describe('writeBusiness reads at the head it commits against', () => {
   });
 });
 
+describe('Fresh.read', () => {
+  it.each([
+    '.kh/business/expenses/2026/01JABCDEFGHJKMNPQRSTVWXYZ0.png',
+    '.kh/business/invoices/2026/RE-2026-001.pdf',
+  ])('refuses binary path %s', async (path) => {
+    files[path] = 'x';
+    let error = '';
+    await writeBusiness(target, async (fresh) => {
+      try {
+        await fresh.read(path);
+      } catch (e) {
+        error = (e as Error).message;
+      }
+      return { ok: false as const, issues: [] } as never;
+    });
+    expect(error).toMatch(/binary/i);
+  });
+});
+
+describe('writeBusiness with binary changes', () => {
+  const PNG = 'expenses/2026/X.png';
+
+  it('commits bytes as they are and never caches them as text', async () => {
+    const bytes = new Uint8Array([0, 255, 1]);
+    vi.mocked(githubService.commitFiles).mockResolvedValue({
+      commitSha: 'c1',
+      blobShas: { [PNG]: 'bin-sha', [TIME]: 'time-sha' },
+    });
+    const result = await writeBusiness(target, async () => ({
+      ok: true as const,
+      value: { changes: { [PNG]: bytes, [TIME]: entry('x') }, message: 'business: add receipt' },
+    }));
+    expect(result.ok).toBe(true);
+    const sent = vi.mocked(githubService.commitFiles).mock.calls[0]?.[3] as FileChanges;
+    expect(sent[PNG]).toBe(bytes);
+    expect(githubFileStore.applyCommit).toHaveBeenCalledWith(sent, {
+      [PNG]: 'bin-sha',
+      [TIME]: 'time-sha',
+    });
+    // A page load for the new blob must go to GitHub: the write seeded text for TIME only.
+    vi.mocked(githubService.getFileContent).mockClear();
+    const item = (path: string, sha: string) => ({ path, type: 'blob', sha, url: '' }) as never;
+    await loadRepoFiles(target.full_name, [item(PNG, 'bin-sha')]);
+    expect(githubService.getFileContent).toHaveBeenCalledTimes(1);
+    vi.mocked(githubService.getFileContent).mockClear();
+    const text = await loadRepoFiles(target.full_name, [item(TIME, 'time-sha')]);
+    expect(githubService.getFileContent).not.toHaveBeenCalled();
+    expect(text.contents[TIME]).toBe(entry('x'));
+  });
+});
+
 describe('writeBusiness after the commit', () => {
   it('still succeeds when the local store update fails', async () => {
     vi.mocked(githubService.commitFiles).mockResolvedValue({ commitSha: 'c1', blobShas: {} });
@@ -253,5 +305,71 @@ describe('writeErrorMessage', () => {
   it('maps conflicts and other errors', () => {
     expect(writeErrorMessage(new ConflictError('x'))).toBe(CONFLICT_MESSAGE);
     expect(writeErrorMessage(new Error('boom'))).toBe('Saving failed, nothing was written: boom');
+  });
+});
+
+describe('writeBusiness upgrades the business tools (ruling S5)', () => {
+  const PROFILE = '.kh/business/business.yaml';
+  const VERSION = '.kh/business/.tools/version';
+  const CHECK = '.kh/business/.tools/business-check.mjs';
+
+  const sentWith = async (version: string | null, changes: FileChanges = {}) => {
+    files[PROFILE] = 'name: x\n';
+    if (version !== null) files[VERSION] = version;
+    vi.mocked(githubService.commitFiles).mockResolvedValue({ commitSha: 'c', blobShas: {} });
+    await writeBusiness(target, async () => ({
+      ok: true as const,
+      value: { changes: { [TIME]: entry('x'), ...changes }, message: 'business: log time' },
+    }));
+    return vi.mocked(githubService.commitFiles).mock.calls[0]?.[3] as FileChanges;
+  };
+
+  it('adds the tool files when the repo is at an older version', async () => {
+    const sent = await sentWith('1.2.0\n');
+    expect(Object.keys(sent).sort()).toEqual([TIME, ...Object.keys(getBusinessToolFiles())].sort());
+    expect(sent[VERSION]).toBe(BUSINESS_TOOLS_VERSION);
+  });
+
+  it('adds them when the version file is missing', async () => {
+    expect(await sentWith(null)).toHaveProperty(CHECK);
+  });
+
+  it('adds nothing when the tools are current', async () => {
+    expect(Object.keys(await sentWith(`${BUSINESS_TOOLS_VERSION}\n`))).toEqual([TIME]);
+  });
+
+  it('keeps a change the builder made to a tool path', async () => {
+    const sent = await sentWith('1.2.0', { [CHECK]: 'mine' });
+    expect(sent[CHECK]).toBe('mine');
+  });
+
+  it('adds nothing to a repo without business', async () => {
+    vi.mocked(githubService.commitFiles).mockResolvedValue({ commitSha: 'c', blobShas: {} });
+    await writeBusiness(target, appendOurs());
+    const sent = vi.mocked(githubService.commitFiles).mock.calls[0]?.[3] as FileChanges;
+    expect(Object.keys(sent)).toEqual([TIME]);
+  });
+});
+
+describe('writeBusiness deletions', () => {
+  it('drops a deletion of a path that is not in the fresh tree', async () => {
+    const GONE = '.kh/business/expenses/2026/01JABCDEFGHJKMNPQRSTVWXYZ0.pdf';
+    vi.mocked(githubService.commitFiles).mockResolvedValue({ commitSha: 'c', blobShas: {} });
+    await writeBusiness(target, async () => ({
+      ok: true as const,
+      value: { changes: { [TIME]: null, [GONE]: null }, message: 'business: delete' },
+    }));
+    const sent = vi.mocked(githubService.commitFiles).mock.calls[0]?.[3] as FileChanges;
+    expect(sent).toEqual({ [TIME]: null });
+  });
+
+  it('makes no commit when only deletions of missing paths remain', async () => {
+    const GONE = '.kh/business/expenses/2026/01JABCDEFGHJKMNPQRSTVWXYZ0.pdf';
+    const res = await writeBusiness(target, async () => ({
+      ok: true as const,
+      value: { changes: { [GONE]: null }, message: 'business: delete' },
+    }));
+    expect(githubService.commitFiles).not.toHaveBeenCalled();
+    expect(res).toEqual({ ok: true, value: { commitSha: 'head-1' } });
   });
 });

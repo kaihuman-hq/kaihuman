@@ -32,6 +32,21 @@ export const EVENTS_PATH = `${BUSINESS_ROOT}/events.jsonl`;
 export const LINKS_PATH = `${BUSINESS_ROOT}/links.jsonl`;
 export const paymentsPath = (year: number): string => `${BUSINESS_ROOT}/payments/${year}.jsonl`;
 
+/** Largest receipt or contract file; images are stored as they are, so this bounds the commit too. */
+export const ATTACHMENT_MAX_BYTES = 10485760;
+export const RECEIPT_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic'] as const;
+export type ReceiptExtension = (typeof RECEIPT_EXTENSIONS)[number];
+export const CONTRACT_EXTENSIONS = ['pdf'] as const;
+
+export const expensePath = (year: string, id: Ulid): string =>
+  `${BUSINESS_ROOT}/expenses/${year}/${id}.yaml`;
+export const receiptPath = (year: string, id: Ulid, ext: string): string =>
+  `${BUSINESS_ROOT}/expenses/${year}/${id}.${ext.toLowerCase()}`;
+export const contractPath = (client: Slug, id: Ulid): string =>
+  `${clientDir(client)}/contracts/${id}.yaml`;
+export const contractFilePath = (client: Slug, id: Ulid): string =>
+  `${clientDir(client)}/contracts/${id}.pdf`;
+
 const UNKNOWN: BusinessPath = { kind: 'unknown' };
 const YEAR = /^\d{4}$/;
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;

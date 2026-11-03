@@ -1,5 +1,6 @@
-import { loadBusinessRepo, type Ulid } from '@kaihuman/formats/business';
+import { loadBusinessRepo, type TextChanges, type Ulid } from '@kaihuman/formats/business';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BUSINESS_TOOLS_VERSION } from '../business-setup';
 import { __resetRepoFilesCacheForTests } from '../repo-files';
 import { loadFixtureRepo } from './fixture.test-helper';
 import {
@@ -10,7 +11,7 @@ import {
   loadedSource,
   previewIssue,
 } from './issue-flow';
-import { type FileChanges, writeBusiness } from './write';
+import { writeBusiness } from './write';
 
 // Lets a test make issue() return an extra change, to prove the frozen-file guard stops it.
 const force = vi.hoisted(() => ({ extra: null as string | null }));
@@ -62,6 +63,8 @@ const baseFiles = (): Record<string, string> => {
   m.set(DRAFT, (m.get(DRAFT) ?? '').replace('01M581YW00W16BGNTZ49EKRX27', ENTRY));
   m.set(issuedAt('RE-2026-0042'), otherInvoice(invoice, 'RE-2026-0042'));
   m.set(LOG, OLD_LOG);
+  // Current tools, so the commit holds only the issue's own changes (no tool upgrade).
+  m.set('.kh/business/.tools/version', BUSINESS_TOOLS_VERSION);
   return Object.fromEntries(m);
 };
 const otherInvoice = (template: string, number: string) =>
@@ -82,7 +85,7 @@ const otherDeviceWrites = (path: string, content: string) => {
 };
 const commits = () =>
   vi.mocked(githubService.commitFiles).mock.calls.map((c) => ({
-    changes: c[3] as FileChanges,
+    changes: c[3] as TextChanges,
     message: c[4],
     expected: c[5],
   }));
@@ -296,6 +299,34 @@ describe('issuing through writeBusiness', () => {
     expect(log.slice(OLD_LOG.length)).toBe(
       '- 2026-11-02 09:30:00 Issued RE-2026-0043 (1001.38 EUR) #business\n',
     );
+  });
+
+  it('Review Focus 4: a retainer draft advances next_date in the issuing commit, once', async () => {
+    const PROJECT = `${ROOT}/clients/acme-gmbh/projects/website.yaml`;
+    files[PROJECT] =
+      `# hand-edited\n${files[PROJECT]}retainer:\n  amount: 1000\n  interval: monthly\n  next_date: "2026-11-01"\n  description: Care\n`;
+    files[DRAFT] = `${files[DRAFT]}from_retainer: "2026-11-01"\n`;
+    const first = await commit();
+    expect(first.result.ok).toBe(true);
+    const [one] = commits();
+    expect(one?.changes[PROJECT]).toBe(
+      files[PROJECT]?.replace('next_date: "2026-11-01"', 'next_date: "2026-12-01"'),
+    );
+    expect(one?.changes[issuedAt('RE-2026-0043')]).not.toContain('from_retainer');
+
+    // A stale second draft for the same period: the project has moved on, so it stays.
+    files[PROJECT] = one?.changes[PROJECT] ?? '';
+    files[issuedAt('RE-2026-0043')] = one?.changes[issuedAt('RE-2026-0043')] ?? '';
+    const second = '01M5KA3Q00W16BGNTZ49EKRX29' as Ulid;
+    files[`${ROOT}/drafts/${second}.yaml`] = (baseFiles()[DRAFT] ?? '')
+      .replace(DRAFT_ID, second)
+      .replace(/time_entries:[\s\S]*$/, 'from_retainer: "2026-11-01"\n');
+    head++;
+    const again = await writeBusiness(target, (fresh) =>
+      issueFromFresh(fresh, second, '2026-11-02', now),
+    );
+    expect(again.ok).toBe(true);
+    expect(Object.keys(commits()[1]?.changes ?? {})).not.toContain(PROJECT);
   });
 
   it('Review Focus 3: a number taken after the preview yields the next, never an overwrite', async () => {

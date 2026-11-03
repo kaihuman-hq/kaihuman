@@ -1,21 +1,29 @@
 import { ConflictError, githubFileStore, githubService, type TreeItem } from '@kaihuman/core';
-import { type BusinessRepo, loadBusinessRepo, type Result } from '@kaihuman/formats/business';
+import {
+  type BusinessRepo,
+  classifyBusinessPath,
+  type FileChanges,
+  loadBusinessRepo,
+  type Result,
+} from '@kaihuman/formats/business';
 import type { KBRepo } from '../github-kb';
 import { loadRepoFiles, rememberRepoFile } from '../repo-files';
-import { businessTreeItems } from './load';
+import { BUSINESS_PROFILE_PATH, BUSINESS_TOOLS_VERSION_PATH, businessTreeItems } from './load';
 
 export const CONFLICT_MESSAGE =
   'Someone else changed the repository at the same time. Reload and try again.';
 
-/** `null` deletes the path. */
-export type FileChanges = Record<string, string | null>;
+export type { FileChanges };
 
 /** What a builder sees: the repository as it is right now, not as the page last loaded it. */
 export type Fresh = {
   headSha: string;
   tree: TreeItem[];
   repo: BusinessRepo;
-  /** Current content, or `null` when the path is not in the fresh tree. */
+  /**
+   * Current content as text, or `null` when the path is not in the fresh tree. Text files only:
+   * receipts and PDFs are binary and throw here; read them with `githubService.getFileBytes`.
+   */
   read: (path: string) => Promise<string | null>;
 };
 
@@ -45,11 +53,34 @@ async function readFresh(owner: string, name: string, target: KBRepo): Promise<F
   const blobPaths = tree.filter((item) => item.type === 'blob').map((item) => item.path);
   const repo = loadBusinessRepo(new Map(Object.entries(contents)), blobPaths);
   const read = async (path: string) => {
+    const kind = classifyBusinessPath(path);
+    if (kind.kind === 'receipt' || (kind.kind === 'artifact' && kind.ext === 'pdf')) {
+      throw new Error(`Cannot read ${path} as text: it is a binary file (use getFileBytes).`);
+    }
     const item = tree.find((t) => t.type === 'blob' && t.path === path);
     if (!item) return null;
     return (await load([item]))[path] ?? null;
   };
   return { headSha, tree, repo, read };
+}
+
+/** GitHub can refuse a tree that deletes a path it does not have, so such deletions are dropped. */
+function withoutMissingDeletes(fresh: Fresh, changes: FileChanges): FileChanges {
+  const present = new Set(fresh.tree.filter((t) => t.type === 'blob').map((t) => t.path));
+  return Object.fromEntries(
+    Object.entries(changes).filter(([path, content]) => content !== null || present.has(path)),
+  );
+}
+
+/**
+ * A repo with business on older tools gets the current ones in the same commit (ruling S5); a
+ * change the builder made to a tool path wins. The check bundle is large, so it loads only here.
+ */
+async function withToolUpgrade(fresh: Fresh, changes: FileChanges): Promise<FileChanges> {
+  if (!fresh.tree.some((t) => t.type === 'blob' && t.path === BUSINESS_PROFILE_PATH))
+    return changes;
+  const { businessToolUpgrade } = await import('../business-setup');
+  return { ...businessToolUpgrade(await fresh.read(BUSINESS_TOOLS_VERSION_PATH)), ...changes };
 }
 
 /**
@@ -69,7 +100,14 @@ export async function writeBusiness(
       const fresh = await readFresh(owner, name, target);
       const built = await build(fresh);
       if (!built.ok) return built;
-      const { changes, message } = built.value;
+      const { message } = built.value;
+      const changes = await withToolUpgrade(
+        fresh,
+        withoutMissingDeletes(fresh, built.value.changes),
+      );
+      // Nothing left to change (e.g. only deletions of files already gone): the head is the result.
+      if (Object.keys(changes).length === 0)
+        return { ok: true, value: { commitSha: fresh.headSha } };
       const res = await githubService.commitFiles(
         owner,
         name,
@@ -91,7 +129,9 @@ export async function writeBusiness(
     }
     for (const [path, content] of Object.entries(done.changes)) {
       const sha = done.blobShas[path];
-      if (content !== null && sha) rememberRepoFile(target.full_name, path, sha, content);
+      // Binary has no text form; the cache holds text only, so it is read back from GitHub.
+      if (typeof content === 'string' && sha)
+        rememberRepoFile(target.full_name, path, sha, content);
     }
     return { ok: true, value: { commitSha: done.commitSha } };
   }

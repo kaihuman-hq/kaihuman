@@ -80,6 +80,7 @@ describe('BusinessPage', () => {
     expect(host.querySelector('a[href="/clients/acme-gmbh"]')).not.toBeNull();
     expect(host.textContent).toContain('Who owes me');
     expect(host.textContent).toContain('Pipeline');
+    expect(host.querySelector('a[href="/business/pipeline"]')?.textContent).toBe('Open board');
     expect(host.textContent).not.toContain('files have problems');
   });
 
@@ -120,10 +121,125 @@ describe('BusinessPage', () => {
     expect(host.textContent).toContain('New draft');
   });
 
+  it('links to the expenses page', () => {
+    show(ready(loadBusinessRepo(unpaid())));
+    const link = host.querySelector('a[href="/business/expenses"]');
+    expect(link?.textContent).toBe('Expenses');
+  });
+
   it('links Record payment on an open receivable', () => {
     show(ready(loadBusinessRepo(unpaid())));
     expect(
       host.querySelector('a[href="/business/payments/new?invoice=RE-2026-0001"]'),
     ).not.toBeNull();
+  });
+
+  it('labels the VAT stats payable with the basis, and refund when negative', () => {
+    show(ready(loadBusinessRepo(unpaid())));
+    expect(host.textContent).toContain('VAT payable 2026-Q4 (Soll)');
+    expect(host.textContent).toContain('VAT payable 2026-11 (Soll)');
+    // Fixture: output 158.88 from the invoice, input 1.90 from the October expense.
+    expect(host.textContent).toContain('156.98 EUR');
+    show(
+      ready(
+        loadBusinessRepo(
+          files((m) =>
+            m.set(
+              '.kh/business/expenses/2026/01M55FJ500NTZ49EKRX27CHPV1.yaml',
+              'id: 01M55FJ500NTZ49EKRX27CHPV1\ndate: "2026-11-05"\nsupplier: X\ndescription: y\ncategory: z\nnet: 1000\nvat: 190\ngross: 1190\nvat_rate: "19"\n',
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(host.textContent).toContain('VAT refund 2026-11 (Soll)');
+    expect(host.textContent).toContain('1.90 EUR');
+    show(
+      ready(
+        loadBusinessRepo(
+          files((m) => {
+            m.set(
+              '.kh/business/business.yaml',
+              `${m.get('.kh/business/business.yaml') ?? ''}vat_basis: cash\n`,
+            );
+          }),
+        ),
+      ),
+    );
+    expect(host.textContent).toContain('(Ist)');
+  });
+
+  it('shows the not-applicable text for the small-business regime', () => {
+    show(
+      ready(
+        loadBusinessRepo(
+          files((m) => {
+            const p = '.kh/business/business.yaml';
+            m.set(p, (m.get(p) ?? '').replace('vat_regime: regular', 'vat_regime: small-business'));
+          }),
+        ),
+      ),
+    );
+    expect(host.textContent).toContain('No VAT: small-business regime (§19 UStG).');
+    expect(host.textContent).not.toContain('VAT payable');
+  });
+
+  const hosting = (m: Map<string, string>) =>
+    m.set(
+      '.kh/business/clients/acme-gmbh/projects/hosting.yaml',
+      'client: acme-gmbh\nname: Hosting\nstatus: active\nretainer:\n  amount: 120000\n  interval: monthly\n  next_date: "2026-11-12"\n  description: Hosting\n',
+    );
+
+  it('lists retainers due with Create draft', () => {
+    show(ready(loadBusinessRepo(files(hosting))));
+    expect(host.textContent).toContain('Retainers due');
+    expect(host.textContent).toContain('Hosting');
+    expect(host.textContent).toContain('2026-11-12');
+    const create = [...host.querySelectorAll('a')].find(
+      (a) =>
+        a.getAttribute('href') ===
+        '/business/drafts/new?client=acme-gmbh&kind=invoice&from=retainer&project=hosting',
+    );
+    expect(create?.textContent).toBe('Create draft');
+  });
+
+  it('shows Draft ready, linking the draft, when a draft bills the period', () => {
+    show(
+      ready(
+        loadBusinessRepo(
+          files((m) => {
+            hosting(m);
+            m.set(
+              '.kh/business/drafts/01M5KA3Q00W16BGNTZ49EKRX28.yaml',
+              'id: 01M5KA3Q00W16BGNTZ49EKRX28\nkind: invoice\nclient: acme-gmbh\nproject: hosting\nfrom_retainer: "2026-11-12"\nlines:\n  - description: Hosting\n    quantity: "1"\n    unit: month\n    unit_price: 120000\n    vat_category: S\n    vat_rate: "19"\n',
+            );
+          }),
+        ),
+      ),
+    );
+    expect(host.textContent).not.toContain('Create draft');
+    const ready_ = host.querySelector('a[href="/business/drafts/01M5KA3Q00W16BGNTZ49EKRX28"]');
+    expect(ready_?.textContent).toContain('Draft ready');
+  });
+
+  it('shows an empty note without retainers due', () => {
+    show(ready(loadBusinessRepo(files())));
+    expect(host.textContent).toContain('No retainers due.');
+  });
+
+  it('shows an ending contract in the reminders', () => {
+    show(
+      ready(
+        loadBusinessRepo(
+          files((m) => {
+            const p = '.kh/business/clients/acme-gmbh/contracts/01M52X5E00EKRX27CHPV05AFMS.yaml';
+            m.set(p, `${m.get(p) ?? ''}end: "2026-12-15"\n`);
+          }),
+        ),
+      ),
+    );
+    expect(host.textContent).toContain('Rahmenvertrag Webentwicklung');
+    expect(host.textContent).toContain('ends');
+    expect(host.textContent).toContain('2026-12-15');
   });
 });

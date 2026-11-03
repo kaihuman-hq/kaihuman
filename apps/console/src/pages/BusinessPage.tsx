@@ -1,14 +1,19 @@
 import { CLIENT_STAGES } from '@kaihuman/formats/business';
 import { Card } from '../components/business/Card';
 import { RecordPaymentLink } from '../components/business/DocActions';
-import { hours, money } from '../components/business/money';
+import { hours, money, STAGE_LABEL } from '../components/business/money';
 import { PageShell } from '../components/business/PageShell';
 import { ProblemsList } from '../components/business/ProblemsList';
 import { Stat } from '../components/business/Stat';
 import { StatusPill } from '../components/business/StatusPill';
 import { TimerCard } from '../components/business/TimerCard';
 import { todayLocal } from '../lib/business/dates';
-import { businessDashboard, hoursSummary } from '../lib/business/overview';
+import {
+  businessDashboard,
+  CONTRACT_WHAT,
+  hoursSummary,
+  type VatStat,
+} from '../lib/business/overview';
 import { useBusinessRepo } from '../lib/business/use-business-repo';
 
 const th =
@@ -19,6 +24,40 @@ const clientLink = (slug: string, text = slug) => (
     {text}
   </a>
 );
+
+const BASIS_LABEL = { accrual: 'Soll', cash: 'Ist' } as const;
+
+/** Month and quarter VAT; a negative payable is a refund. One note replaces both for the small-business regime. */
+function VatStats({
+  month,
+  quarter,
+  currency,
+}: {
+  month: VatStat;
+  quarter: VatStat;
+  currency: string;
+}) {
+  if (!month.applicable || !quarter.applicable) {
+    return (
+      <div class="col-span-2 lg:col-span-1">
+        <Stat label="VAT" value="No VAT: small-business regime (§19 UStG)." />
+      </div>
+    );
+  }
+  return (
+    <>
+      {[month, quarter].map((v) =>
+        v.applicable ? (
+          <Stat
+            key={v.period}
+            label={`${v.payable < 0 ? 'VAT refund' : 'VAT payable'} ${v.period} (${BASIS_LABEL[v.basis]})`}
+            value={money(Math.abs(v.payable), currency)}
+          />
+        ) : null,
+      )}
+    </>
+  );
+}
 
 export function BusinessPage() {
   const state = useBusinessRepo();
@@ -37,8 +76,7 @@ export function BusinessPage() {
                 value={money(d.overdueTotal, cur)}
                 tone={d.overdueTotal > 0 ? 'warning' : undefined}
               />
-              <Stat label={`VAT ${d.vat.month.period}`} value={money(d.vat.month.due, cur)} />
-              <Stat label={`VAT ${d.vat.quarter.period}`} value={money(d.vat.quarter.due, cur)} />
+              <VatStats month={d.vat.month} quarter={d.vat.quarter} currency={cur} />
               <Stat label="Hours today" value={`${hours(h.todayMinutes)} h`} />
               <Stat label="Hours this week" value={`${hours(h.weekMinutes)} h`} />
             </dl>
@@ -83,6 +121,38 @@ export function BusinessPage() {
               </div>
             </Card>
 
+            <Card
+              title="Retainers due"
+              empty={d.retainersDue.length === 0 ? 'No retainers due.' : undefined}
+            >
+              <ul class="text-xs space-y-1">
+                {d.retainersDue.map(({ project, date, draftId }) => (
+                  <li key={`${project.client}/${project.slug}`} class="flex justify-between gap-2">
+                    <span class="min-w-0 break-words">
+                      {project.name}, {clientLink(project.client)}: {date}
+                    </span>
+                    <span class="shrink-0">
+                      {draftId ? (
+                        <a
+                          href={`/business/drafts/${draftId}`}
+                          class="text-[var(--los-accent)] hover:underline"
+                        >
+                          Draft ready
+                        </a>
+                      ) : (
+                        <a
+                          href={`/business/drafts/new?client=${project.client}&kind=invoice&from=retainer&project=${project.slug}`}
+                          class="text-[var(--los-accent)] hover:underline"
+                        >
+                          Create draft
+                        </a>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Card
                 title="Unbilled time"
@@ -108,7 +178,8 @@ export function BusinessPage() {
                   {d.contractsDue.map((c) => (
                     <li key={`${c.contract.id}:${c.what}`} class="flex justify-between gap-2">
                       <span class="min-w-0 break-words">
-                        {c.contract.title} ({c.what}), {clientLink(c.contract.client)}
+                        {c.contract.title} ({CONTRACT_WHAT[c.what]}),{' '}
+                        {clientLink(c.contract.client)}
                       </span>
                       <span class="shrink-0">{c.date}</span>
                     </li>
@@ -137,6 +208,11 @@ export function BusinessPage() {
               </ul>
             </Card>
             <p class="text-xs">
+              <a href="/business/expenses" class="text-[var(--los-accent)] hover:underline">
+                Expenses
+              </a>
+            </p>
+            <p class="text-xs">
               <a href="/business/shared" class="text-[var(--los-accent)] hover:underline">
                 Shared files
               </a>
@@ -148,11 +224,16 @@ export function BusinessPage() {
             </p>
 
             <Card title="Pipeline">
+              <p class="text-xs mb-2">
+                <a href="/business/pipeline" class="text-[var(--los-accent)] hover:underline">
+                  Open board
+                </a>
+              </p>
               <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {CLIENT_STAGES.map((stage) => (
                   <div key={stage} class="min-w-0">
                     <h3 class="text-[10px] uppercase tracking-widest text-[var(--los-muted)] mb-1">
-                      {stage}
+                      {STAGE_LABEL[stage]}
                     </h3>
                     {d.pipeline[stage].length === 0 ? (
                       <p class="text-xs italic text-[var(--los-muted)]">None</p>

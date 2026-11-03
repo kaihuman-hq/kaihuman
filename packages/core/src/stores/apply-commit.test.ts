@@ -80,4 +80,38 @@ describe('githubFileStore.applyCommit', () => {
     expect(store.openFiles.value).toEqual({ 'a.md': { content: 'new', sha: 'sha-a' } });
     expect(store.activeFile.value).toBeNull();
   });
+
+  it('records a binary file in the tree and caches no text for it', async () => {
+    remote.tree = [];
+    await store.loadTree();
+    const png = 'expenses/2026/X.png';
+    store.openFiles.value = { [png]: { content: 'stale text', sha: 'old' } };
+    await store.applyCommit({ [png]: new Uint8Array([0, 255, 1]) }, { [png]: 'binsha' });
+    expect(store.tree.value.find((t) => t.path === png)?.sha).toBe('binsha');
+    expect(store.openFiles.value[png]).toBeUndefined();
+    // IDB held text for the path before; binary must not leave it (or add any) there.
+    const db = await openDB('life-os-db', 1);
+    await db.put('files', { path: `o/r:${png}`, content: 'stale', sha: 'old', timestamp: 1 });
+    await store.applyCommit({ [png]: new Uint8Array([9]) }, { [png]: 'binsha2' });
+    expect(await db.get('files', `o/r:${png}`)).toBeUndefined();
+    db.close();
+  });
+
+  it('keeps a just-committed binary file through a lagging listing, then stops tracking it', async () => {
+    const png = 'expenses/2026/X.png';
+    remote.tree = [blob('keep.md', 'k1')];
+    await store.loadTree();
+    await store.applyCommit({ [png]: new Uint8Array([0, 255, 1]) }, { [png]: 'binsha' });
+    // GitHub's listing does not have it yet.
+    await store.loadTree();
+    expect(store.tree.value.find((t) => t.path === png)?.sha).toBe('binsha');
+    // Now it does: listed once, no duplicate.
+    remote.tree = [blob('keep.md', 'k1'), blob(png, 'binsha')];
+    await store.loadTree();
+    expect(store.tree.value.filter((t) => t.path === png)).toHaveLength(1);
+    // Marker cleared: if the file is later gone remotely, it is not resurrected.
+    remote.tree = [blob('keep.md', 'k1')];
+    await store.loadTree();
+    expect(store.tree.value.map((t) => t.path)).not.toContain(png);
+  });
 });

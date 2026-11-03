@@ -2,6 +2,7 @@ import type { TreeItem } from '@kaihuman/core';
 import { BUSINESS_ROOT, classifyBusinessPath } from '@kaihuman/formats/business';
 
 export const BUSINESS_PROFILE_PATH = `${BUSINESS_ROOT}/business.yaml`;
+export const BUSINESS_TOOLS_VERSION_PATH = `${BUSINESS_ROOT}/.tools/version`;
 
 /** `repo-files` reports a failed fetch as "path: message". */
 export const parseLoadError = (entry: string): { path: string; message: string } => {

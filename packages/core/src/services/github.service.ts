@@ -1,6 +1,8 @@
 import { Octokit } from '@octokit/rest';
 import { demoMode } from '../demo-mode.js';
 import { authStore } from '../stores/auth.store.js';
+import type { TreeItem } from '../stores/github-file.store.js';
+import { bytesToBase64 } from '../utils/base64.js';
 import { gitBlobSha } from '../utils/git-blob-sha.js';
 import { ConflictError } from './conflict.js';
 import { inMemoryGithubService } from './github.service.memory.js';
@@ -93,6 +95,25 @@ export class GithubService {
     return treeData.tree;
   }
 
+  /**
+   * The recursive tree of one commit with GitHub's `truncated` flag, which `fetchRepoTree` drops:
+   * past GitHub's limit (100,000 entries or 7 MB) the list is partial, and a caller that must see
+   * every file has to know.
+   */
+  async fetchCommitTree(
+    owner: string,
+    repo: string,
+    commitSha: string,
+  ): Promise<{ tree: TreeItem[]; truncated: boolean }> {
+    const { data } = await this.getClient().git.getTree({
+      owner,
+      repo,
+      tree_sha: commitSha,
+      recursive: 'true',
+    });
+    return { tree: data.tree as TreeItem[], truncated: data.truncated };
+  }
+
   /** With `ref` (a commit sha) the file is read as of that commit, which never changes. */
   async getFileContent(owner: string, repo: string, path: string, opts?: { ref?: string }) {
     const client = this.getClient();
@@ -165,11 +186,28 @@ export class GithubService {
             : 'file';
     if (kind !== 'file') throw new Error(`Path is not a file: ${kind}`);
 
+    return this.readBlob(owner, repo, entry.sha, notFound);
+  }
+
+  /**
+   * Raw bytes of one blob by its sha, in one request: for a caller that already holds a tree
+   * (a year export), where `getFileBytes` would walk the trees again for every file.
+   */
+  async getBlobBytes(owner: string, repo: string, sha: string): Promise<Uint8Array> {
+    return this.readBlob(owner, repo, sha, () => new Error(`Not found: blob ${sha}`));
+  }
+
+  private async readBlob(
+    owner: string,
+    repo: string,
+    sha: string,
+    notFound: () => Error,
+  ): Promise<Uint8Array> {
     let blob: { content: string; encoding: string };
     try {
-      ({ data: blob } = await client.git.getBlob({ owner, repo, file_sha: entry.sha }));
+      ({ data: blob } = await this.getClient().git.getBlob({ owner, repo, file_sha: sha }));
     } catch (e) {
-      throw is404(e) ? notFound() : e;
+      throw (e as { status?: number }).status === 404 ? notFound() : e;
     }
     if (blob.encoding !== 'base64') {
       throw new Error(`Unexpected blob encoding: ${blob.encoding}`);
@@ -329,7 +367,7 @@ export class GithubService {
     owner: string,
     repo: string,
     branch: string,
-    files: Record<string, string | null>,
+    files: Record<string, string | Uint8Array | null>,
     message: string,
     opts?: { expectedHeadSha?: string },
   ): Promise<{ commitSha: string; blobShas: Record<string, string> }> {
@@ -349,15 +387,28 @@ export class GithubService {
       repo,
       commit_sha: headSha,
     });
+    // Binary content cannot travel as tree `content` (that is UTF-8 text), so it is uploaded as a
+    // blob first and referenced by sha. All blobs exist before the tree, so a failed upload leaves
+    // the branch untouched.
+    const entries = await Promise.all(
+      Object.entries(files).map(async ([path, content]) => {
+        const base = { path, mode: '100644' as const, type: 'blob' as const };
+        if (content === null) return { ...base, sha: null };
+        if (typeof content === 'string') return { ...base, content };
+        const { data: blob } = await client.git.createBlob({
+          owner,
+          repo,
+          content: bytesToBase64(content),
+          encoding: 'base64',
+        });
+        return { ...base, sha: blob.sha };
+      }),
+    );
     const { data: newTree } = await client.git.createTree({
       owner,
       repo,
       base_tree: commitData.tree.sha,
-      tree: Object.entries(files).map(([path, content]) =>
-        content === null
-          ? { path, mode: '100644' as const, type: 'blob' as const, sha: null }
-          : { path, mode: '100644' as const, type: 'blob' as const, content },
-      ),
+      tree: entries,
     });
     const { data: newCommit } = await client.git.createCommit({
       owner,

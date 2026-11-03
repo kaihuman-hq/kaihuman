@@ -2,7 +2,9 @@
 
 Status: phase 1 built (2026-10-26): formats, repo check, skill, set-up function. Phase 2 built
 (2026-10-27): read-only console pages. Phase 3 built (2026-11-02): daily forms, running timer,
-palette commands, read-only issued files, business hours on the browser extension's start page. Design: `docs/superpowers/specs/2026-10-26-business-design.md`.
+palette commands, read-only issued files, business hours on the browser extension's start page. Phase 4 built
+(2026-11-02): share links. Phase 5a built (2026-11-02): money admin (expenses and receipts, VAT summary,
+CSV, year export, retainers due, contract reminders and form, pipeline board). Design: `docs/superpowers/specs/2026-10-26-business-design.md`.
 
 ## Goal
 
@@ -15,13 +17,13 @@ and the console share the files. A GitHub Action checks them on every push.
 .kh/business/
   business.yaml                  your profile (legal name, address, VAT ID, bank, defaults)
   clients/<slug>/client.yaml     + notes.md, todos.todos.md, log.actionlog.md,
-                                 projects/<slug>.yaml, contracts/<id>.yaml
+                                 projects/<slug>.yaml, contracts/<id>.yaml + <id>.pdf
   drafts/<ulid>.yaml             unnumbered offer / invoice / credit-note drafts
   offers/<year>/<number>.yaml    issued offers (frozen)
   invoices/<year>/<number>.yaml  issued invoices and credit notes (frozen)
   time/<yyyy-mm>.jsonl           one line per time entry
   payments/<year>.jsonl          one line per payment
-  expenses/<year>/<ulid>.yaml    expenses (+ receipt file)
+  expenses/<year>/<ulid>.yaml    expenses (+ receipt <ulid>.<ext> beside it)
   events.jsonl, links.jsonl      document events and share links
   VERFAHRENSDOKUMENTATION.md     GoBD template you complete
   SKILL.md                       agent skill (copies in .agents/ and .claude/skills/kh-business/)
@@ -64,6 +66,38 @@ lines:
 
 The first line is `time/2026-10.jsonl`, the second `payments/2026.jsonl`. JSONL files are
 append only: one object per line, and hand edits (CRLF, blank lines, no final newline) are fine.
+
+```yaml
+# expenses/2026/01M5KA3Q00W16BGNTZ49EKRX27.yaml (the receipt is expenses/2026/01M5KA3Q00W16BGNTZ49EKRX27.pdf)
+id: 01M5KA3Q00W16BGNTZ49EKRX27
+date: "2026-03-14"      # must be in the folder's year
+supplier: Hetzner Online GmbH
+description: Server March
+category: Software      # free text; the form suggests common ones
+net: 1000
+vat_rate: "19"
+vat: 190
+gross: 1190
+client: acme-gmbh       # optional, with project
+receipt: 01M5KA3Q00W16BGNTZ49EKRX27.pdf
+```
+
+```yaml
+# clients/acme-gmbh/contracts/<ulid>.yaml (optional file: <ulid>.pdf)
+id: 01M5KA3Q00W16BGNTZ49EKRX28
+client: acme-gmbh
+kind: retainer
+title: Support agreement
+start: "2026-01-01"
+end: "2026-12-31"       # optional
+notice_period_days: 90  # optional
+renewal_date: "2027-01-01"   # optional
+file: 01M5KA3Q00W16BGNTZ49EKRX28.pdf
+```
+
+`business.yaml` takes an optional `vat_basis: accrual | cash`. A missing value means `accrual`
+(Soll). A project may carry `retainer: { amount, interval: monthly|quarterly, next_date, description }`.
+A draft made from a retainer carries `from_retainer: <next_date>`.
 
 ## Money and decimals
 
@@ -110,7 +144,14 @@ It exits 1 on any error. Errors:
 
 - invalid records: unknown keys, missing fields, unquoted numbers where a string or decimal is
   expected, a missing or invalid `business.yaml`;
-- an `id` that differs from the file name (drafts, expenses, contracts);
+- an `id` that differs from the file name (drafts, expenses, contracts), an expense whose `date`
+  is not in its year folder, a contract whose `client` differs from its client folder, or an
+  expense or contract id used twice (the console leaves such an expense or contract out and lists
+  it under load problems);
+- an expense `receipt` or contract `file` that is not exactly `<id>.<ext>` (`<id>.pdf` for
+  contracts), or that names a file not beside the record in the tree (from tools version 1.3.0 on;
+  a record with another name is a load error, so rename the file and the field to match the id;
+  a record whose file is missing stays loaded so the form can remove or replace it);
 - issued documents: a `number` that differs from the file name or does not parse under the
   series pattern (`business.yaml` `numbering`, else the default) with the folder's year; an
   `issue_date` outside the year folder; an offer outside `offers/` or an invoice or credit note
@@ -135,8 +176,13 @@ profile, refuses a public repo (`PublicRepoError`) or one that already has
 `.kh/business/business.yaml` (`AlreadyEnabledError`), and makes one commit,
 `chore: enable kaihuman business`, with the profile, empty data folders, the check, the workflow,
 the skill and the Verfahrensdokumentation template. The console form for it is `/business/enable`.
-`syncKB` refreshes the tool files when `.kh/business/.tools/version` differs from
-`BUSINESS_TOOLS_VERSION`. Repos without business get nothing.
+The next business write (any console action that commits under `.kh/business/`) or KB sync
+refreshes the tool files when `.kh/business/.tools/version` differs from `BUSINESS_TOOLS_VERSION`
+(`1.3.0` since phase 5a: the check, skill and validators changed, so a repo set up earlier is
+upgraded with its next business write or KB sync). Repos without business get nothing.
+
+The form has a `VAT basis` select next to the VAT regime: Soll (default, nothing written) or Ist
+(writes `vat_basis: cash`). Edit `business.yaml` to change it later.
 
 Before you enable: the whole repo now holds tax records for 8 years, so do not delete it or
 rewrite its history, and protect the main branch (no force-push, no deletion).
@@ -158,6 +204,9 @@ private repo).
 | `/business/payments/new?invoice=` | Record a payment |
 | `/business/drafts/new`, `/business/drafts/:id` | Draft editor (invoice, offer, credit note) |
 | `/business/drafts/:id/issue` | Issue preview and the "Issue <number>" button |
+| `/business/expenses`, `/business/expenses/new`, `/business/expenses/:id` | Expenses of a year, VAT summary, CSV exports, year export; expense form |
+| `/business/pipeline` | Pipeline board: clients by stage |
+| `/clients/:slug/contracts/new`, `/clients/:slug/contracts/:id` | Contract form |
 | `/business/shared` | Shared files: every share link on the service with size, dates, downloads and status; revoke; storage used |
 
 - The Kanban board, the todo analytics and the action log have an All / Business / Personal toggle.
@@ -194,6 +243,82 @@ Every form makes one commit per action, with a message starting `business: `
   unique prefix. Quick todo and quick log also have a "For client" select.
 - **File browser:** issued yaml and offer/invoice pdf, xml and sha256 files open read-only and
   cannot be changed, renamed, moved or deleted there.
+
+## Money admin (phase 5a)
+
+**Expenses and receipts.** `/business/expenses` lists a year newest first (the select offers the
+current and previous year, and every year with documents, payments, time or expenses). The form
+takes date, supplier, description, category, client and project, net, VAT rate and VAT (suggested
+from net × rate, half-up, until you type one); gross is net + VAT. A receipt is a PDF, JPG, JPEG,
+PNG, WEBP or HEIC of up to 10 MB (`Receipts can be up to 10 MB.`, `Receipts must be PDF, JPG, PNG,
+WEBP or HEIC.`), stored as it is (no recompression) at `expenses/<year>/<id>.<ext>`, extension
+lower-cased, in the same commit as the YAML. A refused file is checked when you pick it and never
+blocks saving. "Remove receipt" deletes it. Changing the date to another year moves the YAML and
+refuses to leave a kept receipt behind. Delete asks
+`This record must be kept until <date> (retention). Delete anyway?` while today is on or before
+31 Dec of (year of the expense date + the jurisdiction's retention years: 8 for `de`, 10 for
+`generic`); after that it is a plain confirm. Expenses cannot be negative yet (no refunds).
+
+**VAT summary.** On `/business/expenses` for a month, quarter or year, and as `VAT payable
+<period> (Soll|Ist)` on the dashboard (`VAT refund` when negative).
+- Soll (accrual): invoices count by issue date, credit notes negative by their issue date.
+- Ist (cash): credit notes are netted into the invoice they correct (effective gross and VAT per
+  category and rate = invoice − credit notes). Each payment carries its share of the effective VAT,
+  in proportion to the effective gross, capped at it; the payment that completes the invoice takes
+  the exact remainder, so the parts sum to the effective VAT. A credit note issued after payments
+  already exceed the new effective gross counts negative on its issue date only for that excess
+  (VAT already taxed). A credit note whose invoice is unknown counts by its issue date. Payments
+  on credit notes are ignored.
+- Both bases: input VAT is the VAT of expenses by expense date; net of reverse-charge (`AE`)
+  lines is shown separately. Payable = output − input.
+- With `vat_regime: small-business` it shows `No VAT: small-business regime (§19 UStG).`
+
+**CSV.** `expenses-<year>.csv` and `vat-<year>.csv` (12 months, 4 quarters, the year) are
+downloaded from the expenses page; the year export has more. UTF-8 with BOM, `;` separator, CRLF,
+fields with `;`, `"`, CR or LF quoted with `"` doubled, amounts as `1234,56` (`-` for negatives),
+dates `YYYY-MM-DD`. Text fields (supplier, description, category, client, project, receipt,
+method, reference) that start with `=`, `+`, `@`, tab or CR get a leading `'`, so a spreadsheet
+does not run them as a formula. Columns:
+- expenses: `Datum;Lieferant;Beschreibung;Kategorie;Netto;USt-Satz;USt;Brutto;Kunde;Projekt;Beleg`,
+  oldest first;
+- invoices: `Nummer;Typ;Datum;Kunde;Netto;USt;Brutto;Bezahlt;Offen` (`Rechnung`, or
+  `Rechnungskorrektur` for credit notes, negative and never open);
+- payments: `Datum;Rechnung;Betrag;Methode;Referenz`;
+- VAT: `Zeitraum;Basis;Umsatzsteuer;Vorsteuer;Reverse-Charge netto;Zahllast`, `Basis` is `Soll` or
+  `Ist`; small-business rows say `Kleinunternehmer` with `0,00`.
+
+**Year export** ("Export year for Steuerberater…" on the expenses page; also in demo mode).
+It builds `business-<year>.zip` in the browser from the head commit and shows
+`Reading <n> of <total> files…`. Contents, paths relative to `.kh/business/`: `business.yaml`,
+`VERFAHRENSDOKUMENTATION.md`; that year's offers and invoices with PDF, XML and SHA-256; that
+year's expenses with receipts; `payments/<year>.jsonl`; `time/<year>-*.jsonl`; the `client.yaml`
+of every client named by the year's documents, expenses or time, and their contracts active that
+year with the PDF (start on or before 31 Dec, no end or end on or after 1 Jan); `summary/`
+(`invoices.csv`, `payments.csv`, `expenses.csv`, `vat.csv`, `README.txt`); and `SHA256SUMS`. No
+drafts, links or events. Raw files come from the head commit, one request per file (the blob named by the head tree); paid and open amounts are those of
+the generation date, not the year end (the README says so). Files are fetched 4 at a time; one
+failure stops the export with `Could not read <path>.` and no zip. A repository tree too large
+for GitHub's listing is refused (`The repository is too large to export in one go.`). The zip uses
+the store method (no ZIP64: at most 65535 files and 4 GiB), UTF-8 names.
+
+**Retainers.** A project's `retainer` (`monthly` or `quarterly`) with `next_date` within 14 days
+(or overdue) appears in the dashboard card `Retainers due` with `Create draft` (a draft with
+`from_retainer`) or `Draft ready`. Issuing that invoice moves `next_date` on by one interval (a
+month-end date stays on the month end), but only while `next_date` still equals the draft's
+`from_retainer`, so a stale second draft never skips a period. Only active projects count.
+
+**Contracts.** The client page lists contracts with their next reminder, `Open PDF` and `Edit`,
+and `Add contract` opens the form (kind, title, dates, notice days, renewal date, optional PDF of
+up to 10 MB: `Contract files can be up to 10 MB.`, `Contract files must be PDF.`). The dashboard
+warns 60 days ahead of the renewal date, the notice deadline (counted back from `renewal_date`,
+else `end`) and the end. Delete uses the retention text; retention counts from the contract's end,
+or its start when open-ended.
+
+**Pipeline.** `/business/pipeline` ("Open board" on the dashboard): Lead, Contacted, Offer sent and
+Active columns; Past and Lost sit behind `Show past and lost (n)`. Cards show the open amount and
+the last activity. Pick the stage in the `Move <name> to…` select, then press `Move` (one commit,
+`business: <slug> → <stage>`; changing the select alone saves nothing); there is no drag-and-drop.
+Demo mode is read-only.
 
 ## Share links (phase 4)
 

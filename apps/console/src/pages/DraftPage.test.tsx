@@ -287,4 +287,25 @@ describe('DraftPage new', () => {
     expect(field('line-0-description').value).toBe('Hosting Dec');
     expect(field('service-end').value).toBe('2026-12-31');
   });
+
+  it('carries from_retainer into the saved retainer draft', async () => {
+    const files = (m: Map<string, string>) =>
+      m.set(
+        '.kh/business/clients/acme-gmbh/projects/hosting.yaml',
+        'client: acme-gmbh\nname: Hosting\nstatus: active\nretainer:\n  amount: 120000\n  interval: monthly\n  next_date: "2026-12-01"\n  description: Hosting Dec\n',
+      );
+    const data = load(files);
+    show(ready(data), {
+      client: 'acme-gmbh',
+      kind: 'invoice',
+      from: 'retainer',
+      project: 'hosting',
+    });
+    writeAgainst(data);
+    await click('Save draft');
+    const text = Object.values(built?.value?.changes ?? {}).find((v) =>
+      v?.includes('kind: invoice'),
+    );
+    expect(text).toContain('from_retainer: 2026-12-01');
+  });
 });

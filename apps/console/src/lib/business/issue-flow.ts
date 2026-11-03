@@ -12,6 +12,7 @@ import {
   type Line,
   type Result,
   seriesOf,
+  type TextChanges,
   type Totals,
   timePath,
   type Ulid,
@@ -128,6 +129,15 @@ export async function buildIssueContext(
     if (text !== null) timeFiles[timePath(month)] = text;
   }
   const clientLog = await source.read(`${clientDir(client.slug)}/log.actionlog.md`);
+  // The file text too: advancing a retainer edits only `next_date`, keeping the person's comments.
+  const projectRecord = repo.projects.find(
+    (p) => p.client === draft.client && p.slug === draft.project,
+  );
+  const projectText = projectRecord
+    ? await source.read(`${clientDir(client.slug)}/projects/${projectRecord.slug}.yaml`)
+    : null;
+  const project =
+    projectRecord && projectText !== null ? { value: projectRecord, text: projectText } : undefined;
 
   return {
     ok: true,
@@ -141,6 +151,7 @@ export async function buildIssueContext(
       timeFiles,
       clientLog,
       now,
+      ...(project ? { project } : {}),
     },
   };
 }
@@ -247,7 +258,7 @@ export async function issueFromFresh(
   draftId: Ulid,
   issueDate: string,
   now: Date,
-): Promise<Result<{ changes: FileChanges; message: string; number: string }>> {
+): Promise<Result<{ changes: TextChanges; message: string; number: string }>> {
   const ctx = await buildIssueContext(fresh, draftId, issueDate, now);
   if (!ctx.ok) return ctx;
   const r = issue(ctx.value);

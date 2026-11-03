@@ -2,7 +2,7 @@ import { appendAction, parseActionLog } from '../../action-log.js';
 import { addActionLogEntry, addTodoEntry, splitInlineTags } from '../../entries.js';
 import { slugifyWords } from '../../ideas.js';
 import { asSlug, type Slug } from '../ids.js';
-import type { FileChanges } from '../issue.js';
+import type { TextChanges } from '../issue.js';
 import { clientDir } from '../paths.js';
 import { type Client, KEY_ORDER, type Project } from '../records.js';
 import type { BusinessRepo } from '../repo.js';
@@ -10,7 +10,7 @@ import { validateClient, validateProject } from '../validate.js';
 import type { Issue, Result } from '../validate-kit.js';
 import { stringifyYaml } from '../yaml.js';
 
-type Action = Result<{ changes: FileChanges; message: string }>;
+type Action = Result<{ changes: TextChanges; message: string }>;
 
 const refuse = (path: string, message: string): { ok: false; issues: Issue[] } => ({
   ok: false,

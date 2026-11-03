@@ -47,6 +47,13 @@ describe('profileFromForm', () => {
     expect(p.ok && 'bic' in p.value.bank).toBe(false);
   });
 
+  it('writes vat_basis only for cash', () => {
+    const accrual = profileFromForm(filled);
+    expect(accrual.ok && 'vat_basis' in accrual.value).toBe(false);
+    const cash = profileFromForm({ ...filled, vatBasis: 'cash' });
+    expect(cash.ok && cash.value.vat_basis).toBe('cash');
+  });
+
   it('uses the generic jurisdiction outside Germany', () => {
     const p = profileFromForm({ ...filled, country: 'AT' });
     expect(p.ok && p.value.jurisdiction).toBe('generic');
