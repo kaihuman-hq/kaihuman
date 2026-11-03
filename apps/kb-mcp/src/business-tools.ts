@@ -48,7 +48,12 @@ const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
 const TODAY = DATE.optional().describe(
   'Treat this date as today (YYYY-MM-DD); default: the server’s local date.',
 );
-const CLIENT = z.string().trim().min(1).max(100).describe('Client slug (see business_clients).');
+const CLIENT = z
+  .string()
+  .trim()
+  .min(1)
+  .max(100)
+  .describe('Client slug or name (see business_clients).');
 const SLUGISH = z.string().trim().min(1).max(100);
 const TEXT = z.string().trim().min(1).max(20_000);
 const PERIOD = z
@@ -124,6 +129,12 @@ export function registerBusinessTools(server: McpServer, deps: BusinessToolDeps)
     if (!client) throw new KbError(`Unknown client ${ref}. Use business_clients.`);
     return client;
   };
+
+  /** Records name clients by slug; agents may pass the name. */
+  const withSlug = (b: LoadedBusiness, input: Record<string, unknown>) =>
+    typeof input.client === 'string'
+      ? { ...input, client: findClient(b, input.client).slug }
+      : input;
 
   /** Applies a formats action result: writes its changes, commits them, returns the tool result. */
   const apply = async (
@@ -380,7 +391,7 @@ export function registerBusinessTools(server: McpServer, deps: BusinessToolDeps)
     run(async (input: Record<string, unknown>) => {
       const b = await load();
       const id = ulid();
-      const draft = draftOf(id, input);
+      const draft = draftOf(id, withSlug(b, input));
       const checked = validateDraft(draft);
       if (!checked.ok) throw refusal(checked.issues);
       return apply(saveDraft(b.repo, checked.value), { id });
@@ -399,7 +410,7 @@ export function registerBusinessTools(server: McpServer, deps: BusinessToolDeps)
       if (!isUlid(id) || !b.repo.drafts.some((d) => d.id === id)) {
         throw new KbError(`No draft ${id}. Use business_client to list a client's drafts.`);
       }
-      return apply(saveDraft(b.repo, draftOf(id, input)), { id });
+      return apply(saveDraft(b.repo, draftOf(id, withSlug(b, input))), { id });
     }),
   );
 
@@ -500,7 +511,9 @@ export function registerBusinessTools(server: McpServer, deps: BusinessToolDeps)
     run(async (input: Record<string, unknown>) => {
       const b = await load();
       const id = ulid();
-      const fields = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined));
+      const fields = Object.fromEntries(
+        Object.entries(withSlug(b, input)).filter(([, v]) => v !== undefined),
+      );
       return apply(saveExpense(b.repo, { id, ...fields } as never), { id });
     }),
   );

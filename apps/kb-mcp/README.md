@@ -49,7 +49,7 @@ These tools read the business data in `.kh/business/` (see `doc/business.md`). T
 
 | Tool | Input | Result |
 | --- | --- | --- |
-| `business_clients` | `stage` (optional) | Clients with `slug`, `name`, `stage`, `tags`, currency, open invoice amount, overdue invoice count and unbilled minutes. |
+| `business_clients` | `stage`, `today` (both optional) | Clients with `slug`, `name`, `stage`, `tags`, currency, open invoice amount, overdue invoice count and unbilled minutes. |
 | `business_client` | `client`, `today` | One client: record, projects, contracts with dates, drafts in full, offers and invoices with derived status, payments, unbilled time, minutes per month, expenses, and the notes, todos and log files as text. |
 | `business_open_invoices` | `client` (optional), `today` | Invoices with an open amount (overdue first) and the totals of open and overdue amounts. |
 | `business_vat_summary` | `period`: `YYYY`, `YYYY-MM` or `YYYY-Qn` | Output VAT by rate, input VAT, reverse-charge base and the amount payable. It is not a tax filing. |

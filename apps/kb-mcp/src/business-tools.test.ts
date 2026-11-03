@@ -222,6 +222,28 @@ describe('business write tools', () => {
     expect(await draftFiles(root)).toContain(`${r.id}.yaml`);
   });
 
+  it('business_create_draft and business_add_expense accept a client name', async () => {
+    const { root, call } = await connect();
+    const r = parse(
+      await call('business_create_draft', { kind: 'invoice', client: 'ACME GmbH', lines: [LINE] }),
+    );
+    expect(await readFile(join(root, r.paths[0]), 'utf8')).toContain('client: acme-gmbh');
+    const e = parse(
+      await call('business_add_expense', {
+        date: '2026-11-02',
+        supplier: 'Shop',
+        description: 'Cable',
+        category: 'hardware',
+        net: 1000,
+        vat: 190,
+        gross: 1190,
+        vat_rate: '19',
+        client: 'Acme GmbH',
+      }),
+    );
+    expect(await readFile(join(root, e.paths[0]), 'utf8')).toContain('client: acme-gmbh');
+  });
+
   it('business_create_draft refuses invalid input with path: message', async () => {
     const { root, call } = await connect();
     const before = await draftFiles(root);
@@ -231,7 +253,7 @@ describe('business write tools', () => {
       lines: [LINE],
     });
     expect(unknown.isError).toBe(true);
-    expect(text(unknown)).toContain('client: unknown client "nobody"');
+    expect(text(unknown)).toContain('Unknown client nobody');
     const bad = await call('business_create_draft', {
       kind: 'invoice',
       client: 'acme-gmbh',
