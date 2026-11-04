@@ -336,6 +336,16 @@ export const addTodo = (
   return { ...data, items: [...data.items, item] };
 };
 
+/** Move the item at `from` to index `to`; out-of-range indexes leave data unchanged. */
+export const moveTodo = (data: TodoData, from: number, to: number): TodoData => {
+  const n = data.items.length;
+  if (from === to || from < 0 || from >= n || to < 0 || to >= n) return data;
+  const items = [...data.items];
+  const [item] = items.splice(from, 1);
+  items.splice(to, 0, item as TodoItem);
+  return { ...data, items };
+};
+
 export const setMilestone = (
   data: TodoData,
   index: number,
