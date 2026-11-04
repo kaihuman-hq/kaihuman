@@ -60,6 +60,8 @@ export interface Message {
     | 'READ_LATER_DONE'
     | 'READ_LATER_ADD'
     | 'ADD_TODO'
+    | 'GET_OPEN_TODOS'
+    | 'UPDATE_TODO'
     | 'ADD_EVENT'
     | 'CAPTURE_CLASSIFY'
     | 'PAGE_SUMMARIZE'
@@ -142,6 +144,8 @@ export interface Message {
   tabIds?: number[];
   /** `ADD_TODO`: the milestone the todo belongs to. */
   milestoneId?: string;
+  /** `UPDATE_TODO`: which todo (id and text, to detect a changed file) and what to do to it. */
+  todoAction?: { type: 'status'; status: string } | { type: 'cycle-priority' };
   /** `ADD_EVENT`: the event's name, type, and first and last day (YYYY-MM-DD). */
   name?: string;
   eventType?: string;

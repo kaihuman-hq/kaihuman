@@ -232,6 +232,53 @@ describe('writes from the start page', () => {
     expect(remote['.kh/inbox.todos.md']).toBe('- [ ] existing\n');
   });
 
+  it('lists open todos across files, highest priority first', async () => {
+    remote['work.todos.md'] = '- [ ] urgent ^high\n- [x] finished\n';
+    seedCache();
+    const response = await call({ type: 'GET_OPEN_TODOS' });
+    expect(response.todos.map((t: any) => [t.stream, t.text])).toEqual([
+      ['work', 'urgent'],
+      ['inbox', 'existing'],
+    ]);
+  });
+
+  it('starts a todo and cycles its priority, saving the file', async () => {
+    remote['work.todos.md'] = '- [ ] urgent\n';
+    seedCache();
+    const todoAction = { type: 'status', status: 'in-progress' };
+    const started = await call({
+      type: 'UPDATE_TODO',
+      path: 'work.todos.md',
+      id: 'item-0',
+      text: 'urgent',
+      todoAction,
+    });
+    expect(remote['work.todos.md']).toMatch(/^- \[>\] urgent/);
+    expect(started.todos[0]).toMatchObject({ text: 'urgent', status: 'in-progress' });
+
+    await call({
+      type: 'UPDATE_TODO',
+      path: 'work.todos.md',
+      id: 'item-0',
+      text: 'urgent',
+      todoAction: { type: 'cycle-priority' },
+    });
+    expect(remote['work.todos.md']).toMatch(/urgent \^high/);
+  });
+
+  it('refuses to update a file that is not a known todo list', async () => {
+    seedCache();
+    const response = await call({
+      type: 'UPDATE_TODO',
+      path: '.kh/health.habit.csv',
+      id: 'item-0',
+      text: 'x',
+      todoAction: { type: 'cycle-priority' },
+    });
+    expect(response.error).toContain('not one of the start page');
+    expect(writes()).toHaveLength(0);
+  });
+
   it('refuses a todo for a list the page does not know', async () => {
     seedCache();
     for (const path of ['secret.todos.md', '.kh/health.habit.csv']) {

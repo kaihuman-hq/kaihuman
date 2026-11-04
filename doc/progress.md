@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-04 — Stream tab, file colours, item priority, extension todo list
+
+- Console bottom bar: "Board" is now "Stream" and opens `/stream` (stream view). `/streams` and `/board` still work.
+- Per-file colour picker (10 colours) in stream tiles and the kanban file filter; stream tile border and kanban card border use it.
+- `PriorityBadge` (`!`/`!!`/`!!!`) on stream items and kanban cards; click cycles priority. Streams with higher-priority open items sort first.
+- Browser extension side panel: "Todos" flat list of open and in-progress todos from all `.todos.md` files, sorted by priority, then oldest created, then in-progress first. Shows file colour, priority, status and stream; actions start, back to open, done, reject, cycle priority (`GET_OPEN_TODOS`, `UPDATE_TODO`).
+
 ## 2026-11-04 — Todos: file colour and item priority
 
 - `@kaihuman/formats` `todos.ts`: optional `color:` in the `.todos.md` frontmatter (`TODO_COLORS`, `TodoColor`, `TODO_COLOR_HEX`, `setTodoColor`; unknown values parse to undefined, frontmatter still omitted when empty) and inline item priority tokens `^high` / `^super-high` / `^ultra-high` (`TodoPriority`, `PRIORITY_RANK`, `PRIORITY_LABELS`, `setTodoPriority`, `cyclePriority`, `maxPriorityRank`). Unknown `^word` stays in the text. Round-trip tests added.

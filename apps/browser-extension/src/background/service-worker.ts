@@ -152,6 +152,7 @@ import {
   withFile,
   withoutFile,
 } from './today';
+import { applyTodoAction, collectOpenTodos, type TodoAction } from './todo-board';
 import {
   handlePinMenuClick,
   handleWorkMessage,
@@ -1551,6 +1552,15 @@ function todoTarget(cache: TodayCache, path: string | undefined): string {
   return path;
 }
 
+/** Open todos of every synced `.todos.md`, for the side panel. */
+async function openTodos() {
+  const { repo } = await credentials();
+  let cache = await readTodayCache();
+  if (!isTodayCacheUsable(cache, repo) || !cache) cache = await syncToday();
+  if (!cache) throw new Error(NOT_LOGGED_IN);
+  return { todos: collectOpenTodos(cache.files) };
+}
+
 /** The capture box's guesses, from the synced files only: a new tab must not cost a request. */
 async function captureGuesses(text: string) {
   const { repo } = await credentials();
@@ -2458,6 +2468,21 @@ chrome.runtime.onMessage.addListener(function onMessage(
         (cache) => todoTarget(cache, message.path),
         (md) => addTodoEntry(md, entry, now),
       ),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'GET_OPEN_TODOS') return answer(openTodos(), sendResponse);
+
+  if (message.type === 'UPDATE_TODO') {
+    const action = message.todoAction as TodoAction | undefined;
+    if (!action || (action.type !== 'status' && action.type !== 'cycle-priority')) {
+      return answer(Promise.reject(new Error('Unknown todo action')), sendResponse);
+    }
+    return answer(
+      commitTodayFile({ path: message.path || '', suffix: '.todos.md' }, (md) =>
+        applyTodoAction(md, String(message.id), String(message.text), action),
+      ).then(openTodos),
       sendResponse,
     );
   }
