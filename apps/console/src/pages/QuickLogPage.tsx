@@ -242,7 +242,7 @@ export const QuickLogPage = () => {
         mode="LOG"
         onDashboardClick={() => route('/')}
         onFilesClick={() => route('/')}
-        onBoardClick={() => route('/board')}
+        onBoardClick={() => route('/stream')}
       />
     </>
   );

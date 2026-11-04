@@ -241,7 +241,7 @@ export const QuickTodoPage = () => {
         mode="INBOX"
         onDashboardClick={() => route('/')}
         onFilesClick={() => route('/')}
-        onBoardClick={() => route('/board')}
+        onBoardClick={() => route('/stream')}
       />
     </>
   );

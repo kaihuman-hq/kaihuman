@@ -4,15 +4,16 @@ import {
   GitBranch,
   GitCommit,
   Home,
-  Kanban,
   Keyboard,
   LayoutGrid,
   MoreHorizontal,
+  Rows3,
 } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { Logo } from '../Atoms/Logo';
 import { MonoLabel, MonoText } from '../Atoms/Typography';
+import { activeTabForPath } from '../navbar-items';
 
 export interface Repository {
   id: string;
@@ -239,7 +240,7 @@ const WorkspaceSubView = ({
 );
 
 // Items excluded from the mobile More sheet — handled by tabs
-const SHEET_EXCLUDED = new Set(['Dashboard', 'Board', 'Quick Note', 'Shortcuts']);
+const SHEET_EXCLUDED = new Set(['Dashboard', 'Stream', 'Quick Note', 'Shortcuts']);
 
 // ---------------------------------------------------------------------------
 // RecentFilesSubView
@@ -555,8 +556,7 @@ export const StatusBar = ({
   // Initialise activeTab from the current URL on mount
   useEffect(() => {
     const path = window.location.pathname;
-    if (path === '/board') navigationStore.activeTab.value = 'BOARD';
-    else navigationStore.activeTab.value = 'HOME';
+    navigationStore.activeTab.value = activeTabForPath(path);
   }, []);
 
   const handleToggleExpand = (mode: 'MENU' | 'REPOS' | 'WORKSPACES') => {
@@ -1014,7 +1014,7 @@ export const StatusBar = ({
             <MonoText className="text-[9px] uppercase">Home</MonoText>
           </button>
 
-          {/* Board */}
+          {/* Stream */}
           <button
             type="button"
             className={tabClass('BOARD')}
@@ -1027,8 +1027,8 @@ export const StatusBar = ({
             }}
             disabled={!onBoardClick}
           >
-            <Kanban size={18} />
-            <MonoText className="text-[9px] uppercase">Board</MonoText>
+            <Rows3 size={18} />
+            <MonoText className="text-[9px] uppercase">Stream</MonoText>
           </button>
 
           {/* Shortcuts */}

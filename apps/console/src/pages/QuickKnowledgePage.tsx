@@ -121,7 +121,7 @@ export const QuickKnowledgePage = () => {
         mode="KNOWLEDGE"
         onDashboardClick={() => route('/')}
         onFilesClick={() => route('/')}
-        onBoardClick={() => route('/board')}
+        onBoardClick={() => route('/stream')}
       />
     </>
   );

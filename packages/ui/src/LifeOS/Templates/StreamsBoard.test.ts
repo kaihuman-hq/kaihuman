@@ -1,9 +1,14 @@
-import type { TodoData, TodoItem, TodoStatus } from '@kaihuman/formats';
+import type { TodoData, TodoItem, TodoPriority, TodoStatus } from '@kaihuman/formats';
 import { describe, expect, it } from 'vitest';
 import { actionsFor, sortStreams, streamItems } from './StreamsBoard';
 
-const item = (text: string, status: TodoStatus, createdAt?: string, tags: string[] = []) =>
-  ({ text, status, createdAt, tags }) as TodoItem;
+const item = (
+  text: string,
+  status: TodoStatus,
+  createdAt?: string,
+  tags: string[] = [],
+  priority?: TodoPriority,
+) => ({ text, status, createdAt, tags, priority }) as TodoItem;
 const data = (...items: TodoItem[]) => ({ items, milestones: [] }) as unknown as TodoData;
 
 describe('streamItems', () => {
@@ -49,6 +54,53 @@ describe('sortStreams', () => {
       'c.todos.md',
     ]);
     expect(sortStreams(files, 'newest', 'closed')[0]?.path).toBe('c.todos.md');
+  });
+  it('higher open priority always comes first, then the chosen sort', () => {
+    const withPrio = [
+      ...files,
+      {
+        path: 'd.todos.md',
+        data: data(item('p', 'backlog', '2020-01-01T00:00:00Z', [], 'high')),
+      },
+      {
+        path: 'e.todos.md',
+        data: data(item('q', 'in-progress', undefined, [], 'ultra-high')),
+      },
+    ];
+    expect(sortStreams(withPrio, 'count', 'active').map((f) => f.path)).toEqual([
+      'e.todos.md',
+      'd.todos.md',
+      'a.todos.md',
+      'b.todos.md',
+      'c.todos.md',
+    ]);
+    expect(sortStreams(withPrio, 'newest', 'active').map((f) => f.path)).toEqual([
+      'e.todos.md',
+      'd.todos.md',
+      'b.todos.md',
+      'a.todos.md',
+      'c.todos.md',
+    ]);
+  });
+  it('priority of done items or items hidden by search does not lift a stream', () => {
+    const f = [
+      { path: 'a.todos.md', data: data(item('x', 'backlog'), item('y', 'backlog')) },
+      {
+        path: 'b.todos.md',
+        data: data(item('z', 'done', undefined, [], 'ultra-high'), item('w', 'backlog')),
+      },
+      { path: 'c.todos.md', data: data(item('v', 'backlog', undefined, [], 'high')) },
+    ];
+    expect(sortStreams(f, 'count', 'active').map((x) => x.path)).toEqual([
+      'c.todos.md',
+      'a.todos.md',
+      'b.todos.md',
+    ]);
+    expect(sortStreams(f, 'count', 'active', 'x').map((x) => x.path)).toEqual([
+      'a.todos.md',
+      'b.todos.md',
+      'c.todos.md',
+    ]);
   });
   it('does not mutate the input', () => {
     const copy = [...files];
