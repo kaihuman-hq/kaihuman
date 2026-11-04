@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-04 — Travel: read-only widget, separate trip editor
+
+- `TravelWidget` is read-only in every mode: focus shows trips (sorted), trip and step fields, addresses, custom fields, website and "Open in Maps" links (http(s) only, new tab), and an EDIT button per trip.
+- New `TravelEditForm` edits one trip on a local draft (trip fields, custom fields, steps with address/maps URL/custom fields, reorder, delete step, delete trip); SAVE writes, CANCEL discards. Opened via `MainApp` view mode `EDIT` + trip id. Shared step metadata moved to `TravelMeta.ts`.
+- Edit tests moved to the form; new tests for read-only widget, maps links, Edit button, step address/custom fields, cancel.
+
 ## 2026-11-04 — Travel steps: address, maps link, custom fields (formats)
 
 - Every `TravelStep` gets optional `address`, `mapsUrl` and `custom: CustomField[]` (missing → `[]`, old files still parse and round-trip). `updateStep` can patch them; new `mapsLink(step)` returns `mapsUrl` or a Google Maps search URL for `address`. Tests in `travel.test.ts`; spec v2 section added. No UI yet.
