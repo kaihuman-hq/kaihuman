@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-04 — Todos: file colour and item priority
+
+- `@kaihuman/formats` `todos.ts`: optional `color:` in the `.todos.md` frontmatter (`TODO_COLORS`, `TodoColor`, `TODO_COLOR_HEX`, `setTodoColor`; unknown values parse to undefined, frontmatter still omitted when empty) and inline item priority tokens `^high` / `^super-high` / `^ultra-high` (`TodoPriority`, `PRIORITY_RANK`, `PRIORITY_LABELS`, `setTodoPriority`, `cyclePriority`, `maxPriorityRank`). Unknown `^word` stays in the text. Round-trip tests added.
+
 ## 2026-11-04 — Streams view on the board
 
 - New `StreamsBoard` (`packages/ui`): one tile per `.todos.md` in a 4-column grid, an always-visible add input (Enter adds on top), colour-coded rows, hover buttons for in progress / done / rejected / backlog, drag to reorder within a tile (`moveTodo`). Header toggles KANBAN | STREAMS, ACTIVE | CLOSED and MOST ITEMS | NEWEST; scope and search apply. Route `/streams` in the console; `KanbanBoard` takes `view`.
