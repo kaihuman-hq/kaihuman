@@ -19,7 +19,7 @@ export const StreamsBoardPage = () => (
       mode="BOARD"
       onDashboardClick={() => route('/')}
       onFilesClick={() => route('/')}
-      onBoardClick={() => route('/board')}
+      onBoardClick={() => route('/stream')}
     />
   </>
 );

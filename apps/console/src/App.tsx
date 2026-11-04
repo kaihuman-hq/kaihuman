@@ -83,6 +83,7 @@ export const App = () => {
         <ProtectedRoute path="/extension-onboarded" component={ExtensionSuccess} />
         <ProtectedRoute path="/" component={Dashboard} />
         <ProtectedRoute path="/board" component={KanbanBoardPage} />
+        <ProtectedRoute path="/stream" component={StreamsBoardPage} />
         <ProtectedRoute path="/streams" component={StreamsBoardPage} />
         <ProtectedRoute path="/analytics" component={TodoAnalyticsPage} />
         <ProtectedRoute path="/action-log" component={ActionLogViewPage} />

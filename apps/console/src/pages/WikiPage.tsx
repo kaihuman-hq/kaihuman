@@ -31,7 +31,7 @@ export const WikiPage = () => {
         mode="WIKI"
         onDashboardClick={() => route('/')}
         onFilesClick={() => route('/')}
-        onBoardClick={() => route('/board')}
+        onBoardClick={() => route('/stream')}
         onWikiClick={() => route('/wiki')}
       />
     </>

@@ -350,7 +350,7 @@ export const Dashboard = () => {
               layoutStore.navigate(path.join('/'));
             }
           }}
-          onBoardClick={() => route('/board')}
+          onBoardClick={() => route('/stream')}
           onActionLogClick={() => route('/action-log')}
           onShortcutsClick={() => route('/shortcuts')}
           onKnowledgeClick={() => route('/knowledge')}
