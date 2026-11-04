@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-04 — Travel steps: address, maps link, custom fields (formats)
+
+- Every `TravelStep` gets optional `address`, `mapsUrl` and `custom: CustomField[]` (missing → `[]`, old files still parse and round-trip). `updateStep` can patch them; new `mapsLink(step)` returns `mapsUrl` or a Google Maps search URL for `address`. Tests in `travel.test.ts`; spec v2 section added. No UI yet.
+
 ## 2026-11-04 — Travel file type (`.travel.json`)
 
 - New yearly travel file `YYYY.travel.json` (`{version, currency, trips[]}`) in `@kaihuman/formats` (`travel.ts`): tolerant parse, pure mutators, trip/total cost, `nextTrip`. Step types: general, car (toll dates), rental, flight, train, hotel.

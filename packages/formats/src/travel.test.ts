@@ -5,6 +5,7 @@ import {
   deleteStep,
   deleteTrip,
   emptyStep,
+  mapsLink,
   moveStep,
   nextTrip,
   parseTravel,
@@ -47,7 +48,7 @@ describe('parseTravel', () => {
     );
     expect(doc.currency).toBe('USD');
     expect(doc.trips[0]?.steps).toEqual([
-      { id: 'c', type: 'hotel', from: 'a', to: 'b', ref: 'r', website: 'w', cost: 0 },
+      { id: 'c', type: 'hotel', from: 'a', to: 'b', ref: 'r', website: 'w', cost: 0, custom: [] },
     ]);
   });
 
@@ -71,7 +72,7 @@ describe('emptyStep', () => {
     hotel: { from: '', to: '', ref: '', cost: 0 },
   };
   it.each(Object.keys(cases) as StepType[])('%s', (type) => {
-    expect(emptyStep(type, 's1')).toEqual({ id: 's1', type, ...cases[type] });
+    expect(emptyStep(type, 's1')).toEqual({ id: 's1', type, custom: [], ...cases[type] });
   });
 });
 
@@ -136,5 +137,75 @@ describe('nextTrip', () => {
       'later',
       'none',
     ]);
+  });
+});
+
+describe('step v2 fields', () => {
+  const hotel = { id: 'h', type: 'hotel', from: 'a', to: 'b', ref: 'r' };
+  const parseStep = (step: object) =>
+    parseTravel(JSON.stringify({ trips: [{ id: 't', title: 'T', steps: [step] }] })).trips[0]
+      ?.steps[0];
+
+  it('defaults missing or invalid custom to [] and keeps valid entries', () => {
+    expect(parseStep(hotel)).toMatchObject({ custom: [] });
+    expect(parseStep({ ...hotel, custom: 'x' })).toMatchObject({ custom: [] });
+    expect(
+      parseStep({ ...hotel, custom: [{ key: 'Seat', value: '1A' }, { value: 'no key' }, 5] }),
+    ).toMatchObject({ custom: [{ key: 'Seat', value: '1A' }] });
+  });
+
+  it('keeps address/mapsUrl only when non-empty strings', () => {
+    expect(parseStep({ ...hotel, address: 'Via 1', mapsUrl: 'https://m' })).toMatchObject({
+      address: 'Via 1',
+      mapsUrl: 'https://m',
+    });
+    const s = parseStep({ ...hotel, address: '', mapsUrl: 3 });
+    expect(s).not.toHaveProperty('address');
+    expect(s).not.toHaveProperty('mapsUrl');
+  });
+
+  it('round-trips exactly', () => {
+    let doc = addTrip(EMPTY, { title: 'R' }, 't1');
+    doc = addStep(doc, 't1', {
+      ...emptyStep('hotel', 's1'),
+      address: 'Via 1',
+      mapsUrl: 'https://m',
+      custom: [{ key: 'k', value: 'v' }],
+    });
+    expect(parseTravel(serializeTravel(doc))).toEqual(doc);
+  });
+
+  it('updateStep patches address/mapsUrl/custom but not id/type', () => {
+    let doc = addTrip(EMPTY, { title: 'R' }, 't1');
+    doc = addStep(doc, 't1', emptyStep('hotel', 's1'));
+    doc = updateStep(doc, 't1', 's1', {
+      address: 'A',
+      mapsUrl: 'U',
+      custom: [{ key: 'k', value: 'v' }],
+      id: 'x',
+      type: 'car',
+    } as never);
+    expect(doc.trips[0]?.steps[0]).toMatchObject({
+      id: 's1',
+      type: 'hotel',
+      address: 'A',
+      mapsUrl: 'U',
+      custom: [{ key: 'k', value: 'v' }],
+    });
+  });
+});
+
+describe('mapsLink', () => {
+  const step = emptyStep('hotel', 's');
+  it('prefers mapsUrl', () => {
+    expect(mapsLink({ ...step, address: 'A', mapsUrl: 'https://m' })).toBe('https://m');
+  });
+  it('builds a search URL from address', () => {
+    expect(mapsLink({ ...step, address: 'Via Roma 1, Rome' })).toBe(
+      'https://www.google.com/maps/search/?api=1&query=Via%20Roma%201%2C%20Rome',
+    );
+  });
+  it('is undefined with neither', () => {
+    expect(mapsLink(step)).toBeUndefined();
   });
 });
