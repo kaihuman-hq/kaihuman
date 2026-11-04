@@ -57,6 +57,7 @@
 | Android long-press shortcuts | manifest.webmanifest | 2026-03-28 |
 | Inbox always on board | KanbanBoard | 2026-03-28 |
 | Move todo between files | KanbanBoard card hover | 2026-03-28 |
+| Streams view: one tile per todo file with quick add, one-click status buttons, drag to reorder, active/closed and sort toggles | `/streams`, KanbanBoard STREAMS toggle | 2026-11-04 |
 
 ## Browser extension (`apps/browser-extension`)
 

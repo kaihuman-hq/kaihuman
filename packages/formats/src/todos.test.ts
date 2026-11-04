@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseTodos } from './todos.js';
+import { moveTodo, parseTodos } from './todos.js';
 
 describe('parseTodos', () => {
   it('reads milestones and todos the way the console writes them', () => {
@@ -25,5 +25,17 @@ describe('parseTodos', () => {
       createdAt: '2026-09-01T00:00:00.000Z',
     });
     expect(items[1]).toMatchObject({ text: 'Done thing', status: 'done' });
+  });
+});
+
+describe('moveTodo', () => {
+  const data = parseTodos('- [ ] a\n- [ ] b\n- [ ] c\n');
+  it('moves an item down and up', () => {
+    expect(moveTodo(data, 0, 2).items.map((i) => i.text)).toEqual(['b', 'c', 'a']);
+    expect(moveTodo(data, 2, 0).items.map((i) => i.text)).toEqual(['c', 'a', 'b']);
+  });
+  it('ignores out-of-range indexes', () => {
+    expect(moveTodo(data, 0, 5)).toBe(data);
+    expect(moveTodo(data, -1, 1)).toBe(data);
   });
 });
