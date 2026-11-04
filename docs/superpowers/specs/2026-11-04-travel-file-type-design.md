@@ -53,3 +53,9 @@ Add `.travel.json` everywhere suffixes are listed: `packages/core/src/stores/lay
 
 ## Out of scope
 Multi-currency, per-step custom fields, attachments, cross-year views.
+
+## v2: step address, maps link, custom fields (formats only)
+- Every step gets optional `address`, optional `mapsUrl` (kept on parse only if non-empty strings) and `custom: CustomField[]` (missing/invalid → `[]`; same entry rules as `Trip.custom`). `emptyStep` returns `custom: []`; old files still parse and round-trip.
+- `updateStep` patch may set these; id/type stay fixed.
+- `mapsLink(step)`: `mapsUrl` if set, else `https://www.google.com/maps/search/?api=1&query=<encoded address>`, else `undefined`.
+- Per-step custom fields are no longer out of scope. UI is a follow-up.

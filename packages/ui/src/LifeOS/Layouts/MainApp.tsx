@@ -92,6 +92,7 @@ import { TimezoneWidget } from '../Organisms/Widgets/TimezoneWidget';
 import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
 import { TodoWidget } from '../Organisms/Widgets/TodoWidget';
 import { TravelAddForm } from '../Organisms/Widgets/TravelAddForm';
+import { TravelEditForm } from '../Organisms/Widgets/TravelEditForm';
 import { TravelWidget } from '../Organisms/Widgets/TravelWidget';
 import { AIPanel } from '../Templates/AIPanel';
 import type { DashboardConfig, DashboardEntry } from '../types';
@@ -907,13 +908,7 @@ abbreviations: undefined
     }
     if (tile.extension?.toLowerCase() === '.travel.json') {
       // Empty file is valid: parseTravel turns it into an empty doc.
-      return (
-        <TravelWidget
-          content={tile.rawContent ?? ''}
-          mode={mode}
-          onChange={(newContent) => tile.onContentChange?.(newContent)}
-        />
-      );
+      return <TravelWidget content={tile.rawContent ?? ''} mode={mode} />;
     }
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
       return (
@@ -2295,6 +2290,8 @@ const FocusedTileInternal = ({
     initialViewMode || (hasWidget ? 'WIDGET' : 'CODE'),
   );
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
+  const [editTripId, setEditTripId] = useState<string | null>(null);
+  // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const [showHistory, setShowHistory] = useState(false);
 
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
@@ -2627,7 +2624,7 @@ const FocusedTileInternal = ({
                   onClick={() => setViewMode('WIDGET')}
                   className={cn(
                     'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
-                    viewMode === 'WIDGET'
+                    viewMode === 'WIDGET' || viewMode === 'EDIT'
                       ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
                       : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                   )}
@@ -3037,7 +3034,10 @@ const FocusedTileInternal = ({
                 <TravelWidget
                   content={tile.rawContent || ''}
                   mode="FOCUS"
-                  onChange={(newContent) => tile.onContentChange?.(newContent)}
+                  onEditTrip={(tripId) => {
+                    setEditTripId(tripId);
+                    setViewMode('EDIT');
+                  }}
                 />
               )}
               {isGenericCsv && <CsvTableView content={tile.rawContent || ''} />}
@@ -3053,6 +3053,16 @@ const FocusedTileInternal = ({
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="flex flex-col min-h-full w-full p-8">
               <TimeTrackingCharts data={tile.rawContent as string} />
+            </div>
+          ) : viewMode === 'EDIT' && isTravel && editTripId ? (
+            <div className="min-h-full w-full p-8 flex justify-center items-start">
+              <TravelEditForm
+                key={editTripId}
+                content={tile.rawContent || ''}
+                tripId={editTripId}
+                onChange={(newContent) => tile.onContentChange?.(newContent)}
+                onDone={() => setViewMode('WIDGET')}
+              />
             </div>
           ) : viewMode === 'ADD' && isTravel ? (
             <div className="min-h-full w-full p-8 flex justify-center items-start">

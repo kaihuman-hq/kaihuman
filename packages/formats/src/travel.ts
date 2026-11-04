@@ -1,6 +1,12 @@
 export type CustomField = { key: string; value: string };
 
-type StepBase = { id: string; website?: string };
+type StepBase = {
+  id: string;
+  website?: string;
+  address?: string;
+  mapsUrl?: string;
+  custom: CustomField[];
+};
 
 export type TravelStep = StepBase &
   (
@@ -72,6 +78,13 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
+const parseCustom = (raw: unknown): CustomField[] =>
+  Array.isArray(raw)
+    ? raw.flatMap((c) =>
+        isRecord(c) && typeof c.key === 'string' ? [{ key: c.key, value: str(c.value) ?? '' }] : [],
+      )
+    : [];
+
 function emptyDoc(): TravelDoc {
   return { version: 1, currency: DEFAULT_CURRENCY, trips: [] };
 }
@@ -91,6 +104,11 @@ function parseStep(raw: unknown): TravelStep | undefined {
     const v = str(raw[key]);
     if (v !== undefined) out[key] = v;
   }
+  for (const key of ['address', 'mapsUrl']) {
+    const v = str(raw[key]);
+    if (v) out[key] = v;
+  }
+  out.custom = parseCustom(raw.custom);
   if (HAS_COST(t)) {
     out.cost = typeof raw.cost === 'number' && Number.isFinite(raw.cost) ? raw.cost : 0;
   }
@@ -113,13 +131,7 @@ function parseTrip(raw: unknown): Trip | undefined {
     const v = str(raw[key]);
     if (v !== undefined) trip[key] = v;
   }
-  if (Array.isArray(raw.custom)) {
-    for (const c of raw.custom) {
-      if (isRecord(c) && typeof c.key === 'string') {
-        trip.custom.push({ key: c.key, value: str(c.value) ?? '' });
-      }
-    }
-  }
+  trip.custom = parseCustom(raw.custom);
   if (Array.isArray(raw.steps)) {
     for (const s of raw.steps) {
       const step = parseStep(s);
@@ -155,15 +167,15 @@ export function serializeTravel(doc: TravelDoc): string {
 export function emptyStep(type: StepType, id: string = newId()): TravelStep {
   switch (type) {
     case 'general':
-      return { id, type, title: '' };
+      return { id, type, custom: [], title: '' };
     case 'car':
-      return { id, type, tollStart: '', tollEnd: '', cost: 0 };
+      return { id, type, custom: [], tollStart: '', tollEnd: '', cost: 0 };
     case 'rental':
     case 'flight':
     case 'train':
-      return { id, type, from: '', to: '', start: '', end: '', ref: '', cost: 0 };
+      return { id, type, custom: [], from: '', to: '', start: '', end: '', ref: '', cost: 0 };
     case 'hotel':
-      return { id, type, from: '', to: '', ref: '', cost: 0 };
+      return { id, type, custom: [], from: '', to: '', ref: '', cost: 0 };
   }
 }
 
@@ -252,4 +264,13 @@ export function nextTrip(doc: TravelDoc, today: string): Trip | undefined {
     (t) => (t.start as string) <= today && today <= (t.end ?? (t.start as string)),
   );
   return current ?? dated.find((t) => (t.start as string) > today);
+}
+
+/** Explicit mapsUrl wins; otherwise a Google Maps search for the address. */
+export function mapsLink(step: TravelStep): string | undefined {
+  if (step.mapsUrl) return step.mapsUrl;
+  if (step.address) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(step.address)}`;
+  }
+  return undefined;
 }
