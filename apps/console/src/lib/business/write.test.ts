@@ -73,6 +73,26 @@ describe('writeBusiness', () => {
     expect(githubFileStore.applyCommit).toHaveBeenCalledWith(call?.[3], { [TIME]: 'new-sha' });
   });
 
+  it('leaves a workflow GitHub refused out of the local store', async () => {
+    const wf = '.github/workflows/business-check.yml';
+    vi.mocked(githubService.commitFiles).mockImplementation(async (_o, _r, _b, files) => ({
+      commitSha: 'c1',
+      blobShas: {},
+      skipped: wf in files ? [wf] : [],
+    }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const build = vi.fn(async () => ({
+      ok: true as const,
+      value: { changes: { [TIME]: 'x', [wf]: 'on: push' }, message: 'm' },
+    }));
+    const result = await writeBusiness(target, build);
+    expect(result).toEqual({ ok: true, value: { commitSha: 'c1' } });
+    const mirrored = vi.mocked(githubFileStore.applyCommit).mock.calls[0]?.[0] as FileChanges;
+    expect(mirrored[TIME]).toBe('x');
+    expect(wf in mirrored).toBe(false);
+    warn.mockRestore();
+  });
+
   it('retries once on a conflict and keeps both devices entries (two devices at once)', async () => {
     vi.mocked(githubService.commitFiles)
       .mockImplementationOnce(async () => {

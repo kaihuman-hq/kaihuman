@@ -37,7 +37,7 @@ let host: HTMLDivElement;
 beforeEach(() => {
   vi.clearAllMocks();
   kb.syncKB.mockResolvedValue('current');
-  setup.enableBusiness.mockResolvedValue(undefined);
+  setup.enableBusiness.mockResolvedValue({ skipped: {} });
   core.loadTree.mockResolvedValue(undefined);
   core.currentRepo.value = repo;
   core.tree.value = [];
@@ -149,6 +149,20 @@ describe('BusinessEnablePage', () => {
     expect(kb.syncKB).toHaveBeenCalledTimes(1);
     expect(core.loadTree).toHaveBeenCalled();
     expect(router.route).toHaveBeenCalledWith('/business');
+  });
+
+  it('shows the workflow to add by hand when GitHub refused it, instead of leaving', async () => {
+    const path = '.github/workflows/business-check.yml';
+    setup.enableBusiness.mockResolvedValue({ skipped: { [path]: 'on: push' } });
+    fillValid();
+    act(() => submit().click());
+    await flush();
+    expect(router.route).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('Business is enabled.');
+    expect(host.textContent).toContain(path);
+    expect(host.querySelector('pre')?.textContent).toContain('on: push');
+    const link = host.querySelector('a[target="_blank"]') as HTMLAnchorElement;
+    expect(link.href).toContain('github.com/me/biz/new/main?filename=');
   });
 
   it('installs the knowledge base first when it is missing', async () => {

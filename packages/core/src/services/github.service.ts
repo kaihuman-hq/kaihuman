@@ -362,6 +362,10 @@ export class GithubService {
    * {@link ConflictError} before creating anything when the branch has moved; a ref update GitHub
    * rejects as non-fast-forward is a ConflictError too. `blobShas` maps each written path to its
    * new blob SHA.
+   *
+   * GitHub refuses (404/403) a tree or ref that changes `.github/workflows/` unless the token has
+   * the `workflow` scope, which sign-in does not ask for. Then the commit is retried once without
+   * those files and they are listed in `skipped`, so the rest of the write still lands.
    */
   async commitFiles(
     owner: string,
@@ -370,7 +374,7 @@ export class GithubService {
     files: Record<string, string | Uint8Array | null>,
     message: string,
     opts?: { expectedHeadSha?: string },
-  ): Promise<{ commitSha: string; blobShas: Record<string, string> }> {
+  ): Promise<{ commitSha: string; blobShas: Record<string, string>; skipped?: string[] }> {
     const client = this.getClient();
     const { data: refData } = await client.git.getRef({
       owner,
@@ -404,35 +408,49 @@ export class GithubService {
         return { ...base, sha: blob.sha };
       }),
     );
-    const { data: newTree } = await client.git.createTree({
-      owner,
-      repo,
-      base_tree: commitData.tree.sha,
-      tree: entries,
-    });
-    const { data: newCommit } = await client.git.createCommit({
-      owner,
-      repo,
-      message,
-      tree: newTree.sha,
-      parents: [headSha],
-    });
+    const commitTree = async (tree: typeof entries): Promise<string> => {
+      const { data: newTree } = await client.git.createTree({
+        owner,
+        repo,
+        base_tree: commitData.tree.sha,
+        tree,
+      });
+      const { data: newCommit } = await client.git.createCommit({
+        owner,
+        repo,
+        message,
+        tree: newTree.sha,
+        parents: [headSha],
+      });
+      try {
+        await client.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommit.sha });
+      } catch (e) {
+        const status = (e as { status?: number }).status;
+        // 422 can also be another ref validation error; treating it as a conflict only costs a retry.
+        if (status === 409 || status === 422) {
+          throw new ConflictError(`${branch} moved while the commit was built`);
+        }
+        throw e;
+      }
+      return newCommit.sha;
+    };
+    let commitSha: string;
+    let skipped: string[] = [];
     try {
-      await client.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommit.sha });
+      commitSha = await commitTree(entries);
     } catch (e) {
       const status = (e as { status?: number }).status;
-      // 422 can also be another ref validation error; treating it as a conflict only costs a retry.
-      if (status === 409 || status === 422) {
-        throw new ConflictError(`${branch} moved while the commit was built`);
-      }
-      throw e;
+      skipped = entries.filter((x) => isWorkflowPath(x.path)).map((x) => x.path);
+      if ((status !== 404 && status !== 403) || skipped.length === 0) throw e;
+      const rest = entries.filter((x) => !isWorkflowPath(x.path));
+      commitSha = rest.length > 0 ? await commitTree(rest) : headSha;
     }
     // createTree lists only top-level entries, so compute the blob SHAs locally.
     const blobShas: Record<string, string> = {};
     for (const [path, content] of Object.entries(files)) {
-      if (content !== null) blobShas[path] = gitBlobSha(content);
+      if (content !== null && !skipped.includes(path)) blobShas[path] = gitBlobSha(content);
     }
-    return { commitSha: newCommit.sha, blobShas };
+    return skipped.length > 0 ? { commitSha, blobShas, skipped } : { commitSha, blobShas };
   }
 
   /** Create or update a file, fetching the current SHA automatically when needed. */
@@ -506,3 +524,8 @@ export const githubService = new Proxy(realGithubService, {
       : value;
   },
 });
+
+/** Files GitHub only lets a token with the `workflow` scope create, change or delete. */
+function isWorkflowPath(path: string): boolean {
+  return path.startsWith('.github/workflows/');
+}

@@ -174,7 +174,7 @@ export class InMemoryGithubService {
     files: Record<string, string | Uint8Array | null>,
     _message: string,
     opts?: { expectedHeadSha?: string },
-  ): Promise<{ commitSha: string; blobShas: Record<string, string> }> {
+  ): Promise<{ commitSha: string; blobShas: Record<string, string>; skipped?: string[] }> {
     const head = await this.getHeadSha(owner, repo, branch);
     if (opts?.expectedHeadSha !== undefined && opts.expectedHeadSha !== head) {
       throw new ConflictError(`${branch} moved from ${opts.expectedHeadSha} to ${head}`);

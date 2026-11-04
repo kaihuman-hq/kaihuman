@@ -61,8 +61,13 @@ export function getBusinessScaffoldFiles(profile: BusinessProfile): Record<strin
 /**
  * Creates the business skeleton in one commit. Refuses a public repo, because it will hold
  * invoices and client data, and a repo that already has a profile, so nothing is overwritten.
+ * `skipped` holds the files GitHub refused (the workflow, when the token lacks the `workflow`
+ * scope) with their content, so the user can add them by hand.
  */
-export async function enableBusiness(kbRepo: KBRepo, profile: BusinessProfile): Promise<void> {
+export async function enableBusiness(
+  kbRepo: KBRepo,
+  profile: BusinessProfile,
+): Promise<{ skipped: Record<string, string> }> {
   const checked = validateProfile(profile);
   if (!checked.ok) {
     throw new Error(`Invalid business profile: ${checked.issues.map((i) => i.message).join('; ')}`);
@@ -78,11 +83,15 @@ export async function enableBusiness(kbRepo: KBRepo, profile: BusinessProfile): 
   if (tree.some((item) => item.path === BUSINESS_PROFILE_PATH)) {
     throw new AlreadyEnabledError(`${kbRepo.full_name} already has business data`);
   }
-  await githubService.commitFiles(
+  const files = getBusinessScaffoldFiles(profile);
+  const res = await githubService.commitFiles(
     owner,
     repo,
     kbRepo.default_branch,
-    getBusinessScaffoldFiles(profile),
+    files,
     'chore: enable kaihuman business',
   );
+  return {
+    skipped: Object.fromEntries((res.skipped ?? []).map((path) => [path, files[path] ?? ''])),
+  };
 }

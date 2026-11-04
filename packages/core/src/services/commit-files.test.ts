@@ -189,6 +189,56 @@ describe('GithubService.commitFiles', () => {
     );
   });
 
+  it('retries without the workflow when GitHub refuses the tree (no workflow scope)', async () => {
+    const notFound = Object.assign(new Error('Not Found'), { status: 404 });
+    git.createTree.mockRejectedValueOnce(notFound);
+    const res = await svc.commitFiles(
+      'o',
+      'r',
+      'main',
+      { '.github/workflows/check.yml': 'on: push', 'a.md': 'x' },
+      'msg',
+    );
+    expect(git.createTree).toHaveBeenCalledTimes(2);
+    expect(git.createTree.mock.calls[1]?.[0].tree).toEqual([
+      { path: 'a.md', mode: '100644', type: 'blob', content: 'x' },
+    ]);
+    expect(git.updateRef).toHaveBeenCalledTimes(1);
+    expect(res).toEqual({
+      commitSha: 'commit2',
+      blobShas: { 'a.md': gitBlobSha('x') },
+      skipped: ['.github/workflows/check.yml'],
+    });
+  });
+
+  it('retries without the workflow when GitHub refuses the ref update', async () => {
+    git.updateRef.mockRejectedValueOnce(Object.assign(new Error('Forbidden'), { status: 403 }));
+    const res = await svc.commitFiles(
+      'o',
+      'r',
+      'main',
+      { '.github/workflows/check.yml': 'on: push', 'a.md': 'x' },
+      'msg',
+    );
+    expect(git.updateRef).toHaveBeenCalledTimes(2);
+    expect(res.skipped).toEqual(['.github/workflows/check.yml']);
+  });
+
+  it('commits nothing when only a refused workflow was to be written', async () => {
+    git.createTree.mockRejectedValueOnce(Object.assign(new Error('Not Found'), { status: 404 }));
+    const res = await svc.commitFiles('o', 'r', 'main', { '.github/workflows/c.yml': 'x' }, 'm');
+    expect(git.createTree).toHaveBeenCalledTimes(1);
+    expect(git.updateRef).not.toHaveBeenCalled();
+    expect(res).toEqual({ commitSha: 'head1', blobShas: {}, skipped: ['.github/workflows/c.yml'] });
+  });
+
+  it('rethrows a 404 when no workflow is in the commit', async () => {
+    const notFound = Object.assign(new Error('Not Found'), { status: 404 });
+    git.createTree.mockRejectedValueOnce(notFound);
+    await expect(svc.commitFiles('o', 'r', 'main', { 'a.md': 'x' }, 'm')).rejects.toBe(notFound);
+    expect(git.createTree).toHaveBeenCalledTimes(1);
+  });
+
   it('rethrows other updateRef errors', async () => {
     git.updateRef.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
     await expect(
