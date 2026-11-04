@@ -1,5 +1,10 @@
 import { encrypt, Logger, passwordStore } from '@kaihuman/core';
-import { DEFAULT_PALETTE_SETTINGS, serializePaletteSettings } from '@kaihuman/formats';
+import {
+  DEFAULT_PALETTE_SETTINGS,
+  parseTravel,
+  serializePaletteSettings,
+  serializeTravel,
+} from '@kaihuman/formats';
 import {
   Activity,
   AlertTriangle,
@@ -15,6 +20,7 @@ import {
   ListTodo,
   Lock,
   MessageSquareQuote,
+  Plane,
   Rss,
   Star,
   Terminal,
@@ -157,6 +163,15 @@ const TEMPLATES: Template[] = [
     icon: Star,
     extension: '.bookmarks.json',
     defaultContent: JSON.stringify({ bookmarks: [], updatedAt: '' }, null, 2),
+  },
+  {
+    id: 'travel',
+    name: 'Travel',
+    description: 'One file per year: trips with flights, hotels, rentals, costs and notes.',
+    icon: Plane,
+    extension: '.travel.json',
+    defaultContent: serializeTravel(parseTravel('')),
+    suggestedFilename: String(new Date().getFullYear()),
   },
   {
     id: 'command-palette-settings',
