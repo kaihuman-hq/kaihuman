@@ -4,6 +4,7 @@ import {
   addTodoEntry,
   getUpcomingMilestone,
   type Milestone,
+  moveTodo,
   parseTodos,
   removeMilestone,
   STATUS_LABELS,
@@ -44,6 +45,7 @@ import {
   usePersistedScope,
   withBusinessFiles,
 } from '../scope-files';
+import { type StreamMode, type StreamSort, StreamsBoard } from './StreamsBoard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1066,11 +1068,42 @@ const AssignMilestonePanel = ({
 
 // ─── KanbanBoard ──────────────────────────────────────────────────────────────
 
+const HeaderToggle = <T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: [T, string][];
+}) => (
+  <div className="flex items-center border border-[var(--los-border)] shrink-0">
+    {options.map(([v, label]) => (
+      <button
+        key={v}
+        type="button"
+        aria-pressed={value === v}
+        onClick={() => onChange(v)}
+        className={cn(
+          'text-[10px] font-mono px-2 py-1 transition-colors',
+          value === v
+            ? 'text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+            : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+        )}
+      >
+        {label}
+      </button>
+    ))}
+  </div>
+);
+
 export interface KanbanBoardProps {
   onNavigateBack?: () => void;
   onAnalyticsClick?: () => void;
   onCreateFile?: (path: string, content: string) => Promise<void>;
   onOpenFile?: (path: string) => void;
+  /** Initial view; the header toggle switches it. */
+  view?: 'kanban' | 'streams';
 }
 
 export const KanbanBoard = ({
@@ -1078,6 +1111,7 @@ export const KanbanBoard = ({
   onAnalyticsClick,
   onCreateFile,
   onOpenFile,
+  view: initialView = 'kanban',
 }: KanbanBoardProps) => {
   const openFiles = githubFileStore.openFiles.value;
   const tree = githubFileStore.tree.value;
@@ -1142,6 +1176,10 @@ export const KanbanBoard = ({
     rejected: true,
   });
   const [colorMode, setColorMode] = useState(false);
+  const [view, setView] = useState<'kanban' | 'streams'>(initialView);
+  const [streamMode, setStreamMode] = useState<StreamMode>('active');
+  const [streamSort, setStreamSort] = useState<StreamSort>('count');
+  const streams = view === 'streams';
   const [scope, setScope] = usePersistedScope('board');
 
   // Find .todos.md files assigned to any workspace in the dashboard config.
@@ -1262,6 +1300,26 @@ export const KanbanBoard = ({
     githubFileStore.saveFile(filePath);
   };
 
+  const handleStreamAdd = (filePath: string, text: string) => {
+    const file = openFiles[filePath];
+    if (!file) return;
+    githubFileStore.updateFileContent(
+      filePath,
+      addTodoEntry(file.content, { text, position: 'top' }),
+    );
+    githubFileStore.saveFile(filePath);
+  };
+
+  const handleStreamMove = (filePath: string, from: number, to: number) => {
+    const file = openFiles[filePath];
+    if (!file) return;
+    githubFileStore.updateFileContent(
+      filePath,
+      serializeTodos(moveTodo(parseTodos(file.content), from, to)),
+    );
+    githubFileStore.saveFile(filePath);
+  };
+
   const handleEditText = (filePath: string, itemIndex: number, text: string) => {
     const file = openFiles[filePath];
     if (!file) return;
@@ -1336,8 +1394,8 @@ export const KanbanBoard = ({
             </button>
           )}
           <div className="h-4 w-px bg-[var(--los-border)]" />
-          <MonoHeader>KANBAN BOARD</MonoHeader>
-          {todoFilePaths.length > 1 ? (
+          <MonoHeader>{streams ? 'STREAMS' : 'KANBAN BOARD'}</MonoHeader>
+          {streams ? null : todoFilePaths.length > 1 ? (
             <FileSelect
               value={focusedFiles.size === 1 ? ([...focusedFiles][0] ?? '') : ''}
               options={todoFilePaths}
@@ -1351,21 +1409,24 @@ export const KanbanBoard = ({
               {todoFilePaths.length} file{todoFilePaths.length !== 1 ? 's' : ''}
             </MonoText>
           )}
-          {focusedFiles.size === 1 && focusedFileData && focusedFileData.milestones.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setAssignMode((v) => !v)}
-              className={cn(
-                'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
-                assignMode
-                  ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
-                  : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)]',
-              )}
-            >
-              <Tags size={10} />
-              ASSIGN
-            </button>
-          )}
+          {!streams &&
+            focusedFiles.size === 1 &&
+            focusedFileData &&
+            focusedFileData.milestones.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setAssignMode((v) => !v)}
+                className={cn(
+                  'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
+                  assignMode
+                    ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                    : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)]',
+                )}
+              >
+                <Tags size={10} />
+                ASSIGN
+              </button>
+            )}
         </div>
 
         <ScopeToggle value={scope} onChange={setScope} />
@@ -1392,82 +1453,115 @@ export const KanbanBoard = ({
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          {upcomingMilestone && (
-            <button
-              type="button"
-              onClick={() => setShowUpcoming((v) => !v)}
-              className={cn(
-                'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
-                showUpcoming
-                  ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
-                  : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
-              )}
-              title={`Next milestone: ${upcomingMilestone.name}${upcomingMilestone.dueDate ? ` (${upcomingMilestone.dueDate})` : ''}`}
-            >
-              <CalendarDays size={10} />
-              UPCOMING
-            </button>
-          )}
-
-          {allMilestones.length > 0 && (
-            <select
-              value={milestoneFilter}
-              onChange={(e) => {
-                setMilestoneFilter(e.currentTarget.value);
-                setShowUpcoming(false);
-              }}
-              className="bg-[var(--los-bg)] border border-[var(--los-border)] text-xs font-mono px-2 py-1 focus:border-[var(--los-accent)] outline-none transition-colors"
-            >
-              <option value="">All milestones</option>
-              {allMilestones.map((m) => (
-                <option key={m.id} value={m.id}>
-                  !{m.id}
-                  {m.dueDate ? ` · ${m.dueDate}` : ''}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setColorMode((v) => !v)}
-            className={cn(
-              'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
-              colorMode
-                ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
-                : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)]',
-            )}
-            title="Toggle list colors"
-          >
-            <Palette size={10} />
-            COLOR
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowMilestoneManager(true)}
-            className="flex items-center gap-1.5 text-[10px] font-mono border border-[var(--los-border)] px-2 py-1 text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
-          >
-            <Pencil size={10} />
-            MILESTONES
-          </button>
-
-          {onAnalyticsClick && (
-            <button
-              type="button"
-              onClick={onAnalyticsClick}
-              className="flex items-center gap-1.5 text-[10px] font-mono border border-[var(--los-border)] px-2 py-1 text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
-              title="Todo Analytics"
-            >
-              <BarChart2 size={10} />
-              ANALYTICS
-            </button>
+          <HeaderToggle
+            value={view}
+            onChange={setView}
+            options={[
+              ['kanban', 'KANBAN'],
+              ['streams', 'STREAMS'],
+            ]}
+          />
+          {streams && (
+            <>
+              <HeaderToggle
+                value={streamMode}
+                onChange={setStreamMode}
+                options={[
+                  ['active', 'ACTIVE'],
+                  ['closed', 'CLOSED'],
+                ]}
+              />
+              <HeaderToggle
+                value={streamSort}
+                onChange={setStreamSort}
+                options={[
+                  ['count', 'MOST ITEMS'],
+                  ['newest', 'NEWEST'],
+                ]}
+              />
+            </>
           )}
         </div>
+
+        {!streams && (
+          <div className="flex items-center gap-3 shrink-0">
+            {upcomingMilestone && (
+              <button
+                type="button"
+                onClick={() => setShowUpcoming((v) => !v)}
+                className={cn(
+                  'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
+                  showUpcoming
+                    ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                    : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
+                )}
+                title={`Next milestone: ${upcomingMilestone.name}${upcomingMilestone.dueDate ? ` (${upcomingMilestone.dueDate})` : ''}`}
+              >
+                <CalendarDays size={10} />
+                UPCOMING
+              </button>
+            )}
+
+            {allMilestones.length > 0 && (
+              <select
+                value={milestoneFilter}
+                onChange={(e) => {
+                  setMilestoneFilter(e.currentTarget.value);
+                  setShowUpcoming(false);
+                }}
+                className="bg-[var(--los-bg)] border border-[var(--los-border)] text-xs font-mono px-2 py-1 focus:border-[var(--los-accent)] outline-none transition-colors"
+              >
+                <option value="">All milestones</option>
+                {allMilestones.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    !{m.id}
+                    {m.dueDate ? ` · ${m.dueDate}` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setColorMode((v) => !v)}
+              className={cn(
+                'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
+                colorMode
+                  ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                  : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)]',
+              )}
+              title="Toggle list colors"
+            >
+              <Palette size={10} />
+              COLOR
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowMilestoneManager(true)}
+              className="flex items-center gap-1.5 text-[10px] font-mono border border-[var(--los-border)] px-2 py-1 text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
+            >
+              <Pencil size={10} />
+              MILESTONES
+            </button>
+
+            {onAnalyticsClick && (
+              <button
+                type="button"
+                onClick={onAnalyticsClick}
+                className="flex items-center gap-1.5 text-[10px] font-mono border border-[var(--los-border)] px-2 py-1 text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
+                title="Todo Analytics"
+              >
+                <BarChart2 size={10} />
+                ANALYTICS
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* List badges row */}
-      {todoFilePaths.length > 1 && (
+      {!streams && todoFilePaths.length > 1 && (
         <div className="border-b border-[var(--los-border)] flex items-center gap-2 px-4 py-2 overflow-x-auto shrink-0">
           <button
             type="button"
@@ -1539,6 +1633,17 @@ export const KanbanBoard = ({
         <div className="flex-1 flex items-center justify-center text-[var(--los-muted)]">
           <MonoText>No .todos.md files found in this repository.</MonoText>
         </div>
+      ) : streams ? (
+        <StreamsBoard
+          files={parsedFiles}
+          searchQuery={searchQuery}
+          mode={streamMode}
+          sort={streamSort}
+          onStatusChange={handleStatusChange}
+          onAddItem={handleStreamAdd}
+          onMoveItem={handleStreamMove}
+          onOpenFile={onOpenFile}
+        />
       ) : !assignMode ? (
         <div className="flex-1 overflow-x-auto overflow-y-hidden flex">
           {COLUMNS.map((col) => {

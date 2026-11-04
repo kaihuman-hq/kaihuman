@@ -49,9 +49,7 @@ export function addTodoEntry(content: string, entry: TodoEntry, now = new Date()
     entry.prompt,
     now,
   );
-  return serializeTodos(
-    entry.position === 'top' ? moveTodo(data, data.items.length - 1, 0) : data,
-  );
+  return serializeTodos(entry.position === 'top' ? moveTodo(data, data.items.length - 1, 0) : data);
 }
 
 export interface ActionLogEntryInput {

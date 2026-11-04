@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-04 — Streams view on the board
+
+- New `StreamsBoard` (`packages/ui`): one tile per `.todos.md` in a 4-column grid, an always-visible add input (Enter adds on top), colour-coded rows, hover buttons for in progress / done / rejected / backlog, drag to reorder within a tile (`moveTodo`). Header toggles KANBAN | STREAMS, ACTIVE | CLOSED and MOST ITEMS | NEWEST; scope and search apply. Route `/streams` in the console; `KanbanBoard` takes `view`.
+- Pure helpers `streamItems`, `sortStreams`, `actionsFor` are unit-tested.
+
 ## 2026-11-03 — Business, phase 6: e-invoices (XRechnung UBL, CII/ZUGFeRD)
 
 - `@kaihuman/formats` business: `xml.ts` (small builder, escaping, illegal control characters stripped) and `xrechnung.ts` with `toUbl(e)` (XRechnung 3.0 UBL 2.1, `Invoice` for 380, `CreditNote` for 381 with the preceding invoice in BG-3), `toCii(e, { guideline: 'xrechnung' | 'en16931' })` (UN/CEFACT CII D16B; `en16931` is the ZUGFeRD / Factur-X EN 16931 profile), `electronicAddress` (explicit `SCHEME:value`, e-mail → `EM`, Leitweg-ID → `0204`) and `xrechnungGaps` (buyer reference, seller contact with phone and e-mail, electronic addresses, E without reason). Mapping: SEPA `58` with IBAN/BIC/reference, credit notes without payment get code `1` and a refund note (BT-20), AE with `VATEX-EU-AE`, E with the § 19 reason, O without rate, service period, delivery date, UN/ECE units. Amounts are the strings of `toEn16931`, so rounding is that of `computeTotals`.
