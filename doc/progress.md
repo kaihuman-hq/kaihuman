@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-04 — Travel file type (`.travel.json`)
+
+- New yearly travel file `YYYY.travel.json` (`{version, currency, trips[]}`) in `@kaihuman/formats` (`travel.ts`): tolerant parse, pure mutators, trip/total cost, `nextTrip`. Step types: general, car (toll dates), rental, flight, train, hotel.
+- `TravelWidget` (tile: next trip, countdown, totals; focus: edit trips, custom fields, steps) and `TravelAddForm`; wired into layout store, `MainApp`, `Dashboard`, `NewFileWizard`, `kb-skills`.
+- Review fixes: empty `.travel.json` now renders the widget; cost field no longer resets while typing decimals or when cleared (regression test).
+
 ## 2026-11-04 — Business enable and writes without the workflow scope
 
 - Enabling business failed with `404 Not Found` on `git/trees`: sign-in requests only the `repo` scope, and GitHub refuses a tree touching `.github/workflows/` without `workflow`. `commitFiles` (core) now retries once without workflow files on 404/403 and returns them in `skipped`; `enableBusiness` returns them with content and `/business/enable` shows the workflow to add by hand; `writeBusiness` keeps them out of the local mirror. Ruling W1 in `doc/business.md`. Regression tests in core and console.

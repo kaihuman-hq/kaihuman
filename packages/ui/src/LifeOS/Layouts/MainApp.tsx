@@ -905,10 +905,11 @@ abbreviations: undefined
         />
       );
     }
-    if (tile.extension?.toLowerCase() === '.travel.json' && tile.rawContent) {
+    if (tile.extension?.toLowerCase() === '.travel.json') {
+      // Empty file is valid: parseTravel turns it into an empty doc.
       return (
         <TravelWidget
-          content={tile.rawContent}
+          content={tile.rawContent ?? ''}
           mode={mode}
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />

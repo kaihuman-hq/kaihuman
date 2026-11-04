@@ -248,7 +248,9 @@ const LabeledInput = ({
     <input
       type={type}
       aria-label={ariaLabel}
-      value={value}
+      // Number inputs stay uncontrolled: re-rendering "0" over a cleared field or
+      // a half-typed "12." makes decimals impossible to enter.
+      {...(type === 'number' ? { defaultValue: value } : { value })}
       onInput={(e) => onValue(e.currentTarget.value)}
       className={inputClass}
     />

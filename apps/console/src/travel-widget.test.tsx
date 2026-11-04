@@ -110,6 +110,14 @@ describe('TravelWidget focus view', () => {
     expect(onChange.mock.calls.at(-1)?.[0]).not.toContain('null');
   });
 
+  it('keeps a cleared cost field empty instead of redisplaying 0', () => {
+    mountFocus(withTrips());
+    act(() => byLabel<HTMLButtonElement>('Toggle trip').click());
+    const input = byLabel<HTMLInputElement>('Step cost', 0);
+    typeInto(input, '');
+    expect(byLabel<HTMLInputElement>('Step cost', 0).value).toBe('');
+  });
+
   it('adds a custom field then deletes a step', () => {
     const onChange = mountFocus(withTrips());
     act(() => byLabel<HTMLButtonElement>('Toggle trip').click());
