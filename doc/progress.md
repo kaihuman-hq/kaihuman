@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-04 — Easier to find colour and priority controls
+
+- `FileColorPicker` shows a palette icon when no colour is set; unset `PriorityBadge` stays faintly visible instead of hidden until hover.
+
 ## 2026-11-04 — Stream tab, file colours, item priority, extension todo list
 
 - Console bottom bar: "Board" is now "Stream" and opens `/stream` (stream view). `/streams` and `/board` still work.

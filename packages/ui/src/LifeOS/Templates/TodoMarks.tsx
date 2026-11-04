@@ -7,6 +7,7 @@ import {
   type TodoData,
   type TodoPriority,
 } from '@kaihuman/formats';
+import { Palette } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 
@@ -29,7 +30,7 @@ export const priorityMark = (
 export const fileColorHex = (data: Pick<TodoData, 'color'>): string | undefined =>
   data.color ? TODO_COLOR_HEX[data.color] : undefined;
 
-/** Click cycles none → ! → !! → !!! → none; unset stays hidden until the row is hovered. */
+/** Click cycles none → ! → !! → !!! → none; unset stays faint so it can be found. */
 export const PriorityBadge = ({
   priority,
   onCycle,
@@ -50,7 +51,7 @@ export const PriorityBadge = ({
       className={cn(
         'shrink-0 min-w-[1.25rem] text-[10px] font-mono font-bold leading-none hover:opacity-80 transition-opacity',
         m.className,
-        !priority && 'opacity-0 group-hover:opacity-60 group-focus-within:opacity-60',
+        !priority && 'opacity-30 group-hover:opacity-70 group-focus-within:opacity-70',
       )}
     >
       {m.glyph}
@@ -94,10 +95,14 @@ export const FileColorPicker = ({
         onClick={() => setOpen((v) => !v)}
         style={color ? { backgroundColor: TODO_COLOR_HEX[color] } : undefined}
         className={cn(
-          'w-3 h-3 rounded-full border border-[var(--los-border)] hover:border-[var(--los-fg)] transition-colors',
-          !color && 'bg-transparent',
+          'flex items-center justify-center rounded-full transition-colors',
+          color
+            ? 'w-3 h-3 border border-[var(--los-border)] hover:border-[var(--los-fg)]'
+            : 'w-4 h-4 text-[var(--los-muted)] hover:text-[var(--los-fg)]',
         )}
-      />
+      >
+        {!color && <Palette size={12} aria-hidden="true" />}
+      </button>
       {open && (
         <div className="absolute top-full left-0 mt-1 z-50 grid grid-cols-6 gap-1 p-1.5 bg-[var(--los-bg)] border border-[var(--los-border)] shadow-lg">
           <button
