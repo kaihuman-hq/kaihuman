@@ -241,6 +241,18 @@ refreshes the tool files when `.kh/business/.tools/version` differs from `BUSINE
 (`1.3.0` since phase 5a: the check, skill and validators changed, so a repo set up earlier is
 upgraded with its next business write or KB sync). Repos without business get nothing.
 
+Sign-in asks GitHub only for the `repo` scope, and GitHub refuses (`404 Not Found` on
+`git/trees`, or 403) a commit that touches `.github/workflows/` without the `workflow` scope.
+`githubService.commitFiles` then retries once without the workflow files and lists them in
+`skipped`; the rest of the commit lands. Enable shows the skipped workflow with its content and a
+"Create it on GitHub" link, so the user adds it by hand; until then the check does not run on
+push. A business write or KB sync that upgrades the tool files skips it the same way (writes log
+a warning).
+
+Ruling W1: commit without the workflow instead of asking for the `workflow` scope at sign-in —
+cost: a repo set up this way has no CI check until the user adds the file, and since the tool
+version file is still written, later upgrades do not offer the workflow again.
+
 The form has a `VAT basis` select next to the VAT regime: Soll (default, nothing written) or Ist
 (writes `vat_basis: cash`). Edit `business.yaml` to change it later.
 

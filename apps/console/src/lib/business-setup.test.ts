@@ -67,6 +67,23 @@ describe('enableBusiness', () => {
     expect(githubService.commitFiles).not.toHaveBeenCalled();
   });
 
+  it('returns the workflow GitHub refused, with its content, for adding by hand', async () => {
+    givenRepo({ private: true }, {});
+    const path = '.github/workflows/business-check.yml';
+    vi.mocked(githubService.commitFiles).mockResolvedValue({
+      commitSha: 'c',
+      blobShas: {},
+      skipped: [path],
+    });
+    const res = await enableBusiness(repo, profile);
+    expect(res.skipped).toEqual({ [path]: getBusinessToolFiles()[path] });
+  });
+
+  it('reports nothing skipped when the whole skeleton was committed', async () => {
+    givenRepo({ private: true }, {});
+    expect(await enableBusiness(repo, profile)).toEqual({ skipped: {} });
+  });
+
   it('commits the whole skeleton once, with a profile that validates', async () => {
     givenRepo({ private: true }, {});
     await enableBusiness(repo, profile);
