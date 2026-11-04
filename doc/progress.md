@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-04 — Faster 10 MB base64 test in core
+
+- `commit-files.test.ts`: the 10 MB round-trip test built and checked bytes with `Uint8Array.from(fn)` / `.every()` (~4 s) and timed out on busy CI runners. Plain loops (~0.7 s) and a 30 s timeout.
+
 ## 2026-11-04 — Easier to find colour and priority controls
 
 - `FileColorPicker` shows a palette icon when no colour is set; unset `PriorityBadge` stays faintly visible instead of hidden until hover.

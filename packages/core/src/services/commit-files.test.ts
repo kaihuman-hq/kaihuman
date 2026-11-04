@@ -147,14 +147,23 @@ describe('GithubService.commitFiles', () => {
   it('base64-encodes 10 MB without overflowing the stack', async () => {
     git.createBlob.mockResolvedValue({ data: { sha: 'big' } });
     // Patterned, so a dropped or repeated chunk shows up (0x6000 is the encoder's chunk size).
-    const big = Uint8Array.from({ length: 10 * 1024 * 1024 }, (_, i) => i % 256);
+    const big = new Uint8Array(10 * 1024 * 1024);
+    for (let i = 0; i < big.length; i++) big[i] = i % 256;
     await svc.commitFiles('o', 'r', 'main', { 'big.pdf': big }, 'msg');
     const sent = git.createBlob.mock.calls[0]?.[0].content as string;
     expect(sent.length).toBe(Math.ceil(big.length / 3) * 4);
-    const back = Uint8Array.from(atob(sent), (c) => c.charCodeAt(0));
-    expect(back.length).toBe(big.length);
-    expect(back.every((b, i) => b === big[i])).toBe(true);
-  });
+    // Plain loops: Uint8Array.from(..., fn) and .every() took seconds and timed out on busy CI runners.
+    const bin = atob(sent);
+    expect(bin.length).toBe(big.length);
+    let firstMismatch = -1;
+    for (let i = 0; i < bin.length; i++) {
+      if (bin.charCodeAt(i) !== big[i]) {
+        firstMismatch = i;
+        break;
+      }
+    }
+    expect(firstMismatch).toBe(-1);
+  }, 30_000);
 
   it('creates no tree when a blob upload fails', async () => {
     git.createBlob.mockRejectedValue(new Error('boom'));
