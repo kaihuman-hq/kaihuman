@@ -2,6 +2,7 @@ import { githubFileStore, layoutStore } from '@kaihuman/core';
 import {
   addMilestone,
   addTodoEntry,
+  cyclePriority,
   getUpcomingMilestone,
   type Milestone,
   moveTodo,
@@ -11,6 +12,9 @@ import {
   serializeTodos,
   setMilestone,
   setStatus,
+  setTodoColor,
+  setTodoPriority,
+  type TodoColor,
   type TodoData,
   type TodoItem,
   type TodoStatus,
@@ -46,6 +50,7 @@ import {
   withBusinessFiles,
 } from '../scope-files';
 import { type StreamMode, type StreamSort, StreamsBoard } from './StreamsBoard';
+import { FileColorPicker, fileColorHex, PriorityBadge } from './TodoMarks';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -745,11 +750,13 @@ const KanbanCard = ({
   onOpenFile,
   onMove,
   onEditText,
+  onCyclePriority,
   otherFilePaths,
   borderColor,
 }: {
   agg: AggregatedItem;
   onStatusChange: (filePath: string, itemIndex: number, newStatus: TodoStatus) => void;
+  onCyclePriority?: (filePath: string, itemIndex: number) => void;
   onOpenFile?: (path: string) => void;
   onMove?: (targetFilePath: string) => void;
   onEditText?: (filePath: string, itemIndex: number, text: string) => void;
@@ -836,9 +843,17 @@ const KanbanCard = ({
         </div>
       ) : (
         <>
-          <MonoText className="text-xs leading-relaxed break-words">
-            {renderTextWithLinks(item.text)}
-          </MonoText>
+          <div className="flex items-start gap-1.5">
+            <MonoText className="flex-1 min-w-0 text-xs leading-relaxed break-words">
+              {renderTextWithLinks(item.text)}
+            </MonoText>
+            {onCyclePriority && (
+              <PriorityBadge
+                priority={item.priority}
+                onCycle={() => onCyclePriority(filePath, agg.itemIndex)}
+              />
+            )}
+          </div>
 
           <div className="flex flex-wrap gap-1">
             {item.tags.map((t) => (
@@ -1320,6 +1335,33 @@ export const KanbanBoard = ({
     githubFileStore.saveFile(filePath);
   };
 
+  const handleCyclePriority = (filePath: string, itemIndex: number) => {
+    const file = openFiles[filePath];
+    if (!file) return;
+    const data = parseTodos(file.content);
+    const item = data.items[itemIndex];
+    if (!item) return;
+    const newData = setTodoPriority(data, item.id, cyclePriority(item.priority));
+    githubFileStore.updateFileContent(filePath, serializeTodos(newData));
+    githubFileStore.saveFile(filePath);
+  };
+
+  const handleColorChange = (filePath: string, color?: TodoColor) => {
+    const file = openFiles[filePath];
+    if (!file) return;
+    githubFileStore.updateFileContent(
+      filePath,
+      serializeTodos(setTodoColor(parseTodos(file.content), color)),
+    );
+    githubFileStore.saveFile(filePath);
+  };
+
+  // An explicit file color wins; the palette toggle only fills in files without one.
+  const cardBorder = (filePath: string): string | undefined => {
+    const data = parsedFiles.find((f) => f.path === filePath)?.data;
+    return (data && fileColorHex(data)) ?? (colorMode ? fileColors[filePath] : undefined);
+  };
+
   const handleEditText = (filePath: string, itemIndex: number, text: string) => {
     const file = openFiles[filePath];
     if (!file) return;
@@ -1408,6 +1450,13 @@ export const KanbanBoard = ({
             <MonoText className="text-[10px] text-[var(--los-muted)]">
               {todoFilePaths.length} file{todoFilePaths.length !== 1 ? 's' : ''}
             </MonoText>
+          )}
+          {!streams && focusedFiles.size === 1 && focusedFileData && (
+            <FileColorPicker
+              color={focusedFileData.color}
+              label={fileLabel([...focusedFiles][0] ?? '')}
+              onChange={(c) => handleColorChange([...focusedFiles][0] ?? '', c)}
+            />
           )}
           {!streams &&
             focusedFiles.size === 1 &&
@@ -1642,6 +1691,8 @@ export const KanbanBoard = ({
           onStatusChange={handleStatusChange}
           onAddItem={handleStreamAdd}
           onMoveItem={handleStreamMove}
+          onCyclePriority={handleCyclePriority}
+          onColorChange={handleColorChange}
           onOpenFile={onOpenFile}
         />
       ) : !assignMode ? (
@@ -1760,6 +1811,7 @@ export const KanbanBoard = ({
                                 onStatusChange={handleStatusChange}
                                 onOpenFile={onOpenFile}
                                 onEditText={handleEditText}
+                                onCyclePriority={handleCyclePriority}
                                 onMove={
                                   todoFilePaths.length > 1
                                     ? (targetPath) =>
@@ -1767,7 +1819,7 @@ export const KanbanBoard = ({
                                     : undefined
                                 }
                                 otherFilePaths={todoFilePaths.filter((fp) => fp !== agg.filePath)}
-                                borderColor={colorMode ? fileColors[agg.filePath] : undefined}
+                                borderColor={cardBorder(agg.filePath)}
                               />
                             ))}
                           </div>

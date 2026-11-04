@@ -145,7 +145,7 @@ export const QuickNotePage = () => {
         mode="NOTE"
         onDashboardClick={() => route('/')}
         onFilesClick={() => route('/')}
-        onBoardClick={() => route('/board')}
+        onBoardClick={() => route('/stream')}
       />
     </>
   );

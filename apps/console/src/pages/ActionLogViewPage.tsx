@@ -8,7 +8,7 @@ export const ActionLogViewPage = () => (
       mode="ACTION LOG"
       onDashboardClick={() => route('/')}
       onFilesClick={() => route('/')}
-      onBoardClick={() => route('/board')}
+      onBoardClick={() => route('/stream')}
     />
   </>
 );

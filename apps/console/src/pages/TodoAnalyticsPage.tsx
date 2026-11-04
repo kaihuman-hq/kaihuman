@@ -8,7 +8,7 @@ export const TodoAnalyticsPage = () => (
       mode="ANALYTICS"
       onDashboardClick={() => route('/')}
       onFilesClick={() => route('/')}
-      onBoardClick={() => route('/board')}
+      onBoardClick={() => route('/stream')}
     />
   </>
 );

@@ -2102,7 +2102,7 @@ abbreviations: undefined
                     onClick: () => setShowSearch(true),
                   },
                   ...(onShortcutsClick ? [{ label: 'Shortcuts', onClick: onShortcutsClick }] : []),
-                  ...(onBoardClick ? [{ label: 'Board', onClick: onBoardClick }] : []),
+                  ...(onBoardClick ? [{ label: 'Stream', onClick: onBoardClick }] : []),
                   ...(onActionLogClick ? [{ label: 'Action Log', onClick: onActionLogClick }] : []),
                   ...(onKnowledgeClick
                     ? [{ label: 'Knowledge Base', onClick: onKnowledgeClick }]

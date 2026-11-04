@@ -638,7 +638,7 @@ export const IdeasPage = () => {
         mode="IDEAS"
         onDashboardClick={() => route('/')}
         onFilesClick={() => route('/')}
-        onBoardClick={() => route('/board')}
+        onBoardClick={() => route('/stream')}
       />
     </>
   );

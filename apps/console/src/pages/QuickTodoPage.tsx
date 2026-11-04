@@ -214,7 +214,7 @@ export const QuickTodoPage = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => route('/board')}
+                  onClick={() => route('/stream')}
                   class="px-4 py-2 border border-[var(--los-border)] text-xs font-mono text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)] transition-colors"
                 >
                   BOARD →
@@ -241,7 +241,7 @@ export const QuickTodoPage = () => {
         mode="INBOX"
         onDashboardClick={() => route('/')}
         onFilesClick={() => route('/')}
-        onBoardClick={() => route('/board')}
+        onBoardClick={() => route('/stream')}
       />
     </>
   );

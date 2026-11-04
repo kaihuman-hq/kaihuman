@@ -1,9 +1,16 @@
-import type { TodoData, TodoItem, TodoStatus } from '@kaihuman/formats';
+import {
+  maxPriorityRank,
+  type TodoColor,
+  type TodoData,
+  type TodoItem,
+  type TodoStatus,
+} from '@kaihuman/formats';
 import { CheckCircle2, Circle, PlayCircle, XCircle } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoText } from '../Atoms/Typography';
 import { fileLabel } from '../scope-files';
+import { FileColorPicker, fileColorHex, PriorityBadge } from './TodoMarks';
 
 export type StreamMode = 'active' | 'closed';
 export type StreamSort = 'count' | 'newest';
@@ -36,24 +43,29 @@ export const streamItems = (
   return rows;
 };
 
+/** Streams holding a higher visible priority always lead; `sort` orders within a rank. */
 export const sortStreams = <F extends StreamFile>(
   files: readonly F[],
   sort: StreamSort,
   mode: StreamMode,
   query = '',
 ): F[] => {
-  const key = (f: F) => {
+  const keyed = files.map((f) => {
     const rows = streamItems(f.data, mode, query);
-    return sort === 'count'
-      ? rows.length
-      : rows.reduce(
-          (m, r) => (r.item.createdAt && r.item.createdAt > m ? r.item.createdAt : m),
-          '',
-        );
-  };
-  return files
-    .map((f) => ({ f, k: key(f) }))
-    .sort((a, b) => (a.k < b.k ? 1 : a.k > b.k ? -1 : a.f.path.localeCompare(b.f.path)))
+    const k =
+      sort === 'count'
+        ? rows.length
+        : rows.reduce(
+            (m, r) => (r.item.createdAt && r.item.createdAt > m ? r.item.createdAt : m),
+            '',
+          );
+    return { f, k, rank: maxPriorityRank(rows.map((r) => r.item)) };
+  });
+  return keyed
+    .sort(
+      (a, b) =>
+        b.rank - a.rank || (a.k < b.k ? 1 : a.k > b.k ? -1 : a.f.path.localeCompare(b.f.path)),
+    )
     .map((x) => x.f);
 };
 
@@ -103,6 +115,8 @@ export interface StreamsBoardProps {
   onStatusChange: (path: string, index: number, status: TodoStatus) => void;
   onAddItem: (path: string, text: string) => void;
   onMoveItem: (path: string, from: number, to: number) => void;
+  onCyclePriority: (path: string, index: number) => void;
+  onColorChange: (path: string, color?: TodoColor) => void;
   onOpenFile?: (path: string) => void;
 }
 
@@ -113,6 +127,8 @@ const StreamTile = ({
   onStatusChange,
   onAddItem,
   onMoveItem,
+  onCyclePriority,
+  onColorChange,
   onOpenFile,
 }: Omit<StreamsBoardProps, 'files' | 'sort'> & { file: StreamFile; mode: StreamMode }) => {
   const [draft, setDraft] = useState('');
@@ -126,14 +142,22 @@ const StreamTile = ({
   };
 
   return (
-    <section className="h-[40vh] min-h-[260px] flex flex-col border border-[var(--los-border)] min-w-0">
+    <section
+      style={fileColorHex(file.data) ? { borderColor: fileColorHex(file.data) } : undefined}
+      className="h-[40vh] min-h-[260px] flex flex-col border border-[var(--los-border)] min-w-0"
+    >
       <header className="h-9 flex items-center justify-between gap-2 px-3 border-b border-[var(--los-border)] shrink-0">
+        <FileColorPicker
+          color={file.data.color}
+          label={fileLabel(file.path)}
+          onChange={(c) => onColorChange(file.path, c)}
+        />
         <button
           type="button"
           onClick={() => onOpenFile?.(file.path)}
           disabled={!onOpenFile}
           title={file.path}
-          className="min-w-0 truncate text-left text-[11px] font-mono font-bold hover:text-[var(--los-accent)] transition-colors"
+          className="flex-1 min-w-0 truncate text-left text-[11px] font-mono font-bold hover:text-[var(--los-accent)] transition-colors"
         >
           {fileLabel(file.path)}
         </button>
@@ -193,6 +217,10 @@ const StreamTile = ({
               )}
             >
               <Icon size={11} className={cn('mt-0.5 shrink-0', ui.text)} aria-label={ui.title} />
+              <PriorityBadge
+                priority={item.priority}
+                onCycle={() => onCyclePriority(file.path, index)}
+              />
               <MonoText className="flex-1 min-w-0 text-xs break-words">{item.text}</MonoText>
               <div className="hidden group-hover:flex group-focus-within:flex items-center gap-1 shrink-0">
                 {actionsFor(item.status).map((s) => {

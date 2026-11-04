@@ -18,7 +18,7 @@ export const KanbanBoardPage = () => (
       mode="BOARD"
       onDashboardClick={() => route('/')}
       onFilesClick={() => route('/')}
-      onBoardClick={() => route('/board')}
+      onBoardClick={() => route('/stream')}
     />
   </>
 );
