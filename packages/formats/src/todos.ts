@@ -3,6 +3,7 @@
  *
  * Format v2 (flat list with inline metadata):
  *   ---
+ *   color: sky            (optional file color, one of TODO_COLORS)
  *   milestones:
  *     - id: v1.0
  *       name: Version 1.0
@@ -10,12 +11,15 @@
  *   ---
  *
  *   - [ ] backlog task #tag1 #tag2
- *   - [>] in-progress task #tag !milestone-id
+ *   - [>] in-progress task #tag !milestone-id ^super-high
  *   - [x] done task #tag
  *   - [-] rejected task
  *     > Prompt text line 1
  *     > Prompt line 2
  *     > ref:path/to/prompts.md
+ *
+ * Priority token (optional, after tags/milestone): ^high, ^super-high, ^ultra-high.
+ * Unknown ^words stay in the text.
  *
  * Status markers:
  *   [ ] = backlog, [>] = in-progress, [x] = done, [-] = rejected
@@ -25,6 +29,49 @@
  */
 
 export type TodoStatus = 'backlog' | 'in-progress' | 'done' | 'rejected';
+
+export const TODO_COLORS = [
+  'red',
+  'orange',
+  'amber',
+  'lime',
+  'emerald',
+  'teal',
+  'sky',
+  'indigo',
+  'violet',
+  'pink',
+] as const;
+export type TodoColor = (typeof TODO_COLORS)[number];
+
+export const TODO_COLOR_HEX: Record<TodoColor, string> = {
+  red: '#ef4444',
+  orange: '#f97316',
+  amber: '#f59e0b',
+  lime: '#84cc16',
+  emerald: '#10b981',
+  teal: '#14b8a6',
+  sky: '#0ea5e9',
+  indigo: '#6366f1',
+  violet: '#8b5cf6',
+  pink: '#ec4899',
+};
+
+export type TodoPriority = 'high' | 'super-high' | 'ultra-high';
+
+export const PRIORITY_RANK: Record<TodoPriority, number> = {
+  high: 1,
+  'super-high': 2,
+  'ultra-high': 3,
+};
+
+export const PRIORITY_LABELS: Record<TodoPriority, string> = {
+  high: 'High',
+  'super-high': 'Super high',
+  'ultra-high': 'Ultra high',
+};
+
+const PRIORITY_ORDER: TodoPriority[] = ['high', 'super-high', 'ultra-high'];
 
 export interface Milestone {
   id: string;
@@ -43,6 +90,7 @@ export interface TodoItem {
   status: TodoStatus;
   tags: string[];
   milestoneId?: string;
+  priority?: TodoPriority;
   prompt?: TodoPrompt;
   createdAt?: string; // ISO 8601
   updatedAt?: number; // Unix ms
@@ -52,6 +100,7 @@ export interface TodoData {
   milestones: Milestone[];
   items: TodoItem[];
   isLegacyFormat: boolean;
+  color?: TodoColor;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -126,19 +175,30 @@ function parseMilestonesYaml(yaml: string): Milestone[] {
   return milestones;
 }
 
-function parseFrontmatter(content: string): { milestones: Milestone[]; remaining: string } {
+function parseColor(yaml: string): TodoColor | undefined {
+  const value = yaml.match(/^color:\s*(\S+)\s*$/m)?.[1];
+  return TODO_COLORS.find((c) => c === value);
+}
+
+function parseFrontmatter(content: string): {
+  milestones: Milestone[];
+  color?: TodoColor;
+  remaining: string;
+} {
   if (!content.startsWith('---')) return { milestones: [], remaining: content };
   const afterOpen = content.slice(3);
   const closeIdx = afterOpen.indexOf('\n---');
   if (closeIdx === -1) return { milestones: [], remaining: content };
   const yamlBlock = afterOpen.slice(0, closeIdx);
   const remaining = afterOpen.slice(closeIdx + 4).replace(/^\n/, '');
-  return { milestones: parseMilestonesYaml(yamlBlock), remaining };
+  return { milestones: parseMilestonesYaml(yamlBlock), color: parseColor(yamlBlock), remaining };
 }
 
-function serializeMilestones(milestones: Milestone[]): string {
-  if (milestones.length === 0) return '';
-  let result = '---\nmilestones:\n';
+function serializeFrontmatter(milestones: Milestone[], color?: TodoColor): string {
+  if (milestones.length === 0 && !color) return '';
+  let result = '---\n';
+  if (color) result += `color: ${color}\n`;
+  if (milestones.length > 0) result += 'milestones:\n';
   for (const m of milestones) {
     result += `  - id: ${m.id}\n`;
     result += `    name: ${m.name}\n`;
@@ -153,7 +213,7 @@ function serializeMilestones(milestones: Milestone[]): string {
 export const parseTodos = (md: string): TodoData => {
   if (!md) return { milestones: [], items: [], isLegacyFormat: false };
 
-  const { milestones, remaining } = parseFrontmatter(md);
+  const { milestones, color, remaining } = parseFrontmatter(md);
   const lines = remaining.split(/\r?\n/);
   const isLegacyFormat = lines.some((l) => /^#\s+/.test(l));
 
@@ -216,6 +276,15 @@ export const parseTodos = (md: string): TodoData => {
       })
       .trim();
 
+    // Priority token: ^high | ^super-high | ^ultra-high (unknown ^words stay in text)
+    let priority: TodoPriority | undefined;
+    rawText = rawText
+      .replace(/(^|\s)\^(super-high|ultra-high|high)(?=\s|$)/g, (_, lead: string, p: string) => {
+        priority = p as TodoPriority;
+        return lead;
+      })
+      .trim();
+
     // Metadata line: ::updated:: <ms> ::created:: <iso>  (either or both may be present)
     let updatedAt: number | undefined;
     const metaLine = (lines[i + 1] ?? '').trim();
@@ -252,6 +321,7 @@ export const parseTodos = (md: string): TodoData => {
       status,
       tags,
       milestoneId,
+      priority,
       prompt,
       createdAt,
       updatedAt,
@@ -259,19 +329,22 @@ export const parseTodos = (md: string): TodoData => {
     i++;
   }
 
-  return { milestones, items, isLegacyFormat };
+  return color
+    ? { milestones, items, isLegacyFormat, color }
+    : { milestones, items, isLegacyFormat };
 };
 
 // ─── Serialize ───────────────────────────────────────────────────────────────
 
 export const serializeTodos = (data: TodoData): string => {
-  let result = serializeMilestones(data.milestones);
+  let result = serializeFrontmatter(data.milestones, data.color);
 
   for (const item of data.items) {
     const marker = STATUS_TO_MARKER[item.status];
     const tagStr = item.tags.map((t) => `#${t}`).join(' ');
     const milestoneStr = item.milestoneId ? `!${item.milestoneId}` : '';
-    const suffix = [tagStr, milestoneStr].filter(Boolean).join(' ');
+    const priorityStr = item.priority ? `^${item.priority}` : '';
+    const suffix = [tagStr, milestoneStr, priorityStr].filter(Boolean).join(' ');
     result += `- ${marker} ${item.text}${suffix ? ` ${suffix}` : ''}\n`;
 
     if (item.updatedAt || item.createdAt) {
@@ -367,6 +440,33 @@ export const setPrompt = (
   items[index] = { ...(items[index] as TodoItem), prompt };
   return { ...data, items };
 };
+
+export const setTodoColor = (data: TodoData, color?: TodoColor): TodoData => {
+  const { color: _old, ...rest } = data;
+  return color ? { ...rest, color } : rest;
+};
+
+export const setTodoPriority = (data: TodoData, id: string, priority?: TodoPriority): TodoData => {
+  const index = data.items.findIndex((item) => item.id === id);
+  if (index < 0) return data;
+  const items = [...data.items];
+  items[index] = { ...(items[index] as TodoItem), priority, updatedAt: Date.now() };
+  return { ...data, items };
+};
+
+/** none -> high -> super-high -> ultra-high -> none */
+export const cyclePriority = (p?: TodoPriority): TodoPriority | undefined =>
+  p ? PRIORITY_ORDER[PRIORITY_ORDER.indexOf(p) + 1] : PRIORITY_ORDER[0];
+
+/** Highest priority rank among backlog / in-progress items; 0 if none. */
+export const maxPriorityRank = (items: TodoItem[]): number =>
+  items.reduce(
+    (max, i) =>
+      i.priority && (i.status === 'backlog' || i.status === 'in-progress')
+        ? Math.max(max, PRIORITY_RANK[i.priority])
+        : max,
+    0,
+  );
 
 export const addMilestone = (data: TodoData, milestone: Milestone): TodoData => ({
   ...data,
