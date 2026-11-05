@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-11-05 — Sync fixes, phase 2 (revalidate on resume, outbox, atomic moves)
+
+- Fix 2: `GithubFileStore.syncNow()` reads the head (no-store) and stops when it is unchanged; otherwise it loads the tree of that commit, refreshes clean open files whose sha changed (blob by sha) and reconciles dirty ones through phase 1's `reconcile`. Concurrent calls share one run; it skips while a save or tree load is in flight. `installAutoSync` (core `sync/auto-sync.ts`, wired in console `main.tsx`) runs it on `visibilitychange → visible`, `focus`, `online` and every 90 s while visible, throttled to 2 s. `loadTree` records the head too.
+- Views no longer use `if (!openFiles[p]) openFile(p)`: they call `ensureFresh(path)` (opens a missing file; reconciles an open one whose tree sha changed, once per tree sha). Kanban, TodoAnalytics, ActionLog, BoardOverview, GraphView, Dashboard read-it-later, Quick log/note/todo.
+- Fix 5: the outbox is the IndexedDB `files` records marked dirty (no DB version bump). `flushOutbox()` restores them and saves each through `saveFile` (sha-checked, 409 → reconcile, never a force push); failures retry with backoff (2 s doubling, max 5 min). Runs at startup, on resume and online. `unsyncedCount` drives the new **UNSYNCED n** status-bar indicator.
+- Fix 6: `renameFile` and the new `commitTransform(paths, transform, message)` (used by the Kanban move) are one `commitFiles` with `expectedHeadSha`, retried on `ConflictError`. The tree smart merge keeps a cached-only entry only when it is unpushed (`sha === ''`) or just committed (`pendingCommit`, was `pendingBinary`).
+- In-memory GitHub service: `saveFile`/`deleteFile` advance the head. Tests: `sync-phase2.test.ts` (causes 2, 5, 6), `auto-sync.test.ts`, `UnsyncedIndicator.test.tsx`, editor test for remote content under a clean editor.
+- Review fixes: a sync/`ensureFresh`/`commitTransform` run no longer reconciles against a listing older than a save (save-generation guard, saved tree sha kept, head not recorded when a path was skipped) or after a repo switch; edits typed during `commitTransform`/`renameFile` commits are replayed instead of overwritten; `deleteFile`/`renameFolder` clear dirty state so the outbox stops retrying removed paths; `commitTransform` makes no commit for an empty change set; the Kanban move re-finds the dragged todo by text and `createdAt` (`moveTodo.ts`) instead of a stale index.
+
+## 2026-11-05 — Sync fixes, phase 1 (no blind overwrite, durable edits, no-store reads)
+
+- Fix 1: `GithubFileStore.saveFile` no longer re-sends stale content on 409/422 ("user wins" removed). New `reconcile(path)` reads the remote copy (no-store), three-way merges it with the working copy's base, then saves with the remote sha or fills `fileConflicts`. `keep_local` only overrides the version the user saw. `upsertRepoFile` takes a merge function and retries on 409/422; the push config merges subscriptions; raw notes are created without a read.
+- Merge: in-repo line diff3 in `packages/core/src/sync/`, plus a merger registry; structural todos, read-it-later and action-log merges live in `packages/formats/src/merge.ts` and are registered by the console at startup (core still does not import formats).
+- Fix 3: IndexedDB file records keep `dirty` and `baseContent`; `openFile` merges instead of replacing a dirty copy. Editor autosave is a 3 s debounce (was 2 min) and flushes on `visibilitychange → hidden`, `pagehide` and unmount.
+- Fix 4: `fetchRepoTree`'s ref read and by-path `getFileContent` bypass the HTTP cache.
+- In-memory GitHub service: 409/422 on sha mismatch, blob history, stale-read mode. Tests: `sync.test.ts` (causes 1, 3, 4), `merge.test.ts` (core and formats), `sync-io.test.ts`, editor autosave tests.
+- Review fixes: the editor reads its dirty flag back from `githubFileStore.dirtyFiles` after a save and on store updates (failed saves stay dirty and retry on hide; a still-dirty merge or IndexedDB-restored file is autosaved; a path switch saves the previous file). `saveFile` keeps the sha/base a concurrent reconcile set; `openFile` drops a read that raced a save (per-path save generation); a repo switch flushes pending cache writes (keyed by the repo they were made in) and resets dirty/conflict state; new `discardLocal(path)` used by the failed idea-create rollback; push setup treats only a 404 as first setup and refuses to write a config whose VAPID key changed under it. Phase 1 status noted in `doc/sync-analysis.md`.
+- Phase 2 (resume revalidation, outbox, atomic moves) is still open; it will call `reconcile(path)`.
+
+## 2026-11-05 — Sync analysis (docs only)
+
+- New `doc/sync-analysis.md`: root causes of late cross-device sync and lost desktop edits in the console PWA (blind "user wins" 409 retry, no revalidation on resume, 2-min autosave + non-durable dirty flag, HTTP-cached reads, no outbox), with evidence, repro, fix design and test plan. No source changes.
+
 ## 2026-11-04 — Travel: read-only widget, separate trip editor
 
 - `TravelWidget` is read-only in every mode: focus shows trips (sorted), trip and step fields, addresses, custom fields, website and "Open in Maps" links (http(s) only, new tab), and an EDIT button per trip.

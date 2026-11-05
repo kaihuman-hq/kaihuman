@@ -14,6 +14,7 @@ import { cn } from '../../utils';
 import { Logo } from '../Atoms/Logo';
 import { MonoLabel, MonoText } from '../Atoms/Typography';
 import { activeTabForPath } from '../navbar-items';
+import { UnsyncedIndicator } from './UnsyncedIndicator';
 
 export interface Repository {
   id: string;
@@ -922,6 +923,8 @@ export const StatusBar = ({
                 </MonoText>
               </div>
             )}
+
+            <UnsyncedIndicator />
 
             {stats.map((stat) => (
               <div

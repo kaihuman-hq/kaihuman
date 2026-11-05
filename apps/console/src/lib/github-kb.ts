@@ -93,7 +93,8 @@ export async function addRawNote(
   const tagList = tags.length > 0 ? tags : ['general'];
   const content = `---\ntitle: "${escapedTitle}"\nurl: ''\ndate: ${date}\nprocessed: false\ntags: [${tagList.join(', ')}]\n---\n\n${text}`;
   const path = `.kh/raw/${Date.now()}-${slug}.md`;
-  await githubService.upsertRepoFile(owner, repo, path, content, `note: add "${title}"`);
+  // Unique path: create without reading. No sha means GitHub refuses if it exists, never overwrites.
+  await githubService.saveFile(owner, repo, path, content, `note: add "${title}"`);
 }
 
 export async function listKBDir(

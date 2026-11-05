@@ -56,14 +56,12 @@ export async function createIdeaFile(path: string, content: string) {
   githubFileStore.error.value = null;
   await githubFileStore.createFile(path, content);
   if (githubFileStore.dirtyFiles.peek().has(path)) {
-    // Undo the store's optimistic entry, or the failed slug would read as taken.
-    const { [path]: _failed, ...open } = githubFileStore.openFiles.peek();
-    githubFileStore.openFiles.value = open;
+    // Undo the store's optimistic entry, or the failed slug would read as taken (and the cached
+    // record would bring it back on the next tree load).
+    const message = githubFileStore.error.peek() ?? `Could not create ${path}.`;
     githubFileStore.tree.value = githubFileStore.tree.peek().filter((item) => item.path !== path);
-    const dirty = new Set(githubFileStore.dirtyFiles.peek());
-    dirty.delete(path);
-    githubFileStore.dirtyFiles.value = dirty;
-    throw new Error(githubFileStore.error.peek() ?? `Could not create ${path}.`);
+    await githubFileStore.discardLocal(path);
+    throw new Error(message);
   }
   remember(path, content);
 }

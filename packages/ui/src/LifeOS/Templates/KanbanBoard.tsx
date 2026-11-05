@@ -49,6 +49,7 @@ import {
   usePersistedScope,
   withBusinessFiles,
 } from '../scope-files';
+import { moveTodoChanges } from './moveTodo';
 import { type StreamMode, type StreamSort, StreamsBoard } from './StreamsBoard';
 import { FileColorPicker, fileColorHex, PriorityBadge } from './TodoMarks';
 
@@ -1224,13 +1225,12 @@ export const KanbanBoard = ({
     setFocusedFiles((prev) => pruneFocus(prev, todoFilePaths));
   }, [todoFilePaths]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tree is a trigger, not a read: a new remote sha must re-run the freshness check
   useEffect(() => {
     for (const path of todoFilePaths) {
-      if (!openFiles[path]) {
-        githubFileStore.openFile(path);
-      }
+      githubFileStore.ensureFresh(path);
     }
-  }, [todoFilePaths, openFiles]);
+  }, [todoFilePaths, tree]);
 
   // Parse all open todo files
   const parsedFiles = useMemo<{ path: string; data: TodoData }[]>(() => {
@@ -1400,22 +1400,22 @@ export const KanbanBoard = ({
     itemIndex: number,
     targetFilePath: string,
   ) => {
-    const sourceFile = openFiles[sourceFilePath];
-    const targetFile = openFiles[targetFilePath];
-    if (!sourceFile || !targetFile) return;
-    const sourceData = parseTodos(sourceFile.content);
-    const item = sourceData.items[itemIndex];
-    if (!item) return;
-    const newSourceData = {
-      ...sourceData,
-      items: sourceData.items.filter((_, i) => i !== itemIndex),
-    };
-    const targetData = parseTodos(targetFile.content);
-    const newTargetData = { ...targetData, items: [...targetData.items, item] };
-    githubFileStore.updateFileContent(sourceFilePath, serializeTodos(newSourceData));
-    await githubFileStore.saveFile(sourceFilePath);
-    githubFileStore.updateFileContent(targetFilePath, serializeTodos(newTargetData));
-    await githubFileStore.saveFile(targetFilePath);
+    if (!openFiles[sourceFilePath] || !openFiles[targetFilePath]) return;
+    if (sourceFilePath === targetFilePath) return;
+    // Captured now: the index may point elsewhere once core reconciles or retries the transform.
+    const dragged = parseTodos(openFiles[sourceFilePath]?.content ?? '').items[itemIndex];
+    if (!dragged) return;
+    try {
+      // One commit for both files: two separate saves could leave the item in both or neither.
+      // The transform sees the freshest contents (core reconciles before calling it).
+      await githubFileStore.commitTransform(
+        [sourceFilePath, targetFilePath],
+        (contents) => moveTodoChanges(contents, sourceFilePath, targetFilePath, dragged),
+        `Move todo to ${targetFilePath}`,
+      );
+    } catch (e) {
+      githubFileStore.error.value = e instanceof Error ? e.message : String(e);
+    }
   };
 
   const isLoading = todoFilePaths.some((p) => !openFiles[p]);

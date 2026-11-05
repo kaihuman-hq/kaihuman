@@ -83,13 +83,12 @@ function useStats(cfg: BoardOverviewConfig) {
     return withBusinessFiles(paths, tree ?? [], '.todos.md', cfg.scope ?? 'all');
   }, [remoteConfig, tree, cfg.scope]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tree is a trigger, not a read: a new remote sha must re-run the freshness check
   useEffect(() => {
     for (const path of todoFilePaths) {
-      if (!openFiles[path]) {
-        githubFileStore.openFile(path);
-      }
+      githubFileStore.ensureFresh(path);
     }
-  }, [todoFilePaths, openFiles]);
+  }, [todoFilePaths, tree]);
 
   const stats = useMemo(() => {
     const overdueCutoff = cfg.overdueDays * 24 * 60 * 60 * 1000;

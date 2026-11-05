@@ -137,7 +137,8 @@ describe('InMemoryGithubService', () => {
     const created = await svc.getFileContent(owner, repo, 'notes/new.md');
     expect(created.content).toBe('# Hello');
 
-    const updated = await svc.saveFile(owner, repo, CONFIG_PATH, 'changed', 'msg');
+    // Like GitHub, an update must name the sha it replaces.
+    const updated = await svc.saveFile(owner, repo, CONFIG_PATH, 'changed', 'msg', before.sha);
     expect(updated.content.sha).not.toBe(before.sha);
   });
 
