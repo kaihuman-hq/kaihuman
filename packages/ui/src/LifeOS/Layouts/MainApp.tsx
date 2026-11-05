@@ -135,6 +135,8 @@ export interface MainAppProps {
   onSelectRepository?: (repo: import('../Organisms/StatusBar').Repository) => void;
   /** Client slugs and handler for business capture lines in the palette. */
   businessClients?: string[];
+  /** Business is set up: its link joins the default navbar. */
+  businessEnabled?: boolean;
   onBusinessCapture?: (capture: import('@kaihuman/formats/business').Capture) => void;
 
   renderEditor?: (
@@ -201,7 +203,7 @@ const parseUrlState = () => {
 };
 
 import { StackedNavigation } from '../Molecules/StackedNavigation';
-import { DEFAULT_NAVBAR, NAVBAR_ITEMS } from '../navbar-items';
+import { defaultNavbar, NAVBAR_ITEMS } from '../navbar-items';
 import type { NavItemId } from '../types';
 
 // Helper hook for mobile detection
@@ -1392,7 +1394,9 @@ abbreviations: undefined
     },
   };
 
-  const navbarLinks = (layoutStore.remoteConfig.value?.navbar ?? DEFAULT_NAVBAR)
+  const navbarLinks = (
+    layoutStore.remoteConfig.value?.navbar ?? defaultNavbar(props.businessEnabled === true)
+  )
     .map((id) => {
       const def = NAVBAR_ITEMS.find((n) => n.id === id);
       const onClick = navHandlers[id];
