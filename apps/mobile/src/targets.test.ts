@@ -1,21 +1,28 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { WidgetTodoItem, WidgetTodoSnapshot } from '@kaihuman/core';
 import { parseTodos } from '@kaihuman/formats';
 import { describe, expect, it } from 'vitest';
 import withKaihumanWidgets, {
+  ANDROID_RECEIVER_NAME,
   type AndroidManifest,
+  addComposeCompilerClasspath,
   addGlanceDependencies,
   addIosWidgetTarget,
   addWidgetReceiverToManifest,
+  applyComposePlugin,
   type CopyFs,
   copyAndroidWidgetSources,
   IOS_WIDGET_TARGET,
+  kotlinVersionFromCatalog,
   type ModFn,
+  resolveReactNativeKotlinVersion,
   withIosAppGroup,
   withUrlScheme,
   type XcodeEditor,
+  xcodeProjectEditor,
 } from '../plugins/with-kaihuman-widgets.js';
 import {
   PENDING_WIDGET_MUTATIONS_FILE,
@@ -104,6 +111,45 @@ describe('config plugin transforms', () => {
     expect(calls).toEqual(['KaihumanWidgets:A.swift']);
   });
 
+  it('wires the widget extension into a real Xcode project', () => {
+    // `xcode` is the pbxproj library Expo hands to xcodeproj mods; no types ship with it.
+    const xcode = createRequire(import.meta.url)('xcode') as {
+      project(path: string): { parseSync(): { writeSync(): string } };
+    };
+    const project = xcode.project(join(root, 'src/fixtures/app.pbxproj')).parseSync();
+    const files = readdirSync(join(root, IOS_WIDGET_TARGET.sourceDir));
+    const target = { ...IOS_WIDGET_TARGET, marketingVersion: '0.1.0', buildNumber: '7' };
+
+    expect(xcodeProjectEditor.hasTarget(project, target.name)).toBe(false);
+    addIosWidgetTarget(project, files, xcodeProjectEditor, target);
+    expect(xcodeProjectEditor.hasTarget(project, target.name)).toBe(true);
+    addIosWidgetTarget(project, files, xcodeProjectEditor, target);
+
+    const out = project.writeSync();
+    expect(out.match(/isa = PBXNativeTarget;/g)).toHaveLength(2);
+    // Sources are referenced in place from the app root, one level above ios/.
+    expect(out).toContain('path = "../targets/ios-widget";');
+    expect(out).toContain('INFOPLIST_FILE = "../targets/ios-widget/Info.plist";');
+    expect(out).toContain(
+      'CODE_SIGN_ENTITLEMENTS = "../targets/ios-widget/KaihumanWidgets.entitlements";',
+    );
+    expect(out).toContain('IPHONEOS_DEPLOYMENT_TARGET = 17.0;');
+    expect(out).toContain('MARKETING_VERSION = "0.1.0";');
+    expect(out).toContain('CURRENT_PROJECT_VERSION = "7";');
+    expect(out.match(/isa = PBXTargetDependency;/g)).toHaveLength(1);
+
+    const swift = files.filter((f) => f.endsWith('.swift'));
+    const sources = out.match(/\/\* "?[\w.]+\.swift"? in Sources \*\/,/g) ?? [];
+    expect(sources).toHaveLength(swift.length);
+
+    // The embed phase sits right after Resources, ahead of the React Native bundling script.
+    const appPhases = out.slice(out.indexOf('/* app */ = {'));
+    const order = ['/* Resources */,', '/* Copy Files */,', '/* Bundle React Native'];
+    const positions = order.map((marker) => appPhases.indexOf(marker));
+    expect(positions.every((p) => p >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+  });
+
   it('composes with existing mods and applies the transforms through them', async () => {
     const order: string[] = [];
     const existing: ModFn = async (cfg) => {
@@ -132,6 +178,36 @@ describe('config plugin transforms', () => {
     const faked = withKaihumanWidgets({}, { xcode: fakeXcode });
     await (faked.mods?.ios?.xcodeproj as ModFn)({ modResults: {} });
     expect(added).toEqual(['KaihumanWidgets']);
+  });
+
+  it('enables the Compose compiler at the Kotlin version React Native uses', () => {
+    const rootGradle = [
+      'buildscript {',
+      '  dependencies {',
+      "    def kotlinVersion = findProperty('android.kotlinVersion')",
+      '    classpath(kotlinVersion ? "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion" : \'org.jetbrains.kotlin:kotlin-gradle-plugin\')',
+      '  }',
+      '}',
+    ].join('\n');
+    const patched = addComposeCompilerClasspath(rootGradle, '2.2.0');
+    expect(patched).toContain(
+      `    classpath("org.jetbrains.kotlin:compose-compiler-gradle-plugin:\${kotlinVersion ?: '2.2.0'}")`,
+    );
+    expect(addComposeCompilerClasspath(patched, '2.2.0')).toBe(patched);
+
+    const app =
+      'apply plugin: "com.android.application"\napply plugin: "org.jetbrains.kotlin.android"\n';
+    const withCompose = applyComposePlugin(app);
+    expect(withCompose).toContain(
+      'apply plugin: "org.jetbrains.kotlin.android"\napply plugin: "org.jetbrains.kotlin.plugin.compose"',
+    );
+    expect(applyComposePlugin(withCompose)).toBe(withCompose);
+
+    expect(kotlinVersionFromCatalog('[versions]\nkotlin = "2.2.0"\nkotlinx = "1"\n')).toBe('2.2.0');
+  });
+
+  it('reads the Kotlin version from the installed React Native', () => {
+    expect(resolveReactNativeKotlinVersion(root)).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it('adds the Glance dependency to app/build.gradle idempotently', async () => {
@@ -378,5 +454,59 @@ describe('planReminders', () => {
 
   it('returns nothing for empty sources', () => {
     expect(planReminders({}, now)).toEqual([]);
+  });
+});
+
+// ─── kaihuman-shared native module ───────────────────────────────────────────
+
+describe('kaihuman-shared native module', () => {
+  const moduleDir = 'modules/kaihuman-shared';
+  const config = JSON.parse(read(`${moduleDir}/expo-module.config.json`)) as {
+    apple: { modules: string[] };
+    android: { modules: string[] };
+  };
+  const declared = [...read(`${moduleDir}/index.ts`).matchAll(/^\s+(\w+)\(.*\):/gm)].map(
+    (m) => m[1],
+  );
+  const swift = read(`${moduleDir}/ios/KaihumanSharedModule.swift`);
+  const kotlinClass = config.android.modules[0] ?? '';
+  const kotlinSource = read(
+    `${moduleDir}/android/src/main/java/${kotlinClass.replaceAll('.', '/')}.kt`,
+  );
+
+  it('ships the native sources autolinking expects', () => {
+    expect(config.apple.modules).toEqual(['KaihumanSharedModule']);
+    expect(swift).toContain('public class KaihumanSharedModule: Module');
+    expect(read(`${moduleDir}/ios/KaihumanShared.podspec`)).toContain(
+      "s.name           = 'KaihumanShared'",
+    );
+    expect(kotlinSource).toContain('class KaihumanSharedModule : Module()');
+    expect(read(`${moduleDir}/android/build.gradle`)).toContain('namespace "com.kaihuman.shared"');
+  });
+
+  it('implements every function the JS interface declares on both platforms', () => {
+    expect(declared).toEqual([
+      'readSharedFile',
+      'writeSharedFile',
+      'reloadWidgets',
+      'setSharedToken',
+      'consumePendingUrl',
+    ]);
+    for (const name of declared) {
+      expect(swift).toContain(`Function("${name}")`);
+      expect(kotlinSource).toContain(`Function("${name}")`);
+    }
+    expect(swift).toContain('Name("KaihumanShared")');
+    expect(kotlinSource).toContain('Name("KaihumanShared")');
+  });
+
+  it('uses the keys the widget targets read', () => {
+    for (const key of ['"group.com.kaihuman.app"', '"github-token"', '"pending-url"']) {
+      expect(swift).toContain(key);
+    }
+    for (const key of ['"kaihuman_widget"', '"github-token"', '"pending-url"']) {
+      expect(kotlinSource).toContain(key);
+    }
+    expect(kotlinSource).toContain(`"${ANDROID_RECEIVER_NAME}"`);
   });
 });

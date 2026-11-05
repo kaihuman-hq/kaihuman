@@ -70,7 +70,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # The action's default package list includes the removed `tools` package, which sdkmanager
+      # rejects. Gradle downloads the platform and build-tools it needs.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -117,6 +121,11 @@ jobs:
       - name: Prebuild native project
         working-directory: apps/mobile
         run: npx expo prebuild --platform ios --no-install
+
+      # Prebuild ran with --no-install, so the workspace does not exist until CocoaPods runs.
+      - name: Install CocoaPods
+        working-directory: apps/mobile/ios
+        run: pod install
 
       - name: Build app and widget for iOS Simulator
         working-directory: apps/mobile/ios

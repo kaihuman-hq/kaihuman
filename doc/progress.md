@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-05 — Mobile build: native module sources, widget target wiring, CI setup
+
+- `apps/mobile/.gitignore` ignored every `ios/` and `android/` directory, so the `kaihuman-shared` module's Swift and Kotlin sources were never committed. The patterns are now anchored to the app root, and the module ships `ios/KaihumanSharedModule.swift`, `ios/KaihumanShared.podspec`, `android/build.gradle` and `KaihumanSharedModule.kt`.
+- Widget config plugin, iOS: the extension's group, `INFOPLIST_FILE` and `CODE_SIGN_ENTITLEMENTS` now point at `../targets/ios-widget` (the Xcode project lives in `ios/`); build settings are written to the target's own configurations (node-xcode stores the target name quoted, so the old `updateBuildProperty` calls matched nothing); the app depends on the extension; the embed phase sits before the React Native bundling script; the extension's version follows the app.
+- Widget config plugin, Android: applies the Kotlin Compose compiler plugin to the app (Glance widgets are Compose code), at the Kotlin version React Native's version catalog pins.
+- `mobile-build.yml`: `setup-android` installs only `platform-tools` (its default list includes the removed `tools` package); the iOS job runs `pod install` before `xcodebuild`.
+- Tests: the Xcode editor runs against a pbxproj fixture with the real `xcode` library (root devDependency), plus checks that the native module implements every function `index.ts` declares and that the Compose transforms are idempotent.
+
 ## 2026-11-05 — Mobile phase 6: React Native views and runnable Expo app
 
 - `apps/mobile` is a runnable Expo SDK 58 app (react 19.3, react-native 0.88) with expo-router file routes in `apps/mobile/app/`: index, login, repos, quick capture, board, analytics, dashboard, ideas, wiki, knowledge, and files. `main` is `expo-router/entry`; `metro.config.js` strips `.js` from relative imports.
