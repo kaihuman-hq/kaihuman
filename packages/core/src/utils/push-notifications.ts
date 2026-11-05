@@ -245,13 +245,28 @@ export async function setupPushNotifications(
   );
   subscriptions.push(subJson);
 
-  const config: PushConfig = { vapidPublicKey, subscriptions };
-
+  // Merge into the CURRENT remote config at write time, so a subscription another device
+  // added since `existingConfig` was read is kept.
   await githubService.upsertRepoFile(
     owner,
     repo,
     PUSH_CONFIG_PATH,
-    JSON.stringify(config, null, 2),
+    (current) => {
+      let remote: PushConfig | null = null;
+      try {
+        remote = current ? (JSON.parse(current) as PushConfig) : null;
+      } catch {
+        // Unreadable remote config: fall back to the subscriptions read earlier.
+      }
+      const others = (remote?.subscriptions ?? subscriptions).filter(
+        (s) => s.endpoint !== subJson.endpoint,
+      );
+      const config: PushConfig = {
+        vapidPublicKey: remote?.vapidPublicKey ?? vapidPublicKey,
+        subscriptions: [...others, subJson],
+      };
+      return JSON.stringify(config, null, 2);
+    },
     'Update push notification subscription',
   );
 
