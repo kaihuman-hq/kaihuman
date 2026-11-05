@@ -41,3 +41,6 @@ apps/console/src/version.ts
 
 # Git worktrees
 .worktrees
+
+# docspack local index and hook log (per machine)
+.docspack/
