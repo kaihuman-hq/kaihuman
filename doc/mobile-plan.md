@@ -195,3 +195,69 @@
 - [x] Update `doc/roadmap.md`, `doc/features.md`, `doc/progress.md`, and `README.md`.
 - [x] Run `pnpm run fix`, `pnpm run build`, `pnpm run check`, and `pnpm -r test` across the entire monorepo and ensure zero warnings and 100% passing tests.
 
+
+---
+
+## Phase 6: React Native Views & Runnable Expo App
+
+**Objective:** Turn `apps/mobile` from controllers-only into a runnable Expo app: add the Expo SDK, React Native and Expo Router runtime, an app entry and layout, thin `.tsx` views over every existing controller, the native glue the widgets expect (shared token, App Group files, `pending-url`), and a `crypto.subtle` polyfill so `.enc` files work on Hermes. Views stay thin; all logic stays in the existing controllers.
+
+**Decisions:**
+- **Expo SDK (latest stable) + Expo Router.** `routes.ts` already models URL-shaped deep links (`kaihuman://board`, `kaihuman://files/<path>`, `kaihuman://quick-<kind>`), which map 1:1 onto file-based routes (`app/board.tsx`, `app/files/[...path].tsx`, `app/quick-[kind].tsx`). `package.json` `main` becomes `expo-router/entry`; the controller barrel stays at `src/index.ts`.
+- **Signals in React:** a small in-repo `useSignalValue` hook (`useSyncExternalStore` over `signal.subscribe`) instead of another signals adapter package.
+- **Render tests:** Vitest + jsdom with `react-native` aliased to `react-native-web` and `@testing-library/react`. No native toolchain or Jest preset needed, so tests run in the existing Linux CI.
+- **Native glue:** a local Expo module (`apps/mobile/modules/kaihuman-shared`, Swift + Kotlin) for the App Group container files, shared token copies and `pending-url`; `expo-secure-store` for the Keychain copy. Same keys the widget targets already read: `github-token`, Keychain service `com.kaihuman.app`, App Group `group.com.kaihuman.app` defaults, Android prefs `kaihuman_widget`.
+- **Crypto:** a pure-JS `crypto.subtle` subset (PBKDF2-SHA256 → AES-GCM: `importKey`, `deriveKey`, `encrypt`, `decrypt`) on `@noble/hashes` + `@noble/ciphers`, installed only when `crypto.subtle` is missing; `getRandomValues` from `expo-crypto`.
+
+### Task 6.1: Expo Runtime, Entry Point, App Layout & Render-Test Harness
+**Files:**
+- Modify: `apps/mobile/package.json`, `apps/mobile/tsconfig.json`, `apps/mobile/app.json`, root `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml` (only if needed)
+- Create: `apps/mobile/vitest.config.ts`, `apps/mobile/babel.config.js` / `metro.config.js` (only if needed for pnpm monorepo)
+- Create: `apps/mobile/app/_layout.tsx`, `apps/mobile/app/index.tsx`
+- Create: `apps/mobile/src/views/use-signal.ts`, `apps/mobile/src/views/primitives.tsx` (themed `Screen`, `Title`, `Button`, `Field`, `Row` over `theme/tokens.ts`)
+- Create: `apps/mobile/src/views/primitives.test.tsx`
+
+**Steps:**
+- [ ] Add `expo`, `react`, `react-native`, `expo-router`, `expo-linking`, `expo-web-browser`, `react-native-safe-area-context`, `react-native-screens`, `expo-status-bar` (SDK-matched versions) to `apps/mobile` `dependencies`; `react-native-web`, `react-dom`, `@testing-library/react`, `@types/react` to root `devDependencies`.
+- [ ] Set `main` to `expo-router/entry`; configure `tsconfig.json` for `react-jsx`; root layout renders a stack, `index.tsx` redirects to login or dashboard from `authStore`.
+- [ ] Add `useSignalValue` and themed primitives; render tests prove the harness works.
+- [ ] Console and all other apps still build and test (no hoisting changes that break them); `expo export` smoke check run if it works offline.
+
+### Task 6.2: Native Glue — Secure Token, App Group Bridge, `pending-url` & Crypto Polyfill
+**Files:**
+- Create: `apps/mobile/modules/kaihuman-shared/` (`expo-module.config.json`, `index.ts`, `ios/KaihumanSharedModule.swift`, `android/.../KaihumanSharedModule.kt`)
+- Create: `apps/mobile/src/runtime/token-sync.ts`, `apps/mobile/src/runtime/native-container.ts`, `apps/mobile/src/runtime/pending-url.ts`, `apps/mobile/src/runtime/crypto-polyfill.ts`, `apps/mobile/src/runtime/bootstrap.ts`
+- Create: `apps/mobile/src/runtime/runtime.test.ts`
+- Modify: `apps/mobile/app/_layout.tsx` (call `bootstrap()`)
+
+**Steps:**
+- [ ] Mirror `authStore.token` to SecureStore (`keychainService: com.kaihuman.app`, key `github-token`) and to App Group defaults / Android prefs `kaihuman_widget` via the module; clear all copies on sign-out.
+- [ ] `SharedContainer` implementation backed by the module (App Group directory on iOS, `kaihuman_widget` prefs on Android) feeding `WidgetBridge`.
+- [ ] On launch and on app foreground, consume `pending-url` and route it with `parseDeepLink`/`routeToUrl`; handle incoming `Linking` URLs (incl. `auth/callback`).
+- [ ] Pure-JS `crypto.subtle` subset, installed only when missing; tests prove `encrypt`/`decrypt` from `@kaihuman/core` round-trip with it and interoperate with Node WebCrypto.
+
+### Task 6.3: Views — Login, Repo Selector, Quick Capture, Kanban, Todo Analytics
+**Files:**
+- Create: `apps/mobile/src/views/{login,repo-selector,quick-capture,kanban,todo-analytics}-view.tsx` + `views-core.test.tsx`
+- Create: `apps/mobile/app/login.tsx`, `apps/mobile/app/repos.tsx`, `apps/mobile/app/quick-[kind].tsx`, `apps/mobile/app/board.tsx`, `apps/mobile/app/analytics.tsx`
+
+**Steps:**
+- [ ] Each view takes its controller as a prop and only renders state and forwards events; route files construct controllers and pass them in.
+- [ ] Render tests cover main states and one user action per view (token sign-in, repo select, capture submit, status move, analytics totals).
+
+### Task 6.4: Views — Dashboard Tiles, Ideas, Wiki, Knowledge, File Editor (incl. `.enc`)
+**Files:**
+- Create: `apps/mobile/src/views/{dashboard,tile,ideas,wiki,knowledge,file-editor}-view.tsx` + `views-content.test.tsx`
+- Create: `apps/mobile/app/dashboard.tsx`, `apps/mobile/app/ideas.tsx`, `apps/mobile/app/wiki.tsx`, `apps/mobile/app/knowledge.tsx`, `apps/mobile/app/files/[...path].tsx`
+
+**Steps:**
+- [ ] Dashboard renders each tile kind from `presentTile` with its actions; ideas, wiki (with wiki-link navigation), knowledge inbox and file browser/editor render their controllers, including the passphrase flow for `.enc` files.
+- [ ] Render tests cover each tile kind and each screen's main state and action.
+
+### Task 6.5: Docs & Final Verification
+**Files:**
+- Modify: `doc/mobile-plan.md`, `doc/mobile.md`, `doc/roadmap.md`, `doc/features.md`, `doc/progress.md`, `README.md`
+
+**Steps:**
+- [ ] Tick Phase 6 boxes, remove the "no React Native views" gap, add dated progress entry.
+- [ ] `npx turbo run build`, `npx turbo run lint check-types`, `pnpm -r test` pass for the whole repo.
