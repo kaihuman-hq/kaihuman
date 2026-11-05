@@ -357,6 +357,7 @@ export const Dashboard = () => {
           onIdeasClick={() => route('/ideas')}
           onBusinessClick={() => route('/business')}
           businessClients={businessClients}
+          businessEnabled={businessEnabled}
           onBusinessCapture={businessEnabled ? handleBusinessCapture : undefined}
           onWikiClick={() => route('/wiki')}
           onCheatsheetClick={() => route('/cheatsheet')}

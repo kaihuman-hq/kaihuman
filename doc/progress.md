@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-05 — Business link in the default navbar
+
+- The desktop navbar now includes Business by default once `.kh/business/business.yaml` exists (`defaultNavbar(businessEnabled)` in `navbar-items.ts`, `MainApp` prop `businessEnabled`, set by the Dashboard). Before that the entry existed only in the Dashboard magic menu and as an opt-in item in Settings. A customised navbar is unchanged. Without business set up the magic-menu entry still opens `/business`, which shows the enable callout. Test: `navbar-config.test.ts`.
+
 ## 2026-11-02 — Business, phase 5a: money admin
 
 - Final nits: a write left with nothing to change makes no commit; CSV text starting with `-` is guarded too; the Ist test for a credit note after full payment now goes through the netting path.
