@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-05 — Sync analysis (docs only)
+
+- New `doc/sync-analysis.md`: root causes of late cross-device sync and lost desktop edits in the console PWA (blind "user wins" 409 retry, no revalidation on resume, 2-min autosave + non-durable dirty flag, HTTP-cached reads, no outbox), with evidence, repro, fix design and test plan. No source changes.
+
 ## 2026-11-04 — Travel: read-only widget, separate trip editor
 
 - `TravelWidget` is read-only in every mode: focus shows trips (sorted), trip and step fields, addresses, custom fields, website and "Open in Maps" links (http(s) only, new tab), and an EDIT button per trip.
