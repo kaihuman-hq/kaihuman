@@ -234,3 +234,12 @@ Every feature in `apps/console` maps to a native screen or component in `apps/mo
 | Push / Reminders | Local notifications scheduled from milestone `dueDate` & events | `@kaihuman/formats` (`todos.ts`, `events.ts`) |
 | Home / Lock Screen Widgets | `targets/ios-widget/*` (SwiftUI) & `targets/android-widget/*` (Kotlin) | `packages/core/src/widget-sync.ts` |
 
+## 6. Status & Known Gaps
+
+Phases 1–5 are implemented (Phase 5: `.github/workflows/mobile-build.yml`). Known gaps:
+
+- Swift and Kotlin widget code has never been compiled here (no Xcode or Android toolchain in this environment); CI compile checks are the first real build.
+- The Expo config plugin's editing of the real Xcode project is untested.
+- The app must write the GitHub token to key `github-token` (iOS Keychain service `com.kaihuman.app`, then App Group defaults; Android prefs `kaihuman_widget`) and handle the App Group `pending-url` key.
+- Core `encrypt`/`decrypt` (`.enc` files) need a `crypto.subtle` polyfill on React Native.
+- Phase 3 built screen controllers only; there are no React Native view components yet.

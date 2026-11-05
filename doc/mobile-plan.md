@@ -191,7 +191,7 @@
 - Modify: `doc/roadmap.md`, `doc/features.md`, `doc/progress.md`, `README.md`
 
 **Steps:**
-- [ ] Create `.github/workflows/mobile-build.yml` (manual `workflow_dispatch` + changes under `apps/mobile/**`) with jobs for type-checking/testing on `ubuntu-latest`, Android debug APK build, and iOS Simulator + WidgetKit compilation check on `macos-latest`.
-- [ ] Update `doc/roadmap.md`, `doc/features.md`, `doc/progress.md`, and `README.md`.
-- [ ] Run `pnpm run fix`, `pnpm run build`, `pnpm run check`, and `pnpm -r test` across the entire monorepo and ensure zero warnings and 100% passing tests.
+- [x] Create `.github/workflows/mobile-build.yml` (manual `workflow_dispatch` + changes under `apps/mobile/**`) with jobs for type-checking/testing on `ubuntu-latest`, Android debug APK build, and iOS Simulator + WidgetKit compilation check on `macos-latest`.
+- [x] Update `doc/roadmap.md`, `doc/features.md`, `doc/progress.md`, and `README.md`.
+- [x] Run `pnpm run fix`, `pnpm run build`, `pnpm run check`, and `pnpm -r test` across the entire monorepo and ensure zero warnings and 100% passing tests.
 

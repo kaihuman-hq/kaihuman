@@ -1,0 +1,130 @@
+name: "Mobile build"
+
+# Native-compile checks for apps/mobile. The Swift/Kotlin widget targets and the Expo config plugin
+# have never been compiled by the authors (no local toolchain), so the Android and iOS jobs may need
+# fixes on first run; they are not part of the main CI workflow for that reason.
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - "apps/mobile/**"
+      - "packages/core/**"
+      - "packages/formats/**"
+      - ".github/workflows/mobile-build.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Core and formats are consumed through their build output.
+      - name: Build dependencies
+        run: pnpm turbo run build --filter=@kaihuman/mobile...
+
+      - name: Lint and type-check
+        run: pnpm turbo run lint check-types --filter=@kaihuman/mobile
+
+      - name: Test
+        run: pnpm --filter @kaihuman/mobile test
+
+  android:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build dependencies
+        run: pnpm turbo run build --filter=@kaihuman/mobile^...
+
+      # Generates apps/mobile/android and runs the widget config plugin.
+      - name: Prebuild native project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Assemble debug APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kaihuman-android-debug
+          path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
+
+  ios:
+    needs: check
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build dependencies
+        run: pnpm turbo run build --filter=@kaihuman/mobile^...
+
+      # Generates apps/mobile/ios (with the WidgetKit target from the config plugin).
+      - name: Prebuild native project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform ios --no-install
+
+      - name: Build app and widget for iOS Simulator
+        working-directory: apps/mobile/ios
+        run: |
+          xcodebuild build \
+            -workspace kaihuman.xcworkspace \
+            -scheme kaihuman \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO

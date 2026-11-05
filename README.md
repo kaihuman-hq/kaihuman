@@ -10,7 +10,18 @@ A personal life-OS built on GitHub — notes, dashboards, habits, and tasks, all
 | `apps/console` | Preact + Vite | Web dashboard (files, kanban, analytics) |
 | `apps/browser-extension` | Preact + CRXJS | Browser extension |
 | `apps/kb-mcp` | Node + MCP SDK | MCP server over the `.kh/` knowledge base and ideas |
+| `apps/mobile` | Expo + React Native | iOS and Android app with home-screen Todo widgets ([design](doc/mobile.md)) |
 | `apps/auth-worker` | Cloudflare Worker | GitHub sign-in for the console; stores no tokens ([setup](apps/auth-worker/README.md)) |
+
+## Mobile (`apps/mobile`)
+
+Expo + React Native app with iOS WidgetKit and Android Glance Todo widgets. Design and status: [doc/mobile.md](doc/mobile.md).
+
+Known gaps:
+- Swift and Kotlin widget code is not yet compiled anywhere (CI compile checks are new).
+- The Expo config plugin's Xcode project editing is untested.
+- Core `.enc` encrypt/decrypt needs a `crypto.subtle` polyfill on React Native.
+- Screen controllers exist; React Native view components do not yet.
 
 ## Prerequisites
 

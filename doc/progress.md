@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-11-05 — Mobile phase 5: mobile CI workflow and docs
+
+- Added `.github/workflows/mobile-build.yml`: manual `workflow_dispatch` plus push/PR with the path filter `apps/mobile/**`. Jobs: ubuntu type-check, lint and tests; Android debug APK build (prebuild, then assemble); macOS iOS Simulator build and WidgetKit compile check.
+- Docs updated: `doc/roadmap.md` (Phase 5 ticked), `doc/mobile-plan.md` (Task 5.1), `doc/features.md` (Mobile section), `doc/mobile.md` (status and known gaps), `README.md` (Mobile).
+- Known gaps:
+  - Swift and Kotlin widget code has never been compiled here (no Xcode or Android toolchain in this environment); CI compile checks are the first real build.
+  - The Expo config plugin's editing of the real Xcode project is untested.
+  - The app must write the GitHub token to key `github-token` (iOS Keychain service `com.kaihuman.app`, then App Group defaults; Android prefs `kaihuman_widget`) and handle the App Group `pending-url` key.
+  - Core `encrypt`/`decrypt` (`.enc` files) need a `crypto.subtle` polyfill on React Native.
+  - Phase 3 built screen controllers only; there are no React Native view components yet.
+
 ## 2026-11-05 — Mobile phase 4: native iOS/Android Todo widgets, config plugin, reminders
 
 - iOS WidgetKit extension (`apps/mobile/targets/ios-widget/`): `Codable` models mirroring `WidgetTodoSnapshot`, `SharedTodoStore` (App Group `group.com.kaihuman.app`, `.todos.md` line toggle with `::updated::`, GitHub contents `PUT`, `pending-widget-mutations.json` fallback), `ToggleTodoIntent` / `QuickCaptureTodoIntent` (iOS 17), small/medium/large/accessory widgets in the Nexus dark theme. Quick capture writes `kaihuman://quick-todo` to App Group key `pending-url` for the app to route on launch.

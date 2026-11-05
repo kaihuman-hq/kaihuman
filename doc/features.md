@@ -117,6 +117,24 @@
 | Ideas tools (`ideas_list`, `ideas_find`, `ideas_read`, `ideas_create`, `ideas_append`, `ideas_set_summary`, `ideas_set_status`, `ideas_import`) and opt-in `--git` commit and push, for Claude Desktop | `kaihuman-kb-mcp --repo <path> --git` | 2026-10-13 |
 | stdio MCP server: `kb_search`, `kb_read`, `kb_list`, `kb_index`, `kb_log`, `kb_add_raw` over a local clone | `kaihuman-kb-mcp --repo <path>` | 2026-09-23 |
 
+## Mobile app (`apps/mobile`)
+
+| Feature | Location | Added |
+|---------|----------|-------|
+| Screen controllers (pure TypeScript, injectable ports): quick capture, kanban, analytics, ideas, wiki, knowledge, file editor (`.enc`) | `apps/mobile/src` | 2026-11-05 |
+| Dashboard tile presenters for every dashboard extension, tested against the demo seed | `apps/mobile/src/tile-controllers.ts` | 2026-11-05 |
+| iOS WidgetKit + AppIntents and Android Jetpack Glance Todo widgets (toggle, quick capture, GitHub sync, offline queue) | `apps/mobile/targets/ios-widget/`, `apps/mobile/targets/android-widget/` | 2026-11-05 |
+| `kaihuman://` deep links, milestone reminders from `.todos.md` and `.events.csv` | `apps/mobile/src` | 2026-11-05 |
+| GitHub OAuth sign-in through `auth-worker` (`?client=mobile`), PAT entry and demo mode | `apps/auth-worker`, mobile login | 2026-11-05 |
+| Native-compile CI: type-check, Android debug APK, iOS Simulator and WidgetKit check | `.github/workflows/mobile-build.yml` | 2026-11-05 |
+
+**Known gaps:**
+- Swift and Kotlin widget code has never been compiled here (no Xcode or Android toolchain in this environment); CI compile checks are the first real build.
+- The Expo config plugin's editing of the real Xcode project is untested.
+- The app must write the GitHub token to key `github-token` (iOS Keychain service `com.kaihuman.app`, then App Group defaults; Android prefs `kaihuman_widget`) and handle the App Group `pending-url` key.
+- Core `encrypt`/`decrypt` (`.enc` files) need a `crypto.subtle` polyfill on React Native.
+- Phase 3 built screen controllers only; there are no React Native view components yet.
+
 ## Sign-in worker (`apps/auth-worker`)
 
 | Feature | Location | Added |
