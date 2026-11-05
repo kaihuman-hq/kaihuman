@@ -7,6 +7,8 @@ import {
 } from '@kaihuman/formats/business';
 import { useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { PRIMARY } from '../components/business/buttons';
+import { INPUT } from '../components/business/FormField';
 import { PageShell } from '../components/business/PageShell';
 import { todayLocal } from '../lib/business/dates';
 import {
@@ -20,9 +22,6 @@ import {
 import { useBusinessRepo } from '../lib/business/use-business-repo';
 import { writeBusiness, writeErrorMessage } from '../lib/business/write';
 import type { KBRepo } from '../lib/github-kb';
-
-const INPUT =
-  'w-full bg-transparent border border-[var(--los-border)] rounded px-2 py-1.5 text-sm text-[var(--los-fg)] placeholder:text-[var(--los-fg-dim)] focus:outline-none focus:border-[var(--los-accent)] disabled:opacity-50';
 
 type Query = { client?: string; project?: string; from?: string };
 
@@ -236,11 +235,7 @@ function LogTimeForm(props: { target: KBRepo; data: BusinessRepo; query: Query }
         />
         {err('note')}
       </div>
-      <button
-        type="submit"
-        disabled={busy}
-        class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50"
-      >
+      <button type="submit" disabled={busy} class={PRIMARY}>
         {busy ? 'Saving...' : 'Save time'}
       </button>
       {error && (

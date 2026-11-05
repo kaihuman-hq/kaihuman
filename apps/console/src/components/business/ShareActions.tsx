@@ -12,10 +12,8 @@ import {
 } from '../../lib/business/share';
 import { useBusinessRepo } from '../../lib/business/use-business-repo';
 import { writeErrorMessage } from '../../lib/business/write';
+import { BUTTON_SM } from './buttons';
 import { ShareConsent } from './ShareConsent';
-
-const BUTTON =
-  'px-2 py-1 text-xs rounded border border-[var(--los-border)] text-[var(--los-fg)] hover:opacity-90 disabled:opacity-50';
 
 export type ShareDoc = {
   number: string;
@@ -56,7 +54,7 @@ function CopyLink({ url, number }: { url: string; number: string }) {
     <>
       <button
         type="button"
-        class={BUTTON}
+        class={BUTTON_SM}
         aria-label={`Copy the share link for ${number}`}
         onClick={copy}
       >
@@ -116,7 +114,12 @@ export function ShareActions({
   if (demoMode.value) {
     return (
       <div class="flex flex-wrap items-center gap-1">
-        <button type="button" class={BUTTON} disabled aria-describedby={`share-demo-${doc.number}`}>
+        <button
+          type="button"
+          class={BUTTON_SM}
+          disabled
+          aria-describedby={`share-demo-${doc.number}`}
+        >
           Share…
         </button>
         <span id={`share-demo-${doc.number}`} class="text-xs text-[var(--los-muted)]">
@@ -215,7 +218,7 @@ export function ShareActions({
           {active && phase !== 'confirm-revoke' && (
             <button
               type="button"
-              class={BUTTON}
+              class={BUTTON_SM}
               disabled={busy}
               aria-label={`Revoke the share link for ${doc.number}`}
               onClick={() => setPhase('confirm-revoke')}
@@ -233,7 +236,7 @@ export function ShareActions({
           {phase !== 'confirm' && (
             <button
               type="button"
-              class={BUTTON}
+              class={BUTTON_SM}
               disabled={busy}
               aria-label={`Share ${doc.number}`}
               onClick={startShare}
@@ -244,7 +247,7 @@ export function ShareActions({
           {lapsed && phase !== 'confirm-revoke' && (
             <button
               type="button"
-              class={BUTTON}
+              class={BUTTON_SM}
               disabled={busy}
               aria-label={`Revoke the expired share link for ${doc.number}`}
               onClick={() => setPhase('confirm-revoke')}
@@ -258,10 +261,16 @@ export function ShareActions({
       {phase === 'confirm' && !url && (
         <div class="w-full flex flex-wrap items-center gap-1 text-xs">
           <span>Upload {doc.number}.pdf (encrypted) to create a share link?</span>
-          <button ref={confirmButton} type="button" class={BUTTON} disabled={busy} onClick={share}>
+          <button
+            ref={confirmButton}
+            type="button"
+            class={BUTTON_SM}
+            disabled={busy}
+            onClick={share}
+          >
             {busy ? 'Uploading…' : 'Upload'}
           </button>
-          <button type="button" class={BUTTON} disabled={busy} onClick={() => setPhase('idle')}>
+          <button type="button" class={BUTTON_SM} disabled={busy} onClick={() => setPhase('idle')}>
             Cancel
           </button>
         </div>
@@ -270,10 +279,16 @@ export function ShareActions({
       {phase === 'confirm-revoke' && revocable && (
         <div class="w-full flex flex-wrap items-center gap-1 text-xs">
           <span>Revoke the link for {doc.number}? It stops working for everyone who has it.</span>
-          <button ref={confirmButton} type="button" class={BUTTON} disabled={busy} onClick={revoke}>
+          <button
+            ref={confirmButton}
+            type="button"
+            class={BUTTON_SM}
+            disabled={busy}
+            onClick={revoke}
+          >
             {busy ? 'Revoking…' : 'Revoke'}
           </button>
-          <button type="button" class={BUTTON} disabled={busy} onClick={() => setPhase('idle')}>
+          <button type="button" class={BUTTON_SM} disabled={busy} onClick={() => setPhase('idle')}>
             Cancel
           </button>
         </div>

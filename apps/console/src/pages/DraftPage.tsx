@@ -14,6 +14,7 @@ import {
 } from '@kaihuman/formats/business';
 import { useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { PRIMARY } from '../components/business/buttons';
 import { a11y, Field, INPUT } from '../components/business/FormField';
 import { LinesEditor } from '../components/business/LinesEditor';
 import { PageShell } from '../components/business/PageShell';
@@ -92,11 +93,7 @@ function ClientChooser({ data }: { data: BusinessRepo }) {
           <option value="offer">Offer</option>
         </select>
       </Field>
-      <button
-        type="submit"
-        disabled={!client}
-        class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50"
-      >
+      <button type="submit" disabled={!client} class={PRIMARY}>
         Start draft
       </button>
     </form>
@@ -313,11 +310,7 @@ function DraftEditor(props: {
         />
       </Field>
       <div class="flex flex-wrap gap-2">
-        <button
-          type="submit"
-          disabled={busy}
-          class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50"
-        >
+        <button type="submit" disabled={busy} class={PRIMARY}>
           {busy ? 'Saving...' : 'Save draft'}
         </button>
         <button

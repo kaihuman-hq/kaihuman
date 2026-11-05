@@ -2,6 +2,7 @@ import { addClientLog, addClientTodo, clientDir, type Slug } from '@kaihuman/for
 import { useRef, useState } from 'preact/hooks';
 import { useBusinessRepo } from '../../lib/business/use-business-repo';
 import { writeBusiness, writeErrorMessage } from '../../lib/business/write';
+import { SECONDARY_MD } from './buttons';
 import { INPUT } from './FormField';
 
 const KINDS = {
@@ -65,11 +66,7 @@ export function QuickAdd({ client, kind }: { client: Slug; kind: keyof typeof KI
         aria-describedby={error ? `${id}-error` : undefined}
         onInput={(e) => setText((e.target as HTMLInputElement).value)}
       />
-      <button
-        type="submit"
-        disabled={busy}
-        class="px-3 py-1.5 text-sm font-bold rounded border border-[var(--los-border)] text-[var(--los-fg)] hover:opacity-90 disabled:opacity-50"
-      >
+      <button type="submit" disabled={busy} class={SECONDARY_MD}>
         {busy ? 'Saving...' : button}
       </button>
       {error && (

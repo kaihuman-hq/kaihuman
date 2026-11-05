@@ -1,6 +1,7 @@
 import { CLIENT_STAGES, createClient } from '@kaihuman/formats/business';
 import { useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { PRIMARY } from '../components/business/buttons';
 import { a11y, Field, INPUT, More } from '../components/business/FormField';
 import { PageShell } from '../components/business/PageShell';
 import {
@@ -182,11 +183,7 @@ function NewClientForm({ target }: { target: KBRepo }) {
           <input type="text" {...text('leitwegId')} />
         </Field>
       </More>
-      <button
-        type="submit"
-        disabled={busy}
-        class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50"
-      >
+      <button type="submit" disabled={busy} class={PRIMARY}>
         {busy ? 'Saving...' : 'Create client'}
       </button>
       {error && (

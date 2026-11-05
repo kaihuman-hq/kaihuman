@@ -11,9 +11,7 @@ import { route } from 'preact-router';
 import { todayLocal } from '../../lib/business/dates';
 import { useBusinessRepo } from '../../lib/business/use-business-repo';
 import { writeBusiness, writeErrorMessage } from '../../lib/business/write';
-
-const BUTTON =
-  'px-2 py-1 text-xs rounded border border-[var(--los-border)] text-[var(--los-fg)] hover:opacity-90 disabled:opacity-50';
+import { BUTTON_SM } from './buttons';
 
 export function RecordPaymentLink({ invoice }: { invoice: string }) {
   return (
@@ -87,7 +85,7 @@ export function OfferActions({
         <>
           <button
             type="button"
-            class={BUTTON}
+            class={BUTTON_SM}
             disabled={busy}
             aria-label={`Mark ${offer} accepted`}
             onClick={() => decide('accepted')}
@@ -96,7 +94,7 @@ export function OfferActions({
           </button>
           <button
             type="button"
-            class={BUTTON}
+            class={BUTTON_SM}
             disabled={busy}
             aria-label={`Mark ${offer} declined`}
             onClick={() => decide('declined')}
@@ -108,7 +106,7 @@ export function OfferActions({
       {canConvert && (
         <button
           type="button"
-          class={BUTTON}
+          class={BUTTON_SM}
           disabled={busy}
           aria-label={`Convert ${offer} to invoice`}
           onClick={convert}
@@ -173,7 +171,7 @@ export function CreditNoteAction({ invoice }: { invoice: string }) {
     <div class="flex flex-wrap gap-1">
       <button
         type="button"
-        class={BUTTON}
+        class={BUTTON_SM}
         disabled={busy}
         aria-label={`Credit note for ${invoice}`}
         onClick={credit}
