@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-05 — Mobile phase 3: screen controllers and dashboard tile presenters
+
+- Quick capture (`QuickCaptureController`: todo, note, log, idea with `kh-idea` handoff, knowledge to `.kh/raw/`), `KanbanBoardController` (multi-file `.todos.md` incl. inbox, status/tag/milestone filters, move between files writing target first, milestone CRUD) and `TodoAnalyticsController` (velocity, tag distribution, milestone progress).
+- `tile-controllers.ts`: pure presenters and mutators with an injected clock for every dashboard extension (todos, habit, timetracking, events, actionlog, timezones, readitlater, bookmarks, budget, stocks, consumption, data-collection, prompts, commands), tested against `buildDemoSeed()`. Bookmarks/budget/stocks/consumption/data-collection parsers are local copies of the `@kaihuman/ui` ones until they move into `@kaihuman/formats`.
+- `IdeasScreenController`, `WikiScreenController` (`[[wikilinks]]`, backlinks, tags), `KnowledgeScreenController` and `FileEditorController` (tree, create/rename/delete, `.enc` via core `encrypt`/`decrypt` + `passwordStore`; React Native will need a `crypto.subtle` polyfill).
+- All controllers are pure TypeScript with injectable file/clock ports; 89 mobile tests.
+
 ## 2026-11-05 — Mobile phase 2: `apps/mobile` workspace, adapters, deep links, auth controllers
 
 - New `@kaihuman/mobile` package (pure TypeScript, tested under Vitest; Expo/React Native deps arrive with the screens in phase 3): theme tokens, `app.json` (scheme `kaihuman`).

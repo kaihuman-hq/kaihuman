@@ -103,10 +103,10 @@
 - Create: `apps/mobile/src/screens/todos-and-capture.test.ts`
 
 **Steps:**
-- [ ] Implement unified Quick Capture controllers (`quickTodo`, `quickNote`, `quickLog`, `quickIdea` including `kh-idea` handoff blocks, and `quickKnowledge` to `.kh/raw/`) using `@kaihuman/formats` and `githubFileStore`.
-- [ ] Implement `KanbanBoardController` supporting multi-file `.todos.md` aggregation (always including `.kh/inbox.todos.md`), status transitions (`backlog` / `in-progress` / `done` / `rejected`), tag & milestone filtering, moving a todo between files, and milestone CRUD.
-- [ ] Implement `TodoAnalyticsController` computing completion velocity, tag distribution, and milestone progress.
-- [ ] Write comprehensive tests in `src/screens/todos-and-capture.test.ts`.
+- [x] Implement unified Quick Capture controllers (`quickTodo`, `quickNote`, `quickLog`, `quickIdea` including `kh-idea` handoff blocks, and `quickKnowledge` to `.kh/raw/`) using `@kaihuman/formats` and `githubFileStore`.
+- [x] Implement `KanbanBoardController` supporting multi-file `.todos.md` aggregation (always including `.kh/inbox.todos.md`), status transitions (`backlog` / `in-progress` / `done` / `rejected`), tag & milestone filtering, moving a todo between files, and milestone CRUD.
+- [x] Implement `TodoAnalyticsController` computing completion velocity, tag distribution, and milestone progress.
+- [x] Write comprehensive tests in `src/screens/todos-and-capture.test.ts`.
 
 ### Task 3.2: Dashboard Tiles & LifeOS Widget Suite
 **Files:**
@@ -114,7 +114,7 @@
 - Create: `apps/mobile/src/components/widgets/tile-controllers.test.ts`
 
 **Steps:**
-- [ ] Implement native mobile controllers/presenters for every dashboard widget extension supported by the console:
+- [x] Implement native mobile controllers/presenters for every dashboard widget extension supported by the console:
   - `.todos.md` (visible todos, inline toggle, add task)
   - `.habit.csv` (streak computation, 7-day strip, today check-in toggle)
   - `.timetracking.csv` (active timer detection, elapsed seconds, clock in / clock out)
@@ -125,7 +125,7 @@
   - `.bookmarks.json` (search, tag filter, frecency/useCount sort, add/delete)
   - `.budget.csv`, `.stocks.csv`, `.consumption.csv`, `.data-collection.csv` (summary metrics & series data for charts)
   - `.prompts.md` & `.commands.md` (`{{param}}` interpolation & copy)
-- [ ] Write unit tests in `src/components/widgets/tile-controllers.test.ts` against the demo seed data (`buildDemoSeed()`).
+- [x] Write unit tests in `src/components/widgets/tile-controllers.test.ts` against the demo seed data (`buildDemoSeed()`).
 
 ### Task 3.3: Ideas, Wiki, Knowledge Base, File Browser & Encrypted (`.enc`) Files
 **Files:**
@@ -136,10 +136,10 @@
 - Create: `apps/mobile/src/screens/content-screens.test.ts`
 
 **Steps:**
-- [ ] Implement `IdeasScreenController` (status chips, 12-week activity strip, hot/warm/cool/dormant levels, search/product/sort filters, inline log, challenge, and status mutations).
-- [ ] Implement `WikiScreenController` (`[[wikilink]]` resolution, backlinks computation, tag filter, `.kh/wiki/` page rendering) and `KnowledgeScreenController` (`.kh/raw/` inbox list, processed list, add raw note).
-- [ ] Implement `FileEditorController` (directory traversal, file creation/deletion/rename, markdown editing, and `.enc` decryption/encryption via `decryptContent`/`encryptContent` and `passwordStore` from `@kaihuman/core`).
-- [ ] Write unit tests in `src/screens/content-screens.test.ts`.
+- [x] Implement `IdeasScreenController` (status chips, 12-week activity strip, hot/warm/cool/dormant levels, search/product/sort filters, inline log, challenge, and status mutations).
+- [x] Implement `WikiScreenController` (`[[wikilink]]` resolution, backlinks computation, tag filter, `.kh/wiki/` page rendering) and `KnowledgeScreenController` (`.kh/raw/` inbox list, processed list, add raw note).
+- [x] Implement `FileEditorController` (directory traversal, file creation/deletion/rename, markdown editing, and `.enc` decryption/encryption via `decryptContent`/`encryptContent` and `passwordStore` from `@kaihuman/core`).
+- [x] Write unit tests in `src/screens/content-screens.test.ts`.
 
 ---
 
