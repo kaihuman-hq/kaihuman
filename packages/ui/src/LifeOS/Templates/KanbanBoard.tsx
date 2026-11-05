@@ -49,6 +49,7 @@ import {
   usePersistedScope,
   withBusinessFiles,
 } from '../scope-files';
+import { moveTodoChanges } from './moveTodo';
 import { type StreamMode, type StreamSort, StreamsBoard } from './StreamsBoard';
 import { FileColorPicker, fileColorHex, PriorityBadge } from './TodoMarks';
 
@@ -1401,27 +1402,15 @@ export const KanbanBoard = ({
   ) => {
     if (!openFiles[sourceFilePath] || !openFiles[targetFilePath]) return;
     if (sourceFilePath === targetFilePath) return;
+    // Captured now: the index may point elsewhere once core reconciles or retries the transform.
+    const dragged = parseTodos(openFiles[sourceFilePath]?.content ?? '').items[itemIndex];
+    if (!dragged) return;
     try {
       // One commit for both files: two separate saves could leave the item in both or neither.
       // The transform sees the freshest contents (core reconciles before calling it).
       await githubFileStore.commitTransform(
         [sourceFilePath, targetFilePath],
-        (contents) => {
-          const sourceData = parseTodos(contents[sourceFilePath] ?? '');
-          const item = sourceData.items[itemIndex];
-          if (!item) return {};
-          const targetData = parseTodos(contents[targetFilePath] ?? '');
-          return {
-            [sourceFilePath]: serializeTodos({
-              ...sourceData,
-              items: sourceData.items.filter((_, i) => i !== itemIndex),
-            }),
-            [targetFilePath]: serializeTodos({
-              ...targetData,
-              items: [...targetData.items, item],
-            }),
-          };
-        },
+        (contents) => moveTodoChanges(contents, sourceFilePath, targetFilePath, dragged),
         `Move todo to ${targetFilePath}`,
       );
     } catch (e) {

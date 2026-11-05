@@ -315,3 +315,143 @@ describe('phase 2, cause 6: atomic commits', () => {
     expect(paths).toContain(FILE);
   });
 });
+
+describe('phase 2 review fixes', () => {
+  /** Runs `during` once, right after the next tree listing was read and before it is returned. */
+  const duringNextTreeFetch = (during: () => Promise<void>) => {
+    const real = remote.fetchRepoTree.bind(remote);
+    vi.spyOn(remote, 'fetchRepoTree').mockImplementationOnce(async (...args) => {
+      const listing = await real(...args);
+      await during();
+      return listing;
+    });
+  };
+
+  it('syncNow keeps a save that finished while the tree was being listed', async () => {
+    remote.load({ [FILE]: V0, 'other.md': 'x' }, []);
+    const a = device();
+    await a.loadTree();
+    await a.openFile(FILE);
+    await remote.saveFile(
+      'o',
+      'r',
+      'other.md',
+      'y',
+      'other device',
+      (await remote.getFileContent('o', 'r', 'other.md')).sha,
+    );
+    a.updateFileContent(FILE, 'a\nb\nc\nd\nE\n');
+    duringNextTreeFetch(() => a.saveFile(FILE));
+
+    await a.syncNow();
+    expect(a.openFiles.value[FILE]?.content).toBe('a\nb\nc\nd\nE\n');
+    expect(a.dirtyFiles.value.has(FILE)).toBe(false);
+    expect(a.tree.value.find((t) => t.path === FILE)?.sha).toBe(a.openFiles.value[FILE]?.sha);
+    expect(await remoteText()).toBe('a\nb\nc\nd\nE\n');
+  });
+
+  it('commitTransform does not reconcile against a listing older than a save', async () => {
+    remote.load({ 'a.md': '1\n' }, []);
+    const s = device();
+    await s.loadTree();
+    await s.openFile('a.md');
+    s.updateFileContent('a.md', '2\n');
+    duringNextTreeFetch(() => s.saveFile('a.md'));
+    let seen = '';
+    await s.commitTransform(
+      ['a.md'],
+      (c) => {
+        seen = c['a.md'] ?? '';
+        return { 'a.md': `${seen}3\n` };
+      },
+      'edit',
+    );
+    expect(seen).toBe('2\n');
+    expect(await remoteText('a.md')).toBe('2\n3\n');
+  });
+
+  it('syncNow stops when the repo changed while a blob was read', async () => {
+    const a = device();
+    await a.loadTree();
+    await a.openFile(FILE);
+    await pushRemote('A\nb\nc\nd\ne\n');
+    const real = remote.getBlobBytes.bind(remote);
+    vi.spyOn(remote, 'getBlobBytes').mockImplementationOnce(async (...args) => {
+      const bytes = await real(...args);
+      githubProfileStore.currentRepo.value = {
+        full_name: 'o/other',
+        name: 'other',
+        owner: { login: 'o' },
+        default_branch: 'main',
+      } as never;
+      return bytes;
+    });
+    await a.syncNow();
+    expect(a.openFiles.value[FILE]?.content).toBe(V0);
+  });
+
+  it('commitTransform keeps edits typed while the commit was in flight', async () => {
+    remote.load({ 'a.md': '- x\n- y\n- w\n- v\n' }, []);
+    const s = device();
+    await s.loadTree();
+    await s.openFile('a.md');
+    const real = remote.commitFiles.bind(remote);
+    vi.spyOn(remote, 'commitFiles').mockImplementationOnce(async (...args) => {
+      s.updateFileContent('a.md', '- x\n- y\n- w\n- V\n');
+      return real(...args);
+    });
+    await s.commitTransform(['a.md'], () => ({ 'a.md': '- y\n- w\n- v\n' }), 'drop x');
+    expect(await remoteText('a.md')).toBe('- y\n- w\n- v\n');
+    expect(s.openFiles.value['a.md']?.content).toBe('- y\n- w\n- V\n');
+    expect(s.dirtyFiles.value.has('a.md')).toBe(true);
+    await s.saveFile('a.md');
+    expect(await remoteText('a.md')).toBe('- y\n- w\n- V\n');
+  });
+
+  it('renameFile carries edits typed during the commit to the new path', async () => {
+    const a = device();
+    await a.loadTree();
+    await a.openFile(FILE);
+    const real = remote.commitFiles.bind(remote);
+    vi.spyOn(remote, 'commitFiles').mockImplementationOnce(async (...args) => {
+      a.updateFileContent(FILE, 'a\nb\nc\nd\nE\n');
+      return real(...args);
+    });
+    await a.renameFile(FILE, 'moved.md');
+    expect(a.openFiles.value['moved.md']?.content).toBe('a\nb\nc\nd\nE\n');
+    expect(a.dirtyFiles.value.has('moved.md')).toBe(true);
+    expect(a.dirtyFiles.value.has(FILE)).toBe(false);
+  });
+
+  it('deleteFile clears the dirty state of the removed path', async () => {
+    const a = device();
+    await a.loadTree();
+    await a.openFile(FILE);
+    a.updateFileContent(FILE, 'x\n');
+    await a.deleteFile(FILE);
+    expect(a.unsyncedCount.value).toBe(0);
+    await a.flushPendingWrites();
+    const reloaded = device();
+    await reloaded.flushOutbox();
+    expect(reloaded.unsyncedCount.value).toBe(0);
+  });
+
+  it('renameFolder clears the dirty state of the moved files', async () => {
+    remote.load({ 'dir/a.md': 'a\n' }, []);
+    const a = device();
+    await a.loadTree();
+    await a.openFile('dir/a.md');
+    a.updateFileContent('dir/a.md', 'b\n');
+    await a.renameFolder('dir', 'dir2');
+    expect(a.unsyncedCount.value).toBe(0);
+  });
+
+  it('commitTransform makes no commit when the transform changes nothing', async () => {
+    remote.load({ 'a.md': '1\n' }, []);
+    const s = device();
+    await s.loadTree();
+    const commit = vi.spyOn(remote, 'commitFiles');
+    await s.commitTransform(['a.md'], () => ({}), 'noop');
+    expect(commit).not.toHaveBeenCalled();
+  });
+});
