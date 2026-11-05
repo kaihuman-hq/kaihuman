@@ -6,6 +6,7 @@ export * from './entries.js';
 export * from './events.js';
 export * from './habits.js';
 export * from './ideas.js';
+export * from './merge.js';
 export * from './palette-settings.js';
 export * from './prompts.js';
 export * from './read-later.js';

@@ -68,8 +68,8 @@ export const ConflictModal = () => {
                 <MonoLabel className="text-sm text-[var(--los-fg)]">KEEP LOCAL</MonoLabel>
               </div>
               <MonoText className="text-[10px] text-[var(--los-muted)] leading-relaxed w-full">
-                Keep the version currently open in your editor. The remote changes will be
-                overwritten on your next save.
+                Keep the version currently open in your editor. It replaces the remote version shown
+                here on your next save; newer remote edits are merged first.
               </MonoText>
             </button>
 

@@ -30,6 +30,7 @@ vi.mock('@kaihuman/core', async () => {
       activeFile: signal(null),
       openFiles: signal({}),
       updateFileContent: vi.fn(),
+      flushPendingWrites: vi.fn(async () => {}),
     },
   };
 });

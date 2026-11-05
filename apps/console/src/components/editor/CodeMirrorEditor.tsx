@@ -135,6 +135,8 @@ export const CodeMirrorEditor = ({
   // Save right now if dirty, skipping the debounce.
   const flush = () => {
     clearTimer();
+    // The edit must reach IndexedDB even if the save cannot finish before suspension.
+    void githubFileStore.flushPendingWrites();
     const s = stateRef.current;
     if (s.readOnly || !dirtyRef.current || savingRef.current) return;
     s.handleSave(docRef.current);

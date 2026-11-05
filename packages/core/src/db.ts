@@ -14,8 +14,13 @@ interface LifeOSDB extends DBSchema {
     value: {
       path: string;
       content: string;
+      /** Sha of the base: the remote version the working copy was last synced with. */
       sha: string;
       timestamp: number;
+      /** Unsaved local edits. A dirty copy is merged with the remote, never replaced by it. */
+      dirty?: boolean;
+      /** Content at `sha`, the base of a three-way merge. */
+      baseContent?: string;
     };
     indexes: { 'by-path': string };
   };
