@@ -80,11 +80,14 @@ describe('BusinessPage', () => {
     expect(host.querySelector('a[href="/clients/acme-gmbh"]')).not.toBeNull();
     expect(host.textContent).toContain('Who owes me');
     expect(host.textContent).toContain('Pipeline');
-    expect(host.querySelector('a[href="/business/pipeline"]')?.textContent).toBe('Open board');
+    const board = [...host.querySelectorAll('a[href="/business/pipeline"]')].map(
+      (a) => a.textContent,
+    );
+    expect(board).toEqual(['Pipeline', 'Open board']);
     expect(host.textContent).not.toContain('files have problems');
   });
 
-  it('shows muted notes for empty sections', () => {
+  it('hides empty sections instead of showing empty boxes', () => {
     show(
       ready(
         loadBusinessRepo(
@@ -92,7 +95,72 @@ describe('BusinessPage', () => {
         ),
       ),
     );
-    expect(host.textContent).toContain('No drafts waiting to be issued.');
+    expect(host.textContent).not.toContain('Draft invoice for');
+    expect(host.textContent).not.toContain('Who owes me');
+    expect(host.querySelector('p.italic')).toBeNull();
+    expect(host.textContent).not.toContain('Retainer');
+  });
+
+  it('says all caught up when nothing needs attention', () => {
+    show(
+      ready(
+        loadBusinessRepo(
+          files((m) => {
+            m.delete('.kh/business/drafts/01M5KA3Q00W16BGNTZ49EKRX27.yaml');
+            for (const k of [...m.keys()]) if (k.startsWith('.kh/business/time/')) m.delete(k);
+            for (const k of [...m.keys()]) if (k.includes('/contracts/')) m.delete(k);
+          }),
+        ),
+      ),
+    );
+    expect(host.textContent).toContain('All caught up');
+  });
+
+  it('guides a new user to add the first client and hides everything else', () => {
+    show(
+      ready(
+        loadBusinessRepo(
+          files((m) => {
+            for (const k of [...m.keys()]) if (k !== '.kh/business/business.yaml') m.delete(k);
+          }),
+        ),
+      ),
+    );
+    const cta = host.querySelector('a[href="/clients/new"]');
+    expect(cta?.textContent).toBe('Add your first client');
+    expect(host.textContent).toContain('Track time');
+    expect(host.textContent).toContain('Draft an invoice');
+    expect(host.textContent).not.toContain('Timer');
+    expect(host.textContent).not.toContain('At a glance');
+    expect(host.textContent).not.toContain('Needs attention');
+    expect(host.querySelector('nav[aria-label="Business sections"]')).not.toBeNull();
+  });
+
+  it('links every business section and marks the overview as current', () => {
+    show(ready(loadBusinessRepo(files())));
+    const nav = host.querySelector('nav[aria-label="Business sections"]');
+    const hrefs = [...(nav?.querySelectorAll('a') ?? [])].map((a) => a.getAttribute('href'));
+    expect(hrefs).toEqual([
+      '/business',
+      '/clients',
+      '/business/pipeline',
+      '/business/invoices',
+      '/business/expenses',
+      '/business/shared',
+    ]);
+    expect(nav?.querySelector('[aria-current="page"]')?.getAttribute('href')).toBe('/business');
+  });
+
+  it('offers the primary actions as buttons', () => {
+    show(ready(loadBusinessRepo(files())));
+    const hrefs = [...host.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    for (const h of [
+      '/business/time/new',
+      '/business/drafts/new',
+      '/clients/new',
+      '/business/expenses/new',
+    ])
+      expect(hrefs).toContain(h);
   });
 
   it('lists a broken file and still renders the rest', () => {
@@ -109,6 +177,7 @@ describe('BusinessPage', () => {
     show(ready(loadBusinessRepo(files())));
     const hrefs = [...host.querySelectorAll('a')].map((a) => a.getAttribute('href'));
     expect(hrefs).toContain('/business/drafts/01M5KA3Q00W16BGNTZ49EKRX27');
+    expect(host.textContent).toContain('Review and issue');
     expect(hrefs).toContain('/business/drafts/new');
     show(
       ready(
@@ -117,7 +186,7 @@ describe('BusinessPage', () => {
         ),
       ),
     );
-    expect(host.textContent).toContain('No drafts waiting');
+    expect(host.textContent).not.toContain('Review and issue');
     expect(host.textContent).toContain('New draft');
   });
 
@@ -192,9 +261,8 @@ describe('BusinessPage', () => {
 
   it('lists retainers due with Create draft', () => {
     show(ready(loadBusinessRepo(files(hosting))));
-    expect(host.textContent).toContain('Retainers due');
-    expect(host.textContent).toContain('Hosting');
-    expect(host.textContent).toContain('2026-11-12');
+    expect(host.textContent).toContain('Retainer Hosting for Acme GmbH');
+    expect(host.textContent).toContain('Bill by 2026-11-12');
     const create = [...host.querySelectorAll('a')].find(
       (a) =>
         a.getAttribute('href') ===
@@ -203,7 +271,7 @@ describe('BusinessPage', () => {
     expect(create?.textContent).toBe('Create draft');
   });
 
-  it('shows Draft ready, linking the draft, when a draft bills the period', () => {
+  it('shows Review draft, linking the draft, when a draft bills the period', () => {
     show(
       ready(
         loadBusinessRepo(
@@ -219,12 +287,17 @@ describe('BusinessPage', () => {
     );
     expect(host.textContent).not.toContain('Create draft');
     const ready_ = host.querySelector('a[href="/business/drafts/01M5KA3Q00W16BGNTZ49EKRX28"]');
-    expect(ready_?.textContent).toContain('Draft ready');
+    expect(ready_?.textContent).toContain('Review draft');
   });
 
-  it('shows an empty note without retainers due', () => {
+  it('lists no retainer without retainers due', () => {
     show(ready(loadBusinessRepo(files())));
-    expect(host.textContent).toContain('No retainers due.');
+    expect(host.textContent).not.toContain('Retainer ');
+  });
+
+  it('explains the VAT basis next to the figures', () => {
+    show(ready(loadBusinessRepo(unpaid())));
+    expect(host.textContent).toContain('Soll: VAT is owed once you invoice');
   });
 
   it('shows an ending contract in the reminders', () => {
@@ -238,8 +311,7 @@ describe('BusinessPage', () => {
         ),
       ),
     );
-    expect(host.textContent).toContain('Rahmenvertrag Webentwicklung');
-    expect(host.textContent).toContain('ends');
+    expect(host.textContent).toContain('Contract ends: Rahmenvertrag Webentwicklung');
     expect(host.textContent).toContain('2026-12-15');
   });
 });

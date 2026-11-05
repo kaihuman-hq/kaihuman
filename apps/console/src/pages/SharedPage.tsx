@@ -474,7 +474,7 @@ export function SharedPage() {
   const [accepted, setAccepted] = useState(false);
   const [version, setVersion] = useState(0);
   return (
-    <PageShell state={state} title="Shared files">
+    <PageShell state={state} title="Shared files" section="/business/shared">
       {({ repo, data }) =>
         demoMode.value ? (
           <p class="text-xs text-[var(--los-muted)]">Sharing is not available in demo mode.</p>

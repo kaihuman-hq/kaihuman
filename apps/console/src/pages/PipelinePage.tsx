@@ -88,7 +88,7 @@ export function PipelinePage() {
   }
 
   return (
-    <PageShell state={state} title="Pipeline">
+    <PageShell state={state} title="Pipeline" section="/business/pipeline">
       {({ data: repo, repo: target, loadErrors }) => {
         const all = clientSummaries(repo, todayLocal()).map((c) => ({
           ...c,
