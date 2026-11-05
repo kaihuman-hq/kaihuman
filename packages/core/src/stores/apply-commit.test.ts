@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const remote = vi.hoisted(() => ({ tree: [] as unknown[] }));
 vi.mock('../services/github.service.js', () => ({
-  githubService: { fetchRepoTree: async () => remote.tree },
+  githubService: { fetchRepoTree: async () => remote.tree, getHeadSha: async () => 'head' },
 }));
 
 import { GithubFileStore } from './github-file.store.js';

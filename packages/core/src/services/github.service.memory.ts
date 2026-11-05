@@ -156,6 +156,7 @@ export class InMemoryGithubService {
     }
     const next = contentSha(path, content);
     this.put(path, { content, sha: next });
+    this.commitCount++; // a real PUT is a commit: the head must move so syncers notice it
     return { content: { sha: next } };
   }
 
@@ -167,6 +168,7 @@ export class InMemoryGithubService {
     _sha: string,
   ): Promise<Record<string, never>> {
     this.files.delete(path);
+    this.commitCount++;
     return {};
   }
 

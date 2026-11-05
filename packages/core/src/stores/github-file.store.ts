@@ -2,9 +2,10 @@ import { computed, signal } from '@preact/signals';
 import { openDB } from 'idb';
 import { demoMode } from '../demo-mode.js';
 import { Logger } from '../logger.js';
+import { ConflictError } from '../services/conflict.js';
 import { githubService } from '../services/github.service.js';
 import { mergeFile } from '../sync/merge.js';
-import { githubProfileStore } from './github-profile.store.js';
+import { type GithubRepo, githubProfileStore } from './github-profile.store.js';
 
 const logger = new Logger('GithubFileStore');
 
@@ -44,6 +45,14 @@ export interface FileContent {
   base?: string;
 }
 
+/** Outcome of {@link GithubFileStore.syncNow}. */
+export type SyncOutcome = 'skipped' | 'unchanged' | 'synced';
+
+type Db = Awaited<typeof dbPromise>;
+
+const RETRY_MIN_MS = 2000;
+const RETRY_MAX_MS = 5 * 60_000;
+
 /** Outcome of {@link GithubFileStore.reconcile}. */
 export type ReconcileResult = 'unchanged' | 'updated' | 'merged' | 'conflict';
 
@@ -64,15 +73,24 @@ export class GithubFileStore {
   // drops them from the remote tree until the remote stops listing them.
   // Maps `repo:path` to the deleted blob's sha ('' when unknown).
   private deletedPaths = new Map<string, string>();
-  // Binary files committed by applyCommit, `repo:path` to sha. They have no `files` (text) entry, so
-  // loadTree's merge needs this to keep them while GitHub's listing lags; cleared once it lists them.
-  private pendingBinary = new Map<string, string>();
+  // Files written by applyCommit, `repo:path` to sha. The merge keeps them while GitHub's listing
+  // lags (the sync merge no longer trusts cached entries with a real sha); cleared once it lists them.
+  private pendingCommit = new Map<string, string>();
   private idbWriteTimers = new Map<
     string,
     { timer: ReturnType<typeof setTimeout>; run: () => Promise<void> }
   >();
   // Bumped when a save of a path starts and ends, so a read begun before it can be recognised as stale.
   private saveGen = new Map<string, number>();
+  // Branch head the tree was last loaded or synced at; syncNow skips the tree fetch while it holds.
+  private lastHead: { repo: string; sha: string } | null = null;
+  private syncInFlight: Promise<SyncOutcome> | null = null;
+  // path -> tree sha ensureFresh already reconciled against, so a view effect that re-runs on
+  // every openFiles change cannot loop or spam the network.
+  private freshChecked = new Map<string, string>();
+  private outboxInFlight: Promise<void> | null = null;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private retryDelay = RETRY_MIN_MS;
   activeFile = signal<string | null>(null);
   dirtyFiles = signal<Set<string>>(new Set());
   isLoading = signal<boolean>(false);
@@ -84,6 +102,9 @@ export class GithubFileStore {
   fileConflicts = signal<
     Record<string, { localContent: string; remoteContent: string; remoteSha: string }>
   >({});
+
+  /** Files with edits not yet on GitHub (the outbox: dirty IndexedDB records survive a reload). */
+  unsyncedCount = computed(() => this.dirtyFiles.value.size);
 
   // Computed: currently open file content
   currentContent = computed(() => {
@@ -300,6 +321,265 @@ export class GithubFileStore {
     return true;
   }
 
+  /**
+   * Applies a freshly listed remote tree: drops tombstoned paths, settles the pending-binary and
+   * deletion bookkeeping, and keeps only cached entries that exist locally and nowhere remote yet.
+   */
+  private async mergeRemoteTree(
+    repo: { full_name: string },
+    fetchedTree: TreeItem[],
+    cachedTree: TreeItem[],
+    db: Db,
+  ): Promise<TreeItem[]> {
+    const fetchedBySha = new Map(fetchedTree.map((t) => [t.path, t.sha]));
+    const prefix = `${repo.full_name}:`;
+    for (const [key, deletedSha] of this.deletedPaths) {
+      if (!key.startsWith(prefix)) continue;
+      const remoteSha = fetchedBySha.get(key.slice(prefix.length));
+      // Gone, or re-created elsewhere with different content: stop hiding it.
+      if (remoteSha === undefined || (deletedSha !== '' && remoteSha !== deletedSha)) {
+        this.deletedPaths.delete(key);
+      }
+    }
+    for (const key of this.pendingCommit.keys()) {
+      if (key.startsWith(prefix) && fetchedBySha.has(key.slice(prefix.length))) {
+        this.pendingCommit.delete(key);
+      }
+    }
+    const remoteTree = fetchedTree.filter(
+      (t) => !this.deletedPaths.has(`${repo.full_name}:${t.path}`),
+    );
+
+    // Keep a cached entry the remote lacks only when it was created here and is not listed yet
+    // (sha '') or was just committed and GitHub has not listed it. Anything else with a real sha was
+    // deleted or renamed elsewhere; keeping it would bring a deleted file back.
+    const mergedTree = [...remoteTree];
+    const remotePaths = new Set(remoteTree.map((t) => t.path));
+    for (const item of cachedTree) {
+      if (remotePaths.has(item.path)) continue;
+      if (item.sha === '' || this.pendingCommit.has(`${repo.full_name}:${item.path}`)) {
+        logger.debug(`Preserving local file not(yet) in remote: ${item.path} `);
+        mergedTree.push(item);
+      }
+    }
+
+    mergedTree.sort((a, b) => {
+      if (a.type === 'tree' && b.type !== 'tree') return -1;
+      if (a.type !== 'tree' && b.type === 'tree') return 1;
+      return a.path.localeCompare(b.path);
+    });
+    this.tree.value = mergedTree;
+    await db.put('trees', mergedTree, `tree:${repo.full_name} `);
+    return mergedTree;
+  }
+
+  private async readBlobText(
+    repo: { owner: { login: string }; name: string },
+    sha: string,
+  ): Promise<string> {
+    const bytes = await githubService.getBlobBytes(repo.owner.login, repo.name, sha);
+    return new TextDecoder().decode(bytes);
+  }
+
+  /**
+   * Pulls remote changes: when the branch head moved, lists its tree, merges it as loadTree does
+   * and reconciles every open file whose blob changed or vanished. Calls share one run. Skipped
+   * while a load or a save is in progress, since either would race the result.
+   */
+  syncNow(): Promise<SyncOutcome> {
+    if (this.syncInFlight) return this.syncInFlight;
+    const repo = githubProfileStore.currentRepo.peek();
+    if (!repo || this.isLoading.peek() || this.savingFiles.peek().size > 0) {
+      return Promise.resolve('skipped');
+    }
+    const run = this.runSync(repo).finally(() => {
+      this.syncInFlight = null;
+    });
+    this.syncInFlight = run;
+    return run;
+  }
+
+  private async runSync(repo: GithubRepo): Promise<SyncOutcome> {
+    const head = await githubService.getHeadSha(repo.owner.login, repo.name, repo.default_branch);
+    if (this.lastHead?.repo === repo.full_name && this.lastHead.sha === head) return 'unchanged';
+    const fetched = (await githubService.fetchRepoTree(
+      repo.owner.login,
+      repo.name,
+      repo.default_branch,
+      { commitSha: head },
+    )) as TreeItem[];
+    // Something started while the tree was listed; its result would be newer than this listing.
+    if (
+      githubProfileStore.currentRepo.peek()?.full_name !== repo.full_name ||
+      this.isLoading.peek() ||
+      this.savingFiles.peek().size > 0
+    ) {
+      return 'skipped';
+    }
+    const db = await dbPromise;
+    const merged = await this.mergeRemoteTree(repo, fetched, this.tree.peek(), db);
+    const byPath = new Map(merged.filter((t) => t.type === 'blob').map((t) => [t.path, t]));
+
+    let failed = false;
+    for (const [path, open] of Object.entries(this.openFiles.peek())) {
+      if (this.savingFiles.peek().has(path) || path in this.fileConflicts.peek()) continue;
+      try {
+        const item = byPath.get(path);
+        if (item) {
+          if (item.sha === '' || item.sha === open.sha) continue;
+          const content = await this.readBlobText(repo, item.sha);
+          await this.reconcile(path, { content, sha: item.sha });
+        } else if (this.dirtyFiles.peek().has(path)) {
+          await this.reconcile(path, null);
+        } else if (open.sha !== '') {
+          await this.discardLocal(path);
+        }
+      } catch (e) {
+        logger.warn(`Could not sync ${path}`, e);
+        failed = true;
+      }
+    }
+    // Unrecorded after a failure, so the next run lists the tree again and retries that file.
+    if (!failed) this.lastHead = { repo: repo.full_name, sha: head };
+    return 'synced';
+  }
+
+  /**
+   * For views that read a file from the store: opens it, or, when open, clean and behind the
+   * tree, refreshes it from the blob the tree lists. Checks each tree sha once per path.
+   */
+  async ensureFresh(path: string): Promise<void> {
+    const open = this.openFiles.peek()[path];
+    if (!open) {
+      await this.openFile(path);
+      return;
+    }
+    const repo = githubProfileStore.currentRepo.peek();
+    if (!repo) return;
+    if (
+      this.dirtyFiles.peek().has(path) ||
+      this.savingFiles.peek().has(path) ||
+      this.pendingFiles.peek().has(path)
+    ) {
+      return;
+    }
+    const item = this.tree.peek().find((t) => t.path === path && t.type === 'blob');
+    if (!item || item.sha === '' || item.sha === open.sha) return;
+    if (this.freshChecked.get(path) === item.sha) return;
+    this.freshChecked.set(path, item.sha);
+    try {
+      const content = await this.readBlobText(repo, item.sha);
+      await this.reconcile(path, { content, sha: item.sha });
+    } catch (e) {
+      this.freshChecked.delete(path);
+      logger.warn(`Could not refresh ${path}`, e);
+    }
+  }
+
+  /**
+   * Pushes every unsaved file: restores dirty IndexedDB records of this repo (edits from before a
+   * reload or a failed save), then saves each. saveFile is sha-checked, so a remote that moved is
+   * merged, never overwritten. A file still dirty without a conflict failed: retry with backoff.
+   */
+  flushOutbox(): Promise<void> {
+    if (this.outboxInFlight) return this.outboxInFlight;
+    const run = this.runOutbox().finally(() => {
+      this.outboxInFlight = null;
+    });
+    this.outboxInFlight = run;
+    return run;
+  }
+
+  private async runOutbox(): Promise<void> {
+    const repo = githubProfileStore.currentRepo.peek();
+    if (!repo) return;
+    const prefix = `${repo.full_name}:`;
+    try {
+      const db = await dbPromise;
+      const records = (await db.getAll('files')) as FileRecord[];
+      for (const r of records) {
+        if (!r.dirty || !r.path.startsWith(prefix)) continue;
+        const path = r.path.slice(prefix.length);
+        if (!this.openFiles.peek()[path]) await this.restoreFromCache(path);
+      }
+    } catch (e) {
+      logger.error('Failed to restore unsaved files from cache', e);
+    }
+
+    for (const path of [...this.dirtyFiles.peek()]) {
+      if (this.savingFiles.peek().has(path) || path in this.fileConflicts.peek()) continue;
+      await this.saveFile(path);
+    }
+
+    const failed = [...this.dirtyFiles.peek()].some((p) => !(p in this.fileConflicts.peek()));
+    if (!failed) {
+      if (this.retryTimer) clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+      this.retryDelay = RETRY_MIN_MS;
+    } else if (!this.retryTimer) {
+      const delay = this.retryDelay;
+      this.retryDelay = Math.min(delay * 2, RETRY_MAX_MS);
+      this.retryTimer = setTimeout(() => {
+        this.retryTimer = null;
+        void this.flushOutbox();
+      }, delay);
+    }
+  }
+
+  /**
+   * Edits several files in one commit (e.g. moving a todo between boards). Open copies are first
+   * reconciled with the head's tree, `transform` maps their contents to the changes (null deletes),
+   * and the commit is pinned to that head; a moved branch retries up to three times.
+   */
+  async commitTransform(
+    paths: string[],
+    transform: (contents: Record<string, string>) => Record<string, string | null>,
+    message: string,
+  ): Promise<void> {
+    const repo = githubProfileStore.currentRepo.peek();
+    if (!repo) return;
+    const MAX_ATTEMPTS = 3;
+    for (let attempt = 1; ; attempt++) {
+      const head = await githubService.getHeadSha(repo.owner.login, repo.name, repo.default_branch);
+      const tree = (await githubService.fetchRepoTree(
+        repo.owner.login,
+        repo.name,
+        repo.default_branch,
+        { commitSha: head },
+      )) as TreeItem[];
+      const contents: Record<string, string> = {};
+      for (const path of paths) {
+        if (!this.openFiles.peek()[path]) await this.openFile(path);
+        const item = tree.find((t) => t.path === path && t.type === 'blob');
+        const open = this.openFiles.peek()[path];
+        if (item && open && item.sha !== '' && item.sha !== open.sha) {
+          const content = await this.readBlobText(repo, item.sha);
+          if ((await this.reconcile(path, { content, sha: item.sha })) === 'conflict') {
+            throw new Error(`${path} has a sync conflict; resolve it first.`);
+          }
+        }
+        const current = this.openFiles.peek()[path];
+        if (!current) throw new Error(`Could not load ${path}`);
+        contents[path] = current.content;
+      }
+      const changes = transform(contents);
+      try {
+        const res = await githubService.commitFiles(
+          repo.owner.login,
+          repo.name,
+          repo.default_branch,
+          changes,
+          message,
+          { expectedHeadSha: head },
+        );
+        await this.applyCommit(changes, res.blobShas);
+        return;
+      } catch (e) {
+        if (!(e instanceof ConflictError) || attempt >= MAX_ATTEMPTS) throw e;
+      }
+    }
+  }
+
   async loadTree() {
     const repo = githubProfileStore.currentRepo.value;
     if (!repo) return;
@@ -318,6 +598,8 @@ export class GithubFileStore {
       this.openFiles.value = {}; // Clear open files too? Yes, safer.
       this.dirtyFiles.value = new Set();
       this.fileConflicts.value = {};
+      this.lastHead = null;
+      this.freshChecked.clear();
       this.loadedRepo.value = repo.full_name;
     }
 
@@ -339,64 +621,17 @@ export class GithubFileStore {
         }
       }
 
-      // 2. Fetch fresh from network
+      // 2. Fetch fresh from network. Reading the head first and listing that exact commit avoids
+      // a lagging listing, and records the head so syncNow can tell when nothing changed.
+      const head = await githubService.getHeadSha(repo.owner.login, repo.name, repo.default_branch);
       const fetchedTree = (await githubService.fetchRepoTree(
         repo.owner.login,
         repo.name,
+        repo.default_branch,
+        { commitSha: head },
       )) as TreeItem[];
-      const fetchedBySha = new Map(fetchedTree.map((t) => [t.path, t.sha]));
-      const prefix = `${repo.full_name}:`;
-      for (const [key, deletedSha] of this.deletedPaths) {
-        if (!key.startsWith(prefix)) continue;
-        const remoteSha = fetchedBySha.get(key.slice(prefix.length));
-        // Gone, or re-created elsewhere with different content: stop hiding it.
-        if (remoteSha === undefined || (deletedSha !== '' && remoteSha !== deletedSha)) {
-          this.deletedPaths.delete(key);
-        }
-      }
-      for (const key of this.pendingBinary.keys()) {
-        if (key.startsWith(prefix) && fetchedBySha.has(key.slice(prefix.length))) {
-          this.pendingBinary.delete(key);
-        }
-      }
-      const remoteTree = fetchedTree.filter(
-        (t) => !this.deletedPaths.has(`${repo.full_name}:${t.path}`),
-      );
-
-      // 3. Smart Merge: Keep items from Cache that are NOT in Remote but have Local Content
-      // This handles the "Eventual Consistency" of GitHub API after creation
-      const mergedTree = [...remoteTree];
-      const remotePaths = new Set(remoteTree.map((t) => t.path));
-
-      // Check for missing items
-      for (const item of cachedTree) {
-        if (!remotePaths.has(item.path)) {
-          // This item is in Cache but not Remote.
-          // Check if we have content for it in 'files' store.
-          // Logic: If we have content, it's likely a local file we care about (newly created or working on).
-          // If we don't, it might be a deleted file we should drop.
-
-          const cacheKey = `${repo.full_name}:${item.path}`;
-          const hasFile = await db.getKey('files', cacheKey);
-
-          if (hasFile || this.pendingBinary.has(cacheKey)) {
-            logger.debug(`Preserving local file not(yet) in remote: ${item.path} `);
-            mergedTree.push(item);
-          }
-        }
-      }
-
-      // Sort
-      mergedTree.sort((a, b) => {
-        if (a.type === 'tree' && b.type !== 'tree') return -1;
-        if (a.type !== 'tree' && b.type === 'tree') return 1;
-        return a.path.localeCompare(b.path);
-      });
-
-      this.tree.value = mergedTree;
-
-      // 4. Update DB
-      await db.put('trees', mergedTree, `tree:${repo.full_name} `);
+      await this.mergeRemoteTree(repo, fetchedTree, cachedTree, db);
+      this.lastHead = { repo: repo.full_name, sha: head };
     } catch (err: any) {
       logger.error('Failed to load tree', err);
       // Fallback to cache if request fails
@@ -647,7 +882,10 @@ export class GithubFileStore {
             logger.warn(`Saved ${path}, but content changed during save.Retrying...`);
           }
           // Persist new SHA (and dirty state) so a reload after save uses the correct base.
-          if (serverSha) await this.persistFile(path);
+          if (serverSha) {
+            await this.persistFile(path);
+            await this.updateTreeSha(repo.full_name, path, serverSha);
+          }
         } catch (e: any) {
           // 409: our sha is stale. 422: the file exists but we had no sha (created elsewhere).
           // Never push the local text as is: merge it with the latest remote first.
@@ -680,6 +918,23 @@ export class GithubFileStore {
       doneSaving.delete(path);
       this.savingFiles.value = doneSaving;
       this.bumpSaveGen(path);
+    }
+  }
+
+  /**
+   * Keeps the tree item in step with a saved file so syncNow does not see our own save as a remote
+   * change. A sha '' item (created locally) stays '' so loadTree's merge still preserves it.
+   */
+  private async updateTreeSha(repoName: string, path: string, sha: string) {
+    const item = this.tree.peek().find((t) => t.path === path);
+    if (!item || item.sha === '' || item.sha === sha) return;
+    const next = this.tree.peek().map((t) => (t === item ? { ...t, sha } : t));
+    this.tree.value = next;
+    try {
+      const db = await dbPromise;
+      await db.put('trees', next, `tree:${repoName} `);
+    } catch (e) {
+      logger.error('Failed to persist tree after save', e);
     }
   }
 
@@ -871,8 +1126,8 @@ export class GithubFileStore {
     const paths = new Set(Object.keys(changes));
     for (const [path, content] of Object.entries(changes)) {
       const key = `${repo.full_name}:${path}`;
-      if (typeof content === 'string' || content === null) this.pendingBinary.delete(key);
-      else this.pendingBinary.set(key, blobShas[path] ?? '');
+      if (content === null) this.pendingCommit.delete(key);
+      else this.pendingCommit.set(key, blobShas[path] ?? '');
       if (content === null) {
         const item = this.tree.peek().find((t) => t.path === path && t.type === 'blob');
         this.deletedPaths.set(key, this.openFiles.peek()[path]?.sha || item?.sha || '');
@@ -1007,6 +1262,7 @@ export class GithubFileStore {
     }
   }
 
+  /** Moves a file in one commit, so a failure cannot leave both copies or neither. */
   async renameFile(oldPath: string, newPath: string) {
     const repo = githubProfileStore.currentRepo.value;
     if (!repo) return;
@@ -1015,38 +1271,44 @@ export class GithubFileStore {
       throw new Error(`Destination ${newPath} already exists`);
     }
 
+    // Unsaved edits must be in the commit; if they cannot be saved, moving the remote copy would lose them.
+    if (this.dirtyFiles.peek().has(oldPath)) {
+      await this.saveFile(oldPath);
+      if (this.dirtyFiles.peek().has(oldPath)) {
+        throw new Error(`Could not save ${oldPath} before renaming it`);
+      }
+    }
+
     this.isLoading.value = true;
-
     try {
-      // 1. Get Content
-      // Try open files first
-      let content = this.openFiles.value[oldPath]?.content;
-
-      // If not open, try to load it
-      if (content === undefined) {
-        await this.openFile(oldPath);
-        content = this.openFiles.value[oldPath]?.content;
+      const MAX_ATTEMPTS = 3;
+      for (let attempt = 1; ; attempt++) {
+        const head = await githubService.getHeadSha(
+          repo.owner.login,
+          repo.name,
+          repo.default_branch,
+        );
+        const { content } = await githubService.getFileContent(
+          repo.owner.login,
+          repo.name,
+          oldPath,
+        );
+        const changes = { [newPath]: content, [oldPath]: null };
+        try {
+          const res = await githubService.commitFiles(
+            repo.owner.login,
+            repo.name,
+            repo.default_branch,
+            changes,
+            `Rename ${oldPath} to ${newPath}`,
+            { expectedHeadSha: head },
+          );
+          await this.applyCommit(changes, res.blobShas);
+          break;
+        } catch (e) {
+          if (!(e instanceof ConflictError) || attempt >= MAX_ATTEMPTS) throw e;
+        }
       }
-
-      if (content === undefined) {
-        throw new Error(`Could not load content for ${oldPath}`);
-      }
-
-      // 2. Create new file
-      // 2. Create new file
-
-      // Actually we can use our existing methods but we need to be careful with atomicity manually
-      // Use direct service calls to avoid UI flicker or state updates mid-flight?
-      // No, strictly: Create New -> Delete Old.
-
-      await this.saveFileDirectly(newPath, content); // We need a direct save that accepts content, not just from state
-
-      // 3. Delete old file
-      await this.deleteFile(oldPath);
-
-      // 4. Update Open Files to point to new path if it was open
-      // deleteFile handled removal.
-      // We should open the new file.
       await this.openFile(newPath);
     } catch (e) {
       logger.error(`Rename failed`, e);
@@ -1054,37 +1316,6 @@ export class GithubFileStore {
     } finally {
       this.isLoading.value = false;
     }
-  }
-
-  // Helper for rename to avoid complex state juggling
-  async saveFileDirectly(path: string, content: string) {
-    const repo = githubProfileStore.currentRepo.value;
-    if (!repo) return;
-
-    const res = await githubService.saveFile(
-      repo.owner.login,
-      repo.name,
-      path,
-      content,
-      `Create ${path} (Rename)`,
-      undefined, // No SHA = Create
-    );
-
-    // Optimistically update our tree
-    const newItem: TreeItem = {
-      path,
-      mode: '100644',
-      type: 'blob',
-      sha: res.content?.sha || '',
-      url: '',
-      size: content.length,
-    };
-    this.tree.value = [...this.tree.value, newItem].sort((a, b) => a.path.localeCompare(b.path));
-
-    // Update DB tree
-    dbPromise.then((db) => {
-      db.put('trees', this.tree.value, `tree:${repo.full_name} `);
-    });
   }
 }
 
