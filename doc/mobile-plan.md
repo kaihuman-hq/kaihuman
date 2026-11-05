@@ -218,10 +218,10 @@
 - Create: `apps/mobile/src/views/primitives.test.tsx`
 
 **Steps:**
-- [ ] Add `expo`, `react`, `react-native`, `expo-router`, `expo-linking`, `expo-web-browser`, `react-native-safe-area-context`, `react-native-screens`, `expo-status-bar` (SDK-matched versions) to `apps/mobile` `dependencies`; `react-native-web`, `react-dom`, `@testing-library/react`, `@types/react` to root `devDependencies`.
-- [ ] Set `main` to `expo-router/entry`; configure `tsconfig.json` for `react-jsx`; root layout renders a stack, `index.tsx` redirects to login or dashboard from `authStore`.
-- [ ] Add `useSignalValue` and themed primitives; render tests prove the harness works.
-- [ ] Console and all other apps still build and test (no hoisting changes that break them); `expo export` smoke check run if it works offline.
+- [x] Add `expo`, `react`, `react-native`, `expo-router`, `expo-linking`, `expo-web-browser`, `react-native-safe-area-context`, `react-native-screens`, `expo-status-bar` (SDK-matched versions) to `apps/mobile` `dependencies`; `react-native-web`, `react-dom`, `@testing-library/react`, `@types/react` to root `devDependencies`.
+- [x] Set `main` to `expo-router/entry`; configure `tsconfig.json` for `react-jsx`; root layout renders a stack, `index.tsx` redirects to login or dashboard from `authStore`.
+- [x] Add `useSignalValue` and themed primitives; render tests prove the harness works.
+- [x] Console and all other apps still build and test (no hoisting changes that break them); `expo export` smoke check run if it works offline.
 
 ### Task 6.2: Native Glue — Secure Token, App Group Bridge, `pending-url` & Crypto Polyfill
 **Files:**

@@ -12,6 +12,6 @@
     "android": {
       "package": "com.kaihuman.app"
     },
-    "plugins": ["./plugins/with-kaihuman-widgets.ts"]
+    "plugins": ["expo-router", "./plugins/with-kaihuman-widgets.ts"]
   }
 }

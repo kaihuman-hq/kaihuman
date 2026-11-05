@@ -3,8 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "src/index.ts",
+  "main": "expo-router/entry",
   "scripts": {
+    "start": "expo start",
     "build": "tsc --noEmit",
     "check-types": "tsc --noEmit",
     "lint": "biome check .",
@@ -15,6 +16,16 @@
   "dependencies": {
     "@kaihuman/core": "workspace:*",
     "@kaihuman/formats": "workspace:*",
-    "@preact/signals": "^2.0.1"
+    "@preact/signals": "^2.0.1",
+    "expo": "^58.0.23",
+    "expo-constants": "~58.0.15",
+    "expo-linking": "~58.0.16",
+    "expo-router": "~58.0.30",
+    "expo-status-bar": "~58.0.4",
+    "expo-web-browser": "~58.0.7",
+    "react": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "~5.11.1",
+    "react-native-screens": "~4.30.1"
   }
 }
