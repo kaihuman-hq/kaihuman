@@ -251,8 +251,8 @@
 - Create: `apps/mobile/app/dashboard.tsx`, `apps/mobile/app/ideas.tsx`, `apps/mobile/app/wiki.tsx`, `apps/mobile/app/knowledge.tsx`, `apps/mobile/app/files/[...path].tsx`
 
 **Steps:**
-- [ ] Dashboard renders each tile kind from `presentTile` with its actions; ideas, wiki (with wiki-link navigation), knowledge inbox and file browser/editor render their controllers, including the passphrase flow for `.enc` files.
-- [ ] Render tests cover each tile kind and each screen's main state and action.
+- [x] Dashboard renders each tile kind from `presentTile` with its actions; ideas, wiki (with wiki-link navigation), knowledge inbox and file browser/editor render their controllers, including the passphrase flow for `.enc` files.
+- [x] Render tests cover each tile kind and each screen's main state and action.
 
 ### Task 6.5: Docs & Final Verification
 **Files:**
