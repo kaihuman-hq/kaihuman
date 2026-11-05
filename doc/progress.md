@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-11-05 — Sync fixes, phase 1 (no blind overwrite, durable edits, no-store reads)
+
+- Fix 1: `GithubFileStore.saveFile` no longer re-sends stale content on 409/422 ("user wins" removed). New `reconcile(path)` reads the remote copy (no-store), three-way merges it with the working copy's base, then saves with the remote sha or fills `fileConflicts`. `keep_local` only overrides the version the user saw. `upsertRepoFile` takes a merge function and retries on 409/422; the push config merges subscriptions; raw notes are created without a read.
+- Merge: in-repo line diff3 in `packages/core/src/sync/`, plus a merger registry; structural todos, read-it-later and action-log merges live in `packages/formats/src/merge.ts` and are registered by the console at startup (core still does not import formats).
+- Fix 3: IndexedDB file records keep `dirty` and `baseContent`; `openFile` merges instead of replacing a dirty copy. Editor autosave is a 3 s debounce (was 2 min) and flushes on `visibilitychange → hidden`, `pagehide` and unmount.
+- Fix 4: `fetchRepoTree`'s ref read and by-path `getFileContent` bypass the HTTP cache.
+- In-memory GitHub service: 409/422 on sha mismatch, blob history, stale-read mode. Tests: `sync.test.ts` (causes 1, 3, 4), `merge.test.ts` (core and formats), `sync-io.test.ts`, editor autosave tests.
+- Phase 2 (resume revalidation, outbox, atomic moves) is still open; it will call `reconcile(path)`.
+
 ## 2026-11-05 — Sync analysis (docs only)
 
 - New `doc/sync-analysis.md`: root causes of late cross-device sync and lost desktop edits in the console PWA (blind "user wins" 409 retry, no revalidation on resume, 2-min autosave + non-durable dirty flag, HTTP-cached reads, no outbox), with evidence, repro, fix design and test plan. No source changes.

@@ -20,6 +20,7 @@
 
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
+| Safe cross-device saves: a save that hits a newer remote version is three-way merged (todos, read-it-later and action logs item by item, other files line by line) or shown in the conflict dialog, never overwritten; unsaved edits survive a reload; the editor autosaves 3 s after the last keystroke and when the app is hidden | all file editing, `doc/sync-analysis.md` | 2026-11-05 |
 | Ideas overview: every `.kh/ideas/` idea as a card coloured by status, with a 12-week activity strip and a hot/warm/cool/dormant level; status chips, text, product and sort filters; inline log, challenge and status edits | `/ideas` (navbar **Ideas**) | 2026-10-13 |
 | Quick idea: one text becomes a seed idea; pasted `kh-idea` hand-off blocks from chat apps are applied | `/quick-idea` | 2026-10-13 |
 | `kh-ideas` agent skill installed into the data repo (`.agents/skills/`, `.claude/skills/`) together with `CLAUDE.md` / `AGENTS.md`; set up in one commit from `/knowledge` or `/ideas`, and a half-finished set-up is completed on the next visit | `/knowledge`, `/ideas` | 2026-10-13 |
