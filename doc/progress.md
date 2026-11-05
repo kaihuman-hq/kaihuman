@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-05 — Business link in the default navbar
+
+- The desktop navbar now includes Business by default once `.kh/business/business.yaml` exists (`defaultNavbar(businessEnabled)` in `navbar-items.ts`, `MainApp` prop `businessEnabled`, set by the Dashboard). Before that the entry existed only in the Dashboard magic menu and as an opt-in item in Settings. A customised navbar is unchanged. Without business set up the magic-menu entry still opens `/business`, which shows the enable callout. Test: `navbar-config.test.ts`.
+
 ## 2026-11-05 — Sync fixes, phase 2 (revalidate on resume, outbox, atomic moves)
 
 - Fix 2: `GithubFileStore.syncNow()` reads the head (no-store) and stops when it is unchanged; otherwise it loads the tree of that commit, refreshes clean open files whose sha changed (blob by sha) and reconciles dirty ones through phase 1's `reconcile`. Concurrent calls share one run; it skips while a save or tree load is in flight. `installAutoSync` (core `sync/auto-sync.ts`, wired in console `main.tsx`) runs it on `visibilitychange → visible`, `focus`, `online` and every 90 s while visible, throttled to 2 s. `loadTree` records the head too.
@@ -8,6 +12,7 @@
 - Fix 6: `renameFile` and the new `commitTransform(paths, transform, message)` (used by the Kanban move) are one `commitFiles` with `expectedHeadSha`, retried on `ConflictError`. The tree smart merge keeps a cached-only entry only when it is unpushed (`sha === ''`) or just committed (`pendingCommit`, was `pendingBinary`).
 - In-memory GitHub service: `saveFile`/`deleteFile` advance the head. Tests: `sync-phase2.test.ts` (causes 2, 5, 6), `auto-sync.test.ts`, `UnsyncedIndicator.test.tsx`, editor test for remote content under a clean editor.
 - Review fixes: a sync/`ensureFresh`/`commitTransform` run no longer reconciles against a listing older than a save (save-generation guard, saved tree sha kept, head not recorded when a path was skipped) or after a repo switch; edits typed during `commitTransform`/`renameFile` commits are replayed instead of overwritten; `deleteFile`/`renameFolder` clear dirty state so the outbox stops retrying removed paths; `commitTransform` makes no commit for an empty change set; the Kanban move re-finds the dragged todo by text and `createdAt` (`moveTodo.ts`) instead of a stale index.
+
 
 ## 2026-11-05 — Sync fixes, phase 1 (no blind overwrite, durable edits, no-store reads)
 

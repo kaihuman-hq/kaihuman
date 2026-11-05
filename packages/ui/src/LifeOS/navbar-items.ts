@@ -37,6 +37,10 @@ export const NAVBAR_ITEMS: NavbarItemDef[] = [
 /** Items shown when the user has not customised the navbar. */
 export const DEFAULT_NAVBAR: NavItemId[] = ['dashboard', 'files', 'board', 'ideas', 'shortcuts'];
 
+/** Business joins the default navbar only once it is set up; a customised navbar is never touched. */
+export const defaultNavbar = (businessEnabled: boolean): NavItemId[] =>
+  businessEnabled ? [...DEFAULT_NAVBAR, 'business'] : DEFAULT_NAVBAR;
+
 export const getNavbarItem = (id: NavItemId): NavbarItemDef | undefined =>
   NAVBAR_ITEMS.find((item) => item.id === id);
 
