@@ -231,10 +231,10 @@
 - Modify: `apps/mobile/app/_layout.tsx` (call `bootstrap()`)
 
 **Steps:**
-- [ ] Mirror `authStore.token` to SecureStore (`keychainService: com.kaihuman.app`, key `github-token`) and to App Group defaults / Android prefs `kaihuman_widget` via the module; clear all copies on sign-out.
-- [ ] `SharedContainer` implementation backed by the module (App Group directory on iOS, `kaihuman_widget` prefs on Android) feeding `WidgetBridge`.
-- [ ] On launch and on app foreground, consume `pending-url` and route it with `parseDeepLink`/`routeToUrl`; handle incoming `Linking` URLs (incl. `auth/callback`).
-- [ ] Pure-JS `crypto.subtle` subset, installed only when missing; tests prove `encrypt`/`decrypt` from `@kaihuman/core` round-trip with it and interoperate with Node WebCrypto.
+- [x] Mirror `authStore.token` to SecureStore (`keychainService: com.kaihuman.app`, key `github-token`) and to App Group defaults / Android prefs `kaihuman_widget` via the module; clear all copies on sign-out.
+- [x] `SharedContainer` implementation backed by the module (App Group directory on iOS, `kaihuman_widget` prefs on Android) feeding `WidgetBridge`.
+- [x] On launch and on app foreground, consume `pending-url` and route it with `parseDeepLink`/`routeToUrl`; handle incoming `Linking` URLs (incl. `auth/callback`).
+- [x] Pure-JS `crypto.subtle` subset, installed only when missing; tests prove `encrypt`/`decrypt` from `@kaihuman/core` round-trip with it and interoperate with Node WebCrypto.
 
 ### Task 6.3: Views — Login, Repo Selector, Quick Capture, Kanban, Todo Analytics
 **Files:**

@@ -1,0 +1,5 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["KaihumanSharedModule"] },
+  "android": { "modules": ["com.kaihuman.shared.KaihumanSharedModule"] }
+}
