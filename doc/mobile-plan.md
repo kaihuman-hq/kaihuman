@@ -30,11 +30,11 @@
 - Modify: `packages/core/package.json` (add `"test": "vitest run"` script)
 
 **Steps:**
-- [ ] Define `CoreStorageAdapter`, `CachedFileRecord`, and `PendingMutation` in `packages/core/src/storage/adapter.ts`, plus `getCoreStorage()` and `configureCoreStorage(adapter)`.
-- [ ] Implement `InMemoryStorageAdapter` (`memory-adapter.ts`) and `WebStorageAdapter` (`web-adapter.ts`) which uses `idb` + `localStorage` when available in the browser and falls back to `InMemoryStorageAdapter` when `indexedDB` or `localStorage` is undefined (such as React Native or Node).
-- [ ] Guard direct `window` / `localStorage` / `document` references in `auth.store.ts`, `github-profile.store.ts`, `github-file.store.ts`, and `password.store.ts` so `@kaihuman/core` imports cleanly in non-DOM runtimes (React Native & Node) and supports `authStore.handleCallbackUrl(url: string)` in addition to `window.location.search`.
-- [ ] Add an offline mutation queue (`enqueueOfflineSave`, `flushOfflineMutations`) to `githubFileStore` backed by `CoreStorageAdapter`.
-- [ ] Write unit tests in `packages/core/src/storage/storage.test.ts` covering custom adapter injection, auth token persistence, `handleCallbackUrl('kaihuman://auth/callback?access_token=gho_test')`, and offline mutation queuing/flushing.
+- [x] Define `CoreStorageAdapter`, `CachedFileRecord`, and `PendingMutation` in `packages/core/src/storage/adapter.ts`, plus `getCoreStorage()` and `configureCoreStorage(adapter)`.
+- [x] Implement `InMemoryStorageAdapter` (`memory-adapter.ts`) and `WebStorageAdapter` (`web-adapter.ts`) which uses `idb` + `localStorage` when available in the browser and falls back to `InMemoryStorageAdapter` when `indexedDB` or `localStorage` is undefined (such as React Native or Node).
+- [x] Guard direct `window` / `localStorage` / `document` references in `auth.store.ts`, `github-profile.store.ts`, `github-file.store.ts`, and `password.store.ts` so `@kaihuman/core` imports cleanly in non-DOM runtimes (React Native & Node) and supports `authStore.handleCallbackUrl(url: string)` in addition to `window.location.search`.
+- [x] Add an offline mutation queue (`enqueueOfflineSave`, `flushOfflineMutations`) to `githubFileStore` backed by `CoreStorageAdapter`.
+- [x] Write unit tests in `packages/core/src/storage/storage.test.ts` covering custom adapter injection, auth token persistence, `handleCallbackUrl('kaihuman://auth/callback?access_token=gho_test')`, and offline mutation queuing/flushing.
 
 ### Task 1.2: Shared Widget Todo Snapshot & Toggle Reconciliation in `@kaihuman/core`
 **Files:**
@@ -43,10 +43,10 @@
 - Modify: `packages/core/src/index.ts`
 
 **Steps:**
-- [ ] Implement `buildWidgetTodoSnapshot(files: Record<string, { content: string; sha: string }>, repoFullName: string, branch?: string): WidgetTodoSnapshot` in `packages/core/src/widget-sync.ts`.
+- [x] Implement `buildWidgetTodoSnapshot(files: Record<string, { content: string; sha: string }>, repoFullName: string, branch?: string): WidgetTodoSnapshot` in `packages/core/src/widget-sync.ts`.
   - Parses all `.todos.md` files under `.kh/` (or `.lifeos/`), prioritizing `.kh/inbox.todos.md` and `in-progress` items, computing `counts` (`inbox`, `inProgress`, `backlog`, `doneToday`), and extracting `upcomingMilestone` via `getUpcomingMilestone`.
-- [ ] Implement `applyWidgetTodoToggle(snapshot: WidgetTodoSnapshot, itemId: string, now?: Date): { snapshot: WidgetTodoSnapshot; updatedFilePath: string; updatedContent: string; baseSha: string } | null` so both the JS bridge and tests share the exact mutation logic that the Swift/Kotlin widget intents execute.
-- [ ] Write unit tests in `packages/core/src/widget-sync.test.ts` verifying snapshot prioritization, milestone extraction, and toggling an item from `backlog` / `in-progress` to `done` with `::updated::` metadata.
+- [x] Implement `applyWidgetTodoToggle(snapshot: WidgetTodoSnapshot, itemId: string, now?: Date): { snapshot: WidgetTodoSnapshot; updatedFilePath: string; updatedContent: string; baseSha: string } | null` so both the JS bridge and tests share the exact mutation logic that the Swift/Kotlin widget intents execute.
+- [x] Write unit tests in `packages/core/src/widget-sync.test.ts` verifying snapshot prioritization, milestone extraction, and toggling an item from `backlog` / `in-progress` to `done` with `::updated::` metadata.
 
 ### Task 1.3: Mobile OAuth Redirect in `apps/auth-worker`
 **Files:**
@@ -54,8 +54,8 @@
 - Modify: `apps/auth-worker/src/index.test.ts`
 
 **Steps:**
-- [ ] Update `/login` in `apps/auth-worker/src/index.ts` to check `url.searchParams.get('client') === 'mobile'`. Encode a `:mobile` suffix on the state token (or cookie) so `/callback` knows whether to redirect to `env.APP_URL` or `kaihuman://auth/callback`.
-- [ ] Verify existing tests pass and add tests for `/login?client=mobile` and `/callback` redirecting to `kaihuman://auth/callback?access_token=gho_token`.
+- [x] Update `/login` in `apps/auth-worker/src/index.ts` to check `url.searchParams.get('client') === 'mobile'`. Encode a `:mobile` suffix on the state token (or cookie) so `/callback` knows whether to redirect to `env.APP_URL` or `kaihuman://auth/callback`.
+- [x] Verify existing tests pass and add tests for `/login?client=mobile` and `/callback` redirecting to `kaihuman://auth/callback?access_token=gho_token`.
 
 ---
 

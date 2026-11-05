@@ -373,6 +373,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@kaihuman/formats':
+        specifier: workspace:*
+        version: link:../formats
       '@noble/hashes':
         specifier: ^1.8.0
         version: 1.8.0

@@ -2,6 +2,7 @@ import { effect, signal } from '@preact/signals';
 import { demoMode } from '../demo-mode.js';
 import { Logger } from '../logger.js';
 import { githubService } from '../services/github.service.js';
+import { getCoreStorage } from '../storage/adapter.js';
 import { authStore } from './auth.store.js';
 
 const logger = new Logger('GithubProfileStore');
@@ -32,7 +33,7 @@ export class GithubProfileStore {
 
   private init() {
     // 1. Try localStorage first (sync, fast)
-    const saved = localStorage.getItem('lifeos_current_repo');
+    const saved = getCoreStorage().getItem('lifeos_current_repo');
     if (saved) {
       try {
         const repo = JSON.parse(saved);
@@ -48,9 +49,9 @@ export class GithubProfileStore {
       // Demo sessions are ephemeral — never persist the fake repo selection.
       if (demoMode.value) return;
       if (repo) {
-        localStorage.setItem('lifeos_current_repo', JSON.stringify(repo));
+        getCoreStorage().setItem('lifeos_current_repo', JSON.stringify(repo));
       } else {
-        localStorage.removeItem('lifeos_current_repo');
+        getCoreStorage().removeItem('lifeos_current_repo');
       }
     });
   }

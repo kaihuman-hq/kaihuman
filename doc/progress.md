@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-05 — Mobile phase 1: core storage adapter, widget sync, mobile OAuth
+
+- `@kaihuman/core`: pluggable `CoreStorageAdapter` (`configureCoreStorage`, web adapter with in-memory fallback; IndexedDB now v2 with a `mutations` store), stores no longer touch `window`/`localStorage` directly, `authStore.handleCallbackUrl`, and an offline save queue in `githubFileStore`.
+- `widget-sync.ts`: `buildWidgetTodoSnapshot` and `applyWidgetTodoToggle`, shared with the native widgets. Core now depends on `@kaihuman/formats`.
+- `auth-worker`: `/login?client=mobile` redirects the callback to `kaihuman://auth/callback`.
+
 ## 2026-11-01 — Mobile app (iOS & Android): design spec and autonomous implementation plan
 
 - Design for `@kaihuman/mobile` (`apps/mobile`, Option B: Expo + React Native) with full console feature parity and interactive iOS (SwiftUI WidgetKit + AppIntents) and Android (Jetpack Glance) Todo widgets: `doc/mobile.md`.
