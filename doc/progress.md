@@ -7,6 +7,7 @@
 - Fix 3: IndexedDB file records keep `dirty` and `baseContent`; `openFile` merges instead of replacing a dirty copy. Editor autosave is a 3 s debounce (was 2 min) and flushes on `visibilitychange → hidden`, `pagehide` and unmount.
 - Fix 4: `fetchRepoTree`'s ref read and by-path `getFileContent` bypass the HTTP cache.
 - In-memory GitHub service: 409/422 on sha mismatch, blob history, stale-read mode. Tests: `sync.test.ts` (causes 1, 3, 4), `merge.test.ts` (core and formats), `sync-io.test.ts`, editor autosave tests.
+- Review fixes: the editor reads its dirty flag back from `githubFileStore.dirtyFiles` after a save and on store updates (failed saves stay dirty and retry on hide; a still-dirty merge or IndexedDB-restored file is autosaved; a path switch saves the previous file). `saveFile` keeps the sha/base a concurrent reconcile set; `openFile` drops a read that raced a save (per-path save generation); a repo switch flushes pending cache writes (keyed by the repo they were made in) and resets dirty/conflict state; new `discardLocal(path)` used by the failed idea-create rollback; push setup treats only a 404 as first setup and refuses to write a config whose VAPID key changed under it. Phase 1 status noted in `doc/sync-analysis.md`.
 - Phase 2 (resume revalidation, outbox, atomic moves) is still open; it will call `reconcile(path)`.
 
 ## 2026-11-05 — Sync analysis (docs only)

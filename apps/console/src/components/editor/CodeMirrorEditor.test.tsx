@@ -29,6 +29,7 @@ vi.mock('@kaihuman/core', async () => {
     githubFileStore: {
       activeFile: signal(null),
       openFiles: signal({}),
+      dirtyFiles: signal(new Set<string>()),
       updateFileContent: vi.fn(),
       flushPendingWrites: vi.fn(async () => {}),
     },

@@ -1,6 +1,6 @@
 import { CodeEditor, type CodeEditorHandle } from '@cascivo/editor';
 import { githubFileStore, Logger } from '@kaihuman/core';
-import { useSignalEffect } from '@preact/signals';
+import { untracked, useSignalEffect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { languageForPath } from './language';
 
@@ -56,6 +56,13 @@ export const CodeMirrorEditor = ({
 
   const controlled = initialContent !== undefined;
 
+  // Store mode: the store owns the dirty flag. Its saveFile never throws (a failed or conflicted
+  // save leaves the file dirty and sets `error`), so the editor reads the flag back from it.
+  const setDirtyState = (dirty: boolean) => {
+    dirtyRef.current = dirty;
+    setHasUnsavedChanges(dirty);
+  };
+
   // Replace the whole document via the undoable handle, guarding the echo.
   const syncExternal = (next: string) => {
     const view = editorRef.current;
@@ -90,14 +97,17 @@ export const CodeMirrorEditor = ({
     try {
       if (controlled) {
         await onSave?.(value);
+        // Keep the dirty flag if the user typed while the save was in flight.
+        if (docRef.current === value) setDirtyState(false);
       } else {
         const currentPath = propsPath || githubFileStore.activeFile.value;
-        if (currentPath) await githubFileStore.saveFile(currentPath);
-      }
-      // Keep the dirty flag if the user typed while the save was in flight.
-      if (docRef.current === value) {
-        dirtyRef.current = false;
-        setHasUnsavedChanges(false);
+        if (currentPath) {
+          await githubFileStore.saveFile(currentPath);
+          // The editor may show another file by now; that file's flag is not ours to change.
+          if (currentPathRef.current === currentPath) {
+            setDirtyState(githubFileStore.dirtyFiles.peek().has(currentPath));
+          }
+        }
       }
     } catch (e) {
       logger.error('Failed to save:', e);
@@ -173,16 +183,19 @@ export const CodeMirrorEditor = ({
       : '';
     if (!effectivePath) return;
 
-    if (effectivePath !== currentPathRef.current) {
+    const previousPath = currentPathRef.current;
+    if (effectivePath === previousPath && content === docRef.current) return;
+    if (effectivePath !== previousPath) {
+      // The pending autosave belongs to the previous file: save it now instead of dropping it.
+      clearTimer();
+      if (previousPath) untracked(() => void githubFileStore.saveFile(previousPath));
       currentPathRef.current = effectivePath;
-      syncExternal(content);
-      dirtyRef.current = false;
-      setHasUnsavedChanges(false);
-    } else if (content !== docRef.current) {
-      syncExternal(content);
-      dirtyRef.current = false;
-      setHasUnsavedChanges(false);
     }
+    syncExternal(content);
+    // A store update (a clean merge, or a copy restored from IndexedDB) can leave the file dirty.
+    const dirty = githubFileStore.dirtyFiles.peek().has(effectivePath);
+    setDirtyState(dirty);
+    if (dirty && !readOnly) scheduleAutosave();
   });
 
   if (!propsPath && !githubFileStore.activeFile.value && initialContent === undefined) {

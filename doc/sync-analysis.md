@@ -8,6 +8,11 @@ Date: 2026-11-05. Analysis only; no source changed.
 
 Line numbers refer to `packages/core/src/stores/github-file.store.ts` (**store**) and `packages/core/src/services/github.service.ts` (**service**) at commit `e73a206`, unless a file is named.
 
+## Phase 1 status
+
+- Done: fix 1 (merge on 409/422 instead of a blind overwrite), fix 3 (durable dirty state, 3 s autosave, flush on hide) and fix 4 (no-store reads). A follow-up review fixed save/reconcile races, editor dirty-flag drift, repo-switch cache writes, failed-create rollback and the push-config VAPID key check.
+- Known limitation (not in phase 1): structural merges (todos, read-it-later, action log, `packages/formats/src/merge.ts`) match items by a derived key; edge cases such as an edit that changes an item's key, or duplicate keys, are not handled item by item yet.
+
 ## How sync works today
 
 - Write path: an edit goes to `updateFileContent` (store:303). This updates memory, sets an in-memory dirty flag and writes to IndexedDB after 500 ms. `saveFile` (store:403) then sends one Contents API `PUT` with the sha held in memory (service:222–247). There is one commit per file and no queue. Failures are not replayed.

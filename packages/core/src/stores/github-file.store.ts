@@ -71,6 +71,8 @@ export class GithubFileStore {
     string,
     { timer: ReturnType<typeof setTimeout>; run: () => Promise<void> }
   >();
+  // Bumped when a save of a path starts and ends, so a read begun before it can be recognised as stale.
+  private saveGen = new Map<string, number>();
   activeFile = signal<string | null>(null);
   dirtyFiles = signal<Set<string>>(new Set());
   isLoading = signal<boolean>(false);
@@ -123,13 +125,22 @@ export class GithubFileStore {
     this.fileConflicts.value = next;
   }
 
-  /** Writes the in-memory working copy of `path`, with its dirty flag and base, to IndexedDB. */
-  private async persistFile(path: string) {
-    const repo = githubProfileStore.currentRepo.peek();
+  private bumpSaveGen(path: string) {
+    this.saveGen.set(path, (this.saveGen.get(path) ?? 0) + 1);
+  }
+
+  /**
+   * Writes the in-memory working copy of `path`, with its dirty flag and base, to IndexedDB, under
+   * `repoName` (the current repo by default; a debounced write passes the repo it was made in).
+   */
+  private async persistFile(
+    path: string,
+    repoName = githubProfileStore.currentRepo.peek()?.full_name,
+  ) {
     const file = this.openFiles.peek()[path];
-    if (!repo || !file) return;
+    if (!repoName || !file) return;
     const record: FileRecord = {
-      path: `${repo.full_name}:${path}`,
+      path: `${repoName}:${path}`,
       content: file.content,
       sha: file.sha,
       timestamp: Date.now(),
@@ -150,6 +161,35 @@ export class GithubFileStore {
     this.idbWriteTimers.clear();
     for (const p of pending) clearTimeout(p.timer);
     await Promise.all(pending.map((p) => p.run()));
+  }
+
+  /**
+   * Forgets every local trace of `path`: the open copy, its dirty flag and conflict, a pending
+   * cache write and the IndexedDB record. For undoing an optimistic create that never reached
+   * GitHub; without the record gone, loadTree's merge would bring the path back.
+   */
+  async discardLocal(path: string): Promise<void> {
+    const repo = githubProfileStore.currentRepo.peek();
+    if (repo) {
+      const key = `${repo.full_name}:${path}`;
+      clearTimeout(this.idbWriteTimers.get(key)?.timer);
+      this.idbWriteTimers.delete(key);
+    }
+    if (this.openFiles.peek()[path]) {
+      const open = { ...this.openFiles.peek() };
+      delete open[path];
+      this.openFiles.value = open;
+    }
+    this.setDirty(path, false);
+    this.clearConflict(path);
+    if (this.activeFile.peek() === path) this.activeFile.value = null;
+    if (!repo) return;
+    try {
+      const db = await dbPromise;
+      await db.delete('files', `${repo.full_name}:${path}`);
+    } catch (e) {
+      logger.error(`Failed to drop ${path} from cache`, e);
+    }
   }
 
   /**
@@ -271,9 +311,13 @@ export class GithubFileStore {
       logger.info(
         `Switching repo from ${this.loadedRepo.value} to ${repo.full_name}. Clearing tree.`,
       );
+      // Pending cache writes belong to the old repo's files: write them before those are cleared.
+      await this.flushPendingWrites();
       this.tree.value = [];
       this.activeFile.value = null;
       this.openFiles.value = {}; // Clear open files too? Yes, safer.
+      this.dirtyFiles.value = new Set();
+      this.fileConflicts.value = {};
       this.loadedRepo.value = repo.full_name;
     }
 
@@ -394,8 +438,13 @@ export class GithubFileStore {
 
       // Always revalidate from network. A dirty copy is never replaced: reconcile merges it.
       try {
+        const gen = this.saveGen.get(path) ?? 0;
         const fileData = await githubService.getFileContent(repo.owner.login, repo.name, path);
-        if (this.openFiles.peek()[path]) {
+        const raced = (this.saveGen.get(path) ?? 0) !== gen || this.savingFiles.peek().has(path);
+        if (raced && this.openFiles.peek()[path]) {
+          // A save ran during the read, so the read may predate it: the saved copy is newer.
+          logger.debug(`Dropping a read of ${path} that raced a save.`);
+        } else if (this.openFiles.peek()[path]) {
           await this.reconcile(path, fileData);
         } else {
           this.setOpenFile(path, {
@@ -453,7 +502,7 @@ export class GithubFileStore {
         const cacheKey = `${repo.full_name}:${path}`;
         clearTimeout(this.idbWriteTimers.get(cacheKey)?.timer);
         // Persists whatever is in memory when it runs, so a save that finished first is not undone.
-        const run = () => this.persistFile(path);
+        const run = () => this.persistFile(path, repo.full_name);
         this.idbWriteTimers.set(cacheKey, {
           run,
           timer: setTimeout(() => {
@@ -533,6 +582,7 @@ export class GithubFileStore {
     const newSaving = new Set(this.savingFiles.value);
     newSaving.add(path);
     this.savingFiles.value = newSaving;
+    this.bumpSaveGen(path);
 
     try {
       let attempts = 0;
@@ -556,6 +606,7 @@ export class GithubFileStore {
         }
 
         const contentToSave = file.content;
+        const shaUsed = file.sha;
 
         logger.debug(`Saving ${path} (Attempt ${attempts})...`);
 
@@ -566,22 +617,27 @@ export class GithubFileStore {
             path,
             contentToSave,
             `Update ${path} via Console`,
-            file.sha,
+            shaUsed,
           );
 
-          // 2. Update SHA from response; the saved content is the new base.
+          // 2. Update SHA from response; the saved content is the new base. A reconcile that ran
+          // during the PUT already moved the copy to a newer remote: its sha and base win.
           const serverSha = res.content?.sha;
-          if (serverSha) {
-            const currentFileState = this.openFiles.value[path];
-            if (currentFileState) {
-              this.setOpenFile(path, { ...currentFileState, sha: serverSha, base: contentToSave });
-            }
+          const currentFileState = this.openFiles.value[path];
+          const reconciled = !!currentFileState && currentFileState.sha !== shaUsed;
+          if (serverSha && currentFileState && !reconciled) {
+            this.setOpenFile(path, { ...currentFileState, sha: serverSha, base: contentToSave });
           }
 
           // 3. Mark as NOT dirty (for THIS content version)
-          // We only remove dirty flag if content matches what we just saved.
+          // We only remove dirty flag if content matches what we just saved (or, after a
+          // reconcile, the base it was moved onto).
           const currentFile = this.openFiles.value[path];
-          if (currentFile && currentFile.content === contentToSave) {
+          const clean = reconciled
+            ? currentFile?.content === currentFile?.base
+            : currentFile?.content === contentToSave;
+          if (reconciled && !clean) this.setDirty(path, true);
+          if (currentFile && clean) {
             const dirty = new Set(this.dirtyFiles.value);
             dirty.delete(path);
             this.dirtyFiles.value = dirty;
@@ -623,6 +679,7 @@ export class GithubFileStore {
       const doneSaving = new Set(this.savingFiles.value);
       doneSaving.delete(path);
       this.savingFiles.value = doneSaving;
+      this.bumpSaveGen(path);
     }
   }
 

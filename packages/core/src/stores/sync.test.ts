@@ -267,3 +267,126 @@ describe('sync: 409 retry (cause 4)', () => {
     expect(s.fileConflicts.value[FILE]).toMatchObject({ remoteContent: '', remoteSha: '' });
   });
 });
+
+/** A promise with its resolve exposed, to pause a fake network call mid-flight. */
+const deferred = () => {
+  let resolve!: () => void;
+  const promise = new Promise<void>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+};
+
+/** Makes the next `method` call do its work, then wait for `gate` before returning. */
+const pauseNext = (method: 'saveFile' | 'getFileContent') => {
+  const reached = deferred();
+  const gate = deferred();
+  const original = (remote[method] as (...args: unknown[]) => Promise<unknown>).bind(remote);
+  vi.spyOn(remote, method).mockImplementationOnce((async (...args: unknown[]) => {
+    const result = await original(...args);
+    reached.resolve();
+    await gate.promise;
+    return result;
+  }) as never);
+  return { reached: reached.promise, release: gate.resolve };
+};
+
+describe('sync: races between a save and a reconcile', () => {
+  it('keeps the sha and base a reconcile set while the save was in flight', async () => {
+    const s = device();
+    await s.openFile(FILE);
+    s.updateFileContent(FILE, 'A\nb\nc\nd\ne\n');
+    const put = pauseNext('saveFile');
+    const saving = s.saveFile(FILE);
+    await put.reached;
+
+    // Another device builds on our landed save; we reconcile before our PUT returns.
+    await pushRemote('A\nb\nc\nd\nE\n');
+    await s.reconcile(FILE);
+    put.release();
+    await saving;
+
+    const latest = await remote.getFileContent('o', 'r', FILE);
+    expect(s.openFiles.value[FILE]).toEqual({
+      content: latest.content,
+      sha: latest.sha,
+      base: latest.content,
+    });
+    expect(s.dirtyFiles.value.has(FILE)).toBe(false);
+  });
+
+  it('does not replace a just-saved copy with a remote fetched before the save landed', async () => {
+    const s = device();
+    await s.openFile(FILE);
+    const get = pauseNext('getFileContent');
+    const opening = s.openFile(FILE);
+    await get.reached;
+
+    s.updateFileContent(FILE, 'SAVED\nb\nc\nd\ne\n');
+    await s.saveFile(FILE);
+    const saved = await remote.getFileContent('o', 'r', FILE);
+    get.release();
+    await opening;
+
+    expect(s.openFiles.value[FILE]?.content).toBe('SAVED\nb\nc\nd\ne\n');
+    expect(s.openFiles.value[FILE]?.sha).toBe(saved.sha);
+    await s.flushPendingWrites();
+    const db = await openDB('life-os-db', 1);
+    const rec = await db.get('files', `o/r:${FILE}`);
+    db.close();
+    expect(rec.content).toBe('SAVED\nb\nc\nd\ne\n');
+  });
+});
+
+describe('sync: discardLocal', () => {
+  it('drops the memory copy, dirty flag, conflict, pending cache write and cache record', async () => {
+    const s = device();
+    vi.spyOn(remote, 'saveFile').mockRejectedValueOnce(new Error('offline'));
+    await s.createFile('new.md', 'draft\n');
+    expect(s.dirtyFiles.value.has('new.md')).toBe(true);
+    s.updateFileContent('new.md', 'draft 2\n'); // leaves a debounced cache write pending
+    s.fileConflicts.value = {
+      'new.md': { localContent: 'x', remoteContent: 'y', remoteSha: 'z' },
+    };
+
+    await s.discardLocal('new.md');
+    await s.flushPendingWrites();
+    await new Promise((r) => setTimeout(r, 600));
+
+    expect(s.openFiles.value['new.md']).toBeUndefined();
+    expect(s.dirtyFiles.value.has('new.md')).toBe(false);
+    expect(s.fileConflicts.value).toEqual({});
+    const db = await openDB('life-os-db', 1);
+    const rec = await db.get('files', 'o/r:new.md');
+    db.close();
+    expect(rec).toBeUndefined();
+  });
+});
+
+describe('sync: repo switch', () => {
+  it('writes the pending edit under the old repo and resets dirty and conflicts', async () => {
+    const s = device();
+    await s.loadTree();
+    await s.openFile(FILE);
+    s.updateFileContent(FILE, 'a\nb\nPENDING\nd\ne\n');
+    s.fileConflicts.value = { [FILE]: { localContent: 'x', remoteContent: 'y', remoteSha: 'z' } };
+
+    githubProfileStore.currentRepo.value = {
+      full_name: 'o/r2',
+      name: 'r2',
+      owner: { login: 'o' },
+      default_branch: 'main',
+    } as never;
+    await s.loadTree();
+    await new Promise((r) => setTimeout(r, 600));
+
+    expect(s.dirtyFiles.value.size).toBe(0);
+    expect(s.fileConflicts.value).toEqual({});
+    const db = await openDB('life-os-db', 1);
+    const old = await db.get('files', `o/r:${FILE}`);
+    const wrong = await db.get('files', `o/r2:${FILE}`);
+    db.close();
+    expect(old).toMatchObject({ content: 'a\nb\nPENDING\nd\ne\n', dirty: true });
+    expect(wrong).toBeUndefined();
+  });
+});

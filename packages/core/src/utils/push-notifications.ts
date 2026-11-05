@@ -195,8 +195,10 @@ export async function setupPushNotifications(
   try {
     const { content } = await githubService.getFileContent(owner, repo, PUSH_CONFIG_PATH);
     existingConfig = JSON.parse(content);
-  } catch {
-    // File doesn't exist yet — this is the first setup.
+  } catch (e) {
+    // Only a missing file means first setup. Treating any other failure as one would generate a
+    // new key pair and leave every other device's subscription useless.
+    if ((e as { status?: number }).status !== 404) throw e;
   }
 
   let vapidPublicKey: string;
@@ -258,11 +260,17 @@ export async function setupPushNotifications(
       } catch {
         // Unreadable remote config: fall back to the subscriptions read earlier.
       }
+      // This device subscribed with `vapidPublicKey`; under another key its subscription is useless.
+      if (remote?.vapidPublicKey && remote.vapidPublicKey !== vapidPublicKey) {
+        throw new Error(
+          'Another device just set up notifications. Please try again to subscribe with its key.',
+        );
+      }
       const others = (remote?.subscriptions ?? subscriptions).filter(
         (s) => s.endpoint !== subJson.endpoint,
       );
       const config: PushConfig = {
-        vapidPublicKey: remote?.vapidPublicKey ?? vapidPublicKey,
+        vapidPublicKey,
         subscriptions: [...others, subJson],
       };
       return JSON.stringify(config, null, 2);
