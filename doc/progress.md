@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-11-05 — Mobile phase 6: React Native views and runnable Expo app
+
+- `apps/mobile` is a runnable Expo SDK 58 app (react 19.3, react-native 0.88) with expo-router file routes in `apps/mobile/app/`: index, login, repos, quick capture, board, analytics, dashboard, ideas, wiki, knowledge, and files. `main` is `expo-router/entry`; `metro.config.js` strips `.js` from relative imports.
+- Thin views in `apps/mobile/src/views/` over every controller: login, repo selector, quick capture, kanban, todo analytics, dashboard with all 14 tile kinds, ideas, wiki with wiki-link navigation, knowledge inbox, and file browser/editor including the `.enc` passphrase flow. A `useSignalValue` hook binds controller signals to views; primitives are themed.
+- Native glue in the local Expo module `apps/mobile/modules/kaihuman-shared` (Swift and Kotlin): App Group / `kaihuman_widget` prefs, shared `github-token` copy, `pending-url` consumption, and widget reload. The token is mirrored to SecureStore (Keychain service `com.kaihuman.app`, key `github-token`). Deep links and `pending-url` are routed on launch and foreground.
+- Pure-JS `crypto.subtle` polyfill for Hermes (PBKDF2-SHA256 to AES-GCM via @noble) so core `encrypt`/`decrypt` works on React Native.
+- Tests: Vitest render tests (jsdom, `react-native` aliased to `react-native-web`, `@testing-library/react`); mobile now has 166 tests. `expo export --platform android` produces a Hermes bundle on Linux.
+- Docs updated: `doc/mobile-plan.md` (Task 6.5 ticked), `doc/features.md`, `doc/roadmap.md`, `doc/mobile.md` (status), `README.md` (Mobile gaps).
+- Still untested:
+  - The Swift and Kotlin module and widget targets have never been compiled; the mobile-build workflow on macOS and Android runners is the first real build.
+  - The app has not been run on a device or simulator.
+  - Route files and the bootstrap are not unit-tested.
+  - The Expo config plugin's editing of the real Xcode project is untested.
+
 ## 2026-11-05 — Mobile phase 5: mobile CI workflow and docs
 
 - Added `.github/workflows/mobile-build.yml`: manual `workflow_dispatch` plus push/PR with the path filter `apps/mobile/**`. Jobs: ubuntu type-check, lint and tests; Android debug APK build (prebuild, then assemble); macOS iOS Simulator build and WidgetKit compile check.

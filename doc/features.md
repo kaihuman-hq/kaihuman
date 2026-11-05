@@ -127,13 +127,19 @@
 | `kaihuman://` deep links, milestone reminders from `.todos.md` and `.events.csv` | `apps/mobile/src` | 2026-11-05 |
 | GitHub OAuth sign-in through `auth-worker` (`?client=mobile`), PAT entry and demo mode | `apps/auth-worker`, mobile login | 2026-11-05 |
 | Native-compile CI: type-check, Android debug APK, iOS Simulator and WidgetKit check | `.github/workflows/mobile-build.yml` | 2026-11-05 |
+| Runnable Expo SDK 58 app with expo-router file routes (login, repos, quick capture, board, analytics, dashboard, ideas, wiki, knowledge, files) | `apps/mobile/app` | 2026-11-05 |
+| React Native views over every controller: all 14 dashboard tile kinds, wiki-link navigation, knowledge inbox, file editor with the `.enc` passphrase flow | `apps/mobile/src/views` | 2026-11-05 |
+| Local Expo module `kaihuman-shared` (Swift and Kotlin): App Group and `kaihuman_widget` prefs, shared GitHub token, `pending-url` handling, widget reload | `apps/mobile/modules/kaihuman-shared` | 2026-11-05 |
+| GitHub token mirrored to SecureStore; deep links and `pending-url` routed on launch and foreground | `apps/mobile/src` | 2026-11-05 |
+| Pure-JS `crypto.subtle` polyfill for Hermes (PBKDF2-SHA256 to AES-GCM via @noble) so `.enc` files work on device | `apps/mobile/src` | 2026-11-05 |
+| Vitest render tests for the views (jsdom, `react-native` aliased to `react-native-web`); 166 mobile tests | `apps/mobile` | 2026-11-05 |
 
 **Known gaps:**
 - Swift and Kotlin widget code has never been compiled here (no Xcode or Android toolchain in this environment); CI compile checks are the first real build.
 - The Expo config plugin's editing of the real Xcode project is untested.
 - The app must write the GitHub token to key `github-token` (iOS Keychain service `com.kaihuman.app`, then App Group defaults; Android prefs `kaihuman_widget`) and handle the App Group `pending-url` key.
 - Core `encrypt`/`decrypt` (`.enc` files) need a `crypto.subtle` polyfill on React Native.
-- Phase 3 built screen controllers only; there are no React Native view components yet.
+- Phase 6 views have not been run on a device or simulator, and the Swift/Kotlin native targets are still uncompiled.
 
 ## Sign-in worker (`apps/auth-worker`)
 

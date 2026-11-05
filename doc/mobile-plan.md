@@ -259,5 +259,5 @@
 - Modify: `doc/mobile-plan.md`, `doc/mobile.md`, `doc/roadmap.md`, `doc/features.md`, `doc/progress.md`, `README.md`
 
 **Steps:**
-- [ ] Tick Phase 6 boxes, remove the "no React Native views" gap, add dated progress entry.
-- [ ] `npx turbo run build`, `npx turbo run lint check-types`, `pnpm -r test` pass for the whole repo.
+- [x] Tick Phase 6 boxes, remove the "no React Native views" gap, add dated progress entry.
+- [x] `npx turbo run build`, `npx turbo run lint check-types`, `pnpm -r test` pass for the whole repo.

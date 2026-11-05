@@ -21,7 +21,7 @@ Known gaps:
 - Swift and Kotlin widget code is not yet compiled anywhere (CI compile checks are new).
 - The Expo config plugin's Xcode project editing is untested.
 - Core `.enc` encrypt/decrypt needs a `crypto.subtle` polyfill on React Native.
-- Screen controllers exist; React Native view components do not yet.
+- Views and the Expo app exist but have not been run on a device or simulator.
 
 ## Prerequisites
 
