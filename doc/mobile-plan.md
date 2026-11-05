@@ -72,10 +72,10 @@
 - Create: `apps/mobile/src/adapters/mobile-adapters.test.ts`
 
 **Steps:**
-- [ ] Configure `apps/mobile` workspace package `@kaihuman/mobile` depending on `@kaihuman/core` and `@kaihuman/formats`, with `build`, `lint`, `format`, `fix`, `check-types`, and `test` scripts compatible with Turborepo and CI.
-- [ ] Implement `MobileStorageAdapter` (`src/adapters/mobile-storage.ts`) with pluggable native drivers (SecureStore for auth tokens, SQLite/KV for files & trees, and App Group / SharedPreferences mirror) that gracefully runs in-memory during headless/Vitest tests.
-- [ ] Implement `WidgetBridge` (`src/adapters/widget-bridge.ts`) that subscribes to `githubFileStore.openFiles` / `githubProfileStore.currentRepo`, writes `WidgetTodoSnapshot` to the shared native container (`group.com.kaihuman.app/widget-todos.json`), reconciles any `pending-widget-mutations.json` written by the native iOS/Android widget while the app was backgrounded, and triggers `reloadAllTimelines()`.
-- [ ] Write unit tests in `src/adapters/mobile-adapters.test.ts` testing end-to-end sync between `githubFileStore`, `MobileStorageAdapter`, and `WidgetBridge` (including replaying a widget toggle back into `githubFileStore`).
+- [x] Configure `apps/mobile` workspace package `@kaihuman/mobile` depending on `@kaihuman/core` and `@kaihuman/formats`, with `build`, `lint`, `format`, `fix`, `check-types`, and `test` scripts compatible with Turborepo and CI.
+- [x] Implement `MobileStorageAdapter` (`src/adapters/mobile-storage.ts`) with pluggable native drivers (SecureStore for auth tokens, SQLite/KV for files & trees, and App Group / SharedPreferences mirror) that gracefully runs in-memory during headless/Vitest tests.
+- [x] Implement `WidgetBridge` (`src/adapters/widget-bridge.ts`) that subscribes to `githubFileStore.openFiles` / `githubProfileStore.currentRepo`, writes `WidgetTodoSnapshot` to the shared native container (`group.com.kaihuman.app/widget-todos.json`), reconciles any `pending-widget-mutations.json` written by the native iOS/Android widget while the app was backgrounded, and triggers `reloadAllTimelines()`.
+- [x] Write unit tests in `src/adapters/mobile-adapters.test.ts` testing end-to-end sync between `githubFileStore`, `MobileStorageAdapter`, and `WidgetBridge` (including replaying a widget toggle back into `githubFileStore`).
 
 ### Task 2.2: Mobile View-Models, Router & Auth / Repo Selection Controllers
 **Files:**
@@ -85,9 +85,9 @@
 - Create: `apps/mobile/src/screens/navigation.test.ts`
 
 **Steps:**
-- [ ] Define all deep-link routes (`kaihuman://auth/callback`, `kaihuman://quick-todo`, `kaihuman://quick-note`, `kaihuman://quick-log`, `kaihuman://quick-idea`, `kaihuman://quick-knowledge`, `kaihuman://board`, `kaihuman://files/...`) and URL parser in `src/navigation/routes.ts`.
-- [ ] Implement `LoginScreenController` (OAuth login URL builder with `?client=mobile`, deep-link callback handler, PAT sign-in, and one-tap Demo Mode via `demoStore.enterDemoMode()`) and `RepoSelectorController`.
-- [ ] Write unit tests in `src/screens/navigation.test.ts` verifying deep-link parsing, OAuth callback handling, Demo Mode initialization, and repository switching.
+- [x] Define all deep-link routes (`kaihuman://auth/callback`, `kaihuman://quick-todo`, `kaihuman://quick-note`, `kaihuman://quick-log`, `kaihuman://quick-idea`, `kaihuman://quick-knowledge`, `kaihuman://board`, `kaihuman://files/...`) and URL parser in `src/navigation/routes.ts`.
+- [x] Implement `LoginScreenController` (OAuth login URL builder with `?client=mobile`, deep-link callback handler, PAT sign-in, and one-tap Demo Mode via `demoStore.enterDemoMode()`) and `RepoSelectorController`.
+- [x] Write unit tests in `src/screens/navigation.test.ts` verifying deep-link parsing, OAuth callback handling, Demo Mode initialization, and repository switching.
 
 ---
 

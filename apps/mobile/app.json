@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "kaihuman",
+    "slug": "kaihuman",
+    "scheme": "kaihuman",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": { "bundleIdentifier": "com.kaihuman.app" },
+    "android": { "package": "com.kaihuman.app" }
+  }
+}

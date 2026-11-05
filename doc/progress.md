@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-05 — Mobile phase 2: `apps/mobile` workspace, adapters, deep links, auth controllers
+
+- New `@kaihuman/mobile` package (pure TypeScript, tested under Vitest; Expo/React Native deps arrive with the screens in phase 3): theme tokens, `app.json` (scheme `kaihuman`).
+- `MobileStorageAdapter`: pluggable secure/KV/SQLite drivers plus a widget mirror; falls back to memory when a driver is absent.
+- `WidgetBridge`: writes `widget-todos.json` to the shared container, reloads timelines, and replays `pending-widget-mutations.json` toggles through `githubFileStore` (re-applied to current content so stale SHAs cannot clobber edits).
+- `parseDeepLink` for all `kaihuman://` routes, `LoginScreenController` (`?client=mobile` OAuth URL, callback, PAT, demo mode) and `RepoSelectorController`.
+
 ## 2026-11-05 — Mobile phase 1: core storage adapter, widget sync, mobile OAuth
 
 - `@kaihuman/core`: pluggable `CoreStorageAdapter` (`configureCoreStorage`, web adapter with in-memory fallback; IndexedDB now v2 with a `mutations` store), stores no longer touch `window`/`localStorage` directly, `authStore.handleCallbackUrl`, and an offline save queue in `githubFileStore`.

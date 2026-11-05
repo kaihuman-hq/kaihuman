@@ -359,6 +359,18 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
 
+  apps/mobile:
+    dependencies:
+      '@kaihuman/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@kaihuman/formats':
+        specifier: workspace:*
+        version: link:../../packages/formats
+      '@preact/signals':
+        specifier: ^2.0.1
+        version: 2.5.1(preact@10.28.2)
+
   packages/config:
     devDependencies:
       '@biomejs/biome':
