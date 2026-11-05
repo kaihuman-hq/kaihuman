@@ -8,9 +8,10 @@ Date: 2026-11-05. Analysis only; no source changed.
 
 Line numbers refer to `packages/core/src/stores/github-file.store.ts` (**store**) and `packages/core/src/services/github.service.ts` (**service**) at commit `e73a206`, unless a file is named.
 
-## Phase 1 status
+## Implementation status
 
 - Done: fix 1 (merge on 409/422 instead of a blind overwrite), fix 3 (durable dirty state, 3 s autosave, flush on hide) and fix 4 (no-store reads). A follow-up review fixed save/reconcile races, editor dirty-flag drift, repo-switch cache writes, failed-create rollback and the push-config VAPID key check.
+- Phase 2 done: fix 2 (`syncNow` on resume/focus/online/interval, `ensureFresh` in views), fix 5 (IndexedDB dirty records as outbox, replay with backoff, "UNSYNCED n" indicator) and fix 6 (atomic rename and Kanban move with `expectedHeadSha`, smart merge limited to unpushed or just-committed entries). All six fixes are implemented.
 - Known limitation (not in phase 1): structural merges (todos, read-it-later, action log, `packages/formats/src/merge.ts`) match items by a derived key; edge cases such as an edit that changes an item's key, or duplicate keys, are not handled item by item yet.
 
 ## How sync works today

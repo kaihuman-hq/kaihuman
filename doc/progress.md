@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-05 — Sync fixes, phase 2 (revalidate on resume, outbox, atomic moves)
+
+- Fix 2: `GithubFileStore.syncNow()` reads the head (no-store) and stops when it is unchanged; otherwise it loads the tree of that commit, refreshes clean open files whose sha changed (blob by sha) and reconciles dirty ones through phase 1's `reconcile`. Concurrent calls share one run; it skips while a save or tree load is in flight. `installAutoSync` (core `sync/auto-sync.ts`, wired in console `main.tsx`) runs it on `visibilitychange → visible`, `focus`, `online` and every 90 s while visible, throttled to 2 s. `loadTree` records the head too.
+- Views no longer use `if (!openFiles[p]) openFile(p)`: they call `ensureFresh(path)` (opens a missing file; reconciles an open one whose tree sha changed, once per tree sha). Kanban, TodoAnalytics, ActionLog, BoardOverview, GraphView, Dashboard read-it-later, Quick log/note/todo.
+- Fix 5: the outbox is the IndexedDB `files` records marked dirty (no DB version bump). `flushOutbox()` restores them and saves each through `saveFile` (sha-checked, 409 → reconcile, never a force push); failures retry with backoff (2 s doubling, max 5 min). Runs at startup, on resume and online. `unsyncedCount` drives the new **UNSYNCED n** status-bar indicator.
+- Fix 6: `renameFile` and the new `commitTransform(paths, transform, message)` (used by the Kanban move) are one `commitFiles` with `expectedHeadSha`, retried on `ConflictError`. The tree smart merge keeps a cached-only entry only when it is unpushed (`sha === ''`) or just committed (`pendingCommit`, was `pendingBinary`).
+- In-memory GitHub service: `saveFile`/`deleteFile` advance the head. Tests: `sync-phase2.test.ts` (causes 2, 5, 6), `auto-sync.test.ts`, `UnsyncedIndicator.test.tsx`, editor test for remote content under a clean editor.
+
 ## 2026-11-05 — Sync fixes, phase 1 (no blind overwrite, durable edits, no-store reads)
 
 - Fix 1: `GithubFileStore.saveFile` no longer re-sends stale content on 409/422 ("user wins" removed). New `reconcile(path)` reads the remote copy (no-store), three-way merges it with the working copy's base, then saves with the remote sha or fills `fileConflicts`. `keep_local` only overrides the version the user saw. `upsertRepoFile` takes a merge function and retries on 409/422; the push config merges subscriptions; raw notes are created without a read.
