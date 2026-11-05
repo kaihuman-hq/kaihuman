@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_NAVBAR,
+  defaultNavbar,
   getNavbarItem,
   NAVBAR_ITEMS,
 } from '../../../packages/ui/src/LifeOS/navbar-items';
@@ -8,6 +9,11 @@ import {
 describe('navbar catalog', () => {
   it('defaults to the historical desktop navbar items plus Ideas', () => {
     expect(DEFAULT_NAVBAR).toEqual(['dashboard', 'files', 'board', 'ideas', 'shortcuts']);
+  });
+
+  it('adds Business to the default navbar only when business is enabled', () => {
+    expect(defaultNavbar(false)).not.toContain('business');
+    expect(defaultNavbar(true)).toEqual([...DEFAULT_NAVBAR, 'business']);
   });
 
   it('every default item exists in the catalog', () => {
@@ -32,6 +38,11 @@ describe('navbar catalog', () => {
     expect(ids.has('knowledge')).toBe(true);
     expect(ids.has('graph')).toBe(true);
     expect(ids.has('ideas')).toBe(true);
+  });
+
+  it('offers Business in settings but not in the default navbar', () => {
+    expect(NAVBAR_ITEMS.find((item) => item.id === 'business')?.label).toBe('Business');
+    expect(DEFAULT_NAVBAR).not.toContain('business');
   });
 
   it('getNavbarItem resolves known ids and ignores unknown ones', () => {

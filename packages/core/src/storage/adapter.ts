@@ -4,8 +4,13 @@ export interface CachedFileRecord {
   /** Composite key: `${repoFullName}:${path}`. */
   path: string;
   content: string;
+  /** Sha of the base: the remote version the working copy was last synced with. */
   sha: string;
   timestamp: number;
+  /** Unsaved local edits. A dirty copy is merged with the remote, never replaced by it. */
+  dirty?: boolean;
+  /** Content at `sha`, the base of a three-way merge. */
+  baseContent?: string;
 }
 
 export interface PendingMutation {
@@ -32,6 +37,8 @@ export interface CoreStorageAdapter {
   getRecord<T = unknown>(store: RecordStore, key: string): Promise<T | undefined>;
   putRecord(store: RecordStore, key: string, value: unknown): Promise<void>;
   deleteRecord(store: RecordStore, key: string): Promise<void>;
+  /** Every record in a store (used to scan cached working copies). */
+  listRecords<T = unknown>(store: RecordStore): Promise<T[]>;
   listPendingMutations(): Promise<PendingMutation[]>;
   putPendingMutation(mutation: PendingMutation): Promise<void>;
   deletePendingMutation(id: string): Promise<void>;

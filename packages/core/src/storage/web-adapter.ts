@@ -71,6 +71,10 @@ export class WebStorageAdapter implements CoreStorageAdapter {
     if (!this.hasIdb) return this.fallback.deleteRecord(store, key);
     await (await this.db()).delete(store, key);
   }
+  async listRecords<T>(store: RecordStore): Promise<T[]> {
+    if (!this.hasIdb) return this.fallback.listRecords<T>(store);
+    return (await (await this.db()).getAll(store)) as T[];
+  }
   async listPendingMutations(): Promise<PendingMutation[]> {
     if (!this.hasIdb) return this.fallback.listPendingMutations();
     const all = await (await this.db()).getAll('mutations');

@@ -61,6 +61,8 @@ struct ContentsResponse {
     #[serde(default)]
     content: String,
     sha: String,
+    #[serde(default)]
+    encoding: String,
 }
 
 /// What a write that names a version got back: GitHub refuses one whose `sha` is stale (409), or
@@ -252,6 +254,10 @@ impl Client {
                     .and_then(|value| value.to_str().ok())
                     .map(str::to_string);
                 let body: ContentsResponse = response.json().await.map_err(network_error)?;
+                // Over 1 MB GitHub sends no content; reading it as empty would let a write wipe it.
+                if body.encoding == "none" {
+                    return Err(format!("{path} is too large to read here (over 1 MB)"));
+                }
                 Ok(Read::Found {
                     content: decode_base64(&body.content)?,
                     sha: body.sha,

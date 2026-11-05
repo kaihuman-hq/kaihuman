@@ -1,0 +1,435 @@
+import { authStore, demoMode } from '@kaihuman/core';
+import { loadBusinessRepo } from '@kaihuman/formats/business';
+import { render } from 'preact';
+import { act } from 'preact/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { loadFixtureRepo } from '../lib/business/fixture.test-helper';
+import { businessNotice, showNotice } from '../lib/business/notice';
+import type { BusinessState } from '../lib/business/use-business-repo';
+
+const hooks = vi.hoisted(() => ({ state: { status: 'loading' } as unknown }));
+const writes = vi.hoisted(() => ({ writeBusiness: vi.fn() }));
+const router = vi.hoisted(() => ({ route: vi.fn() }));
+vi.mock('../lib/business/use-business-repo', () => ({ useBusinessRepo: () => hooks.state }));
+vi.mock('../lib/business/write', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/business/write')>()),
+  writeBusiness: writes.writeBusiness,
+}));
+vi.mock('../lib/business/dates', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/business/dates')>()),
+  todayLocal: () => '2026-11-10',
+}));
+vi.mock('@kaihuman/ui', () => ({ StatusBar: () => <div data-testid="status-bar" /> }));
+vi.mock('preact-router', () => router);
+const shares = vi.hoisted(() => ({
+  revokeShareLink: vi.fn(),
+  shareApi: vi.fn((): unknown => ({})),
+  actual: {} as typeof import('../lib/business/share'),
+}));
+vi.mock('../lib/business/share', async (importOriginal) => {
+  shares.actual = await importOriginal<typeof import('../lib/business/share')>();
+  return {
+    ...shares.actual,
+    revokeShareLink: shares.revokeShareLink,
+    shareApi: shares.shareApi,
+  };
+});
+
+const { IssuePage } = await import('./IssuePage');
+
+const DRAFT_ID = '01M5KA3Q00W16BGNTZ49EKRX27';
+const DRAFT = `.kh/business/drafts/${DRAFT_ID}.yaml`;
+const INVOICE_1 = '.kh/business/invoices/2026/RE-2026-0001.yaml';
+const target = { full_name: 'me/biz', default_branch: 'main', private: true } as never;
+
+/** The fixture with the draft's (already billed) time entry removed, so it can be issued. */
+const files = (edit?: (m: Map<string, string>) => void): Map<string, string> => {
+  const m = loadFixtureRepo();
+  m.set(DRAFT, (m.get(DRAFT) ?? '').replace(/time_entries:\n(\s+- .*\n?)+/, ''));
+  edit?.(m);
+  return m;
+};
+const ready = (m: Map<string, string>): BusinessState => ({
+  status: 'ready',
+  repo: target,
+  data: loadBusinessRepo(m, [...m.keys()]),
+  contents: Object.fromEntries(m),
+  loadErrors: [],
+});
+let committed: Record<string, string | null>[];
+const writeAgainst = (m: Map<string, string>) =>
+  writes.writeBusiness.mockImplementation(async (_t, build) => {
+    const r = await build({
+      repo: loadBusinessRepo(m, [...m.keys()]),
+      headSha: 'h',
+      tree: [...m.keys()].map((path) => ({ path, type: 'blob', sha: 's', url: '' })),
+      read: async (path: string) => m.get(path) ?? null,
+    });
+    if (r.ok) committed.push(r.value.changes);
+    return r.ok ? { ok: true, value: { commitSha: 'c' } } : r;
+  });
+
+let host: HTMLDivElement;
+const flush = () => act(() => new Promise((r) => setTimeout(r, 0)));
+const show = async (state: BusinessState, id = DRAFT_ID) => {
+  hooks.state = state;
+  act(() => render(<IssuePage id={id} />, host));
+  await flush();
+};
+const issueButton = () =>
+  [...host.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Issue')) as
+    | HTMLButtonElement
+    | undefined;
+const setDate = async (value: string) => {
+  const input = host.querySelector('#issue-date') as HTMLInputElement;
+  act(() => {
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await flush();
+};
+const submit = () => host.querySelector('button[type="submit"]') as HTMLButtonElement;
+const alerts = () => [...host.querySelectorAll('[role="alert"]')].map((a) => a.textContent);
+
+beforeEach(() => {
+  demoMode.value = false;
+  vi.spyOn(authStore as unknown as { fetchUser(): Promise<void> }, 'fetchUser').mockResolvedValue();
+  authStore.token.value = 'gho_test';
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(2026, 10, 10, 12, 0, 0));
+  vi.clearAllMocks();
+  committed = [];
+  businessNotice.value = null;
+  host = document.createElement('div');
+  document.body.appendChild(host);
+});
+afterEach(() => {
+  vi.useRealTimers();
+  act(() => render(null, host));
+  host.remove();
+});
+
+describe('IssuePage preview', () => {
+  it('shows number, client, dates, lines and totals without writing', async () => {
+    await show(ready(files()));
+    const text = host.textContent ?? '';
+    expect(text).toContain('RE-2026-0002');
+    expect(text).toContain('Acme GmbH');
+    expect(text).toContain('Net842.50 EUR');
+    expect(text).toContain('VAT158.88 EUR');
+    expect(text).toContain('Gross1001.38 EUR');
+    expect(text).toContain('Due2026-11-24');
+    expect(text).toContain('Dev');
+    expect((host.querySelector('#issue-date') as HTMLInputElement).value).toBe('2026-11-10');
+    expect(host.querySelector('label[for="issue-date"]')).not.toBeNull();
+    expect(issueButton()?.textContent).toBe('Issue RE-2026-0002');
+    expect(writes.writeBusiness).not.toHaveBeenCalled();
+  });
+
+  it('counts a PDF without its yaml in the previewed number', async () => {
+    const m = files();
+    const orphan = '.kh/business/invoices/2026/RE-2026-0002.pdf';
+    await show({
+      ...ready(m),
+      data: loadBusinessRepo(m, [...m.keys(), orphan]),
+    } as BusinessState);
+    expect(issueButton()?.textContent).toBe('Issue RE-2026-0003');
+  });
+
+  it('follows the issue date into the next year', async () => {
+    await show(ready(files()));
+    const input = host.querySelector('#issue-date') as HTMLInputElement;
+    act(() => {
+      input.value = '2027-01-04';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await flush();
+    expect(issueButton()?.textContent).toBe('Issue RE-2027-0001');
+  });
+
+  it('refuses an impossible issue date with a field error', async () => {
+    await show(ready(files()));
+    const input = host.querySelector('#issue-date') as HTMLInputElement;
+    act(() => {
+      input.value = '2026-02-30';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await flush();
+    expect(host.querySelector('#issue-date-error')?.textContent).toBe(
+      'Enter the issue date as YYYY-MM-DD.',
+    );
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(issueButton()?.disabled).toBe(true);
+  });
+
+  it('shows an issue() refusal (de exemption rule) and offers no issue', async () => {
+    await show(
+      ready(
+        files((m) =>
+          m.set(DRAFT, (m.get(DRAFT) ?? '').replace('vat_category: S', 'vat_category: Z')),
+        ),
+      ),
+    );
+    expect(alerts().join(' ')).toMatch(/lines\[0\]/);
+    expect(issueButton()?.disabled).toBe(true);
+    expect(writes.writeBusiness).not.toHaveBeenCalled();
+  });
+
+  it('says so for a draft that was already issued', async () => {
+    await show(
+      ready(
+        files((m) => {
+          m.delete(DRAFT);
+          m.set(
+            INVOICE_1,
+            (m.get(INVOICE_1) ?? '').replace(/^draft_id: .*$/m, `draft_id: ${DRAFT_ID}`),
+          );
+        }),
+      ),
+    );
+    expect(host.textContent).toContain('This draft was already issued.');
+    expect(issueButton()).toBeUndefined();
+  });
+});
+
+describe('business notice', () => {
+  it('is shown on the next business page until dismissed', async () => {
+    showNotice('Issued RE-2026-0002.', '/business/drafts/x/issue');
+    await show(ready(files()));
+    const notice = host.querySelector('output');
+    expect(notice?.textContent).toContain('Issued RE-2026-0002.');
+    act(() => (notice?.querySelector('button') as HTMLButtonElement).click());
+    expect(businessNotice.value).toBeNull();
+    expect(host.querySelector('output')).toBeNull();
+  });
+});
+
+describe('IssuePage issue', () => {
+  it('commits once, shows the committed number in the notice and goes to the client', async () => {
+    const m = files();
+    await show(ready(m));
+    // Another device issued RE-2026-0002 after this page loaded.
+    const fresh = new Map(m);
+    fresh.set(
+      '.kh/business/invoices/2026/RE-2026-0002.yaml',
+      (m.get(INVOICE_1) ?? '').replaceAll('RE-2026-0001', 'RE-2026-0002'),
+    );
+    writeAgainst(fresh);
+    act(() => issueButton()?.click());
+    await flush();
+    expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
+    expect(Object.keys(committed[0] ?? {})).toContain(
+      '.kh/business/invoices/2026/RE-2026-0003.yaml',
+    );
+    expect(committed[0]?.[DRAFT]).toBeNull();
+    expect(businessNotice.value).toEqual({
+      path: '/clients/acme-gmbh',
+      text: 'Issued RE-2026-0003. Generate the PDF with your generator; kaihuman shows "PDF missing" until it is in the repo.',
+    });
+    expect(router.route).toHaveBeenCalledWith('/clients/acme-gmbh');
+  });
+
+  it('shows a refusal found at commit time and writes nothing', async () => {
+    await show(ready(files()));
+    writeAgainst(
+      files((m) =>
+        m.set(DRAFT, (m.get(DRAFT) ?? '').replace('vat_category: S', 'vat_category: Z')),
+      ),
+    );
+    act(() => issueButton()?.click());
+    await flush();
+    expect(committed).toEqual([]);
+    expect(alerts().join(' ')).toMatch(/lines\[0\]/);
+    expect(router.route).not.toHaveBeenCalled();
+    expect(businessNotice.value).toBeNull();
+  });
+
+  it('shows the conflict message when the write fails twice', async () => {
+    await show(ready(files()));
+    const { ConflictError } = await import('@kaihuman/core');
+    writes.writeBusiness.mockRejectedValue(new ConflictError('moved'));
+    act(() => issueButton()?.click());
+    await flush();
+    expect(alerts()).toContain(
+      'Someone else changed the repository at the same time. Reload and try again.',
+    );
+    expect(router.route).not.toHaveBeenCalled();
+  });
+
+  it('ignores a second click while issuing', async () => {
+    await show(ready(files()));
+    let release: () => void = () => {};
+    writes.writeBusiness.mockImplementation(
+      () =>
+        new Promise((r) => {
+          release = () => r({ ok: false, issues: [{ path: 'x', message: 'no' }] });
+        }),
+    );
+    act(() => {
+      issueButton()?.click();
+      issueButton()?.click();
+    });
+    expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
+    const submit = host.querySelector('button[type="submit"]') as HTMLButtonElement;
+    expect(submit.textContent).toBe('Issuing...');
+    expect(submit.disabled).toBe(true);
+    release();
+    await flush();
+  });
+});
+
+describe('IssuePage confirmations', () => {
+  it('asks before issuing with a future date, then issues on the second click', async () => {
+    const m = files();
+    await show(ready(m));
+    await setDate('2026-11-20');
+    writeAgainst(m);
+    act(() => submit().click());
+    await flush();
+    expect(writes.writeBusiness).not.toHaveBeenCalled();
+    expect(alerts().join(' ')).toContain('The issue date is in the future. Issue anyway?');
+    expect(submit().textContent).toBe('Issue RE-2026-0002 anyway');
+    act(() => submit().click());
+    await flush();
+    expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
+    expect(router.route).toHaveBeenCalledWith('/clients/acme-gmbh');
+  });
+
+  it('asks again after the date changes', async () => {
+    await show(ready(files()));
+    await setDate('2026-11-20');
+    act(() => submit().click());
+    await flush();
+    await setDate('2026-11-21');
+    expect(submit().textContent).toBe('Issue RE-2026-0002');
+  });
+
+  it('warns when a credit note is more than the uncredited rest of the invoice', async () => {
+    const m = files((f) =>
+      f.set(
+        DRAFT,
+        (f.get(DRAFT) ?? '')
+          .replace('kind: invoice', 'kind: credit-note\ncorrects: RE-2026-0001')
+          .replace('quantity: "7.5"', 'quantity: "8.5"'),
+      ),
+    );
+    await show(ready(m));
+    expect(host.textContent).toContain(
+      'This credit note is 113.05 EUR more than the amount still open on RE-2026-0001.',
+    );
+    writeAgainst(m);
+    act(() => submit().click());
+    await flush();
+    expect(writes.writeBusiness).not.toHaveBeenCalled();
+    act(() => submit().click());
+    await flush();
+    expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
+  });
+
+  it('wraps refusals in one alert that keeps the list', async () => {
+    await show(
+      ready(
+        files((m) =>
+          m.set(DRAFT, (m.get(DRAFT) ?? '').replace('vat_category: S', 'vat_category: Z')),
+        ),
+      ),
+    );
+    const alert = host.querySelector('[role="alert"]');
+    expect(alert?.tagName).toBe('DIV');
+    expect(alert?.querySelector('ul li')).not.toBeNull();
+  });
+});
+
+describe('IssuePage credit note and share link', () => {
+  const LINK = `{"id":"01M50ARQ007CHPV05AFMSY38DJ","doc":"RE-2026-0001","url":"https://docs.kaihuman.com/d/AAAAAAAAAAAAAAAAAAAAAA#${'k'.repeat(43)}","created":"2026-11-01T00:00:00.000Z"}\n`;
+  const creditNote = (links = LINK) =>
+    files((f) => {
+      f.set(
+        DRAFT,
+        (f.get(DRAFT) ?? '').replace('kind: invoice', 'kind: credit-note\ncorrects: RE-2026-0001'),
+      );
+      f.set('.kh/business/links.jsonl', links);
+    });
+  const checkbox = () => host.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+
+  it('offers to revoke the share link of the corrected invoice, checked by default', async () => {
+    await show(ready(creditNote()));
+    expect(checkbox()?.checked).toBe(true);
+    expect(host.textContent).toContain('Also revoke the share link of RE-2026-0001');
+  });
+
+  it('offers nothing without an active link, or for an invoice', async () => {
+    await show(
+      ready(creditNote(`${LINK.trimEnd().slice(0, -1)},"revoked":"2026-11-02T00:00:00.000Z"}\n`)),
+    );
+    expect(checkbox()).toBeNull();
+    await show(ready(files((f) => f.set('.kh/business/links.jsonl', LINK))));
+    expect(checkbox()).toBeNull();
+  });
+
+  it('revokes the link after a successful issue', async () => {
+    const m = creditNote();
+    shares.revokeShareLink.mockResolvedValue({ ok: true, value: { commitSha: 'r' } });
+    await show(ready(m));
+    writeAgainst(m);
+    act(() => submit().click());
+    await flush();
+    expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
+    expect(shares.revokeShareLink).toHaveBeenCalledTimes(1);
+    expect(shares.revokeShareLink.mock.calls[0]?.[1]).toMatchObject({ doc: 'RE-2026-0001' });
+    expect(router.route).toHaveBeenCalled();
+  });
+
+  it('does not revoke when the box is unchecked', async () => {
+    const m = creditNote();
+    await show(ready(m));
+    act(() => checkbox()?.click());
+    writeAgainst(m);
+    act(() => submit().click());
+    await flush();
+    expect(writes.writeBusiness).toHaveBeenCalledTimes(1);
+    expect(shares.revokeShareLink).not.toHaveBeenCalled();
+  });
+
+  it('does not revoke when issuing fails', async () => {
+    const m = creditNote();
+    await show(ready(m));
+    writes.writeBusiness.mockResolvedValue({ ok: false, issues: [{ path: 'x', message: 'no' }] });
+    act(() => submit().click());
+    await flush();
+    expect(shares.revokeShareLink).not.toHaveBeenCalled();
+  });
+
+  it('keeps the issue and says so in a notice when the revoke fails', async () => {
+    const m = creditNote();
+    shares.revokeShareLink.mockRejectedValue(new Error('The share service is not reachable.'));
+    await show(ready(m));
+    writeAgainst(m);
+    act(() => submit().click());
+    await flush();
+    expect(router.route).toHaveBeenCalled();
+    expect(businessNotice.value?.text).toContain('could not be revoked');
+    expect(businessNotice.value?.text).toContain('RE-2026-0001');
+  });
+
+  it('says so and records no revoke when the link belongs to another GitHub account (S11)', async () => {
+    const m = creditNote();
+    shares.revokeShareLink.mockImplementation(shares.actual.revokeShareLink);
+    const revoke = vi.fn(async () => {
+      throw new shares.actual.ShareError('This link belongs to another GitHub account.', 403);
+    });
+    shares.shareApi.mockReturnValue({ revoke });
+    await show(ready(m));
+    writeAgainst(m);
+    act(() => submit().click());
+    await flush();
+    await flush();
+    expect(revoke).toHaveBeenCalledWith('AAAAAAAAAAAAAAAAAAAAAA');
+    expect(businessNotice.value?.text).toContain(
+      'could not be revoked: This link belongs to another GitHub account.',
+    );
+    // Only the credit note was committed; links.jsonl was not touched.
+    expect(committed).toHaveLength(1);
+    expect(Object.keys(committed[0] ?? {})).not.toContain('.kh/business/links.jsonl');
+  });
+});

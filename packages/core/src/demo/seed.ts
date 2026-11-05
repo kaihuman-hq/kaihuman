@@ -602,6 +602,310 @@ function ideas(now: Date): Record<string, string> {
   };
 }
 
+// ─── Business (.kh/business/, the formats of `@kaihuman/formats/business`) ───
+// Inline strings: core must not import formats. `demo.test.ts` validates the
+// result with the real repo check, so format drift fails there.
+
+const BIZ = '.kh/business';
+const ULID_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+/** Distinct, valid-looking ULIDs from a small counter (the check only validates the alphabet and length). */
+const ulid = (n: number) =>
+  `01M5${'0'.repeat(10)}${ULID_ALPHABET[n % 32]}${'ABCDEFGHJKMNPQRS'.slice(0, 11)}`;
+
+const SELLER = [
+  'seller:',
+  '  name: Demo Studio',
+  '  address: { street: Beispielstrasse 12, postcode: "10115", city: Berlin, country: DE }',
+  '  vat_id: DE000000000',
+  '  contact: { name: Demo Owner, email: hello@demo-studio.example }',
+];
+
+function party(
+  key: string,
+  name: string,
+  street: string,
+  postcode: string,
+  city: string,
+): string[] {
+  return [
+    `${key}:`,
+    `  name: ${name}`,
+    `  address: { street: ${street}, postcode: "${postcode}", city: ${city}, country: DE }`,
+  ];
+}
+
+interface DemoDoc {
+  kind: 'invoice' | 'offer';
+  issued: Date;
+  client: string;
+  buyer: string[];
+  /** Hours (invoice) or 1 (offer) at `unitPrice` minor units. */
+  quantity: number;
+  unit: 'HUR' | 'C62';
+  unitPrice: number;
+  description: string;
+  serviceDays?: [number, number];
+  now: Date;
+  dueDays?: number;
+  validDays?: number;
+  timeEntries?: string[];
+}
+
+function issuedDoc(d: DemoDoc, number: string, draftId: string): string {
+  const net = d.quantity * d.unitPrice;
+  const vat = Math.round((net * 19) / 100);
+  const year = d.issued.getFullYear();
+  const lines = [
+    `number: ${number}`,
+    `draft_id: ${draftId}`,
+    `type_code: ${d.kind === 'invoice' ? '380' : 'null'}`,
+    `issue_date: "${isoDate(d.issued)}"`,
+  ];
+  if (d.kind === 'invoice') {
+    lines.push(`due_date: "${isoDate(addDays(d.issued, d.dueDays ?? 14))}"`);
+  }
+  lines.push('jurisdiction: de', `kind: ${d.kind}`, `client: ${d.client}`);
+  if (d.kind === 'invoice') {
+    lines.push('project: website');
+    const [from, to] = d.serviceDays ?? [0, 0];
+    lines.push(
+      'service_period:',
+      `  start: "${isoDate(addDays(d.now, from))}"`,
+      `  end: "${isoDate(addDays(d.now, to))}"`,
+    );
+  } else {
+    lines.push(`valid_until: "${isoDate(addDays(d.issued, d.validDays ?? 30))}"`);
+  }
+  lines.push(
+    'lines:',
+    `  - { description: ${d.description}, quantity: "${d.quantity}", unit: ${d.unit}, unit_price: ${d.unitPrice}, vat_category: S, vat_rate: "19" }`,
+  );
+  if (d.timeEntries?.length) {
+    lines.push('time_entries:', ...d.timeEntries.map((id) => `  - ${id}`));
+  }
+  lines.push(...SELLER, ...d.buyer);
+  if (d.kind === 'invoice') {
+    lines.push(
+      'payment:',
+      '  means_code: "58"',
+      '  iban: DE89370400440532013000',
+      '  bic: COBADEFFXXX',
+      `  reference: ${number}`,
+    );
+  }
+  lines.push(
+    'totals:',
+    `  net: ${net}`,
+    `  vat: ${vat}`,
+    `  gross: ${net + vat}`,
+    '  breakdown:',
+    `    - { category: S, rate: "19", taxable: ${net}, tax: ${vat} }`,
+    'legal_notes: []',
+    `retain_until: "${year + 8}-12-31"`,
+    '',
+  );
+  return lines.join('\n');
+}
+
+function business(now: Date): Record<string, string> {
+  const files: Record<string, string> = {};
+  const put = (path: string, lines: string[]) => {
+    files[`${BIZ}/${path}`] = `${lines.join('\n')}\n`;
+  };
+
+  put('business.yaml', [
+    'name: Demo Studio',
+    'address: { street: Beispielstrasse 12, postcode: "10115", city: Berlin, country: DE }',
+    'vat_id: DE000000000',
+    'contact: { name: Demo Owner, email: hello@demo-studio.example }',
+    'bank: { iban: DE89370400440532013000, bic: COBADEFFXXX, account_holder: Demo Studio }',
+    'jurisdiction: de',
+    'vat_regime: regular',
+    'currency: EUR',
+    'language: en',
+    'payment_terms_days: 14',
+    'default_vat_rate: "19"',
+  ]);
+
+  const northwind = [
+    'northwind-labs',
+    'Northwind Labs GmbH',
+    'Hafenstrasse 3',
+    '20457',
+    'Hamburg',
+  ] as const;
+  const harbor = ['harbor-coffee', 'Harbor Coffee UG', 'Kaffeeweg 8', '50667', 'Koeln'] as const;
+  put(`clients/${northwind[0]}/client.yaml`, [
+    `name: ${northwind[1]}`,
+    `address: { street: ${northwind[2]}, postcode: "${northwind[3]}", city: ${northwind[4]}, country: DE }`,
+    'contacts: [{ name: Nora Wind, email: nora@northwind.example, role: Product }]',
+    'payment_terms_days: 14',
+    'stage: active',
+    'tags: [web]',
+  ]);
+  put(`clients/${harbor[0]}/client.yaml`, [
+    `name: ${harbor[1]}`,
+    `address: { street: ${harbor[2]}, postcode: "${harbor[3]}", city: ${harbor[4]}, country: DE }`,
+    'contacts: [{ name: Hans Hafen, email: hans@harbor.example }]',
+    'stage: offer-sent',
+  ]);
+  put('clients/tidepool-studio/client.yaml', [
+    'name: Tidepool Studio',
+    'address: { street: Gezeitenallee 2, postcode: "24103", city: Kiel, country: DE }',
+    'contacts: [{ name: Tia Pool, email: tia@tidepool.example }]',
+    'stage: lead',
+  ]);
+
+  put(`clients/${northwind[0]}/projects/website.yaml`, [
+    `client: ${northwind[0]}`,
+    'name: Website relaunch',
+    'status: active',
+    'rate: { per: hour, amount: 10000 }',
+    'budget_minutes: 6000',
+  ]);
+  put(`clients/${northwind[0]}/contracts/${ulid(1)}.yaml`, [
+    `id: ${ulid(1)}`,
+    `client: ${northwind[0]}`,
+    'kind: service-agreement',
+    'title: Web development framework agreement',
+    `start: "${isoDate(addDays(now, -320))}"`,
+    `end: "${isoDate(addDays(now, 40))}"`,
+    'notice_period_days: 30',
+  ]);
+
+  const stamp = (d: number, h: number, m: number) =>
+    `${isoDate(addDays(now, d))} ${pad(h)}:${pad(m)}:00`;
+  put(`clients/${northwind[0]}/todos.todos.md`, [
+    `- [>] Plan the launch checklist with Nora #website`,
+    `::created:: ${addDays(now, -6).toISOString()}`,
+    `- [ ] Send the updated sitemap #website`,
+    `::created:: ${addDays(now, -2).toISOString()}`,
+    `- [ ] Remind about the overdue invoice #billing`,
+    `::created:: ${addDays(now, -1).toISOString()}`,
+    `- [x] Collect brand assets #website`,
+    `::created:: ${addDays(now, -30).toISOString()}`,
+  ]);
+  put(`clients/${northwind[0]}/log.actionlog.md`, [
+    '# Action Log',
+    '',
+    `- ${stamp(-1, 16, 40)} Call with Nora about launch date #website`,
+    `- ${stamp(-4, 11, 5)} Sent invoice reminder #billing`,
+    `- ${stamp(-12, 9, 30)} Kick-off for the next sprint #website`,
+    `- ${stamp(-33, 14, 0)} Agreed scope for phase two #contract`,
+  ]);
+
+  // Issue dates relative to now; numbering restarts at 1 for each year (also across a year boundary).
+  const buyer = party('buyer', northwind[1], northwind[2], northwind[3], northwind[4]);
+  const paidIds = [ulid(2), ulid(3)];
+  const overdueIds = [ulid(4)];
+  const docs: { path: string; doc: DemoDoc }[] = [
+    {
+      path: 'paid',
+      doc: {
+        kind: 'invoice',
+        issued: addDays(now, -40),
+        client: northwind[0],
+        buyer,
+        quantity: 10,
+        unit: 'HUR',
+        unitPrice: 10000,
+        description: 'Frontend development',
+        serviceDays: [-70, -41],
+        now,
+        timeEntries: paidIds,
+      },
+    },
+    {
+      path: 'overdue',
+      doc: {
+        kind: 'invoice',
+        issued: addDays(now, -30),
+        client: northwind[0],
+        buyer,
+        quantity: 8,
+        unit: 'HUR',
+        unitPrice: 10000,
+        description: 'Backend development',
+        serviceDays: [-40, -31],
+        now,
+        timeEntries: overdueIds,
+      },
+    },
+    {
+      path: 'offer',
+      doc: {
+        kind: 'offer',
+        issued: addDays(now, -5),
+        client: harbor[0],
+        buyer: party('buyer', harbor[1], harbor[2], harbor[3], harbor[4]),
+        quantity: 1,
+        unit: 'C62',
+        unitPrice: 400000,
+        description: 'Online shop setup',
+        now,
+        validDays: 30,
+      },
+    },
+  ];
+  const counters = new Map<string, number>();
+  const numbers: Record<string, string> = {};
+  let draft = 10;
+  for (const entry of docs) {
+    const { kind, issued } = entry.doc;
+    const year = issued.getFullYear();
+    const key = `${kind}-${year}`;
+    const n = (counters.get(key) ?? 0) + 1;
+    counters.set(key, n);
+    const number =
+      kind === 'invoice'
+        ? `RE-${year}-${String(n).padStart(4, '0')}`
+        : `AN-${year}-${String(n).padStart(3, '0')}`;
+    numbers[entry.path] = number;
+    const dir = kind === 'invoice' ? 'invoices' : 'offers';
+    files[`${BIZ}/${dir}/${year}/${number}.yaml`] = issuedDoc(entry.doc, number, ulid(draft++));
+  }
+
+  const entries = [
+    { id: paidIds[0], d: -50, minutes: 360, note: 'Landing page', invoice: numbers.paid },
+    { id: paidIds[1], d: -49, minutes: 240, note: 'Navigation and footer', invoice: numbers.paid },
+    { id: overdueIds[0], d: -35, minutes: 480, note: 'Contact form API', invoice: numbers.overdue },
+    { id: ulid(5), d: -1, minutes: 180, note: 'Launch checklist' },
+    { id: ulid(6), d: 0, minutes: 240, note: 'Sitemap and redirects' },
+  ];
+  const byMonth = new Map<string, string[]>();
+  for (const e of entries) {
+    const date = addDays(now, e.d);
+    const line = JSON.stringify({
+      id: e.id,
+      date: isoDate(date),
+      minutes: e.minutes,
+      client: northwind[0],
+      project: 'website',
+      note: e.note,
+      ...(e.invoice ? { invoice: e.invoice } : {}),
+    });
+    const month = isoDate(date).slice(0, 7);
+    byMonth.set(month, [...(byMonth.get(month) ?? []), line]);
+  }
+  for (const [month, lines] of byMonth)
+    files[`${BIZ}/time/${month}.jsonl`] = `${lines.join('\n')}\n`;
+
+  const payDate = addDays(now, -25);
+  files[`${BIZ}/payments/${payDate.getFullYear()}.jsonl`] =
+    `${JSON.stringify({ id: ulid(7), date: isoDate(payDate), invoice: numbers.paid, amount: 119000, method: 'transfer' })}\n`;
+  files[`${BIZ}/events.jsonl`] =
+    `${JSON.stringify({ id: ulid(8), at: `${isoDate(addDays(now, -30))}T09:30:00Z`, doc: numbers.overdue, type: 'sent' })}\n`;
+
+  return files;
+}
+
+const CLIENTS_WIKI = [
+  '# Clients',
+  '',
+  'Active work: [[client:northwind-labs]] (website relaunch, launch checklist in progress).',
+  '',
+].join('\n');
+
 // ─── Assembly ────────────────────────────────────────────────────────────────
 
 export function buildDemoSeed(now: Date = new Date()): DemoSeed {
@@ -626,6 +930,8 @@ export function buildDemoSeed(now: Date = new Date()): DemoSeed {
     'notes/welcome.md': WELCOME,
     'notes/ideas.md': IDEAS,
     ...ideas(now),
+    ...business(now),
+    '.kh/wiki/clients.md': CLIENTS_WIKI,
   };
 
   const repos: GithubRepo[] = [

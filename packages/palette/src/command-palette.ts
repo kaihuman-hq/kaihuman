@@ -190,6 +190,11 @@ export interface PaletteHandlers {
    * prefix or a URL; null offers nothing. Without it the palette never asks.
    */
   ask?: (query: string) => Promise<ModeItem | null>;
+  /**
+   * Loaded each time the palette opens: what turns a typed line into a capture with a client
+   * target ("todo acme: send draft"), listed first. Null, or without it, offers none.
+   */
+  loadCapture?: () => Promise<((query: string) => ModeItem | null) | null>;
 }
 
 /** How many recently chosen entries each prefix mode keeps. */
@@ -532,6 +537,8 @@ export function createCommandPalette(
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   /** What `ask` offered, for the query it was asked about; a newer query hides it. */
   let asked: { query: string; item: ModeItem } | null = null;
+  let captureFor: ((query: string) => ModeItem | null) | null = null;
+  let captureLoads = 0;
   let askTimer: ReturnType<typeof setTimeout> | undefined;
   /** Guards against a slow answer landing after the query moved on, like `searchToken`. */
   let askToken = 0;
@@ -1096,6 +1103,21 @@ export function createCommandPalette(
     }));
   };
 
+  /** The business capture the query names — a todo, log or timer for a client. */
+  const captureRows = (): Row[] => {
+    if (trail.length > 0 || !captureFor) return [];
+    const item = captureFor(input.value);
+    return item
+      ? [
+          {
+            title: item.title,
+            subtitle: item.subtitle ?? '',
+            activate: () => void chooseItem(item),
+          },
+        ]
+      : [];
+  };
+
   /** The one thing `ask` made of the query, while the query is still what it was asked about. */
   const askRows = (): Row[] => {
     if (trail.length > 0 || !asked || asked.query !== input.value.trim()) return [];
@@ -1182,6 +1204,7 @@ export function createCommandPalette(
     if (pending) return [];
     if (mode) return modeRows();
     return [
+      ...captureRows(),
       ...askRows(),
       ...recentRows(),
       ...bookmarkRows(),
@@ -1311,6 +1334,7 @@ export function createCommandPalette(
     else if (here) input.placeholder = `Search ${here.title.replace(/…$/, '')}…`;
     else input.placeholder = 'Search bookmarks or the web…';
 
+    const captureMatches = captureRows();
     const askMatches = askRows();
     const recent = recentRows();
     const bookmarkMatches = bookmarkRows();
@@ -1324,6 +1348,7 @@ export function createCommandPalette(
     if (mode) total = listed.length;
     else if (!pending)
       total =
+        captureMatches.length +
         askMatches.length +
         recent.length +
         bookmarkMatches.length +
@@ -1400,6 +1425,7 @@ export function createCommandPalette(
       }
       if (listed.length === 0 && (mode.items || mode.parent)) addNote('No matches.');
     } else {
+      addGroup('Business', captureMatches);
       addGroup('Ask kaihuman', askMatches);
       addGroup('Recent', recent);
       addGroup('Bookmarks', bookmarkMatches);
@@ -1645,6 +1671,22 @@ export function createCommandPalette(
     render();
     input.focus();
 
+    // Not awaited with the rest: the clients take several reads, and nothing else waits for them.
+    // Another repository's clients must never stay live, so each open starts without any.
+    captureFor = null;
+    const captureToken = ++captureLoads;
+    handlers
+      .loadCapture?.()
+      .then((loaded) => {
+        if (captureToken !== captureLoads || !open) return;
+        // Like an ask row it lands above the rest, so the selection moves down with its row.
+        const before = captureRows().length;
+        captureFor = loaded;
+        const added = captureRows().length - before;
+        if (added > 0 && allRows().length > added) selected += added;
+        render();
+      })
+      .catch((e: any) => console.warn('LifeOS palette: could not load the business clients', e));
     const [loadedBookmarks, loadedRecents, loadedSettings] = await Promise.all([
       handlers.loadBookmarks().catch((e: any) => {
         setStatus(e?.message || 'Could not load bookmarks');

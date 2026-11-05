@@ -42,6 +42,11 @@ describe('addTodoEntry', () => {
     });
   });
 
+  it('puts the todo first when position is top', () => {
+    const next = addTodoEntry('- [x] Done\n', { text: 'New', position: 'top' }, NOW);
+    expect(parseTodos(next).items.map((i) => i.text)).toEqual(['New', 'Done']);
+  });
+
   it('keeps milestones and takes a milestone and a prompt', () => {
     const md = '---\nmilestones:\n  - id: v1\n    name: One\n---\n\n- [ ] Old\n';
     const next = addTodoEntry(

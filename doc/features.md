@@ -20,10 +20,20 @@
 
 | Feature | Route/Location | Added |
 |---------|---------------|-------|
+| Safe cross-device saves: a save that hits a newer remote version is three-way merged (todos, read-it-later and action logs item by item, other files line by line) or shown in the conflict dialog, never overwritten; unsaved edits survive a reload; the editor autosaves 3 s after the last keystroke and when the app is hidden | all file editing, `doc/sync-analysis.md` | 2026-11-05 |
+| Cross-device freshness: when the app comes back to the foreground, regains focus or goes online, and every 90 s while visible, it checks the branch head and refreshes open files (unsaved ones are merged); unsynced edits are kept on the device and replayed with backoff, shown as **UNSYNCED n** in the status bar; Kanban moves and renames are single atomic commits | all file views, status bar, `doc/sync-analysis.md` | 2026-11-05 |
 | Ideas overview: every `.kh/ideas/` idea as a card coloured by status, with a 12-week activity strip and a hot/warm/cool/dormant level; status chips, text, product and sort filters; inline log, challenge and status edits | `/ideas` (navbar **Ideas**) | 2026-10-13 |
 | Quick idea: one text becomes a seed idea; pasted `kh-idea` hand-off blocks from chat apps are applied | `/quick-idea` | 2026-10-13 |
 | `kh-ideas` agent skill installed into the data repo (`.agents/skills/`, `.claude/skills/`) together with `CLAUDE.md` / `AGENTS.md`; set up in one commit from `/knowledge` or `/ideas`, and a half-finished set-up is completed on the next visit | `/knowledge`, `/ideas` | 2026-10-13 |
-| Business data module: clients, drafts, issued invoices, time and payments as files under `.kh/business/`; `kh-business` agent skill and a GitHub Action check (formats, totals, numbering, frozen issued files); `enableBusiness` set-up for private repos. No console pages yet | `.kh/business/`, `doc/business.md` | 2026-10-26 |
+| Business data module: clients, drafts, issued invoices, time and payments as files under `.kh/business/`; `kh-business` agent skill and a GitHub Action check (formats, totals, numbering, frozen issued files); `enableBusiness` set-up for private repos. Read-only console pages: `/business` dashboard, `/clients`, `/clients/:slug`, `/business/enable`; All / Business / Personal toggle on the board, todo analytics and action log; `[[client:slug]]` wiki links; sample business in demo mode | `.kh/business/`, `doc/business.md`, `/business`, `/clients` | 2026-10-27 |
+| Business daily forms: log time, shared running timer, clients and projects, client todo / log lines, payments, offer decisions, draft editor, issue and credit notes, all via one conflict-safe commit per action; palette commands `todo`/`log <client>:`, `timer`, `stop timer`; issued files read-only in the file browser; "Business today" hours and timer line in the browser extension's start page | `/business/time/new`, `/business/drafts/:id`, `doc/business.md` | 2026-11-02 |
+| Business client targets in the browser extension and desktop palette: `todo <client>: …`, `log <client>: …`, `timer <client>[/project]`, `stop timer` write the client's files in one commit, as the console does | command palette (extension), desktop palette, `doc/business.md` | 2026-11-03 |
+| Business share links: encrypted PDF links for issued offers, invoices and credit notes (key only in the link, EU storage on Cloudflare, per-upload confirm, revoke, expiry for offers, download counts, `/business/shared` page, self-hostable `apps/share-worker`) | `/business/shared`, client page, `doc/business.md` | 2026-11-02 |
+| Business expenses: expense list per year, receipt upload (PDF/JPG/PNG/WEBP/HEIC up to 10 MB, in the same commit as the record), retention-aware delete, VAT summary per month/quarter/year (Soll or Ist basis, §19 aware; `vat_basis` choice in the enable form), CSV export of expenses and VAT (German Steuerberater format), year export zip with documents, receipts, summaries and checksums | `/business/expenses`, `doc/business.md` | 2026-11-02 |
+| Business retainers and contracts: `Retainers due` card with one-click draft (issuing advances `next_date` once), contract form with optional PDF (10 MB), renewal / notice / end reminders on the dashboard and client page, retention-aware delete | `/business`, `/clients/:slug/contracts/new`, `doc/business.md` | 2026-11-02 |
+| Business dashboard: first-run guide (add first client, four-step flow), Needs attention list with one action per item, explained figures (VAT Soll/Ist), empty sections hidden; business section nav; `/business/invoices` list of drafts, invoices and offers | `/business`, `/business/invoices` | 2026-11-05 |
+| Business pipeline board: clients by stage (Lead, Contacted, Offer sent, Active; Past and Lost collapsed) with open amount and last activity, stage change by select | `/business/pipeline`, `doc/business.md` | 2026-11-02 |
+| Business e-invoices: XRechnung 3.0 UBL and UN/CEFACT CII (ZUGFeRD / Factur-X EN 16931 profile) from every issued invoice and credit note, generated in the browser; missing XRechnung data listed; golden files checked by the KoSIT validator in CI; guide for embedding CII into PDF/A-3 | client page, `doc/business.md` | 2026-11-03 |
 | `>id` ideas — list by activity, create a seed idea, `<slug>: <text>` logs on one | command palette, desktop palette | 2026-10-13 |
 | `>w` Wi‑Fi — turn it on or off, see the networks in range, connect with a password prompt when needed (NetworkManager via `nmcli`); GitHub work moves to `>gw` | desktop palette | 2026-09-28 |
 | Bookmarks: rename, change the link or delete any entry, including in search results | Bookmarks widget → pencil / trash | 2026-09-25 |
@@ -36,6 +46,7 @@
 | Wiki view: clickable `[[wikilinks]]`, backlinks, page type and tags, tag filter, repo-stored images | `/wiki` | 2026-09-23 |
 | Knowledge base commands: `/kb-ask --save` files answers, new `/kb-digest` for personal data, interactive `/kb-ingest`, `/kb-lint` stale claims and suggestions | `/knowledge` → Commands | 2026-09-23 |
 | Bookmarks (`.bookmarks.json`) — tagged, searchable bookmarks; mirrored into the browser extension | New File → Bookmarks | 2026-09-22 |
+| Travel (`YYYY.travel.json`) — one file per year; tile shows next trip, countdown and total cost; read-only focus view shows trips, steps (general, car toll, rental, flight, train, hotel), addresses, custom fields and Open in Maps links; EDIT opens a per-trip editor (save/cancel) | New File → Travel | 2026-11-04 |
 | Command library (`.commands.md`) — shell commands with `{{name}}` parameters, a field per parameter and copy; run from the desktop palette (`>x`) | New File → Commands | 2026-09-23 |
 | Prompt library (`.prompts.md`) — searchable, taggable prompts in one grep-able file | New File → Prompts | 2026-09-16 |
 | Cheatsheet (tabbed reference: KB how-to, capture, CLI keys, slash commands) | `/cheatsheet` | 2026-07-18 |
@@ -50,6 +61,9 @@
 | Android long-press shortcuts | manifest.webmanifest | 2026-03-28 |
 | Inbox always on board | KanbanBoard | 2026-03-28 |
 | Move todo between files | KanbanBoard card hover | 2026-03-28 |
+| Streams view: one tile per todo file with quick add, one-click status buttons, drag to reorder, active/closed and sort toggles | `/stream`, KanbanBoard STREAMS toggle | 2026-11-04 |
+| Todo file colours (10 presets, stored as `color:` in frontmatter) and item priority (`^high`/`^super-high`/`^ultra-high`), shown on board and stream views; higher-priority streams first | `/stream`, `/board` | 2026-11-04 |
+| Extension Todos list: all open and in-progress todos sorted by priority, age and status, with colour, stream name and quick actions | side panel | 2026-11-04 |
 
 ## Browser extension (`apps/browser-extension`)
 
@@ -114,6 +128,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Business tools: `business_clients`, `business_client`, `business_open_invoices`, `business_vat_summary`, `business_reminders`, `business_check` (read) and `business_create_draft`, `business_update_draft`, `business_add_time`, `business_add_todo`, `business_add_log`, `business_add_expense` (draft-only writes, never issue) | `kaihuman-kb-mcp --repo <path>` | 2026-11-03 |
 | Ideas tools (`ideas_list`, `ideas_find`, `ideas_read`, `ideas_create`, `ideas_append`, `ideas_set_summary`, `ideas_set_status`, `ideas_import`) and opt-in `--git` commit and push, for Claude Desktop | `kaihuman-kb-mcp --repo <path> --git` | 2026-10-13 |
 | stdio MCP server: `kb_search`, `kb_read`, `kb_list`, `kb_index`, `kb_log`, `kb_add_raw` over a local clone | `kaihuman-kb-mcp --repo <path>` | 2026-09-23 |
 

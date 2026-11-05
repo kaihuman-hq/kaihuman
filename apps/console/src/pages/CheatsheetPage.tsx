@@ -306,7 +306,7 @@ export const CheatsheetPage = () => {
         mode="CHEATSHEET"
         onDashboardClick={() => route('/')}
         onFilesClick={() => route('/')}
-        onBoardClick={() => route('/board')}
+        onBoardClick={() => route('/stream')}
         onWikiClick={() => route('/wiki')}
       />
     </>

@@ -1,10 +1,13 @@
 import { CodeEditor, type CodeEditorHandle } from '@cascivo/editor';
 import { githubFileStore, Logger } from '@kaihuman/core';
-import { useSignalEffect } from '@preact/signals';
+import { untracked, useSignalEffect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { languageForPath } from './language';
 
 const logger = new Logger('CodeMirrorEditor');
+
+/** Quiet period after the last user edit before the document is saved. */
+export const AUTOSAVE_DEBOUNCE_MS = 3000;
 
 // Zen-mode overrides — a partial map of --cascivo-editor-* props that Cascivo
 // spreads onto the editor root and re-applies live when the object changes.
@@ -22,12 +25,15 @@ export const CodeMirrorEditor = ({
   initialContent,
   onChange,
   onSave,
+  readOnly = false,
 }: {
   path?: string;
   zenMode?: boolean;
   initialContent?: string;
   onChange?: (content: string) => void;
   onSave?: (content: string) => void;
+  /** No edits and no saving; selecting and copying still work. */
+  readOnly?: boolean;
 }) => {
   const editorRef = useRef<CodeEditorHandle | null>(null);
   // Latest editor text — kept current via onValueChange so external syncs can
@@ -39,10 +45,23 @@ export const CodeMirrorEditor = ({
   const isUpdatingFromStore = useRef(false);
   const currentPathRef = useRef<string | null>(null);
 
+  // Synchronous mirrors of the state below: a flush can run in the same tick as
+  // an edit or save, before Preact has re-rendered.
+  const dirtyRef = useRef(false);
+  const savingRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const controlled = initialContent !== undefined;
+
+  // Store mode: the store owns the dirty flag. Its saveFile never throws (a failed or conflicted
+  // save leaves the file dirty and sets `error`), so the editor reads the flag back from it.
+  const setDirtyState = (dirty: boolean) => {
+    dirtyRef.current = dirty;
+    setHasUnsavedChanges(dirty);
+  };
 
   // Replace the whole document via the undoable handle, guarding the echo.
   const syncExternal = (next: string) => {
@@ -59,8 +78,10 @@ export const CodeMirrorEditor = ({
 
   const handleChange = (value: string) => {
     docRef.current = value;
-    if (isUpdatingFromStore.current) return; // external sync, not a user edit
+    if (isUpdatingFromStore.current || readOnly) return; // external sync or read-only, not a user edit
+    dirtyRef.current = true;
     setHasUnsavedChanges(true);
+    scheduleAutosave();
     if (controlled) {
       onChange?.(value);
       return;
@@ -70,38 +91,81 @@ export const CodeMirrorEditor = ({
   };
 
   const handleSave = async (value: string) => {
+    if (readOnly) return;
+    savingRef.current = true;
     setIsSaving(true);
     try {
       if (controlled) {
         await onSave?.(value);
+        // Keep the dirty flag if the user typed while the save was in flight.
+        if (docRef.current === value) setDirtyState(false);
       } else {
         const currentPath = propsPath || githubFileStore.activeFile.value;
-        if (currentPath) await githubFileStore.saveFile(currentPath);
+        if (currentPath) {
+          await githubFileStore.saveFile(currentPath);
+          // The editor may show another file by now; that file's flag is not ours to change.
+          if (currentPathRef.current === currentPath) {
+            setDirtyState(githubFileStore.dirtyFiles.peek().has(currentPath));
+          }
+        }
       }
-      setHasUnsavedChanges(false);
     } catch (e) {
       logger.error('Failed to save:', e);
     } finally {
+      savingRef.current = false;
       setIsSaving(false);
     }
   };
 
-  // Auto-save every 2 minutes when dirty — read through a ref so the interval
-  // never closes over stale state.
-  const stateRef = useRef({ hasUnsavedChanges, isSaving, handleSave });
-  stateRef.current = { hasUnsavedChanges, isSaving, handleSave };
+  // Debounced auto-save, read through a ref so timers and listeners never
+  // close over stale state.
+  const stateRef = useRef({ readOnly, handleSave });
+  stateRef.current = { readOnly, handleSave };
+
+  const clearTimer = () => {
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
+    timerRef.current = null;
+  };
+
+  function scheduleAutosave() {
+    clearTimer();
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      const s = stateRef.current;
+      if (s.readOnly || !dirtyRef.current) return;
+      if (savingRef.current) {
+        scheduleAutosave(); // a save is in flight; try again after another quiet period
+        return;
+      }
+      logger.debug('Auto-saving...');
+      s.handleSave(docRef.current);
+    }, AUTOSAVE_DEBOUNCE_MS);
+  }
+
+  // Save right now if dirty, skipping the debounce.
+  const flush = () => {
+    clearTimer();
+    // The edit must reach IndexedDB even if the save cannot finish before suspension.
+    void githubFileStore.flushPendingWrites();
+    const s = stateRef.current;
+    if (s.readOnly || !dirtyRef.current || savingRef.current) return;
+    s.handleSave(docRef.current);
+  };
+
+  // Mobile PWAs can be suspended or killed without warning once hidden, so a
+  // pending debounce would never fire; flush as soon as the page is hidden.
+  // pagehide covers browsers (iOS Safari) that skip visibilitychange on unload.
   useEffect(() => {
-    const id = setInterval(
-      () => {
-        const s = stateRef.current;
-        if (s.hasUnsavedChanges && !s.isSaving) {
-          logger.debug('Auto-saving...');
-          s.handleSave(docRef.current);
-        }
-      },
-      2 * 60 * 1000,
-    );
-    return () => clearInterval(id);
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', flush);
+      flush();
+    };
   }, []);
 
   // Controlled mode: sync when the parent pushes new content (e.g. a late
@@ -119,14 +183,19 @@ export const CodeMirrorEditor = ({
       : '';
     if (!effectivePath) return;
 
-    if (effectivePath !== currentPathRef.current) {
+    const previousPath = currentPathRef.current;
+    if (effectivePath === previousPath && content === docRef.current) return;
+    if (effectivePath !== previousPath) {
+      // The pending autosave belongs to the previous file: save it now instead of dropping it.
+      clearTimer();
+      if (previousPath) untracked(() => void githubFileStore.saveFile(previousPath));
       currentPathRef.current = effectivePath;
-      syncExternal(content);
-      setHasUnsavedChanges(false);
-    } else if (content !== docRef.current) {
-      syncExternal(content);
-      setHasUnsavedChanges(false);
     }
+    syncExternal(content);
+    // A store update (a clean merge, or a copy restored from IndexedDB) can leave the file dirty.
+    const dirty = githubFileStore.dirtyFiles.peek().has(effectivePath);
+    setDirtyState(dirty);
+    if (dirty && !readOnly) scheduleAutosave();
   });
 
   if (!propsPath && !githubFileStore.activeFile.value && initialContent === undefined) {
@@ -146,7 +215,8 @@ export const CodeMirrorEditor = ({
         language={languageForPath(effectivePath)}
         defaultValue={docRef.current}
         onValueChange={handleChange}
-        onSave={handleSave}
+        onSave={readOnly ? undefined : handleSave}
+        readOnly={readOnly}
         wrap={effectivePath ? effectivePath.endsWith('.md') : true}
         bracketMatching
         theme={zenMode ? ZEN_THEME : undefined}
@@ -154,25 +224,27 @@ export const CodeMirrorEditor = ({
       />
 
       {/* Save Button Overlay */}
-      <div
-        className={`absolute top-4 right-8 transition-opacity duration-300 ${hasUnsavedChanges ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-      >
-        <button
-          type="button"
-          onClick={() => handleSave(docRef.current)}
-          disabled={isSaving}
-          className="bg-[var(--los-accent)] text-black px-4 py-1.5 rounded-sm shadow-lg text-xs font-bold font-mono tracking-wider hover:opacity-90 active:scale-95 transition-all flex items-center gap-2"
+      {!readOnly && (
+        <div
+          className={`absolute top-4 right-8 transition-opacity duration-300 ${hasUnsavedChanges ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         >
-          {isSaving ? (
-            <>
-              <div className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-              SAVING...
-            </>
-          ) : (
-            'SAVE CHANGES'
-          )}
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => handleSave(docRef.current)}
+            disabled={isSaving}
+            className="bg-[var(--los-accent)] text-black px-4 py-1.5 rounded-sm shadow-lg text-xs font-bold font-mono tracking-wider hover:opacity-90 active:scale-95 transition-all flex items-center gap-2"
+          >
+            {isSaving ? (
+              <>
+                <div className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                SAVING...
+              </>
+            ) : (
+              'SAVE CHANGES'
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

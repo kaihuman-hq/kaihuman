@@ -11,6 +11,7 @@ export type BusinessPath =
   | { kind: 'issued'; doc: 'invoice' | 'offer'; year: number; number: string }
   | { kind: 'artifact'; doc: 'invoice' | 'offer' | 'contract'; ext: 'pdf' | 'xml' | 'sha256' }
   | { kind: 'time'; month: string }
+  | { kind: 'timer' }
   | { kind: 'payments'; year: number }
   | { kind: 'events' }
   | { kind: 'links' }
@@ -26,7 +27,25 @@ export const draftPath = (id: Ulid): string => `${BUSINESS_ROOT}/drafts/${id}.ya
 export const issuedPath = (doc: 'invoice' | 'offer', year: number, number: string): string =>
   `${BUSINESS_ROOT}/${doc === 'invoice' ? 'invoices' : 'offers'}/${year}/${number}.yaml`;
 export const timePath = (month: string): string => `${BUSINESS_ROOT}/time/${month}.jsonl`;
+export const TIMER_PATH = `${BUSINESS_ROOT}/time/running.yaml`;
+export const EVENTS_PATH = `${BUSINESS_ROOT}/events.jsonl`;
+export const LINKS_PATH = `${BUSINESS_ROOT}/links.jsonl`;
 export const paymentsPath = (year: number): string => `${BUSINESS_ROOT}/payments/${year}.jsonl`;
+
+/** Largest receipt or contract file; images are stored as they are, so this bounds the commit too. */
+export const ATTACHMENT_MAX_BYTES = 10485760;
+export const RECEIPT_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic'] as const;
+export type ReceiptExtension = (typeof RECEIPT_EXTENSIONS)[number];
+export const CONTRACT_EXTENSIONS = ['pdf'] as const;
+
+export const expensePath = (year: string, id: Ulid): string =>
+  `${BUSINESS_ROOT}/expenses/${year}/${id}.yaml`;
+export const receiptPath = (year: string, id: Ulid, ext: string): string =>
+  `${BUSINESS_ROOT}/expenses/${year}/${id}.${ext.toLowerCase()}`;
+export const contractPath = (client: Slug, id: Ulid): string =>
+  `${clientDir(client)}/contracts/${id}.yaml`;
+export const contractFilePath = (client: Slug, id: Ulid): string =>
+  `${clientDir(client)}/contracts/${id}.pdf`;
 
 const UNKNOWN: BusinessPath = { kind: 'unknown' };
 const YEAR = /^\d{4}$/;
@@ -115,6 +134,7 @@ export const classifyBusinessPath = (path: string): BusinessPath => {
   if ((top === 'invoices' || top === 'offers') && parts.length === 3 && a && b) {
     return issuedDir(top === 'invoices' ? 'invoice' : 'offer', a, b);
   }
+  if (top === 'time' && parts.length === 2 && a === 'running.yaml') return { kind: 'timer' };
   if (top === 'time' && parts.length === 2 && a?.endsWith('.jsonl')) {
     const month = a.slice(0, -'.jsonl'.length);
     return MONTH.test(month) ? { kind: 'time', month } : UNKNOWN;
@@ -130,3 +150,19 @@ export const classifyBusinessPath = (path: string): BusinessPath => {
   }
   return UNKNOWN;
 };
+
+export const isBusinessPath = (path: string): boolean => path.startsWith(`${BUSINESS_ROOT}/`);
+
+/** The client slug of any path under `.kh/business/clients/<slug>/`, else null. */
+export const clientOfPath = (path: string): Slug | null => {
+  const prefix = `${BUSINESS_ROOT}/clients/`;
+  if (!path.startsWith(prefix)) return null;
+  const rest = path.slice(prefix.length);
+  const slash = rest.indexOf('/');
+  return slash < 0 ? null : asSlug(rest.slice(0, slash));
+};
+
+export type Scope = 'all' | 'business' | 'personal';
+
+export const inScope = (path: string, scope: Scope): boolean =>
+  scope === 'all' || isBusinessPath(path) === (scope === 'business');

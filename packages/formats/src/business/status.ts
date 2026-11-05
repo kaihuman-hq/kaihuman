@@ -55,7 +55,10 @@ export const deriveOfferStatus = (
   const mine = events.filter((e) => e.doc === offer.number);
   const decision = mine
     .filter((e) => e.type === 'accepted' || e.type === 'declined')
-    .reduce<DocEvent | null>((latest, e) => (latest && latest.at > e.at ? latest : e), null);
+    .reduce<DocEvent | null>(
+      (latest, e) => (latest && Date.parse(latest.at) > Date.parse(e.at) ? latest : e),
+      null,
+    );
   if (decision) return decision.type === 'accepted' ? 'accepted' : 'declined';
   if (offer.valid_until !== undefined && offer.valid_until < today) return 'expired';
   return mine.some((e) => e.type === 'sent' || e.type === 'downloaded') ? 'sent' : 'issued';

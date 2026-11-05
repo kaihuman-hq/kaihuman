@@ -205,6 +205,34 @@ describe('checkBusinessRepo', () => {
     }
   });
 
+  it('reports a receipt or contract file that is not in the tree (ruling S6)', () => {
+    const EXPENSE = '.kh/business/expenses/2026/01M55FJ500NTZ49EKRX27CHPV0.yaml';
+    const CONTRACT = '.kh/business/clients/acme-gmbh/contracts/01M52X5E00EKRX27CHPV05AFMS.yaml';
+    const files = new Map(base);
+    files.set(EXPENSE, `${base.get(EXPENSE)}receipt: 01M55FJ500NTZ49EKRX27CHPV0.pdf\n`);
+    files.set(CONTRACT, `${base.get(CONTRACT)}file: 01M52X5E00EKRX27CHPV05AFMS.pdf\n`);
+    expect(errors(files)).toEqual([
+      expect.objectContaining({ file: CONTRACT, path: 'file' }),
+      expect.objectContaining({ file: EXPENSE, path: 'receipt' }),
+    ]);
+    files.set(EXPENSE.replace('.yaml', '.pdf'), '%PDF');
+    files.set(CONTRACT.replace('.yaml', '.pdf'), '%PDF');
+    expect(errors(files)).toEqual([]);
+  });
+
+  it('reports a contract in another client folder or with a duplicate id', () => {
+    const CONTRACT = '.kh/business/clients/acme-gmbh/contracts/01M52X5E00EKRX27CHPV05AFMS.yaml';
+    const moved = CONTRACT.replace('acme-gmbh', 'zeta-ag');
+    expect(errors(withFile(moved, base.get(CONTRACT) ?? ''))).toEqual([
+      expect.objectContaining({ file: moved, path: 'client' }),
+      expect.objectContaining({
+        file: moved,
+        path: 'id',
+        message: expect.stringContaining('already'),
+      }),
+    ]);
+  });
+
   it('reports a retain_until that does not follow the jurisdiction', () => {
     const files = withFile(
       INVOICE,

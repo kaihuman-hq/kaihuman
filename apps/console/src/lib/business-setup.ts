@@ -9,17 +9,21 @@ import BUSINESS_WORKFLOW from '@kaihuman/formats/business-templates/business-che
 import VERFAHRENSDOKUMENTATION from '@kaihuman/formats/business-templates/VERFAHRENSDOKUMENTATION.md?raw';
 import BUSINESS_CHECK from '@kaihuman/formats/dist/business-check.mjs?raw';
 import KH_BUSINESS_SKILL from '@kaihuman/formats/skills/kh-business/SKILL.md?raw';
+import { AlreadyEnabledError, PublicRepoError } from './business/errors';
+import { BUSINESS_PROFILE_PATH } from './business/load';
 import type { KBRepo } from './github-kb';
 
-/** Bump when the check, workflow or skill changes: `syncKB` then rewrites the tool files. */
-export const BUSINESS_TOOLS_VERSION = '1.0.0';
+/**
+ * Bump when the check, workflow or skill changes: the next `syncKB` or business write then
+ * rewrites the tool files.
+ */
+export const BUSINESS_TOOLS_VERSION = '1.4.0';
 
-export const BUSINESS_PROFILE_PATH = '.kh/business/business.yaml';
+export { BUSINESS_PROFILE_PATH };
 
 const DATA_DIRS = ['clients', 'drafts', 'offers', 'invoices', 'time', 'payments', 'expenses'];
 
-export class PublicRepoError extends Error {}
-export class AlreadyEnabledError extends Error {}
+export { AlreadyEnabledError, PublicRepoError };
 
 /** The files an update rewrites: the check, its workflow and the agent skill. */
 export function getBusinessToolFiles(): Record<string, string> {
@@ -31,6 +35,15 @@ export function getBusinessToolFiles(): Record<string, string> {
     '.claude/skills/kh-business/SKILL.md': KH_BUSINESS_SKILL,
     '.github/workflows/business-check.yml': BUSINESS_WORKFLOW,
   };
+}
+
+/**
+ * The tool files to write for a repo whose `.kh/business/.tools/version` reads `installed` (null
+ * when absent): all of them when it is not the current version, else none. Shared by `syncKB`
+ * and `writeBusiness`, so any of them upgrades an older repo (ruling S5).
+ */
+export function businessToolUpgrade(installed: string | null): Record<string, string> {
+  return installed?.trim() === BUSINESS_TOOLS_VERSION ? {} : getBusinessToolFiles();
 }
 
 /** Everything a new business needs: tool files plus the user's own data skeleton. */
@@ -48,8 +61,13 @@ export function getBusinessScaffoldFiles(profile: BusinessProfile): Record<strin
 /**
  * Creates the business skeleton in one commit. Refuses a public repo, because it will hold
  * invoices and client data, and a repo that already has a profile, so nothing is overwritten.
+ * `skipped` holds the files GitHub refused (the workflow, when the token lacks the `workflow`
+ * scope) with their content, so the user can add them by hand.
  */
-export async function enableBusiness(kbRepo: KBRepo, profile: BusinessProfile): Promise<void> {
+export async function enableBusiness(
+  kbRepo: KBRepo,
+  profile: BusinessProfile,
+): Promise<{ skipped: Record<string, string> }> {
   const checked = validateProfile(profile);
   if (!checked.ok) {
     throw new Error(`Invalid business profile: ${checked.issues.map((i) => i.message).join('; ')}`);
@@ -65,11 +83,15 @@ export async function enableBusiness(kbRepo: KBRepo, profile: BusinessProfile): 
   if (tree.some((item) => item.path === BUSINESS_PROFILE_PATH)) {
     throw new AlreadyEnabledError(`${kbRepo.full_name} already has business data`);
   }
-  await githubService.commitFiles(
+  const files = getBusinessScaffoldFiles(profile);
+  const res = await githubService.commitFiles(
     owner,
     repo,
     kbRepo.default_branch,
-    getBusinessScaffoldFiles(profile),
+    files,
     'chore: enable kaihuman business',
   );
+  return {
+    skipped: Object.fromEntries((res.skipped ?? []).map((path) => [path, files[path] ?? ''])),
+  };
 }

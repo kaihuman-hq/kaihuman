@@ -40,11 +40,15 @@
 ## Business (`doc/business.md`)
 
 - [x] Phase 1: formats, repo check, agent skill, set-up (`enableBusiness`) and `syncKB` wiring
-- [ ] Phase 2: read-only console (enable form, `/clients`, client page, `/business` dashboard)
-- [ ] Phase 3: daily forms (time, payments, drafts, issue, credit notes, offer accept/decline)
-- [ ] Phase 4: share service (encrypted, revocable links)
-- [ ] Phase 5: money admin (expenses, VAT summary, year export, retainers, contract reminders)
-- [ ] Phase 6: e-invoice XML (XRechnung, ZUGFeRD), before 2028-01-01
+- [x] Phase 2: read-only console (enable form, `/clients`, client page, `/business` dashboard)
+- [x] Phase 3: daily forms (time, payments, drafts, issue, credit notes, offer accept/decline)
+- [x] Phase 4: share service (encrypted, revocable links)
+- [x] Phase 5a: money admin (expenses and receipts, VAT summary Soll/Ist, CSV, year export, retainers due, contract reminders and form, pipeline board)
+- [x] Phase 5b: money admin in the other clients (browser extension and desktop palette targets, `kb-mcp` business tools)
+  - [x] Part A: client targets in the browser extension and desktop palette (2026-11-03)
+  - [x] Part B: kb-mcp business tools (read clients/invoices/VAT/reminders/check; draft-only writes)
+- [ ] Refund (negative) expenses with receipts
+- [x] Phase 6: e-invoice XML (XRechnung, ZUGFeRD), before 2028-01-01
 
 ## Documentation
 

@@ -1,45 +1,12 @@
-import { parseJsonl } from './jsonl.js';
-import { jurisdictionFor } from './jurisdiction.js';
-import { DEFAULT_NUMBERING, findGaps, formatNumber, parseNumber } from './numbering.js';
-import { BUSINESS_ROOT, type BusinessPath, classifyBusinessPath } from './paths.js';
-import type { BusinessProfile, Draft, Issued, VatCategory } from './records.js';
-import { computeTotals } from './totals.js';
-import {
-  validateClient,
-  validateContract,
-  validateDraft,
-  validateEvent,
-  validateExpense,
-  validateIssued,
-  validateLink,
-  validatePayment,
-  validateProfile,
-  validateProject,
-  validateTimeEntry,
-} from './validate.js';
-import type { Issue, Result } from './validate-kit.js';
-import { parseYaml } from './yaml.js';
+import { findGaps, formatNumber } from './numbering.js';
+import { BUSINESS_ROOT, classifyBusinessPath } from './paths.js';
+import { type Finding, loadBusinessRepoDetailed } from './repo.js';
+import type { Issue } from './validate-kit.js';
 
+export type { Finding } from './repo.js';
 export type Change = { status: 'A' | 'M' | 'D'; path: string };
-export type Finding = Issue & { file: string; level: 'error' | 'warning' };
 
-type Series = 'invoice' | 'offer';
-
-const PROFILE_PATH = `${BUSINESS_ROOT}/business.yaml`;
 const FROZEN_MESSAGE = 'issued documents never change; issue a credit note';
-
-/** Key-sorted JSON, so stored and recomputed totals compare regardless of key order. */
-const canonical = (value: unknown): string =>
-  JSON.stringify(value, (_k, v) =>
-    v && typeof v === 'object' && !Array.isArray(v)
-      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
-      : v,
-  );
-
-const readYaml = <T>(text: string, validate: (raw: unknown) => Result<T>): Result<T> => {
-  const parsed = parseYaml(text);
-  return parsed.ok ? validate(parsed.value) : parsed;
-};
 
 export const checkBusinessRepo = (input: {
   files: ReadonlyMap<string, string>;
@@ -50,200 +17,13 @@ export const checkBusinessRepo = (input: {
   today: string;
 }): Finding[] => {
   const { files, changes } = input;
-  const findings: Finding[] = [];
+  const { repo, cross } = loadBusinessRepoDetailed(files);
+  const findings: Finding[] = [...repo.findings];
   const add = (file: string, level: Finding['level'], issue: Issue) =>
     findings.push({ ...issue, file, level });
-  const addIssues = (file: string, issues: readonly Issue[]) => {
-    for (const i of issues) add(file, 'error', i);
-  };
   const fail = (file: string, path: string, message: string, level: Finding['level'] = 'error') =>
     add(file, level, { path, message });
-  const sameId = (file: string, id: string, expected: string) => {
-    if (id !== expected) fail(file, 'id', `"${id}" does not match the file name "${expected}"`);
-  };
-
-  const paths = [...files.keys()].filter((p) => p.startsWith(`${BUSINESS_ROOT}/`)).sort();
-
-  // Profile first: numbering patterns and exemption reasons depend on it.
-  let profile: BusinessProfile | undefined;
-  const profileText = files.get(PROFILE_PATH);
-  if (profileText === undefined) {
-    fail(PROFILE_PATH, '', 'business.yaml is missing; default numbering patterns are used');
-  } else {
-    const r = readYaml(profileText, validateProfile);
-    if (r.ok) profile = r.value;
-    else addIssues(PROFILE_PATH, r.issues);
-  }
-  const patterns: Record<Series, string> = {
-    invoice: profile?.numbering?.invoice ?? DEFAULT_NUMBERING.invoice,
-    offer: profile?.numbering?.offer ?? DEFAULT_NUMBERING.offer,
-  };
-
-  const clients = new Set<string>();
-  const projects = new Set<string>(); // "client/project"
-  const issued: { file: string; series: Series; year: number; doc: Issued }[] = [];
-  const drafts: { file: string; doc: Draft }[] = [];
-  const refs: { file: string; line?: number; path: string; client?: string; project?: string }[] =
-    [];
-  const payments: { file: string; line: number; invoice: string }[] = [];
-  const docRefs: { file: string; line: number; doc: string; what: string }[] = [];
-
-  for (const file of paths) {
-    const text = files.get(file) ?? '';
-    const p: BusinessPath = classifyBusinessPath(file);
-    switch (p.kind) {
-      case 'profile':
-      case 'meta':
-      case 'receipt':
-      case 'artifact':
-      case 'notes':
-      case 'todos':
-      case 'log':
-        break;
-      case 'unknown':
-        fail(file, '', 'unrecognised file in the business folder', 'warning');
-        break;
-      case 'client': {
-        clients.add(p.client);
-        const r = readYaml(text, (raw) => validateClient(raw, p.client));
-        if (!r.ok) addIssues(file, r.issues);
-        break;
-      }
-      case 'project': {
-        projects.add(`${p.client}/${p.project}`);
-        const r = readYaml(text, (raw) => validateProject(raw, p.project, p.client));
-        if (!r.ok) addIssues(file, r.issues);
-        break;
-      }
-      case 'contract': {
-        const r = readYaml(text, validateContract);
-        if (!r.ok) addIssues(file, r.issues);
-        else {
-          sameId(file, r.value.id, p.id);
-          refs.push({ file, path: 'client', client: r.value.client });
-        }
-        break;
-      }
-      case 'draft': {
-        const r = readYaml(text, validateDraft);
-        if (!r.ok) addIssues(file, r.issues);
-        else {
-          sameId(file, r.value.id, p.id);
-          drafts.push({ file, doc: r.value });
-          refs.push({
-            file,
-            path: 'client',
-            client: r.value.client,
-            ...(r.value.project ? { project: r.value.project } : {}),
-          });
-        }
-        break;
-      }
-      case 'issued': {
-        const r = readYaml(text, validateIssued);
-        if (!r.ok) {
-          addIssues(file, r.issues);
-          break;
-        }
-        const doc = r.value;
-        issued.push({ file, series: p.doc, year: p.year, doc });
-        if (doc.number !== p.number) {
-          fail(file, 'number', `"${doc.number}" does not match the file name "${p.number}"`);
-        }
-        const parsed = parseNumber(patterns[p.doc], p.number);
-        if (!parsed || parsed.year !== p.year) {
-          fail(
-            file,
-            'number',
-            `"${p.number}" is not a ${p.year} number of the pattern "${patterns[p.doc]}"`,
-          );
-        }
-        if (!doc.issue_date.startsWith(`${p.year}-`)) {
-          fail(file, 'issue_date', `${doc.issue_date} is not in the year folder ${p.year}`);
-        }
-        if ((p.doc === 'offer') !== (doc.kind === 'offer')) {
-          fail(
-            file,
-            'kind',
-            p.doc === 'offer'
-              ? `a ${doc.kind} belongs under invoices/, not offers/`
-              : 'an offer belongs under offers/, not invoices/',
-          );
-        }
-        const retainUntil = `${Number(doc.issue_date.slice(0, 4)) + jurisdictionFor(doc.jurisdiction).retentionYears}-12-31`;
-        if (doc.retain_until !== retainUntil) {
-          fail(file, 'retain_until', `must be ${retainUntil} for ${doc.jurisdiction}`);
-        }
-        // Reasons come from the document itself: the profile's vat_regime may change later,
-        // and that must not turn frozen history red. Amounts, categories and rates are still verified.
-        const reasons: Partial<Record<VatCategory, string>> = {};
-        for (const b of r.value.totals.breakdown) {
-          if (b.exemption_reason !== undefined) reasons[b.category] = b.exemption_reason;
-        }
-        const expected = computeTotals(r.value.lines, reasons);
-        if (canonical(expected) !== canonical(r.value.totals)) {
-          fail(file, 'totals', 'stored totals differ from the totals computed from the lines');
-        }
-        refs.push({
-          file,
-          path: 'client',
-          client: r.value.client,
-          ...(r.value.project ? { project: r.value.project } : {}),
-        });
-        break;
-      }
-      case 'time': {
-        const r = parseJsonl(text, validateTimeEntry);
-        addIssues(file, r.issues);
-        for (const e of r.entries) {
-          refs.push({
-            file,
-            line: e.line,
-            path: 'client',
-            client: e.value.client,
-            ...(e.value.project ? { project: e.value.project } : {}),
-          });
-        }
-        break;
-      }
-      case 'expense': {
-        const r = readYaml(text, validateExpense);
-        if (!r.ok) addIssues(file, r.issues);
-        else {
-          sameId(file, r.value.id, p.id);
-          if (r.value.client) {
-            refs.push({
-              file,
-              path: 'client',
-              client: r.value.client,
-              ...(r.value.project ? { project: r.value.project } : {}),
-            });
-          }
-        }
-        break;
-      }
-      case 'payments': {
-        const r = parseJsonl(text, validatePayment);
-        addIssues(file, r.issues);
-        for (const e of r.entries) payments.push({ file, line: e.line, invoice: e.value.invoice });
-        break;
-      }
-      case 'events': {
-        const r = parseJsonl(text, validateEvent);
-        addIssues(file, r.issues);
-        for (const e of r.entries)
-          docRefs.push({ file, line: e.line, doc: e.value.doc, what: 'doc' });
-        break;
-      }
-      case 'links': {
-        const r = parseJsonl(text, validateLink);
-        addIssues(file, r.issues);
-        for (const e of r.entries)
-          docRefs.push({ file, line: e.line, doc: e.value.doc, what: 'doc' });
-        break;
-      }
-    }
-  }
+  const { patterns, clients, projects, issued, drafts, refs, payments, docRefs } = cross;
 
   for (const r of refs) {
     const at = r.line === undefined ? {} : { line: r.line };

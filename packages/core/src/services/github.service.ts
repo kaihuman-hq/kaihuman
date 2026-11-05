@@ -1,7 +1,20 @@
 import { Octokit } from '@octokit/rest';
 import { demoMode } from '../demo-mode.js';
 import { authStore } from '../stores/auth.store.js';
+import type { TreeItem } from '../stores/github-file.store.js';
+import { bytesToBase64 } from '../utils/base64.js';
+import { gitBlobSha } from '../utils/git-blob-sha.js';
+import { ConflictError } from './conflict.js';
 import { inMemoryGithubService } from './github.service.memory.js';
+
+// GitHub's GETs are cacheable for 60s. A branch head read through that cache is stale, which
+// makes a write think the branch moved (or, worse, build on old state), so refs skip it.
+const noStore = {
+  request: {
+    fetch: (url: string | URL | Request, init?: RequestInit) =>
+      fetch(url, { ...init, cache: 'no-store' }),
+  },
+};
 
 export class GithubService {
   private octokit: Octokit | null = null;
@@ -46,8 +59,22 @@ export class GithubService {
     return data;
   }
 
-  async fetchRepoTree(owner: string, repo: string, branch = 'main') {
+  /**
+   * With `commitSha` the tree of that commit is fetched and the branch ref is not read. The
+   * branch head is read with `noStore`: a cached head would make a sync build on old state.
+   */
+  async fetchRepoTree(owner: string, repo: string, branch = 'main', opts?: { commitSha?: string }) {
     const client = this.getClient();
+    if (opts?.commitSha) {
+      // The tree endpoint resolves a commit sha to its tree.
+      const { data } = await client.git.getTree({
+        owner,
+        repo,
+        tree_sha: opts.commitSha,
+        recursive: 'true',
+      });
+      return data.tree;
+    }
     // Get the reference for the branch to find the commit SHA
     // Or just use the branch name in getTree if supported?
     // git/trees/:tree_sha supports recursive=true
@@ -57,6 +84,7 @@ export class GithubService {
       owner,
       repo,
       ref: `heads/${branch}`,
+      ...noStore,
     });
     const sha = refData.object.sha;
 
@@ -71,12 +99,38 @@ export class GithubService {
     return treeData.tree;
   }
 
-  async getFileContent(owner: string, repo: string, path: string) {
+  /**
+   * The recursive tree of one commit with GitHub's `truncated` flag, which `fetchRepoTree` drops:
+   * past GitHub's limit (100,000 entries or 7 MB) the list is partial, and a caller that must see
+   * every file has to know.
+   */
+  async fetchCommitTree(
+    owner: string,
+    repo: string,
+    commitSha: string,
+  ): Promise<{ tree: TreeItem[]; truncated: boolean }> {
+    const { data } = await this.getClient().git.getTree({
+      owner,
+      repo,
+      tree_sha: commitSha,
+      recursive: 'true',
+    });
+    return { tree: data.tree as TreeItem[], truncated: data.truncated };
+  }
+
+  /**
+   * With `ref` (a commit sha) the file is read as of that commit, which never changes, so the
+   * response may be cached. Without `ref` it is the branch head's version and the read bypasses
+   * the HTTP cache (`noStore`): the returned sha is used for the next write, and a stale one
+   * would be refused or, worse, overwrite newer content.
+   */
+  async getFileContent(owner: string, repo: string, path: string, opts?: { ref?: string }) {
     const client = this.getClient();
     const { data } = await client.repos.getContent({
       owner,
       repo,
       path,
+      ...(opts?.ref ? { ref: opts.ref } : noStore),
     });
 
     if (Array.isArray(data)) {
@@ -93,6 +147,85 @@ export class GithubService {
     const bytes = Uint8Array.from(binaryString, (c) => c.charCodeAt(0));
     const content = new TextDecoder().decode(bytes);
     return { content, sha: data.sha };
+  }
+
+  /**
+   * Raw bytes of a file, binary-safe (getFileContent decodes UTF-8 and caps at 1 MB).
+   * The blob sha comes from the git trees, walked from the ref's root tree down to the parent
+   * folder: the contents API refuses files over 1 MB with the default JSON media type, and its
+   * folder listing stops at 1000 entries (S12). A tree lists every entry with its sha and no body;
+   * the blob API then serves up to 100 MB.
+   */
+  async getFileBytes(
+    owner: string,
+    repo: string,
+    path: string,
+    opts?: { ref?: string },
+  ): Promise<Uint8Array> {
+    const client = this.getClient();
+    const segments = path.split('/');
+    const name = segments.pop() ?? '';
+    const notFound = () => new Error(`Not found: ${path}`);
+    const is404 = (e: unknown) => (e as { status?: number }).status === 404;
+
+    // `tree_sha` takes a commit sha or a branch or tag name and resolves it to its root tree.
+    let treeSha = opts?.ref ?? (await client.repos.get({ owner, repo })).data.default_branch;
+    const treeOf = async (sha: string) => {
+      try {
+        return (await client.git.getTree({ owner, repo, tree_sha: sha })).data.tree;
+      } catch (e) {
+        throw is404(e) ? notFound() : e;
+      }
+    };
+    for (const segment of segments) {
+      const folder = (await treeOf(treeSha)).find((item) => item.path === segment);
+      if (!folder || folder.type !== 'tree' || !folder.sha) throw notFound();
+      treeSha = folder.sha;
+    }
+    const entry = (await treeOf(treeSha)).find((item) => item.path === name);
+    if (!entry?.sha) throw notFound();
+    // Named as the contents API names them, which callers and messages already know.
+    const kind =
+      entry.type === 'tree'
+        ? 'dir'
+        : entry.type === 'commit'
+          ? 'submodule'
+          : entry.mode === '120000'
+            ? 'symlink'
+            : 'file';
+    if (kind !== 'file') throw new Error(`Path is not a file: ${kind}`);
+
+    return this.readBlob(owner, repo, entry.sha, notFound);
+  }
+
+  /**
+   * Raw bytes of one blob by its sha, in one request: for a caller that already holds a tree
+   * (a year export), where `getFileBytes` would walk the trees again for every file.
+   */
+  async getBlobBytes(owner: string, repo: string, sha: string): Promise<Uint8Array> {
+    return this.readBlob(owner, repo, sha, () => new Error(`Not found: blob ${sha}`));
+  }
+
+  private async readBlob(
+    owner: string,
+    repo: string,
+    sha: string,
+    notFound: () => Error,
+  ): Promise<Uint8Array> {
+    let blob: { content: string; encoding: string };
+    try {
+      ({ data: blob } = await this.getClient().git.getBlob({ owner, repo, file_sha: sha }));
+    } catch (e) {
+      throw (e as { status?: number }).status === 404 ? notFound() : e;
+    }
+    if (blob.encoding !== 'base64') {
+      throw new Error(`Unexpected blob encoding: ${blob.encoding}`);
+    }
+    // atob, not TextDecoder: the bytes are not text.
+    const binary = atob(blob.content.replace(/\s/g, ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
   }
 
   async saveFile(
@@ -220,62 +353,149 @@ export class GithubService {
     });
   }
 
+  /** Current commit SHA of a branch. */
+  async getHeadSha(owner: string, repo: string, branch: string): Promise<string> {
+    const client = this.getClient();
+    const { data } = await client.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+      ...noStore,
+    });
+    return data.object.sha;
+  }
+
   /**
-   * Writes several files in a single commit, so the branch gets all of them or none: a write
-   * that fails halfway leaves nothing behind. Fails if the branch moved while the commit was built.
+   * Writes and deletes (`null`) several files in a single commit, so the branch gets all of them
+   * or none: a write that fails halfway leaves nothing behind. With `expectedHeadSha` it throws
+   * {@link ConflictError} before creating anything when the branch has moved; a ref update GitHub
+   * rejects as non-fast-forward is a ConflictError too. `blobShas` maps each written path to its
+   * new blob SHA.
+   *
+   * GitHub refuses (404/403) a tree or ref that changes `.github/workflows/` unless the token has
+   * the `workflow` scope, which sign-in does not ask for. Then the commit is retried once without
+   * those files and they are listed in `skipped`, so the rest of the write still lands.
    */
   async commitFiles(
     owner: string,
     repo: string,
     branch: string,
-    files: Record<string, string>,
+    files: Record<string, string | Uint8Array | null>,
     message: string,
-  ) {
+    opts?: { expectedHeadSha?: string },
+  ): Promise<{ commitSha: string; blobShas: Record<string, string>; skipped?: string[] }> {
     const client = this.getClient();
-    const { data: refData } = await client.git.getRef({ owner, repo, ref: `heads/${branch}` });
+    const { data: refData } = await client.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+      ...noStore,
+    });
     const headSha = refData.object.sha;
+    if (opts?.expectedHeadSha !== undefined && opts.expectedHeadSha !== headSha) {
+      throw new ConflictError(`${branch} moved from ${opts.expectedHeadSha} to ${headSha}`);
+    }
     const { data: commitData } = await client.git.getCommit({
       owner,
       repo,
       commit_sha: headSha,
     });
-    const { data: newTree } = await client.git.createTree({
-      owner,
-      repo,
-      base_tree: commitData.tree.sha,
-      tree: Object.entries(files).map(([path, content]) => ({
-        path,
-        mode: '100644' as const,
-        type: 'blob' as const,
-        content,
-      })),
-    });
-    const { data: newCommit } = await client.git.createCommit({
-      owner,
-      repo,
-      message,
-      tree: newTree.sha,
-      parents: [headSha],
-    });
-    await client.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommit.sha });
+    // Binary content cannot travel as tree `content` (that is UTF-8 text), so it is uploaded as a
+    // blob first and referenced by sha. All blobs exist before the tree, so a failed upload leaves
+    // the branch untouched.
+    const entries = await Promise.all(
+      Object.entries(files).map(async ([path, content]) => {
+        const base = { path, mode: '100644' as const, type: 'blob' as const };
+        if (content === null) return { ...base, sha: null };
+        if (typeof content === 'string') return { ...base, content };
+        const { data: blob } = await client.git.createBlob({
+          owner,
+          repo,
+          content: bytesToBase64(content),
+          encoding: 'base64',
+        });
+        return { ...base, sha: blob.sha };
+      }),
+    );
+    const commitTree = async (tree: typeof entries): Promise<string> => {
+      const { data: newTree } = await client.git.createTree({
+        owner,
+        repo,
+        base_tree: commitData.tree.sha,
+        tree,
+      });
+      const { data: newCommit } = await client.git.createCommit({
+        owner,
+        repo,
+        message,
+        tree: newTree.sha,
+        parents: [headSha],
+      });
+      try {
+        await client.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommit.sha });
+      } catch (e) {
+        const status = (e as { status?: number }).status;
+        // 422 can also be another ref validation error; treating it as a conflict only costs a retry.
+        if (status === 409 || status === 422) {
+          throw new ConflictError(`${branch} moved while the commit was built`);
+        }
+        throw e;
+      }
+      return newCommit.sha;
+    };
+    let commitSha: string;
+    let skipped: string[] = [];
+    try {
+      commitSha = await commitTree(entries);
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      skipped = entries.filter((x) => isWorkflowPath(x.path)).map((x) => x.path);
+      if ((status !== 404 && status !== 403) || skipped.length === 0) throw e;
+      const rest = entries.filter((x) => !isWorkflowPath(x.path));
+      commitSha = rest.length > 0 ? await commitTree(rest) : headSha;
+    }
+    // createTree lists only top-level entries, so compute the blob SHAs locally.
+    const blobShas: Record<string, string> = {};
+    for (const [path, content] of Object.entries(files)) {
+      if (content !== null && !skipped.includes(path)) blobShas[path] = gitBlobSha(content);
+    }
+    return skipped.length > 0 ? { commitSha, blobShas, skipped } : { commitSha, blobShas };
   }
 
-  /** Create or update a file, fetching the current SHA automatically when needed. */
+  /**
+   * Create or update a file with a read-modify-write that survives concurrent writers.
+   * A string is the exact content wanted (generated files). A function receives the current
+   * remote content (`null` if absent) and returns the next one, so it can merge into what
+   * another device wrote. The PUT is skipped when nothing changes; on a 409/422 (the file moved
+   * under us) it re-reads and recomputes, up to 3 attempts.
+   */
   async upsertRepoFile(
     owner: string,
     repo: string,
     path: string,
-    content: string,
+    content: string | ((current: string | null) => string),
     message: string,
   ) {
-    let sha: string | undefined;
-    try {
-      const existing = await this.getFileContent(owner, repo, path);
-      sha = existing.sha;
-    } catch {
-      // File does not exist yet — create it
+    const attempts = 3;
+    for (let attempt = 1; ; attempt++) {
+      let current: string | null = null;
+      let sha: string | undefined;
+      try {
+        const existing = await this.getFileContent(owner, repo, path);
+        current = existing.content;
+        sha = existing.sha;
+      } catch (e) {
+        if ((e as { status?: number }).status !== 404) throw e;
+      }
+      const next = typeof content === 'function' ? content(current) : content;
+      if (sha !== undefined && next === current) return { content: { sha } };
+      try {
+        return await this.saveFile(owner, repo, path, next, message, sha);
+      } catch (e) {
+        const status = (e as { status?: number }).status;
+        if ((status !== 409 && status !== 422) || attempt >= attempts) throw e;
+      }
     }
-    return this.saveFile(owner, repo, path, content, message, sha);
   }
 
   async getActionsPublicKey(owner: string, repo: string): Promise<{ key_id: string; key: string }> {
@@ -331,3 +551,8 @@ export const githubService = new Proxy(realGithubService, {
       : value;
   },
 });
+
+/** Files GitHub only lets a token with the `workflow` scope create, change or delete. */
+function isWorkflowPath(path: string): boolean {
+  return path.startsWith('.github/workflows/');
+}

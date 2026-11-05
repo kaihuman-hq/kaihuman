@@ -4,41 +4,11 @@ import { CheckCircle2, Circle, Clock, ExternalLink, PlayCircle, XCircle } from '
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../../Atoms/Typography';
+import { ScopeToggle } from '../../Molecules/ScopeToggle';
+import { withBusinessFiles } from '../../scope-files';
+import { type BoardOverviewConfig, parseConfig, serializeConfig } from './board-overview-config';
 
-// ─── Config ───────────────────────────────────────────────────────────────────
-
-export interface BoardOverviewConfig {
-  showBacklog: boolean;
-  showInProgress: boolean;
-  showDone: boolean;
-  showRejected: boolean;
-  showOverdue: boolean;
-  overdueDays: number;
-  minAgeDays: number;
-}
-
-const DEFAULT_CONFIG: BoardOverviewConfig = {
-  showBacklog: true,
-  showInProgress: true,
-  showDone: false,
-  showRejected: false,
-  showOverdue: true,
-  overdueDays: 7,
-  minAgeDays: 0,
-};
-
-function parseConfig(raw: string): BoardOverviewConfig {
-  try {
-    const parsed = JSON.parse(raw || '{}');
-    return { ...DEFAULT_CONFIG, ...parsed };
-  } catch {
-    return { ...DEFAULT_CONFIG };
-  }
-}
-
-function serializeConfig(cfg: BoardOverviewConfig): string {
-  return JSON.stringify(cfg, null, 2);
-}
+export type { BoardOverviewConfig } from './board-overview-config';
 
 // ─── Column meta ──────────────────────────────────────────────────────────────
 
@@ -110,16 +80,15 @@ function useStats(cfg: BoardOverviewConfig) {
     if ((tree ?? []).some((t) => t.path === inboxPath) && !paths.includes(inboxPath)) {
       paths = [inboxPath, ...paths];
     }
-    return paths;
-  }, [remoteConfig, tree]);
+    return withBusinessFiles(paths, tree ?? [], '.todos.md', cfg.scope ?? 'all');
+  }, [remoteConfig, tree, cfg.scope]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tree is a trigger, not a read: a new remote sha must re-run the freshness check
   useEffect(() => {
     for (const path of todoFilePaths) {
-      if (!openFiles[path]) {
-        githubFileStore.openFile(path);
-      }
+      githubFileStore.ensureFresh(path);
     }
-  }, [todoFilePaths, openFiles]);
+  }, [todoFilePaths, tree]);
 
   const stats = useMemo(() => {
     const overdueCutoff = cfg.overdueDays * 24 * 60 * 60 * 1000;
@@ -290,6 +259,12 @@ const FocusView = ({
               />
             ))}
           </div>
+        </section>
+
+        {/* Scope */}
+        <section className="space-y-3">
+          <MonoLabel className="text-[var(--los-muted)] text-[10px] uppercase">Scope</MonoLabel>
+          <ScopeToggle value={localCfg.scope ?? 'all'} onChange={(v) => update({ scope: v })} />
         </section>
 
         {/* Overdue threshold */}

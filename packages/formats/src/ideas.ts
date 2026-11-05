@@ -47,9 +47,13 @@ export const ideaPath = (slug: IdeaSlug) => `${IDEAS_FOLDER}/${slug}.md`;
 export const ideaSlugOf = (path: string): IdeaSlug | null =>
   (IDEA_PATH.exec(path)?.[1] as IdeaSlug | undefined) ?? null;
 
-/** A slug from a title: words joined by `-`, cut at a word end so it stays readable. */
-export const slugifyIdeaTitle = (title: string): IdeaSlug => {
-  const words = title
+/**
+ * The shared slug rule for ideas, clients and projects: words joined by `-`, cut at a word end so
+ * it stays readable. Shorter than 2 characters means the text has no usable slug; callers decide
+ * what to do then.
+ */
+export const slugifyWords = (text: string): string => {
+  const words = text
     .normalize('NFKD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
@@ -62,6 +66,12 @@ export const slugifyIdeaTitle = (title: string): IdeaSlug => {
     slug = next;
   }
   if (!slug) slug = (words[0] ?? '').slice(0, SLUG_LENGTH);
+  return slug;
+};
+
+/** A slug from a title; a title without letters or digits becomes `idea`. */
+export const slugifyIdeaTitle = (title: string): IdeaSlug => {
+  const slug = slugifyWords(title);
   return (slug.length >= 2 ? slug : 'idea') as IdeaSlug;
 };
 

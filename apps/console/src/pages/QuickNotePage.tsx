@@ -29,8 +29,8 @@ export const QuickNotePage = () => {
     const folder = githubFileStore.appFolder.peek();
     const path = `${folder}/dump.md`;
     const existsInTree = githubFileStore.tree.peek().some((t) => t.path === path);
-    if (existsInTree && !githubFileStore.openFiles.peek()[path]) {
-      githubFileStore.openFile(path);
+    if (existsInTree) {
+      githubFileStore.ensureFresh(path);
     }
   }, [tree.length]);
 
@@ -145,7 +145,7 @@ export const QuickNotePage = () => {
         mode="NOTE"
         onDashboardClick={() => route('/')}
         onFilesClick={() => route('/')}
-        onBoardClick={() => route('/board')}
+        onBoardClick={() => route('/stream')}
       />
     </>
   );

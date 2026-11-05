@@ -11,14 +11,18 @@ import {
   type Issued,
   KEY_ORDER,
   type Party,
+  type Project,
 } from './records.js';
+import { nextRetainerDate } from './reminders.js';
 import { computeTotals } from './totals.js';
-import { validateDraft, validateTimeEntry } from './validate.js';
+import { validateDraft, validateProject, validateTimeEntry } from './validate.js';
 import { date, type Issue, type Result } from './validate-kit.js';
-import { stringifyYaml } from './yaml.js';
+import { editYaml, parseYaml, stringifyYaml } from './yaml.js';
 
-/** Repo-root path → new content; `null` deletes the file. */
-export type FileChanges = Record<string, string | null>;
+/** Repo-root path → new text; `null` deletes the file. What every text-only action produces. */
+export type TextChanges = Record<string, string | null>;
+/** As {@link TextChanges}, plus raw bytes (a receipt, a contract PDF) that must not be read as text. */
+export type FileChanges = Record<string, string | Uint8Array | null>;
 
 export type IssueContext = {
   draft: Draft;
@@ -37,6 +41,12 @@ export type IssueContext = {
   /** Current `log.actionlog.md` of the client, or null when there is none yet. */
   clientLog: string | null;
   now: Date;
+  /**
+   * The draft's project as it is now, record and file text. A retainer invoice (`from_retainer`)
+   * advances its `next_date` in the same commit, but only while it still equals `from_retainer`:
+   * a stale second draft for the same period must not skip a period.
+   */
+  project?: { value: Project; text: string };
 };
 
 const problem = (path: string, message: string): Issue => ({
@@ -50,8 +60,36 @@ const addDays = (date: string, days: number): string => {
   return d.toISOString().slice(0, 10);
 };
 
-const without = <T extends object>(value: T, key: string): Omit<T, never> =>
-  Object.fromEntries(Object.entries(value).filter(([k]) => k !== key)) as T;
+const without = <T extends object>(value: T, ...keys: string[]): Omit<T, never> =>
+  Object.fromEntries(Object.entries(value).filter(([k]) => !keys.includes(k))) as T;
+
+/**
+ * The project file with the retainer moved to its next period, or nothing when the draft is not
+ * an invoice for the period the project is at now. Only `next_date` changes in the file's text.
+ */
+const advanceRetainer = (draft: Draft, project: IssueContext['project']): Result<TextChanges> => {
+  const retainer = project?.value.retainer;
+  if (
+    !project ||
+    !retainer ||
+    draft.kind !== 'invoice' ||
+    draft.from_retainer === undefined ||
+    project.value.client !== draft.client ||
+    project.value.slug !== draft.project ||
+    retainer.next_date !== draft.from_retainer
+  ) {
+    return { ok: true, value: {} };
+  }
+  const { client, slug } = project.value;
+  const edited = editYaml(project.text, [
+    { path: ['retainer', 'next_date'], value: nextRetainerDate(retainer) },
+  ]);
+  if (!edited.ok) return edited;
+  const parsed = parseYaml(edited.value);
+  const checked = parsed.ok ? validateProject(parsed.value, slug, client) : parsed;
+  if (!checked.ok) return checked;
+  return { ok: true, value: { [`${clientDir(client)}/projects/${slug}.yaml`]: edited.value } };
+};
 
 const seller = (p: BusinessProfile): Party => ({
   name: p.name,
@@ -88,7 +126,7 @@ const billTimeEntries = (
   draft: Draft,
   number: string,
   timeFiles: Readonly<Record<string, string>>,
-): { changes: FileChanges; issues: Issue[] } => {
+): { changes: TextChanges; issues: Issue[] } => {
   const ids = draft.time_entries ?? [];
   const found = new Map<string, { file: string; invoice: string | undefined; client: string }>();
   for (const [file, text] of Object.entries(timeFiles)) {
@@ -113,7 +151,7 @@ const billTimeEntries = (
       );
     }
   });
-  const changes: FileChanges = {};
+  const changes: TextChanges = {};
   for (const file of new Set([...found.values()].map((e) => e.file))) {
     const text = timeFiles[file] as string;
     const next = replaceJsonlLines(
@@ -142,7 +180,7 @@ const logText = (draft: Draft, number: string, gross: number, currency: string):
  */
 export const issue = (
   ctx: IssueContext,
-): Result<{ document: Issued; changes: FileChanges; commitMessage: string }> => {
+): Result<{ document: Issued; changes: TextChanges; commitMessage: string }> => {
   const { draft, profile, client, issueDate } = ctx;
   const rules = jurisdictionFor(profile.jurisdiction);
   const issues: Issue[] = [];
@@ -182,6 +220,8 @@ export const issue = (
     issues.push(problem('number', `${number} already exists; check numbering in business.yaml`));
   const billed = billTimeEntries(draft, number, ctx.timeFiles);
   issues.push(...billed.issues);
+  const advanced = advanceRetainer(draft, ctx.project);
+  if (!advanced.ok) issues.push(...advanced.issues.map((i) => problem('project', i.message)));
   if (issues.length > 0) return { ok: false, issues };
 
   const currency = draft.currency ?? client.currency ?? profile.currency;
@@ -189,7 +229,7 @@ export const issue = (
   const terms = draft.payment_terms_days ?? client.payment_terms_days ?? profile.payment_terms_days;
   const totals = computeTotals(draft.lines, rules.exemptionReasons(profile));
   const document: Issued = {
-    ...(without(draft, 'id') as Omit<Draft, 'id'>),
+    ...(without(draft, 'id', 'from_retainer') as Omit<Draft, 'id' | 'from_retainer'>),
     currency,
     language: draft.language ?? client.language ?? profile.language,
     number,
@@ -229,10 +269,11 @@ export const issue = (
     ctx.clientLog === null
       ? `${serializeActionLog(added)}\n`
       : `${ctx.clientLog}${ctx.clientLog === '' || ctx.clientLog.endsWith('\n') ? '' : '\n'}${line}`;
-  const changes: FileChanges = {
+  const changes: TextChanges = {
     [issuedPath(series, year, number)]: stringifyYaml(document, KEY_ORDER.issued),
     [draftPath(draft.id)]: null,
     ...billed.changes,
+    ...(advanced.ok ? advanced.value : {}),
     [logPath]: logContent,
   };
   return {

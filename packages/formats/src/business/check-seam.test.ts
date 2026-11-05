@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { type Change, checkBusinessRepo } from './check.js';
 import { loadFixtureRepo } from './fixture-repo.test-helper.js';
 import type { Ulid } from './ids.js';
-import { type FileChanges, issue } from './issue.js';
+import { issue, type TextChanges } from './issue.js';
 import { draftPath } from './paths.js';
 import { type BusinessProfile, type Client, type Draft, KEY_ORDER } from './records.js';
 import { validateClient, validateDraft, validateProfile } from './validate.js';
@@ -61,7 +61,7 @@ describe('scaffold layout', () => {
 /** Applies `issue()`'s changes the way a commit would and lists them as git name-status. */
 const commit = (
   files: ReadonlyMap<string, string>,
-  changes: FileChanges,
+  changes: TextChanges,
 ): { files: Map<string, string>; changes: Change[] } => {
   const next = new Map(files);
   const list: Change[] = [];

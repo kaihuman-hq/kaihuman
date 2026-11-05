@@ -139,9 +139,7 @@ export const GraphView = ({ onNavigate }: { onNavigate: (path: string) => void }
       if (file) {
         try {
           // Check if already loaded
-          if (!openFiles[file.path]) {
-            await githubFileStore.openFile(file.path);
-          }
+          await githubFileStore.ensureFresh(file.path);
         } catch (e) {
           logger.warn('Failed to analyze', file.path, e);
         }

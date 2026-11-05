@@ -4,7 +4,7 @@
 
 pnpm + Turborepo monorepo, TypeScript strict, Biome for lint and format.
 - `apps/console`: the main app ("Life OS"). Preact + `@preact/signals`, Tailwind, `@cascivo/*` components (React aliased to `preact/compat` in `vite.config.ts`).
-- Other apps: `auth-worker` (Cloudflare Worker, GitHub sign-in), `kb-mcp` (MCP server for a `.kh` knowledge base), `browser-extension` (Preact), `desktop-palette` (Tauri), `cli` (Rust, cargo), `kh-capture-native`, `landing-page` and `landing-page-nextgen` (Astro).
+- Other apps: `auth-worker` (Cloudflare Worker, GitHub sign-in), `share-worker` (Cloudflare Worker, encrypted share links), `kb-mcp` (MCP server for a `.kh` knowledge base), `browser-extension` (Preact), `desktop-palette` (Tauri), `cli` (Rust, cargo), `kh-capture-native`, `landing-page` and `landing-page-nextgen` (Astro).
 - `packages/`: `core`, `formats`, `palette`, `ui` (Preact components + Storybook), `config` (shared tsconfig/Biome/Tailwind), `docspack` (this repo's docs as a docspack package).
 
 ## Commands

@@ -11,6 +11,7 @@ A personal life-OS built on GitHub — notes, dashboards, habits, and tasks, all
 | `apps/browser-extension` | Preact + CRXJS | Browser extension |
 | `apps/kb-mcp` | Node + MCP SDK | MCP server over the `.kh/` knowledge base and ideas |
 | `apps/mobile` | Expo + React Native | iOS and Android app with home-screen Todo widgets ([design](doc/mobile.md)) |
+| `apps/share-worker` | Cloudflare Worker | Stores encrypted business documents for share links; cannot read them ([setup](apps/share-worker/README.md)) |
 | `apps/auth-worker` | Cloudflare Worker | GitHub sign-in for the console; stores no tokens ([setup](apps/auth-worker/README.md)) |
 
 ## Mobile (`apps/mobile`)

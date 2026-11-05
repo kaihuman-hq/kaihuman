@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { asSlug, type Ulid } from './ids.js';
 import {
+  ATTACHMENT_MAX_BYTES,
   BUSINESS_ROOT,
+  CONTRACT_EXTENSIONS,
   classifyBusinessPath,
   clientDir,
+  contractFilePath,
+  contractPath,
   draftPath,
+  expensePath,
   issuedPath,
+  LINKS_PATH,
   paymentsPath,
+  RECEIPT_EXTENSIONS,
+  receiptPath,
   timePath,
 } from './paths.js';
 
@@ -14,6 +22,10 @@ const id = '01M50ARQ007CHPV05AFMSY38DJ' as Ulid;
 const b = (p: string) => classifyBusinessPath(`${BUSINESS_ROOT}/${p}`);
 
 describe('classifyBusinessPath', () => {
+  it('classifies LINKS_PATH as the links file', () => {
+    expect(classifyBusinessPath(LINKS_PATH)).toEqual({ kind: 'links' });
+  });
+
   it('classifies issued documents and their artifacts', () => {
     expect(b('invoices/2026/RE-2026-0001.yaml')).toEqual({
       kind: 'issued',
@@ -76,6 +88,7 @@ describe('classifyBusinessPath', () => {
     expect(b(`drafts/${id}.yaml`)).toEqual({ kind: 'draft', id });
     expect(b('time/2026-10.jsonl')).toEqual({ kind: 'time', month: '2026-10' });
     expect(b('time/2026-13.jsonl').kind).toBe('unknown');
+    expect(b('time/running.yaml')).toEqual({ kind: 'timer' });
     expect(b('payments/2026.jsonl')).toEqual({ kind: 'payments', year: 2026 });
     expect(b('events.jsonl')).toEqual({ kind: 'events' });
     expect(b('links.jsonl')).toEqual({ kind: 'links' });
@@ -115,5 +128,22 @@ describe('path builders', () => {
     const slug = asSlug('acme-gmbh');
     if (!slug) throw new Error('slug');
     expect(clientDir(slug)).toBe('.kh/business/clients/acme-gmbh');
+  });
+});
+
+describe('expense and contract paths', () => {
+  it('builds expense, receipt, contract and contract file paths', () => {
+    const acme = asSlug('acme-gmbh');
+    if (!acme) throw new Error('slug');
+    expect(expensePath('2026', id)).toBe(`${BUSINESS_ROOT}/expenses/2026/${id}.yaml`);
+    expect(receiptPath('2026', id, 'PNG')).toBe(`${BUSINESS_ROOT}/expenses/2026/${id}.png`);
+    expect(contractPath(acme, id)).toBe(`${BUSINESS_ROOT}/clients/acme-gmbh/contracts/${id}.yaml`);
+    expect(contractFilePath(acme, id)).toBe(
+      `${BUSINESS_ROOT}/clients/acme-gmbh/contracts/${id}.pdf`,
+    );
+    expect(b(`expenses/2026/${id}.yaml`)).toEqual({ kind: 'expense', year: 2026, id });
+    expect(ATTACHMENT_MAX_BYTES).toBe(10485760);
+    expect(RECEIPT_EXTENSIONS).toEqual(['pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic']);
+    expect(CONTRACT_EXTENSIONS).toEqual(['pdf']);
   });
 });

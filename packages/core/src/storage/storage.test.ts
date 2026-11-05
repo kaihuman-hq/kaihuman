@@ -71,4 +71,19 @@ describe('CoreStorageAdapter', () => {
     expect(save).toHaveBeenCalledWith('me', 'kb', 'a.md', 'two', expect.any(String), 's0');
     save.mockRestore();
   });
+
+  it('round-trips dirty and baseContent on file records', async () => {
+    const rec = {
+      path: 'me/kb:a.md',
+      content: 'local',
+      sha: 's1',
+      timestamp: 1,
+      dirty: true,
+      baseContent: 'base',
+    };
+    await adapter.putRecord('files', rec.path, rec);
+    expect(await adapter.getRecord('files', rec.path)).toEqual(rec);
+    expect(await adapter.listRecords('files')).toEqual([rec]);
+    expect(await adapter.listRecords('trees')).toEqual([]);
+  });
 });

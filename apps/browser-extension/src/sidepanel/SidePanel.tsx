@@ -13,6 +13,7 @@ import { RelatedPicker } from './RelatedPicker.js';
 import { ReviewDraft } from './ReviewDraft.js';
 import { StreamSection } from './StreamSection.js';
 import { ThisTabBar } from './ThisTabBar.js';
+import { TodoBoard } from './TodoBoard.js';
 import { useInboxLabels } from './useInboxLabels.js';
 import { useAutoFileInbox } from './useSuggestion.js';
 import { updateWorkUi, useWorkState } from './useWorkState.js';
@@ -369,6 +370,7 @@ export function SidePanel() {
                 />
               </div>
             )}
+            <TodoBoard />
             <Streams
               state={state}
               unread={unread}

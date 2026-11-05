@@ -51,7 +51,7 @@ function committed(): Record<string, string> {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(githubService.commitFiles).mockResolvedValue(undefined);
+  vi.mocked(githubService.commitFiles).mockResolvedValue({ commitSha: 'c', blobShas: {} });
 });
 
 describe('enableBusiness', () => {
@@ -65,6 +65,23 @@ describe('enableBusiness', () => {
     givenRepo({ private: true }, { '.kh/business/business.yaml': 'x' });
     await expect(enableBusiness(repo, profile)).rejects.toBeInstanceOf(AlreadyEnabledError);
     expect(githubService.commitFiles).not.toHaveBeenCalled();
+  });
+
+  it('returns the workflow GitHub refused, with its content, for adding by hand', async () => {
+    givenRepo({ private: true }, {});
+    const path = '.github/workflows/business-check.yml';
+    vi.mocked(githubService.commitFiles).mockResolvedValue({
+      commitSha: 'c',
+      blobShas: {},
+      skipped: [path],
+    });
+    const res = await enableBusiness(repo, profile);
+    expect(res.skipped).toEqual({ [path]: getBusinessToolFiles()[path] });
+  });
+
+  it('reports nothing skipped when the whole skeleton was committed', async () => {
+    givenRepo({ private: true }, {});
+    expect(await enableBusiness(repo, profile)).toEqual({ skipped: {} });
   });
 
   it('commits the whole skeleton once, with a profile that validates', async () => {
@@ -86,6 +103,8 @@ describe('enableBusiness', () => {
         '.kh/business/invoices/.gitkeep',
       ]),
     );
+    // Bumped with the kb-mcp business tools skill section so syncKB refreshes existing repos.
+    expect(BUSINESS_TOOLS_VERSION).toBe('1.4.0');
     expect(files['.kh/business/.tools/version']).toBe(BUSINESS_TOOLS_VERSION);
     const parsed = parseYaml(files['.kh/business/business.yaml'] as string);
     expect(parsed.ok && validateProfile(parsed.value).ok).toBe(true);

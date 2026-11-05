@@ -23,6 +23,10 @@ export class InMemoryStorageAdapter implements CoreStorageAdapter {
   async deleteRecord(store: RecordStore, key: string): Promise<void> {
     this.records.delete(`${store}\u0000${key}`);
   }
+  async listRecords<T>(store: RecordStore): Promise<T[]> {
+    const prefix = `${store}\u0000`;
+    return [...this.records].filter(([k]) => k.startsWith(prefix)).map(([, v]) => v as T);
+  }
   async listPendingMutations(): Promise<PendingMutation[]> {
     return [...this.mutations.values()].sort((a, b) => a.timestamp - b.timestamp);
   }

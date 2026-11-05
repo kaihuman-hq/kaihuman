@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clientLinkSlug,
   findBacklinks,
   linkifyWikilinks,
   parseFrontmatter,
@@ -85,5 +86,37 @@ describe('findBacklinks', () => {
       '.kh/wiki/anki.md',
       '.kh/wiki/memory.md',
     ]);
+  });
+});
+
+describe('client links', () => {
+  it('reads the slug of a client: target, ignoring label and heading', () => {
+    expect(clientLinkSlug('client:acme-gmbh')).toBe('acme-gmbh');
+    expect(clientLinkSlug('client:acme-gmbh|Acme')).toBe('acme-gmbh');
+    expect(clientLinkSlug('client:acme-gmbh#Offers')).toBe('acme-gmbh');
+    expect(clientLinkSlug('acme-gmbh')).toBeNull();
+  });
+
+  it('rejects invalid client slugs', () => {
+    for (const bad of [
+      'client:',
+      'client:Acme',
+      'client:a',
+      'client:-acme',
+      'client:a b',
+      'client:../x',
+    ]) {
+      expect(clientLinkSlug(bad)).toBeNull();
+    }
+  });
+
+  it('never resolves a client: target to a page, even one titled "client"', () => {
+    expect(
+      resolveWikilink('client:acme-gmbh', ['client.md'], { 'client.md': 'client' }, 'x.md'),
+    ).toBeNull();
+  });
+
+  it('linkifies client links with an encoded wiki: href', () => {
+    expect(linkifyWikilinks('see [[client:acme-gmbh|Acme]]')).toContain('(wiki:client%3Aacme-gmbh');
   });
 });

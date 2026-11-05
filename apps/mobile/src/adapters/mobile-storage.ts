@@ -94,6 +94,13 @@ export class MobileStorageAdapter implements CoreStorageAdapter {
     else await this.fallback.deleteRecord(store, key);
   }
 
+  async listRecords<T = unknown>(store: RecordStore): Promise<T[]> {
+    if (store === 'auth' && this.drivers.secure) return [];
+    return this.drivers.records
+      ? this.drivers.records.list<T>(store)
+      : this.fallback.listRecords<T>(store);
+  }
+
   async listPendingMutations(): Promise<PendingMutation[]> {
     if (!this.drivers.records) return this.fallback.listPendingMutations();
     const all = await this.drivers.records.list<PendingMutation>('mutations');

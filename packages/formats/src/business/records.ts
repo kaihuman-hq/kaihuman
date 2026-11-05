@@ -15,6 +15,8 @@ export type BusinessProfile = {
   bank: { iban: string; bic?: string; account_holder?: string };
   jurisdiction: Jurisdiction;
   vat_regime: 'regular' | 'small-business';
+  /** Missing means `accrual` (Soll): output VAT by issue date. `cash` (Ist) counts it when paid. */
+  vat_basis?: 'accrual' | 'cash';
   currency: string;
   language: 'de' | 'en';
   payment_terms_days: number;
@@ -108,6 +110,8 @@ export type Draft = {
   corrects?: string;
   buyer_reference?: string;
   time_entries?: Ulid[];
+  /** Retainer drafts only: the `next_date` the draft bills; issuing advances it once. Not issued. */
+  from_retainer?: string;
 };
 
 export type Party = {
@@ -134,7 +138,7 @@ export type Totals = {
   }[];
 };
 
-export type Issued = Omit<Draft, 'id'> & {
+export type Issued = Omit<Draft, 'id' | 'from_retainer'> & {
   number: string;
   draft_id: Ulid;
   /** Offers have no EN 16931 type code. */
@@ -158,6 +162,15 @@ export type TimeEntry = {
   project?: Slug;
   note: string;
   invoice?: string;
+};
+
+/** The one running timer (`time/running.yaml`); stopping turns it into a `TimeEntry`. */
+export type RunningTimer = {
+  client: Slug;
+  project?: Slug;
+  /** ISO 8601 datetime with an explicit offset, as written. */
+  started_at: string;
+  note?: string;
 };
 
 export type Payment = {
@@ -211,6 +224,7 @@ export type RecordKind =
   | 'draft'
   | 'issued'
   | 'time'
+  | 'timer'
   | 'payment'
   | 'event'
   | 'link'
@@ -265,6 +279,7 @@ export const KEY_ORDER: Record<RecordKind, readonly string[]> = {
     'bank',
     'jurisdiction',
     'vat_regime',
+    'vat_basis',
     'currency',
     'language',
     'payment_terms_days',
@@ -307,7 +322,7 @@ export const KEY_ORDER: Record<RecordKind, readonly string[]> = {
     'renewal_date',
     'file',
   ],
-  draft: ['id', ...DRAFT_BODY_KEYS],
+  draft: ['id', ...DRAFT_BODY_KEYS, 'from_retainer'],
   issued: [
     'number',
     'draft_id',
@@ -324,6 +339,7 @@ export const KEY_ORDER: Record<RecordKind, readonly string[]> = {
     'retain_until',
   ],
   time: ['id', 'date', 'minutes', 'client', 'project', 'note', 'invoice'],
+  timer: ['client', 'project', 'started_at', 'note'],
   payment: ['id', 'date', 'invoice', 'amount', 'method', 'ref'],
   event: ['id', 'at', 'doc', 'type', 'note'],
   link: ['id', 'doc', 'url', 'created', 'expires', 'revoked'],

@@ -254,6 +254,30 @@ export interface PaletteProtocol {
    * with its console link. Backends refuse any path `isKnowledgePath` does not allow.
    */
   CAPTURE_KNOWLEDGE: { request: { path: string; content: string }; response: { url: string } };
+  /**
+   * The business files a client target needs — those `isCaptureContextPath` allows, raw — or none
+   * when the repository has no `.kh/business/business.yaml` (business is not set up).
+   */
+  READ_BUSINESS_CONTEXT: {
+    request: NoFields;
+    response: { files: { path: string; content: string }[] };
+  };
+  /**
+   * One file a capture writes and the version read; `content` is null when it is not there.
+   * Backends refuse any path `isCaptureWritePath` does not allow.
+   */
+  READ_BUSINESS_FILE: {
+    request: { path: string };
+    response: { content: string | null; sha?: string };
+  };
+  /**
+   * Writes it in one commit with `message`: over the version `sha` names, or without one only as a
+   * new file, so a change made since the read fails. Same paths as `READ_BUSINESS_FILE`.
+   */
+  WRITE_BUSINESS_FILE: {
+    request: { path: string; content: string; message: string; sha?: string };
+    response: NoFields;
+  };
   /** Every idea in `IDEAS_FOLDER` (`.kh/ideas/<slug>.md`); none when the folder is not there. */
   LIST_IDEAS: { request: NoFields; response: { ideas: IdeaFile[] } };
   /**

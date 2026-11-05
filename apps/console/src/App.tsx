@@ -4,22 +4,40 @@ import { NotFound } from '@kaihuman/ui';
 import { Route, Router, route } from 'preact-router';
 import { DemoBanner } from './components/DemoBanner';
 import { ExtensionAuthBridge } from './components/ExtensionAuthBridge';
+import { noticeAfterRoute } from './lib/business/notice';
 import { ActionLogViewPage } from './pages/ActionLogViewPage';
 import { AuthCli } from './pages/AuthCli';
+import { BusinessEnablePage } from './pages/BusinessEnablePage';
+import { BusinessPage } from './pages/BusinessPage';
 import { CheatsheetPage } from './pages/CheatsheetPage';
+import { ClientFormPage } from './pages/ClientFormPage';
+import { ClientPage } from './pages/ClientPage';
+import { ClientsPage } from './pages/ClientsPage';
+import { ContractFormPage } from './pages/ContractFormPage';
 import { Dashboard } from './pages/Dashboard';
 import { DemoEntry } from './pages/DemoEntry';
+import { DraftPage } from './pages/DraftPage';
+import { ExpenseFormPage } from './pages/ExpenseFormPage';
+import { ExpensesPage } from './pages/ExpensesPage';
 import { ExtensionSuccess } from './pages/ExtensionSuccess';
 import { IdeasPage } from './pages/IdeasPage';
+import { InvoicesPage } from './pages/InvoicesPage';
+import { IssuePage } from './pages/IssuePage';
 import { KanbanBoardPage } from './pages/KanbanBoardPage';
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage';
+import { LogTimePage } from './pages/LogTimePage';
 import { Login } from './pages/login';
+import { PaymentFormPage } from './pages/PaymentFormPage';
+import { PipelinePage } from './pages/PipelinePage';
+import { ProjectFormPage } from './pages/ProjectFormPage';
 import { QuickIdeaPage } from './pages/QuickIdeaPage';
 import { QuickKnowledgePage } from './pages/QuickKnowledgePage';
 import { QuickLogPage } from './pages/QuickLogPage';
 import { QuickNotePage } from './pages/QuickNotePage';
 import { QuickTodoPage } from './pages/QuickTodoPage';
+import { SharedPage } from './pages/SharedPage';
 import { ShortcutsPage } from './pages/ShortcutsPage';
+import { StreamsBoardPage } from './pages/StreamsBoardPage';
 import { TodoAnalyticsPage } from './pages/TodoAnalyticsPage';
 import { WikiPage } from './pages/WikiPage';
 
@@ -59,13 +77,15 @@ export const App = () => {
     >
       <ExtensionAuthBridge />
       <DemoBanner />
-      <Router>
+      <Router onChange={(e) => noticeAfterRoute(e.url)}>
         <Route path="/login" component={Login} />
         <Route path="/demo" component={DemoEntry} />
         <Route path="/auth/cli" component={AuthCli} />
         <ProtectedRoute path="/extension-onboarded" component={ExtensionSuccess} />
         <ProtectedRoute path="/" component={Dashboard} />
         <ProtectedRoute path="/board" component={KanbanBoardPage} />
+        <ProtectedRoute path="/stream" component={StreamsBoardPage} />
+        <ProtectedRoute path="/streams" component={StreamsBoardPage} />
         <ProtectedRoute path="/analytics" component={TodoAnalyticsPage} />
         <ProtectedRoute path="/action-log" component={ActionLogViewPage} />
         <ProtectedRoute path="/quick-todo" component={QuickTodoPage} />
@@ -78,6 +98,25 @@ export const App = () => {
         <ProtectedRoute path="/cheatsheet" component={CheatsheetPage} />
         <ProtectedRoute path="/knowledge" component={KnowledgeBasePage} />
         <ProtectedRoute path="/wiki" component={WikiPage} />
+        <ProtectedRoute path="/business" component={BusinessPage} />
+        <ProtectedRoute path="/clients" component={ClientsPage} />
+        <ProtectedRoute path="/clients/new" component={ClientFormPage} />
+        <ProtectedRoute path="/clients/:slug" component={ClientPage} />
+        <ProtectedRoute path="/clients/:slug/projects/new" component={ProjectFormPage} />
+        <ProtectedRoute path="/clients/:slug/contracts/new" component={ContractFormPage} />
+        <ProtectedRoute path="/clients/:slug/contracts/:id" component={ContractFormPage} />
+        <ProtectedRoute path="/business/pipeline" component={PipelinePage} />
+        <ProtectedRoute path="/business/invoices" component={InvoicesPage} />
+        <ProtectedRoute path="/business/shared" component={SharedPage} />
+        <ProtectedRoute path="/business/enable" component={BusinessEnablePage} />
+        <ProtectedRoute path="/business/time/new" component={LogTimePage} />
+        <ProtectedRoute path="/business/payments/new" component={PaymentFormPage} />
+        <ProtectedRoute path="/business/expenses" component={ExpensesPage} />
+        <ProtectedRoute path="/business/expenses/new" component={ExpenseFormPage} />
+        <ProtectedRoute path="/business/expenses/:id" component={ExpenseFormPage} />
+        <ProtectedRoute path="/business/drafts/new" component={DraftPage} />
+        <ProtectedRoute path="/business/drafts/:id" component={DraftPage} />
+        <ProtectedRoute path="/business/drafts/:id/issue" component={IssuePage} />
         <ProtectedRoute path="/files" component={Dashboard} />
         <ProtectedRoute path="/files/:rest*" component={Dashboard} />
         <ProtectedRoute path="/new" component={Dashboard} />
