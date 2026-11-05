@@ -77,7 +77,7 @@ describe('PipelinePage', () => {
       'Offer sent (0)',
       'Active (1)',
     ]);
-    const card = host.querySelector('li') as HTMLElement;
+    const card = host.querySelector('li:not(nav li)') as HTMLElement;
     expect(card.querySelector('a')?.getAttribute('href')).toBe('/clients/acme-gmbh');
     expect(card.querySelector('a')?.textContent).toBe('Acme GmbH');
     expect(card.textContent).toContain('Open 1001.38 EUR');
@@ -196,6 +196,6 @@ describe('PipelinePage', () => {
     expect(host.querySelector('select')).toBeNull();
     expect(host.querySelector('li button')).toBeNull();
     expect(host.textContent).toContain('not available in demo mode');
-    expect(host.querySelector('li a')?.textContent).toBe('Acme GmbH');
+    expect(host.querySelector('li:not(nav li) a')?.textContent).toBe('Acme GmbH');
   });
 });

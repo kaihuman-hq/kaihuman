@@ -3,6 +3,8 @@ import { StatusBar } from '@kaihuman/ui';
 import type { ComponentChildren } from 'preact';
 import { useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { PRIMARY } from '../components/business/buttons';
+import { INPUT } from '../components/business/FormField';
 import {
   canSubmit,
   EMPTY_FORM,
@@ -14,9 +16,6 @@ import {
 import { AlreadyEnabledError, PublicRepoError } from '../lib/business/errors';
 import { BUSINESS_PROFILE_PATH } from '../lib/business/load';
 import { syncKB } from '../lib/github-kb';
-
-const INPUT =
-  'w-full bg-transparent border border-[var(--los-border)] rounded px-2 py-1.5 text-sm text-[var(--los-fg)] placeholder:text-[var(--los-fg-dim)] focus:outline-none focus:border-[var(--los-accent)] disabled:opacity-50';
 
 const CONFIRMATIONS = [
   {
@@ -355,11 +354,7 @@ export function BusinessEnablePage() {
             ))}
           </fieldset>
 
-          <button
-            type="submit"
-            disabled={disabled || !canSubmit(form)}
-            class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50"
-          >
+          <button type="submit" disabled={disabled || !canSubmit(form)} class={PRIMARY}>
             {busy ? 'Setting up...' : 'Enable business'}
           </button>
           {error && (

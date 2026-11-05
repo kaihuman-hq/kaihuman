@@ -10,6 +10,7 @@ import {
 } from '@kaihuman/formats/business';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { PRIMARY, SECONDARY } from '../components/business/buttons';
 import { a11y, Field, INPUT } from '../components/business/FormField';
 import { PageShell } from '../components/business/PageShell';
 import { todayLocal } from '../lib/business/dates';
@@ -33,8 +34,6 @@ import type { KBRepo } from '../lib/github-kb';
 
 const LIST = '/business/expenses';
 const ACCEPT = RECEIPT_EXTENSIONS.map((e) => `.${e}`).join(',');
-const BUTTON =
-  'px-4 py-2 text-sm rounded disabled:opacity-50 border border-[var(--los-border)] hover:opacity-90';
 
 function ExpenseEditor(props: {
   target: KBRepo;
@@ -309,18 +308,14 @@ function ExpenseEditor(props: {
           </p>
         )}
         <div class="flex flex-wrap gap-2">
-          <button
-            type="submit"
-            disabled={locked}
-            class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50"
-          >
+          <button type="submit" disabled={locked} class={PRIMARY}>
             {busy ? 'Saving...' : 'Save expense'}
           </button>
-          <a href={LIST} class={BUTTON}>
+          <a href={LIST} class={SECONDARY}>
             Cancel
           </a>
           {existing && !confirmDelete && (
-            <button type="button" class={BUTTON} onClick={() => setConfirmDelete(true)}>
+            <button type="button" class={SECONDARY} onClick={() => setConfirmDelete(true)}>
               Delete
             </button>
           )}
@@ -333,13 +328,13 @@ function ExpenseEditor(props: {
             {inRetention
               ? `This record must be kept until ${keepUntil} (retention). Delete anyway?`
               : 'Delete this expense? This cannot be undone.'}
-            <button type="button" class={BUTTON} onClick={remove}>
+            <button type="button" class={SECONDARY} onClick={remove}>
               Yes, delete expense
             </button>
             <button
               ref={keepRef}
               type="button"
-              class={BUTTON}
+              class={SECONDARY}
               onClick={() => setConfirmDelete(false)}
             >
               Keep it

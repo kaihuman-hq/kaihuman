@@ -375,7 +375,7 @@ function ExpensesBody(props: { target: KBRepo; data: Parameters<typeof vatSummar
 export function ExpensesPage() {
   const state = useBusinessRepo();
   return (
-    <PageShell state={state} title="Expenses">
+    <PageShell state={state} title="Expenses" section="/business/expenses">
       {({ repo, data, loadErrors }) => (
         <>
           <ExpensesBody target={repo} data={data} />

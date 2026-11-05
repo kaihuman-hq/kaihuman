@@ -173,3 +173,16 @@
     40px 40px;
   background-position: center, center, center;
 }
+
+/* Tokens derived from each theme. Pages used them before any theme defined them, so warnings
+   and dimmed text silently fell back to the plain foreground colour. */
+:root,
+[data-theme] {
+  --los-fg-dim: color-mix(in srgb, var(--los-fg) 70%, transparent);
+  --los-warning: #f59e0b;
+  --los-success: var(--los-accent);
+}
+
+[data-theme="light"] {
+  --los-warning: #b45309;
+}

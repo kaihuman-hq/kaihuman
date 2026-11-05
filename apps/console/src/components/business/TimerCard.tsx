@@ -3,14 +3,10 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { useBusinessRepo } from '../../lib/business/use-business-repo';
 import { writeBusiness, writeErrorMessage } from '../../lib/business/write';
+import { PRIMARY_MD, SECONDARY_MD } from './buttons';
 import { Card } from './Card';
+import { INPUT } from './FormField';
 
-const INPUT =
-  'w-full bg-transparent border border-[var(--los-border)] rounded px-2 py-1.5 text-sm text-[var(--los-fg)] placeholder:text-[var(--los-fg-dim)] focus:outline-none focus:border-[var(--los-accent)] disabled:opacity-50';
-const BUTTON =
-  'px-3 py-1.5 text-sm font-bold rounded border border-[var(--los-border)] text-[var(--los-fg)] hover:opacity-90 disabled:opacity-50';
-const PRIMARY =
-  'px-3 py-1.5 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50';
 const TICK_MS = 30_000;
 
 /** `H:MM` since `startedAt`; a clock set back never shows a negative time. */
@@ -89,12 +85,12 @@ export function TimerCard({ client }: { client?: Slug }) {
         {confirming ? (
           <div class="mt-2 flex flex-wrap items-center gap-2">
             <span class="text-xs">Discard this timer without logging time?</span>
-            <button type="button" class={BUTTON} disabled={busy} onClick={cancel}>
+            <button type="button" class={SECONDARY_MD} disabled={busy} onClick={cancel}>
               Yes, cancel timer
             </button>
             <button
               type="button"
-              class={BUTTON}
+              class={SECONDARY_MD}
               disabled={busy}
               onClick={() => setConfirming(false)}
             >
@@ -105,12 +101,12 @@ export function TimerCard({ client }: { client?: Slug }) {
           <div class="mt-2 flex gap-2">
             <button
               type="button"
-              class={PRIMARY}
+              class={PRIMARY_MD}
               onClick={() => route('/business/time/new?from=timer')}
             >
               Stop…
             </button>
-            <button type="button" class={BUTTON} onClick={() => setConfirming(true)}>
+            <button type="button" class={SECONDARY_MD} onClick={() => setConfirming(true)}>
               Cancel
             </button>
           </div>
@@ -195,7 +191,7 @@ export function TimerCard({ client }: { client?: Slug }) {
             onInput={(e) => setNote((e.target as HTMLInputElement).value)}
           />
         </div>
-        <button type="submit" class={PRIMARY} disabled={busy || !chosen}>
+        <button type="submit" class={PRIMARY_MD} disabled={busy || !chosen}>
           {busy ? 'Starting...' : 'Start'}
         </button>
       </form>

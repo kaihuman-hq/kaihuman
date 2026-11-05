@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-05 — Business dashboard redesign and shared business button styles
+
+- Reuse audit: Business already shares the todo and action-log formats; its time entries (`.kh/business/time/*.jsonl`) stay separate from `*.timetracking.csv` by design (client, project and billing links). No shared EmptyState, stat or badge component exists, so `Card`, `Stat` and `StatusPill` stay. The duplication was ~15 copies of button classes and 4 of the input class: now `components/business/buttons.ts` (`PRIMARY`, `SECONDARY`, `PRIMARY_MD`, `SECONDARY_MD`, `BUTTON_SM`) and `FormField`'s `INPUT`.
+- `/business` dashboard: first run (no clients) shows only a "Start by adding your first client" panel with the four-step flow (client → time → draft → issue and get paid) and one button. With clients: primary actions as buttons (Log time, New draft, New client, Add expense), a "Needs attention" list (overdue invoices, retainers, contract dates, drafts, unbilled time; each with its action; `lib/business/attention.ts`), the timer, "At a glance" figures with short explanations (VAT Soll/Ist, open, overdue), "Who owes me" only when something is open, and the pipeline with only non-empty stages. Empty cards are gone. Client names replace slugs. Page bottom padding so the demo bar no longer covers the last row. Screenshots in `doc/screenshots/business-dashboard/`.
+- Business sub-page nav (`BusinessNav`, via `PageShell`'s `section` prop on the overview, clients, pipeline, invoices, expenses and shared pages) and a new `/business/invoices` page listing drafts, invoices and offers across clients.
+- Theme: `--los-warning`, `--los-success` and `--los-fg-dim` were used but never defined, so warnings rendered in the normal text colour; they are now derived per theme in `packages/ui/src/LifeOS/styles.css`.
+- Tests: `attention.test.ts`, `InvoicesPage.test.tsx`, updated and new cases in `BusinessPage.test.tsx` (onboarding, hidden empty sections, all caught up, nav, actions, VAT hint).
+
 ## 2026-11-05 — Business link in the default navbar
 
 - The desktop navbar now includes Business by default once `.kh/business/business.yaml` exists (`defaultNavbar(businessEnabled)` in `navbar-items.ts`, `MainApp` prop `businessEnabled`, set by the Dashboard). Before that the entry existed only in the Dashboard magic menu and as an opt-in item in Settings. A customised navbar is unchanged. Without business set up the magic-menu entry still opens `/business`, which shows the enable callout. Test: `navbar-config.test.ts`.

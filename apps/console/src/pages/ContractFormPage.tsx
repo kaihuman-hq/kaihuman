@@ -10,6 +10,7 @@ import {
 } from '@kaihuman/formats/business';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { PRIMARY, SECONDARY } from '../components/business/buttons';
 import { a11y, Field, INPUT } from '../components/business/FormField';
 import { PageShell } from '../components/business/PageShell';
 import {
@@ -30,8 +31,6 @@ import { writeBusiness, writeErrorMessage } from '../lib/business/write';
 import type { KBRepo } from '../lib/github-kb';
 
 const ACCEPT = CONTRACT_EXTENSIONS.map((e) => `.${e}`).join(',');
-const BUTTON =
-  'px-4 py-2 text-sm rounded disabled:opacity-50 border border-[var(--los-border)] hover:opacity-90';
 const LINK_BUTTON = 'text-[var(--los-accent)] hover:underline';
 
 function ContractEditor(props: {
@@ -257,18 +256,14 @@ function ContractEditor(props: {
           </p>
         )}
         <div class="flex flex-wrap gap-2">
-          <button
-            type="submit"
-            disabled={locked}
-            class="px-4 py-2 bg-[var(--los-accent)] text-black font-bold text-sm rounded hover:opacity-90 disabled:opacity-50"
-          >
+          <button type="submit" disabled={locked} class={PRIMARY}>
             {busy ? 'Saving...' : 'Save contract'}
           </button>
-          <a href={back} class={BUTTON}>
+          <a href={back} class={SECONDARY}>
             Cancel
           </a>
           {existing && !confirmDelete && (
-            <button type="button" class={BUTTON} onClick={() => setConfirmDelete(true)}>
+            <button type="button" class={SECONDARY} onClick={() => setConfirmDelete(true)}>
               Delete
             </button>
           )}
@@ -281,13 +276,13 @@ function ContractEditor(props: {
             {inRetention
               ? `This record must be kept until ${keepUntil} (retention). Delete anyway?`
               : 'Delete this contract? This cannot be undone.'}
-            <button type="button" class={BUTTON} onClick={remove}>
+            <button type="button" class={SECONDARY} onClick={remove}>
               Yes, delete contract
             </button>
             <button
               ref={keepRef}
               type="button"
-              class={BUTTON}
+              class={SECONDARY}
               onClick={() => setConfirmDelete(false)}
             >
               Keep it

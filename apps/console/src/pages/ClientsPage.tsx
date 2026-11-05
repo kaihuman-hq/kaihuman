@@ -15,7 +15,7 @@ export function ClientsPage() {
   const state = useBusinessRepo();
   const [stage, setStage] = useState<ClientStage | 'all'>('all');
   return (
-    <PageShell state={state} title="Clients">
+    <PageShell state={state} title="Clients" section="/clients">
       {({ data, loadErrors }) => {
         const all = clientSummaries(data, todayLocal());
         const shown = stage === 'all' ? all : all.filter((c) => c.stage === stage);

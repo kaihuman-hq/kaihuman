@@ -7,6 +7,7 @@ import {
 } from '@kaihuman/formats/business';
 import { parseShareUrl } from '@kaihuman/formats/share';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { BUTTON_SM } from '../components/business/buttons';
 import { PageShell } from '../components/business/PageShell';
 import { ShareConsent } from '../components/business/ShareConsent';
 import {
@@ -27,8 +28,6 @@ import { useBusinessRepo } from '../lib/business/use-business-repo';
 import { writeBusiness, writeErrorMessage } from '../lib/business/write';
 import type { KBRepo } from '../lib/github-kb';
 
-const BUTTON =
-  'px-2 py-1 text-xs rounded border border-[var(--los-border)] text-[var(--los-fg)] hover:opacity-90 disabled:opacity-50';
 const th =
   'text-left text-[10px] uppercase tracking-widest text-[var(--los-muted)] font-normal py-1 pr-3';
 const td = 'py-1 pr-3 align-top';
@@ -115,10 +114,10 @@ function ServiceUrl({ onChange }: { onChange: () => void }) {
         />
       </label>
       <div class="flex gap-1">
-        <button type="button" class={BUTTON} onClick={save}>
+        <button type="button" class={BUTTON_SM} onClick={save}>
           Save
         </button>
-        <button type="button" class={BUTTON} onClick={reset}>
+        <button type="button" class={BUTTON_SM} onClick={reset}>
           Reset
         </button>
       </div>
@@ -340,7 +339,7 @@ function Files({
         <button
           ref={syncButton}
           type="button"
-          class={BUTTON}
+          class={BUTTON_SM}
           disabled={busy}
           onClick={() => run(() => sync())}
         >
@@ -391,7 +390,7 @@ function Files({
                         <span class="flex flex-wrap items-center gap-1">
                           <button
                             type="button"
-                            class={BUTTON}
+                            class={BUTTON_SM}
                             disabled={busy}
                             ref={confirmButton}
                             aria-label={`Revoke ${f.label}`}
@@ -401,7 +400,7 @@ function Files({
                           </button>
                           <button
                             type="button"
-                            class={BUTTON}
+                            class={BUTTON_SM}
                             aria-label={`Cancel revoking ${f.label}`}
                             onClick={() => setConfirm(null)}
                           >
@@ -411,7 +410,7 @@ function Files({
                       ) : (
                         <button
                           type="button"
-                          class={BUTTON}
+                          class={BUTTON_SM}
                           disabled={busy}
                           data-trigger={f.token}
                           aria-label={`Revoke the share link for ${f.label}`}
@@ -437,7 +436,7 @@ function Files({
             <button
               ref={confirmButton}
               type="button"
-              class={BUTTON}
+              class={BUTTON_SM}
               disabled={busy}
               onClick={deleteAll}
             >
@@ -445,7 +444,7 @@ function Files({
             </button>
             <button
               type="button"
-              class={BUTTON}
+              class={BUTTON_SM}
               aria-label="Cancel deleting all shared files"
               onClick={() => setConfirm(null)}
             >
@@ -455,7 +454,7 @@ function Files({
         ) : (
           <button
             type="button"
-            class={BUTTON}
+            class={BUTTON_SM}
             disabled={busy}
             data-trigger="all"
             onClick={() => setConfirm('all')}
@@ -475,7 +474,7 @@ export function SharedPage() {
   const [accepted, setAccepted] = useState(false);
   const [version, setVersion] = useState(0);
   return (
-    <PageShell state={state} title="Shared files">
+    <PageShell state={state} title="Shared files" section="/business/shared">
       {({ repo, data }) =>
         demoMode.value ? (
           <p class="text-xs text-[var(--los-muted)]">Sharing is not available in demo mode.</p>
@@ -490,7 +489,7 @@ export function SharedPage() {
             {!consent && (
               <p class="text-xs space-y-1">
                 <span class="block">Sharing is off until you read how it works.</span>
-                <button type="button" class={BUTTON} onClick={() => setAsking(true)}>
+                <button type="button" class={BUTTON_SM} onClick={() => setAsking(true)}>
                   Enable sharing…
                 </button>
               </p>
