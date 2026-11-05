@@ -242,8 +242,8 @@
 - Create: `apps/mobile/app/login.tsx`, `apps/mobile/app/repos.tsx`, `apps/mobile/app/quick-[kind].tsx`, `apps/mobile/app/board.tsx`, `apps/mobile/app/analytics.tsx`
 
 **Steps:**
-- [ ] Each view takes its controller as a prop and only renders state and forwards events; route files construct controllers and pass them in.
-- [ ] Render tests cover main states and one user action per view (token sign-in, repo select, capture submit, status move, analytics totals).
+- [x] Each view takes its controller as a prop and only renders state and forwards events; route files construct controllers and pass them in.
+- [x] Render tests cover main states and one user action per view (token sign-in, repo select, capture submit, status move, analytics totals).
 
 ### Task 6.4: Views — Dashboard Tiles, Ideas, Wiki, Knowledge, File Editor (incl. `.enc`)
 **Files:**
