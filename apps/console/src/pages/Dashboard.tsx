@@ -350,7 +350,7 @@ export const Dashboard = () => {
               layoutStore.navigate(path.join('/'));
             }
           }}
-          onBoardClick={() => route('/board')}
+          onBoardClick={() => route('/stream')}
           onActionLogClick={() => route('/action-log')}
           onShortcutsClick={() => route('/shortcuts')}
           onKnowledgeClick={() => route('/knowledge')}
@@ -421,6 +421,7 @@ export const Dashboard = () => {
               lowerPath.endsWith('.consumption.csv') ||
               lowerPath.endsWith('.board-overview.json') ||
               lowerPath.endsWith('.bookmarks.json') ||
+              lowerPath.endsWith('.travel.json') ||
               lowerPath.endsWith('command-palette.settings.json') ||
               lowerPath.endsWith('.enc');
 
@@ -471,12 +472,10 @@ export const Dashboard = () => {
             try {
               let fileExists = githubFileStore.tree.value.some((t) => t.path === rilPath);
               if (fileExists) {
-                if (!githubFileStore.openFiles.value[rilPath]) {
-                  try {
-                    await githubFileStore.openFile(rilPath);
-                  } catch (_e) {
-                    fileExists = false;
-                  }
+                try {
+                  await githubFileStore.ensureFresh(rilPath);
+                } catch (_e) {
+                  fileExists = false;
                 }
               }
 

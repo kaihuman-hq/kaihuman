@@ -147,14 +147,23 @@ describe('GithubService.commitFiles', () => {
   it('base64-encodes 10 MB without overflowing the stack', async () => {
     git.createBlob.mockResolvedValue({ data: { sha: 'big' } });
     // Patterned, so a dropped or repeated chunk shows up (0x6000 is the encoder's chunk size).
-    const big = Uint8Array.from({ length: 10 * 1024 * 1024 }, (_, i) => i % 256);
+    const big = new Uint8Array(10 * 1024 * 1024);
+    for (let i = 0; i < big.length; i++) big[i] = i % 256;
     await svc.commitFiles('o', 'r', 'main', { 'big.pdf': big }, 'msg');
     const sent = git.createBlob.mock.calls[0]?.[0].content as string;
     expect(sent.length).toBe(Math.ceil(big.length / 3) * 4);
-    const back = Uint8Array.from(atob(sent), (c) => c.charCodeAt(0));
-    expect(back.length).toBe(big.length);
-    expect(back.every((b, i) => b === big[i])).toBe(true);
-  });
+    // Plain loops: Uint8Array.from(..., fn) and .every() took seconds and timed out on busy CI runners.
+    const bin = atob(sent);
+    expect(bin.length).toBe(big.length);
+    let firstMismatch = -1;
+    for (let i = 0; i < bin.length; i++) {
+      if (bin.charCodeAt(i) !== big[i]) {
+        firstMismatch = i;
+        break;
+      }
+    }
+    expect(firstMismatch).toBe(-1);
+  }, 30_000);
 
   it('creates no tree when a blob upload fails', async () => {
     git.createBlob.mockRejectedValue(new Error('boom'));
@@ -178,6 +187,56 @@ describe('GithubService.commitFiles', () => {
     await expect(svc.commitFiles('o', 'r', 'main', { 'a.md': 'x' }, 'msg')).rejects.toBeInstanceOf(
       ConflictError,
     );
+  });
+
+  it('retries without the workflow when GitHub refuses the tree (no workflow scope)', async () => {
+    const notFound = Object.assign(new Error('Not Found'), { status: 404 });
+    git.createTree.mockRejectedValueOnce(notFound);
+    const res = await svc.commitFiles(
+      'o',
+      'r',
+      'main',
+      { '.github/workflows/check.yml': 'on: push', 'a.md': 'x' },
+      'msg',
+    );
+    expect(git.createTree).toHaveBeenCalledTimes(2);
+    expect(git.createTree.mock.calls[1]?.[0].tree).toEqual([
+      { path: 'a.md', mode: '100644', type: 'blob', content: 'x' },
+    ]);
+    expect(git.updateRef).toHaveBeenCalledTimes(1);
+    expect(res).toEqual({
+      commitSha: 'commit2',
+      blobShas: { 'a.md': gitBlobSha('x') },
+      skipped: ['.github/workflows/check.yml'],
+    });
+  });
+
+  it('retries without the workflow when GitHub refuses the ref update', async () => {
+    git.updateRef.mockRejectedValueOnce(Object.assign(new Error('Forbidden'), { status: 403 }));
+    const res = await svc.commitFiles(
+      'o',
+      'r',
+      'main',
+      { '.github/workflows/check.yml': 'on: push', 'a.md': 'x' },
+      'msg',
+    );
+    expect(git.updateRef).toHaveBeenCalledTimes(2);
+    expect(res.skipped).toEqual(['.github/workflows/check.yml']);
+  });
+
+  it('commits nothing when only a refused workflow was to be written', async () => {
+    git.createTree.mockRejectedValueOnce(Object.assign(new Error('Not Found'), { status: 404 }));
+    const res = await svc.commitFiles('o', 'r', 'main', { '.github/workflows/c.yml': 'x' }, 'm');
+    expect(git.createTree).toHaveBeenCalledTimes(1);
+    expect(git.updateRef).not.toHaveBeenCalled();
+    expect(res).toEqual({ commitSha: 'head1', blobShas: {}, skipped: ['.github/workflows/c.yml'] });
+  });
+
+  it('rethrows a 404 when no workflow is in the commit', async () => {
+    const notFound = Object.assign(new Error('Not Found'), { status: 404 });
+    git.createTree.mockRejectedValueOnce(notFound);
+    await expect(svc.commitFiles('o', 'r', 'main', { 'a.md': 'x' }, 'm')).rejects.toBe(notFound);
+    expect(git.createTree).toHaveBeenCalledTimes(1);
   });
 
   it('rethrows other updateRef errors', async () => {

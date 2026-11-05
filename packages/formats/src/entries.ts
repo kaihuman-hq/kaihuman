@@ -15,7 +15,7 @@ import {
   type ReadItLaterItem,
   serializeReadItLater,
 } from './read-later.js';
-import { addTodo, parseTodos, serializeTodos, type TodoPrompt } from './todos.js';
+import { addTodo, moveTodo, parseTodos, serializeTodos, type TodoPrompt } from './todos.js';
 
 const TAG = /#([\w-]+)/g;
 
@@ -33,9 +33,11 @@ export interface TodoEntry {
   tags?: string[];
   milestoneId?: string;
   prompt?: TodoPrompt;
+  /** Default `end`; streams add new items on top. */
+  position?: 'top' | 'end';
 }
 
-/** A backlog todo at the end of a `.todos.md`. */
+/** A backlog todo at the end (or top) of a `.todos.md`. */
 export function addTodoEntry(content: string, entry: TodoEntry, now = new Date()): string {
   const { text, tags } = splitInlineTags(entry.text);
   if (!text) throw new Error('Nothing to add');
@@ -47,7 +49,7 @@ export function addTodoEntry(content: string, entry: TodoEntry, now = new Date()
     entry.prompt,
     now,
   );
-  return serializeTodos(data);
+  return serializeTodos(entry.position === 'top' ? moveTodo(data, data.items.length - 1, 0) : data);
 }
 
 export interface ActionLogEntryInput {

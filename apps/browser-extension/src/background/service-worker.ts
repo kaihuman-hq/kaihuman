@@ -16,6 +16,7 @@ import {
   serializeTimeTracking,
   toggleStartStop,
 } from '@kaihuman/formats';
+import { isCaptureWritePath } from '@kaihuman/formats/business';
 import {
   type GithubWorkFilter,
   isKnowledgePath,
@@ -95,6 +96,7 @@ import {
 } from './kb-capture';
 import {
   encodePath,
+  fetchBusinessContext,
   fetchEntryFilePaths,
   fetchPromptFiles,
   isEntryFilePath,
@@ -150,6 +152,7 @@ import {
   withFile,
   withoutFile,
 } from './today';
+import { applyTodoAction, collectOpenTodos, type TodoAction } from './todo-board';
 import {
   handlePinMenuClick,
   handleWorkMessage,
@@ -562,6 +565,9 @@ async function githubReadFile(
   if (res.status === 404) return null;
   if (!res.ok) throw await githubFailure(res, `Failed to read ${filePath}`);
   const data = await res.json();
+  // Over 1 MB GitHub sends no content; reading it as empty would let a write wipe the file.
+  if (data.encoding === 'none')
+    throw new Error(`${filePath} is too large to read here (over 1 MB)`);
   return { content: decodeBase64(data.content || ''), sha: data.sha };
 }
 
@@ -571,12 +577,13 @@ async function githubWriteFile(
   filePath: string,
   content: string,
   sha?: string,
+  message = `Update ${filePath} via Extension`,
 ): Promise<string | null> {
   const res = await fetch(`https://api.github.com/repos/${repoUrl}/contents/${filePath}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
     body: JSON.stringify({
-      message: `Update ${filePath} via Extension`,
+      message,
       content: encodeBase64(content),
       sha,
     }),
@@ -1545,6 +1552,15 @@ function todoTarget(cache: TodayCache, path: string | undefined): string {
   return path;
 }
 
+/** Open todos of every synced `.todos.md`, for the side panel. */
+async function openTodos() {
+  const { repo } = await credentials();
+  let cache = await readTodayCache();
+  if (!isTodayCacheUsable(cache, repo) || !cache) cache = await syncToday();
+  if (!cache) throw new Error(NOT_LOGGED_IN);
+  return { todos: collectOpenTodos(cache.files) };
+}
+
 /** The capture box's guesses, from the synced files only: a new tab must not cost a request. */
 async function captureGuesses(text: string) {
   const { repo } = await credentials();
@@ -1719,6 +1735,36 @@ async function writeEntryFile(path: string, content: string, sha?: string) {
   const written = await githubWriteFile(token, repo, encodePath(path), content, sha);
   const cache = await readTodayCache();
   if (cache && isTodayCacheUsable(cache, repo) && cache.files.some((file) => file.path === path)) {
+    await chrome.storage.local.set({
+      todayCache: withFile(cache, { path, sha: written ?? '', content }),
+    });
+  }
+  return {};
+}
+
+async function readBusinessContext() {
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  return { files: await fetchBusinessContext(token, repo) };
+}
+
+/** A missing file reads as null, so the capture builds it as the console would a new one. */
+async function readBusinessFile(path: string) {
+  if (!isCaptureWritePath(path)) throw new Error(`Refusing to read ${path}`);
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  return (await githubReadFile(token, repo, encodePath(path))) ?? { content: null };
+}
+
+/** One commit with the capture's own message; without `sha` GitHub refuses an existing file. */
+async function writeBusinessFile(path: string, content: string, message: string, sha?: string) {
+  if (!isCaptureWritePath(path)) throw new Error(`Refusing to write ${path}`);
+  const { token, repo } = await credentials();
+  if (!token) throw new Error(NOT_LOGGED_IN);
+  const written = await githubWriteFile(token, repo, encodePath(path), content, sha, message);
+  // As `writeEntryFile`: the start page lists client todo files and the timer from this cache.
+  const cache = await readTodayCache();
+  if (cache && isTodayCacheUsable(cache, repo)) {
     await chrome.storage.local.set({
       todayCache: withFile(cache, { path, sha: written ?? '', content }),
     });
@@ -2136,6 +2182,24 @@ chrome.runtime.onMessage.addListener(function onMessage(
     );
   }
 
+  if (message.type === 'READ_BUSINESS_CONTEXT') return answer(readBusinessContext(), sendResponse);
+
+  if (message.type === 'READ_BUSINESS_FILE') {
+    return answer(readBusinessFile(message.path || ''), sendResponse);
+  }
+
+  if (message.type === 'WRITE_BUSINESS_FILE') {
+    return answer(
+      writeBusinessFile(
+        message.path || '',
+        message.content ?? '',
+        message.message || 'business: capture',
+        message.sha || undefined,
+      ),
+      sendResponse,
+    );
+  }
+
   if (message.type === 'CAPTURE_KNOWLEDGE') {
     return answer(captureKnowledge(message.path || '', message.content ?? ''), sendResponse);
   }
@@ -2404,6 +2468,21 @@ chrome.runtime.onMessage.addListener(function onMessage(
         (cache) => todoTarget(cache, message.path),
         (md) => addTodoEntry(md, entry, now),
       ),
+      sendResponse,
+    );
+  }
+
+  if (message.type === 'GET_OPEN_TODOS') return answer(openTodos(), sendResponse);
+
+  if (message.type === 'UPDATE_TODO') {
+    const action = message.todoAction as TodoAction | undefined;
+    if (!action || (action.type !== 'status' && action.type !== 'cycle-priority')) {
+      return answer(Promise.reject(new Error('Unknown todo action')), sendResponse);
+    }
+    return answer(
+      commitTodayFile({ path: message.path || '', suffix: '.todos.md' }, (md) =>
+        applyTodoAction(md, String(message.id), String(message.text), action),
+      ).then(openTodos),
       sendResponse,
     );
   }

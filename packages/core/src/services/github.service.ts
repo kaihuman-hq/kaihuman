@@ -59,7 +59,10 @@ export class GithubService {
     return data;
   }
 
-  /** With `commitSha` the tree of that commit is fetched and the branch ref is not read. */
+  /**
+   * With `commitSha` the tree of that commit is fetched and the branch ref is not read. The
+   * branch head is read with `noStore`: a cached head would make a sync build on old state.
+   */
   async fetchRepoTree(owner: string, repo: string, branch = 'main', opts?: { commitSha?: string }) {
     const client = this.getClient();
     if (opts?.commitSha) {
@@ -81,6 +84,7 @@ export class GithubService {
       owner,
       repo,
       ref: `heads/${branch}`,
+      ...noStore,
     });
     const sha = refData.object.sha;
 
@@ -114,14 +118,19 @@ export class GithubService {
     return { tree: data.tree as TreeItem[], truncated: data.truncated };
   }
 
-  /** With `ref` (a commit sha) the file is read as of that commit, which never changes. */
+  /**
+   * With `ref` (a commit sha) the file is read as of that commit, which never changes, so the
+   * response may be cached. Without `ref` it is the branch head's version and the read bypasses
+   * the HTTP cache (`noStore`): the returned sha is used for the next write, and a stale one
+   * would be refused or, worse, overwrite newer content.
+   */
   async getFileContent(owner: string, repo: string, path: string, opts?: { ref?: string }) {
     const client = this.getClient();
     const { data } = await client.repos.getContent({
       owner,
       repo,
       path,
-      ...(opts?.ref ? { ref: opts.ref } : {}),
+      ...(opts?.ref ? { ref: opts.ref } : noStore),
     });
 
     if (Array.isArray(data)) {
@@ -362,6 +371,10 @@ export class GithubService {
    * {@link ConflictError} before creating anything when the branch has moved; a ref update GitHub
    * rejects as non-fast-forward is a ConflictError too. `blobShas` maps each written path to its
    * new blob SHA.
+   *
+   * GitHub refuses (404/403) a tree or ref that changes `.github/workflows/` unless the token has
+   * the `workflow` scope, which sign-in does not ask for. Then the commit is retried once without
+   * those files and they are listed in `skipped`, so the rest of the write still lands.
    */
   async commitFiles(
     owner: string,
@@ -370,7 +383,7 @@ export class GithubService {
     files: Record<string, string | Uint8Array | null>,
     message: string,
     opts?: { expectedHeadSha?: string },
-  ): Promise<{ commitSha: string; blobShas: Record<string, string> }> {
+  ): Promise<{ commitSha: string; blobShas: Record<string, string>; skipped?: string[] }> {
     const client = this.getClient();
     const { data: refData } = await client.git.getRef({
       owner,
@@ -404,53 +417,85 @@ export class GithubService {
         return { ...base, sha: blob.sha };
       }),
     );
-    const { data: newTree } = await client.git.createTree({
-      owner,
-      repo,
-      base_tree: commitData.tree.sha,
-      tree: entries,
-    });
-    const { data: newCommit } = await client.git.createCommit({
-      owner,
-      repo,
-      message,
-      tree: newTree.sha,
-      parents: [headSha],
-    });
+    const commitTree = async (tree: typeof entries): Promise<string> => {
+      const { data: newTree } = await client.git.createTree({
+        owner,
+        repo,
+        base_tree: commitData.tree.sha,
+        tree,
+      });
+      const { data: newCommit } = await client.git.createCommit({
+        owner,
+        repo,
+        message,
+        tree: newTree.sha,
+        parents: [headSha],
+      });
+      try {
+        await client.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommit.sha });
+      } catch (e) {
+        const status = (e as { status?: number }).status;
+        // 422 can also be another ref validation error; treating it as a conflict only costs a retry.
+        if (status === 409 || status === 422) {
+          throw new ConflictError(`${branch} moved while the commit was built`);
+        }
+        throw e;
+      }
+      return newCommit.sha;
+    };
+    let commitSha: string;
+    let skipped: string[] = [];
     try {
-      await client.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: newCommit.sha });
+      commitSha = await commitTree(entries);
     } catch (e) {
       const status = (e as { status?: number }).status;
-      // 422 can also be another ref validation error; treating it as a conflict only costs a retry.
-      if (status === 409 || status === 422) {
-        throw new ConflictError(`${branch} moved while the commit was built`);
-      }
-      throw e;
+      skipped = entries.filter((x) => isWorkflowPath(x.path)).map((x) => x.path);
+      if ((status !== 404 && status !== 403) || skipped.length === 0) throw e;
+      const rest = entries.filter((x) => !isWorkflowPath(x.path));
+      commitSha = rest.length > 0 ? await commitTree(rest) : headSha;
     }
     // createTree lists only top-level entries, so compute the blob SHAs locally.
     const blobShas: Record<string, string> = {};
     for (const [path, content] of Object.entries(files)) {
-      if (content !== null) blobShas[path] = gitBlobSha(content);
+      if (content !== null && !skipped.includes(path)) blobShas[path] = gitBlobSha(content);
     }
-    return { commitSha: newCommit.sha, blobShas };
+    return skipped.length > 0 ? { commitSha, blobShas, skipped } : { commitSha, blobShas };
   }
 
-  /** Create or update a file, fetching the current SHA automatically when needed. */
+  /**
+   * Create or update a file with a read-modify-write that survives concurrent writers.
+   * A string is the exact content wanted (generated files). A function receives the current
+   * remote content (`null` if absent) and returns the next one, so it can merge into what
+   * another device wrote. The PUT is skipped when nothing changes; on a 409/422 (the file moved
+   * under us) it re-reads and recomputes, up to 3 attempts.
+   */
   async upsertRepoFile(
     owner: string,
     repo: string,
     path: string,
-    content: string,
+    content: string | ((current: string | null) => string),
     message: string,
   ) {
-    let sha: string | undefined;
-    try {
-      const existing = await this.getFileContent(owner, repo, path);
-      sha = existing.sha;
-    } catch {
-      // File does not exist yet — create it
+    const attempts = 3;
+    for (let attempt = 1; ; attempt++) {
+      let current: string | null = null;
+      let sha: string | undefined;
+      try {
+        const existing = await this.getFileContent(owner, repo, path);
+        current = existing.content;
+        sha = existing.sha;
+      } catch (e) {
+        if ((e as { status?: number }).status !== 404) throw e;
+      }
+      const next = typeof content === 'function' ? content(current) : content;
+      if (sha !== undefined && next === current) return { content: { sha } };
+      try {
+        return await this.saveFile(owner, repo, path, next, message, sha);
+      } catch (e) {
+        const status = (e as { status?: number }).status;
+        if ((status !== 409 && status !== 422) || attempt >= attempts) throw e;
+      }
     }
-    return this.saveFile(owner, repo, path, content, message, sha);
   }
 
   async getActionsPublicKey(owner: string, repo: string): Promise<{ key_id: string; key: string }> {
@@ -506,3 +551,8 @@ export const githubService = new Proxy(realGithubService, {
       : value;
   },
 });
+
+/** Files GitHub only lets a token with the `workflow` scope create, change or delete. */
+function isWorkflowPath(path: string): boolean {
+  return path.startsWith('.github/workflows/');
+}

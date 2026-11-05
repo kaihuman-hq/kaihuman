@@ -76,6 +76,8 @@ export function BusinessEnablePage() {
   const [errors, setErrors] = useState<Partial<Record<keyof EnableForm, string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Files GitHub refused to commit (the workflow without the `workflow` scope), shown for adding by hand.
+  const [skipped, setSkipped] = useState<Record<string, string> | null>(null);
   // Set synchronously: `busy` only changes after the next render, so two quick submits could both pass.
   const submitting = useRef(false);
 
@@ -84,10 +86,44 @@ export function BusinessEnablePage() {
       mode="BUSINESS"
       onDashboardClick={() => route('/')}
       onFilesClick={() => route('/')}
-      onBoardClick={() => route('/board')}
+      onBoardClick={() => route('/stream')}
       onWikiClick={() => route('/wiki')}
     />
   );
+
+  if (repo && skipped) {
+    return (
+      <>
+        <div class="h-[calc(100vh-2rem)] overflow-y-auto p-6 text-sm font-mono text-[var(--los-fg)] space-y-3">
+          <p>Business is enabled.</p>
+          {Object.entries(skipped).map(([path, content]) => (
+            <div key={path} class="space-y-2">
+              <p class="text-xs text-[var(--los-warning)]">
+                GitHub did not let kaihuman add <code>{path}</code>: sign-in has no permission to
+                change workflows. Without it the business check does not run on push. Add the file
+                yourself:
+              </p>
+              <a
+                href={`https://github.com/${repo.full_name}/new/${repo.default_branch}?filename=${encodeURIComponent(path)}&value=${encodeURIComponent(content)}`}
+                target="_blank"
+                rel="noreferrer"
+                class="text-[var(--los-accent)] hover:underline"
+              >
+                Create it on GitHub
+              </a>
+              <pre class="text-[10px] whitespace-pre-wrap border border-[var(--los-border)] rounded p-2 max-h-64 overflow-auto">
+                {content}
+              </pre>
+            </div>
+          ))}
+          <a href="/business" class="text-[var(--los-accent)] hover:underline">
+            Open the business dashboard
+          </a>
+        </div>
+        {bar}
+      </>
+    );
+  }
 
   if (!repo) {
     return (
@@ -161,9 +197,10 @@ export function BusinessEnablePage() {
       }
       // Loaded here so the bundled check stays out of the main chunk.
       const { enableBusiness } = await import('../lib/business-setup');
-      await enableBusiness(repo, result.value);
+      const done = await enableBusiness(repo, result.value);
       await githubFileStore.loadTree();
-      route('/business');
+      if (Object.keys(done.skipped).length > 0) setSkipped(done.skipped);
+      else route('/business');
     } catch (err) {
       const known = err instanceof PublicRepoError || err instanceof AlreadyEnabledError;
       setError(

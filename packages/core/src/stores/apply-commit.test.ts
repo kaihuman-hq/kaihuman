@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const remote = vi.hoisted(() => ({ tree: [] as unknown[] }));
 vi.mock('../services/github.service.js', () => ({
-  githubService: { fetchRepoTree: async () => remote.tree },
+  githubService: { fetchRepoTree: async () => remote.tree, getHeadSha: async () => 'head' },
 }));
 
 import { GithubFileStore } from './github-file.store.js';
@@ -77,7 +77,9 @@ describe('githubFileStore.applyCommit', () => {
     };
     store.activeFile.value = 'b.md';
     await store.applyCommit({ 'a.md': 'new', 'b.md': null }, { 'a.md': 'sha-a' });
-    expect(store.openFiles.value).toEqual({ 'a.md': { content: 'new', sha: 'sha-a' } });
+    expect(store.openFiles.value).toEqual({
+      'a.md': { content: 'new', sha: 'sha-a', base: 'new' },
+    });
     expect(store.activeFile.value).toBeNull();
   });
 

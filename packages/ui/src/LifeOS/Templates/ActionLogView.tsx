@@ -334,9 +334,7 @@ export const ActionLogView = ({ onNavigateBack }: ActionLogViewProps) => {
   // ── Open files ───────────────────────────────────────────────────────────────
   useEffect(() => {
     for (const path of actionLogFilePaths) {
-      if (!githubFileStore.openFiles.peek()[path]) {
-        githubFileStore.openFile(path);
-      }
+      githubFileStore.ensureFresh(path);
     }
   }, [actionLogFilePaths]);
 

@@ -91,6 +91,9 @@ import { TimezoneAddForm } from '../Organisms/Widgets/TimezoneAddForm';
 import { TimezoneWidget } from '../Organisms/Widgets/TimezoneWidget';
 import { TodoAddForm } from '../Organisms/Widgets/TodoAddForm';
 import { TodoWidget } from '../Organisms/Widgets/TodoWidget';
+import { TravelAddForm } from '../Organisms/Widgets/TravelAddForm';
+import { TravelEditForm } from '../Organisms/Widgets/TravelEditForm';
+import { TravelWidget } from '../Organisms/Widgets/TravelWidget';
 import { AIPanel } from '../Templates/AIPanel';
 import type { DashboardConfig, DashboardEntry } from '../types';
 import { MainGrid } from './MainGrid';
@@ -759,6 +762,7 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.consumption.csv')) ext = '.consumption.csv';
       else if (lowerPath.endsWith('.board-overview.json')) ext = '.board-overview.json';
       else if (lowerPath.endsWith('.bookmarks.json')) ext = '.bookmarks.json';
+      else if (lowerPath.endsWith('.travel.json')) ext = '.travel.json';
       else if (lowerPath.endsWith('command-palette.settings.json'))
         ext = 'command-palette.settings.json';
       else {
@@ -903,6 +907,10 @@ abbreviations: undefined
           onChange={(newContent) => tile.onContentChange?.(newContent)}
         />
       );
+    }
+    if (tile.extension?.toLowerCase() === '.travel.json') {
+      // Empty file is valid: parseTravel turns it into an empty doc.
+      return <TravelWidget content={tile.rawContent ?? ''} mode={mode} />;
     }
     if (tile.extension?.toLowerCase() === '.readitlater.json' && tile.rawContent) {
       return (
@@ -1129,6 +1137,7 @@ abbreviations: undefined
       else if (lowerPath.endsWith('.stocks.csv')) ext = '.stocks.csv';
       else if (lowerPath.endsWith('.consumption.csv')) ext = '.consumption.csv';
       else if (lowerPath.endsWith('.bookmarks.json')) ext = '.bookmarks.json';
+      else if (lowerPath.endsWith('.travel.json')) ext = '.travel.json';
       else if (lowerPath.endsWith('command-palette.settings.json'))
         ext = 'command-palette.settings.json';
       else {
@@ -2106,7 +2115,7 @@ abbreviations: undefined
                     onClick: () => setShowSearch(true),
                   },
                   ...(onShortcutsClick ? [{ label: 'Shortcuts', onClick: onShortcutsClick }] : []),
-                  ...(onBoardClick ? [{ label: 'Board', onClick: onBoardClick }] : []),
+                  ...(onBoardClick ? [{ label: 'Stream', onClick: onBoardClick }] : []),
                   ...(onActionLogClick ? [{ label: 'Action Log', onClick: onActionLogClick }] : []),
                   ...(onKnowledgeClick
                     ? [{ label: 'Knowledge Base', onClick: onKnowledgeClick }]
@@ -2246,6 +2255,7 @@ const FocusedTileInternal = ({
   const isConsumption = tile.extension === '.consumption.csv';
   const isBoardOverview = tile.extension === '.board-overview.json';
   const isBookmarks = tile.extension?.toLowerCase() === '.bookmarks.json';
+  const isTravel = tile.extension?.toLowerCase() === '.travel.json';
 
   const isGenericCsv =
     tile.extension === '.csv' &&
@@ -2276,12 +2286,15 @@ const FocusedTileInternal = ({
     isConsumption ||
     isAnyCsv || // && !!tile.rawContent;
     isBoardOverview ||
-    isBookmarks;
+    isBookmarks ||
+    isTravel;
 
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const [viewMode, setViewMode] = useState<string>(
     initialViewMode || (hasWidget ? 'WIDGET' : 'CODE'),
   );
+  // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
+  const [editTripId, setEditTripId] = useState<string | null>(null);
   // biome-ignore lint/correctness/useHookAtTopLevel: early return above is safe, tile is always defined here
   const [showHistory, setShowHistory] = useState(false);
 
@@ -2358,6 +2371,7 @@ const FocusedTileInternal = ({
     const _isConsumption = tile.extension === '.consumption.csv';
     const _isAnyCsv = tile.extension?.toLowerCase()?.replace('.enc', '').endsWith('.csv');
     const _isBookmarks = tile.extension?.toLowerCase() === '.bookmarks.json';
+    const _isTravel = tile.extension?.toLowerCase() === '.travel.json';
 
     const _hasWidget =
       _isTimeTracking ||
@@ -2375,7 +2389,8 @@ const FocusedTileInternal = ({
       _isStocks ||
       _isConsumption ||
       _isAnyCsv ||
-      _isBookmarks;
+      _isBookmarks ||
+      _isTravel;
 
     if (viewMode === 'CODE') {
       // console.log('[FocusedTileInternal] ViewMode is CODE. HasWidget:', _hasWidget, 'RawContent length:', tile.rawContent?.length);
@@ -2613,7 +2628,7 @@ const FocusedTileInternal = ({
                   onClick={() => setViewMode('WIDGET')}
                   className={cn(
                     'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
-                    viewMode === 'WIDGET'
+                    viewMode === 'WIDGET' || viewMode === 'EDIT'
                       ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
                       : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
                   )}
@@ -2648,6 +2663,21 @@ const FocusedTileInternal = ({
                     )}
                   >
                     ADD BOOKMARK
+                  </button>
+                )}
+
+                {isTravel && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('ADD')}
+                    className={cn(
+                      'px-3 py-1.5 text-[10px] font-mono transition-colors rounded-sm whitespace-nowrap flex-1 md:flex-none text-center',
+                      viewMode === 'ADD'
+                        ? 'bg-[var(--los-bg)] text-[var(--los-fg)]'
+                        : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+                    )}
+                  >
+                    ADD TRIP
                   </button>
                 )}
 
@@ -3004,6 +3034,16 @@ const FocusedTileInternal = ({
                   onChange={(newContent) => tile.onContentChange?.(newContent)}
                 />
               )}
+              {isTravel && (
+                <TravelWidget
+                  content={tile.rawContent || ''}
+                  mode="FOCUS"
+                  onEditTrip={(tripId) => {
+                    setEditTripId(tripId);
+                    setViewMode('EDIT');
+                  }}
+                />
+              )}
               {isGenericCsv && <CsvTableView content={tile.rawContent || ''} />}
               {isBoardOverview && (
                 <BoardOverviewWidget
@@ -3017,6 +3057,24 @@ const FocusedTileInternal = ({
           ) : viewMode === 'CHARTS' && isTimeTracking ? (
             <div className="flex flex-col min-h-full w-full p-8">
               <TimeTrackingCharts data={tile.rawContent as string} />
+            </div>
+          ) : viewMode === 'EDIT' && isTravel && editTripId ? (
+            <div className="min-h-full w-full p-8 flex justify-center items-start">
+              <TravelEditForm
+                key={editTripId}
+                content={tile.rawContent || ''}
+                tripId={editTripId}
+                onChange={(newContent) => tile.onContentChange?.(newContent)}
+                onDone={() => setViewMode('WIDGET')}
+              />
+            </div>
+          ) : viewMode === 'ADD' && isTravel ? (
+            <div className="min-h-full w-full p-8 flex justify-center items-start">
+              <TravelAddForm
+                content={tile.rawContent || ''}
+                onChange={(newContent) => tile.onContentChange?.(newContent)}
+                onDone={() => setViewMode('WIDGET')}
+              />
             </div>
           ) : viewMode === 'ADD' && isBookmarks ? (
             <div className="min-h-full w-full p-8 flex justify-center items-start">

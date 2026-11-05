@@ -116,7 +116,14 @@ export async function writeBusiness(
         message,
         { expectedHeadSha: fresh.headSha },
       );
-      done = { ...res, changes };
+      // Files GitHub refused (the workflow without the `workflow` scope) are not in the commit.
+      const skipped = new Set(res.skipped ?? []);
+      if (skipped.size > 0)
+        console.warn('Committed without (needs the workflow scope):', [...skipped]);
+      done = {
+        ...res,
+        changes: Object.fromEntries(Object.entries(changes).filter(([p]) => !skipped.has(p))),
+      };
     } catch (e) {
       if (!(e instanceof ConflictError) || attempt >= 1) throw e;
       continue;

@@ -4,7 +4,8 @@ Status: phase 1 built (2026-10-26): formats, repo check, skill, set-up function.
 (2026-10-27): read-only console pages. Phase 3 built (2026-11-02): daily forms, running timer,
 palette commands, read-only issued files, business hours on the browser extension's start page. Phase 4 built
 (2026-11-02): share links. Phase 5a built (2026-11-02): money admin (expenses and receipts, VAT summary,
-CSV, year export, retainers due, contract reminders and form, pipeline board). Design: `docs/superpowers/specs/2026-10-26-business-design.md`.
+CSV, year export, retainers due, contract reminders and form, pipeline board). Phase 5b part A built (2026-11-03): client targets in the browser extension and
+desktop palette. Design: `docs/superpowers/specs/2026-10-26-business-design.md`.
 
 ## Goal
 
@@ -131,6 +132,65 @@ A draft made from a retainer carries `from_retainer: <next_date>`.
   yet. E is the category for small-business (§ 19 UStG); AE (reverse charge) gets its note.
 - Status (open, part-paid, paid, overdue, credited) is calculated from payments and dates, never stored.
 
+## E-invoices (phase 6)
+
+kaihuman writes the EN 16931 data of an issued invoice or credit note as XML. It does not render
+PDFs. Everything is generated from the issued YAML, so nothing new is stored.
+
+- `toEn16931(issued)` maps the record to EN 16931 business terms. `toUbl(e)` writes XRechnung 3.0
+  UBL 2.1 (`Invoice` for type 380, `CreditNote` for 381). `toCii(e, { guideline })` writes
+  UN/CEFACT CII D16B. `guideline: 'xrechnung'` (default) uses the XRechnung CIUS identifier;
+  `guideline: 'en16931'` gives the ZUGFeRD / Factur-X EN 16931 profile XML. The serialisers only
+  format the strings of `toEn16931`, so amounts and rounding are those of `computeTotals`.
+- Mapping notes: a credit note references the corrected invoice (BG-3). The buyer reference (BT-10)
+  is the document's `buyer_reference`, else the client's Leitweg-ID, else its buyer reference.
+  Payment means are SEPA credit transfer `58` with IBAN, BIC and the invoice number as reference.
+  A credit note without payment details gets code `1` and a refund note (BT-20). Reverse charge is
+  category `AE` with `VATEX-EU-AE` and the reason text; small business is category `E` with the
+  § 19 UStG reason. A seller without VAT id also gets its tax number as seller identifier (BT-29),
+  because EN 16931 rule BR-CO-26 does not accept the tax number (BT-32) alone. Units are UN/ECE recommendation 20 codes from the line (`HUR`, `C62`, …).
+- Electronic addresses (BT-34 seller, BT-49 buyer): `electronic_address` written as
+  `SCHEME:value` (for example `0204:991-12345-67` or `9930:DE123456789`) is used as written; an
+  e-mail address gets scheme `EM`; a Leitweg-ID gets `0204`. Without one, the seller falls back to
+  the contact e-mail and the buyer to a Leitweg-ID buyer reference, then the contact e-mail.
+- XRechnung needs data that EN 16931 and ZUGFeRD do not: a buyer reference, a seller contact with
+  phone and e-mail, and both electronic addresses. `xrechnungGaps(e)` lists what is missing; the
+  console shows it next to the download buttons. Add the missing data to `business.yaml` or the
+  client before issuing; an issued file never changes.
+- Console: the client page's invoice table has an XML column (`XML` when `<number>.xml` is in the
+  repository, else `XML missing`) and the buttons **Download XRechnung (UBL)** and **Download CII**
+  on every invoice and credit note. Both are generated in the browser.
+- Validation: golden files in `packages/formats/fixtures/business/einvoice/` (standard invoice,
+  reverse charge, small business, credit note; UBL and CII) are compared with the serialiser output
+  in the tests (`UPDATE_GOLDEN=1` rewrites them) and checked in CI by the KoSIT validator with the
+  XRechnung configuration (job `einvoice`, versions and checksums pinned in
+  `.github/workflows/ci.yml`).
+
+### ZUGFeRD / Factur-X for external PDF generators
+
+The generator contract (`<number>.pdf`, `<number>.xml`, `<number>.sha256` next to the issued
+YAML) stays the same. A generator that wants a ZUGFeRD 2.x / Factur-X invoice:
+
+1. Reads `<number>.yaml`, validates it with `validateIssued`, and calls
+   `toCii(toEn16931(doc), { guideline: 'en16931' })`. It never computes tax itself.
+2. Renders the PDF as **PDF/A-3** (PDF/A-3b is enough) with embedded fonts and an sRGB output
+   intent.
+3. Embeds the XML as file `factur-x.xml` (ZUGFeRD 2.x and Factur-X use this name) with MIME type
+   `text/xml`, `AFRelationship` `Alternative` (or `Data`), lists it in the document catalog's `AF`
+   array and in the `EmbeddedFiles` name tree.
+4. Adds the XMP metadata of the Factur-X extension schema
+   (`urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#`): `DocumentType` `INVOICE`,
+   `DocumentFileName` `factur-x.xml`, `Version` `1.0`, `ConformanceLevel` `EN 16931`, with the
+   matching `pdfaExtension` schema description.
+5. Writes the same XML as `<number>.xml` (or the XRechnung UBL from `toUbl` when the recipient wants
+   pure XRechnung) and the hashes of both files plus generator name and template version into
+   `<number>.sha256`.
+6. Checks the result with a PDF/A validator (veraPDF) and the XML with the KoSIT validator or
+   Mustang.
+
+For German public buyers (B2G) send the pure XRechnung XML (`toUbl` or `toCii` with the
+default guideline); a ZUGFeRD PDF is accepted there only in the XRechnung profile.
+
 ## The check
 
 Run it from the repo root:
@@ -180,6 +240,18 @@ The next business write (any console action that commits under `.kh/business/`) 
 refreshes the tool files when `.kh/business/.tools/version` differs from `BUSINESS_TOOLS_VERSION`
 (`1.3.0` since phase 5a: the check, skill and validators changed, so a repo set up earlier is
 upgraded with its next business write or KB sync). Repos without business get nothing.
+
+Sign-in asks GitHub only for the `repo` scope, and GitHub refuses (`404 Not Found` on
+`git/trees`, or 403) a commit that touches `.github/workflows/` without the `workflow` scope.
+`githubService.commitFiles` then retries once without the workflow files and lists them in
+`skipped`; the rest of the commit lands. Enable shows the skipped workflow with its content and a
+"Create it on GitHub" link, so the user adds it by hand; until then the check does not run on
+push. A business write or KB sync that upgrades the tool files skips it the same way (writes log
+a warning).
+
+Ruling W1: commit without the workflow instead of asking for the `workflow` scope at sign-in —
+cost: a repo set up this way has no CI check until the user adds the file, and since the tool
+version file is still written, later upgrades do not offer the workflow again.
 
 The form has a `VAT basis` select next to the VAT regime: Soll (default, nothing written) or Ist
 (writes `vat_basis: cash`). Edit `business.yaml` to change it later.
@@ -241,6 +313,14 @@ Every form makes one commit per action, with a message starting `business: `
 - **Palette** (console `SearchModal`, when business is enabled): `todo <client>: text`,
   `log <client>: text`, `timer <client>[/project]`, `stop timer`. The client is an exact slug or a
   unique prefix. Quick todo and quick log also have a "For client" select.
+- **Browser extension and desktop palette** (phase 5b): the same four commands in the shared
+  palette, listed first under "Business" when `.kh/business/business.yaml` exists. The clients come
+  from `.kh/business/clients/` (each `client.yaml`), read each time the palette opens. A todo or
+  log line goes to the client's `todos.todos.md` / `log.actionlog.md` and `timer` writes
+  `time/running.yaml`, each in one commit with the console's message (`business: todo for acme`)
+  and over the version just read, so a change made meanwhile fails instead of being overwritten.
+  `stop timer` opens the console's time form. Unlike a console save, a palette capture does not
+  upgrade outdated business tool files and does not retry on a conflict.
 - **File browser:** issued yaml and offer/invoice pdf, xml and sha256 files open read-only and
   cannot be changed, renamed, moved or deleted there.
 
@@ -379,6 +459,15 @@ affected. The README lists the setup steps.
   `http://localhost` override is ignored. For local development build or start the console with
   `VITE_SHARE_URL=http://localhost:8788`. Add the console's origin to `CONSOLE_ORIGINS`. Your GitHub
   sign-in token goes to that service, and the consent names it.
+
+## kb-mcp tools
+
+The MCP server in `apps/kb-mcp` gives an agent without a shell (Claude Desktop) access to the business data. It always reads `.kh/business`, even when the knowledge base uses the legacy `.lifeos`.
+
+- Read: `business_clients`, `business_client` (client by slug or name), `business_open_invoices`, `business_vat_summary` (period `YYYY`, `YYYY-MM`, `YYYY-Qn`), `business_reminders` and `business_check`. Status, VAT and the check come from the same library as the console. The check works without a profile and does not check the frozen-file rule, which needs git history.
+- Write: `business_create_draft`, `business_update_draft` (replaces the whole draft), `business_add_time`, `business_add_todo`, `business_add_log` and `business_add_expense` (no receipt). Each returns `{ paths, id?, git }`.
+- The server never issues or numbers a document and never deletes. A write to any path that is not a draft, time entry, expense, todos or log file is refused. Issuing stays in the console.
+- With `--git`, a write is committed (message `business: …`) and pushed, in the same queue as the ideas tools. See `apps/kb-mcp/README.md`.
 
 ## Browser extension
 

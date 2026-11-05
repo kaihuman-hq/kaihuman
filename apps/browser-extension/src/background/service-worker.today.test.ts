@@ -232,6 +232,53 @@ describe('writes from the start page', () => {
     expect(remote['.kh/inbox.todos.md']).toBe('- [ ] existing\n');
   });
 
+  it('lists open todos across files, highest priority first', async () => {
+    remote['work.todos.md'] = '- [ ] urgent ^high\n- [x] finished\n';
+    seedCache();
+    const response = await call({ type: 'GET_OPEN_TODOS' });
+    expect(response.todos.map((t: any) => [t.stream, t.text])).toEqual([
+      ['work', 'urgent'],
+      ['inbox', 'existing'],
+    ]);
+  });
+
+  it('starts a todo and cycles its priority, saving the file', async () => {
+    remote['work.todos.md'] = '- [ ] urgent\n';
+    seedCache();
+    const todoAction = { type: 'status', status: 'in-progress' };
+    const started = await call({
+      type: 'UPDATE_TODO',
+      path: 'work.todos.md',
+      id: 'item-0',
+      text: 'urgent',
+      todoAction,
+    });
+    expect(remote['work.todos.md']).toMatch(/^- \[>\] urgent/);
+    expect(started.todos[0]).toMatchObject({ text: 'urgent', status: 'in-progress' });
+
+    await call({
+      type: 'UPDATE_TODO',
+      path: 'work.todos.md',
+      id: 'item-0',
+      text: 'urgent',
+      todoAction: { type: 'cycle-priority' },
+    });
+    expect(remote['work.todos.md']).toMatch(/urgent \^high/);
+  });
+
+  it('refuses to update a file that is not a known todo list', async () => {
+    seedCache();
+    const response = await call({
+      type: 'UPDATE_TODO',
+      path: '.kh/health.habit.csv',
+      id: 'item-0',
+      text: 'x',
+      todoAction: { type: 'cycle-priority' },
+    });
+    expect(response.error).toContain('not one of the start page');
+    expect(writes()).toHaveLength(0);
+  });
+
   it('refuses a todo for a list the page does not know', async () => {
     seedCache();
     for (const path of ['secret.todos.md', '.kh/health.habit.csv']) {
@@ -533,6 +580,94 @@ describe('the palette’s widget entries', () => {
       expect((await call({ type: 'WRITE_ENTRY_FILE', path, content: 'x' })).error).toContain(
         'Refusing',
       );
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('the palette’s business captures', () => {
+  const TODOS = '.kh/business/clients/acme/todos.todos.md';
+
+  it('reads no context without business set up, and the capture files with it', async () => {
+    remote['.kh/business/clients/acme/client.yaml'] = 'name: Acme\n';
+    expect((await call({ type: 'READ_BUSINESS_CONTEXT' })).files).toEqual([]);
+    remote['.kh/business/business.yaml'] = 'name: Me\n';
+    remote['.kh/business/clients/acme/notes.md'] = 'private';
+    const { files } = await call({ type: 'READ_BUSINESS_CONTEXT' });
+    expect(files.map((f: any) => f.path).sort()).toEqual([
+      '.kh/business/business.yaml',
+      '.kh/business/clients/acme/client.yaml',
+    ]);
+  });
+
+  it('reads a capture file with its version, a missing one as null', async () => {
+    remote[TODOS] = '- [ ] x\n';
+    expect(await call({ type: 'READ_BUSINESS_FILE', path: TODOS })).toMatchObject({
+      content: '- [ ] x\n',
+      sha: `sha-${TODOS}`,
+    });
+    const missing = await call({
+      type: 'READ_BUSINESS_FILE',
+      path: '.kh/business/time/running.yaml',
+    });
+    expect(missing).toMatchObject({ success: true, content: null });
+  });
+
+  it('writes in one commit with the capture’s message, over the version read', async () => {
+    const response = await call({
+      type: 'WRITE_BUSINESS_FILE',
+      path: TODOS,
+      content: 'new\n',
+      message: 'business: todo for acme',
+      sha: 'v1',
+    });
+    expect(response.success).toBe(true);
+    expect(remote[TODOS]).toBe('new\n');
+    expect(writes()).toHaveLength(1);
+    expect(JSON.parse(writes()[0]?.[1].body)).toMatchObject({
+      message: 'business: todo for acme',
+      sha: 'v1',
+    });
+  });
+
+  it('puts the written file into the start page’s cache', async () => {
+    seedCache();
+    await call({
+      type: 'WRITE_BUSINESS_FILE',
+      path: '.kh/business/time/running.yaml',
+      content: 'client: acme\n',
+      message: 'business: start timer for acme',
+    });
+    expect(
+      store.todayCache.files.find((f: any) => f.path === '.kh/business/time/running.yaml'),
+    ).toEqual({
+      path: '.kh/business/time/running.yaml',
+      sha: 'new-sha',
+      content: 'client: acme\n',
+    });
+  });
+
+  it('refuses to read a file GitHub sends without content (over 1 MB)', async () => {
+    remote[TODOS] = 'big';
+    fetchMock.mockImplementationOnce(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ content: '', encoding: 'none', sha: 'v1' }),
+    }));
+    expect((await call({ type: 'READ_BUSINESS_FILE', path: TODOS })).error).toContain('too large');
+  });
+
+  it('refuses any file a capture does not write', async () => {
+    for (const path of [
+      '.kh/business/clients/acme/client.yaml',
+      '.kh/business/clients/../todos.todos.md',
+      '.kh/business/time/2026-11.jsonl',
+      '.kh/inbox.todos.md',
+    ]) {
+      expect((await call({ type: 'READ_BUSINESS_FILE', path })).error).toContain('Refusing');
+      expect(
+        (await call({ type: 'WRITE_BUSINESS_FILE', path, content: 'x', message: 'm' })).error,
+      ).toContain('Refusing');
     }
     expect(fetchMock).not.toHaveBeenCalled();
   });

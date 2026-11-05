@@ -2,14 +2,19 @@ import { githubFileStore, layoutStore } from '@kaihuman/core';
 import {
   addMilestone,
   addTodoEntry,
+  cyclePriority,
   getUpcomingMilestone,
   type Milestone,
+  moveTodo,
   parseTodos,
   removeMilestone,
   STATUS_LABELS,
   serializeTodos,
   setMilestone,
   setStatus,
+  setTodoColor,
+  setTodoPriority,
+  type TodoColor,
   type TodoData,
   type TodoItem,
   type TodoStatus,
@@ -44,6 +49,9 @@ import {
   usePersistedScope,
   withBusinessFiles,
 } from '../scope-files';
+import { moveTodoChanges } from './moveTodo';
+import { type StreamMode, type StreamSort, StreamsBoard } from './StreamsBoard';
+import { FileColorPicker, fileColorHex, PriorityBadge } from './TodoMarks';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -743,11 +751,13 @@ const KanbanCard = ({
   onOpenFile,
   onMove,
   onEditText,
+  onCyclePriority,
   otherFilePaths,
   borderColor,
 }: {
   agg: AggregatedItem;
   onStatusChange: (filePath: string, itemIndex: number, newStatus: TodoStatus) => void;
+  onCyclePriority?: (filePath: string, itemIndex: number) => void;
   onOpenFile?: (path: string) => void;
   onMove?: (targetFilePath: string) => void;
   onEditText?: (filePath: string, itemIndex: number, text: string) => void;
@@ -834,9 +844,17 @@ const KanbanCard = ({
         </div>
       ) : (
         <>
-          <MonoText className="text-xs leading-relaxed break-words">
-            {renderTextWithLinks(item.text)}
-          </MonoText>
+          <div className="flex items-start gap-1.5">
+            <MonoText className="flex-1 min-w-0 text-xs leading-relaxed break-words">
+              {renderTextWithLinks(item.text)}
+            </MonoText>
+            {onCyclePriority && (
+              <PriorityBadge
+                priority={item.priority}
+                onCycle={() => onCyclePriority(filePath, agg.itemIndex)}
+              />
+            )}
+          </div>
 
           <div className="flex flex-wrap gap-1">
             {item.tags.map((t) => (
@@ -1066,11 +1084,42 @@ const AssignMilestonePanel = ({
 
 // ─── KanbanBoard ──────────────────────────────────────────────────────────────
 
+const HeaderToggle = <T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: [T, string][];
+}) => (
+  <div className="flex items-center border border-[var(--los-border)] shrink-0">
+    {options.map(([v, label]) => (
+      <button
+        key={v}
+        type="button"
+        aria-pressed={value === v}
+        onClick={() => onChange(v)}
+        className={cn(
+          'text-[10px] font-mono px-2 py-1 transition-colors',
+          value === v
+            ? 'text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+            : 'text-[var(--los-muted)] hover:text-[var(--los-fg)]',
+        )}
+      >
+        {label}
+      </button>
+    ))}
+  </div>
+);
+
 export interface KanbanBoardProps {
   onNavigateBack?: () => void;
   onAnalyticsClick?: () => void;
   onCreateFile?: (path: string, content: string) => Promise<void>;
   onOpenFile?: (path: string) => void;
+  /** Initial view; the header toggle switches it. */
+  view?: 'kanban' | 'streams';
 }
 
 export const KanbanBoard = ({
@@ -1078,6 +1127,7 @@ export const KanbanBoard = ({
   onAnalyticsClick,
   onCreateFile,
   onOpenFile,
+  view: initialView = 'kanban',
 }: KanbanBoardProps) => {
   const openFiles = githubFileStore.openFiles.value;
   const tree = githubFileStore.tree.value;
@@ -1142,6 +1192,10 @@ export const KanbanBoard = ({
     rejected: true,
   });
   const [colorMode, setColorMode] = useState(false);
+  const [view, setView] = useState<'kanban' | 'streams'>(initialView);
+  const [streamMode, setStreamMode] = useState<StreamMode>('active');
+  const [streamSort, setStreamSort] = useState<StreamSort>('count');
+  const streams = view === 'streams';
   const [scope, setScope] = usePersistedScope('board');
 
   // Find .todos.md files assigned to any workspace in the dashboard config.
@@ -1171,13 +1225,12 @@ export const KanbanBoard = ({
     setFocusedFiles((prev) => pruneFocus(prev, todoFilePaths));
   }, [todoFilePaths]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tree is a trigger, not a read: a new remote sha must re-run the freshness check
   useEffect(() => {
     for (const path of todoFilePaths) {
-      if (!openFiles[path]) {
-        githubFileStore.openFile(path);
-      }
+      githubFileStore.ensureFresh(path);
     }
-  }, [todoFilePaths, openFiles]);
+  }, [todoFilePaths, tree]);
 
   // Parse all open todo files
   const parsedFiles = useMemo<{ path: string; data: TodoData }[]>(() => {
@@ -1262,6 +1315,53 @@ export const KanbanBoard = ({
     githubFileStore.saveFile(filePath);
   };
 
+  const handleStreamAdd = (filePath: string, text: string) => {
+    const file = openFiles[filePath];
+    if (!file) return;
+    githubFileStore.updateFileContent(
+      filePath,
+      addTodoEntry(file.content, { text, position: 'top' }),
+    );
+    githubFileStore.saveFile(filePath);
+  };
+
+  const handleStreamMove = (filePath: string, from: number, to: number) => {
+    const file = openFiles[filePath];
+    if (!file) return;
+    githubFileStore.updateFileContent(
+      filePath,
+      serializeTodos(moveTodo(parseTodos(file.content), from, to)),
+    );
+    githubFileStore.saveFile(filePath);
+  };
+
+  const handleCyclePriority = (filePath: string, itemIndex: number) => {
+    const file = openFiles[filePath];
+    if (!file) return;
+    const data = parseTodos(file.content);
+    const item = data.items[itemIndex];
+    if (!item) return;
+    const newData = setTodoPriority(data, item.id, cyclePriority(item.priority));
+    githubFileStore.updateFileContent(filePath, serializeTodos(newData));
+    githubFileStore.saveFile(filePath);
+  };
+
+  const handleColorChange = (filePath: string, color?: TodoColor) => {
+    const file = openFiles[filePath];
+    if (!file) return;
+    githubFileStore.updateFileContent(
+      filePath,
+      serializeTodos(setTodoColor(parseTodos(file.content), color)),
+    );
+    githubFileStore.saveFile(filePath);
+  };
+
+  // An explicit file color wins; the palette toggle only fills in files without one.
+  const cardBorder = (filePath: string): string | undefined => {
+    const data = parsedFiles.find((f) => f.path === filePath)?.data;
+    return (data && fileColorHex(data)) ?? (colorMode ? fileColors[filePath] : undefined);
+  };
+
   const handleEditText = (filePath: string, itemIndex: number, text: string) => {
     const file = openFiles[filePath];
     if (!file) return;
@@ -1300,22 +1400,22 @@ export const KanbanBoard = ({
     itemIndex: number,
     targetFilePath: string,
   ) => {
-    const sourceFile = openFiles[sourceFilePath];
-    const targetFile = openFiles[targetFilePath];
-    if (!sourceFile || !targetFile) return;
-    const sourceData = parseTodos(sourceFile.content);
-    const item = sourceData.items[itemIndex];
-    if (!item) return;
-    const newSourceData = {
-      ...sourceData,
-      items: sourceData.items.filter((_, i) => i !== itemIndex),
-    };
-    const targetData = parseTodos(targetFile.content);
-    const newTargetData = { ...targetData, items: [...targetData.items, item] };
-    githubFileStore.updateFileContent(sourceFilePath, serializeTodos(newSourceData));
-    await githubFileStore.saveFile(sourceFilePath);
-    githubFileStore.updateFileContent(targetFilePath, serializeTodos(newTargetData));
-    await githubFileStore.saveFile(targetFilePath);
+    if (!openFiles[sourceFilePath] || !openFiles[targetFilePath]) return;
+    if (sourceFilePath === targetFilePath) return;
+    // Captured now: the index may point elsewhere once core reconciles or retries the transform.
+    const dragged = parseTodos(openFiles[sourceFilePath]?.content ?? '').items[itemIndex];
+    if (!dragged) return;
+    try {
+      // One commit for both files: two separate saves could leave the item in both or neither.
+      // The transform sees the freshest contents (core reconciles before calling it).
+      await githubFileStore.commitTransform(
+        [sourceFilePath, targetFilePath],
+        (contents) => moveTodoChanges(contents, sourceFilePath, targetFilePath, dragged),
+        `Move todo to ${targetFilePath}`,
+      );
+    } catch (e) {
+      githubFileStore.error.value = e instanceof Error ? e.message : String(e);
+    }
   };
 
   const isLoading = todoFilePaths.some((p) => !openFiles[p]);
@@ -1336,8 +1436,8 @@ export const KanbanBoard = ({
             </button>
           )}
           <div className="h-4 w-px bg-[var(--los-border)]" />
-          <MonoHeader>KANBAN BOARD</MonoHeader>
-          {todoFilePaths.length > 1 ? (
+          <MonoHeader>{streams ? 'STREAMS' : 'KANBAN BOARD'}</MonoHeader>
+          {streams ? null : todoFilePaths.length > 1 ? (
             <FileSelect
               value={focusedFiles.size === 1 ? ([...focusedFiles][0] ?? '') : ''}
               options={todoFilePaths}
@@ -1351,21 +1451,31 @@ export const KanbanBoard = ({
               {todoFilePaths.length} file{todoFilePaths.length !== 1 ? 's' : ''}
             </MonoText>
           )}
-          {focusedFiles.size === 1 && focusedFileData && focusedFileData.milestones.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setAssignMode((v) => !v)}
-              className={cn(
-                'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
-                assignMode
-                  ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
-                  : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)]',
-              )}
-            >
-              <Tags size={10} />
-              ASSIGN
-            </button>
+          {!streams && focusedFiles.size === 1 && focusedFileData && (
+            <FileColorPicker
+              color={focusedFileData.color}
+              label={fileLabel([...focusedFiles][0] ?? '')}
+              onChange={(c) => handleColorChange([...focusedFiles][0] ?? '', c)}
+            />
           )}
+          {!streams &&
+            focusedFiles.size === 1 &&
+            focusedFileData &&
+            focusedFileData.milestones.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setAssignMode((v) => !v)}
+                className={cn(
+                  'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
+                  assignMode
+                    ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                    : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)]',
+                )}
+              >
+                <Tags size={10} />
+                ASSIGN
+              </button>
+            )}
         </div>
 
         <ScopeToggle value={scope} onChange={setScope} />
@@ -1392,82 +1502,115 @@ export const KanbanBoard = ({
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          {upcomingMilestone && (
-            <button
-              type="button"
-              onClick={() => setShowUpcoming((v) => !v)}
-              className={cn(
-                'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
-                showUpcoming
-                  ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
-                  : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
-              )}
-              title={`Next milestone: ${upcomingMilestone.name}${upcomingMilestone.dueDate ? ` (${upcomingMilestone.dueDate})` : ''}`}
-            >
-              <CalendarDays size={10} />
-              UPCOMING
-            </button>
-          )}
-
-          {allMilestones.length > 0 && (
-            <select
-              value={milestoneFilter}
-              onChange={(e) => {
-                setMilestoneFilter(e.currentTarget.value);
-                setShowUpcoming(false);
-              }}
-              className="bg-[var(--los-bg)] border border-[var(--los-border)] text-xs font-mono px-2 py-1 focus:border-[var(--los-accent)] outline-none transition-colors"
-            >
-              <option value="">All milestones</option>
-              {allMilestones.map((m) => (
-                <option key={m.id} value={m.id}>
-                  !{m.id}
-                  {m.dueDate ? ` · ${m.dueDate}` : ''}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setColorMode((v) => !v)}
-            className={cn(
-              'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
-              colorMode
-                ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
-                : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)]',
-            )}
-            title="Toggle list colors"
-          >
-            <Palette size={10} />
-            COLOR
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowMilestoneManager(true)}
-            className="flex items-center gap-1.5 text-[10px] font-mono border border-[var(--los-border)] px-2 py-1 text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
-          >
-            <Pencil size={10} />
-            MILESTONES
-          </button>
-
-          {onAnalyticsClick && (
-            <button
-              type="button"
-              onClick={onAnalyticsClick}
-              className="flex items-center gap-1.5 text-[10px] font-mono border border-[var(--los-border)] px-2 py-1 text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
-              title="Todo Analytics"
-            >
-              <BarChart2 size={10} />
-              ANALYTICS
-            </button>
+          <HeaderToggle
+            value={view}
+            onChange={setView}
+            options={[
+              ['kanban', 'KANBAN'],
+              ['streams', 'STREAMS'],
+            ]}
+          />
+          {streams && (
+            <>
+              <HeaderToggle
+                value={streamMode}
+                onChange={setStreamMode}
+                options={[
+                  ['active', 'ACTIVE'],
+                  ['closed', 'CLOSED'],
+                ]}
+              />
+              <HeaderToggle
+                value={streamSort}
+                onChange={setStreamSort}
+                options={[
+                  ['count', 'MOST ITEMS'],
+                  ['newest', 'NEWEST'],
+                ]}
+              />
+            </>
           )}
         </div>
+
+        {!streams && (
+          <div className="flex items-center gap-3 shrink-0">
+            {upcomingMilestone && (
+              <button
+                type="button"
+                onClick={() => setShowUpcoming((v) => !v)}
+                className={cn(
+                  'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
+                  showUpcoming
+                    ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                    : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-fg)] hover:text-[var(--los-fg)]',
+                )}
+                title={`Next milestone: ${upcomingMilestone.name}${upcomingMilestone.dueDate ? ` (${upcomingMilestone.dueDate})` : ''}`}
+              >
+                <CalendarDays size={10} />
+                UPCOMING
+              </button>
+            )}
+
+            {allMilestones.length > 0 && (
+              <select
+                value={milestoneFilter}
+                onChange={(e) => {
+                  setMilestoneFilter(e.currentTarget.value);
+                  setShowUpcoming(false);
+                }}
+                className="bg-[var(--los-bg)] border border-[var(--los-border)] text-xs font-mono px-2 py-1 focus:border-[var(--los-accent)] outline-none transition-colors"
+              >
+                <option value="">All milestones</option>
+                {allMilestones.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    !{m.id}
+                    {m.dueDate ? ` · ${m.dueDate}` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setColorMode((v) => !v)}
+              className={cn(
+                'flex items-center gap-1.5 text-[10px] font-mono border px-2 py-1 transition-colors',
+                colorMode
+                  ? 'border-[var(--los-accent)] text-[var(--los-accent)] bg-[var(--los-accent)]/5'
+                  : 'border-[var(--los-border)] text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)]',
+              )}
+              title="Toggle list colors"
+            >
+              <Palette size={10} />
+              COLOR
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowMilestoneManager(true)}
+              className="flex items-center gap-1.5 text-[10px] font-mono border border-[var(--los-border)] px-2 py-1 text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
+            >
+              <Pencil size={10} />
+              MILESTONES
+            </button>
+
+            {onAnalyticsClick && (
+              <button
+                type="button"
+                onClick={onAnalyticsClick}
+                className="flex items-center gap-1.5 text-[10px] font-mono border border-[var(--los-border)] px-2 py-1 text-[var(--los-muted)] hover:border-[var(--los-accent)] hover:text-[var(--los-accent)] transition-colors"
+                title="Todo Analytics"
+              >
+                <BarChart2 size={10} />
+                ANALYTICS
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* List badges row */}
-      {todoFilePaths.length > 1 && (
+      {!streams && todoFilePaths.length > 1 && (
         <div className="border-b border-[var(--los-border)] flex items-center gap-2 px-4 py-2 overflow-x-auto shrink-0">
           <button
             type="button"
@@ -1539,6 +1682,19 @@ export const KanbanBoard = ({
         <div className="flex-1 flex items-center justify-center text-[var(--los-muted)]">
           <MonoText>No .todos.md files found in this repository.</MonoText>
         </div>
+      ) : streams ? (
+        <StreamsBoard
+          files={parsedFiles}
+          searchQuery={searchQuery}
+          mode={streamMode}
+          sort={streamSort}
+          onStatusChange={handleStatusChange}
+          onAddItem={handleStreamAdd}
+          onMoveItem={handleStreamMove}
+          onCyclePriority={handleCyclePriority}
+          onColorChange={handleColorChange}
+          onOpenFile={onOpenFile}
+        />
       ) : !assignMode ? (
         <div className="flex-1 overflow-x-auto overflow-y-hidden flex">
           {COLUMNS.map((col) => {
@@ -1655,6 +1811,7 @@ export const KanbanBoard = ({
                                 onStatusChange={handleStatusChange}
                                 onOpenFile={onOpenFile}
                                 onEditText={handleEditText}
+                                onCyclePriority={handleCyclePriority}
                                 onMove={
                                   todoFilePaths.length > 1
                                     ? (targetPath) =>
@@ -1662,7 +1819,7 @@ export const KanbanBoard = ({
                                     : undefined
                                 }
                                 otherFilePaths={todoFilePaths.filter((fp) => fp !== agg.filePath)}
-                                borderColor={colorMode ? fileColors[agg.filePath] : undefined}
+                                borderColor={cardBorder(agg.filePath)}
                               />
                             ))}
                           </div>

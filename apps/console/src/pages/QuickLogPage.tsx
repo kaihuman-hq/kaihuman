@@ -44,8 +44,8 @@ export const QuickLogPage = () => {
     const folder = githubFileStore.appFolder.peek();
     const path = `${folder}/inbox.actionlog.md`;
     const existsInTree = githubFileStore.tree.peek().some((t) => t.path === path);
-    if (existsInTree && !githubFileStore.openFiles.peek()[path]) {
-      githubFileStore.openFile(path);
+    if (existsInTree) {
+      githubFileStore.ensureFresh(path);
     }
   }, [tree.length]);
 
@@ -242,7 +242,7 @@ export const QuickLogPage = () => {
         mode="LOG"
         onDashboardClick={() => route('/')}
         onFilesClick={() => route('/')}
-        onBoardClick={() => route('/board')}
+        onBoardClick={() => route('/stream')}
       />
     </>
   );

@@ -31,6 +31,10 @@ function contentSha(path: string, content: string): string {
   return (hex(h1) + hex(h2) + hex(h1 ^ h2) + hex(h2 + 1) + hex(h1 + 1)).slice(0, 40);
 }
 
+function httpError(status: number, message: string): Error & { status: number } {
+  return Object.assign(new Error(message), { status });
+}
+
 /**
  * Drop-in replacement for {@link GithubService} that operates entirely on an
  * in-memory `Map`. Returns Octokit-shaped responses so the stores can use it
@@ -38,14 +42,19 @@ function contentSha(path: string, content: string): string {
  */
 export class InMemoryGithubService {
   private files = new Map<string, MemoryFile>();
+  /** Every blob ever written, by sha. Blobs are immutable in git, so old shas stay readable. */
+  private blobs = new Map<string, string | Uint8Array>();
+  /** Snapshot served by `getFileContent` while stale reads are on. */
+  private staleFiles: Map<string, MemoryFile> | null = null;
   private repos: GithubRepo[] = [];
   private commitCount = 0;
 
   /** Install seed data. Replaces any previously loaded state. */
   load(files: Record<string, string>, repos: GithubRepo[]): void {
     this.files.clear();
+    this.blobs.clear();
     for (const [path, content] of Object.entries(files)) {
-      this.files.set(path, { content, sha: contentSha(path, content) });
+      this.put(path, { content, sha: contentSha(path, content) });
     }
     this.repos = repos;
     logger.info(`Loaded ${this.files.size} files and ${repos.length} repo(s) into demo store.`);
@@ -54,7 +63,23 @@ export class InMemoryGithubService {
   /** Remove all in-memory state (used when exiting demo mode). */
   reset(): void {
     this.files.clear();
+    this.blobs.clear();
+    this.staleFiles = null;
     this.repos = [];
+  }
+
+  private put(path: string, file: MemoryFile): void {
+    this.files.set(path, file);
+    this.blobs.set(file.sha, file.bytes ?? file.content);
+  }
+
+  /**
+   * Test hook: while on, `getFileContent` serves the files as they were when this was switched
+   * on, like a cached by-path read. The real service bypasses the HTTP cache (no-store), so store
+   * code must never rely on a by-path read being stale OR fresh beyond what the sha check enforces.
+   */
+  setStaleReads(on: boolean): void {
+    this.staleFiles = on ? new Map(this.files) : null;
   }
 
   async getRepo(_owner: string, repo: string): Promise<GithubRepo> {
@@ -90,12 +115,8 @@ export class InMemoryGithubService {
     path: string,
     _opts?: { ref?: string },
   ): Promise<{ content: string; sha: string }> {
-    const file = this.files.get(path);
-    if (!file) {
-      const err = new Error(`Not Found: ${path}`) as Error & { status: number };
-      err.status = 404;
-      throw err;
-    }
+    const file = (this.staleFiles ?? this.files).get(path);
+    if (!file) throw httpError(404, `Not Found: ${path}`);
     return { content: file.content, sha: file.sha };
   }
 
@@ -114,9 +135,9 @@ export class InMemoryGithubService {
   }
 
   async getBlobBytes(_owner: string, _repo: string, sha: string): Promise<Uint8Array> {
-    const file = [...this.files.values()].find((f) => f.sha === sha);
-    if (!file) throw new Error(`Not found: blob ${sha}`);
-    return file.bytes ?? new TextEncoder().encode(file.content);
+    const blob = this.blobs.get(sha);
+    if (blob === undefined) throw new Error(`Not found: blob ${sha}`);
+    return typeof blob === 'string' ? new TextEncoder().encode(blob) : blob;
   }
 
   async saveFile(
@@ -125,11 +146,18 @@ export class InMemoryGithubService {
     path: string,
     content: string,
     _message: string,
-    _sha?: string,
+    sha?: string,
   ): Promise<{ content: { sha: string } }> {
-    const sha = contentSha(path, content);
-    this.files.set(path, { content, sha });
-    return { content: { sha } };
+    const existing = this.files.get(path);
+    if (existing) {
+      // Same statuses GitHub answers with: 422 for a missing sha, 409 for a stale one.
+      if (!sha) throw httpError(422, `"sha" wasn't supplied: ${path} exists`);
+      if (sha !== existing.sha) throw httpError(409, `${path} does not match ${sha}`);
+    }
+    const next = contentSha(path, content);
+    this.put(path, { content, sha: next });
+    this.commitCount++; // a real PUT is a commit: the head must move so syncers notice it
+    return { content: { sha: next } };
   }
 
   async deleteFile(
@@ -140,6 +168,7 @@ export class InMemoryGithubService {
     _sha: string,
   ): Promise<Record<string, never>> {
     this.files.delete(path);
+    this.commitCount++;
     return {};
   }
 
@@ -158,7 +187,7 @@ export class InMemoryGithubService {
       this.files.delete(item.path);
       // Binary content is hashed as bytes; text keeps the demo's path-derived pseudo sha.
       const sha = file.bytes ? gitBlobSha(file.bytes) : contentSha(newPath, file.content);
-      this.files.set(newPath, { ...file, sha });
+      this.put(newPath, { ...file, sha });
     }
   }
 
@@ -174,7 +203,7 @@ export class InMemoryGithubService {
     files: Record<string, string | Uint8Array | null>,
     _message: string,
     opts?: { expectedHeadSha?: string },
-  ): Promise<{ commitSha: string; blobShas: Record<string, string> }> {
+  ): Promise<{ commitSha: string; blobShas: Record<string, string>; skipped?: string[] }> {
     const head = await this.getHeadSha(owner, repo, branch);
     if (opts?.expectedHeadSha !== undefined && opts.expectedHeadSha !== head) {
       throw new ConflictError(`${branch} moved from ${opts.expectedHeadSha} to ${head}`);
@@ -187,7 +216,7 @@ export class InMemoryGithubService {
       }
       // Same sha the real service reports, so the tree and blobShas agree.
       const sha = gitBlobSha(content);
-      this.files.set(
+      this.put(
         path,
         typeof content === 'string' ? { content, sha } : { content: '', bytes: content, sha },
       );
@@ -201,10 +230,21 @@ export class InMemoryGithubService {
     owner: string,
     repo: string,
     path: string,
-    content: string,
+    content: string | ((current: string | null) => string),
     message: string,
   ): Promise<{ content: { sha: string } }> {
-    return this.saveFile(owner, repo, path, content, message);
+    for (let attempt = 1; ; attempt++) {
+      const existing = this.files.get(path);
+      const current = existing ? existing.content : null;
+      const next = typeof content === 'function' ? content(current) : content;
+      if (existing && next === current) return { content: { sha: existing.sha } };
+      try {
+        return await this.saveFile(owner, repo, path, next, message, existing?.sha);
+      } catch (e) {
+        const status = (e as { status?: number }).status;
+        if ((status !== 409 && status !== 422) || attempt >= 3) throw e;
+      }
+    }
   }
 
   async listCommits(

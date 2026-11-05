@@ -3,6 +3,96 @@
 ## 2026-11-05 — Business link in the default navbar
 
 - The desktop navbar now includes Business by default once `.kh/business/business.yaml` exists (`defaultNavbar(businessEnabled)` in `navbar-items.ts`, `MainApp` prop `businessEnabled`, set by the Dashboard). Before that the entry existed only in the Dashboard magic menu and as an opt-in item in Settings. A customised navbar is unchanged. Without business set up the magic-menu entry still opens `/business`, which shows the enable callout. Test: `navbar-config.test.ts`.
+## 2026-11-05 — Sync fixes, phase 2 (revalidate on resume, outbox, atomic moves)
+
+- Fix 2: `GithubFileStore.syncNow()` reads the head (no-store) and stops when it is unchanged; otherwise it loads the tree of that commit, refreshes clean open files whose sha changed (blob by sha) and reconciles dirty ones through phase 1's `reconcile`. Concurrent calls share one run; it skips while a save or tree load is in flight. `installAutoSync` (core `sync/auto-sync.ts`, wired in console `main.tsx`) runs it on `visibilitychange → visible`, `focus`, `online` and every 90 s while visible, throttled to 2 s. `loadTree` records the head too.
+- Views no longer use `if (!openFiles[p]) openFile(p)`: they call `ensureFresh(path)` (opens a missing file; reconciles an open one whose tree sha changed, once per tree sha). Kanban, TodoAnalytics, ActionLog, BoardOverview, GraphView, Dashboard read-it-later, Quick log/note/todo.
+- Fix 5: the outbox is the IndexedDB `files` records marked dirty (no DB version bump). `flushOutbox()` restores them and saves each through `saveFile` (sha-checked, 409 → reconcile, never a force push); failures retry with backoff (2 s doubling, max 5 min). Runs at startup, on resume and online. `unsyncedCount` drives the new **UNSYNCED n** status-bar indicator.
+- Fix 6: `renameFile` and the new `commitTransform(paths, transform, message)` (used by the Kanban move) are one `commitFiles` with `expectedHeadSha`, retried on `ConflictError`. The tree smart merge keeps a cached-only entry only when it is unpushed (`sha === ''`) or just committed (`pendingCommit`, was `pendingBinary`).
+- In-memory GitHub service: `saveFile`/`deleteFile` advance the head. Tests: `sync-phase2.test.ts` (causes 2, 5, 6), `auto-sync.test.ts`, `UnsyncedIndicator.test.tsx`, editor test for remote content under a clean editor.
+- Review fixes: a sync/`ensureFresh`/`commitTransform` run no longer reconciles against a listing older than a save (save-generation guard, saved tree sha kept, head not recorded when a path was skipped) or after a repo switch; edits typed during `commitTransform`/`renameFile` commits are replayed instead of overwritten; `deleteFile`/`renameFolder` clear dirty state so the outbox stops retrying removed paths; `commitTransform` makes no commit for an empty change set; the Kanban move re-finds the dragged todo by text and `createdAt` (`moveTodo.ts`) instead of a stale index.
+
+## 2026-11-05 — Sync fixes, phase 1 (no blind overwrite, durable edits, no-store reads)
+
+- Fix 1: `GithubFileStore.saveFile` no longer re-sends stale content on 409/422 ("user wins" removed). New `reconcile(path)` reads the remote copy (no-store), three-way merges it with the working copy's base, then saves with the remote sha or fills `fileConflicts`. `keep_local` only overrides the version the user saw. `upsertRepoFile` takes a merge function and retries on 409/422; the push config merges subscriptions; raw notes are created without a read.
+- Merge: in-repo line diff3 in `packages/core/src/sync/`, plus a merger registry; structural todos, read-it-later and action-log merges live in `packages/formats/src/merge.ts` and are registered by the console at startup (core still does not import formats).
+- Fix 3: IndexedDB file records keep `dirty` and `baseContent`; `openFile` merges instead of replacing a dirty copy. Editor autosave is a 3 s debounce (was 2 min) and flushes on `visibilitychange → hidden`, `pagehide` and unmount.
+- Fix 4: `fetchRepoTree`'s ref read and by-path `getFileContent` bypass the HTTP cache.
+- In-memory GitHub service: 409/422 on sha mismatch, blob history, stale-read mode. Tests: `sync.test.ts` (causes 1, 3, 4), `merge.test.ts` (core and formats), `sync-io.test.ts`, editor autosave tests.
+- Review fixes: the editor reads its dirty flag back from `githubFileStore.dirtyFiles` after a save and on store updates (failed saves stay dirty and retry on hide; a still-dirty merge or IndexedDB-restored file is autosaved; a path switch saves the previous file). `saveFile` keeps the sha/base a concurrent reconcile set; `openFile` drops a read that raced a save (per-path save generation); a repo switch flushes pending cache writes (keyed by the repo they were made in) and resets dirty/conflict state; new `discardLocal(path)` used by the failed idea-create rollback; push setup treats only a 404 as first setup and refuses to write a config whose VAPID key changed under it. Phase 1 status noted in `doc/sync-analysis.md`.
+- Phase 2 (resume revalidation, outbox, atomic moves) is still open; it will call `reconcile(path)`.
+
+## 2026-11-05 — Sync analysis (docs only)
+
+- New `doc/sync-analysis.md`: root causes of late cross-device sync and lost desktop edits in the console PWA (blind "user wins" 409 retry, no revalidation on resume, 2-min autosave + non-durable dirty flag, HTTP-cached reads, no outbox), with evidence, repro, fix design and test plan. No source changes.
+
+## 2026-11-04 — Travel: read-only widget, separate trip editor
+
+- `TravelWidget` is read-only in every mode: focus shows trips (sorted), trip and step fields, addresses, custom fields, website and "Open in Maps" links (http(s) only, new tab), and an EDIT button per trip.
+- New `TravelEditForm` edits one trip on a local draft (trip fields, custom fields, steps with address/maps URL/custom fields, reorder, delete step, delete trip); SAVE writes, CANCEL discards. Opened via `MainApp` view mode `EDIT` + trip id. Shared step metadata moved to `TravelMeta.ts`.
+- Edit tests moved to the form; new tests for read-only widget, maps links, Edit button, step address/custom fields, cancel.
+
+## 2026-11-04 — Travel steps: address, maps link, custom fields (formats)
+
+- Every `TravelStep` gets optional `address`, `mapsUrl` and `custom: CustomField[]` (missing → `[]`, old files still parse and round-trip). `updateStep` can patch them; new `mapsLink(step)` returns `mapsUrl` or a Google Maps search URL for `address`. Tests in `travel.test.ts`; spec v2 section added. No UI yet.
+
+## 2026-11-04 — Travel file type (`.travel.json`)
+
+- New yearly travel file `YYYY.travel.json` (`{version, currency, trips[]}`) in `@kaihuman/formats` (`travel.ts`): tolerant parse, pure mutators, trip/total cost, `nextTrip`. Step types: general, car (toll dates), rental, flight, train, hotel.
+- `TravelWidget` (tile: next trip, countdown, totals; focus: edit trips, custom fields, steps) and `TravelAddForm`; wired into layout store, `MainApp`, `Dashboard`, `NewFileWizard`, `kb-skills`.
+- Review fixes: empty `.travel.json` now renders the widget; cost field no longer resets while typing decimals or when cleared (regression test).
+
+## 2026-11-04 — Business enable and writes without the workflow scope
+
+- Enabling business failed with `404 Not Found` on `git/trees`: sign-in requests only the `repo` scope, and GitHub refuses a tree touching `.github/workflows/` without `workflow`. `commitFiles` (core) now retries once without workflow files on 404/403 and returns them in `skipped`; `enableBusiness` returns them with content and `/business/enable` shows the workflow to add by hand; `writeBusiness` keeps them out of the local mirror. Ruling W1 in `doc/business.md`. Regression tests in core and console.
+
+## 2026-11-04 — Faster 10 MB base64 test in core
+
+- `commit-files.test.ts`: the 10 MB round-trip test built and checked bytes with `Uint8Array.from(fn)` / `.every()` (~4 s) and timed out on busy CI runners. Plain loops (~0.7 s) and a 30 s timeout.
+
+## 2026-11-04 — Easier to find colour and priority controls
+
+- `FileColorPicker` shows a palette icon when no colour is set; unset `PriorityBadge` stays faintly visible instead of hidden until hover.
+
+## 2026-11-04 — Stream tab, file colours, item priority, extension todo list
+
+- Console bottom bar: "Board" is now "Stream" and opens `/stream` (stream view). `/streams` and `/board` still work.
+- Per-file colour picker (10 colours) in stream tiles and the kanban file filter; stream tile border and kanban card border use it.
+- `PriorityBadge` (`!`/`!!`/`!!!`) on stream items and kanban cards; click cycles priority. Streams with higher-priority open items sort first.
+- Browser extension side panel: "Todos" flat list of open and in-progress todos from all `.todos.md` files, sorted by priority, then oldest created, then in-progress first. Shows file colour, priority, status and stream; actions start, back to open, done, reject, cycle priority (`GET_OPEN_TODOS`, `UPDATE_TODO`).
+
+## 2026-11-04 — Todos: file colour and item priority
+
+- `@kaihuman/formats` `todos.ts`: optional `color:` in the `.todos.md` frontmatter (`TODO_COLORS`, `TodoColor`, `TODO_COLOR_HEX`, `setTodoColor`; unknown values parse to undefined, frontmatter still omitted when empty) and inline item priority tokens `^high` / `^super-high` / `^ultra-high` (`TodoPriority`, `PRIORITY_RANK`, `PRIORITY_LABELS`, `setTodoPriority`, `cyclePriority`, `maxPriorityRank`). Unknown `^word` stays in the text. Round-trip tests added.
+
+## 2026-11-04 — Streams view on the board
+
+- New `StreamsBoard` (`packages/ui`): one tile per `.todos.md` in a 4-column grid, an always-visible add input (Enter adds on top), colour-coded rows, hover buttons for in progress / done / rejected / backlog, drag to reorder within a tile (`moveTodo`). Header toggles KANBAN | STREAMS, ACTIVE | CLOSED and MOST ITEMS | NEWEST; scope and search apply. Route `/streams` in the console; `KanbanBoard` takes `view`.
+- Pure helpers `streamItems`, `sortStreams`, `actionsFor` are unit-tested.
+
+## 2026-11-03 — Business, phase 6: e-invoices (XRechnung UBL, CII/ZUGFeRD)
+
+- `@kaihuman/formats` business: `xml.ts` (small builder, escaping, illegal control characters stripped) and `xrechnung.ts` with `toUbl(e)` (XRechnung 3.0 UBL 2.1, `Invoice` for 380, `CreditNote` for 381 with the preceding invoice in BG-3), `toCii(e, { guideline: 'xrechnung' | 'en16931' })` (UN/CEFACT CII D16B; `en16931` is the ZUGFeRD / Factur-X EN 16931 profile), `electronicAddress` (explicit `SCHEME:value`, e-mail → `EM`, Leitweg-ID → `0204`) and `xrechnungGaps` (buyer reference, seller contact with phone and e-mail, electronic addresses, E without reason). Mapping: SEPA `58` with IBAN/BIC/reference, credit notes without payment get code `1` and a refund note (BT-20), AE with `VATEX-EU-AE`, E with the § 19 reason, O without rate, service period, delivery date, UN/ECE units. Amounts are the strings of `toEn16931`, so rounding is that of `computeTotals`.
+- Golden files `packages/formats/fixtures/business/einvoice/` (invoice, reverse charge, small business, credit note; UBL and CII) equal the serialiser output (`UPDATE_GOLDEN=1` rewrites them); CI job `einvoice` checks them with the KoSIT validator 1.6.3 and the XRechnung 3.0.2 configuration (2026-08-31), sha256-pinned and cached.
+- Console client page: `XML` column (`XML` / muted `XML missing`), **Download XRechnung (UBL)** (`<number>.xrechnung.xml`) and **Download CII** (`<number>.cii.xml`) on invoices and credit notes, generated in the browser, with `XRechnung incomplete: …` when data is missing, and `No e-invoice: …` on the row instead of a crash when the document cannot be mapped. `InvoiceRow.xml`.
+- `doc/business.md`: e-invoice section and how an external generator embeds the CII as `factur-x.xml` into a PDF/A-3 for ZUGFeRD. No business-check or skill change, so `BUSINESS_TOOLS_VERSION` stays.
+
+## 2026-11-03 — Business: loader survives uncomputable totals
+
+- `loadBusinessRepo` no longer throws when an issued file's lines overflow the amount range in `computeTotals`; it reports a `totals` error for that file and loads the rest (regression test in `repo.test.ts`).
+
+## 2026-11-03 — Business, phase 5b part B: kb-mcp business tools
+
+- `apps/kb-mcp` gets business tools (`src/business-tools.ts`, `src/business.ts`) on top of `@kaihuman/formats/business`; status, VAT, reminders and the check come from the library. Read: `business_clients`, `business_client`, `business_open_invoices` (every `client` input takes the slug or the name, case-insensitive), `business_vat_summary`, `business_reminders`, `business_check` (works without a profile; says the frozen-file rule is not checked). Write: `business_create_draft`, `business_update_draft` (replaces the whole draft), `business_add_time`, `business_add_todo`, `business_add_log`, `business_add_expense` (no receipt). Writes return `{ paths, id?, git }`.
+- Guard: every write path must classify as draft, time, expense, todos or log; deletions, binary content and all other paths are refused, so the server never issues, numbers or deletes. Symlinks in `.kh/business` are skipped on read and refused on write. Business data is always at `.kh/business`, even with the legacy `.lifeos`. Business writes share the ideas queue and `--git` sync (commit message `business: …`).
+- Docs: `apps/kb-mcp/README.md`, `doc/business.md`, `doc/features.md`. The `kh-business` skill prefers the `business_*` tools when available. `BUSINESS_TOOLS_VERSION` is `1.4.0`, so `syncKB` refreshes the skill in existing repos. With part A (#166) merged, phase 5b is ticked in the roadmap.
+
+## 2026-11-03 — Business, phase 5b part A: client targets in the extension and desktop palette
+
+- Shared palette (`packages/palette/src/business.ts`): `loadBusinessCapture(port, consoleUrl)` reads `READ_BUSINESS_CONTEXT` once per palette open (in the background) and, when `.kh/business/business.yaml` exists, turns `todo <client>: text`, `log <client>: text`, `timer <client>[/project]` and `stop timer` into one row under **Business**, listed first (`PaletteHandlers.loadCapture`, wired in `portHandlers`, so the extension's in-page and start-page palettes and the desktop palette all get it). Parsing is the console's `parseCapture` (exact slug or unique prefix). ⏎ reads the target file fresh (`READ_BUSINESS_FILE`), builds the change with the new formats `buildCapture` (the console's `addClientTodo` / `addClientLog` / `startTimer`) and writes it in one commit with the console's message (`WRITE_BUSINESS_FILE`, over the version read; a new file is never written over an existing one). `stop timer` opens the console's time form. Without business set up nothing changes.
+- `@kaihuman/formats` business `actions/capture.ts`: `isCaptureContextPath` (profile, client, project, timer), `isCaptureWritePath` (client `todos.todos.md`, `log.actionlog.md`, `time/running.yaml`), `capturePath`, `buildCapture` (refuses a running timer read fresh).
+- Backends: the extension's service worker (`fetchBusinessContext` in `palette-modes.ts`; `githubWriteFile` takes a commit message) and the desktop's Rust (`src-tauri/src/business.rs`, requests in `requests.rs`) answer the three requests and refuse any other path.
+- Review fixes: a capture row that loads late moves the selection down with the selected row; each palette open drops the last lookup and ignores an older load, so another repository's clients never stay live; the extension puts a written business file into the start page's cache; both backends refuse a file GitHub sends without content (over 1 MB) instead of reading it as empty.
 
 ## 2026-11-02 — Business, phase 5a: money admin
 

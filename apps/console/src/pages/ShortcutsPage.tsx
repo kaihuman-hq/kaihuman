@@ -352,7 +352,7 @@ export const ShortcutsPage = () => {
         mode="SHORTCUTS"
         onDashboardClick={() => route('/')}
         onFilesClick={() => route('/')}
-        onBoardClick={() => route('/board')}
+        onBoardClick={() => route('/stream')}
       />
     </>
   );
