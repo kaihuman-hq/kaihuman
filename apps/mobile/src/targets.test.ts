@@ -1,0 +1,382 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { WidgetTodoItem, WidgetTodoSnapshot } from '@kaihuman/core';
+import { parseTodos } from '@kaihuman/formats';
+import { describe, expect, it } from 'vitest';
+import withKaihumanWidgets, {
+  type AndroidManifest,
+  addGlanceDependencies,
+  addIosWidgetTarget,
+  addWidgetReceiverToManifest,
+  type CopyFs,
+  copyAndroidWidgetSources,
+  IOS_WIDGET_TARGET,
+  type ModFn,
+  withIosAppGroup,
+  withUrlScheme,
+  type XcodeEditor,
+} from '../plugins/with-kaihuman-widgets.js';
+import {
+  PENDING_WIDGET_MUTATIONS_FILE,
+  type PendingWidgetMutation,
+  WIDGET_TODOS_FILE,
+} from './adapters/widget-bridge.js';
+import {
+  planEventReminders,
+  planMilestoneReminders,
+  planReminders,
+} from './notifications/milestone-reminders.js';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const read = (p: string): string => readFileSync(join(root, p), 'utf8');
+const kotlin = (f: string): string => read(`targets/android-widget/${f}`);
+const kotlinAll = (): string =>
+  ['TodoGlanceWidget.kt', 'TodoWidgetReceiver.kt', 'ToggleTodoAction.kt'].map(kotlin).join('\n');
+
+// ─── Config plugin ──────────────────────────────────────────────────────────
+
+const emptyManifest = (): AndroidManifest => ({ manifest: { application: [{ $: {} }] } });
+
+describe('config plugin transforms', () => {
+  it('adds the app group entitlement idempotently, keeping other groups', () => {
+    const once = withIosAppGroup({
+      ios: { entitlements: { 'com.apple.security.application-groups': ['group.other'] } },
+    });
+    expect(once.ios?.entitlements?.['com.apple.security.application-groups']).toEqual([
+      'group.other',
+      'group.com.kaihuman.app',
+    ]);
+    expect(withIosAppGroup(once)).toEqual(once);
+    expect(
+      withIosAppGroup({}).ios?.entitlements?.['com.apple.security.application-groups'],
+    ).toEqual(['group.com.kaihuman.app']);
+  });
+
+  it('sets the kaihuman scheme without duplicating', () => {
+    expect(withUrlScheme({}).scheme).toBe('kaihuman');
+    expect(withUrlScheme({ scheme: 'kaihuman' }).scheme).toBe('kaihuman');
+    expect(withUrlScheme({ scheme: 'other' }).scheme).toEqual(['other', 'kaihuman']);
+    expect(withUrlScheme({ scheme: ['other', 'kaihuman'] }).scheme).toEqual(['other', 'kaihuman']);
+  });
+
+  it('adds the widget receiver to the manifest idempotently', () => {
+    const m = addWidgetReceiverToManifest(addWidgetReceiverToManifest(emptyManifest()));
+    const receivers = m.manifest.application?.[0]?.receiver ?? [];
+    expect(receivers).toHaveLength(1);
+    expect(receivers[0]).toEqual({
+      $: { 'android:name': '.TodoWidgetReceiver', 'android:exported': 'false' },
+      'intent-filter': [
+        { action: [{ $: { 'android:name': 'android.appwidget.action.APPWIDGET_UPDATE' } }] },
+      ],
+      'meta-data': [
+        {
+          $: {
+            'android:name': 'android.appwidget.provider',
+            'android:resource': '@xml/todo_widget_info',
+          },
+        },
+      ],
+    });
+  });
+
+  it('describes the iOS widget extension target', () => {
+    expect(IOS_WIDGET_TARGET).toMatchObject({
+      name: 'KaihumanWidgets',
+      bundleIdentifier: 'com.kaihuman.app.widgets',
+      sourceDir: 'targets/ios-widget',
+      deploymentTarget: '17.0',
+    });
+  });
+
+  it('only adds the Xcode target when it is missing', () => {
+    const calls: string[] = [];
+    let exists = false;
+    const editor: XcodeEditor = {
+      hasTarget: () => exists,
+      addWidgetExtension: (_p, t, files) => {
+        calls.push(`${t.name}:${files.join(',')}`);
+        exists = true;
+      },
+    };
+    addIosWidgetTarget({}, ['A.swift'], editor);
+    addIosWidgetTarget({}, ['A.swift'], editor);
+    expect(calls).toEqual(['KaihumanWidgets:A.swift']);
+  });
+
+  it('composes with existing mods and applies the transforms through them', async () => {
+    const order: string[] = [];
+    const existing: ModFn = async (cfg) => {
+      order.push('existing');
+      return cfg;
+    };
+    const config = withKaihumanWidgets({
+      scheme: 'kaihuman',
+      android: { package: 'com.kaihuman.app' },
+      mods: { android: { manifest: existing } },
+    });
+
+    expect(config.ios?.entitlements?.['com.apple.security.application-groups']).toContain(
+      'group.com.kaihuman.app',
+    );
+    const manifestMod = config.mods?.android?.manifest as ModFn;
+    const out = await manifestMod({ modResults: emptyManifest() });
+    expect(order).toEqual(['existing']);
+    expect((out.modResults as AndroidManifest).manifest.application?.[0]?.receiver).toHaveLength(1);
+
+    const added: string[] = [];
+    const fakeXcode: XcodeEditor = {
+      hasTarget: () => false,
+      addWidgetExtension: (_p, t) => added.push(t.name),
+    };
+    const faked = withKaihumanWidgets({}, { xcode: fakeXcode });
+    await (faked.mods?.ios?.xcodeproj as ModFn)({ modResults: {} });
+    expect(added).toEqual(['KaihumanWidgets']);
+  });
+
+  it('adds the Glance dependency to app/build.gradle idempotently', async () => {
+    const gradle = 'android {\n}\n\ndependencies {\n    implementation "x:y:1"\n}\n';
+    const once = addGlanceDependencies(gradle);
+    expect(once).toContain(
+      'dependencies {\n    implementation "androidx.glance:glance-appwidget:1.1.1"',
+    );
+    expect(addGlanceDependencies(once)).toBe(once);
+
+    let previous = false;
+    const config = withKaihumanWidgets({
+      mods: {
+        android: {
+          appBuildGradle: async (cfg) => {
+            previous = true;
+            return cfg;
+          },
+        },
+      },
+    });
+    const out = await (config.mods?.android?.appBuildGradle as ModFn)({
+      modResults: { contents: gradle },
+    });
+    expect(previous).toBe(true);
+    expect((out.modResults as { contents: string }).contents).toContain('glance-appwidget:1.1.1');
+  });
+
+  it('keeps Kotlin package lines aligned with the Android package', () => {
+    for (const f of ['TodoGlanceWidget.kt', 'TodoWidgetReceiver.kt', 'ToggleTodoAction.kt']) {
+      expect(kotlin(f)).toMatch(/^package com\.kaihuman\.app$/m);
+    }
+  });
+
+  it('copies Kotlin sources and res into the generated project via an injected fs', () => {
+    const ops: string[] = [];
+    const fs: CopyFs = {
+      exists: () => true,
+      mkdir: (p) => ops.push(`mkdir ${p}`),
+      copy: (a, b) => ops.push(`cp ${a} ${b}`),
+      list: () => ['A.kt', 'res', 'notes.txt'],
+    };
+    const copied = copyAndroidWidgetSources('/p', '/p/android', 'com.kaihuman.app', fs);
+    expect(copied).toEqual([
+      '/p/android/app/src/main/java/com/kaihuman/app/A.kt',
+      '/p/android/app/src/main/res',
+    ]);
+  });
+});
+
+// ─── Kotlin / TS parity ─────────────────────────────────────────────────────
+
+const fullItem: Required<WidgetTodoItem> = {
+  id: 'a#0',
+  filePath: '.kh/inbox.todos.md',
+  indexInFile: 0,
+  text: 't',
+  status: 'backlog',
+  tags: [],
+  milestoneId: 'm',
+  milestoneName: 'M',
+  milestoneDueDate: '2026-01-01',
+  updatedAt: 1,
+};
+const fullSnapshot: Required<WidgetTodoSnapshot> = {
+  updatedAt: 1,
+  repoFullName: 'o/r',
+  branch: 'main',
+  appFolder: '.kh',
+  upcomingMilestone: { id: 'm', name: 'M', dueDate: '2026-01-01' },
+  counts: { inbox: 0, inProgress: 0, backlog: 0, doneToday: 0 },
+  items: [fullItem],
+  files: { p: { sha: 's', content: 'c' } },
+};
+const snapshotKeys = [
+  ...Object.keys(fullSnapshot),
+  ...Object.keys(fullItem),
+  ...Object.keys(fullSnapshot.upcomingMilestone),
+  ...Object.keys(fullSnapshot.counts),
+  ...Object.keys(fullSnapshot.files.p ?? {}),
+];
+
+describe('Kotlin widget sources', () => {
+  it('uses every WidgetTodoSnapshot JSON key', () => {
+    const src = kotlinAll();
+    for (const key of new Set(snapshotKeys)) expect(src, key).toContain(`"${key}"`);
+  });
+
+  it('knows every todo status value', () => {
+    for (const status of ['backlog', 'in-progress', 'done', 'rejected']) {
+      expect(kotlin('TodoGlanceWidget.kt')).toContain(`"${status}"`);
+    }
+  });
+
+  it('uses the shared preference and file names from widget-bridge.ts', () => {
+    const src = kotlin('TodoGlanceWidget.kt');
+    expect(src).toContain('"kaihuman_widget"');
+    expect(src).toContain(`"${WIDGET_TODOS_FILE}"`);
+    expect(src).toContain(`"${PENDING_WIDGET_MUTATIONS_FILE}"`);
+  });
+
+  it('queues PendingWidgetMutation records', () => {
+    const sample: PendingWidgetMutation = { itemId: 'x', timestamp: 1 };
+    for (const key of Object.keys(sample))
+      expect(kotlin('ToggleTodoAction.kt')).toContain(`"${key}"`);
+  });
+
+  it('pushes to the GitHub contents API with sha and branch', () => {
+    const src = kotlin('ToggleTodoAction.kt');
+    expect(src).toMatch(
+      /https:\/\/api\.github\.com\/repos\/\$\{snapshot\.repoFullName\}\/contents\/\$path/,
+    );
+    expect(src).toContain('"PUT"');
+    for (const key of ['message', 'content', 'sha', 'branch']) expect(src).toContain(`"${key}"`);
+    expect(src).toContain('Dispatchers.IO');
+    expect(src).toContain('TodoGlanceWidget().updateAll(context)');
+  });
+
+  it('serializes the updated marker like formats does', () => {
+    const src = kotlin('ToggleTodoAction.kt');
+    expect(src).toContain('::updated:: $nowMs');
+    expect(src).toContain('"[x]"');
+    // Same layout the Kotlin edit targets: marker line, then meta line.
+    const md = '- [ ] a #t\n::updated:: 1\n';
+    expect(parseTodos(md).items[0]?.updatedAt).toBe(1);
+  });
+
+  it('renders the Nexus widget', () => {
+    const src = kotlin('TodoGlanceWidget.kt');
+    for (const s of ['KAIHUMAN // TODOS', '0xFF0A0A0F', '0xFF00FF00', 'kaihuman://quick-todo']) {
+      expect(src).toContain(s);
+    }
+    expect(src).toContain('actionRunCallback<ToggleTodoAction>');
+    expect(src).toContain('MAX_TASKS = 5');
+  });
+
+  it('wires the receiver and widget info xml', () => {
+    expect(kotlin('TodoWidgetReceiver.kt')).toContain('GlanceAppWidgetReceiver');
+    expect(kotlin('TodoWidgetReceiver.kt')).toContain('TodoGlanceWidget()');
+    const xml = read('targets/android-widget/res/xml/todo_widget_info.xml');
+    expect(xml).toContain('<appwidget-provider');
+    expect(xml).toContain('android:widgetCategory="home_screen"');
+  });
+
+  it('app.json registers the plugin and scheme', () => {
+    const app = JSON.parse(read('app.json')) as { expo: { plugins: string[]; scheme: string } };
+    expect(app.expo.scheme).toBe('kaihuman');
+    expect(app.expo.plugins).toContain('./plugins/with-kaihuman-widgets.ts');
+  });
+});
+
+// ─── Reminders ──────────────────────────────────────────────────────────────
+
+const at = (y: number, m: number, d: number, h = 0, min = 0): number =>
+  new Date(y, m - 1, d, h, min).getTime();
+const now = new Date(2026, 10, 5, 12, 0); // 2026-11-05 12:00 local
+
+const todos = `---
+milestones:
+  - id: v1
+    name: Version 1
+    dueDate: 2026-11-07
+  - id: old
+    name: Old One
+    dueDate: 2026-11-01
+  - id: finished
+    name: Finished
+    dueDate: 2026-11-02
+  - id: tomorrow
+    name: Tomorrow
+    dueDate: 2026-11-06
+---
+
+- [>] ship it !v1
+- [ ] late !old
+- [x] done thing !finished
+- [ ] soon !tomorrow
+`;
+
+describe('milestone reminders', () => {
+  it('schedules eve and due-day reminders at 09:00 local, skipping past ones', () => {
+    const r = planMilestoneReminders(parseTodos(todos), now);
+    const byId = new Map(r.map((x) => [x.id, x]));
+    expect(byId.get('milestone:v1:eve')?.fireAt).toBe(at(2026, 11, 6, 9));
+    expect(byId.get('milestone:v1:due')?.fireAt).toBe(at(2026, 11, 7, 9));
+    // Eve of "tomorrow" is today 09:00, already past.
+    expect(byId.has('milestone:tomorrow:eve')).toBe(false);
+    expect(byId.get('milestone:tomorrow:due')?.fireAt).toBe(at(2026, 11, 6, 9));
+  });
+
+  it('fires overdue milestones immediately and ignores finished ones', () => {
+    const r = planMilestoneReminders(parseTodos(todos), now);
+    expect(r.find((x) => x.id === 'milestone:old:overdue')?.fireAt).toBe(now.getTime());
+    expect(r.some((x) => x.id.startsWith('milestone:finished'))).toBe(false);
+  });
+
+  it('honors milestoneHour', () => {
+    const r = planMilestoneReminders(parseTodos(todos), now, { milestoneHour: 8 });
+    expect(r.find((x) => x.id === 'milestone:v1:due')?.fireAt).toBe(at(2026, 11, 7, 8));
+  });
+});
+
+const csv = `name;type;start iso date;end iso date
+Dentist;general;2026-11-06;2026-11-06
+Past trip;general;2026-10-01;2026-10-03
+Mum;birthday;1960-11-05;1960-11-05
+Anna;birthday;1990-12-24;1990-12-24
+Bad;general;nope;nope
+`;
+
+describe('event reminders', () => {
+  it('fires N minutes before the assumed 09:00 start', () => {
+    const r = planEventReminders(csv, now);
+    expect(r.find((x) => x.title === 'Dentist')?.fireAt).toBe(at(2026, 11, 6, 8));
+    const custom = planEventReminders(csv, now, { eventLeadMinutes: 30 });
+    expect(custom.find((x) => x.title === 'Dentist')?.fireAt).toBe(at(2026, 11, 6, 8, 30));
+  });
+
+  it('skips past-only and malformed events, rolls birthdays forward', () => {
+    const r = planEventReminders(csv, now);
+    expect(r.some((x) => x.title === 'Past trip' || x.title === 'Bad')).toBe(false);
+    // 09:00 today already passed, so Mum's next birthday is next year.
+    expect(r.find((x) => x.title === 'Mum')?.id).toBe('event:birthday:Mum:2027-11-05');
+    expect(r.find((x) => x.title === 'Anna')?.fireAt).toBe(at(2026, 12, 24, 8));
+  });
+
+  it('clamps a reminder whose lead time already passed to now', () => {
+    const early = new Date(2026, 10, 6, 8, 30);
+    const r = planEventReminders(csv, early);
+    expect(r.find((x) => x.title === 'Dentist')?.fireAt).toBe(early.getTime());
+  });
+});
+
+describe('planReminders', () => {
+  it('merges, dedupes by id and sorts deterministically', () => {
+    const a = planReminders({ todos: [todos, todos], events: csv }, now);
+    const b = planReminders({ events: csv, todos: [todos] }, now);
+    expect(a).toEqual(b);
+    expect(new Set(a.map((x) => x.id)).size).toBe(a.length);
+    const times = a.map((x) => x.fireAt);
+    expect(times).toEqual([...times].sort((x, y) => x - y));
+    expect(a[0]?.kind).toBe('milestone-overdue');
+  });
+
+  it('returns nothing for empty sources', () => {
+    expect(planReminders({}, now)).toEqual([]);
+  });
+});

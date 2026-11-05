@@ -57,5 +57,5 @@
 - [x] Phase 1: `@kaihuman/core` storage adapter, widget todo snapshot engine, and `auth-worker` mobile OAuth callback
 - [x] Phase 2: `apps/mobile` (`@kaihuman/mobile`) workspace, mobile storage/widget bridges, deep-link router, and auth/repo controllers
 - [x] Phase 3: Native screens & widget tiles (Dashboard, Kanban, Quick Captures, Ideas, Wiki, KB, Action Log, Analytics, File Editor + `.enc`)
-- [ ] Phase 4: iOS WidgetKit + AppIntents (`targets/ios-widget/`) and Android Jetpack Glance (`targets/android-widget/`) Todo widgets
+- [x] Phase 4: iOS WidgetKit + AppIntents (`targets/ios-widget/`) and Android Jetpack Glance (`targets/android-widget/`) Todo widgets
 - [ ] Phase 5: Mobile CI workflow (`.github/workflows/mobile-build.yml`) and docs

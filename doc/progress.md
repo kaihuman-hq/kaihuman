@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-11-05 — Mobile phase 4: native iOS/Android Todo widgets, config plugin, reminders
+
+- iOS WidgetKit extension (`apps/mobile/targets/ios-widget/`): `Codable` models mirroring `WidgetTodoSnapshot`, `SharedTodoStore` (App Group `group.com.kaihuman.app`, `.todos.md` line toggle with `::updated::`, GitHub contents `PUT`, `pending-widget-mutations.json` fallback), `ToggleTodoIntent` / `QuickCaptureTodoIntent` (iOS 17), small/medium/large/accessory widgets in the Nexus dark theme. Quick capture writes `kaihuman://quick-todo` to App Group key `pending-url` for the app to route on launch.
+- Android Jetpack Glance widget (`apps/mobile/targets/android-widget/`): `TodoGlanceWidget`, `TodoWidgetReceiver`, `ToggleTodoAction` (same toggle, GitHub sync and offline queue via `SharedPreferences` `kaihuman_widget`).
+- Both widgets read the GitHub token from key `github-token` (Keychain service `com.kaihuman.app` on iOS, then App Group defaults; prefs on Android); the app must write it there.
+- `plugins/with-kaihuman-widgets.ts`: dependency-free Expo config plugin (App Group entitlement, `kaihuman` scheme, WidgetKit target, Glance receiver manifest entry, Glance Gradle dependency, Kotlin source copy) registered in `app.json`.
+- `src/notifications/milestone-reminders.ts`: local notification schedule from `.todos.md` milestones (day before and due day, overdue now) and `.events.csv` events.
+- Swift/Kotlin are not compiled in CI yet (no macOS/Android toolchain); Vitest checks model parity with `WidgetTodoSnapshot`, constants, plugin transforms and reminders (`ios-widget.test.ts`, `targets.test.ts`).
+
 ## 2026-11-05 — Mobile phase 3: screen controllers and dashboard tile presenters
 
 - Quick capture (`QuickCaptureController`: todo, note, log, idea with `kh-idea` handoff, knowledge to `.kh/raw/`), `KanbanBoardController` (multi-file `.todos.md` incl. inbox, status/tag/milestone filters, move between files writing target first, milestone CRUD) and `TodoAnalyticsController` (velocity, tag distribution, milestone progress).

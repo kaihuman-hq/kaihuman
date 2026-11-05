@@ -158,10 +158,10 @@
 - Create: `apps/mobile/targets/ios-widget/KaihumanWidgets.entitlements`
 
 **Steps:**
-- [ ] Implement `SharedTodoModels.swift` matching `WidgetTodoSnapshot` and `WidgetTodoItem` (`Codable`).
-- [ ] Implement `SharedTodoStore.swift` reading/writing `group.com.kaihuman.app/widget-todos.json`, mutating `.todos.md` lines (`- [ ]` / `- [>]` → `- [x]` + `::updated::`), queueing `pending-widget-mutations.json`, and pushing directly to GitHub's `PUT /repos/{owner}/{repo}/contents/{path}` endpoint using the Keychain/AppGroup token.
-- [ ] Implement `ToggleTodoIntent.swift` (`AppIntent` for iOS 17+ interactive widget buttons) and `QuickCaptureTodoIntent.swift`.
-- [ ] Implement `TodoWidgetViews.swift` and `KaihumanWidgets.swift` supporting `systemSmall`, `systemMedium`, `systemLarge`, `accessoryCircular`, and `accessoryRectangular` in Nexus dark theme (`#0A0A0F` background, `#00FF00` neon accent, monospaced font).
+- [x] Implement `SharedTodoModels.swift` matching `WidgetTodoSnapshot` and `WidgetTodoItem` (`Codable`).
+- [x] Implement `SharedTodoStore.swift` reading/writing `group.com.kaihuman.app/widget-todos.json`, mutating `.todos.md` lines (`- [x]` / `- [>]` → `- [x]` + `::updated::`), queueing `pending-widget-mutations.json`, and pushing directly to GitHub's `PUT /repos/{owner}/{repo}/contents/{path}` endpoint using the Keychain/AppGroup token.
+- [x] Implement `ToggleTodoIntent.swift` (`AppIntent` for iOS 17+ interactive widget buttons) and `QuickCaptureTodoIntent.swift`.
+- [x] Implement `TodoWidgetViews.swift` and `KaihumanWidgets.swift` supporting `systemSmall`, `systemMedium`, `systemLarge`, `accessoryCircular`, and `accessoryRectangular` in Nexus dark theme (`#0A0A0F` background, `#00FF00` neon accent, monospaced font).
 
 ### Task 4.2: Android Jetpack Glance Target (`targets/android-widget/`) & Expo Config Plugin
 **Files:**
@@ -174,10 +174,10 @@
 - Create: `apps/mobile/src/targets.test.ts`
 
 **Steps:**
-- [ ] Implement `TodoGlanceWidget.kt`, `TodoWidgetReceiver.kt`, and `ToggleTodoAction.kt` providing interactive Android home-screen Todo widgets with direct GitHub sync and offline mutation queueing.
-- [ ] Implement `with-kaihuman-widgets.ts` Expo Config Plugin wiring the iOS App Group entitlement (`group.com.kaihuman.app`), URL scheme (`kaihuman`), iOS WidgetKit extension target, and Android `TodoWidgetReceiver` manifest entries.
-- [ ] Implement `milestone-reminders.ts` computing local notification schedules from upcoming/overdue milestones in `.todos.md` and events in `.events.csv`.
-- [ ] Write verification tests in `apps/mobile/src/targets.test.ts` validating the config plugin transformations, Swift/Kotlin model parity with `WidgetTodoSnapshot`, and reminder scheduling.
+- [x] Implement `TodoGlanceWidget.kt`, `TodoWidgetReceiver.kt`, and `ToggleTodoAction.kt` providing interactive Android home-screen Todo widgets with direct GitHub sync and offline mutation queueing.
+- [x] Implement `with-kaihuman-widgets.ts` Expo Config Plugin wiring the iOS App Group entitlement (`group.com.kaihuman.app`), URL scheme (`kaihuman`), iOS WidgetKit extension target, and Android `TodoWidgetReceiver` manifest entries.
+- [x] Implement `milestone-reminders.ts` computing local notification schedules from upcoming/overdue milestones in `.todos.md` and events in `.events.csv`.
+- [x] Write verification tests in `apps/mobile/src/targets.test.ts` validating the config plugin transformations, Swift/Kotlin model parity with `WidgetTodoSnapshot`, and reminder scheduling.
 
 ---
 
