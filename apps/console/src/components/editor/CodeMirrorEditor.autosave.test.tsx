@@ -2,7 +2,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const editor = vi.hoisted(() => ({ emit: (_value: string) => {} }));
+const editor = vi.hoisted(() => ({ emit: (_value: string) => {}, applied: [] as string[] }));
 const store = vi.hoisted(() => ({
   saveFile: vi.fn(async (_path: string) => {}),
   // Stands in for the store's dirty set: edits add to it, a successful save removes from it.
@@ -22,7 +22,10 @@ vi.mock('@cascivo/editor', async () => {
         editor.emit = (value) => onValueChange?.(value);
         // A store sync replaces the document through applyEdit, which echoes as a change.
         useImperativeHandle(ref, () => ({
-          applyEdit: (_range: unknown, next: string) => onValueChange?.(next),
+          applyEdit: (_range: unknown, next: string) => {
+            editor.applied.push(next);
+            onValueChange?.(next);
+          },
         }));
         return <textarea value={defaultValue} />;
       },
@@ -69,6 +72,7 @@ beforeEach(() => {
   store.saveFile.mockImplementation(async (path: string) => store.setDirty(path, false));
   githubFileStore.dirtyFiles.value = new Set();
   githubFileStore.openFiles.value = {};
+  editor.applied.length = 0;
   host = document.createElement('div');
   document.body.appendChild(host);
   act(() => render(<CodeMirrorEditor path="a.md" />, host));
@@ -160,6 +164,19 @@ describe('CodeMirrorEditor dirty state follows the store', () => {
       window.dispatchEvent(new Event('pagehide'));
     });
     expect(store.saveFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows store content that changes underneath a clean editor, without saving it back', () => {
+    act(() => setOpenFiles({ 'a.md': 'v1' }));
+    editor.applied.length = 0;
+    vi.mocked(githubFileStore.updateFileContent).mockClear();
+    act(() => setOpenFiles({ 'a.md': 'v2 from remote' }));
+    expect(editor.applied).toEqual(['v2 from remote']);
+    act(() => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS * 2);
+    });
+    expect(githubFileStore.updateFileContent).not.toHaveBeenCalled();
+    expect(store.saveFile).not.toHaveBeenCalled();
   });
 
   it('autosaves a store update (a clean merge) that leaves the file dirty', async () => {

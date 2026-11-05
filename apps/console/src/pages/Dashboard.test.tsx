@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
     deleteFile: vi.fn(),
     createFile: vi.fn(),
     openFile: vi.fn(),
+    ensureFresh: vi.fn(),
     renameFile: vi.fn(),
     renameFolder: vi.fn(),
     updateFileContent: vi.fn(),

@@ -471,12 +471,10 @@ export const Dashboard = () => {
             try {
               let fileExists = githubFileStore.tree.value.some((t) => t.path === rilPath);
               if (fileExists) {
-                if (!githubFileStore.openFiles.value[rilPath]) {
-                  try {
-                    await githubFileStore.openFile(rilPath);
-                  } catch (_e) {
-                    fileExists = false;
-                  }
+                try {
+                  await githubFileStore.ensureFresh(rilPath);
+                } catch (_e) {
+                  fileExists = false;
                 }
               }
 

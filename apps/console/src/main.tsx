@@ -1,3 +1,4 @@
+import { githubFileStore, installAutoSync } from '@kaihuman/core';
 import { render } from 'preact';
 import { App } from './App';
 // Before anything can save a file: sync merges need the list-format mergers registered.
@@ -10,6 +11,10 @@ import './index.css';
 import '@cascivo/editor/styles.css';
 import '@cascivo/charts/styles.css';
 import '@cascivo/themes/dark.css';
+
+// Pulls remote changes and retries unsynced edits on focus, reconnect and a timer.
+const stopAutoSync = installAutoSync(githubFileStore);
+import.meta.hot?.dispose(stopAutoSync);
 
 // biome-ignore lint/style/noNonNullAssertion: Root element is guaranteed to exist
 render(<App />, document.getElementById('app')!);

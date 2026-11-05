@@ -12,6 +12,7 @@ const store = vi.hoisted(() => ({
   createFile: vi.fn(async () => {}),
   updateFileContent: vi.fn(),
   openFile: vi.fn(),
+  ensureFresh: vi.fn(),
   loadTree: vi.fn(),
 }));
 vi.mock('@kaihuman/core', async (importOriginal) => {
