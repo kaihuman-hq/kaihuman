@@ -139,6 +139,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          ram-size: 4096M
           disable-animations: true
           script: .github/scripts/mobile-screenshots-android.sh apps/mobile/android/app/build/outputs/apk/release/app-release.apk screenshots
 
