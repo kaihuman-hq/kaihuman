@@ -510,3 +510,13 @@ describe('kaihuman-shared native module', () => {
     expect(kotlinSource).toContain(`"${ANDROID_RECEIVER_NAME}"`);
   });
 });
+
+describe('widget extension Info.plist', () => {
+  it('names its executable, or the simulator rejects the installed app', () => {
+    const plist = readFileSync(
+      new URL('../targets/ios-widget/Info.plist', import.meta.url),
+      'utf8',
+    );
+    expect(plist).toContain('<key>CFBundleExecutable</key>');
+  });
+});
