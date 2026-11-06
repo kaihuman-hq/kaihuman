@@ -1,36 +1,101 @@
-import type { IdeaSlug } from '@kaihuman/formats';
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import type { IdeaSlug, IdeaStatus } from '@kaihuman/formats';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 import type { IdeaStatusFilter, IdeasScreenController } from '../screens/ideas-screen.js';
-import { Body, Button, Card, Field, Muted, Row, Screen, Title } from './primitives.js';
+import { useTheme } from '../theme/theme.js';
+import {
+  Badge,
+  type BadgeTone,
+  Button,
+  Chip,
+  EmptyState,
+  Fab,
+  haptics,
+  Icon,
+  ListRow,
+  Screen,
+  Section,
+  type SwipeAction,
+  Text,
+  TextField,
+} from '../ui/index.js';
 
-const STATUSES = ['seed', 'exploring', 'committed', 'shipped', 'parked', 'dropped'] as const;
+const STATUSES: readonly IdeaStatus[] = [
+  'seed',
+  'exploring',
+  'committed',
+  'shipped',
+  'parked',
+  'dropped',
+];
+
+const STATUS_TONE: Record<IdeaStatus, BadgeTone> = {
+  seed: 'neutral',
+  exploring: 'accent',
+  committed: 'warning',
+  shipped: 'success',
+  parked: 'neutral',
+  dropped: 'danger',
+};
+
+const label = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export function IdeasView({ controller }: { controller: IdeasScreenController }) {
+  const theme = useTheme();
+  const ios = theme.platform === 'ios';
+  const { colors, spacing } = theme;
+  const pad = ios ? spacing.md : theme.metrics.screenMargin;
+  const tile = ios
+    ? { iconBackground: colors.accentFill, iconColor: colors.onAccentFill }
+    : { iconColor: colors.accent };
   const [, setRev] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<IdeaSlug | null>(null);
+  const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
 
   const rerender = () => setRev((n) => n + 1);
-  useEffect(() => {
-    controller
-      .load()
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoaded(true));
+
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+      await controller.load();
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setLoaded(true);
+      setRev((n) => n + 1);
+    }
   }, [controller]);
 
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
   // Controller calls can reject (offline, conflicts); show that instead of dropping the input.
-  const run = async (action: () => Promise<unknown>) => {
+  const run = async (action: () => Promise<unknown>): Promise<boolean> => {
     try {
       setError(null);
       await action();
+      haptics.success();
+      rerender();
+      return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(message(e));
+      haptics.error();
+      rerender();
+      return false;
     }
-    rerender();
   };
 
   const filter = (patch: Parameters<IdeasScreenController['setFilters']>[0]) => {
@@ -38,82 +103,265 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
     rerender();
   };
 
-  const entry = selected ? controller.get(selected) : undefined;
-  const entries = controller.view();
+  const create = async () => {
+    const name = title.trim();
+    if (!name) return;
+    await run(async () => {
+      const slug = await controller.create({ title: name });
+      setTitle('');
+      setComposing(false);
+      setSelected(slug);
+    });
+  };
 
-  return (
-    <Screen scroll>
-      <Title>Ideas</Title>
-      {error && (
-        <View accessibilityRole="alert">
-          <Body>{error}</Body>
+  const errorBanner = error ? (
+    <View
+      accessibilityRole="alert"
+      style={{
+        flexDirection: 'row',
+        gap: spacing.sm,
+        alignItems: 'flex-start',
+        padding: spacing.md,
+        borderRadius: theme.shape.md,
+        backgroundColor: `${colors.danger}1F`,
+      }}
+    >
+      <Icon name="warning" size={17} color={colors.danger} />
+      <View style={{ flex: 1 }}>
+        <Text variant="subheadline" tone="danger">
+          {error}
+        </Text>
+      </View>
+    </View>
+  ) : null;
+
+  const entry = selected ? controller.get(selected) : undefined;
+
+  if (selected && entry) {
+    const { idea } = entry;
+    const addLog = async () => {
+      const note = text.trim();
+      if (!note) return;
+      if (await run(() => controller.log(selected, note))) setText('');
+    };
+    return (
+      <Screen keyboard refreshing={refreshing} onRefresh={refresh}>
+        <Button
+          label="All ideas"
+          variant="plain"
+          size="medium"
+          onPress={() => setSelected(null)}
+          accessibilityLabel="Back to all ideas"
+        />
+        <View style={{ gap: spacing.sm, paddingHorizontal: spacing.xs }}>
+          <Text variant="title1" accessibilityRole="header">
+            {idea.title}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
+            <Badge label={label(idea.status)} tone={STATUS_TONE[idea.status]} />
+            <Text variant="footnote" tone="secondary">
+              {`${label(entry.activity.level)} activity${idea.product ? ` · ${idea.product}` : ''}`}
+            </Text>
+          </View>
+          {idea.summary ? <Text tone="secondary">{idea.summary}</Text> : null}
         </View>
-      )}
-      {!loaded && <Muted>Loading...</Muted>}
-      <Field
-        label="Search ideas"
-        value={controller.filters.query}
-        onChangeText={(query) => filter({ query })}
-      />
-      <Row>
-        {controller.chips().map((c) => (
-          <Button
-            key={c.status}
-            testID={`chip-${c.status}`}
-            label={`${c.status} (${c.count})`}
-            disabled={controller.filters.status === c.status}
-            onPress={() => filter({ status: c.status as IdeaStatusFilter })}
-          />
-        ))}
-      </Row>
-      {loaded && entries.length === 0 && <Muted>No ideas</Muted>}
-      {entries.map((e) => (
-        <Card key={e.slug}>
-          <Body>{e.idea.title}</Body>
-          <Muted>{`${e.idea.status} - ${e.activity.level}${e.idea.product ? ` - ${e.idea.product}` : ''}`}</Muted>
-          <Button label="Open" testID={`open-${e.slug}`} onPress={() => setSelected(e.slug)} />
-        </Card>
-      ))}
-      {entry && selected && (
-        <Card>
-          <Title>{entry.idea.title}</Title>
-          <Muted>{entry.idea.status}</Muted>
-          {entry.idea.summary ? <Body>{entry.idea.summary}</Body> : null}
-          {entry.idea.log.slice(0, 5).map((l) => (
-            <Muted key={`${l.at}-${l.text}`}>{`${l.at} ${l.text}`}</Muted>
+        {errorBanner}
+        <Section header="Status">
+          {STATUSES.map((s) => (
+            <ListRow
+              key={s}
+              title={label(s)}
+              testID={`status-${s}`}
+              accessory={idea.status === s ? 'check' : 'none'}
+              onPress={
+                idea.status === s
+                  ? undefined
+                  : () => void run(() => controller.setStatus(selected, s))
+              }
+            />
           ))}
-          <Field label="Log entry" value={text} onChangeText={setText} />
+        </Section>
+        <Section header="Add to log">
+          <View style={{ padding: pad, gap: spacing.md }}>
+            <TextField
+              label="Log entry"
+              value={text}
+              onChangeText={setText}
+              autoCapitalize="sentences"
+              placeholder="What happened?"
+              returnKeyType="send"
+              onSubmitEditing={() => void addLog()}
+            />
+            <Button
+              label="Add log"
+              icon="add"
+              variant="tinted"
+              size="medium"
+              disabled={!text.trim()}
+              onPress={() => void addLog()}
+            />
+          </View>
+        </Section>
+        {idea.log.length > 0 ? (
+          <Section header="Log">
+            {idea.log.slice(0, 8).map((l) => (
+              <ListRow key={`${l.at}-${l.text}`} title={l.text} subtitle={l.at} />
+            ))}
+          </Section>
+        ) : null}
+      </Screen>
+    );
+  }
+
+  const entries = controller.view();
+  const chips = controller.chips();
+  const filtered = controller.filters.query.trim() !== '' || controller.filters.status !== 'open';
+
+  const actionsFor = (slug: IdeaSlug, current: IdeaStatus): SwipeAction[] => [
+    { label: 'Log entry', icon: 'log', onPress: () => setSelected(slug) },
+    ...STATUSES.filter((s) => s !== current).map((s) => ({
+      label: `Mark ${s}`,
+      onPress: () => void run(() => controller.setStatus(slug, s)),
+    })),
+  ];
+
+  const composer = composing ? (
+    <Section header="New idea">
+      <View style={{ padding: pad, gap: spacing.md }}>
+        <TextField
+          label="New idea title"
+          value={title}
+          onChangeText={setTitle}
+          autoCapitalize="sentences"
+          placeholder="A sentence is enough"
+          returnKeyType="done"
+          onSubmitEditing={() => void create()}
+        />
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           <Button
-            label="Add log"
+            label="Create idea"
+            size="medium"
+            disabled={!title.trim()}
+            onPress={() => void create()}
+          />
+          <Button
+            label="Cancel"
+            variant="plain"
+            size="medium"
             onPress={() => {
-              void run(() => controller.log(selected, text));
-              setText('');
+              setComposing(false);
+              setTitle('');
             }}
           />
-          <Row>
-            {STATUSES.map((s) => (
-              <Button
-                key={s}
-                label={s}
-                testID={`status-${s}`}
-                disabled={entry.idea.status === s}
-                onPress={() => void run(() => controller.setStatus(selected, s))}
+        </View>
+      </View>
+    </Section>
+  ) : ios ? (
+    <Section>
+      <ListRow title="New idea" icon="add" {...tile} onPress={() => setComposing(true)} />
+    </Section>
+  ) : null;
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Screen keyboard refreshing={refreshing} onRefresh={refresh}>
+        <TextField
+          label="Search ideas"
+          value={controller.filters.query}
+          onChangeText={(query) => filter({ query })}
+          placeholder="Title, summary or log"
+          returnKeyType="search"
+        />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0, marginHorizontal: -theme.metrics.screenMargin }}
+          contentContainerStyle={{
+            gap: spacing.sm,
+            paddingHorizontal: theme.metrics.screenMargin,
+            paddingVertical: spacing.xs,
+          }}
+        >
+          {chips.map((c) => (
+            <Chip
+              key={c.status}
+              label={`${label(c.status)} ${c.count}`}
+              selected={controller.filters.status === c.status}
+              onPress={() => {
+                haptics.selection();
+                filter({ status: c.status as IdeaStatusFilter });
+              }}
+            />
+          ))}
+        </ScrollView>
+        {errorBanner}
+        {composer}
+        {!loaded ? (
+          <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.sm }}>
+            <ActivityIndicator color={colors.secondaryLabel} />
+            <Text variant="footnote" tone="secondary">
+              Loading ideas
+            </Text>
+          </View>
+        ) : entries.length === 0 ? (
+          error ? (
+            <EmptyState
+              icon="warning"
+              title="Couldn't load ideas"
+              message="Check your connection and try again."
+              action={{ label: 'Retry', onPress: () => void load() }}
+            />
+          ) : filtered ? (
+            <EmptyState
+              icon="search"
+              title="No matching ideas"
+              message="Try another status or search."
+              action={{
+                label: 'Show open ideas',
+                onPress: () => filter({ status: 'open', query: '' }),
+              }}
+            />
+          ) : (
+            <EmptyState
+              icon="ideas"
+              title="No ideas yet"
+              message="Capture a spark before it gets away."
+              action={{ label: 'New idea', onPress: () => setComposing(true) }}
+            />
+          )
+        ) : (
+          <Section>
+            {entries.map((e) => (
+              <ListRow
+                key={e.slug}
+                title={e.idea.title}
+                subtitle={`${label(e.activity.level)} activity${e.idea.product ? ` · ${e.idea.product}` : ''}`}
+                icon="ideas"
+                {...tile}
+                accessory={
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                    <Badge label={label(e.idea.status)} tone={STATUS_TONE[e.idea.status]} />
+                    <Icon
+                      name="chevronRight"
+                      size={14}
+                      color={colors.tertiaryLabel}
+                      weight="semibold"
+                    />
+                  </View>
+                }
+                onPress={() => setSelected(e.slug)}
+                swipeActions={actionsFor(e.slug, e.idea.status)}
               />
             ))}
-          </Row>
-        </Card>
-      )}
-      <Field label="New idea title" value={title} onChangeText={setTitle} />
-      <Button
-        label="Create idea"
-        disabled={!title.trim()}
-        onPress={() => {
-          void run(async () => {
-            setSelected(await controller.create({ title: title.trim() }));
-            setTitle('');
-          });
-        }}
+          </Section>
+        )}
+      </Screen>
+      <Fab
+        icon="add"
+        label="New idea"
+        accessibilityLabel="New idea"
+        onPress={() => setComposing(true)}
       />
-    </Screen>
+    </View>
   );
 }

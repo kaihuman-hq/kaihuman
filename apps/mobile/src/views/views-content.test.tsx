@@ -256,8 +256,7 @@ describe('IdeasView', () => {
   it('lists ideas and logs to one', async () => {
     const { map, controller } = setup();
     render(<IdeasView controller={controller} />);
-    expect(await screen.findByText('Alpha')).toBeTruthy();
-    press('Open');
+    fireEvent.click(await screen.findByRole('button', { name: /^Alpha/ }));
     type('Log entry', 'Thought about it');
     press('Add log');
     await waitFor(() => expect(map.get('.kh/ideas/alpha.md')).toContain('Thought about it'));
@@ -271,6 +270,7 @@ describe('IdeasView', () => {
     press('Create idea');
     await waitFor(() => expect(map.has('.kh/ideas/beta.md')).toBe(true));
   });
+    press('New idea');
 });
 
 describe('WikiView', () => {
@@ -282,7 +282,7 @@ describe('WikiView', () => {
   it('lists pages, renders one and follows a wiki link', async () => {
     const controller = new WikiScreenController({ files: memoryFiles(pages).files });
     render(<WikiView controller={controller} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Open Home' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Home/ }));
     expect(screen.getByTestId('wiki-page').textContent).toContain('See Other and Ghost.');
     expect(screen.queryByRole('link', { name: 'Ghost' })).toBeNull();
     fireEvent.click(screen.getByRole('link', { name: 'Other' }));
