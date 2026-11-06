@@ -102,7 +102,7 @@ private fun MilestoneContent(
         Text(
             text = days.number,
             maxLines = 1,
-            style = TextStyle(color = numberColor, fontSize = if (medium) 44.sp else 36.sp, fontWeight = FontWeight.Bold),
+            style = TextStyle(color = numberColor, fontSize = if (medium) 44.sp else 28.sp, fontWeight = FontWeight.Bold),
         )
         Text(
             text = khString(context, captionRes(days.caption)),
@@ -120,7 +120,10 @@ private fun MilestoneContent(
             backgroundColor = GlanceTheme.colors.secondaryContainer,
         )
         Spacer(GlanceModifier.height(4.dp))
-        if (freshness is Freshness.Fresh) {
+        // Small has 86 dp of content height: the bar alone says progress, the footer only when stale.
+        if (!medium && freshness is Freshness.Fresh) {
+            Unit
+        } else if (freshness is Freshness.Fresh) {
             Text(
                 text = counts,
                 maxLines = 1,
@@ -133,11 +136,13 @@ private fun MilestoneContent(
 
     @Composable
     fun nameBlock() {
-        Text(
-            text = khString(context, R.string.kh_ms_title),
-            maxLines = 1,
-            style = TextStyle(color = GlanceTheme.colors.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold),
-        )
+        if (medium || hideText) {
+            Text(
+                text = khString(context, R.string.kh_ms_title),
+                maxLines = 1,
+                style = TextStyle(color = GlanceTheme.colors.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold),
+            )
+        }
         if (!hideText) {
             Text(
                 text = m.name,
@@ -159,7 +164,6 @@ private fun MilestoneContent(
     } else {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             nameBlock()
-            Spacer(GlanceModifier.height(2.dp))
             daysBlock()
             Spacer(GlanceModifier.defaultWeight())
             progressBlock()

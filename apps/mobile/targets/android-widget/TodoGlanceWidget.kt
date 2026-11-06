@@ -96,15 +96,17 @@ private fun NextUpContent(
                 Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "${all.size}",
-                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 30.sp, fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 26.sp, fontWeight = FontWeight.Bold),
                     )
-                    Spacer(GlanceModifier.width(6.dp))
+                    Spacer(GlanceModifier.width(4.dp))
                     Text(
                         text = khString(context, R.string.kh_nu_open),
-                        style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                        maxLines = 1,
+                        style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium),
                         modifier = GlanceModifier.defaultWeight(),
                     )
-                    AddButton()
+                    AddButton(width = 28.dp)
                 }
                 if (hideText) {
                     Text(
@@ -114,7 +116,7 @@ private fun NextUpContent(
                 } else if (rows.isEmpty()) {
                     EmptyState(empty, GlanceModifier.defaultWeight())
                 } else {
-                    TodoRow(rows.first(), GlanceModifier.fillMaxWidth().height(40.dp), 13.sp)
+                    TodoRow(rows.first(), GlanceModifier.fillMaxWidth().height(40.dp), 13.sp, checkWidth = 30.dp, maxLines = 2)
                 }
                 Spacer(GlanceModifier.defaultWeight())
                 StaleFooter(freshness)
@@ -234,10 +236,10 @@ internal fun NextUpHeader(title: String, trailing: String, height: androidx.comp
 
 /** Round "+" with a 40 x 24 dp tap area; opens the quick-add todo sheet. */
 @Composable
-internal fun AddButton() {
+internal fun AddButton(width: androidx.compose.ui.unit.Dp = 40.dp) {
     val context = LocalContext.current
     Box(
-        modifier = GlanceModifier.width(40.dp).height(24.dp)
+        modifier = GlanceModifier.width(width).height(24.dp)
             .clickable(openUri(context, DeepLinks.quick("todo")))
             .semantics { contentDescription = khString(context, R.string.kh_nu_add_desc) },
         contentAlignment = Alignment.Center,
@@ -256,7 +258,15 @@ internal fun AddButton() {
 
 /** One open todo: a 48 dp wide check, then the text. Tapping outside the check opens the item. */
 @Composable
-internal fun TodoRow(item: WidgetTodoItem, modifier: GlanceModifier, textSize: TextUnit, showTag: Boolean = false) {
+internal fun TodoRow(
+    item: WidgetTodoItem,
+    modifier: GlanceModifier,
+    textSize: TextUnit,
+    showTag: Boolean = false,
+    // The small widget is 86 dp wide inside its padding, so its check column is narrower.
+    checkWidth: androidx.compose.ui.unit.Dp = 48.dp,
+    maxLines: Int = 1,
+) {
     val context = LocalContext.current
     val inProgress = item.status == "in-progress"
     Row(
@@ -264,7 +274,7 @@ internal fun TodoRow(item: WidgetTodoItem, modifier: GlanceModifier, textSize: T
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = GlanceModifier.width(48.dp).fillMaxHeight()
+            modifier = GlanceModifier.width(checkWidth).fillMaxHeight()
                 .clickable(actionRunCallback<ToggleTodoAction>(actionParametersOf(TodoActionKeys.itemId to item.id)))
                 .semantics { contentDescription = khString(context, R.string.kh_nu_complete_item_desc, item.text) },
             contentAlignment = Alignment.CenterStart,
@@ -280,7 +290,7 @@ internal fun TodoRow(item: WidgetTodoItem, modifier: GlanceModifier, textSize: T
         }
         Text(
             text = item.text,
-            maxLines = 1,
+            maxLines = maxLines,
             style = TextStyle(
                 color = GlanceTheme.colors.onSurface,
                 fontSize = textSize,

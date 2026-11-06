@@ -15,7 +15,11 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.Box
+import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
+import androidx.glance.layout.width
+import androidx.glance.layout.Row
+import androidx.glance.LocalSize
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.height
@@ -52,6 +56,28 @@ class InboxWidget : GlanceAppWidget() {
                     if (state.isZero) {
                         Spacer(GlanceModifier.height(8.dp))
                         EmptyState(khString(R.string.kh_w_inbox_zero))
+                        Spacer(GlanceModifier.defaultWeight())
+                        StaleFooter(freshness)
+                    } else if (LocalSize.current.height < 130.dp) {
+                        // 86 dp of content height: no room for the Process button; the whole widget opens the inbox.
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "${state.todos}",
+                                maxLines = 1,
+                                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 30.sp, fontWeight = FontWeight.Bold),
+                            )
+                            Spacer(GlanceModifier.width(6.dp))
+                            Text(
+                                text = khPlural(R.plurals.kh_w_todos, state.todos),
+                                maxLines = 1,
+                                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                            )
+                        }
+                        Text(
+                            text = khString(R.string.kh_w_in_knowledge, state.notes),
+                            maxLines = 1,
+                            style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                        )
                         Spacer(GlanceModifier.defaultWeight())
                         StaleFooter(freshness)
                     } else {

@@ -5,11 +5,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.glance.Button
-import androidx.glance.ButtonDefaults
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.Image
+import androidx.glance.ImageProvider
+import androidx.glance.appwidget.cornerRadius
+import androidx.glance.background
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
@@ -25,6 +28,7 @@ import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
+import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
@@ -113,22 +117,34 @@ private fun Footer(snapshot: WidgetTodoSnapshot?, nowMs: Long) {
 @Composable
 private fun CaptureButton(kind: String, label: Int, primary: Boolean, modifier: GlanceModifier) {
     val context = LocalContext.current
-    val colors = if (primary) {
-        ButtonDefaults.buttonColors(
-            backgroundColor = GlanceTheme.colors.primary,
-            contentColor = GlanceTheme.colors.onPrimary,
+    // A plain tile instead of Glance's Button: its built-in padding clips labels in a 2×2 cell.
+    val background = if (primary) GlanceTheme.colors.primary else GlanceTheme.colors.secondaryContainer
+    val content = if (primary) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onSecondaryContainer
+    Column(
+        modifier = modifier
+            .background(background)
+            .cornerRadius(12.dp)
+            .clickable(openUri(context, DeepLinks.quick(kind))),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Image(
+            provider = ImageProvider(iconOf(kind)),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(content),
+            modifier = GlanceModifier.size(20.dp),
         )
-    } else {
-        ButtonDefaults.buttonColors(
-            backgroundColor = GlanceTheme.colors.secondaryContainer,
-            contentColor = GlanceTheme.colors.onSecondaryContainer,
+        Text(
+            text = khString(label),
+            maxLines = 1,
+            style = TextStyle(color = content, fontSize = 12.sp, fontWeight = FontWeight.Medium),
         )
     }
-    Button(
-        text = khString(label),
-        onClick = openUri(context, DeepLinks.quick(kind)),
-        modifier = modifier,
-        colors = colors,
-        maxLines = 1,
-    )
+}
+
+private fun iconOf(kind: String): Int = when (kind) {
+    "note" -> R.drawable.kh_ic_note
+    "log" -> R.drawable.kh_ic_log
+    "idea" -> R.drawable.kh_ic_idea
+    else -> R.drawable.kh_ic_todo
 }

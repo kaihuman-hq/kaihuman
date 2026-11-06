@@ -82,7 +82,7 @@ class KnowledgeCardWidget : GlanceAppWidget() {
                     } else {
                         Text(
                             text = if (hideText) khString(R.string.kh_w_text_hidden) else card.title,
-                            maxLines = 2,
+                            maxLines = if (large) 2 else 1,
                             style = TextStyle(
                                 color = if (hideText) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface,
                                 fontSize = if (large) 20.sp else 16.sp,
@@ -93,13 +93,14 @@ class KnowledgeCardWidget : GlanceAppWidget() {
                             Spacer(GlanceModifier.height(4.dp))
                             Text(
                                 text = card.excerpt,
-                                maxLines = if (large) 9 else 3,
+                                maxLines = if (large) 9 else 1,
                                 style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = if (large) 14.sp else 12.sp),
                             )
                         }
                         Spacer(GlanceModifier.defaultWeight())
-                        Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            if (!hideText) {
+                        // The medium widget has no room for tag chips; only the stale footer may claim the line.
+                        if (large || freshness !is Freshness.Fresh) Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            if (!hideText && large) {
                                 card.tags.take(3).forEach { TagChip(it) }
                             }
                             Spacer(GlanceModifier.defaultWeight())
