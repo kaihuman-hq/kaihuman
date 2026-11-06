@@ -5,9 +5,11 @@
 - Design spec `doc/mobile-design.md`: brand carry-over from the console, semantic colour, type, shape and metric tables quoted from `theme.ts`, iOS HIG and Material 3 rules, navigation architecture, primitives catalogue, web preview, screen restyle checklist, and status and known gaps.
 - `apps/mobile/src/theme/theme.ts` (committed in `f768ed0`): platform-aware light and dark palettes (iOS and Android), type scales, shape, metrics and `useTheme()`. The web preview uses iOS styling unless `?platform=android` is in the URL.
 - `expo-haptics` and `expo-symbols` added to `apps/mobile/package.json` (committed in `f768ed0`).
-- `src/ui/` primitives (`Icon`, `haptics`, `Text`, `Screen`, `Section`/`ListRow`, `Button`, `TextField`, `SegmentedControl`, `Chip`, `Badge`, `EmptyState`, `Card`, `StatTile`, `Fab`) are written but not yet committed or used by any screen.
-- Not built yet: `NativeTabs` navigation with per-tab stacks, and the screen restyle. The spec's status section lists them.
-- Known gaps: `secondaryLabel` and `tertiaryLabel` fall below 4.5:1 on some surfaces, Android status colours still use the iOS values, and the `Icon` map needs an outline/fill split. See `doc/mobile-design.md` §14.
+- `src/ui/` primitives (`Icon`, `haptics`, `Text`, `Screen`, `Section`/`ListRow`, `Button`, `TextField`, `SegmentedControl`, `Chip`, `Badge`, `EmptyState`, `Card`, `StatTile`, `Fab`, `Divider`) are built and committed. The legacy `src/views/primitives.tsx` `Button` now renders the tinted variant instead of filled, so screens not yet restyled are not a wall of Volt.
+- Navigation is built: root Stack themed from `useTheme()`; `app/(tabs)` with `NativeTabs` on iOS and Android and a custom JS tab bar on web (`src/navigation/web-tab-bar.tsx`). Five tabs (Today, Board, Capture, Ideas, More), each with its own Stack. Capture is a launcher (`src/views/capture-hub-view.tsx`), More is `src/views/more-view.tsx`, and `quick-*` routes are modal sheets with a grabber. Shared options are in `src/navigation/stack-options.ts`; `app.json` sets `userInterfaceStyle` to `automatic`.
+- Light-mode contrast fixed in `theme.ts`: iOS light `secondaryLabel` `rgba(60,60,67,0.76)` (≈5.1:1) and Android light `tertiaryLabel` `#6A6C60` (≈5.0:1).
+- Not built yet: the screen restyle. The spec's status section lists it.
+- Known gaps: Android status colours still use the iOS values, and the `Icon` map needs an outline/fill split. iOS `tertiaryLabel` stays below 4.5:1 and is for placeholder and disabled text only. See `doc/mobile-design.md` §14.
 
 ## 2026-11-06 — Mobile: CI screenshots and `kaihuman://demo`
 

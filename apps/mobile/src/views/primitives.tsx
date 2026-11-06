@@ -47,7 +47,19 @@ export function Button({
   disabled?: boolean;
   testID?: string;
 }) {
-  return <UiButton label={label} onPress={onPress} disabled={disabled} testID={testID} fullWidth />;
+  // Tinted, not filled: legacy views have many buttons per screen and a wall of solid
+  // Volt drowns the content. Screens pick a filled primary action when restyled.
+  return (
+    <UiButton
+      label={label}
+      onPress={onPress}
+      disabled={disabled}
+      testID={testID}
+      variant="tinted"
+      size="medium"
+      fullWidth
+    />
+  );
 }
 
 export function Field({

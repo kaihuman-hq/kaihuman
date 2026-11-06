@@ -1,8 +1,8 @@
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { tileKindForPath } from '../src/components/widgets/tile-controllers.js';
-import { githubContentFiles } from '../src/screens/file-editor-screen.js';
-import { DashboardView, type TileFile } from '../src/views/dashboard-view.js';
+import { tileKindForPath } from '../../../src/components/widgets/tile-controllers.js';
+import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
+import { DashboardView, type TileFile } from '../../../src/views/dashboard-view.js';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -38,7 +38,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Dashboard' }} />
+      <Stack.Screen options={{ title: 'Today' }} />
       <DashboardView
         tiles={tiles}
         now={now}

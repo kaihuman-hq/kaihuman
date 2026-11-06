@@ -1,26 +1,60 @@
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
+import { CloseButton } from '../src/navigation/close-button.js';
+import { useStackScreenOptions } from '../src/navigation/stack-options.js';
 import { bootstrap, startAppLinkHandling } from '../src/runtime/bootstrap.js';
-import { colors, typography } from '../src/theme/tokens.js';
+import { useTheme } from '../src/theme/theme.js';
+
+const QUICK_ROUTES = ['quick-todo', 'quick-note', 'quick-log', 'quick-idea', 'quick-knowledge'];
 
 export default function RootLayout() {
   const router = useRouter();
+  const options = useStackScreenOptions();
+  const { platform } = useTheme();
+  const largeTitles = platform === 'ios' && Platform.OS !== 'web';
 
   useEffect(() => bootstrap(), []);
   useEffect(() => startAppLinkHandling((href) => router.push(href as never)), [router]);
 
   return (
     <>
-      <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.accent,
-          headerTitleStyle: { fontFamily: typography.mono },
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      />
+      <StatusBar style="auto" />
+      <Stack screenOptions={options}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        {QUICK_ROUTES.map((name) => (
+          <Stack.Screen
+            key={name}
+            name={name}
+            options={{
+              presentation: 'modal',
+              sheetGrabberVisible: true,
+              // The iOS sheet has a grabber and swipe; Android and web need an explicit close.
+              headerRight: platform === 'ios' && Platform.OS !== 'web' ? undefined : CloseButton,
+            }}
+          />
+        ))}
+        <Stack.Screen
+          name="analytics"
+          options={{ title: 'Analytics', headerLargeTitle: largeTitles }}
+        />
+        <Stack.Screen name="wiki" options={{ title: 'Wiki', headerLargeTitle: largeTitles }} />
+        <Stack.Screen
+          name="knowledge"
+          options={{ title: 'Knowledge', headerLargeTitle: largeTitles }}
+        />
+        <Stack.Screen
+          name="repos"
+          options={{ title: 'Repositories', headerLargeTitle: largeTitles }}
+        />
+        <Stack.Screen
+          name="files/index"
+          options={{ title: 'Files', headerLargeTitle: largeTitles }}
+        />
+        <Stack.Screen name="files/[...path]" options={{ title: 'File' }} />
+      </Stack>
     </>
   );
 }

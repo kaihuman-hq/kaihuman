@@ -94,7 +94,7 @@ Ratios computed from the exact values above (WCAG relative luminance). Body text
 ### 3.3 Usage rules
 
 - `label` carries all information the user needs to act on.
-- `secondaryLabel` is for supporting text: subtitles, metadata, timestamps. It must never be the only carrier of meaning, and on iOS light it may not hold body-size text until the value is tuned (§14).
+- `secondaryLabel` is for supporting text: subtitles, metadata, timestamps. It must never be the only carrier of meaning.
 - `tertiaryLabel` is for placeholders and disabled controls only. It never carries information.
 - Never convey state by colour alone. Pair `success`, `warning`, `danger` and `info` with an icon or text.
 - `accentSoft` backgrounds always take `onAccentSoft` text, never `label`.
@@ -225,7 +225,7 @@ Expo-router groups `(…)` do not appear in URLs, so every path above is unchang
 | Ideas | `/ideas` | `ideas` | Ideas list |
 | More | `/more` | `more` | Analytics, Wiki, Knowledge, Files, Repositories, Sign out |
 
-- Tabs use expo-router `NativeTabs` (real `UITabBar` on iOS, Material `NavigationBar` on Android). The web preview uses JS tabs styled the same.
+- Tabs use expo-router `NativeTabs` (real `UITabBar` on iOS, Material `NavigationBar` on Android). The web preview uses a custom JS tab bar (`src/navigation/web-tab-bar.tsx`) styled the same.
 - Selected tab tint is `accent`. Tab labels are visible for selected and unselected tabs.
 - Capture is a launcher, not a sheet. Each row pushes the matching `quick-*` modal.
 - Sign out is the last row in More, styled with `danger` and confirmed first.
@@ -352,14 +352,13 @@ Follow-up session. One bullet per screen. Each screen uses only `src/ui/` primit
 | `src/theme/theme.ts` (platform-aware palettes, type, shape, metrics, `useTheme`) | Committed in `f768ed0` |
 | `expo-haptics` and `expo-symbols` in `apps/mobile/package.json` | Committed in `f768ed0`. Lockfile updated |
 | This spec | Written. Not committed |
-| `src/ui/` primitives, `Icon`, `haptics` | Written, uncommitted. All §11 names present. No screen uses them yet |
-| Tab navigation (`NativeTabs`, per-tab Stacks, modal presentation, `(tabs)` group) | Not started. `app/_layout.tsx` still uses the old Stack and `tokens.ts`. No `(tabs)` directory |
+| `src/ui/` primitives (`Icon`, `haptics`, `Text`, `Screen`, `Section`, `ListRow`, `Button`, `TextField`, `SegmentedControl`, `Chip`, `Badge`, `EmptyState`, `Card`, `StatTile`, `Fab`, `Divider`) | Done. Committed. The legacy `src/views/primitives.tsx` `Button` renders the tinted variant so unrestyled screens are not filled |
+| Tab navigation (`app/(tabs)` with `NativeTabs` and a JS tab bar on web, per-tab Stacks, `quick-*` modal sheets, `src/navigation/stack-options.ts`) | Done. Root Stack themed from `useTheme()`. Five tabs; Capture is `src/views/capture-hub-view.tsx`, More is `src/views/more-view.tsx` |
 | Screen restyle (§13) | Not started |
 
 ### 14.2 Known gaps
 
-1. **Label contrast below 4.5:1.** `secondaryLabel` on iOS light is 3.6:1. `tertiaryLabel` is 4.3:1 on Android light, 2.6:1 on iOS dark and 1.7:1 on iOS light. The usage rules in §3.3 limit where these may appear. Tuning the values in `theme.ts` is a decision for the follow-up, because it changes the quoted values in §3.1.
+1. **Label contrast.** Fixed for `secondaryLabel` (iOS light `rgba(60,60,67,0.76)`, ≈5.1:1) and Android light `tertiaryLabel` (`#6A6C60`, ≈5.0:1). iOS `tertiaryLabel` stays below 4.5:1 (2.6:1 dark, 1.7:1 light). It is for placeholder and disabled text only, matching Apple, so the §3.3 rules govern it.
 2. **Android status colours are iOS values.** `success`, `warning`, `danger` and `info` on Android come from the iOS palette through the spread in `theme.ts`. Generating Material 3 tonal status colours is a follow-up.
-3. **Brand contrast figure.** Volt on Ink is 17.4:1 (computed), not the ≈16:1 in the brief. §3.2 uses the computed value.
-4. **Icon outline and fill.** `src/ui/icon.tsx` uses the SF `.fill` variant as the default for most names. §5 requires outline for unselected controls and fill for selected tabs. Split the map into outline and fill names before the tab bar ships.
-5. **Open question: detail routes.** Analytics, Wiki, Knowledge, Files and Repositories are pushed on the root Stack, which hides the tab bar while open. Nesting them under the More tab would keep the tab bar visible. This spec keeps them on the root Stack, as decided, and the question can be revisited after the restyle.
+3. **Icon outline and fill.** `src/ui/icon.tsx` uses the SF `.fill` variant as the default for most names. §5 requires outline for unselected controls and fill for selected tabs. Still open: split the map into outline and fill names.
+4. **Open question: detail routes.**
