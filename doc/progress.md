@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-11-06 — Workflow hardening for public release
+
+- `template-deploy-to-cloudflare.yaml`: inputs/env moved from `run:` into step `env:` (script-injection fix), `permissions: contents: read`, wrangler pinned to 4.148.0, `pnpm install --frozen-lockfile`, dead `set-output` step removed.
+- `mobile-screenshots.yml`: concurrency cancels in-progress runs; Maestro installed from the pinned `cli-2.12.1` release zip with a sha256 check instead of `curl | bash`.
+- Third-party actions in all workflows pinned to commit SHAs.
+
+## 2026-11-06 — Declare licenses in every manifest
+
+- Added `"license": "AGPL-3.0-only"` to the 15 workspace `package.json` files under `apps/*` and `packages/*` that lacked one, and `license = "AGPL-3.0-only"` to `apps/cli/Cargo.toml` and `apps/desktop-palette/src-tauri/Cargo.toml`.
+- `packages/docspack` keeps its `MIT` license and gets its own `LICENSE` file with the MIT text (copyright kaihuman contributors).
+
+## 2026-11-06 — Stop tracking `packages/ui/storybook-static`
+
+- Removed the 58 tracked files under `packages/ui/storybook-static` from the git index (`git rm -r --cached`). The directory is a Storybook build output and stays on disk.
+- Nothing in `.github/`, `doc/`, `README.md`, `package.json` files, `turbo.json`, `apps/`, or `scripts/` depends on the tracked copy. The root `.gitignore` already ignores `storybook-static`.
+
 ## 2026-11-06 — Mobile: every screen restyled to native iOS and Material 3
 
 - All screens now use only `src/ui` primitives and `useTheme()` colours, in light and dark, with iOS (HIG) and Android (Material 3) variants:

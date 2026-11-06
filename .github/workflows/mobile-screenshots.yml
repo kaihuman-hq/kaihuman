@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: mobile-screenshots-${{ github.ref }}
-  cancel-in-progress: false # the restyle session pushes often; cancelling would starve the 30-minute run
+  cancel-in-progress: true
 
 jobs:
   ios:
@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           run_install: false
       - uses: actions/setup-node@v4
@@ -66,9 +66,16 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Install Maestro
+        env:
+          MAESTRO_VERSION: 2.12.1
+          # sha256 of the cli-2.12.1 maestro.zip release asset (no checksum file is published; computed from the download)
+          MAESTRO_SHA256: 54dbb0716425626604973cbb374c585ca30272375d9ce15177a1152765ddd9d7
         run: |
-          curl -fsSL "https://get.maestro.mobile.dev" | MAESTRO_VERSION=1.41.0 bash
-          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          curl -fsSL -o "$RUNNER_TEMP/maestro.zip" "https://github.com/mobile-dev-inc/maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip"
+          echo "${MAESTRO_SHA256}  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c -
+          mkdir -p "$HOME/.maestro"
+          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$HOME/.maestro"
+          echo "$HOME/.maestro/maestro/bin" >> "$GITHUB_PATH"
 
       - name: Take screenshots
         run: .github/scripts/mobile-screenshots-ios.sh apps/mobile/ios/build/Build/Products/Release-iphonesimulator/kaihuman.app screenshots
@@ -92,7 +99,7 @@ jobs:
           sudo docker image prune --all --force
 
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           run_install: false
       - uses: actions/setup-node@v4
@@ -103,7 +110,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
           packages: platform-tools
 
@@ -126,7 +133,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - uses: reactivecircus/android-emulator-runner@v2
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 34
           target: google_apis

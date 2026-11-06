@@ -1,6 +1,7 @@
 {
   "name": "@kaihuman/kb-mcp",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "description": "MCP server exposing a local kaihuman .kh knowledge base to LLM agents",
   "type": "module",
