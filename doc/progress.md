@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-06 — Mobile: iOS widget concepts
+
+- New `doc/mobile-widgets.md`: ten ranked iOS widget concepts (families, interactions, data, effort), a v1 set (Next up, Quick capture + Control Center controls, Weekly done ring, Inbox, App Shortcuts) and a v2 set, refresh/offline/Lock Screen privacy rules, and the additive `widget-sync` snapshot changes (`schemaVersion: 2`, stats, milestones, knowledge inbox, local time zone).
+- Mockups at true point sizes in light, dark and tinted, Home Screen and Lock Screen: `apps/mobile/docs/widgets.png` (source `apps/mobile/docs/widgets-mockup.html`). Design only; no widget code changed.
+
 ## 2026-11-06 — Mobile: Android release crashed on launch (WorkManager vs R8)
 
 - The Release APK died at startup in `androidx.startup.InitializationProvider` ("Failed to create an instance of androidx.work.impl.WorkDatabase"): Glance's WorkManager creates its Room database reflectively and R8 stripped `WorkDatabase_Impl`. The widget config plugin now appends keep rules to `android/app/proguard-rules.pro` (`addWorkManagerKeepRules`, with a test). Found via the crash logs the screenshots workflow now saves.
