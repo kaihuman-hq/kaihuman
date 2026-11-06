@@ -6,9 +6,8 @@ name: "Mobile screenshots"
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - native-app-plan-antigravity
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "apps/mobile/**"
       - "packages/core/**"
@@ -25,6 +24,7 @@ concurrency:
 
 jobs:
   ios:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -81,6 +81,7 @@ jobs:
           if-no-files-found: warn
 
   android:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -143,7 +144,7 @@ jobs:
 
   collect:
     needs: [ios, android]
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
