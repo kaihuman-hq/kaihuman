@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-06 — Mobile: fix startup crash and unreachable quick capture
+
+- `@kaihuman/core`: `logger.ts` and `auth.store.ts` read `import.meta.env` directly, which is undefined under Metro, so the mobile app crashed at module load (blank screen). Added `viteEnv(import.meta)` (`packages/core/src/env.ts`) with a regression test.
+- `apps/mobile`: `app/quick-[kind].tsx` never matched (expo-router has no partial dynamic segments), so quick capture and the widgets' `kaihuman://quick-*` links hit "Unmatched Route". Replaced with one static route per kind over a shared `QuickCaptureScreen`; added a route-file test.
+- Found by rendering the Expo web export with Playwright.
+
 ## 2026-11-05 — Mobile build: native module sources, widget target wiring, CI setup
 
 - `apps/mobile/.gitignore` ignored every `ios/` and `android/` directory, so the `kaihuman-shared` module's Swift and Kotlin sources were never committed. The patterns are now anchored to the app root, and the module ships `ios/KaihumanSharedModule.swift`, `ios/KaihumanShared.podspec`, `android/build.gradle` and `KaihumanSharedModule.kt`.

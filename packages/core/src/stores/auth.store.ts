@@ -2,6 +2,7 @@
 import { computed, effect, signal } from '@preact/signals';
 import { z } from 'zod';
 import { demoMode } from '../demo-mode.js';
+import { viteEnv } from '../env.js';
 import { Logger } from '../logger.js';
 import { getCoreStorage } from '../storage/adapter.js';
 
@@ -100,7 +101,7 @@ export class AuthStore {
   }
 
   login() {
-    const gatewayUrl = import.meta.env.VITE_GH_LOGIN;
+    const gatewayUrl = viteEnv(import.meta).VITE_GH_LOGIN;
     if (!gatewayUrl) {
       logger.error('VITE_GH_LOGIN is not defined');
       return;

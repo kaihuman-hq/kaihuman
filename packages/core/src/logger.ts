@@ -1,3 +1,5 @@
+import { viteEnv } from './env.js';
+
 export enum LogLevel {
   DEBUG = 0,
   INFO = 1,
@@ -9,7 +11,7 @@ export enum LogLevel {
 export class Logger {
   private module: string;
   // Production: only errors surface. Development: everything.
-  private static level: LogLevel = import.meta.env.PROD ? LogLevel.ERROR : LogLevel.DEBUG;
+  private static level: LogLevel = viteEnv(import.meta).PROD ? LogLevel.ERROR : LogLevel.DEBUG;
 
   constructor(module: string) {
     this.module = module;
