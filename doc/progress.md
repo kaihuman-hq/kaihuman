@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-06 — CI: skip workflows on draft pull requests
+
+- `ci.yml` and `mobile-build.yml` now run on `pull_request` (opened, synchronize, reopened, ready_for_review) instead of every branch push, and every job is skipped while the PR is a draft. Marking a PR ready for review starts them. `mobile-build.yml` keeps `workflow_dispatch` for manual runs. Branch pushes without a PR no longer run CI.
+
 ## 2026-11-06 — Mobile: native design foundation
 
 - Design spec `doc/mobile-design.md`: brand carry-over from the console, semantic colour, type, shape and metric tables quoted from `theme.ts`, iOS HIG and Material 3 rules, navigation architecture, primitives catalogue, web preview, screen restyle checklist, and status and known gaps.

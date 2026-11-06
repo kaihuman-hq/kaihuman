@@ -1,13 +1,12 @@
 name: "CI"
 
-# Builds, lints, type-checks and tests the whole monorepo on every branch push, so a broken
+# Builds, lints, type-checks and tests the whole monorepo on every pull request that is not a draft, so a broken
 # lockfile, build or test shows up before the deploy workflows run on main. Main itself is
 # skipped: the deploy workflows build it.
 
 on:
-  push:
-    branches-ignore:
-      - main
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -18,6 +17,8 @@ concurrency:
 
 jobs:
   check:
+    # Draft PRs don't run CI; marking the PR ready for review triggers it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +57,8 @@ jobs:
   # The goldens are what the serialisers produce (a Vitest test keeps them in sync), so this checks
   # the serialisers against the official Schematron and schemas.
   einvoice:
+    # Draft PRs don't run CI; marking the PR ready for review triggers it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     env:
       KOSIT_VALIDATOR: 1.6.3

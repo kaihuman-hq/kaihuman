@@ -6,9 +6,8 @@ name: "Mobile build"
 
 on:
   workflow_dispatch:
-  push:
-    branches-ignore:
-      - main
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "apps/mobile/**"
       - "packages/core/**"
@@ -24,6 +23,8 @@ concurrency:
 
 jobs:
   check:
+    # Draft PRs don't run CI; marking the PR ready for review triggers it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +52,8 @@ jobs:
         run: pnpm --filter @kaihuman/mobile test
 
   android:
+    # Draft PRs don't run CI; marking the PR ready for review triggers it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     needs: check
     runs-on: ubuntu-latest
     steps:
@@ -106,6 +109,8 @@ jobs:
           path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
 
   ios:
+    # Draft PRs don't run CI; marking the PR ready for review triggers it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     needs: check
     runs-on: macos-latest
     steps:
