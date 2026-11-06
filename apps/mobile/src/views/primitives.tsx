@@ -1,43 +1,36 @@
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { colors, spacing, typography } from '../theme/tokens.js';
+import { View } from 'react-native';
+import { spacing } from '../theme/theme.js';
+import {
+  Text,
+  TextField,
+  Button as UiButton,
+  Card as UiCard,
+  Screen as UiScreen,
+} from '../ui/index.js';
 
-const mono = typography.mono;
+// Legacy view primitives, kept with their original signatures and re-implemented on the
+// native design system so older views pick up the new look until they are rewritten.
 
 export function Screen({ children, scroll = false }: { children: ReactNode; scroll?: boolean }) {
-  const style = { flex: 1, backgroundColor: colors.background } as const;
-  if (scroll) {
-    return (
-      <ScrollView style={style} contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
-        {children}
-      </ScrollView>
-    );
-  }
-  return <View style={{ ...style, padding: spacing.lg, gap: spacing.md }}>{children}</View>;
+  return <UiScreen scroll={scroll}>{children}</UiScreen>;
 }
 
 export function Title({ children }: { children: ReactNode }) {
   return (
-    <Text
-      accessibilityRole="header"
-      style={{ color: colors.accent, fontFamily: mono, fontSize: typography.sizes.title }}
-    >
+    <Text variant="title2" accessibilityRole="header">
       {children}
     </Text>
   );
 }
 
 export function Body({ children }: { children: ReactNode }) {
-  return (
-    <Text style={{ color: colors.text, fontFamily: mono, fontSize: typography.sizes.body }}>
-      {children}
-    </Text>
-  );
+  return <Text variant="body">{children}</Text>;
 }
 
 export function Muted({ children }: { children: ReactNode }) {
   return (
-    <Text style={{ color: colors.muted, fontFamily: mono, fontSize: typography.sizes.caption }}>
+    <Text variant="footnote" tone="secondary">
       {children}
     </Text>
   );
@@ -54,32 +47,7 @@ export function Button({
   disabled?: boolean;
   testID?: string;
 }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      testID={testID}
-      style={{
-        borderWidth: 1,
-        borderColor: disabled ? colors.border : colors.accent,
-        padding: spacing.md,
-        alignItems: 'center',
-        opacity: disabled ? 0.5 : 1,
-      }}
-    >
-      <Text
-        style={{
-          color: disabled ? colors.muted : colors.accent,
-          fontFamily: mono,
-          fontSize: typography.sizes.body,
-        }}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
+  return <UiButton label={label} onPress={onPress} disabled={disabled} testID={testID} fullWidth />;
 }
 
 export function Field({
@@ -100,32 +68,15 @@ export function Field({
   testID?: string;
 }) {
   return (
-    <View style={{ gap: spacing.xs }}>
-      <Muted>{label}</Muted>
-      <TextInput
-        accessibilityLabel={label}
-        value={value}
-        onChangeText={onChangeText}
-        secureTextEntry={secureTextEntry}
-        multiline={multiline}
-        placeholder={placeholder}
-        placeholderTextColor={colors.muted}
-        autoCapitalize="none"
-        autoCorrect={false}
-        testID={testID}
-        style={{
-          color: colors.text,
-          fontFamily: mono,
-          fontSize: typography.sizes.body,
-          backgroundColor: colors.surface,
-          borderWidth: 1,
-          borderColor: colors.border,
-          padding: spacing.md,
-          minHeight: multiline ? 120 : undefined,
-          textAlignVertical: multiline ? 'top' : 'center',
-        }}
-      />
-    </View>
+    <TextField
+      label={label}
+      value={value}
+      onChangeText={onChangeText}
+      secureTextEntry={secureTextEntry}
+      multiline={multiline}
+      placeholder={placeholder}
+      testID={testID}
+    />
   );
 }
 
@@ -136,17 +87,5 @@ export function Row({ children }: { children: ReactNode }) {
 }
 
 export function Card({ children }: { children: ReactNode }) {
-  return (
-    <View
-      style={{
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-        padding: spacing.md,
-        gap: spacing.sm,
-      }}
-    >
-      {children}
-    </View>
-  );
+  return <UiCard>{children}</UiCard>;
 }

@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-11-06 — Mobile: native design foundation
+
+- Design spec `doc/mobile-design.md`: brand carry-over from the console, semantic colour, type, shape and metric tables quoted from `theme.ts`, iOS HIG and Material 3 rules, navigation architecture, primitives catalogue, web preview, screen restyle checklist, and status and known gaps.
+- `apps/mobile/src/theme/theme.ts` (committed in `f768ed0`): platform-aware light and dark palettes (iOS and Android), type scales, shape, metrics and `useTheme()`. The web preview uses iOS styling unless `?platform=android` is in the URL.
+- `expo-haptics` and `expo-symbols` added to `apps/mobile/package.json` (committed in `f768ed0`).
+- `src/ui/` primitives (`Icon`, `haptics`, `Text`, `Screen`, `Section`/`ListRow`, `Button`, `TextField`, `SegmentedControl`, `Chip`, `Badge`, `EmptyState`, `Card`, `StatTile`, `Fab`) are written but not yet committed or used by any screen.
+- Not built yet: `NativeTabs` navigation with per-tab stacks, and the screen restyle. The spec's status section lists them.
+- Known gaps: `secondaryLabel` and `tertiaryLabel` fall below 4.5:1 on some surfaces, Android status colours still use the iOS values, and the `Icon` map needs an outline/fill split. See `doc/mobile-design.md` §14.
+
 ## 2026-11-06 — Mobile: CI screenshots and `kaihuman://demo`
 
 - New `.github/workflows/mobile-screenshots.yml`: builds apps/mobile Release (JS bundled, no Metro) for the iOS Simulator and an x86_64 Android emulator build, boots them, opens each route, and uploads light and dark PNGs as the `mobile-screenshots` artifact. Runs on pushes to `native-app-plan-antigravity` touching mobile/core/formats, and via `workflow_dispatch`. Scripts in `.github/scripts/mobile-screenshots-*.sh`; iOS opens deep links through Maestro (`simctl openurl` shows an unanswerable confirmation).

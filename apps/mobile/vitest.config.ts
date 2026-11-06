@@ -20,7 +20,12 @@ export default defineConfig({
       {
         resolve: { alias },
         define,
-        test: { name: 'dom', environment: 'jsdom', include: ['src/**/*.test.tsx'] },
+        test: {
+          name: 'dom',
+          environment: 'jsdom',
+          include: ['src/**/*.test.tsx'],
+          setupFiles: ['src/ui/test-setup.ts'],
+        },
       },
     ],
   },
