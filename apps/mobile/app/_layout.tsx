@@ -4,8 +4,10 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { CloseButton } from '../src/navigation/close-button.js';
 import { useStackScreenOptions } from '../src/navigation/stack-options.js';
+import { webBackOptions as webBack } from '../src/navigation/web-back-button.js';
 import { bootstrap, startAppLinkHandling } from '../src/runtime/bootstrap.js';
 import { useTheme } from '../src/theme/theme.js';
+import { GestureRoot } from '../src/ui/gesture-root.js';
 
 const QUICK_ROUTES = ['quick-todo', 'quick-note', 'quick-log', 'quick-idea', 'quick-knowledge'];
 
@@ -18,8 +20,9 @@ export default function RootLayout() {
   useEffect(() => bootstrap(), []);
   useEffect(() => startAppLinkHandling((href) => router.push(href as never)), [router]);
 
+  // Swipeable rows need the gesture root above every navigator.
   return (
-    <>
+    <GestureRoot>
       <StatusBar style="auto" />
       <Stack screenOptions={options}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -38,23 +41,28 @@ export default function RootLayout() {
         ))}
         <Stack.Screen
           name="analytics"
-          options={{ title: 'Analytics', headerLargeTitle: largeTitles }}
+          options={{ title: 'Analytics', headerLargeTitle: largeTitles, ...webBack('/more') }}
         />
-        <Stack.Screen name="wiki" options={{ title: 'Wiki', headerLargeTitle: largeTitles }} />
+        <Stack.Screen
+          name="wiki/index"
+          options={{ title: 'Wiki', headerLargeTitle: largeTitles, ...webBack('/more') }}
+        />
+        {/* Page titles are arbitrary, so the reader uses a standard inline title. */}
+        <Stack.Screen name="wiki/[...page]" options={{ title: 'Page', ...webBack('/wiki') }} />
         <Stack.Screen
           name="knowledge"
-          options={{ title: 'Knowledge', headerLargeTitle: largeTitles }}
+          options={{ title: 'Knowledge', headerLargeTitle: largeTitles, ...webBack('/more') }}
         />
         <Stack.Screen
           name="repos"
-          options={{ title: 'Repositories', headerLargeTitle: largeTitles }}
+          options={{ title: 'Repositories', headerLargeTitle: largeTitles, ...webBack('/more') }}
         />
         <Stack.Screen
           name="files/index"
-          options={{ title: 'Files', headerLargeTitle: largeTitles }}
+          options={{ title: 'Files', headerLargeTitle: largeTitles, ...webBack('/more') }}
         />
-        <Stack.Screen name="files/[...path]" options={{ title: 'File' }} />
+        <Stack.Screen name="files/[...path]" options={{ title: 'File', ...webBack('/files') }} />
       </Stack>
-    </>
+    </GestureRoot>
   );
 }

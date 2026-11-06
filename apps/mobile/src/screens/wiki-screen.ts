@@ -2,6 +2,16 @@ import { basename, type ContentFiles, dirname, githubContentFiles } from './file
 
 export const WIKI_FOLDER = '.kh/wiki';
 
+/** Route href for a page: `.kh/wiki/a/b.md` becomes `/wiki/a/b`, so URLs read like the wiki. */
+export const wikiPageHref = (path: string): string => {
+  const rel = path.slice(WIKI_FOLDER.length + 1).replace(/\.md$/, '');
+  return `/wiki/${rel.split('/').map(encodeURIComponent).join('/')}`;
+};
+
+/** Inverse of `wikiPageHref`; the router has already decoded the catch-all segments. */
+export const wikiPagePath = (segments: readonly string[]): string =>
+  `${WIKI_FOLDER}/${segments.join('/')}.md`;
+
 export interface WikiPage {
   path: string;
   title: string;

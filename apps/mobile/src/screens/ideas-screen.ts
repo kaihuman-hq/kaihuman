@@ -161,6 +161,12 @@ export class IdeasScreenController {
     return slug;
   }
 
+  /** Deletes the idea file; the git history keeps it recoverable. */
+  async remove(slug: IdeaSlug): Promise<void> {
+    await this.files.remove(ideaPath(slug));
+    this.ideas.delete(slug);
+  }
+
   private entry(slug: IdeaSlug, text: string): IdeaEntry {
     const idea = parseIdea(text);
     const now = this.now();

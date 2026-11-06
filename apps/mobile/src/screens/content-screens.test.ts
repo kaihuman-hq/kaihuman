@@ -114,6 +114,14 @@ describe('IdeasScreenController', () => {
     expect(ctl.get(slug)?.idea.title).toBe('Brand New Thing');
     await expect(ctl.create({ title: 'Alpha' })).rejects.toThrow('exists');
   });
+
+  it('removes an idea file and forgets it', async () => {
+    const { ctl, map } = setup();
+    await ctl.load();
+    await ctl.remove('alpha' as IdeaSlug);
+    expect(map.has('.kh/ideas/alpha.md')).toBe(false);
+    expect(ctl.get('alpha' as IdeaSlug)).toBeUndefined();
+  });
 });
 
 describe('WikiScreenController', () => {
@@ -188,6 +196,24 @@ describe('KnowledgeScreenController', () => {
     expect(map.get(path)).toContain('processed: false');
     expect(ctl.inbox()[0]?.title).toBe('Read this \\"paper\\"');
     await expect(ctl.addNote('   ')).rejects.toThrow('Nothing to capture');
+  });
+
+  it('archives a note into processed, keeping its title', async () => {
+    const { ctl, map } = setup();
+    await ctl.load();
+    await ctl.archive('.kh/raw/100-first.md');
+    expect(map.has('.kh/raw/100-first.md')).toBe(false);
+    expect(map.has('.kh/raw/processed/100-first.md')).toBe(true);
+    expect(ctl.inbox().map((i) => i.name)).toEqual(['200-second.md']);
+    expect(ctl.processed().find((i) => i.name === '100-first.md')?.title).toBe('First one');
+  });
+
+  it('removes a note', async () => {
+    const { ctl, map } = setup();
+    await ctl.load();
+    await ctl.remove('.kh/raw/200-second.md');
+    expect(map.has('.kh/raw/200-second.md')).toBe(false);
+    expect(ctl.inbox().map((i) => i.name)).toEqual(['100-first.md']);
   });
 });
 

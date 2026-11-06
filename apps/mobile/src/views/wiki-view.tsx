@@ -1,9 +1,13 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Text as RNText, ScrollView, View } from 'react-native';
-import type { WikiScreenController, WikiSegment } from '../screens/wiki-screen.js';
+import {
+  type WikiScreenController,
+  type WikiSegment,
+  wikiPageHref,
+} from '../screens/wiki-screen.js';
 import { type TextVariant, useTheme } from '../theme/theme.js';
 import {
-  BackButton,
   Chip,
   EmptyState,
   haptics,
@@ -116,20 +120,119 @@ function WikiBlockView({ block, onOpen }: { block: WikiBlock; onOpen: (path: str
   }
 }
 
-export function WikiView({
+const openPage = (router: ReturnType<typeof useRouter>, path: string) =>
+  router.push(wikiPageHref(path) as never);
+
+/** Pushed reader for one wiki page; wikilinks push further pages onto the stack. */
+export function WikiPageView({
   controller,
-  initialPath = null,
+  path,
+  onTitle,
 }: {
   controller: WikiScreenController;
-  initialPath?: string | null;
+  path: string;
+  /** Reports the page title so the route can set the native header. */
+  onTitle?: (title: string) => void;
 }) {
+  const router = useRouter();
+  const { colors, spacing } = useTheme();
+  const [, setRev] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+      await controller.load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoaded(true);
+      setRev((n) => n + 1);
+    }
+  }, [controller]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const page = controller.page(path);
+  const pageTitle = page?.title;
+  useEffect(() => {
+    if (pageTitle) onTitle?.(pageTitle);
+  }, [pageTitle, onTitle]);
+
+  if (!page) {
+    return (
+      <Screen>
+        {!loaded ? (
+          <View style={{ alignItems: 'center', padding: spacing.xl }}>
+            <ActivityIndicator color={colors.secondaryLabel} />
+          </View>
+        ) : (
+          <EmptyState
+            icon="wiki"
+            title={error ? "Couldn't load the page" : 'Page not found'}
+            message={error ?? 'It may have been moved or deleted.'}
+            action={{ label: 'Try again', onPress: () => void load() }}
+          />
+        )}
+      </Screen>
+    );
+  }
+
+  const { title, blocks } = withoutTitleHeading(page.title, wikiBlocks(controller.render(path)));
+  const backlinks = controller.backlinks(path);
+  const refresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+  return (
+    <Screen refreshing={refreshing} onRefresh={refresh}>
+      <View style={{ gap: spacing.sm, paddingHorizontal: spacing.xs }}>
+        <Text variant="title1" accessibilityRole="header">
+          {title}
+        </Text>
+        {page.tags.length > 0 ? (
+          <Text variant="footnote" tone="secondary">
+            {page.tags.map((t) => `#${t}`).join('  ')}
+          </Text>
+        ) : null}
+      </View>
+      <View testID="wiki-page" style={{ paddingHorizontal: spacing.xs, gap: spacing.md }}>
+        {blocks.map((block, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: blocks are positional and static
+          <WikiBlockView key={i} block={block} onOpen={(p) => openPage(router, p)} />
+        ))}
+      </View>
+      {backlinks.length > 0 ? (
+        <Section header="Linked from">
+          {backlinks.map((b) => (
+            <ListRow
+              key={b.path}
+              title={b.title}
+              icon="wiki"
+              iconTone="accent"
+              accessory="chevron"
+              onPress={() => openPage(router, b.path)}
+            />
+          ))}
+        </Section>
+      ) : null}
+    </Screen>
+  );
+}
+
+export function WikiView({ controller }: { controller: WikiScreenController }) {
   const theme = useTheme();
+  const router = useRouter();
   const { colors, spacing } = theme;
   const [, setRev] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [path, setPath] = useState<string | null>(initialPath);
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState<string | null>(null);
 
@@ -154,48 +257,6 @@ export function WikiView({
     await load();
     setRefreshing(false);
   };
-
-  const page = path ? controller.page(path) : undefined;
-
-  if (page && path) {
-    const { title, blocks } = withoutTitleHeading(page.title, wikiBlocks(controller.render(path)));
-    const backlinks = controller.backlinks(path);
-    return (
-      <Screen refreshing={refreshing} onRefresh={refresh}>
-        <BackButton label="Wiki" onPress={() => setPath(null)} />
-        <View style={{ gap: spacing.sm, paddingHorizontal: spacing.xs }}>
-          <Text variant="title1" accessibilityRole="header">
-            {title}
-          </Text>
-          {page.tags.length > 0 ? (
-            <Text variant="footnote" tone="secondary">
-              {page.tags.map((t) => `#${t}`).join('  ')}
-            </Text>
-          ) : null}
-        </View>
-        <View testID="wiki-page" style={{ paddingHorizontal: spacing.xs, gap: spacing.md }}>
-          {blocks.map((block, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: blocks are positional and static
-            <WikiBlockView key={i} block={block} onOpen={setPath} />
-          ))}
-        </View>
-        {backlinks.length > 0 ? (
-          <Section header="Linked from">
-            {backlinks.map((b) => (
-              <ListRow
-                key={b.path}
-                title={b.title}
-                icon="wiki"
-                iconTone="accent"
-                accessory="chevron"
-                onPress={() => setPath(b.path)}
-              />
-            ))}
-          </Section>
-        ) : null}
-      </Screen>
-    );
-  }
 
   const q = query.trim().toLowerCase();
   const pages = controller
@@ -280,7 +341,7 @@ export function WikiView({
               icon="wiki"
               iconTone="accent"
               accessory="chevron"
-              onPress={() => setPath(p.path)}
+              onPress={() => openPage(router, p.path)}
             />
           ))}
         </Section>

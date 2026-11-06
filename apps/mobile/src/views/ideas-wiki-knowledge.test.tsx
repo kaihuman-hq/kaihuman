@@ -1,15 +1,29 @@
-import { newIdea } from '@kaihuman/formats';
+import { asIdeaSlug, newIdea } from '@kaihuman/formats';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { useEffect } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ContentFiles } from '../screens/file-editor-screen.js';
 import { IdeasScreenController } from '../screens/ideas-screen.js';
 import { KnowledgeScreenController } from '../screens/knowledge-screen.js';
 import { WikiScreenController } from '../screens/wiki-screen.js';
-import { IdeasView } from './ideas-view.js';
+import { IdeaDetailView, IdeasView } from './ideas-view.js';
 import { KnowledgeView } from './knowledge-view.js';
-import { WikiView } from './wiki-view.js';
+import { WikiPageView, WikiView } from './wiki-view.js';
 
-afterEach(cleanup);
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock('expo-router', () => ({
+  useRouter: () => router,
+  // biome-ignore lint/correctness/useExhaustiveDependencies: stands in for the real hook
+  useFocusEffect: (effect: () => void) => useEffect(effect, [effect]),
+}));
+
+afterEach(() => {
+  cleanup();
+  router.push.mockClear();
+});
+
+const alpha = asIdeaSlug('alpha');
+if (!alpha) throw new Error('bad slug');
 
 const NOW = new Date(2026, 10, 5, 10, 0, 0);
 
@@ -49,17 +63,44 @@ describe('IdeasView states', () => {
     expect(await screen.findByText('Alpha')).toBeTruthy();
   });
 
-  it('changes status from the detail screen', async () => {
-    const { map, files } = memory({
+  it('pushes the detail route when a row is pressed', async () => {
+    const { files } = memory({
       '.kh/ideas/alpha.md': newIdea({ title: 'Alpha' }, { now: NOW, author: 'human' }).content,
     });
     render(<IdeasView controller={new IdeasScreenController({ files, now: () => NOW })} />);
     fireEvent.click(await screen.findByRole('button', { name: /^Alpha/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Shipped' }));
+    expect(router.push).toHaveBeenCalledWith('/ideas/alpha');
+  });
+});
+
+describe('IdeaDetailView', () => {
+  const setup = () => {
+    const { map, files } = memory({
+      '.kh/ideas/alpha.md': newIdea({ title: 'Alpha' }, { now: NOW, author: 'human' }).content,
+    });
+    return { map, controller: new IdeasScreenController({ files, now: () => NOW }) };
+  };
+
+  it('loads the idea itself, reports its title and changes status', async () => {
+    const { map, controller } = setup();
+    const onTitle = vi.fn();
+    render(<IdeaDetailView controller={controller} slug={alpha} onTitle={onTitle} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Shipped' }));
     await waitFor(() => expect(map.get('.kh/ideas/alpha.md')).toContain('status: shipped'));
-    fireEvent.click(screen.getByRole('button', { name: 'Back to ideas' }));
+    expect(onTitle).toHaveBeenCalledWith('Alpha');
+    expect(screen.queryByRole('button', { name: 'Back to ideas' })).toBeNull();
   });
 
+  it('shows a not-found state for an unknown idea', async () => {
+    const { controller } = setup();
+    const missing = asIdeaSlug('missing');
+    if (!missing) throw new Error('bad slug');
+    render(<IdeaDetailView controller={controller} slug={missing} />);
+    expect(await screen.findByText('Idea not found')).toBeTruthy();
+  });
+});
+
+describe('IdeasView errors', () => {
   it('shows an error state with retry when loading fails', async () => {
     render(<IdeasView controller={new IdeasScreenController({ files: failing() })} />);
     expect(await screen.findByText("Couldn't load ideas")).toBeTruthy();
@@ -78,13 +119,19 @@ describe('WikiView reader', () => {
     '.kh/wiki/other.md': '---\ntitle: Other\ntags: [b]\n---\nBack.',
   };
 
-  it('hides frontmatter and links tinted wikilinks', async () => {
+  it('pushes the page route from the list', async () => {
     render(<WikiView controller={new WikiScreenController({ files: memory(pages).files })} />);
     fireEvent.click(await screen.findByRole('button', { name: /^Home/ }));
-    const body = screen.getByTestId('wiki-page').textContent ?? '';
-    expect(body).toBe('See Other.');
-    fireEvent.click(screen.getByRole('button', { name: 'Back to wiki' }));
-    expect(await screen.findByRole('button', { name: /^Other/ })).toBeTruthy();
+    expect(router.push).toHaveBeenCalledWith('/wiki/home');
+  });
+
+  it('hides frontmatter and pushes the target when a wikilink is pressed', async () => {
+    const controller = new WikiScreenController({ files: memory(pages).files });
+    render(<WikiPageView controller={controller} path=".kh/wiki/home.md" />);
+    await screen.findByTestId('wiki-page');
+    expect(screen.getByTestId('wiki-page').textContent).toBe('See Other.');
+    fireEvent.click(screen.getByRole('link', { name: 'Other' }));
+    expect(router.push).toHaveBeenCalledWith('/wiki/other');
   });
 
   it('renders Markdown headings and bullets with links still tappable', async () => {
@@ -92,15 +139,22 @@ describe('WikiView reader', () => {
       '.kh/wiki/clients.md': '# Clients\n\n## Active\n- Working with [[Other]]\n',
       '.kh/wiki/other.md': '---\ntitle: Other\n---\nBack.',
     }).files;
-    render(<WikiView controller={new WikiScreenController({ files })} />);
-    fireEvent.click(await screen.findByRole('button', { name: /^clients/i }));
-    expect(screen.getByRole('heading', { name: 'Clients' })).toBeTruthy();
+    render(
+      <WikiPageView controller={new WikiScreenController({ files })} path=".kh/wiki/clients.md" />,
+    );
+    expect(await screen.findByRole('heading', { name: 'Clients' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Active' })).toBeTruthy();
     const body = screen.getByTestId('wiki-page').textContent ?? '';
     expect(body).not.toContain('#');
     expect(body).toContain('•');
     fireEvent.click(screen.getByRole('link', { name: 'Other' }));
-    expect(await screen.findByRole('heading', { name: 'Other' })).toBeTruthy();
+    expect(router.push).toHaveBeenCalledWith('/wiki/other');
+  });
+
+  it('shows a not-found state for an unknown page', async () => {
+    const controller = new WikiScreenController({ files: memory(pages).files });
+    render(<WikiPageView controller={controller} path=".kh/wiki/nope.md" />);
+    expect(await screen.findByText('Page not found')).toBeTruthy();
   });
 
   it('searches and filters by tag', async () => {

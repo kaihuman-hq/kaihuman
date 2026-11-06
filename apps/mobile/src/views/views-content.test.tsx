@@ -1,7 +1,8 @@
 import { webcrypto } from 'node:crypto';
 import { buildDemoSeed, encrypt, type TreeItem } from '@kaihuman/core';
-import { newIdea } from '@kaihuman/formats';
+import { asIdeaSlug, newIdea } from '@kaihuman/formats';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useEffect } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   addCommandEntry,
@@ -19,12 +20,22 @@ import { KnowledgeScreenController } from '../screens/knowledge-screen.js';
 import { WikiScreenController } from '../screens/wiki-screen.js';
 import { DashboardView } from './dashboard-view.js';
 import { FileBrowserView, FileEditorView } from './file-editor-view.js';
-import { IdeasView } from './ideas-view.js';
+import { IdeaDetailView, IdeasView } from './ideas-view.js';
 import { KnowledgeView } from './knowledge-view.js';
 import { Tile } from './tile-view.js';
-import { WikiView } from './wiki-view.js';
+import { WikiPageView, WikiView } from './wiki-view.js';
 
-afterEach(cleanup);
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock('expo-router', () => ({
+  useRouter: () => router,
+  // biome-ignore lint/correctness/useExhaustiveDependencies: stands in for the real hook
+  useFocusEffect: (effect: () => void) => useEffect(effect, [effect]),
+}));
+
+afterEach(() => {
+  cleanup();
+  router.push.mockClear();
+});
 
 beforeAll(() => {
   // Core's encrypt reads `window.crypto.subtle`; jsdom may not provide it.
@@ -259,10 +270,12 @@ describe('IdeasView', () => {
     return { map, controller: new IdeasScreenController({ files, now: () => NOW }) };
   };
 
-  it('lists ideas and logs to one', async () => {
+  it('lists ideas and logs to one from its detail screen', async () => {
     const { map, controller } = setup();
-    render(<IdeasView controller={controller} />);
-    fireEvent.click(await screen.findByRole('button', { name: /^Alpha/ }));
+    const slug = asIdeaSlug('alpha');
+    if (!slug) throw new Error('bad slug');
+    render(<IdeaDetailView controller={controller} slug={slug} />);
+    await screen.findByLabelText('Log entry');
     type('Log entry', 'Thought about it');
     press('Add log');
     await waitFor(() => expect(map.get('.kh/ideas/alpha.md')).toContain('Thought about it'));
@@ -285,15 +298,23 @@ describe('WikiView', () => {
     '.kh/wiki/other.md': '---\ntitle: Other\n---\nBack to [[home]].',
   };
 
-  it('lists pages, renders one and follows a wiki link', async () => {
+  it('lists pages, renders one and links to a wiki page', async () => {
     const controller = new WikiScreenController({ files: memoryFiles(pages).files });
     render(<WikiView controller={controller} />);
     fireEvent.click(await screen.findByRole('button', { name: /^Home/ }));
+    expect(router.push).toHaveBeenCalledWith('/wiki/home');
+    cleanup();
+    render(<WikiPageView controller={controller} path=".kh/wiki/home.md" />);
+    await screen.findByTestId('wiki-page');
     expect(screen.getByTestId('wiki-page').textContent).toContain('See Other and Ghost.');
     expect(screen.queryByRole('link', { name: 'Ghost' })).toBeNull();
     fireEvent.click(screen.getByRole('link', { name: 'Other' }));
-    expect(screen.getByRole('heading', { name: 'Other' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Home' })).toBeTruthy(); // backlink
+    expect(router.push).toHaveBeenLastCalledWith('/wiki/other');
+    cleanup();
+    render(<WikiPageView controller={controller} path=".kh/wiki/other.md" />);
+    expect(await screen.findByRole('heading', { name: 'Other' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Home' })); // backlink
+    expect(router.push).toHaveBeenLastCalledWith('/wiki/home');
   });
 
   it('shows an empty state', async () => {

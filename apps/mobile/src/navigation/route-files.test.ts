@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { QuickKind } from './routes.js';
@@ -26,5 +26,31 @@ describe('expo-router route files', () => {
       /(^|\/)[^/[]+\[[^\]]+\]/.test(f),
     );
     expect(partial).toEqual([]);
+  });
+
+  it('has pushed detail routes for ideas and wiki pages', () => {
+    for (const file of ['(tabs)/ideas/[slug].tsx', 'wiki/index.tsx', 'wiki/[...page].tsx']) {
+      expect(existsSync(`${appDir}${file}`), `app/${file}`).toBe(true);
+    }
+    // The old single-file wiki route would shadow wiki/index.
+    expect(existsSync(`${appDir}wiki.tsx`)).toBe(false);
+  });
+
+  it('registers the detail routes in their stacks', () => {
+    const root = readFileSync(`${appDir}_layout.tsx`, 'utf8');
+    expect(root).toContain('name="wiki/index"');
+    expect(root).toContain('name="wiki/[...page]"');
+    expect(readFileSync(`${appDir}(tabs)/ideas/_layout.tsx`, 'utf8')).toContain('name="[slug]"');
+  });
+
+  it('gives every pushed root-stack screen a web back control', () => {
+    const root = readFileSync(`${appDir}_layout.tsx`, 'utf8');
+    for (const name of ['analytics', 'wiki/index', 'wiki/[...page]', 'knowledge', 'repos']) {
+      const screen = new RegExp(`name="${name.replace(/[[\].]/g, '\\$&')}"[\\s\\S]*?/>`).exec(
+        root,
+      )?.[0];
+      expect(screen, name).toContain('webBack(');
+    }
+    expect(root).toContain("webBack('/files')");
   });
 });
