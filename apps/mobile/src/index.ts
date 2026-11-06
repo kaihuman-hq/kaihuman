@@ -11,4 +11,4 @@ export * from './screens/quick-capture.js';
 export * from './screens/repo-selector-screen.js';
 export * from './screens/todo-analytics.js';
 export * from './screens/wiki-screen.js';
-export * from './theme/tokens.js';
+export * from './theme/theme.js';
