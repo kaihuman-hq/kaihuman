@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-06 — Mobile: Android release crashed on launch (WorkManager vs R8)
+
+- The Release APK died at startup in `androidx.startup.InitializationProvider` ("Failed to create an instance of androidx.work.impl.WorkDatabase"): Glance's WorkManager creates its Room database reflectively and R8 stripped `WorkDatabase_Impl`. The widget config plugin now appends keep rules to `android/app/proguard-rules.pro` (`addWorkManagerKeepRules`, with a test). Found via the crash logs the screenshots workflow now saves.
+- iOS screenshots now show the real screens (the "Open in kaihuman?" prompt is confirmed).
+
 ## 2026-11-06 — Workflow hardening for public release
 
 - `template-deploy-to-cloudflare.yaml`: inputs/env moved from `run:` into step `env:` (script-injection fix), `permissions: contents: read`, wrangler pinned to 4.148.0, `pnpm install --frozen-lockfile`, dead `set-output` step removed.

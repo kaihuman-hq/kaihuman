@@ -12,6 +12,7 @@ import withKaihumanWidgets, {
   addGlanceDependencies,
   addIosWidgetTarget,
   addWidgetReceiverToManifest,
+  addWorkManagerKeepRules,
   applyComposePlugin,
   type CopyFs,
   copyAndroidWidgetSources,
@@ -204,6 +205,14 @@ describe('config plugin transforms', () => {
     expect(applyComposePlugin(withCompose)).toBe(withCompose);
 
     expect(kotlinVersionFromCatalog('[versions]\nkotlin = "2.2.0"\nkotlinx = "1"\n')).toBe('2.2.0');
+  });
+
+  it("keeps WorkManager's Room database out of R8, once (release launch crash)", () => {
+    const once = addWorkManagerKeepRules('# Add project specific ProGuard rules here.\n');
+    expect(once).toContain('-keep class * extends androidx.room.RoomDatabase');
+    expect(once).toContain('-keep class androidx.work.impl.WorkDatabase_Impl { *; }');
+    expect(addWorkManagerKeepRules(once)).toBe(once);
+    expect(addWorkManagerKeepRules('')).toContain('WorkDatabase_Impl');
   });
 
   it('reads the Kotlin version from the installed React Native', () => {

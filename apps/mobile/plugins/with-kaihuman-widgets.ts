@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
@@ -113,6 +113,20 @@ export const addGlanceDependencies = (buildGradle: string): string => {
     (open) => `${open}\n    implementation "${GLANCE_DEPENDENCY}"`,
   );
 };
+
+// Glance pulls in WorkManager, which creates its Room database reflectively. R8 in release builds
+// renames/removes `WorkDatabase_Impl`, and the app then dies in InitializationProvider on launch
+// ("Failed to create an instance of androidx.work.impl.WorkDatabase").
+export const WORK_KEEP_RULES = [
+  '-keep class * extends androidx.room.RoomDatabase',
+  '-keep class androidx.work.impl.WorkDatabase_Impl { *; }',
+].join('\n');
+
+/** Appends the WorkManager keep rules to proguard-rules.pro, once. */
+export const addWorkManagerKeepRules = (rules: string): string =>
+  rules.includes(WORK_KEEP_RULES)
+    ? rules
+    : `${rules}${rules === '' || rules.endsWith('\n') ? '' : '\n'}\n# kaihuman widgets\n${WORK_KEEP_RULES}\n`;
 
 // Glance widgets are Compose code, so the app module needs the Compose compiler, whose version
 // must equal the Kotlin Gradle plugin's. React Native's version catalog pins that version.
@@ -400,6 +414,10 @@ const withKaihumanWidgets = (
         next.android?.package ?? 'com.kaihuman.app',
         options.fs,
       );
+      const rulesFile = join(platformProjectRoot, 'app/proguard-rules.pro');
+      if (existsSync(rulesFile)) {
+        writeFileSync(rulesFile, addWorkManagerKeepRules(readFileSync(rulesFile, 'utf8')));
+      }
     }
     return cfg;
   });
