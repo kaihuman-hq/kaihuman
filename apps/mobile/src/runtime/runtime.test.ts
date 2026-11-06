@@ -111,6 +111,7 @@ describe('links', () => {
   it('routeToHref', () => {
     expect(routeToHref({ name: 'quick-capture', kind: 'idea' })).toBe('/quick-idea');
     expect(routeToHref({ name: 'board' })).toBe('/board');
+    expect(routeToHref({ name: 'inbox' })).toBe('/board');
     expect(routeToHref({ name: 'file', path: '.kh/a b/c.md' })).toBe('/files/.kh/a%20b/c.md');
     expect(routeToHref({ name: 'auth-callback', accessToken: 'x' })).toBe('/');
   });

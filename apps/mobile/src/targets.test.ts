@@ -269,7 +269,12 @@ describe('config plugin transforms', () => {
 
 // ─── Kotlin / TS parity ─────────────────────────────────────────────────────
 
-const fullItem: Required<WidgetTodoItem> = {
+// Android only reads the v1 keys; v2 keys are preserved verbatim in its raw copy.
+type V1Counts = Pick<
+  WidgetTodoSnapshot['counts'],
+  'inbox' | 'inProgress' | 'backlog' | 'doneToday'
+>;
+const fullItem: Required<Omit<WidgetTodoItem, 'priority' | 'pending'>> = {
   id: 'a#0',
   filePath: '.kh/inbox.todos.md',
   indexInFile: 0,
@@ -281,7 +286,12 @@ const fullItem: Required<WidgetTodoItem> = {
   milestoneDueDate: '2026-01-01',
   updatedAt: 1,
 };
-const fullSnapshot: Required<WidgetTodoSnapshot> = {
+const fullSnapshot: Required<
+  Omit<
+    WidgetTodoSnapshot,
+    'schemaVersion' | 'stats' | 'milestones' | 'tags' | 'privacy' | 'timeZone' | 'counts' | 'items'
+  >
+> & { counts: V1Counts; items: (typeof fullItem)[] } = {
   updatedAt: 1,
   repoFullName: 'o/r',
   branch: 'main',

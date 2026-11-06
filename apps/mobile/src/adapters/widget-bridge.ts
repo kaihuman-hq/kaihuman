@@ -40,6 +40,8 @@ export class InMemorySharedContainer implements SharedContainer {
 const isTodoPath = (path: string): boolean =>
   /^\.(kh|lifeos)\//.test(path) && path.endsWith('.todos.md');
 
+const isRawPath = (path: string): boolean => /^\.(kh|lifeos)\/raw\//.test(path);
+
 const currentSnapshot = () => {
   const repo = githubProfileStore.currentRepo.value;
   if (!repo) return null;
@@ -47,7 +49,13 @@ const currentSnapshot = () => {
   for (const [path, file] of Object.entries(githubFileStore.openFiles.value)) {
     if (isTodoPath(path)) files[path] = { sha: file.sha, content: file.content };
   }
-  return buildWidgetTodoSnapshot(files, repo.full_name, repo.default_branch);
+  // Only what the app has loaded: raw captures that were never opened are not counted.
+  const knowledgeInbox = Object.keys(githubFileStore.openFiles.value).filter(isRawPath).length;
+  return buildWidgetTodoSnapshot(files, repo.full_name, repo.default_branch, new Date(), {
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    knowledgeInbox,
+    lockScreenText: true, // no privacy setting exists yet; v2 reserves the flag for it
+  });
 };
 
 /** Keeps `widget-todos.json` current and replays toggles the widgets queued while the app slept. */

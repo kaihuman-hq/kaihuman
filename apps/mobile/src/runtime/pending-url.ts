@@ -13,6 +13,7 @@ export const routeToHref = (route: Route): string => {
     case 'quick-capture':
       return `/quick-${route.kind}`;
     case 'board':
+    case 'inbox': // no dedicated inbox screen yet; the board lists inbox items
       return '/board';
     case 'demo':
       return '/dashboard';

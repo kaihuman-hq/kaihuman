@@ -20,6 +20,9 @@ struct SharedTodoCounts: Codable {
     var inProgress: Int
     var backlog: Int
     var doneToday: Int
+    // v2 (optional so v1 files still decode)
+    var knowledgeInbox: Int?
+    var doneThisWeek: Int?
 }
 
 struct SharedUpcomingMilestone: Codable {
@@ -39,9 +42,31 @@ struct SharedTodoItem: Codable, Identifiable {
     var milestoneName: String?
     var milestoneDueDate: String?
     var updatedAt: Int64?
+    // v2
+    var priority: String?
+    var pending: Bool?
+}
+
+struct SharedTodoStats: Codable {
+    var doneByDay: [Int]
+    var streakDays: Int
+    var weeklyGoal: Int?
+}
+
+struct SharedMilestone: Codable, Identifiable {
+    var id: String
+    var name: String
+    var dueDate: String?
+    var open: Int
+    var done: Int
+}
+
+struct SharedPrivacy: Codable {
+    var lockScreenText: Bool
 }
 
 struct SharedTodoSnapshot: Codable {
+    var schemaVersion: Int?
     var updatedAt: Int64
     var repoFullName: String
     var branch: String
@@ -50,6 +75,12 @@ struct SharedTodoSnapshot: Codable {
     var counts: SharedTodoCounts
     var items: [SharedTodoItem]
     var files: [String: SharedTodoFile]
+    // v2
+    var stats: SharedTodoStats?
+    var milestones: [SharedMilestone]?
+    var tags: [String]?
+    var privacy: SharedPrivacy?
+    var timeZone: String?
 }
 
 /// A toggle the widget could not commit; the main app replays it (see widget-bridge.ts).

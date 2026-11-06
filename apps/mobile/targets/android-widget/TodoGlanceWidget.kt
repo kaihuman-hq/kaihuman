@@ -98,8 +98,10 @@ data class WidgetTodoSnapshot(
     val counts: WidgetCounts,
     val items: List<WidgetTodoItem>,
     val files: Map<String, WidgetFile>,
+    // Raw JSON as read; keys this class does not model (schema v2+) survive a rewrite.
+    val raw: JSONObject? = null,
 ) {
-    fun toJson(): JSONObject = JSONObject().apply {
+    fun toJson(): JSONObject = JSONObject(raw?.toString() ?: "{}").apply {
         put("updatedAt", updatedAt)
         put("repoFullName", repoFullName)
         put("branch", branch)
@@ -121,6 +123,10 @@ data class WidgetTodoSnapshot(
                 put("inProgress", counts.inProgress)
                 put("backlog", counts.backlog)
                 put("doneToday", counts.doneToday)
+                // Preserve v2 counts (knowledgeInbox, doneThisWeek) from the raw snapshot.
+                raw?.optJSONObject("counts")?.let { old ->
+                    for (key in old.keys()) if (!has(key)) put(key, old.get(key))
+                }
             },
         )
         put("items", JSONArray().also { arr -> items.forEach { arr.put(it.toJson()) } })
@@ -165,6 +171,7 @@ data class WidgetTodoSnapshot(
                 ),
                 items = (0 until itemArray.length()).map { WidgetTodoItem.fromJson(itemArray.getJSONObject(it)) },
                 files = files,
+                raw = o,
             )
         }
     }

@@ -40,6 +40,9 @@ describe('parseDeepLink', () => {
       expect(parseDeepLink(`kaihuman://quick-${kind}`)).toEqual({ name: 'quick-capture', kind });
     }
     expect(parseDeepLink('kaihuman://board')).toEqual({ name: 'board' });
+    expect(parseDeepLink('kaihuman://inbox')).toEqual({ name: 'inbox' });
+    expect(parseDeepLink('kaihuman://inbox/x')).toBeNull();
+    expect(routeToUrl({ name: 'inbox' })).toBe('kaihuman://inbox');
     expect(parseDeepLink('kaihuman://demo')).toEqual({ name: 'demo' });
     expect(parseDeepLink('kaihuman://demo/x')).toBeNull();
     expect(parseDeepLink('kaihuman://files/.kh/inbox.todos.md')).toEqual({

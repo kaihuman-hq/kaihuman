@@ -6,6 +6,7 @@ export type Route =
   | { name: 'auth-callback'; accessToken: string | null }
   | { name: 'quick-capture'; kind: QuickKind }
   | { name: 'board' }
+  | { name: 'inbox' }
   | { name: 'demo' }
   | { name: 'file'; path: string };
 
@@ -32,6 +33,7 @@ export function parseDeepLink(url: string): Route | null {
     return { name: 'auth-callback', accessToken: parsed.searchParams.get('access_token') };
   }
   if (head === 'board' && rest.length === 0) return { name: 'board' };
+  if (head === 'inbox' && rest.length === 0) return { name: 'inbox' };
   // Non-interactive "Try demo" (used by CI screenshots).
   if (head === 'demo' && rest.length === 0) return { name: 'demo' };
   if (head === 'files' && rest.length > 0) {
@@ -54,6 +56,8 @@ export const routeToUrl = (route: Exclude<Route, { name: 'auth-callback' }>): st
       return `${APP_SCHEME}://quick-${route.kind}`;
     case 'board':
       return `${APP_SCHEME}://board`;
+    case 'inbox':
+      return `${APP_SCHEME}://inbox`;
     case 'demo':
       return `${APP_SCHEME}://demo`;
     case 'file':
