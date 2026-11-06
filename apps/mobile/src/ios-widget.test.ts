@@ -557,4 +557,13 @@ describe('ios widget target', () => {
       expect(activity).toContain('Button(intent: FocusExtendIntent(');
     });
   });
+  it('pluralises todo counts and has a Next up empty state that is not "Inbox zero"', () => {
+    const swift = readdirSync(dir)
+      .filter((f) => f.endsWith('.swift'))
+      .map(read)
+      .join('\n');
+    // A bare "\(n) todos" reads "1 todos"; every count must pick the singular for 1.
+    expect(swift).not.toMatch(/\\\([\w.]+\) todos/);
+    expect(views).toContain('case .all: return "Nothing up next"');
+  });
 });

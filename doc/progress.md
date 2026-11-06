@@ -6,6 +6,7 @@
 - iOS widgets: **Board column** (medium/large, column + tag config, Start moves backlog → in progress), **Milestone countdown** (small, circular, rectangular, milestone picker, daily entries), **Idea pipeline** (small/medium, stage links, hot idea with Log), **Knowledge card** (medium/large, rotates every 3 h, in-process Next), **Habits** (small, rectangular, Log per habit, queued for the app). All with light, dark, tinted, Lock Screen privacy and `#Preview`s.
 - **Focus Live Activity**: `FocusActivityAttributes`, Lock Screen/StandBy and Dynamic Island views with `Text(timerInterval:)`, Done and +5m `LiveActivityIntent`s; `startFocusActivity`/`updateFocusActivity`/`endFocusActivity` in the `kaihuman-shared` module; `NSSupportsLiveActivities` via the config plugin; "Start focus" swipe action on board cards.
 - **Background capture**: `CaptureTodoIntent` (Siri/Shortcuts, no app launch) appends to the cached inbox and commits, or queues for the app; new App Shortcut phrase.
+- v1 fixes: Next up "all" empty state reads "Nothing up next"; todo counts pluralise ("1 todo"), with a test.
 - Deep links: `kaihuman://ideas?status=`, `quick-log?idea=<slug>`, `board?milestone=|item=`.
 - CI render harness draws every v2 widget; contact sheets `apps/mobile/docs/widgets-real.png` (v1) and `widgets-real-v2.png` (v2).
 

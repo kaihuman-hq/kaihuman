@@ -62,7 +62,8 @@ struct NextUpContent: View {
     private var emptyTitle: String {
         switch entry.source {
         case .inProgress: return "Nothing in progress — pick from backlog"
-        case .all, .inbox: return "Inbox zero"
+        case .all: return "Nothing up next"
+        case .inbox: return "Inbox zero"
         case .backlog, .tag, .milestone: return "Nothing open here"
         }
     }
@@ -86,7 +87,7 @@ struct NextUpContent: View {
             if snapshot.showsLockScreenText, let first = items.first {
                 Text("\(Image(systemName: "checklist")) \(first.text)").privacySensitive()
             } else {
-                Text("\(Image(systemName: "checklist")) \(items.count) todos · \(doneToday) done today")
+                Text("\(Image(systemName: "checklist")) \(items.count) \(items.count == 1 ? "todo" : "todos") · \(doneToday) done today")
             }
         }
     }
@@ -127,7 +128,7 @@ struct NextUpContent: View {
                     Text("+\(items.count - 1) more").font(.system(size: 12)).foregroundStyle(.secondary)
                 }
             } else {
-                Text("\(items.count) todos open").font(.system(size: 14, weight: .semibold))
+                Text("\(items.count) \(items.count == 1 ? "todo" : "todos") open").font(.system(size: 14, weight: .semibold))
             }
             if freshness != .fresh {
                 Text("Synced \(freshness.hours)h ago").font(.system(size: 11)).foregroundStyle(.secondary)
