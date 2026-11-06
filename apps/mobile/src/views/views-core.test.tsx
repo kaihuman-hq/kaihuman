@@ -101,10 +101,10 @@ describe('KanbanView', () => {
     const files = todoFiles();
     render(<KanbanView controller={new KanbanBoardController(files)} />);
     await waitFor(() => expect(screen.getByText('write tests')).toBeTruthy());
-    expect(screen.getByText('backlog (1)')).toBeTruthy();
+    expect(screen.getByText('Todo 1')).toBeTruthy();
     fireEvent.click(screen.getByTestId('move-0-in-progress'));
-    await waitFor(() => expect(screen.getByText('in-progress (1)')).toBeTruthy());
-    expect(screen.getByText('backlog (0)')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Active 1')).toBeTruthy());
+    expect(screen.getByText('Todo 0')).toBeTruthy();
     expect(parseTodos(files.store.get('.kh/inbox.todos.md') ?? '').items[0]?.status).toBe(
       'in-progress',
     );
@@ -114,11 +114,10 @@ describe('KanbanView', () => {
 describe('TodoAnalyticsView', () => {
   it('shows totals and completion', async () => {
     render(<TodoAnalyticsView controller={new TodoAnalyticsController(todoFiles())} />);
-    await waitFor(() => expect(screen.getByText('Total: 2')).toBeTruthy());
-    expect(screen.getByText('Completion: 100%')).toBeTruthy();
-    expect(screen.getByText('done: 1')).toBeTruthy();
-    expect(screen.getByText('#qa: 1')).toBeTruthy();
-    fireEvent.click(screen.getByTestId('frame-ALL'));
-    expect(screen.getByText('[ALL]')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('100%')).toBeTruthy());
+    expect(screen.getByText('Total')).toBeTruthy();
+    expect(screen.getByText('#qa')).toBeTruthy();
+    fireEvent.click(screen.getByText('All'));
+    expect(screen.getByText('Done per week')).toBeTruthy();
   });
 });
