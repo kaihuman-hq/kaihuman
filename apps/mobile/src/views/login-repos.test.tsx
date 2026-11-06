@@ -60,6 +60,15 @@ describe('LoginView', () => {
     expect(onSignedIn).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the GitHub mark on the sign-in button instead of a code icon', () => {
+    setup();
+    const button = screen.getByTestId('login-browser');
+    expect(button.querySelector('[data-testid="github-mark"]')).not.toBeNull();
+    expect(button.querySelector('[data-testid="icon-code"]')).toBeNull();
+    expect(button.querySelector('path')?.getAttribute('fill')).toBeTruthy();
+    expect(button.textContent).toBe('Sign in with GitHub');
+  });
+
   it('enters demo mode', () => {
     const { onSignedIn } = setup();
     fireEvent.click(screen.getByTestId('login-demo'));

@@ -33,7 +33,6 @@ const icons = {
   trash: { ios: 'trash', material: 'delete' },
   edit: { ios: 'pencil', material: 'edit' },
   share: { ios: 'square.and.arrow.up', material: 'share' },
-  github: { ios: 'chevron.left.forwardslash.chevron.right', material: 'code' },
   sparkles: { ios: 'sparkles', material: 'auto_awesome' },
   calendar: { ios: 'calendar', material: 'calendar_today' },
   flag: { ios: 'flag.fill', material: 'flag' },

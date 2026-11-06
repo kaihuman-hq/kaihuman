@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import type { LoginScreenController } from '../screens/login-screen.js';
 import { useTheme } from '../theme/theme.js';
-import { Button, haptics, Screen, Text, TextField } from '../ui/index.js';
+import { Button, GithubMark, haptics, Screen, Text, TextField } from '../ui/index.js';
 
 const MARK = 88;
 
@@ -85,7 +85,7 @@ export function LoginView({
         <View style={{ gap: spacing.md }}>
           <Button
             label="Sign in with GitHub"
-            icon="github"
+            leading={(color) => <GithubMark color={color} />}
             fullWidth
             testID="login-browser"
             onPress={() => onOpenBrowser(controller.buildLoginUrl())}

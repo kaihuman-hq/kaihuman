@@ -26,3 +26,12 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('expo-router/react-navigation', () => ({
   HeaderShownContext: createContext(false),
 }));
+
+// react-native-svg ships untranspiled native code that jsdom cannot load.
+vi.mock('react-native-svg', () => {
+  const el =
+    (tag: string) =>
+    ({ testID, fill, children }: Record<string, any>) =>
+      createElement(tag, { 'data-testid': testID, fill }, children);
+  return { Svg: el('svg'), Path: el('path') };
+});

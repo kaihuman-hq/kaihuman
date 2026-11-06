@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useTheme } from '../theme/theme.js';
 import { haptics } from './haptics.js';
@@ -13,6 +14,8 @@ export interface ButtonProps {
   variant?: ButtonVariant;
   size?: ButtonSize;
   icon?: IconName;
+  /** Custom leading graphic (e.g. a brand mark); receives the label colour so it matches in every scheme. */
+  leading?: (color: string) => ReactNode;
   disabled?: boolean;
   loading?: boolean;
   fullWidth?: boolean;
@@ -26,6 +29,7 @@ export function Button({
   variant = 'filled',
   size = 'large',
   icon,
+  leading,
   disabled = false,
   loading = false,
   fullWidth,
@@ -90,7 +94,8 @@ export function Button({
       })}
     >
       {loading ? <ActivityIndicator size="small" color={palette.fg} /> : null}
-      {!loading && icon ? (
+      {!loading && leading ? <View>{leading(palette.fg)}</View> : null}
+      {!loading && icon && !leading ? (
         <View>
           <Icon
             name={icon}

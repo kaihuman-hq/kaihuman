@@ -5,6 +5,7 @@ export { Badge, type BadgeProps, type BadgeTone, Chip, type ChipProps } from './
 export { Divider } from './divider.js';
 export { EmptyState, type EmptyStateProps } from './empty-state.js';
 export { Fab, type FabProps } from './fab.js';
+export { GithubMark, type GithubMarkProps } from './github-mark.js';
 export { haptics } from './haptics.js';
 export { Icon, type IconName, type IconProps } from './icon.js';
 export {
