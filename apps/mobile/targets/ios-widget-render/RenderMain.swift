@@ -47,10 +47,11 @@ struct Frame: View {
 }
 
 struct Sheet: View {
+    let title: String
     let rows: [(String, [Tile])]
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
-            Text("kaihuman · iOS widgets v1 + v2 (rendered in CI)")
+            Text(title)
                 .font(.system(size: 22, weight: .bold, design: .monospaced))
                 .foregroundStyle(WidgetTheme.volt)
             ForEach(rows.indices, id: \.self) { index in
@@ -148,7 +149,7 @@ struct RenderHarness {
             Tile(label: "next-up-\(tag)", family: .systemSmall, scheme: .dark, mode: .fullColor,
                  view: nextUp(entry, .systemSmall, .fullColor, .dark))
         }
-        let rows: [(String, [Tile])] = [
+        let v1Rows: [(String, [Tile])] = [
             ("Next up · small", tiles("next-up", [.systemSmall], make: nextUp)),
             ("Next up · medium", tiles("next-up", [.systemMedium], make: nextUp)),
             ("Next up · large", tiles("next-up", [.systemLarge], make: nextUp)),
@@ -157,6 +158,9 @@ struct RenderHarness {
                 + tiles("capture", [.systemMedium], make: capture).prefix(1)),
             ("Weekly done", tiles("weekly", [.systemSmall, .accessoryCircular, .accessoryInline], make: weekly)),
             ("Inbox", tiles("inbox", [.systemSmall, .accessoryCircular, .accessoryInline], make: inbox)),
+            ("States (signed out, empty, stale)", states),
+        ]
+        let v2Rows: [(String, [Tile])] = [
             ("Board column · medium", tiles("board", [.systemMedium], entry: backlogBoard, make: board)),
             ("Board column · large", tiles("board", [.systemLarge], entry: backlogBoard, make: board)),
             ("Milestone countdown", tiles("milestone", [.systemSmall, .accessoryCircular, .accessoryRectangular], make: milestone)),
@@ -165,8 +169,8 @@ struct RenderHarness {
             ("Knowledge card · large", tiles("cards", [.systemLarge], make: cards)),
             ("Habits", tiles("habits", [.systemSmall, .accessoryRectangular], make: habits)),
             ("Focus Live Activity · Lock Screen", [focus]),
-            ("States (signed out, empty, stale)", states),
         ]
+        let rows = v1Rows + v2Rows
 
         for tile in rows.flatMap(\.1) {
             let renderer = ImageRenderer(content: Frame(tile: tile))
@@ -175,13 +179,20 @@ struct RenderHarness {
                 try? data.write(to: outDir.appendingPathComponent("\(tile.label).png"))
             }
         }
-        let sheet = ImageRenderer(content: Sheet(rows: rows))
-        sheet.scale = 2
-        guard let data = sheet.uiImage?.pngData() else {
-            print("render failed: contact sheet")
-            exit(1)
+        // One sheet per set: a single sheet of every row exceeds what ImageRenderer can allocate.
+        let sheets = [
+            ("widgets-real.png", "kaihuman · iOS widgets v1 (rendered in CI)", v1Rows),
+            ("widgets-real-v2.png", "kaihuman · iOS widgets v2 (rendered in CI)", v2Rows),
+        ]
+        for (file, title, sheetRows) in sheets {
+            let sheet = ImageRenderer(content: Sheet(title: title, rows: sheetRows))
+            sheet.scale = 2
+            guard let data = sheet.uiImage?.pngData() else {
+                print("render failed: \(file)")
+                exit(1)
+            }
+            try? data.write(to: outDir.appendingPathComponent(file))
         }
-        try? data.write(to: outDir.appendingPathComponent("widgets-real.png"))
         print("rendered \(rows.flatMap(\.1).count) tiles to \(outDir.path)")
     }
 }
