@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { HeaderShownContext } from 'expo-router/react-navigation';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -100,6 +101,17 @@ describe('Screen', () => {
     );
     expect(screen.getByRole('heading', { name: 'Board' })).toBeTruthy();
     expect(screen.getByText('content')).toBeTruthy();
+  });
+
+  it('skips the inline title when a navigation header already shows it', () => {
+    render(
+      <HeaderShownContext.Provider value={true}>
+        <Screen title="Repositories">
+          <Text>content</Text>
+        </Screen>
+      </HeaderShownContext.Provider>,
+    );
+    expect(screen.queryByRole('heading', { name: 'Repositories' })).toBeNull();
   });
 
   it('renders footer and non-scrolling content', () => {

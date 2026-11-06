@@ -1,3 +1,4 @@
+import { HeaderShownContext } from 'expo-router/react-navigation';
 import { createContext, type ReactNode, useContext } from 'react';
 import {
   KeyboardAvoidingView,
@@ -58,8 +59,11 @@ export function Screen({
   const insets = useInsets();
   const { spacing, colors } = theme;
   const margin = inset === 'grouped' ? theme.metrics.screenMargin : 0;
-  // On native the navigation header already shows the title; only the web preview needs it.
-  const inlineTitle = Platform.OS === 'web' && title ? <ScreenTitle>{title}</ScreenTitle> : null;
+  // Native headers already show the title. The web preview hides tab-root headers, so only
+  // a screen without a visible header draws the title inline.
+  const headerShown = useContext(HeaderShownContext);
+  const inlineTitle =
+    Platform.OS === 'web' && title && !headerShown ? <ScreenTitle>{title}</ScreenTitle> : null;
 
   const content = scroll ? (
     <ScrollView

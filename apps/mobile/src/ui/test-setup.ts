@@ -22,3 +22,7 @@ vi.mock('expo-haptics', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   SafeAreaInsetsContext: createContext(null),
 }));
+
+vi.mock('expo-router/react-navigation', () => ({
+  HeaderShownContext: createContext(false),
+}));

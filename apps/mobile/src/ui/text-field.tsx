@@ -16,6 +16,8 @@ export interface TextFieldProps {
   keyboardType?: KeyboardTypeOptions;
   returnKeyType?: ReturnKeyTypeOptions;
   onSubmitEditing?: () => void;
+  /** Focus on mount, e.g. the main field of a capture sheet. */
+  autoFocus?: boolean;
   testID?: string;
 }
 
@@ -32,6 +34,7 @@ export function TextField({
   keyboardType,
   returnKeyType,
   onSubmitEditing,
+  autoFocus,
   testID,
 }: TextFieldProps) {
   const theme = useTheme();
@@ -53,6 +56,7 @@ export function TextField({
       keyboardType={keyboardType}
       returnKeyType={returnKeyType}
       onSubmitEditing={onSubmitEditing}
+      autoFocus={autoFocus}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       selectionColor={colors.accent}

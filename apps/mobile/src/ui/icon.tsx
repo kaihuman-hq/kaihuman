@@ -44,6 +44,11 @@ const icons = {
   filter: { ios: 'line.3.horizontal.decrease', material: 'filter_list' },
   sort: { ios: 'arrow.up.arrow.down', material: 'sort' },
   empty: { ios: 'tray', material: 'inbox' },
+  lock: { ios: 'lock.fill', material: 'lock' },
+  unlock: { ios: 'lock.open', material: 'lock_open' },
+  folder: { ios: 'folder', material: 'folder' },
+  document: { ios: 'doc.text', material: 'description' },
+  chevronLeft: { ios: 'chevron.left', material: 'chevron_left' },
 } as const satisfies Record<string, IconDef>;
 
 export type IconName = keyof typeof icons;
