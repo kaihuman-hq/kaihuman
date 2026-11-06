@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-06 — Mobile: Android widget set (Glance, Material You), QS tiles, focus notification
+
+- Android widgets (`apps/mobile/targets/android-widget`, Glance 1.1.1 + glance-material3) matching iOS v1 and v2: **Next up** (column/tag/milestone, interactive done), **Quick capture** (2×2, 1×4), **Weekly done** ring + streak, **Inbox** (Process → `kaihuman://inbox`), **Board column** (Start/Done), **Milestone countdown**, **Idea pipeline** (stage links, Log), **Wiki card** (Next). Habits are iOS-only for now.
+- Material You dynamic colour on Android 12+, Volt-on-Ink fallback, system corner radius, `SizeMode.Responsive`, picker preview layouts and descriptions, `WidgetConfigActivity` for setup and reconfiguration. Signed-out, stale (> 6 h) and dimmed (> 48 h) states; todo text, idea titles and card text hidden on lock-screen hosts when `privacy.lockScreenText` is off.
+- Quick Settings tiles for new todo/note/log/idea (the Control Center counterpart), static app shortcuts (`kh_shortcuts.xml`), and an ongoing focus notification with a countdown, Done and +5m, behind the existing `startFocusActivity` bridge (needs `POST_NOTIFICATIONS`).
+- Snapshot parsing reads v1 and v2 and keeps unknown keys on rewrite; Kotlin JVM/Robolectric tests run in CI (`:app:testDebugUnitTest`), which also renders every widget to PNG (`widget-renders-android` artifact, sheet at `apps/mobile/docs/widgets-android.png`).
+- Config plugin wires all receivers, provider XML, the configure activity, tiles, focus receiver, shortcuts and the notification permission, adds Glance Material 3 / Compose Material 3 and test dependencies, copies `test/*.kt`, and keeps the WorkManager keep rules.
+
 ## 2026-11-06 — Mobile: iOS widget set v2, focus Live Activity, background capture
 
 - `packages/core` widget-sync (still `schemaVersion: 2`, additive): optional `ideas` (counts by status, 3 most active open ideas), `cards` (≤ 20 wiki pages, 280-char excerpts, rotated daily) and `habits` (`.habit.csv`: done today, streak), built by `buildWidgetExtras`; `applyWidgetTodoMove` (toggle is now a wrapper) and `applyWidgetCapture`. Pending widget mutations are a union (`toggle` | `move` | `capture` | `habit`; no `kind` = v1 toggle) that `WidgetBridge.reconcile` replays against current content; a capture a later widget push already committed is skipped.

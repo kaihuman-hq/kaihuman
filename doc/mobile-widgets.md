@@ -1,7 +1,7 @@
-# iOS widgets — concepts
+# iOS and Android widgets — concepts
 
 Status: v1 and v2 built (2026-11-06) — see §6.
-Rendered widgets from CI: `apps/mobile/docs/widgets-real.png` (v1), `apps/mobile/docs/widgets-real-v2.png` (v2).
+Rendered widgets from CI: `apps/mobile/docs/widgets-real.png` (v1), `apps/mobile/docs/widgets-real-v2.png` (v2), `apps/mobile/docs/widgets-android.png` (Android, §10).
 Mockups: `apps/mobile/docs/widgets.png` (source `apps/mobile/docs/widgets-mockup.html`).
 
 ## 1. Starting point
@@ -144,3 +144,29 @@ Function changes in `packages/core/src/widget-sync.ts`:
 4. Should in-widget writes beyond "done" (start, habit log, background capture) commit directly, or always queue for the app to avoid conflicts?
 5. Lock Screen text default: on (convenience) or off (privacy)?
 6. Focus Live Activity: does it need a matching console/desktop concept (timer exists only in the business module)?
+
+## 10. Android
+
+Built 2026-11-06 in `apps/mobile/targets/android-widget` (package `com.kaihuman.app`, Glance 1.1.1). Reads the same `widget-todos.json` from the `kaihuman_widget` SharedPreferences; never writes schema changes.
+
+| iOS | Android | Notes |
+|-----|---------|-------|
+| Next up (AppIntentConfiguration) | `TodoGlanceWidget` + `WidgetConfigActivity` | Source: all, inbox, in progress, backlog, tag, milestone. Done toggle via `ToggleTodoAction`. |
+| Quick capture | `QuickCaptureWidget` | 2×2 grid and 1×4 row; Todo is the filled button. |
+| Weekly done ring | `WeeklyDoneWidget` | Ring drawn to a bitmap in theme colours; medium adds Mon–Sun bars. |
+| Inbox | `InboxWidget` | Todo + knowledge counts; Process → `kaihuman://inbox`. |
+| Board column | `BoardColumnWidget` | Configurable (default inbox); Start (`move`) and Done. |
+| Milestone countdown | `MilestoneWidget` | Configurable milestone, falls back to upcoming. |
+| Idea pipeline | `IdeaPipelineWidget` | Stage links, hot idea with Log (`quick-log?idea=`). |
+| Knowledge card | `KnowledgeCardWidget` | 3 h rotation, Next shifts a per-widget offset. |
+| Habits | — | Skipped: not in the Android scope yet. |
+| Control Center controls | `*CaptureTileService` (Quick Settings tiles) | Open `kaihuman://quick-<kind>`. |
+| App Shortcuts | `res/xml/kh_shortcuts.xml` | Launcher long-press and Assistant: add todo/note/log/idea. |
+| Focus Live Activity | `FocusNotification` + `FocusActionReceiver` | Ongoing notification with countdown chronometer, Done and +5m; private on the lock screen. Started by `startFocusActivity` in `kaihuman-shared` (returns null without `POST_NOTIFICATIONS`). |
+
+- **Look**: `GlanceTheme` dynamic (Material You) colours on Android 12+, Volt-on-Ink `ColorProviders` fallback below; `system_app_widget_background_radius` corners; `SizeMode.Responsive` small/medium/large; `previewLayout` + `description` for the picker; configurable widgets declare `reconfigurable|configuration_optional`.
+- **States**: as §5.2 (signed out, > 6 h footer, > 48 h dimmed by a scrim) plus per-widget empty copy. Pending (queued) items show ◷.
+- **Privacy**: widgets declare `home_screen|keyguard`; on a keyguard host with `privacy.lockScreenText` false, text is replaced and only counts, rings and countdowns stay.
+- **Writes**: `TodoCommit` commits done and start with the cached file + SHA and queues `toggle`/`move` mutations on failure, like iOS.
+- **Tests**: `targets/android-widget/test` (copied to `app/src/test` by the plugin): snapshot v1/v2/unknown keys, queries, widget logic, focus notification, and `WidgetPreviewRenderTest`, which renders each widget through `GlanceRemoteViews` in Robolectric and writes the contact sheet.
+- **Untested on a device**: home-screen hosts, Material You colours from a real wallpaper, keyguard hosts, tiles, shortcuts, and the focus notification.
