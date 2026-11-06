@@ -7,15 +7,18 @@ import { parseTodos } from '@kaihuman/formats';
 import { describe, expect, it } from 'vitest';
 import withKaihumanWidgets, {
   ANDROID_RECEIVER_NAME,
+  ANDROID_WIDGETS,
   type AndroidManifest,
   APP_INTENTS_DIR,
   addComposeCompilerClasspath,
   addGlanceDependencies,
   addIosWidgetTarget,
+  addSystemSurfacesToManifest,
   addWidgetReceiverToManifest,
   addWorkManagerKeepRules,
   applyComposePlugin,
   appSourceGroups,
+  CAPTURE_KINDS,
   type CopyFs,
   copyAndroidWidgetSources,
   IOS_WIDGET_TARGET,
@@ -44,8 +47,17 @@ import {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string): string => readFileSync(join(root, p), 'utf8');
 const kotlin = (f: string): string => read(`targets/android-widget/${f}`);
-const kotlinAll = (): string =>
-  ['TodoGlanceWidget.kt', 'TodoWidgetReceiver.kt', 'ToggleTodoAction.kt'].map(kotlin).join('\n');
+const KOTLIN_FILES = [
+  'TodoGlanceWidget.kt',
+  'TodoWidgetReceiver.kt',
+  'ToggleTodoAction.kt',
+  'WidgetSnapshot.kt',
+  'SnapshotQueries.kt',
+  'WidgetUi.kt',
+  'WidgetConfigStore.kt',
+  'TodoCommit.kt',
+];
+const kotlinAll = (): string => KOTLIN_FILES.map(kotlin).join('\n');
 
 // ─── Config plugin ──────────────────────────────────────────────────────────
 
@@ -86,11 +98,14 @@ describe('config plugin transforms', () => {
     expect(withUrlScheme({ scheme: ['other', 'kaihuman'] }).scheme).toEqual(['other', 'kaihuman']);
   });
 
-  it('adds the widget receiver to the manifest idempotently', () => {
-    const m = addWidgetReceiverToManifest(addWidgetReceiverToManifest(emptyManifest()));
+  it('adds every widget receiver to the manifest idempotently, keeping existing ones', () => {
+    const existing = { $: { 'android:name': '.Other' } };
+    const m: AndroidManifest = { manifest: { application: [{ $: {}, receiver: [existing] }] } };
+    addWidgetReceiverToManifest(addWidgetReceiverToManifest(m));
     const receivers = m.manifest.application?.[0]?.receiver ?? [];
-    expect(receivers).toHaveLength(1);
-    expect(receivers[0]).toEqual({
+    expect(receivers).toHaveLength(ANDROID_WIDGETS.length + 1);
+    expect(receivers[0]).toBe(existing);
+    expect(receivers.find((r) => r.$?.['android:name'] === ANDROID_RECEIVER_NAME)).toEqual({
       $: { 'android:name': '.TodoWidgetReceiver', 'android:exported': 'false' },
       'intent-filter': [
         { action: [{ $: { 'android:name': 'android.appwidget.action.APPWIDGET_UPDATE' } }] },
@@ -104,6 +119,77 @@ describe('config plugin transforms', () => {
         },
       ],
     });
+    for (const { receiver, info } of ANDROID_WIDGETS) {
+      const node = receivers.find((r) => r.$?.['android:name'] === receiver);
+      expect(node?.$?.['android:exported'], receiver).toBe('false');
+      expect(JSON.stringify(node), receiver).toContain(`@xml/${info}`);
+    }
+    expect(ANDROID_WIDGETS).toHaveLength(8);
+  });
+
+  it('adds the config activity, tiles, focus receiver, shortcuts and permission once', () => {
+    const permission = { $: { 'android:name': 'android.permission.INTERNET' } };
+    const main = { $: { 'android:name': '.MainActivity' }, 'meta-data': [{ $: { x: 'y' } }] };
+    const m: AndroidManifest = {
+      manifest: { 'uses-permission': [permission], application: [{ $: {}, activity: [main] }] },
+    };
+    addSystemSurfacesToManifest(addSystemSurfacesToManifest(m));
+    const app = m.manifest.application?.[0];
+    const named = (list: Array<{ $?: Record<string, string> }> | undefined, n: string) =>
+      (list ?? []).filter((x) => x.$?.['android:name'] === n);
+
+    expect(m.manifest['uses-permission']?.[0]).toBe(permission);
+    expect(
+      named(m.manifest['uses-permission'], 'android.permission.POST_NOTIFICATIONS'),
+    ).toHaveLength(1);
+
+    const config = named(app?.activity, '.WidgetConfigActivity');
+    expect(config).toHaveLength(1);
+    expect(config[0]).toEqual({
+      $: {
+        'android:name': '.WidgetConfigActivity',
+        'android:exported': 'true',
+        'android:theme': '@style/KhConfigTheme',
+        'android:excludeFromRecents': 'true',
+      },
+      'intent-filter': [
+        { action: [{ $: { 'android:name': 'android.appwidget.action.APPWIDGET_CONFIGURE' } }] },
+      ],
+    });
+
+    expect(app?.activity?.[0]).toBe(main);
+    expect(main['meta-data']).toEqual([
+      { $: { x: 'y' } },
+      { $: { 'android:name': 'android.app.shortcuts', 'android:resource': '@xml/kh_shortcuts' } },
+    ]);
+
+    expect(app?.service).toHaveLength(4);
+    expect(CAPTURE_KINDS).toEqual(['todo', 'note', 'log', 'idea']);
+    for (const kind of CAPTURE_KINDS) {
+      const name = `.${kind[0]?.toUpperCase()}${kind.slice(1)}CaptureTileService`;
+      expect(named(app?.service, name)[0]).toEqual({
+        $: {
+          'android:name': name,
+          'android:exported': 'true',
+          'android:permission': 'android.permission.BIND_QUICK_SETTINGS_TILE',
+          'android:icon': `@drawable/kh_ic_${kind}`,
+          'android:label': `@string/kh_tile_${kind}`,
+        },
+        'intent-filter': [
+          { action: [{ $: { 'android:name': 'android.service.quicksettings.action.QS_TILE' } }] },
+        ],
+      });
+    }
+
+    expect(named(app?.receiver, '.FocusActionReceiver')).toEqual([
+      { $: { 'android:name': '.FocusActionReceiver', 'android:exported': 'false' } },
+    ]);
+  });
+
+  it('has a provider xml in targets/android-widget/res/xml for every widget', () => {
+    for (const { info } of ANDROID_WIDGETS) {
+      expect(() => read(`targets/android-widget/res/xml/${info}.xml`), info).not.toThrow();
+    }
   });
 
   it('describes the iOS widget extension target', () => {
@@ -234,7 +320,9 @@ describe('config plugin transforms', () => {
     const manifestMod = config.mods?.android?.manifest as ModFn;
     const out = await manifestMod({ modResults: emptyManifest() });
     expect(order).toEqual(['existing']);
-    expect((out.modResults as AndroidManifest).manifest.application?.[0]?.receiver).toHaveLength(1);
+    expect((out.modResults as AndroidManifest).manifest.application?.[0]?.receiver).toHaveLength(
+      ANDROID_WIDGETS.length + 1,
+    );
 
     const added: string[] = [];
     const fakeXcode: XcodeEditor = {
@@ -285,13 +373,37 @@ describe('config plugin transforms', () => {
     expect(resolveReactNativeKotlinVersion(root)).toMatch(/^\d+\.\d+\.\d+/);
   });
 
-  it('adds the Glance dependency to app/build.gradle idempotently', async () => {
-    const gradle = 'android {\n}\n\ndependencies {\n    implementation "x:y:1"\n}\n';
+  it('adds Glance, test dependencies and testOptions to app/build.gradle idempotently', async () => {
+    const gradle =
+      'android {\n    compileSdk 35\n}\n\ndependencies {\n    implementation "x:y:1"\n}\n';
     const once = addGlanceDependencies(gradle);
     expect(once).toContain(
       'dependencies {\n    implementation "androidx.glance:glance-appwidget:1.1.1"',
     );
+    for (const dep of [
+      'implementation "androidx.glance:glance-material3:1.1.1"',
+      'implementation "androidx.compose.material3:material3:1.3.1"',
+      'testImplementation "junit:junit:4.13.2"',
+      'testImplementation "org.json:json:20240303"',
+      'testImplementation "org.robolectric:robolectric:4.14.1"',
+      'testImplementation "androidx.test:core:1.6.1"',
+    ]) {
+      expect(once).toContain(dep);
+    }
+    expect(once).toMatch(
+      /android \{\n {4}testOptions \{\n {8}unitTests \{\n {12}includeAndroidResources = true/,
+    );
+    expect(once).toContain('implementation "x:y:1"');
     expect(addGlanceDependencies(once)).toBe(once);
+    // A project that already has the v1 Glance line gains only what is missing.
+    const upgraded = addGlanceDependencies(
+      gradle.replace(
+        'dependencies {',
+        'dependencies {\n    implementation "androidx.glance:glance-appwidget:1.1.1"',
+      ),
+    );
+    expect(upgraded.match(/glance-appwidget:1\.1\.1/g)).toHaveLength(1);
+    expect(upgraded).toContain('glance-material3:1.1.1');
 
     let previous = false;
     const config = withKaihumanWidgets({
@@ -312,21 +424,32 @@ describe('config plugin transforms', () => {
   });
 
   it('keeps Kotlin package lines aligned with the Android package', () => {
-    for (const f of ['TodoGlanceWidget.kt', 'TodoWidgetReceiver.kt', 'ToggleTodoAction.kt']) {
+    for (const f of KOTLIN_FILES) {
       expect(kotlin(f)).toMatch(/^package com\.kaihuman\.app$/m);
     }
   });
 
-  it('copies Kotlin sources and res into the generated project via an injected fs', () => {
+  it('copies Kotlin sources, JVM tests and res into the generated project via an injected fs', () => {
     const ops: string[] = [];
     const fs: CopyFs = {
       exists: () => true,
       mkdir: (p) => ops.push(`mkdir ${p}`),
       copy: (a, b) => ops.push(`cp ${a} ${b}`),
-      list: () => ['A.kt', 'res', 'notes.txt'],
+      list: (p) =>
+        p.endsWith('/test') ? ['ATest.kt', 'data.json'] : ['A.kt', 'res', 'test', 'notes.txt'],
     };
     const copied = copyAndroidWidgetSources('/p', '/p/android', 'com.kaihuman.app', fs);
     expect(copied).toEqual([
+      '/p/android/app/src/main/java/com/kaihuman/app/A.kt',
+      '/p/android/app/src/test/java/com/kaihuman/app/ATest.kt',
+      '/p/android/app/src/main/res',
+    ]);
+    expect(ops).toContain(
+      'cp /p/targets/android-widget/test/ATest.kt /p/android/app/src/test/java/com/kaihuman/app/ATest.kt',
+    );
+
+    const noTests: CopyFs = { ...fs, exists: (p) => !p.endsWith('/test') };
+    expect(copyAndroidWidgetSources('/p', '/p/android', 'com.kaihuman.app', noTests)).toEqual([
       '/p/android/app/src/main/java/com/kaihuman/app/A.kt',
       '/p/android/app/src/main/res',
     ]);
@@ -393,12 +516,12 @@ describe('Kotlin widget sources', () => {
 
   it('knows every todo status value', () => {
     for (const status of ['backlog', 'in-progress', 'done', 'rejected']) {
-      expect(kotlin('TodoGlanceWidget.kt')).toContain(`"${status}"`);
+      expect(kotlinAll()).toContain(`"${status}"`);
     }
   });
 
   it('uses the shared preference and file names from widget-bridge.ts', () => {
-    const src = kotlin('TodoGlanceWidget.kt');
+    const src = kotlin('WidgetSnapshot.kt');
     expect(src).toContain('"kaihuman_widget"');
     expect(src).toContain(`"${WIDGET_TODOS_FILE}"`);
     expect(src).toContain(`"${PENDING_WIDGET_MUTATIONS_FILE}"`);
@@ -406,37 +529,53 @@ describe('Kotlin widget sources', () => {
 
   it('queues PendingWidgetMutation records', () => {
     const sample: PendingWidgetMutation = { itemId: 'x', timestamp: 1 };
-    for (const key of Object.keys(sample))
-      expect(kotlin('ToggleTodoAction.kt')).toContain(`"${key}"`);
+    for (const key of Object.keys(sample)) expect(kotlin('TodoCommit.kt')).toContain(`"${key}"`);
   });
 
   it('pushes to the GitHub contents API with sha and branch', () => {
-    const src = kotlin('ToggleTodoAction.kt');
+    const src = kotlin('TodoCommit.kt');
     expect(src).toMatch(
       /https:\/\/api\.github\.com\/repos\/\$\{snapshot\.repoFullName\}\/contents\/\$path/,
     );
     expect(src).toContain('"PUT"');
     for (const key of ['message', 'content', 'sha', 'branch']) expect(src).toContain(`"${key}"`);
     expect(src).toContain('Dispatchers.IO');
-    expect(src).toContain('TodoGlanceWidget().updateAll(context)');
+    expect(src).toContain('updateAllWidgets(context)');
   });
 
   it('serializes the updated marker like formats does', () => {
-    const src = kotlin('ToggleTodoAction.kt');
+    const src = kotlin('TodoCommit.kt');
     expect(src).toContain('::updated:: $nowMs');
-    expect(src).toContain('"[x]"');
+    expect(src).toContain('"[$to]"');
+    expect(src).toContain('"x"');
     // Same layout the Kotlin edit targets: marker line, then meta line.
     const md = '- [ ] a #t\n::updated:: 1\n';
     expect(parseTodos(md).items[0]?.updatedAt).toBe(1);
   });
 
-  it('renders the Nexus widget', () => {
+  it('renders the Next up widget on the shared theme, not the old Nexus colours', () => {
     const src = kotlin('TodoGlanceWidget.kt');
-    for (const s of ['KAIHUMAN // TODOS', '0xFF0A0A0F', '0xFF00FF00', 'kaihuman://quick-todo']) {
-      expect(src).toContain(s);
-    }
+    expect(src).toContain('DeepLinks.quick("todo")');
     expect(src).toContain('actionRunCallback<ToggleTodoAction>');
-    expect(src).toContain('MAX_TASKS = 5');
+    expect(src).toContain('KhTheme');
+    for (const s of ['0xFF0A0A0F', '0xFF00FF00', 'KAIHUMAN // TODOS']) {
+      expect(kotlinAll()).not.toContain(s);
+    }
+    expect(kotlin('WidgetUi.kt')).toContain('0xFFE6FF4A'); // Volt
+    expect(kotlin('WidgetUi.kt')).toContain('0xFF4F5E00'); // Olive
+  });
+
+  it('queues move mutations like PendingWidgetMutation', () => {
+    const sample: PendingWidgetMutation = {
+      kind: 'move',
+      itemId: 'x',
+      status: 'in-progress',
+      timestamp: 1,
+    };
+    for (const key of Object.keys(sample)) expect(kotlin('TodoCommit.kt')).toContain(`"${key}"`);
+    expect(kotlin('TodoCommit.kt')).toContain('"toggle"');
+    expect(kotlin('TodoCommit.kt')).toContain('"move"');
+    expect(kotlin('ToggleTodoAction.kt')).toContain('class StartTodoAction');
   });
 
   it('wires the receiver and widget info xml', () => {
@@ -444,7 +583,7 @@ describe('Kotlin widget sources', () => {
     expect(kotlin('TodoWidgetReceiver.kt')).toContain('TodoGlanceWidget()');
     const xml = read('targets/android-widget/res/xml/todo_widget_info.xml');
     expect(xml).toContain('<appwidget-provider');
-    expect(xml).toContain('android:widgetCategory="home_screen"');
+    expect(xml).toContain('android:widgetCategory="home_screen|keyguard"');
   });
 
   it('app.json registers the plugin and scheme', () => {
@@ -611,6 +750,12 @@ describe('kaihuman-shared native module', () => {
     }
     expect(kotlinSource).toContain(`"${ANDROID_RECEIVER_NAME}"`);
   });
+
+  it('refreshes exactly the receivers in ANDROID_WIDGETS', () => {
+    const list = /WIDGET_RECEIVER_CLASSES = listOf\(([^)]*)\)/.exec(kotlinSource)?.[1] ?? '';
+    const names = [...list.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    expect(names).toEqual(ANDROID_WIDGETS.map((w) => w.receiver));
+  });
 });
 
 describe('widget extension Info.plist', () => {
@@ -620,5 +765,39 @@ describe('widget extension Info.plist', () => {
       'utf8',
     );
     expect(plist).toContain('<key>CFBundleExecutable</key>');
+  });
+});
+
+describe('Android system surfaces', () => {
+  const kinds = ['todo', 'note', 'log', 'idea'] as const;
+  const moduleKt = read(
+    'modules/kaihuman-shared/android/src/main/java/com/kaihuman/shared/KaihumanSharedModule.kt',
+  );
+
+  it('declares an abstract capture tile with one subclass per kind', () => {
+    const tile = kotlin('CaptureTileService.kt');
+    expect(tile).toContain('abstract class CaptureTileService : TileService()');
+    for (const kind of kinds) {
+      const name = `${kind[0]?.toUpperCase()}${kind.slice(1)}CaptureTileService`;
+      expect(tile).toContain(`class ${name} : CaptureTileService()`);
+      expect(tile).toContain(`override val kind = "${kind}"`);
+      expect(read(`targets/android-widget/res/drawable/kh_ic_${kind}.xml`)).toContain('<vector');
+    }
+  });
+
+  it('has a static shortcut that opens each quick-capture link', () => {
+    const xml = read('targets/android-widget/res/xml/kh_shortcuts.xml');
+    for (const kind of kinds) {
+      expect(xml).toContain(`android:shortcutId="add_${kind}"`);
+      expect(xml).toContain(`android:data="kaihuman://quick-${kind}"`);
+    }
+    expect(xml.match(/android:targetClass="com\.kaihuman\.app\.MainActivity"/g)).toHaveLength(4);
+  });
+
+  it('implements the three focus functions in the Android module', () => {
+    for (const name of ['startFocusActivity', 'updateFocusActivity', 'endFocusActivity']) {
+      expect(moduleKt).toContain(`Function("${name}")`);
+    }
+    expect(moduleKt).toContain('.FocusActionReceiver');
   });
 });

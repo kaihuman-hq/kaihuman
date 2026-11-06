@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="kh_desc_quick_capture">Capture a todo, note, log or idea.</string>
+    <string name="kh_desc_weekly_done">Todos finished this week against your goal.</string>
+    <string name="kh_desc_inbox">Todos and notes waiting to be processed.</string>
+    <string name="kh_desc_idea_pipeline">Ideas by stage, and the hottest one.</string>
+    <string name="kh_desc_knowledge_card">A page from your wiki, a new one every 3 hours.</string>
+
+    <string name="kh_w_sign_in">Open kaihuman to sign in</string>
+    <string name="kh_w_text_hidden">Hidden on lock screen</string>
+
+    <string name="kh_w_capture_todo">Todo</string>
+    <string name="kh_w_capture_note">Note</string>
+    <string name="kh_w_capture_log">Log</string>
+    <string name="kh_w_capture_idea">Idea</string>
+
+    <string name="kh_w_this_week">THIS WEEK</string>
+    <string name="kh_w_day_streak">%1$d-day streak</string>
+    <string name="kh_w_ring_desc">%1$d of %2$d done this week</string>
+
+    <string name="kh_w_inbox_title">INBOX</string>
+    <string name="kh_w_inbox_zero">Inbox zero</string>
+    <string name="kh_w_in_knowledge">%1$d in knowledge</string>
+    <string name="kh_w_process">Process</string>
+    <plurals name="kh_w_todos">
+        <item quantity="one">todo</item>
+        <item quantity="other">todos</item>
+    </plurals>
+    <plurals name="kh_w_notes">
+        <item quantity="one">note</item>
+        <item quantity="other">notes</item>
+    </plurals>
+
+    <string name="kh_w_ideas_title">IDEAS</string>
+    <string name="kh_w_no_ideas">No ideas yet</string>
+    <string name="kh_w_no_ideas_sub">Capture one from the app</string>
+    <string name="kh_w_hot">HOT</string>
+    <string name="kh_w_nothing_hot">Nothing hot right now</string>
+
+    <string name="kh_w_knowledge_title">KNOWLEDGE</string>
+    <string name="kh_w_next">Next</string>
+    <string name="kh_w_no_cards">No cards yet</string>
+    <string name="kh_w_no_cards_sub">Cards come from your wiki after a sync</string>
+    <string name="kh_w_log">Log</string>
+</resources>

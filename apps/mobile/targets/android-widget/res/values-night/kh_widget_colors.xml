@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="kh_surface">#FF1B1C19</color>
+    <color name="kh_on_surface">#FFF2F3EE</color>
+    <color name="kh_secondary">#FFA3A69C</color>
+    <color name="kh_accent">#FFE6FF4A</color>
+    <color name="kh_fill">#FFE6FF4A</color>
+    <color name="kh_on_fill">#FF0C0D0C</color>
+    <color name="kh_track">#33F2F3EE</color>
+</resources>

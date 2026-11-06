@@ -12,7 +12,7 @@ export class FocusSessionController {
 
   constructor(private readonly native: FocusNative | null | undefined) {}
 
-  /** False on Android and wherever the native module is not linked, so the UI hides the action. */
+  /** False wherever the native module is not linked, so the UI hides the action. */
   get available(): boolean {
     return typeof this.native?.startFocusActivity === 'function';
   }

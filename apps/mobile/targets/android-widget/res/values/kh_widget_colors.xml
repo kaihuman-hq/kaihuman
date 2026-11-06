@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Brand fallback for widget previews (doc/mobile-design.md §3). Live widgets use Material You on 31+. -->
+<resources>
+    <color name="kh_surface">#FFFFFFFF</color>
+    <color name="kh_on_surface">#FF0C0D0C</color>
+    <color name="kh_secondary">#FF5C5F57</color>
+    <color name="kh_accent">#FF4F5E00</color>
+    <color name="kh_fill">#FF0C0D0C</color>
+    <color name="kh_on_fill">#FFE6FF4A</color>
+    <color name="kh_track">#1F0C0D0C</color>
+</resources>

@@ -1,270 +1,328 @@
 package com.kaihuman.app
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
-import androidx.glance.action.ActionParameters
+import androidx.glance.GlanceTheme
+import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionRunCallback
-import androidx.glance.appwidget.action.actionStartActivity
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Alignment
+import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.ColumnScope
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
-import androidx.glance.layout.padding
 import androidx.glance.layout.height
+import androidx.glance.layout.padding
+import androidx.glance.layout.size
+import androidx.glance.layout.width
+import androidx.glance.semantics.contentDescription
+import androidx.glance.semantics.semantics
 import androidx.glance.text.FontFamily
+import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import org.json.JSONArray
-import org.json.JSONObject
+import androidx.compose.ui.unit.DpSize
 
-// Names must match apps/mobile/src/adapters/widget-bridge.ts.
-const val PREFS_NAME = "kaihuman_widget"
-const val WIDGET_TODOS_KEY = "widget-todos.json"
-const val PENDING_MUTATIONS_KEY = "pending-widget-mutations.json"
-const val GITHUB_TOKEN_KEY = "github-token"
-
-// Mirrors WidgetTodoItem in packages/core/src/widget-sync.ts.
-data class WidgetTodoItem(
-    val id: String,
-    val filePath: String,
-    val indexInFile: Int,
-    val text: String,
-    val status: String, // "backlog" | "in-progress" | "done" | "rejected"
-    val tags: List<String>,
-    val milestoneId: String?,
-    val milestoneName: String?,
-    val milestoneDueDate: String?,
-    val updatedAt: Long?,
-) {
-    fun toJson(): JSONObject = JSONObject().apply {
-        put("id", id)
-        put("filePath", filePath)
-        put("indexInFile", indexInFile)
-        put("text", text)
-        put("status", status)
-        put("tags", JSONArray(tags))
-        milestoneId?.let { put("milestoneId", it) }
-        milestoneName?.let { put("milestoneName", it) }
-        milestoneDueDate?.let { put("milestoneDueDate", it) }
-        updatedAt?.let { put("updatedAt", it) }
-    }
-
-    companion object {
-        fun fromJson(o: JSONObject): WidgetTodoItem {
-            val tagArray = o.optJSONArray("tags") ?: JSONArray()
-            return WidgetTodoItem(
-                id = o.getString("id"),
-                filePath = o.getString("filePath"),
-                indexInFile = o.getInt("indexInFile"),
-                text = o.getString("text"),
-                status = o.getString("status"),
-                tags = (0 until tagArray.length()).map { tagArray.getString(it) },
-                milestoneId = o.optString("milestoneId").ifEmpty { null },
-                milestoneName = o.optString("milestoneName").ifEmpty { null },
-                milestoneDueDate = o.optString("milestoneDueDate").ifEmpty { null },
-                updatedAt = if (o.has("updatedAt")) o.getLong("updatedAt") else null,
-            )
-        }
-    }
-}
-
-data class WidgetMilestone(val id: String, val name: String, val dueDate: String?)
-
-data class WidgetCounts(val inbox: Int, val inProgress: Int, val backlog: Int, val doneToday: Int)
-
-data class WidgetFile(val sha: String, val content: String)
-
-// Mirrors WidgetTodoSnapshot in packages/core/src/widget-sync.ts.
-data class WidgetTodoSnapshot(
-    val updatedAt: Long,
-    val repoFullName: String,
-    val branch: String,
-    val appFolder: String, // ".kh" | ".lifeos"
-    val upcomingMilestone: WidgetMilestone?,
-    val counts: WidgetCounts,
-    val items: List<WidgetTodoItem>,
-    val files: Map<String, WidgetFile>,
-    // Raw JSON as read; keys this class does not model (schema v2+) survive a rewrite.
-    val raw: JSONObject? = null,
-) {
-    fun toJson(): JSONObject = JSONObject(raw?.toString() ?: "{}").apply {
-        put("updatedAt", updatedAt)
-        put("repoFullName", repoFullName)
-        put("branch", branch)
-        put("appFolder", appFolder)
-        upcomingMilestone?.let {
-            put(
-                "upcomingMilestone",
-                JSONObject().apply {
-                    put("id", it.id)
-                    put("name", it.name)
-                    it.dueDate?.let { d -> put("dueDate", d) }
-                },
-            )
-        }
-        put(
-            "counts",
-            JSONObject().apply {
-                put("inbox", counts.inbox)
-                put("inProgress", counts.inProgress)
-                put("backlog", counts.backlog)
-                put("doneToday", counts.doneToday)
-                // Preserve v2 counts (knowledgeInbox, doneThisWeek) from the raw snapshot.
-                raw?.optJSONObject("counts")?.let { old ->
-                    for (key in old.keys()) if (!has(key)) put(key, old.get(key))
-                }
-            },
-        )
-        put("items", JSONArray().also { arr -> items.forEach { arr.put(it.toJson()) } })
-        put(
-            "files",
-            JSONObject().also { obj ->
-                files.forEach { (path, f) ->
-                    obj.put(path, JSONObject().apply { put("sha", f.sha); put("content", f.content) })
-                }
-            },
-        )
-    }
-
-    companion object {
-        fun fromJson(o: JSONObject): WidgetTodoSnapshot {
-            val itemArray = o.optJSONArray("items") ?: JSONArray()
-            val c = o.getJSONObject("counts")
-            val m = o.optJSONObject("upcomingMilestone")
-            val fileObj = o.optJSONObject("files") ?: JSONObject()
-            val files = HashMap<String, WidgetFile>()
-            for (path in fileObj.keys()) {
-                val f = fileObj.getJSONObject(path)
-                files[path] = WidgetFile(f.getString("sha"), f.getString("content"))
-            }
-            return WidgetTodoSnapshot(
-                updatedAt = o.getLong("updatedAt"),
-                repoFullName = o.getString("repoFullName"),
-                branch = o.getString("branch"),
-                appFolder = o.getString("appFolder"),
-                upcomingMilestone = m?.let {
-                    WidgetMilestone(
-                        it.getString("id"),
-                        it.getString("name"),
-                        it.optString("dueDate").ifEmpty { null },
-                    )
-                },
-                counts = WidgetCounts(
-                    c.getInt("inbox"),
-                    c.getInt("inProgress"),
-                    c.getInt("backlog"),
-                    c.getInt("doneToday"),
-                ),
-                items = (0 until itemArray.length()).map { WidgetTodoItem.fromJson(itemArray.getJSONObject(it)) },
-                files = files,
-                raw = o,
-            )
-        }
-    }
-}
-
-object WidgetStore {
-    fun load(context: Context): WidgetTodoSnapshot? {
-        val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(WIDGET_TODOS_KEY, null) ?: return null
-        return try {
-            WidgetTodoSnapshot.fromJson(JSONObject(raw))
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    fun save(context: Context, snapshot: WidgetTodoSnapshot) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(WIDGET_TODOS_KEY, snapshot.toJson().toString())
-            .apply()
-    }
-}
-
-private val NEXUS_BG = Color(0xFF0A0A0F)
-private val NEXUS_GREEN = Color(0xFF00FF00)
-private val NEXUS_CYAN = Color(0xFF00FFFF)
-private val NEXUS_MUTED = Color(0xFF8A8A99)
-private const val MAX_TASKS = 5
+// "Next up": open todos with an interactive check per row. Small, medium and large layouts mirror
+// the iOS families (TodoWidgetViews.swift) but use Material You colours and system corner radii.
 
 class TodoGlanceWidget : GlanceAppWidget() {
+    override val sizeMode = SizeMode.Responsive(
+        setOf(DpSize(110.dp, 110.dp), DpSize(250.dp, 110.dp), DpSize(250.dp, 250.dp)),
+    )
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val snapshot = WidgetStore.load(context)
-        provideContent { WidgetContent(context, snapshot) }
+        val source = WidgetConfigStore.source(context, appWidgetIdOf(context, id))
+        val hideText = hidesText(context, id, snapshot)
+        provideContent {
+            KhTheme { NextUpBody(snapshot, WidgetClock.now(), hideText, source) }
+        }
     }
+}
 
-    @Composable
-    private fun WidgetContent(context: Context, snapshot: WidgetTodoSnapshot?) {
-        val mono = FontFamily.Monospace
-        val open = snapshot?.items.orEmpty().filter { it.status == "backlog" || it.status == "in-progress" }
-        Column(
-            modifier = GlanceModifier.fillMaxSize().background(NEXUS_BG).padding(12.dp),
-        ) {
-            Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "KAIHUMAN // TODOS",
-                    style = TextStyle(color = androidx.glance.unit.ColorProvider(NEXUS_GREEN), fontFamily = mono, fontSize = 12.sp),
-                    modifier = GlanceModifier.defaultWeight(),
-                )
-                Text(
-                    text = "+",
-                    style = TextStyle(color = androidx.glance.unit.ColorProvider(NEXUS_GREEN), fontFamily = mono, fontSize = 18.sp),
-                    modifier = GlanceModifier.clickable(
-                        actionStartActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse("kaihuman://quick-todo")).setPackage(context.packageName),
-                        ),
-                    ),
-                )
-            }
-            Spacer(modifier = GlanceModifier.height(4.dp))
-            if (open.isEmpty()) {
-                Text(
-                    text = if (snapshot == null) "open kaihuman to sync" else "all clear",
-                    style = TextStyle(color = androidx.glance.unit.ColorProvider(NEXUS_MUTED), fontFamily = mono, fontSize = 12.sp),
-                )
-            }
-            open.take(MAX_TASKS).forEach { item ->
-                val inProgress = item.status == "in-progress"
-                Row(
-                    modifier = GlanceModifier.fillMaxWidth().padding(vertical = 3.dp).clickable(
-                        actionRunCallback<ToggleTodoAction>(actionParametersOf(itemIdKey to item.id)),
-                    ),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+/** Whole widget including the surface; callers wrap it in [KhTheme] and provide the size. */
+@Composable
+internal fun NextUpBody(
+    snapshot: WidgetTodoSnapshot?,
+    nowMs: Long,
+    hideText: Boolean,
+    source: TodoSource = TodoSource.All,
+) {
+    val size = LocalSize.current
+    val sizeClass = sizeClassOf(size.width.value, size.height.value)
+    Column(modifier = GlanceModifier.khWidgetSurface()) {
+        SnapshotShell(snapshot, nowMs, DeepLinks.BOARD) { snap, freshness ->
+            NextUpContent(snap, freshness, nowMs, hideText, source, sizeClass)
+        }
+    }
+}
+
+@Composable
+private fun NextUpContent(
+    snap: WidgetTodoSnapshot,
+    freshness: Freshness,
+    nowMs: Long,
+    hideText: Boolean,
+    source: TodoSource,
+    size: WidgetSizeClass,
+) {
+    val context = LocalContext.current
+    val stale = freshness !is Freshness.Fresh
+    val all = snap.items(source)
+    val rows = snap.nextUpRows(source, size, stale)
+    val doneToday = snap.doneToday(nowMs)
+    val empty = khString(context, nextUpEmptyRes(nextUpEmpty(source)))
+
+    Column(modifier = GlanceModifier.fillMaxSize()) {
+        when (size) {
+            WidgetSizeClass.Small -> {
+                Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (inProgress) "[>] " else "[ ] ",
-                        style = TextStyle(
-                            color = androidx.glance.unit.ColorProvider(if (inProgress) NEXUS_CYAN else NEXUS_MUTED),
-                            fontFamily = mono,
-                            fontSize = 13.sp,
-                        ),
+                        text = "${all.size}",
+                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 30.sp, fontWeight = FontWeight.Bold),
                     )
+                    Spacer(GlanceModifier.width(6.dp))
                     Text(
-                        text = item.text,
+                        text = khString(context, R.string.kh_nu_open),
+                        style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                        modifier = GlanceModifier.defaultWeight(),
+                    )
+                    AddButton()
+                }
+                if (hideText) {
+                    Text(
+                        text = khString(context, R.string.kh_nu_done_today, doneToday),
+                        style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
+                    )
+                } else if (rows.isEmpty()) {
+                    EmptyState(empty, GlanceModifier.defaultWeight())
+                } else {
+                    TodoRow(rows.first(), GlanceModifier.fillMaxWidth().height(40.dp), 13.sp)
+                }
+                Spacer(GlanceModifier.defaultWeight())
+                StaleFooter(freshness)
+            }
+            WidgetSizeClass.Medium -> {
+                NextUpHeader(khString(context, R.string.kh_nu_title), khString(context, R.string.kh_nu_open_count, all.size), height = 24.dp)
+                ItemRows(rows, nextUpRowLimit(size, stale), hideText, empty, doneToday, all.size) { item, mod ->
+                    TodoRow(item, mod, 12.sp)
+                }
+                StaleFooter(freshness)
+            }
+            WidgetSizeClass.Large -> {
+                val label = sourceLabelText(context, sourceLabel(source, snap)).uppercase()
+                NextUpHeader(
+                    "${khString(context, R.string.kh_nu_title)} · $label",
+                    khString(context, R.string.kh_nu_open_count, all.size),
+                    height = 28.dp,
+                )
+                ItemRows(rows, nextUpRowLimit(size, stale), hideText, empty, doneToday, all.size) { item, mod ->
+                    TodoRow(item, mod, 14.sp, showTag = true)
+                }
+                Row(modifier = GlanceModifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = GlanceModifier.defaultWeight()) {
+                        if (stale) {
+                            StaleFooter(freshness)
+                        } else if (!hideText) {
+                            snap.upcomingMilestone?.let { m ->
+                                Text(
+                                    text = "⚑ " + (m.dueDate?.let { "${m.name} · $it" } ?: m.name),
+                                    maxLines = 1,
+                                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        text = khString(context, R.string.kh_nu_done_today, doneToday),
                         maxLines = 1,
-                        style = TextStyle(color = androidx.glance.unit.ColorProvider(Color.White), fontFamily = mono, fontSize = 13.sp),
+                        style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Medium),
                     )
                 }
             }
         }
     }
+}
 
-    companion object {
-        val itemIdKey = ActionParameters.Key<String>("itemId")
+/**
+ * The list area shared by Next up and Board column: rows, the empty state, or counts only when
+ * text is hidden. Missing rows become weighted spacers so the rows keep one height.
+ */
+@Composable
+internal fun ColumnScope.ItemRows(
+    rows: List<WidgetTodoItem>,
+    limit: Int,
+    hideText: Boolean,
+    emptyText: String,
+    doneToday: Int,
+    openCount: Int,
+    row: @Composable (WidgetTodoItem, GlanceModifier) -> Unit,
+) {
+    val context = LocalContext.current
+    when {
+        hideText -> Column(modifier = GlanceModifier.fillMaxWidth().defaultWeight(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = if (openCount == 1) khString(context, R.string.kh_nu_todos_open_one) else khString(context, R.string.kh_nu_todos_open_many, openCount),
+                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+            )
+            Text(
+                text = khString(context, R.string.kh_nu_done_today, doneToday),
+                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
+            )
+        }
+        rows.isEmpty() -> EmptyState(emptyText, GlanceModifier.defaultWeight(), subtitle = if (limit > 3) khString(context, R.string.kh_nu_done_today, doneToday) else null)
+        else -> {
+            rows.forEach { row(it, GlanceModifier.fillMaxWidth().defaultWeight()) }
+            repeat(limit - rows.size) { Spacer(GlanceModifier.defaultWeight()) }
+        }
     }
+}
+
+@Composable
+internal fun EmptyState(title: String, modifier: GlanceModifier, subtitle: String? = null) {
+    Column(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = title,
+            maxLines = 2,
+            style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Medium),
+        )
+        if (subtitle != null) {
+            Text(text = subtitle, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp))
+        }
+    }
+}
+
+@Composable
+internal fun NextUpHeader(title: String, trailing: String, height: androidx.compose.ui.unit.Dp) {
+    Row(modifier = GlanceModifier.fillMaxWidth().height(height), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = title,
+            maxLines = 1,
+            style = TextStyle(color = GlanceTheme.colors.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold),
+            modifier = GlanceModifier.defaultWeight(),
+        )
+        Text(
+            text = trailing,
+            maxLines = 1,
+            style = TextStyle(
+                color = GlanceTheme.colors.onSurfaceVariant,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = FontFamily.Monospace,
+            ),
+        )
+        AddButton()
+    }
+}
+
+/** Round "+" with a 40 x 24 dp tap area; opens the quick-add todo sheet. */
+@Composable
+internal fun AddButton() {
+    val context = LocalContext.current
+    Box(
+        modifier = GlanceModifier.width(40.dp).height(24.dp)
+            .clickable(openUri(context, DeepLinks.quick("todo")))
+            .semantics { contentDescription = khString(context, R.string.kh_nu_add_desc) },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = GlanceModifier.size(22.dp).cornerRadius(11.dp).background(GlanceTheme.colors.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = khString(context, R.string.kh_nu_add),
+                style = TextStyle(color = GlanceTheme.colors.onPrimaryContainer, fontSize = 15.sp, fontWeight = FontWeight.Bold),
+            )
+        }
+    }
+}
+
+/** One open todo: a 48 dp wide check, then the text. Tapping outside the check opens the item. */
+@Composable
+internal fun TodoRow(item: WidgetTodoItem, modifier: GlanceModifier, textSize: TextUnit, showTag: Boolean = false) {
+    val context = LocalContext.current
+    val inProgress = item.status == "in-progress"
+    Row(
+        modifier = modifier.clickable(openUri(context, DeepLinks.boardItem(item.id))),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = GlanceModifier.width(48.dp).fillMaxHeight()
+                .clickable(actionRunCallback<ToggleTodoAction>(actionParametersOf(TodoActionKeys.itemId to item.id)))
+                .semantics { contentDescription = khString(context, R.string.kh_nu_complete_item_desc, item.text) },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(
+                text = if (inProgress) "◉" else "○",
+                style = TextStyle(
+                    color = if (inProgress) GlanceTheme.colors.primary else GlanceTheme.colors.onSurfaceVariant,
+                    fontSize = (textSize.value + 7f).sp,
+                ),
+                modifier = GlanceModifier.padding(start = 4.dp),
+            )
+        }
+        Text(
+            text = item.text,
+            maxLines = 1,
+            style = TextStyle(
+                color = GlanceTheme.colors.onSurface,
+                fontSize = textSize,
+                fontWeight = if (inProgress) FontWeight.Bold else FontWeight.Medium,
+            ),
+            modifier = GlanceModifier.defaultWeight(),
+        )
+        val tag = if (showTag) item.tags.firstOrNull() else null
+        if (tag != null) {
+            Text(
+                text = "  #$tag",
+                maxLines = 1,
+                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = (textSize.value - 2f).sp),
+            )
+        }
+        if (item.pending) {
+            Text(
+                text = " $PENDING_GLYPH",
+                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = textSize),
+            )
+        }
+    }
+}
+
+// String helpers: Glance text takes plain strings, so resolve resources at composition time.
+
+internal fun khString(context: Context, id: Int, vararg args: Any): String = context.getString(id, *args)
+
+internal fun nextUpEmptyRes(copy: EmptyCopy): Int = when (copy) {
+    EmptyCopy.NothingInProgress -> R.string.kh_empty_nothing_in_progress
+    EmptyCopy.NothingUpNext -> R.string.kh_empty_nothing_up_next
+    EmptyCopy.InboxZero -> R.string.kh_empty_inbox_zero
+    EmptyCopy.NothingOpenHere -> R.string.kh_empty_nothing_open_here
+    EmptyCopy.BacklogEmpty -> R.string.kh_empty_backlog_empty
+}
+
+internal fun sourceLabelText(context: Context, label: SourceLabel): String = when (label.kind) {
+    SourceLabel.Kind.All -> context.getString(R.string.kh_src_all)
+    SourceLabel.Kind.Inbox -> context.getString(R.string.kh_src_inbox)
+    SourceLabel.Kind.InProgress -> context.getString(R.string.kh_src_in_progress)
+    SourceLabel.Kind.Backlog -> context.getString(R.string.kh_src_backlog)
+    SourceLabel.Kind.Tag -> context.getString(R.string.kh_src_tag, label.text ?: "")
+    SourceLabel.Kind.Milestone -> label.text ?: context.getString(R.string.kh_src_milestone)
+    SourceLabel.Kind.Upcoming -> context.getString(R.string.kh_src_upcoming)
 }

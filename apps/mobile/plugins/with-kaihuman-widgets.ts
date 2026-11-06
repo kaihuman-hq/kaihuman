@@ -11,8 +11,14 @@ export interface XmlNode {
   [child: string]: unknown;
 }
 
+export interface AndroidApplication extends XmlNode {
+  receiver?: XmlNode[];
+  activity?: XmlNode[];
+  service?: XmlNode[];
+}
+
 export interface AndroidManifest {
-  manifest: { application?: Array<XmlNode & { receiver?: XmlNode[] }> };
+  manifest: { 'uses-permission'?: XmlNode[]; application?: AndroidApplication[] };
 }
 
 export interface ModConfig<Results = unknown> {
@@ -42,6 +48,37 @@ export const URL_SCHEME = 'kaihuman';
 export const APP_GROUP_ENTITLEMENT = 'com.apple.security.application-groups';
 export const ANDROID_RECEIVER_NAME = '.TodoWidgetReceiver';
 export const ANDROID_WIDGET_INFO = '@xml/todo_widget_info';
+
+export interface AndroidWidget {
+  /** Manifest class name, relative to the app package. */
+  receiver: string;
+  /** Provider xml under `res/xml`, without extension. */
+  info: string;
+}
+
+/** Every Glance widget. KaihumanSharedModule.kt keeps a copy of the receiver names (tested). */
+export const ANDROID_WIDGETS: readonly AndroidWidget[] = [
+  { receiver: ANDROID_RECEIVER_NAME, info: 'todo_widget_info' },
+  { receiver: '.QuickCaptureWidgetReceiver', info: 'quick_capture_widget_info' },
+  { receiver: '.WeeklyDoneWidgetReceiver', info: 'weekly_done_widget_info' },
+  { receiver: '.InboxWidgetReceiver', info: 'inbox_widget_info' },
+  { receiver: '.BoardColumnWidgetReceiver', info: 'board_column_widget_info' },
+  { receiver: '.MilestoneWidgetReceiver', info: 'milestone_widget_info' },
+  { receiver: '.IdeaPipelineWidgetReceiver', info: 'idea_pipeline_widget_info' },
+  { receiver: '.KnowledgeCardWidgetReceiver', info: 'knowledge_card_widget_info' },
+];
+
+export const CAPTURE_KINDS = ['todo', 'note', 'log', 'idea'] as const;
+export const CONFIG_ACTIVITY_NAME = '.WidgetConfigActivity';
+export const FOCUS_RECEIVER_NAME = '.FocusActionReceiver';
+const CONFIG_ACTIVITY_THEME = '@style/KhConfigTheme';
+const MAIN_ACTIVITY_NAME = '.MainActivity';
+const SHORTCUTS_META = 'android.app.shortcuts';
+const SHORTCUTS_RESOURCE = '@xml/kh_shortcuts';
+const POST_NOTIFICATIONS = 'android.permission.POST_NOTIFICATIONS';
+const BIND_QUICK_SETTINGS_TILE = 'android.permission.BIND_QUICK_SETTINGS_TILE';
+const QS_TILE = 'android.service.quicksettings.action.QS_TILE';
+const APPWIDGET_CONFIGURE = 'android.appwidget.action.APPWIDGET_CONFIGURE';
 const APPWIDGET_UPDATE = 'android.appwidget.action.APPWIDGET_UPDATE';
 const APPWIDGET_PROVIDER = 'android.appwidget.provider';
 
@@ -168,17 +205,23 @@ export const withUrlScheme = (config: ExpoConfigLike): ExpoConfigLike => {
 
 const nameOf = (node: XmlNode): string | undefined => node.$?.['android:name'];
 
-/** Adds the Glance receiver to the xml2js-shaped manifest Expo uses. Mutates and returns it. */
-export const addWidgetReceiverToManifest = (manifest: AndroidManifest): AndroidManifest => {
+const push = <T extends XmlNode>(list: T[] | undefined, node: T): T[] => [...(list ?? []), node];
+
+/** Adds every widget receiver to the xml2js-shaped manifest Expo uses. Mutates and returns it. */
+export const addWidgetReceiverToManifest = (
+  manifest: AndroidManifest,
+  widgets: readonly AndroidWidget[] = ANDROID_WIDGETS,
+): AndroidManifest => {
   const application = manifest.manifest.application?.[0];
   if (!application) return manifest;
-  const receivers = application.receiver ?? [];
-  if (!receivers.some((r) => nameOf(r) === ANDROID_RECEIVER_NAME)) {
-    receivers.push({
-      $: { 'android:name': ANDROID_RECEIVER_NAME, 'android:exported': 'false' },
+  let receivers = application.receiver ?? [];
+  for (const { receiver, info } of widgets) {
+    if (receivers.some((r) => nameOf(r) === receiver)) continue;
+    receivers = push(receivers, {
+      $: { 'android:name': receiver, 'android:exported': 'false' },
       'intent-filter': [{ action: [{ $: { 'android:name': APPWIDGET_UPDATE } }] }],
       'meta-data': [
-        { $: { 'android:name': APPWIDGET_PROVIDER, 'android:resource': ANDROID_WIDGET_INFO } },
+        { $: { 'android:name': APPWIDGET_PROVIDER, 'android:resource': `@xml/${info}` } },
       ],
     });
   }
@@ -186,15 +229,104 @@ export const addWidgetReceiverToManifest = (manifest: AndroidManifest): AndroidM
   return manifest;
 };
 
+/**
+ * Adds everything besides the widget receivers: the widget configuration activity, the Quick
+ * Settings tiles, the Focus action receiver, the launcher shortcuts and the notification
+ * permission. Idempotent; mutates and returns the manifest.
+ */
+export const addSystemSurfacesToManifest = (manifest: AndroidManifest): AndroidManifest => {
+  const root = manifest.manifest;
+  const permissions = root['uses-permission'] ?? [];
+  if (!permissions.some((p) => nameOf(p) === POST_NOTIFICATIONS)) {
+    permissions.push({ $: { 'android:name': POST_NOTIFICATIONS } });
+  }
+  root['uses-permission'] = permissions;
+
+  const application = root.application?.[0];
+  if (!application) return manifest;
+
+  let activities = application.activity ?? [];
+  if (!activities.some((a) => nameOf(a) === CONFIG_ACTIVITY_NAME)) {
+    activities = push(activities, {
+      $: {
+        'android:name': CONFIG_ACTIVITY_NAME,
+        'android:exported': 'true',
+        'android:theme': CONFIG_ACTIVITY_THEME,
+        'android:excludeFromRecents': 'true',
+      },
+      'intent-filter': [{ action: [{ $: { 'android:name': APPWIDGET_CONFIGURE } }] }],
+    });
+  }
+  const main = activities.find((a) => nameOf(a) === MAIN_ACTIVITY_NAME);
+  if (main) {
+    const meta = (main['meta-data'] as XmlNode[] | undefined) ?? [];
+    if (!meta.some((m) => nameOf(m) === SHORTCUTS_META)) {
+      meta.push({ $: { 'android:name': SHORTCUTS_META, 'android:resource': SHORTCUTS_RESOURCE } });
+    }
+    main['meta-data'] = meta;
+  }
+  application.activity = activities;
+
+  let services = application.service ?? [];
+  for (const kind of CAPTURE_KINDS) {
+    const name = `.${kind[0]?.toUpperCase()}${kind.slice(1)}CaptureTileService`;
+    if (services.some((s) => nameOf(s) === name)) continue;
+    services = push(services, {
+      $: {
+        'android:name': name,
+        'android:exported': 'true',
+        'android:permission': BIND_QUICK_SETTINGS_TILE,
+        'android:icon': `@drawable/kh_ic_${kind}`,
+        'android:label': `@string/kh_tile_${kind}`,
+      },
+      'intent-filter': [{ action: [{ $: { 'android:name': QS_TILE } }] }],
+    });
+  }
+  application.service = services;
+
+  const receivers = application.receiver ?? [];
+  if (!receivers.some((r) => nameOf(r) === FOCUS_RECEIVER_NAME)) {
+    receivers.push({ $: { 'android:name': FOCUS_RECEIVER_NAME, 'android:exported': 'false' } });
+  }
+  application.receiver = receivers;
+  return manifest;
+};
+
 export const GLANCE_DEPENDENCY = 'androidx.glance:glance-appwidget:1.1.1';
 
-/** Inserts the Glance dependency into the `dependencies {` block of app/build.gradle. */
+export const GLANCE_MATERIAL3_DEPENDENCY = 'androidx.glance:glance-material3:1.1.1';
+// glance-material3 only compiles against Compose Material 3; ColorProviders needs it at runtime.
+export const COMPOSE_MATERIAL3_DEPENDENCY = 'androidx.compose.material3:material3:1.3.1';
+export const TEST_DEPENDENCIES: readonly string[] = [
+  'junit:junit:4.13.2',
+  'org.json:json:20240303',
+  'org.robolectric:robolectric:4.14.1',
+  'androidx.test:core:1.6.1',
+];
+const TEST_OPTIONS =
+  'testOptions {\n        unitTests {\n            includeAndroidResources = true\n        }\n    }';
+
+/**
+ * Adds the Glance and JVM-test dependencies to the `dependencies {` block of app/build.gradle and
+ * Robolectric's `includeAndroidResources` to the `android {` block. Each piece is added once.
+ */
 export const addGlanceDependencies = (buildGradle: string): string => {
-  if (buildGradle.includes(GLANCE_DEPENDENCY)) return buildGradle;
-  return buildGradle.replace(
-    /^dependencies\s*\{/m,
-    (open) => `${open}\n    implementation "${GLANCE_DEPENDENCY}"`,
-  );
+  const lines = [
+    ...[GLANCE_DEPENDENCY, GLANCE_MATERIAL3_DEPENDENCY, COMPOSE_MATERIAL3_DEPENDENCY]
+      .filter((d) => !buildGradle.includes(d))
+      .map((d) => `    implementation "${d}"`),
+    ...TEST_DEPENDENCIES.filter((d) => !buildGradle.includes(d)).map(
+      (d) => `    testImplementation "${d}"`,
+    ),
+  ];
+  let out = buildGradle;
+  if (lines.length > 0) {
+    out = out.replace(/^dependencies\s*\{/m, (open) => `${open}\n${lines.join('\n')}`);
+  }
+  if (!/includeAndroidResources\s*=\s*true/.test(out)) {
+    out = out.replace(/^android\s*\{/m, (open) => `${open}\n    ${TEST_OPTIONS}`);
+  }
+  return out;
 };
 
 // Glance pulls in WorkManager, which creates its Room database reflectively. R8 in release builds
@@ -464,7 +596,7 @@ const nodeCopyFs: CopyFs = {
   list: (p) => readdirSync(p),
 };
 
-/** Copies the Kotlin sources and `res/` of the Glance target into the generated Android project. */
+/** Copies the Kotlin sources, JVM unit tests (`test/`) and `res/` of the Glance target into the generated Android project. */
 export const copyAndroidWidgetSources = (
   projectRoot: string,
   platformProjectRoot: string,
@@ -480,6 +612,15 @@ export const copyAndroidWidgetSources = (
   for (const file of fs.list(source).filter((f) => f.endsWith('.kt'))) {
     fs.copy(join(source, file), join(javaDir, file));
     copied.push(join(javaDir, file));
+  }
+  const testSource = join(source, 'test');
+  if (fs.exists(testSource)) {
+    const testDir = join(platformProjectRoot, 'app/src/test/java', ...packageName.split('.'));
+    fs.mkdir(testDir);
+    for (const file of fs.list(testSource).filter((f) => f.endsWith('.kt'))) {
+      fs.copy(join(testSource, file), join(testDir, file));
+      copied.push(join(testDir, file));
+    }
   }
   if (fs.exists(join(source, 'res'))) {
     fs.copy(join(source, 'res'), join(main, 'res'));
@@ -505,7 +646,7 @@ const withKaihumanWidgets = (
 
   next = composeMod<AndroidManifest>(next, 'android', 'manifest', (cfg) => ({
     ...cfg,
-    modResults: addWidgetReceiverToManifest(cfg.modResults),
+    modResults: addSystemSurfacesToManifest(addWidgetReceiverToManifest(cfg.modResults)),
   }));
 
   next = composeMod<{ contents: string }>(next, 'android', 'appBuildGradle', (cfg) => ({
