@@ -50,7 +50,7 @@ struct Sheet: View {
     let rows: [(String, [Tile])]
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
-            Text("kaihuman · iOS widgets v1 (rendered in CI)")
+            Text("kaihuman · iOS widgets v1 + v2 (rendered in CI)")
                 .font(.system(size: 22, weight: .bold, design: .monospaced))
                 .foregroundStyle(WidgetTheme.volt)
             ForEach(rows.indices, id: \.self) { index in
@@ -118,6 +118,29 @@ struct RenderHarness {
         let inbox = { (e: TodoEntry, f: WidgetFamily, m: WidgetRenderingMode, s: ColorScheme) in
             AnyView(InboxCountView(entry: e, family: f, renderingMode: m, colorScheme: s))
         }
+        let board = { (e: TodoEntry, f: WidgetFamily, m: WidgetRenderingMode, s: ColorScheme) in
+            AnyView(BoardColumnView(entry: e, family: f, renderingMode: m, colorScheme: s))
+        }
+        let milestone = { (e: TodoEntry, f: WidgetFamily, m: WidgetRenderingMode, s: ColorScheme) in
+            AnyView(MilestoneCountdownView(entry: e, family: f, renderingMode: m, colorScheme: s))
+        }
+        let ideas = { (e: TodoEntry, f: WidgetFamily, m: WidgetRenderingMode, s: ColorScheme) in
+            AnyView(IdeaPipelineView(entry: e, family: f, renderingMode: m, colorScheme: s))
+        }
+        let cards = { (e: TodoEntry, f: WidgetFamily, m: WidgetRenderingMode, s: ColorScheme) in
+            AnyView(KnowledgeCardView(entry: e, family: f, renderingMode: m, colorScheme: s))
+        }
+        let habits = { (e: TodoEntry, f: WidgetFamily, m: WidgetRenderingMode, s: ColorScheme) in
+            AnyView(HabitsView(entry: e, family: f, renderingMode: m, colorScheme: s))
+        }
+        let backlogBoard = TodoEntry(date: Date(), snapshot: .preview, source: .backlog)
+        // The Live Activity itself needs ActivityKit; its Lock Screen layout is a plain view.
+        let focus = Tile(
+            label: "focus-lock-screen", family: .systemMedium, scheme: .dark, mode: .fullColor,
+            view: AnyView(FocusLockScreenView(
+                attributes: .preview, state: .preview, activityId: "preview"
+            ))
+        )
         let accessories: [WidgetFamily] = [.accessoryRectangular, .accessoryInline]
         let states: [Tile] = [
             ("signed-out", TodoEntry.previewSignedOut), ("empty", .previewEmpty), ("stale", .previewStale),
@@ -134,6 +157,14 @@ struct RenderHarness {
                 + tiles("capture", [.systemMedium], make: capture).prefix(1)),
             ("Weekly done", tiles("weekly", [.systemSmall, .accessoryCircular, .accessoryInline], make: weekly)),
             ("Inbox", tiles("inbox", [.systemSmall, .accessoryCircular, .accessoryInline], make: inbox)),
+            ("Board column · medium", tiles("board", [.systemMedium], entry: backlogBoard, make: board)),
+            ("Board column · large", tiles("board", [.systemLarge], entry: backlogBoard, make: board)),
+            ("Milestone countdown", tiles("milestone", [.systemSmall, .accessoryCircular, .accessoryRectangular], make: milestone)),
+            ("Idea pipeline", tiles("ideas", [.systemSmall, .systemMedium], make: ideas)),
+            ("Knowledge card · medium", tiles("cards", [.systemMedium], make: cards)),
+            ("Knowledge card · large", tiles("cards", [.systemLarge], make: cards)),
+            ("Habits", tiles("habits", [.systemSmall, .accessoryRectangular], make: habits)),
+            ("Focus Live Activity · Lock Screen", [focus]),
             ("States (signed out, empty, stale)", states),
         ]
 

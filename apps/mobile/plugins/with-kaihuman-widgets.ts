@@ -28,6 +28,7 @@ export interface ExpoConfigLike {
   ios?: {
     bundleIdentifier?: string;
     entitlements?: Record<string, unknown>;
+    infoPlist?: Record<string, unknown>;
     [key: string]: unknown;
   };
   android?: { package?: string; [key: string]: unknown };
@@ -80,6 +81,13 @@ export const SHARED_APP_SOURCES: readonly string[] = [
   'ToggleTodoIntent.swift',
   'QuickCaptureTodoIntent.swift',
   'OpenQuickCaptureIntent.swift',
+  // v2 intents: board Start, background capture, knowledge Next, habit Log, Focus Live Activity.
+  'StartTodoIntent.swift',
+  'CaptureTodoIntent.swift',
+  'NextKnowledgeCardIntent.swift',
+  'LogHabitIntent.swift',
+  'FocusActivityAttributes.swift',
+  'FocusIntents.swift',
 ];
 
 /**
@@ -88,9 +96,15 @@ export const SHARED_APP_SOURCES: readonly string[] = [
  * SHARED_APP_SOURCES together cover every `.swift` file in the directory exactly once.
  */
 export const WIDGET_ONLY_SOURCES: readonly string[] = [
+  'BoardColumnWidget.swift',
   'ControlWidgets.swift',
+  'FocusLiveActivity.swift',
+  'HabitsWidget.swift',
+  'IdeaPipelineWidget.swift',
   'InboxCountWidget.swift',
   'KaihumanWidgets.swift',
+  'KnowledgeCardWidget.swift',
+  'MilestoneCountdownWidget.swift',
   'NextUpConfigurationIntent.swift',
   'PreviewData.swift',
   'QuickCaptureWidget.swift',
@@ -138,6 +152,12 @@ export const withIosAppGroup = (config: ExpoConfigLike): ExpoConfigLike => {
     : [...groups, APP_GROUP];
   return { ...config, ios: { ...config.ios, entitlements } };
 };
+
+/** The app (not the extension) must declare Live Activity support or `Activity.request` throws. */
+export const withLiveActivities = (config: ExpoConfigLike): ExpoConfigLike => ({
+  ...config,
+  ios: { ...config.ios, infoPlist: { ...config.ios?.infoPlist, NSSupportsLiveActivities: true } },
+});
 
 export const withUrlScheme = (config: ExpoConfigLike): ExpoConfigLike => {
   const current = config.scheme;
@@ -481,7 +501,7 @@ const withKaihumanWidgets = (
   config: ExpoConfigLike,
   options: PluginOptions = {},
 ): ExpoConfigLike => {
-  let next = withUrlScheme(withIosAppGroup(config));
+  let next = withLiveActivities(withUrlScheme(withIosAppGroup(config)));
 
   next = composeMod<AndroidManifest>(next, 'android', 'manifest', (cfg) => ({
     ...cfg,

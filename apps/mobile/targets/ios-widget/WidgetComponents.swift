@@ -6,6 +6,32 @@ enum DeepLink {
     static let app = URL(string: "kaihuman://")!
     static let board = URL(string: "kaihuman://board")!
     static let inbox = URL(string: "kaihuman://inbox")!
+    static let ideas = URL(string: "kaihuman://ideas")!
+
+    private static func url(host: String, path: String = "", query: [String: String] = [:]) -> URL {
+        var components = URLComponents()
+        components.scheme = "kaihuman"
+        components.host = host
+        components.path = path
+        if !query.isEmpty {
+            components.queryItems = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+        }
+        return components.url ?? app
+    }
+
+    static func board(milestone id: String) -> URL { url(host: "board", query: ["milestone": id]) }
+    static func board(item id: String) -> URL { url(host: "board", query: ["item": id]) }
+    static func ideas(status: String) -> URL { url(host: "ideas", query: ["status": status]) }
+    /// Opens the quick-log sheet; `idea` is ignored by routes that predate it.
+    static func quickLog(idea slug: String) -> URL { url(host: "quick-log", query: ["idea": slug]) }
+
+    /// `kaihuman://files/<path>`, one percent-encoded segment at a time (paths hold `.kh/` and spaces).
+    static func file(path: String) -> URL {
+        let segments = path.split(separator: "/").compactMap {
+            String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+        }
+        return URL(string: "kaihuman://files/" + segments.joined(separator: "/")) ?? app
+    }
 }
 
 /// Shared by every widget: signed-out placeholder, dimming of very old data and the app link.
@@ -173,6 +199,9 @@ struct TodoRow: View {
     let style: WidgetStyle
     var fontSize: CGFloat = 12.5
     var showsTag = false
+    /// Backlog rows get a "Start" button (backlog -> in progress), for the board column widget.
+    var showsStart = false
+    var link: URL = DeepLink.board
 
     private var linksText: Bool { style.family != .systemSmall }
 
@@ -191,12 +220,24 @@ struct TodoRow: View {
                 .buttonStyle(.plain)
             }
             if linksText {
-                Link(destination: DeepLink.board) { text(theme, pending: pending) }
+                Link(destination: link) { text(theme, pending: pending) }
             } else {
                 text(theme, pending: pending)
             }
             if showsTag, let tag = item.tags.first {
                 TagChip(tag: tag, theme: theme)
+            }
+            if showsStart, item.status == .backlog, !pending {
+                Button(intent: StartTodoIntent(itemId: item.id)) {
+                    Text("Start")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(theme.label)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(theme.button))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
             }
         }
     }

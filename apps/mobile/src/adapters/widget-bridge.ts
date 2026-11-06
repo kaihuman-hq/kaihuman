@@ -160,6 +160,16 @@ export class WidgetBridge {
     }
     const snapshot = currentSnapshot();
     if (!snapshot) return false;
+    // A failed capture push leaves the line in the widget's cached inbox, so a later widget push
+    // may already have committed it: replaying would duplicate the todo.
+    if (
+      m.kind === 'capture' &&
+      snapshot.items.some(
+        (i) => i.filePath === `${snapshot.appFolder}/inbox.todos.md` && i.text === m.text,
+      )
+    ) {
+      return false;
+    }
     const result =
       m.kind === 'capture'
         ? applyWidgetCapture(snapshot, m.text)

@@ -81,10 +81,69 @@ struct SharedTodoSnapshot: Codable {
     var tags: [String]?
     var privacy: SharedPrivacy?
     var timeZone: String?
+    var ideas: SharedIdeas?
+    var cards: [SharedCard]?
+    var habits: [SharedHabit]?
 }
 
-/// A toggle the widget could not commit; the main app replays it (see widget-bridge.ts).
+struct SharedHotIdea: Codable, Identifiable {
+    var slug: String
+    var title: String
+    /// "hot" | "warm" | "cool" | "dormant"; a String so a new level never breaks decoding.
+    var level: String
+    var id: String { slug }
+}
+
+struct SharedIdeas: Codable {
+    var byStatus: [String: Int]
+    var hot: [SharedHotIdea]
+}
+
+struct SharedCard: Codable, Identifiable {
+    var path: String
+    var title: String
+    var excerpt: String
+    var tags: [String]
+    var id: String { path }
+}
+
+struct SharedHabit: Codable, Identifiable {
+    var path: String
+    var name: String
+    var doneToday: Bool
+    var streakDays: Int
+    var pending: Bool?
+    var id: String { path }
+}
+
+/// Something the widget or an intent did that the main app must commit (see widget-bridge.ts).
+/// One flat struct for the TS union: `kind` is nil in v1 files (always a toggle); the other
+/// optionals are filled per kind (move: itemId + status, capture: text, habit: path + date).
 struct PendingWidgetMutation: Codable {
-    var itemId: String
+    var kind: String?
+    var itemId: String?
+    var status: String?
+    var text: String?
+    var path: String?
+    /// Local calendar day, YYYY-MM-DD.
+    var date: String?
     var timestamp: Int64
+
+    static func millis(_ now: Date) -> Int64 { Int64(now.timeIntervalSince1970 * 1000) }
+
+    static func toggle(itemId: String, now: Date = Date()) -> PendingWidgetMutation {
+        PendingWidgetMutation(kind: "toggle", itemId: itemId, timestamp: millis(now))
+    }
+
+    static func move(itemId: String, status: TodoStatus, now: Date = Date()) -> PendingWidgetMutation {
+        PendingWidgetMutation(kind: "move", itemId: itemId, status: status.rawValue, timestamp: millis(now))
+    }
+
+    static func capture(text: String, now: Date = Date()) -> PendingWidgetMutation {
+        PendingWidgetMutation(kind: "capture", text: text, timestamp: millis(now))
+    }
+
+    static func habit(path: String, date: String, now: Date = Date()) -> PendingWidgetMutation {
+        PendingWidgetMutation(kind: "habit", path: path, date: date, timestamp: millis(now))
+    }
 }

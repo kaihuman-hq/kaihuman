@@ -156,3 +156,70 @@ extension SnapshotFreshness {
         return false
     }
 }
+
+// MARK: v2 widgets
+
+/// How the knowledge card widget rotates: a new card every 3 h, shifted by the user's "Next" taps.
+enum KnowledgeRotation {
+    static let slotSeconds: TimeInterval = 3 * 3600
+
+    static func slot(at date: Date) -> Int {
+        Int((date.timeIntervalSince1970 / slotSeconds).rounded(.down))
+    }
+
+    /// Start of the slot after `date`: the next entry that changes the card.
+    static func nextSlotStart(after date: Date) -> Date {
+        Date(timeIntervalSince1970: TimeInterval(slot(at: date) + 1) * slotSeconds)
+    }
+}
+
+struct IdeaStage: Identifiable {
+    let status: String
+    let count: Int
+    var id: String { status }
+}
+
+extension SharedTodoSnapshot {
+    /// Card shown at `date`; stable within a slot so a reload does not reshuffle it.
+    func card(at date: Date, offset: Int) -> SharedCard? {
+        guard let cards, !cards.isEmpty else { return nil }
+        let index = (KnowledgeRotation.slot(at: date) &+ offset) % cards.count
+        return cards[index < 0 ? index + cards.count : index]
+    }
+
+    /// The picked milestone, else the upcoming one. A vanished pick falls back to the upcoming one.
+    func milestone(id: String?) -> SharedMilestone? {
+        if let id, let picked = milestones?.first(where: { $0.id == id }) { return picked }
+        guard let upcoming = upcomingMilestone else { return nil }
+        if let known = milestones?.first(where: { $0.id == upcoming.id }) { return known }
+        return SharedMilestone(
+            id: upcoming.id, name: upcoming.name, dueDate: upcoming.dueDate,
+            open: items.filter { $0.milestoneId == upcoming.id }.count, done: 0
+        )
+    }
+
+    /// Whole local days from `now` to a `YYYY-MM-DD` due date; negative when overdue.
+    func daysLeft(until dueDate: String?, at now: Date) -> Int? {
+        guard let dueDate else { return nil }
+        let parts = dueDate.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        let calendar = resolvedCalendar
+        guard let due = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])) else {
+            return nil
+        }
+        return calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: due).day
+    }
+
+    /// The snapshot only knows "done today" as of its last sync; a habit ticked yesterday is open again.
+    func habitDone(_ habit: SharedHabit, at now: Date) -> Bool {
+        habit.doneToday && resolvedCalendar.isDate(updatedDate, inSameDayAs: now)
+    }
+
+    /// Idea statuses in pipeline order first, then any the app invented.
+    func ideaStages(preferred: [String]) -> [IdeaStage] {
+        guard let byStatus = ideas?.byStatus else { return [] }
+        let known = preferred.filter { byStatus[$0] != nil }
+        let extra = byStatus.keys.filter { !preferred.contains($0) }.sorted()
+        return (known + extra).map { IdeaStage(status: $0, count: byStatus[$0] ?? 0) }
+    }
+}

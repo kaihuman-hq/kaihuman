@@ -51,6 +51,9 @@ const snapshot: Required<WidgetTodoSnapshot> = {
 };
 const statuses: WidgetTodoItem['status'][] = ['backlog', 'in-progress', 'done', 'rejected'];
 
+const pendingKeys = ['kind', 'itemId', 'status', 'text', 'path', 'date', 'timestamp'];
+const mutationKinds = ['toggle', 'move', 'capture', 'habit'];
+
 const hasProperty = (swift: string, key: string): boolean =>
   new RegExp(`\\bvar ${key}\\s*:`).test(swift);
 
@@ -69,6 +72,10 @@ describe('ios widget target', () => {
       ...Object.keys(snapshot.stats),
       ...Object.keys(snapshot.milestones[0] ?? {}),
       ...Object.keys(snapshot.privacy),
+      ...Object.keys(snapshot.ideas),
+      ...Object.keys(snapshot.ideas.hot[0] ?? {}),
+      ...Object.keys(snapshot.cards[0] ?? {}),
+      ...Object.keys(snapshot.habits[0] ?? {}),
       ...Object.keys({ sha: '', content: '' }),
     ];
     for (const key of keys) expect(hasProperty(models, key), key).toBe(true);
@@ -77,8 +84,40 @@ describe('ios widget target', () => {
   it('mirrors the status raw values and pending mutation shape', () => {
     for (const status of statuses) expect(models).toContain(`"${status}"`);
     expect(models).toMatch(/struct PendingWidgetMutation: Codable/);
-    expect(hasProperty(models, 'itemId')).toBe(true);
-    expect(hasProperty(models, 'timestamp')).toBe(true);
+    for (const key of pendingKeys) expect(hasProperty(models, key), key).toBe(true);
+  });
+
+  it('decodes v1 pending files and every v2 mutation kind', () => {
+    // v1 wrote `{itemId, timestamp}` with no kind; the optional fields keep those files decoding.
+    expect(models).toMatch(/var kind: String\?/);
+    expect(models).toMatch(/var itemId: String\?/);
+    for (const kind of mutationKinds) expect(models, kind).toContain(`kind: "${kind}"`);
+    // Same shape as the TS union (PendingWidgetMutation in widget-sync.ts).
+    const kindsInTs = readFileSync(
+      join(dir, '..', '..', '..', '..', 'packages/core/src/widget-sync.ts'),
+      'utf8',
+    );
+    for (const kind of mutationKinds) expect(kindsInTs, kind).toContain(`'${kind}'`);
+  });
+
+  it('rewrites checkboxes with the markers of packages/formats todos', () => {
+    expect(store).toMatch(/case backlog = "\[ \]"/);
+    expect(store).toMatch(/case inProgress = "\[>\]"/);
+    expect(store).toMatch(/case done = "\[x\]"/);
+    expect(store).toContain('static func setMarker(');
+    expect(store).toMatch(/static func markDone\([^)]*\) -> String\? \{\s*setMarker\(/);
+    for (const fn of [
+      'func move(itemId: String',
+      'func appendCapture(text',
+      'func checkInHabit(path',
+      'func queue(_ mutation',
+    ]) {
+      expect(store, fn).toContain(fn);
+    }
+    expect(store).toContain('- [ ] \\(text)');
+    expect(store).toContain('::created:: ');
+    expect(store).toContain('queueing mutation: PendingWidgetMutation');
+    expect(store).toContain('message: String');
   });
 
   it('uses the same container id and file names as the JS bridge', () => {
@@ -119,6 +158,11 @@ describe('ios widget target', () => {
       QuickCaptureWidget: read('QuickCaptureWidget.swift'),
       WeeklyDoneWidget: read('WeeklyDoneWidget.swift'),
       InboxCountWidget: read('InboxCountWidget.swift'),
+      BoardColumnWidget: read('BoardColumnWidget.swift'),
+      MilestoneCountdownWidget: read('MilestoneCountdownWidget.swift'),
+      IdeaPipelineWidget: read('IdeaPipelineWidget.swift'),
+      KnowledgeCardWidget: read('KnowledgeCardWidget.swift'),
+      HabitsWidget: read('HabitsWidget.swift'),
     };
     const families: Record<keyof typeof widgetFiles, string[]> = {
       InboxTodoWidget: [
@@ -132,6 +176,11 @@ describe('ios widget target', () => {
       QuickCaptureWidget: ['systemSmall', 'systemMedium'],
       WeeklyDoneWidget: ['systemSmall', 'accessoryCircular', 'accessoryInline'],
       InboxCountWidget: ['systemSmall', 'accessoryCircular', 'accessoryInline'],
+      BoardColumnWidget: ['systemMedium', 'systemLarge'],
+      MilestoneCountdownWidget: ['systemSmall', 'accessoryRectangular', 'accessoryCircular'],
+      IdeaPipelineWidget: ['systemSmall', 'systemMedium'],
+      KnowledgeCardWidget: ['systemMedium', 'systemLarge'],
+      HabitsWidget: ['systemSmall', 'accessoryRectangular'],
     };
     const kinds = Object.keys(widgetFiles) as Array<keyof typeof widgetFiles>;
     const familiesOf = (swift: string): string[] =>
@@ -148,6 +197,59 @@ describe('ios widget target', () => {
       }
       expect(widgets).toContain('AppIntentConfiguration');
       expect(widgets).toContain('NextUpConfigurationIntent');
+      expect(widgets).toContain('        FocusLiveActivity()');
+    });
+
+    it('configures the board column and milestone widgets from the snapshot', () => {
+      const board = widgetFiles.BoardColumnWidget;
+      expect(board).toContain('BoardColumnConfigurationIntent: WidgetConfigurationIntent');
+      expect(board).toContain('AppIntentConfiguration(kind: kind');
+      expect(board).toContain('EntityQuery');
+      for (const column of ['inbox', 'inProgress', 'backlog'])
+        expect(board).toContain(`case ${column}`);
+      expect(board).toContain('showsStart: true');
+      const milestone = widgetFiles.MilestoneCountdownWidget;
+      expect(milestone).toContain('MilestoneConfigurationIntent: WidgetConfigurationIntent');
+      expect(milestone).toContain('struct MilestoneEntity: AppEntity');
+      expect(milestone).toContain('EntityQuery');
+      expect(milestone).toContain('KaihumanTimeline.daily');
+      expect(milestone).toContain('DeepLink.board(milestone:');
+    });
+
+    it('uses only deep links the app routes, plus query parameters it ignores today', () => {
+      const components = read('WidgetComponents.swift');
+      for (const host of ['board', 'ideas', 'quick-log'])
+        expect(components).toContain(`host: "${host}"`);
+      expect(components).toContain('kaihuman://files/');
+      expect(widgetFiles.KnowledgeCardWidget).toContain('DeepLink.file(path:');
+      expect(widgetFiles.IdeaPipelineWidget).toContain('DeepLink.ideas(status:');
+      expect(widgetFiles.IdeaPipelineWidget).toContain('OpenIdeaLogIntent(slug:');
+      expect(read('OpenQuickCaptureIntent.swift')).toContain('kaihuman://quick-log?idea=');
+    });
+
+    it('rotates the knowledge card every 3 h and nexts without the network', () => {
+      const queries = read('SnapshotQueries.swift');
+      expect(queries).toContain('3 * 3600');
+      expect(read('WidgetProviders.swift')).toContain('static func rotating(');
+      expect(widgetFiles.KnowledgeCardWidget).toContain(
+        'Button(intent: NextKnowledgeCardIntent())',
+      );
+      const next = read('NextKnowledgeCardIntent.swift');
+      expect(next).toContain('advanceCardOffset()');
+      expect(next).toContain('reloadTimelines(ofKind: Self.widgetKind)');
+      expect(next).not.toContain('URLSession');
+      expect(next).toContain('"KnowledgeCardWidget"');
+    });
+
+    it('starts todos and logs habits in process', () => {
+      const start = read('StartTodoIntent.swift');
+      expect(start).toContain('store.move(itemId: itemId, to: .inProgress)');
+      expect(start.indexOf('reloadAllTimelines')).toBeLessThan(start.indexOf('store.push'));
+      expect(start).toContain('queueing: .move(');
+      const habit = read('LogHabitIntent.swift');
+      expect(habit).toContain('checkInHabit(path: path)');
+      expect(habit).toContain('"HabitsWidget"');
+      expect(widgetFiles.HabitsWidget).toContain('Button(intent: LogHabitIntent(path:');
     });
 
     it('supports the right families per widget', () => {
@@ -173,6 +275,11 @@ describe('ios widget target', () => {
         'QuickCaptureWidget.swift',
         'WeeklyDoneWidget.swift',
         'InboxCountWidget.swift',
+        'BoardColumnWidget.swift',
+        'MilestoneCountdownWidget.swift',
+        'IdeaPipelineWidget.swift',
+        'KnowledgeCardWidget.swift',
+        'HabitsWidget.swift',
       ]) {
         const swift = read(file);
         expect(swift, file).toMatch(
@@ -206,6 +313,9 @@ describe('ios widget target', () => {
         'WeeklyDoneWidget.swift',
         'InboxCountWidget.swift',
         'QuickCaptureWidget.swift',
+        'MilestoneCountdownWidget.swift',
+        'IdeaPipelineWidget.swift',
+        'HabitsWidget.swift',
       ]) {
         expect(read(file), file).toContain('.widgetAccentable(');
       }
@@ -220,6 +330,15 @@ describe('ios widget target', () => {
       expect(read('WidgetComponents.swift')).toContain('.privacySensitive()');
       expect(views).toContain('.privacySensitive()');
       expect(views).toContain('snapshot.showsLockScreenText');
+      for (const file of [
+        'IdeaPipelineWidget.swift',
+        'KnowledgeCardWidget.swift',
+        'HabitsWidget.swift',
+        'FocusLiveActivity.swift',
+      ]) {
+        expect(read(file), file).toContain('.privacySensitive()');
+      }
+      expect(read('HabitsWidget.swift')).toContain('snapshot.showsLockScreenText');
       expect(read('SnapshotQueries.swift')).toContain('privacy?.lockScreenText ?? true');
     });
 
@@ -321,13 +440,18 @@ describe('ios widget target', () => {
     it('provides Siri phrases that all name the app', () => {
       expect(shortcuts).toContain('AppShortcutsProvider');
       const blocks = [...shortcuts.matchAll(/phrases:\s*\[([^\]]*)\]/g)].map((m) => m[1] ?? '');
-      expect(blocks).toHaveLength(3);
+      expect(blocks).toHaveLength(4);
       for (const block of blocks) {
         const phrases = block.match(/"[^"]*"/g) ?? [];
         expect(phrases.length).toBeGreaterThan(0);
         for (const phrase of phrases) expect(phrase).toContain('\\(.applicationName)');
       }
-      for (const intent of ['AddTodoIntent()', 'WhatsNextIntent()', 'CompleteTodoIntent()']) {
+      for (const intent of [
+        'AddTodoIntent()',
+        'WhatsNextIntent()',
+        'CompleteTodoIntent()',
+        'CaptureTodoIntent()',
+      ]) {
         expect(shortcuts).toContain(intent);
       }
     });
@@ -344,6 +468,93 @@ describe('ios widget target', () => {
 
     it('stays out of the widget extension and has no second @main', () => {
       for (const swift of [intents, shortcuts]) expect(swift).not.toMatch(/@main|WidgetBundle/);
+    });
+  });
+
+  describe('background capture', () => {
+    const capture = read('CaptureTodoIntent.swift');
+
+    it('adds to the inbox without opening the app and queues on failure', () => {
+      expect(capture).toContain('struct CaptureTodoIntent: AppIntent');
+      expect(capture).toContain('openAppWhenRun = false');
+      expect(capture).toMatch(/@Parameter\(title: "Todo"\)\s+var text: String/);
+      expect(capture).toContain('some IntentResult & ProvidesDialog');
+      expect(capture).toContain('"Added to inbox"');
+      expect(capture).toContain('store.appendCapture(text: trimmed)');
+      expect(capture).toContain('queueing: .capture(text: trimmed)');
+    });
+  });
+
+  describe('focus live activity', () => {
+    const attributes = read('FocusActivityAttributes.swift');
+    const moduleSwift = readFileSync(
+      join(dir, '..', '..', 'modules', 'kaihuman-shared', 'ios', 'KaihumanSharedModule.swift'),
+      'utf8',
+    );
+
+    // Brace-matched struct text without comments or whitespace.
+    const structOf = (swift: string): string => {
+      const start = swift.indexOf('struct FocusActivityAttributes: ActivityAttributes');
+      expect(start).toBeGreaterThanOrEqual(0);
+      let depth = 0;
+      for (let i = swift.indexOf('{', start); i < swift.length; i++) {
+        if (swift[i] === '{') depth++;
+        if (swift[i] === '}' && --depth === 0) {
+          return swift
+            .slice(start, i + 1)
+            .replace(/\/\/.*$/gm, '')
+            .replace(/\s+/g, '');
+        }
+      }
+      throw new Error('unbalanced struct');
+    };
+
+    it('keeps the pod copy of the attributes identical to the app copy', () => {
+      expect(structOf(moduleSwift)).toBe(structOf(attributes));
+      for (const field of [
+        'startedAt: Date',
+        'plannedEnd: Date',
+        'todoId: String',
+        'todoText: String',
+      ]) {
+        expect(attributes).toContain(`var ${field}`);
+      }
+    });
+
+    it('exposes start, update and end behind the availability and enabled checks', () => {
+      for (const name of ['startFocusActivity', 'updateFocusActivity', 'endFocusActivity']) {
+        expect(moduleSwift, name).toMatch(new RegExp(`(Async)?Function\\("${name}"\\)`));
+      }
+      expect(moduleSwift).toContain('#available(iOS 16.2, *)');
+      expect(moduleSwift).toContain('ActivityAuthorizationInfo().areActivitiesEnabled');
+      expect(moduleSwift).toContain('relevanceScore: 100');
+    });
+
+    it('runs Done and +5m as Live Activity intents', () => {
+      const intents = read('FocusIntents.swift');
+      expect(intents).toContain('struct FocusDoneIntent: LiveActivityIntent');
+      expect(intents).toContain('struct FocusExtendIntent: LiveActivityIntent');
+      expect(intents).toContain('store.toggle(itemId: todoId)');
+      expect(intents).toContain('activity.end(nil, dismissalPolicy: .immediate)');
+      expect(intents).toContain('activity.update(');
+      expect(intents).toContain('5 * 60');
+    });
+
+    it('counts down with a system timer and has the Dynamic Island regions', () => {
+      const activity = read('FocusLiveActivity.swift');
+      expect(activity).toContain('Text(timerInterval:');
+      expect(activity).toContain('countsDown: true');
+      expect(activity).toContain('ActivityConfiguration(for: FocusActivityAttributes.self)');
+      for (const region of [
+        'compactLeading',
+        'compactTrailing',
+        'minimal',
+        '.keylineTint(WidgetTheme.volt)',
+      ]) {
+        expect(activity, region).toContain(region);
+      }
+      expect(activity).toContain('Button(intent: FocusDoneIntent(');
+      expect(activity).toContain('Button(intent: FocusExtendIntent(');
     });
   });
 });

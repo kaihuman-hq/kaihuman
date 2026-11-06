@@ -27,6 +27,8 @@ struct KaihumanWidgets: WidgetBundle {
         QuickCaptureWidget()
         WeeklyDoneWidget()
         InboxCountWidget()
+        // Nested so the builder never sees more than ten children (older SDKs cap buildBlock).
+        KaihumanV2Widgets().body
         // ControlWidget needs the iOS 18 SDK runtime; the extension itself deploys to 17.0.
         if #available(iOS 18.0, *) {
             NewTodoControl()
@@ -34,5 +36,18 @@ struct KaihumanWidgets: WidgetBundle {
             NewLogControl()
             NewIdeaControl()
         }
+    }
+}
+
+/// The v2 set: board column, milestone, ideas, knowledge card, habits and the focus Live Activity.
+struct KaihumanV2Widgets: WidgetBundle {
+    @WidgetBundleBuilder
+    var body: some Widget {
+        BoardColumnWidget()
+        MilestoneCountdownWidget()
+        IdeaPipelineWidget()
+        KnowledgeCardWidget()
+        HabitsWidget()
+        FocusLiveActivity()
     }
 }

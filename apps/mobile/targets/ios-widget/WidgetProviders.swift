@@ -6,6 +6,11 @@ struct TodoEntry: TimelineEntry {
     let date: Date
     let snapshot: SharedTodoSnapshot?
     var source: TodoSourceFilter = .all
+    // v2 widgets
+    var tag: String?
+    var milestoneId: String?
+    /// "Next" taps on the knowledge card, read when the timeline was built.
+    var cardOffset = 0
 }
 
 /// Entries at `now`, on each hour (so "Synced Nh ago" and the 6 h / 48 h thresholds stay right) and
@@ -13,7 +18,7 @@ struct TodoEntry: TimelineEntry {
 /// any change, so `.atEnd` only has to cover quiet days.
 enum KaihumanTimeline {
     static func make(
-        snapshot: SharedTodoSnapshot?, source: TodoSourceFilter = .all, now: Date = Date()
+        snapshot: SharedTodoSnapshot?, source: TodoSourceFilter = .all, tag: String? = nil, now: Date = Date()
     ) -> Timeline<TodoEntry> {
         let calendar = snapshot?.resolvedCalendar ?? Calendar.current
         let midnight = snapshot?.nextMidnight(after: now)
@@ -29,7 +34,36 @@ enum KaihumanTimeline {
             }
             dates.append(midnight)
         }
-        let entries = dates.map { TodoEntry(date: $0, snapshot: snapshot, source: source) }
+        let entries = dates.map { TodoEntry(date: $0, snapshot: snapshot, source: source, tag: tag) }
+        return Timeline(entries: entries, policy: .atEnd)
+    }
+
+    /// One entry now and one at each of the next `days` local midnights, so a day counter ticks over
+    /// without spending reload budget.
+    static func daily(
+        snapshot: SharedTodoSnapshot?, milestoneId: String?, days: Int = 7, now: Date = Date()
+    ) -> Timeline<TodoEntry> {
+        var dates = [now]
+        while dates.count <= days, let last = dates.last {
+            guard let midnight = snapshot?.nextMidnight(after: last)
+                ?? Calendar.current.nextDate(
+                    after: last, matching: DateComponents(hour: 0, minute: 0, second: 0), matchingPolicy: .nextTime
+                ) else { break }
+            dates.append(midnight)
+        }
+        let entries = dates.map { TodoEntry(date: $0, snapshot: snapshot, milestoneId: milestoneId) }
+        return Timeline(entries: entries, policy: .atEnd)
+    }
+
+    /// One entry per 3 h rotation slot for the next `slots` slots (24 h by default).
+    static func rotating(
+        snapshot: SharedTodoSnapshot?, cardOffset: Int, slots: Int = 8, now: Date = Date()
+    ) -> Timeline<TodoEntry> {
+        var dates = [now]
+        while dates.count <= slots, let last = dates.last {
+            dates.append(KnowledgeRotation.nextSlotStart(after: last))
+        }
+        let entries = dates.map { TodoEntry(date: $0, snapshot: snapshot, cardOffset: cardOffset) }
         return Timeline(entries: entries, policy: .atEnd)
     }
 }

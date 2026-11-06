@@ -218,6 +218,16 @@ describe('WidgetBridge', () => {
     expect(inbox()).toContain('- [ ] buy milk');
   });
 
+  it('skips a capture the widget already committed with a later push', async () => {
+    const container = new InMemorySharedContainer();
+    githubFileStore.openFiles.value = {
+      '.kh/inbox.todos.md': { content: `${TODOS}- [ ] buy milk\n`, sha: 's2' },
+    };
+    await queue(container, [{ kind: 'capture', text: 'buy milk', timestamp: 1 }]);
+    expect(await new WidgetBridge(container).reconcile()).toBe(0);
+    expect(inbox().match(/buy milk/g)).toHaveLength(1);
+  });
+
   it('creates the inbox for a capture when it does not exist', async () => {
     const container = new InMemorySharedContainer();
     githubFileStore.openFiles.value = {};

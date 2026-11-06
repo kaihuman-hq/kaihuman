@@ -44,7 +44,32 @@ extension SharedTodoSnapshot {
             milestones: [SharedMilestone(id: "m1", name: "Widgets v1", dueDate: "2026-11-20", open: 5, done: 7)],
             tags: ["work", "life"],
             privacy: SharedPrivacy(lockScreenText: true),
-            timeZone: nil
+            timeZone: nil,
+            ideas: SharedIdeas(
+                byStatus: ["seed": 6, "exploring": 3, "committed": 2, "shipped": 4, "parked": 1],
+                hot: [
+                    SharedHotIdea(slug: "habit-widgets", title: "Habit check-ins from the Lock Screen", level: "hot"),
+                    SharedHotIdea(slug: "weekly-review", title: "Weekly review digest", level: "warm"),
+                ]
+            ),
+            cards: [
+                SharedCard(
+                    path: "wiki/spaced-repetition.md", title: "Spaced repetition",
+                    excerpt: "Review material at growing intervals so each recall happens just before you would forget it. "
+                        + "The gap roughly doubles after every successful recall.",
+                    tags: ["learning", "memory"]
+                ),
+                SharedCard(
+                    path: "wiki/zettelkasten.md", title: "Zettelkasten",
+                    excerpt: "Small atomic notes that link to each other. Value comes from the links, not the folders.",
+                    tags: ["notes"]
+                ),
+            ],
+            habits: [
+                SharedHabit(path: ".kh/habits/read.habit.csv", name: "Read 20 pages", doneToday: true, streakDays: 12, pending: nil),
+                SharedHabit(path: ".kh/habits/walk.habit.csv", name: "Walk outside", doneToday: false, streakDays: 3, pending: nil),
+                SharedHabit(path: ".kh/habits/stretch.habit.csv", name: "Stretch", doneToday: true, streakDays: 1, pending: true),
+            ]
         )
     }
 

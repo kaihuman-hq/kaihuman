@@ -25,6 +25,7 @@ import withKaihumanWidgets, {
   SHARED_APP_SOURCES,
   WIDGET_ONLY_SOURCES,
   withIosAppGroup,
+  withLiveActivities,
   withUrlScheme,
   type XcodeEditor,
   xcodeProjectEditor,
@@ -63,6 +64,19 @@ describe('config plugin transforms', () => {
     expect(
       withIosAppGroup({}).ios?.entitlements?.['com.apple.security.application-groups'],
     ).toEqual(['group.com.kaihuman.app']);
+  });
+
+  it('declares Live Activity support in the app Info.plist, keeping other keys', () => {
+    const once = withLiveActivities({ ios: { infoPlist: { UIBackgroundModes: ['fetch'] } } });
+    expect(once.ios?.infoPlist).toEqual({
+      UIBackgroundModes: ['fetch'],
+      NSSupportsLiveActivities: true,
+    });
+    expect(withLiveActivities(once)).toEqual(once);
+    expect(withLiveActivities({}).ios?.infoPlist).toEqual({ NSSupportsLiveActivities: true });
+    expect(withLiveActivities({ ios: { bundleIdentifier: 'x' } }).ios?.bundleIdentifier).toBe('x');
+    // The full plugin applies it too, next to the app group and scheme.
+    expect(withKaihumanWidgets({}).ios?.infoPlist?.NSSupportsLiveActivities).toBe(true);
   });
 
   it('sets the kaihuman scheme without duplicating', () => {
@@ -341,7 +355,17 @@ const fullItem: Required<Omit<WidgetTodoItem, 'priority' | 'pending'>> = {
 const fullSnapshot: Required<
   Omit<
     WidgetTodoSnapshot,
-    'schemaVersion' | 'stats' | 'milestones' | 'tags' | 'privacy' | 'timeZone' | 'counts' | 'items'
+    | 'schemaVersion'
+    | 'stats'
+    | 'milestones'
+    | 'tags'
+    | 'privacy'
+    | 'timeZone'
+    | 'counts'
+    | 'items'
+    | 'ideas'
+    | 'cards'
+    | 'habits'
   >
 > & { counts: V1Counts; items: (typeof fullItem)[] } = {
   updatedAt: 1,
@@ -569,6 +593,13 @@ describe('kaihuman-shared native module', () => {
     }
     expect(swift).toContain('Name("KaihumanShared")');
     expect(kotlinSource).toContain('Name("KaihumanShared")');
+  });
+
+  it('declares the Focus Live Activity functions on iOS', () => {
+    for (const name of ['startFocusActivity', 'updateFocusActivity', 'endFocusActivity']) {
+      expect(read(`${moduleDir}/index.ts`)).toContain(name);
+      expect(swift).toContain(`Function("${name}")`);
+    }
   });
 
   it('uses the keys the widget targets read', () => {

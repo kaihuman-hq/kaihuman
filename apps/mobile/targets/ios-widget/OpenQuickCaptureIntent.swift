@@ -48,3 +48,26 @@ struct OpenQuickCaptureIntent: AppIntent {
         return .result()
     }
 }
+
+/// Opens quick-log for one idea (the idea pipeline's "Log" button). The slug rides along as a query
+/// parameter on the same `quick-log` route the other capture buttons use.
+struct OpenIdeaLogIntent: AppIntent {
+    static let title: LocalizedStringResource = "Log Idea"
+    static let openAppWhenRun = true
+
+    @Parameter(title: "Idea slug")
+    var slug: String
+
+    init() {}
+
+    init(slug: String) {
+        self.slug = slug
+    }
+
+    func perform() async throws -> some IntentResult {
+        let encoded = slug.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? slug
+        UserDefaults(suiteName: SharedTodoStore.appGroupId)?
+            .set("kaihuman://quick-log?idea=\(encoded)", forKey: "pending-url")
+        return .result()
+    }
+}

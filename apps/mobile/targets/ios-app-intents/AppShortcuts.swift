@@ -30,5 +30,15 @@ struct KaihumanAppShortcuts: AppShortcutsProvider {
             shortTitle: "Complete todo",
             systemImageName: "checkmark.circle"
         )
+        // Siri asks for the text; a String parameter cannot appear in the phrase itself.
+        AppShortcut(
+            intent: CaptureTodoIntent(),
+            phrases: [
+                "Capture a todo in \(.applicationName)",
+                "Quick add to \(.applicationName) inbox",
+            ],
+            shortTitle: "Capture to inbox",
+            systemImageName: "tray.and.arrow.down"
+        )
     }
 }
