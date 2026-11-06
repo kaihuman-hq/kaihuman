@@ -65,12 +65,3 @@ struct NewIdeaControl: ControlWidget {
     }
 }
 
-@available(iOS 18.0, *)
-struct KaihumanControls: WidgetBundle {
-    var body: some Widget {
-        NewTodoControl()
-        NewNoteControl()
-        NewLogControl()
-        NewIdeaControl()
-    }
-}

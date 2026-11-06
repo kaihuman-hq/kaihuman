@@ -294,20 +294,19 @@ describe('ios widget target', () => {
 
     it('offers four iOS 18 controls behind an availability guard', () => {
       const controls = read('ControlWidgets.swift');
-      for (const kind of ['NewTodoControl', 'NewNoteControl', 'NewLogControl', 'NewIdeaControl']) {
+      const controlKinds = ['NewTodoControl', 'NewNoteControl', 'NewLogControl', 'NewIdeaControl'];
+      for (const kind of controlKinds) {
         expect(controls).toContain(`static let kind = "${kind}"`);
         expect(controls).toMatch(
           new RegExp(`@available\\(iOS 18\\.0, \\*\\)\\s+struct ${kind}: ControlWidget`),
         );
-        expect(widgets).not.toContain(kind);
       }
       expect(controls).toContain('ControlWidgetButton(action: OpenQuickCaptureIntent(');
-      expect(controls).toMatch(
-        /@available\(iOS 18\.0, \*\)\s+struct KaihumanControls: WidgetBundle/,
-      );
-      expect(widgets).toMatch(
-        /if #available\(iOS(ApplicationExtension)? 18\.0, \*\) \{\s+KaihumanControls\(\)/,
-      );
+      // A nested WidgetBundle is not a Widget, so the controls sit in the bundle's iOS 18 branch.
+      const guarded = /if #available\(iOS(ApplicationExtension)? 18\.0, \*\) \{([^}]*)\}/.exec(
+        widgets,
+      )?.[2];
+      for (const kind of controlKinds) expect(guarded, kind).toContain(`${kind}()`);
     });
   });
 
