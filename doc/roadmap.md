@@ -64,4 +64,5 @@
 - [x] Phase 4: iOS WidgetKit + AppIntents (`targets/ios-widget/`) and Android Jetpack Glance (`targets/android-widget/`) Todo widgets
 - [x] Phase 5: Mobile CI workflow (`.github/workflows/mobile-build.yml`) and docs
 - [x] iOS widget set v1 (Next up, Quick capture, Weekly done, Inbox, Control Center controls, App Shortcuts) and widget-sync schema v2
+- [x] iOS widget set v2 (Board column, Milestone countdown, Idea pipeline, Knowledge card, Habits, focus Live Activity, background capture)
 - [x] Phase 6: React Native views and runnable Expo app (expo-router routes, views over every controller, `kaihuman-shared` native module)

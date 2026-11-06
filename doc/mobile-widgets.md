@@ -1,7 +1,7 @@
 # iOS widgets — concepts
 
-Status: v1 built (2026-11-06) — see §6. v2 remains a proposal.
-Rendered widgets from CI: `apps/mobile/docs/widgets-real.png`.
+Status: v1 and v2 built (2026-11-06) — see §6.
+Rendered widgets from CI: `apps/mobile/docs/widgets-real.png` (v1), `apps/mobile/docs/widgets-real-v2.png` (v2).
 Mockups: `apps/mobile/docs/widgets.png` (source `apps/mobile/docs/widgets-mockup.html`).
 
 ## 1. Starting point
@@ -86,7 +86,13 @@ Not proposed: bookmarks (low glance value on a phone, browser extension covers i
 4. **Inbox** — todo + knowledge inbox count with a Process button.
 5. **App Shortcuts** — Siri/Spotlight/Action button phrases for add, next and complete (no UI, high reach).
 
-**v2**: board column (large, start/move), milestone countdown with picker, idea pipeline, wiki/knowledge card, focus Live Activity, background capture intent, habits/logs.
+**v2** — built 2026-11-06: board column (large, start/move), milestone countdown with picker, idea pipeline, wiki/knowledge card, focus Live Activity, background capture intent, habits.
+
+Decisions taken while building v2:
+- Habits use the existing `.habit.csv` format (`packages/formats/src/habits.ts`), not the action log. The snapshot carries `habits[]` (path, name, doneToday, streakDays) without file contents; a widget Log marks it pending and queues a `habit` mutation that the app commits with `checkIn`.
+- Open question 4: Start and background capture commit directly with the cached file + SHA and queue on failure (like the toggle); habit check-ins always queue.
+- The pending-mutation file is a union keyed by `kind` (absent = v1 toggle); `schemaVersion` stays 2 because every change is additive.
+- The Live Activity attributes struct is declared twice (widget sources and the `kaihuman-shared` pod, which cannot see app sources); a test keeps both identical.
 
 ## 7. widget-sync contract changes
 
@@ -112,6 +118,7 @@ interface WidgetTodoSnapshot {
   // v2
   ideas?: { byStatus: Record<string, number>; hot: { slug: string; title: string; level: string }[] };
   cards?: { path: string; title: string; excerpt: string; tags: string[] }[];
+  habits?: { path: string; name: string; doneToday: boolean; streakDays: number; pending?: boolean }[];
 }
 ```
 

@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-11-06 — Mobile: iOS widget set v2, focus Live Activity, background capture
+
+- `packages/core` widget-sync (still `schemaVersion: 2`, additive): optional `ideas` (counts by status, 3 most active open ideas), `cards` (≤ 20 wiki pages, 280-char excerpts, rotated daily) and `habits` (`.habit.csv`: done today, streak), built by `buildWidgetExtras`; `applyWidgetTodoMove` (toggle is now a wrapper) and `applyWidgetCapture`. Pending widget mutations are a union (`toggle` | `move` | `capture` | `habit`; no `kind` = v1 toggle) that `WidgetBridge.reconcile` replays against current content; a capture a later widget push already committed is skipped.
+- iOS widgets: **Board column** (medium/large, column + tag config, Start moves backlog → in progress), **Milestone countdown** (small, circular, rectangular, milestone picker, daily entries), **Idea pipeline** (small/medium, stage links, hot idea with Log), **Knowledge card** (medium/large, rotates every 3 h, in-process Next), **Habits** (small, rectangular, Log per habit, queued for the app). All with light, dark, tinted, Lock Screen privacy and `#Preview`s.
+- **Focus Live Activity**: `FocusActivityAttributes`, Lock Screen/StandBy and Dynamic Island views with `Text(timerInterval:)`, Done and +5m `LiveActivityIntent`s; `startFocusActivity`/`updateFocusActivity`/`endFocusActivity` in the `kaihuman-shared` module; `NSSupportsLiveActivities` via the config plugin; "Start focus" swipe action on board cards.
+- **Background capture**: `CaptureTodoIntent` (Siri/Shortcuts, no app launch) appends to the cached inbox and commits, or queues for the app; new App Shortcut phrase.
+- Deep links: `kaihuman://ideas?status=`, `quick-log?idea=<slug>`, `board?milestone=|item=`.
+- CI render harness draws every v2 widget; contact sheets `apps/mobile/docs/widgets-real.png` (v1) and `widgets-real-v2.png` (v2).
+
 ## 2026-11-06 — Mobile: iOS widget set v1, widget-sync schema v2
 
 - `packages/core` widget-sync `schemaVersion: 2` (additive): `stats.doneByDay` (Mon→Sun, local week), `stats.streakDays`, `counts.knowledgeInbox`/`doneThisWeek`, `milestones[]` with open/done counts, `tags`, `privacy.lockScreenText`, `timeZone`. Fixed "done today" counted by UTC day; it now uses the user's time zone (regression tests for Europe/Prague and America/Los_Angeles). v1 keys keep their shape, so Glance and old readers keep working; Glance now keeps unknown keys when it rewrites the snapshot.
