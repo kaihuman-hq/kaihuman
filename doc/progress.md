@@ -3,7 +3,7 @@
 ## 2026-11-06 — Workflow hardening for public release
 
 - `template-deploy-to-cloudflare.yaml`: inputs/env moved from `run:` into step `env:` (script-injection fix), `permissions: contents: read`, wrangler pinned to 4.148.0, `pnpm install --frozen-lockfile`, dead `set-output` step removed.
-- `mobile-screenshots.yml`: concurrency cancels in-progress runs; Maestro installed from the pinned `cli-2.12.1` release zip with a sha256 check instead of `curl | bash`.
+- `mobile-screenshots.yml`: concurrency cancels in-progress runs; Maestro installed from the pinned `cli-1.41.0` release zip with a sha256 check instead of `curl | bash`.
 - Third-party actions in all workflows pinned to commit SHAs.
 
 ## 2026-11-06 — Declare licenses in every manifest
