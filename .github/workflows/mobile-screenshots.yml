@@ -78,13 +78,16 @@ jobs:
           echo "$HOME/.maestro/maestro/bin" >> "$GITHUB_PATH"
 
       - name: Take screenshots
+        timeout-minutes: 40
         run: .github/scripts/mobile-screenshots-ios.sh apps/mobile/ios/build/Build/Products/Release-iphonesimulator/kaihuman.app screenshots
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: shots-ios
-          path: screenshots/*.png
+          path: |
+            screenshots/*.png
+            screenshots/*.ips
           if-no-files-found: warn
 
   android:
