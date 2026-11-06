@@ -40,6 +40,8 @@ describe('parseDeepLink', () => {
       expect(parseDeepLink(`kaihuman://quick-${kind}`)).toEqual({ name: 'quick-capture', kind });
     }
     expect(parseDeepLink('kaihuman://board')).toEqual({ name: 'board' });
+    expect(parseDeepLink('kaihuman://demo')).toEqual({ name: 'demo' });
+    expect(parseDeepLink('kaihuman://demo/x')).toBeNull();
     expect(parseDeepLink('kaihuman://files/.kh/inbox.todos.md')).toEqual({
       name: 'file',
       path: '.kh/inbox.todos.md',
@@ -64,7 +66,12 @@ describe('parseDeepLink', () => {
   });
 
   it('round-trips through routeToUrl', () => {
-    for (const url of ['kaihuman://quick-log', 'kaihuman://board', 'kaihuman://files/a%20b/c.md']) {
+    for (const url of [
+      'kaihuman://quick-log',
+      'kaihuman://board',
+      'kaihuman://demo',
+      'kaihuman://files/a%20b/c.md',
+    ]) {
       const route = parseDeepLink(url);
       if (!route || route.name === 'auth-callback') throw new Error('unexpected');
       expect(routeToUrl(route)).toBe(url);

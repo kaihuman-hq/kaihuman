@@ -1,5 +1,10 @@
-import { authStore } from '@kaihuman/core';
+import { authStore, demoMode, enterDemoMode } from '@kaihuman/core';
 import { parseDeepLink, type Route } from '../navigation/routes.js';
+
+/** Enters demo mode unless already in it, so a deep link plus its route file do not reseed twice. */
+export function enterDemoOnce(): void {
+  if (!demoMode.value) enterDemoMode();
+}
 
 export const routeToHref = (route: Route): string => {
   switch (route.name) {
@@ -9,6 +14,8 @@ export const routeToHref = (route: Route): string => {
       return `/quick-${route.kind}`;
     case 'board':
       return '/board';
+    case 'demo':
+      return '/dashboard';
     case 'file':
       return `/files/${route.path.split('/').map(encodeURIComponent).join('/')}`;
   }
@@ -19,6 +26,7 @@ export function handleUrl(url: string, navigate: (href: string) => void): void {
   const route = parseDeepLink(url);
   if (!route) return;
   if (route.name === 'auth-callback' && !authStore.handleCallbackUrl(url)) return;
+  if (route.name === 'demo') enterDemoOnce();
   navigate(routeToHref(route));
 }
 

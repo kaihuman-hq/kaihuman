@@ -4,7 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KaihumanSharedModule } from '../../modules/kaihuman-shared/index.js';
 import { installCryptoPolyfill } from './crypto-polyfill.js';
 import { createNativeContainer } from './native-container.js';
-import { handlePendingUrl, routeToHref, startLinkHandling } from './pending-url.js';
+import {
+  enterDemoOnce,
+  handlePendingUrl,
+  handleUrl,
+  routeToHref,
+  startLinkHandling,
+} from './pending-url.js';
 import { startTokenSync } from './token-sync.js';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -107,6 +113,21 @@ describe('links', () => {
     expect(routeToHref({ name: 'board' })).toBe('/board');
     expect(routeToHref({ name: 'file', path: '.kh/a b/c.md' })).toBe('/files/.kh/a%20b/c.md');
     expect(routeToHref({ name: 'auth-callback', accessToken: 'x' })).toBe('/');
+  });
+
+  it('kaihuman://demo enters demo mode once and opens the dashboard', () => {
+    const nav = vi.fn();
+    expect(routeToHref({ name: 'demo' })).toBe('/dashboard');
+    handleUrl('kaihuman://demo', nav);
+    expect(demoMode.value).toBe(true);
+    expect(authStore.token.value).toBeTruthy();
+    expect(nav).toHaveBeenCalledWith('/dashboard');
+    const token = authStore.token.value;
+    enterDemoOnce();
+    expect(authStore.token.value).toBe(token);
+    handleUrl('kaihuman://demo/extra', nav);
+    expect(nav).toHaveBeenCalledTimes(1);
+    demoMode.value = false;
   });
 
   it('routes a consumed pending url, ignores empty and foreign', () => {

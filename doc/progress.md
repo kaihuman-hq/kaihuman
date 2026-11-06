@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-06 — Mobile: CI screenshots and `kaihuman://demo`
+
+- New `.github/workflows/mobile-screenshots.yml`: builds apps/mobile Release (JS bundled, no Metro) for the iOS Simulator and an x86_64 Android emulator build, boots them, opens each route, and uploads light and dark PNGs as the `mobile-screenshots` artifact. Runs on pushes to `native-app-plan-antigravity` touching mobile/core/formats, and via `workflow_dispatch`. Scripts in `.github/scripts/mobile-screenshots-*.sh`; iOS opens deep links through Maestro (`simctl openurl` shows an unanswerable confirmation).
+- `kaihuman://demo` enters demo mode non-interactively and opens the dashboard (`app/demo.tsx` plus the deep-link handler), with tests. Screens: login, dashboard, board, analytics, quick-todo, ideas, wiki, knowledge, files, repos.
+
 ## 2026-11-06 — Mobile: fix startup crash and unreachable quick capture
 
 - `@kaihuman/core`: `logger.ts` and `auth.store.ts` read `import.meta.env` directly, which is undefined under Metro, so the mobile app crashed at module load (blank screen). Added `viteEnv(import.meta)` (`packages/core/src/env.ts`) with a regression test.

@@ -1,0 +1,157 @@
+name: "Mobile screenshots"
+
+# Real native screenshots of apps/mobile (iOS Simulator + Android emulator), light and dark, so the
+# native look can be judged without a Mac. Output: the `mobile-screenshots` artifact.
+# Screens get data from `kaihuman://demo` (non-interactive "Try demo").
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - native-app-plan-antigravity
+    paths:
+      - "apps/mobile/**"
+      - "packages/core/**"
+      - "packages/formats/**"
+      - ".github/workflows/mobile-screenshots.yml"
+      - ".github/scripts/mobile-screenshots-*.sh"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter=@kaihuman/mobile^...
+
+      - name: Prebuild native project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform ios --no-install
+
+      - name: Install CocoaPods
+        working-directory: apps/mobile/ios
+        run: pod install
+
+      # Release embeds the JS bundle, so the app runs without Metro.
+      - name: Build Release app for the simulator
+        working-directory: apps/mobile/ios
+        run: |
+          xcodebuild build \
+            -workspace kaihuman.xcworkspace \
+            -scheme kaihuman \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | MAESTRO_VERSION=1.41.0 bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Take screenshots
+        run: .github/scripts/mobile-screenshots-ios.sh apps/mobile/ios/build/Build/Products/Release-iphonesimulator/kaihuman.app screenshots
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shots-ios
+          path: screenshots/*.png
+          if-no-files-found: warn
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost /usr/local/lib/node_modules /usr/share/swift
+          sudo docker image prune --all --force
+
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter=@kaihuman/mobile^...
+
+      - name: Prebuild native project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+
+      # x86_64 only: it is the emulator's ABI and skips three NDK builds. Release is signed with the
+      # debug key by the Expo template and embeds the JS bundle.
+      - name: Assemble release APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: .github/scripts/mobile-screenshots-android.sh apps/mobile/android/app/build/outputs/apk/release/app-release.apk screenshots
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shots-android
+          path: screenshots/*.png
+          if-no-files-found: warn
+
+  collect:
+    needs: [ios, android]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: shots-*
+          path: all
+          merge-multiple: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-screenshots
+          path: all/*.png
