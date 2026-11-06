@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-11-06 — Mobile: iOS widget set v1, widget-sync schema v2
+
+- `packages/core` widget-sync `schemaVersion: 2` (additive): `stats.doneByDay` (Mon→Sun, local week), `stats.streakDays`, `counts.knowledgeInbox`/`doneThisWeek`, `milestones[]` with open/done counts, `tags`, `privacy.lockScreenText`, `timeZone`. Fixed "done today" counted by UTC day; it now uses the user's time zone (regression tests for Europe/Prague and America/Los_Angeles). v1 keys keep their shape, so Glance and old readers keep working; Glance now keeps unknown keys when it rewrites the snapshot.
+- iOS widgets (`apps/mobile/targets/ios-widget`), Volt on Ink with light, dark, tinted/clear and Lock Screen variants, `.privacySensitive()` todo text, stale (> 6 h, > 48 h), empty and signed-out states, and `#Preview`s: **Next up** (kind `InboxTodoWidget` kept; `AppIntentConfiguration` by column, tag or milestone; interactive toggle; small/medium/large/rectangular/inline/circular), **Quick capture** (2×2 and 4-wide), **Weekly done** (ring, circular gauge, streak inline), **Inbox** (todo + knowledge count, Process → `kaihuman://inbox`).
+- Four Control Center controls (`ControlWidget`, iOS 18 only behind `@available`) for new todo, note, log and idea.
+- App Shortcuts (`targets/ios-app-intents`): add todo, what's next, complete todo for Siri, Spotlight and the Action button. The config plugin compiles them and the shared store/intents into the app target.
+- New `kaihuman://inbox` deep link (opens the board).
+- CI: the iOS job renders every widget variant with `ImageRenderer` (`targets/ios-widget-render`) and uploads them; contact sheet at `apps/mobile/docs/widgets-real.png`.
+
 ## 2026-11-06 — Mobile: swipe actions, pushed detail screens, GitHub mark, demo done dates
 
 - Added `react-native-gesture-handler`, `react-native-reanimated`, `react-native-worklets` and `react-native-svg` at the SDK 58 versions.

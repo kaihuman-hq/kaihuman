@@ -139,6 +139,7 @@
 | Screen controllers (pure TypeScript, injectable ports): quick capture, kanban, analytics, ideas, wiki, knowledge, file editor (`.enc`) | `apps/mobile/src` | 2026-11-05 |
 | Dashboard tile presenters for every dashboard extension, tested against the demo seed | `apps/mobile/src/tile-controllers.ts` | 2026-11-05 |
 | iOS WidgetKit + AppIntents and Android Jetpack Glance Todo widgets (toggle, quick capture, GitHub sync, offline queue) | `apps/mobile/targets/ios-widget/`, `apps/mobile/targets/android-widget/` | 2026-11-05 |
+| iOS widget set v1: Next up (configurable, interactive), Quick capture, Weekly done ring, Inbox; iOS 18 Control Center controls; App Shortcuts (Siri, Spotlight, Action button); widget-sync schema v2 with local-day stats | `apps/mobile/targets/ios-widget/`, `apps/mobile/targets/ios-app-intents/`, `packages/core/src/widget-sync.ts` | 2026-11-06 |
 | `kaihuman://` deep links, milestone reminders from `.todos.md` and `.events.csv` | `apps/mobile/src` | 2026-11-05 |
 | GitHub OAuth sign-in through `auth-worker` (`?client=mobile`), PAT entry and demo mode | `apps/auth-worker`, mobile login | 2026-11-05 |
 | Native-compile CI: type-check, Android debug APK, iOS Simulator and WidgetKit check | `.github/workflows/mobile-build.yml` | 2026-11-05 |

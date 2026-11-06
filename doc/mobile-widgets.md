@@ -1,6 +1,7 @@
 # iOS widgets — concepts
 
-Status: design proposal (2026-11-06). No widget code changes yet.
+Status: v1 built (2026-11-06) — see §6. v2 remains a proposal.
+Rendered widgets from CI: `apps/mobile/docs/widgets-real.png`.
 Mockups: `apps/mobile/docs/widgets.png` (source `apps/mobile/docs/widgets-mockup.html`).
 
 ## 1. Starting point
@@ -78,7 +79,7 @@ Not proposed: bookmarks (low glance value on a phone, browser extension covers i
 
 ## 6. Recommended sets
 
-**v1** (one release, ~1.5 weeks):
+**v1** — built 2026-11-06:
 1. **Next up** — restyle to Volt/Ink with light, dark, tinted and accessory variants; configurable source (column / tag / milestone).
 2. **Quick capture** — 2×2 small, 4-wide medium, plus four Control Center controls.
 3. **Weekly done ring** — small and accessoryCircular gauge, streak in inline.
