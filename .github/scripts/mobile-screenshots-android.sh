@@ -19,10 +19,15 @@ for MODE in light dark; do
   adb shell am force-stop "$PKG"
   adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null
   shot login 15
+  # Crash diagnostics: a "keeps stopping" dialog in a screenshot is useless without the stack.
+  adb logcat -d -b crash > "$OUT/logcat-crash-$MODE-login.txt" || true
+  adb logcat -d -s AndroidRuntime:E ReactNativeJS:E ReactNative:E | tail -80 || true
   for pair in $ROUTES; do
     name=${pair%%:*}; link=${pair##*:}
     adb shell am start -a android.intent.action.VIEW -d "kaihuman://$link" "$PKG" >/dev/null
     shot "$name" 5
   done
 done
+adb logcat -d -b crash > "$OUT/logcat-crash.txt" || true
+tail -60 "$OUT/logcat-crash.txt" || true
 ls -l "$OUT"
