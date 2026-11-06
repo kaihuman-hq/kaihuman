@@ -28,7 +28,7 @@ struct KaihumanWidgets: WidgetBundle {
         WeeklyDoneWidget()
         InboxCountWidget()
         // ControlWidget needs the iOS 18 SDK runtime; the extension itself deploys to 17.0.
-        if #available(iOSApplicationExtension 18.0, *) {
+        if #available(iOS 18.0, *) {
             NewTodoControl()
             NewNoteControl()
             NewLogControl()
