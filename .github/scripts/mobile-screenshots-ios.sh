@@ -22,6 +22,10 @@ cat > "$RUNNER_TEMP/open.yaml" <<'Y'
 appId: com.kaihuman.app
 ---
 - openLink: ${URL}
+# iOS asks "Open in kaihuman?" for custom schemes; openLink alone leaves it up.
+- tapOn:
+    text: Open
+    optional: true
 Y
 
 # name:link pairs; `login` is the cold-start screen, `demo` loads the sample data and lands on the dashboard.
