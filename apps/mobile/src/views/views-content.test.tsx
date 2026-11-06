@@ -116,7 +116,7 @@ describe('tiles', () => {
 
   it('todos: toggle writes the new content; add task validates', () => {
     const { onWrite, f } = renderTile('todos');
-    fireEvent.click(screen.getAllByRole('button', { name: /^\[ \]/ })[0] as HTMLElement);
+    fireEvent.click(screen.getAllByRole('checkbox', { checked: false })[0] as HTMLElement);
     expect(onWrite).toHaveBeenCalledTimes(1);
     expect(onWrite.mock.calls[0]?.[0]).toBe(f.path);
     expect(onWrite.mock.calls[0]?.[1]).not.toBe(f.content);
@@ -142,9 +142,10 @@ describe('tiles', () => {
 
   it('events: add event', () => {
     const { onWrite } = renderTile('events');
+    press('Add event');
     type('Event name', 'Party');
     type('Event date (YYYY-MM-DD)', '2026-12-24');
-    press('Add event');
+    press('Save event');
     expect(onWrite.mock.calls[0]?.[1]).toContain('Party');
   });
 
@@ -157,7 +158,7 @@ describe('tiles', () => {
 
   it('timezones: shows clocks', () => {
     renderTile('timezones');
-    expect(screen.getAllByText(/\d\d:\d\d \(/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^\d\d:\d\d$/).length).toBeGreaterThan(0);
   });
 
   it('readitlater: add, mark read, clear read', () => {
@@ -165,7 +166,7 @@ describe('tiles', () => {
     type('Page URL', 'https://example.com/a');
     press('Save page');
     expect(onWrite.mock.calls[0]?.[1]).toContain('https://example.com/a');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Mark read' })[0] as HTMLElement);
+    fireEvent.click(screen.getAllByRole('checkbox', { name: /^Mark .* as read$/ })[0] as HTMLElement);
     expect(onWrite).toHaveBeenCalledTimes(2);
     press('Clear read');
     expect(onWrite).toHaveBeenCalledTimes(3);
@@ -176,27 +177,27 @@ describe('tiles', () => {
 
   it('bookmarks: search filters, add and delete write', () => {
     const { onWrite } = renderTile('bookmarks');
-    const before = screen.getAllByRole('button', { name: 'Delete' }).length;
-    expect(before).toBeGreaterThan(1);
+    expect(screen.getAllByTestId(/^bookmark-/).length).toBeGreaterThan(1);
     type('Search bookmarks', 'zzz-no-match');
-    expect(screen.queryAllByRole('button', { name: 'Delete' })).toHaveLength(0);
+    expect(screen.queryAllByTestId(/^bookmark-/)).toHaveLength(0);
+    expect(screen.getByText('No bookmarks match.')).toBeTruthy();
     type('Search bookmarks', '');
     type('Bookmark URL', 'https://new.example.org/');
     press('Add bookmark');
     expect(onWrite.mock.calls[0]?.[1]).toContain('https://new.example.org/');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Delete' })[0] as HTMLElement);
-    expect(onWrite).toHaveBeenCalledTimes(2);
+    // Delete lives in the long-press menu; see dashboard-tiles.test.tsx.
+    expect(onWrite).toHaveBeenCalledTimes(1);
   });
 
   it('budget, stocks, consumption and data collection show their figures', () => {
     renderTile('budget');
-    expect(screen.getByText(/^Income /)).toBeTruthy();
+    expect(screen.getByText('Income')).toBeTruthy();
     cleanup();
     renderTile('stocks');
-    expect(screen.getByText(/^Profit /)).toBeTruthy();
+    expect(screen.getByText('Profit')).toBeTruthy();
     cleanup();
     renderTile('consumption');
-    expect(screen.getAllByText(/:.*\d/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^\d+\.\d\d \S+/).length).toBeGreaterThan(0);
     cleanup();
     renderTile('datacollection');
     expect(screen.getByText(/rows$/)).toBeTruthy();
@@ -204,16 +205,19 @@ describe('tiles', () => {
 
   it('prompts and commands interpolate parameters', () => {
     renderTile('prompts');
+    press('Greet');
     type('Greet: name', 'Kai');
     expect(screen.getByTestId('preview-Greet').textContent).toBe('Hello Kai, welcome');
     cleanup();
     const { onWrite } = renderTile('commands');
+    press('Deploy');
     expect(screen.getByText('Missing: env')).toBeTruthy();
     type('Deploy: env', 'prod');
     expect(screen.getByTestId('preview-Deploy').textContent).toBe('deploy --env prod');
+    press('Add command');
     type('New command title', 'Ls');
     type('New command text', 'ls -la');
-    press('Add command');
+    press('Save command');
     expect(onWrite.mock.calls[0]?.[1]).toContain('ls -la');
   });
 });
@@ -266,11 +270,11 @@ describe('IdeasView', () => {
     const { map, controller } = setup();
     render(<IdeasView controller={controller} />);
     await screen.findByText('Alpha');
+    press('New idea');
     type('New idea title', 'Beta');
     press('Create idea');
     await waitFor(() => expect(map.has('.kh/ideas/beta.md')).toBe(true));
   });
-    press('New idea');
 });
 
 describe('WikiView', () => {

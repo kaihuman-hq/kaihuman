@@ -9,6 +9,8 @@ export default function Dashboard() {
   const [tiles, setTiles] = useState<TileFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => new Date());
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     await githubContentFiles.refresh();
@@ -30,11 +32,23 @@ export default function Dashboard() {
     setNow(new Date());
   }, []);
 
-  useEffect(() => {
-    load()
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const run = useCallback(async () => {
+    try {
+      await load();
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Check your connection and try again.');
+    }
   }, [load]);
+
+  useEffect(() => {
+    run().finally(() => setLoading(false));
+  }, [run]);
+
+  const refresh = useCallback(() => {
+    setRefreshing(true);
+    run().finally(() => setRefreshing(false));
+  }, [run]);
 
   return (
     <>
@@ -43,6 +57,9 @@ export default function Dashboard() {
         tiles={tiles}
         now={now}
         loading={loading}
+        refreshing={refreshing}
+        error={error}
+        onRefresh={refresh}
         onNavigate={(href) => router.push(href)}
         onWrite={async (path, content) => {
           await githubContentFiles.write(path, content);
