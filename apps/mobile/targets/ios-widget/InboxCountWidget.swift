@@ -45,7 +45,7 @@ struct InboxCountContent: View {
             if todos + notes == 0 {
                 Text("\(Image(systemName: "tray")) Inbox zero")
             } else {
-                Text("\(Image(systemName: "tray")) \(todos) todos · \(notes) notes")
+                Text("\(Image(systemName: "tray")) \(todos) \(todos == 1 ? "todo" : "todos") · \(notes) \(notes == 1 ? "note" : "notes")")
             }
         }
     }
