@@ -139,10 +139,17 @@ describe('WikiView reader', () => {
       '.kh/wiki/clients.md': '# Clients\n\n## Active\n- Working with [[Other]]\n',
       '.kh/wiki/other.md': '---\ntitle: Other\n---\nBack.',
     }).files;
+    const onTitle = vi.fn();
     render(
-      <WikiPageView controller={new WikiScreenController({ files })} path=".kh/wiki/clients.md" />,
+      <WikiPageView
+        controller={new WikiScreenController({ files })}
+        path=".kh/wiki/clients.md"
+        onTitle={onTitle}
+      />,
     );
     expect(await screen.findByRole('heading', { name: 'Clients' })).toBeTruthy();
+    // The native header must match the body title, not the lower-case file name.
+    expect(onTitle).toHaveBeenCalledWith('Clients');
     expect(screen.getByRole('heading', { name: 'Active' })).toBeTruthy();
     const body = screen.getByTestId('wiki-page').textContent ?? '';
     expect(body).not.toContain('#');

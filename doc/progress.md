@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-11-06 — Mobile: swipe actions, pushed detail screens, GitHub mark, demo done dates
+
+- Added `react-native-gesture-handler`, `react-native-reanimated`, `react-native-worklets` and `react-native-svg` at the SDK 58 versions.
+- `ListRow` reveals `swipeActions` with `ReanimatedSwipeable` (iOS full-height buttons, Android tonal, destructive outermost, `side: 'leading' | 'trailing'`), with haptics. Long press keeps the action sheet; each action is also an `accessibilityAction`. `GestureRoot` wraps the root layout. Todos: Done, Start/Backlog/Reject, Delete (`KanbanBoardController.remove`). Ideas: status changes, Delete (`IdeasScreenController.remove`). Knowledge inbox: Archive, Delete.
+- Idea detail (`app/(tabs)/ideas/[slug].tsx`) and wiki page (`app/wiki/[...page].tsx`; `wiki.tsx` moved to `wiki/index.tsx`) are pushed stack screens with the native header and back button; the header title matches the page title.
+- Web preview: pushed screens get a back control (`webBackOptions`); native is unchanged.
+- The sign-in button shows the official GitHub mark (`GithubMark`, coloured with the label via the new `Button` `leading` prop).
+- Demo seed: done todos carry `::updated::` dates over the last ~7 weeks, so the weekly-done bars show data.
+- Regenerated `apps/mobile/docs/screens.png`.
+
 ## 2026-11-06 — Mobile: iOS widget concepts
 
 - New `doc/mobile-widgets.md`: ten ranked iOS widget concepts (families, interactions, data, effort), a v1 set (Next up, Quick capture + Control Center controls, Weekly done ring, Inbox, App Shortcuts) and a v2 set, refresh/offline/Lock Screen privacy rules, and the additive `widget-sync` snapshot changes (`schemaVersion: 2`, stats, milestones, knowledge inbox, local time zone).

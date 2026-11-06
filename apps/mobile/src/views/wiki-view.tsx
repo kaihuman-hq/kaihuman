@@ -158,7 +158,10 @@ export function WikiPageView({
   }, [load]);
 
   const page = controller.page(path);
-  const pageTitle = page?.title;
+  // The header shows the same title as the page body, which prefers the H1's capitalisation.
+  const pageTitle = page
+    ? withoutTitleHeading(page.title, wikiBlocks(controller.render(path))).title
+    : undefined;
   useEffect(() => {
     if (pageTitle) onTitle?.(pageTitle);
   }, [pageTitle, onTitle]);

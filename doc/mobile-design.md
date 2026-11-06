@@ -255,7 +255,8 @@ Unchanged: `kaihuman://board`, `kaihuman://quick-todo|note|log|idea|knowledge`, 
 
 - Native-stack headers with large titles on tab roots (§7.4).
 - Lists are inset grouped: 16 pt margin, `md` (10) radius, hairline separators inset by `separatorInset`. Settings-style coloured icon tiles lead rows where a row has a category icon.
-- Row actions: current implementation uses a long-press action sheet. Upgrade path: `react-native-gesture-handler` `Swipeable` for swipe actions and a native context menu for long press.
+- Row actions: `ListRow` `swipeActions` reveal with `ReanimatedSwipeable` (react-native-gesture-handler). Full-height solid buttons, first action `accentFill`, destructive red and outermost. Leading edge for the positive action (todo Done, knowledge Archive), trailing for the rest. Haptics: `selection` on open, `success`/`warning` on trigger. Long press keeps the action sheet, and every action is also an `accessibilityAction`. `GestureRoot` wraps the root layout.
+- Detail screens are pushed (idea: `app/(tabs)/ideas/[slug].tsx`; wiki page: `app/wiki/[...page].tsx`) with the native back button and an inline title. Large titles stay on list screens only.
 - Sheets for capture (§7.3). No FAB.
 - Haptics: `selection` on segmented control and tab changes. `impact` light on primary actions. `notification` success or error after save or failure.
 - SF Symbols for all icons. Pressed state is an opacity change, not a colour change.
@@ -271,6 +272,7 @@ Unchanged: `kaihuman://board`, `kaihuman://quick-todo|note|log|idea|knowledge`, 
 - Edge-to-edge: content draws behind the status and navigation bars and is padded with safe-area insets.
 - Bottom navigation bar with pill indicator (`NativeTabs`).
 - Lists are full width without cards. Rows are 56 dp.
+- Swipe actions use tonal buttons (`accentSoft`/`onAccentSoft`, destructive `danger`) revealed behind the row; long press and `accessibilityActions` as on iOS.
 
 ## 9. Light and dark
 
@@ -324,18 +326,20 @@ Legacy `src/views/primitives.tsx` and `src/theme/tokens.ts` were deleted on 2026
   - Pixel 8: 412 × 915
   - Light and dark: emulate `colorScheme` in Playwright
 - Each restyled screen gets one screenshot per platform and scheme (8 images). Check there is no horizontal page scroll at phone width.
+- Pushed screens get a web-only header back control (`webBackOptions` in `src/navigation/web-back-button.tsx`): history back, or `replace` to the parent after a deep link. Native headers are untouched.
+- Swipe gestures are native-only; on web rows fall back to the long-press menu.
 
 ## 13. Screen restyle checklist
 
 Follow-up session. One bullet per screen. Each screen uses only `src/ui/` primitives and `useTheme()`, and passes §10 and §4.3 at 200% text.
 
-- **Login** (`app/login.tsx`, `src/views/login-view.tsx`): no header. Logo, one filled `Button` for GitHub sign-in, one line of helper text.
+- **Login** (`app/login.tsx`, `src/views/login-view.tsx`): no header. Logo, one filled `Button` for GitHub sign-in (official GitHub mark via `react-native-svg`, `GithubMark`, coloured with the label), one line of helper text.
 - **Dashboard** (`app/dashboard.tsx`, `src/views/dashboard-view.tsx`, `tile-view.tsx`): Today tab. Tiles become `Card` and `StatTile`. Numbers in mono.
 - **Board** (`app/board.tsx`, `src/views/kanban-view.tsx`): Board tab. Large title, `SegmentedControl` for status filter, `Chip` for tags, FAB on Android.
 - **Capture** (new `app/(tabs)/(capture)/capture.tsx`): Launcher `Section` with five `ListRow`s (Todo, Note, Log, Idea, Knowledge), each pushing its `quick-*` sheet.
-- **Ideas** (`app/ideas.tsx`, `src/views/ideas-view.tsx`): Ideas tab. `ListRow` list, `EmptyState`, FAB on Android.
+- **Ideas** (`app/(tabs)/ideas/index.tsx`, detail `app/(tabs)/ideas/[slug].tsx`, `src/views/ideas-view.tsx`): Ideas tab; detail is pushed. `ListRow` list, `EmptyState`, FAB on Android.
 - **Analytics** (`app/analytics.tsx`, `src/views/todo-analytics-view.tsx`): Pushed detail. `StatTile` row for velocity and totals, mono numbers, no coloured chart without a label.
-- **Wiki** (`app/wiki.tsx`, `src/views/wiki-view.tsx`): Pushed detail. `[[wikilinks]]` styled with `accent`, backlinks in a `Section`.
+- **Wiki** (`app/wiki/index.tsx`, page `app/wiki/[...page].tsx`, `src/views/wiki-view.tsx`): Pushed list; each page is pushed again. `[[wikilinks]]` styled with `accent`, backlinks in a `Section`.
 - **Knowledge** (`app/knowledge.tsx`, `src/views/knowledge-view.tsx`): Pushed detail. Inbox as `ListRow`s with `Badge` counts.
 - **Files** (`app/files/index.tsx`): Pushed detail. Tree as `ListRow`s with `folder` and `files` icons, paths in mono.
 - **File editor** (`app/files/[...path].tsx`, `src/views/file-editor-view.tsx`): Pushed detail. Monospace editor body, `Button` for save, error haptic on failed save. `.enc` passphrase prompt as a `TextField` in a sheet.
