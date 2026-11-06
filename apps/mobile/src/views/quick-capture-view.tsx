@@ -1,46 +1,109 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { View } from 'react-native';
 import type { QuickKind } from '../navigation/routes.js';
 import type { QuickCaptureController } from '../screens/quick-capture.js';
-import { Body, Button, Field, Muted, Screen, Title } from './primitives.js';
+import { useTheme } from '../theme/theme.js';
+import { Button, haptics, Icon, Screen, Text, TextField } from '../ui/index.js';
 
-const TITLES: Record<QuickKind, string> = {
-  todo: 'Quick todo',
-  note: 'Quick note',
-  log: 'Quick log',
-  idea: 'Quick idea',
-  knowledge: 'Quick knowledge',
+export const CAPTURE_TITLES: Record<QuickKind, string> = {
+  todo: 'New todo',
+  note: 'New note',
+  log: 'New log entry',
+  idea: 'New idea',
+  knowledge: 'New knowledge',
+};
+
+interface KindCopy {
+  label: string;
+  placeholder: string;
+  multiline: boolean;
+  extra?: { label: string; placeholder: string; helper: string };
+}
+
+const COPY: Record<QuickKind, KindCopy> = {
+  todo: {
+    label: 'Todo',
+    placeholder: 'What needs doing?',
+    multiline: false,
+    extra: { label: 'Tags', placeholder: 'work, home', helper: 'Separate tags with commas.' },
+  },
+  note: { label: 'Note', placeholder: 'Write something down', multiline: true },
+  log: {
+    label: 'Log entry',
+    placeholder: 'What did you do?',
+    multiline: false,
+    extra: { label: 'Tags', placeholder: 'focus, review', helper: 'Separate tags with commas.' },
+  },
+  idea: {
+    label: 'Idea',
+    placeholder: 'First line is the title, the rest is the braindump',
+    multiline: true,
+    extra: {
+      label: 'Slug',
+      placeholder: 'optional-file-name',
+      helper: 'Leave empty to derive it from the title.',
+    },
+  },
+  knowledge: {
+    label: 'Source',
+    placeholder: 'Paste a fact, quote or link',
+    multiline: true,
+    extra: {
+      label: 'Title',
+      placeholder: 'Optional',
+      helper: 'Defaults to the first line.',
+    },
+  },
 };
 
 type Status = { ok: boolean; text: string } | null;
 
+/** What the header needs to render the primary action when the view does not draw its own button. */
+export interface CaptureHeaderState {
+  canSubmit: boolean;
+  busy: boolean;
+  submit: () => void;
+}
+
+const DISMISS_DELAY_MS = 800;
+
 export function QuickCaptureView({
   controller,
   kind,
+  onDone,
+  headerAction,
+  onHeaderState,
 }: {
   controller: QuickCaptureController;
   kind: QuickKind;
+  /** Called shortly after a successful save so the sheet can dismiss. */
+  onDone?: () => void;
+  /** True when the header owns the primary action; the view then draws no button. */
+  headerAction?: boolean;
+  onHeaderState?: (state: CaptureHeaderState) => void;
 }) {
+  const { spacing, colors } = useTheme();
   const [text, setText] = useState('');
   const [extra, setExtra] = useState('');
   const [status, setStatus] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const copy = COPY[kind];
 
-  // Todo/log take tags; knowledge takes a title; idea takes a slug.
-  const extraLabel = { todo: 'Tags', log: 'Tags', knowledge: 'Title', idea: 'Slug' }[
-    kind as string
-  ];
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   const submit = async () => {
+    if (busy) return;
+    haptics.light();
     setBusy(true);
+    let result: Status;
     try {
       const value = extra.trim() || undefined;
       if (kind === 'idea') {
         const res = await controller.quickIdea(text, value ? { slug: value } : {});
-        setStatus(
-          res.ok
-            ? { ok: true, text: `Saved ${res.results.map((r) => r.path).join(', ')}` }
-            : { ok: false, text: res.error },
-        );
+        result = res.ok
+          ? { ok: true, text: `Saved ${res.results.map((r) => r.path).join(', ')}` }
+          : { ok: false, text: res.error };
       } else {
         const res =
           kind === 'todo'
@@ -50,36 +113,94 @@ export function QuickCaptureView({
               : kind === 'knowledge'
                 ? await controller.quickKnowledge(text, value)
                 : await controller.quickNote(text);
-        setStatus(res.ok ? { ok: true, text: res.message } : { ok: false, text: res.error });
-        if (res.ok) {
-          setText('');
-          setExtra('');
-        }
+        result = res.ok ? { ok: true, text: res.message } : { ok: false, text: res.error };
       }
+    } catch (err) {
+      result = { ok: false, text: err instanceof Error ? err.message : String(err) };
     } finally {
       setBusy(false);
     }
+    setStatus(result);
+    if (result.ok) {
+      haptics.success();
+      setText('');
+      setExtra('');
+      if (onDone) timer.current = setTimeout(onDone, DISMISS_DELAY_MS);
+    } else {
+      haptics.error();
+    }
   };
 
+  const canSubmit = text.trim().length > 0;
+  const run = () => void submit();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `run` closes over the fields tracked below
+  useEffect(() => {
+    onHeaderState?.({ canSubmit, busy, submit: run });
+  }, [canSubmit, busy, text, extra, onHeaderState]);
+
+  const clearStatus = () => setStatus(null);
+
   return (
-    <Screen scroll>
-      <Title>{TITLES[kind]}</Title>
-      <Field
-        label="Text"
+    <Screen
+      title={CAPTURE_TITLES[kind]}
+      keyboard
+      footer={
+        headerAction ? undefined : (
+          <Button
+            label={busy ? 'Saving' : 'Save'}
+            testID="capture-submit"
+            loading={busy}
+            fullWidth
+            onPress={run}
+          />
+        )
+      }
+    >
+      <TextField
+        label={copy.label}
         value={text}
-        onChangeText={setText}
-        multiline={kind !== 'todo' && kind !== 'log'}
+        onChangeText={(v) => {
+          setText(v);
+          if (status) clearStatus();
+        }}
+        placeholder={copy.placeholder}
+        autoCapitalize="sentences"
+        multiline={copy.multiline}
+        returnKeyType={copy.multiline ? 'default' : copy.extra ? 'next' : 'done'}
+        onSubmitEditing={copy.multiline || copy.extra ? undefined : run}
         testID="capture-text"
       />
-      {extraLabel ? (
-        <Field label={extraLabel} value={extra} onChangeText={setExtra} testID="capture-extra" />
+      {copy.extra ? (
+        <TextField
+          label={copy.extra.label}
+          value={extra}
+          onChangeText={setExtra}
+          placeholder={copy.extra.placeholder}
+          helper={copy.extra.helper}
+          autoCapitalize={kind === 'knowledge' ? 'sentences' : 'none'}
+          returnKeyType="done"
+          onSubmitEditing={run}
+          testID="capture-extra"
+        />
       ) : null}
-      <Button label="Save" testID="capture-submit" disabled={busy} onPress={() => void submit()} />
       {status ? (
-        <Body>{status.ok ? status.text : `Error: ${status.text}`}</Body>
-      ) : (
-        <Muted>Saved to your repository</Muted>
-      )}
+        <View
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}
+        >
+          <Icon
+            name={status.ok ? 'check' : 'warning'}
+            size={18}
+            color={status.ok ? colors.success : colors.danger}
+          />
+          <View style={{ flex: 1 }}>
+            <Text variant="subheadline" tone={status.ok ? 'success' : 'danger'}>
+              {status.ok ? status.text : `Error: ${status.text}`}
+            </Text>
+          </View>
+        </View>
+      ) : null}
     </Screen>
   );
 }

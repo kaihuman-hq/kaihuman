@@ -3,50 +3,49 @@ import { useTheme } from '../theme/theme.js';
 import type { IconName } from '../ui/index.js';
 import { haptics, ListRow, Screen, Section } from '../ui/index.js';
 
+type TileTone = 'accentFill' | 'warning' | 'info' | 'success' | 'secondaryLabel';
+
 interface CaptureOption {
   kind: QuickKind;
   title: string;
   subtitle: string;
   icon: IconName;
-  /** iOS tile fill; undefined falls back to the brand fill. */
-  tile?: string;
-  glyph?: string;
+  tile: TileTone;
 }
 
 const OPTIONS: readonly CaptureOption[] = [
-  { kind: 'todo', title: 'Todo', subtitle: 'Add to your todo list', icon: 'todo' },
-  { kind: 'note', title: 'Note', subtitle: 'Jot something down', icon: 'note', tile: '#FF9F0A' },
   {
-    kind: 'log',
-    title: 'Log',
-    subtitle: 'Timestamped journal entry',
-    icon: 'log',
-    tile: '#5E5CE6',
+    kind: 'todo',
+    title: 'Todo',
+    subtitle: 'Add to your todo list',
+    icon: 'todo',
+    tile: 'accentFill',
   },
+  { kind: 'note', title: 'Note', subtitle: 'Jot something down', icon: 'note', tile: 'warning' },
+  { kind: 'log', title: 'Log', subtitle: 'Timestamped journal entry', icon: 'log', tile: 'info' },
   {
     kind: 'idea',
     title: 'Idea',
     subtitle: 'Park an idea for later',
     icon: 'ideas',
-    tile: '#FFD60A',
-    glyph: '#1C1C1E',
+    tile: 'success',
   },
   {
     kind: 'knowledge',
     title: 'Knowledge',
     subtitle: 'Save a fact or link',
     icon: 'knowledge',
-    tile: '#30B0C7',
+    tile: 'secondaryLabel',
   },
 ];
 
 export function CaptureHubView({ onSelect }: { onSelect: (kind: QuickKind) => void }) {
   const { colors, platform } = useTheme();
-  // Android ignores the tile and keeps a neutral glyph, so a custom glyph colour would vanish there.
+  // Android rows show a plain tinted glyph instead of a tile, so the tile colours only apply on iOS.
   const ios = platform === 'ios';
   return (
     <Screen title="Capture">
-      <Section header="New">
+      <Section footer="Everything you capture is saved to your repository.">
         {OPTIONS.map((o) => (
           <ListRow
             key={o.kind}
@@ -54,8 +53,11 @@ export function CaptureHubView({ onSelect }: { onSelect: (kind: QuickKind) => vo
             title={o.title}
             subtitle={o.subtitle}
             icon={o.icon}
-            iconBackground={o.tile ?? colors.accentFill}
-            iconColor={ios ? (o.glyph ?? (o.tile ? '#FFFFFF' : colors.onAccentFill)) : undefined}
+            iconBackground={colors[o.tile]}
+            // Dark glyph on the bright tiles in dark mode, light-surface glyph in light mode.
+            iconColor={
+              ios ? (o.tile === 'accentFill' ? colors.onAccentFill : colors.background) : undefined
+            }
             accessory="chevron"
             onPress={() => {
               haptics.selection();

@@ -34,6 +34,7 @@ describe('LoginView', () => {
     const onSignedIn = vi.fn();
     const controller = new LoginScreenController('https://auth.example/login');
     render(<LoginView controller={controller} onOpenBrowser={vi.fn()} onSignedIn={onSignedIn} />);
+    fireEvent.click(screen.getByTestId('login-token-toggle'));
     fireEvent.click(screen.getByTestId('login-token-submit'));
     expect(onSignedIn).not.toHaveBeenCalled();
     expect(screen.getByText('Enter a personal access token')).toBeTruthy();
@@ -80,7 +81,7 @@ describe('QuickCaptureView', () => {
   it('writes a todo through the controller and shows the result', async () => {
     const files = new MemoryFiles();
     render(<QuickCaptureView controller={new QuickCaptureController(files)} kind="todo" />);
-    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'buy milk' } });
+    fireEvent.change(screen.getByLabelText('Todo'), { target: { value: 'buy milk' } });
     fireEvent.click(screen.getByTestId('capture-submit'));
     await waitFor(() => expect(screen.getByText('Todo added')).toBeTruthy());
     expect(parseTodos(files.store.get('.kh/inbox.todos.md') ?? '').items[0]?.text).toBe('buy milk');
