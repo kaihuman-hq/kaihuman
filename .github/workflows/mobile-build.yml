@@ -108,6 +108,20 @@ jobs:
           name: kaihuman-android-debug
           path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
 
+      # Snapshot parsing, widget logic, focus notification, and the Robolectric widget renders.
+      - name: Kotlin unit tests and widget previews
+        working-directory: apps/mobile/android
+        env:
+          KH_WIDGET_PREVIEW_DIR: ${{ github.workspace }}/widget-renders-android
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: widget-renders-android
+          path: widget-renders-android/*.png
+          if-no-files-found: ignore
+
   ios:
     # Draft PRs don't run CI; marking the PR ready for review triggers it.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
