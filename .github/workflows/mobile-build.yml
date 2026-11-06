@@ -151,3 +151,12 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO
+
+      # Renders every widget view variant with ImageRenderer (outside WidgetKit) for visual review.
+      - name: Render widget previews
+        run: apps/mobile/targets/ios-widget-render/render.sh widget-renders
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: widget-renders
+          path: widget-renders/*.png
