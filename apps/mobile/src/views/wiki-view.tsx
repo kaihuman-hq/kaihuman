@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Text as RNText, ScrollView, View } from 'react-native';
-import type { WikiScreenController } from '../screens/wiki-screen.js';
-import { useTheme } from '../theme/theme.js';
+import type { WikiScreenController, WikiSegment } from '../screens/wiki-screen.js';
+import { type TextVariant, useTheme } from '../theme/theme.js';
 import {
-  Button,
+  BackButton,
   Chip,
   EmptyState,
   haptics,
@@ -13,9 +13,108 @@ import {
   Text,
   TextField,
 } from '../ui/index.js';
+import { type WikiBlock, wikiBlocks, withoutTitleHeading } from './wiki-blocks.js';
 
-// The reader shows the body; frontmatter is metadata already surfaced as title and tags.
-const FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/;
+const HEADING_VARIANT: Record<1 | 2 | 3, TextVariant> = { 1: 'title2', 2: 'title3', 3: 'headline' };
+
+/** Inline runs of one block: text plus tappable `[[wikilinks]]` in accent. */
+function Inlines({
+  inlines,
+  onOpen,
+}: {
+  inlines: readonly WikiSegment[];
+  onOpen: (path: string) => void;
+}) {
+  const { colors } = useTheme();
+  return inlines.map((seg, i) => {
+    if (seg.type === 'text')
+      // biome-ignore lint/suspicious/noArrayIndexKey: inlines are positional and static
+      return <RNText key={i}>{seg.text}</RNText>;
+    const target = seg.path;
+    return target ? (
+      <RNText
+        // biome-ignore lint/suspicious/noArrayIndexKey: inlines are positional and static
+        key={i}
+        accessibilityRole="link"
+        onPress={() => {
+          haptics.selection();
+          onOpen(target);
+        }}
+        style={{ color: colors.accent, fontWeight: '600' }}
+      >
+        {seg.label}
+      </RNText>
+    ) : (
+      // biome-ignore lint/suspicious/noArrayIndexKey: inlines are positional and static
+      <RNText key={i} style={{ color: colors.secondaryLabel }}>
+        {seg.label}
+      </RNText>
+    );
+  });
+}
+
+function WikiBlockView({ block, onOpen }: { block: WikiBlock; onOpen: (path: string) => void }) {
+  const theme = useTheme();
+  const { colors, spacing, shape } = theme;
+  // Generous leading keeps long pages comfortable to read.
+  const reading = { lineHeight: Math.round(theme.type.body.fontSize * 1.45) };
+  switch (block.kind) {
+    case 'heading':
+      return (
+        <Text
+          variant={HEADING_VARIANT[block.level]}
+          accessibilityRole="header"
+          style={{ paddingTop: block.level === 3 ? spacing.xs : spacing.sm }}
+        >
+          <Inlines inlines={block.inlines} onOpen={onOpen} />
+        </Text>
+      );
+    case 'bullet':
+      return (
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: spacing.sm,
+            paddingLeft: spacing.xs + block.depth * spacing.lg,
+            marginTop: -spacing.xs,
+          }}
+        >
+          <Text tone="secondary" style={[reading, { minWidth: spacing.md }]}>
+            {block.marker}
+          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={reading}>
+              <Inlines inlines={block.inlines} onOpen={onOpen} />
+            </Text>
+          </View>
+        </View>
+      );
+    case 'quote':
+      return (
+        <View
+          style={{ borderLeftWidth: 3, borderLeftColor: colors.separator, paddingLeft: spacing.md }}
+        >
+          <Text tone="secondary" style={reading}>
+            <Inlines inlines={block.inlines} onOpen={onOpen} />
+          </Text>
+        </View>
+      );
+    case 'code':
+      return (
+        <View style={{ backgroundColor: colors.fill, borderRadius: shape.sm, padding: spacing.md }}>
+          <Text variant="footnote" mono>
+            {block.text}
+          </Text>
+        </View>
+      );
+    default:
+      return (
+        <Text style={reading}>
+          <Inlines inlines={block.inlines} onOpen={onOpen} />
+        </Text>
+      );
+  }
+}
 
 export function WikiView({
   controller,
@@ -26,10 +125,6 @@ export function WikiView({
 }) {
   const theme = useTheme();
   const { colors, spacing } = theme;
-  const ios = theme.platform === 'ios';
-  const tile = ios
-    ? { iconBackground: colors.accentFill, iconColor: colors.onAccentFill }
-    : { iconColor: colors.accent };
   const [, setRev] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,21 +158,14 @@ export function WikiView({
   const page = path ? controller.page(path) : undefined;
 
   if (page && path) {
-    const segments = controller.render(path);
+    const { title, blocks } = withoutTitleHeading(page.title, wikiBlocks(controller.render(path)));
     const backlinks = controller.backlinks(path);
-    const body = theme.type.body;
     return (
       <Screen refreshing={refreshing} onRefresh={refresh}>
-        <Button
-          label="All pages"
-          variant="plain"
-          size="medium"
-          accessibilityLabel="Back to all pages"
-          onPress={() => setPath(null)}
-        />
+        <BackButton label="Wiki" onPress={() => setPath(null)} />
         <View style={{ gap: spacing.sm, paddingHorizontal: spacing.xs }}>
           <Text variant="title1" accessibilityRole="header">
-            {page.title}
+            {title}
           </Text>
           {page.tags.length > 0 ? (
             <Text variant="footnote" tone="secondary">
@@ -85,46 +173,11 @@ export function WikiView({
             </Text>
           ) : null}
         </View>
-        <View testID="wiki-page" style={{ paddingHorizontal: spacing.xs, paddingTop: spacing.sm }}>
-          <RNText
-            selectable
-            style={{
-              ...body,
-              // Generous leading and a capped measure keep long pages comfortable to read.
-              lineHeight: Math.round((body.fontSize ?? 17) * 1.5),
-              color: colors.label,
-              fontFamily: theme.fontFamily.system,
-            }}
-          >
-            {segments.map((seg, i) => {
-              if (seg.type === 'text')
-                return (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: segments are positional and static
-                  <RNText key={i}>
-                    {i === 0 ? seg.text.replace(FRONTMATTER, '').trimStart() : seg.text}
-                  </RNText>
-                );
-              return seg.path ? (
-                <RNText
-                  // biome-ignore lint/suspicious/noArrayIndexKey: segments are positional and static
-                  key={i}
-                  accessibilityRole="link"
-                  onPress={() => {
-                    haptics.selection();
-                    if (seg.path) setPath(seg.path);
-                  }}
-                  style={{ color: colors.accent, fontWeight: '600' }}
-                >
-                  {seg.label}
-                </RNText>
-              ) : (
-                // biome-ignore lint/suspicious/noArrayIndexKey: segments are positional and static
-                <RNText key={i} style={{ color: colors.secondaryLabel }}>
-                  {seg.label}
-                </RNText>
-              );
-            })}
-          </RNText>
+        <View testID="wiki-page" style={{ paddingHorizontal: spacing.xs, gap: spacing.md }}>
+          {blocks.map((block, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: blocks are positional and static
+            <WikiBlockView key={i} block={block} onOpen={setPath} />
+          ))}
         </View>
         {backlinks.length > 0 ? (
           <Section header="Linked from">
@@ -133,7 +186,7 @@ export function WikiView({
                 key={b.path}
                 title={b.title}
                 icon="wiki"
-                {...tile}
+                iconTone="accent"
                 accessory="chevron"
                 onPress={() => setPath(b.path)}
               />
@@ -205,7 +258,7 @@ export function WikiView({
           icon="warning"
           title="Couldn't load the wiki"
           message={error}
-          action={{ label: 'Retry', onPress: () => void load() }}
+          action={{ label: 'Try again', onPress: () => void load() }}
         />
       ) : pages.length === 0 ? (
         q || tag ? (
@@ -225,7 +278,7 @@ export function WikiView({
               title={p.title}
               subtitle={p.tags.length ? p.tags.map((t) => `#${t}`).join('  ') : undefined}
               icon="wiki"
-              {...tile}
+              iconTone="accent"
               accessory="chevron"
               onPress={() => setPath(p.path)}
             />

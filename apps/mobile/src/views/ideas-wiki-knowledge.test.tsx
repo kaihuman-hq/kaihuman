@@ -57,13 +57,13 @@ describe('IdeasView states', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^Alpha/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Shipped' }));
     await waitFor(() => expect(map.get('.kh/ideas/alpha.md')).toContain('status: shipped'));
-    fireEvent.click(screen.getByRole('button', { name: 'Back to all ideas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back to ideas' }));
   });
 
   it('shows an error state with retry when loading fails', async () => {
     render(<IdeasView controller={new IdeasScreenController({ files: failing() })} />);
     expect(await screen.findByText("Couldn't load ideas")).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
   });
 
   it('shows the first-run empty state', async () => {
@@ -83,8 +83,24 @@ describe('WikiView reader', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^Home/ }));
     const body = screen.getByTestId('wiki-page').textContent ?? '';
     expect(body).toBe('See Other.');
-    fireEvent.click(screen.getByRole('button', { name: 'Back to all pages' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back to wiki' }));
     expect(await screen.findByRole('button', { name: /^Other/ })).toBeTruthy();
+  });
+
+  it('renders Markdown headings and bullets with links still tappable', async () => {
+    const files = memory({
+      '.kh/wiki/clients.md': '# Clients\n\n## Active\n- Working with [[Other]]\n',
+      '.kh/wiki/other.md': '---\ntitle: Other\n---\nBack.',
+    }).files;
+    render(<WikiView controller={new WikiScreenController({ files })} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^clients/i }));
+    expect(screen.getByRole('heading', { name: 'Clients' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Active' })).toBeTruthy();
+    const body = screen.getByTestId('wiki-page').textContent ?? '';
+    expect(body).not.toContain('#');
+    expect(body).toContain('•');
+    fireEvent.click(screen.getByRole('link', { name: 'Other' }));
+    expect(await screen.findByRole('heading', { name: 'Other' })).toBeTruthy();
   });
 
   it('searches and filters by tag', async () => {

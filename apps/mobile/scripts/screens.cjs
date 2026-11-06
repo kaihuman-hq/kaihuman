@@ -1,5 +1,7 @@
 // Web-preview screenshots: node scripts/screens.cjs [outDir] [route,...]
 // Serves dist/ (SPA fallback), enters demo mode, then visits each route on iPhone 15 Pro and Pixel 8 in light + dark.
+// `route@Text` clicks the first element showing Text after load (detail views that live inside one route).
+// FULLPAGE=1 captures the whole scrollable content instead of one viewport.
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -18,7 +20,10 @@ const ALL = [
   '/wiki',
   '/knowledge',
   '/files',
+  '/files/notes/welcome.md',
   '/repos',
+  '/ideas@Weekly review template',
+  '/wiki@clients',
   '/quick-todo',
   '/quick-note',
   '/quick-log',
@@ -67,24 +72,49 @@ const devices = [
       });
       const page = await ctx.newPage();
       page.on('pageerror', (e) => errors.push(`${d.name}/${scheme}: ${e.message}`));
-      for (const route of routes) {
+      for (const entry of routes) {
+        const [route, clickText] = entry.split('@');
         if (route === '/login') await page.goto(`${base}/login${d.qs}`);
         else {
           await page.goto(`${base}/demo${d.qs}`);
-          await page.waitForTimeout(600);
-          if (route !== '/dashboard') {
-            await page.evaluate((r) => {
-              history.pushState({}, '', r);
-              dispatchEvent(new PopStateEvent('popstate'));
-            }, route + d.qs);
-          }
+          await page.waitForTimeout(1500); // demo seeding and the first dashboard load settle
+          await page.evaluate((r) => {
+            history.pushState({}, '', r);
+            dispatchEvent(new PopStateEvent('popstate'));
+          }, route + d.qs);
         }
         await page.waitForTimeout(900);
+        if (clickText) {
+          await page
+            .getByText(clickText, { exact: true })
+            .first()
+            .click({ timeout: 5000 })
+            .catch(() => errors.push(`${d.name}/${scheme}${entry}: nothing to click`));
+          await page.waitForTimeout(600);
+        }
+        if (process.env.FULLPAGE) {
+          await page.waitForTimeout(1500); // let async content (tiles) finish before measuring
+          // RN-web scrolls inside a ScrollView, not the document: grow the viewport to fit it.
+          const h = await page.evaluate(() =>
+            Math.max(
+              innerHeight,
+              ...[...document.querySelectorAll('div')]
+                .filter(
+                  (el) =>
+                    el.scrollHeight > el.clientHeight + 4 &&
+                    getComputedStyle(el).overflowY !== 'visible',
+                )
+                .map((el) => el.scrollHeight + (innerHeight - el.clientHeight)),
+            ),
+          );
+          await page.setViewportSize({ width: d.viewport.width, height: Math.min(h, 6000) });
+          await page.waitForTimeout(300);
+        }
         const sw = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
-        if (sw) errors.push(`${d.name}/${scheme}${route}: horizontal scroll`);
-        await page.screenshot({
-          path: path.join(out, `${d.name}-${scheme}-${route.slice(1).replace(/\//g, '_')}.png`),
-        });
+        if (sw) errors.push(`${d.name}/${scheme}${entry}: horizontal scroll`);
+        const name = (route.slice(1) + (clickText ? '-detail' : '')).replace(/[/.]/g, '_');
+        await page.screenshot({ path: path.join(out, `${d.name}-${scheme}-${name}.png`) });
+        if (process.env.FULLPAGE) await page.setViewportSize(d.viewport);
       }
       await ctx.close();
     }

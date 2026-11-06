@@ -41,13 +41,22 @@ export function Button({
   // Small buttons stay visually compact but keep a full-size touch target.
   const slop = Math.max(0, (metrics.hitTarget - height) / 2);
 
-  const palette = {
+  const enabledPalette = {
     filled: { bg: colors.accentFill, fg: colors.onAccentFill, border: undefined },
     tinted: { bg: colors.accentSoft, fg: colors.onAccentSoft, border: undefined },
     plain: { bg: 'transparent', fg: colors.accent, border: undefined },
     outlined: { bg: 'transparent', fg: colors.accent, border: colors.separator },
-    destructive: { bg: colors.danger, fg: '#FFFFFF', border: undefined },
+    destructive: { bg: colors.danger, fg: colors.onDanger, border: undefined },
   }[variant];
+  // Disabled buttons go neutral, as UIKit and Material do, instead of a faded brand fill.
+  const solid = variant === 'filled' || variant === 'tinted' || variant === 'destructive';
+  const palette = disabled
+    ? {
+        bg: solid ? colors.fill : 'transparent',
+        fg: colors.tertiaryLabel,
+        border: enabledPalette.border,
+      }
+    : enabledPalette;
 
   const handlePress = () => {
     if (variant === 'filled' || variant === 'destructive') haptics.light();
@@ -77,7 +86,7 @@ export function Button({
         gap: spacing.sm,
         overflow: 'hidden',
         alignSelf: fullWidth ? 'stretch' : 'flex-start',
-        opacity: disabled ? 0.4 : pressed && ios ? 0.7 : 1,
+        opacity: pressed && ios ? 0.7 : 1,
       })}
     >
       {loading ? <ActivityIndicator size="small" color={palette.fg} /> : null}

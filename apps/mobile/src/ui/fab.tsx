@@ -42,7 +42,7 @@ export function Fab({ icon, label, onPress, accessibilityLabel }: FabProps) {
           justifyContent: 'center',
           gap: spacing.sm,
           elevation: 3,
-          shadowColor: '#000',
+          shadowColor: colors.shadow,
           shadowOpacity: 0.25,
           shadowRadius: 6,
           shadowOffset: { width: 0, height: 3 },

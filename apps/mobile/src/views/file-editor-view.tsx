@@ -5,7 +5,7 @@ import type {
   FileEditorController,
   FileEditorState,
 } from '../screens/file-editor-screen.js';
-import { type Theme, useTheme } from '../theme/theme.js';
+import { useTheme } from '../theme/theme.js';
 import {
   Badge,
   Button,
@@ -22,13 +22,6 @@ import {
 } from '../ui/index.js';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-/** Tile styling shared by browser rows. Android draws a bare glyph, iOS a coloured tile. */
-function tileFor(theme: Theme, fill: string, glyph: string) {
-  return theme.platform === 'ios'
-    ? { iconBackground: fill, iconColor: glyph }
-    : { iconColor: glyph === theme.colors.accentFill ? theme.colors.accent : fill };
-}
 
 function InlineError({ children }: { children: ReactNode }) {
   const { colors, spacing, shape } = useTheme();
@@ -113,7 +106,7 @@ export function FileBrowserView({
   onOpenFile: (path: string) => void;
 }) {
   const theme = useTheme();
-  const { colors, spacing } = theme;
+  const { spacing } = theme;
   const [, setRev] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -145,7 +138,6 @@ export function FileBrowserView({
 
   const entries = controller.list();
   const folder = controller.folder;
-  const glyph = theme.scheme === 'dark' ? colors.background : colors.surface;
 
   const row = (e: DirectoryEntry) => {
     if (e.kind === 'folder') {
@@ -155,8 +147,8 @@ export function FileBrowserView({
           testID={`entry-${e.path}`}
           title={e.name}
           subtitle={countLabel(controller.list(e.path).length)}
-          icon="files"
-          {...tileFor(theme, colors.info, glyph)}
+          icon="folder"
+          iconTone="info"
           accessory="chevron"
           onPress={() => go(() => controller.enter(e.path))}
         />
@@ -168,8 +160,8 @@ export function FileBrowserView({
         testID={`entry-${e.path}`}
         title={e.name}
         subtitle={e.encrypted ? 'Encrypted' : undefined}
-        icon="note"
-        {...tileFor(theme, e.encrypted ? colors.warning : colors.secondaryLabel, glyph)}
+        icon={e.encrypted ? 'lock' : 'document'}
+        iconTone={e.encrypted ? 'warning' : 'neutral'}
         accessory={e.encrypted ? <Badge label="Encrypted" tone="warning" /> : 'none'}
         onPress={() => onOpenFile(e.path)}
       />
@@ -185,7 +177,13 @@ export function FileBrowserView({
         load().finally(() => setRefreshing(false));
       }}
     >
-      <Breadcrumbs crumbs={controller.breadcrumbs()} onGo={(p) => go(() => controller.enter(p))} />
+      {/* At the root the title already says where you are. */}
+      {folder ? (
+        <Breadcrumbs
+          crumbs={controller.breadcrumbs()}
+          onGo={(p) => go(() => controller.enter(p))}
+        />
+      ) : null}
       {error ? <InlineError>{error}</InlineError> : null}
       {loading && entries.length === 0 ? (
         <Loading label="Loading files" />
@@ -310,7 +308,7 @@ export function FileEditorView({
                   justifyContent: 'center',
                 }}
               >
-                <Icon name="info" size={28} color={colors.onAccentSoft} />
+                <Icon name="lock" size={28} color={colors.onAccentSoft} />
               </View>
               <Text variant="title3" align="center" accessibilityRole="header">
                 This file is encrypted
@@ -418,6 +416,8 @@ export function FileEditorView({
               padding: spacing.md,
               textAlignVertical: 'top',
               outlineWidth: 0,
+              // A 'solid' style makes the zero width win over the browser's focus ring in the web preview.
+              outlineStyle: 'solid',
             },
           ]}
         />
@@ -430,7 +430,7 @@ export function FileEditorView({
       <Screen>
         <EmptyState
           icon="warning"
-          title="Could not open file"
+          title="Couldn't open the file"
           message={error}
           action={{ label: 'Try again', onPress: () => setAttempt((n) => n + 1) }}
         />

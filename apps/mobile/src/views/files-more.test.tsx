@@ -142,7 +142,7 @@ describe('FileEditorView', () => {
     );
     const controller = new FileEditorController({ files, passwords: passwords() });
     render(<FileEditorView controller={controller} path="gone.md" />);
-    expect(await screen.findByText('Could not open file')).toBeTruthy();
+    expect(await screen.findByText("Couldn't open the file")).toBeTruthy();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy());
   });
 });

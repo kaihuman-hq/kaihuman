@@ -1,6 +1,6 @@
 import { Children, createContext, type ReactNode, useContext } from 'react';
 import { ActionSheetIOS, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { useTheme } from '../theme/theme.js';
+import { type Palette, useTheme } from '../theme/theme.js';
 import { Icon, type IconName } from './icon.js';
 import { useScreenInset } from './screen.js';
 import { Text } from './text.js';
@@ -93,11 +93,22 @@ export interface SwipeAction {
   onPress: () => void;
 }
 
+/** Category colour of a row's leading icon; one mapping so every screen's tiles match. */
+export type IconTone = 'accent' | 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+
+function toneColors(c: Palette, tone: IconTone): { fill: string; glyph: string } {
+  if (tone === 'accent') return { fill: c.accentFill, glyph: c.onAccentFill };
+  const fill = tone === 'neutral' ? c.secondaryLabel : c[tone];
+  return { fill, glyph: tone === 'danger' ? c.onDanger : c.onStatus };
+}
+
 export interface ListRowProps {
   title: string;
   subtitle?: string;
   value?: string;
   icon?: IconName;
+  /** iOS: coloured tile behind the glyph. Android: tinted glyph. Overrides the two below. */
+  iconTone?: IconTone;
   /** iOS: tile fill. Android: ignored (glyph stays neutral). */
   iconBackground?: string;
   /** Glyph colour; defaults to white on a custom tile, accent-on-fill otherwise. */
@@ -142,8 +153,9 @@ export function ListRow({
   subtitle,
   value,
   icon,
-  iconBackground,
-  iconColor,
+  iconTone,
+  iconBackground: tileFill,
+  iconColor: tileGlyph,
   accessory = 'none',
   onPress,
   onLongPress,
@@ -156,6 +168,17 @@ export function ListRow({
   const { colors, spacing, metrics } = theme;
   const ios = theme.platform === 'ios';
   const { last } = useContext(RowPosition);
+  const tone = iconTone ? toneColors(colors, iconTone) : undefined;
+  const iconBackground = tone ? tone.fill : tileFill;
+  const iconColor = tone
+    ? ios
+      ? tone.glyph
+      : iconTone === 'accent'
+        ? colors.accent
+        : iconTone === 'neutral'
+          ? colors.secondaryLabel
+          : tone.fill
+    : tileGlyph;
   const hasActions = (swipeActions?.length ?? 0) > 0;
   const interactive = Boolean(onPress || onLongPress || hasActions) && !disabled;
 
@@ -179,7 +202,7 @@ export function ListRow({
         <Icon
           name={icon}
           size={17}
-          color={iconColor ?? (iconBackground ? '#FFFFFF' : colors.onAccentFill)}
+          color={iconColor ?? (iconBackground ? colors.onStatus : colors.onAccentFill)}
         />
       </View>
     ) : (

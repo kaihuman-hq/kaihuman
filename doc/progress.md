@@ -16,7 +16,8 @@
   - Editor: mono, dirty state, and an `.enc` unlock card.
   - More: account card, workspace rows and a danger sign-out.
 - Pull-to-refresh where data loads, accessibility labels and roles on every control, and 44pt/48dp targets.
-- `src/ui`: new `lock`, `unlock`, `folder`, `document` and `chevronLeft` icons, `TextField` `autoFocus`, and `Screen` no longer duplicates the title under a visible navigation header in the web preview.
+- Consistency pass: `BackButton` primitive for in-tab detail views, `ListRow` `iconTone` so each concept keeps one tile colour across Capture, More, Files, Ideas, Wiki and Knowledge, a markdown block renderer for the wiki reader (`wiki-blocks.ts`: headings, lists, quotes, code, tappable `[[links]]`), "Couldn't …" / "Try again" error wording everywhere, visible iOS dark selected segment, and grey disabled buttons.
+- `src/ui`: new icons (lock, folder, document, chevrons, globe, gauge, terminal, chart, clock, timer, bookmark, wallet, table and more), `TextField` `autoFocus`, and `Screen` no longer duplicates the title under a visible navigation header in the web preview.
 - Deleted the legacy `src/views/primitives.tsx` and `src/theme/tokens.ts`. `src/index.ts` now re-exports `theme.ts`.
 - New `apps/mobile/scripts/screens.cjs` takes web-preview screenshots on iPhone 15 Pro and Pixel 8 in light and dark. A contact sheet is in `apps/mobile/docs/screens.png`.
 

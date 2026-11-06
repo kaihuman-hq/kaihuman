@@ -472,7 +472,7 @@ export function Bookmarks({ initial, ctx }: { initial: BookmarksView; ctx: Ctx }
                   title={b.title}
                   subtitle={hostOf(b.url)}
                   leading={
-                    <Icon name={b.pinned ? 'star' : 'wiki'} size={20} color={colors.accent} />
+                    <Icon name={b.pinned ? 'star' : 'bookmark'} size={20} color={colors.accent} />
                   }
                   trailing={
                     <Icon

@@ -1,6 +1,6 @@
 import { View } from 'react-native';
-import { type Theme, useTheme } from '../theme/theme.js';
-import type { IconName } from '../ui/index.js';
+import { useTheme } from '../theme/theme.js';
+import type { IconName, IconTone } from '../ui/index.js';
 import { ListRow, Screen, Section, Text } from '../ui/index.js';
 
 interface WorkspaceLink {
@@ -8,45 +8,46 @@ interface WorkspaceLink {
   title: string;
   subtitle: string;
   icon: IconName;
-  tile: (c: Theme['colors']) => string;
+  tone: IconTone;
 }
 
-// Tile fills come from the palette so they follow light and dark; no off-palette hues.
+// One tone per concept across screens: Knowledge green as in Capture, Wiki accent as its page
+// rows, Files blue as its folders.
 const WORKSPACE: readonly WorkspaceLink[] = [
   {
     href: '/analytics',
     title: 'Analytics',
     subtitle: 'Todo velocity and totals',
     icon: 'analytics',
-    tile: (c) => c.warning,
+    tone: 'warning',
   },
   {
     href: '/wiki',
     title: 'Wiki',
     subtitle: 'Pages and backlinks',
     icon: 'wiki',
-    tile: (c) => c.info,
+    tone: 'accent',
   },
   {
     href: '/knowledge',
     title: 'Knowledge',
     subtitle: 'Inbox and topics',
     icon: 'knowledge',
-    tile: (c) => c.success,
+    tone: 'success',
   },
   {
     href: '/files',
     title: 'Files',
     subtitle: 'Browse and edit the repository',
     icon: 'files',
-    tile: (c) => c.accentFill,
+    tone: 'info',
   },
   {
     href: '/repos',
     title: 'Repositories',
     subtitle: 'Choose the knowledge base',
     icon: 'repos',
-    tile: (c) => c.secondaryLabel,
+    tone: 'neutral',
   },
 ];
 
@@ -72,9 +73,6 @@ const initials = (name: string) =>
 export function MoreView({ onNavigate, onSignOut, version, account, repo }: MoreViewProps) {
   const theme = useTheme();
   const { spacing, colors } = theme;
-  const ios = theme.platform === 'ios';
-  // Glyphs on a coloured tile must contrast with it in both schemes.
-  const glyph = theme.scheme === 'dark' ? colors.background : colors.surface;
 
   return (
     <Screen title="More">
@@ -129,8 +127,7 @@ export function MoreView({ onNavigate, onSignOut, version, account, repo }: More
             title={l.title}
             subtitle={l.subtitle}
             icon={l.icon}
-            iconBackground={l.tile(colors)}
-            iconColor={ios ? (l.icon === 'files' ? colors.onAccentFill : glyph) : undefined}
+            iconTone={l.tone}
             accessory="chevron"
             onPress={() => onNavigate(l.href)}
           />
@@ -141,8 +138,7 @@ export function MoreView({ onNavigate, onSignOut, version, account, repo }: More
           testID="more-sign-out"
           title="Sign out"
           icon="signOut"
-          iconBackground={colors.danger}
-          iconColor={ios ? glyph : undefined}
+          iconTone="danger"
           destructive
           onPress={onSignOut}
         />

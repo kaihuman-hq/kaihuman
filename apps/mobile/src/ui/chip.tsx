@@ -43,6 +43,8 @@ export function Chip({ label, selected = false, onPress, icon }: ChipProps) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
       aria-selected={selected}
       onPress={onPress}
       hitSlop={{ top: 6, bottom: 6 }}

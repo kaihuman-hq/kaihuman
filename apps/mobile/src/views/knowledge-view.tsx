@@ -3,7 +3,6 @@ import { ActivityIndicator, View } from 'react-native';
 import type { KnowledgeScreenController } from '../screens/knowledge-screen.js';
 import { useTheme } from '../theme/theme.js';
 import {
-  Badge,
   Button,
   EmptyState,
   haptics,
@@ -20,11 +19,7 @@ export function KnowledgeView({ controller }: { controller: KnowledgeScreenContr
   const { colors, spacing } = theme;
   const ios = theme.platform === 'ios';
   const pad = ios ? spacing.md : theme.metrics.screenMargin;
-  const tile = ios
-    ? { iconBackground: colors.accentFill, iconColor: colors.onAccentFill }
-    : { iconColor: colors.accent };
   const quiet = ios ? { iconBackground: colors.fill, iconColor: colors.secondaryLabel } : {};
-  const ok = ios ? { iconBackground: colors.success } : { iconColor: colors.success };
   const [, setRev] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -96,17 +91,8 @@ export function KnowledgeView({ controller }: { controller: KnowledgeScreenContr
         </View>
       </Section>
       <Section header="Overview">
-        <ListRow
-          title="Inbox"
-          icon="knowledge"
-          {...tile}
-          accessory={
-            <View>
-              <Badge count={inbox.length} tone={inbox.length ? 'accent' : 'neutral'} />
-            </View>
-          }
-        />
-        <ListRow title="Processed" icon="check" {...ok} value={String(processed)} />
+        <ListRow title="Inbox" icon="knowledge" iconTone="accent" value={String(inbox.length)} />
+        <ListRow title="Processed" icon="check" iconTone="success" value={String(processed)} />
       </Section>
       {!loaded ? (
         <View style={{ alignItems: 'center', padding: spacing.xl, gap: spacing.sm }}>
@@ -137,7 +123,7 @@ export function KnowledgeView({ controller }: { controller: KnowledgeScreenContr
       {error && loaded && inbox.length === 0 ? (
         <View style={{ flexDirection: 'row', gap: spacing.sm, justifyContent: 'center' }}>
           <Icon name="warning" size={17} color={colors.danger} />
-          <Button label="Retry" variant="plain" size="small" onPress={() => void load()} />
+          <Button label="Try again" variant="plain" size="small" onPress={() => void load()} />
         </View>
       ) : null}
     </Screen>

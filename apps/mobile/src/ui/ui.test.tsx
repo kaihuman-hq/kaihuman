@@ -3,6 +3,7 @@ import { HeaderShownContext } from 'expo-router/react-navigation';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  BackButton,
   Badge,
   Button,
   Card,
@@ -302,6 +303,39 @@ describe.each(bothPlatforms)('on %s design', (platform) => {
     expect(screen.getByText('Done')).toBeTruthy();
     expect(screen.getByText('12')).toBeTruthy();
     expect(screen.getByText('+3 this week')).toBeTruthy();
+  });
+
+  it('BackButton names its destination and fires onPress', () => {
+    setPlatform(platform);
+    const onPress = vi.fn();
+    render(<BackButton label="Ideas" onPress={onPress} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Back to ideas' }));
+    expect(onPress).toHaveBeenCalledOnce();
+    expect(screen.getByText('Ideas')).toBeTruthy();
+  });
+
+  it('ListRow iconTone draws the category glyph and keeps the row accessible', () => {
+    setPlatform(platform);
+    render(
+      <Section>
+        <ListRow
+          title="Files"
+          icon="folder"
+          iconTone="info"
+          accessory="chevron"
+          onPress={vi.fn()}
+        />
+        <ListRow title="Sign out" icon="signOut" iconTone="danger" destructive onPress={vi.fn()} />
+      </Section>,
+    );
+    expect(screen.getByRole('button', { name: 'Files' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
+  });
+
+  it('Button keeps a disabled state when greyed out', () => {
+    setPlatform(platform);
+    render(<Button label="Save" disabled onPress={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Save' }).getAttribute('aria-disabled')).toBe('true');
   });
 
   it('Divider renders', () => {

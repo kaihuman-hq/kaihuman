@@ -164,6 +164,7 @@ export function QuickCaptureView({
           if (status) clearStatus();
         }}
         placeholder={copy.placeholder}
+        autoFocus
         autoCapitalize="sentences"
         multiline={copy.multiline}
         returnKeyType={copy.multiline ? 'default' : copy.extra ? 'next' : 'done'}

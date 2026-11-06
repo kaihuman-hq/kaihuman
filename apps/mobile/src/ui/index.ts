@@ -1,3 +1,4 @@
+export { BackButton, type BackButtonProps } from './back-button.js';
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './button.js';
 export { Card, type CardProps, StatTile, type StatTileProps } from './card.js';
 export { Badge, type BadgeProps, type BadgeTone, Chip, type ChipProps } from './chip.js';
@@ -7,6 +8,7 @@ export { Fab, type FabProps } from './fab.js';
 export { haptics } from './haptics.js';
 export { Icon, type IconName, type IconProps } from './icon.js';
 export {
+  type IconTone,
   ListRow,
   type ListRowProps,
   Section,

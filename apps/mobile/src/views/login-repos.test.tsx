@@ -85,7 +85,7 @@ describe('RepoSelectorView', () => {
   it('shows a fetch error with retry', () => {
     githubProfileStore.error.value = 'boom';
     view();
-    expect(screen.getByText('Could not load repositories')).toBeTruthy();
+    expect(screen.getByText("Couldn't load repositories")).toBeTruthy();
     expect(screen.getByText('boom')).toBeTruthy();
     expect(screen.getByTestId('repos-retry')).toBeTruthy();
   });

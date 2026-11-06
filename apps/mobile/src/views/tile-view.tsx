@@ -40,18 +40,18 @@ export interface TileProps {
 export const TILE_META: Record<TileKind, { title: string; icon: IconName }> = {
   todos: { title: 'Todos', icon: 'todo' },
   habit: { title: 'Habit', icon: 'flag' },
-  timetracking: { title: 'Time tracking', icon: 'log' },
+  timetracking: { title: 'Time tracking', icon: 'timer' },
   events: { title: 'Events', icon: 'calendar' },
-  actionlog: { title: 'Action log', icon: 'note' },
-  timezones: { title: 'World clocks', icon: 'info' },
-  readitlater: { title: 'Read it later', icon: 'wiki' },
+  actionlog: { title: 'Action log', icon: 'list' },
+  timezones: { title: 'World clocks', icon: 'globe' },
+  readitlater: { title: 'Read it later', icon: 'bookmark' },
   bookmarks: { title: 'Bookmarks', icon: 'star' },
-  budget: { title: 'Budget', icon: 'analytics' },
-  stocks: { title: 'Stocks', icon: 'analytics' },
-  consumption: { title: 'Consumption', icon: 'sparkles' },
-  datacollection: { title: 'Data collection', icon: 'files' },
-  prompts: { title: 'Prompts', icon: 'ideas' },
-  commands: { title: 'Commands', icon: 'github' },
+  budget: { title: 'Budget', icon: 'wallet' },
+  stocks: { title: 'Stocks', icon: 'chartLine' },
+  consumption: { title: 'Consumption', icon: 'gauge' },
+  datacollection: { title: 'Data collection', icon: 'table' },
+  prompts: { title: 'Prompts', icon: 'prompt' },
+  commands: { title: 'Commands', icon: 'terminal' },
 };
 
 const nameOf = (path: string) => path.slice(path.lastIndexOf('/') + 1);

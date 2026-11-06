@@ -11,10 +11,10 @@ export function CloseButton() {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Close"
-      hitSlop={metrics.hitTarget / 4}
+      hitSlop={(metrics.hitTarget - 22) / 2}
       onPress={() => (router.canGoBack() ? router.back() : router.replace('/dashboard'))}
     >
-      <Icon name="close" size={18} />
+      <Icon name="close" size={22} />
     </Pressable>
   );
 }

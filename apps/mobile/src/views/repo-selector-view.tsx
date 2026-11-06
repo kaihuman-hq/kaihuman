@@ -53,7 +53,7 @@ export function RepoSelectorView({
         <Card>
           <View style={{ gap: spacing.sm }} accessibilityRole="alert">
             <Text tone="danger" weight="600">
-              Could not load repositories
+              Couldn't load repositories
             </Text>
             <Text variant="subheadline" tone="secondary">
               {error}

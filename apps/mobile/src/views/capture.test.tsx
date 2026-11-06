@@ -53,6 +53,11 @@ describe('QuickCaptureView', () => {
     expect(onDone).toHaveBeenCalledOnce();
   });
 
+  it('focuses the main field when the sheet opens', async () => {
+    render(<QuickCaptureView controller={controller()} kind="note" />);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Note')));
+  });
+
   it('keeps the sheet open and shows the error when saving fails', async () => {
     const onDone = vi.fn();
     render(<QuickCaptureView controller={controller()} kind="knowledge" onDone={onDone} />);

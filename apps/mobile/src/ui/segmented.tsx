@@ -48,8 +48,12 @@ export function SegmentedControl<T extends string>({
           <Pressable
             key={option.value}
             accessibilityRole="button"
+            accessibilityLabel={option.label}
+            accessibilityState={{ selected }}
             aria-selected={selected}
             onPress={() => select(option.value)}
+            // The 28pt iOS segment extends to the 44pt minimum target.
+            hitSlop={ios ? { top: 8, bottom: 8 } : undefined}
             android_ripple={ios ? undefined : { color: colors.pressed }}
             style={[
               {
@@ -64,10 +68,15 @@ export function SegmentedControl<T extends string>({
                 ? {
                     height: 28,
                     borderRadius: 7,
-                    backgroundColor: selected ? colors.surfaceElevated : 'transparent',
+                    // UIKit lifts the dark-mode thumb to a light grey; the elevated surface vanishes on the track.
+                    backgroundColor: selected
+                      ? theme.scheme === 'dark'
+                        ? colors.tertiaryLabel
+                        : colors.surfaceElevated
+                      : 'transparent',
                     ...(selected
                       ? {
-                          shadowColor: '#000',
+                          shadowColor: colors.shadow,
                           shadowOpacity: theme.scheme === 'light' ? 0.12 : 0.4,
                           shadowRadius: 3,
                           shadowOffset: { width: 0, height: 1 },

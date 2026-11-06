@@ -49,6 +49,18 @@ const icons = {
   folder: { ios: 'folder', material: 'folder' },
   document: { ios: 'doc.text', material: 'description' },
   chevronLeft: { ios: 'chevron.left', material: 'chevron_left' },
+  arrowBack: { ios: 'chevron.left', material: 'arrow_back' },
+  globe: { ios: 'globe', material: 'public' },
+  gauge: { ios: 'gauge.with.dots.needle.33percent', material: 'speed' },
+  terminal: { ios: 'terminal', material: 'terminal' },
+  chartLine: { ios: 'chart.line.uptrend.xyaxis', material: 'show_chart' },
+  clock: { ios: 'clock', material: 'schedule' },
+  timer: { ios: 'timer', material: 'timer' },
+  bookmark: { ios: 'bookmark', material: 'bookmark' },
+  wallet: { ios: 'creditcard', material: 'payments' },
+  table: { ios: 'tablecells', material: 'table_chart' },
+  prompt: { ios: 'text.bubble', material: 'chat' },
+  list: { ios: 'list.bullet', material: 'format_list_bulleted' },
 } as const satisfies Record<string, IconDef>;
 
 export type IconName = keyof typeof icons;

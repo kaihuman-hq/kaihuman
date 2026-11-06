@@ -4,6 +4,7 @@ import { ActivityIndicator, ScrollView, View } from 'react-native';
 import type { IdeaStatusFilter, IdeasScreenController } from '../screens/ideas-screen.js';
 import { useTheme } from '../theme/theme.js';
 import {
+  BackButton,
   Badge,
   type BadgeTone,
   Button,
@@ -46,9 +47,6 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
   const ios = theme.platform === 'ios';
   const { colors, spacing } = theme;
   const pad = ios ? spacing.md : theme.metrics.screenMargin;
-  const tile = ios
-    ? { iconBackground: colors.accentFill, iconColor: colors.onAccentFill }
-    : { iconColor: colors.accent };
   const [, setRev] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -146,13 +144,7 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
     };
     return (
       <Screen keyboard refreshing={refreshing} onRefresh={refresh}>
-        <Button
-          label="All ideas"
-          variant="plain"
-          size="medium"
-          onPress={() => setSelected(null)}
-          accessibilityLabel="Back to all ideas"
-        />
+        <BackButton label="Ideas" onPress={() => setSelected(null)} />
         <View style={{ gap: spacing.sm, paddingHorizontal: spacing.xs }}>
           <Text variant="title1" accessibilityRole="header">
             {idea.title}
@@ -258,13 +250,13 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
     </Section>
   ) : ios ? (
     <Section>
-      <ListRow title="New idea" icon="add" {...tile} onPress={() => setComposing(true)} />
+      <ListRow title="New idea" icon="add" iconTone="accent" onPress={() => setComposing(true)} />
     </Section>
   ) : null;
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen keyboard refreshing={refreshing} onRefresh={refresh}>
+      <Screen title="Ideas" keyboard refreshing={refreshing} onRefresh={refresh}>
         <TextField
           label="Search ideas"
           value={controller.filters.query}
@@ -309,7 +301,7 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
               icon="warning"
               title="Couldn't load ideas"
               message="Check your connection and try again."
-              action={{ label: 'Retry', onPress: () => void load() }}
+              action={{ label: 'Try again', onPress: () => void load() }}
             />
           ) : filtered ? (
             <EmptyState
@@ -337,7 +329,7 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
                 title={e.idea.title}
                 subtitle={`${label(e.activity.level)} activity${e.idea.product ? ` · ${e.idea.product}` : ''}`}
                 icon="ideas"
-                {...tile}
+                iconTone="accent"
                 accessory={
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                     <Badge label={label(e.idea.status)} tone={STATUS_TONE[e.idea.status]} />

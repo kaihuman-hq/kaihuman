@@ -71,6 +71,8 @@ export function TextField({
           minHeight: multiline ? 120 : undefined,
           textAlignVertical: multiline ? 'top' : 'center',
           outlineWidth: 0,
+          // A 'solid' style makes the zero width win over the browser's focus ring in the web preview.
+          outlineStyle: 'solid',
         },
       ]}
     />

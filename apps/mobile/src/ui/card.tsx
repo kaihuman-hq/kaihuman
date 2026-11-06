@@ -29,7 +29,7 @@ export function Card({ children, title, icon, accessory, onPress, padding }: Car
       // Dark surfaces separate by tone alone; shadows only help on light backgrounds.
       ...(ios && theme.scheme === 'light'
         ? {
-            shadowColor: '#000',
+            shadowColor: colors.shadow,
             shadowOpacity: 0.06,
             shadowRadius: 8,
             shadowOffset: { width: 0, height: 1 },
@@ -60,6 +60,7 @@ export function Card({ children, title, icon, accessory, onPress, padding }: Car
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={title}
       onPress={onPress}
       android_ripple={ios ? undefined : { color: colors.pressed }}
       style={({ pressed }) => box(pressed)}

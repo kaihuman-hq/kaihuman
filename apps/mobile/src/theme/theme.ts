@@ -45,6 +45,12 @@ export interface Palette {
   info: string;
   /** Android ripple / iOS pressed overlay. */
   pressed: string;
+  /** Glyphs on a status-coloured icon tile (dark on the bright dark-mode hues). */
+  onStatus: string;
+  /** Text and icons on a `danger` fill. */
+  onDanger: string;
+  /** Shadow colour for raised items on light surfaces. */
+  shadow: string;
 }
 
 const iosDark: Palette = {
@@ -66,6 +72,9 @@ const iosDark: Palette = {
   danger: '#FF453A',
   info: '#64D2FF',
   pressed: 'rgba(255,255,255,0.08)',
+  onStatus: '#0B0C0A',
+  onDanger: '#FFFFFF',
+  shadow: '#000000',
 };
 
 const iosLight: Palette = {
@@ -87,6 +96,9 @@ const iosLight: Palette = {
   danger: '#D70015',
   info: '#0071A4',
   pressed: 'rgba(0,0,0,0.06)',
+  onStatus: '#FFFFFF',
+  onDanger: '#FFFFFF',
+  shadow: '#000000',
 };
 
 // Material 3 tonal surfaces generated around the Volt seed.
