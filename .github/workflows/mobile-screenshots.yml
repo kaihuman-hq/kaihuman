@@ -21,7 +21,7 @@ permissions:
 
 concurrency:
   group: mobile-screenshots-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false # the restyle session pushes often; cancelling would starve the 30-minute run
 
 jobs:
   ios:
