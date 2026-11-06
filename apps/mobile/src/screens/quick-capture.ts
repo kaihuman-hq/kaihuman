@@ -7,6 +7,7 @@ import {
   type IdeaHandoff,
   ideaPath,
   localDate,
+  logIdea,
   newIdea,
   parseIdeaHandoffs,
   slugifyIdeaTitle,
@@ -134,7 +135,11 @@ export class QuickCaptureController {
     );
   }
 
+  /** Set by `kaihuman://quick-log?idea=<slug>`: log entries then go to that idea's log. */
+  targetIdea: string | null = null;
+
   quickLog(description: string, tags?: string | string[]): Promise<CaptureResult> {
+    if (this.targetIdea) return this.logToIdea(this.targetIdea, description);
     const path = `${this.files.appFolder()}/inbox.actionlog.md`;
     return this.append(
       path,
@@ -142,6 +147,20 @@ export class QuickCaptureController {
         addActionLogEntry(current, { description, tags: parseTagInput(tags) }, this.clock()),
       'Log entry added',
     );
+  }
+
+  private logToIdea(slugText: string, description: string): Promise<CaptureResult> {
+    const text = description.trim();
+    if (!text) return Promise.resolve({ ok: false, error: 'Nothing to add' });
+    const slug = asIdeaSlug(slugText);
+    if (!slug) return Promise.resolve({ ok: false, error: `"${slugText}" is not an idea slug` });
+    const path = ideaPath(slug);
+    return this.run(path, async () => {
+      if (!this.files.exists(path)) throw new Error(`No idea "${slugText}"`);
+      const current = (await this.files.read(path)) ?? '';
+      await this.files.write(path, logIdea(current, text, { now: this.clock(), author: 'human' }));
+      return `Logged to ${slugText}`;
+    });
   }
 
   /**

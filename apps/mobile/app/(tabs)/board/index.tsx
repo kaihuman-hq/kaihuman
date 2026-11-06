@@ -1,4 +1,4 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable } from 'react-native';
 import { KaihumanShared } from '../../../modules/kaihuman-shared/index.js';
@@ -9,7 +9,18 @@ import { Icon } from '../../../src/ui/index.js';
 import { KanbanView } from '../../../src/views/kanban-view.js';
 
 export default function Board() {
-  const controller = useMemo(() => new KanbanBoardController(), []);
+  const params = useLocalSearchParams<{
+    milestone?: string | string[];
+    item?: string | string[];
+  }>();
+  const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const milestoneId = first(params.milestone);
+  const itemId = first(params.item);
+  const controller = useMemo(() => {
+    const c = new KanbanBoardController();
+    c.pin({ milestoneId, itemId });
+    return c;
+  }, [milestoneId, itemId]);
   const focus = useMemo(() => new FocusSessionController(KaihumanShared), []);
   const router = useRouter();
   const { platform, colors } = useTheme();

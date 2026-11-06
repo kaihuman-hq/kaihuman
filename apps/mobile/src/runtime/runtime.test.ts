@@ -171,6 +171,9 @@ describe('links', () => {
     pending.mockReturnValueOnce('kaihuman://quick-log');
     onFg();
     expect(nav).toHaveBeenCalledWith('/quick-log');
+    pending.mockReturnValueOnce('kaihuman://quick-log?idea=solar');
+    onFg();
+    expect(nav).toHaveBeenLastCalledWith('/quick-log?idea=solar');
     stop();
     expect(off).toHaveBeenCalledTimes(2);
   });

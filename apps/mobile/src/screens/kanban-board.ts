@@ -80,6 +80,8 @@ const slugify = (name: string) => name.trim().toLowerCase().replace(/\s+/g, '-')
 export class KanbanBoardController {
   private loaded: LoadedTodoFile[] = [];
   private filter: BoardFilter = {};
+  /** Deep-link scope; kept apart from `filter` because the view replaces `filter` on every tag pick. */
+  private pinned: { milestoneId?: string; itemId?: string } = {};
 
   constructor(private readonly files: RepoFiles = githubRepoFiles) {}
 
@@ -89,6 +91,11 @@ export class KanbanBoardController {
 
   setFilter(filter: BoardFilter): void {
     this.filter = filter;
+  }
+
+  /** Scopes the board to a milestone or a single item (`kaihuman://board?milestone=|item=`). */
+  pin(pinned: { milestoneId?: string; itemId?: string }): void {
+    this.pinned = pinned;
   }
 
   get paths(): string[] {
@@ -115,6 +122,10 @@ export class KanbanBoardController {
     for (const { path, data } of this.loaded) {
       if (files?.length && !files.includes(path)) continue;
       data.items.forEach((item, itemIndex) => {
+        // Widgets link with their own `<path>#<index>` id, which is unique across files.
+        const pinnedItem = this.pinned.itemId;
+        if (pinnedItem && item.id !== pinnedItem && `${path}#${itemIndex}` !== pinnedItem) return;
+        if (this.pinned.milestoneId && item.milestoneId !== this.pinned.milestoneId) return;
         if (milestoneId && item.milestoneId !== milestoneId) return;
         if (wantedTag && !item.tags.some((t) => t.toLowerCase() === wantedTag)) return;
         if (

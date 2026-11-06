@@ -99,6 +99,13 @@ export class IdeasScreenController {
     this.filters = { ...this.filters, ...patch };
   }
 
+  /** Applies a `kaihuman://ideas?status=` link; unknown values leave the filter unchanged. */
+  applyLinkStatus(status: string | undefined): void {
+    if (status && (isIdeaStatus(status) || status === 'open' || status === 'all')) {
+      this.setFilters({ status });
+    }
+  }
+
   /** Chips for every status, plus `open` and `all`, counted against product and search only. */
   chips(): StatusChip[] {
     const base = this.matching({ ...this.filters, status: 'all' });

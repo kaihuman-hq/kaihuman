@@ -1,5 +1,5 @@
 import { githubFileStore } from '@kaihuman/core';
-import { parseActionLog, parseIdea, parseTodos } from '@kaihuman/formats';
+import { newIdea, parseActionLog, parseIdea, parseTodos } from '@kaihuman/formats';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { KanbanBoardController } from './kanban-board.js';
 import { githubRepoFiles, QuickCaptureController, type RepoFiles } from './quick-capture.js';
@@ -75,6 +75,21 @@ describe('QuickCaptureController', () => {
     expect(entry?.timestamp).toBe('2026-09-24 10:00:00');
     expect(entry?.tags).toEqual(['health']);
     expect(await capture(files).quickLog(' ')).toMatchObject({ ok: false });
+  });
+
+  it('logs onto a targeted idea instead of the action log', async () => {
+    const idea = newIdea({ title: 'Solar' }, { now: NOW, author: 'human' });
+    const files = mem({ [idea.path]: idea.content });
+    const c = capture(files);
+    c.targetIdea = idea.slug;
+    expect(await c.quickLog('Measured the roof')).toMatchObject({ ok: true, path: idea.path });
+    expect(files.store.get(idea.path)).toContain('Measured the roof');
+    expect(files.store.has('.kh/inbox.actionlog.md')).toBe(false);
+    c.targetIdea = 'missing';
+    expect(await c.quickLog('x')).toMatchObject({ ok: false });
+    expect(await capture(files).quickLog('plain')).toMatchObject({
+      path: '.kh/inbox.actionlog.md',
+    });
   });
 
   it('turns plain idea text into a new idea and refuses to overwrite', async () => {
@@ -263,6 +278,29 @@ describe('KanbanBoardController', () => {
     c.setFilter({ files: ['work.todos.md'] });
     expect(Object.values(c.columns()).flat()).toHaveLength(2);
     expect(c.tags).toEqual(['docs', 'misc', 'ui']);
+  });
+
+  it('pins a deep-link milestone or item that survives setFilter', async () => {
+    const { c } = await board();
+    const all = () => Object.values(c.columns()).flat();
+    c.pin({ milestoneId: 'v1' });
+    c.setFilter({ tag: 'ui' });
+    expect(
+      all()
+        .map((b) => b.item.text)
+        .sort(),
+    ).toEqual(['build ui', 'ship alpha']);
+    c.setFilter({});
+    expect(all()).toHaveLength(3);
+    const id = all()[0]?.item.id ?? '';
+    c.pin({ itemId: id });
+    // Ids are per file (`item-<n>`), so the same id can match in more than one file.
+    expect(all().length).toBeGreaterThan(0);
+    expect(all().every((b) => b.item.id === id)).toBe(true);
+    c.pin({ itemId: '.kh/inbox.todos.md#0' });
+    expect(all().map((b) => b.filePath)).toEqual(['.kh/inbox.todos.md']);
+    c.pin({});
+    expect(all()).toHaveLength(5);
   });
 
   it('transitions status and persists it', async () => {

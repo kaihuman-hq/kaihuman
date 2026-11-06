@@ -1,11 +1,15 @@
+import { isIdeaStatus } from '@kaihuman/formats';
+
 export const APP_SCHEME = 'kaihuman';
 
 export type QuickKind = 'todo' | 'note' | 'log' | 'idea' | 'knowledge';
 
 export type Route =
   | { name: 'auth-callback'; accessToken: string | null }
-  | { name: 'quick-capture'; kind: QuickKind }
-  | { name: 'board' }
+  /** `idea` (log only) targets that idea's log instead of the action log. */
+  | { name: 'quick-capture'; kind: QuickKind; idea?: string }
+  | { name: 'ideas'; status?: string }
+  | { name: 'board'; milestone?: string; item?: string }
   | { name: 'inbox' }
   | { name: 'demo' }
   | { name: 'file'; path: string };
@@ -32,7 +36,17 @@ export function parseDeepLink(url: string): Route | null {
   if (head === 'auth' && rest[0] === 'callback') {
     return { name: 'auth-callback', accessToken: parsed.searchParams.get('access_token') };
   }
-  if (head === 'board' && rest.length === 0) return { name: 'board' };
+  const param = (key: string) => parsed.searchParams.get(key) || undefined;
+  if (head === 'board' && rest.length === 0) {
+    const milestone = param('milestone');
+    const item = param('item');
+    return { name: 'board', ...(milestone && { milestone }), ...(item && { item }) };
+  }
+  if (head === 'ideas' && rest.length === 0) {
+    const status = param('status');
+    const known = status && (isIdeaStatus(status) || status === 'open' || status === 'all');
+    return { name: 'ideas', ...(known && { status }) };
+  }
   if (head === 'inbox' && rest.length === 0) return { name: 'inbox' };
   // Non-interactive "Try demo" (used by CI screenshots).
   if (head === 'demo' && rest.length === 0) return { name: 'demo' };
@@ -45,17 +59,30 @@ export function parseDeepLink(url: string): Route | null {
   }
   const kind = head?.startsWith('quick-') ? head.slice('quick-'.length) : undefined;
   if (rest.length === 0 && kind && (QUICK_KINDS as readonly string[]).includes(kind)) {
-    return { name: 'quick-capture', kind: kind as QuickKind };
+    const idea = kind === 'log' ? param('idea') : undefined;
+    return { name: 'quick-capture', kind: kind as QuickKind, ...(idea && { idea }) };
   }
   return null;
 }
 
+const withQuery = (base: string, params: Record<string, string | undefined>): string => {
+  const query = Object.entries(params)
+    .flatMap(([k, v]) => (v ? [`${k}=${encodeURIComponent(v)}`] : []))
+    .join('&');
+  return query ? `${base}?${query}` : base;
+};
+
+/** Shared by `routeToUrl` and the expo-router href mapping so params are encoded one way. */
+export const routeQuery = withQuery;
+
 export const routeToUrl = (route: Exclude<Route, { name: 'auth-callback' }>): string => {
   switch (route.name) {
     case 'quick-capture':
-      return `${APP_SCHEME}://quick-${route.kind}`;
+      return withQuery(`${APP_SCHEME}://quick-${route.kind}`, { idea: route.idea });
+    case 'ideas':
+      return withQuery(`${APP_SCHEME}://ideas`, { status: route.status });
     case 'board':
-      return `${APP_SCHEME}://board`;
+      return withQuery(`${APP_SCHEME}://board`, { milestone: route.milestone, item: route.item });
     case 'inbox':
       return `${APP_SCHEME}://inbox`;
     case 'demo':

@@ -82,6 +82,19 @@ describe('IdeasScreenController', () => {
     expect(ctl.view().map((e) => e.slug)).toEqual(['alpha']);
   });
 
+  it('applies a deep-link status, ignoring unknown values', async () => {
+    const { ctl } = setup();
+    await ctl.load();
+    ctl.applyLinkStatus('parked');
+    expect(ctl.view().map((e) => e.slug)).toEqual(['beta']);
+    ctl.applyLinkStatus('all');
+    expect(ctl.view()).toHaveLength(3);
+    ctl.applyLinkStatus('bogus');
+    expect(ctl.filters.status).toBe('all');
+    ctl.applyLinkStatus(undefined);
+    expect(ctl.filters.status).toBe('all');
+  });
+
   it('builds a 12 week strip, newest week last', () => {
     const parsed = {
       log: [{ at: '2026-11-05 09:00' }, { at: '2026-10-20 09:00' }, { at: '2025-01-01 09:00' }],

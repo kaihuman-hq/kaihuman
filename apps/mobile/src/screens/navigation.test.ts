@@ -8,6 +8,7 @@ import {
 } from '@kaihuman/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseDeepLink, routeToUrl } from '../navigation/routes.js';
+import { routeToHref } from '../runtime/pending-url.js';
 import { LoginScreenController } from './login-screen.js';
 import { RepoSelectorController } from './repo-selector-screen.js';
 
@@ -68,9 +69,57 @@ describe('parseDeepLink', () => {
     }
   });
 
+  it('parses widget deep links with params', () => {
+    expect(parseDeepLink('kaihuman://ideas')).toEqual({ name: 'ideas' });
+    expect(parseDeepLink('kaihuman://ideas?status=seed')).toEqual({
+      name: 'ideas',
+      status: 'seed',
+    });
+    expect(parseDeepLink('kaihuman://ideas?status=all')).toEqual({ name: 'ideas', status: 'all' });
+    expect(parseDeepLink('kaihuman://ideas?status=bogus')).toEqual({ name: 'ideas' });
+    expect(parseDeepLink('kaihuman://ideas/x')).toBeNull();
+    expect(parseDeepLink('kaihuman://quick-log?idea=solar-balcony')).toEqual({
+      name: 'quick-capture',
+      kind: 'log',
+      idea: 'solar-balcony',
+    });
+    expect(parseDeepLink('kaihuman://quick-todo?idea=x')).toEqual({
+      name: 'quick-capture',
+      kind: 'todo',
+    });
+    expect(parseDeepLink('kaihuman://quick-log?idea=')).toEqual({
+      name: 'quick-capture',
+      kind: 'log',
+    });
+    expect(parseDeepLink('kaihuman://board?milestone=v1')).toEqual({
+      name: 'board',
+      milestone: 'v1',
+    });
+    expect(parseDeepLink('kaihuman://board?item=abc')).toEqual({ name: 'board', item: 'abc' });
+  });
+
+  it('maps routes to expo-router hrefs with params', () => {
+    const href = (url: string) => {
+      const route = parseDeepLink(url);
+      if (!route) throw new Error('unparsed');
+      return routeToHref(route);
+    };
+    expect(href('kaihuman://ideas')).toBe('/ideas');
+    expect(href('kaihuman://ideas?status=exploring')).toBe('/ideas?status=exploring');
+    expect(href('kaihuman://quick-log?idea=a%20b')).toBe('/quick-log?idea=a%20b');
+    expect(href('kaihuman://quick-log')).toBe('/quick-log');
+    expect(href('kaihuman://board?milestone=v1&item=t1')).toBe('/board?milestone=v1&item=t1');
+    expect(href('kaihuman://board')).toBe('/board');
+  });
+
   it('round-trips through routeToUrl', () => {
     for (const url of [
       'kaihuman://quick-log',
+      'kaihuman://quick-log?idea=solar',
+      'kaihuman://ideas',
+      'kaihuman://ideas?status=seed',
+      'kaihuman://board?milestone=v1',
+      'kaihuman://board?item=t1',
       'kaihuman://board',
       'kaihuman://demo',
       'kaihuman://files/a%20b/c.md',
