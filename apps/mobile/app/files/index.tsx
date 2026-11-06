@@ -8,7 +8,7 @@ export default function Files() {
   const controller = useMemo(() => new FileEditorController(), []);
   return (
     <>
-      <Stack.Screen options={{ title: 'Files' }} />
+      <Stack.Screen options={{ title: 'Files', headerBackTitle: 'More' }} />
       <FileBrowserView
         controller={controller}
         onOpenFile={(path) =>

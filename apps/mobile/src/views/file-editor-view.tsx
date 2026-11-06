@@ -1,9 +1,109 @@
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import type { FileEditorController, FileEditorState } from '../screens/file-editor-screen.js';
-import { Body, Button, Field, Muted, Row, Screen, Title } from './primitives.js';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
+import type {
+  DirectoryEntry,
+  FileEditorController,
+  FileEditorState,
+} from '../screens/file-editor-screen.js';
+import { type Theme, useTheme } from '../theme/theme.js';
+import {
+  Badge,
+  Button,
+  Card,
+  Chip,
+  EmptyState,
+  haptics,
+  Icon,
+  ListRow,
+  Screen,
+  Section,
+  Text,
+  TextField,
+} from '../ui/index.js';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** Tile styling shared by browser rows. Android draws a bare glyph, iOS a coloured tile. */
+function tileFor(theme: Theme, fill: string, glyph: string) {
+  return theme.platform === 'ios'
+    ? { iconBackground: fill, iconColor: glyph }
+    : { iconColor: glyph === theme.colors.accentFill ? theme.colors.accent : fill };
+}
+
+function InlineError({ children }: { children: ReactNode }) {
+  const { colors, spacing, shape } = useTheme();
+  return (
+    <View
+      accessibilityRole="alert"
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: spacing.sm,
+        padding: spacing.md,
+        borderRadius: shape.md,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.danger,
+      }}
+    >
+      <Icon name="warning" size={17} color={colors.danger} />
+      <View style={{ flex: 1 }}>
+        <Text variant="subheadline" tone="danger">
+          {children}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function Loading({ label }: { label: string }) {
+  const { colors, spacing } = useTheme();
+  return (
+    <View
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+      style={{ alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xxl }}
+    >
+      <ActivityIndicator color={colors.secondaryLabel} />
+      <Text variant="subheadline" tone="secondary">
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function Breadcrumbs({
+  crumbs,
+  onGo,
+}: {
+  crumbs: { name: string; path: string }[];
+  onGo: (path: string) => void;
+}) {
+  const { spacing, colors } = useTheme();
+  const items = [{ name: 'Files', path: '' }, ...crumbs];
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      accessibilityLabel="Folder path"
+      contentContainerStyle={{ alignItems: 'center', gap: spacing.xs }}
+    >
+      {items.map((c, i) => (
+        <View key={c.path || 'root'} style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {i > 0 ? <Icon name="chevronRight" size={12} color={colors.tertiaryLabel} /> : null}
+          <Chip
+            label={c.name}
+            icon={i === 0 ? 'files' : undefined}
+            selected={i === items.length - 1}
+            onPress={() => onGo(c.path)}
+          />
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+const countLabel = (n: number) => (n === 1 ? '1 item' : `${n} items`);
 
 export function FileBrowserView({
   controller,
@@ -12,47 +112,111 @@ export function FileBrowserView({
   controller: FileEditorController;
   onOpenFile: (path: string) => void;
 }) {
+  const theme = useTheme();
+  const { colors, spacing } = theme;
   const [, setRev] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(
+    () =>
+      controller
+        .refresh()
+        .then(() => setError(null))
+        .catch((e: unknown) => {
+          setError(messageOf(e));
+          haptics.error();
+        })
+        .finally(() => setRev((n) => n + 1)),
+    [controller],
+  );
 
   useEffect(() => {
-    controller
-      .refresh()
-      .catch((e: unknown) => setError(messageOf(e)))
-      .finally(() => setRev((n) => n + 1));
-  }, [controller]);
+    setLoading(true);
+    load().finally(() => setLoading(false));
+  }, [load]);
 
   const go = (fn: () => void) => {
+    haptics.selection();
     fn();
     setRev((n) => n + 1);
   };
+
   const entries = controller.list();
-  return (
-    <Screen scroll>
-      <Title>Files</Title>
-      {error && (
-        <View accessibilityRole="alert">
-          <Body>{error}</Body>
-        </View>
-      )}
-      <Muted>{`/${controller.folder}`}</Muted>
-      <Row>
-        <Button label="Root" onPress={() => go(() => controller.enter(''))} />
-        {controller.folder && <Button label="Up" onPress={() => go(() => controller.up())} />}
-      </Row>
-      {entries.length === 0 && <Muted>Empty folder</Muted>}
-      {entries.map((e) => (
-        <Button
+  const folder = controller.folder;
+  const glyph = theme.scheme === 'dark' ? colors.background : colors.surface;
+
+  const row = (e: DirectoryEntry) => {
+    if (e.kind === 'folder') {
+      return (
+        <ListRow
           key={e.path}
           testID={`entry-${e.path}`}
-          label={
-            e.kind === 'folder' ? `${e.name}/` : e.encrypted ? `${e.name} (encrypted)` : e.name
+          title={e.name}
+          subtitle={countLabel(controller.list(e.path).length)}
+          icon="files"
+          {...tileFor(theme, colors.info, glyph)}
+          accessory="chevron"
+          onPress={() => go(() => controller.enter(e.path))}
+        />
+      );
+    }
+    return (
+      <ListRow
+        key={e.path}
+        testID={`entry-${e.path}`}
+        title={e.name}
+        subtitle={e.encrypted ? 'Encrypted' : undefined}
+        icon="note"
+        {...tileFor(theme, e.encrypted ? colors.warning : colors.secondaryLabel, glyph)}
+        accessory={e.encrypted ? <Badge label="Encrypted" tone="warning" /> : 'none'}
+        onPress={() => onOpenFile(e.path)}
+      />
+    );
+  };
+
+  return (
+    <Screen
+      title="Files"
+      refreshing={refreshing}
+      onRefresh={() => {
+        setRefreshing(true);
+        load().finally(() => setRefreshing(false));
+      }}
+    >
+      <Breadcrumbs crumbs={controller.breadcrumbs()} onGo={(p) => go(() => controller.enter(p))} />
+      {error ? <InlineError>{error}</InlineError> : null}
+      {loading && entries.length === 0 ? (
+        <Loading label="Loading files" />
+      ) : entries.length === 0 && !error ? (
+        <EmptyState
+          icon="files"
+          title={folder ? 'This folder is empty' : 'No files yet'}
+          message={
+            folder
+              ? 'Files you add to this folder in the repository show up here.'
+              : 'Pull down to refresh, or choose another repository.'
           }
-          onPress={() =>
-            e.kind === 'folder' ? go(() => controller.enter(e.path)) : onOpenFile(e.path)
+          action={
+            folder ? { label: 'Up one level', onPress: () => go(() => controller.up()) } : undefined
           }
         />
-      ))}
+      ) : entries.length > 0 ? (
+        <Section footer={countLabel(entries.length)}>{entries.map(row)}</Section>
+      ) : error ? (
+        <Button label="Try again" variant="tinted" size="medium" onPress={() => void load()} />
+      ) : null}
+      {folder && entries.length > 0 ? (
+        <View style={{ paddingTop: spacing.xs }}>
+          <Button
+            label="Up one level"
+            variant="plain"
+            size="medium"
+            onPress={() => go(() => controller.up())}
+          />
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -64,104 +228,219 @@ export function FileEditorView({
   controller: FileEditorController;
   path: string;
 }) {
+  const theme = useTheme();
+  const { colors, spacing, shape } = theme;
   const [state, setState] = useState<FileEditorState>({ status: 'closed' });
   const [error, setError] = useState<string | null>(null);
   const [passphrase, setPassphrase] = useState('');
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` re-runs the load on Retry
   useEffect(() => {
+    setError(null);
     controller
       .refresh()
       .then(() => controller.open(path))
       .then(setState)
-      .catch((e: unknown) => setError(messageOf(e)));
+      .catch((e: unknown) => {
+        setError(messageOf(e));
+        haptics.error();
+      });
     return () => controller.close();
-  }, [controller, path]);
+  }, [controller, path, attempt]);
 
   const sync = () => setState(controller.state);
 
+  const unlock = () => {
+    if (!passphrase || unlocking) return;
+    setUnlocking(true);
+    void controller
+      .unlock(passphrase)
+      .then((s) => {
+        setState(s);
+        if (s.status === 'open') {
+          haptics.success();
+          setPassphrase('');
+        } else haptics.error();
+      })
+      .finally(() => setUnlocking(false));
+  };
+
+  const save = () => {
+    setError(null);
+    setSaving(true);
+    controller
+      .save()
+      .then(() => {
+        setSaved(true);
+        haptics.success();
+      })
+      .catch((e: unknown) => {
+        setError(messageOf(e));
+        haptics.error();
+      })
+      .finally(() => {
+        setSaving(false);
+        sync();
+      });
+  };
+
+  const pathLabel = (
+    <Text variant="footnote" tone="secondary" mono numberOfLines={2} testID="editor-path">
+      {path}
+    </Text>
+  );
+
   if (state.status === 'locked') {
     return (
-      <Screen>
-        <Title>{path}</Title>
-        <Muted>This file is encrypted.</Muted>
-        {state.error && (
-          <View accessibilityRole="alert">
-            <Body>{state.error}</Body>
-          </View>
-        )}
-        <Field label="Passphrase" value={passphrase} onChangeText={setPassphrase} secureTextEntry />
-        <Button
-          label="Unlock"
-          disabled={!passphrase}
-          onPress={() => {
-            void controller.unlock(passphrase).then((s) => {
-              setState(s);
-              if (s.status === 'open') setPassphrase('');
-            });
-          }}
-        />
+      <Screen keyboard>
+        <View style={{ paddingTop: spacing.xl }}>
+          <Card padding={spacing.xl}>
+            <View style={{ alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm }}>
+              <View
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 32,
+                  backgroundColor: colors.accentSoft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name="info" size={28} color={colors.onAccentSoft} />
+              </View>
+              <Text variant="title3" align="center" accessibilityRole="header">
+                This file is encrypted
+              </Text>
+              <Text variant="subheadline" tone="secondary" align="center">
+                Enter the passphrase to read and edit it.
+              </Text>
+              {pathLabel}
+            </View>
+            {state.error ? <InlineError>{state.error}</InlineError> : null}
+            <TextField
+              label="Passphrase"
+              value={passphrase}
+              onChangeText={setPassphrase}
+              secureTextEntry
+              returnKeyType="go"
+              onSubmitEditing={unlock}
+              testID="passphrase"
+            />
+            <Button
+              label="Unlock"
+              fullWidth
+              loading={unlocking}
+              disabled={!passphrase}
+              onPress={unlock}
+            />
+          </Card>
+        </View>
       </Screen>
     );
   }
 
   if (state.status === 'open') {
+    const dirty = state.dirty;
     return (
-      <Screen scroll>
-        <Title>{path}</Title>
-        {error && (
-          <View accessibilityRole="alert">
-            <Body>{error}</Body>
+      <Screen
+        scroll={false}
+        inset="none"
+        keyboard
+        footer={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <View style={{ flex: 1, gap: spacing.xxs }}>
+              {dirty ? (
+                <Badge label="Unsaved changes" tone="warning" />
+              ) : saved ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                  <Icon name="check" size={14} color={colors.success} weight="semibold" />
+                  <Text variant="footnote" tone="success">
+                    Saved
+                  </Text>
+                </View>
+              ) : (
+                <Text variant="footnote" tone="secondary">
+                  {state.encrypted ? 'Encrypted file' : 'No changes'}
+                </Text>
+              )}
+            </View>
+            {state.encrypted ? (
+              <Button
+                label="Lock"
+                variant="plain"
+                size="medium"
+                onPress={() => {
+                  haptics.selection();
+                  controller.lock();
+                  setSaved(false);
+                  sync();
+                }}
+              />
+            ) : null}
+            <Button label="Save" size="medium" disabled={!dirty} loading={saving} onPress={save} />
           </View>
-        )}
-        <Field
-          label="Content"
+        }
+      >
+        <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
+          {pathLabel}
+          {error ? <InlineError>{error}</InlineError> : null}
+        </View>
+        <TextInput
+          accessibilityLabel="Content"
           value={state.content}
           multiline
+          autoCapitalize="none"
+          autoCorrect={false}
+          spellCheck={false}
+          scrollEnabled
+          placeholder="Empty file"
+          placeholderTextColor={colors.tertiaryLabel}
+          selectionColor={colors.accent}
+          cursorColor={colors.accent}
           onChangeText={(text) => {
             controller.edit(text);
             setSaved(false);
             sync();
           }}
+          style={[
+            theme.type.callout,
+            {
+              flex: 1,
+              color: colors.label,
+              fontFamily: theme.fontFamily.mono,
+              backgroundColor: colors.surface,
+              borderRadius: shape.md,
+              marginHorizontal: spacing.lg,
+              padding: spacing.md,
+              textAlignVertical: 'top',
+              outlineWidth: 0,
+            },
+          ]}
         />
-        <Row>
-          <Button
-            label="Save"
-            disabled={!state.dirty}
-            onPress={() => {
-              setError(null);
-              controller
-                .save()
-                .then(() => setSaved(true))
-                .catch((e: unknown) => setError(messageOf(e)))
-                .finally(sync);
-            }}
-          />
-          {state.encrypted && (
-            <Button
-              label="Lock"
-              onPress={() => {
-                controller.lock();
-                sync();
-              }}
-            />
-          )}
-        </Row>
-        {saved && !state.dirty && <Muted>Saved</Muted>}
+      </Screen>
+    );
+  }
+
+  if (error) {
+    return (
+      <Screen>
+        <EmptyState
+          icon="warning"
+          title="Could not open file"
+          message={error}
+          action={{ label: 'Try again', onPress: () => setAttempt((n) => n + 1) }}
+        />
       </Screen>
     );
   }
 
   return (
-    <Screen>
-      <Title>{path}</Title>
-      {error ? (
-        <View accessibilityRole="alert">
-          <Body>{error}</Body>
-        </View>
-      ) : (
-        <Muted>Loading...</Muted>
-      )}
+    <Screen scroll={false}>
+      <Loading label="Opening file" />
     </Screen>
   );
 }

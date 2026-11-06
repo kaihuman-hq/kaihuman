@@ -329,10 +329,11 @@ describe('file editor', () => {
     const controller = new FileEditorController({ files, passwords: passwordPort() });
     const onOpenFile = vi.fn();
     render(<FileBrowserView controller={controller} onOpenFile={onOpenFile} />);
-    press('a/');
+    press('a');
+    expect(screen.getByRole('button', { name: 'Files' })).toBeTruthy(); // breadcrumb
     fireEvent.click(screen.getByRole('button', { name: 'b.txt' }));
     expect(onOpenFile).toHaveBeenCalledWith('a/b.txt');
-    press('Up');
+    press('Up one level');
     fireEvent.click(screen.getByRole('button', { name: 'top.md' }));
     expect(onOpenFile).toHaveBeenCalledWith('top.md');
   });

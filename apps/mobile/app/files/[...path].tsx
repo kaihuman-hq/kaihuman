@@ -9,7 +9,9 @@ export default function FileRoute() {
   const controller = useMemo(() => new FileEditorController(), []);
   return (
     <>
-      <Stack.Screen options={{ title: path.slice(path.lastIndexOf('/') + 1) }} />
+      <Stack.Screen
+        options={{ title: path.slice(path.lastIndexOf('/') + 1), headerBackTitle: 'Files' }}
+      />
       <FileEditorView controller={controller} path={path} />
     </>
   );
