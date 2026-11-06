@@ -1,48 +1,35 @@
 import SwiftUI
 import WidgetKit
 
-struct TodoEntry: TimelineEntry {
-    let date: Date
-    let snapshot: SharedTodoSnapshot?
-}
-
-struct TodoProvider: TimelineProvider {
-    func placeholder(in context: Context) -> TodoEntry {
-        TodoEntry(date: Date(), snapshot: nil)
-    }
-
-    func getSnapshot(in context: Context, completion: @escaping (TodoEntry) -> Void) {
-        completion(TodoEntry(date: Date(), snapshot: SharedTodoStore.shared.load()))
-    }
-
-    func getTimeline(in context: Context, completion: @escaping (Timeline<TodoEntry>) -> Void) {
-        let entry = TodoEntry(date: Date(), snapshot: SharedTodoStore.shared.load())
-        // The app and intents reload timelines on change; this is only a safety refresh.
-        let refresh = Calendar.current.date(byAdding: .minute, value: 30, to: entry.date) ?? entry.date
-        completion(Timeline(entries: [entry], policy: .after(refresh)))
-    }
-}
-
+/// Next up. The kind string predates the restyle and stays so already-placed widgets survive.
 struct InboxTodoWidget: Widget {
     let kind = "InboxTodoWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: TodoProvider()) { entry in
-            TodoWidgetView(entry: entry)
-                .containerBackground(Theme.background, for: .widget)
+        AppIntentConfiguration(kind: kind, intent: NextUpConfigurationIntent.self, provider: NextUpProvider()) { entry in
+            NextUpEntryView(entry: entry)
+                .modifier(KaihumanBackground())
         }
-        .configurationDisplayName("Kaihuman Todos")
-        .description("Your in-progress and inbox todos.")
+        .configurationDisplayName("Next up")
+        .description("Your next todos. Tap a circle to complete one.")
         .supportedFamilies([
             .systemSmall, .systemMedium, .systemLarge,
-            .accessoryCircular, .accessoryRectangular,
+            .accessoryCircular, .accessoryRectangular, .accessoryInline,
         ])
     }
 }
 
 @main
 struct KaihumanWidgets: WidgetBundle {
+    @WidgetBundleBuilder
     var body: some Widget {
         InboxTodoWidget()
+        QuickCaptureWidget()
+        WeeklyDoneWidget()
+        InboxCountWidget()
+        // ControlWidget needs the iOS 18 SDK runtime; the extension itself deploys to 17.0.
+        if #available(iOSApplicationExtension 18.0, *) {
+            KaihumanControls()
+        }
     }
 }

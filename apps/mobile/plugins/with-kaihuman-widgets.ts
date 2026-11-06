@@ -64,6 +64,69 @@ export const IOS_WIDGET_TARGET: WidgetTargetDescriptor = {
   appGroup: APP_GROUP,
 };
 
+/** Where the App Shortcuts (main app only) live, relative to the mobile app root. */
+export const APP_INTENTS_DIR = 'targets/ios-app-intents';
+export const APP_INTENTS_GROUP = 'KaihumanAppIntents';
+
+/**
+ * Swift files of `targets/ios-widget` compiled into the widget extension AND the main app: the
+ * App Shortcuts read the same snapshot and complete todos through the same store as the widgets.
+ * No SwiftUI or WidgetKit views in here.
+ */
+export const SHARED_APP_SOURCES: readonly string[] = [
+  'SharedTodoModels.swift',
+  'SharedTodoStore.swift',
+  'SnapshotQueries.swift',
+  'ToggleTodoIntent.swift',
+  'QuickCaptureTodoIntent.swift',
+  'OpenQuickCaptureIntent.swift',
+];
+
+/**
+ * Swift files compiled into the widget extension only: the `@main` WidgetBundle (the app has its
+ * own `@main`), views, providers, controls and previews. A test checks that this list and
+ * SHARED_APP_SOURCES together cover every `.swift` file in the directory exactly once.
+ */
+export const WIDGET_ONLY_SOURCES: readonly string[] = [
+  'ControlWidgets.swift',
+  'InboxCountWidget.swift',
+  'KaihumanWidgets.swift',
+  'NextUpConfigurationIntent.swift',
+  'PreviewData.swift',
+  'QuickCaptureWidget.swift',
+  'Theme.swift',
+  'TodoWidgetViews.swift',
+  'WeeklyDoneWidget.swift',
+  'WidgetComponents.swift',
+  'WidgetProviders.swift',
+];
+
+/** Source files to add to the main app target, grouped by the directory they live in. */
+export interface AppSourceGroup {
+  name: string;
+  /** Relative to the mobile app root. */
+  dir: string;
+  files: string[];
+}
+
+export const appSourceGroups = (
+  target: WidgetTargetDescriptor,
+  widgetFiles: readonly string[],
+  appIntentFiles: readonly string[],
+): AppSourceGroup[] =>
+  [
+    {
+      name: target.name,
+      dir: target.sourceDir,
+      files: SHARED_APP_SOURCES.filter((f) => widgetFiles.includes(f)),
+    },
+    {
+      name: APP_INTENTS_GROUP,
+      dir: APP_INTENTS_DIR,
+      files: appIntentFiles.filter((f) => f.endsWith('.swift')),
+    },
+  ].filter((group) => group.files.length > 0);
+
 // ─── Pure config transforms ──────────────────────────────────────────────────
 
 export const withIosAppGroup = (config: ExpoConfigLike): ExpoConfigLike => {
@@ -204,12 +267,16 @@ export const composeMod = <R>(
 export interface XcodeEditor {
   hasTarget(project: unknown, name: string): boolean;
   addWidgetExtension(project: unknown, target: WidgetTargetDescriptor, sourceFiles: string[]): void;
+  /** Compiles the given Swift files into the main app target. Must be safe to repeat. */
+  addAppSources(project: unknown, groups: AppSourceGroup[]): void;
 }
 
 interface PbxObjects {
   PBXNativeTarget: Record<string, PbxNativeTarget | string>;
   XCConfigurationList: Record<string, { buildConfigurations: Array<{ value: string }> } | string>;
   XCBuildConfiguration: Record<string, { buildSettings: Record<string, unknown> } | string>;
+  PBXFileReference: Record<string, { path?: string } | string>;
+  PBXBuildFile: Record<string, unknown>;
   PBXTargetDependency?: Record<string, unknown>;
   PBXContainerItemProxy?: Record<string, unknown>;
   [section: string]: Record<string, unknown> | undefined;
@@ -231,6 +298,10 @@ interface PbxProject {
   addBuildPhase(files: string[], type: string, comment: string, target: string): unknown;
   addPbxGroup(files: string[], name: string, path: string): { uuid: string };
   addToPbxGroup(groupUuid: string, parentGroupUuid: string): void;
+  pbxSourcesBuildPhaseObj(
+    target: string,
+  ): { files: Array<{ value: string; comment?: string }> } | null;
+  generateUuid(): string;
 }
 
 /** The generated Xcode project lives in `ios/`, so app-root paths are one level up from SRCROOT. */
@@ -310,6 +381,37 @@ export const xcodeProjectEditor: XcodeEditor = {
     const settings = widgetBuildSettings(target);
     for (const buildSettings of configsOf(objects, native)) Object.assign(buildSettings, settings);
   },
+  addAppSources(project, groups) {
+    const pbx = project as PbxProject;
+    const objects = pbx.hash.project.objects;
+    const sources = pbx.pbxSourcesBuildPhaseObj(pbx.getFirstTarget().uuid);
+    if (!sources) throw new Error('with-kaihuman-widgets: the app target has no Sources phase');
+
+    const fileRefOf = (name: string): string | undefined =>
+      Object.entries(objects.PBXFileReference).find(
+        ([key, ref]) =>
+          !key.endsWith('_comment') &&
+          typeof ref !== 'string' &&
+          (ref.path === name || ref.path === `"${name}"`),
+      )?.[0];
+
+    for (const group of groups) {
+      const missing = group.files.filter((file) => !fileRefOf(file));
+      if (missing.length > 0) {
+        const created = pbx.addPbxGroup(missing, group.name, `"${fromIosProject(group.dir)}"`);
+        pbx.addToPbxGroup(created.uuid, pbx.getFirstProject().firstProject.mainGroup);
+      }
+      for (const file of group.files) {
+        const fileRef = fileRefOf(file);
+        const comment = `${file} in Sources`;
+        if (!fileRef || sources.files.some((f) => f.comment === comment)) continue;
+        const uuid = pbx.generateUuid();
+        objects.PBXBuildFile[uuid] = { isa: 'PBXBuildFile', fileRef, fileRef_comment: file };
+        objects.PBXBuildFile[`${uuid}_comment`] = comment;
+        sources.files.push({ value: uuid, comment });
+      }
+    }
+  },
 };
 
 export const addIosWidgetTarget = (
@@ -317,9 +419,13 @@ export const addIosWidgetTarget = (
   sourceFiles: string[],
   editor: XcodeEditor = xcodeProjectEditor,
   target: WidgetTargetDescriptor = IOS_WIDGET_TARGET,
+  appIntentFiles: string[] = [],
 ): void => {
-  if (editor.hasTarget(project, target.name)) return;
-  editor.addWidgetExtension(project, target, sourceFiles);
+  if (!editor.hasTarget(project, target.name)) {
+    editor.addWidgetExtension(project, target, sourceFiles);
+  }
+  // Also runs for projects that already have the extension, so upgrades gain the app sources.
+  editor.addAppSources(project, appSourceGroups(target, sourceFiles, appIntentFiles));
 };
 
 // ─── Android source copy ─────────────────────────────────────────────────────
@@ -428,11 +534,19 @@ const withKaihumanWidgets = (
     const fs = options.fs ?? nodeCopyFs;
     const files = dir && fs.exists(dir) ? fs.list(dir) : [];
     const ios = next.ios as { buildNumber?: string } | undefined;
-    addIosWidgetTarget(cfg.modResults, files, options.xcode, {
-      ...IOS_WIDGET_TARGET,
-      marketingVersion: typeof next.version === 'string' ? next.version : undefined,
-      buildNumber: ios?.buildNumber,
-    });
+    const intentsDir = root ? join(root, APP_INTENTS_DIR) : undefined;
+    const appIntentFiles = intentsDir && fs.exists(intentsDir) ? fs.list(intentsDir) : [];
+    addIosWidgetTarget(
+      cfg.modResults,
+      files,
+      options.xcode,
+      {
+        ...IOS_WIDGET_TARGET,
+        marketingVersion: typeof next.version === 'string' ? next.version : undefined,
+        buildNumber: ios?.buildNumber,
+      },
+      appIntentFiles,
+    );
     return cfg;
   });
 

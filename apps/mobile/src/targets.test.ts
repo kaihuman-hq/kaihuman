@@ -8,18 +8,22 @@ import { describe, expect, it } from 'vitest';
 import withKaihumanWidgets, {
   ANDROID_RECEIVER_NAME,
   type AndroidManifest,
+  APP_INTENTS_DIR,
   addComposeCompilerClasspath,
   addGlanceDependencies,
   addIosWidgetTarget,
   addWidgetReceiverToManifest,
   addWorkManagerKeepRules,
   applyComposePlugin,
+  appSourceGroups,
   type CopyFs,
   copyAndroidWidgetSources,
   IOS_WIDGET_TARGET,
   kotlinVersionFromCatalog,
   type ModFn,
   resolveReactNativeKotlinVersion,
+  SHARED_APP_SOURCES,
+  WIDGET_ONLY_SOURCES,
   withIosAppGroup,
   withUrlScheme,
   type XcodeEditor,
@@ -99,6 +103,7 @@ describe('config plugin transforms', () => {
 
   it('only adds the Xcode target when it is missing', () => {
     const calls: string[] = [];
+    const appCalls: string[][] = [];
     let exists = false;
     const editor: XcodeEditor = {
       hasTarget: () => exists,
@@ -106,10 +111,44 @@ describe('config plugin transforms', () => {
         calls.push(`${t.name}:${files.join(',')}`);
         exists = true;
       },
+      addAppSources: (_p, groups) => {
+        appCalls.push(groups.flatMap((g) => g.files));
+      },
     };
-    addIosWidgetTarget({}, ['A.swift'], editor);
-    addIosWidgetTarget({}, ['A.swift'], editor);
-    expect(calls).toEqual(['KaihumanWidgets:A.swift']);
+    addIosWidgetTarget({}, ['A.swift', 'SharedTodoStore.swift'], editor, IOS_WIDGET_TARGET, [
+      'AppShortcuts.swift',
+      'notes.md',
+    ]);
+    addIosWidgetTarget({}, ['A.swift', 'SharedTodoStore.swift'], editor);
+    expect(calls).toEqual(['KaihumanWidgets:A.swift,SharedTodoStore.swift']);
+    // The app sources are (re)applied every run so an upgraded project gains them.
+    expect(appCalls).toEqual([
+      ['SharedTodoStore.swift', 'AppShortcuts.swift'],
+      ['SharedTodoStore.swift'],
+    ]);
+  });
+
+  it('splits the widget Swift files between the extension only and the app too', () => {
+    const swift = readdirSync(join(root, IOS_WIDGET_TARGET.sourceDir)).filter((f) =>
+      f.endsWith('.swift'),
+    );
+    const claimed = [...SHARED_APP_SOURCES, ...WIDGET_ONLY_SOURCES];
+    expect([...claimed].sort()).toEqual([...swift].sort());
+    expect(new Set(claimed).size).toBe(claimed.length);
+    // The app has its own @main and no business with views or controls.
+    expect(SHARED_APP_SOURCES).not.toContain('KaihumanWidgets.swift');
+    for (const file of SHARED_APP_SOURCES) {
+      const source = readFileSync(join(root, IOS_WIDGET_TARGET.sourceDir, file), 'utf8');
+      expect(source, file).not.toMatch(/import SwiftUI|@main|WidgetBundle/);
+    }
+    expect(appSourceGroups(IOS_WIDGET_TARGET, swift, ['AppShortcuts.swift'])).toEqual([
+      {
+        name: 'KaihumanWidgets',
+        dir: 'targets/ios-widget',
+        files: [...SHARED_APP_SOURCES].filter((f) => swift.includes(f)),
+      },
+      { name: 'KaihumanAppIntents', dir: 'targets/ios-app-intents', files: ['AppShortcuts.swift'] },
+    ]);
   });
 
   it('wires the widget extension into a real Xcode project', () => {
@@ -119,12 +158,13 @@ describe('config plugin transforms', () => {
     };
     const project = xcode.project(join(root, 'src/fixtures/app.pbxproj')).parseSync();
     const files = readdirSync(join(root, IOS_WIDGET_TARGET.sourceDir));
+    const intents = readdirSync(join(root, APP_INTENTS_DIR));
     const target = { ...IOS_WIDGET_TARGET, marketingVersion: '0.1.0', buildNumber: '7' };
 
     expect(xcodeProjectEditor.hasTarget(project, target.name)).toBe(false);
-    addIosWidgetTarget(project, files, xcodeProjectEditor, target);
+    addIosWidgetTarget(project, files, xcodeProjectEditor, target, intents);
     expect(xcodeProjectEditor.hasTarget(project, target.name)).toBe(true);
-    addIosWidgetTarget(project, files, xcodeProjectEditor, target);
+    addIosWidgetTarget(project, files, xcodeProjectEditor, target, intents);
 
     const out = project.writeSync();
     expect(out.match(/isa = PBXNativeTarget;/g)).toHaveLength(2);
@@ -141,7 +181,18 @@ describe('config plugin transforms', () => {
 
     const swift = files.filter((f) => f.endsWith('.swift'));
     const sources = out.match(/\/\* "?[\w.]+\.swift"? in Sources \*\/,/g) ?? [];
-    expect(sources).toHaveLength(swift.length);
+    const appSwift = intents.filter((f) => f.endsWith('.swift'));
+    // Extension: every widget file. App: the shared ones plus the App Shortcuts, each exactly once.
+    expect(sources).toHaveLength(swift.length + SHARED_APP_SOURCES.length + appSwift.length);
+    expect(out).toContain('path = "../targets/ios-app-intents";');
+    const appSources = out.slice(
+      out.indexOf('/* Sources */ = {'),
+      out.indexOf('/* End PBXSourcesBuildPhase'),
+    );
+    const inApp = appSources.match(/\/\* [\w]+\.swift in Sources \*\/,/g) ?? [];
+    expect(inApp).toHaveLength(SHARED_APP_SOURCES.length + appSwift.length);
+    expect(appSources).toContain('AppShortcuts.swift in Sources');
+    expect(appSources).not.toContain('KaihumanWidgets.swift in Sources');
 
     // The embed phase sits right after Resources, ahead of the React Native bundling script.
     const appPhases = out.slice(out.indexOf('/* app */ = {'));
@@ -175,6 +226,7 @@ describe('config plugin transforms', () => {
     const fakeXcode: XcodeEditor = {
       hasTarget: () => false,
       addWidgetExtension: (_p, t) => added.push(t.name),
+      addAppSources: (_p, groups) => added.push(...groups.map((g) => g.name)),
     };
     const faked = withKaihumanWidgets({}, { xcode: fakeXcode });
     await (faked.mods?.ios?.xcodeproj as ModFn)({ modResults: {} });
