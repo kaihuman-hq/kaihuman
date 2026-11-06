@@ -186,15 +186,13 @@ struct MilestoneCountdownContent: View {
                 Image(systemName: "flag.fill").font(.system(size: 9)).widgetAccentable()
                 Text(milestone.name).font(.system(size: 12, weight: .bold)).lineLimit(1)
             }
-            Text("\(dayNumber(milestone)) \(caption(milestone))")
+            // Count inline: the linear gauge's own labels add a row the rectangle has no room for.
+            Text("\(dayNumber(milestone)) \(caption(milestone)) · \(milestone.done)/\(milestone.open + milestone.done)")
                 .font(.system(size: 14, weight: .semibold))
                 .lineLimit(1)
-            Gauge(value: Double(milestone.done), in: 0...Double(total(milestone))) {
-                Text("Done")
-            } currentValueLabel: {
-                Text("\(milestone.done)/\(milestone.open + milestone.done)")
-            }
-            .gaugeStyle(.accessoryLinearCapacity)
+                .minimumScaleFactor(0.8)
+            Gauge(value: Double(milestone.done), in: 0...Double(total(milestone))) { EmptyView() }
+                .gaugeStyle(.accessoryLinearCapacity)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
