@@ -57,6 +57,21 @@ const ADVANCE: Record<TodoStatus, { to: TodoStatus; label: string; icon: IconNam
   rejected: { to: 'backlog', label: 'Reopen', icon: 'refresh' },
 };
 
+/** Short, verb-first labels: swipe buttons are ~80pt wide. */
+const ACTION_LABEL: Record<TodoStatus, string> = {
+  backlog: 'Backlog',
+  'in-progress': 'Start',
+  done: 'Done',
+  rejected: 'Reject',
+};
+
+const ACTION_ICON: Record<TodoStatus, IconName> = {
+  backlog: 'refresh',
+  'in-progress': 'chevronRight',
+  done: 'check',
+  rejected: 'close',
+};
+
 export interface KanbanViewProps {
   controller: KanbanBoardController;
   /** Opens the add-todo sheet; enables the Android FAB. */
@@ -112,6 +127,13 @@ export function KanbanView({ controller, onAddTodo }: KanbanViewProps) {
     setVersion((v) => v + 1);
   };
 
+  const remove = async (path: string, index: number) => {
+    const res = await controller.remove(path, index);
+    setError(res.ok ? null : res.error);
+    if (!res.ok) haptics.error();
+    setVersion((v) => v + 1);
+  };
+
   const columns = controller.columns();
   const tags = controller.tags;
   const cards = columns[status];
@@ -150,11 +172,24 @@ export function KanbanView({ controller, onAddTodo }: KanbanViewProps) {
     body = (
       <Section header={`${LABEL[status]} · ${cards.length}`}>
         {cards.map(({ item, itemIndex, filePath }) => {
-          const actions: SwipeAction[] = TODO_STATUSES.filter((s) => s !== status).map((s) => ({
-            label: `Move to ${LABEL[s]}`,
-            destructive: s === 'rejected',
-            onPress: () => void move(filePath, itemIndex, s),
-          }));
+          // Done sits on the leading edge so the common "finish it" swipe mirrors Mail's read/unread;
+          // Delete is the red, outermost trailing action.
+          const actions: SwipeAction[] = [
+            ...TODO_STATUSES.filter((s) => s !== status).map(
+              (s): SwipeAction => ({
+                label: ACTION_LABEL[s],
+                icon: ACTION_ICON[s],
+                side: s === 'done' ? 'leading' : 'trailing',
+                onPress: () => void move(filePath, itemIndex, s),
+              }),
+            ),
+            {
+              label: 'Delete',
+              icon: 'trash',
+              destructive: true,
+              onPress: () => void remove(filePath, itemIndex),
+            },
+          ];
           return (
             <ListRow
               key={`${filePath}:${itemIndex}`}

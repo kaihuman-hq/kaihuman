@@ -82,6 +82,21 @@ export class KnowledgeScreenController {
     return path;
   }
 
+  /** Files a note as processed by moving it under `processed/`, as `/kb-ingest` would. */
+  async archive(path: string): Promise<void> {
+    const to = `${KNOWLEDGE_PROCESSED}/${path.slice(path.lastIndexOf('/') + 1)}`;
+    await this.files.rename(path, to);
+    const title = this.titles.get(path);
+    this.titles.delete(path);
+    if (title !== undefined) this.titles.set(to, title);
+  }
+
+  /** Deletes a note for good. */
+  async remove(path: string): Promise<void> {
+    await this.files.remove(path);
+    this.titles.delete(path);
+  }
+
   private paths(folder: string): string[] {
     const prefix = `${folder}/`;
     return this.files

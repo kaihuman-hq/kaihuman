@@ -27,6 +27,27 @@ vi.mock('expo-router/react-navigation', () => ({
   HeaderShownContext: createContext(false),
 }));
 
+// The native gesture stack needs a worklet runtime. This stand-in renders both action sets
+// inline so tests can press the revealed buttons.
+vi.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
+  const methods = { close: vi.fn(), openLeft: vi.fn(), openRight: vi.fn(), reset: vi.fn() };
+  return {
+    default: ({ children, renderLeftActions, renderRightActions, testID }: Record<string, any>) =>
+      createElement(
+        'div',
+        { 'data-testid': testID },
+        renderLeftActions?.({ value: 0 }, { value: 0 }, methods),
+        children,
+        renderRightActions?.({ value: 0 }, { value: 0 }, methods),
+      ),
+  };
+});
+
+vi.mock('react-native-gesture-handler', () => ({
+  GestureHandlerRootView: ({ children, style }: Record<string, any>) =>
+    createElement('div', { style }, children),
+}));
+
 // react-native-svg ships untranspiled native code that jsdom cannot load.
 vi.mock('react-native-svg', () => {
   const el =

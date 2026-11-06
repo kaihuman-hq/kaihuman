@@ -10,6 +10,7 @@ import {
   ListRow,
   Screen,
   Section,
+  type SwipeAction,
   Text,
   TextField,
 } from '../ui/index.js';
@@ -65,6 +66,32 @@ export function KnowledgeView({ controller }: { controller: KnowledgeScreenContr
     setRev((n) => n + 1);
   };
 
+  const settle = async (run: () => Promise<void>) => {
+    try {
+      setError(null);
+      await run();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      haptics.error();
+    }
+    setRev((n) => n + 1);
+  };
+
+  const actionsFor = (path: string): SwipeAction[] => [
+    {
+      label: 'Archive',
+      icon: 'check',
+      side: 'leading',
+      onPress: () => void settle(() => controller.archive(path)),
+    },
+    {
+      label: 'Delete',
+      icon: 'trash',
+      destructive: true,
+      onPress: () => void settle(() => controller.remove(path)),
+    },
+  ];
+
   const inbox = controller.inbox();
   const processed = controller.processed().length;
 
@@ -115,6 +142,7 @@ export function KnowledgeView({ controller }: { controller: KnowledgeScreenContr
               title={item.title}
               subtitle={item.name}
               icon="note"
+              swipeActions={actionsFor(item.path)}
               {...quiet}
             />
           ))}

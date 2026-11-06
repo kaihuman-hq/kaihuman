@@ -1,9 +1,18 @@
-import { Children, createContext, type ReactNode, useContext } from 'react';
+import { Children, createContext, type ReactNode, useContext, useRef } from 'react';
 import { ActionSheetIOS, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
+import SwipeableModule, {
+  type SwipeableMethods,
+  type SwipeableProps,
+} from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { type Palette, useTheme } from '../theme/theme.js';
+import { haptics } from './haptics.js';
 import { Icon, type IconName } from './icon.js';
 import { useScreenInset } from './screen.js';
 import { Text } from './text.js';
+
+// NodeNext types this CJS-flagged subpath's default export as the module namespace; at runtime it
+// is the component.
+const ReanimatedSwipeable = SwipeableModule as unknown as (props: SwipeableProps) => ReactNode;
 
 const ICON_TILE = 29;
 const ICON_GAP = 12;
@@ -90,7 +99,83 @@ export interface SwipeAction {
   color?: string;
   /** Marked red in the iOS action sheet. */
   destructive?: boolean;
+  /** Edge the button is revealed from when swiping; defaults to trailing. */
+  side?: 'leading' | 'trailing';
   onPress: () => void;
+}
+
+const sideOf = (a: SwipeAction) => a.side ?? 'trailing';
+
+/**
+ * Buttons in reveal order, nearest the row first. The destructive action goes outermost
+ * (HIG), which is the last button on the trailing edge and the first one on the leading edge.
+ */
+function revealOrder(actions: readonly SwipeAction[], side: 'leading' | 'trailing') {
+  const mine = actions.filter((a) => sideOf(a) === side);
+  const safe = mine.filter((a) => !a.destructive);
+  const risky = mine.filter((a) => a.destructive);
+  return side === 'trailing' ? [...safe, ...risky] : [...risky, ...safe];
+}
+
+const ACTION_WIDTH = 80;
+
+function actionColors(c: Palette, action: SwipeAction, index: number, ios: boolean) {
+  if (action.destructive) return { fill: c.danger, text: c.onDanger };
+  if (action.color) return { fill: action.color, text: c.onStatus };
+  // Material 3 uses tonal containers; iOS uses solid fills, one hue per extra action.
+  if (!ios) return { fill: c.accentSoft, text: c.onAccentSoft };
+  return index === 0
+    ? { fill: c.accentFill, text: c.onAccentFill }
+    : { fill: c.info, text: c.onStatus };
+}
+
+function SwipeButtons({
+  actions,
+  methods,
+  onTrigger,
+}: {
+  actions: readonly SwipeAction[];
+  methods: SwipeableMethods;
+  onTrigger: (action: SwipeAction, methods: SwipeableMethods) => void;
+}) {
+  const theme = useTheme();
+  const ios = theme.platform === 'ios';
+  return (
+    <View style={{ flexDirection: 'row' }}>
+      {actions.map((action, index) => {
+        const { fill, text } = actionColors(theme.colors, action, index, ios);
+        return (
+          <Pressable
+            key={action.label}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            testID={`swipe-action-${action.label}`}
+            onPress={() => onTrigger(action, methods)}
+            style={{
+              width: ACTION_WIDTH,
+              backgroundColor: fill,
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              paddingHorizontal: 4,
+            }}
+          >
+            {action.icon ? (
+              <Icon name={action.icon} size={22} color={text} weight="semibold" />
+            ) : null}
+            <Text
+              variant="footnote"
+              weight="600"
+              numberOfLines={2}
+              style={{ color: text, textAlign: 'center' }}
+            >
+              {action.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
 
 /** Category colour of a row's leading icon; one mapping so every screen's tiles match. */
@@ -123,9 +208,8 @@ export interface ListRowProps {
 }
 
 /**
- * Swipe actions are surfaced as a long-press menu (ActionSheet on iOS, Alert elsewhere)
- * rather than a pan-gesture reveal: it needs no gesture-handler dependency and is
- * reachable by assistive tech. The trade-off is lower discoverability than a swipe.
+ * Long-press menu (ActionSheet on iOS, Alert elsewhere). The swipe reveal is a pan gesture
+ * that switch and screen-reader users cannot perform, so this stays as the fallback.
  */
 function showActions(title: string, actions: readonly SwipeAction[], ios: boolean) {
   if (ios && Platform.OS === 'ios') {
@@ -181,6 +265,19 @@ export function ListRow({
     : tileGlyph;
   const hasActions = (swipeActions?.length ?? 0) > 0;
   const interactive = Boolean(onPress || onLongPress || hasActions) && !disabled;
+
+  const swipeRef = useRef<SwipeableMethods>(null);
+  // react-native-web has no usable native swipe; there the long-press menu is the way in.
+  const swipeable = hasActions && !disabled && Platform.OS !== 'web';
+  const leading = revealOrder(swipeActions ?? [], 'leading');
+  const trailing = revealOrder(swipeActions ?? [], 'trailing');
+
+  const trigger = (action: SwipeAction, methods?: SwipeableMethods) => {
+    (methods ?? swipeRef.current)?.close();
+    if (action.destructive) haptics.warning();
+    else haptics.success();
+    action.onPress();
+  };
 
   const handleLongPress = () => {
     if (onLongPress) onLongPress();
@@ -293,11 +390,19 @@ export function ListRow({
     );
   }
 
-  return (
+  const actionList = swipeActions ?? [];
+  const pressable = (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={value ? `${title}, ${value}` : title}
       accessibilityHint={hasActions && !onLongPress ? 'Long press for more actions' : undefined}
+      accessibilityActions={
+        hasActions ? actionList.map((a, i) => ({ name: `swipe-${i}`, label: a.label })) : undefined
+      }
+      onAccessibilityAction={(event) => {
+        const action = actionList[Number(event.nativeEvent.actionName.replace('swipe-', ''))];
+        if (action) trigger(action);
+      }}
       onPress={onPress}
       onLongPress={onLongPress || hasActions ? handleLongPress : undefined}
       testID={testID}
@@ -305,5 +410,35 @@ export function ListRow({
     >
       {({ pressed }) => body(pressed)}
     </Pressable>
+  );
+  if (!swipeable) return pressable;
+
+  return (
+    <ReanimatedSwipeable
+      ref={swipeRef}
+      testID={testID ? `${testID}-swipeable` : undefined}
+      friction={2}
+      overshootLeft={false}
+      overshootRight={false}
+      onSwipeableWillOpen={() => haptics.selection()}
+      renderLeftActions={
+        leading.length
+          ? (_progress, _translation, methods) => (
+              <SwipeButtons actions={leading} methods={methods} onTrigger={trigger} />
+            )
+          : undefined
+      }
+      renderRightActions={
+        trailing.length
+          ? (_progress, _translation, methods) => (
+              <SwipeButtons actions={trailing} methods={methods} onTrigger={trigger} />
+            )
+          : undefined
+      }
+      // Opaque so the buttons stay hidden until the row slides away.
+      childrenContainerStyle={{ backgroundColor: ios ? colors.surface : colors.background }}
+    >
+      {pressable}
+    </ReanimatedSwipeable>
   );
 }

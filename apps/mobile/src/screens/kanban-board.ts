@@ -161,6 +161,13 @@ export class KanbanBoardController {
     });
   }
 
+  remove(path: string, index: number): Promise<BoardResult> {
+    return this.edit(path, (d) => {
+      if (!d.items[index]) throw new Error('Todo not found');
+      return { ...d, items: d.items.filter((_, i) => i !== index) };
+    });
+  }
+
   editText(path: string, index: number, text: string): Promise<BoardResult> {
     return this.edit(path, (d) => {
       if (!d.items[index]) throw new Error('Todo not found');
