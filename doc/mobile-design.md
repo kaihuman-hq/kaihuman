@@ -312,7 +312,7 @@ Built on `theme.ts` and `useTheme()`. All 14 primitives below exist in `src/ui/`
 | `StatTile` | A single number with a `caption2` label. Value in mono |
 | `Fab` | Android only: the primary create action on list screens. Renders nothing on iOS |
 
-Legacy: `src/views/primitives.tsx` stays as a thin wrapper over `src/ui/` until its screens are restyled. `src/theme/tokens.ts` (the old Nexus palette) is still used by the root layout and legacy views and is deleted when the last import is gone (§13).
+Legacy `src/views/primitives.tsx` and `src/theme/tokens.ts` were deleted on 2026-11-06 once every screen used `src/ui/`.
 
 ## 12. Web preview
 
@@ -354,7 +354,7 @@ Follow-up session. One bullet per screen. Each screen uses only `src/ui/` primit
 | This spec | Written. Not committed |
 | `src/ui/` primitives (`Icon`, `haptics`, `Text`, `Screen`, `Section`, `ListRow`, `Button`, `TextField`, `SegmentedControl`, `Chip`, `Badge`, `EmptyState`, `Card`, `StatTile`, `Fab`, `Divider`) | Done. Committed. The legacy `src/views/primitives.tsx` `Button` renders the tinted variant so unrestyled screens are not filled |
 | Tab navigation (`app/(tabs)` with `NativeTabs` and a JS tab bar on web, per-tab Stacks, `quick-*` modal sheets, `src/navigation/stack-options.ts`) | Done. Root Stack themed from `useTheme()`. Five tabs; Capture is `src/views/capture-hub-view.tsx`, More is `src/views/more-view.tsx` |
-| Screen restyle (§13) | Not started |
+| Screen restyle (§13) | Done 2026-11-06. Every screen uses `src/ui`; `src/views/primitives.tsx` and `src/theme/tokens.ts` are deleted |
 
 ### 14.2 Known gaps
 

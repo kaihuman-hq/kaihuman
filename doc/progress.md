@@ -1,5 +1,25 @@
 # Progress
 
+## 2026-11-06 — Mobile: every screen restyled to native iOS and Material 3
+
+- All screens now use only `src/ui` primitives and `useTheme()` colours, in light and dark, with iOS (HIG) and Android (Material 3) variants:
+  - Login: brand mark, "Sign in with GitHub", "Try demo", token sign-in behind a disclosure.
+  - Repositories: grouped rows with a checkmark, search, and loading/empty/error states.
+  - Today: date header, shortcut grid, and every tile kind as a `Card` with mono stat cells and checkbox rows.
+  - Board: column `SegmentedControl` with counts, tag chips, a per-row advance button and a long-press move menu, and a FAB on Android.
+  - Analytics: stat tiles and labelled bars.
+  - Capture: launcher with icon tiles. Quick sheets have one primary action, keyboard handling, and success/error haptics.
+  - Ideas: status chips, row menus and a detail screen with status and log.
+  - Wiki: reader with tappable `[[links]]` and backlinks.
+  - Knowledge: inbox with counts.
+  - Files: browser with breadcrumbs and an "Encrypted" badge.
+  - Editor: mono, dirty state, and an `.enc` unlock card.
+  - More: account card, workspace rows and a danger sign-out.
+- Pull-to-refresh where data loads, accessibility labels and roles on every control, and 44pt/48dp targets.
+- `src/ui`: new `lock`, `unlock`, `folder`, `document` and `chevronLeft` icons, `TextField` `autoFocus`, and `Screen` no longer duplicates the title under a visible navigation header in the web preview.
+- Deleted the legacy `src/views/primitives.tsx` and `src/theme/tokens.ts`. `src/index.ts` now re-exports `theme.ts`.
+- New `apps/mobile/scripts/screens.cjs` takes web-preview screenshots on iPhone 15 Pro and Pixel 8 in light and dark. A contact sheet is in `apps/mobile/docs/screens.png`.
+
 ## 2026-11-06 — CI: skip workflows on draft pull requests
 
 - `ci.yml` and `mobile-build.yml` now run on `pull_request` (opened, synchronize, reopened, ready_for_review) instead of every branch push, and every job is skipped while the PR is a draft. Marking a PR ready for review starts them. `mobile-build.yml` keeps `workflow_dispatch` for manual runs. Branch pushes without a PR no longer run CI.

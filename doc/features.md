@@ -149,6 +149,7 @@
 | Pure-JS `crypto.subtle` polyfill for Hermes (PBKDF2-SHA256 to AES-GCM via @noble) so `.enc` files work on device | `apps/mobile/src` | 2026-11-05 |
 | Vitest render tests for the views (jsdom, `react-native` aliased to `react-native-web`); 166 mobile tests | `apps/mobile` | 2026-11-05 |
 | Native design system (`src/ui/`: Icon, Text, Screen, Section, ListRow, Button, TextField, Chip, Card and more) and five-tab navigation (`NativeTabs`, per-tab Stacks, quick-capture modal sheets, JS tab bar on web) | `apps/mobile/src/ui`, `apps/mobile/app/(tabs)` | 2026-11-06 |
+| Every mobile screen restyled to native iOS (HIG) and Material 3 in light and dark: grouped lists, platform icons, haptics, pull-to-refresh, empty/loading/error states, row action menus, Android FABs | `apps/mobile/src/views`, `apps/mobile/app` | 2026-11-06 |
 
 **Known gaps:**
 - Swift and Kotlin widget code has never been compiled here (no Xcode or Android toolchain in this environment); CI compile checks are the first real build.
