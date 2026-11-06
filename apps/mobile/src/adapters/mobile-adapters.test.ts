@@ -5,7 +5,7 @@ import {
   githubProfileStore,
   type PendingMutation,
 } from '@kaihuman/core';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type KeyValueDriver, MobileStorageAdapter, type RecordDriver } from './mobile-storage.js';
 import {
   InMemorySharedContainer,
@@ -109,7 +109,17 @@ describe('MobileStorageAdapter', () => {
   });
 });
 
+/** A save that succeeds: clears the dirty flag the way a real commit does. */
+const mockSave = () =>
+  vi.spyOn(githubFileStore, 'saveFile').mockImplementation(async () => {
+    githubFileStore.dirtyFiles.value = new Set();
+  });
+
+const HABIT = '.kh/run.habit.csv';
+
 describe('WidgetBridge', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   beforeEach(() => {
     configureCoreStorage(new MobileStorageAdapter());
     githubProfileStore.currentRepo.value = repo;
@@ -151,7 +161,7 @@ describe('WidgetBridge', () => {
     const snap = JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}');
     const item = snap.items.find((i: { text: string }) => i.text === 'write plan');
 
-    const save = vi.spyOn(githubFileStore, 'saveFile').mockResolvedValue(undefined as never);
+    const save = mockSave();
     await container.write(
       PENDING_WIDGET_MUTATIONS_FILE,
       JSON.stringify([
@@ -171,5 +181,106 @@ describe('WidgetBridge', () => {
 
     expect(await bridge.reconcile()).toBe(0);
     save.mockRestore();
+  });
+  const queue = async (container: InMemorySharedContainer, entries: unknown) =>
+    container.write(PENDING_WIDGET_MUTATIONS_FILE, JSON.stringify(entries));
+  const inbox = () => githubFileStore.openFiles.value['.kh/inbox.todos.md']?.content ?? '';
+
+  it('replays a move to in-progress and back to backlog in timestamp order', async () => {
+    const container = new InMemorySharedContainer();
+    const bridge = new WidgetBridge(container);
+    mockSave();
+    const id = '.kh/inbox.todos.md#0';
+    await queue(container, [
+      { kind: 'move', itemId: id, status: 'backlog', timestamp: 3 },
+      { kind: 'move', itemId: id, status: 'in-progress', timestamp: 2 },
+    ]);
+    // Applied oldest first: backlog -> in-progress, then back to backlog.
+    expect(await bridge.reconcile()).toBe(2);
+    expect(inbox()).toContain('- [ ] write plan');
+  });
+
+  it('treats entries without kind (v1 and Android) as toggles', async () => {
+    const container = new InMemorySharedContainer();
+    mockSave();
+    await queue(container, [{ itemId: '.kh/inbox.todos.md#1', timestamp: 1 }]);
+    expect(await new WidgetBridge(container).reconcile()).toBe(1);
+    expect(inbox()).toContain('- [x] ship phase 2');
+  });
+
+  it('appends a capture to the current inbox content, not the widget copy', async () => {
+    const container = new InMemorySharedContainer();
+    mockSave();
+    githubFileStore.updateFileContent('.kh/inbox.todos.md', `${TODOS}- [ ] edited meanwhile\n`);
+    await queue(container, [{ kind: 'capture', text: 'buy milk', timestamp: 1 }]);
+    expect(await new WidgetBridge(container).reconcile()).toBe(1);
+    expect(inbox()).toContain('edited meanwhile');
+    expect(inbox()).toContain('- [ ] buy milk');
+  });
+
+  it('creates the inbox for a capture when it does not exist', async () => {
+    const container = new InMemorySharedContainer();
+    githubFileStore.openFiles.value = {};
+    const create = vi.spyOn(githubFileStore, 'createFile').mockImplementation(async (p, c) => {
+      githubFileStore.openFiles.value = { [p]: { content: c, sha: '' } };
+    });
+    await queue(container, [{ kind: 'capture', text: 'first', timestamp: 1 }]);
+    expect(await new WidgetBridge(container).reconcile()).toBe(1);
+    expect(create).toHaveBeenCalledWith(
+      '.kh/inbox.todos.md',
+      expect.stringContaining('- [ ] first'),
+    );
+  });
+
+  it('checks in a habit on the current file and skips an already checked day', async () => {
+    const container = new InMemorySharedContainer();
+    mockSave();
+    githubFileStore.openFiles.value = {
+      ...githubFileStore.openFiles.value,
+      [HABIT]: { content: 'iso date;goal reached\n2026-06-09;x', sha: 'h1' },
+    };
+    await queue(container, [
+      { kind: 'habit', path: HABIT, date: '2026-06-10', timestamp: 1 },
+      { kind: 'habit', path: HABIT, date: '2026-06-10', timestamp: 2 },
+      { kind: 'habit', path: '.kh/missing.habit.csv', date: '2026-06-10', timestamp: 3 },
+    ]);
+    expect(await new WidgetBridge(container).reconcile()).toBe(1);
+    expect(githubFileStore.openFiles.value[HABIT]?.content).toBe(
+      'iso date;goal reached\n2026-06-09;x\n2026-06-10;x',
+    );
+  });
+
+  it('skips malformed entries and malformed JSON', async () => {
+    const container = new InMemorySharedContainer();
+    const save = mockSave();
+    await queue(container, [
+      null,
+      'x',
+      { kind: 'move', itemId: '.kh/inbox.todos.md#0', status: 'done', timestamp: 1 },
+      { kind: 'capture', timestamp: 1 },
+      { kind: 'wat', timestamp: 1 },
+      { itemId: '.kh/inbox.todos.md#0' },
+    ]);
+    expect(await new WidgetBridge(container).reconcile()).toBe(0);
+    expect(save).not.toHaveBeenCalled();
+    await container.write(PENDING_WIDGET_MUTATIONS_FILE, '{not json');
+    expect(await new WidgetBridge(container).reconcile()).toBe(0);
+    expect(container.files.get(PENDING_WIDGET_MUTATIONS_FILE)).toBe('[]');
+  });
+
+  it('puts habits, wiki cards and the raw count in the snapshot', async () => {
+    const container = new InMemorySharedContainer();
+    githubFileStore.openFiles.value = {
+      ...githubFileStore.openFiles.value,
+      [HABIT]: { content: 'iso date;goal reached', sha: 'h' },
+      '.kh/wiki/a.md': { content: '# A\n\nbody', sha: 'w' },
+      '.kh/raw/1.md': { content: 'x', sha: 'r' },
+    };
+    await new WidgetBridge(container).sync();
+    const snap = JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}');
+    expect(snap.counts.knowledgeInbox).toBe(1);
+    expect(snap.habits[0]).toMatchObject({ path: HABIT, name: 'Run', doneToday: false });
+    expect(snap.cards[0]).toMatchObject({ path: '.kh/wiki/a.md', title: 'A' });
+    expect(Object.keys(snap.files)).toEqual(['.kh/inbox.todos.md']);
   });
 });

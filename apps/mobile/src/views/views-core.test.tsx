@@ -1,7 +1,9 @@
 import { authStore, githubProfileStore } from '@kaihuman/core';
 import { parseTodos } from '@kaihuman/formats';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Platform } from 'react-native';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FocusSessionController } from '../screens/focus-session.js';
 import { KanbanBoardController } from '../screens/kanban-board.js';
 import { LoginScreenController } from '../screens/login-screen.js';
 import { QuickCaptureController, type RepoFiles } from '../screens/quick-capture.js';
@@ -108,6 +110,35 @@ describe('KanbanView', () => {
     expect(parseTodos(files.store.get('.kh/inbox.todos.md') ?? '').items[0]?.status).toBe(
       'in-progress',
     );
+  });
+});
+
+describe('KanbanView focus', () => {
+  // react-native-web reports 'web', where swipe actions are off; pretend to be a native build.
+  const realOS = Platform.OS;
+  beforeEach(() => {
+    (Platform as { OS: string }).OS = 'ios';
+  });
+  afterEach(() => {
+    (Platform as { OS: string }).OS = realOS;
+  });
+
+  it('only offers Start focus when the controller is available', async () => {
+    const files = todoFiles();
+    const none = new FocusSessionController(null);
+    const { unmount } = render(
+      <KanbanView controller={new KanbanBoardController(files)} focus={none} />,
+    );
+    await waitFor(() => expect(screen.getByText('write tests')).toBeTruthy());
+    expect(screen.queryByTestId('swipe-action-Start focus')).toBeNull();
+    unmount();
+
+    const start = vi.fn(() => 'a1');
+    const focus = new FocusSessionController({ startFocusActivity: start });
+    render(<KanbanView controller={new KanbanBoardController(files)} focus={focus} />);
+    await waitFor(() => expect(screen.getByText('write tests')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('swipe-action-Start focus'));
+    expect(start).toHaveBeenCalledWith('.kh/inbox.todos.md#0', 'write tests', 25);
   });
 });
 

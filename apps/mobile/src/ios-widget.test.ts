@@ -45,6 +45,9 @@ const snapshot: Required<WidgetTodoSnapshot> = {
   timeZone: '',
   items: [],
   files: {},
+  ideas: { byStatus: {}, hot: [{ slug: '', title: '', level: 'hot' }] },
+  cards: [{ path: '', title: '', excerpt: '', tags: [] }],
+  habits: [{ path: '', name: '', doneToday: false, streakDays: 0, pending: false }],
 };
 const statuses: WidgetTodoItem['status'][] = ['backlog', 'in-progress', 'done', 'rejected'];
 

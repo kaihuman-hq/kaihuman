@@ -1,10 +1,17 @@
 import {
-  applyWidgetTodoToggle,
+  applyWidgetCapture,
+  applyWidgetTodoMove,
+  buildWidgetExtras,
   buildWidgetTodoSnapshot,
   githubFileStore,
   githubProfileStore,
+  type PendingWidgetMutation,
 } from '@kaihuman/core';
+import { checkIn } from '@kaihuman/formats';
 import { effect } from '@preact/signals';
+import { githubRepoFiles } from '../screens/quick-capture.js';
+
+export type { PendingWidgetMutation };
 
 export const WIDGET_TODOS_FILE = 'widget-todos.json';
 export const PENDING_WIDGET_MUTATIONS_FILE = 'pending-widget-mutations.json';
@@ -15,12 +22,6 @@ export interface SharedContainer {
   write(name: string, content: string): Promise<void>;
   /** `WidgetCenter.shared.reloadAllTimelines()` / Glance `updateAll`. */
   reloadAllTimelines(): Promise<void>;
-}
-
-/** A toggle the native widget could not commit (offline or SHA conflict). */
-export interface PendingWidgetMutation {
-  itemId: string;
-  timestamp: number;
 }
 
 export class InMemorySharedContainer implements SharedContainer {
@@ -40,25 +41,45 @@ export class InMemorySharedContainer implements SharedContainer {
 const isTodoPath = (path: string): boolean =>
   /^\.(kh|lifeos)\//.test(path) && path.endsWith('.todos.md');
 
-const isRawPath = (path: string): boolean => /^\.(kh|lifeos)\/raw\//.test(path);
-
 const currentSnapshot = () => {
   const repo = githubProfileStore.currentRepo.value;
   if (!repo) return null;
+  const open = githubFileStore.openFiles.value;
   const files: Record<string, { sha: string; content: string }> = {};
-  for (const [path, file] of Object.entries(githubFileStore.openFiles.value)) {
+  for (const [path, file] of Object.entries(open)) {
     if (isTodoPath(path)) files[path] = { sha: file.sha, content: file.content };
   }
-  // Only what the app has loaded: raw captures that were never opened are not counted.
-  const knowledgeInbox = Object.keys(githubFileStore.openFiles.value).filter(isRawPath).length;
-  return buildWidgetTodoSnapshot(files, repo.full_name, repo.default_branch, new Date(), {
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    knowledgeInbox,
+  const now = new Date();
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Extras only see what the app has loaded: unopened raw captures, wiki pages etc. are not counted.
+  return buildWidgetTodoSnapshot(files, repo.full_name, repo.default_branch, now, {
+    timeZone,
+    ...buildWidgetExtras(open, now, timeZone),
     lockScreenText: true, // no privacy setting exists yet; v2 reserves the flag for it
   });
 };
 
-/** Keeps `widget-todos.json` current and replays toggles the widgets queued while the app slept. */
+const isMutation = (m: unknown): m is PendingWidgetMutation => {
+  if (typeof m !== 'object' || m === null) return false;
+  const o = m as Record<string, unknown>;
+  if (typeof o.timestamp !== 'number') return false;
+  const str = (k: string) => typeof o[k] === 'string' && o[k] !== '';
+  switch (o.kind) {
+    case undefined:
+    case 'toggle':
+      return str('itemId');
+    case 'move':
+      return str('itemId') && (o.status === 'backlog' || o.status === 'in-progress');
+    case 'capture':
+      return str('text');
+    case 'habit':
+      return str('path') && str('date');
+    default:
+      return false;
+  }
+};
+
+/** Keeps `widget-todos.json` current and replays mutations the widgets queued while the app slept. */
 export class WidgetBridge {
   private lastWritten = '';
   private queue: Promise<unknown> = Promise.resolve();
@@ -94,31 +115,57 @@ export class WidgetBridge {
   }
 
   /**
-   * Replays queued widget toggles through `githubFileStore`. Toggles are re-applied to the
-   * current content (not the widget's copy) so a stale SHA cannot overwrite newer edits.
-   * Returns the number of toggles applied.
+   * Replays queued widget mutations through `githubFileStore`, oldest first. Each one is
+   * re-applied to the current content (not the widget's copy) so a stale SHA cannot overwrite
+   * newer edits. Returns the number applied.
    */
   async reconcile(): Promise<number> {
     const raw = await this.container.read(PENDING_WIDGET_MUTATIONS_FILE);
     if (!raw) return 0;
-    let pending: PendingWidgetMutation[];
+    let parsed: unknown;
     try {
-      pending = JSON.parse(raw) as PendingWidgetMutation[];
+      parsed = JSON.parse(raw);
     } catch {
-      pending = [];
+      parsed = [];
     }
+    const pending = (Array.isArray(parsed) ? parsed : [])
+      .filter(isMutation)
+      .sort((a, b) => a.timestamp - b.timestamp);
     await this.container.write(PENDING_WIDGET_MUTATIONS_FILE, '[]');
 
     let applied = 0;
-    for (const mutation of pending.sort((a, b) => a.timestamp - b.timestamp)) {
-      const snapshot = currentSnapshot();
-      const result = snapshot && applyWidgetTodoToggle(snapshot, mutation.itemId);
-      if (!result) continue; // already done or gone: replaying would be a no-op
-      githubFileStore.updateFileContent(result.updatedFilePath, result.updatedContent);
-      await githubFileStore.saveFile(result.updatedFilePath);
-      applied++;
+    for (const mutation of pending) {
+      try {
+        if (await this.replay(mutation)) applied++;
+      } catch {
+        // One failed write must not drop the rest of the queue.
+      }
     }
     if (applied > 0) await this.sync();
     return applied;
+  }
+
+  private async replay(m: PendingWidgetMutation): Promise<boolean> {
+    if (m.kind === 'habit') {
+      const content = await githubRepoFiles.read(m.path);
+      if (content === null) return false;
+      const next = checkIn(content, m.date);
+      if (next === content) return false;
+      await githubRepoFiles.write(m.path, next);
+      return true;
+    }
+    if (m.kind === 'capture') {
+      // The inbox may not be loaded (or exist) yet; read() opens it when it is in the repo tree.
+      await githubRepoFiles.read(`${githubRepoFiles.appFolder()}/inbox.todos.md`);
+    }
+    const snapshot = currentSnapshot();
+    if (!snapshot) return false;
+    const result =
+      m.kind === 'capture'
+        ? applyWidgetCapture(snapshot, m.text)
+        : applyWidgetTodoMove(snapshot, m.itemId, m.kind === 'move' ? m.status : 'done');
+    if (!result) return false; // already done or gone: replaying would be a no-op
+    await githubRepoFiles.write(result.updatedFilePath, result.updatedContent);
+    return true;
   }
 }

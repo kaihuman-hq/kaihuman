@@ -1,6 +1,7 @@
 import type { TodoStatus } from '@kaihuman/formats';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import type { FocusSessionController } from '../screens/focus-session.js';
 import type { KanbanBoardController } from '../screens/kanban-board.js';
 import { TODO_STATUSES } from '../screens/kanban-board.js';
 import { useTheme } from '../theme/theme.js';
@@ -76,9 +77,11 @@ export interface KanbanViewProps {
   controller: KanbanBoardController;
   /** Opens the add-todo sheet; enables the Android FAB. */
   onAddTodo?: () => void;
+  /** iOS only: adds a "Start focus" swipe action to open cards. */
+  focus?: FocusSessionController;
 }
 
-export function KanbanView({ controller, onAddTodo }: KanbanViewProps) {
+export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
   const { colors, spacing, metrics } = useTheme();
   // The controller is mutable, not signal-based: bump to re-read after load/moves.
   const [, setVersion] = useState(0);
@@ -183,6 +186,19 @@ export function KanbanView({ controller, onAddTodo }: KanbanViewProps) {
                 onPress: () => void move(filePath, itemIndex, s),
               }),
             ),
+            ...(focus?.available && (status === 'backlog' || status === 'in-progress')
+              ? [
+                  {
+                    label: 'Start focus',
+                    icon: 'timer',
+                    side: 'leading',
+                    onPress: () => {
+                      if (focus.start(`${filePath}#${itemIndex}`, item.text)) haptics.success();
+                      else haptics.error();
+                    },
+                  } satisfies SwipeAction,
+                ]
+              : []),
             {
               label: 'Delete',
               icon: 'trash',

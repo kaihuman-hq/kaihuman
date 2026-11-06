@@ -1,6 +1,8 @@
 import { Stack, useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable } from 'react-native';
+import { KaihumanShared } from '../../../modules/kaihuman-shared/index.js';
+import { FocusSessionController } from '../../../src/screens/focus-session.js';
 import { KanbanBoardController } from '../../../src/screens/kanban-board.js';
 import { useTheme } from '../../../src/theme/theme.js';
 import { Icon } from '../../../src/ui/index.js';
@@ -8,6 +10,7 @@ import { KanbanView } from '../../../src/views/kanban-view.js';
 
 export default function Board() {
   const controller = useMemo(() => new KanbanBoardController(), []);
+  const focus = useMemo(() => new FocusSessionController(KaihumanShared), []);
   const router = useRouter();
   const { platform, colors } = useTheme();
   const add = () => router.push('/quick-todo');
@@ -32,7 +35,11 @@ export default function Board() {
               : undefined,
         }}
       />
-      <KanbanView controller={controller} onAddTodo={platform === 'ios' ? undefined : add} />
+      <KanbanView
+        controller={controller}
+        focus={focus}
+        onAddTodo={platform === 'ios' ? undefined : add}
+      />
     </>
   );
 }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyWidgetCapture,
+  applyWidgetTodoMove,
   applyWidgetTodoToggle,
+  buildWidgetExtras,
   buildWidgetTodoSnapshot,
   WIDGET_SCHEMA_VERSION,
 } from './widget-sync.js';
@@ -233,5 +236,208 @@ describe('schema v2', () => {
       counts: { knowledgeInbox: 3, doneThisWeek: 5 },
       stats: { weeklyGoal: 10 },
     });
+  });
+});
+
+describe('applyWidgetTodoMove', () => {
+  const snap = buildWidgetTodoSnapshot(files, 'o/r', 'main', NOW, { timeZone: 'UTC' });
+  const later = new Date('2026-06-10T13:00:00Z');
+  const idOf = (text: string) => snap.items.find((i) => i.text === text)?.id ?? '';
+
+  it('moves backlog to in-progress and stamps updatedAt', () => {
+    const res = applyWidgetTodoMove(snap, idOf('plain backlog'), 'in-progress', later);
+    expect(res?.updatedContent).toContain('- [>] plain backlog');
+    expect(res?.updatedContent).toContain(`::updated:: ${later.getTime()}`);
+    expect(res?.snapshot.counts.inProgress).toBe(2);
+  });
+
+  it('moves in-progress back to backlog', () => {
+    const res = applyWidgetTodoMove(snap, idOf('working'), 'backlog', later);
+    expect(res?.updatedContent).toContain('- [ ] working');
+    expect(res?.baseSha).toBe('p1');
+  });
+
+  it('is a no-op for the same status, unknown ids and drifted items', () => {
+    expect(applyWidgetTodoMove(snap, idOf('working'), 'in-progress', later)).toBeNull();
+    expect(applyWidgetTodoMove(snap, 'nope', 'done', later)).toBeNull();
+    const drift = { ...snap, items: snap.items.map((i) => ({ ...i, text: `${i.text}!` })) };
+    expect(applyWidgetTodoMove(drift, drift.items[0]?.id ?? '', 'done', later)).toBeNull();
+  });
+
+  it('carries ideas, cards, habits and options through a move', () => {
+    const extras = {
+      ideas: { byStatus: { seed: 1 }, hot: [] },
+      cards: [{ path: '.kh/wiki/a.md', title: 'A', excerpt: 'x', tags: [] }],
+      habits: [{ path: '.kh/run.habit.csv', name: 'Run', doneToday: false, streakDays: 2 }],
+    };
+    const base = buildWidgetTodoSnapshot(files, 'o/r', 'main', NOW, {
+      timeZone: 'UTC',
+      knowledgeInbox: 4,
+      weeklyGoal: 7,
+      lockScreenText: false,
+      ...extras,
+    });
+    const res = applyWidgetTodoMove(base, idOf('plain backlog'), 'done', later);
+    expect(res?.snapshot).toMatchObject({
+      ...extras,
+      counts: { knowledgeInbox: 4 },
+      stats: { weeklyGoal: 7 },
+      privacy: { lockScreenText: false },
+    });
+  });
+});
+
+describe('applyWidgetCapture', () => {
+  const snap = buildWidgetTodoSnapshot(files, 'o/r', 'main', NOW, { timeZone: 'UTC' });
+
+  it('appends an open todo to the inbox with the current sha as base', () => {
+    const res = applyWidgetCapture(snap, '  buy milk #home ', NOW);
+    expect(res?.updatedFilePath).toBe('.kh/inbox.todos.md');
+    expect(res?.baseSha).toBe('i1');
+    expect(res?.updatedContent).toContain('- [ ] inbox one');
+    expect(res?.updatedContent).toContain('- [ ] buy milk #home');
+    expect(res?.snapshot.counts.inbox).toBe(3);
+  });
+
+  it('creates the inbox with an empty base sha when absent', () => {
+    const { '.kh/inbox.todos.md': _, ...rest } = files;
+    const bare = buildWidgetTodoSnapshot(rest, 'o/r', 'main', NOW, { timeZone: 'UTC' });
+    const res = applyWidgetCapture(bare, 'first', NOW);
+    expect(res?.baseSha).toBe('');
+    expect(res?.updatedContent).toContain('- [ ] first');
+  });
+
+  it('rejects empty text', () => {
+    expect(applyWidgetCapture(snap, '   ', NOW)).toBeNull();
+    expect(applyWidgetCapture(snap, '#only', NOW)).toBeNull();
+  });
+});
+
+describe('buildWidgetExtras', () => {
+  const idea = (title: string, status: string, updated: string) => ({
+    content: `---\ntitle: ${title}\nstatus: ${status}\nupdated: ${updated}\n---\n\n## Summary\n\nx\n`,
+  });
+  const csv = (days: string[]) => ({
+    content: `iso date;goal reached\n${days.map((d) => `${d};x`).join('\n')}`,
+  });
+  const run = (f: Record<string, { content: string }>, at = NOW) => buildWidgetExtras(f, at, 'UTC');
+
+  it('is minimal and omits sections when there is nothing', () => {
+    const extras = run({ '.kh/inbox.todos.md': { content: '' } });
+    expect(extras).toEqual({ knowledgeInbox: 0 });
+  });
+
+  it('counts raw captures in either folder and ignores .enc', () => {
+    expect(
+      run({ '.kh/raw/a.md': { content: '' }, '.kh/raw/b.md.enc': { content: '' } }).knowledgeInbox,
+    ).toBe(1);
+    expect(
+      run({ '.lifeos/raw/a.md': { content: '' }, '.lifeos/x.todos.md': { content: '' } })
+        .knowledgeInbox,
+    ).toBe(1);
+  });
+
+  it('summarises ideas: byStatus over all, hot = 3 open by recency', () => {
+    const extras = run({
+      '.kh/ideas/idea-a.md': idea('A', 'seed', '2026-06-09'),
+      '.kh/ideas/idea-b.md': idea('B', 'exploring', '2026-06-10'),
+      '.kh/ideas/idea-c.md': idea('C', 'committed', '2026-05-01'),
+      '.kh/ideas/idea-d.md': idea('D', 'seed', '2026-06-01'),
+      '.kh/ideas/idea-e.md': idea('E', 'shipped', '2026-06-10'),
+      '.kh/ideas/e.md.enc': idea('Z', 'seed', '2026-06-10'),
+    });
+    expect(extras.ideas?.byStatus).toEqual({ seed: 2, exploring: 1, committed: 1, shipped: 1 });
+    expect(extras.ideas?.hot.map((h) => h.slug)).toEqual(['idea-b', 'idea-a', 'idea-d']);
+    expect(extras.ideas?.hot[0]).toEqual({ slug: 'idea-b', title: 'B', level: 'hot' });
+  });
+
+  const wiki = (n: number) =>
+    Object.fromEntries(
+      Array.from({ length: n }, (_, i) => [
+        `.kh/wiki/p${String(i).padStart(2, '0')}.md`,
+        { content: `# P${i}\n\nbody ${i}` },
+      ]),
+    );
+
+  it('builds cards: title, stripped excerpt, tags', () => {
+    const extras = run({
+      '.kh/wiki/x.md': {
+        content:
+          '---\ntags: [a, "b c"]\n---\n# The X\n\nSome **bold** [link](http://u) and `code`.\n\n- item\n',
+      },
+      '.kh/wiki/no-heading.md': { content: 'plain\n\ntags:\n  - nope' },
+    });
+    const x = extras.cards?.find((c) => c.path === '.kh/wiki/x.md');
+    expect(x).toEqual({
+      path: '.kh/wiki/x.md',
+      title: 'The X',
+      excerpt: 'Some bold link and code. item',
+      tags: ['a', 'b c'],
+    });
+    expect(extras.cards?.find((c) => c.path.endsWith('no-heading.md'))?.title).toBe('no-heading');
+  });
+
+  it('block-list tags and 280-char excerpt with ellipsis', () => {
+    const extras = run({
+      '.kh/wiki/l.md': {
+        content: `---\ntags:\n  - one\n  - two\n---\n# L\n\n${'word '.repeat(100)}`,
+      },
+    });
+    const card = extras.cards?.[0];
+    expect(card?.tags).toEqual(['one', 'two']);
+    expect(card?.excerpt.length).toBe(280);
+    expect(card?.excerpt.endsWith('…')).toBe(true);
+  });
+
+  it('caps at 20 cards, stable within a day, rotating across days', () => {
+    const f = wiki(40);
+    const a = run(f, new Date('2026-06-10T01:00:00Z'));
+    const same = run(f, new Date('2026-06-10T22:00:00Z'));
+    const next = run(f, new Date('2026-06-11T01:00:00Z'));
+    expect(a.cards).toHaveLength(20);
+    expect(same.cards).toEqual(a.cards);
+    expect(next.cards?.map((c) => c.path)).not.toEqual(a.cards?.map((c) => c.path));
+  });
+
+  it('day boundary follows the time zone', () => {
+    const f = wiki(40);
+    const at = new Date('2026-06-10T23:30:00Z');
+    const prague = buildWidgetExtras(f, at, 'Europe/Prague'); // already 06-11 locally
+    expect(prague.cards).toEqual(run(f, new Date('2026-06-11T12:00:00Z')).cards);
+  });
+
+  it('excludes .enc wiki pages', () => {
+    expect(run({ '.kh/wiki/a.md.enc': { content: '# A' } }).cards).toBeUndefined();
+  });
+
+  it('computes habits with local-day doneToday and streak', () => {
+    const extras = run({
+      '.kh/morning-run.habit.csv': csv(['2026-06-08', '2026-06-09', '2026-06-10']),
+      '.kh/read.habit.csv': csv(['2026-06-08', '2026-06-09']),
+      '.kh/old.habit.csv': csv(['2026-06-01']),
+    });
+    expect(extras.habits).toEqual([
+      { path: '.kh/morning-run.habit.csv', name: 'Morning run', doneToday: true, streakDays: 3 },
+      { path: '.kh/old.habit.csv', name: 'Old', doneToday: false, streakDays: 0 },
+      { path: '.kh/read.habit.csv', name: 'Read', doneToday: false, streakDays: 2 },
+    ]);
+  });
+
+  it('uses the zone for doneToday (23:30Z is already tomorrow in Prague)', () => {
+    const f = { '.kh/r.habit.csv': csv(['2026-06-11']) };
+    expect(
+      buildWidgetExtras(f, new Date('2026-06-10T23:30:00Z'), 'Europe/Prague').habits?.[0]
+        ?.doneToday,
+    ).toBe(true);
+    expect(run(f, new Date('2026-06-10T23:30:00Z')).habits?.[0]?.doneToday).toBe(false);
+  });
+
+  it('feeds the snapshot, which still keeps only todo files', () => {
+    const extras = run({ '.kh/ideas/idea-a.md': idea('A', 'seed', '2026-06-10'), ...wiki(2) });
+    const snap = buildWidgetTodoSnapshot(files, 'o/r', 'main', NOW, { timeZone: 'UTC', ...extras });
+    expect(snap.ideas).toEqual(extras.ideas);
+    expect(snap.cards).toEqual(extras.cards);
+    expect('habits' in snap).toBe(false);
+    expect(Object.keys(snap.files).sort()).toEqual(Object.keys(files).sort());
   });
 });
