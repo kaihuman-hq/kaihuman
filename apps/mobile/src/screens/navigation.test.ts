@@ -146,6 +146,48 @@ describe('LoginScreenController', () => {
     expect(authStore.token.value).toBe('gho_cb');
   });
 
+  describe('handleAuthResult', () => {
+    beforeEach(() => {
+      authStore.token.value = null;
+    });
+
+    it('stores the token from a successful auth session', () => {
+      expect(
+        login.handleAuthResult({
+          type: 'success',
+          url: 'kaihuman://auth/callback?access_token=gho_session',
+        }),
+      ).toBe('signed-in');
+      expect(authStore.token.value).toBe('gho_session');
+    });
+
+    it('reports a successful redirect without a token', () => {
+      expect(login.handleAuthResult({ type: 'success', url: 'kaihuman://auth/callback' })).toBe(
+        'no-token',
+      );
+      expect(
+        login.handleAuthResult({ type: 'success', url: 'https://evil.example/?access_token=x' }),
+      ).toBe('no-token');
+      expect(authStore.token.value).toBeNull();
+    });
+
+    it('treats cancel, dismiss and locked as a quiet cancel', () => {
+      for (const type of ['cancel', 'dismiss', 'locked'] as const) {
+        expect(login.handleAuthResult({ type })).toBe('cancelled');
+      }
+      expect(authStore.token.value).toBeNull();
+    });
+  });
+
+  it('opens the login URL with the app callback as the return URL', async () => {
+    const open = vi.fn().mockResolvedValue({ type: 'cancel' });
+    await expect(login.signInWithBrowser(open)).resolves.toBe('cancelled');
+    expect(open).toHaveBeenCalledWith(
+      'https://auth.example.com/login?client=mobile',
+      'kaihuman://auth/callback',
+    );
+  });
+
   it('signs in with a trimmed PAT and rejects blanks', () => {
     expect(login.signInWithToken('   ')).toBe(false);
     expect(authStore.token.value).toBeNull();

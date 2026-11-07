@@ -28,6 +28,10 @@ describe('expo-router route files', () => {
     expect(partial).toEqual([]);
   });
 
+  it('has a route for the OAuth callback so expo-router never shows "Unmatched route"', () => {
+    expect(existsSync(`${appDir}auth/callback.tsx`)).toBe(true);
+  });
+
   it('has pushed detail routes for ideas and wiki pages', () => {
     for (const file of ['(tabs)/ideas/[slug].tsx', 'wiki/index.tsx', 'wiki/[...page].tsx']) {
       expect(existsSync(`${appDir}${file}`), `app/${file}`).toBe(true);

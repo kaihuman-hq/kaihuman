@@ -29,7 +29,7 @@ describe('LoginView', () => {
   const setup = () => {
     const onSignedIn = vi.fn();
     const controller = new LoginScreenController('https://auth.example/login');
-    render(<LoginView controller={controller} onOpenBrowser={vi.fn()} onSignedIn={onSignedIn} />);
+    render(<LoginView controller={controller} openAuthSession={vi.fn()} onSignedIn={onSignedIn} />);
     return { onSignedIn };
   };
 

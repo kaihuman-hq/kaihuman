@@ -31,7 +31,7 @@ export default function Login() {
       <Stack.Screen options={{ title: 'Sign in' }} />
       <LoginView
         controller={controller}
-        onOpenBrowser={(u) => void WebBrowser.openBrowserAsync(u)}
+        openAuthSession={WebBrowser.openAuthSessionAsync}
         onSignedIn={() => router.replace('/dashboard')}
       />
     </>

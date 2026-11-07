@@ -4,6 +4,12 @@
 
 - `.github/workflows/deploy-auth-worker.yml` lints, type-checks, tests and runs `wrangler deploy` for `apps/auth-worker` on pushes to `main` that touch it, and on manual dispatch. Uses the existing `CF_API_TOKEN`/`CF_ACCOUNT_ID` secrets; worker secrets stay on Cloudflare.
 
+## 2026-11-07 — Mobile: app icon, in-app GitHub sign-in return
+
+- First TestFlight build had a white icon and sign-in stranded in the browser. Added `apps/mobile/assets/icon.png` (1024×1024, RGB/no alpha; Ink K on a Volt tile, the login-screen mark) with an Android adaptive foreground and Volt background. Sources are `assets/*.svg`; regenerate with `CHROMIUM_PATH=/opt/pw-browsers/chromium node apps/mobile/scripts/generate-icons.mjs` (Playwright, no new deps). The widget extension needs no icon of its own. No splash added: `expo-splash-screen` is not a dependency.
+- Login uses `WebBrowser.openAuthSessionAsync(url, 'kaihuman://auth/callback')` (ASWebAuthenticationSession / Custom Tabs); `LoginScreenController.handleAuthResult` feeds the returned URL into the deep-link token path. Cancel/dismiss are silent, a success without a token shows an inline message. The deep-link handler stays as a fallback, and `app/auth/callback.tsx` redirects to `/` so expo-router never shows "Unmatched route".
+- Needs the auth-worker `client=mobile` redirect deployed first (see `doc/mobile-testflight.md`).
+
 ## 2026-11-07 — Mobile: drop static EAS copy from app.json
 
 - `eas init` had written a static copy of `extra.eas.build` (appExtensions) and `extra.router` into `apps/mobile/app.json`. Removed both; `app.config.ts` still derives `appExtensions` from `ios.bundleIdentifier` and expo-router adds `asyncRoutes`, so the bundle id stays the only edit. `projectId` and `owner` stay.

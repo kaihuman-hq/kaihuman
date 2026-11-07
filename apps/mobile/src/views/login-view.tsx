@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { View } from 'react-native';
-import type { LoginScreenController } from '../screens/login-screen.js';
+import type { LoginScreenController, OpenAuthSession } from '../screens/login-screen.js';
 import { useTheme } from '../theme/theme.js';
 import { Button, GithubMark, haptics, Screen, Text, TextField } from '../ui/index.js';
 
@@ -43,12 +43,12 @@ function BrandMark() {
 
 export function LoginView({
   controller,
-  onOpenBrowser,
+  openAuthSession,
   onSignedIn,
 }: {
   controller: LoginScreenController;
-  /** Receives the gateway URL to open in the system browser. */
-  onOpenBrowser: (url: string) => void;
+  /** Opens the gateway URL in an auth session that resolves when the app callback is hit. */
+  openAuthSession: OpenAuthSession;
   onSignedIn: () => void;
 }) {
   const { spacing } = useTheme();
@@ -57,6 +57,27 @@ export function LoginView({
   const [showToken, setShowToken] = useState(false);
   const tokenRef = useRef(token);
   tokenRef.current = token;
+
+  const [browserError, setBrowserError] = useState<string | null>(null);
+
+  const signInWithBrowser = async () => {
+    setBrowserError(null);
+    try {
+      const outcome = await controller.signInWithBrowser(openAuthSession);
+      if (outcome === 'signed-in') {
+        haptics.success();
+        onSignedIn();
+      } else if (outcome === 'no-token') {
+        setBrowserError(
+          'GitHub sign-in returned no token. Try again, or use a personal access token.',
+        );
+        haptics.error();
+      }
+    } catch {
+      setBrowserError('Could not open GitHub sign-in. Try again, or use a personal access token.');
+      haptics.error();
+    }
+  };
 
   const signIn = () => {
     if (controller.signInWithToken(tokenRef.current)) {
@@ -88,8 +109,13 @@ export function LoginView({
             leading={(color) => <GithubMark color={color} />}
             fullWidth
             testID="login-browser"
-            onPress={() => onOpenBrowser(controller.buildLoginUrl())}
+            onPress={() => void signInWithBrowser()}
           />
+          {browserError ? (
+            <Text variant="footnote" tone="danger" align="center">
+              {browserError}
+            </Text>
+          ) : null}
           <Button
             label="Try demo"
             variant="tinted"

@@ -17,6 +17,10 @@ cd apps/mobile
 eas init          # creates the Expo project and writes extra.eas.projectId; commit that change
 ```
 
+## Deploy auth-worker first
+
+"Sign in with GitHub" opens `<auth-worker>/login?client=mobile` and expects the worker to redirect to `kaihuman://auth/callback?access_token=…`. That redirect lives in `apps/auth-worker/src/index.ts`; deploy the worker (`wrangler deploy` in `apps/auth-worker`) before building or testing, otherwise the sign-in page never returns to the app. Until then, use "Use a personal access token".
+
 ## Build
 
 ```sh

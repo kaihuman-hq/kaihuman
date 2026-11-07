@@ -35,7 +35,7 @@ describe('LoginView', () => {
   it('signs in with a token and reports success', () => {
     const onSignedIn = vi.fn();
     const controller = new LoginScreenController('https://auth.example/login');
-    render(<LoginView controller={controller} onOpenBrowser={vi.fn()} onSignedIn={onSignedIn} />);
+    render(<LoginView controller={controller} openAuthSession={vi.fn()} onSignedIn={onSignedIn} />);
     fireEvent.click(screen.getByTestId('login-token-toggle'));
     fireEvent.click(screen.getByTestId('login-token-submit'));
     expect(onSignedIn).not.toHaveBeenCalled();
@@ -48,14 +48,51 @@ describe('LoginView', () => {
     expect(onSignedIn).toHaveBeenCalledTimes(1);
   });
 
-  it('opens the gateway URL in the browser', () => {
-    const onOpenBrowser = vi.fn();
+  it('opens the gateway URL in an auth session and signs in with the returned token', async () => {
+    const openAuthSession = vi.fn().mockResolvedValue({
+      type: 'success',
+      url: 'kaihuman://auth/callback?access_token=gho_view',
+    });
+    // Captured at call time: the real auth store starts validating the token right away.
+    let tokenAtSignIn: string | null = null;
+    const onSignedIn = vi.fn(() => {
+      tokenAtSignIn = authStore.token.value;
+    });
     const controller = new LoginScreenController('https://auth.example/login');
     render(
-      <LoginView controller={controller} onOpenBrowser={onOpenBrowser} onSignedIn={vi.fn()} />,
+      <LoginView
+        controller={controller}
+        openAuthSession={openAuthSession}
+        onSignedIn={onSignedIn}
+      />,
     );
     fireEvent.click(screen.getByTestId('login-browser'));
-    expect(onOpenBrowser).toHaveBeenCalledWith('https://auth.example/login?client=mobile');
+    expect(openAuthSession).toHaveBeenCalledWith(
+      'https://auth.example/login?client=mobile',
+      'kaihuman://auth/callback',
+    );
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+    expect(tokenAtSignIn).toBe('gho_view');
+  });
+
+  it('stays silent on cancel and explains a missing token', async () => {
+    const openAuthSession = vi.fn().mockResolvedValueOnce({ type: 'cancel' });
+    const onSignedIn = vi.fn();
+    const controller = new LoginScreenController('https://auth.example/login');
+    render(
+      <LoginView
+        controller={controller}
+        openAuthSession={openAuthSession}
+        onSignedIn={onSignedIn}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('login-browser'));
+    await waitFor(() => expect(openAuthSession).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/no token|could not open/i)).toBeNull();
+    openAuthSession.mockResolvedValueOnce({ type: 'success', url: 'kaihuman://auth/callback' });
+    fireEvent.click(screen.getByTestId('login-browser'));
+    expect(await screen.findByText(/no token/i)).toBeTruthy();
+    expect(onSignedIn).not.toHaveBeenCalled();
   });
 });
 
