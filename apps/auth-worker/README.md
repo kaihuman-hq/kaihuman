@@ -61,7 +61,11 @@ root.
    ```
 
    If the worker does not exist yet, wrangler offers to create it.
-4. **Deploy:**
+4. **Deploy:** pushes to `main` that touch `apps/auth-worker/**` deploy automatically
+   (`.github/workflows/deploy-auth-worker.yml`, needs the `CF_API_TOKEN` and `CF_ACCOUNT_ID`
+   repository secrets; the token needs the *Workers Scripts: Edit* and *Workers Routes: Edit*
+   permissions). Run it by hand from the Actions tab (*Run workflow*) for any branch. For a
+   local deploy:
 
    ```sh
    pnpm run deploy

@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-07 — Auth worker: automatic Cloudflare deploy
+
+- `.github/workflows/deploy-auth-worker.yml` lints, type-checks, tests and runs `wrangler deploy` for `apps/auth-worker` on pushes to `main` that touch it, and on manual dispatch. Uses the existing `CF_API_TOKEN`/`CF_ACCOUNT_ID` secrets; worker secrets stay on Cloudflare.
+
 ## 2026-11-07 — Mobile: drop static EAS copy from app.json
 
 - `eas init` had written a static copy of `extra.eas.build` (appExtensions) and `extra.router` into `apps/mobile/app.json`. Removed both; `app.config.ts` still derives `appExtensions` from `ios.bundleIdentifier` and expo-router adds `asyncRoutes`, so the bundle id stays the only edit. `projectId` and `owner` stay.
