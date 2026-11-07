@@ -1,6 +1,6 @@
 import '../db.js';
-import { openDB } from 'idb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { openLifeOsDb } from './idb-test-helper.js';
 
 const remote = vi.hoisted(() => ({ tree: [] as unknown[] }));
 vi.mock('../services/github.service.js', () => ({
@@ -63,7 +63,7 @@ describe('githubFileStore.applyCommit', () => {
 
   it('removes the deleted path from the IDB files cache', async () => {
     await store.applyCommit({ [DRAFT]: 'd' }, { [DRAFT]: 's' });
-    const db = await openDB('life-os-db', 1);
+    const db = await openLifeOsDb();
     expect(await db.get('files', `o/r:${DRAFT}`)).toBeDefined();
     await store.applyCommit({ [DRAFT]: null }, {});
     expect(await db.get('files', `o/r:${DRAFT}`)).toBeUndefined();
@@ -92,7 +92,7 @@ describe('githubFileStore.applyCommit', () => {
     expect(store.tree.value.find((t) => t.path === png)?.sha).toBe('binsha');
     expect(store.openFiles.value[png]).toBeUndefined();
     // IDB held text for the path before; binary must not leave it (or add any) there.
-    const db = await openDB('life-os-db', 1);
+    const db = await openLifeOsDb();
     await db.put('files', { path: `o/r:${png}`, content: 'stale', sha: 'old', timestamp: 1 });
     await store.applyCommit({ [png]: new Uint8Array([9]) }, { [png]: 'binsha2' });
     expect(await db.get('files', `o/r:${png}`)).toBeUndefined();

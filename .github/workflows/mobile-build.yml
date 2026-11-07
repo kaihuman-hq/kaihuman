@@ -1,0 +1,176 @@
+name: "Mobile build"
+
+# Native-compile checks for apps/mobile. The Swift/Kotlin widget targets and the Expo config plugin
+# have never been compiled by the authors (no local toolchain), so the Android and iOS jobs may need
+# fixes on first run; they are not part of the main CI workflow for that reason.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "apps/mobile/**"
+      - "packages/core/**"
+      - "packages/formats/**"
+      - ".github/workflows/mobile-build.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Draft PRs don't run CI; marking the PR ready for review triggers it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Core and formats are consumed through their build output.
+      - name: Build dependencies
+        run: pnpm turbo run build --filter=@kaihuman/mobile...
+
+      - name: Lint and type-check
+        run: pnpm turbo run lint check-types --filter=@kaihuman/mobile
+
+      - name: Test
+        run: pnpm --filter @kaihuman/mobile test
+
+  android:
+    # Draft PRs don't run CI; marking the PR ready for review triggers it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      # The NDK build of React Native's C++ for all four ABIs fills the runner's default disk.
+      # Remove preinstalled toolchains this job never uses.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost /usr/local/lib/node_modules /usr/share/swift
+          sudo docker image prune --all --force
+          df -h /
+
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # The action's default package list includes the removed `tools` package, which sdkmanager
+      # rejects. Gradle downloads the platform and build-tools it needs.
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: platform-tools
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build dependencies
+        run: pnpm turbo run build --filter=@kaihuman/mobile^...
+
+      # Generates apps/mobile/android and runs the widget config plugin.
+      - name: Prebuild native project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Assemble debug APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kaihuman-android-debug
+          path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
+
+      # Snapshot parsing, widget logic, focus notification, and the Robolectric widget renders.
+      - name: Kotlin unit tests and widget previews
+        working-directory: apps/mobile/android
+        env:
+          KH_WIDGET_PREVIEW_DIR: ${{ github.workspace }}/widget-renders-android
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: widget-renders-android
+          path: widget-renders-android/*.png
+          if-no-files-found: ignore
+
+  ios:
+    # Draft PRs don't run CI; marking the PR ready for review triggers it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: check
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build dependencies
+        run: pnpm turbo run build --filter=@kaihuman/mobile^...
+
+      # Generates apps/mobile/ios (with the WidgetKit target from the config plugin).
+      - name: Prebuild native project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform ios --no-install
+
+      # Prebuild ran with --no-install, so the workspace does not exist until CocoaPods runs.
+      - name: Install CocoaPods
+        working-directory: apps/mobile/ios
+        run: pod install
+
+      - name: Build app and widget for iOS Simulator
+        working-directory: apps/mobile/ios
+        run: |
+          xcodebuild build \
+            -workspace kaihuman.xcworkspace \
+            -scheme kaihuman \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
+
+      # Renders every widget view variant with ImageRenderer (outside WidgetKit) for visual review.
+      - name: Render widget previews
+        run: apps/mobile/targets/ios-widget-render/render.sh widget-renders
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: widget-renders
+          path: widget-renders/*.png

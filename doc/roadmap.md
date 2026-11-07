@@ -55,3 +55,14 @@
 - [x] Document every app, package, file format and CLI command as a docspack package (`packages/docspack`)
 - [ ] Publish `@kaihuman/docspack` to npm
 - [ ] Run `docspack doctor --strict` and `docspack eval` in CI
+
+## Mobile (`doc/mobile.md`)
+
+- [x] Phase 1: `@kaihuman/core` storage adapter, widget todo snapshot engine, and `auth-worker` mobile OAuth callback
+- [x] Phase 2: `apps/mobile` (`@kaihuman/mobile`) workspace, mobile storage/widget bridges, deep-link router, and auth/repo controllers
+- [x] Phase 3: Native screens & widget tiles (Dashboard, Kanban, Quick Captures, Ideas, Wiki, KB, Action Log, Analytics, File Editor + `.enc`)
+- [x] Phase 4: iOS WidgetKit + AppIntents (`targets/ios-widget/`) and Android Jetpack Glance (`targets/android-widget/`) Todo widgets
+- [x] Phase 5: Mobile CI workflow (`.github/workflows/mobile-build.yml`) and docs
+- [x] iOS widget set v1 (Next up, Quick capture, Weekly done, Inbox, Control Center controls, App Shortcuts) and widget-sync schema v2
+- [x] iOS widget set v2 (Board column, Milestone countdown, Idea pipeline, Knowledge card, Habits, focus Live Activity, background capture)
+- [x] Phase 6: React Native views and runnable Expo app (expo-router routes, views over every controller, `kaihuman-shared` native module)

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="add_todo"
+        android:enabled="true"
+        android:icon="@drawable/kh_ic_todo"
+        android:shortcutShortLabel="@string/kh_shortcut_todo_short"
+        android:shortcutLongLabel="@string/kh_shortcut_todo_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="kaihuman://quick-todo"
+            android:targetPackage="com.kaihuman.app"
+            android:targetClass="com.kaihuman.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="add_note"
+        android:enabled="true"
+        android:icon="@drawable/kh_ic_note"
+        android:shortcutShortLabel="@string/kh_shortcut_note_short"
+        android:shortcutLongLabel="@string/kh_shortcut_note_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="kaihuman://quick-note"
+            android:targetPackage="com.kaihuman.app"
+            android:targetClass="com.kaihuman.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="add_log"
+        android:enabled="true"
+        android:icon="@drawable/kh_ic_log"
+        android:shortcutShortLabel="@string/kh_shortcut_log_short"
+        android:shortcutLongLabel="@string/kh_shortcut_log_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="kaihuman://quick-log"
+            android:targetPackage="com.kaihuman.app"
+            android:targetClass="com.kaihuman.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="add_idea"
+        android:enabled="true"
+        android:icon="@drawable/kh_ic_idea"
+        android:shortcutShortLabel="@string/kh_shortcut_idea_short"
+        android:shortcutLongLabel="@string/kh_shortcut_idea_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="kaihuman://quick-idea"
+            android:targetPackage="com.kaihuman.app"
+            android:targetClass="com.kaihuman.app.MainActivity" />
+    </shortcut>
+</shortcuts>

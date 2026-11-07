@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="250dp"
+    android:minResizeHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen|keyguard"
+    android:description="@string/kh_desc_board_column"
+    android:previewLayout="@layout/kh_preview_board_column"
+    android:configure="com.kaihuman.app.WidgetConfigActivity"
+    android:widgetFeatures="reconfigurable|configuration_optional"
+    android:initialLayout="@layout/glance_default_loading_layout" />

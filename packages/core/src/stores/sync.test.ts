@@ -1,7 +1,7 @@
 import '../db.js';
-import { openDB } from 'idb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InMemoryGithubService } from '../services/github.service.memory.js';
+import { openLifeOsDb } from './idb-test-helper.js';
 
 vi.mock('../services/github.service.js', async () => {
   const { InMemoryGithubService } = await import('../services/github.service.memory.js');
@@ -29,7 +29,7 @@ const pushRemote = async (content: string, path = FILE) => {
   await remote.saveFile('o', 'r', path, content, 'other device', sha);
 };
 const clearIdb = async () => {
-  const db = await openDB('life-os-db', 1);
+  const db = await openLifeOsDb();
   await db.clear('files');
   await db.clear('trees');
   db.close();
@@ -175,7 +175,7 @@ describe('sync: resolveConflict', () => {
     expect(b.openFiles.value[FILE]?.content).toBe('A1\nb\nc\nd\ne\n');
     expect(b.dirtyFiles.value.has(FILE)).toBe(false);
     await vi.waitFor(async () => {
-      const db = await openDB('life-os-db', 1);
+      const db = await openLifeOsDb();
       const rec = await db.get('files', `o/r:${FILE}`);
       db.close();
       expect(rec).toMatchObject({ content: 'A1\nb\nc\nd\ne\n', dirty: false });
@@ -212,7 +212,7 @@ describe('sync: unsaved edits survive a reload (cause 3)', () => {
 
   it('reads the base by blob sha when the cached record has no base content', async () => {
     const after = await editThenReload('a\nb\nLOCAL\nd\ne\n');
-    const db = await openDB('life-os-db', 1);
+    const db = await openLifeOsDb();
     const rec = await db.get('files', `o/r:${FILE}`);
     delete rec.baseContent;
     await db.put('files', rec);
@@ -331,7 +331,7 @@ describe('sync: races between a save and a reconcile', () => {
     expect(s.openFiles.value[FILE]?.content).toBe('SAVED\nb\nc\nd\ne\n');
     expect(s.openFiles.value[FILE]?.sha).toBe(saved.sha);
     await s.flushPendingWrites();
-    const db = await openDB('life-os-db', 1);
+    const db = await openLifeOsDb();
     const rec = await db.get('files', `o/r:${FILE}`);
     db.close();
     expect(rec.content).toBe('SAVED\nb\nc\nd\ne\n');
@@ -356,7 +356,7 @@ describe('sync: discardLocal', () => {
     expect(s.openFiles.value['new.md']).toBeUndefined();
     expect(s.dirtyFiles.value.has('new.md')).toBe(false);
     expect(s.fileConflicts.value).toEqual({});
-    const db = await openDB('life-os-db', 1);
+    const db = await openLifeOsDb();
     const rec = await db.get('files', 'o/r:new.md');
     db.close();
     expect(rec).toBeUndefined();
@@ -382,7 +382,7 @@ describe('sync: repo switch', () => {
 
     expect(s.dirtyFiles.value.size).toBe(0);
     expect(s.fileConflicts.value).toEqual({});
-    const db = await openDB('life-os-db', 1);
+    const db = await openLifeOsDb();
     const old = await db.get('files', `o/r:${FILE}`);
     const wrong = await db.get('files', `o/r2:${FILE}`);
     db.close();

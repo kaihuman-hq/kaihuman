@@ -352,6 +352,17 @@ function rss(): string {
   )}\n`;
 }
 
+// Done items carry `::updated::` (Unix ms), which the analytics velocity chart buckets by week.
+// Day offsets are spread over ~7 weeks with uneven counts so the chart looks lived-in.
+const doneItem = (now: Date, text: string, doneOff: number, createdOff: number): string[] => {
+  const done = addDays(now, doneOff);
+  done.setHours(10 + (Math.abs(doneOff) % 7), (Math.abs(doneOff) * 13) % 60, 0, 0);
+  return [
+    `- [x] ${text}`,
+    `::updated:: ${done.getTime()} ::created:: ${addDays(now, createdOff).toISOString()}`,
+  ];
+};
+
 function projectsTodos(now: Date): string {
   const m1 = isoDate(addDays(now, 21));
   const m2 = isoDate(addDays(now, 60));
@@ -367,10 +378,17 @@ function projectsTodos(now: Date): string {
     `    dueDate: ${m2}`,
     '---',
     '',
-    `- [x] Set up the project repository #setup`,
-    `::created:: ${created(-30)}`,
-    `- [x] Design the dashboard layout #design !v1`,
-    `::created:: ${created(-21)}`,
+    ...doneItem(now, 'Set up the project repository #setup', -48, -52),
+    ...doneItem(now, 'Design the dashboard layout #design !v1', -41, -50),
+    ...doneItem(now, 'Pick a colour palette #design !v1', -40, -45),
+    ...doneItem(now, 'Wire up GitHub sign-in #dev !v1', -33, -40),
+    ...doneItem(now, 'Build the todo board #dev !v1', -26, -35),
+    ...doneItem(now, 'Add tag filters to the board #dev !v1', -25, -30),
+    ...doneItem(now, 'Write the onboarding copy #marketing', -24, -28),
+    ...doneItem(now, 'Import sample data #dev !v1', -18, -22),
+    ...doneItem(now, 'Add dark mode #design !v1', -12, -20),
+    ...doneItem(now, 'Set up error reporting #dev', -11, -15),
+    ...doneItem(now, 'Create the landing page #marketing !v1', -5, -14),
     `- [>] Implement demo mode #dev !v1`,
     `::created:: ${created(-4)}`,
     `- [>] Record the product video #marketing`,
@@ -782,8 +800,7 @@ function business(now: Date): Record<string, string> {
     `::created:: ${addDays(now, -2).toISOString()}`,
     `- [ ] Remind about the overdue invoice #billing`,
     `::created:: ${addDays(now, -1).toISOString()}`,
-    `- [x] Collect brand assets #website`,
-    `::created:: ${addDays(now, -30).toISOString()}`,
+    ...doneItem(now, 'Collect brand assets #website', -16, -30),
   ]);
   put(`clients/${northwind[0]}/log.actionlog.md`, [
     '# Action Log',

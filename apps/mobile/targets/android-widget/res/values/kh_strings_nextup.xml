@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="kh_desc_next_up">Your next todos. Tap the circle to complete one.</string>
+    <string name="kh_desc_board_column">One board column. Start a backlog todo or mark it done.</string>
+    <string name="kh_desc_milestone">Days left and open versus done todos for a milestone.</string>
+
+    <string name="kh_nu_title">NEXT UP</string>
+    <string name="kh_nu_open">open</string>
+    <string name="kh_nu_open_count">%1$d open</string>
+    <string name="kh_nu_todos_open_one">1 todo open</string>
+    <string name="kh_nu_todos_open_many">%1$d todos open</string>
+    <string name="kh_nu_done_today">%1$d done today</string>
+    <string name="kh_nu_add">+</string>
+    <string name="kh_nu_add_desc">New todo</string>
+    <string name="kh_nu_complete_desc">Complete todo</string>
+    <string name="kh_nu_complete_item_desc">Complete: %1$s</string>
+    <string name="kh_nu_in_progress_marker">In progress</string>
+    <string name="kh_nu_start">Start</string>
+    <string name="kh_nu_done">Done</string>
+    <string name="kh_nu_more">+%1$d more</string>
+
+    <string name="kh_empty_nothing_in_progress">Nothing in progress — pick from backlog</string>
+    <string name="kh_empty_nothing_up_next">Nothing up next</string>
+    <string name="kh_empty_inbox_zero">Inbox zero</string>
+    <string name="kh_empty_nothing_open_here">Nothing open here</string>
+    <string name="kh_empty_nothing_here">Nothing here</string>
+    <string name="kh_empty_backlog_empty">Backlog is empty</string>
+
+    <string name="kh_src_all">All</string>
+    <string name="kh_src_all_open">All open todos</string>
+    <string name="kh_src_inbox">Inbox</string>
+    <string name="kh_src_in_progress">In progress</string>
+    <string name="kh_src_backlog">Backlog</string>
+    <string name="kh_src_tag">#%1$s</string>
+    <string name="kh_src_milestone">Milestone</string>
+    <string name="kh_src_upcoming">Upcoming</string>
+
+    <string name="kh_ms_title">MILESTONE</string>
+    <string name="kh_ms_none">No milestone</string>
+    <string name="kh_ms_none_hint">Add one to your board</string>
+    <string name="kh_ms_open_done">%1$d open · %2$d done</string>
+    <string name="kh_ms_days_left">days left</string>
+    <string name="kh_ms_day_left">day left</string>
+    <string name="kh_ms_due_today">due today</string>
+    <string name="kh_ms_day_overdue">day overdue</string>
+    <string name="kh_ms_days_overdue">days overdue</string>
+    <string name="kh_ms_no_due_date">no due date</string>
+
+    <string name="kh_cfg_title_source">Choose todos to show</string>
+    <string name="kh_cfg_title_milestone">Choose a milestone</string>
+    <string name="kh_cfg_signed_out">Open kaihuman to sign in</string>
+    <string name="kh_cfg_use_default">Use default</string>
+
+    <string name="kh_preview_nu_1">Ship Android widgets</string>
+    <string name="kh_preview_nu_2">Review pull request</string>
+    <string name="kh_preview_nu_3">Plan the week</string>
+    <string name="kh_preview_nu_4">Reply to Sam</string>
+    <string name="kh_preview_nu_5">Update changelog</string>
+    <string name="kh_preview_nu_6">Book dentist</string>
+    <string name="kh_preview_ms_name">Widgets v1</string>
+    <string name="kh_preview_ms_days">12</string>
+    <string name="kh_preview_nu_count">6 open</string>
+    <string name="kh_preview_bc_count">3</string>
+</resources>

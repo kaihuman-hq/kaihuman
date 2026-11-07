@@ -1,9 +1,10 @@
 /// <reference types="vite/client" />
 import { computed, effect, signal } from '@preact/signals';
 import { z } from 'zod';
-import { dbPromise } from '../db.js';
 import { demoMode } from '../demo-mode.js';
+import { viteEnv } from '../env.js';
 import { Logger } from '../logger.js';
+import { getCoreStorage } from '../storage/adapter.js';
 
 const logger = new Logger('AuthStore');
 
@@ -20,7 +21,7 @@ const STORAGE_KEY_TOKEN = 'lifeos_gh_token';
 
 export class AuthStore {
   // Signals
-  token = signal<string | null>(localStorage.getItem(STORAGE_KEY_TOKEN));
+  token = signal<string | null>(getCoreStorage().getItem(STORAGE_KEY_TOKEN));
   user = signal<GithubProfile | null>(null);
   isAuthenticated = computed(() => !!this.token.value);
 
@@ -29,23 +30,23 @@ export class AuthStore {
   }
 
   private async init() {
-    const db = await dbPromise;
+    const db = getCoreStorage();
 
     // Check for explicit logout flag
-    const loggedOut = localStorage.getItem('lifeos_logged_out');
+    const loggedOut = getCoreStorage().getItem('lifeos_logged_out');
 
     if (loggedOut) {
       // We were explicitly logged out, so ignore any token in DB to prevent zombie sessions
-      await db.delete('auth', 'token');
-      await db.delete('auth', 'user');
+      await db.deleteRecord('auth', 'token');
+      await db.deleteRecord('auth', 'user');
       // We can clear the flag now, or keep it. Clearing it is safe as we've nuked the DB token.
-      localStorage.removeItem('lifeos_logged_out');
+      getCoreStorage().removeItem('lifeos_logged_out');
 
       // Clear legacy
-      localStorage.removeItem(STORAGE_KEY_TOKEN);
+      getCoreStorage().removeItem(STORAGE_KEY_TOKEN);
     } else {
-      const token = await db.get('auth', 'token');
-      const user = await db.get('auth', 'user');
+      const token = await db.getRecord<string>('auth', 'token');
+      const user = await db.getRecord<GithubProfile>('auth', 'user');
 
       // Only restore from DB if handleCallback() hasn't already set a fresh token.
       // handleCallback() runs synchronously during render (before this async resumes),
@@ -54,8 +55,8 @@ export class AuthStore {
       if (user) this.user.value = user;
 
       // Fallback to localStorage if DB empty (migration path)
-      if (!this.token.value && localStorage.getItem(STORAGE_KEY_TOKEN)) {
-        this.token.value = localStorage.getItem(STORAGE_KEY_TOKEN);
+      if (!this.token.value && getCoreStorage().getItem(STORAGE_KEY_TOKEN)) {
+        this.token.value = getCoreStorage().getItem(STORAGE_KEY_TOKEN);
       }
     }
 
@@ -64,14 +65,14 @@ export class AuthStore {
       const saveToken = async () => {
         // Demo sessions are ephemeral — never persist the fake token.
         if (demoMode.value) return;
-        const db = await dbPromise;
+        const db = getCoreStorage();
         if (this.token.value) {
           // Keep localStorage as backup/sync for now, but primary source is DB for local-first
-          localStorage.setItem(STORAGE_KEY_TOKEN, this.token.value);
-          await db.put('auth', this.token.value, 'token');
+          getCoreStorage().setItem(STORAGE_KEY_TOKEN, this.token.value);
+          await db.putRecord('auth', 'token', this.token.value);
         } else {
-          localStorage.removeItem(STORAGE_KEY_TOKEN);
-          await db.delete('auth', 'token');
+          getCoreStorage().removeItem(STORAGE_KEY_TOKEN);
+          await db.deleteRecord('auth', 'token');
         }
       };
       saveToken();
@@ -88,11 +89,11 @@ export class AuthStore {
     effect(() => {
       const saveUser = async () => {
         if (demoMode.value) return;
-        const db = await dbPromise;
+        const db = getCoreStorage();
         if (this.user.value) {
-          await db.put('auth', this.user.value, 'user');
+          await db.putRecord('auth', 'user', this.user.value);
         } else {
-          await db.delete('auth', 'user');
+          await db.deleteRecord('auth', 'user');
         }
       };
       saveUser();
@@ -100,9 +101,13 @@ export class AuthStore {
   }
 
   login() {
-    const gatewayUrl = import.meta.env.VITE_GH_LOGIN;
+    const gatewayUrl = viteEnv(import.meta).VITE_GH_LOGIN;
     if (!gatewayUrl) {
       logger.error('VITE_GH_LOGIN is not defined');
+      return;
+    }
+    if (typeof window === 'undefined') {
+      logger.error('login() requires a browser; open the gateway URL natively');
       return;
     }
     window.location.href = gatewayUrl;
@@ -110,10 +115,10 @@ export class AuthStore {
 
   logout() {
     // 1. Set explicit logout flag immediately
-    localStorage.setItem('lifeos_logged_out', 'true');
+    getCoreStorage().setItem('lifeos_logged_out', 'true');
 
     // 2. Immediate sync cleanup to prevent loop if a reload happens
-    localStorage.removeItem(STORAGE_KEY_TOKEN);
+    getCoreStorage().removeItem(STORAGE_KEY_TOKEN);
 
     // 3. Update state - this triggers the effect to clean DB, and updates UI
     this.token.value = null;
@@ -125,7 +130,7 @@ export class AuthStore {
   /** Seed an in-memory session for demo mode. Relies on `demoMode` already being
    * true so the persistence effects skip writing the fake credentials. */
   enterDemo(user: GithubProfile) {
-    localStorage.removeItem('lifeos_logged_out');
+    getCoreStorage().removeItem('lifeos_logged_out');
     this.user.value = user;
     this.token.value = 'demo-token';
   }
@@ -137,19 +142,33 @@ export class AuthStore {
   }
 
   handleCallback() {
-    const params = new URLSearchParams(window.location.search);
-    const accessToken = params.get('access_token');
-
-    if (accessToken) {
-      // Clear logout flag on successful login
-      localStorage.removeItem('lifeos_logged_out');
-
-      this.token.value = accessToken;
+    if (typeof window === 'undefined') return false;
+    const accepted = this.applyCallbackParams(new URLSearchParams(window.location.search));
+    if (accepted) {
       // Clear query param
       window.history.replaceState({}, document.title, window.location.pathname);
-      return true;
     }
-    return false;
+    return accepted;
+  }
+
+  /** Native/deep-link variant of handleCallback, e.g. `kaihuman://auth/callback?access_token=...`. */
+  handleCallbackUrl(url: string): boolean {
+    let params: URLSearchParams;
+    try {
+      params = new URL(url).searchParams;
+    } catch {
+      return false;
+    }
+    return this.applyCallbackParams(params);
+  }
+
+  private applyCallbackParams(params: URLSearchParams): boolean {
+    const accessToken = params.get('access_token');
+    if (!accessToken) return false;
+    // Clear logout flag on successful login
+    getCoreStorage().removeItem('lifeos_logged_out');
+    this.token.value = accessToken;
+    return true;
   }
 
   private async fetchUser() {

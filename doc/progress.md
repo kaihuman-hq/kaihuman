@@ -1,5 +1,206 @@
 # Progress
 
+## 2026-11-07 — Auth worker: automatic Cloudflare deploy
+
+- `.github/workflows/deploy-auth-worker.yml` lints, type-checks, tests and runs `wrangler deploy` for `apps/auth-worker` on pushes to `main` that touch it, and on manual dispatch. Uses the existing `CF_API_TOKEN`/`CF_ACCOUNT_ID` secrets; worker secrets stay on Cloudflare.
+
+## 2026-11-07 — Mobile: app icon, in-app GitHub sign-in return
+
+- First TestFlight build had a white icon and sign-in stranded in the browser. Added `apps/mobile/assets/icon.png` (1024×1024, RGB/no alpha; Ink K on a Volt tile, the login-screen mark) with an Android adaptive foreground and Volt background. Sources are `assets/*.svg`; regenerate with `CHROMIUM_PATH=/opt/pw-browsers/chromium node apps/mobile/scripts/generate-icons.mjs` (Playwright, no new deps). The widget extension needs no icon of its own. No splash added: `expo-splash-screen` is not a dependency.
+- Login uses `WebBrowser.openAuthSessionAsync(url, 'kaihuman://auth/callback')` (ASWebAuthenticationSession / Custom Tabs); `LoginScreenController.handleAuthResult` feeds the returned URL into the deep-link token path. Cancel/dismiss are silent, a success without a token shows an inline message. The deep-link handler stays as a fallback, and `app/auth/callback.tsx` redirects to `/` so expo-router never shows "Unmatched route".
+- Needs the auth-worker `client=mobile` redirect deployed first (see `doc/mobile-testflight.md`).
+
+## 2026-11-07 — Mobile: drop static EAS copy from app.json
+
+- `eas init` had written a static copy of `extra.eas.build` (appExtensions) and `extra.router` into `apps/mobile/app.json`. Removed both; `app.config.ts` still derives `appExtensions` from `ios.bundleIdentifier` and expo-router adds `asyncRoutes`, so the bundle id stays the only edit. `projectId` and `owner` stay.
+
+## 2026-11-07 — Mobile: EAS Build + TestFlight readiness
+
+- `apps/mobile/eas.json` (development, preview, production with autoIncrement, remote app version, empty `submit.production.ios`) and `app.config.ts`, which adds `extra.eas.build.experimental.ios.appExtensions` for the `KaihumanWidgets` extension (`com.kaihuman.app.widgets`, App Group entitlement) so EAS creates its App ID and profile.
+- Widget bundle id, App Group and keychain service now derive from `ios.bundleIdentifier` (`deriveIosIds`); the widget entitlements/Info.plist use `KH_APP_GROUP`/`KH_APP_BUNDLE_ID` build settings and the Swift sources read `KHAppGroup`/`KHKeychainService` from Info.plist. Tests cover the derivation and that `app.config` matches the plugin target.
+- `ITSAppUsesNonExemptEncryption` left unset: the app does its own AES-GCM, so it is not plainly exempt; see `doc/mobile-testflight.md` (new, step by step for Linux).
+
+## 2026-11-07 — Mobile: widget polish, focus notification permission
+
+- Android 13+: starting focus now asks for `POST_NOTIFICATIONS` in context (`requestNotificationPermission` in `kaihuman-shared`); when denied the Board shows how to turn notifications on. `FocusSessionController.start` is async and returns why it did not start.
+- Widget copy: Board column no longer falls back to "Inbox zero" on Android or iOS ("Nothing here"); Android sign-in/synced strings moved to resources and covered by `WidgetStringsTest`.
+- Android light theme is neutral (white / #F5F5F4, Ink text, Volt only as a fill, WCAG AA); Next up add target is 48dp; tighter padding; previews clip to the system radius.
+- iOS: large Knowledge card is top-aligned with an "Up next" second card; large Board column uses fixed 44pt rows and shows 7. The v2 sheet's gold accent was 256-colour quantisation of the committed PNG, not Swift; sheets are now committed full-colour.
+
+## 2026-11-06 — Mobile: Android widget set (Glance, Material You), QS tiles, focus notification
+
+- Android widgets (`apps/mobile/targets/android-widget`, Glance 1.1.1 + glance-material3) matching iOS v1 and v2: **Next up** (column/tag/milestone, interactive done), **Quick capture** (2×2, 1×4), **Weekly done** ring + streak, **Inbox** (Process → `kaihuman://inbox`), **Board column** (Start/Done), **Milestone countdown**, **Idea pipeline** (stage links, Log), **Wiki card** (Next). Habits are iOS-only for now.
+- Material You dynamic colour on Android 12+, Volt-on-Ink fallback, system corner radius, `SizeMode.Responsive`, picker preview layouts and descriptions, `WidgetConfigActivity` for setup and reconfiguration. Signed-out, stale (> 6 h) and dimmed (> 48 h) states; todo text, idea titles and card text hidden on lock-screen hosts when `privacy.lockScreenText` is off.
+- Quick Settings tiles for new todo/note/log/idea (the Control Center counterpart), static app shortcuts (`kh_shortcuts.xml`), and an ongoing focus notification with a countdown, Done and +5m, behind the existing `startFocusActivity` bridge (needs `POST_NOTIFICATIONS`).
+- Snapshot parsing reads v1 and v2 and keeps unknown keys on rewrite; Kotlin JVM/Robolectric tests run in CI (`:app:testDebugUnitTest`), which also renders every widget to PNG (`widget-renders-android` artifact, sheet at `apps/mobile/docs/widgets-android.png`).
+- Config plugin wires all receivers, provider XML, the configure activity, tiles, focus receiver, shortcuts and the notification permission, adds Glance Material 3 / Compose Material 3 and test dependencies, copies `test/*.kt`, and keeps the WorkManager keep rules.
+
+## 2026-11-06 — Mobile: iOS widget set v2, focus Live Activity, background capture
+
+- `packages/core` widget-sync (still `schemaVersion: 2`, additive): optional `ideas` (counts by status, 3 most active open ideas), `cards` (≤ 20 wiki pages, 280-char excerpts, rotated daily) and `habits` (`.habit.csv`: done today, streak), built by `buildWidgetExtras`; `applyWidgetTodoMove` (toggle is now a wrapper) and `applyWidgetCapture`. Pending widget mutations are a union (`toggle` | `move` | `capture` | `habit`; no `kind` = v1 toggle) that `WidgetBridge.reconcile` replays against current content; a capture a later widget push already committed is skipped.
+- iOS widgets: **Board column** (medium/large, column + tag config, Start moves backlog → in progress), **Milestone countdown** (small, circular, rectangular, milestone picker, daily entries), **Idea pipeline** (small/medium, stage links, hot idea with Log), **Knowledge card** (medium/large, rotates every 3 h, in-process Next), **Habits** (small, rectangular, Log per habit, queued for the app). All with light, dark, tinted, Lock Screen privacy and `#Preview`s.
+- **Focus Live Activity**: `FocusActivityAttributes`, Lock Screen/StandBy and Dynamic Island views with `Text(timerInterval:)`, Done and +5m `LiveActivityIntent`s; `startFocusActivity`/`updateFocusActivity`/`endFocusActivity` in the `kaihuman-shared` module; `NSSupportsLiveActivities` via the config plugin; "Start focus" swipe action on board cards.
+- **Background capture**: `CaptureTodoIntent` (Siri/Shortcuts, no app launch) appends to the cached inbox and commits, or queues for the app; new App Shortcut phrase.
+- CI: the iOS screenshot script waits up to 3 min for the Maestro driver, retries a hung flow (5 min cap) three times, and uploads crash reports from the run.
+- v1 fixes: Next up "all" empty state reads "Nothing up next"; todo counts pluralise ("1 todo"), with a test.
+- Deep links: `kaihuman://ideas?status=`, `quick-log?idea=<slug>`, `board?milestone=|item=`.
+- CI render harness draws every v2 widget; contact sheets `apps/mobile/docs/widgets-real.png` (v1) and `widgets-real-v2.png` (v2).
+
+## 2026-11-06 — Mobile: iOS widget set v1, widget-sync schema v2
+
+- `packages/core` widget-sync `schemaVersion: 2` (additive): `stats.doneByDay` (Mon→Sun, local week), `stats.streakDays`, `counts.knowledgeInbox`/`doneThisWeek`, `milestones[]` with open/done counts, `tags`, `privacy.lockScreenText`, `timeZone`. Fixed "done today" counted by UTC day; it now uses the user's time zone (regression tests for Europe/Prague and America/Los_Angeles). v1 keys keep their shape, so Glance and old readers keep working; Glance now keeps unknown keys when it rewrites the snapshot.
+- iOS widgets (`apps/mobile/targets/ios-widget`), Volt on Ink with light, dark, tinted/clear and Lock Screen variants, `.privacySensitive()` todo text, stale (> 6 h, > 48 h), empty and signed-out states, and `#Preview`s: **Next up** (kind `InboxTodoWidget` kept; `AppIntentConfiguration` by column, tag or milestone; interactive toggle; small/medium/large/rectangular/inline/circular), **Quick capture** (2×2 and 4-wide), **Weekly done** (ring, circular gauge, streak inline), **Inbox** (todo + knowledge count, Process → `kaihuman://inbox`).
+- Four Control Center controls (`ControlWidget`, iOS 18 only behind `@available`) for new todo, note, log and idea.
+- App Shortcuts (`targets/ios-app-intents`): add todo, what's next, complete todo for Siri, Spotlight and the Action button. The config plugin compiles them and the shared store/intents into the app target.
+- New `kaihuman://inbox` deep link (opens the board).
+- CI: the iOS job renders every widget variant with `ImageRenderer` (`targets/ios-widget-render`) and uploads them; contact sheet at `apps/mobile/docs/widgets-real.png`.
+
+## 2026-11-06 — Mobile: swipe actions, pushed detail screens, GitHub mark, demo done dates
+
+- Added `react-native-gesture-handler`, `react-native-reanimated`, `react-native-worklets` and `react-native-svg` at the SDK 58 versions.
+- `ListRow` reveals `swipeActions` with `ReanimatedSwipeable` (iOS full-height buttons, Android tonal, destructive outermost, `side: 'leading' | 'trailing'`), with haptics. Long press keeps the action sheet; each action is also an `accessibilityAction`. `GestureRoot` wraps the root layout. Todos: Done, Start/Backlog/Reject, Delete (`KanbanBoardController.remove`). Ideas: status changes, Delete (`IdeasScreenController.remove`). Knowledge inbox: Archive, Delete.
+- Idea detail (`app/(tabs)/ideas/[slug].tsx`) and wiki page (`app/wiki/[...page].tsx`; `wiki.tsx` moved to `wiki/index.tsx`) are pushed stack screens with the native header and back button; the header title matches the page title.
+- Web preview: pushed screens get a back control (`webBackOptions`); native is unchanged.
+- The sign-in button shows the official GitHub mark (`GithubMark`, coloured with the label via the new `Button` `leading` prop).
+- Demo seed: done todos carry `::updated::` dates over the last ~7 weeks, so the weekly-done bars show data.
+- Regenerated `apps/mobile/docs/screens.png`.
+
+## 2026-11-06 — Mobile: iOS widget concepts
+
+- New `doc/mobile-widgets.md`: ten ranked iOS widget concepts (families, interactions, data, effort), a v1 set (Next up, Quick capture + Control Center controls, Weekly done ring, Inbox, App Shortcuts) and a v2 set, refresh/offline/Lock Screen privacy rules, and the additive `widget-sync` snapshot changes (`schemaVersion: 2`, stats, milestones, knowledge inbox, local time zone).
+- Mockups at true point sizes in light, dark and tinted, Home Screen and Lock Screen: `apps/mobile/docs/widgets.png` (source `apps/mobile/docs/widgets-mockup.html`). Design only; no widget code changed.
+
+## 2026-11-06 — Mobile: Android release crashed on launch (WorkManager vs R8)
+
+- The Release APK died at startup in `androidx.startup.InitializationProvider` ("Failed to create an instance of androidx.work.impl.WorkDatabase"): Glance's WorkManager creates its Room database reflectively and R8 stripped `WorkDatabase_Impl`. The widget config plugin now appends keep rules to `android/app/proguard-rules.pro` (`addWorkManagerKeepRules`, with a test). Found via the crash logs the screenshots workflow now saves.
+- iOS screenshots now show the real screens (the "Open in kaihuman?" prompt is confirmed).
+
+## 2026-11-06 — Workflow hardening for public release
+
+- `template-deploy-to-cloudflare.yaml`: inputs/env moved from `run:` into step `env:` (script-injection fix), `permissions: contents: read`, wrangler pinned to 4.148.0, `pnpm install --frozen-lockfile`, dead `set-output` step removed.
+- `mobile-screenshots.yml`: concurrency cancels in-progress runs; Maestro installed from the pinned `cli-1.41.0` release zip with a sha256 check instead of `curl | bash`.
+- Third-party actions in all workflows pinned to commit SHAs.
+
+## 2026-11-06 — Declare licenses in every manifest
+
+- Added `"license": "AGPL-3.0-only"` to the 15 workspace `package.json` files under `apps/*` and `packages/*` that lacked one, and `license = "AGPL-3.0-only"` to `apps/cli/Cargo.toml` and `apps/desktop-palette/src-tauri/Cargo.toml`.
+- `packages/docspack` keeps its `MIT` license and gets its own `LICENSE` file with the MIT text (copyright kaihuman contributors).
+
+## 2026-11-06 — Stop tracking `packages/ui/storybook-static`
+
+- Removed the 58 tracked files under `packages/ui/storybook-static` from the git index (`git rm -r --cached`). The directory is a Storybook build output and stays on disk.
+- Nothing in `.github/`, `doc/`, `README.md`, `package.json` files, `turbo.json`, `apps/`, or `scripts/` depends on the tracked copy. The root `.gitignore` already ignores `storybook-static`.
+
+## 2026-11-06 — Mobile: every screen restyled to native iOS and Material 3
+
+- All screens now use only `src/ui` primitives and `useTheme()` colours, in light and dark, with iOS (HIG) and Android (Material 3) variants:
+  - Login: brand mark, "Sign in with GitHub", "Try demo", token sign-in behind a disclosure.
+  - Repositories: grouped rows with a checkmark, search, and loading/empty/error states.
+  - Today: date header, shortcut grid, and every tile kind as a `Card` with mono stat cells and checkbox rows.
+  - Board: column `SegmentedControl` with counts, tag chips, a per-row advance button and a long-press move menu, and a FAB on Android.
+  - Analytics: stat tiles and labelled bars.
+  - Capture: launcher with icon tiles. Quick sheets have one primary action, keyboard handling, and success/error haptics.
+  - Ideas: status chips, row menus and a detail screen with status and log.
+  - Wiki: reader with tappable `[[links]]` and backlinks.
+  - Knowledge: inbox with counts.
+  - Files: browser with breadcrumbs and an "Encrypted" badge.
+  - Editor: mono, dirty state, and an `.enc` unlock card.
+  - More: account card, workspace rows and a danger sign-out.
+- Pull-to-refresh where data loads, accessibility labels and roles on every control, and 44pt/48dp targets.
+- Consistency pass: `BackButton` primitive for in-tab detail views, `ListRow` `iconTone` so each concept keeps one tile colour across Capture, More, Files, Ideas, Wiki and Knowledge, a markdown block renderer for the wiki reader (`wiki-blocks.ts`: headings, lists, quotes, code, tappable `[[links]]`), "Couldn't …" / "Try again" error wording everywhere, visible iOS dark selected segment, and grey disabled buttons.
+- `src/ui`: new icons (lock, folder, document, chevrons, globe, gauge, terminal, chart, clock, timer, bookmark, wallet, table and more), `TextField` `autoFocus`, and `Screen` no longer duplicates the title under a visible navigation header in the web preview.
+- Deleted the legacy `src/views/primitives.tsx` and `src/theme/tokens.ts`. `src/index.ts` now re-exports `theme.ts`.
+- New `apps/mobile/scripts/screens.cjs` takes web-preview screenshots on iPhone 15 Pro and Pixel 8 in light and dark. A contact sheet is in `apps/mobile/docs/screens.png`.
+
+## 2026-11-06 — CI: skip workflows on draft pull requests
+
+- `ci.yml` and `mobile-build.yml` now run on `pull_request` (opened, synchronize, reopened, ready_for_review) instead of every branch push, and every job is skipped while the PR is a draft. Marking a PR ready for review starts them. `mobile-build.yml` keeps `workflow_dispatch` for manual runs. Branch pushes without a PR no longer run CI.
+
+## 2026-11-06 — Mobile: native design foundation
+
+- Design spec `doc/mobile-design.md`: brand carry-over from the console, semantic colour, type, shape and metric tables quoted from `theme.ts`, iOS HIG and Material 3 rules, navigation architecture, primitives catalogue, web preview, screen restyle checklist, and status and known gaps.
+- `apps/mobile/src/theme/theme.ts` (committed in `f768ed0`): platform-aware light and dark palettes (iOS and Android), type scales, shape, metrics and `useTheme()`. The web preview uses iOS styling unless `?platform=android` is in the URL.
+- `expo-haptics` and `expo-symbols` added to `apps/mobile/package.json` (committed in `f768ed0`).
+- `src/ui/` primitives (`Icon`, `haptics`, `Text`, `Screen`, `Section`/`ListRow`, `Button`, `TextField`, `SegmentedControl`, `Chip`, `Badge`, `EmptyState`, `Card`, `StatTile`, `Fab`, `Divider`) are built and committed. The legacy `src/views/primitives.tsx` `Button` now renders the tinted variant instead of filled, so screens not yet restyled are not a wall of Volt.
+- Navigation is built: root Stack themed from `useTheme()`; `app/(tabs)` with `NativeTabs` on iOS and Android and a custom JS tab bar on web (`src/navigation/web-tab-bar.tsx`). Five tabs (Today, Board, Capture, Ideas, More), each with its own Stack. Capture is a launcher (`src/views/capture-hub-view.tsx`), More is `src/views/more-view.tsx`, and `quick-*` routes are modal sheets with a grabber. Shared options are in `src/navigation/stack-options.ts`; `app.json` sets `userInterfaceStyle` to `automatic`.
+- Light-mode contrast fixed in `theme.ts`: iOS light `secondaryLabel` `rgba(60,60,67,0.76)` (≈5.1:1) and Android light `tertiaryLabel` `#6A6C60` (≈5.0:1).
+- Not built yet: the screen restyle. The spec's status section lists it.
+- Known gaps: Android status colours still use the iOS values, and the `Icon` map needs an outline/fill split. iOS `tertiaryLabel` stays below 4.5:1 and is for placeholder and disabled text only. See `doc/mobile-design.md` §14.
+
+## 2026-11-06 — Mobile: CI screenshots and `kaihuman://demo`
+
+- New `.github/workflows/mobile-screenshots.yml`: builds apps/mobile Release (JS bundled, no Metro) for the iOS Simulator and an x86_64 Android emulator build, boots them, opens each route, and uploads light and dark PNGs as the `mobile-screenshots` artifact. Runs on pushes to `native-app-plan-antigravity` touching mobile/core/formats, and via `workflow_dispatch`. Scripts in `.github/scripts/mobile-screenshots-*.sh`; iOS opens deep links through Maestro (`simctl openurl` shows an unanswerable confirmation).
+- `kaihuman://demo` enters demo mode non-interactively and opens the dashboard (`app/demo.tsx` plus the deep-link handler), with tests. Screens: login, dashboard, board, analytics, quick-todo, ideas, wiki, knowledge, files, repos.
+- Fix: the WidgetKit extension's `Info.plist` lacked `CFBundleExecutable`, so installing the built app on a simulator failed ("missing or invalid CFBundleExecutable"); found by the screenshots workflow.
+
+## 2026-11-06 — Mobile: fix startup crash and unreachable quick capture
+
+- `@kaihuman/core`: `logger.ts` and `auth.store.ts` read `import.meta.env` directly, which is undefined under Metro, so the mobile app crashed at module load (blank screen). Added `viteEnv(import.meta)` (`packages/core/src/env.ts`) with a regression test.
+- `apps/mobile`: `app/quick-[kind].tsx` never matched (expo-router has no partial dynamic segments), so quick capture and the widgets' `kaihuman://quick-*` links hit "Unmatched Route". Replaced with one static route per kind over a shared `QuickCaptureScreen`; added a route-file test.
+- Found by rendering the Expo web export with Playwright.
+
+## 2026-11-05 — Mobile build: native module sources, widget target wiring, CI setup
+
+- `apps/mobile/.gitignore` ignored every `ios/` and `android/` directory, so the `kaihuman-shared` module's Swift and Kotlin sources were never committed. The patterns are now anchored to the app root, and the module ships `ios/KaihumanSharedModule.swift`, `ios/KaihumanShared.podspec`, `android/build.gradle` and `KaihumanSharedModule.kt`.
+- Widget config plugin, iOS: the extension's group, `INFOPLIST_FILE` and `CODE_SIGN_ENTITLEMENTS` now point at `../targets/ios-widget` (the Xcode project lives in `ios/`); build settings are written to the target's own configurations (node-xcode stores the target name quoted, so the old `updateBuildProperty` calls matched nothing); the app depends on the extension; the embed phase sits before the React Native bundling script; the extension's version follows the app.
+- Widget config plugin, Android: applies the Kotlin Compose compiler plugin to the app (Glance widgets are Compose code), at the Kotlin version React Native's version catalog pins.
+- `mobile-build.yml`: `setup-android` installs only `platform-tools` (its default list includes the removed `tools` package); the iOS job runs `pod install` before `xcodebuild`; the Android job first frees runner disk (dotnet, GHC, CodeQL and similar), since the NDK build for all four ABIs ran out of space.
+- Tests: the Xcode editor runs against a pbxproj fixture with the real `xcode` library (root devDependency), plus checks that the native module implements every function `index.ts` declares and that the Compose transforms are idempotent.
+
+## 2026-11-05 — Mobile phase 6: React Native views and runnable Expo app
+
+- `apps/mobile` is a runnable Expo SDK 58 app (react 19.3, react-native 0.88) with expo-router file routes in `apps/mobile/app/`: index, login, repos, quick capture, board, analytics, dashboard, ideas, wiki, knowledge, and files. `main` is `expo-router/entry`; `metro.config.js` strips `.js` from relative imports.
+- Thin views in `apps/mobile/src/views/` over every controller: login, repo selector, quick capture, kanban, todo analytics, dashboard with all 14 tile kinds, ideas, wiki with wiki-link navigation, knowledge inbox, and file browser/editor including the `.enc` passphrase flow. A `useSignalValue` hook binds controller signals to views; primitives are themed.
+- Native glue in the local Expo module `apps/mobile/modules/kaihuman-shared` (Swift and Kotlin): App Group / `kaihuman_widget` prefs, shared `github-token` copy, `pending-url` consumption, and widget reload. The token is mirrored to SecureStore (Keychain service `com.kaihuman.app`, key `github-token`). Deep links and `pending-url` are routed on launch and foreground.
+- Pure-JS `crypto.subtle` polyfill for Hermes (PBKDF2-SHA256 to AES-GCM via @noble) so core `encrypt`/`decrypt` works on React Native.
+- Tests: Vitest render tests (jsdom, `react-native` aliased to `react-native-web`, `@testing-library/react`); mobile now has 166 tests. `expo export --platform android` produces a Hermes bundle on Linux.
+- Docs updated: `doc/mobile-plan.md` (Task 6.5 ticked), `doc/features.md`, `doc/roadmap.md`, `doc/mobile.md` (status), `README.md` (Mobile gaps).
+- Still untested:
+  - The Swift and Kotlin module and widget targets have never been compiled; the mobile-build workflow on macOS and Android runners is the first real build.
+  - The app has not been run on a device or simulator.
+  - Route files and the bootstrap are not unit-tested.
+  - The Expo config plugin's editing of the real Xcode project is untested.
+
+## 2026-11-05 — Mobile phase 5: mobile CI workflow and docs
+
+- Added `.github/workflows/mobile-build.yml`: manual `workflow_dispatch` plus push/PR with the path filter `apps/mobile/**`. Jobs: ubuntu type-check, lint and tests; Android debug APK build (prebuild, then assemble); macOS iOS Simulator build and WidgetKit compile check.
+- Docs updated: `doc/roadmap.md` (Phase 5 ticked), `doc/mobile-plan.md` (Task 5.1), `doc/features.md` (Mobile section), `doc/mobile.md` (status and known gaps), `README.md` (Mobile).
+- Known gaps:
+  - Swift and Kotlin widget code has never been compiled here (no Xcode or Android toolchain in this environment); CI compile checks are the first real build.
+  - The Expo config plugin's editing of the real Xcode project is untested.
+  - The app must write the GitHub token to key `github-token` (iOS Keychain service `com.kaihuman.app`, then App Group defaults; Android prefs `kaihuman_widget`) and handle the App Group `pending-url` key.
+  - Core `encrypt`/`decrypt` (`.enc` files) need a `crypto.subtle` polyfill on React Native.
+  - Phase 3 built screen controllers only; there are no React Native view components yet.
+
+## 2026-11-05 — Mobile phase 4: native iOS/Android Todo widgets, config plugin, reminders
+
+- iOS WidgetKit extension (`apps/mobile/targets/ios-widget/`): `Codable` models mirroring `WidgetTodoSnapshot`, `SharedTodoStore` (App Group `group.com.kaihuman.app`, `.todos.md` line toggle with `::updated::`, GitHub contents `PUT`, `pending-widget-mutations.json` fallback), `ToggleTodoIntent` / `QuickCaptureTodoIntent` (iOS 17), small/medium/large/accessory widgets in the Nexus dark theme. Quick capture writes `kaihuman://quick-todo` to App Group key `pending-url` for the app to route on launch.
+- Android Jetpack Glance widget (`apps/mobile/targets/android-widget/`): `TodoGlanceWidget`, `TodoWidgetReceiver`, `ToggleTodoAction` (same toggle, GitHub sync and offline queue via `SharedPreferences` `kaihuman_widget`).
+- Both widgets read the GitHub token from key `github-token` (Keychain service `com.kaihuman.app` on iOS, then App Group defaults; prefs on Android); the app must write it there.
+- `plugins/with-kaihuman-widgets.ts`: dependency-free Expo config plugin (App Group entitlement, `kaihuman` scheme, WidgetKit target, Glance receiver manifest entry, Glance Gradle dependency, Kotlin source copy) registered in `app.json`.
+- `src/notifications/milestone-reminders.ts`: local notification schedule from `.todos.md` milestones (day before and due day, overdue now) and `.events.csv` events.
+- Swift/Kotlin are not compiled in CI yet (no macOS/Android toolchain); Vitest checks model parity with `WidgetTodoSnapshot`, constants, plugin transforms and reminders (`ios-widget.test.ts`, `targets.test.ts`).
+
+## 2026-11-05 — Mobile phase 3: screen controllers and dashboard tile presenters
+
+- Quick capture (`QuickCaptureController`: todo, note, log, idea with `kh-idea` handoff, knowledge to `.kh/raw/`), `KanbanBoardController` (multi-file `.todos.md` incl. inbox, status/tag/milestone filters, move between files writing target first, milestone CRUD) and `TodoAnalyticsController` (velocity, tag distribution, milestone progress).
+- `tile-controllers.ts`: pure presenters and mutators with an injected clock for every dashboard extension (todos, habit, timetracking, events, actionlog, timezones, readitlater, bookmarks, budget, stocks, consumption, data-collection, prompts, commands), tested against `buildDemoSeed()`. Bookmarks/budget/stocks/consumption/data-collection parsers are local copies of the `@kaihuman/ui` ones until they move into `@kaihuman/formats`.
+- `IdeasScreenController`, `WikiScreenController` (`[[wikilinks]]`, backlinks, tags), `KnowledgeScreenController` and `FileEditorController` (tree, create/rename/delete, `.enc` via core `encrypt`/`decrypt` + `passwordStore`; React Native will need a `crypto.subtle` polyfill).
+- All controllers are pure TypeScript with injectable file/clock ports; 89 mobile tests.
+
+## 2026-11-05 — Mobile phase 2: `apps/mobile` workspace, adapters, deep links, auth controllers
+
+- New `@kaihuman/mobile` package (pure TypeScript, tested under Vitest; Expo/React Native deps arrive with the screens in phase 3): theme tokens, `app.json` (scheme `kaihuman`).
+- `MobileStorageAdapter`: pluggable secure/KV/SQLite drivers plus a widget mirror; falls back to memory when a driver is absent.
+- `WidgetBridge`: writes `widget-todos.json` to the shared container, reloads timelines, and replays `pending-widget-mutations.json` toggles through `githubFileStore` (re-applied to current content so stale SHAs cannot clobber edits).
+- `parseDeepLink` for all `kaihuman://` routes, `LoginScreenController` (`?client=mobile` OAuth URL, callback, PAT, demo mode) and `RepoSelectorController`.
+
+## 2026-11-05 — Mobile phase 1: core storage adapter, widget sync, mobile OAuth
+
+- `@kaihuman/core`: pluggable `CoreStorageAdapter` (`configureCoreStorage`, web adapter with in-memory fallback; IndexedDB now v2 with a `mutations` store), stores no longer touch `window`/`localStorage` directly, `authStore.handleCallbackUrl`, and an offline save queue in `githubFileStore`.
+- `widget-sync.ts`: `buildWidgetTodoSnapshot` and `applyWidgetTodoToggle`, shared with the native widgets. Core now depends on `@kaihuman/formats`.
+- `auth-worker`: `/login?client=mobile` redirects the callback to `kaihuman://auth/callback`.
+
 ## 2026-11-05 — Business dashboard redesign and shared business button styles
 
 - Reuse audit: Business already shares the todo and action-log formats; its time entries (`.kh/business/time/*.jsonl`) stay separate from `*.timetracking.csv` by design (client, project and billing links). No shared EmptyState, stat or badge component exists, so `Card`, `Stat` and `StatusPill` stay. The duplication was ~15 copies of button classes and 4 of the input class: now `components/business/buttons.ts` (`PRIMARY`, `SECONDARY`, `PRIMARY_MD`, `SECONDARY_MD`, `BUTTON_SM`) and `FormField`'s `INPUT`.
@@ -144,6 +345,10 @@
 - Business hours in the browser extension's start page and phase 3 docs: pure `businessToday(timeJsonl, timerYaml, today, now)` in `background/today.ts` (parsed with `parseJsonl`/`parseYaml` and the validators from `@kaihuman/formats/business`, which the extension build accepts) sums today's entries of the current month's file and adds a running timer's minutes from `max(started_at, local midnight)`, rounded down. The time files and `running.yaml` ride along in `isTodayPath`; `TodaySummary.business` is `null` without them and the "Doing" section then shows no line, otherwise `Business today: 2.5 h` with `· timer running for <client>`. Read-only. `doc/business.md` gets the phase-3 writing section, features and roadmap are updated, the `kh-business` skill notes the shared timer, and `BUSINESS_TOOLS_VERSION` is `1.1.0` so `syncKB` refreshes the tool files.
 - Final review fixes: `convertOffer` also refuses a declined offer and one already invoiced by an issued invoice (`from_offer`), and the client page hides "Convert to invoice" then (convert appends no `accepted` event; JSDoc corrected); stopping a timer refuses when the running timer's `started_at` changed on another device; the log-time hours field takes `1:30` and `90m` (`inputMode="text"`) and lists only active projects (a prefilled one stays); the issue preview counts PDFs without a yaml in its number; `entryFromForm` uses `isRealDate`; the file browser refuses creating, renaming or moving to a new issued-document path; ideas writes are cached under the content's blob sha; tests pin `gitBlobSha('ä')` and make the read-only auto-save test fail without the gate.
 
+## 2026-11-01 — Mobile app (iOS & Android): design spec and autonomous implementation plan
+
+- Design for `@kaihuman/mobile` (`apps/mobile`, Option B: Expo + React Native) with full console feature parity and interactive iOS (SwiftUI WidgetKit + AppIntents) and Android (Jetpack Glance) Todo widgets: `doc/mobile.md`.
+- 5-phase autonomous implementation plan (`doc/mobile-plan.md`) and Antigravity workspace orchestrator skill (`.agents/skills/mobile-orchestrator/SKILL.md`) so each phase runs in a fresh subagent context window with zero breaking changes to `apps/console`. No code yet.
 ## 2026-10-27 — Business, phase 2: console pages
 
 - `loadBusinessRepo(files, treePaths?)` in `@kaihuman/formats/business` parses and validates every business file into typed records, client file lists, artifact paths and findings; one broken file never stops the rest. `checkBusinessRepo` now uses it and keeps only its cross-file rules. New path helpers `isBusinessPath`, `clientOfPath`, `Scope` and `inScope`.

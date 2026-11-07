@@ -15,6 +15,10 @@ export interface Env {
 
 const STATE_COOKIE = 'kh_oauth_state';
 const STATE_MAX_AGE_SECONDS = 600;
+// Where the native app receives the token. Marked in the state so it is covered by the same
+// strict state/cookie equality check as the rest of the state.
+const MOBILE_REDIRECT = 'kaihuman://auth/callback';
+const MOBILE_STATE_SUFFIX = ':mobile';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -36,7 +40,8 @@ export default {
 function login(url: URL, env: Env): Response {
   // The state ties the callback to a login this browser started, so another site cannot
   // log the user into an account of its choosing.
-  const state = crypto.randomUUID();
+  const mobile = url.searchParams.get('client') === 'mobile';
+  const state = crypto.randomUUID() + (mobile ? MOBILE_STATE_SUFFIX : '');
   const authorize = new URL('https://github.com/login/oauth/authorize');
   authorize.searchParams.set('client_id', env.GITHUB_CLIENT_ID);
   authorize.searchParams.set('redirect_uri', callbackUrl(url));
@@ -82,7 +87,7 @@ async function callback(request: Request, url: URL, env: Env): Promise<Response>
     return text(`GitHub token exchange failed: ${body.error ?? 'no access token'}`, 502);
   }
 
-  const target = new URL(env.APP_URL);
+  const target = new URL(state.endsWith(MOBILE_STATE_SUFFIX) ? MOBILE_REDIRECT : env.APP_URL);
   target.searchParams.set('access_token', body.access_token);
   return redirect(target.toString(), stateCookie('', 0));
 }

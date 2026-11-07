@@ -44,7 +44,44 @@ describe('/login', () => {
   });
 });
 
+describe('/login?client=mobile', () => {
+  it('marks the state in both the GitHub redirect and the cookie', async () => {
+    const response = await get('/login?client=mobile');
+
+    const state = new URL(response.headers.get('Location') ?? '').searchParams.get('state');
+    expect(state).toMatch(/:mobile$/);
+    expect(response.headers.get('Set-Cookie')).toContain(`kh_oauth_state=${state};`);
+  });
+
+  it('does not mark the state for other client values', async () => {
+    const response = await get('/login?client=web');
+
+    const state = new URL(response.headers.get('Location') ?? '').searchParams.get('state');
+    expect(state).not.toContain(':mobile');
+  });
+});
+
 describe('/callback', () => {
+  it('redirects a mobile login to the app scheme with the token', async () => {
+    mockGitHub(200, { access_token: 'gho_token' });
+
+    const response = await get('/callback?code=abc&state=s1:mobile', 'kh_oauth_state=s1:mobile');
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe(
+      'kaihuman://auth/callback?access_token=gho_token',
+    );
+  });
+
+  it('rejects a mobile-marked state that does not match the cookie', async () => {
+    const fetchMock = mockGitHub(200, { access_token: 'gho_token' });
+
+    const response = await get('/callback?code=abc&state=s1:mobile', 'kh_oauth_state=s1');
+
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('exchanges the code and redirects to the console with the token', async () => {
     const fetchMock = mockGitHub(200, { access_token: 'gho_token' });
 

@@ -44,3 +44,4 @@ apps/console/src/version.ts
 
 # docspack local index and hook log (per machine)
 .docspack/
+dist-*

@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "kaihuman",
+    "slug": "kaihuman",
+    "scheme": "kaihuman",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "bundleIdentifier": "com.kaihuman.app"
+    },
+    "android": {
+      "package": "com.kaihuman.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#E6FF4A"
+      }
+    },
+    "plugins": ["expo-router", "./plugins/with-kaihuman-widgets.ts"],
+    "extra": {
+      "eas": {
+        "projectId": "43114d95-85d0-472a-a83c-05b6d1f62d2d"
+      }
+    },
+    "owner": "u11g"
+  }
+}

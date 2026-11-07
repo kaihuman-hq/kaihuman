@@ -1,6 +1,7 @@
 {
   "name": "@kaihuman/share-worker",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "description": "Cloudflare Worker that stores encrypted business documents for share links; it never sees the keys",
   "type": "module",

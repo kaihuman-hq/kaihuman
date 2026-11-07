@@ -1,6 +1,7 @@
 {
   "name": "@kaihuman/auth-worker",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "description": "Cloudflare Worker that runs the GitHub sign-in for the kaihuman console without storing tokens",
   "type": "module",

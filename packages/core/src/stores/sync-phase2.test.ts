@@ -1,8 +1,8 @@
 import '../db.js';
-import { openDB } from 'idb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConflictError } from '../services/conflict.js';
 import type { InMemoryGithubService } from '../services/github.service.memory.js';
+import { openLifeOsDb } from './idb-test-helper.js';
 
 vi.mock('../services/github.service.js', async () => {
   const { InMemoryGithubService } = await import('../services/github.service.memory.js');
@@ -31,7 +31,7 @@ const pushRemote = async (content: string, path = FILE) => {
   await remote.saveFile('o', 'r', path, content, 'other device', sha);
 };
 const clearIdb = async () => {
-  const db = await openDB('life-os-db', 1);
+  const db = await openLifeOsDb();
   await db.clear('files');
   await db.clear('trees');
   db.close();
@@ -290,7 +290,7 @@ describe('phase 2, cause 6: atomic commits', () => {
   });
 
   it('loadTree no longer resurrects a cached file deleted remotely, but keeps a local create', async () => {
-    const db = await openDB('life-os-db', 1);
+    const db = await openLifeOsDb();
     const item = (path: string, sha: string) => ({
       path,
       mode: '100644',

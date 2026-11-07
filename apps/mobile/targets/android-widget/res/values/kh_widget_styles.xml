@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dialog shown when a configurable widget is added or reconfigured. -->
+    <style name="KhConfigTheme" parent="Theme.AppCompat.DayNight.Dialog" />
+</resources>

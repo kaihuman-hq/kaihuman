@@ -1,5 +1,6 @@
 import { signal } from '@preact/signals';
 import { Logger } from '../logger.js';
+import { getCoreStorage } from '../storage/adapter.js';
 import { githubProfileStore } from './github-profile.store.js';
 
 const logger = new Logger('PasswordStore');
@@ -60,12 +61,12 @@ const store = {
 
   loadFromStorage() {
     try {
-      const old = localStorage.getItem(OLD_LS_KEY);
+      const old = getCoreStorage().getItem(OLD_LS_KEY);
       if (old !== null) {
-        if (localStorage.getItem(LS_KEY) === null) localStorage.setItem(LS_KEY, old);
-        localStorage.removeItem(OLD_LS_KEY);
+        if (getCoreStorage().getItem(LS_KEY) === null) getCoreStorage().setItem(LS_KEY, old);
+        getCoreStorage().removeItem(OLD_LS_KEY);
       }
-      const raw = localStorage.getItem(LS_KEY);
+      const raw = getCoreStorage().getItem(LS_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
@@ -115,10 +116,10 @@ const store = {
       try {
         const repo = githubProfileStore.currentRepo.value;
         const blob = obfuscate(password, repo?.full_name ?? 'unknown');
-        const raw = localStorage.getItem(LS_KEY);
+        const raw = getCoreStorage().getItem(LS_KEY);
         const stored = raw ? JSON.parse(raw) : {};
         stored[key] = blob;
-        localStorage.setItem(LS_KEY, JSON.stringify(stored));
+        getCoreStorage().setItem(LS_KEY, JSON.stringify(stored));
         this._encryptedStored[key] = blob;
       } catch (e) {
         logger.warn('Failed to remember password:', e);
@@ -136,11 +137,11 @@ const store = {
     unlockedFiles.value = newUnlocked;
 
     try {
-      const raw = localStorage.getItem(LS_KEY);
+      const raw = getCoreStorage().getItem(LS_KEY);
       const stored = raw ? JSON.parse(raw) : {};
       if (stored[key]) {
         delete stored[key];
-        localStorage.setItem(LS_KEY, JSON.stringify(stored));
+        getCoreStorage().setItem(LS_KEY, JSON.stringify(stored));
       }
     } catch {
       // ignore
@@ -149,8 +150,6 @@ const store = {
 };
 
 // Initialize from storage on module load
-if (typeof localStorage !== 'undefined') {
-  store.loadFromStorage();
-}
+store.loadFromStorage();
 
 export const passwordStore = store;

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="kh_tile_todo">New todo</string>
+    <string name="kh_tile_note">New note</string>
+    <string name="kh_tile_log">New log</string>
+    <string name="kh_tile_idea">New idea</string>
+    <string name="kh_shortcut_todo_short">New todo</string>
+    <string name="kh_shortcut_todo_long">Capture a new todo</string>
+    <string name="kh_shortcut_note_short">New note</string>
+    <string name="kh_shortcut_note_long">Capture a new note</string>
+    <string name="kh_shortcut_log_short">New log</string>
+    <string name="kh_shortcut_log_long">Capture a new log entry</string>
+    <string name="kh_shortcut_idea_short">New idea</string>
+    <string name="kh_shortcut_idea_long">Capture a new idea</string>
+    <string name="kh_focus_channel_name">Focus sessions</string>
+    <string name="kh_focus_public_title">Focus session running</string>
+    <string name="kh_focus_done">Done</string>
+    <string name="kh_focus_extend">+5m</string>
+</resources>

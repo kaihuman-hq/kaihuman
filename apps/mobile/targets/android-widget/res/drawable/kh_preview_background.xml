@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Root background of every widget preview layout: surface colour with the system corner radius. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/kh_surface" />
+    <corners android:radius="@dimen/kh_widget_radius" />
+</shape>

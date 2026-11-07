@@ -132,6 +132,35 @@
 | Ideas tools (`ideas_list`, `ideas_find`, `ideas_read`, `ideas_create`, `ideas_append`, `ideas_set_summary`, `ideas_set_status`, `ideas_import`) and opt-in `--git` commit and push, for Claude Desktop | `kaihuman-kb-mcp --repo <path> --git` | 2026-10-13 |
 | stdio MCP server: `kb_search`, `kb_read`, `kb_list`, `kb_index`, `kb_log`, `kb_add_raw` over a local clone | `kaihuman-kb-mcp --repo <path>` | 2026-09-23 |
 
+## Mobile app (`apps/mobile`)
+
+| Feature | Location | Added |
+|---------|----------|-------|
+| Screen controllers (pure TypeScript, injectable ports): quick capture, kanban, analytics, ideas, wiki, knowledge, file editor (`.enc`) | `apps/mobile/src` | 2026-11-05 |
+| Dashboard tile presenters for every dashboard extension, tested against the demo seed | `apps/mobile/src/tile-controllers.ts` | 2026-11-05 |
+| iOS WidgetKit + AppIntents and Android Jetpack Glance Todo widgets (toggle, quick capture, GitHub sync, offline queue) | `apps/mobile/targets/ios-widget/`, `apps/mobile/targets/android-widget/` | 2026-11-05 |
+| iOS widget set v1: Next up (configurable, interactive), Quick capture, Weekly done ring, Inbox; iOS 18 Control Center controls; App Shortcuts (Siri, Spotlight, Action button); widget-sync schema v2 with local-day stats | `apps/mobile/targets/ios-widget/`, `apps/mobile/targets/ios-app-intents/`, `packages/core/src/widget-sync.ts` | 2026-11-06 |
+| iOS widget set v2: Board column (Start), Milestone countdown, Idea pipeline, Knowledge card, Habits; focus Live Activity + Dynamic Island (Done, +5m); background capture intent; widget deep links | `apps/mobile/targets/ios-widget/`, `apps/mobile/modules/kaihuman-shared/`, `packages/core/src/widget-sync.ts` | 2026-11-06 |
+| Android widget set (Glance, Material You): Next up (configurable, interactive), Quick capture, Weekly done, Inbox, Board column, Milestone countdown, Idea pipeline, Wiki card; Quick Settings capture tiles; static app shortcuts; focus ongoing notification (Done, +5m) | `apps/mobile/targets/android-widget/`, `apps/mobile/modules/kaihuman-shared/` | 2026-11-06 |
+| `kaihuman://` deep links, milestone reminders from `.todos.md` and `.events.csv` | `apps/mobile/src` | 2026-11-05 |
+| GitHub OAuth sign-in through `auth-worker` (`?client=mobile`), PAT entry and demo mode | `apps/auth-worker`, mobile login | 2026-11-05 |
+| Native-compile CI: type-check, Android debug APK, iOS Simulator and WidgetKit check | `.github/workflows/mobile-build.yml` | 2026-11-05 |
+| Runnable Expo SDK 58 app with expo-router file routes (login, repos, quick capture, board, analytics, dashboard, ideas, wiki, knowledge, files) | `apps/mobile/app` | 2026-11-05 |
+| React Native views over every controller: all 14 dashboard tile kinds, wiki-link navigation, knowledge inbox, file editor with the `.enc` passphrase flow | `apps/mobile/src/views` | 2026-11-05 |
+| Local Expo module `kaihuman-shared` (Swift and Kotlin): App Group and `kaihuman_widget` prefs, shared GitHub token, `pending-url` handling, widget reload | `apps/mobile/modules/kaihuman-shared` | 2026-11-05 |
+| GitHub token mirrored to SecureStore; deep links and `pending-url` routed on launch and foreground | `apps/mobile/src` | 2026-11-05 |
+| Pure-JS `crypto.subtle` polyfill for Hermes (PBKDF2-SHA256 to AES-GCM via @noble) so `.enc` files work on device | `apps/mobile/src` | 2026-11-05 |
+| Vitest render tests for the views (jsdom, `react-native` aliased to `react-native-web`); 166 mobile tests | `apps/mobile` | 2026-11-05 |
+| Native design system (`src/ui/`: Icon, Text, Screen, Section, ListRow, Button, TextField, Chip, Card and more) and five-tab navigation (`NativeTabs`, per-tab Stacks, quick-capture modal sheets, JS tab bar on web) | `apps/mobile/src/ui`, `apps/mobile/app/(tabs)` | 2026-11-06 |
+| Every mobile screen restyled to native iOS (HIG) and Material 3 in light and dark: grouped lists, platform icons, haptics, pull-to-refresh, empty/loading/error states, row action menus, Android FABs | `apps/mobile/src/views`, `apps/mobile/app` | 2026-11-06 |
+
+**Known gaps:**
+- Swift and Kotlin widget code has never been compiled here (no Xcode or Android toolchain in this environment); CI compile checks are the first real build.
+- The Expo config plugin's editing of the real Xcode project is untested.
+- The app must write the GitHub token to key `github-token` (iOS Keychain service `com.kaihuman.app`, then App Group defaults; Android prefs `kaihuman_widget`) and handle the App Group `pending-url` key.
+- Core `encrypt`/`decrypt` (`.enc` files) need a `crypto.subtle` polyfill on React Native.
+- Phase 6 views have not been run on a device or simulator, and the Swift/Kotlin native targets are still uncompiled.
+
 ## Sign-in worker (`apps/auth-worker`)
 
 | Feature | Location | Added |

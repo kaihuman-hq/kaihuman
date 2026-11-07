@@ -1,9 +1,9 @@
 import { computed, signal } from '@preact/signals';
-import { openDB } from 'idb';
 import { demoMode } from '../demo-mode.js';
 import { Logger } from '../logger.js';
 import { ConflictError } from '../services/conflict.js';
 import { githubService } from '../services/github.service.js';
+import { type CachedFileRecord, getCoreStorage, type PendingMutation } from '../storage/adapter.js';
 import { mergeFile } from '../sync/merge.js';
 import { type GithubRepo, githubProfileStore } from './github-profile.store.js';
 
@@ -13,21 +13,22 @@ const logger = new Logger('GithubFileStore');
 // IndexedDB cache is bypassed entirely: writes (put/delete) become no-ops and
 // reads (get/getKey) return undefined. This keeps demo edits temporary and
 // in-memory without branching at every cache call site.
-const NEUTERED_IN_DEMO = new Set(['put', 'delete', 'get', 'getKey']);
-const dbPromise = openDB('life-os-db', 1).then(
-  (db) =>
-    new Proxy(db, {
-      get(target, prop) {
-        if (demoMode.value && typeof prop === 'string' && NEUTERED_IN_DEMO.has(prop)) {
-          return async () => undefined;
-        }
-        // Access via the real db so idb's own proxy resolves the method, then
-        // bind it back to the db so `this` is correct after our wrapper.
-        const value = (target as unknown as Record<string | symbol, unknown>)[prop];
-        return typeof value === 'function' ? (value as () => unknown).bind(target) : value;
-      },
-    }),
-);
+const storage = () => getCoreStorage();
+const dbPromise = Promise.resolve({
+  get: async (store: 'trees' | 'files', key: string): Promise<any> =>
+    demoMode.value ? undefined : storage().getRecord(store, key),
+  getAll: async (store: 'files'): Promise<any[]> =>
+    demoMode.value ? [] : storage().listRecords(store),
+  // `files` records carry their own key (`path`), mirroring the old keyPath store.
+  put: async (store: 'trees' | 'files', value: any, key?: string): Promise<void> => {
+    if (demoMode.value) return;
+    await storage().putRecord(store, store === 'files' ? value.path : (key as string), value);
+  },
+  delete: async (store: 'trees' | 'files', key: string): Promise<void> => {
+    if (demoMode.value) return;
+    await storage().deleteRecord(store, key);
+  },
+});
 
 export interface TreeItem {
   path: string;
@@ -56,14 +57,7 @@ const RETRY_MAX_MS = 5 * 60_000;
 /** Outcome of {@link GithubFileStore.reconcile}. */
 export type ReconcileResult = 'unchanged' | 'updated' | 'merged' | 'conflict';
 
-type FileRecord = {
-  path: string;
-  content: string;
-  sha: string;
-  timestamp: number;
-  dirty?: boolean;
-  baseContent?: string;
-};
+type FileRecord = CachedFileRecord;
 
 export class GithubFileStore {
   // State
@@ -1161,7 +1155,7 @@ export class GithubFileStore {
 
     // Guard against concurrent tabs running migration simultaneously
     const flagKey = `kh_migration_done:${repo.full_name}`;
-    if (localStorage.getItem(flagKey) === 'done') return;
+    if (getCoreStorage().getItem(flagKey) === 'done') return;
 
     logger.info('[Migration] Starting .lifeos → .kh migration...');
 
@@ -1176,7 +1170,7 @@ export class GithubFileStore {
       lifeosItems,
     );
 
-    localStorage.setItem(flagKey, 'done');
+    getCoreStorage().setItem(flagKey, 'done');
     logger.info('[Migration] .lifeos → .kh migration complete. Cleaning up IDB...');
 
     // Clean up stale IDB cache entries BEFORE reloading tree (so smart merge doesn't re-add them)
@@ -1416,6 +1410,52 @@ export class GithubFileStore {
     } finally {
       this.isLoading.value = false;
     }
+  }
+
+  /** Queue an edit for later push (e.g. while offline). Newer edits to a path replace older ones. */
+  async enqueueOfflineSave(path: string, content: string, baseSha?: string) {
+    const repo = githubProfileStore.currentRepo.value;
+    if (!repo || demoMode.value) return;
+    await storage().putPendingMutation({
+      id: `${repo.full_name}:${path}`,
+      repoFullName: repo.full_name,
+      path,
+      content,
+      baseSha: baseSha ?? this.openFiles.peek()[path]?.sha,
+      timestamp: Date.now(),
+    });
+  }
+
+  /** Push queued edits for the current repo; failed ones stay queued. Returns the number flushed. */
+  async flushOfflineMutations(): Promise<number> {
+    const repo = githubProfileStore.currentRepo.value;
+    if (!repo || demoMode.value) return 0;
+    const pending: PendingMutation[] = (await storage().listPendingMutations()).filter(
+      (m) => m.repoFullName === repo.full_name,
+    );
+    let flushed = 0;
+    for (const m of pending) {
+      try {
+        const res = await githubService.saveFile(
+          repo.owner.login,
+          repo.name,
+          m.path,
+          m.content,
+          `Update ${m.path} via Console`,
+          m.baseSha,
+        );
+        await storage().deletePendingMutation(m.id);
+        const sha = res.content?.sha;
+        const open = this.openFiles.peek()[m.path];
+        if (sha && open) {
+          this.openFiles.value = { ...this.openFiles.peek(), [m.path]: { ...open, sha } };
+        }
+        flushed++;
+      } catch (e) {
+        logger.warn(`Offline mutation for ${m.path} failed; keeping it queued`, e);
+      }
+    }
+    return flushed;
   }
 }
 
