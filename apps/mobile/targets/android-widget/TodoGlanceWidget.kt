@@ -90,8 +90,6 @@ private fun NextUpContent(
     val doneToday = snap.doneToday(nowMs)
     val empty = khString(context, nextUpEmptyRes(nextUpEmpty(source)))
 
-    // The 48 dp "+" tap area overlays the top-right corner; headers reserve its width with a spacer.
-    Box(modifier = GlanceModifier.fillMaxSize()) {
     Column(modifier = GlanceModifier.fillMaxSize()) {
         when (size) {
             WidgetSizeClass.Small -> {
@@ -108,7 +106,7 @@ private fun NextUpContent(
                         style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium),
                         modifier = GlanceModifier.defaultWeight(),
                     )
-                    Spacer(GlanceModifier.width(ADD_TAP_SIZE))
+                    AddButton(width = 28.dp)
                 }
                 if (hideText) {
                     Text(
@@ -118,7 +116,7 @@ private fun NextUpContent(
                 } else if (rows.isEmpty()) {
                     EmptyState(empty, GlanceModifier.defaultWeight())
                 } else {
-                    TodoRow(rows.first(), GlanceModifier.fillMaxWidth().height(40.dp), 13.sp, checkWidth = 30.dp, maxLines = 2)
+                    TodoRow(rows.first(), GlanceModifier.fillMaxWidth().height(40.dp), 13.sp, maxLines = 2)
                 }
                 Spacer(GlanceModifier.defaultWeight())
                 StaleFooter(freshness)
@@ -162,8 +160,6 @@ private fun NextUpContent(
                 }
             }
         }
-    }
-    Box(modifier = GlanceModifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) { AddButton() }
     }
 }
 
@@ -234,18 +230,16 @@ internal fun NextUpHeader(title: String, trailing: String, height: androidx.comp
                 fontFamily = FontFamily.Monospace,
             ),
         )
-        Spacer(GlanceModifier.width(ADD_TAP_SIZE))
+        AddButton()
     }
 }
 
-internal val ADD_TAP_SIZE = 48.dp
-
-/** Round "+" with a 48 dp square tap area (22 dp visual); opens the quick-add todo sheet. */
+/** Round "+" with a 40 x 24 dp tap area; opens the quick-add todo sheet. */
 @Composable
-internal fun AddButton(width: androidx.compose.ui.unit.Dp = ADD_TAP_SIZE) {
+internal fun AddButton(width: androidx.compose.ui.unit.Dp = 40.dp) {
     val context = LocalContext.current
     Box(
-        modifier = GlanceModifier.width(width).height(ADD_TAP_SIZE)
+        modifier = GlanceModifier.width(width).height(24.dp)
             .clickable(openUri(context, DeepLinks.quick("todo")))
             .semantics { contentDescription = khString(context, R.string.kh_nu_add_desc) },
         contentAlignment = Alignment.Center,
@@ -269,7 +263,7 @@ internal fun TodoRow(
     modifier: GlanceModifier,
     textSize: TextUnit,
     showTag: Boolean = false,
-    // The small widget is 86 dp wide inside its padding, so its check column is narrower.
+    // Material minimum touch target; the small widget uses it too.
     checkWidth: androidx.compose.ui.unit.Dp = 48.dp,
     maxLines: Int = 1,
 ) {

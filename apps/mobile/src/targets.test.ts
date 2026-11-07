@@ -553,6 +553,14 @@ describe('Kotlin widget sources', () => {
     expect(parseTodos(md).items[0]?.updatedAt).toBe(1);
   });
 
+  it('gives every Next up check at least a 48 dp touch target', () => {
+    const src = kotlin('TodoGlanceWidget.kt');
+    expect(src).toContain('checkWidth: androidx.compose.ui.unit.Dp = 48.dp');
+    for (const m of src.matchAll(/checkWidth = (\d+)\.dp/g)) {
+      expect(Number(m[1])).toBeGreaterThanOrEqual(48);
+    }
+  });
+
   it('renders the Next up widget on the shared theme, not the old Nexus colours', () => {
     const src = kotlin('TodoGlanceWidget.kt');
     expect(src).toContain('DeepLinks.quick("todo")');
