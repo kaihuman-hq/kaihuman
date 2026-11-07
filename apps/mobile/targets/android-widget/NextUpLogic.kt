@@ -31,7 +31,7 @@ fun WidgetTodoSnapshot.nextUpRows(source: TodoSource, size: WidgetSizeClass, sta
 fun WidgetTodoSnapshot.boardRows(source: TodoSource, size: WidgetSizeClass, stale: Boolean = false): List<WidgetTodoItem> =
     items(source).take(boardRowLimit(size, stale))
 
-enum class EmptyCopy { NothingInProgress, NothingUpNext, InboxZero, NothingOpenHere, BacklogEmpty }
+enum class EmptyCopy { NothingInProgress, NothingUpNext, InboxZero, NothingOpenHere, BacklogEmpty, NothingHere }
 
 fun nextUpEmpty(source: TodoSource): EmptyCopy = when (source) {
     TodoSource.InProgress -> EmptyCopy.NothingInProgress
@@ -43,8 +43,8 @@ fun nextUpEmpty(source: TodoSource): EmptyCopy = when (source) {
 fun boardEmpty(source: TodoSource): EmptyCopy = when (source) {
     TodoSource.InProgress -> EmptyCopy.NothingInProgress
     TodoSource.Backlog -> EmptyCopy.BacklogEmpty
-    TodoSource.Inbox -> EmptyCopy.InboxZero
-    TodoSource.All -> EmptyCopy.NothingUpNext
+    // A column is not an "inbox" or a "next up" list, so these two stay generic.
+    TodoSource.Inbox, TodoSource.All -> EmptyCopy.NothingHere
     is TodoSource.Tag, is TodoSource.Milestone -> EmptyCopy.NothingOpenHere
 }
 

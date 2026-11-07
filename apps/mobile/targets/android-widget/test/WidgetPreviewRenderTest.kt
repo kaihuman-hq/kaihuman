@@ -191,8 +191,8 @@ class WidgetPreviewRenderTest {
         val filter = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
         for ((label, top, night) in heads) {
             val bandTop = top - margin / 2
-            canvas.drawRect(0f, bandTop.toFloat(), sheetW.toFloat(), (bandTop + titleH).toFloat(), Paint().apply { color = if (night) 0xFF1B1C19.toInt() else 0xFFF1F2EC.toInt() })
-            title.color = if (night) 0xFFE6FF4A.toInt() else 0xFF4F5E00.toInt()
+            canvas.drawRect(0f, bandTop.toFloat(), sheetW.toFloat(), (bandTop + titleH).toFloat(), Paint().apply { color = if (night) 0xFF1B1C19.toInt() else 0xFFF5F5F4.toInt() })
+            title.color = if (night) 0xFFE6FF4A.toInt() else 0xFF0C0D0C.toInt()
             canvas.drawText("kaihuman Android widgets - $label", margin.toFloat(), (bandTop + 46).toFloat(), title)
         }
         for (p in placed) {

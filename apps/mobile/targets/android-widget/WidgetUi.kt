@@ -80,29 +80,28 @@ object KhForceBrand {
     var enabled = false
 }
 
-private val Olive = Color(0xFF4F5E00)
 private val Volt = Color(0xFFE6FF4A)
 private val Ink = Color(0xFF0C0D0C)
 
-/** Fallback palette (pre-Android 12, or forced): Olive on light, Volt on Ink, as on iOS. */
+/** Fallback palette (pre-Android 12, or forced): neutral surface with Ink text; Volt only as a fill. */
 val KhBrandColors = ColorProviders(
     light = lightColorScheme(
-        primary = Olive,
-        onPrimary = Color.White,
-        primaryContainer = Color(0xFFDDEB8A),
+        primary = Ink,
+        onPrimary = Volt,
+        primaryContainer = Volt,
         onPrimaryContainer = Ink,
-        secondary = Color(0xFF5B6148),
+        secondary = Color(0xFF585856),
         onSecondary = Color.White,
         background = Color(0xFFFFFFFF),
         onBackground = Ink,
         surface = Color(0xFFFFFFFF),
         onSurface = Ink,
-        surfaceVariant = Color(0xFFE8E9DF),
+        surfaceVariant = Color(0xFFF5F5F4),
         surfaceContainer = Color(0xFFFFFFFF),
-        secondaryContainer = Color(0xFFE4E8CF),
+        secondaryContainer = Color(0xFFECECEA),
         onSecondaryContainer = Ink,
-        onSurfaceVariant = Color(0xFF45483C),
-        outline = Color(0xFF75786B),
+        onSurfaceVariant = Color(0xFF585856),
+        outline = Color(0xFF767674),
         error = Color(0xFFBA1A1A),
         onError = Color.White,
     ),
@@ -145,7 +144,7 @@ fun GlanceModifier.khWidgetSurface(): GlanceModifier {
     } else {
         m.cornerRadius(16.dp)
     }
-    return m.padding(12.dp)
+    return m.padding(10.dp)
 }
 
 object DeepLinks {
@@ -215,7 +214,7 @@ fun SnapshotShell(
             contentAlignment = Alignment.CenterStart,
         ) {
             Text(
-                text = "Open kaihuman to sign in",
+                text = LocalContext.current.getString(R.string.kh_w_sign_in),
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurface,
                     fontSize = 13.sp,
@@ -243,7 +242,7 @@ fun StaleFooter(freshness: Freshness) {
         Text(text = "●", style = TextStyle(color = Warning, fontSize = 9.sp))
         Spacer(GlanceModifier.width(4.dp))
         Text(
-            text = "Synced ${freshness.hours}h ago",
+            text = LocalContext.current.getString(R.string.kh_w_synced_ago, freshness.hours),
             maxLines = 1,
             style = TextStyle(color = Warning, fontSize = 11.sp, fontWeight = FontWeight.Medium),
         )

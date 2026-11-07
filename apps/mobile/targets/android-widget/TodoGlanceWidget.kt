@@ -90,6 +90,8 @@ private fun NextUpContent(
     val doneToday = snap.doneToday(nowMs)
     val empty = khString(context, nextUpEmptyRes(nextUpEmpty(source)))
 
+    // The 48 dp "+" tap area overlays the top-right corner; headers reserve its width with a spacer.
+    Box(modifier = GlanceModifier.fillMaxSize()) {
     Column(modifier = GlanceModifier.fillMaxSize()) {
         when (size) {
             WidgetSizeClass.Small -> {
@@ -106,7 +108,7 @@ private fun NextUpContent(
                         style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium),
                         modifier = GlanceModifier.defaultWeight(),
                     )
-                    AddButton(width = 28.dp)
+                    Spacer(GlanceModifier.width(ADD_TAP_SIZE))
                 }
                 if (hideText) {
                     Text(
@@ -160,6 +162,8 @@ private fun NextUpContent(
                 }
             }
         }
+    }
+    Box(modifier = GlanceModifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) { AddButton() }
     }
 }
 
@@ -230,16 +234,18 @@ internal fun NextUpHeader(title: String, trailing: String, height: androidx.comp
                 fontFamily = FontFamily.Monospace,
             ),
         )
-        AddButton()
+        Spacer(GlanceModifier.width(ADD_TAP_SIZE))
     }
 }
 
-/** Round "+" with a 40 x 24 dp tap area; opens the quick-add todo sheet. */
+internal val ADD_TAP_SIZE = 48.dp
+
+/** Round "+" with a 48 dp square tap area (22 dp visual); opens the quick-add todo sheet. */
 @Composable
-internal fun AddButton(width: androidx.compose.ui.unit.Dp = 40.dp) {
+internal fun AddButton(width: androidx.compose.ui.unit.Dp = ADD_TAP_SIZE) {
     val context = LocalContext.current
     Box(
-        modifier = GlanceModifier.width(width).height(24.dp)
+        modifier = GlanceModifier.width(width).height(ADD_TAP_SIZE)
             .clickable(openUri(context, DeepLinks.quick("todo")))
             .semantics { contentDescription = khString(context, R.string.kh_nu_add_desc) },
         contentAlignment = Alignment.Center,
@@ -325,6 +331,7 @@ internal fun nextUpEmptyRes(copy: EmptyCopy): Int = when (copy) {
     EmptyCopy.InboxZero -> R.string.kh_empty_inbox_zero
     EmptyCopy.NothingOpenHere -> R.string.kh_empty_nothing_open_here
     EmptyCopy.BacklogEmpty -> R.string.kh_empty_backlog_empty
+    EmptyCopy.NothingHere -> R.string.kh_empty_nothing_here
 }
 
 internal fun sourceLabelText(context: Context, label: SourceLabel): String = when (label.kind) {

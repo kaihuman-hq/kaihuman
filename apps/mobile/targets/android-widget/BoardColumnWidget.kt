@@ -83,7 +83,7 @@ private fun BoardContent(
     Column(modifier = GlanceModifier.fillMaxSize()) {
         val title = sourceLabelText(context, sourceLabel(source, snap)).uppercase()
         // Count only in the header's trailing slot: the "+" belongs to Next up.
-        Row(modifier = GlanceModifier.fillMaxWidth().padding(bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = GlanceModifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = title,
                 maxLines = 1,

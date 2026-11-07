@@ -57,7 +57,9 @@ class NextUpLogicTest {
         assertEquals(EmptyCopy.NothingOpenHere, nextUpEmpty(TodoSource.Milestone("m")))
         assertEquals(EmptyCopy.BacklogEmpty, boardEmpty(TodoSource.Backlog))
         assertEquals(EmptyCopy.NothingInProgress, boardEmpty(TodoSource.InProgress))
-        assertEquals(EmptyCopy.InboxZero, boardEmpty(TodoSource.Inbox))
+        // A board column is not an inbox, so it never claims "Inbox zero".
+        assertEquals(EmptyCopy.NothingHere, boardEmpty(TodoSource.Inbox))
+        assertEquals(EmptyCopy.NothingHere, boardEmpty(TodoSource.All))
     }
 
     @Test fun boardRowAction() {

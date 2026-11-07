@@ -23,6 +23,7 @@
     <string name="kh_empty_nothing_up_next">Nothing up next</string>
     <string name="kh_empty_inbox_zero">Inbox zero</string>
     <string name="kh_empty_nothing_open_here">Nothing open here</string>
+    <string name="kh_empty_nothing_here">Nothing here</string>
     <string name="kh_empty_backlog_empty">Backlog is empty</string>
 
     <string name="kh_src_all">All</string>

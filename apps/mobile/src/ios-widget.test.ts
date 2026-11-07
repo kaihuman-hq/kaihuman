@@ -329,6 +329,12 @@ describe('ios widget target', () => {
       expect(board).toMatch(/isLarge \? \(freshness == \.fresh \? 7 : 6\)/);
     });
 
+    it('does not fall back to inbox copy for other board columns', () => {
+      const board = widgetFiles.BoardColumnWidget;
+      expect(board).toContain('case .inbox: return "Inbox zero"');
+      expect(board).toContain('default: return "Nothing here"');
+    });
+
     it('fills the large knowledge card with a second card', () => {
       const cards = widgetFiles.KnowledgeCardWidget;
       expect(cards).toContain('offset: entry.cardOffset + 1');

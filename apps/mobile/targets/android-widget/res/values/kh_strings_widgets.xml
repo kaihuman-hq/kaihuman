@@ -7,6 +7,7 @@
     <string name="kh_desc_knowledge_card">A page from your wiki, a new one every 3 hours.</string>
 
     <string name="kh_w_sign_in">Open kaihuman to sign in</string>
+    <string name="kh_w_synced_ago">Synced %1$dh ago</string>
     <string name="kh_w_text_hidden">Hidden on lock screen</string>
 
     <string name="kh_w_capture_todo">Todo</string>

@@ -168,7 +168,8 @@ struct BoardColumnContent: View {
         switch entry.source {
         case .inProgress: return "Nothing in progress — pick from backlog"
         case .backlog: return "Backlog is empty"
-        default: return "Inbox zero"
+        case .inbox: return "Inbox zero"
+        default: return "Nothing here"
         }
     }
 
