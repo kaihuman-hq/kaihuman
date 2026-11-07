@@ -86,27 +86,48 @@ struct KnowledgeCardContent: View {
                     WidgetHeader(title: "KNOWLEDGE", theme: theme)
                     nextButton
                 }
-                Text(card.title)
-                    .font(.system(size: isLarge ? 20 : 16, weight: .bold))
-                    .foregroundStyle(theme.label)
-                    .lineLimit(2)
-                    .privacySensitive()
-                Text(card.excerpt)
-                    .font(.system(size: isLarge ? 14 : 12.5, weight: .regular))
-                    .foregroundStyle(theme.secondary)
-                    .lineLimit(isLarge ? 9 : 3)
-                    .privacySensitive()
+                cardBody(card, large: isLarge)
+                if isLarge, let following = snapshot.card(at: entry.date, offset: entry.cardOffset + 1),
+                   following.path != card.path {
+                    Rectangle().fill(theme.separator).frame(height: 0.5).padding(.vertical, 6)
+                    Text("UP NEXT")
+                        .font(.system(size: 10, weight: .bold)).tracking(0.6)
+                        .foregroundStyle(theme.secondary)
+                    cardBody(following, large: false)
+                }
+                // Pushes the footer to the bottom while the content stays top-aligned.
                 Spacer(minLength: 0)
                 HStack(spacing: 6) {
-                    ForEach(card.tags.prefix(3), id: \.self) { TagChip(tag: $0, theme: theme) }
+                    ForEach(card.tags.prefix(isLarge ? 4 : 3), id: \.self) { TagChip(tag: $0, theme: theme) }
                     Spacer(minLength: 0)
                     StaleFooter(freshness: freshness, theme: theme)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         } else {
             VStack(alignment: .leading, spacing: 8) {
                 WidgetHeader(title: "KNOWLEDGE", theme: theme)
                 EmptyStateView(title: "No cards yet", subtitle: "Cards come from your wiki after a sync", theme: theme)
+            }
+        }
+    }
+
+    private func cardBody(_ card: SharedCard, large: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(card.title)
+                .font(.system(size: large ? 20 : 16, weight: .bold))
+                .foregroundStyle(theme.label)
+                .lineLimit(2)
+                .privacySensitive()
+            Text(card.excerpt)
+                .font(.system(size: large ? 14 : 12.5, weight: .regular))
+                .foregroundStyle(theme.secondary)
+                .lineLimit(large ? 9 : 3)
+                .privacySensitive()
+            if isLarge && !large {
+                HStack(spacing: 6) {
+                    ForEach(card.tags.prefix(3), id: \.self) { TagChip(tag: $0, theme: theme) }
+                }
             }
         }
     }

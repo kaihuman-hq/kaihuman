@@ -141,6 +141,10 @@ struct BoardColumnContent: View {
     private var theme: WidgetTheme { style.theme }
     private var freshness: SnapshotFreshness { snapshot.freshness(at: entry.date) }
     private var isLarge: Bool { style.family == .systemLarge }
+    /// Fixed so rows keep the same rhythm whatever the count; a flexible row would stretch to fill the widget.
+    private var rowHeight: CGFloat { isLarge ? 44 : 32 }
+    /// Large: 350 pt of content minus header and spacing leaves room for 7 rows, 6 with the stale footer.
+    private var maxRows: Int { isLarge ? (freshness == .fresh ? 7 : 6) : 3 }
 
     private var items: [SharedTodoItem] {
         let column = snapshot.items(for: entry.source)
@@ -175,12 +179,12 @@ struct BoardColumnContent: View {
                 EmptyStateView(title: emptyTitle, theme: theme)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(items.prefix(isLarge ? 7 : 3)) { item in
+                    ForEach(items.prefix(maxRows)) { item in
                         TodoRow(
                             item: item, style: style, fontSize: isLarge ? 15 : 13, showsTag: isLarge,
                             showsStart: true, link: DeepLink.board(item: item.id)
                         )
-                        .frame(maxHeight: .infinity)
+                        .frame(height: rowHeight)
                         Rectangle().fill(theme.separator).frame(height: 0.5)
                     }
                 }
@@ -189,6 +193,7 @@ struct BoardColumnContent: View {
                 StaleFooter(freshness: freshness, theme: theme)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
 

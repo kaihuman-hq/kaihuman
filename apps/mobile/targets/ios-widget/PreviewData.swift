@@ -27,6 +27,10 @@ extension SharedTodoSnapshot {
             item(4, "Renew passport", .backlog, tags: ["life"]),
             item(5, "Plan Q1 roadmap", .backlog, tags: ["work"]),
             item(6, "Fix flaky CI test", .inProgress, tags: ["work"]),
+            item(7, "Draft hiring plan", .backlog, tags: ["work"]),
+            item(8, "Call the landlord", .backlog, tags: ["life"]),
+            item(9, "Update dependencies", .backlog, tags: ["work"]),
+            item(10, "Plan weekend trip", .backlog, tags: ["life"]),
         ]
         return SharedTodoSnapshot(
             schemaVersion: 2,
@@ -36,7 +40,7 @@ extension SharedTodoSnapshot {
             appFolder: ".kh",
             upcomingMilestone: SharedUpcomingMilestone(id: "m1", name: "Widgets v1", dueDate: "2026-11-20"),
             counts: SharedTodoCounts(
-                inbox: 1, inProgress: 2, backlog: 4, doneToday: 3, knowledgeInbox: 4, doneThisWeek: 12
+                inbox: 1, inProgress: 2, backlog: 8, doneToday: 3, knowledgeInbox: 4, doneThisWeek: 12
             ),
             items: items,
             files: [:],
@@ -56,8 +60,10 @@ extension SharedTodoSnapshot {
                 SharedCard(
                     path: "wiki/spaced-repetition.md", title: "Spaced repetition",
                     excerpt: "Review material at growing intervals so each recall happens just before you would forget it. "
-                        + "The gap roughly doubles after every successful recall.",
-                    tags: ["learning", "memory"]
+                        + "The gap roughly doubles after every successful recall, so a card you know well "
+                        + "returns after weeks instead of days. Short daily sessions beat long cramming, "
+                        + "and a missed review costs little: the card simply comes back sooner.",
+                    tags: ["learning", "memory", "habits"]
                 ),
                 SharedCard(
                     path: "wiki/zettelkasten.md", title: "Zettelkasten",

@@ -302,6 +302,40 @@ describe('ios widget target', () => {
       }
     });
 
+    it('defines Volt once, in sRGB, with no colour-space or tint leaks', () => {
+      let voltLiterals = 0;
+      for (const file of readdirSync(dir).filter((f) => f.endsWith('.swift'))) {
+        const swift = read(file);
+        expect(swift, file).not.toMatch(/displayP3|\.accentColor|\.tint\(|Color\(red:/);
+        voltLiterals += swift.match(/0xE6FF4A/gi)?.length ?? 0;
+      }
+      expect(voltLiterals).toBe(1);
+      expect(read('Theme.swift')).toContain('.sRGB');
+      expect(read('Theme.swift')).toContain('static let volt = Color(hex: 0xE6FF4A)');
+      const render = readFileSync(join(dir, '..', 'ios-widget-render', 'RenderMain.swift'), 'utf8');
+      expect(render).toContain('WidgetTheme.volt');
+      expect(render).toContain('MilestoneCountdownView');
+      expect(render).toContain('.accessoryRectangular');
+    });
+
+    it('lays out large board rows at a fixed height from the top', () => {
+      const board = widgetFiles.BoardColumnWidget;
+      expect(board).toContain('.frame(height: rowHeight)');
+      expect(board).not.toContain(
+        '.frame(maxHeight: .infinity)\n                        Rectangle',
+      );
+      expect(board).toContain('items.prefix(maxRows)');
+      expect(board).toContain('alignment: .top');
+      expect(board).toMatch(/isLarge \? \(freshness == \.fresh \? 7 : 6\)/);
+    });
+
+    it('fills the large knowledge card with a second card', () => {
+      const cards = widgetFiles.KnowledgeCardWidget;
+      expect(cards).toContain('offset: entry.cardOffset + 1');
+      expect(cards).toContain('"UP NEXT"');
+      expect(cards).toContain('alignment: .top');
+    });
+
     it('handles tinted rendering without relying on colour', () => {
       const theme = read('Theme.swift');
       expect(theme).toContain('@Environment(\\.widgetRenderingMode)');
