@@ -12,6 +12,37 @@
     "android": {
       "package": "com.kaihuman.app"
     },
-    "plugins": ["expo-router", "./plugins/with-kaihuman-widgets.ts"]
+    "plugins": [
+      "expo-router",
+      "./plugins/with-kaihuman-widgets.ts"
+    ],
+    "extra": {
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "KaihumanWidgets",
+                  "bundleIdentifier": "com.kaihuman.app.widgets",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.kaihuman.app"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "43114d95-85d0-472a-a83c-05b6d1f62d2d"
+      },
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      }
+    },
+    "owner": "u11g"
   }
 }
