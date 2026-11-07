@@ -562,7 +562,7 @@ describe('Kotlin widget sources', () => {
       expect(kotlinAll()).not.toContain(s);
     }
     expect(kotlin('WidgetUi.kt')).toContain('0xFFE6FF4A'); // Volt
-    expect(kotlin('WidgetUi.kt')).toContain('0xFF4F5E00'); // Olive
+    expect(kotlin('WidgetUi.kt')).not.toContain('0xFF4F5E00'); // no olive tint in the light theme
   });
 
   it('queues move mutations like PendingWidgetMutation', () => {
@@ -798,6 +798,13 @@ describe('Android system surfaces', () => {
     for (const name of ['startFocusActivity', 'updateFocusActivity', 'endFocusActivity']) {
       expect(moduleKt).toContain(`Function("${name}")`);
     }
+    // Android 13+ drops the focus notification unless the user granted POST_NOTIFICATIONS.
+    expect(moduleKt).toContain('AsyncFunction("requestNotificationPermission")');
+    expect(moduleKt).toContain('askForPermissions');
+    expect(read('modules/kaihuman-shared/index.ts')).toContain('requestNotificationPermission');
+    expect(read('modules/kaihuman-shared/ios/KaihumanSharedModule.swift')).toContain(
+      'AsyncFunction("requestNotificationPermission")',
+    );
     expect(moduleKt).toContain('.FocusActionReceiver');
   });
 });

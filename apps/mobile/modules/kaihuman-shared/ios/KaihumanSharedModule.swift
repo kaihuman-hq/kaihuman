@@ -85,6 +85,9 @@ public class KaihumanSharedModule: Module {
       }
     }
 
+    // Live Activities need no notification permission; present so JS can call it on both platforms.
+    AsyncFunction("requestNotificationPermission") { () -> Bool in true }
+
     AsyncFunction("updateFocusActivity") { (activityId: String, plannedEndMs: Double) in
       guard #available(iOS 16.2, *),
             let activity = Activity<FocusActivityAttributes>.activities.first(where: { $0.id == activityId })

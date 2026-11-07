@@ -138,7 +138,24 @@ describe('KanbanView focus', () => {
     render(<KanbanView controller={new KanbanBoardController(files)} focus={focus} />);
     await waitFor(() => expect(screen.getByText('write tests')).toBeTruthy());
     fireEvent.click(screen.getByTestId('swipe-action-Start focus'));
-    expect(start).toHaveBeenCalledWith('.kh/inbox.todos.md#0', 'write tests', 25);
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith('.kh/inbox.todos.md#0', 'write tests', 25),
+    );
+  });
+
+  it('shows how to enable notifications when the permission is denied', async () => {
+    const start = vi.fn(() => 'a1');
+    const focus = new FocusSessionController({
+      startFocusActivity: start,
+      requestNotificationPermission: async () => false,
+    });
+    render(<KanbanView controller={new KanbanBoardController(todoFiles())} focus={focus} />);
+    await waitFor(() => expect(screen.getByText('write tests')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('swipe-action-Start focus'));
+    await waitFor(() =>
+      expect(screen.getByText(/Allow notifications to see the focus timer/)).toBeTruthy(),
+    );
+    expect(start).not.toHaveBeenCalled();
   });
 });
 

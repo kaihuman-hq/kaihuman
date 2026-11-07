@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import expo.modules.interfaces.permissions.PermissionsStatus
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -26,6 +28,7 @@ private val WIDGET_RECEIVER_CLASSES = listOf(
   ".KnowledgeCardWidgetReceiver",
 )
 
+private const val POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
 private const val FOCUS_ACTION_PREFIX = "com.kaihuman.app.focus."
 
 class KaihumanSharedModule : Module() {
@@ -72,6 +75,23 @@ class KaihumanSharedModule : Module() {
       todoId
     }
 
+    // Android 13+ needs a runtime grant or the focus notification is silently dropped. Asked in
+    // context (first "Start focus"); resolves false when denied, including "don't ask again".
+    AsyncFunction("requestNotificationPermission") { promise: Promise ->
+      if (canPostNotifications()) {
+        promise.resolve(true)
+        return@AsyncFunction
+      }
+      val permissions = appContext.permissions
+      if (permissions == null) {
+        promise.resolve(false)
+        return@AsyncFunction
+      }
+      permissions.askForPermissions({ result ->
+        promise.resolve(result[POST_NOTIFICATIONS]?.status == PermissionsStatus.GRANTED)
+      }, POST_NOTIFICATIONS)
+    }
+
     Function("updateFocusActivity") { id: String, plannedEndMs: Double ->
       sendFocus("UPDATE") {
         putExtra("todoId", id)
@@ -98,7 +118,7 @@ class KaihumanSharedModule : Module() {
 
   private fun canPostNotifications(): Boolean =
     Build.VERSION.SDK_INT < 33 ||
-      context.checkSelfPermission("android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED
+      context.checkSelfPermission(POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
   private fun sendFocus(action: String, extras: Intent.() -> Unit) {
     val intent = Intent(FOCUS_ACTION_PREFIX + action)

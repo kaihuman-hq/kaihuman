@@ -1,7 +1,10 @@
 import type { TodoStatus } from '@kaihuman/formats';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
-import type { FocusSessionController } from '../screens/focus-session.js';
+import {
+  type FocusSessionController,
+  NOTIFICATIONS_DENIED_MESSAGE,
+} from '../screens/focus-session.js';
 import type { KanbanBoardController } from '../screens/kanban-board.js';
 import { TODO_STATUSES } from '../screens/kanban-board.js';
 import { useTheme } from '../theme/theme.js';
@@ -86,6 +89,7 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
   // The controller is mutable, not signal-based: bump to re-read after load/moves.
   const [, setVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [focusNotice, setFocusNotice] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -135,6 +139,16 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
     setError(res.ok ? null : res.error);
     if (!res.ok) haptics.error();
     setVersion((v) => v + 1);
+  };
+
+  const startFocus = async (id: string, text: string) => {
+    if (!focus) return;
+    const res = await focus.start(id, text);
+    setFocusNotice(
+      !res.started && res.reason === 'notifications-denied' ? NOTIFICATIONS_DENIED_MESSAGE : null,
+    );
+    if (res.started) haptics.success();
+    else haptics.error();
   };
 
   const columns = controller.columns();
@@ -192,10 +206,7 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
                     label: 'Start focus',
                     icon: 'timer',
                     side: 'leading',
-                    onPress: () => {
-                      if (focus.start(`${filePath}#${itemIndex}`, item.text)) haptics.success();
-                      else haptics.error();
-                    },
+                    onPress: () => void startFocus(`${filePath}#${itemIndex}`, item.text),
                   } satisfies SwipeAction,
                 ]
               : []),
@@ -286,6 +297,11 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
         {error ? (
           <Text variant="footnote" tone="danger" accessibilityRole="summary">
             {`Couldn't move the todo: ${error}`}
+          </Text>
+        ) : null}
+        {focusNotice ? (
+          <Text variant="footnote" tone="danger" accessibilityRole="summary">
+            {focusNotice}
           </Text>
         ) : null}
         {body}
