@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-07 — Mobile: drop static EAS copy from app.json
+
+- `eas init` had written a static copy of `extra.eas.build` (appExtensions) and `extra.router` into `apps/mobile/app.json`. Removed both; `app.config.ts` still derives `appExtensions` from `ios.bundleIdentifier` and expo-router adds `asyncRoutes`, so the bundle id stays the only edit. `projectId` and `owner` stay.
+
 ## 2026-11-07 — Mobile: EAS Build + TestFlight readiness
 
 - `apps/mobile/eas.json` (development, preview, production with autoIncrement, remote app version, empty `submit.production.ios`) and `app.config.ts`, which adds `extra.eas.build.experimental.ios.appExtensions` for the `KaihumanWidgets` extension (`com.kaihuman.app.widgets`, App Group entitlement) so EAS creates its App ID and profile.
