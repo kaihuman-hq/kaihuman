@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-07 — Mobile: widget polish, focus notification permission
+
+- Android 13+: starting focus now asks for `POST_NOTIFICATIONS` in context (`requestNotificationPermission` in `kaihuman-shared`); when denied the Board shows how to turn notifications on. `FocusSessionController.start` is async and returns why it did not start.
+- Widget copy: Board column no longer falls back to "Inbox zero" on Android or iOS ("Nothing here"); Android sign-in/synced strings moved to resources and covered by `WidgetStringsTest`.
+- Android light theme is neutral (white / #F5F5F4, Ink text, Volt only as a fill, WCAG AA); Next up add target is 48dp; tighter padding; previews clip to the system radius.
+- iOS: large Knowledge card is top-aligned with an "Up next" second card; large Board column uses fixed 44pt rows and shows 7. The v2 sheet's gold accent was 256-colour quantisation of the committed PNG, not Swift; sheets are now committed full-colour.
+
 ## 2026-11-06 — Mobile: Android widget set (Glance, Material You), QS tiles, focus notification
 
 - Android widgets (`apps/mobile/targets/android-widget`, Glance 1.1.1 + glance-material3) matching iOS v1 and v2: **Next up** (column/tag/milestone, interactive done), **Quick capture** (2×2, 1×4), **Weekly done** ring + streak, **Inbox** (Process → `kaihuman://inbox`), **Board column** (Start/Done), **Milestone countdown**, **Idea pipeline** (stage links, Log), **Wiki card** (Next). Habits are iOS-only for now.
