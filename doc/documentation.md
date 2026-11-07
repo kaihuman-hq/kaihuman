@@ -215,3 +215,7 @@ Everything in this file, and the rest of the monorepo, is also packaged for agen
 pnpm --filter @kaihuman/docspack build
 pnpm --filter @kaihuman/docspack exec docspack preview "how do I capture a note"
 ```
+
+## Mobile app
+
+Build and ship the iOS app from Linux with EAS and TestFlight: see [mobile-testflight.md](mobile-testflight.md).

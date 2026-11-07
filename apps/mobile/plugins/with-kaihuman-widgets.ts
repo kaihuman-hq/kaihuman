@@ -43,9 +43,21 @@ export interface ExpoConfigLike {
   [key: string]: unknown;
 }
 
-export const APP_GROUP = 'group.com.kaihuman.app';
+export const DEFAULT_BUNDLE_ID = 'com.kaihuman.app';
+export const WIDGET_BUNDLE_SUFFIX = '.widgets';
+
+/** Every iOS identifier hangs off the app's bundle id, so `ios.bundleIdentifier` is the one knob. */
+export const deriveIosIds = (bundleId: string = DEFAULT_BUNDLE_ID) => ({
+  bundleId,
+  widgetBundleId: `${bundleId}${WIDGET_BUNDLE_SUFFIX}`,
+  appGroup: `group.${bundleId}`,
+});
+
+export const APP_GROUP = deriveIosIds().appGroup;
 export const URL_SCHEME = 'kaihuman';
 export const APP_GROUP_ENTITLEMENT = 'com.apple.security.application-groups';
+export const INFO_APP_GROUP_KEY = 'KHAppGroup';
+export const INFO_KEYCHAIN_SERVICE_KEY = 'KHKeychainService';
 export const ANDROID_RECEIVER_NAME = '.TodoWidgetReceiver';
 export const ANDROID_WIDGET_INFO = '@xml/todo_widget_info';
 
@@ -89,17 +101,40 @@ export interface WidgetTargetDescriptor {
   sourceDir: string;
   deploymentTarget: string;
   appGroup: string;
+  /** The containing app's bundle id (keychain service and access group). */
+  appBundleId?: string;
   /** The app's version and build number; an extension must match its containing app. */
   marketingVersion?: string;
   buildNumber?: string;
 }
 
-export const IOS_WIDGET_TARGET: WidgetTargetDescriptor = {
-  name: 'KaihumanWidgets',
-  bundleIdentifier: 'com.kaihuman.app.widgets',
-  sourceDir: 'targets/ios-widget',
-  deploymentTarget: '17.0',
-  appGroup: APP_GROUP,
+export const iosWidgetTarget = (bundleId?: string): WidgetTargetDescriptor => {
+  const ids = deriveIosIds(bundleId);
+  return {
+    name: 'KaihumanWidgets',
+    bundleIdentifier: ids.widgetBundleId,
+    sourceDir: 'targets/ios-widget',
+    deploymentTarget: '17.0',
+    appGroup: ids.appGroup,
+    appBundleId: ids.bundleId,
+  };
+};
+
+export const IOS_WIDGET_TARGET: WidgetTargetDescriptor = iosWidgetTarget();
+
+/**
+ * The `extra.eas.build.experimental.ios.appExtensions` entry: lets EAS Build create the extension's
+ * App ID and provisioning profile. Entitlements must mirror the extension's .entitlements file.
+ */
+export const easAppExtensions = (bundleId?: string) => {
+  const target = iosWidgetTarget(bundleId);
+  return [
+    {
+      targetName: target.name,
+      bundleIdentifier: target.bundleIdentifier,
+      entitlements: { [APP_GROUP_ENTITLEMENT]: [target.appGroup] },
+    },
+  ];
 };
 
 /** Where the App Shortcuts (main app only) live, relative to the mobile app root. */
@@ -181,20 +216,31 @@ export const appSourceGroups = (
 // ─── Pure config transforms ──────────────────────────────────────────────────
 
 export const withIosAppGroup = (config: ExpoConfigLike): ExpoConfigLike => {
+  const { appGroup } = deriveIosIds(config.ios?.bundleIdentifier);
   const entitlements = { ...config.ios?.entitlements };
   const existing = entitlements[APP_GROUP_ENTITLEMENT];
   const groups = Array.isArray(existing) ? (existing as string[]) : [];
-  entitlements[APP_GROUP_ENTITLEMENT] = groups.includes(APP_GROUP)
-    ? groups
-    : [...groups, APP_GROUP];
+  entitlements[APP_GROUP_ENTITLEMENT] = groups.includes(appGroup) ? groups : [...groups, appGroup];
   return { ...config, ios: { ...config.ios, entitlements } };
 };
 
 /** The app (not the extension) must declare Live Activity support or `Activity.request` throws. */
-export const withLiveActivities = (config: ExpoConfigLike): ExpoConfigLike => ({
-  ...config,
-  ios: { ...config.ios, infoPlist: { ...config.ios?.infoPlist, NSSupportsLiveActivities: true } },
-});
+export const withLiveActivities = (config: ExpoConfigLike): ExpoConfigLike => {
+  const ids = deriveIosIds(config.ios?.bundleIdentifier);
+  return {
+    ...config,
+    ios: {
+      ...config.ios,
+      infoPlist: {
+        ...config.ios?.infoPlist,
+        NSSupportsLiveActivities: true,
+        // Read by the Swift sources (app and widget) instead of hard-coded ids.
+        [INFO_APP_GROUP_KEY]: ids.appGroup,
+        [INFO_KEYCHAIN_SERVICE_KEY]: ids.bundleId,
+      },
+    },
+  };
+};
 
 export const withUrlScheme = (config: ExpoConfigLike): ExpoConfigLike => {
   const current = config.scheme;
@@ -465,6 +511,9 @@ export const widgetBuildSettings = (target: WidgetTargetDescriptor): Record<stri
   return {
     INFOPLIST_FILE: `"${dir}/Info.plist"`,
     CODE_SIGN_ENTITLEMENTS: `"${dir}/${target.name}.entitlements"`,
+    // Expanded by Info.plist and the .entitlements file, so neither hard-codes an id.
+    KH_APP_GROUP: `"${target.appGroup}"`,
+    KH_APP_BUNDLE_ID: `"${target.appBundleId ?? DEFAULT_BUNDLE_ID}"`,
     PRODUCT_BUNDLE_IDENTIFIER: `"${target.bundleIdentifier}"`,
     IPHONEOS_DEPLOYMENT_TARGET: target.deploymentTarget,
     SDKROOT: 'iphoneos',
@@ -694,7 +743,7 @@ const withKaihumanWidgets = (
     const dir = root ? join(root, IOS_WIDGET_TARGET.sourceDir) : undefined;
     const fs = options.fs ?? nodeCopyFs;
     const files = dir && fs.exists(dir) ? fs.list(dir) : [];
-    const ios = next.ios as { buildNumber?: string } | undefined;
+    const ios = next.ios as { buildNumber?: string; bundleIdentifier?: string } | undefined;
     const intentsDir = root ? join(root, APP_INTENTS_DIR) : undefined;
     const appIntentFiles = intentsDir && fs.exists(intentsDir) ? fs.list(intentsDir) : [];
     addIosWidgetTarget(
@@ -702,7 +751,7 @@ const withKaihumanWidgets = (
       files,
       options.xcode,
       {
-        ...IOS_WIDGET_TARGET,
+        ...iosWidgetTarget(ios?.bundleIdentifier),
         marketingVersion: typeof next.version === 'string' ? next.version : undefined,
         buildNumber: ios?.buildNumber,
       },

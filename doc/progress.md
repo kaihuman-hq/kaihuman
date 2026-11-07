@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-07 — Mobile: EAS Build + TestFlight readiness
+
+- `apps/mobile/eas.json` (development, preview, production with autoIncrement, remote app version, empty `submit.production.ios`) and `app.config.ts`, which adds `extra.eas.build.experimental.ios.appExtensions` for the `KaihumanWidgets` extension (`com.kaihuman.app.widgets`, App Group entitlement) so EAS creates its App ID and profile.
+- Widget bundle id, App Group and keychain service now derive from `ios.bundleIdentifier` (`deriveIosIds`); the widget entitlements/Info.plist use `KH_APP_GROUP`/`KH_APP_BUNDLE_ID` build settings and the Swift sources read `KHAppGroup`/`KHKeychainService` from Info.plist. Tests cover the derivation and that `app.config` matches the plugin target.
+- `ITSAppUsesNonExemptEncryption` left unset: the app does its own AES-GCM, so it is not plainly exempt; see `doc/mobile-testflight.md` (new, step by step for Linux).
+
 ## 2026-11-07 — Mobile: widget polish, focus notification permission
 
 - Android 13+: starting focus now asks for `POST_NOTIFICATIONS` in context (`requestNotificationPermission` in `kaihuman-shared`); when denied the Board shows how to turn notifications on. `FocusSessionController.start` is async and returns why it did not start.

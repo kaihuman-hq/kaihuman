@@ -20,10 +20,12 @@ enum TodoMarker: String {
 }
 
 struct SharedTodoStore {
-    static let appGroupId = "group.com.kaihuman.app"
+    static let appGroupId = Bundle.main.object(forInfoDictionaryKey: "KHAppGroup") as? String
+        ?? "group.com.kaihuman.app"
     static let snapshotFile = "widget-todos.json"
     static let pendingFile = "pending-widget-mutations.json"
-    static let keychainService = "com.kaihuman.app"
+    static let keychainService = Bundle.main.object(forInfoDictionaryKey: "KHKeychainService") as? String
+        ?? "com.kaihuman.app"
     static let keychainAccount = "github-token"
     static let tokenDefaultsKey = "github-token"
 

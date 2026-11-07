@@ -4,9 +4,10 @@
     "jsx": "react-jsx",
     "types": ["node", "vite/client"],
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": ["src/**/*", "app/**/*", "plugins/**/*", "vitest.config.ts"]
+  "include": ["src/**/*", "app/**/*", "plugins/**/*", "app.config.ts", "vitest.config.ts"]
 }

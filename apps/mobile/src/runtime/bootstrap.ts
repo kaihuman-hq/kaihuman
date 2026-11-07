@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { getRandomValues } from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
@@ -9,7 +10,11 @@ import { createNativeContainer } from './native-container.js';
 import { type LinkDeps, startLinkHandling } from './pending-url.js';
 import { KEYCHAIN_SERVICE, SECURE_TOKEN_KEY, startTokenSync } from './token-sync.js';
 
-const secureOptions = { keychainService: KEYCHAIN_SERVICE };
+// Must match the widgets' keychain service, which is the iOS bundle id (see the widgets plugin).
+// expo-constants' typings resolve the default import to the module namespace here (see app/login.tsx).
+const expoConfig = (Constants as { expoConfig?: { ios?: { bundleIdentifier?: string } } | null })
+  .expoConfig;
+const secureOptions = { keychainService: expoConfig?.ios?.bundleIdentifier ?? KEYCHAIN_SERVICE };
 
 let active: (() => void) | null = null;
 

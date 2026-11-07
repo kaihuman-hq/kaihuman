@@ -4,7 +4,8 @@ import Foundation
 import WidgetKit
 
 // Names must match targets/ios-widget/SharedTodoStore.swift and QuickCaptureTodoIntent.swift.
-private let appGroupId = "group.com.kaihuman.app"
+private let appGroupId =
+  Bundle.main.object(forInfoDictionaryKey: "KHAppGroup") as? String ?? "group.com.kaihuman.app"
 private let tokenDefaultsKey = "github-token"
 private let pendingUrlKey = "pending-url"
 

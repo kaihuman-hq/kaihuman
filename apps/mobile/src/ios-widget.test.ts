@@ -148,7 +148,7 @@ describe('ios widget target', () => {
     expect(read('Info.plist')).toContain('com.apple.widgetkit-extension');
     const entitlements = read('KaihumanWidgets.entitlements');
     expect(entitlements).toContain('com.apple.security.application-groups');
-    expect(entitlements).toContain('group.com.kaihuman.app');
+    expect(entitlements).toContain('$(KH_APP_GROUP)');
     expect(entitlements).toContain('keychain-access-groups');
   });
 

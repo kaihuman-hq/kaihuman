@@ -21,12 +21,15 @@ import withKaihumanWidgets, {
   CAPTURE_KINDS,
   type CopyFs,
   copyAndroidWidgetSources,
+  deriveIosIds,
   IOS_WIDGET_TARGET,
+  iosWidgetTarget,
   kotlinVersionFromCatalog,
   type ModFn,
   resolveReactNativeKotlinVersion,
   SHARED_APP_SOURCES,
   WIDGET_ONLY_SOURCES,
+  widgetBuildSettings,
   withIosAppGroup,
   withLiveActivities,
   withUrlScheme,
@@ -83,9 +86,11 @@ describe('config plugin transforms', () => {
     expect(once.ios?.infoPlist).toEqual({
       UIBackgroundModes: ['fetch'],
       NSSupportsLiveActivities: true,
+      KHAppGroup: 'group.com.kaihuman.app',
+      KHKeychainService: 'com.kaihuman.app',
     });
     expect(withLiveActivities(once)).toEqual(once);
-    expect(withLiveActivities({}).ios?.infoPlist).toEqual({ NSSupportsLiveActivities: true });
+    expect(withLiveActivities({}).ios?.infoPlist).toMatchObject({ NSSupportsLiveActivities: true });
     expect(withLiveActivities({ ios: { bundleIdentifier: 'x' } }).ios?.bundleIdentifier).toBe('x');
     // The full plugin applies it too, next to the app group and scheme.
     expect(withKaihumanWidgets({}).ios?.infoPlist?.NSSupportsLiveActivities).toBe(true);
@@ -814,5 +819,71 @@ describe('Android system surfaces', () => {
       'AsyncFunction("requestNotificationPermission")',
     );
     expect(moduleKt).toContain('.FocusActionReceiver');
+  });
+});
+
+describe('iOS ids derive from the bundle id', () => {
+  it('derives widget id, app group and keychain service', () => {
+    expect(deriveIosIds()).toEqual({
+      bundleId: 'com.kaihuman.app',
+      widgetBundleId: 'com.kaihuman.app.widgets',
+      appGroup: 'group.com.kaihuman.app',
+    });
+    expect(iosWidgetTarget('org.acme.kh')).toMatchObject({
+      bundleIdentifier: 'org.acme.kh.widgets',
+      appGroup: 'group.org.acme.kh',
+      appBundleId: 'org.acme.kh',
+    });
+  });
+
+  it('feeds a custom bundle id into entitlements, Info.plist and build settings', () => {
+    const config = withLiveActivities(
+      withIosAppGroup({ ios: { bundleIdentifier: 'org.acme.kh' } }),
+    );
+    expect(config.ios?.entitlements?.['com.apple.security.application-groups']).toEqual([
+      'group.org.acme.kh',
+    ]);
+    expect(config.ios?.infoPlist).toMatchObject({
+      NSSupportsLiveActivities: true,
+      KHAppGroup: 'group.org.acme.kh',
+      KHKeychainService: 'org.acme.kh',
+    });
+    expect(widgetBuildSettings(iosWidgetTarget('org.acme.kh'))).toMatchObject({
+      PRODUCT_BUNDLE_IDENTIFIER: '"org.acme.kh.widgets"',
+      KH_APP_GROUP: '"group.org.acme.kh"',
+      KH_APP_BUNDLE_ID: '"org.acme.kh"',
+    });
+  });
+
+  it('keeps the extension files free of hard-coded ids', () => {
+    const dir = join(root, 'targets/ios-widget');
+    expect(readFileSync(join(dir, 'KaihumanWidgets.entitlements'), 'utf8')).toContain(
+      '$(KH_APP_GROUP)',
+    );
+    expect(readFileSync(join(dir, 'Info.plist'), 'utf8')).toContain('$(KH_APP_BUNDLE_ID)');
+  });
+});
+
+describe('app.config', () => {
+  it('declares the widget as an EAS app extension matching the plugin target', async () => {
+    const { default: appConfig } = await import('../app.config.ts');
+    const base = JSON.parse(readFileSync(join(root, 'app.json'), 'utf8')).expo;
+    const out = appConfig({ config: base } as never);
+    type Ext = {
+      targetName: string;
+      bundleIdentifier: string;
+      entitlements: Record<string, string[]>;
+    };
+    const eas = out.extra?.eas as { build: { experimental: { ios: { appExtensions: Ext[] } } } };
+    const [ext] = eas.build.experimental.ios.appExtensions as [Ext];
+    expect(ext.targetName).toBe(IOS_WIDGET_TARGET.name);
+    expect(ext.bundleIdentifier).toBe(IOS_WIDGET_TARGET.bundleIdentifier);
+    expect(ext.entitlements['com.apple.security.application-groups']).toEqual([
+      IOS_WIDGET_TARGET.appGroup,
+    ]);
+    // The main app must carry the same group, or the widgets cannot read its data.
+    expect(
+      withIosAppGroup(base).ios?.entitlements?.['com.apple.security.application-groups'],
+    ).toContain(IOS_WIDGET_TARGET.appGroup);
   });
 });
