@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-07 — Mobile: declare exempt encryption for App Store Connect
+
+- `apps/mobile/app.json` sets `ios.infoPlist.ITSAppUsesNonExemptEncryption: false`, so TestFlight builds no longer stop at "Missing Compliance". App Group, `KHAppGroup`, `KHKeychainService`, `NSSupportsLiveActivities` and the EAS `appExtensions` stay derived by the config plugin / `app.config.ts`, not duplicated in `app.json`. `doc/mobile-testflight.md` updated.
+
 ## 2026-11-07 — Auth worker: automatic Cloudflare deploy
 
 - `.github/workflows/deploy-auth-worker.yml` lints, type-checks, tests and runs `wrangler deploy` for `apps/auth-worker` on pushes to `main` that touch it, and on manual dispatch. Uses the existing `CF_API_TOKEN`/`CF_ACCOUNT_ID` secrets; worker secrets stay on Cloudflare.

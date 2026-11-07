@@ -50,7 +50,7 @@ It also asks for the **ASC App ID** (numeric) if the app does not exist yet; EAS
 
 ### Export compliance (decide this)
 
-The app does **not** set `ITSAppUsesNonExemptEncryption`, on purpose. It uses HTTPS (exempt), but it also encrypts user data itself with AES-GCM-256 / PBKDF2 through `@noble/ciphers` and the WebCrypto polyfill (`src/runtime/crypto-polyfill.ts`). That is encryption beyond the operating system's, so Apple's questionnaire treats it as non-exempt (it usually qualifies for the standard-encryption exemption, which needs a self-classification report in some regions). With the key unset, App Store Connect asks the export-compliance questions for each build. Answer them for your situation, or ask a lawyer. If you conclude the app is exempt, add `"ITSAppUsesNonExemptEncryption": false` to `ios.infoPlist` in `app.json` to skip the prompt.
+`app.json` sets `ios.infoPlist.ITSAppUsesNonExemptEncryption: false` (owner's decision, 2026-11-07), so App Store Connect does not ask the export-compliance questions per build. The app uses HTTPS and encrypts user data itself with AES-GCM-256 / PBKDF2 (`@noble/ciphers`, `src/runtime/crypto-polyfill.ts`): standard algorithms that usually qualify for the encryption exemption, which may need a self-classification report in some regions. Remove the key if that assessment changes.
 
 ## TestFlight testers
 
