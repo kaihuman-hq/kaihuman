@@ -30,7 +30,7 @@ describe('loadDashboards', () => {
     const { files } = fakeFiles(buildDemoSeed(NOW).files);
     const { pages, defaulted } = await loadDashboards(files);
     expect(defaulted).toBe(false);
-    expect(pages.map((p) => p.name)).toEqual(['Overview', 'Finance', 'Reading']);
+    expect(pages.map((p) => p.name)).toEqual(['Overview', 'Finance', 'Reading', 'Tools']);
     expect(paths(pages[0] as DashboardPage)[0]).toBe('.kh/projects.todos.md');
     // Console-only kinds stay on the page so they can offer "Open file".
     expect(paths(pages[2] as DashboardPage)).toContain('.kh/news.rss.json');

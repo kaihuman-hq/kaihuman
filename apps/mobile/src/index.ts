@@ -4,6 +4,8 @@ export * from './components/widgets/tile-controllers.js';
 export * from './navigation/routes.js';
 export * from './screens/file-editor-screen.js';
 export * from './screens/ideas-screen.js';
+// The board-overview tile also has a `BoardItem`; the explicit export settles the clash.
+export type { BoardItem } from './screens/kanban-board.js';
 export * from './screens/kanban-board.js';
 export * from './screens/knowledge-screen.js';
 export * from './screens/login-screen.js';
