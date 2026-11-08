@@ -157,6 +157,7 @@
 | Native design system (`src/ui/`: Icon, Text, Screen, Section, ListRow, Button, TextField, Chip, Card and more) and five-tab navigation (`NativeTabs`, per-tab Stacks, quick-capture modal sheets, JS tab bar on web) | `apps/mobile/src/ui`, `apps/mobile/app/(tabs)` | 2026-11-06 |
 | Every mobile screen restyled to native iOS (HIG) and Material 3 in light and dark: grouped lists, platform icons, haptics, pull-to-refresh, empty/loading/error states, row action menus, Android FABs | `apps/mobile/src/views`, `apps/mobile/app` | 2026-11-06 |
 | Per-todo due dates: native date/time picker in quick capture, Due swipe on board rows (Today / Tomorrow / Pick… / Clear), due/overdue badges on board rows and the todos tile; notifications use the item due (milestone fallback) incl. N minutes before a timed due; one-time "Get reminded when todos are due" prompt; " · today" / " · overdue" in widget Next up rows | `apps/mobile/src/screens/todo-due.ts`, `apps/mobile/app/reminders.tsx`, `apps/mobile/targets/` | 2026-11-08 |
+| Todo detail/edit screen (title, status, milestone, tags, due, metadata, delete with undo; autosave through the sync engine), opened from board rows, widget item links and notification taps | `apps/mobile/src/screens/todo-detail.ts`, `apps/mobile/src/views/todo-detail-view.tsx`, `apps/mobile/app/(tabs)/board/todo.tsx` | 2026-11-08 |
 
 **Known gaps:**
 - Swift and Kotlin widget code has never been compiled here (no Xcode or Android toolchain in this environment); CI compile checks are the first real build.

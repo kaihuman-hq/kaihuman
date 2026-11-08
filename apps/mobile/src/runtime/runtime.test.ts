@@ -116,6 +116,19 @@ describe('links', () => {
     expect(routeToHref({ name: 'auth-callback', accessToken: 'x' })).toBe('/');
   });
 
+  it('opens a widget or notification item link in the todo detail screen', () => {
+    const nav = vi.fn();
+    handleUrl('kaihuman://board?item=.kh%2Finbox.todos.md%232', nav);
+    expect(nav).toHaveBeenCalledWith('/board/todo?id=.kh%2Finbox.todos.md%232');
+  });
+
+  it('falls back to the board filter for ids the detail screen cannot address', () => {
+    expect(routeToHref({ name: 'board', item: 'item-2' })).toBe('/board?item=item-2');
+    expect(routeToHref({ name: 'board', milestone: 'm', item: '.kh/a.todos.md#0' })).toBe(
+      '/board?milestone=m&item=.kh%2Fa.todos.md%230',
+    );
+  });
+
   it('kaihuman://demo enters demo mode once and opens the dashboard', () => {
     const nav = vi.fn();
     expect(routeToHref({ name: 'demo' })).toBe('/dashboard');

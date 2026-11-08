@@ -18,6 +18,8 @@ export interface TextFieldProps {
   onSubmitEditing?: () => void;
   /** Focus on mount, e.g. the main field of a capture sheet. */
   autoFocus?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
   testID?: string;
 }
 
@@ -35,6 +37,8 @@ export function TextField({
   returnKeyType,
   onSubmitEditing,
   autoFocus,
+  onFocus,
+  onBlur,
   testID,
 }: TextFieldProps) {
   const theme = useTheme();
@@ -57,8 +61,14 @@ export function TextField({
       returnKeyType={returnKeyType}
       onSubmitEditing={onSubmitEditing}
       autoFocus={autoFocus}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
+      onFocus={() => {
+        setFocused(true);
+        onFocus?.();
+      }}
+      onBlur={() => {
+        setFocused(false);
+        onBlur?.();
+      }}
       selectionColor={colors.accent}
       cursorColor={colors.accent}
       testID={testID}

@@ -86,9 +86,11 @@ export interface KanbanViewProps {
   onAddTodo?: () => void;
   /** iOS only: adds a "Start focus" swipe action to open cards. */
   focus?: FocusSessionController;
+  /** Opens the detail screen for a card, addressed `<path>#<index>`. */
+  onOpenTodo?: (id: string) => void;
 }
 
-export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
+export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanViewProps) {
   const { colors, spacing, metrics } = useTheme();
   // The controller is mutable, not signal-based: bump to re-read after load/moves.
   const [, setVersion] = useState(0);
@@ -243,6 +245,7 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
               title={item.text}
               subtitle={item.tags.length ? item.tags.map((t) => `#${t}`).join(' ') : undefined}
               swipeActions={actions}
+              onPress={onOpenTodo ? () => onOpenTodo(`${filePath}#${itemIndex}`) : undefined}
               accessory={
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                   {badge ? <Badge tone={badge.tone} label={badge.label} /> : null}

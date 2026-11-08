@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-08 — Mobile: todo detail/edit screen
+
+- New pushed screen `/board/todo?id=<path>#<index>` (`app/(tabs)/board/todo.tsx`, `views/todo-detail-view.tsx`): grouped form with multi-line title (debounced autosave), status, milestone, tags (add/remove, suggestions from the repo), due date + optional time (existing picker, Clear), read-only created/updated/file, and Delete with confirm and Undo. No Save button: every change goes through the sync engine's optimistic write path, which already refreshes widgets and reschedules notifications.
+- `screens/todo-detail.ts` (`TodoDetailController`) re-reads the file before each edit, serialises edits, follows the item when its index shifts (by `createdAt`, else text) and reports not-found when it was deleted elsewhere. Conflicts reuse `SyncStatusBanner`.
+- Opened by tapping a board row, and by `kaihuman://board?item=<path>#<index>` links (widgets, notification taps); other item ids still fall back to the board filter.
+- The `.todos.md` format has no notes/description field (only AI `prompt` lines), so the screen has none.
+
 ## 2026-11-08 — CI: survive Gradle download timeouts
 
 - `mobile-build.yml` and `mobile-screenshots.yml` cache `~/.gradle/wrapper/dists`, raise the wrapper `networkTimeout` to 120 s and retry the Gradle download up to 5 times before building. Android jobs failed twice on services.gradle.org (504, then the 10 s wrapper timeout) before compiling.

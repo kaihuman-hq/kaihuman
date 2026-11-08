@@ -150,6 +150,18 @@ describe('KanbanView', () => {
   });
 });
 
+describe('KanbanView open', () => {
+  it('opens the detail for a tapped row as <path>#<index>', async () => {
+    const onOpenTodo = vi.fn();
+    render(
+      <KanbanView controller={new KanbanBoardController(todoFiles())} onOpenTodo={onOpenTodo} />,
+    );
+    await waitFor(() => expect(screen.getByText('write tests')).toBeTruthy());
+    fireEvent.click(screen.getByText('write tests'));
+    expect(onOpenTodo).toHaveBeenCalledWith('.kh/inbox.todos.md#0');
+  });
+});
+
 describe('KanbanView focus', () => {
   // react-native-web reports 'web', where swipe actions are off; pretend to be a native build.
   const realOS = Platform.OS;
