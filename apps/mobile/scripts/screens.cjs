@@ -2,6 +2,7 @@
 // Serves dist/ (SPA fallback), enters demo mode, then visits each route on iPhone 15 Pro and Pixel 8 in light + dark.
 // `route@Text` clicks the first element showing Text after load (detail views that live inside one route);
 // `route@A@B` clicks A, then B (e.g. the dashboard menu, then a dashboard).
+// Steps may also be `fill:Label=value` (type into the field with that aria-label) `testid:id` (click by testID) or `label:Text` (click by aria-label; the dashboard picker's title changes with the last page).
 // FULLPAGE=1 captures the whole scrollable content instead of one viewport.
 const http = require('node:http');
 const fs = require('node:fs');
@@ -32,6 +33,37 @@ const ALL = [
   '/quick-log',
   '/quick-idea',
   '/quick-knowledge',
+  '/dashboard@label:Choose dashboard@Tools',
+  '/dashboard@label:Choose dashboard@Reading',
+  '/files/.kh/news.rss.json',
+  '/files/.kh/news.rss.json@testid:toggle-source',
+  ...[
+    '.kh/projects.todos.md',
+    '.kh/health.habit.csv',
+    '.kh/work.timetracking.csv',
+    '.kh/personal.events.csv',
+    '.kh/daily.actionlog.md',
+    '.kh/world.timezones.json',
+    '.kh/reading.readitlater.json',
+    '.kh/browser.bookmarks.json',
+    '.kh/monthly.budget.csv',
+    '.kh/portfolio.stocks.csv',
+    '.kh/utilities.consumption.csv',
+    '.kh/metrics.data-collection.csv',
+    '.kh/ai.prompts.md',
+    '.kh/shell.commands.md',
+    '.kh/trips.travel.json',
+    '.kh/board.board-overview.json',
+    '.kh/command-palette.settings.json',
+    'data/reading-list.csv',
+    'data/app-settings.json',
+    '.kh/business/business.yaml',
+    'images/logo.svg',
+    'notes/plain.txt',
+    'notes/secret.md.enc',
+    'notes/diagram.drawio',
+  ].map((f) => `/files/${f}`),
+  '/files/notes/secret.md.enc@fill:Passphrase=demo@Unlock',
 ];
 const routes = process.argv[3] ? process.argv[3].split(',') : ALL;
 const types = {
@@ -89,11 +121,17 @@ const devices = [
         }
         await page.waitForTimeout(900);
         for (const text of clicks) {
-          await page
-            .getByText(text, { exact: true })
-            .first()
-            .click({ timeout: 5000 })
-            .catch(() => errors.push(`${d.name}/${scheme}${entry}: nothing to click`));
+          const fill = /^fill:([^=]+)=(.*)$/.exec(text);
+          const lab = /^label:(.+)$/.exec(text);
+          const tid = /^testid:(.+)$/.exec(text);
+          const step = fill
+            ? page.getByLabel(fill[1]).first().fill(fill[2], { timeout: 5000 })
+            : lab
+              ? page.getByLabel(lab[1]).first().click({ timeout: 5000 })
+              : tid
+                ? page.getByTestId(tid[1]).first().click({ timeout: 5000 })
+                : page.getByText(text, { exact: true }).first().click({ timeout: 5000 });
+          await step.catch(() => errors.push(`${d.name}/${scheme}${entry}: nothing to click`));
           await page.waitForTimeout(600);
         }
         if (process.env.FULLPAGE) {
@@ -118,7 +156,11 @@ const devices = [
         if (sw) errors.push(`${d.name}/${scheme}${entry}: horizontal scroll`);
         const name = (
           route.slice(1) +
-          (clicks.length > 1 ? `-${clickText.toLowerCase()}` : clickText ? '-detail' : '')
+          (clicks.length > 1 || clickText?.startsWith('testid:')
+            ? `-${clickText.replace(/^testid:/, '').toLowerCase()}`
+            : clickText
+              ? '-detail'
+              : '')
         ).replace(/[/. ]/g, '_');
         await page.screenshot({ path: path.join(out, `${d.name}-${scheme}-${name}.png`) });
         if (process.env.FULLPAGE) await page.setViewportSize(d.viewport);
