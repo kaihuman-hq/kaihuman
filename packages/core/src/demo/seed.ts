@@ -436,6 +436,10 @@ function dashboardConfig(): DashboardConfig {
     { path: '.kh/reading.readitlater.json', dashboard: 'reading' },
     { path: '.kh/browser.bookmarks.json', dashboard: 'reading' },
     { path: '.kh/news.rss.json', dashboard: 'reading' },
+    { path: '.kh/trips.travel.json', dashboard: 'tools' },
+    { path: '.kh/ai.prompts.md', dashboard: 'tools' },
+    { path: '.kh/shell.commands.md', dashboard: 'tools' },
+    { path: '.kh/command-palette.settings.json', dashboard: 'tools' },
   ];
   return {
     version: 1,
@@ -443,6 +447,7 @@ function dashboardConfig(): DashboardConfig {
       { id: 'overview', name: 'Overview' },
       { id: 'finance', name: 'Finance' },
       { id: 'reading', name: 'Reading' },
+      { id: 'tools', name: 'Tools' },
     ],
     entries,
     theme: 'nexus',
@@ -463,9 +468,10 @@ only in memory. Edits won't be saved anywhere and disappear on refresh.
 
 ## Try it
 
-- Browse the **Overview**, **Finance**, and **Reading** dashboards.
+- Browse the **Overview**, **Finance**, **Reading**, and **Tools** dashboards.
 - Open the Kanban board and drag a card.
 - Edit a note — it updates instantly (in memory).
+- Open \`notes/secret.md.enc\` and enter the passphrase \`demo\` to decrypt it.
 `;
 
 const WELCOME = `# Welcome 👋
@@ -923,6 +929,236 @@ const CLIENTS_WIKI = [
   '',
 ].join('\n');
 
+// ─── Travel, prompts, commands, palette, misc file kinds ─────────────────────
+
+function travel(now: Date): string {
+  const d = (n: number) => isoDate(addDays(now, n));
+  const dt = (n: number, h: number) => `${d(n)}T${pad(h)}:00`;
+  const base = { custom: [] as { key: string; value: string }[] };
+  return `${JSON.stringify(
+    {
+      version: 1,
+      currency: 'EUR',
+      trips: [
+        {
+          id: 'trip-lisbon',
+          title: 'Lisbon long weekend',
+          start: d(21),
+          end: d(25),
+          destination: 'Lisbon, Portugal',
+          notes: 'Book the Sintra day trip once the flights are confirmed.',
+          custom: [],
+          steps: [
+            {
+              ...base,
+              id: 'lis-flight',
+              type: 'flight',
+              from: 'Berlin BER',
+              to: 'Lisbon LIS',
+              start: dt(21, 7),
+              end: dt(21, 10),
+              ref: 'TP1234',
+              cost: 189.9,
+            },
+            {
+              ...base,
+              id: 'lis-hotel',
+              type: 'hotel',
+              from: d(21),
+              to: d(25),
+              ref: 'HTL-55821',
+              cost: 412,
+              address: 'Rua Augusta 100, Lisbon',
+            },
+            {
+              ...base,
+              id: 'lis-train',
+              type: 'train',
+              from: 'Lisbon Rossio',
+              to: 'Sintra',
+              start: dt(23, 9),
+              end: dt(23, 10),
+              ref: 'CP-7781',
+              cost: 9.2,
+            },
+            {
+              ...base,
+              id: 'lis-note',
+              type: 'general',
+              title: 'Pastéis de Belém',
+              description: 'Go early to skip the queue.',
+            },
+          ],
+        },
+        {
+          id: 'trip-alps',
+          title: 'Alps road trip',
+          start: d(-45),
+          end: d(-40),
+          destination: 'Innsbruck, Austria',
+          custom: [],
+          steps: [
+            {
+              ...base,
+              id: 'alp-rental',
+              type: 'rental',
+              from: 'Munich',
+              to: 'Munich',
+              start: dt(-45, 9),
+              end: dt(-40, 18),
+              ref: 'RENT-9921',
+              cost: 245,
+            },
+            {
+              ...base,
+              id: 'alp-car',
+              type: 'car',
+              tollStart: 'Munich',
+              tollEnd: 'Innsbruck',
+              tollRef: 'VIG-2026',
+              cost: 12.5,
+            },
+            {
+              ...base,
+              id: 'alp-hotel',
+              type: 'hotel',
+              from: d(-45),
+              to: d(-40),
+              ref: 'ALP-3310',
+              cost: 530,
+            },
+          ],
+        },
+      ],
+    },
+    null,
+    2,
+  )}\n`;
+}
+
+const PROMPTS = `# Prompts
+
+## Summarize an article #writing #summary
+
+Summarize the article below in five bullet points, then list any claims that need a source.
+
+## Refactor to hooks #react #refactor
+
+Convert the class component below into a function component using hooks.
+Keep the public props identical.
+
+## Commit message #git
+
+Write a conventional-commit message for the staged diff.
+`;
+
+const COMMANDS = `# Commands
+
+## Free a port #shell #network
+
+Find and kill whatever listens on a port.
+
+\`\`\`sh
+lsof -ti :{{port}} | xargs kill
+\`\`\`
+
+## Git branches by recency #git
+
+\`\`\`sh
+git branch --sort=-committerdate | head -10
+\`\`\`
+
+## Disk usage #shell
+
+\`\`\`sh
+du -sh * | sort -h
+\`\`\`
+`;
+
+const PALETTE_SETTINGS = `${JSON.stringify(
+  {
+    searchEngines: [
+      { name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q={query}', params: [] },
+      { name: 'Wikipedia', url: 'https://en.wikipedia.org/w/index.php?search={query}', params: [] },
+    ],
+    assistants: [{ name: 'Claude', url: 'https://claude.ai/new?q={query}', params: [] }],
+    tools: [
+      {
+        prefix: 'npm',
+        name: 'npm packages',
+        description: 'Search the npm registry for what is typed',
+        url: 'https://www.npmjs.com/search',
+        params: [{ key: 'q', value: '{query}' }],
+      },
+    ],
+  },
+  null,
+  2,
+)}\n`;
+
+const READING_LIST_CSV = `title,author,year,status
+Deep Work,Cal Newport,2016,finished
+"Thinking, Fast and Slow",Daniel Kahneman,2011,reading
+The Pragmatic Programmer,Hunt & Thomas,1999,finished
+Atomic Habits,James Clear,2018,finished
+Designing Data-Intensive Applications,Martin Kleppmann,2017,reading
+The Mom Test,Rob Fitzpatrick,2013,queued
+Essentialism,Greg McKeown,2014,queued
+Four Thousand Weeks,Oliver Burkeman,2021,queued
+`;
+
+const APP_SETTINGS_JSON = `${JSON.stringify(
+  {
+    app: { name: 'Life OS', version: '1.0.0', locale: 'en' },
+    ui: { theme: 'nexus', density: 'comfortable', sidebar: { collapsed: false, width: 260 } },
+    sync: { enabled: true, intervalMinutes: 15, targets: ['github', 'local'] },
+    features: { beta: false, shortcuts: { palette: 'Mod+K', capture: 'Mod+Shift+N' } },
+  },
+  null,
+  2,
+)}\n`;
+
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="14" fill="#4f46e5"/>
+  <path d="M20 16v32M20 34l22-18M26 30l18 18" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
+`;
+
+const PLAIN_TXT = `Plain text note
+
+Just some unformatted text with no markup at all.
+Line two of the note.
+`;
+
+// A .drawio file has no viewer yet, so this exercises the fallback.
+const DIAGRAM_DRAWIO = `<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="demo">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" value="Capture" style="rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="100" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" value="Review" style="rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="220" y="40" width="100" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" edge="1" parent="1" source="2" target="3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+`;
+
+// Encrypted with core's \`encrypt\` (passphrase "demo"); precomputed because the seed is synchronous.
+export const DEMO_PASSPHRASE = 'demo';
+export const SECRET_NOTE_PLAINTEXT =
+  '# Secret note\n\nThis note is encrypted with the passphrase `demo`.\n\n- Treasure map: under the old oak\n';
+const SECRET_NOTE_ENC =
+  'MDcwMDE5YzY2OWEyOGZkYzI2ZTg0MjMzYTkyNjhiOGE6OThlNjdmNDg0NDUxY2MxYjZhNjgwZjEyOmI4MDFlNzZmNmIwNGQ2NDhlYjA2YzNjNjRjMzY0OThkMGQyNjg0MzdkYjk2ZDIzZWM3Y2RlNjdkODgxMGM2NDJlNjlkNjhmOTRiYTMxNzA3NTU1YTBlOTE5Yjg0YzU5YTAyNGMxNDhmNmZlOTI1MjJhMzdkNTI3MzhlZDM1MjdkZDhhNDY1YWMzMGI1ZWMzMDFmYjY5OWE5YTY4ZTFhZDFiMWM4ODcxODBmNGM4OGM1ZjBkZTdlMTE0ZGM5NDkzYWM3MDNkOTJkNTZmYTQyMGUzMDJmZjRjZjdkMGQ5YmViYmY2NjdjOTZkZg==';
+
 // ─── Assembly ────────────────────────────────────────────────────────────────
 
 export function buildDemoSeed(now: Date = new Date()): DemoSeed {
@@ -943,6 +1179,16 @@ export function buildDemoSeed(now: Date = new Date()): DemoSeed {
     '.kh/reading.readitlater.json': readItLater(now),
     '.kh/browser.bookmarks.json': bookmarks(now),
     '.kh/news.rss.json': rss(),
+    '.kh/trips.travel.json': travel(now),
+    '.kh/ai.prompts.md': PROMPTS,
+    '.kh/shell.commands.md': COMMANDS,
+    '.kh/command-palette.settings.json': PALETTE_SETTINGS,
+    'data/reading-list.csv': READING_LIST_CSV,
+    'data/app-settings.json': APP_SETTINGS_JSON,
+    'images/logo.svg': LOGO_SVG,
+    'notes/plain.txt': PLAIN_TXT,
+    'notes/diagram.drawio': DIAGRAM_DRAWIO,
+    'notes/secret.md.enc': SECRET_NOTE_ENC,
     'README.md': README,
     'notes/welcome.md': WELCOME,
     'notes/ideas.md': IDEAS,
