@@ -89,6 +89,15 @@ function applyOnline(next: boolean) {
   scheduler.setOnline(next);
 }
 
+/** Some Expo listeners have no web implementation and throw, which blanked the web preview. */
+const optional = (subscribe: () => { remove(): void }): { remove(): void } => {
+  try {
+    return subscribe();
+  } catch {
+    return { remove: () => {} };
+  }
+};
+
 /** Wires AppState, network and Low Power Mode to the scheduler and starts the first run. */
 export function startSync(opts: {
   bridge: SyncWidgets;
@@ -102,9 +111,11 @@ export function startSync(opts: {
   const appSub = AppState.addEventListener('change', (state) => {
     scheduler.setActive(state === 'active');
   });
-  const netSub = Network.addNetworkStateListener((state) => applyOnline(isConnected(state)));
-  const powerSub = Battery.addLowPowerModeListener(({ lowPowerMode }) =>
-    scheduler.setLowPower(lowPowerMode),
+  const netSub = optional(() =>
+    Network.addNetworkStateListener((state) => applyOnline(isConnected(state))),
+  );
+  const powerSub = optional(() =>
+    Battery.addLowPowerModeListener(({ lowPowerMode }) => scheduler.setLowPower(lowPowerMode)),
   );
 
   void (async () => {

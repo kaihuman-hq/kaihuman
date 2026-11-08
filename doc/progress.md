@@ -6,6 +6,7 @@
 - `screens/todo-detail.ts` (`TodoDetailController`) re-reads the file before each edit, serialises edits, follows the item when its index shifts (by `createdAt`, else text) and reports not-found when it was deleted elsewhere. Conflicts reuse `SyncStatusBanner`.
 - Opened by tapping a board row, and by `kaihuman://board?item=<path>#<index>` links (widgets, notification taps); other item ids still fall back to the board filter.
 - The `.todos.md` format has no notes/description field (only AI `prompt` lines), so the screen has none.
+- Fix: the web preview rendered blank because `expo-battery`/`expo-network` listeners and the notification response APIs throw on web. Sync now treats those listeners as optional and notifications are not started on web (regression test `sync/runtime-web.test.ts`).
 
 ## 2026-11-08 — CI: survive Gradle download timeouts
 

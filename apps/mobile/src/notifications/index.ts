@@ -1,7 +1,7 @@
 import { githubFileStore, githubProfileStore } from '@kaihuman/core';
 import { effect } from '@preact/signals';
 import * as Notifications from 'expo-notifications';
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import {
   currentSnapshot,
   type SharedContainer,
@@ -78,6 +78,8 @@ export interface NotificationDeps {
 let activeContainer: SharedContainer | null = null;
 
 export function startNotifications(deps: NotificationDeps): () => void {
+  // expo-notifications' response APIs throw on web, which blanked the whole web preview.
+  if (Platform.OS === 'web') return () => {};
   activeContainer = deps.container;
   void loadNotificationSettings(deps.container).catch(() => undefined);
   Notifications.setNotificationHandler({
