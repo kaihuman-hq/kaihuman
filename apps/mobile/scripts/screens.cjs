@@ -115,10 +115,13 @@ const devices = [
         else {
           await page.goto(`${base}/demo${d.qs}`);
           await page.waitForTimeout(1500); // demo seeding and the first dashboard load settle
-          await page.evaluate((r) => {
-            history.pushState({}, '', r);
-            dispatchEvent(new PopStateEvent('popstate'));
-          }, route + (route.includes('?') && d.qs ? `&${d.qs.slice(1)}` : d.qs));
+          await page.evaluate(
+            (r) => {
+              history.pushState({}, '', r);
+              dispatchEvent(new PopStateEvent('popstate'));
+            },
+            route + (route.includes('?') && d.qs ? `&${d.qs.slice(1)}` : d.qs),
+          );
         }
         await page.waitForTimeout(900);
         for (const text of clicks) {
