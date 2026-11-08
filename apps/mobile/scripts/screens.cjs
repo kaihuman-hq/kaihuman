@@ -33,6 +33,7 @@ const ALL = [
   '/quick-log',
   '/quick-idea',
   '/quick-knowledge',
+  '/search?q=review',
   '/dashboard@label:Choose dashboard@Tools',
   '/dashboard@label:Choose dashboard@Reading',
   '/files/.kh/news.rss.json',
@@ -117,7 +118,7 @@ const devices = [
           await page.evaluate((r) => {
             history.pushState({}, '', r);
             dispatchEvent(new PopStateEvent('popstate'));
-          }, route + d.qs);
+          }, route + (route.includes('?') && d.qs ? `&${d.qs.slice(1)}` : d.qs));
         }
         await page.waitForTimeout(900);
         for (const text of clicks) {
@@ -161,7 +162,7 @@ const devices = [
             : clickText
               ? '-detail'
               : '')
-        ).replace(/[/. ]/g, '_');
+        ).replace(/[/. ?=&]/g, '_');
         await page.screenshot({ path: path.join(out, `${d.name}-${scheme}-${name}.png`) });
         if (process.env.FULLPAGE) await page.setViewportSize(d.viewport);
       }

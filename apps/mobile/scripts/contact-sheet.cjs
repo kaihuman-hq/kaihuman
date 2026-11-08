@@ -63,6 +63,7 @@ const SECTIONS = [
   ['Quick log', 'quick-log'],
   ['Quick idea', 'quick-idea'],
   ['Quick knowledge', 'quick-knowledge'],
+  ['Search', 'search_q_review'],
 ];
 const COLS = [
   ['iphone', 'light', 'iPhone 15 Pro, light'],
