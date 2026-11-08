@@ -1,5 +1,3 @@
-// @vitest-environment node
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   appFolderFor,
@@ -7,9 +5,13 @@ import {
   parseDashboardConfig,
   resolveDashboards,
 } from './dashboard-config.js';
+import legacy from './fixtures/legacy.dashboard.config.json?raw';
+import malformed from './fixtures/malformed.dashboard.config.json?raw';
+import seed from './fixtures/seed.dashboard.config.json?raw';
+import stories from './fixtures/stories.dashboard.config.json?raw';
 
-const fixture = (name: string) =>
-  readFileSync(new URL(`./fixtures/${name}.dashboard.config.json`, import.meta.url), 'utf8');
+const FIXTURES = { legacy, malformed, seed, stories };
+const fixture = (name: keyof typeof FIXTURES) => FIXTURES[name];
 
 const DEFAULT = { id: 'default', name: 'Main' };
 
