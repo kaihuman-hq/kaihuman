@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-11-08 — Mobile: native views for every file kind (console parity)
+
+- Opening a file in Files showed raw source (e.g. an RSS file on iPhone). `fileKindForPath` (`src/files/file-kinds.ts`) now routes each file to a native viewer; "View source" is a header action (`toggle-source`), and unknown kinds open the editor with a "No viewer for .xyz yet" note. Inventory table: `doc/mobile-design.md` §14.
+- New tiles (dashboard and file view): RSS (`.rss.json`: items with title, source, date and unread state, opens in the in-app browser, add/remove feed, mark read), travel (next trip, trips, add trip), board overview (status columns across all todo files), command-palette settings. The 14 existing widget kinds now also open as their tile in Files.
+- Readers: rendered Markdown (wiki block renderer), CSV/TSV table, pretty JSON, YAML, images (SVG via react-native-svg, raster via the blob API), plain text. `.enc` files unlock, then show the inner kind's view. Viewer edits go through the optimistic save path (re-encrypted for `.enc`).
+- `@kaihuman/formats` gains DOM-free `rss` (RSS 2.0 + Atom), `csv` and `board-overview`; the console's `RssLogic` and board-overview config delegate to them.
+- Demo seed: travel, prompts, commands, palette settings, generic CSV, JSON, SVG, text, an encrypted note (passphrase `demo`) and a `.drawio` fallback example, plus a Tools dashboard.
 ## 2026-11-08 — Mobile: offline global search
 
 - New `/search` screen: native header search bar (iOS and Android), with an in-view field on the web preview. It is reached from a magnifier button on the Today and Ideas headers, from `kaihuman://search?q=` and from an Android launcher shortcut. Results are grouped by kind (todos, ideas, wiki, knowledge, notes, logs, bookmarks, files) with highlighted matches, body snippets, recent searches, and empty and no-results states. Tapping a result opens the todo detail, idea, wiki page or file route, or the bookmark URL.
