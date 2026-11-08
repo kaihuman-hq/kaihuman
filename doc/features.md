@@ -160,6 +160,7 @@
 - The app must write the GitHub token to key `github-token` (iOS Keychain service `com.kaihuman.app`, then App Group defaults; Android prefs `kaihuman_widget`) and handle the App Group `pending-url` key.
 - Core `encrypt`/`decrypt` (`.enc` files) need a `crypto.subtle` polyfill on React Native.
 - Phase 6 views have not been run on a device or simulator, and the Swift/Kotlin native targets are still uncompiled.
+- **Due-date notifications** (local, on-device): due today, due soon, overdue summary, milestone due tomorrow and an optional daily digest; Done / Snooze 1h actions; settings under More → Notifications.
 
 ## Sign-in worker (`apps/auth-worker`)
 

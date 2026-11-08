@@ -7,7 +7,11 @@ import { CloseButton } from '../src/navigation/close-button.js';
 import { useStackScreenOptions } from '../src/navigation/stack-options.js';
 import { guardRedirect } from '../src/navigation/start-route.js';
 import { webBackOptions as webBack } from '../src/navigation/web-back-button.js';
-import { bootstrap, startAppLinkHandling } from '../src/runtime/bootstrap.js';
+import {
+  bootstrap,
+  setNotificationNavigator,
+  startAppLinkHandling,
+} from '../src/runtime/bootstrap.js';
 import { useTheme } from '../src/theme/theme.js';
 import { GestureRoot } from '../src/ui/gesture-root.js';
 import { useSignalValue } from '../src/views/use-signal.js';
@@ -31,7 +35,10 @@ export default function RootLayout() {
   }, [token, repo, segment, router]);
 
   useEffect(() => bootstrap(), []);
-  useEffect(() => startAppLinkHandling((href) => router.push(href as never)), [router]);
+  useEffect(() => {
+    setNotificationNavigator((href) => router.push(href as never));
+    return startAppLinkHandling((href) => router.push(href as never));
+  }, [router]);
 
   // Swipeable rows need the gesture root above every navigator.
   return (

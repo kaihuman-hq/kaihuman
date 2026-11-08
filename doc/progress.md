@@ -1,9 +1,15 @@
 # Progress
 
+## 2026-11-08 — Mobile: local due-date notifications
+
+- `expo-notifications` (~58.1.8, config plugin in `app.json`), local only: no push server, no APNs key. Pure `planNotifications(todos, milestones, settings, now, tz)` (`apps/mobile/src/notifications/planner.ts`) plans due-today (morning time, default 09:00), due-soon (N min before a timed due, default 15), one overdue summary, milestone-due-tomorrow and an optional daily digest ("3 todos due today"), nearest first under the iOS 64-pending cap. `scheduler.ts` diffs against the OS schedule by stable ids (`kh:<kind>:<id>`) and a content signature, so edits reschedule and done/rejected todos cancel.
+- Actions: Done (queues the widget toggle mutation and runs `WidgetBridge.reconcile`), Snooze 1h; a tap opens `kaihuman://board?item=…`. More → Notifications: master toggle (asks permission in context, links to system settings when denied), digest, morning time, minutes before, per-kind toggles.
+- `rescheduleNotifications()` from `src/notifications/index.ts` runs on file changes and is exported for the sync/background refresh. The todo format has no per-item due date: items use their milestone's `dueDate`; the timed path is ready for when the format gains a time. Tests cover time zones, DST, cancel, reschedule and the cap.
 ## 2026-11-08 — Mobile: first-run repository onboarding
 
 - After GitHub or token sign-in with no repo selected, the app now goes to a full `/onboarding` step (title, explanation, search, recently pushed first, Private/Public badges, confirm card). A single plausible kaihuman/life-os/`kh` repo is preselected but still needs "Use this repository". Empty, loading and error (with retry, and "Sign in again" on a rejected token) states are covered. Choosing a repo does `router.replace('/dashboard')`, so back never returns to login or onboarding.
 - One pure decision in `src/navigation/start-route.ts`: `resolveStartRoute({ token, repo })` plus `guardRedirect` used by the root layout, so later launches skip both screens, a lost token goes to login and a token without a repo goes to the selector. Core `GithubRepo` gains optional `pushed_at`. Tests: `start-route.test.ts`, `onboarding-view.test.tsx`. `doc/mobile-design.md` updated.
+
 
 ## 2026-11-08 — Mobile: build numbers committed in git
 

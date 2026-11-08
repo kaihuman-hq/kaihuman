@@ -6,6 +6,7 @@ export default function MoreLayout() {
   return (
     <Stack screenOptions={options}>
       <Stack.Screen name="index" options={{ title: 'More' }} />
+      <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
     </Stack>
   );
 }

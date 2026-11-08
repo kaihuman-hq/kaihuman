@@ -43,6 +43,13 @@ const WORKSPACE: readonly WorkspaceLink[] = [
     tone: 'info',
   },
   {
+    href: '/more/notifications',
+    title: 'Notifications',
+    subtitle: 'Reminders for due todos and milestones',
+    icon: 'clock',
+    tone: 'danger',
+  },
+  {
     href: '/repos',
     title: 'Repositories',
     subtitle: 'Choose the knowledge base',

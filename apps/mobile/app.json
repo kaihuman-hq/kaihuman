@@ -22,7 +22,11 @@
       },
       "versionCode": 1
     },
-    "plugins": ["expo-router", "./plugins/with-kaihuman-widgets.ts"],
+    "plugins": [
+      "expo-router",
+      ["expo-notifications", { "color": "#E6FF4A" }],
+      "./plugins/with-kaihuman-widgets.ts"
+    ],
     "extra": {
       "eas": {
         "projectId": "43114d95-85d0-472a-a83c-05b6d1f62d2d"

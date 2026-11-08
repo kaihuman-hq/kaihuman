@@ -5,6 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import { AppState } from 'react-native';
 import { KaihumanShared } from '../../modules/kaihuman-shared/index.js';
 import { WidgetBridge } from '../adapters/widget-bridge.js';
+import { startNotifications } from '../notifications/index.js';
 import { installCryptoPolyfill } from './crypto-polyfill.js';
 import { createNativeContainer } from './native-container.js';
 import { type LinkDeps, startLinkHandling } from './pending-url.js';
@@ -17,14 +18,26 @@ const expoConfig = (Constants as { expoConfig?: { ios?: { bundleIdentifier?: str
 const secureOptions = { keychainService: expoConfig?.ios?.bundleIdentifier ?? KEYCHAIN_SERVICE };
 
 let active: (() => void) | null = null;
+let notificationNavigator: (href: string) => void = () => undefined;
+
+/** The router is only available inside React; notification taps navigate through this. */
+export function setNotificationNavigator(navigate: (href: string) => void): void {
+  notificationNavigator = navigate;
+}
 
 /** One-time app setup; idempotent while active. Returns a disposer that also allows a fresh start. */
 export function bootstrap(): () => void {
   if (active) return active;
   installCryptoPolyfill(globalThis, { getRandomValues });
-  const bridge = new WidgetBridge(createNativeContainer(KaihumanShared));
+  const container = createNativeContainer(KaihumanShared);
+  const bridge = new WidgetBridge(container);
   const stopBridge = bridge.start();
   void bridge.reconcile().catch(() => undefined);
+  const stopNotifications = startNotifications({
+    container,
+    bridge,
+    navigate: (href) => notificationNavigator(href),
+  });
   const stopToken = startTokenSync({
     shared: KaihumanShared,
     secure: {
@@ -35,6 +48,7 @@ export function bootstrap(): () => void {
   });
   active = () => {
     stopBridge();
+    stopNotifications();
     stopToken();
     active = null;
   };
