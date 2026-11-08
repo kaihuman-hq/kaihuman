@@ -6,6 +6,7 @@
 - New tiles (dashboard and file view): RSS (`.rss.json`: items with title, source, date and unread state, opens in the in-app browser, add/remove feed, mark read), travel (next trip, trips, add trip), board overview (status columns across all todo files), command-palette settings. The 14 existing widget kinds now also open as their tile in Files.
 - Readers: rendered Markdown (wiki block renderer), CSV/TSV table, pretty JSON, YAML, images (SVG via react-native-svg, raster via the blob API), plain text. `.enc` files unlock, then show the inner kind's view. Viewer edits go through the optimistic save path (re-encrypted for `.enc`).
 - `@kaihuman/formats` gains DOM-free `rss` (RSS 2.0 + Atom), `csv` and `board-overview`; the console's `RssLogic` and board-overview config delegate to them.
+- `screens.png` regenerated with a section per file kind (`scripts/contact-sheet.cjs`). Deflaked the editor save test (react-native-web applies `disabled` in an effect; the test now flushes effects before the retry tap).
 - Demo seed: travel, prompts, commands, palette settings, generic CSV, JSON, SVG, text, an encrypted note (passphrase `demo`) and a `.drawio` fallback example, plus a Tools dashboard.
 ## 2026-11-08 — Mobile: offline global search
 
