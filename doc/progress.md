@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-08 — Mobile: home screen pages follow the console dashboards
+
+- `@kaihuman/core` gains `parseDashboardConfig`, `resolveDashboards` and `dashboardConfigPath` (same rules as the console: `.lifeos/` rewrite, tree filter, entry order, `skipOnMobile` on mobile). The mobile home is now a horizontal pager with one page per dashboard (`dashboard-pager.tsx`, `screens/dashboards.ts`); without a config it falls back to a single "Today" page of all tile files. Compact tiles (habit, timer, clocks, budget, stocks, consumption, data collection) and medium ones (events, action log, read it later, bookmarks, prompts, commands) show as summary cards with "See all" opening `/dashboard/tile?path=...`; todos stay interactive inline; console-only files offer "Open file".
+- Header: date, dashboard name (tap → sheet to jump), page dots; page changes are remembered and use a selection haptic. Pull-to-refresh on every page calls the sync engine's `useRefresh()`; pages re-read on `useSyncRevision()`. Empty states for no config and for an empty dashboard.
+- `scripts/screens.cjs` takes chained clicks (`route@A@B`); regenerated `apps/mobile/docs/screens.png` with the Finance page and a tile detail. `doc/mobile-design.md` §7.6 added.
+
 ## 2026-11-08 — Mobile: automatic sync (stale-while-revalidate)
 
 - Root cause of stale data on device: (1) no triggers — the console's `installAutoSync` is DOM-only and mobile had no AppState/network equivalent, so `syncNow`/`flushOutbox` never ran; (2) no persistent cache — `MobileStorageAdapter` was never installed, so tree, files, dirty edits and the selected repo lived in memory; (3) screens snapshot data on mount; (4) every read was a network GET. Details in `apps/mobile/src/sync/README.md`.

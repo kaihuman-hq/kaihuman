@@ -1,15 +1,17 @@
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { tileKindForPath } from '../../../src/components/widgets/tile-controllers.js';
+import { type DashboardPage, loadDashboards } from '../../../src/screens/dashboards.js';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
 import { useFocusRefresh, useRefresh, useSyncRevision } from '../../../src/sync/hooks.js';
-import { DashboardView, type TileFile } from '../../../src/views/dashboard-view.js';
+import { DashboardPager } from '../../../src/views/dashboard-pager.js';
 
 export default function Dashboard() {
   const router = useRouter();
-  const [tiles, setTiles] = useState<TileFile[]>([]);
+  const [pages, setPages] = useState<DashboardPage[]>([]);
+  const [defaulted, setDefaulted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => new Date());
+  // Pull-to-refresh on every page goes through the sync engine; `rev` re-reads after a sync.
   const { refreshing, onRefresh } = useRefresh();
   const rev = useSyncRevision();
   useFocusRefresh();
@@ -17,21 +19,9 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     await githubContentFiles.refresh();
-    const paths = githubContentFiles
-      .tree()
-      .filter((i) => i.type !== 'tree' && tileKindForPath(i.path))
-      .map((i) => i.path)
-      .sort();
-    const files = await Promise.all(
-      paths.map(async (path): Promise<TileFile | null> => {
-        try {
-          return { path, content: await githubContentFiles.read(path) };
-        } catch {
-          return null;
-        }
-      }),
-    );
-    setTiles(files.filter((f): f is TileFile => f !== null));
+    const result = await loadDashboards(githubContentFiles);
+    setPages(result.pages);
+    setDefaulted(result.defaulted);
     setNow(new Date());
   }, []);
 
@@ -51,18 +41,23 @@ export default function Dashboard() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Today' }} />
-      <DashboardView
-        tiles={tiles}
+      <Stack.Screen options={{ headerShown: false }} />
+      <DashboardPager
+        pages={pages}
+        defaulted={defaulted}
         now={now}
         loading={loading}
         refreshing={refreshing}
         error={error}
         onRefresh={onRefresh}
-        onNavigate={(href) => router.push(href)}
+        onNavigate={(href) => router.push(href as never)}
         onWrite={async (path, content) => {
           await githubContentFiles.write(path, content);
-          setTiles((prev) => prev.map((t) => (t.path === path ? { path, content } : t)));
+          const patch = (p: DashboardPage): DashboardPage => ({
+            ...p,
+            files: p.files.map((f) => (f.path === path ? { path, content } : f)),
+          });
+          setPages((prev) => prev.map(patch));
           setNow(new Date());
         }}
       />

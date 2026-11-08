@@ -3,7 +3,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Alert, type AlertButton } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { presentTile } from '../components/widgets/tile-controllers.js';
-import { DashboardView } from './dashboard-view.js';
+import type { DashboardPage } from '../screens/dashboards.js';
+import { DashboardPager } from './dashboard-pager.js';
 import { Tile } from './tile-view.js';
 
 afterEach(() => {
@@ -87,18 +88,21 @@ describe('todo rows', () => {
   });
 });
 
-describe('DashboardView states', () => {
+describe('DashboardPager states', () => {
   const props = { now: NOW, onWrite: vi.fn(), onNavigate: vi.fn() };
+  const today = (files: DashboardPage['files'] = []): DashboardPage[] => [
+    { id: 'today', name: 'Today', files },
+  ];
 
   it('shows a skeleton while loading', () => {
-    render(<DashboardView tiles={[]} loading {...props} />);
+    render(<DashboardPager pages={[]} loading {...props} />);
     expect(screen.getByLabelText('Loading tiles')).toBeTruthy();
     expect(screen.queryByText('No dashboard files in this repository')).toBeNull();
   });
 
   it('shows the error with a retry that refreshes', () => {
     const onRefresh = vi.fn();
-    render(<DashboardView tiles={[]} error="Offline" onRefresh={onRefresh} {...props} />);
+    render(<DashboardPager pages={today()} error="Offline" onRefresh={onRefresh} {...props} />);
     expect(screen.getByText("Couldn't load your tiles")).toBeTruthy();
     expect(screen.getByText('Offline')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
@@ -107,13 +111,13 @@ describe('DashboardView states', () => {
 
   it('keeps showing tiles when a refresh fails', () => {
     const f = file('projects.todos.md');
-    render(<DashboardView tiles={[f]} error="Offline" {...props} />);
+    render(<DashboardPager pages={today([f])} error="Offline" {...props} />);
     expect(screen.getByTestId('tile-todos')).toBeTruthy();
     expect(screen.queryByText("Couldn't load your tiles")).toBeNull();
   });
 
   it('titles the screen and shows today', () => {
-    render(<DashboardView tiles={[]} {...props} />);
+    render(<DashboardPager pages={today()} {...props} />);
     expect(screen.getByRole('heading', { name: 'Today' })).toBeTruthy();
     expect(screen.getByText(/November/)).toBeTruthy();
   });

@@ -1,13 +1,8 @@
 import { ActivityIndicator, Pressable, useWindowDimensions, View } from 'react-native';
-import { presentTile } from '../components/widgets/tile-controllers.js';
 import { useTheme } from '../theme/theme.js';
-import { EmptyState, Icon, type IconName, Screen, Text } from '../ui/index.js';
-import { Tile } from './tile-view.js';
+import { Icon, type IconName, Text } from '../ui/index.js';
 
-export interface TileFile {
-  path: string;
-  content: string;
-}
+export type { TileFile } from '../screens/dashboards.js';
 
 export const DASHBOARD_LINKS = [
   ['Quick todo', '/quick-todo'],
@@ -31,10 +26,7 @@ const LINK_ICONS: Record<(typeof DASHBOARD_LINKS)[number][0], IconName> = {
   Repos: 'repos',
 };
 
-const dateLine = (now: Date) =>
-  now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-
-function Shortcuts({ onNavigate }: { onNavigate: (href: string) => void }) {
+export function Shortcuts({ onNavigate }: { onNavigate: (href: string) => void }) {
   const { colors, spacing, shape, metrics, platform } = useTheme();
   const { fontScale } = useWindowDimensions();
   const ios = platform === 'ios';
@@ -86,7 +78,7 @@ function Shortcuts({ onNavigate }: { onNavigate: (href: string) => void }) {
   );
 }
 
-function Skeleton() {
+export function Skeleton() {
   const { colors, spacing, shape } = useTheme();
   const bar = (width: `${number}%`, height = 14) => (
     <View style={{ width, height, borderRadius: 7, backgroundColor: colors.fill }} />
@@ -122,65 +114,5 @@ function Skeleton() {
       ))}
       <ActivityIndicator color={colors.secondaryLabel} />
     </View>
-  );
-}
-
-export function DashboardView({
-  tiles,
-  now,
-  loading = false,
-  refreshing = false,
-  error,
-  onRefresh,
-  onWrite,
-  onNavigate,
-}: {
-  tiles: TileFile[];
-  now: Date;
-  loading?: boolean;
-  refreshing?: boolean;
-  /** Set when the last load failed; shown with a retry when there is nothing to show. */
-  error?: string | null;
-  onRefresh?: () => void;
-  onWrite: (path: string, content: string) => void | Promise<void>;
-  onNavigate: (href: string) => void;
-}) {
-  const shown = tiles.flatMap((f) => {
-    const tile = presentTile(f.path, f.content, now);
-    return tile ? [{ ...f, tile }] : [];
-  });
-  return (
-    <Screen scroll title="Today" refreshing={refreshing} onRefresh={onRefresh} keyboard>
-      <Text variant="subheadline" tone="secondary">
-        {dateLine(now)}
-      </Text>
-      <Shortcuts onNavigate={onNavigate} />
-      {loading ? <Skeleton /> : null}
-      {!loading && error && shown.length === 0 ? (
-        <EmptyState
-          icon="warning"
-          title="Couldn't load your tiles"
-          message={error}
-          action={onRefresh ? { label: 'Try again', onPress: onRefresh } : undefined}
-        />
-      ) : null}
-      {!loading && !error && shown.length === 0 ? (
-        <EmptyState
-          icon="empty"
-          title="No dashboard files in this repository"
-          message="Add a todo list, habit or bookmarks file and it shows up here as a tile."
-        />
-      ) : null}
-      {shown.map((f) => (
-        <Tile
-          key={f.path}
-          path={f.path}
-          tile={f.tile}
-          content={f.content}
-          now={now}
-          onWrite={onWrite}
-        />
-      ))}
-    </Screen>
   );
 }

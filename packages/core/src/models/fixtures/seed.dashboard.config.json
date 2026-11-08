@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "dashboards": [
+    { "id": "overview", "name": "Overview" },
+    { "id": "finance", "name": "Finance" },
+    { "id": "reading", "name": "Reading" }
+  ],
+  "entries": [
+    { "path": ".kh/projects.todos.md", "dashboard": "overview" },
+    { "path": ".kh/work.timetracking.csv", "dashboard": "overview" },
+    { "path": ".kh/health.habit.csv", "dashboard": "overview" },
+    { "path": ".kh/personal.events.csv", "dashboard": "overview" },
+    { "path": ".kh/board.board-overview.json", "dashboard": "overview" },
+    { "path": ".kh/daily.actionlog.md", "dashboard": "overview" },
+    { "path": ".kh/world.timezones.json", "dashboard": "overview" },
+    { "path": ".kh/monthly.budget.csv", "dashboard": "finance" },
+    { "path": ".kh/portfolio.stocks.csv", "dashboard": "finance" },
+    { "path": ".kh/utilities.consumption.csv", "dashboard": "finance" },
+    { "path": ".kh/metrics.data-collection.csv", "dashboard": "finance" },
+    { "path": ".kh/reading.readitlater.json", "dashboard": "reading" },
+    { "path": ".kh/browser.bookmarks.json", "dashboard": "reading" },
+    { "path": ".kh/news.rss.json", "dashboard": "reading" }
+  ],
+  "theme": "nexus",
+  "files": {}
+}

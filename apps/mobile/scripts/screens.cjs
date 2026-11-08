@@ -1,6 +1,7 @@
 // Web-preview screenshots: node scripts/screens.cjs [outDir] [route,...]
 // Serves dist/ (SPA fallback), enters demo mode, then visits each route on iPhone 15 Pro and Pixel 8 in light + dark.
-// `route@Text` clicks the first element showing Text after load (detail views that live inside one route).
+// `route@Text` clicks the first element showing Text after load (detail views that live inside one route);
+// `route@A@B` clicks A, then B (e.g. the dashboard menu, then a dashboard).
 // FULLPAGE=1 captures the whole scrollable content instead of one viewport.
 const http = require('node:http');
 const fs = require('node:fs');
@@ -12,6 +13,8 @@ const out = path.resolve(process.argv[2] || 'screens-out');
 const ALL = [
   '/login',
   '/dashboard',
+  '/dashboard@Overview@Finance',
+  '/dashboard@See all',
   '/board',
   '/capture',
   '/ideas',
@@ -73,7 +76,8 @@ const devices = [
       const page = await ctx.newPage();
       page.on('pageerror', (e) => errors.push(`${d.name}/${scheme}: ${e.message}`));
       for (const entry of routes) {
-        const [route, clickText] = entry.split('@');
+        const [route, ...clicks] = entry.split('@');
+        const clickText = clicks.at(-1);
         if (route === '/login') await page.goto(`${base}/login${d.qs}`);
         else {
           await page.goto(`${base}/demo${d.qs}`);
@@ -84,9 +88,9 @@ const devices = [
           }, route + d.qs);
         }
         await page.waitForTimeout(900);
-        if (clickText) {
+        for (const text of clicks) {
           await page
-            .getByText(clickText, { exact: true })
+            .getByText(text, { exact: true })
             .first()
             .click({ timeout: 5000 })
             .catch(() => errors.push(`${d.name}/${scheme}${entry}: nothing to click`));
@@ -112,7 +116,10 @@ const devices = [
         }
         const sw = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
         if (sw) errors.push(`${d.name}/${scheme}${entry}: horizontal scroll`);
-        const name = (route.slice(1) + (clickText ? '-detail' : '')).replace(/[/.]/g, '_');
+        const name = (
+          route.slice(1) +
+          (clicks.length > 1 ? `-${clickText.toLowerCase()}` : clickText ? '-detail' : '')
+        ).replace(/[/. ]/g, '_');
         await page.screenshot({ path: path.join(out, `${d.name}-${scheme}-${name}.png`) });
         if (process.env.FULLPAGE) await page.setViewportSize(d.viewport);
       }

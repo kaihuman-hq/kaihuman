@@ -191,7 +191,8 @@ app/
   login.tsx                   Stack screen, no header
   (tabs)/_layout.tsx          NativeTabs host, five tabs
     (today)/_layout.tsx       Stack for Today
-      dashboard.tsx           /dashboard
+      dashboard.tsx           /dashboard (dashboard pager)
+      dashboard/tile.tsx      /dashboard/tile?path=… (tile detail)
     (board)/_layout.tsx       Stack for Board
       board.tsx               /board
     (capture)/_layout.tsx     Stack for Capture
@@ -219,7 +220,7 @@ Expo-router groups `(…)` do not appear in URLs, so every path above is unchang
 
 | Tab | Path | Icon (outline / fill) | Content |
 | --- | --- | --- | --- |
-| Today | `/dashboard` | `home` | Dashboard tiles |
+| Today | `/dashboard` | `home` | One page per console dashboard (§7.6) |
 | Board | `/board` | `board` | Kanban over `.todos.md` files |
 | Capture | `/capture` | `capture` | Launcher for the five quick-capture kinds |
 | Ideas | `/ideas` | `ideas` | Ideas list |
@@ -248,6 +249,22 @@ Each quick screen has a single primary action in the header or footer. Saving us
 ### 7.5 Deep links
 
 Unchanged: `kaihuman://board`, `kaihuman://quick-todo|note|log|idea|knowledge`, `kaihuman://files/...`, and the auth callback. Groups do not change paths, so `parseDeepLink` in `src/navigation/routes.ts` keeps its URLs.
+
+### 7.6 Today: dashboard pager
+
+- **Source.** The same `${appFolder}/.dashboard.config.json` the web console reads, through `parseDashboardConfig` / `resolveDashboards` in `@kaihuman/core`: dashboard order, entry order, `.lifeos/` → `.kh/` rewrite, entries for missing files dropped. Mobile also drops `skipOnMobile` entries.
+- **Pager.** A horizontal `FlatList` with `pagingEnabled` (no `react-native-pager-view`). Each page scrolls vertically and has its own pull-to-refresh. The fixed header shows the date, the dashboard name (`title1`) with a chevron, and page dots (hidden with one page). Tapping the name opens a bottom sheet listing the dashboards, the current one checked. A page change fires `haptics.selection()` and is remembered (`kh_mobile_dashboard`). The native header is hidden on this screen.
+- **Tile size classes** (`TILE_SIZE` in `src/views/tiles/summary.ts`):
+
+  | Class | Kinds | Presentation |
+  | --- | --- | --- |
+  | compact | habit, timetracking, timezones, budget, stocks, consumption, datacollection | Summary card in a 2-column grid (1 column when `fontScale > 1.3` or width < 360) |
+  | medium | events, actionlog, readitlater, bookmarks, prompts, commands | Full-width summary card |
+  | full | todos | The full interactive tile inline |
+
+  A summary card shows a stat, its label and up to three items, plus "See all", which pushes `/dashboard/tile?path=…` with the full tile. Files the console renders but mobile has no tile for get a card with "Open file".
+- **Empty states.** No config (or no entries) → one "Today" page with every tile file and a hint to group tiles into dashboards in the web console. A dashboard with no tiles → "No tiles on this dashboard".
+- Shortcuts sit on the first page only.
 
 ## 8. Platform rules
 
