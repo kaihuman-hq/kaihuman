@@ -58,7 +58,13 @@ function Inlines({
   });
 }
 
-function WikiBlockView({ block, onOpen }: { block: WikiBlock; onOpen: (path: string) => void }) {
+export function WikiBlockView({
+  block,
+  onOpen,
+}: {
+  block: WikiBlock;
+  onOpen: (path: string) => void;
+}) {
   const theme = useTheme();
   const { colors, spacing, shape } = theme;
   // Generous leading keeps long pages comfortable to read.

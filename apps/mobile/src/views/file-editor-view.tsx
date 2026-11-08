@@ -1,5 +1,6 @@
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
+import { fileKindForPath, hasViewer } from '../files/file-kinds.js';
 import type {
   DirectoryEntry,
   FileEditorController,
@@ -21,6 +22,7 @@ import {
   Text,
   TextField,
 } from '../ui/index.js';
+import { FileContentView, NoViewerNote } from './file-views.js';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -216,12 +218,17 @@ export function FileBrowserView({
   );
 }
 
+/** `view` shows the native reader or tile; `source` is the raw text editor. */
+export type FileMode = 'view' | 'source';
+
 export function FileEditorView({
   controller,
   path,
+  mode = 'view',
 }: {
   controller: FileEditorController;
   path: string;
+  mode?: FileMode;
 }) {
   const theme = useTheme();
   const { colors, spacing, shape } = theme;
@@ -248,6 +255,20 @@ export function FileEditorView({
   }, [controller, path, attempt]);
 
   const sync = () => setState(controller.state);
+
+  // A sync can bring a newer copy; re-read unless local edits are pending.
+  const rev = useSyncRevision();
+  const firstRev = useRef(rev);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a new revision re-reads
+  useEffect(() => {
+    if (rev === firstRev.current) return;
+    const current = controller.state;
+    if (current.status !== 'open' || current.dirty) return;
+    controller
+      .open(path)
+      .then(setState)
+      .catch(() => {});
+  }, [rev]);
 
   const unlock = () => {
     if (!passphrase || unlocking) return;
@@ -338,6 +359,44 @@ export function FileEditorView({
     );
   }
 
+  const kind = fileKindForPath(path);
+  if (state.status === 'open' && mode === 'view' && hasViewer(kind.view)) {
+    // Viewer writes take the sync engine's optimistic path: edit, then save.
+    const write = (next: string) => {
+      controller.edit(next);
+      sync();
+      save();
+    };
+    return (
+      <Screen
+        footer={
+          state.encrypted ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <Text variant="footnote" tone="secondary" style={{ flex: 1 }}>
+                Encrypted file
+              </Text>
+              <Button
+                label="Lock"
+                variant="plain"
+                size="medium"
+                onPress={() => {
+                  haptics.selection();
+                  controller.lock();
+                  setSaved(false);
+                  sync();
+                }}
+              />
+            </View>
+          ) : undefined
+        }
+      >
+        {pathLabel}
+        {error ? <InlineError>{error}</InlineError> : null}
+        <FileContentView path={path} content={state.content} onWrite={write} />
+      </Screen>
+    );
+  }
+
   if (state.status === 'open') {
     const dirty = state.dirty;
     return (
@@ -382,6 +441,7 @@ export function FileEditorView({
       >
         <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
           {pathLabel}
+          {kind.view.type === 'unknown' ? <NoViewerNote ext={kind.view.ext} /> : null}
           {error ? <InlineError>{error}</InlineError> : null}
         </View>
         <TextInput

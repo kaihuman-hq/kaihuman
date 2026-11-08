@@ -104,3 +104,89 @@ describe('summarizeTile', () => {
     }
   });
 });
+
+describe('summaries of the file-kind tiles', () => {
+  it('sizes the four newer kinds', () => {
+    expect(TILE_SIZE.rss).toBe('medium');
+    expect(TILE_SIZE.travel).toBe('medium');
+    expect(TILE_SIZE.boardoverview).toBe('medium');
+    expect(TILE_SIZE.palettesettings).toBe('compact');
+  });
+
+  it('rss: unread count with the unread titles', () => {
+    const s = summarizeTile(
+      {
+        kind: 'rss',
+        view: {
+          feeds: [],
+          unreadCount: 2,
+          items: [
+            { feedId: 'f', key: 'a', title: 'A', link: '', source: 's', date: null, unread: true },
+            { feedId: 'f', key: 'b', title: 'B', link: '', source: 's', date: null, unread: false },
+            { feedId: 'f', key: 'c', title: 'C', link: '', source: 's', date: null, unread: true },
+          ],
+        },
+      },
+      NOW,
+    );
+    expect(s).toEqual({ stat: '2', statLabel: 'unread', items: ['A', 'C'] });
+  });
+
+  it('travel: days to the next trip, else the trip count', () => {
+    const trip = {
+      id: 't',
+      name: 'Rome',
+      dateRange: '2026-11-20 – 2026-11-25',
+      cost: 0,
+      costLabel: '0.00 EUR',
+      steps: 0,
+      status: 'upcoming' as const,
+    };
+    const view = { currency: 'EUR', totalLabel: '0.00 EUR', trips: [trip] };
+    expect(
+      summarizeTile(
+        { kind: 'travel', view: { ...view, next: { name: 'Rome', daysUntil: 1 } } },
+        NOW,
+      ),
+    ).toMatchObject({ stat: '1', statLabel: 'day to Rome' });
+    expect(summarizeTile({ kind: 'travel', view: { ...view, next: null } }, NOW)).toMatchObject({
+      stat: '1',
+      statLabel: 'trip',
+    });
+  });
+
+  it('board overview: open count and column lines', () => {
+    const col = (status: 'backlog' | 'done', count: number) => ({
+      status,
+      label: status === 'done' ? 'Done' : 'Backlog',
+      count,
+      items: [],
+    });
+    const s = summarizeTile(
+      {
+        kind: 'boardoverview',
+        view: { columns: [col('backlog', 3), col('done', 9)], overdueCount: 1, files: 2 },
+      },
+      NOW,
+    );
+    expect(s.stat).toBe('3');
+    expect(s.items).toEqual(['1 overdue', 'Backlog: 3', 'Done: 9']);
+  });
+
+  it('palette settings: enabled count, problems first', () => {
+    const e = { prefix: 'g', name: 'G', detail: '', enabled: true, problem: null };
+    const s = summarizeTile(
+      {
+        kind: 'palettesettings',
+        view: {
+          engines: [e, { ...e, enabled: false }],
+          assistants: [],
+          tools: [],
+          problems: ['Bad'],
+        },
+      },
+      NOW,
+    );
+    expect(s).toEqual({ stat: '1', statLabel: 'enabled', items: ['Bad'] });
+  });
+});

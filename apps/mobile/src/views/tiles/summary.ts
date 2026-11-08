@@ -24,6 +24,10 @@ export const TILE_SIZE: Record<TileKind, TileSize> = {
   bookmarks: 'medium',
   prompts: 'medium',
   commands: 'medium',
+  rss: 'medium',
+  travel: 'medium',
+  boardoverview: 'medium',
+  palettesettings: 'compact',
   todos: 'full',
 };
 
@@ -137,6 +141,41 @@ export function summarizeTile(tile: TileView, _now: Date): TileSummary {
         plural(tile.view.rows.length, 'command'),
         tile.view.rows.map((r) => r.title),
       );
+    case 'rss':
+      return out(
+        String(tile.view.unreadCount),
+        'unread',
+        tile.view.items.filter((i) => i.unread).map((i) => i.title),
+      );
+    case 'travel':
+      return tile.view.next
+        ? out(
+            String(tile.view.next.daysUntil),
+            `${plural(tile.view.next.daysUntil, 'day')} to ${tile.view.next.name}`,
+            tile.view.trips.map((t) => `${t.name} ${t.dateRange}`),
+          )
+        : out(
+            String(tile.view.trips.length),
+            plural(tile.view.trips.length, 'trip'),
+            tile.view.trips.map((t) => `${t.name} ${t.dateRange}`),
+          );
+    case 'boardoverview':
+      return out(
+        String(tile.view.columns.reduce((n, c) => n + (c.status === 'done' ? 0 : c.count), 0)),
+        'open',
+        [
+          ...(tile.view.overdueCount > 0 ? [`${tile.view.overdueCount} overdue`] : []),
+          ...tile.view.columns.map((c) => `${c.label}: ${c.count}`),
+        ],
+      );
+    case 'palettesettings': {
+      const all = [...tile.view.engines, ...tile.view.assistants, ...tile.view.tools];
+      return out(
+        String(all.filter((e) => e.enabled).length),
+        'enabled',
+        tile.view.problems.length > 0 ? tile.view.problems : all.map((e) => e.name),
+      );
+    }
     default: {
       const unhandled: never = tile;
       return unhandled;

@@ -32,21 +32,21 @@ describe('DashboardPager with the demo seed', () => {
   it('shows the first dashboard name and page dots', async () => {
     await setup();
     expect(screen.getByRole('button', { name: 'Choose dashboard, current Overview' })).toBeTruthy();
-    expect(screen.getByLabelText('Page 1 of 3')).toBeTruthy();
+    expect(screen.getByLabelText('Page 1 of 4')).toBeTruthy();
   });
 
   it('lists dashboards in the menu and jumping changes the title', async () => {
     await setup();
     fireEvent.click(screen.getByTestId('dashboard-title'));
     const menu = screen.getByTestId('dashboard-menu');
-    for (const name of ['Overview', 'Finance', 'Reading'])
+    for (const name of ['Overview', 'Finance', 'Reading', 'Tools'])
       expect(within(menu).getByRole('button', { name })).toBeTruthy();
     expect(
       within(screen.getByTestId('dashboard-option-overview')).queryByText('Finance'),
     ).toBeNull();
     fireEvent.click(screen.getByTestId('dashboard-option-finance'));
     expect(screen.getByRole('button', { name: 'Choose dashboard, current Finance' })).toBeTruthy();
-    expect(screen.getByLabelText('Page 2 of 3')).toBeTruthy();
+    expect(screen.getByLabelText('Page 2 of 4')).toBeTruthy();
   });
 
   it('remembers the chosen dashboard', async () => {
@@ -67,12 +67,19 @@ describe('DashboardPager with the demo seed', () => {
     expect(screen.getByTestId('summary-events')).toBeTruthy();
   });
 
-  it('offers Open file for console-only kinds', async () => {
-    const { onNavigate } = await setup();
-    fireEvent.click(
-      screen.getAllByRole('button', { name: /^Open file board\./ })[0] as HTMLElement,
+  it('offers Open file for kinds the app has no tile for', async () => {
+    const pages = await demoPages();
+    const first = pages[0] as DashboardPage;
+    const withUnknown = [
+      { ...first, files: [...first.files, { path: 'notes/x.drawio', content: '<x/>' }] },
+      ...pages.slice(1),
+    ];
+    const onNavigate = vi.fn();
+    render(
+      <DashboardPager pages={withUnknown} now={NOW} onWrite={vi.fn()} onNavigate={onNavigate} />,
     );
-    expect(onNavigate).toHaveBeenCalledWith('/files/.kh/board.board-overview.json');
+    fireEvent.click(screen.getByRole('button', { name: /^Open file x\.drawio/ }));
+    expect(onNavigate).toHaveBeenCalledWith('/files/notes/x.drawio');
   });
 
   it('See all opens the tile route', async () => {

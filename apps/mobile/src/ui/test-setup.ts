@@ -71,5 +71,13 @@ vi.mock('react-native-svg', () => {
     (tag: string) =>
     ({ testID, fill, children }: Record<string, any>) =>
       createElement(tag, { 'data-testid': testID, fill }, children);
-  return { Svg: el('svg'), Path: el('path') };
+  const SvgXml = ({ xml, testID }: Record<string, any>) =>
+    createElement('div', { 'data-testid': testID ?? 'svg-xml', 'data-xml': xml });
+  return { Svg: el('svg'), Path: el('path'), SvgXml };
 });
+
+// The in-app browser is a native sheet; tests assert the URL it was asked to open.
+vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn(async () => ({ type: 'opened' })) }));
+
+// expo-crypto pulls in the Expo runtime, which needs a native host.
+vi.mock('expo-crypto', async () => ({ randomUUID: (await import('node:crypto')).randomUUID }));
