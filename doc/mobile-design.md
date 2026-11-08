@@ -384,3 +384,38 @@ Follow-up session. One bullet per screen. Each screen uses only `src/ui/` primit
 2. **Android status colours are iOS values.** `success`, `warning`, `danger` and `info` on Android come from the iOS palette through the spread in `theme.ts`. Generating Material 3 tonal status colours is a follow-up.
 3. **Icon outline and fill.** `src/ui/icon.tsx` uses the SF `.fill` variant as the default for most names. §5 requires outline for unselected controls and fill for selected tabs. Still open: split the map into outline and fill names.
 4. **Open question: detail routes.**
+
+## 14. File kinds: console parity
+
+Source of truth for the console: `FocusedTileInternal` in `packages/ui/src/LifeOS/Layouts/MainApp.tsx` (one widget per suffix, a TABLE view for every CSV, `EncryptedTileWrapper` for `.enc`, CodeMirror for everything else). Mobile routing: `fileKindForPath` (`apps/mobile/src/files/file-kinds.ts`) picks the viewer; the Files browser opens the viewer by default and keeps **View source** in the header menu. Parsers live in `packages/formats` (RSS, CSV and board-overview config moved there so console and mobile share them).
+
+Status: **built** = new native view in this change, **there** = native view existed, **fallback** = source editor with a "No viewer for .xyz yet" note.
+
+| Kind (suffix) | Console view / tile | Parser (`@kaihuman/formats`) | Mobile file view | Mobile tile | Status |
+| --- | --- | --- | --- | --- | --- |
+| `.todos.md` | TodoWidget / tile | `todos` | Todos body | full | there (file view built) |
+| `.habit.csv` | HabitTrackerWidget / tile | `habits` | Habit body | compact | there (file view built) |
+| `.timetracking.csv` | TimeTrackingWidget / tile | `time-tracking` | Timer body | compact | there (file view built) |
+| `.events.csv` | EventsWidget / tile | `events` | Events body | medium | there (file view built) |
+| `.actionlog.md` | ActionLogWidget / tile | `action-log` | Action log body | medium | there (file view built) |
+| `.timezones.json` | TimezoneWidget / tile | `timezones` | World clocks body | compact | there (file view built) |
+| `.readitlater.json` | ReadItLaterWidget / tile | `read-later` | Read it later body | medium | there (file view built) |
+| `.bookmarks.json` | BookmarksWidget / tile | mobile `tile-controllers` | Bookmarks body | medium | there (file view built) |
+| `.budget.csv` | BudgetWidget / tile | mobile `tile-controllers` | Budget body | compact | there (file view built) |
+| `.stocks.csv` | StocksWidget / tile | mobile `tile-controllers` | Stocks body | compact | there (file view built) |
+| `.consumption.csv` | ConsumptionWidget / tile | mobile `tile-controllers` | Consumption body | compact | there (file view built) |
+| `.data-collection.csv` | DataCollectionWidget / tile | mobile `tile-controllers` | Data collection body | compact | there (file view built) |
+| `.prompts.md` | PromptsWidget / tile | `prompts` | Templates body | medium | there (file view built) |
+| `.commands.md` | CommandsWidget / tile | `commands` | Templates body | medium | there (file view built) |
+| `.rss.json` | RssWidget / tile | `rss` (new, DOM-free) | RSS items: title, source, date, unread; opens in the in-app browser; add feed, mark read | medium | built |
+| `.travel.json` | TravelWidget / tile | `travel` | Next trip + trips; add trip | medium | built |
+| `.board-overview.json` | BoardOverviewWidget / tile | `board-overview` (new) + `todos` | Status columns across all todo files | medium | built |
+| `command-palette.settings.json` | CommandPaletteSettingsWidget / tile | `palette-settings` | Engines, assistants, tools, problems | compact | built |
+| `*.csv`, `*.tsv` (generic) | CsvTableView (TABLE) / — | `csv` (new) | Scrollable table | — | built |
+| `*.md` (notes, wiki, ideas, knowledge) | CodeMirror / — | mobile `wiki-blocks` | Rendered Markdown | — | built |
+| `*.json` | CodeMirror / — | `JSON.parse` | Pretty-printed with summary | — | built |
+| `*.yaml`, `*.yml` | CodeMirror / — | — | Indented key/value reader | — | built |
+| `*.png/jpg/gif/webp/svg` | — | — | Image (SVG via react-native-svg) | — | built |
+| `*.txt`, `*.log`, no extension | CodeMirror / — | — | Plain text | — | built |
+| `*.enc` | EncryptedTileWrapper | core `encrypt`/`decrypt` | Unlock, then the inner kind's view | — | there (inner view built) |
+| anything else | CodeMirror / — | — | Source editor + "No viewer for .xyz yet" | — | fallback |
