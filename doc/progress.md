@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-08 — CI: more time for iOS screenshots
+
+- `mobile-screenshots.yml` iOS job: timeout 60 → 90 min, screenshot step 40 → 55 min. The job was cancelled at 60 min after a 27-min Release build and 19 of 20 screenshots (about 1 min each).
+
 ## 2026-11-08 — Mobile: todo detail/edit screen
 
 - New pushed screen `/board/todo?id=<path>#<index>` (`app/(tabs)/board/todo.tsx`, `views/todo-detail-view.tsx`): grouped form with multi-line title (debounced autosave), status, milestone, tags (add/remove, suggestions from the repo), due date + optional time (existing picker, Clear), read-only created/updated/file, and Delete with confirm and Undo. No Save button: every change goes through the sync engine's optimistic write path, which already refreshes widgets and reschedules notifications.

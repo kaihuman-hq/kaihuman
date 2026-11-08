@@ -26,7 +26,8 @@ jobs:
   ios:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: macos-latest
-    timeout-minutes: 60
+    # The Release build takes ~27 min and each of the 20 screenshots ~1 min (Maestro starts per flow).
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -78,7 +79,7 @@ jobs:
           echo "$HOME/.maestro/maestro/bin" >> "$GITHUB_PATH"
 
       - name: Take screenshots
-        timeout-minutes: 40
+        timeout-minutes: 55
         run: .github/scripts/mobile-screenshots-ios.sh apps/mobile/ios/build/Build/Products/Release-iphonesimulator/kaihuman.app screenshots
 
       - uses: actions/upload-artifact@v4
