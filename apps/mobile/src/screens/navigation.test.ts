@@ -111,6 +111,8 @@ describe('parseDeepLink', () => {
     expect(href('kaihuman://quick-log')).toBe('/quick-log');
     expect(href('kaihuman://board?milestone=v1&item=t1')).toBe('/board?milestone=v1&item=t1');
     expect(href('kaihuman://board')).toBe('/board');
+    expect(href('kaihuman://search')).toBe('/search');
+    expect(href('kaihuman://search?q=a%20b')).toBe('/search?q=a%20b');
   });
 
   it('round-trips through routeToUrl', () => {
@@ -129,6 +131,22 @@ describe('parseDeepLink', () => {
       if (!route || route.name === 'auth-callback') throw new Error('unexpected');
       expect(routeToUrl(route)).toBe(url);
     }
+  });
+});
+
+describe('search deep link', () => {
+  it('parses an optional query', () => {
+    expect(parseDeepLink('kaihuman://search')).toEqual({ name: 'search' });
+    expect(parseDeepLink('kaihuman://search?q=release%20notes')).toEqual({
+      name: 'search',
+      q: 'release notes',
+    });
+    expect(parseDeepLink('kaihuman://search/x')).toBeNull();
+  });
+
+  it('builds the url back', () => {
+    expect(routeToUrl({ name: 'search' })).toBe('kaihuman://search');
+    expect(routeToUrl({ name: 'search', q: 'a b' })).toBe('kaihuman://search?q=a%20b');
   });
 });
 

@@ -19,6 +19,7 @@
   "dependencies": {
     "@kaihuman/core": "workspace:*",
     "@kaihuman/formats": "workspace:*",
+    "@kaihuman/palette": "workspace:*",
     "@noble/ciphers": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@preact/signals": "^2.0.1",

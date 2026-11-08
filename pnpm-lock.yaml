@@ -382,6 +382,9 @@ importers:
       '@kaihuman/formats':
         specifier: workspace:*
         version: link:../../packages/formats
+      '@kaihuman/palette':
+        specifier: workspace:*
+        version: link:../../packages/palette
       '@noble/ciphers':
         specifier: ^2.4.0
         version: 2.4.0

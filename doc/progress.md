@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-08 — Mobile: offline global search
+
+- New `/search` screen: native header search bar (iOS and Android), with an in-view field on the web preview. It is reached from a magnifier button on the Today and Ideas headers, from `kaihuman://search?q=` and from an Android launcher shortcut. Results are grouped by kind (todos, ideas, wiki, knowledge, notes, logs, bookmarks, files) with highlighted matches, body snippets, recent searches, and empty and no-results states. Tapping a result opens the todo detail, idea, wiki page or file route, or the bookmark URL.
+- Matching reuses `@kaihuman/palette` (`filterModeItems` and `findMatches`); there is no second engine. `src/search/index.ts` builds an incremental, sha-keyed index from the cached tree and file contents. It re-indexes on `useSyncRevision`, yields every 8 ms, and a newer run cancels an older one. Files whose content is not cached on the device are indexed by name only.
+- Tests: ranked grouped results, document extraction per kind, incremental updates and cancellation, routing per kind, the view, and deep links. The large-fixture perf test (3 000 files, 25 000 docs) builds the index in about 130 ms, with each chunk under 50 ms and each query under 100 ms. `docs/screens.png` gains a search column.
+
 ## 2026-11-08 — Mobile: state survives relaunch (repo, token, cache, outbox, settings)
 
 - Bug from an iPhone: after reopening the app no repo was selected and data was gone. Causes: device storage was installed in a root-layout `useEffect`, after every `@kaihuman/core` store had been built on in-memory storage (only the repo was patched back); secrets (`lifeos_gh_token`, auth records, remembered file passwords) lived only in memory; the Keychain read used the default `WHEN_UNLOCKED` accessibility, and a failed read *deleted* the Keychain token; `index.tsx` and the root guard routed before the token was restored.

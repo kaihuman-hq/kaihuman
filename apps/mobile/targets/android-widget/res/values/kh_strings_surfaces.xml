@@ -12,6 +12,8 @@
     <string name="kh_shortcut_log_long">Capture a new log entry</string>
     <string name="kh_shortcut_idea_short">New idea</string>
     <string name="kh_shortcut_idea_long">Capture a new idea</string>
+    <string name="kh_shortcut_search_short">Search</string>
+    <string name="kh_shortcut_search_long">Search todos, ideas, wiki and files</string>
     <string name="kh_focus_channel_name">Focus sessions</string>
     <string name="kh_focus_public_title">Focus session running</string>
     <string name="kh_focus_done">Done</string>

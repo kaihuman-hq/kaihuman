@@ -78,6 +78,10 @@ export default function RootLayout() {
           options={{ title: 'Analytics', headerLargeTitle: largeTitles, ...webBack('/more') }}
         />
         <Stack.Screen
+          name="search"
+          options={{ title: 'Search', headerLargeTitle: largeTitles, ...webBack('/dashboard') }}
+        />
+        <Stack.Screen
           name="wiki/index"
           options={{ title: 'Wiki', headerLargeTitle: largeTitles, ...webBack('/more') }}
         />
