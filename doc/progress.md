@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-08 — Console board: set, show, sort and filter todo due dates
+
+- Kanban cards show a due badge (Overdue / Today / short date such as "Nov 10 14:00") and a DUE action opens an inline date + optional time editor (SAVE / CLEAR) using `setTodoDue`. The header gains a due filter (All / Overdue / Due today / Has due date) and a NEWEST / DUE sort toggle (DUE drops the age dividers and puts undated cards last).
+- Pure logic in `packages/ui/src/LifeOS/Templates/dueView.ts` with tests; the board component lives in `@kaihuman/ui`, so the change is there rather than in `apps/console`.
+
 ## 2026-11-08 — Mobile: home screen pages follow the console dashboards
 
 - `@kaihuman/core` gains `parseDashboardConfig`, `resolveDashboards` and `dashboardConfigPath` (same rules as the console: `.lifeos/` rewrite, tree filter, entry order, `skipOnMobile` on mobile). The mobile home is now a horizontal pager with one page per dashboard (`dashboard-pager.tsx`, `screens/dashboards.ts`); without a config it falls back to a single "Today" page of all tile files. Compact tiles (habit, timer, clocks, budget, stocks, consumption, data collection) and medium ones (events, action log, read it later, bookmarks, prompts, commands) show as summary cards with "See all" opening `/dashboard/tile?path=...`; todos stay interactive inline; console-only files offer "Open file".
