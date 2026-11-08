@@ -1,6 +1,6 @@
 import { webcrypto } from 'node:crypto';
 import { encrypt, type TreeItem } from '@kaihuman/core';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
@@ -110,8 +110,15 @@ describe('FileEditorView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect((await screen.findByRole('alert')).textContent).toBe('conflict');
     expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    // Regression: the error used to render while Save was still busy, so this retry was dropped.
+    expect(screen.getByRole('button', { name: 'Save' }).getAttribute('aria-disabled')).not.toBe(
+      'true',
+    );
     fail = false;
     map.set('n.md', 'old');
+    // findByRole resolves on the DOM change, before passive effects run; react-native-web's
+    // Pressable applies its new `disabled` in useEffect, so flush effects or the tap is dropped.
+    await act(async () => {});
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Saved')).toBeTruthy();
   });

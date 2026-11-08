@@ -285,23 +285,21 @@ export function FileEditorView({
       .finally(() => setUnlocking(false));
   };
 
-  const save = () => {
+  // The outcome and the end of `saving` are set in one synchronous block so they render
+  // together; otherwise the error showed while Save was still disabled and a retry tap was lost.
+  const save = async () => {
     setError(null);
     setSaving(true);
-    controller
-      .save()
-      .then(() => {
-        setSaved(true);
-        haptics.success();
-      })
-      .catch((e: unknown) => {
-        setError(messageOf(e));
-        haptics.error();
-      })
-      .finally(() => {
-        setSaving(false);
-        sync();
-      });
+    try {
+      await controller.save();
+      setSaved(true);
+      haptics.success();
+    } catch (e: unknown) {
+      setError(messageOf(e));
+      haptics.error();
+    }
+    setSaving(false);
+    sync();
   };
 
   const pathLabel = (
@@ -365,7 +363,7 @@ export function FileEditorView({
     const write = (next: string) => {
       controller.edit(next);
       sync();
-      save();
+      void save();
     };
     return (
       <Screen
@@ -435,7 +433,13 @@ export function FileEditorView({
                 }}
               />
             ) : null}
-            <Button label="Save" size="medium" disabled={!dirty} loading={saving} onPress={save} />
+            <Button
+              label="Save"
+              size="medium"
+              disabled={!dirty}
+              loading={saving}
+              onPress={() => void save()}
+            />
           </View>
         }
       >
