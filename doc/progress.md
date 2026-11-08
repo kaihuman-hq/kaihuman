@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-08 — Mobile: build numbers committed in git
+
+- `apps/mobile/eas.json` uses `appVersionSource: local`; `app.json` holds `ios.buildNumber` and `android.versionCode`. `scripts/release.mjs` (`release:ios`, `release:android`) bumps the number, commits and pushes it, then runs `eas build --auto-submit`, so the number sent to a store is always in git. Fixes App Store Connect rejecting a reused build number. Tests cover the bump. `doc/mobile-testflight.md` updated.
+
 ## 2026-11-07 — Mobile: declare exempt encryption for App Store Connect
 
 - `apps/mobile/app.json` sets `ios.infoPlist.ITSAppUsesNonExemptEncryption: false`, so TestFlight builds no longer stop at "Missing Compliance". App Group, `KHAppGroup`, `KHKeychainService`, `NSSupportsLiveActivities` and the EAS `appExtensions` stay derived by the config plugin / `app.config.ts`, not duplicated in `app.json`. `doc/mobile-testflight.md` updated.

@@ -12,7 +12,9 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "fix": "biome check --write --unsafe .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "release:ios": "node scripts/release.mjs ios",
+    "release:android": "node scripts/release.mjs android"
   },
   "dependencies": {
     "@kaihuman/core": "workspace:*",
