@@ -8,7 +8,18 @@
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
     "ios": {
-      "bundleIdentifier": "com.kaihuman.app"
+      "bundleIdentifier": "com.kaihuman.app",
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.kaihuman.app"
+        ]
+      },
+      "infoPlist": {
+        "NSSupportsLiveActivities": true,
+        "KHAppGroup": "group.com.kaihuman.app",
+        "KHKeychainService": "com.kaihuman.app",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.kaihuman.app",
@@ -17,7 +28,10 @@
         "backgroundColor": "#E6FF4A"
       }
     },
-    "plugins": ["expo-router", "./plugins/with-kaihuman-widgets.ts"],
+    "plugins": [
+      "expo-router",
+      "./plugins/with-kaihuman-widgets.ts"
+    ],
     "extra": {
       "eas": {
         "projectId": "43114d95-85d0-472a-a83c-05b6d1f62d2d"
