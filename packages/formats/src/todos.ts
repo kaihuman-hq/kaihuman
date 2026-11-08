@@ -21,6 +21,10 @@
  * Priority token (optional, after tags/milestone): ^high, ^super-high, ^ultra-high.
  * Unknown ^words stay in the text.
  *
+ * Metadata line (optional, right after a task): `::updated:: <ms> ::created:: <iso> ::due:: <due>`.
+ * `<due>` is a local date `YYYY-MM-DD` or date-time `YYYY-MM-DDTHH:MM`; any part may be absent.
+ * `::due::` goes last so parsers that only know `::updated::`/`::created::` still read the line.
+ *
  * Status markers:
  *   [ ] = backlog, [>] = in-progress, [x] = done, [-] = rejected
  *
@@ -94,6 +98,9 @@ export interface TodoItem {
   prompt?: TodoPrompt;
   createdAt?: string; // ISO 8601
   updatedAt?: number; // Unix ms
+  dueDate?: string; // YYYY-MM-DD, local
+  /** HH:MM, local; only set together with dueDate. */
+  dueTime?: string;
 }
 
 export interface TodoData {
@@ -208,6 +215,66 @@ function serializeFrontmatter(milestones: Milestone[], color?: TodoColor): strin
   return result;
 }
 
+// ─── Due dates ───────────────────────────────────────────────────────────────
+
+export interface TodoDue {
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:MM
+}
+
+export type DueStatus = 'overdue' | 'today' | 'upcoming';
+
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+/** Parse `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`; anything else (including impossible dates) is undefined. */
+export const parseDue = (value: string): TodoDue | undefined => {
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/);
+  if (!m) return undefined;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const check = new Date(Date.UTC(y, mo - 1, d));
+  if (check.getUTCFullYear() !== y || check.getUTCMonth() !== mo - 1 || check.getUTCDate() !== d) {
+    return undefined;
+  }
+  const date = `${m[1]}-${m[2]}-${m[3]}`;
+  if (m[4] === undefined) return { date };
+  if (Number(m[4]) > 23 || Number(m[5]) > 59) return undefined;
+  return { date, time: `${m[4]}:${m[5]}` };
+};
+
+/** The stored `::due::` value, or undefined when the item has no due date. */
+export const formatDue = (item: Pick<TodoItem, 'dueDate' | 'dueTime'>): string | undefined =>
+  item.dueDate ? (item.dueTime ? `${item.dueDate}T${item.dueTime}` : item.dueDate) : undefined;
+
+/** Local calendar date of `ms` as YYYY-MM-DD. */
+export const localDateString = (ms: number): string => {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+};
+
+/** Due state of an open item at `now` (local time); done/rejected/undated items have none. */
+export const dueStatus = (item: TodoItem, now = Date.now()): DueStatus | undefined => {
+  if (!item.dueDate || item.status === 'done' || item.status === 'rejected') return undefined;
+  const today = localDateString(now);
+  if (item.dueDate < today) return 'overdue';
+  if (item.dueDate > today) return 'upcoming';
+  if (item.dueTime) {
+    const d = new Date(now);
+    if (item.dueTime <= `${pad2(d.getHours())}:${pad2(d.getMinutes())}`) return 'overdue';
+  }
+  return 'today';
+};
+
+/** Sort comparator: earlier due first, timed before all-day on the same date, undated last. */
+export const compareDue = (
+  a: Pick<TodoItem, 'dueDate' | 'dueTime'>,
+  b: Pick<TodoItem, 'dueDate' | 'dueTime'>,
+): number => {
+  if (!a.dueDate || !b.dueDate) return a.dueDate ? -1 : b.dueDate ? 1 : 0;
+  if (a.dueDate !== b.dueDate) return a.dueDate < b.dueDate ? -1 : 1;
+  const [ta, tb] = [a.dueTime ?? '99:99', b.dueTime ?? '99:99'];
+  return ta < tb ? -1 : ta > tb ? 1 : 0;
+};
+
 // ─── Parse ───────────────────────────────────────────────────────────────────
 
 export const parseTodos = (md: string): TodoData => {
@@ -287,8 +354,10 @@ export const parseTodos = (md: string): TodoData => {
 
     // Metadata line: ::updated:: <ms> ::created:: <iso>  (either or both may be present)
     let updatedAt: number | undefined;
+    let due: TodoDue | undefined;
     const metaLine = (lines[i + 1] ?? '').trim();
-    if (metaLine.startsWith('::updated::') || metaLine.startsWith('::created::')) {
+    if (/^::(updated|created|due)::/.test(metaLine)) {
+      due = parseDue(metaLine.match(/::due::\s*(.*?)\s*(?=::|$)/)?.[1] ?? '');
       const updatedMatch = metaLine.match(/::updated::\s*(\d+)/);
       if (updatedMatch?.[1]) updatedAt = parseInt(updatedMatch[1], 10);
       const createdMatch = metaLine.match(/::created::\s*(\S+)/);
@@ -325,6 +394,8 @@ export const parseTodos = (md: string): TodoData => {
       prompt,
       createdAt,
       updatedAt,
+      ...(due && { dueDate: due.date }),
+      ...(due?.time && { dueTime: due.time }),
     });
     i++;
   }
@@ -347,10 +418,12 @@ export const serializeTodos = (data: TodoData): string => {
     const suffix = [tagStr, milestoneStr, priorityStr].filter(Boolean).join(' ');
     result += `- ${marker} ${item.text}${suffix ? ` ${suffix}` : ''}\n`;
 
-    if (item.updatedAt || item.createdAt) {
+    const due = formatDue(item);
+    if (item.updatedAt || item.createdAt || due) {
       const metaParts: string[] = [];
       if (item.updatedAt) metaParts.push(`::updated:: ${item.updatedAt}`);
       if (item.createdAt) metaParts.push(`::created:: ${item.createdAt}`);
+      if (due) metaParts.push(`::due:: ${due}`);
       result += `${metaParts.join(' ')}\n`;
     }
 
@@ -451,6 +524,23 @@ export const setTodoPriority = (data: TodoData, id: string, priority?: TodoPrior
   if (index < 0) return data;
   const items = [...data.items];
   items[index] = { ...(items[index] as TodoItem), priority, updatedAt: Date.now() };
+  return { ...data, items };
+};
+
+/** Set or clear (`undefined`) an item's due date; invalid values leave data unchanged. */
+export const setTodoDue = (data: TodoData, id: string, due?: TodoDue): TodoData => {
+  const index = data.items.findIndex((item) => item.id === id);
+  if (index < 0) return data;
+  const valid = due && parseDue(due.time ? `${due.date}T${due.time}` : due.date);
+  if (due && !valid) return data;
+  const { dueDate: _d, dueTime: _t, ...rest } = data.items[index] as TodoItem;
+  const items = [...data.items];
+  items[index] = {
+    ...rest,
+    ...(valid && { dueDate: valid.date }),
+    ...(valid?.time && { dueTime: valid.time }),
+    updatedAt: Date.now(),
+  };
   return { ...data, items };
 };
 

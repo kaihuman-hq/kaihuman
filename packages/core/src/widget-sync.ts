@@ -31,6 +31,10 @@ export interface WidgetTodoItem {
   milestoneDueDate?: string;
   updatedAt?: number;
   priority?: TodoPriority;
+  /** The item's own due date (YYYY-MM-DD, local); additive in v2. */
+  dueDate?: string;
+  /** HH:MM, local; only with dueDate. */
+  dueTime?: string;
   /** Never set here: the native widget marks toggles it could not commit yet. */
   pending?: boolean;
 }
@@ -243,6 +247,8 @@ export const buildWidgetTodoSnapshot = (
         milestoneDueDate: milestone?.dueDate,
         updatedAt: item.updatedAt,
         ...(item.priority && { priority: item.priority }),
+        ...(item.dueDate && { dueDate: item.dueDate }),
+        ...(item.dueTime && { dueTime: item.dueTime }),
       });
     });
   }
