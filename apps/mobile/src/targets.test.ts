@@ -478,6 +478,8 @@ const fullItem: Required<Omit<WidgetTodoItem, 'priority' | 'pending'>> = {
   milestoneId: 'm',
   milestoneName: 'M',
   milestoneDueDate: '2026-01-01',
+  dueDate: '2026-01-02',
+  dueTime: '09:00',
   updatedAt: 1,
 };
 const fullSnapshot: Required<

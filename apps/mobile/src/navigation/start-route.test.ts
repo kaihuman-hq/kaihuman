@@ -46,6 +46,15 @@ describe('guardRedirect', () => {
     expect(guardRedirect({ token: 't', repo: null }, 'onboarding')).toBeNull();
     expect(guardRedirect(ready, 'onboarding')).toBe('/dashboard');
   });
+  it('detours first-run exits through the reminder card while it is owed', () => {
+    const owed = { ...ready, reminderPromptPending: true };
+    expect(guardRedirect(owed, 'onboarding')).toBe('/reminders');
+    expect(guardRedirect(owed, 'login')).toBe('/reminders');
+    expect(guardRedirect(owed, 'reminders')).toBeNull();
+    expect(guardRedirect(owed, '(tabs)')).toBeNull();
+    const noRepo = { token: 't', repo: null, reminderPromptPending: true };
+    expect(guardRedirect(noRepo, 'onboarding')).toBeNull();
+  });
   it('sends app screens back to onboarding when the repo is cleared', () => {
     expect(guardRedirect({ token: 't', repo: null }, '(tabs)')).toBe('/onboarding');
   });

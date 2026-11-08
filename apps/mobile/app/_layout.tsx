@@ -10,6 +10,8 @@ import { CloseButton } from '../src/navigation/close-button.js';
 import { useStackScreenOptions } from '../src/navigation/stack-options.js';
 import { guardRedirect } from '../src/navigation/start-route.js';
 import { webBackOptions as webBack } from '../src/navigation/web-back-button.js';
+import { notificationSettings } from '../src/notifications/index.js';
+import { reminderPromptShown, shouldShowReminderPrompt } from '../src/notifications/soft-prompt.js';
 import {
   bootstrap,
   setNotificationNavigator,
@@ -30,12 +32,17 @@ export default function RootLayout() {
   const segment = useSegments()[0];
   const token = useSignalValue(authStore.token);
   const repo = useSignalValue(githubProfileStore.currentRepo);
+  const remindersOn = useSignalValue(notificationSettings).enabled;
+  const reminderPromptPending = shouldShowReminderPrompt({
+    shown: reminderPromptShown(),
+    enabled: remindersOn,
+  });
 
   // Keychain restore is async, so the session can change after first render; the guard follows it.
   useEffect(() => {
-    const to = guardRedirect({ token, repo }, segment);
+    const to = guardRedirect({ token, repo, reminderPromptPending }, segment);
     if (to) router.replace(to);
-  }, [token, repo, segment, router]);
+  }, [token, repo, reminderPromptPending, segment, router]);
 
   useEffect(() => bootstrap(), []);
   useEffect(() => {
@@ -51,6 +58,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="reminders" options={{ headerShown: false, gestureEnabled: false }} />
         {QUICK_ROUTES.map((name) => (
           <Stack.Screen
             key={name}

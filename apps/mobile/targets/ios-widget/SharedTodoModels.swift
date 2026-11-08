@@ -45,6 +45,29 @@ struct SharedTodoItem: Codable, Identifiable {
     // v2
     var priority: String?
     var pending: Bool?
+    // The item's own due date (YYYY-MM-DD) and time (HH:MM), local; absent in older snapshots.
+    var dueDate: String?
+    var dueTime: String?
+}
+
+enum TodoDueState {
+    case overdue
+    case today
+}
+
+extension SharedTodoItem {
+    /// Overdue when the date has passed, or it is today and the time (if any) has; today otherwise.
+    /// Open items only. Local time, compared as zero-padded strings, which sort like the dates.
+    func dueState(now: Date = Date(), calendar: Calendar = .current) -> TodoDueState? {
+        guard status == .backlog || status == .inProgress, let due = dueDate else { return nil }
+        let c = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: now)
+        let today = String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+        if due < today { return .overdue }
+        if due > today { return nil }
+        let hm = String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
+        if let time = dueTime, time <= hm { return .overdue }
+        return .today
+    }
 }
 
 struct SharedTodoStats: Codable {

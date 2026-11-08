@@ -122,3 +122,19 @@ class NextUpLogicTest {
         assertEquals(listOf<String?>(null), milestoneChoices(snapshot()).map { it.id })
     }
 }
+
+class DueStateTest {
+    private fun due(date: String?, time: String? = null, status: String = "backlog") =
+        todo("a", status = status).copy(dueDate = date, dueTime = time)
+
+    @Test
+    fun classifiesOpenItemsInLocalTime() {
+        assertEquals(DueState.Overdue, dueStateOf(due("2026-11-07"), "2026-11-08", "09:00"))
+        assertEquals(DueState.Today, dueStateOf(due("2026-11-08"), "2026-11-08", "09:00"))
+        assertEquals(DueState.Today, dueStateOf(due("2026-11-08", "14:00"), "2026-11-08", "09:00"))
+        assertEquals(DueState.Overdue, dueStateOf(due("2026-11-08", "09:00"), "2026-11-08", "09:00"))
+        assertEquals(null, dueStateOf(due("2026-11-09"), "2026-11-08", "09:00"))
+        assertEquals(null, dueStateOf(due(null), "2026-11-08", "09:00"))
+        assertEquals(null, dueStateOf(due("2026-11-01", status = "done"), "2026-11-08", "09:00"))
+    }
+}

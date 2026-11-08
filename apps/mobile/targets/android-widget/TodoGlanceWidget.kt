@@ -288,8 +288,14 @@ internal fun TodoRow(
                 modifier = GlanceModifier.padding(start = 4.dp),
             )
         }
+        val now = java.time.LocalDateTime.now()
+        val dueSuffix = when (dueStateOf(item, now.toLocalDate().toString(), now.toLocalTime().toString().take(5))) {
+            DueState.Overdue -> " · " + context.getString(R.string.kh_nu_due_overdue)
+            DueState.Today -> " · " + context.getString(R.string.kh_nu_due_today)
+            null -> ""
+        }
         Text(
-            text = item.text,
+            text = item.text + dueSuffix,
             maxLines = maxLines,
             style = TextStyle(
                 color = GlanceTheme.colors.onSurface,

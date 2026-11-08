@@ -1,9 +1,11 @@
 /** Where the app should be, given only what is persisted. The one place that decision lives. */
-export type StartRoute = '/login' | '/onboarding' | '/dashboard';
+export type StartRoute = '/login' | '/onboarding' | '/dashboard' | '/reminders';
 
 export interface SessionState {
   token: string | null;
   repo: unknown | null;
+  /** The one-time reminder card is still owed; shown when the first-run screens finish. */
+  reminderPromptPending?: boolean;
 }
 
 export function resolveStartRoute({ token, repo }: SessionState): StartRoute {
@@ -23,6 +25,7 @@ export function guardRedirect(state: SessionState, segment: string | undefined):
   // `auth` is the deep-link callback route, which redirects on its own.
   if (segment === 'auth') return null;
   const firstRun = segment === 'login' || segment === 'onboarding';
+  if (target === '/dashboard' && firstRun && state.reminderPromptPending) return '/reminders';
   // Signed-in app screens stay put; everything else follows the session.
   return target === '/dashboard' && !firstRun ? null : target;
 }
