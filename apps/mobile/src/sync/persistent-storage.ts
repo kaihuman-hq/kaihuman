@@ -1,10 +1,5 @@
-import {
-  type CoreStorageAdapter,
-  configureCoreStorage,
-  getCoreStorage,
-  githubProfileStore,
-  type RecordStore,
-} from '@kaihuman/core';
+import type { RecordStore } from '@kaihuman/core/src/storage/adapter.ts';
+import { configureCoreStorage } from '@kaihuman/core/src/storage/adapter.ts';
 import {
   type KeyValueDriver,
   MobileStorageAdapter,
@@ -26,8 +21,6 @@ export interface CacheFs {
 }
 
 const KV_FILE = 'kv.json';
-// Keys the app set on the in-memory adapter before this install; carried over so they survive.
-const CARRIED_KEYS = ['lifeos_current_repo', 'lifeos_logged_out'];
 
 /** One JSON file per record: a corrupt or half-written file loses one record, not the cache. */
 export function createFileRecordDriver(fs: CacheFs): RecordDriver {
@@ -89,38 +82,76 @@ export function createFileKeyValueDriver(fs: CacheFs): KeyValueDriver {
   };
 }
 
+function memoryKeyValueDriver(): KeyValueDriver {
+  const data = new Map<string, string>();
+  return {
+    get: (key) => data.get(key) ?? null,
+    set: (key, value) => void data.set(key, value),
+    remove: (key) => void data.delete(key),
+  };
+}
+
+/** expo-secure-store's synchronous calls; it has no synchronous delete. */
+export interface SecureStoreApi {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  deleteItemAsync(key: string): Promise<void>;
+}
+
 /**
- * Installs file-backed core storage. Secrets (token, remembered passwords) stay on the previous
- * adapter, i.e. in memory: the Keychain copy is owned by token-sync. Returns false (and changes
- * nothing) when there is no file system, as on web and under Vitest.
+ * Keychain/Keystore KV for secrets. A read can throw while the device is locked (background
+ * task before first unlock); then nothing is deleted this session, because an unreadable token
+ * looks exactly like a missing one and core would otherwise "clean it up".
  */
-export function installPersistentStorage(fs: CacheFs | null): boolean {
+export function createSecureKeyValueDriver(api: SecureStoreApi): KeyValueDriver {
+  const cache = new Map<string, string | null>();
+  let readFailed = false;
+  // SecureStore keys allow only [A-Za-z0-9._-]; core uses `record:auth:token`.
+  const native = (key: string) => key.replace(/[^\w.-]/g, '_');
+  return {
+    get(key) {
+      if (cache.has(key)) return cache.get(key) ?? null;
+      try {
+        const value = api.getItem(native(key));
+        cache.set(key, value);
+        return value;
+      } catch {
+        readFailed = true;
+        return null;
+      }
+    },
+    set(key, value) {
+      cache.set(key, value);
+      try {
+        api.setItem(native(key), value);
+      } catch {
+        // The cached copy still serves this session.
+      }
+    },
+    remove(key) {
+      cache.set(key, null);
+      if (!readFailed) void api.deleteItemAsync(native(key)).catch(() => undefined);
+    },
+  };
+}
+
+/**
+ * Installs file-backed core storage, with secrets in `secure`. Must run before anything imports
+ * the `@kaihuman/core` root, whose stores read storage while being constructed. Returns false
+ * (and changes nothing) when there is no file system.
+ */
+export function installPersistentStorage(
+  fs: CacheFs | null,
+  secure: KeyValueDriver | null = null,
+): boolean {
   if (!fs) return false;
-  const previous: CoreStorageAdapter = getCoreStorage();
-  const kv = createFileKeyValueDriver(fs);
-  for (const key of CARRIED_KEYS) {
-    const value = previous.getItem(key);
-    if (value !== null) kv.set(key, value);
-  }
   configureCoreStorage(
     new MobileStorageAdapter({
-      kv,
+      kv: createFileKeyValueDriver(fs),
       records: createFileRecordDriver(fs),
-      secure: {
-        get: (key) => previous.getItem(key),
-        set: (key, value) => previous.setItem(key, value),
-        remove: (key) => previous.removeItem(key),
-      },
+      // Without a Keychain, secrets stay in memory rather than in the plain files.
+      secure: secure ?? memoryKeyValueDriver(),
     }),
   );
-  // githubProfileStore read its repo when it was constructed, before this storage existed.
-  const saved = kv.get('lifeos_current_repo');
-  if (saved && githubProfileStore.currentRepo.peek() === null) {
-    try {
-      githubProfileStore.currentRepo.value = JSON.parse(saved);
-    } catch {
-      // A corrupt value just means no repo is selected.
-    }
-  }
   return true;
 }

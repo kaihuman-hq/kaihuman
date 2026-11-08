@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-08 — Mobile: state survives relaunch (repo, token, cache, outbox, settings)
+
+- Bug from an iPhone: after reopening the app no repo was selected and data was gone. Causes: device storage was installed in a root-layout `useEffect`, after every `@kaihuman/core` store had been built on in-memory storage (only the repo was patched back); secrets (`lifeos_gh_token`, auth records, remembered file passwords) lived only in memory; the Keychain read used the default `WHEN_UNLOCKED` accessibility, and a failed read *deleted* the Keychain token; `index.tsx` and the root guard routed before the token was restored.
+- New app entry `apps/mobile/index.ts` imports `src/runtime/storage-entry.ts` before `expo-router/entry`, so storage exists before any store. The storage modules deep-import core's `storage/` files, not the package root. `bootStorage` throws in dev and logs + shows a non-blocking banner (`SyncStatusBanner`) in production when the file system is missing or a store read storage first (`hasCoreStorage()` in core). Web keeps localStorage + IndexedDB, like the PWA.
+- Secrets go to expo-secure-store (sync API, `AFTER_FIRST_UNLOCK`, keys sanitised to `[A-Za-z0-9._-]`); nothing is deleted after a failed (locked-device) read. Routing waits for `tokenHydrated`. Signing in with a token clears a persisted `lifeos_logged_out` flag.
+- Tests: cold-start integration test (real bootstrap, fake files + Keychain + App Group, `vi.resetModules` relaunch restores token, repo, cached + dirty files, outbox, saved password, reminder flag, dashboard page, notification settings → `/dashboard`), guard waits for hydration, missing file system is reported, secure driver, token-sync read failure.
+- No Maestro relaunch step: the screenshot flows run in demo mode, which is never persisted by design.
+
 ## 2026-11-08 — CI: more time for iOS screenshots
 
 - `mobile-screenshots.yml` iOS job: timeout 60 → 90 min, screenshot step 40 → 55 min. The job was cancelled at 60 min after a 27-min Release build and 19 of 20 screenshots (about 1 min each).

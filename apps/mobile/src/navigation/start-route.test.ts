@@ -65,6 +65,11 @@ describe('guardRedirect', () => {
   it('does nothing before the first segment is known', () => {
     expect(guardRedirect({ token: null, repo: null }, undefined)).toBeNull();
   });
+  it('waits while the Keychain token is still loading', () => {
+    expect(guardRedirect({ token: null, repo: null, hydrated: false }, '(tabs)')).toBeNull();
+    expect(guardRedirect({ token: null, repo: null, hydrated: false }, 'onboarding')).toBeNull();
+    expect(guardRedirect({ token: null, repo: null, hydrated: true }, '(tabs)')).toBe('/login');
+  });
 });
 
 describe('sortByRecentPush', () => {

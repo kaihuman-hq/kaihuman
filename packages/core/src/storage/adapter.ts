@@ -50,6 +50,11 @@ export function configureCoreStorage(adapter: CoreStorageAdapter): void {
   current = adapter;
 }
 
+/** True once an adapter is configured or a store has already read the lazy default. */
+export function hasCoreStorage(): boolean {
+  return current !== undefined;
+}
+
 /** Lazily defaults to the web adapter (which itself falls back to memory). */
 export function getCoreStorage(): CoreStorageAdapter {
   current ??= new WebStorageAdapter();

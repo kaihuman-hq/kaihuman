@@ -6,6 +6,8 @@ export interface SessionState {
   repo: unknown | null;
   /** The one-time reminder card is still owed; shown when the first-run screens finish. */
   reminderPromptPending?: boolean;
+  /** False while the Keychain token is still loading: no route is decided on a half-read session. */
+  hydrated?: boolean;
 }
 
 export function resolveStartRoute({ token, repo }: SessionState): StartRoute {
@@ -18,7 +20,7 @@ export function resolveStartRoute({ token, repo }: SessionState): StartRoute {
  * app screens are left when the session is lost. `segment` is the top-level route segment.
  */
 export function guardRedirect(state: SessionState, segment: string | undefined): StartRoute | null {
-  if (segment === undefined) return null;
+  if (segment === undefined || state.hydrated === false) return null;
   const target = resolveStartRoute(state);
   const own = target === '/login' ? 'login' : target === '/onboarding' ? 'onboarding' : null;
   if (segment === own) return null;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { storageWarning } from '../runtime/storage-boot.js';
 import { useTheme } from '../theme/theme.js';
 import { Button } from '../ui/button.js';
 import { Text } from '../ui/text.js';
@@ -13,12 +14,31 @@ const TICK_MS = 30_000;
 export function SyncStatusBanner() {
   const { colors, spacing, shape } = useTheme();
   const status = useSignalValue(syncStatus);
+  const warning = useSignalValue(storageWarning);
   const [, setTick] = useState(0);
   // The relative time ("5 min ago") goes stale without a state change, so re-render on a timer.
   useEffect(() => {
     const id = setInterval(() => setTick((n) => n + 1), TICK_MS);
     return () => clearInterval(id);
   }, []);
+
+  // Losing data on close outranks any sync state, so it shows first; it never blocks the screen.
+  if (warning) {
+    return (
+      <View
+        accessibilityRole="alert"
+        style={{
+          backgroundColor: colors.surface,
+          borderColor: colors.danger,
+          borderWidth: 1,
+          borderRadius: shape.md,
+          padding: spacing.md,
+        }}
+      >
+        <Text variant="footnote">{warning}</Text>
+      </View>
+    );
+  }
 
   const { text, tone } = describeSyncStatus(status, Date.now());
   if (!text) return null;

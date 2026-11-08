@@ -11,7 +11,7 @@ import {
   routeToHref,
   startLinkHandling,
 } from './pending-url.js';
-import { startTokenSync } from './token-sync.js';
+import { startTokenSync, tokenHydrated } from './token-sync.js';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -84,6 +84,41 @@ describe('token sync', () => {
     expect(authStore.token.value).toBe('saved');
     expect(stored).toBe('saved');
     expect(shared.setSharedToken).toHaveBeenLastCalledWith('saved');
+    stop();
+  });
+
+  it('does not delete the Keychain token when the read fails (locked device)', async () => {
+    stored = 'saved';
+    const remove = vi.fn(async () => {});
+    const stop = startTokenSync({
+      secure: { ...secure, get: async () => Promise.reject(new Error('locked')), remove },
+      shared: fakeNative(),
+    });
+    await stop.ready;
+    expect(remove).not.toHaveBeenCalled();
+    expect(stored).toBe('saved');
+    stop();
+  });
+
+  it('marks the session hydrated only once the Keychain answered', async () => {
+    let answer: (t: string | null) => void = () => {};
+    const stop = startTokenSync({
+      secure: {
+        ...secure,
+        get: () =>
+          new Promise((r) => {
+            answer = r;
+          }),
+      },
+      shared: fakeNative(),
+    });
+    tokenHydrated.value = false;
+    await flush();
+    expect(tokenHydrated.value).toBe(false);
+    answer('saved');
+    await stop.ready;
+    expect(tokenHydrated.value).toBe(true);
+    expect(authStore.token.value).toBe('saved');
     stop();
   });
 

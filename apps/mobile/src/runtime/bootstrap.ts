@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import { getRandomValues } from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
@@ -7,20 +6,13 @@ import { KaihumanShared } from '../../modules/kaihuman-shared/index.js';
 import { WidgetBridge } from '../adapters/widget-bridge.js';
 import { rescheduleNotifications, startNotifications } from '../notifications/index.js';
 import { registerBackgroundSync } from '../sync/background.js';
-import { createExpoCacheFs } from '../sync/expo-cache-fs.js';
 import { setRescheduleNotifications } from '../sync/notifications-hook.js';
-import { installPersistentStorage } from '../sync/persistent-storage.js';
 import { startSync } from '../sync/runtime.js';
 import { installCryptoPolyfill } from './crypto-polyfill.js';
 import { createNativeContainer } from './native-container.js';
 import { type LinkDeps, startLinkHandling } from './pending-url.js';
-import { KEYCHAIN_SERVICE, SECURE_TOKEN_KEY, startTokenSync } from './token-sync.js';
-
-// Must match the widgets' keychain service, which is the iOS bundle id (see the widgets plugin).
-// expo-constants' typings resolve the default import to the module namespace here (see app/login.tsx).
-const expoConfig = (Constants as { expoConfig?: { ios?: { bundleIdentifier?: string } } | null })
-  .expoConfig;
-const secureOptions = { keychainService: expoConfig?.ios?.bundleIdentifier ?? KEYCHAIN_SERVICE };
+import { secureOptions } from './secure-options.js';
+import { SECURE_TOKEN_KEY, startTokenSync } from './token-sync.js';
 
 let active: (() => void) | null = null;
 let notificationNavigator: (href: string) => void = () => undefined;
@@ -39,8 +31,7 @@ export const bootstrapReady = (): Promise<unknown> => ready;
 export function bootstrap(): () => void {
   if (active) return active;
   installCryptoPolyfill(globalThis, { getRandomValues });
-  // Before the bridge reconciles: widget mutations and the first sync read the persistent cache.
-  installPersistentStorage(createExpoCacheFs());
+  // Device storage is already installed by the app entry (src/runtime/storage-entry.ts).
   const container = createNativeContainer(KaihumanShared);
   const bridge = new WidgetBridge(container);
   const stopBridge = bridge.start();

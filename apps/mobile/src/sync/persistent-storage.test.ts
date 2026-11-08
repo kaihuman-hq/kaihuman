@@ -1,14 +1,10 @@
-import {
-  configureCoreStorage,
-  getCoreStorage,
-  githubProfileStore,
-  InMemoryStorageAdapter,
-} from '@kaihuman/core';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { configureCoreStorage, getCoreStorage, InMemoryStorageAdapter } from '@kaihuman/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type CacheFs,
   createFileKeyValueDriver,
   createFileRecordDriver,
+  createSecureKeyValueDriver,
   installPersistentStorage,
 } from './persistent-storage.js';
 
@@ -23,11 +19,8 @@ const fakeFs = (files = new Map<string, string>()): CacheFs & { files: Map<strin
     [...files.keys()].filter((k) => k.startsWith(`${dir}/`)).map((k) => k.slice(dir.length + 1)),
 });
 
-const repo = { full_name: 'o/r', name: 'r', owner: { login: 'o' }, default_branch: 'main' };
-
 beforeEach(() => {
   configureCoreStorage(new InMemoryStorageAdapter());
-  githubProfileStore.currentRepo.value = null;
 });
 
 describe('record driver', () => {
@@ -100,31 +93,60 @@ describe('installPersistentStorage', () => {
     expect(kvFile).toContain('other');
   });
 
-  it('rehydrates the selected repo that stores read before the install', () => {
-    const fs = fakeFs(
-      new Map([['kv.json', JSON.stringify({ lifeos_current_repo: JSON.stringify(repo) })]]),
-    );
-    installPersistentStorage(fs);
-    expect(githubProfileStore.currentRepo.value).toMatchObject({ full_name: 'o/r' });
-  });
-
-  it('does not overwrite a repo the app already selected, and carries it into the file', () => {
-    const chosen = { ...repo, full_name: 'o/new' };
-    getCoreStorage().setItem('lifeos_current_repo', JSON.stringify(chosen));
-    githubProfileStore.currentRepo.value = chosen as never;
-    const fs = fakeFs(
-      new Map([['kv.json', JSON.stringify({ lifeos_current_repo: JSON.stringify(repo) })]]),
-    );
-    installPersistentStorage(fs);
-    expect(githubProfileStore.currentRepo.value).toMatchObject({ full_name: 'o/new' });
-    expect(getCoreStorage().getItem('lifeos_current_repo')).toContain('o/new');
-  });
-
   it('persists records through the installed adapter', async () => {
     const fs = fakeFs();
     installPersistentStorage(fs);
     await getCoreStorage().putRecord('files', 'o/r:a.md', { content: 'hi', dirty: true });
     const again = createFileRecordDriver(fs);
     expect(await again.get('files', 'o/r:a.md')).toEqual({ content: 'hi', dirty: true });
+  });
+});
+
+describe('secure driver', () => {
+  const keychain = (entries: [string, string][] = []) => {
+    const items = new Map(entries);
+    return {
+      items,
+      getItem: vi.fn((k: string) => items.get(k) ?? null),
+      setItem: vi.fn((k: string, v: string) => void items.set(k, v)),
+      deleteItemAsync: vi.fn(async (k: string) => void items.delete(k)),
+    };
+  };
+
+  it('maps core keys onto the characters SecureStore accepts', () => {
+    const api = keychain();
+    const driver = createSecureKeyValueDriver(api);
+    driver.set('record:auth:token', '"t"');
+    expect(api.items.get('record_auth_token')).toBe('"t"');
+    expect(createSecureKeyValueDriver(api).get('record:auth:token')).toBe('"t"');
+  });
+
+  it('reads deletes back as missing before the async delete lands', () => {
+    const api = keychain([['lifeos_gh_token', 't']]);
+    const driver = createSecureKeyValueDriver(api);
+    driver.remove('lifeos_gh_token');
+    expect(driver.get('lifeos_gh_token')).toBeNull();
+    expect(api.deleteItemAsync).toHaveBeenCalledWith('lifeos_gh_token');
+  });
+
+  it('deletes nothing after a locked-device read failure', () => {
+    const api = keychain([['lifeos_gh_token', 't']]);
+    api.getItem.mockImplementation(() => {
+      throw new Error('locked');
+    });
+    const driver = createSecureKeyValueDriver(api);
+    expect(driver.get('lifeos_gh_token')).toBeNull();
+    driver.remove('lifeos_gh_token');
+    expect(api.deleteItemAsync).not.toHaveBeenCalled();
+    expect(api.items.get('lifeos_gh_token')).toBe('t');
+  });
+
+  it('keeps auth records in the secure driver, not the files', async () => {
+    const fs = fakeFs();
+    const api = keychain();
+    installPersistentStorage(fs, createSecureKeyValueDriver(api));
+    await getCoreStorage().putRecord('auth', 'token', 'ghp_x');
+    expect([...fs.files.values()].join('')).not.toContain('ghp_x');
+    expect(api.items.get('record_auth_token')).toBe('"ghp_x"');
   });
 });

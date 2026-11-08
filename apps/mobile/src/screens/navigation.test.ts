@@ -2,6 +2,7 @@ import {
   authStore,
   configureCoreStorage,
   exitDemoMode,
+  getCoreStorage,
   githubProfileStore,
   InMemoryStorageAdapter,
   isDemoMode,
@@ -191,8 +192,11 @@ describe('LoginScreenController', () => {
   it('signs in with a trimmed PAT and rejects blanks', () => {
     expect(login.signInWithToken('   ')).toBe(false);
     expect(authStore.token.value).toBeNull();
+    getCoreStorage().setItem('lifeos_logged_out', 'true');
     expect(login.signInWithToken(' ghp_pat ')).toBe(true);
     expect(authStore.token.value).toBe('ghp_pat');
+    // Otherwise the next launch treats the new session as logged out and wipes the token.
+    expect(getCoreStorage().getItem('lifeos_logged_out')).toBeNull();
   });
 
   it('enters demo mode in one tap', () => {

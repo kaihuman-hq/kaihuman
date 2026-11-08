@@ -17,6 +17,7 @@ import {
   setNotificationNavigator,
   startAppLinkHandling,
 } from '../src/runtime/bootstrap.js';
+import { tokenHydrated } from '../src/runtime/token-sync.js';
 import { useTheme } from '../src/theme/theme.js';
 import { GestureRoot } from '../src/ui/gesture-root.js';
 import { useSignalValue } from '../src/views/use-signal.js';
@@ -32,6 +33,7 @@ export default function RootLayout() {
   const segment = useSegments()[0];
   const token = useSignalValue(authStore.token);
   const repo = useSignalValue(githubProfileStore.currentRepo);
+  const hydrated = useSignalValue(tokenHydrated);
   const remindersOn = useSignalValue(notificationSettings).enabled;
   const reminderPromptPending = shouldShowReminderPrompt({
     shown: reminderPromptShown(),
@@ -40,9 +42,9 @@ export default function RootLayout() {
 
   // Keychain restore is async, so the session can change after first render; the guard follows it.
   useEffect(() => {
-    const to = guardRedirect({ token, repo, reminderPromptPending }, segment);
+    const to = guardRedirect({ token, repo, reminderPromptPending, hydrated }, segment);
     if (to) router.replace(to);
-  }, [token, repo, reminderPromptPending, segment, router]);
+  }, [token, repo, reminderPromptPending, hydrated, segment, router]);
 
   useEffect(() => bootstrap(), []);
   useEffect(() => {

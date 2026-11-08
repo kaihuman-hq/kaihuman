@@ -1,8 +1,10 @@
 import { authStore, demoMode } from '@kaihuman/core';
-import { effect } from '@preact/signals';
+import { effect, signal } from '@preact/signals';
 
 export const SECURE_TOKEN_KEY = 'github-token';
-export const KEYCHAIN_SERVICE = 'com.kaihuman.app';
+
+/** False until the Keychain token has been read; routing waits for it instead of showing login. */
+export const tokenHydrated = signal(false);
 
 export interface SecureTokenStore {
   get(): Promise<string | null>;
@@ -27,13 +29,20 @@ export function startTokenSync(deps: TokenSyncDeps): (() => void) & { ready: Pro
   // Until hydration finishes an empty token must not wipe the Keychain copy we are about to read.
   let hydrated = false;
 
+  let readFailed = false;
   const ready = deps.secure
     .get()
-    .catch(() => null)
+    .catch(() => {
+      readFailed = true;
+      return null;
+    })
     .then((stored) => {
       if (disposed) return;
       if (stored && !auth.token.value) auth.token.value = stored;
       hydrated = true;
+      tokenHydrated.value = true;
+      // A failed read (locked device) is not an empty Keychain: pushing null would delete the token.
+      if (readFailed && !auth.token.value) return;
       push(auth.token.value);
     });
 

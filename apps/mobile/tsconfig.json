@@ -9,5 +9,12 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": ["src/**/*", "app/**/*", "plugins/**/*", "app.config.ts", "vitest.config.ts"]
+  "include": [
+    "index.ts",
+    "src/**/*",
+    "app/**/*",
+    "plugins/**/*",
+    "app.config.ts",
+    "vitest.config.ts"
+  ]
 }
