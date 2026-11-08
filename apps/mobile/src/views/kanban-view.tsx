@@ -1,15 +1,17 @@
-import type { TodoStatus } from '@kaihuman/formats';
+import type { TodoDue, TodoStatus } from '@kaihuman/formats';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import {
   type FocusSessionController,
   NOTIFICATIONS_DENIED_MESSAGE,
 } from '../screens/focus-session.js';
-import type { KanbanBoardController } from '../screens/kanban-board.js';
+import type { BoardItem, KanbanBoardController } from '../screens/kanban-board.js';
 import { TODO_STATUSES } from '../screens/kanban-board.js';
+import { dueBadge } from '../screens/todo-due.js';
 import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
+  Badge,
   Chip,
   EmptyState,
   Fab,
@@ -23,6 +25,7 @@ import {
   type SwipeAction,
   Text,
 } from '../ui/index.js';
+import { DueSheet } from './due-sheet.js';
 
 const LABEL: Record<TodoStatus, string> = {
   backlog: 'Backlog',
@@ -98,6 +101,7 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
   useFocusRefresh();
   const [status, setStatus] = useState<TodoStatus>('backlog');
   const [tag, setTag] = useState<string | undefined>();
+  const [dueFor, setDueFor] = useState<BoardItem | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -126,6 +130,15 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
 
   const move = async (path: string, index: number, to: TodoStatus) => {
     const res = await controller.setStatus(path, index, to);
+    setError(res.ok ? null : res.error);
+    if (res.ok) haptics.success();
+    else haptics.error();
+    setVersion((v) => v + 1);
+  };
+
+  const setDue = async (path: string, index: number, due: TodoDue | undefined) => {
+    setDueFor(null);
+    const res = await controller.setDue(path, index, due);
     setError(res.ok ? null : res.error);
     if (res.ok) haptics.success();
     else haptics.error();
@@ -186,7 +199,9 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
     const advance = ADVANCE[status];
     body = (
       <Section header={`${LABEL[status]} · ${cards.length}`}>
-        {cards.map(({ item, itemIndex, filePath }) => {
+        {cards.map((card) => {
+          const { item, itemIndex, filePath } = card;
+          const badge = dueBadge(item, new Date());
           // Done sits on the leading edge so the common "finish it" swipe mirrors Mail's read/unread;
           // Delete is the red, outermost trailing action.
           const actions: SwipeAction[] = [
@@ -209,6 +224,12 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
                 ]
               : []),
             {
+              label: 'Due',
+              icon: 'calendar',
+              side: 'leading',
+              onPress: () => setDueFor(card),
+            },
+            {
               label: 'Delete',
               icon: 'trash',
               destructive: true,
@@ -223,40 +244,43 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
               subtitle={item.tags.length ? item.tags.map((t) => `#${t}`).join(' ') : undefined}
               swipeActions={actions}
               accessory={
-                <Pressable
-                  testID={`move-${itemIndex}-${advance.to}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${advance.label}: ${item.text}`}
-                  hitSlop={8}
-                  onPress={() => void move(filePath, itemIndex, advance.to)}
-                  android_ripple={{ color: colors.pressed, borderless: true, radius: 24 }}
-                  style={({ pressed }) => ({
-                    width: metrics.hitTarget,
-                    height: metrics.hitTarget,
-                    marginRight: -spacing.sm,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: pressed ? 0.5 : 1,
-                  })}
-                >
-                  <View
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 16,
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                  {badge ? <Badge tone={badge.tone} label={badge.label} /> : null}
+                  <Pressable
+                    testID={`move-${itemIndex}-${advance.to}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${advance.label}: ${item.text}`}
+                    hitSlop={8}
+                    onPress={() => void move(filePath, itemIndex, advance.to)}
+                    android_ripple={{ color: colors.pressed, borderless: true, radius: 24 }}
+                    style={({ pressed }) => ({
+                      width: metrics.hitTarget,
+                      height: metrics.hitTarget,
+                      marginRight: -spacing.sm,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: colors.accentSoft,
-                    }}
+                      opacity: pressed ? 0.5 : 1,
+                    })}
                   >
-                    <Icon
-                      name={advance.icon}
-                      size={17}
-                      color={colors.onAccentSoft}
-                      weight="semibold"
-                    />
-                  </View>
-                </Pressable>
+                    <View
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: colors.accentSoft,
+                      }}
+                    >
+                      <Icon
+                        name={advance.icon}
+                        size={17}
+                        color={colors.onAccentSoft}
+                        weight="semibold"
+                      />
+                    </View>
+                  </Pressable>
+                </View>
               }
             />
           );
@@ -304,6 +328,21 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
         ) : null}
         {body}
       </Screen>
+      {dueFor ? (
+        <DueSheet
+          title={dueFor.item.text}
+          current={
+            dueFor.item.dueDate
+              ? {
+                  date: dueFor.item.dueDate,
+                  ...(dueFor.item.dueTime && { time: dueFor.item.dueTime }),
+                }
+              : undefined
+          }
+          onSelect={(due) => void setDue(dueFor.filePath, dueFor.itemIndex, due)}
+          onClose={() => setDueFor(null)}
+        />
+      ) : null}
       {onAddTodo ? (
         <Fab icon="add" label="Add todo" accessibilityLabel="Add todo" onPress={onAddTodo} />
       ) : null}

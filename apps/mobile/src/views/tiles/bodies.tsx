@@ -35,6 +35,7 @@ import {
   toggleTodo,
   type WorldClock,
 } from '../../components/widgets/tile-controllers.js';
+import { dueBadge } from '../../screens/todo-due.js';
 import { useTheme } from '../../theme/theme.js';
 import { Badge, Button, haptics, Icon, Text, TextField } from '../../ui/index.js';
 import {
@@ -120,9 +121,11 @@ export function Todos({ view, ctx }: { view: TodosView; ctx: Ctx }) {
         <Rows>
           {view.rows.map((r) => {
             const done = r.status === 'done' || r.status === 'rejected';
+            const due = dueBadge(r, ctx.now);
             return (
               <ItemRow
                 key={r.id}
+                trailing={due ? <Badge tone={due.tone} label={due.label} /> : undefined}
                 testID={`todo-${r.index}`}
                 role="checkbox"
                 checked={done}

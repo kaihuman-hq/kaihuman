@@ -1,9 +1,11 @@
+import type { TodoDue } from '@kaihuman/formats';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import type { QuickKind } from '../navigation/routes.js';
 import type { QuickCaptureController } from '../screens/quick-capture.js';
 import { useTheme } from '../theme/theme.js';
 import { Button, haptics, Icon, Screen, Text, TextField } from '../ui/index.js';
+import { DueEditor } from './due-editor.js';
 
 export const CAPTURE_TITLES: Record<QuickKind, string> = {
   todo: 'New todo',
@@ -85,6 +87,7 @@ export function QuickCaptureView({
   const { spacing, colors } = useTheme();
   const [text, setText] = useState('');
   const [extra, setExtra] = useState('');
+  const [due, setDue] = useState<TodoDue | undefined>();
   const [status, setStatus] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -107,7 +110,7 @@ export function QuickCaptureView({
       } else {
         const res =
           kind === 'todo'
-            ? await controller.quickTodo(text, value)
+            ? await controller.quickTodo(text, value, due)
             : kind === 'log'
               ? await controller.quickLog(text, value)
               : kind === 'knowledge'
@@ -125,6 +128,7 @@ export function QuickCaptureView({
       haptics.success();
       setText('');
       setExtra('');
+      setDue(undefined);
       if (onDone) timer.current = setTimeout(onDone, DISMISS_DELAY_MS);
     } else {
       haptics.error();
@@ -136,7 +140,7 @@ export function QuickCaptureView({
   // biome-ignore lint/correctness/useExhaustiveDependencies: `run` closes over the fields tracked below
   useEffect(() => {
     onHeaderState?.({ canSubmit, busy, submit: run });
-  }, [canSubmit, busy, text, extra, onHeaderState]);
+  }, [canSubmit, busy, text, extra, due, onHeaderState]);
 
   const clearStatus = () => setStatus(null);
 
@@ -185,6 +189,7 @@ export function QuickCaptureView({
           testID="capture-extra"
         />
       ) : null}
+      {kind === 'todo' ? <DueEditor value={due} onChange={setDue} /> : null}
       {status ? (
         <View
           accessibilityRole="alert"

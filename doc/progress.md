@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-08 — Todo format: per-item due dates
+
+- `.todos.md` items take an optional `::due:: YYYY-MM-DD` or `::due:: YYYY-MM-DDTHH:MM` (local) at the end of the metadata line (`dueDate`, `dueTime`). Older parsers still read the line and ignore it; files without it round-trip byte for byte; malformed values are ignored. `@kaihuman/formats` adds `setTodoDue`, `dueStatus`, `compareDue`, `formatDue`, `parseDue`; widget snapshot items carry `dueDate`/`dueTime` (additive). Documented in `packages/docspack/docs/70-file-formats.md`.
+
 ## 2026-11-08 — Console board: set, show, sort and filter todo due dates
 
 - Kanban cards show a due badge (Overdue / Today / short date such as "Nov 10 14:00") and a DUE action opens an inline date + optional time editor (SAVE / CLEAR) using `setTodoDue`. The header gains a due filter (All / Overdue / Due today / Has due date) and a NEWEST / DUE sort toggle (DUE drops the age dividers and puts undated cards last).
@@ -10,6 +14,12 @@
 - Notifications: `todosFromSnapshot` now uses the item's own `dueDate`/`dueTime` and falls back to the milestone date (never a time), so timed todos get a "due-soon" notification `minutesBefore` their due time.
 - First-run soft prompt: one card "Get reminded when todos are due" (Enable / Not now) at `/reminders`, shown once when onboarding (or login with a repo) finishes; Enable reuses `setNotificationsEnabled`. Decision logic and the shown flag live in `notifications/soft-prompt.ts`; `guardRedirect` routes through the card while `reminderPromptPending`.
 - Widgets: iOS and Android decode `dueDate`/`dueTime` additively and Next up rows append " · overdue" / " · today" for open items (local time).
+
+## 2026-11-08 — Mobile: set, show and quick-set todo due dates
+
+- New `@react-native-community/datetimepicker` dependency. `screens/todo-due.ts` holds the pure logic (Today/Tomorrow presets, picker to `TodoDue` conversion, badge label and tone, `setDueOnData`), tested in `todo-due.test.ts` and `views/due-ui.test.tsx`.
+- Board: due/overdue badge on each card, and a "Due" swipe action opening a sheet with Today, Tomorrow, Pick… (native picker, optional time) and Clear; `KanbanBoardController.setDue` writes through the same edit path as status changes. Todos tile rows show the same badge. Quick todo has a due date (then optional time) field via `QuickCaptureController.quickTodo(text, tags, due)`.
+- Known: `src/ios-widget.test.ts` and `src/targets.test.ts` fail type-check until the widget targets read `dueDate`/`dueTime` (from the formats change); left to the widget work.
 
 ## 2026-11-08 — Mobile: home screen pages follow the console dashboards
 

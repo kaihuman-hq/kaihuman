@@ -22,6 +22,12 @@ vi.mock('../sync/runtime.js', () => ({
 // Tests that need routing mock the module themselves.
 vi.mock('expo-router', () => ({ useFocusEffect: () => {} }));
 
+// The native date picker is Flow source with no web build; render a marker the tests can find.
+vi.mock('@react-native-community/datetimepicker', () => ({
+  default: ({ mode, testID }: Record<string, any>) =>
+    createElement('div', { 'data-testid': testID, 'data-mode': mode }),
+}));
+
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(async () => {}),
   impactAsync: vi.fn(async () => {}),

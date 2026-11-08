@@ -8,12 +8,14 @@ import {
   setMilestone,
   setStatus,
   type TodoData,
+  type TodoDue,
   type TodoItem,
   type TodoStatus,
   updateMilestone,
   updateTodoText,
 } from '@kaihuman/formats';
 import { githubRepoFiles, type RepoFiles } from './quick-capture.js';
+import { setDueOnData } from './todo-due.js';
 
 export const TODO_STATUSES = [
   'backlog',
@@ -196,6 +198,11 @@ export class KanbanBoardController {
       if (!d.items[index]) throw new Error('Todo not found');
       return setMilestone(d, index, milestoneId);
     });
+  }
+
+  /** Sets (or with `undefined`, clears) the due date, like the other per-card edits. */
+  setDue(path: string, index: number, due: TodoDue | undefined): Promise<BoardResult> {
+    return this.edit(path, (d) => setDueOnData(d, index, due));
   }
 
   addTodo(

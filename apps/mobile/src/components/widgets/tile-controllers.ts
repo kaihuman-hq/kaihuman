@@ -74,6 +74,8 @@ export interface TodoRow {
   status: TodoStatus;
   tags: string[];
   milestone?: string;
+  dueDate?: string;
+  dueTime?: string;
 }
 
 export interface TodosView {
@@ -97,6 +99,8 @@ export const todosView = (content: string, now: Date, hideOlderThanMs = 3_600_00
       status: item.status,
       tags: item.tags,
       milestone: item.milestoneId ? names.get(item.milestoneId) : undefined,
+      ...(item.dueDate && { dueDate: item.dueDate }),
+      ...(item.dueTime && { dueTime: item.dueTime }),
     });
   });
   const today = localDate(now);

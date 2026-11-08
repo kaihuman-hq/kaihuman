@@ -10,10 +10,14 @@ import {
   logIdea,
   newIdea,
   parseIdeaHandoffs,
+  parseTodos,
+  serializeTodos,
   slugifyIdeaTitle,
+  type TodoDue,
 } from '@kaihuman/formats';
 import { syncActions } from '../sync/actions.js';
 import { canServeFromCache } from '../sync/revalidate.js';
+import { setDueOnData } from './todo-due.js';
 
 /**
  * The file access the mobile controllers need. Kept narrow so controllers can be tested without
@@ -116,12 +120,21 @@ export class QuickCaptureController {
     });
   }
 
-  quickTodo(text: string, tags?: string | string[]): Promise<CaptureResult> {
+  quickTodo(text: string, tags?: string | string[], due?: TodoDue): Promise<CaptureResult> {
     const path = `${this.files.appFolder()}/inbox.todos.md`;
     return this.append(
       path,
-      (current) =>
-        addTodoEntry(current, { text: text.trim(), tags: parseTagInput(tags) }, this.clock()),
+      (current) => {
+        const next = addTodoEntry(
+          current,
+          { text: text.trim(), tags: parseTagInput(tags) },
+          this.clock(),
+        );
+        if (!due) return next;
+        // The entry is appended last, so its position is the end of the file.
+        const data = parseTodos(next);
+        return serializeTodos(setDueOnData(data, data.items.length - 1, due));
+      },
       'Todo added',
     );
   }
