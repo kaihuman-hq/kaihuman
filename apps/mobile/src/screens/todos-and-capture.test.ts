@@ -203,6 +203,7 @@ describe('githubRepoFiles adapter', () => {
       githubFileStore.dirtyFiles.value = new Set();
       void path;
     });
+    const flush = vi.spyOn(githubFileStore, 'flushPendingWrites').mockResolvedValue(undefined);
     const create = vi.spyOn(githubFileStore, 'createFile').mockResolvedValue(undefined);
 
     expect(githubRepoFiles.todoPaths()).toEqual(['.kh/a.todos.md']);
@@ -210,17 +211,20 @@ describe('githubRepoFiles adapter', () => {
     expect(await githubRepoFiles.read('missing.md')).toBeNull();
     await githubRepoFiles.write('.kh/a.todos.md', 'new');
     expect(githubFileStore.openFiles.value['.kh/a.todos.md']?.content).toBe('new');
-    expect(save).toHaveBeenCalledWith('.kh/a.todos.md');
+    // Optimistic: the dirty copy is persisted; the outbox pushes it later.
+    expect(flush).toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
     await githubRepoFiles.write('.kh/b.todos.md', 'x');
     expect(create).toHaveBeenCalledWith('.kh/b.todos.md', 'x');
   });
 
-  it('throws the store error when a save leaves the file dirty', async () => {
+  it('does not throw when the push is merely queued (offline)', async () => {
     githubFileStore.openFiles.value = { 'a.md': { content: 'x', sha: '1' } };
-    vi.spyOn(githubFileStore, 'saveFile').mockImplementation(async () => {
-      githubFileStore.error.value = 'offline';
-    });
-    await expect(githubRepoFiles.write('a.md', 'y')).rejects.toThrow('offline');
+    const save = vi.spyOn(githubFileStore, 'saveFile');
+    vi.spyOn(githubFileStore, 'flushPendingWrites').mockResolvedValue(undefined);
+    await expect(githubRepoFiles.write('a.md', 'y')).resolves.toBeUndefined();
+    expect(save).not.toHaveBeenCalled();
+    expect(githubFileStore.openFiles.value['a.md']?.content).toBe('y');
   });
 });
 

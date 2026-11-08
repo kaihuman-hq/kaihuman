@@ -7,6 +7,7 @@ import {
 } from '../screens/focus-session.js';
 import type { KanbanBoardController } from '../screens/kanban-board.js';
 import { TODO_STATUSES } from '../screens/kanban-board.js';
+import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
   Chip,
@@ -92,7 +93,9 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
   const [focusNotice, setFocusNotice] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, onRefresh } = useRefresh();
+  const rev = useSyncRevision();
+  useFocusRefresh();
   const [status, setStatus] = useState<TodoStatus>('backlog');
   const [tag, setTag] = useState<string | undefined>();
 
@@ -106,19 +109,14 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
     setVersion((v) => v + 1);
   }, [controller]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` re-reads after a sync
   useEffect(() => {
     let live = true;
     reload().finally(() => live && setLoading(false));
     return () => {
       live = false;
     };
-  }, [reload]);
-
-  const refresh = async () => {
-    setRefreshing(true);
-    await reload();
-    setRefreshing(false);
-  };
+  }, [reload, rev]);
 
   const pickTag = (next: string | undefined) => {
     setTag(next);
@@ -172,7 +170,7 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
         icon="warning"
         title="Couldn't load the board"
         message={loadError}
-        action={{ label: 'Try again', onPress: () => void refresh() }}
+        action={{ label: 'Try again', onPress: () => void reload() }}
       />
     );
   } else if (cards.length === 0) {
@@ -269,7 +267,7 @@ export function KanbanView({ controller, onAddTodo, focus }: KanbanViewProps) {
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen title="Board" refreshing={refreshing} onRefresh={() => void refresh()}>
+      <Screen title="Board" refreshing={refreshing} onRefresh={onRefresh}>
         <SegmentedControl
           testID="board-status"
           options={options}

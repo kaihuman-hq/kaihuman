@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-08 — Mobile: automatic sync (stale-while-revalidate)
+
+- Root cause of stale data on device: (1) no triggers — the console's `installAutoSync` is DOM-only and mobile had no AppState/network equivalent, so `syncNow`/`flushOutbox` never ran; (2) no persistent cache — `MobileStorageAdapter` was never installed, so tree, files, dirty edits and the selected repo lived in memory; (3) screens snapshot data on mount; (4) every read was a network GET. Details in `apps/mobile/src/sync/README.md`.
+- `apps/mobile/src/sync`: fake-timer-tested scheduler (launch, foreground, focus when > 30 s stale, pull, 60 s poll with backoff paused offline/background/Low Power, debounced after writes, offline → online, `expo-background-task`), engine (sync → widget replay → outbox → widget snapshot + timeline reload → `rescheduleNotifications()` → revision bump only when data changed), file-system persistent cache (`expo-file-system`, secrets stay out), cache-first reads and optimistic writes in the content ports.
+- Core: `getHeadSha` sends `If-None-Match`; a 304 reuses the cached head, so an unchanged repo costs one free request.
+- UI: `useRefresh()` (haptic pull), `useSyncRevision()`, `useFocusRefresh()`, `<SyncStatusBanner />` in `Screen` ("Updated just now", "Syncing…", "Offline · 2 changes pending", error with Retry, conflicts with Keep mine / Use theirs). Wired into Today, Board, Ideas, Wiki, Knowledge and Files.
 ## 2026-11-08 — Mobile: local due-date notifications
 
 - `expo-notifications` (~58.1.8, config plugin in `app.json`), local only: no push server, no APNs key. Pure `planNotifications(todos, milestones, settings, now, tz)` (`apps/mobile/src/notifications/planner.ts`) plans due-today (morning time, default 09:00), due-soon (N min before a timed due, default 15), one overdue summary, milestone-due-tomorrow and an optional daily digest ("3 todos due today"), nearest first under the iOS 64-pending cap. `scheduler.ts` diffs against the OS schedule by stable ids (`kh:<kind>:<id>`) and a content signature, so edits reschedule and done/rejected todos cancel.

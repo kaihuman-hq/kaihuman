@@ -24,6 +24,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-background-task",
       ["expo-notifications", { "color": "#E6FF4A" }],
       "./plugins/with-kaihuman-widgets.ts"
     ],

@@ -91,7 +91,7 @@ export function LoginView({
   };
 
   return (
-    <Screen scroll={false} keyboard>
+    <Screen scroll={false} keyboard syncStatus={false}>
       <View style={{ flex: 1, justifyContent: 'center', gap: spacing.xl, paddingTop: spacing.xxl }}>
         <View style={{ alignItems: 'center', gap: spacing.md }}>
           <BrandMark />

@@ -31,7 +31,12 @@ export interface MobileStorageDrivers {
   mirror?: (key: string, value: string | null) => void;
 }
 
-const SECURE_KEYS: ReadonlySet<string> = new Set(['lifeos_gh_token']);
+// Remembered file passwords are secrets too: they must never land in the plain-file KV driver.
+const SECURE_KEYS: ReadonlySet<string> = new Set([
+  'lifeos_gh_token',
+  'kaihuman_saved_passwords',
+  'lifosy_saved_passwords',
+]);
 const MIRRORED_KEYS: ReadonlySet<string> = new Set(['lifeos_gh_token', 'lifeos_current_repo']);
 
 /**

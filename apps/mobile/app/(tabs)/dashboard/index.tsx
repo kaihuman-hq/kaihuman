@@ -2,6 +2,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { tileKindForPath } from '../../../src/components/widgets/tile-controllers.js';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
+import { useFocusRefresh, useRefresh, useSyncRevision } from '../../../src/sync/hooks.js';
 import { DashboardView, type TileFile } from '../../../src/views/dashboard-view.js';
 
 export default function Dashboard() {
@@ -9,7 +10,9 @@ export default function Dashboard() {
   const [tiles, setTiles] = useState<TileFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => new Date());
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, onRefresh } = useRefresh();
+  const rev = useSyncRevision();
+  useFocusRefresh();
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -41,14 +44,10 @@ export default function Dashboard() {
     }
   }, [load]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` re-reads after a sync
   useEffect(() => {
     run().finally(() => setLoading(false));
-  }, [run]);
-
-  const refresh = useCallback(() => {
-    setRefreshing(true);
-    run().finally(() => setRefreshing(false));
-  }, [run]);
+  }, [run, rev]);
 
   return (
     <>
@@ -59,7 +58,7 @@ export default function Dashboard() {
         loading={loading}
         refreshing={refreshing}
         error={error}
-        onRefresh={refresh}
+        onRefresh={onRefresh}
         onNavigate={(href) => router.push(href)}
         onWrite={async (path, content) => {
           await githubContentFiles.write(path, content);

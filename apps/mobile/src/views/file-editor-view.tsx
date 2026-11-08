@@ -5,6 +5,7 @@ import type {
   FileEditorController,
   FileEditorState,
 } from '../screens/file-editor-screen.js';
+import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
   Badge,
@@ -110,7 +111,9 @@ export function FileBrowserView({
   const [, setRev] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, onRefresh } = useRefresh();
+  const rev = useSyncRevision();
+  useFocusRefresh();
 
   const load = useCallback(
     () =>
@@ -125,10 +128,11 @@ export function FileBrowserView({
     [controller],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` re-reads after a sync
   useEffect(() => {
-    setLoading(true);
+    // Only the first load shows the skeleton; revision reloads swap data in place.
     load().finally(() => setLoading(false));
-  }, [load]);
+  }, [load, rev]);
 
   const go = (fn: () => void) => {
     haptics.selection();
@@ -169,14 +173,7 @@ export function FileBrowserView({
   };
 
   return (
-    <Screen
-      title="Files"
-      refreshing={refreshing}
-      onRefresh={() => {
-        setRefreshing(true);
-        load().finally(() => setRefreshing(false));
-      }}
-    >
+    <Screen title="Files" refreshing={refreshing} onRefresh={onRefresh}>
       {/* At the root the title already says where you are. */}
       {folder ? (
         <Breadcrumbs

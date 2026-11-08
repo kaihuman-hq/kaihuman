@@ -144,6 +144,7 @@ export function QuickCaptureView({
     <Screen
       title={CAPTURE_TITLES[kind]}
       keyboard
+      syncStatus={false}
       footer={
         headerAction ? undefined : (
           <Button

@@ -5,7 +5,12 @@ import * as SecureStore from 'expo-secure-store';
 import { AppState } from 'react-native';
 import { KaihumanShared } from '../../modules/kaihuman-shared/index.js';
 import { WidgetBridge } from '../adapters/widget-bridge.js';
-import { startNotifications } from '../notifications/index.js';
+import { rescheduleNotifications, startNotifications } from '../notifications/index.js';
+import { registerBackgroundSync } from '../sync/background.js';
+import { createExpoCacheFs } from '../sync/expo-cache-fs.js';
+import { setRescheduleNotifications } from '../sync/notifications-hook.js';
+import { installPersistentStorage } from '../sync/persistent-storage.js';
+import { startSync } from '../sync/runtime.js';
 import { installCryptoPolyfill } from './crypto-polyfill.js';
 import { createNativeContainer } from './native-container.js';
 import { type LinkDeps, startLinkHandling } from './pending-url.js';
@@ -25,10 +30,17 @@ export function setNotificationNavigator(navigate: (href: string) => void): void
   notificationNavigator = navigate;
 }
 
+let ready: Promise<unknown> = Promise.resolve();
+
+/** Resolves once the Keychain token has been loaded into the auth store. */
+export const bootstrapReady = (): Promise<unknown> => ready;
+
 /** One-time app setup; idempotent while active. Returns a disposer that also allows a fresh start. */
 export function bootstrap(): () => void {
   if (active) return active;
   installCryptoPolyfill(globalThis, { getRandomValues });
+  // Before the bridge reconciles: widget mutations and the first sync read the persistent cache.
+  installPersistentStorage(createExpoCacheFs());
   const container = createNativeContainer(KaihumanShared);
   const bridge = new WidgetBridge(container);
   const stopBridge = bridge.start();
@@ -46,7 +58,13 @@ export function bootstrap(): () => void {
       remove: () => SecureStore.deleteItemAsync(SECURE_TOKEN_KEY, secureOptions),
     },
   });
+  ready = stopToken.ready;
+  // Every sync run (foreground or background) re-plans local notifications from fresh todos.
+  setRescheduleNotifications(rescheduleNotifications);
+  const stopSync = startSync({ bridge, tokenReady: ready });
+  void registerBackgroundSync();
   active = () => {
+    stopSync();
     stopBridge();
     stopNotifications();
     stopToken();

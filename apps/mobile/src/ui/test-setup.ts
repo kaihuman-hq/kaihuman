@@ -11,6 +11,17 @@ vi.mock('expo-symbols', () => ({
     }),
 }));
 
+// The sync runtime talks to GitHub and native modules; Screen's status banner only needs its types.
+vi.mock('../sync/runtime.js', () => ({
+  refreshAll: vi.fn(async () => {}),
+  requestFocusRefresh: vi.fn(),
+  resolveConflict: vi.fn(),
+}));
+
+// Real expo-router needs the native navigation stack; views only use the focus hook here.
+// Tests that need routing mock the module themselves.
+vi.mock('expo-router', () => ({ useFocusEffect: () => {} }));
+
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(async () => {}),
   impactAsync: vi.fn(async () => {}),

@@ -136,6 +136,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Automatic sync: cache shown instantly, revalidated on launch/foreground/focus/pull/60 s poll/write/reconnect/background; optimistic offline writes; sync status line with conflicts | `apps/mobile/src/sync` | 2026-11-08 |
 | Screen controllers (pure TypeScript, injectable ports): quick capture, kanban, analytics, ideas, wiki, knowledge, file editor (`.enc`) | `apps/mobile/src` | 2026-11-05 |
 | Dashboard tile presenters for every dashboard extension, tested against the demo seed | `apps/mobile/src/tile-controllers.ts` | 2026-11-05 |
 | iOS WidgetKit + AppIntents and Android Jetpack Glance Todo widgets (toggle, quick capture, GitHub sync, offline queue) | `apps/mobile/targets/ios-widget/`, `apps/mobile/targets/android-widget/` | 2026-11-05 |

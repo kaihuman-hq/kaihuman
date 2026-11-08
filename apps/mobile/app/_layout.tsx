@@ -1,3 +1,6 @@
+// Must load first: the OS can start the app headless to run the background task, which needs
+// TaskManager.defineTask to have run at module scope.
+import '../src/sync/background.js';
 import { authStore, githubProfileStore } from '@kaihuman/core';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';

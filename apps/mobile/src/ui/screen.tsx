@@ -8,6 +8,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { SyncStatusBanner } from '../sync/sync-status-banner.js';
 import { useTheme } from '../theme/theme.js';
 import { useInsets } from './insets.js';
 import { Text } from './text.js';
@@ -43,6 +44,8 @@ export interface ScreenProps {
   footer?: ReactNode;
   /** Lift content above the keyboard. */
   keyboard?: boolean;
+  /** Show the sync status line; login and capture screens turn it off. */
+  syncStatus?: boolean;
 }
 
 export function Screen({
@@ -54,6 +57,7 @@ export function Screen({
   onRefresh,
   footer,
   keyboard,
+  syncStatus = true,
 }: ScreenProps) {
   const theme = useTheme();
   const insets = useInsets();
@@ -88,6 +92,7 @@ export function Screen({
       }}
     >
       {inlineTitle}
+      {syncStatus ? <SyncStatusBanner /> : null}
       {children}
     </ScrollView>
   ) : (
@@ -99,6 +104,7 @@ export function Screen({
       ]}
     >
       {inlineTitle}
+      {syncStatus ? <SyncStatusBanner /> : null}
       {children}
     </View>
   );

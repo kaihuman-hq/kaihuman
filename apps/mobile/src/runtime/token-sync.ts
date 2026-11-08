@@ -21,13 +21,13 @@ export interface TokenSyncDeps {
  * it from the Keychain when core's own storage came up empty. Demo tokens are never mirrored.
  * Core keeps owning persistence of `lifeos_gh_token`; this only adds the native copies.
  */
-export function startTokenSync(deps: TokenSyncDeps): () => void {
+export function startTokenSync(deps: TokenSyncDeps): (() => void) & { ready: Promise<void> } {
   const auth = deps.auth ?? authStore;
   let disposed = false;
   // Until hydration finishes an empty token must not wipe the Keychain copy we are about to read.
   let hydrated = false;
 
-  void deps.secure
+  const ready = deps.secure
     .get()
     .catch(() => null)
     .then((stored) => {
@@ -53,8 +53,11 @@ export function startTokenSync(deps: TokenSyncDeps): () => void {
     push(auth.token.value);
     demoMode.value;
   });
-  return () => {
-    disposed = true;
-    stop();
-  };
+  return Object.assign(
+    () => {
+      disposed = true;
+      stop();
+    },
+    { ready },
+  );
 }

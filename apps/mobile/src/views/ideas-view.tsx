@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import type { IdeaStatusFilter, IdeasScreenController } from '../screens/ideas-screen.js';
+import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
   Badge,
@@ -107,7 +108,8 @@ export function IdeaDetailView({
   const pad = theme.platform === 'ios' ? spacing.md : theme.metrics.screenMargin;
   const { error, setError, rerender, run } = useRunner();
   const [loaded, setLoaded] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, onRefresh } = useRefresh();
+  const rev = useSyncRevision();
   const [text, setText] = useState('');
 
   const load = useCallback(async () => {
@@ -122,9 +124,10 @@ export function IdeaDetailView({
     }
   }, [controller, setError, rerender]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` re-reads after a sync
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, rev]);
 
   const entry = controller.get(slug);
   const title = entry?.idea.title;
@@ -160,13 +163,8 @@ export function IdeaDetailView({
     if (!note) return;
     if (await run(() => controller.log(slug, note))) setText('');
   };
-  const refresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
   return (
-    <Screen keyboard refreshing={refreshing} onRefresh={refresh}>
+    <Screen keyboard refreshing={refreshing} onRefresh={onRefresh}>
       <View style={{ gap: spacing.sm, paddingHorizontal: spacing.xs }}>
         <Text variant="title1" accessibilityRole="header">
           {idea.title}
@@ -233,7 +231,9 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
   const pad = ios ? spacing.md : theme.metrics.screenMargin;
   const { error, setError, rerender, run } = useRunner();
   const [loaded, setLoaded] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, onRefresh } = useRefresh();
+  const rev = useSyncRevision();
+  useFocusRefresh();
   const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState('');
 
@@ -251,16 +251,11 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
 
   // Reload on focus so changes made on a pushed detail screen show when returning.
   useFocusEffect(
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` re-reads after a sync
     useCallback(() => {
       void load();
-    }, [load]),
+    }, [load, rev]),
   );
-
-  const refresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
 
   const filter = (patch: Parameters<IdeasScreenController['setFilters']>[0]) => {
     controller.setFilters(patch);
@@ -339,7 +334,7 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen title="Ideas" keyboard refreshing={refreshing} onRefresh={refresh}>
+      <Screen title="Ideas" keyboard refreshing={refreshing} onRefresh={onRefresh}>
         <TextField
           label="Search ideas"
           value={controller.filters.query}
