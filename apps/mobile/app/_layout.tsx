@@ -1,13 +1,16 @@
-import { Stack, useRouter } from 'expo-router';
+import { authStore, githubProfileStore } from '@kaihuman/core';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { CloseButton } from '../src/navigation/close-button.js';
 import { useStackScreenOptions } from '../src/navigation/stack-options.js';
+import { guardRedirect } from '../src/navigation/start-route.js';
 import { webBackOptions as webBack } from '../src/navigation/web-back-button.js';
 import { bootstrap, startAppLinkHandling } from '../src/runtime/bootstrap.js';
 import { useTheme } from '../src/theme/theme.js';
 import { GestureRoot } from '../src/ui/gesture-root.js';
+import { useSignalValue } from '../src/views/use-signal.js';
 
 const QUICK_ROUTES = ['quick-todo', 'quick-note', 'quick-log', 'quick-idea', 'quick-knowledge'];
 
@@ -16,6 +19,16 @@ export default function RootLayout() {
   const options = useStackScreenOptions();
   const { platform } = useTheme();
   const largeTitles = platform === 'ios' && Platform.OS !== 'web';
+
+  const segment = useSegments()[0];
+  const token = useSignalValue(authStore.token);
+  const repo = useSignalValue(githubProfileStore.currentRepo);
+
+  // Keychain restore is async, so the session can change after first render; the guard follows it.
+  useEffect(() => {
+    const to = guardRedirect({ token, repo }, segment);
+    if (to) router.replace(to);
+  }, [token, repo, segment, router]);
 
   useEffect(() => bootstrap(), []);
   useEffect(() => startAppLinkHandling((href) => router.push(href as never)), [router]);
@@ -27,6 +40,7 @@ export default function RootLayout() {
       <Stack screenOptions={options}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
         {QUICK_ROUTES.map((name) => (
           <Stack.Screen
             key={name}

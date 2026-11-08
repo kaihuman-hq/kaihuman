@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-08 — Mobile: first-run repository onboarding
+
+- After GitHub or token sign-in with no repo selected, the app now goes to a full `/onboarding` step (title, explanation, search, recently pushed first, Private/Public badges, confirm card). A single plausible kaihuman/life-os/`kh` repo is preselected but still needs "Use this repository". Empty, loading and error (with retry, and "Sign in again" on a rejected token) states are covered. Choosing a repo does `router.replace('/dashboard')`, so back never returns to login or onboarding.
+- One pure decision in `src/navigation/start-route.ts`: `resolveStartRoute({ token, repo })` plus `guardRedirect` used by the root layout, so later launches skip both screens, a lost token goes to login and a token without a repo goes to the selector. Core `GithubRepo` gains optional `pushed_at`. Tests: `start-route.test.ts`, `onboarding-view.test.tsx`. `doc/mobile-design.md` updated.
+
 ## 2026-11-08 — Mobile: build numbers committed in git
 
 - `apps/mobile/eas.json` uses `appVersionSource: local`; `app.json` holds `ios.buildNumber` and `android.versionCode`. `scripts/release.mjs` (`release:ios`, `release:android`) bumps the number, commits and pushes it, then runs `eas build --auto-submit`, so the number sent to a store is always in git. Fixes App Store Connect rejecting a reused build number. Tests cover the bump. `doc/mobile-testflight.md` updated.

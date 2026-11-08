@@ -334,6 +334,7 @@ Legacy `src/views/primitives.tsx` and `src/theme/tokens.ts` were deleted on 2026
 Follow-up session. One bullet per screen. Each screen uses only `src/ui/` primitives and `useTheme()`, and passes §10 and §4.3 at 200% text.
 
 - **Login** (`app/login.tsx`, `src/views/login-view.tsx`): no header. Logo, one filled `Button` for GitHub sign-in (official GitHub mark via `react-native-svg`, `GithubMark`, coloured with the label), one line of helper text.
+- **Onboarding** (`app/onboarding.tsx`, `src/views/onboarding-view.tsx`): no header, no swipe back. Shown after sign-in when no repo is selected. Explanation, confirm `Card` (preselected plausible repo), searchable `Section` of `ListRow`s with `Badge` Private/Public, `EmptyState` for none/loading, error `Card` with retry. Routing rules live in `src/navigation/start-route.ts`.
 - **Dashboard** (`app/dashboard.tsx`, `src/views/dashboard-view.tsx`, `tile-view.tsx`): Today tab. Tiles become `Card` and `StatTile`. Numbers in mono.
 - **Board** (`app/board.tsx`, `src/views/kanban-view.tsx`): Board tab. Large title, `SegmentedControl` for status filter, `Chip` for tags, FAB on Android.
 - **Capture** (new `app/(tabs)/(capture)/capture.tsx`): Launcher `Section` with five `ListRow`s (Todo, Note, Log, Idea, Knowledge), each pushing its `quick-*` sheet.

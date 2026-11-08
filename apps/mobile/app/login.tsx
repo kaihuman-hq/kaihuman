@@ -23,7 +23,7 @@ export default function Login() {
   const url = Linking.useURL();
 
   useEffect(() => {
-    if (url && controller.handleDeepLink(url)) router.replace('/dashboard');
+    if (url && controller.handleDeepLink(url)) router.replace('/');
   }, [url, controller, router]);
 
   return (
@@ -32,7 +32,7 @@ export default function Login() {
       <LoginView
         controller={controller}
         openAuthSession={WebBrowser.openAuthSessionAsync}
-        onSignedIn={() => router.replace('/dashboard')}
+        onSignedIn={() => router.replace('/')}
       />
     </>
   );
