@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-08 — CI: survive Gradle download timeouts
+
+- `mobile-build.yml` and `mobile-screenshots.yml` cache `~/.gradle/wrapper/dists`, raise the wrapper `networkTimeout` to 120 s and retry the Gradle download up to 5 times before building. Android jobs failed twice on services.gradle.org (504, then the 10 s wrapper timeout) before compiling.
+
 ## 2026-11-08 — Todo format: per-item due dates
 
 - `.todos.md` items take an optional `::due:: YYYY-MM-DD` or `::due:: YYYY-MM-DDTHH:MM` (local) at the end of the metadata line (`dueDate`, `dueTime`). Older parsers still read the line and ignore it; files without it round-trip byte for byte; malformed values are ignored. `@kaihuman/formats` adds `setTodoDue`, `dueStatus`, `compareDue`, `formatDue`, `parseDue`; widget snapshot items carry `dueDate`/`dueTime` (additive). Documented in `packages/docspack/docs/70-file-formats.md`.

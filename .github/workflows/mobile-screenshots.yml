@@ -124,6 +124,29 @@ jobs:
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --no-install
 
+      # services.gradle.org sometimes times out (504 or the wrapper's 10 s limit) before any code
+      # compiles. Cache the distribution, give the wrapper 2 minutes, and retry the download.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: gradle-wrapper-${{ hashFiles('apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+
+      - name: Download Gradle (with retries)
+        working-directory: apps/mobile/android
+        run: |
+          props=gradle/wrapper/gradle-wrapper.properties
+          if grep -q '^networkTimeout=' "$props"; then
+            sed -i 's/^networkTimeout=.*/networkTimeout=120000/' "$props"
+          else
+            echo 'networkTimeout=120000' >> "$props"
+          fi
+          for attempt in 1 2 3 4 5; do
+            ./gradlew --version --no-daemon && exit 0
+            echo "Gradle download failed (attempt $attempt), retrying"
+            sleep $((attempt * 20))
+          done
+          exit 1
+
       # x86_64 only: it is the emulator's ABI and skips three NDK builds. Release is signed with the
       # debug key by the Expo template and embeds the JS bundle.
       - name: Assemble release APK
