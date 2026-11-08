@@ -53,6 +53,8 @@ function main() {
     platform,
   );
   writeFileSync(appJsonPath, `${JSON.stringify(appJson, null, 2)}\n`);
+  // JSON.stringify expands short arrays that Biome keeps inline; reformat so lint stays clean.
+  run('npx', ['biome', 'format', '--write', appJsonPath]);
   run('git', ['add', appJsonPath]);
   run('git', ['commit', '-m', `chore(mobile): ${platform} build ${next}`]);
   run('git', ['push']);
