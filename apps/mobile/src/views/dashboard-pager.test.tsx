@@ -90,6 +90,15 @@ describe('DashboardPager with the demo seed', () => {
     expect(screen.getByTestId('summary-events')).toBeTruthy();
   });
 
+  it('stacks every tile in one column, compact ones included', async () => {
+    await setup();
+    for (const id of ['summary-habit', 'summary-timetracking', 'summary-events']) {
+      const el = screen.queryByTestId(id);
+      if (el) expect(el.closest('[style*="flex-wrap"]')).toBeNull();
+    }
+    expect(screen.getByTestId('summary-habit').closest('[style*="flex-wrap"]')).toBeNull();
+  });
+
   it('offers Open file for kinds the app has no tile for', async () => {
     const pages = await demoPages();
     const first = pages[0] as DashboardPage;

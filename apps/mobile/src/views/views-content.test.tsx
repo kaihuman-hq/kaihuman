@@ -160,6 +160,13 @@ describe('tiles', () => {
     expect(onWrite).toHaveBeenCalledTimes(1);
   });
 
+  it('events: grouped by day with a date block, full width', () => {
+    renderTile('events');
+    expect(screen.getByTestId('events-day-Mon 9 Nov')).toBeTruthy();
+    expect(screen.getAllByText('NOV').length).toBeGreaterThan(0);
+    expect(screen.getByText('Team Offsite')).toBeTruthy();
+  });
+
   it('events: add event', () => {
     const { onWrite } = renderTile('events');
     press('Add event');
@@ -186,9 +193,7 @@ describe('tiles', () => {
     type('Page URL', 'https://example.com/a');
     press('Save page');
     expect(onWrite.mock.calls[0]?.[1]).toContain('https://example.com/a');
-    fireEvent.click(
-      screen.getAllByRole('checkbox', { name: /^Mark .* as read$/ })[0] as HTMLElement,
-    );
+    fireEvent.click(screen.getAllByRole('button', { name: /^Mark .* as read$/ })[0] as HTMLElement);
     expect(onWrite).toHaveBeenCalledTimes(2);
     press('Clear read');
     expect(onWrite).toHaveBeenCalledTimes(3);
@@ -204,8 +209,9 @@ describe('tiles', () => {
     expect(screen.queryAllByTestId(/^bookmark-/)).toHaveLength(0);
     expect(screen.getByText('No bookmarks match.')).toBeTruthy();
     type('Search bookmarks', '');
-    type('Bookmark URL', 'https://new.example.org/');
     press('Add bookmark');
+    type('Bookmark URL', 'https://new.example.org/');
+    press('Save bookmark');
     expect(onWrite.mock.calls[0]?.[1]).toContain('https://new.example.org/');
     // Delete lives in the long-press menu; see dashboard-tiles.test.tsx.
     expect(onWrite).toHaveBeenCalledTimes(1);
@@ -216,10 +222,10 @@ describe('tiles', () => {
     expect(screen.getByText('Income')).toBeTruthy();
     cleanup();
     renderTile('stocks');
-    expect(screen.getByText('Profit')).toBeTruthy();
+    expect(screen.getAllByText('Profit').length).toBeGreaterThan(0);
     cleanup();
     renderTile('consumption');
-    expect(screen.getAllByText(/^\d+\.\d\d \S+/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^Reading \d+ on /).length).toBeGreaterThan(0);
     cleanup();
     renderTile('datacollection');
     expect(screen.getByText(/rows$/)).toBeTruthy();

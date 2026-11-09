@@ -8,24 +8,18 @@ import type {
 import { useTheme } from '../theme/theme.js';
 import type { IconName } from '../ui/index.js';
 import { Badge, Card, ErrorBoundary, Text } from '../ui/index.js';
-import {
-  ActionLog,
-  Bookmarks,
-  Budget,
-  Clocks,
-  Collection,
-  Consumption,
-  type Ctx,
-  Events,
-  Habit,
-  ReadLater,
-  Stocks,
-  Templates,
-  Timer,
-  Todos,
-} from './tiles/bodies.js';
+import { ActionLog } from './tiles/actionlog-body.js';
+import { type Ctx, Events, Todos } from './tiles/bodies.js';
+import { Bookmarks } from './tiles/bookmarks-body.js';
+import { Budget } from './tiles/budget-body.js';
+import { Collection } from './tiles/collection-body.js';
 import { BoardOverview, PaletteSettings, Rss, Travel } from './tiles/more-bodies.js';
 import { Err, TileIcon } from './tiles/parts.js';
+import { ReadLater } from './tiles/read-later-body.js';
+import { Templates } from './tiles/templates-body.js';
+import { Timer } from './tiles/timetracking-body.js';
+import { Clocks } from './tiles/timezones-body.js';
+import { Consumption, Habit, Stocks } from './tiles/tracker-bodies.js';
 
 export interface TileProps {
   path: string;
@@ -35,6 +29,10 @@ export interface TileProps {
   now: Date;
   /** Persists the file's new text. */
   onWrite: (path: string, content: string) => void | Promise<void>;
+  /** Creates another file, for tiles that spawn one (todo prompt files). */
+  onCreateFile?: (path: string, content: string) => Promise<void>;
+  /** Opens a repository file in the editor. */
+  onOpenFile?: (path: string) => void;
 }
 
 /** Friendly heading and glyph per tile kind; the file name stays as a mono caption. */
@@ -79,7 +77,7 @@ export function Tile(props: TileProps) {
   );
 }
 
-function TileCard({ path, tile, content, now, onWrite }: TileProps) {
+function TileCard({ path, tile, content, now, onWrite, onCreateFile, onOpenFile }: TileProps) {
   const [error, setError] = useState<string | null>(null);
   const { spacing } = useTheme();
   const meta = TILE_META[tile.kind];
@@ -98,7 +96,15 @@ function TileCard({ path, tile, content, now, onWrite }: TileProps) {
     setError(result.error);
     return false;
   };
-  const ctx: Ctx = { content, now, apply, error };
+  const ctx: Ctx = {
+    content,
+    now,
+    apply,
+    error,
+    path,
+    ...(onCreateFile && { createFile: onCreateFile }),
+    ...(onOpenFile && { openFile: onOpenFile }),
+  };
   return (
     <Card>
       <View testID={`tile-${tile.kind}`} style={{ gap: spacing.md }}>
@@ -132,25 +138,25 @@ function TileBody({ tile, ctx }: { tile: TileData; ctx: Ctx }) {
     case 'events':
       return <Events rows={tile.view} ctx={ctx} />;
     case 'actionlog':
-      return <ActionLog view={tile.view} ctx={ctx} />;
+      return <ActionLog ctx={ctx} />;
     case 'timezones':
-      return <Clocks clocks={tile.view} />;
+      return <Clocks clocks={tile.view} ctx={ctx} />;
     case 'readitlater':
       return <ReadLater view={tile.view} ctx={ctx} />;
     case 'bookmarks':
       return <Bookmarks initial={tile.view} ctx={ctx} />;
     case 'budget':
-      return <Budget view={tile.view} />;
+      return <Budget ctx={ctx} />;
     case 'stocks':
-      return <Stocks view={tile.view} />;
+      return <Stocks view={tile.view} ctx={ctx} />;
     case 'consumption':
-      return <Consumption meters={tile.view} />;
+      return <Consumption view={tile.view} ctx={ctx} />;
     case 'datacollection':
-      return <Collection view={tile.view} />;
+      return <Collection ctx={ctx} />;
     case 'prompts':
-      return <Templates view={tile.view} ctx={ctx} kind="prompt" />;
+      return <Templates ctx={ctx} kind="prompt" />;
     case 'commands':
-      return <Templates view={tile.view} ctx={ctx} kind="command" />;
+      return <Templates ctx={ctx} kind="command" />;
     case 'rss':
       return <Rss view={tile.view} ctx={ctx} />;
     case 'travel':
@@ -158,7 +164,7 @@ function TileBody({ tile, ctx }: { tile: TileData; ctx: Ctx }) {
     case 'boardoverview':
       return <BoardOverview view={tile.view} ctx={ctx} />;
     case 'palettesettings':
-      return <PaletteSettings view={tile.view} />;
+      return <PaletteSettings view={tile.view} ctx={ctx} />;
     default: {
       const unhandled: never = tile;
       return unhandled;

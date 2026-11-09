@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import type { TileView } from '../../components/widgets/tile-controllers.js';
+import type { RssFilter, TileView } from '../../components/widgets/tile-controllers.js';
 import { useTheme } from '../../theme/theme.js';
-import { Card, Text } from '../../ui/index.js';
+import { Card, SegmentedControl, Text } from '../../ui/index.js';
 import { TILE_META } from '../tile-view.js';
 import { TileIcon } from './parts.js';
 import { summarizeTile } from './summary.js';
@@ -47,7 +48,8 @@ export function SummaryTile({
 }) {
   const { spacing } = useTheme();
   const meta = TILE_META[tile.kind];
-  const { stat, statLabel, items } = summarizeTile(tile, now);
+  const [rssFilter, setRssFilter] = useState<RssFilter>('unread');
+  const { stat, statLabel, items } = summarizeTile(tile, now, rssFilter);
   return (
     <Card>
       <View testID={`summary-${tile.kind}`} style={{ gap: spacing.sm }}>
@@ -65,6 +67,17 @@ export function SummaryTile({
             {statLabel}
           </Text>
         </View>
+        {tile.kind === 'rss' ? (
+          <SegmentedControl
+            testID="rss-filter"
+            options={[
+              { value: 'unread', label: 'Unread' },
+              { value: 'all', label: 'All' },
+            ]}
+            value={rssFilter}
+            onChange={setRssFilter}
+          />
+        ) : null}
         {items.map((line) => (
           <Text key={line} variant="subheadline" tone="secondary" numberOfLines={1}>
             {line}

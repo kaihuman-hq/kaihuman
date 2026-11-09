@@ -22,7 +22,14 @@ import { useTheme } from '../src/theme/theme.js';
 import { GestureRoot } from '../src/ui/gesture-root.js';
 import { useSignalValue } from '../src/views/use-signal.js';
 
-const QUICK_ROUTES = ['quick-todo', 'quick-note', 'quick-log', 'quick-idea', 'quick-knowledge'];
+const QUICK_ROUTES = [
+  'quick-todo',
+  'quick-note',
+  'quick-log',
+  'quick-idea',
+  'quick-knowledge',
+  'quick-inbox',
+];
 
 export default function RootLayout() {
   const router = useRouter();

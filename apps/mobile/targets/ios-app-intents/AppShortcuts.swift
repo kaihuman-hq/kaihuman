@@ -34,6 +34,7 @@ struct KaihumanAppShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: CaptureTodoIntent(),
             phrases: [
+                "Add to \(.applicationName) inbox",
                 "Capture a todo in \(.applicationName)",
                 "Quick add to \(.applicationName) inbox",
             ],

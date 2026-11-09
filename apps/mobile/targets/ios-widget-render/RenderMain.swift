@@ -113,6 +113,9 @@ struct RenderHarness {
         let capture = { (e: TodoEntry, f: WidgetFamily, m: WidgetRenderingMode, s: ColorScheme) in
             AnyView(QuickCaptureView(entry: e, family: f, renderingMode: m, colorScheme: s))
         }
+        let quickAdd = { (e: TodoEntry, f: WidgetFamily, m: WidgetRenderingMode, s: ColorScheme) in
+            AnyView(QuickAddView(entry: e, family: f, renderingMode: m, colorScheme: s))
+        }
         let weekly = { (e: TodoEntry, f: WidgetFamily, m: WidgetRenderingMode, s: ColorScheme) in
             AnyView(WeeklyDoneView(entry: e, family: f, renderingMode: m, colorScheme: s))
         }
@@ -156,6 +159,7 @@ struct RenderHarness {
             ("Next up · Lock Screen", tiles("next-up", accessories, make: nextUp)),
             ("Quick capture", tiles("capture", [.systemSmall], make: capture)
                 + tiles("capture", [.systemMedium], make: capture).prefix(1)),
+            ("Quick add", tiles("quick-add", [.systemSmall, .accessoryCircular, .accessoryRectangular], make: quickAdd)),
             ("Weekly done", tiles("weekly", [.systemSmall, .accessoryCircular, .accessoryInline], make: weekly)),
             ("Inbox", tiles("inbox", [.systemSmall, .accessoryCircular, .accessoryInline], make: inbox)),
             ("States (signed out, empty, stale)", states),

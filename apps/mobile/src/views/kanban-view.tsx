@@ -1,4 +1,4 @@
-import type { TodoDue, TodoItem, TodoRepeat, TodoStatus } from '@kaihuman/formats';
+import type { TodoColor, TodoDue, TodoItem, TodoRepeat, TodoStatus } from '@kaihuman/formats';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import {
@@ -6,7 +6,7 @@ import {
   NOTIFICATIONS_DENIED_MESSAGE,
 } from '../screens/focus-session.js';
 import type { BoardItem, KanbanBoardController } from '../screens/kanban-board.js';
-import { TODO_STATUSES } from '../screens/kanban-board.js';
+import { describeBoardFiles, TODO_STATUSES } from '../screens/kanban-board.js';
 import { completionNotice, dueBadge } from '../screens/todo-due.js';
 import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
@@ -24,8 +24,23 @@ import {
   SegmentedControl,
   type SwipeAction,
   Text,
+  TextField,
 } from '../ui/index.js';
 import { DueSheet } from './due-sheet.js';
+import {
+  activeOptionCount,
+  type BoardOptions,
+  type BoardView,
+  DEFAULT_OPTIONS,
+  KanbanFilterSheet,
+  toBoardFilter,
+} from './kanban-filter-sheet.js';
+import { StreamsList } from './kanban-streams.js';
+
+const VIEWS = [
+  { value: 'board', label: 'Board' },
+  { value: 'streams', label: 'Streams' },
+] as const satisfies readonly { value: BoardView; label: string }[];
 
 const LABEL: Record<TodoStatus, string> = {
   backlog: 'Backlog',
@@ -90,6 +105,26 @@ export interface KanbanViewProps {
   onOpenTodo?: (id: string) => void;
 }
 
+function BoardFile({ paths }: { paths: readonly string[] }) {
+  const { spacing, colors } = useTheme();
+  const { label, detail } = describeBoardFiles(paths);
+  return (
+    <View testID="board-file" accessible accessibilityLabel={`Board file: ${label}`}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+        <Icon name="note" size={14} color={colors.secondaryLabel} />
+        <Text variant="footnote" mono tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
+          {label}
+        </Text>
+      </View>
+      {detail ? (
+        <Text variant="caption2" tone="secondary" numberOfLines={2}>
+          {detail}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanViewProps) {
   const { colors, spacing, metrics } = useTheme();
   // The controller is mutable, not signal-based: bump to re-read after load/moves.
@@ -104,6 +139,14 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
   useFocusRefresh();
   const [status, setStatus] = useState<TodoStatus>('backlog');
   const [tag, setTag] = useState<string | undefined>();
+  const [view, setView] = useState<BoardView>('board');
+  const [search, setSearch] = useState('');
+  // Seeds the controller too, so the default "2W" limit on finished columns applies from the start.
+  const [options, setOptions] = useState<BoardOptions>(() => {
+    controller.setFilter(toBoardFilter(DEFAULT_OPTIONS, ''));
+    return DEFAULT_OPTIONS;
+  });
+  const [filterOpen, setFilterOpen] = useState(false);
   const [dueFor, setDueFor] = useState<BoardItem | null>(null);
 
   const reload = useCallback(async () => {
@@ -125,9 +168,55 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
     };
   }, [reload, rev]);
 
-  const pickTag = (next: string | undefined) => {
-    setTag(next);
-    controller.setFilter({ tag: next });
+  // The view owns the filter state; the controller only ever sees the combined result.
+  const applyFilter = (next: {
+    tag?: string | undefined;
+    search?: string;
+    options?: BoardOptions;
+  }) => {
+    const nextTag = 'tag' in next ? next.tag : tag;
+    const nextSearch = next.search ?? search;
+    const nextOptions = next.options ?? options;
+    setTag(nextTag);
+    setSearch(nextSearch);
+    setOptions(nextOptions);
+    controller.setFilter(toBoardFilter(nextOptions, nextSearch, nextTag));
+    setVersion((v) => v + 1);
+  };
+  const pickTag = (next: string | undefined) => applyFilter({ tag: next });
+
+  const streamStatus = async (path: string, index: number, to: TodoStatus) => {
+    const res = await controller.setStatus(path, index, to);
+    setError(res.ok ? null : res.error);
+    if (res.ok) haptics.success();
+    else haptics.error();
+    setVersion((v) => v + 1);
+  };
+  const streamPriority = async (path: string, index: number) => {
+    const res = await controller.cyclePriority(path, index);
+    setError(res.ok ? null : res.error);
+    if (!res.ok) haptics.error();
+    setVersion((v) => v + 1);
+  };
+  const streamColor = async (path: string, color?: TodoColor) => {
+    const res = await controller.setColor(path, color);
+    setError(res.ok ? null : res.error);
+    if (res.ok) haptics.success();
+    else haptics.error();
+    setVersion((v) => v + 1);
+  };
+  const streamMove = async (path: string, from: number, to: number) => {
+    const res = await controller.moveItem(path, from, to);
+    setError(res.ok ? null : res.error);
+    if (res.ok) haptics.success();
+    else haptics.error();
+    setVersion((v) => v + 1);
+  };
+  const streamAdd = async (path: string, text: string) => {
+    const res = await controller.addTodo(path, text);
+    setError(res.ok ? null : res.error);
+    if (res.ok) haptics.success();
+    else haptics.error();
     setVersion((v) => v + 1);
   };
 
@@ -176,7 +265,8 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
   const columns = controller.columns();
   const tags = controller.tags;
   const cards = columns[status];
-  const options = TODO_STATUSES.map((s) => ({
+  const filterCount = activeOptionCount(options, view, tag);
+  const statusOptions = TODO_STATUSES.map((s) => ({
     value: s,
     label: `${SEGMENT[s]} ${columns[s].length}`,
   }));
@@ -195,6 +285,19 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
         title="Couldn't load the board"
         message={loadError}
         action={{ label: 'Try again', onPress: () => void reload() }}
+      />
+    );
+  } else if (view === 'streams') {
+    body = (
+      <StreamsList
+        streams={controller.streams(options.streamMode, options.streamSort)}
+        mode={options.streamMode}
+        onStatus={(p, i, s) => void streamStatus(p, i, s)}
+        onCyclePriority={(p, i) => void streamPriority(p, i)}
+        onAdd={(p, t) => void streamAdd(p, t)}
+        onColor={(p, c) => void streamColor(p, c)}
+        onMove={(p, f, t) => void streamMove(p, f, t)}
+        onOpenTodo={onOpenTodo}
       />
     );
   } else if (cards.length === 0) {
@@ -312,13 +415,63 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
   return (
     <View style={{ flex: 1 }}>
       <Screen title="Board" refreshing={refreshing} onRefresh={onRefresh}>
-        <SegmentedControl
-          testID="board-status"
-          options={options}
-          value={status}
-          onChange={setStatus}
-        />
-        {tags.length > 0 ? (
+        {loading || loadError ? null : <BoardFile paths={controller.paths} />}
+        <SegmentedControl testID="board-view" options={VIEWS} value={view} onChange={setView} />
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm }}>
+          <View style={{ flex: 1 }}>
+            <TextField
+              label="Search todos"
+              testID="board-search"
+              placeholder="Text, tag or milestone"
+              value={search}
+              onChangeText={(text) => applyFilter({ search: text })}
+              returnKeyType="search"
+            />
+          </View>
+          <Pressable
+            testID="board-filter"
+            accessibilityRole="button"
+            accessibilityLabel={
+              filterCount > 0 ? `Sort and filter, ${filterCount} active` : 'Sort and filter'
+            }
+            onPress={() => setFilterOpen(true)}
+            android_ripple={{ color: colors.pressed, borderless: true, radius: 24 }}
+            style={({ pressed }) => ({
+              width: metrics.hitTarget,
+              height: metrics.hitTarget,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.5 : 1,
+            })}
+          >
+            <Icon name="filter" size={22} color={filterCount > 0 ? colors.accent : colors.label} />
+            {filterCount > 0 ? <Badge tone="accent" count={filterCount} /> : null}
+          </Pressable>
+        </View>
+        {view === 'board' ? (
+          <SegmentedControl
+            testID="board-status"
+            options={statusOptions}
+            value={status}
+            onChange={setStatus}
+          />
+        ) : null}
+        {view === 'board' ? (
+          <Chip
+            label="Last 2 weeks"
+            icon="clock"
+            selected={options.recent[status]}
+            onPress={() =>
+              applyFilter({
+                options: {
+                  ...options,
+                  recent: { ...options.recent, [status]: !options.recent[status] },
+                },
+              })
+            }
+          />
+        ) : null}
+        {view === 'board' && tags.length > 0 ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -355,6 +508,17 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
         ) : null}
         {body}
       </Screen>
+      {filterOpen ? (
+        <KanbanFilterSheet
+          view={view}
+          options={options}
+          onChange={(next) => applyFilter({ options: next })}
+          milestones={controller.milestones}
+          upcoming={controller.upcomingMilestone}
+          paths={controller.paths}
+          onClose={() => setFilterOpen(false)}
+        />
+      ) : null}
       {dueFor ? (
         <DueSheet
           title={dueFor.item.text}

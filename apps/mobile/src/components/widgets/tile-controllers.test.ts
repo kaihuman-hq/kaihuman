@@ -4,6 +4,8 @@ import {
   actionLogView,
   addBookmarkEntry,
   addCommandEntry,
+  addConsumptionMeter,
+  addConsumptionReading,
   addEvent,
   addPromptEntry,
   addReadLaterUrl,
@@ -14,12 +16,15 @@ import {
   clockIn,
   clockOut,
   commandsView,
+  consumptionColumns,
   consumptionView,
   dataCollectionView,
   deleteBookmarkEntry,
+  eventDateParts,
   eventsView,
   formatElapsed,
   formatOffset,
+  groupEventsByDay,
   habitView,
   interpolateTemplate,
   logAction,
@@ -33,6 +38,7 @@ import {
   tileKindForPath,
   timerView,
   todosView,
+  toggleHabitDay,
   toggleHabitToday,
   toggleTodo,
   worldClocksView,
@@ -116,6 +122,45 @@ describe('.habit.csv', () => {
     const off = toggleHabitToday(on, now);
     expect(habitView(off, now).checkedInToday).toBe(false);
   });
+
+  // Regression: mobile had no activity history; the web shows a 20-week heatmap.
+  it('builds a 20-week heatmap ending this week, Sunday first', () => {
+    const view = habitView('iso date;goal reached\n2026-11-03;x\n2026-07-01;x', now);
+    expect(view.weeks).toHaveLength(20);
+    const last = view.weeks[19] ?? [];
+    expect(last.map((d) => d.date)).toEqual([
+      '2026-11-01',
+      '2026-11-02',
+      '2026-11-03',
+      '2026-11-04',
+      '2026-11-05',
+      '2026-11-06',
+      '2026-11-07',
+    ]);
+    expect(last[2]?.reached).toBe(true);
+    expect(last[4]).toMatchObject({ isToday: true, future: false });
+    expect(last[5]?.future).toBe(true);
+    expect(view.weeks[0]?.[0]?.date).toBe('2026-06-21');
+    expect(view.weeks.flat().find((d) => d.date === '2026-07-01')?.reached).toBe(true);
+    expect(view.monthLabels[0]).toEqual({ week: 0, label: 'Jun' });
+    expect(view.monthLabels.map((m) => m.label)).toEqual([
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+    ]);
+    expect(view.checkedInYesterday).toBe(false);
+  });
+
+  it('toggles any past day and refuses future ones', () => {
+    const r = toggleHabitDay('iso date;goal reached\n', '2026-11-04', now);
+    expect(r.ok && habitView(r.content, now).checkedInYesterday).toBe(true);
+    const back = r.ok ? toggleHabitDay(r.content, '2026-11-04', now) : r;
+    expect(back.ok && habitView(back.content, now).checkedInYesterday).toBe(false);
+    expect(toggleHabitDay('', '2026-11-06', now).ok).toBe(false);
+  });
 });
 
 describe('.timetracking.csv', () => {
@@ -166,6 +211,31 @@ describe('.events.csv', () => {
     });
     const mum = eventsView(content, now, 20).find((r) => r.name === 'Mum');
     expect(mum).toMatchObject({ kind: 'birthday', daysUntil: 16, turns: 64 });
+  });
+
+  it('splits a date into calendar-block parts without timezone drift', () => {
+    expect(eventDateParts('2026-11-09')).toEqual({ day: '9', month: 'Nov', weekday: 'Mon' });
+  });
+
+  it('groups rows by day with Today/Tomorrow headings', () => {
+    const row = (name: string, date: string, daysUntil: number) => ({
+      name,
+      date,
+      daysUntil,
+      kind: 'event' as const,
+      label: '',
+    });
+    const groups = groupEventsByDay([
+      row('A', '2026-11-05', 0),
+      row('B', '2026-11-06', 1),
+      row('C', '2026-11-06', 1),
+      row('D', '2026-11-09', 4),
+    ]);
+    expect(groups.map((g) => [g.title, g.rows.map((r) => r.name)])).toEqual([
+      ['Today', ['A']],
+      ['Tomorrow', ['B', 'C']],
+      ['Mon 9 Nov', ['D']],
+    ]);
   });
 
   it('adds an event and validates input', () => {
@@ -353,29 +423,83 @@ describe('.stocks.csv', () => {
     expect(view?.invested).toBe(1500);
     expect(stocksView('')).toBeNull();
   });
+
+  // Regression: the web writes `DD.MM.YYYY HH:MM:SS` stamps and blank invest cells; the tile was empty.
+  it('reads files the web wrote, with German timestamps and a header', () => {
+    const view = stocksView(
+      'timestamp,current value,invest\n01.12.2024 09:00:00,5690,5000\n01.01.2025 09:00:00,6100,500\n03.02.2025 10:30:00,6400,\n',
+    );
+    expect(view).toMatchObject({ latestValue: 6400, invested: 5500, profit: 900 });
+    expect(view?.series.map((s) => s.date)).toEqual(['2024-12-01', '2025-01-01', '2025-02-03']);
+  });
 });
 
 describe('.consumption.csv', () => {
   const { content } = demo('.consumption.csv');
 
-  it('derives use per period and progress against the yearly target', () => {
-    const meters = consumptionView(content);
+  it("shows each meter with this year's use against its yearly target", () => {
+    const { meters, recent, years } = consumptionView(content, now);
     const power = meters.find((m) => m.key === 'Electricity');
     expect(power).toMatchObject({ title: 'Electricity', unit: 'kWh', yearlyTarget: 3500 });
-    expect(power?.series[0]).toMatchObject({ date: '2025-12-01', use: 277 });
-    expect(power?.lastPeriodUse).toBe(power?.series[power.series.length - 1]?.use);
-    expect(meters.find((m) => m.key === 'Water')?.yearlyTarget).toBeUndefined();
+    expect(power?.latestDate).toBe('2026-11-01');
+    expect(power?.yearUse).toBeGreaterThan(0);
+    expect(power?.targetProgress).toBeCloseTo((power?.yearUse ?? 0) / 3500);
     expect(meters.find((m) => m.key === 'Water')?.targetProgress).toBeNull();
+    // Only recorded days are listed, not the gap-filled ones between them.
+    expect(recent[0]?.date).toBe('2026-11-01');
+    expect(recent[1]?.date).toBe('2026-10-01');
+    expect(years[0]?.year).toBe(2026);
   });
 
-  it('computes trailing-year use once a year of readings exists', () => {
-    const rows = Array.from(
-      { length: 13 },
-      (_, i) =>
-        `${i < 12 ? '2025' : '2026'}-${String((i % 12) + 1).padStart(2, '0')}-01,${i * 100}`,
+  // Regression: the web writes DD.MM.YYYY and an old two-date-column layout.
+  it('reads the old German layout the web still supports', () => {
+    const old =
+      'Zeitstempel,Datum,Gas[unit:m³]\n01.01.2026 00:00:00,01.01.2026,100\n01.02.2026 00:00:00,01.02.2026,160\n';
+    const [gas] = consumptionView(old, now).meters;
+    expect(gas).toMatchObject({ latestReading: 160, latestDate: '2026-02-01', lastPeriodUse: 60 });
+  });
+
+  // Regression: there was no way to add a reading on mobile.
+  it('adds a reading for today and rejects bad input', () => {
+    const file = 'created,Gas[unit:m³],Water\n2026-11-01,100,5\n';
+    const res = addConsumptionReading(file, '', { Gas: '112,5', Water: '' }, now);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.content.split('\n').at(-1)).toBe('2026-11-05,112.500,');
+    expect(consumptionView(res.content, now).meters[0]).toMatchObject({ latestReading: 112.5 });
+    expect(addConsumptionReading(file, '2026-11-01', { Gas: '120' }, now)).toEqual({
+      ok: false,
+      error: 'There is already a reading for 2026-11-01.',
+    });
+    expect(addConsumptionReading(file, '', { Gas: 'x' }, now).ok).toBe(false);
+    expect(addConsumptionReading(file, '', {}, now).ok).toBe(false);
+    expect(addConsumptionReading('', '', { Gas: '1' }, now)).toEqual({
+      ok: false,
+      error: 'Add a meter first.',
+    });
+  });
+
+  it('adds a meter to an empty file, then a reading for it', () => {
+    const res = addConsumptionMeter('', { name: 'Gas', unit: 'm³', yearlyTarget: '1200' });
+    expect(res).toEqual({ ok: true, content: 'created,Gas[unit:m³;yearlyTarget:1200]' });
+    if (!res.ok) return;
+    expect(consumptionColumns(res.content)).toEqual([
+      {
+        rawKey: 'Gas[unit:m³;yearlyTarget:1200]',
+        key: 'Gas',
+        title: 'Gas',
+        unit: 'm³',
+        yearlyTarget: 1200,
+        higherIsBetter: false,
+        last: null,
+      },
+    ]);
+    const next = addConsumptionReading(res.content, '', { Gas: '5' }, now);
+    expect(next.ok && consumptionView(next.content, now).meters[0]?.latestReading).toBe(5);
+    expect(addConsumptionMeter(res.content, { name: 'Gas', unit: '', yearlyTarget: '' }).ok).toBe(
+      false,
     );
-    const [m] = consumptionView(`created,Gas[unit:m³;yearlyTarget:1200]\n${rows.join('\n')}`);
-    expect(m).toMatchObject({ yearUse: 1200, targetProgress: 1 });
+    expect(addConsumptionMeter('', { name: 'a,b', unit: '', yearlyTarget: '' }).ok).toBe(false);
   });
 });
 

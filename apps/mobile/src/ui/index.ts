@@ -22,6 +22,7 @@ export {
   Section,
   type SectionProps,
   type SwipeAction,
+  SwipeReveal,
 } from './list.js';
 export { Screen, type ScreenProps, ScreenTitle } from './screen.js';
 export { SegmentedControl, type SegmentedControlProps } from './segmented.js';

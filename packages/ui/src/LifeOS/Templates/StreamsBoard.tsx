@@ -1,8 +1,11 @@
 import {
-  maxPriorityRank,
+  actionsFor,
+  type StreamFile,
+  type StreamMode,
+  type StreamSort,
+  sortStreams,
+  streamItems,
   type TodoColor,
-  type TodoData,
-  type TodoItem,
   type TodoStatus,
 } from '@kaihuman/formats';
 import { CheckCircle2, Circle, PlayCircle, XCircle } from 'lucide-preact';
@@ -12,66 +15,14 @@ import { MonoText } from '../Atoms/Typography';
 import { fileLabel } from '../scope-files';
 import { FileColorPicker, fileColorHex, PriorityBadge } from './TodoMarks';
 
-export type StreamMode = 'active' | 'closed';
-export type StreamSort = 'count' | 'newest';
-
-export interface StreamFile {
-  path: string;
-  data: TodoData;
-}
-
-const ACTIVE: ReadonlySet<TodoStatus> = new Set(['backlog', 'in-progress']);
-
-/** Items shown in a tile; `index` is the position in `data.items` that the callbacks need. */
-export const streamItems = (
-  data: TodoData,
-  mode: StreamMode,
-  query: string,
-): { item: TodoItem; index: number }[] => {
-  const q = query.trim().toLowerCase();
-  const rows: { item: TodoItem; index: number }[] = [];
-  data.items.forEach((item, index) => {
-    if (ACTIVE.has(item.status) !== (mode === 'active')) return;
-    if (
-      q &&
-      !item.text.toLowerCase().includes(q) &&
-      !item.tags.some((t) => t.toLowerCase().includes(q))
-    )
-      return;
-    rows.push({ item, index });
-  });
-  return rows;
-};
-
-/** Streams holding a higher visible priority always lead; `sort` orders within a rank. */
-export const sortStreams = <F extends StreamFile>(
-  files: readonly F[],
-  sort: StreamSort,
-  mode: StreamMode,
-  query = '',
-): F[] => {
-  const keyed = files.map((f) => {
-    const rows = streamItems(f.data, mode, query);
-    const k =
-      sort === 'count'
-        ? rows.length
-        : rows.reduce(
-            (m, r) => (r.item.createdAt && r.item.createdAt > m ? r.item.createdAt : m),
-            '',
-          );
-    return { f, k, rank: maxPriorityRank(rows.map((r) => r.item)) };
-  });
-  return keyed
-    .sort(
-      (a, b) =>
-        b.rank - a.rank || (a.k < b.k ? 1 : a.k > b.k ? -1 : a.f.path.localeCompare(b.f.path)),
-    )
-    .map((x) => x.f);
-};
-
-const ALL_STATUSES: TodoStatus[] = ['backlog', 'in-progress', 'done', 'rejected'];
-export const actionsFor = (status: TodoStatus): TodoStatus[] =>
-  ALL_STATUSES.filter((s) => s !== status);
+export {
+  actionsFor,
+  type StreamFile,
+  type StreamMode,
+  type StreamSort,
+  sortStreams,
+  streamItems,
+} from '@kaihuman/formats';
 
 const STATUS_UI: Record<
   TodoStatus,

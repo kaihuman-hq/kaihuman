@@ -69,7 +69,7 @@ struct InboxCountContent: View {
 
     private var small: some View {
         VStack(alignment: .leading, spacing: 0) {
-            WidgetHeader(title: "INBOX", theme: theme)
+            WidgetHeader(title: "INBOX", theme: theme, showsAdd: true)
             if todos + notes == 0 {
                 EmptyStateView(title: "Inbox zero", theme: theme)
             } else {

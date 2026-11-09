@@ -25,6 +25,7 @@ struct KaihumanWidgets: WidgetBundle {
     var body: some Widget {
         InboxTodoWidget()
         QuickCaptureWidget()
+        QuickAddWidget()
         WeeklyDoneWidget()
         InboxCountWidget()
         // Nested so the builder never sees more than ten children (older SDKs cap buildBlock).
@@ -35,6 +36,7 @@ struct KaihumanWidgets: WidgetBundle {
             NewNoteControl()
             NewLogControl()
             NewIdeaControl()
+            AddToInboxControl()
         }
     }
 }

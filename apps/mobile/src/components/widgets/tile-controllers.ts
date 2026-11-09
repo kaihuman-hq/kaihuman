@@ -9,7 +9,6 @@ import {
   type ActionLogEntry,
   addCommand,
   addPrompt,
-  addTodo,
   appendAction,
   type CommandEntry,
   calculateStats,
@@ -21,7 +20,6 @@ import {
   fillCommand,
   getUpcomingEvents,
   localDate,
-  type Milestone,
   markReadItLaterRead,
   parseActionLog,
   parseCommands,
@@ -31,7 +29,6 @@ import {
   parseReadItLater,
   parseTimeTracking,
   parseTimezones,
-  parseTodos,
   type ReadItLaterItem,
   serializeActionLog,
   serializeEvents,
@@ -39,13 +36,11 @@ import {
   serializePrompts,
   serializeReadItLater,
   serializeTimeTracking,
-  serializeTodos,
-  setStatus,
   type TimeTrackingData,
-  type TodoRepeat,
-  type TodoStatus,
 } from '@kaihuman/formats';
+
 import { feedStore } from '../../files/feed-store.js';
+import { type ConsumptionView, consumptionView } from './consumption-tile.js';
 import {
   type BoardOverviewView,
   boardOverviewView,
@@ -56,8 +51,19 @@ import {
   type TravelView,
   travelView,
 } from './more-tiles.js';
+import { type StocksView, stocksView } from './stocks-tile.js';
+import { type TodosView, todosView } from './todos-tile.js';
 
+export * from './actionlog-tile.js';
+export * from './bookmarks-tile.js';
+export * from './consumption-tile.js';
 export * from './more-tiles.js';
+export * from './read-later-tile.js';
+export * from './stocks-tile.js';
+export * from './templates-tile.js';
+export * from './timetracking-tile.js';
+export * from './timezones-tile.js';
+export * from './todos-tile.js';
 
 /** Outcome of a mutation that can be rejected; `content` is the file's new text. */
 export type TileResult = { ok: true; content: string } | { ok: false; error: string };
@@ -78,89 +84,14 @@ const hasTag = (tags: readonly string[], tag: string | undefined): boolean =>
 
 const uniqueSorted = (values: readonly string[]): string[] => [...new Set(values)].sort();
 
-// ─── .todos.md ───────────────────────────────────────────────────────────────
-
-export interface TodoRow {
-  /** Position in the file; the stable handle for `toggleTodo`. */
-  index: number;
-  id: string;
-  text: string;
-  status: TodoStatus;
-  tags: string[];
-  milestone?: string;
-  dueDate?: string;
-  dueTime?: string;
-  repeat?: TodoRepeat;
-}
-
-export interface TodosView {
-  rows: TodoRow[];
-  openCount: number;
-  upcomingMilestone?: Milestone;
-}
-
-/** Done and rejected todos fade off the tile an hour after their last change. */
-export const todosView = (content: string, now: Date, hideOlderThanMs = 3_600_000): TodosView => {
-  const data = parseTodos(content);
-  const names = new Map(data.milestones.map((m) => [m.id, m.name]));
-  const rows: TodoRow[] = [];
-  data.items.forEach((item, index) => {
-    const open = item.status === 'backlog' || item.status === 'in-progress';
-    if (!open && item.updatedAt && now.getTime() - item.updatedAt >= hideOlderThanMs) return;
-    rows.push({
-      index,
-      id: item.id,
-      text: item.text,
-      status: item.status,
-      tags: item.tags,
-      milestone: item.milestoneId ? names.get(item.milestoneId) : undefined,
-      ...(item.dueDate && { dueDate: item.dueDate }),
-      ...(item.dueTime && { dueTime: item.dueTime }),
-      ...(item.repeat && { repeat: item.repeat }),
-    });
-  });
-  const today = localDate(now);
-  const upcomingMilestone = data.milestones
-    .filter((m) => m.dueDate && m.dueDate >= today)
-    .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''))[0];
-  return {
-    rows,
-    openCount: rows.filter((r) => r.status === 'backlog' || r.status === 'in-progress').length,
-    upcomingMilestone,
-  };
-};
-
-/** Open todos (backlog or in progress) become done; done or rejected ones reopen. */
-export const toggleTodo = (content: string, index: number, now: Date): string => {
-  const data = parseTodos(content);
-  const item = data.items[index];
-  if (!item) return content;
-  const next: TodoStatus =
-    item.status === 'done' || item.status === 'rejected' ? 'backlog' : 'done';
-  const updated = setStatus(data, index, next);
-  updated.items = updated.items.map((it, i) =>
-    i === index ? { ...it, updatedAt: now.getTime() } : it,
-  );
-  return serializeTodos(updated);
-};
-
-export const addTodoTask = (
-  content: string,
-  text: string,
-  now: Date,
-  tags: string[] = [],
-): TileResult => {
-  const clean = text.trim();
-  if (!clean) return fail('Enter a task');
-  return ok(serializeTodos(addTodo(parseTodos(content), clean, tags, undefined, undefined, now)));
-};
-
 // ─── .habit.csv ──────────────────────────────────────────────────────────────
 
 export interface HabitDay {
   date: string;
   reached: boolean;
   isToday: boolean;
+  /** After today; drawn blank and not tappable. */
+  future?: boolean;
 }
 
 export interface HabitView {
@@ -168,33 +99,79 @@ export interface HabitView {
   weekStreak: number;
   totalCount: number;
   checkedInToday: boolean;
+  checkedInYesterday: boolean;
   /** The last seven days, oldest first, ending today. */
   strip: HabitDay[];
+  /** Activity heatmap like the web: 20 week columns (Sunday first), oldest first, ending this week. */
+  weeks: HabitDay[][];
+  /** Short month name over the first column of each month. */
+  monthLabels: { week: number; label: string }[];
 }
+
+export const HABIT_WEEKS = 20;
 
 export const habitView = (content: string, now: Date): HabitView => {
   const data = parseHabitData(content);
   const reached = new Set(data.entries.filter((e) => e.reached).map((e) => e.date));
   const today = localDate(now);
+  const day = (back: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - back);
   const strip: HabitDay[] = [];
   for (let back = 6; back >= 0; back--) {
-    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back);
-    const date = localDate(day);
+    const date = localDate(day(back));
     strip.push({ date, reached: reached.has(date), isToday: date === today });
   }
-  return { ...calculateStats(data, now), checkedInToday: reached.has(today), strip };
+  const weekStart = day(now.getDay());
+  const weeks: HabitDay[][] = [];
+  const monthLabels: { week: number; label: string }[] = [];
+  for (let w = 0; w < HABIT_WEEKS; w++) {
+    const col: HabitDay[] = [];
+    for (let d = 0; d < 7; d++) {
+      const at = new Date(
+        weekStart.getFullYear(),
+        weekStart.getMonth(),
+        weekStart.getDate() - (HABIT_WEEKS - 1 - w) * 7 + d,
+      );
+      const date = localDate(at);
+      col.push({
+        date,
+        reached: reached.has(date),
+        isToday: date === today,
+        future: date > today,
+      });
+      if (d === 0 && monthLabels.at(-1)?.label !== MONTHS[at.getMonth()]) {
+        monthLabels.push({ week: w, label: MONTHS[at.getMonth()] as string });
+      }
+    }
+    weeks.push(col);
+  }
+  return {
+    ...calculateStats(data, now),
+    checkedInToday: reached.has(today),
+    checkedInYesterday: reached.has(localDate(day(1))),
+    strip,
+    weeks,
+    monthLabels,
+  };
+};
+
+/** Checks a day in, or takes the check-in back when it was a mis-tap. Future days are refused. */
+export const toggleHabitDay = (content: string, date: string, now: Date): TileResult => {
+  if (!ISO_DAY.test(date) || date > localDate(now)) {
+    return { ok: false, error: 'You can only check in today or earlier.' };
+  }
+  const data = parseHabitData(content);
+  if (!data.entries.some((e) => e.date === date && e.reached)) return ok(checkIn(content, date));
+  return ok(
+    serializeHabitData({
+      entries: data.entries.map((e) => (e.date === date ? { ...e, reached: false } : e)),
+    }),
+  );
 };
 
 /** Checks today in, or takes the check-in back when it was a mis-tap. */
 export const toggleHabitToday = (content: string, now: Date): string => {
-  const today = localDate(now);
-  if (!parseHabitData(content).entries.some((e) => e.date === today && e.reached)) {
-    return checkIn(content, today);
-  }
-  const data = parseHabitData(content);
-  return serializeHabitData({
-    entries: data.entries.map((e) => (e.date === today ? { ...e, reached: false } : e)),
-  });
+  const r = toggleHabitDay(content, localDate(now), now);
+  return r.ok ? r.content : content;
 };
 
 // ─── .timetracking.csv ───────────────────────────────────────────────────────
@@ -290,6 +267,46 @@ export const eventsView = (content: string, now: Date, limit = 8): EventRow[] =>
         : undefined,
     };
   });
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Calendar-block parts of a `YYYY-MM-DD` date, computed without a timezone or locale. */
+export const eventDateParts = (iso: string): { day: string; month: string; weekday: string } => {
+  const [y = 0, m = 1, d = 1] = iso.split('-').map(Number);
+  return {
+    day: String(d),
+    month: MONTHS[m - 1] ?? '',
+    weekday: WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] ?? '',
+  };
+};
+
+export interface EventGroup {
+  /** "Today", "Tomorrow", else "Mon 9 Nov". */
+  title: string;
+  rows: EventRow[];
+}
+
+/** Consecutive rows on the same day under one heading; input order (soonest first) is kept. */
+export const groupEventsByDay = (rows: readonly EventRow[]): EventGroup[] => {
+  const groups: (EventGroup & { date: string })[] = [];
+  for (const row of rows) {
+    const last = groups[groups.length - 1];
+    if (last && last.date === row.date) {
+      last.rows.push(row);
+      continue;
+    }
+    const p = eventDateParts(row.date);
+    const title =
+      row.daysUntil === 0
+        ? 'Today'
+        : row.daysUntil === 1
+          ? 'Tomorrow'
+          : `${p.weekday} ${p.day} ${p.month}`;
+    groups.push({ title, date: row.date, rows: [row] });
+  }
+  return groups.map(({ title, rows: r }) => ({ title, rows: r }));
+};
 
 export interface EventDraft {
   name: string;
@@ -526,7 +543,7 @@ export const parseBookmarksFile = (content: string): BookmarksFile => {
   }
 };
 
-const serializeBookmarksFile = (file: BookmarksFile): string =>
+export const serializeBookmarksFile = (file: BookmarksFile): string =>
   `${JSON.stringify(file, null, 2)}\n`;
 
 export type BookmarkSort = 'NEWEST' | 'MOST_USED' | 'LEAST_USED' | 'FRECENCY';
@@ -695,143 +712,6 @@ export const budgetView = (content: string): BudgetView => {
     accounts: ranked(accounts),
     months: [...months.values()].sort((a, b) => a.month.localeCompare(b.month)),
   };
-};
-
-// ─── .stocks.csv ─────────────────────────────────────────────────────────────
-
-export interface StockPoint {
-  /** `YYYY-MM-DD`. */
-  date: string;
-  value: number;
-  /** Total invested up to and including this point. */
-  invested: number;
-}
-
-export interface StocksView {
-  latestValue: number;
-  invested: number;
-  profit: number;
-  profitPct: number;
-  changeVsPrev: number | null;
-  allTimeHigh: number;
-  /** Negative percentage below the all-time high. */
-  drawdownPct: number;
-  series: StockPoint[];
-}
-
-/** Comma files hold the amount invested at each step; legacy `;` files hold the running total. */
-export const stocksView = (content: string): StocksView | null => {
-  const legacy =
-    content
-      .split('\n')
-      .find((l) => l.trim() && !l.startsWith('#'))
-      ?.includes(';') ?? false;
-  const sep = legacy ? ';' : ',';
-  const rows: { date: string; value: number; invest: number }[] = [];
-  for (const line of content.split('\n')) {
-    const p = line.trim().split(sep);
-    const date = (p[0] ?? '').trim().slice(0, 10);
-    if (!ISO_DAY.test(date)) continue;
-    const value = Number.parseFloat((p[1] ?? '').replace(',', '.'));
-    if (Number.isNaN(value)) continue;
-    rows.push({ date, value, invest: Number.parseFloat((p[2] ?? '0').replace(',', '.')) || 0 });
-  }
-  if (rows.length === 0) return null;
-  rows.sort((a, b) => a.date.localeCompare(b.date));
-  let invested = 0;
-  const series = rows.map((r) => {
-    invested = legacy ? Math.max(invested, r.invest) : invested + r.invest;
-    return { date: r.date, value: r.value, invested };
-  });
-  const latest = series[series.length - 1] as StockPoint;
-  const prev = series[series.length - 2];
-  const allTimeHigh = Math.max(...series.map((s) => s.value));
-  const profit = latest.value - latest.invested;
-  return {
-    latestValue: latest.value,
-    invested: latest.invested,
-    profit,
-    profitPct: latest.invested > 0 ? (profit / latest.invested) * 100 : 0,
-    changeVsPrev: prev ? latest.value - prev.value : null,
-    allTimeHigh,
-    drawdownPct: allTimeHigh > 0 ? ((latest.value - allTimeHigh) / allTimeHigh) * 100 : 0,
-    series,
-  };
-};
-
-// ─── .consumption.csv ────────────────────────────────────────────────────────
-
-export interface ConsumptionMeter {
-  key: string;
-  title: string;
-  unit: string;
-  yearlyTarget?: number;
-  latestReading: number;
-  /** Use between the last two readings. */
-  lastPeriodUse: number | null;
-  /** Use over the trailing 12 months, when the file spans that long. */
-  yearUse: number | null;
-  /** Share of the yearly target used, 0..1+, when a target is set. */
-  targetProgress: number | null;
-  /** Use per reading interval, oldest first. */
-  series: { date: string; use: number }[];
-}
-
-/** Header cells look like `Gas[title:Gas;unit:m³;yearlyTarget:1200]`; the brackets hide `;`. */
-const splitHeader = (line: string): string[] => line.split(/,(?![^[]*\])/);
-
-const minusOneYear = (iso: string): string => {
-  const d = parseLocalDate(iso);
-  return localDate(new Date(d.getFullYear() - 1, d.getMonth(), d.getDate()));
-};
-
-export const consumptionView = (content: string): ConsumptionMeter[] => {
-  const lines = content.split(/\r?\n/).filter((l) => l.trim());
-  const header = lines[0];
-  if (!header) return [];
-  const cols = splitHeader(header).slice(1);
-  const rows = lines
-    .slice(1)
-    .map((l) => l.split(','))
-    .filter((p) => ISO_DAY.test((p[0] ?? '').trim()))
-    .sort((a, b) => (a[0] ?? '').localeCompare(b[0] ?? ''));
-  const meters: ConsumptionMeter[] = [];
-  cols.forEach((col, ci) => {
-    const m = /^([^[]*)(?:\[(.*)\])?$/.exec(col.trim());
-    const key = m?.[1]?.trim() ?? col;
-    const meta = new Map(
-      (m?.[2] ?? '')
-        .split(';')
-        .map((kv) => [kv.slice(0, kv.indexOf(':')), kv.slice(kv.indexOf(':') + 1)] as const),
-    );
-    const readings = rows
-      .map((p) => ({ date: (p[0] ?? '').trim(), value: Number.parseFloat(p[ci + 1] ?? '') }))
-      .filter((r) => !Number.isNaN(r.value));
-    if (readings.length === 0) return;
-    const series = readings.slice(1).map((r, i) => ({
-      date: r.date,
-      use: r.value - (readings[i] as { value: number }).value,
-    }));
-    const last = readings[readings.length - 1] as { date: string; value: number };
-    const cutoff = minusOneYear(last.date);
-    const yearAgo = readings.find((r) => r.date >= cutoff);
-    const yearUse =
-      yearAgo && yearAgo !== last && readings.length > 12 ? last.value - yearAgo.value : null;
-    const target = Number.parseFloat(meta.get('yearlyTarget') ?? '');
-    meters.push({
-      key,
-      title: meta.get('title') || key,
-      unit: meta.get('unit') ?? '',
-      yearlyTarget: Number.isNaN(target) ? undefined : target,
-      latestReading: last.value,
-      lastPeriodUse: series.length ? (series[series.length - 1] as { use: number }).use : null,
-      yearUse,
-      targetProgress:
-        yearUse !== null && !Number.isNaN(target) && target > 0 ? yearUse / target : null,
-      series,
-    });
-  });
-  return meters;
 };
 
 // ─── .data-collection.csv ────────────────────────────────────────────────────
@@ -1009,7 +889,7 @@ export type TileView =
   | { kind: 'bookmarks'; view: BookmarksView }
   | { kind: 'budget'; view: BudgetView }
   | { kind: 'stocks'; view: StocksView | null }
-  | { kind: 'consumption'; view: ConsumptionMeter[] }
+  | { kind: 'consumption'; view: ConsumptionView }
   | { kind: 'datacollection'; view: DataCollectionView }
   | { kind: 'prompts'; view: TemplatesView }
   | { kind: 'commands'; view: TemplatesView }
@@ -1057,7 +937,7 @@ export const presentTile = (path: string, content: string, now: Date): TileView 
     case 'timetracking':
       return { kind: 'timetracking', view: timerView(content, now) };
     case 'events':
-      return { kind: 'events', view: eventsView(content, now) };
+      return { kind: 'events', view: eventsView(content, now, 30) };
     case 'actionlog':
       return { kind: 'actionlog', view: actionLogView(content) };
     case 'timezones':
@@ -1069,9 +949,9 @@ export const presentTile = (path: string, content: string, now: Date): TileView 
     case 'budget':
       return { kind: 'budget', view: budgetView(content) };
     case 'stocks':
-      return { kind: 'stocks', view: stocksView(content) };
+      return { kind: 'stocks', view: stocksView(content, now) };
     case 'consumption':
-      return { kind: 'consumption', view: consumptionView(content) };
+      return { kind: 'consumption', view: consumptionView(content, now) };
     case 'datacollection':
       return { kind: 'datacollection', view: dataCollectionView(content) };
     case 'prompts':
@@ -1090,3 +970,6 @@ export const presentTile = (path: string, content: string, now: Date): TileView 
       return undefined;
   }
 };
+
+export * from './budget-tile.js';
+export * from './collection-tile.js';

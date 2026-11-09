@@ -14,6 +14,7 @@ export const CAPTURE_TITLES: Record<QuickKind, string> = {
   log: 'New log entry',
   idea: 'New idea',
   knowledge: 'New knowledge',
+  inbox: 'Add to inbox',
 };
 
 interface KindCopy {
@@ -57,6 +58,8 @@ const COPY: Record<QuickKind, KindCopy> = {
       helper: 'Defaults to the first line.',
     },
   },
+  // One line and Return saves: nothing to fill in before the keyboard can go away.
+  inbox: { label: 'Inbox', placeholder: 'What is on your mind?', multiline: false },
 };
 
 type Status = { ok: boolean; text: string } | null;
@@ -113,11 +116,13 @@ export function QuickCaptureView({
         const res =
           kind === 'todo'
             ? await controller.quickTodo(text, value, due, due && repeat)
-            : kind === 'log'
-              ? await controller.quickLog(text, value)
-              : kind === 'knowledge'
-                ? await controller.quickKnowledge(text, value)
-                : await controller.quickNote(text);
+            : kind === 'inbox'
+              ? await controller.quickTodo(text)
+              : kind === 'log'
+                ? await controller.quickLog(text, value)
+                : kind === 'knowledge'
+                  ? await controller.quickKnowledge(text, value)
+                  : await controller.quickNote(text);
         result = res.ok ? { ok: true, text: res.message } : { ok: false, text: res.error };
       }
     } catch (err) {

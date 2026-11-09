@@ -24,6 +24,8 @@ enum DeepLink {
     static func ideas(status: String) -> URL { url(host: "ideas", query: ["status": status]) }
     /// Opens the quick-log sheet; `idea` is ignored by routes that predate it.
     static func quickLog(idea slug: String) -> URL { url(host: "quick-log", query: ["idea": slug]) }
+    /// The one-field "Add to inbox" sheet.
+    static var quickInbox: URL { url(host: "quick-inbox") }
 
     /// `kaihuman://files/<path>`, one percent-encoded segment at a time (paths hold `.kh/` and spaces).
     static func file(path: String) -> URL {
@@ -115,6 +117,7 @@ struct WidgetHeader: View {
     let title: String
     var trailing: String?
     let theme: WidgetTheme
+    var showsAdd = false
 
     var body: some View {
         HStack {
@@ -129,7 +132,30 @@ struct WidgetHeader: View {
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundStyle(theme.secondary)
             }
+            if showsAdd {
+                AddToInboxButton(theme: theme)
+            }
         }
+    }
+}
+
+/// The "+" that opens the one-field inbox sheet. A Button rather than a Link: a systemSmall
+/// widget ignores Links, but intent buttons work in every family.
+struct AddToInboxButton: View {
+    let theme: WidgetTheme
+    var size: CGFloat = 22
+
+    var body: some View {
+        Button(intent: OpenQuickCaptureIntent(kind: .inbox)) {
+            Image(systemName: "plus")
+                .font(.system(size: size * 0.55, weight: .bold))
+                .foregroundStyle(theme.onFill)
+                .frame(width: size, height: size)
+                .background(Circle().fill(theme.fill))
+                .widgetAccentable()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add to inbox")
     }
 }
 

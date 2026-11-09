@@ -221,6 +221,22 @@ describe('WidgetBridge', () => {
     expect(inbox()).toContain('- [ ] buy milk');
   });
 
+  it('replays several queued captures oldest first, each once', async () => {
+    const container = new InMemorySharedContainer();
+    mockSave();
+    await queue(container, [
+      { kind: 'capture', text: 'second', timestamp: 2 },
+      { kind: 'capture', text: 'first', timestamp: 1 },
+      { kind: 'capture', text: '', timestamp: 3 },
+    ]);
+    const bridge = new WidgetBridge(container);
+    expect(await bridge.reconcile()).toBe(2);
+    expect(inbox().indexOf('- [ ] first')).toBeLessThan(inbox().indexOf('- [ ] second'));
+    expect(container.files.get(PENDING_WIDGET_MUTATIONS_FILE)).toBe('[]');
+    expect(await bridge.reconcile()).toBe(0);
+    expect(inbox().match(/- \[ \] first/g)).toHaveLength(1);
+  });
+
   it('skips a capture the widget already committed with a later push', async () => {
     const container = new InMemorySharedContainer();
     githubFileStore.openFiles.value = {

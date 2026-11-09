@@ -43,20 +43,6 @@ const dateLine = (now: Date) =>
 const PLACEHOLDER: DashboardPage = { id: 'today', name: 'Today', files: [] };
 
 type Shown = TileFile & { tile?: TileView; failed?: string };
-type Block = { kind: 'row'; items: Shown[] } | { kind: 'single'; item: Shown };
-
-/** Consecutive compact tiles share a wrapping grid; everything else stands alone, in file order. */
-function toBlocks(files: Shown[]): Block[] {
-  const blocks: Block[] = [];
-  for (const item of files) {
-    const compact = item.tile && TILE_SIZE[item.tile.kind] === 'compact';
-    const last = blocks[blocks.length - 1];
-    if (compact && last?.kind === 'row') last.items.push(item);
-    else if (compact) blocks.push({ kind: 'row', items: [item] });
-    else blocks.push({ kind: 'single', item });
-  }
-  return blocks;
-}
 
 function Hint({ children }: { children: ReactNode }) {
   const { colors, spacing, shape } = useTheme();
@@ -87,6 +73,7 @@ interface PageProps {
   error?: string | null;
   onRefresh?: () => void;
   onWrite: (path: string, content: string) => void | Promise<void>;
+  onCreateFile?: (path: string, content: string) => Promise<void>;
   onNavigate: (href: string) => void;
 }
 
@@ -101,13 +88,11 @@ function Page({
   error,
   onRefresh,
   onWrite,
+  onCreateFile,
   onNavigate,
 }: PageProps) {
   const { colors, spacing, metrics } = useTheme();
   const insets = useInsets();
-  const { fontScale } = useWindowDimensions();
-  // Two columns would clip the numbers at large text sizes or on very narrow phones.
-  const basis = fontScale > 1.3 || width < 360 ? '100%' : '47%';
   // RSS tiles count unread items from fetched feeds, so fetch them here and redraw on arrival.
   useFeedSnapshot();
   const shown: Shown[] = page.files.map((f) => {
@@ -137,6 +122,8 @@ function Page({
           content={item.content}
           now={now}
           onWrite={onWrite}
+          {...(onCreateFile && { onCreateFile })}
+          onOpenFile={(file) => onNavigate(`/files/${file}`)}
         />
       ) : (
         <SummaryTile path={item.path} tile={item.tile} now={now} onSeeAll={() => open(item.path)} />
@@ -193,22 +180,9 @@ function Page({
             message={`Add files to ${page.name} in the web console.`}
           />
         ) : null}
-        {toBlocks(shown).map((block) =>
-          block.kind === 'single' ? (
-            <Fragment key={block.item.path}>{renderOne(block.item)}</Fragment>
-          ) : (
-            <View
-              key={block.items[0]?.path}
-              style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}
-            >
-              {block.items.map((item) => (
-                <View key={item.path} style={{ flexBasis: basis, flexGrow: 1 }}>
-                  {renderOne(item)}
-                </View>
-              ))}
-            </View>
-          ),
-        )}
+        {shown.map((item) => (
+          <Fragment key={item.path}>{renderOne(item)}</Fragment>
+        ))}
       </ScrollView>
     </View>
   );
@@ -348,6 +322,7 @@ export interface DashboardPagerProps {
   /** Pull-to-refresh hook point for every page. */
   onRefresh?: () => void;
   onWrite: (path: string, content: string) => void | Promise<void>;
+  onCreateFile?: (path: string, content: string) => Promise<void>;
   onNavigate: (href: string) => void;
 }
 
@@ -361,6 +336,7 @@ export function DashboardPager({
   error,
   onRefresh,
   onWrite,
+  onCreateFile,
   onNavigate,
 }: DashboardPagerProps) {
   const { colors, spacing, metrics } = useTheme();
@@ -453,6 +429,7 @@ export function DashboardPager({
             error={error}
             onRefresh={onRefresh}
             onWrite={onWrite}
+            {...(onCreateFile && { onCreateFile })}
             onNavigate={onNavigate}
           />
         )}

@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { presentTile } from '../../../src/components/widgets/tile-controllers.js';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
@@ -7,6 +7,7 @@ import { TILE_META, Tile } from '../../../src/views/tile-view.js';
 
 export default function TileDetail() {
   const { path } = useLocalSearchParams<{ path: string }>();
+  const router = useRouter();
   const [content, setContent] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -37,7 +38,15 @@ export default function TileDetail() {
           tile instanceof Error ? (
             <InlineError what="this tile" message={tile.message} />
           ) : (
-            <Tile path={path} tile={tile} content={content} now={now} onWrite={write} />
+            <Tile
+              path={path}
+              tile={tile}
+              content={content}
+              now={now}
+              onWrite={write}
+              onCreateFile={(file, text) => githubContentFiles.create(file, text)}
+              onOpenFile={(file) => router.push(`/files/${file}` as never)}
+            />
           )
         ) : failed || !path ? (
           <EmptyState

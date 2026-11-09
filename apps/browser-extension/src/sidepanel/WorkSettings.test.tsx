@@ -47,8 +47,11 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => {
+afterEach(async () => {
   render(null, host);
+  // Preact's effect scheduler falls back to a 35ms timer that calls cancelAnimationFrame; let it
+  // fire while jsdom is still up, or a busy CI runner hits it after teardown (unhandled error).
+  await new Promise((resolve) => setTimeout(resolve, 50));
   host.remove();
   vi.unstubAllGlobals();
 });

@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { presentTile } from '../components/widgets/tile-controllers.js';
 import { fileKindForPath } from '../files/file-kinds.js';
 import { type ImageSource, loadImage } from '../files/image-source.js';
 import { useTheme } from '../theme/theme.js';
-import { ErrorBoundary, Text } from '../ui/index.js';
+import { ErrorBoundary, SegmentedControl, Text } from '../ui/index.js';
+import { CsvDataTable } from './csv-table.js';
 import {
   CsvTable,
   JsonReader,
@@ -98,6 +99,28 @@ interface FileContentProps {
   onWrite: (content: string) => void | Promise<void>;
 }
 
+type CsvLook = 'widget' | 'table';
+
+/** Widget CSV files open as their tile; the segmented control swaps in the raw table, as on web. */
+function WidgetTableSwitch({ content, children }: { content: string; children: ReactNode }) {
+  const { spacing } = useTheme();
+  const [look, setLook] = useState<CsvLook>('widget');
+  return (
+    <View style={{ gap: spacing.md }}>
+      <SegmentedControl
+        testID="csv-look"
+        options={[
+          { value: 'widget', label: 'Widget' },
+          { value: 'table', label: 'Table' },
+        ]}
+        value={look}
+        onChange={setLook}
+      />
+      {look === 'table' ? <CsvDataTable content={content} /> : children}
+    </View>
+  );
+}
+
 function FileContentBody({ path, content, onWrite }: FileContentProps) {
   const [now] = useState(() => new Date());
   const { encrypted, innerPath, view } = fileKindForPath(path);
@@ -105,7 +128,7 @@ function FileContentBody({ path, content, onWrite }: FileContentProps) {
     case 'tile': {
       const tile = presentTile(innerPath, content, now);
       if (!tile) return <TextReader content={content} />;
-      return (
+      const body = (
         <Tile
           path={innerPath}
           tile={tile}
@@ -113,6 +136,11 @@ function FileContentBody({ path, content, onWrite }: FileContentProps) {
           now={now}
           onWrite={(_, next) => onWrite(next)}
         />
+      );
+      return innerPath.toLowerCase().endsWith('.csv') ? (
+        <WidgetTableSwitch content={content}>{body}</WidgetTableSwitch>
+      ) : (
+        body
       );
     }
     case 'markdown':

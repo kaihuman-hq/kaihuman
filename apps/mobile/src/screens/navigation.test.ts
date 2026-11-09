@@ -38,7 +38,7 @@ describe('parseDeepLink', () => {
       name: 'auth-callback',
       accessToken: null,
     });
-    for (const kind of ['todo', 'note', 'log', 'idea', 'knowledge']) {
+    for (const kind of ['todo', 'note', 'log', 'idea', 'knowledge', 'inbox']) {
       expect(parseDeepLink(`kaihuman://quick-${kind}`)).toEqual({ name: 'quick-capture', kind });
     }
     expect(parseDeepLink('kaihuman://board')).toEqual({ name: 'board' });

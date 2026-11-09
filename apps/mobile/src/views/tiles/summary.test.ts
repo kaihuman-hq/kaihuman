@@ -113,6 +113,22 @@ describe('summaries of the file-kind tiles', () => {
     expect(TILE_SIZE.palettesettings).toBe('compact');
   });
 
+  it('rss: Unread is the default, All lists read items too', () => {
+    const tile = {
+      kind: 'rss' as const,
+      view: {
+        feeds: [],
+        unreadCount: 1,
+        items: [
+          { feedId: 'f', key: 'a', title: 'A', link: '', source: 's', date: null, unread: true },
+          { feedId: 'f', key: 'b', title: 'B', link: '', source: 's', date: null, unread: false },
+        ],
+      },
+    };
+    expect(summarizeTile(tile, NOW).items).toEqual(['A']);
+    expect(summarizeTile(tile, NOW, 'all')).toMatchObject({ stat: '1', items: ['A', 'B'] });
+  });
+
   it('rss: unread count with the unread titles', () => {
     const s = summarizeTile(
       {

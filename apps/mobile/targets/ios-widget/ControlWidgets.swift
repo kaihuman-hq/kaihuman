@@ -65,3 +65,18 @@ struct NewIdeaControl: ControlWidget {
     }
 }
 
+
+@available(iOS 18.0, *)
+struct AddToInboxControl: ControlWidget {
+    static let kind = "AddToInboxControl"
+
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: Self.kind) {
+            ControlWidgetButton(action: OpenQuickCaptureIntent(kind: .inbox)) {
+                Label("Add to inbox", systemImage: "tray.and.arrow.down")
+            }
+        }
+        .displayName("Add to inbox")
+        .description("Add one line to your kaihuman inbox.")
+    }
+}

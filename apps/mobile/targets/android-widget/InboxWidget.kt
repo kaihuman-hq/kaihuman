@@ -52,7 +52,7 @@ class InboxWidget : GlanceAppWidget() {
             SnapshotShell(snapshot, nowMs, DeepLinks.INBOX) { snap, freshness ->
                 val state = snap.inboxState()
                 Column(modifier = GlanceModifier.fillMaxSize()) {
-                    WidgetHeader(khString(R.string.kh_w_inbox_title))
+                    WidgetHeader(khString(R.string.kh_w_inbox_title), showsAdd = true)
                     if (state.isZero) {
                         Spacer(GlanceModifier.height(8.dp))
                         EmptyState(khString(R.string.kh_w_inbox_zero))

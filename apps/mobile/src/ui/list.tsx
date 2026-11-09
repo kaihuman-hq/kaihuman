@@ -187,6 +187,58 @@ function toneColors(c: Palette, tone: IconTone): { fill: string; glyph: string }
   return { fill, glyph: tone === 'danger' ? c.onDanger : c.onStatus };
 }
 
+/** Swipe-to-reveal wrapper for rows that are not a `ListRow`; native only, pass the row as children. */
+export function SwipeReveal({
+  actions,
+  testID,
+  children,
+}: {
+  actions: readonly SwipeAction[];
+  testID?: string;
+  children: ReactNode;
+}) {
+  const theme = useTheme();
+  const ios = theme.platform === 'ios';
+  const ref = useRef<SwipeableMethods>(null);
+  const leading = revealOrder(actions, 'leading');
+  const trailing = revealOrder(actions, 'trailing');
+  const trigger = (action: SwipeAction, methods: SwipeableMethods) => {
+    methods.close();
+    if (action.destructive) haptics.warning();
+    else haptics.success();
+    action.onPress();
+  };
+  return (
+    <ReanimatedSwipeable
+      ref={ref}
+      testID={testID}
+      friction={2}
+      overshootLeft={false}
+      overshootRight={false}
+      onSwipeableWillOpen={() => haptics.selection()}
+      renderLeftActions={
+        leading.length
+          ? (_p, _t, methods) => (
+              <SwipeButtons actions={leading} methods={methods} onTrigger={trigger} />
+            )
+          : undefined
+      }
+      renderRightActions={
+        trailing.length
+          ? (_p, _t, methods) => (
+              <SwipeButtons actions={trailing} methods={methods} onTrigger={trigger} />
+            )
+          : undefined
+      }
+      childrenContainerStyle={{
+        backgroundColor: ios ? theme.colors.surface : theme.colors.background,
+      }}
+    >
+      {children}
+    </ReanimatedSwipeable>
+  );
+}
+
 export interface ListRowProps {
   title: string;
   subtitle?: string;

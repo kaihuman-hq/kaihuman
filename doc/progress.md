@@ -1,5 +1,52 @@
 # Progress
 
+## 2026-11-09 — Tests: extension teardown race, mobile render timeouts
+
+- Mobile `dom` tests get a 20s timeout: full tile and dashboard renders took over 5s on the shared CI runner.
+- `WorkSettings.test.tsx` waits for Preact's 35ms effect timer after unmounting, so it no longer calls `cancelAnimationFrame` after jsdom teardown on a busy CI runner.
+
+## 2026-11-09 — Mobile: full web parity for todos, kanban, travel, board overview, palette, CSV tables, consumption, time tracking, stocks, timezones
+
+- Todos tile (`todos-tile.ts`, `todos-body.tsx`): an expandable Details panel on the quick add with tags, milestone, due date/time and repeat (reuses `DueEditor`/`RepeatEditor`) and "Create prompt file" (beside the todos file, referenced by the task, optionally opened); tag filter chips; long-press for status, milestone, due and AI prompt; milestone manager sheet (add, rename, date, delete); per-task AI prompt sheet with Copy or share; show older completed; migrate legacy files.
+- Kanban: header search; sort and filter sheet (Newest/Due, due filter, milestone with Upcoming, lists, per-column "Last 2 weeks"); Board/Streams segmented control; streams per todo file with add field, swipe status, priority badge, list colour sheet and long-press reorder. Pure logic moved to `@kaihuman/formats` `todo-board.ts`; the console's `KanbanBoard`, `StreamsBoard` and `dueView` use it.
+- Travel: edit sheet for trips (title, destination, dates, notes, custom fields), delete with confirm, steps of all six types (add, edit, reorder, delete), destination on add. Step labels, fields and `money` moved to `@kaihuman/formats/travel`.
+- Board overview: settings sheet (columns, scope, overdue days, minimum age); tap opens the board.
+- Palette settings: editable — add, edit, delete and reorder engines, assistants and tools, URL parameters with live preview, restore removed defaults.
+- Widget CSVs: Widget/Table segmented control on every widget CSV file; the table sorts by column, filters per column in a sheet, pages by 50 and opens a row detail sheet. The generic CSV/TSV reader uses the same table. Table logic moved into `@kaihuman/formats` `csv.ts`; the web `CsvTableView` uses it.
+- Consumption: Monthly tab (per meter and year: total, per day, change vs last year) and Compare tab (multi-year cumulative or per-day lines, toggle years); long-press a meter to remove it. Month/compare helpers moved to `@kaihuman/formats/consumption`.
+- Time tracking: Daily (work and break hours) line, Weekly and Monthly bars, tap a point for its values.
+- Stocks: Bars, Value, Change and Forecast charts; linear-trend forecast to year end with projection table, all-time high, average growth. `buildPeriodForecast` takes an optional `now`.
+- Timezones: the clocks tick live each second (`use-live-now.ts`), paused while the app is in the background.
+- Tests for every item (mobile 958 → 1087, formats +16).
+
+## 2026-11-09 — Mobile: add to inbox from the widget, Lock Screen and Siri
+
+- New `kaihuman://quick-inbox` deep link and route (`app/quick-inbox.tsx`): a one-field "Add to inbox" sheet. The keyboard opens at once, Return or Save appends a plain todo to `.kh/inbox.todos.md` and the outbox syncs it.
+- iOS: a "+" in the Next up (small, medium, large) and Inbox widget headers; a new **Add to inbox** widget (`QuickAddWidget`: Home Screen small, Lock Screen circular and rectangular); an iOS 18 **Add to inbox** control (Control Center, Lock Screen, Action button). All of them open the sheet (`QuickCaptureKind.inbox`). Siri, Shortcuts and Spotlight get the phrase "Add to kaihuman inbox" on the existing background `CaptureTodoIntent`, which adds without opening the app and queues the capture for the app when it cannot commit.
+- Android: a "+" in the Inbox widget header opens the same sheet.
+- Tests: deep-link parsing and routing, the one-field sheet, ordered replay of queued captures, and static checks of the Swift and Kotlin sources.
+## 2026-11-09 — Mobile: widget fixes and web parity (stocks, consumption, habit, …)
+
+- Stocks (bug): the tile was empty for files the web wrote. Root cause: the mobile parser only read ISO dates, the web writes `DD.MM.YYYY HH:MM:SS`, so every row was dropped. The web's parsing moved to `@kaihuman/formats/stocks` (and consumption to `@kaihuman/formats/consumption`; `packages/ui` re-exports both) and mobile uses it. The tile gains week/month/year periods with bars and a list, change vs last, CAGR and an "Add value" form.
+- Consumption (bug): nothing could be added on mobile; the tile was read-only and its own parser missed `DD.MM.YYYY` and the old `Zeitstempel,Datum,…` layout. It now uses the shared parser and has "Add reading" (date, one field per meter with the last reading as a hint; a gap-filled day is replaced), "Add meter" (name, unit, yearly target), this year's use against the target, a Recent list with same day last year, and yearly totals.
+- Habit: the tile now shows the web's 20-week activity heatmap (Sunday-first columns, month labels, today outlined). Tap a day to select it, then "Check in" or "Undo" (future days are disabled; `toggleHabitDay`). Adds the week streak, the streak line and "Check in yesterday" when yesterday was missed.
+- Parity with the web, per tile (renderers moved out of `bodies.tsx` into `src/views/tiles/<widget>-body.tsx`, logic in `src/components/widgets/<widget>-tile.ts`):
+  - Prompts / Commands: Copy (share sheet, with `{{params}}` filled), search, tag chips, tags on add.
+  - Action log: tags on add, search, tag chips, week/month/total stats, show all, Log/Report (12 months, top tags).
+  - Time tracking: week total, 15/30/60 min breaks (web `addPause` logic), last 14 days and 8 weeks as bars.
+  - Timezones: add (search zones and cities), delete (long-press), city names, local clock, year progress.
+  - Read it later: tap opens the link, mark read/unread, delete, tags, "Clear all" with confirm.
+  - Bookmarks: tag chips, sort (newest, most/least used, frecency), pin, edit title/URL/tags, add with title and tags; opening counts a use.
+  - Budget: add transaction (name/account pickers, category, value, date), balance, per-account filter, all categories, recent list.
+  - Data collection: add entry validated per column type, recent rows, bars per column, All/6M/12M/YTD filter.
+
+## 2026-11-09 — Mobile: RSS filter and swipe, one-column dashboard, events redesign, board file header
+
+- RSS (file view and dashboard tile): Unread/All segmented toggle, default Unread (`filterRssItems`, `summarizeTile(…, rssFilter)`); unread items swipe to "Mark read" through `markRssRead`, the same write as opening an item (new `SwipeReveal` in `src/ui`, `ItemRow swipe`; long press stays as the fallback).
+- Dashboard: compact tiles (habits etc.) no longer share a two-column grid; every tile is full width in one column.
+- Events: grouped by day (Today/Tomorrow/`Mon 9 Nov`), date block (day/month), title and countdown, full width; the tile shows up to 30 events like the web focus mode. The `.events.csv` format has no time or location, so neither is shown (the web widget has none either).
+- Board: header naming the todo file (path for one file, count and short names for several).
+
 ## 2026-11-09 — CI: retry Android Gradle builds
 
 - `mobile-build.yml` and `mobile-screenshots.yml` cache `~/.gradle/caches/modules-2` and retry the Gradle build up to 3 times: Maven/GitHub release downloads (`kotlin-compiler-embeddable`) returned 504 twice in a row. The cold-start test now stubs `fetch` and console so unawaited bootstrap work cannot log after teardown.

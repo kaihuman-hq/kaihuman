@@ -3,8 +3,10 @@ import {
   addMilestone,
   addTodoEntry,
   cyclePriority,
+  filterRecent,
   getUpcomingMilestone,
   type Milestone,
+  matchesBoardSearch,
   moveTodo,
   parseTodos,
   removeMilestone,
@@ -89,8 +91,6 @@ const NEXT_STATUS: Record<TodoStatus, TodoStatus> = {
   rejected: 'backlog',
 };
 
-const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
-
 const BADGE_COLORS = [
   '#60a5fa', // blue
   '#4ade80', // green
@@ -107,13 +107,7 @@ const BADGE_COLORS = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function filterByAge(items: AggregatedItem[], recentOnly: boolean): AggregatedItem[] {
-  if (!recentOnly) return items;
-  const cutoff = Date.now() - TWO_WEEKS_MS;
-  return items.filter((a) => {
-    const ts = a.item.updatedAt ?? (a.item.createdAt ? new Date(a.item.createdAt).getTime() : null);
-    if (!ts) return true;
-    return ts >= cutoff;
-  });
+  return filterRecent(items, recentOnly);
 }
 
 // ─── Age buckets ──────────────────────────────────────────────────────────────
@@ -1382,7 +1376,6 @@ export const KanbanBoard = ({
 
   // Aggregate all items
   const allItems = useMemo<AggregatedItem[]>(() => {
-    const q = searchQuery.trim().toLowerCase();
     const result: AggregatedItem[] = [];
     for (const { path, data } of parsedFiles) {
       if (focusedFiles.size > 0 && !focusedFiles.has(path)) continue;
@@ -1390,12 +1383,7 @@ export const KanbanBoard = ({
         if (milestoneFilter && item.milestoneId !== milestoneFilter) return;
         if (showUpcoming && upcomingMilestone && item.milestoneId !== upcomingMilestone.id) return;
         if (!matchesDueFilter(item, dueFilter)) return;
-        if (q) {
-          const matchesText = item.text.toLowerCase().includes(q);
-          const matchesTag = item.tags.some((t) => t.toLowerCase().includes(q));
-          const matchesMilestone = !!item.milestoneId?.toLowerCase().includes(q);
-          if (!matchesText && !matchesTag && !matchesMilestone) return;
-        }
+        if (!matchesBoardSearch(item, searchQuery)) return;
         result.push({ item, itemIndex: idx, filePath: path });
       });
     }

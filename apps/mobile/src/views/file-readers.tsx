@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { Text as RNText, ScrollView, View } from 'react-native';
-import { csvView, jsonView, markdownBlocks, yamlView } from '../files/doc-views.js';
+import { jsonView, markdownBlocks, yamlView } from '../files/doc-views.js';
 import { useTheme } from '../theme/theme.js';
 import { Icon, Text } from '../ui/index.js';
+import { CsvDataTable } from './csv-table.js';
 import { WikiBlockView } from './wiki-view.js';
 
 const noop = () => {};
@@ -22,57 +23,13 @@ export function MarkdownReader({ content }: { content: string }) {
   );
 }
 
-const CELL_WIDTH = 140;
-
-/** A table that scrolls sideways, so wide sheets keep their columns readable. */
+/** Generic CSV/TSV reader: the sortable, filterable, paged table. */
 export function CsvTable({ content, path }: { content: string; path: string }) {
-  const { colors, spacing, shape } = useTheme();
-  const view = useMemo(() => csvView(content, path), [content, path]);
-  if (view.header.length === 0 && view.rows.length === 0) {
-    return <Text tone="secondary">Empty file</Text>;
-  }
-  const cell = (text: string, key: number, head: boolean) => (
-    <View key={key} style={{ width: CELL_WIDTH, paddingHorizontal: spacing.sm }}>
-      <Text variant="footnote" weight={head ? '600' : '400'} mono={!head} numberOfLines={2}>
-        {text}
-      </Text>
-    </View>
-  );
   return (
-    <View testID="reader-csv" style={{ gap: spacing.sm }}>
-      <ScrollView
-        horizontal
-        accessibilityLabel="Table"
-        style={{ backgroundColor: colors.surface, borderRadius: shape.md }}
-      >
-        <View style={{ paddingVertical: spacing.sm }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              paddingBottom: spacing.sm,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.separator,
-            }}
-          >
-            {view.header.map((h, i) => cell(h, i, true))}
-          </View>
-          {view.rows.map((row, r) => (
-            <View
-              // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and static
-              key={r}
-              style={{ flexDirection: 'row', paddingTop: spacing.sm }}
-            >
-              {view.header.map((_, c) => cell(row[c] ?? '', c, false))}
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-      <Text variant="footnote" tone="secondary">
-        {view.truncated
-          ? `Showing ${view.rows.length} of ${view.rowCount} rows`
-          : `${view.rowCount} ${view.rowCount === 1 ? 'row' : 'rows'}`}
-      </Text>
-    </View>
+    <CsvDataTable
+      content={content}
+      {...(path.toLowerCase().endsWith('.tsv') && { delimiter: '\t' })}
+    />
   );
 }
 
