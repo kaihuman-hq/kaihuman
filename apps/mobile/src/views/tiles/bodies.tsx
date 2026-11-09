@@ -3,7 +3,6 @@ import { View } from 'react-native';
 import {
   addEvent,
   addTodoTask,
-  type DataCollectionView,
   type EventRow,
   eventDateParts,
   groupEventsByDay,
@@ -24,7 +23,6 @@ export interface Ctx {
   error: string | null;
 }
 
-const num = (n: number, digits = 2) => n.toFixed(digits);
 
 export function Todos({ view, ctx }: { view: TodosView; ctx: Ctx }) {
   const { colors, spacing } = useTheme();
@@ -183,25 +181,5 @@ export function Events({ rows, ctx }: { rows: EventRow[]; ctx: Ctx }) {
         <Button label="Add event" icon="add" size="medium" variant="tinted" onPress={form.show} />
       )}
     </>
-  );
-}
-
-export function Collection({ view }: { view: DataCollectionView }) {
-  if (view.series.length === 0) return <EmptyLine>No numeric columns yet.</EmptyLine>;
-  return (
-    <Rows>
-      {view.series.map((s) => (
-        <ItemRow
-          key={s.column}
-          title={s.column}
-          subtitle={`${num(s.min)} to ${num(s.max)}, avg ${num(s.average)}`}
-          trailing={
-            <Text variant="title3" mono style={{ fontVariant: ['tabular-nums'] }}>
-              {`${num(s.latest)} ${s.unit}`.trim()}
-            </Text>
-          }
-        />
-      ))}
-    </Rows>
   );
 }

@@ -11,7 +11,7 @@ const FILE = [
   'Lunch;Cash;food;2026-11-05;12.5',
 ].join('\n');
 
-const ctx = (apply: Ctx['apply'] = vi.fn(() => true)): Ctx => ({
+const ctx = (apply: Ctx['apply'] = vi.fn((_r: unknown) => true)): Ctx => ({
   content: FILE,
   now: new Date(2026, 10, 9, 12),
   apply,
@@ -39,7 +39,7 @@ describe('Budget', () => {
   });
 
   it('adds with picked name and account and stays open for the next one', () => {
-    const apply = vi.fn(() => true);
+    const apply = vi.fn((_r: unknown) => true);
     render(<Budget ctx={ctx(apply)} />);
     fireEvent.click(addButton());
     fireEvent.click(screen.getByRole('button', { name: 'Lunch' }));
@@ -52,7 +52,7 @@ describe('Budget', () => {
   });
 
   it('accepts a custom name', () => {
-    const apply = vi.fn(() => true);
+    const apply = vi.fn((_r: unknown) => true);
     render(<Budget ctx={ctx(apply)} />);
     fireEvent.click(addButton());
     fireEvent.click(screen.getByRole('button', { name: 'New name' }));

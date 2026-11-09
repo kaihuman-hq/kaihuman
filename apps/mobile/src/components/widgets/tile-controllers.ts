@@ -1307,3 +1307,4 @@ export const presentTile = (path: string, content: string, now: Date): TileView 
 };
 
 export * from './budget-tile.js';
+export * from './collection-tile.js';
