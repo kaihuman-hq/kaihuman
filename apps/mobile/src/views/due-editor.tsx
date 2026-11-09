@@ -33,12 +33,15 @@ export function DueEditor({
   onChange,
   repeat,
   onRepeatChange,
+  dateOnly,
   now = new Date(),
 }: {
   value: TodoDue | undefined;
   onChange: (due: TodoDue | undefined) => void;
   repeat?: TodoRepeat;
   onRepeatChange?: (repeat: TodoRepeat | undefined) => void;
+  /** Hides the time switch, for dates without a time such as a milestone's. */
+  dateOnly?: boolean;
   now?: Date;
 }) {
   const { spacing, platform } = useTheme();
@@ -81,7 +84,7 @@ export function DueEditor({
           />
         ) : null}
       </View>
-      {value ? (
+      {value && !dateOnly ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Text variant="body">Add a time</Text>
           <Switch

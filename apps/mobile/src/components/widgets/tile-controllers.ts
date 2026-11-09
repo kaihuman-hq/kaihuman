@@ -9,7 +9,6 @@ import {
   type ActionLogEntry,
   addCommand,
   addPrompt,
-  addTodo,
   appendAction,
   type CommandEntry,
   calculateStats,
@@ -21,7 +20,6 @@ import {
   fillCommand,
   getUpcomingEvents,
   localDate,
-  type Milestone,
   markReadItLaterRead,
   parseActionLog,
   parseCommands,
@@ -31,7 +29,6 @@ import {
   parseReadItLater,
   parseTimeTracking,
   parseTimezones,
-  parseTodos,
   type ReadItLaterItem,
   serializeActionLog,
   serializeEvents,
@@ -39,11 +36,7 @@ import {
   serializePrompts,
   serializeReadItLater,
   serializeTimeTracking,
-  serializeTodos,
-  setStatus,
   type TimeTrackingData,
-  type TodoRepeat,
-  type TodoStatus,
 } from '@kaihuman/formats';
 import {
   addColumn,
@@ -72,6 +65,7 @@ import {
   type TravelView,
   travelView,
 } from './more-tiles.js';
+import { type TodosView, todosView } from './todos-tile.js';
 
 export type { PeriodPoint, StockPeriod } from '@kaihuman/formats/stocks';
 export * from './actionlog-tile.js';
@@ -81,6 +75,7 @@ export * from './read-later-tile.js';
 export * from './templates-tile.js';
 export * from './timetracking-tile.js';
 export * from './timezones-tile.js';
+export * from './todos-tile.js';
 
 /** Outcome of a mutation that can be rejected; `content` is the file's new text. */
 export type TileResult = { ok: true; content: string } | { ok: false; error: string };
@@ -100,83 +95,6 @@ const hasTag = (tags: readonly string[], tag: string | undefined): boolean =>
   !tag || tags.includes(tag);
 
 const uniqueSorted = (values: readonly string[]): string[] => [...new Set(values)].sort();
-
-// ─── .todos.md ───────────────────────────────────────────────────────────────
-
-export interface TodoRow {
-  /** Position in the file; the stable handle for `toggleTodo`. */
-  index: number;
-  id: string;
-  text: string;
-  status: TodoStatus;
-  tags: string[];
-  milestone?: string;
-  dueDate?: string;
-  dueTime?: string;
-  repeat?: TodoRepeat;
-}
-
-export interface TodosView {
-  rows: TodoRow[];
-  openCount: number;
-  upcomingMilestone?: Milestone;
-}
-
-/** Done and rejected todos fade off the tile an hour after their last change. */
-export const todosView = (content: string, now: Date, hideOlderThanMs = 3_600_000): TodosView => {
-  const data = parseTodos(content);
-  const names = new Map(data.milestones.map((m) => [m.id, m.name]));
-  const rows: TodoRow[] = [];
-  data.items.forEach((item, index) => {
-    const open = item.status === 'backlog' || item.status === 'in-progress';
-    if (!open && item.updatedAt && now.getTime() - item.updatedAt >= hideOlderThanMs) return;
-    rows.push({
-      index,
-      id: item.id,
-      text: item.text,
-      status: item.status,
-      tags: item.tags,
-      milestone: item.milestoneId ? names.get(item.milestoneId) : undefined,
-      ...(item.dueDate && { dueDate: item.dueDate }),
-      ...(item.dueTime && { dueTime: item.dueTime }),
-      ...(item.repeat && { repeat: item.repeat }),
-    });
-  });
-  const today = localDate(now);
-  const upcomingMilestone = data.milestones
-    .filter((m) => m.dueDate && m.dueDate >= today)
-    .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''))[0];
-  return {
-    rows,
-    openCount: rows.filter((r) => r.status === 'backlog' || r.status === 'in-progress').length,
-    upcomingMilestone,
-  };
-};
-
-/** Open todos (backlog or in progress) become done; done or rejected ones reopen. */
-export const toggleTodo = (content: string, index: number, now: Date): string => {
-  const data = parseTodos(content);
-  const item = data.items[index];
-  if (!item) return content;
-  const next: TodoStatus =
-    item.status === 'done' || item.status === 'rejected' ? 'backlog' : 'done';
-  const updated = setStatus(data, index, next);
-  updated.items = updated.items.map((it, i) =>
-    i === index ? { ...it, updatedAt: now.getTime() } : it,
-  );
-  return serializeTodos(updated);
-};
-
-export const addTodoTask = (
-  content: string,
-  text: string,
-  now: Date,
-  tags: string[] = [],
-): TileResult => {
-  const clean = text.trim();
-  if (!clean) return fail('Enter a task');
-  return ok(serializeTodos(addTodo(parseTodos(content), clean, tags, undefined, undefined, now)));
-};
 
 // ─── .habit.csv ──────────────────────────────────────────────────────────────
 
