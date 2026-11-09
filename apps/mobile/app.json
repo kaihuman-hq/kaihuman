@@ -9,7 +9,7 @@
     "icon": "./assets/icon.png",
     "ios": {
       "bundleIdentifier": "com.kaihuman.app",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -25,7 +25,12 @@
     "plugins": [
       "expo-router",
       "expo-background-task",
-      ["expo-notifications", { "color": "#E6FF4A" }],
+      [
+        "expo-notifications",
+        {
+          "color": "#E6FF4A"
+        }
+      ],
       "./plugins/with-kaihuman-widgets.ts"
     ],
     "extra": {
