@@ -1,7 +1,8 @@
 # Progress
 
-## 2026-11-09 — Test: extension WorkSettings teardown race
+## 2026-11-09 — Tests: extension teardown race, mobile render timeouts
 
+- Mobile `dom` tests get a 20s timeout: full tile and dashboard renders took over 5s on the shared CI runner.
 - `WorkSettings.test.tsx` waits for Preact's 35ms effect timer after unmounting, so it no longer calls `cancelAnimationFrame` after jsdom teardown on a busy CI runner.
 
 ## 2026-11-09 — Mobile: full web parity for todos, kanban, travel, board overview, palette, CSV tables, consumption, time tracking, stocks, timezones

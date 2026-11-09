@@ -25,6 +25,9 @@ export default defineConfig({
           environment: 'jsdom',
           include: ['src/**/*.test.tsx'],
           setupFiles: ['src/ui/test-setup.ts'],
+          // A full jsdom render of a tile or dashboard takes ~1s locally and 5s+ on a 2-CPU CI runner
+          // shared with the other packages' suites; the default 5s limit timed out there.
+          testTimeout: 20_000,
         },
       },
     ],
