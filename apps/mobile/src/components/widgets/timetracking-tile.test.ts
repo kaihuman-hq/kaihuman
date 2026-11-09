@@ -7,6 +7,8 @@ import {
   labelIndices,
   linePath,
   msToNextBoundary,
+  pointDetail,
+  pointIndexAt,
   timeHistoryView,
 } from './timetracking-tile.js';
 
@@ -130,5 +132,23 @@ describe('helpers', () => {
   it('msToNextBoundary', () => {
     expect(msToNextBoundary(61_500, 60_000)).toBe(58_500);
     expect(msToNextBoundary(120_000, 60_000)).toBe(60_000);
+  });
+});
+
+describe('chart point details', () => {
+  const p = { label: '2026-11-05', work: 7.5, breaks: 1 };
+  it('pointIndexAt snaps to the nearest point and clamps', () => {
+    expect(pointIndexAt(0, 100, 5)).toBe(0);
+    expect(pointIndexAt(60, 100, 5)).toBe(2);
+    expect(pointIndexAt(999, 100, 5)).toBe(4);
+    expect(pointIndexAt(-5, 100, 5)).toBe(0);
+    expect(pointIndexAt(50, 100, 1)).toBe(0);
+  });
+  it('pointDetail shows breaks only for daily', () => {
+    expect(pointDetail(p, 'daily')).toEqual({
+      title: '2026-11-05',
+      lines: ['Work: 7.5h', 'Breaks: 1h'],
+    });
+    expect(pointDetail(p, 'monthly').lines).toEqual(['Work: 7.5h']);
   });
 });

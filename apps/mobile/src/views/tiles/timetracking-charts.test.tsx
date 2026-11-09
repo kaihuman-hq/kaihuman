@@ -21,6 +21,32 @@ describe('Charts', () => {
     expect(screen.queryByText('Breaks (dashed)')).toBeNull();
   });
 
+  it('tapping a bar shows its callout; tapping again or the callout dismisses it', () => {
+    render(<Charts content={content} />);
+    fireEvent.click(screen.getByText('Monthly'));
+    const bar = screen.getByTestId(`bar-${today.slice(0, 7)}`);
+    expect(screen.queryByTestId('chart-callout')).toBeNull();
+    fireEvent.click(bar);
+    expect(screen.getByTestId('chart-callout').textContent).toContain(today.slice(0, 7));
+    expect(screen.getByText('Work: 3h')).toBeTruthy();
+    fireEvent.click(bar);
+    expect(screen.queryByTestId('chart-callout')).toBeNull();
+    fireEvent.click(bar);
+    fireEvent.click(screen.getByTestId('chart-callout'));
+    expect(screen.queryByTestId('chart-callout')).toBeNull();
+  });
+
+  it('tapping the daily line shows work and breaks, and switching mode clears it', () => {
+    render(<Charts content={content} />);
+    fireEvent.click(screen.getByTestId('daily-chart-touch'), { clientX: 10 });
+    expect(screen.getByTestId('chart-callout').textContent).toContain(today);
+    expect(screen.getByText('Work: 3h')).toBeTruthy();
+    expect(screen.getByText('Breaks: 1h')).toBeTruthy();
+    expect(screen.getByTestId('chart-marker')).toBeTruthy();
+    fireEvent.click(screen.getByText('Weekly'));
+    expect(screen.queryByTestId('chart-callout')).toBeNull();
+  });
+
   it('weekly shows bars', () => {
     render(<Charts content={content} />);
     fireEvent.click(screen.getByText('Weekly'));

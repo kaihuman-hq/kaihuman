@@ -196,3 +196,21 @@ export const formatHours = (h: number): string => `${Math.round(h * 10) / 10}h`;
 /** Milliseconds until the next whole `unitMs` boundary after `nowMs`; a full unit when exactly on one. */
 export const msToNextBoundary = (nowMs: number, unitMs: number): number =>
   unitMs - (nowMs % unitMs);
+
+/** Index of the point nearest to horizontal position `x` on a line drawn across `width`. */
+export const pointIndexAt = (x: number, width: number, count: number): number => {
+  if (count <= 1 || width <= 0) return 0;
+  return Math.min(count - 1, Math.max(0, Math.round((x / width) * (count - 1))));
+};
+
+/** Callout text for a tapped point: the bucket label, work hours and (daily only) break hours. */
+export const pointDetail = (
+  point: ChartPoint,
+  mode: ChartMode,
+): { title: string; lines: string[] } => ({
+  title: point.label,
+  lines:
+    mode === 'daily'
+      ? [`Work: ${formatHours(point.work)}`, `Breaks: ${formatHours(point.breaks)}`]
+      : [`Work: ${formatHours(point.work)}`],
+});
