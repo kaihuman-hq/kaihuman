@@ -179,6 +179,7 @@ export const WIDGET_ONLY_SOURCES: readonly string[] = [
   'MilestoneCountdownWidget.swift',
   'NextUpConfigurationIntent.swift',
   'PreviewData.swift',
+  'QuickAddWidget.swift',
   'QuickCaptureWidget.swift',
   'Theme.swift',
   'TodoWidgetViews.swift',

@@ -12,6 +12,7 @@ const quickKinds: Record<QuickKind, true> = {
   log: true,
   idea: true,
   knowledge: true,
+  inbox: true,
 };
 
 describe('expo-router route files', () => {
@@ -19,6 +20,11 @@ describe('expo-router route files', () => {
     for (const kind of Object.keys(quickKinds)) {
       expect(existsSync(`${appDir}quick-${kind}.tsx`), `app/quick-${kind}.tsx`).toBe(true);
     }
+  });
+
+  it('presents every quick-capture route as a sheet in the root stack', () => {
+    const root = readFileSync(`${appDir}_layout.tsx`, 'utf8');
+    for (const kind of Object.keys(quickKinds)) expect(root).toContain(`'quick-${kind}'`);
   });
 
   it('uses no partial dynamic segments, which expo-router never matches', () => {

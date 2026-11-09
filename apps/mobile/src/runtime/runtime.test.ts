@@ -145,6 +145,7 @@ describe('links', () => {
 
   it('routeToHref', () => {
     expect(routeToHref({ name: 'quick-capture', kind: 'idea' })).toBe('/quick-idea');
+    expect(routeToHref({ name: 'quick-capture', kind: 'inbox' })).toBe('/quick-inbox');
     expect(routeToHref({ name: 'board' })).toBe('/board');
     expect(routeToHref({ name: 'inbox' })).toBe('/board');
     expect(routeToHref({ name: 'file', path: '.kh/a b/c.md' })).toBe('/files/.kh/a%20b/c.md');
@@ -186,6 +187,9 @@ describe('links', () => {
     expect(nav).not.toHaveBeenCalled();
     handlePendingUrl(() => 'kaihuman://quick-todo', nav);
     expect(nav).toHaveBeenCalledWith('/quick-todo');
+    // The widget "+" and the quick-add widget store this one.
+    handlePendingUrl(() => 'kaihuman://quick-inbox', nav);
+    expect(nav).toHaveBeenCalledWith('/quick-inbox');
   });
 
   it('handles initial url, url events (auth callback) and foreground', async () => {

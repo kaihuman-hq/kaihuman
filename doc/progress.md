@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-09 — Mobile: add to inbox from the widget, Lock Screen and Siri
+
+- New `kaihuman://quick-inbox` deep link and route (`app/quick-inbox.tsx`): a one-field "Add to inbox" sheet. The keyboard opens at once, Return or Save appends a plain todo to `.kh/inbox.todos.md` and the outbox syncs it.
+- iOS: a "+" in the Next up (small, medium, large) and Inbox widget headers; a new **Add to inbox** widget (`QuickAddWidget`: Home Screen small, Lock Screen circular and rectangular); an iOS 18 **Add to inbox** control (Control Center, Lock Screen, Action button). All of them open the sheet (`QuickCaptureKind.inbox`). Siri, Shortcuts and Spotlight get the phrase "Add to kaihuman inbox" on the existing background `CaptureTodoIntent`, which adds without opening the app and queues the capture for the app when it cannot commit.
+- Android: a "+" in the Inbox widget header opens the same sheet.
+- Tests: deep-link parsing and routing, the one-field sheet, ordered replay of queued captures, and static checks of the Swift and Kotlin sources.
 ## 2026-11-09 — Mobile: widget fixes and web parity (stocks, consumption, habit, …)
 
 - Stocks (bug): the tile was empty for files the web wrote. Root cause: the mobile parser only read ISO dates, the web writes `DD.MM.YYYY HH:MM:SS`, so every row was dropped. The web's parsing moved to `@kaihuman/formats/stocks` (and consumption to `@kaihuman/formats/consumption`; `packages/ui` re-exports both) and mobile uses it. The tile gains week/month/year periods with bars and a list, change vs last, CAGR and an "Add value" form.

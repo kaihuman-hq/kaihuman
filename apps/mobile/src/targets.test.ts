@@ -520,6 +520,14 @@ const snapshotKeys = [
 ];
 
 describe('Kotlin widget sources', () => {
+  it('puts a "+" on the inbox widget that opens the one-field inbox sheet', () => {
+    const src = kotlin('InboxWidget.kt');
+    expect(src).toContain('WidgetHeader(khString(R.string.kh_w_inbox_title), showsAdd = true)');
+    expect(kotlin('WidgetUi.kt')).toContain('if (showsAdd) {');
+    expect(kotlin('WidgetUi.kt')).toContain('openUri(context, DeepLinks.QUICK_INBOX)');
+    expect(kotlin('WidgetUi.kt')).toContain('const val QUICK_INBOX = "kaihuman://quick-inbox"');
+  });
+
   it('queues a recurring todo completion for the app instead of marking it done', () => {
     const src = kotlin('TodoCommit.kt');
     expect(src).toMatch(/target == null && item\.repeatRule != null\) \{\s*queueMutation\(/);

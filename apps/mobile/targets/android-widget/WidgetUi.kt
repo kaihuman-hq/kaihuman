@@ -32,8 +32,11 @@ import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.material3.ColorProviders
+import androidx.glance.semantics.contentDescription
+import androidx.glance.semantics.semantics
 import androidx.glance.text.FontFamily
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
@@ -152,6 +155,8 @@ object DeepLinks {
     const val INBOX = "kaihuman://inbox"
     const val BOARD = "kaihuman://board"
     const val IDEAS = "kaihuman://ideas"
+    /** The one-field "Add to inbox" sheet. */
+    const val QUICK_INBOX = "kaihuman://quick-inbox"
 
     private fun enc(s: String): String = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 
@@ -249,8 +254,30 @@ fun StaleFooter(freshness: Freshness) {
     }
 }
 
+/** The "+" that opens the one-field inbox sheet; it takes the tap before the widget's own link. */
 @Composable
-fun WidgetHeader(title: String, trailing: String? = null) {
+fun AddToInboxButton() {
+    val context = LocalContext.current
+    val label = khString(R.string.kh_w_add_to_inbox)
+    Box(
+        modifier = GlanceModifier
+            .size(24.dp)
+            .cornerRadius(12.dp)
+            .background(GlanceTheme.colors.primary)
+            .clickable(openUri(context, DeepLinks.QUICK_INBOX))
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "+",
+            maxLines = 1,
+            style = TextStyle(color = GlanceTheme.colors.onPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold),
+        )
+    }
+}
+
+@Composable
+fun WidgetHeader(title: String, trailing: String? = null, showsAdd: Boolean = false) {
     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = title,
@@ -273,6 +300,10 @@ fun WidgetHeader(title: String, trailing: String? = null) {
                     fontFamily = FontFamily.Monospace,
                 ),
             )
+        }
+        if (showsAdd) {
+            Spacer(GlanceModifier.width(6.dp))
+            AddToInboxButton()
         }
     }
 }

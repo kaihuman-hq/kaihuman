@@ -175,6 +175,7 @@ describe('ios widget target', () => {
       IdeaPipelineWidget: read('IdeaPipelineWidget.swift'),
       KnowledgeCardWidget: read('KnowledgeCardWidget.swift'),
       HabitsWidget: read('HabitsWidget.swift'),
+      QuickAddWidget: read('QuickAddWidget.swift'),
     };
     const families: Record<keyof typeof widgetFiles, string[]> = {
       InboxTodoWidget: [
@@ -193,6 +194,7 @@ describe('ios widget target', () => {
       IdeaPipelineWidget: ['systemSmall', 'systemMedium'],
       KnowledgeCardWidget: ['systemMedium', 'systemLarge'],
       HabitsWidget: ['systemSmall', 'accessoryRectangular'],
+      QuickAddWidget: ['systemSmall', 'accessoryCircular', 'accessoryRectangular'],
     };
     const kinds = Object.keys(widgetFiles) as Array<keyof typeof widgetFiles>;
     const familiesOf = (swift: string): string[] =>
@@ -458,6 +460,22 @@ describe('ios widget target', () => {
       expect(legacy).toContain('openAppWhenRun = true');
     });
 
+    it('opens the one-field inbox sheet from the quick-add widget and every "+"', () => {
+      const intent = read('OpenQuickCaptureIntent.swift');
+      expect(intent).toContain('case inbox');
+      expect(intent).toContain('"kaihuman://quick-inbox"');
+      const add = read('QuickAddWidget.swift');
+      expect(add).toContain('.widgetURL(DeepLink.quickInbox)');
+      expect(read('WidgetComponents.swift')).toContain('host: "quick-inbox"');
+      const plus = /AddToInboxButton\(|showsAdd: true/g;
+      expect(read('WidgetComponents.swift')).toContain(
+        'Button(intent: OpenQuickCaptureIntent(kind: .inbox))',
+      );
+      // Next up: small and large headers plus the medium layout.
+      expect(read('TodoWidgetViews.swift').match(plus)).toHaveLength(3);
+      expect(read('InboxCountWidget.swift')).toMatch(plus);
+    });
+
     it('has four capture buttons in the widget', () => {
       const swift = read('QuickCaptureWidget.swift');
       for (const kind of ['.todo', '.note', '.log', '.idea']) {
@@ -468,14 +486,22 @@ describe('ios widget target', () => {
 
     it('offers four iOS 18 controls behind an availability guard', () => {
       const controls = read('ControlWidgets.swift');
-      const controlKinds = ['NewTodoControl', 'NewNoteControl', 'NewLogControl', 'NewIdeaControl'];
+      const controlKinds = [
+        'NewTodoControl',
+        'NewNoteControl',
+        'NewLogControl',
+        'NewIdeaControl',
+        'AddToInboxControl',
+      ];
       for (const kind of controlKinds) {
         expect(controls).toContain(`static let kind = "${kind}"`);
         expect(controls).toMatch(
           new RegExp(`@available\\(iOS 18\\.0, \\*\\)\\s+struct ${kind}: ControlWidget`),
         );
       }
-      expect(controls).toContain('ControlWidgetButton(action: OpenQuickCaptureIntent(');
+      expect(controls).toContain(
+        'ControlWidgetButton(action: OpenQuickCaptureIntent(kind: .inbox))',
+      );
       // A nested WidgetBundle is not a Widget, so the controls sit in the bundle's iOS 18 branch.
       const guarded = /if #available\(iOS(ApplicationExtension)? 18\.0, \*\) \{([^}]*)\}/.exec(
         widgets,
@@ -534,6 +560,15 @@ describe('ios widget target', () => {
       expect(capture).toContain('"Added to inbox"');
       expect(capture).toContain('store.appendCapture(text: trimmed)');
       expect(capture).toContain('queueing: .capture(text: trimmed)');
+    });
+
+    it('answers "Add to kaihuman inbox" from Siri, Shortcuts and Spotlight', () => {
+      const shortcuts = readFileSync(
+        join(dir, '..', 'ios-app-intents', 'AppShortcuts.swift'),
+        'utf8',
+      );
+      const block = shortcuts.slice(shortcuts.indexOf('intent: CaptureTodoIntent()'));
+      expect(block).toContain('"Add to \\(.applicationName) inbox"');
     });
   });
 

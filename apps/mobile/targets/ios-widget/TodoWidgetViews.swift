@@ -141,7 +141,7 @@ struct NextUpContent: View {
 
     private var small: some View {
         VStack(alignment: .leading, spacing: 9) {
-            WidgetHeader(title: "NEXT UP", trailing: "\(items.count)", theme: theme)
+            WidgetHeader(title: "NEXT UP", trailing: "\(items.count)", theme: theme, showsAdd: true)
             if items.isEmpty {
                 EmptyStateView(title: emptyTitle, theme: theme)
             } else {
@@ -157,13 +157,17 @@ struct NextUpContent: View {
     private var medium: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                Text("\(items.count)")
-                    .font(WidgetTheme.number(40))
-                    .foregroundStyle(theme.label)
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-                    .padding(.top, 12)
-                    .widgetAccentable()
+                HStack(alignment: .top, spacing: 4) {
+                    Text("\(items.count)")
+                        .font(WidgetTheme.number(40))
+                        .foregroundStyle(theme.label)
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                        .padding(.top, 12)
+                        .widgetAccentable()
+                    Spacer(minLength: 0)
+                    AddToInboxButton(theme: theme, size: 26)
+                }
                 Text("open").font(.system(size: 13, weight: .medium)).foregroundStyle(theme.label).padding(.top, 4)
                 Text("\(doneToday) done today")
                     .font(.system(size: 12, weight: .medium))
@@ -193,7 +197,10 @@ struct NextUpContent: View {
 
     private var large: some View {
         VStack(alignment: .leading, spacing: 8) {
-            WidgetHeader(title: "NEXT UP · \(sourceLabel.uppercased())", trailing: "\(items.count) open", theme: theme)
+            WidgetHeader(
+                title: "NEXT UP · \(sourceLabel.uppercased())", trailing: "\(items.count) open", theme: theme,
+                showsAdd: true
+            )
             if items.isEmpty {
                 EmptyStateView(title: emptyTitle, subtitle: "\(doneToday) done today", theme: theme)
             } else {

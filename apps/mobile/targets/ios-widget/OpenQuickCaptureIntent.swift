@@ -8,6 +8,8 @@ enum QuickCaptureKind: String, AppEnum {
     case log
     case idea
     case knowledge
+    /// The one-field sheet that adds a plain todo to the inbox (widget "+", quick-add widget).
+    case inbox
 
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Capture type")
     static let caseDisplayRepresentations: [QuickCaptureKind: DisplayRepresentation] = [
@@ -16,6 +18,7 @@ enum QuickCaptureKind: String, AppEnum {
         .log: DisplayRepresentation(title: "Log"),
         .idea: DisplayRepresentation(title: "Idea"),
         .knowledge: DisplayRepresentation(title: "Knowledge"),
+        .inbox: DisplayRepresentation(title: "Inbox"),
     ]
 
     var url: String {
@@ -25,6 +28,7 @@ enum QuickCaptureKind: String, AppEnum {
         case .log: return "kaihuman://quick-log"
         case .idea: return "kaihuman://quick-idea"
         case .knowledge: return "kaihuman://quick-knowledge"
+        case .inbox: return "kaihuman://quick-inbox"
         }
     }
 }

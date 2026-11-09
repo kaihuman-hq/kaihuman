@@ -53,6 +53,31 @@ describe('QuickCaptureView', () => {
     expect(onDone).toHaveBeenCalledOnce();
   });
 
+  it('inbox is one field that saves to the inbox on Return', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const files = new MemoryFiles();
+    const onDone = vi.fn();
+    render(
+      <QuickCaptureView
+        controller={new QuickCaptureController(files)}
+        kind="inbox"
+        onDone={onDone}
+      />,
+    );
+    expect(screen.getByText('Add to inbox')).toBeTruthy();
+    expect(screen.queryByTestId('capture-extra')).toBeNull();
+    expect(screen.queryByText(/due/i)).toBeNull();
+    const field = screen.getByLabelText('Inbox');
+    await waitFor(() => expect(document.activeElement).toBe(field));
+    expect(field.tagName).toBe('INPUT');
+    fireEvent.change(field, { target: { value: 'renew passport' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByText('Todo added')).toBeTruthy());
+    expect(files.store.get('.kh/inbox.todos.md')).toContain('- [ ] renew passport');
+    vi.advanceTimersByTime(1000);
+    expect(onDone).toHaveBeenCalledOnce();
+  });
+
   it('focuses the main field when the sheet opens', async () => {
     render(<QuickCaptureView controller={controller()} kind="note" />);
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Note')));

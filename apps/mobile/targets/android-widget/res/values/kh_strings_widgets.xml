@@ -23,6 +23,7 @@
     <string name="kh_w_inbox_zero">Inbox zero</string>
     <string name="kh_w_in_knowledge">%1$d in knowledge</string>
     <string name="kh_w_process">Process</string>
+    <string name="kh_w_add_to_inbox">Add to inbox</string>
     <plurals name="kh_w_todos">
         <item quantity="one">todo</item>
         <item quantity="other">todos</item>
