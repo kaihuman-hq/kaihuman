@@ -7,7 +7,7 @@ import type {
 } from '../components/widgets/tile-controllers.js';
 import { useTheme } from '../theme/theme.js';
 import type { IconName } from '../ui/index.js';
-import { Badge, Card, Text } from '../ui/index.js';
+import { Badge, Card, ErrorBoundary, Text } from '../ui/index.js';
 import {
   ActionLog,
   Bookmarks,
@@ -70,8 +70,16 @@ function HeaderBadge({ tile }: { tile: TileData }) {
   return null;
 }
 
-/** One dashboard tile: a card with a heading and a body per tile kind. */
-export function Tile({ path, tile, content, now, onWrite }: TileProps) {
+/** One dashboard tile: a card with a heading and a body per tile kind. A body that throws shows an inline error. */
+export function Tile(props: TileProps) {
+  return (
+    <ErrorBoundary what="this tile" resetKey={props.content}>
+      <TileCard {...props} />
+    </ErrorBoundary>
+  );
+}
+
+function TileCard({ path, tile, content, now, onWrite }: TileProps) {
   const [error, setError] = useState<string | null>(null);
   const { spacing } = useTheme();
   const meta = TILE_META[tile.kind];

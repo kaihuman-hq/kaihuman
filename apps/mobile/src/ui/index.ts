@@ -4,6 +4,13 @@ export { Card, type CardProps, StatTile, type StatTileProps } from './card.js';
 export { Badge, type BadgeProps, type BadgeTone, Chip, type ChipProps } from './chip.js';
 export { Divider } from './divider.js';
 export { EmptyState, type EmptyStateProps } from './empty-state.js';
+export {
+  ErrorBoundary,
+  type ErrorBoundaryProps,
+  errorMessage,
+  InlineError,
+  type InlineErrorProps,
+} from './error-boundary.js';
 export { Fab, type FabProps } from './fab.js';
 export { GithubMark, type GithubMarkProps } from './github-mark.js';
 export { haptics } from './haptics.js';

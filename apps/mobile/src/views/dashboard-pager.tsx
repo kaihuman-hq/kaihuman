@@ -19,7 +19,15 @@ import {
 } from '../screens/dashboards.js';
 import { SyncStatusBanner } from '../sync/sync-status-banner.js';
 import { useTheme } from '../theme/theme.js';
-import { EmptyState, haptics, Icon, Text } from '../ui/index.js';
+import {
+  EmptyState,
+  ErrorBoundary,
+  errorMessage,
+  haptics,
+  Icon,
+  InlineError,
+  Text,
+} from '../ui/index.js';
 import { useInsets } from '../ui/insets.js';
 import { Shortcuts, Skeleton } from './dashboard-view.js';
 import { Tile } from './tile-view.js';
@@ -33,7 +41,7 @@ const dateLine = (now: Date) =>
 
 const PLACEHOLDER: DashboardPage = { id: 'today', name: 'Today', files: [] };
 
-type Shown = TileFile & { tile?: TileView };
+type Shown = TileFile & { tile?: TileView; failed?: string };
 type Block = { kind: 'row'; items: Shown[] } | { kind: 'single'; item: Shown };
 
 /** Consecutive compact tiles share a wrapping grid; everything else stands alone, in file order. */
@@ -99,13 +107,23 @@ function Page({
   const { fontScale } = useWindowDimensions();
   // Two columns would clip the numbers at large text sizes or on very narrow phones.
   const basis = fontScale > 1.3 || width < 360 ? '100%' : '47%';
-  const shown: Shown[] = page.files.map((f) => ({
-    ...f,
-    tile: presentTile(f.path, f.content, now),
-  }));
+  const shown: Shown[] = page.files.map((f) => {
+    try {
+      return { ...f, tile: presentTile(f.path, f.content, now) };
+    } catch (e) {
+      return { ...f, failed: errorMessage(e) };
+    }
+  });
   const open = (path: string) => onNavigate(tileRoute(path));
-  const renderOne = (item: Shown) =>
-    item.tile ? (
+  const renderOne = (item: Shown) => (
+    <ErrorBoundary what="this tile" resetKey={item.content} onRetry={onRefresh}>
+      {renderTile(item)}
+    </ErrorBoundary>
+  );
+  const renderTile = (item: Shown) =>
+    item.failed !== undefined ? (
+      <InlineError what="this tile" message={item.failed} onRetry={onRefresh} />
+    ) : item.tile ? (
       TILE_SIZE[item.tile.kind] === 'full' ? (
         <Tile
           path={item.path}

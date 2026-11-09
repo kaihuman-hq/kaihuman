@@ -5,7 +5,7 @@ import { presentTile } from '../components/widgets/tile-controllers.js';
 import { fileKindForPath } from '../files/file-kinds.js';
 import { type ImageSource, loadImage } from '../files/image-source.js';
 import { useTheme } from '../theme/theme.js';
-import { Text } from '../ui/index.js';
+import { ErrorBoundary, Text } from '../ui/index.js';
 import {
   CsvTable,
   JsonReader,
@@ -84,15 +84,21 @@ export function ImageViewer({ path, mime }: { path: string; mime: string }) {
  * Picks the native view for a file: a dashboard tile for widget files, a reader for documents.
  * `content` is the decrypted text; `onWrite` receives the whole next text.
  */
-export function FileContentView({
-  path,
-  content,
-  onWrite,
-}: {
+export function FileContentView(props: FileContentProps) {
+  return (
+    <ErrorBoundary what="this file" resetKey={props.content}>
+      <FileContentBody {...props} />
+    </ErrorBoundary>
+  );
+}
+
+interface FileContentProps {
   path: string;
   content: string;
   onWrite: (content: string) => void | Promise<void>;
-}) {
+}
+
+function FileContentBody({ path, content, onWrite }: FileContentProps) {
   const [now] = useState(() => new Date());
   const { encrypted, innerPath, view } = fileKindForPath(path);
   switch (view.type) {

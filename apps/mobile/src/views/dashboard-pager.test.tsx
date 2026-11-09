@@ -1,11 +1,15 @@
 import { buildDemoSeed, configureCoreStorage, InMemoryStorageAdapter } from '@kaihuman/core';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as controllers from '../components/widgets/tile-controllers.js';
 import { type DashboardPage, loadDashboards } from '../screens/dashboards.js';
 import type { ContentFiles } from '../screens/file-editor-screen.js';
 import { DashboardPager } from './dashboard-pager.js';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 beforeEach(() => configureCoreStorage(new InMemoryStorageAdapter()));
 
 const NOW = new Date(2026, 10, 5, 10, 0, 0);
@@ -138,5 +142,22 @@ describe('DashboardPager states', () => {
     );
     expect(screen.getAllByText('No tiles on this dashboard').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Add files to Alpha in the web console.').length).toBe(1);
+  });
+});
+
+describe('DashboardPager with a tile that throws', () => {
+  it('shows that tile as an inline error and keeps the others', async () => {
+    const real = controllers.presentTile;
+    const pages = await demoPages();
+    const [bad, good] = pages[0]?.files ?? [];
+    vi.spyOn(controllers, 'presentTile').mockImplementation((path, content, now) => {
+      if (path === bad?.path) throw new Error('parser blew up');
+      return real(path, content, now);
+    });
+    render(<DashboardPager pages={pages} now={NOW} onWrite={vi.fn()} onNavigate={vi.fn()} />);
+    expect(screen.getByText('parser blew up')).toBeTruthy();
+    expect(screen.getByText("Couldn't show this tile")).toBeTruthy();
+    expect(good).toBeDefined();
+    expect(screen.getAllByTestId(/^(tile|summary)-/).length).toBeGreaterThan(0);
   });
 });
