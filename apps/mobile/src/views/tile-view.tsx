@@ -16,7 +16,6 @@ import {
   Collection,
   type Ctx,
   Events,
-  Habit,
   ReadLater,
   Templates,
   Timer,
@@ -24,7 +23,7 @@ import {
 } from './tiles/bodies.js';
 import { BoardOverview, PaletteSettings, Rss, Travel } from './tiles/more-bodies.js';
 import { Err, TileIcon } from './tiles/parts.js';
-import { Consumption, Stocks } from './tiles/tracker-bodies.js';
+import { Consumption, Habit, Stocks } from './tiles/tracker-bodies.js';
 
 export interface TileProps {
   path: string;

@@ -1,8 +1,12 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { consumptionView, stocksView } from '../../components/widgets/tile-controllers.js';
+import {
+  consumptionView,
+  habitView,
+  stocksView,
+} from '../../components/widgets/tile-controllers.js';
 import type { Ctx } from './bodies.js';
-import { Consumption, Stocks } from './tracker-bodies.js';
+import { Consumption, Habit, Stocks } from './tracker-bodies.js';
 
 afterEach(cleanup);
 
@@ -80,5 +84,38 @@ describe('Consumption tile', () => {
     fireEvent.change(screen.getByLabelText('Unit'), { target: { value: 'kWh' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save meter' }));
     expect(apply).toHaveBeenCalledWith({ ok: true, content: 'created,Power[unit:kWh]' });
+  });
+});
+
+describe('Habit tile', () => {
+  const file = 'iso date;goal reached\n2026-11-01;x\n2026-09-15;x\n';
+
+  // Regression: the activity history (heatmap) was missing on mobile.
+  it('renders the activity heatmap with past check-ins', () => {
+    render(<Habit view={habitView(file, NOW)} ctx={ctx(file)} />);
+    expect(screen.getByTestId('habit-heatmap')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '2026-09-15, done' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '2026-09-16, not done' })).toBeTruthy();
+  });
+
+  it('checks in a past day picked on the heatmap', () => {
+    const apply = vi.fn((_: unknown) => true);
+    render(<Habit view={habitView(file, NOW)} ctx={ctx(file, apply)} />);
+    fireEvent.click(screen.getByRole('button', { name: '2026-10-20, not done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check in' }));
+    const result = apply.mock.calls[0]?.[0] as { ok: true; content: string };
+    expect(
+      habitView(result.content, NOW)
+        .weeks.flat()
+        .find((d) => d.date === '2026-10-20')?.reached,
+    ).toBe(true);
+  });
+
+  it('offers to check in yesterday when it was missed', () => {
+    const apply = vi.fn((_: unknown) => true);
+    render(<Habit view={habitView(file, NOW)} ctx={ctx(file, apply)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Check in yesterday' }));
+    const result = apply.mock.calls[0]?.[0] as { ok: true; content: string };
+    expect(habitView(result.content, NOW).checkedInYesterday).toBe(true);
   });
 });

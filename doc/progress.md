@@ -4,6 +4,7 @@
 
 - Stocks (bug): the tile was empty for files the web wrote. Root cause: the mobile parser only read ISO dates, the web writes `DD.MM.YYYY HH:MM:SS`, so every row was dropped. The web's parsing moved to `@kaihuman/formats/stocks` (and consumption to `@kaihuman/formats/consumption`; `packages/ui` re-exports both) and mobile uses it. The tile gains week/month/year periods with bars and a list, change vs last, CAGR and an "Add value" form.
 - Consumption (bug): nothing could be added on mobile; the tile was read-only and its own parser missed `DD.MM.YYYY` and the old `Zeitstempel,Datum,…` layout. It now uses the shared parser and has "Add reading" (date, one field per meter with the last reading as a hint; a gap-filled day is replaced), "Add meter" (name, unit, yearly target), this year's use against the target, a Recent list with same day last year, and yearly totals.
+- Habit: the tile now shows the web's 20-week activity heatmap (Sunday-first columns, month labels, today outlined). Tap a day to select it, then "Check in" or "Undo" (future days are disabled; `toggleHabitDay`). Adds the week streak, the streak line and "Check in yesterday" when yesterday was missed.
 
 ## 2026-11-09 — Mobile: RSS filter and swipe, one-column dashboard, events redesign, board file header
 

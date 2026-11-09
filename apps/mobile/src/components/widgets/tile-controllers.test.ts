@@ -38,6 +38,7 @@ import {
   tileKindForPath,
   timerView,
   todosView,
+  toggleHabitDay,
   toggleHabitToday,
   toggleTodo,
   worldClocksView,
@@ -120,6 +121,45 @@ describe('.habit.csv', () => {
     expect(habitView(on, now)).toMatchObject({ currentStreak: 3, checkedInToday: true });
     const off = toggleHabitToday(on, now);
     expect(habitView(off, now).checkedInToday).toBe(false);
+  });
+
+  // Regression: mobile had no activity history; the web shows a 20-week heatmap.
+  it('builds a 20-week heatmap ending this week, Sunday first', () => {
+    const view = habitView('iso date;goal reached\n2026-11-03;x\n2026-07-01;x', now);
+    expect(view.weeks).toHaveLength(20);
+    const last = view.weeks[19] ?? [];
+    expect(last.map((d) => d.date)).toEqual([
+      '2026-11-01',
+      '2026-11-02',
+      '2026-11-03',
+      '2026-11-04',
+      '2026-11-05',
+      '2026-11-06',
+      '2026-11-07',
+    ]);
+    expect(last[2]?.reached).toBe(true);
+    expect(last[4]).toMatchObject({ isToday: true, future: false });
+    expect(last[5]?.future).toBe(true);
+    expect(view.weeks[0]?.[0]?.date).toBe('2026-06-21');
+    expect(view.weeks.flat().find((d) => d.date === '2026-07-01')?.reached).toBe(true);
+    expect(view.monthLabels[0]).toEqual({ week: 0, label: 'Jun' });
+    expect(view.monthLabels.map((m) => m.label)).toEqual([
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+    ]);
+    expect(view.checkedInYesterday).toBe(false);
+  });
+
+  it('toggles any past day and refuses future ones', () => {
+    const r = toggleHabitDay('iso date;goal reached\n', '2026-11-04', now);
+    expect(r.ok && habitView(r.content, now).checkedInYesterday).toBe(true);
+    const back = r.ok ? toggleHabitDay(r.content, '2026-11-04', now) : r;
+    expect(back.ok && habitView(back.content, now).checkedInYesterday).toBe(false);
+    expect(toggleHabitDay('', '2026-11-06', now).ok).toBe(false);
   });
 });
 

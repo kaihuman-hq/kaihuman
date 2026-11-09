@@ -20,7 +20,6 @@ import {
   eventDateParts,
   formatElapsed,
   groupEventsByDay,
-  type HabitView,
   interpolateTemplate,
   logAction,
   markReadLaterRead,
@@ -31,7 +30,6 @@ import {
   type TileResult,
   type TimerView,
   type TodosView,
-  toggleHabitToday,
   toggleTodo,
   type WorldClock,
 } from '../../components/widgets/tile-controllers.js';
@@ -70,11 +68,6 @@ const hostOf = (url: string) => {
   } catch {
     return url;
   }
-};
-const WEEKDAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
-const dayLetter = (iso: string) => {
-  const [y, m, d] = iso.split('-').map(Number);
-  return WEEKDAY[new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1).getDay()] ?? '';
 };
 /** Lists past this length collapse behind a "Show all" button. */
 const COLLAPSED = 5;
@@ -166,67 +159,6 @@ export function Todos({ view, ctx }: { view: TodosView; ctx: Ctx }) {
         onChangeText={setText}
         onSubmit={add}
         addLabel="Add task"
-      />
-    </>
-  );
-}
-
-export function Habit({ view, ctx }: { view: HabitView; ctx: Ctx }) {
-  const { colors, spacing } = useTheme();
-  return (
-    <>
-      <StatRow>
-        <Stat label="Streak" value={String(view.currentStreak)} unit="days" />
-        <Stat label="Total" value={String(view.totalCount)} unit="check-ins" />
-      </StatRow>
-      <View
-        accessible
-        accessibilityLabel={`Last seven days, ${view.strip.filter((d) => d.reached).length} reached`}
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          paddingVertical: spacing.xs,
-        }}
-      >
-        {view.strip.map((d) => (
-          <View key={d.date} style={{ alignItems: 'center', gap: spacing.xs }}>
-            <View
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: d.reached ? colors.accentFill : colors.fill,
-                borderWidth: d.isToday && !d.reached ? 2 : 0,
-                borderColor: colors.accent,
-              }}
-            >
-              {d.reached ? (
-                <Icon name="check" size={16} color={colors.onAccentFill} weight="bold" />
-              ) : null}
-            </View>
-            <Text
-              variant="caption2"
-              tone={d.isToday ? 'accent' : 'secondary'}
-              weight={d.isToday ? '700' : '500'}
-            >
-              {dayLetter(d.date)}
-            </Text>
-          </View>
-        ))}
-      </View>
-      <Button
-        fullWidth
-        variant={view.checkedInToday ? 'tinted' : 'filled'}
-        icon={view.checkedInToday ? undefined : 'check'}
-        label={view.checkedInToday ? 'Undo check-in' : 'Check in today'}
-        onPress={() => {
-          if (ctx.apply(toggleHabitToday(ctx.content, ctx.now))) {
-            if (view.checkedInToday) haptics.light();
-            else haptics.success();
-          }
-        }}
       />
     </>
   );

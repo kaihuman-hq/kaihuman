@@ -178,6 +178,8 @@ export interface HabitDay {
   date: string;
   reached: boolean;
   isToday: boolean;
+  /** After today; drawn blank and not tappable. */
+  future?: boolean;
 }
 
 export interface HabitView {
@@ -185,33 +187,79 @@ export interface HabitView {
   weekStreak: number;
   totalCount: number;
   checkedInToday: boolean;
+  checkedInYesterday: boolean;
   /** The last seven days, oldest first, ending today. */
   strip: HabitDay[];
+  /** Activity heatmap like the web: 20 week columns (Sunday first), oldest first, ending this week. */
+  weeks: HabitDay[][];
+  /** Short month name over the first column of each month. */
+  monthLabels: { week: number; label: string }[];
 }
+
+export const HABIT_WEEKS = 20;
 
 export const habitView = (content: string, now: Date): HabitView => {
   const data = parseHabitData(content);
   const reached = new Set(data.entries.filter((e) => e.reached).map((e) => e.date));
   const today = localDate(now);
+  const day = (back: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - back);
   const strip: HabitDay[] = [];
   for (let back = 6; back >= 0; back--) {
-    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back);
-    const date = localDate(day);
+    const date = localDate(day(back));
     strip.push({ date, reached: reached.has(date), isToday: date === today });
   }
-  return { ...calculateStats(data, now), checkedInToday: reached.has(today), strip };
+  const weekStart = day(now.getDay());
+  const weeks: HabitDay[][] = [];
+  const monthLabels: { week: number; label: string }[] = [];
+  for (let w = 0; w < HABIT_WEEKS; w++) {
+    const col: HabitDay[] = [];
+    for (let d = 0; d < 7; d++) {
+      const at = new Date(
+        weekStart.getFullYear(),
+        weekStart.getMonth(),
+        weekStart.getDate() - (HABIT_WEEKS - 1 - w) * 7 + d,
+      );
+      const date = localDate(at);
+      col.push({
+        date,
+        reached: reached.has(date),
+        isToday: date === today,
+        future: date > today,
+      });
+      if (d === 0 && monthLabels.at(-1)?.label !== MONTHS[at.getMonth()]) {
+        monthLabels.push({ week: w, label: MONTHS[at.getMonth()] as string });
+      }
+    }
+    weeks.push(col);
+  }
+  return {
+    ...calculateStats(data, now),
+    checkedInToday: reached.has(today),
+    checkedInYesterday: reached.has(localDate(day(1))),
+    strip,
+    weeks,
+    monthLabels,
+  };
+};
+
+/** Checks a day in, or takes the check-in back when it was a mis-tap. Future days are refused. */
+export const toggleHabitDay = (content: string, date: string, now: Date): TileResult => {
+  if (!ISO_DAY.test(date) || date > localDate(now)) {
+    return { ok: false, error: 'You can only check in today or earlier.' };
+  }
+  const data = parseHabitData(content);
+  if (!data.entries.some((e) => e.date === date && e.reached)) return ok(checkIn(content, date));
+  return ok(
+    serializeHabitData({
+      entries: data.entries.map((e) => (e.date === date ? { ...e, reached: false } : e)),
+    }),
+  );
 };
 
 /** Checks today in, or takes the check-in back when it was a mis-tap. */
 export const toggleHabitToday = (content: string, now: Date): string => {
-  const today = localDate(now);
-  if (!parseHabitData(content).entries.some((e) => e.date === today && e.reached)) {
-    return checkIn(content, today);
-  }
-  const data = parseHabitData(content);
-  return serializeHabitData({
-    entries: data.entries.map((e) => (e.date === today ? { ...e, reached: false } : e)),
-  });
+  const r = toggleHabitDay(content, localDate(now), now);
+  return r.ok ? r.content : content;
 };
 
 // ─── .timetracking.csv ───────────────────────────────────────────────────────
