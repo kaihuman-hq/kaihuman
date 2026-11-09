@@ -17,12 +17,12 @@ import {
   type Ctx,
   Events,
   ReadLater,
-  Templates,
   Timer,
   Todos,
 } from './tiles/bodies.js';
 import { BoardOverview, PaletteSettings, Rss, Travel } from './tiles/more-bodies.js';
 import { Err, TileIcon } from './tiles/parts.js';
+import { Templates } from './tiles/templates-body.js';
 import { Consumption, Habit, Stocks } from './tiles/tracker-bodies.js';
 
 export interface TileProps {
@@ -146,9 +146,9 @@ function TileBody({ tile, ctx }: { tile: TileData; ctx: Ctx }) {
     case 'datacollection':
       return <Collection view={tile.view} />;
     case 'prompts':
-      return <Templates view={tile.view} ctx={ctx} kind="prompt" />;
+      return <Templates ctx={ctx} kind="prompt" />;
     case 'commands':
-      return <Templates view={tile.view} ctx={ctx} kind="command" />;
+      return <Templates ctx={ctx} kind="command" />;
     case 'rss':
       return <Rss view={tile.view} ctx={ctx} />;
     case 'travel':

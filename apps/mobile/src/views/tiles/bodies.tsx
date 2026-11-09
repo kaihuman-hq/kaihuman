@@ -3,9 +3,7 @@ import { Linking, View } from 'react-native';
 import {
   type ActionLogView,
   addBookmarkEntry,
-  addCommandEntry,
   addEvent,
-  addPromptEntry,
   addReadLaterUrl,
   addTodoTask,
   type BookmarksView,
@@ -20,13 +18,9 @@ import {
   eventDateParts,
   formatElapsed,
   groupEventsByDay,
-  interpolateTemplate,
   logAction,
   markReadLaterRead,
-  missingParameters,
   type ReadLaterView,
-  type TemplateRow,
-  type TemplatesView,
   type TileResult,
   type TimerView,
   type TodosView,
@@ -547,123 +541,5 @@ export function Collection({ view }: { view: DataCollectionView }) {
         />
       ))}
     </Rows>
-  );
-}
-
-export function Templates({
-  view,
-  ctx,
-  kind,
-}: {
-  view: TemplatesView;
-  ctx: Ctx;
-  kind: 'prompt' | 'command';
-}) {
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const form = useDisclosure();
-  const save = () => {
-    const result =
-      kind === 'prompt'
-        ? addPromptEntry(ctx.content, title, body)
-        : addCommandEntry(ctx.content, title, body);
-    if (ctx.apply(result)) {
-      haptics.success();
-      setTitle('');
-      setBody('');
-      form.hide();
-    } else haptics.error();
-  };
-  return (
-    <>
-      {view.rows.length === 0 ? (
-        <EmptyLine>{`No ${kind}s yet.`}</EmptyLine>
-      ) : (
-        <Rows>
-          {view.rows.map((r) => (
-            <TemplateItem key={r.title} row={r} />
-          ))}
-        </Rows>
-      )}
-      {form.open ? (
-        <>
-          <TextField
-            label={`New ${kind} title`}
-            value={title}
-            onChangeText={setTitle}
-            autoCapitalize="sentences"
-            returnKeyType="next"
-          />
-          <TextField label={`New ${kind} text`} value={body} onChangeText={setBody} multiline />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Button label={`Save ${kind}`} size="medium" onPress={save} />
-            <Button label="Cancel" size="medium" variant="plain" onPress={form.hide} />
-          </View>
-        </>
-      ) : (
-        <Button
-          label={`Add ${kind}`}
-          icon="add"
-          size="medium"
-          variant="tinted"
-          onPress={form.show}
-        />
-      )}
-    </>
-  );
-}
-
-function TemplateItem({ row }: { row: TemplateRow }) {
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [open, setOpen] = useState(false);
-  const { colors, spacing, shape } = useTheme();
-  const missing = missingParameters(row, values);
-  return (
-    <View>
-      <ItemRow
-        title={row.title}
-        subtitle={
-          row.parameters.length > 0 ? `Needs ${row.parameters.join(', ')}` : 'No parameters'
-        }
-        expanded={open}
-        trailing={
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            {row.tags.slice(0, 2).map((t) => (
-              <Badge key={t} tone="neutral" label={t} />
-            ))}
-            <Icon
-              name={open ? 'chevronDown' : 'chevronRight'}
-              size={14}
-              color={colors.tertiaryLabel}
-              weight="semibold"
-            />
-          </View>
-        }
-        onPress={() => setOpen(!open)}
-      />
-      {open ? (
-        <View style={{ gap: spacing.sm, paddingBottom: spacing.md }}>
-          {row.parameters.map((p) => (
-            <TextField
-              key={p}
-              label={`${row.title}: ${p}`}
-              value={values[p] ?? ''}
-              onChangeText={(v) => setValues({ ...values, [p]: v })}
-            />
-          ))}
-          <View
-            testID={`preview-${row.title}`}
-            style={{ backgroundColor: colors.fill, borderRadius: shape.md, padding: spacing.md }}
-          >
-            <Text variant="footnote" mono>
-              {interpolateTemplate(row.template, values)}
-            </Text>
-          </View>
-          {missing.length > 0 ? (
-            <Text variant="footnote" tone="secondary">{`Missing: ${missing.join(', ')}`}</Text>
-          ) : null}
-        </View>
-      ) : null}
-    </View>
   );
 }
