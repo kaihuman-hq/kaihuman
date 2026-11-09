@@ -23,12 +23,26 @@ export interface RssItem {
 
 export const DEFAULT_RSS_CONFIG: RssConfig = { feedOptions: [], readLater: [] };
 
+const strings = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+
+/** Hand-edited or older files miss fields; a feed without `read` used to throw on the first tap. */
+function toFeedConfig(raw: unknown): RssFeedConfig[] {
+  if (!raw || typeof raw !== 'object') return [];
+  const f = raw as Partial<Record<keyof RssFeedConfig, unknown>>;
+  if (typeof f.url !== 'string') return [];
+  const id = typeof f.id === 'string' && f.id ? f.id : f.url;
+  return [{ ...f, id, url: f.url, read: strings(f.read) } as RssFeedConfig];
+}
+
 export const parseRssConfig = (content: string): RssConfig => {
   if (!content || !content.trim()) return DEFAULT_RSS_CONFIG;
   try {
     const parsed = JSON.parse(content);
     return {
-      feedOptions: Array.isArray(parsed?.feedOptions) ? parsed.feedOptions : [],
+      feedOptions: Array.isArray(parsed?.feedOptions)
+        ? parsed.feedOptions.flatMap(toFeedConfig)
+        : [],
       readLater: Array.isArray(parsed?.readLater) ? parsed.readLater : [],
     };
   } catch {

@@ -9,6 +9,14 @@ import {
 } from './rss.js';
 
 describe('rss config', () => {
+  it('fills in a missing read list and drops feeds without a url', () => {
+    const config = parseRssConfig(
+      JSON.stringify({ feedOptions: [{ id: 'a', url: 'https://x/feed' }, { id: 'b' }, null, 3] }),
+    );
+    expect(config.feedOptions).toEqual([{ id: 'a', url: 'https://x/feed', read: [] }]);
+    expect(markRssItemRead(config, 'a', 'k').feedOptions[0]?.read).toEqual(['k']);
+  });
+
   it('returns defaults for empty and invalid input', () => {
     expect(parseRssConfig('')).toEqual({ feedOptions: [], readLater: [] });
     expect(parseRssConfig('{nope')).toEqual({ feedOptions: [], readLater: [] });

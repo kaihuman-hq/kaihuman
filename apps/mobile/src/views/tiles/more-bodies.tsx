@@ -7,7 +7,6 @@ import {
   addTravelTrip,
   type BoardOverviewView,
   boardOverviewView,
-  type FeedSnapshot,
   markRssRead,
   type PaletteEntryRow,
   type PaletteSettingsView,
@@ -17,7 +16,7 @@ import {
   type TravelView,
   type TripRow,
 } from '../../components/widgets/tile-controllers.js';
-import { feedStore } from '../../files/feed-store.js';
+import { useEnsureFeeds, useFeedSnapshot } from '../../files/use-feeds.js';
 import { type ContentFiles, githubContentFiles } from '../../screens/file-editor-screen.js';
 import { useTheme } from '../../theme/theme.js';
 import { Badge, Button, haptics, Icon, Text, TextField } from '../../ui/index.js';
@@ -40,16 +39,6 @@ export function relativeDate(iso: string | null, now: Date): string {
   return iso.slice(0, 10);
 }
 
-/** Feed state lives outside the file; re-render whenever the store reports a change. */
-function useFeedSnapshot(): FeedSnapshot {
-  const [snap, setSnap] = useState<FeedSnapshot>(() => feedStore.snapshot());
-  useEffect(() => {
-    setSnap(feedStore.snapshot());
-    return feedStore.subscribe(() => setSnap(feedStore.snapshot()));
-  }, []);
-  return snap;
-}
-
 export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
   const { colors, spacing } = useTheme();
   const snapshot = useFeedSnapshot();
@@ -59,10 +48,7 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
     () => rssView(ctx.content, snapshot, ctx.now),
     [ctx.content, snapshot, ctx.now],
   );
-  const urlKey = initial.feeds.map((f) => f.url).join('\n');
-  useEffect(() => {
-    if (urlKey) void feedStore.ensure(urlKey.split('\n'));
-  }, [urlKey]);
+  useEnsureFeeds(initial.feeds.map((f) => f.url));
 
   const add = () => {
     if (ctx.apply(addRssFeedUrl(ctx.content, url, randomUUID().slice(0, 8)))) {

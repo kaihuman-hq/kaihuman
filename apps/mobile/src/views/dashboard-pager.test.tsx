@@ -6,8 +6,27 @@ import { type DashboardPage, loadDashboards } from '../screens/dashboards.js';
 import type { ContentFiles } from '../screens/file-editor-screen.js';
 import { DashboardPager } from './dashboard-pager.js';
 
+const feeds = vi.hoisted(() => {
+  let snap: Record<string, unknown> = {};
+  const listeners = new Set<() => void>();
+  return {
+    ensure: vi.fn(async () => {}),
+    set(next: Record<string, unknown>) {
+      snap = next;
+      for (const fn of listeners) fn();
+    },
+    snapshot: () => snap,
+    subscribe(fn: () => void) {
+      listeners.add(fn);
+      return () => void listeners.delete(fn);
+    },
+  };
+});
+vi.mock('../files/feed-store.js', () => ({ feedStore: feeds }));
+
 afterEach(() => {
   cleanup();
+  feeds.set({});
   vi.restoreAllMocks();
 });
 beforeEach(() => configureCoreStorage(new InMemoryStorageAdapter()));
@@ -159,5 +178,29 @@ describe('DashboardPager with a tile that throws', () => {
     expect(screen.getByText("Couldn't show this tile")).toBeTruthy();
     expect(good).toBeDefined();
     expect(screen.getAllByTestId(/^(tile|summary)-/).length).toBeGreaterThan(0);
+  });
+});
+
+describe('DashboardPager RSS tile', () => {
+  it('fetches the feeds and shows the unread count once they arrive', async () => {
+    const pages = (await demoPages()).filter((p) =>
+      p.files.some((f) => f.path.endsWith('.rss.json')),
+    );
+    render(<DashboardPager pages={pages} now={NOW} onWrite={vi.fn()} onNavigate={vi.fn()} />);
+    expect(feeds.ensure).toHaveBeenCalledWith(
+      expect.arrayContaining(['https://hnrss.org/frontpage']),
+    );
+    const item = (guid: string) => ({ title: `Item ${guid}`, link: `https://h/${guid}`, guid });
+    feeds.set({
+      'https://hnrss.org/frontpage': {
+        title: 'HN',
+        fetchedAt: 1,
+        loading: false,
+        items: [item('a'), item('b')],
+      },
+    });
+    const tile = await screen.findByTestId('summary-rss');
+    expect(within(tile).getByText('2')).toBeTruthy();
+    expect(within(tile).getByText('Item a')).toBeTruthy();
   });
 });

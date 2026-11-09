@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { presentTile, type TileView } from '../components/widgets/tile-controllers.js';
+import { useEnsureFeeds, useFeedSnapshot } from '../files/use-feeds.js';
 import {
   type DashboardPage,
   lastDashboardId,
@@ -107,6 +108,8 @@ function Page({
   const { fontScale } = useWindowDimensions();
   // Two columns would clip the numbers at large text sizes or on very narrow phones.
   const basis = fontScale > 1.3 || width < 360 ? '100%' : '47%';
+  // RSS tiles count unread items from fetched feeds, so fetch them here and redraw on arrival.
+  useFeedSnapshot();
   const shown: Shown[] = page.files.map((f) => {
     try {
       return { ...f, tile: presentTile(f.path, f.content, now) };
@@ -114,6 +117,9 @@ function Page({
       return { ...f, failed: errorMessage(e) };
     }
   });
+  useEnsureFeeds(
+    shown.flatMap((f) => (f.tile?.kind === 'rss' ? f.tile.view.feeds.map((x) => x.url) : [])),
+  );
   const open = (path: string) => onNavigate(tileRoute(path));
   const renderOne = (item: Shown) => (
     <ErrorBoundary what="this tile" resetKey={item.content} onRetry={onRefresh}>
