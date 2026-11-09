@@ -46,6 +46,14 @@ import {
   type TodoStatus,
 } from '@kaihuman/formats';
 import {
+  addColumn,
+  addConsumptionEntry,
+  getYearlyStats,
+  parseConsumption,
+  sameDayLastYear,
+  serializeConsumption,
+} from '@kaihuman/formats/consumption';
+import {
   addEntry as addStockEntry,
   aggregateByPeriod,
   getStats,
@@ -793,72 +801,158 @@ export interface ConsumptionMeter {
   title: string;
   unit: string;
   yearlyTarget?: number;
+  /** Latest recorded meter reading. */
   latestReading: number;
-  /** Use between the last two readings. */
+  /** Day of that reading, `YYYY-MM-DD`. */
+  latestDate: string;
+  /** Use between the last two recorded readings. */
   lastPeriodUse: number | null;
-  /** Use over the trailing 12 months, when the file spans that long. */
-  yearUse: number | null;
+  /** Use so far this calendar year, as the web's small widget shows it. */
+  yearUse: number;
   /** Share of the yearly target used, 0..1+, when a target is set. */
   targetProgress: number | null;
-  /** Use per reading interval, oldest first. */
-  series: { date: string; use: number }[];
 }
 
-/** Header cells look like `Gas[title:Gas;unit:m³;yearlyTarget:1200]`; the brackets hide `;`. */
-const splitHeader = (line: string): string[] => line.split(/,(?![^[]*\])/);
+export interface ConsumptionRow {
+  date: string;
+  /** Use since the previous day per meter key; null when unknown. */
+  use: Record<string, number | null>;
+  /** Same day last year, when the file goes back that far. */
+  lastYear: Record<string, number | null>;
+}
 
-const minusOneYear = (iso: string): string => {
-  const d = parseLocalDate(iso);
-  return localDate(new Date(d.getFullYear() - 1, d.getMonth(), d.getDate()));
+export interface ConsumptionYear {
+  year: number;
+  total: Record<string, number>;
+  perDay: Record<string, number>;
+}
+
+export interface ConsumptionView {
+  meters: ConsumptionMeter[];
+  /** Recorded (not gap-filled) days, newest first. */
+  recent: ConsumptionRow[];
+  /** Totals per calendar year, newest first. */
+  years: ConsumptionYear[];
+}
+
+const finite = (n: number | undefined): n is number => n !== undefined && Number.isFinite(n);
+
+/**
+ * Parsing is shared with the web (`DD.MM.YYYY` dates, the old two-date-column layout, daily
+ * gap filling), so a reading added here lands in the file exactly as the web would write it.
+ */
+export const consumptionView = (content: string, now: Date): ConsumptionView => {
+  const { data } = parseConsumption(content);
+  const recorded = data.entries.filter((e) => !e.interpolated);
+  const byDate = new Map(data.entries.map((e) => [e.date, e]));
+  const years = getYearlyStats(data);
+  const thisYear = years.find((y) => y.year === now.getFullYear());
+  const meters: ConsumptionMeter[] = [];
+  for (const col of data.columns) {
+    const readings = recorded.filter((e) => finite(e.readings[col.key]));
+    const last = readings[readings.length - 1];
+    if (!last) continue;
+    const prev = readings[readings.length - 2];
+    const latestReading = last.readings[col.key] as number;
+    const yearUse = thisYear?.totalByKey[col.key] ?? 0;
+    meters.push({
+      key: col.key,
+      title: col.title,
+      unit: col.unit,
+      yearlyTarget: col.yearlyTarget > 0 ? col.yearlyTarget : undefined,
+      latestReading,
+      latestDate: last.date,
+      lastPeriodUse: prev ? latestReading - (prev.readings[col.key] as number) : null,
+      yearUse,
+      targetProgress: col.yearlyTarget > 0 ? yearUse / col.yearlyTarget : null,
+    });
+  }
+  const useOf = (e: { deltas: Record<string, number> } | undefined, key: string) => {
+    const d = e?.deltas[key];
+    return finite(d) && d > 0 ? d : null;
+  };
+  const recent = recorded
+    .slice(-30)
+    .reverse()
+    .map((e) => {
+      const ly = byDate.get(sameDayLastYear(e.date));
+      return {
+        date: e.date,
+        use: Object.fromEntries(data.columns.map((c) => [c.key, useOf(e, c.key)])),
+        lastYear: Object.fromEntries(data.columns.map((c) => [c.key, useOf(ly, c.key)])),
+      };
+    });
+  return {
+    meters,
+    recent,
+    years: [...years]
+      .reverse()
+      .map((y) => ({ year: y.year, total: y.totalByKey, perDay: y.avgPerDayByKey })),
+  };
 };
 
-export const consumptionView = (content: string): ConsumptionMeter[] => {
-  const lines = content.split(/\r?\n/).filter((l) => l.trim());
-  const header = lines[0];
-  if (!header) return [];
-  const cols = splitHeader(header).slice(1);
-  const rows = lines
-    .slice(1)
-    .map((l) => l.split(','))
-    .filter((p) => ISO_DAY.test((p[0] ?? '').trim()))
-    .sort((a, b) => (a[0] ?? '').localeCompare(b[0] ?? ''));
-  const meters: ConsumptionMeter[] = [];
-  cols.forEach((col, ci) => {
-    const m = /^([^[]*)(?:\[(.*)\])?$/.exec(col.trim());
-    const key = m?.[1]?.trim() ?? col;
-    const meta = new Map(
-      (m?.[2] ?? '')
-        .split(';')
-        .map((kv) => [kv.slice(0, kv.indexOf(':')), kv.slice(kv.indexOf(':') + 1)] as const),
-    );
-    const readings = rows
-      .map((p) => ({ date: (p[0] ?? '').trim(), value: Number.parseFloat(p[ci + 1] ?? '') }))
-      .filter((r) => !Number.isNaN(r.value));
-    if (readings.length === 0) return;
-    const series = readings.slice(1).map((r, i) => ({
-      date: r.date,
-      use: r.value - (readings[i] as { value: number }).value,
-    }));
-    const last = readings[readings.length - 1] as { date: string; value: number };
-    const cutoff = minusOneYear(last.date);
-    const yearAgo = readings.find((r) => r.date >= cutoff);
-    const yearUse =
-      yearAgo && yearAgo !== last && readings.length > 12 ? last.value - yearAgo.value : null;
-    const target = Number.parseFloat(meta.get('yearlyTarget') ?? '');
-    meters.push({
-      key,
-      title: meta.get('title') || key,
-      unit: meta.get('unit') ?? '',
-      yearlyTarget: Number.isNaN(target) ? undefined : target,
-      latestReading: last.value,
-      lastPeriodUse: series.length ? (series[series.length - 1] as { use: number }).use : null,
-      yearUse,
-      targetProgress:
-        yearUse !== null && !Number.isNaN(target) && target > 0 ? yearUse / target : null,
-      series,
-    });
+/** The meters a reading can be entered for, with the last reading as a hint. */
+export const consumptionColumns = (
+  content: string,
+): { key: string; title: string; unit: string; last: number | null }[] => {
+  const { data } = parseConsumption(content);
+  return data.columns.map((c) => {
+    const last = data.entries.filter((e) => finite(e.readings[c.key])).at(-1);
+    return { ...c, last: last ? (last.readings[c.key] as number) : null };
   });
-  return meters;
+};
+
+/** Records meter readings for a day; blank meters stay empty, like the web's add form. */
+export const addConsumptionReading = (
+  content: string,
+  date: string,
+  readings: Record<string, string>,
+  now: Date,
+): TileResult => {
+  const { data } = parseConsumption(content);
+  if (data.columns.length === 0) return { ok: false, error: 'Add a meter first.' };
+  const day = date.trim() || localDate(now);
+  if (!ISO_DAY.test(day)) return { ok: false, error: 'Use a date like 2026-01-31.' };
+  if (data.entries.some((e) => e.date === day && !e.interpolated)) {
+    return { ok: false, error: `There is already a reading for ${day}.` };
+  }
+  const parsed: Record<string, number> = {};
+  for (const col of data.columns) {
+    const raw = (readings[col.key] ?? '').trim();
+    const n = raw ? Number(raw.replace(',', '.')) : Number.NaN;
+    if (raw && Number.isNaN(n)) return { ok: false, error: `${col.title} must be a number.` };
+    parsed[col.key] = n;
+  }
+  if (!Object.values(parsed).some(Number.isFinite)) {
+    return { ok: false, error: 'Enter at least one reading.' };
+  }
+  // A gap-filled day is replaced by the real reading.
+  const base = { ...data, entries: data.entries.filter((e) => e.date !== day) };
+  return ok(serializeConsumption(addConsumptionEntry(base, day, parsed)));
+};
+
+/** Adds a meter column, e.g. Gas in m³ with a yearly target. */
+export const addConsumptionMeter = (
+  content: string,
+  meter: { name: string; unit: string; yearlyTarget: string },
+): TileResult => {
+  const name = meter.name.trim();
+  if (!name) return { ok: false, error: 'Give the meter a name.' };
+  if (/[,[\];:]/.test(name)) return { ok: false, error: 'Names cannot contain , ; : [ or ].' };
+  const { data } = parseConsumption(content);
+  const key = name.replace(/\s+/g, '');
+  if (data.columns.some((c) => c.key === key)) {
+    return { ok: false, error: `${name} is already a meter.` };
+  }
+  const target = meter.yearlyTarget.trim() ? Number(meter.yearlyTarget.replace(',', '.')) : 0;
+  if (Number.isNaN(target) || target < 0) {
+    return { ok: false, error: 'The yearly target must be a number.' };
+  }
+  const unit = meter.unit.trim();
+  if (/[,[\];:]/.test(unit)) return { ok: false, error: 'Units cannot contain , ; : [ or ].' };
+  return ok(
+    serializeConsumption(addColumn(data, { key, title: name, unit, yearlyTarget: target })),
+  );
 };
 
 // ─── .data-collection.csv ────────────────────────────────────────────────────
@@ -1036,7 +1130,7 @@ export type TileView =
   | { kind: 'bookmarks'; view: BookmarksView }
   | { kind: 'budget'; view: BudgetView }
   | { kind: 'stocks'; view: StocksView | null }
-  | { kind: 'consumption'; view: ConsumptionMeter[] }
+  | { kind: 'consumption'; view: ConsumptionView }
   | { kind: 'datacollection'; view: DataCollectionView }
   | { kind: 'prompts'; view: TemplatesView }
   | { kind: 'commands'; view: TemplatesView }
@@ -1098,7 +1192,7 @@ export const presentTile = (path: string, content: string, now: Date): TileView 
     case 'stocks':
       return { kind: 'stocks', view: stocksView(content) };
     case 'consumption':
-      return { kind: 'consumption', view: consumptionView(content) };
+      return { kind: 'consumption', view: consumptionView(content, now) };
     case 'datacollection':
       return { kind: 'datacollection', view: dataCollectionView(content) };
     case 'prompts':

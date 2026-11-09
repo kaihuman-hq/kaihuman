@@ -14,7 +14,6 @@ import {
   Budget,
   Clocks,
   Collection,
-  Consumption,
   type Ctx,
   Events,
   Habit,
@@ -25,7 +24,7 @@ import {
 } from './tiles/bodies.js';
 import { BoardOverview, PaletteSettings, Rss, Travel } from './tiles/more-bodies.js';
 import { Err, TileIcon } from './tiles/parts.js';
-import { Stocks } from './tiles/tracker-bodies.js';
+import { Consumption, Stocks } from './tiles/tracker-bodies.js';
 
 export interface TileProps {
   path: string;
@@ -144,7 +143,7 @@ function TileBody({ tile, ctx }: { tile: TileData; ctx: Ctx }) {
     case 'stocks':
       return <Stocks view={tile.view} ctx={ctx} />;
     case 'consumption':
-      return <Consumption meters={tile.view} />;
+      return <Consumption view={tile.view} ctx={ctx} />;
     case 'datacollection':
       return <Collection view={tile.view} />;
     case 'prompts':

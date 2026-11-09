@@ -4,6 +4,8 @@ import {
   actionLogView,
   addBookmarkEntry,
   addCommandEntry,
+  addConsumptionMeter,
+  addConsumptionReading,
   addEvent,
   addPromptEntry,
   addReadLaterUrl,
@@ -14,6 +16,7 @@ import {
   clockIn,
   clockOut,
   commandsView,
+  consumptionColumns,
   consumptionView,
   dataCollectionView,
   deleteBookmarkEntry,
@@ -367,24 +370,69 @@ describe('.stocks.csv', () => {
 describe('.consumption.csv', () => {
   const { content } = demo('.consumption.csv');
 
-  it('derives use per period and progress against the yearly target', () => {
-    const meters = consumptionView(content);
+  it("shows each meter with this year's use against its yearly target", () => {
+    const { meters, recent, years } = consumptionView(content, now);
     const power = meters.find((m) => m.key === 'Electricity');
     expect(power).toMatchObject({ title: 'Electricity', unit: 'kWh', yearlyTarget: 3500 });
-    expect(power?.series[0]).toMatchObject({ date: '2025-12-01', use: 277 });
-    expect(power?.lastPeriodUse).toBe(power?.series[power.series.length - 1]?.use);
-    expect(meters.find((m) => m.key === 'Water')?.yearlyTarget).toBeUndefined();
+    expect(power?.latestDate).toBe('2026-11-01');
+    expect(power?.yearUse).toBeGreaterThan(0);
+    expect(power?.targetProgress).toBeCloseTo((power?.yearUse ?? 0) / 3500);
     expect(meters.find((m) => m.key === 'Water')?.targetProgress).toBeNull();
+    // Only recorded days are listed, not the gap-filled ones between them.
+    expect(recent[0]?.date).toBe('2026-11-01');
+    expect(recent[1]?.date).toBe('2026-10-01');
+    expect(years[0]?.year).toBe(2026);
   });
 
-  it('computes trailing-year use once a year of readings exists', () => {
-    const rows = Array.from(
-      { length: 13 },
-      (_, i) =>
-        `${i < 12 ? '2025' : '2026'}-${String((i % 12) + 1).padStart(2, '0')}-01,${i * 100}`,
+  // Regression: the web writes DD.MM.YYYY and an old two-date-column layout.
+  it('reads the old German layout the web still supports', () => {
+    const old =
+      'Zeitstempel,Datum,Gas[unit:m³]\n01.01.2026 00:00:00,01.01.2026,100\n01.02.2026 00:00:00,01.02.2026,160\n';
+    const [gas] = consumptionView(old, now).meters;
+    expect(gas).toMatchObject({ latestReading: 160, latestDate: '2026-02-01', lastPeriodUse: 60 });
+  });
+
+  // Regression: there was no way to add a reading on mobile.
+  it('adds a reading for today and rejects bad input', () => {
+    const file = 'created,Gas[unit:m³],Water\n2026-11-01,100,5\n';
+    const res = addConsumptionReading(file, '', { Gas: '112,5', Water: '' }, now);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.content.split('\n').at(-1)).toBe('2026-11-05,112.500,');
+    expect(consumptionView(res.content, now).meters[0]).toMatchObject({ latestReading: 112.5 });
+    expect(addConsumptionReading(file, '2026-11-01', { Gas: '120' }, now)).toEqual({
+      ok: false,
+      error: 'There is already a reading for 2026-11-01.',
+    });
+    expect(addConsumptionReading(file, '', { Gas: 'x' }, now).ok).toBe(false);
+    expect(addConsumptionReading(file, '', {}, now).ok).toBe(false);
+    expect(addConsumptionReading('', '', { Gas: '1' }, now)).toEqual({
+      ok: false,
+      error: 'Add a meter first.',
+    });
+  });
+
+  it('adds a meter to an empty file, then a reading for it', () => {
+    const res = addConsumptionMeter('', { name: 'Gas', unit: 'm³', yearlyTarget: '1200' });
+    expect(res).toEqual({ ok: true, content: 'created,Gas[unit:m³;yearlyTarget:1200]' });
+    if (!res.ok) return;
+    expect(consumptionColumns(res.content)).toEqual([
+      {
+        rawKey: 'Gas[unit:m³;yearlyTarget:1200]',
+        key: 'Gas',
+        title: 'Gas',
+        unit: 'm³',
+        yearlyTarget: 1200,
+        higherIsBetter: false,
+        last: null,
+      },
+    ]);
+    const next = addConsumptionReading(res.content, '', { Gas: '5' }, now);
+    expect(next.ok && consumptionView(next.content, now).meters[0]?.latestReading).toBe(5);
+    expect(addConsumptionMeter(res.content, { name: 'Gas', unit: '', yearlyTarget: '' }).ok).toBe(
+      false,
     );
-    const [m] = consumptionView(`created,Gas[unit:m³;yearlyTarget:1200]\n${rows.join('\n')}`);
-    expect(m).toMatchObject({ yearUse: 1200, targetProgress: 1 });
+    expect(addConsumptionMeter('', { name: 'a,b', unit: '', yearlyTarget: '' }).ok).toBe(false);
   });
 });
 

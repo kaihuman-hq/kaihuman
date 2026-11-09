@@ -3,6 +3,7 @@
 ## 2026-11-09 — Mobile: widget fixes and web parity (stocks, consumption, habit, …)
 
 - Stocks (bug): the tile was empty for files the web wrote. Root cause: the mobile parser only read ISO dates, the web writes `DD.MM.YYYY HH:MM:SS`, so every row was dropped. The web's parsing moved to `@kaihuman/formats/stocks` (and consumption to `@kaihuman/formats/consumption`; `packages/ui` re-exports both) and mobile uses it. The tile gains week/month/year periods with bars and a list, change vs last, CAGR and an "Add value" form.
+- Consumption (bug): nothing could be added on mobile; the tile was read-only and its own parser missed `DD.MM.YYYY` and the old `Zeitstempel,Datum,…` layout. It now uses the shared parser and has "Add reading" (date, one field per meter with the last reading as a hint; a gap-filled day is replaced), "Add meter" (name, unit, yearly target), this year's use against the target, a Recent list with same day last year, and yearly totals.
 
 ## 2026-11-09 — CI: retry Android Gradle builds
 

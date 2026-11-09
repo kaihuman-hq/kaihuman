@@ -119,9 +119,9 @@ export function summarizeTile(tile: TileView, _now: Date): TileSummary {
         : out('--', 'no data');
     case 'consumption':
       return out(
-        String(tile.view.length),
-        plural(tile.view.length, 'meter'),
-        tile.view.map((m) => `${m.title}: ${m.latestReading} ${m.unit}`.trim()),
+        String(tile.view.meters.length),
+        plural(tile.view.meters.length, 'meter'),
+        tile.view.meters.map((m) => `${m.title}: ${m.latestReading} ${m.unit}`.trim()),
       );
     case 'datacollection':
       return out(

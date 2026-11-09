@@ -11,7 +11,6 @@ import {
   type BookmarksView,
   type BudgetView,
   bookmarksView,
-  type ConsumptionMeter,
   clearReadLater,
   clockIn,
   clockOut,
@@ -570,45 +569,6 @@ export function Budget({ view }: { view: BudgetView }) {
         </View>
       ) : null}
     </>
-  );
-}
-
-export function Consumption({ meters }: { meters: ConsumptionMeter[] }) {
-  if (meters.length === 0) return <EmptyLine>No meters yet.</EmptyLine>;
-  return (
-    <View style={{ gap: 16 }}>
-      {meters.map((m) => (
-        <View key={m.key} style={{ gap: 6 }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'baseline',
-              justifyContent: 'space-between',
-              gap: 8,
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <Text variant="headline">{m.title}</Text>
-            </View>
-            <Text variant="title3" mono style={{ fontVariant: ['tabular-nums'] }}>
-              {`${num(m.latestReading)} ${m.unit}`}
-            </Text>
-          </View>
-          {m.targetProgress !== null ? (
-            <>
-              <Meter value={m.targetProgress} label={`${m.title} yearly target`} />
-              <Text variant="footnote" tone="secondary">
-                {`${Math.round(m.targetProgress * 100)}% of yearly target`}
-              </Text>
-            </>
-          ) : m.lastPeriodUse !== null ? (
-            <Text variant="footnote" tone="secondary">
-              {`${num(m.lastPeriodUse)} ${m.unit} since last reading`}
-            </Text>
-          ) : null}
-        </View>
-      ))}
-    </View>
   );
 }
 

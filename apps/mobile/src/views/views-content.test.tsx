@@ -219,7 +219,7 @@ describe('tiles', () => {
     expect(screen.getByText('Profit')).toBeTruthy();
     cleanup();
     renderTile('consumption');
-    expect(screen.getAllByText(/^\d+\.\d\d \S+/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^Reading \d+ on /).length).toBeGreaterThan(0);
     cleanup();
     renderTile('datacollection');
     expect(screen.getByText(/rows$/)).toBeTruthy();

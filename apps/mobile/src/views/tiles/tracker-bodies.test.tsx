@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { stocksView } from '../../components/widgets/tile-controllers.js';
+import { consumptionView, stocksView } from '../../components/widgets/tile-controllers.js';
 import type { Ctx } from './bodies.js';
-import { Stocks } from './tracker-bodies.js';
+import { Consumption, Stocks } from './tracker-bodies.js';
 
 afterEach(cleanup);
 
@@ -48,5 +48,37 @@ describe('Stocks tile', () => {
       ok: false,
       error: 'Enter the current value as a number.',
     });
+  });
+});
+
+describe('Consumption tile', () => {
+  const file = 'created,Gas[unit:m³;yearlyTarget:1200]\n2026-10-01,100\n2026-11-01,160\n';
+
+  it("shows this year's use against the target and the recent readings", () => {
+    render(<Consumption view={consumptionView(file, NOW)} ctx={ctx(file)} />);
+    expect(screen.getByText('Reading 160 on 2026-11-01')).toBeTruthy();
+    expect(screen.getByText('2026-11-01')).toBeTruthy();
+  });
+
+  // Regression: on mobile there was no way to add anything.
+  it('adds a reading through the form', () => {
+    const apply = vi.fn((_: unknown) => true);
+    render(<Consumption view={consumptionView(file, NOW)} ctx={ctx(file, apply)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add reading' }));
+    fireEvent.change(screen.getByLabelText('Gas (m³)'), { target: { value: '170' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save reading' }));
+    const result = apply.mock.calls[0]?.[0] as { ok: true; content: string };
+    expect(result.content.endsWith('2026-11-09,170')).toBe(true);
+  });
+
+  it('offers to add a meter to an empty file', () => {
+    const apply = vi.fn((_: unknown) => true);
+    render(<Consumption view={consumptionView('', NOW)} ctx={ctx('', apply)} />);
+    expect(screen.queryByRole('button', { name: 'Add reading' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Add meter' }));
+    fireEvent.change(screen.getByLabelText('Meter name'), { target: { value: 'Power' } });
+    fireEvent.change(screen.getByLabelText('Unit'), { target: { value: 'kWh' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save meter' }));
+    expect(apply).toHaveBeenCalledWith({ ok: true, content: 'created,Power[unit:kWh]' });
   });
 });
