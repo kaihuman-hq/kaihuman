@@ -9,17 +9,10 @@ import { useTheme } from '../theme/theme.js';
 import type { IconName } from '../ui/index.js';
 import { Badge, Card, ErrorBoundary, Text } from '../ui/index.js';
 import { ActionLog } from './tiles/actionlog-body.js';
-import {
-  Bookmarks,
-  Budget,
-  Collection,
-  type Ctx,
-  Events,
-  ReadLater,
-  Todos,
-} from './tiles/bodies.js';
+import { Bookmarks, Budget, Collection, type Ctx, Events, Todos } from './tiles/bodies.js';
 import { BoardOverview, PaletteSettings, Rss, Travel } from './tiles/more-bodies.js';
 import { Err, TileIcon } from './tiles/parts.js';
+import { ReadLater } from './tiles/read-later-body.js';
 import { Templates } from './tiles/templates-body.js';
 import { Timer } from './tiles/timetracking-body.js';
 import { Clocks } from './tiles/timezones-body.js';

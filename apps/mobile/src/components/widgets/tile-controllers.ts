@@ -75,7 +75,9 @@ import {
 
 export type { PeriodPoint, StockPeriod } from '@kaihuman/formats/stocks';
 export * from './actionlog-tile.js';
+export * from './bookmarks-tile.js';
 export * from './more-tiles.js';
+export * from './read-later-tile.js';
 export * from './templates-tile.js';
 export * from './timetracking-tile.js';
 export * from './timezones-tile.js';
@@ -635,7 +637,7 @@ export const parseBookmarksFile = (content: string): BookmarksFile => {
   }
 };
 
-const serializeBookmarksFile = (file: BookmarksFile): string =>
+export const serializeBookmarksFile = (file: BookmarksFile): string =>
   `${JSON.stringify(file, null, 2)}\n`;
 
 export type BookmarkSort = 'NEWEST' | 'MOST_USED' | 'LEAST_USED' | 'FRECENCY';

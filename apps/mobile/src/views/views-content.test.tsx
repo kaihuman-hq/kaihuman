@@ -193,9 +193,7 @@ describe('tiles', () => {
     type('Page URL', 'https://example.com/a');
     press('Save page');
     expect(onWrite.mock.calls[0]?.[1]).toContain('https://example.com/a');
-    fireEvent.click(
-      screen.getAllByRole('checkbox', { name: /^Mark .* as read$/ })[0] as HTMLElement,
-    );
+    fireEvent.click(screen.getAllByRole('button', { name: /^Mark .* as read$/ })[0] as HTMLElement);
     expect(onWrite).toHaveBeenCalledTimes(2);
     press('Clear read');
     expect(onWrite).toHaveBeenCalledTimes(3);

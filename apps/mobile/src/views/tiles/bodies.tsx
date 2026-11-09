@@ -3,19 +3,15 @@ import { Linking, View } from 'react-native';
 import {
   addBookmarkEntry,
   addEvent,
-  addReadLaterUrl,
   addTodoTask,
   type BookmarksView,
   type BudgetView,
   bookmarksView,
-  clearReadLater,
   type DataCollectionView,
   deleteBookmarkEntry,
   type EventRow,
   eventDateParts,
   groupEventsByDay,
-  markReadLaterRead,
-  type ReadLaterView,
   type TileResult,
   type TodosView,
   toggleTodo,
@@ -237,74 +233,6 @@ export function Events({ rows, ctx }: { rows: EventRow[]; ctx: Ctx }) {
       ) : (
         <Button label="Add event" icon="add" size="medium" variant="tinted" onPress={form.show} />
       )}
-    </>
-  );
-}
-
-export function ReadLater({ view, ctx }: { view: ReadLaterView; ctx: Ctx }) {
-  const [url, setUrl] = useState('');
-  const save = () => {
-    if (ctx.apply(addReadLaterUrl(ctx.content, url, ctx.now))) {
-      haptics.success();
-      setUrl('');
-    } else haptics.error();
-  };
-  return (
-    <>
-      {view.unread.length === 0 ? (
-        <EmptyLine>Nothing waiting to be read.</EmptyLine>
-      ) : (
-        <Rows>
-          {view.unread.map((i) => (
-            <ItemRow
-              key={i.id}
-              testID={`read-${i.id}`}
-              title={i.name}
-              role="checkbox"
-              checked={false}
-              label={`Mark ${i.name} as read`}
-              leading={<CheckCircle on={false} />}
-              onPress={() => {
-                if (ctx.apply(markReadLaterRead(ctx.content, i.id, ctx.now))) haptics.success();
-              }}
-            />
-          ))}
-        </Rows>
-      )}
-      {view.read.length > 0 ? (
-        <>
-          <Text
-            variant="footnote"
-            tone="secondary"
-            weight="600"
-            style={{ textTransform: 'uppercase' }}
-          >
-            {`Read (${view.read.length})`}
-          </Text>
-          <Rows>
-            {view.read.map((i) => (
-              <ItemRow key={i.id} title={i.name} done leading={<CheckCircle on />} />
-            ))}
-          </Rows>
-        </>
-      ) : null}
-      <QuickAdd
-        label="Page URL"
-        placeholder="https://"
-        keyboardType="url"
-        value={url}
-        onChangeText={setUrl}
-        onSubmit={save}
-        addLabel="Save page"
-      />
-      {view.read.length > 0 ? (
-        <Button
-          label="Clear read"
-          size="small"
-          variant="plain"
-          onPress={() => ctx.apply(clearReadLater(ctx.content))}
-        />
-      ) : null}
     </>
   );
 }
