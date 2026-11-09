@@ -23,7 +23,6 @@ export interface Ctx {
   error: string | null;
 }
 
-
 export function Todos({ view, ctx }: { view: TodosView; ctx: Ctx }) {
   const { colors, spacing } = useTheme();
   const [text, setText] = useState('');
