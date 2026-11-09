@@ -8,8 +8,8 @@ import type {
 import { useTheme } from '../theme/theme.js';
 import type { IconName } from '../ui/index.js';
 import { Badge, Card, ErrorBoundary, Text } from '../ui/index.js';
+import { ActionLog } from './tiles/actionlog-body.js';
 import {
-  ActionLog,
   Bookmarks,
   Budget,
   Clocks,
@@ -130,7 +130,7 @@ function TileBody({ tile, ctx }: { tile: TileData; ctx: Ctx }) {
     case 'events':
       return <Events rows={tile.view} ctx={ctx} />;
     case 'actionlog':
-      return <ActionLog view={tile.view} ctx={ctx} />;
+      return <ActionLog ctx={ctx} />;
     case 'timezones':
       return <Clocks clocks={tile.view} />;
     case 'readitlater':

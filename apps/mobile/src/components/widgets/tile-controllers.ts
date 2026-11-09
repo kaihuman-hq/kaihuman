@@ -74,6 +74,7 @@ import {
 } from './more-tiles.js';
 
 export type { PeriodPoint, StockPeriod } from '@kaihuman/formats/stocks';
+export * from './actionlog-tile.js';
 export * from './more-tiles.js';
 export * from './templates-tile.js';
 

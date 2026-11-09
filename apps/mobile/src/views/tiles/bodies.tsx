@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Linking, View } from 'react-native';
 import {
-  type ActionLogView,
   addBookmarkEntry,
   addEvent,
   addReadLaterUrl,
@@ -18,7 +17,6 @@ import {
   eventDateParts,
   formatElapsed,
   groupEventsByDay,
-  logAction,
   markReadLaterRead,
   type ReadLaterView,
   type TileResult,
@@ -277,43 +275,6 @@ export function Events({ rows, ctx }: { rows: EventRow[]; ctx: Ctx }) {
       ) : (
         <Button label="Add event" icon="add" size="medium" variant="tinted" onPress={form.show} />
       )}
-    </>
-  );
-}
-
-export function ActionLog({ view, ctx }: { view: ActionLogView; ctx: Ctx }) {
-  const [text, setText] = useState('');
-  const { colors } = useTheme();
-  const submit = () => {
-    if (ctx.apply(logAction(ctx.content, text, ctx.now))) {
-      haptics.success();
-      setText('');
-    } else haptics.error();
-  };
-  return (
-    <>
-      {view.entries.length === 0 ? (
-        <EmptyLine>Nothing logged yet.</EmptyLine>
-      ) : (
-        <Rows>
-          {view.entries.map((e) => (
-            <ItemRow
-              key={`${e.timestamp}-${e.description}`}
-              title={e.description}
-              subtitle={e.timestamp}
-              leading={<Icon name="check" size={18} color={colors.success} />}
-            />
-          ))}
-        </Rows>
-      )}
-      <QuickAdd
-        label="What did you do?"
-        placeholder="Ran 5k"
-        value={text}
-        onChangeText={setText}
-        onSubmit={submit}
-        addLabel="Log action"
-      />
     </>
   );
 }
