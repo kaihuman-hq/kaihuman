@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-09 — Test: extension WorkSettings teardown race
+
+- `WorkSettings.test.tsx` waits for Preact's 35ms effect timer after unmounting, so it no longer calls `cancelAnimationFrame` after jsdom teardown on a busy CI runner.
+
 ## 2026-11-09 — Mobile: full web parity for todos, kanban, travel, board overview, palette, CSV tables, consumption, time tracking, stocks, timezones
 
 - Todos tile (`todos-tile.ts`, `todos-body.tsx`): an expandable Details panel on the quick add with tags, milestone, due date/time and repeat (reuses `DueEditor`/`RepeatEditor`) and "Create prompt file" (beside the todos file, referenced by the task, optionally opened); tag filter chips; long-press for status, milestone, due and AI prompt; milestone manager sheet (add, rename, date, delete); per-task AI prompt sheet with Copy or share; show older completed; migrate legacy files.
