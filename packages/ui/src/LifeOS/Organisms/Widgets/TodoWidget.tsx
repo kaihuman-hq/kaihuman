@@ -33,7 +33,9 @@ import {
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoText } from '../../Atoms/Typography';
+import { dueBadge } from '../../Templates/dueView';
 import { CompactList, CompactWidgetLayout } from './CompactWidgetLayout';
+import { RepeatIcon } from './RepeatFields';
 
 export interface TodoWidgetProps {
   content: string;
@@ -550,6 +552,22 @@ const MilestoneManager = ({
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const ANIM_DURATION_MS = 700;
 
+/** Due/overdue badge plus the recurrence icon of an item; renders nothing without either. */
+const DueMarks = ({ item, className }: { item: TodoItem; className?: string }) => {
+  const badge = dueBadge(item);
+  if (!badge && !(item.repeat && item.dueDate)) return null;
+  return (
+    <span className={cn('inline-flex items-center gap-1 shrink-0', className)}>
+      {badge && (
+        <span className={cn('text-[9px] font-mono border px-1', badge.className)}>
+          {badge.label}
+        </span>
+      )}
+      {item.repeat && item.dueDate && <RepeatIcon repeat={item.repeat} />}
+    </span>
+  );
+};
+
 export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: TodoWidgetProps) => {
   const data: TodoData = useMemo(() => parseTodos(content), [content]);
   const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -706,6 +724,7 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
                       onCycle={() => handleCycleStatus(idx)}
                     />
                     <MonoText className="text-xs flex-1 min-w-0 break-words">{item.text}</MonoText>
+                    <DueMarks item={item} />
                   </div>
                 );
               })}
@@ -873,6 +892,8 @@ export const TodoWidget = ({ content, mode, className, onChange, onOpenAdd }: To
                         )
                       )}
                     </div>
+
+                    <DueMarks item={item} className="mt-1" />
 
                     {/* Tags */}
                     {item.tags.length > 0 && (

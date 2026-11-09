@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FeedStore } from './feed-store.js';
+import { defaultFeedFetcher, FeedStore } from './feed-store.js';
+
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 
 const XML =
   '<rss><channel><title>T</title><item><title>A</title><link>https://x.test/a</link></item></channel></rss>';
@@ -67,5 +69,15 @@ describe('FeedStore', () => {
     const before = store.snapshot();
     await store.ensure([URL_A]);
     expect(store.snapshot()).not.toBe(before);
+  });
+});
+
+describe('defaultFeedFetcher', () => {
+  it('fetches the feed directly on native', async () => {
+    const fetch = vi.fn(async () => new Response(XML));
+    vi.stubGlobal('fetch', fetch);
+    expect(await defaultFeedFetcher(URL_A)).toBe(XML);
+    expect(fetch).toHaveBeenCalledWith(URL_A);
+    vi.unstubAllGlobals();
   });
 });

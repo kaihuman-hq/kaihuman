@@ -14,10 +14,11 @@ import {
   serializeTodos,
   slugifyIdeaTitle,
   type TodoDue,
+  type TodoRepeat,
 } from '@kaihuman/formats';
 import { syncActions } from '../sync/actions.js';
 import { canServeFromCache } from '../sync/revalidate.js';
-import { setDueOnData } from './todo-due.js';
+import { setDueOnData, setRepeatOnData } from './todo-due.js';
 
 /**
  * The file access the mobile controllers need. Kept narrow so controllers can be tested without
@@ -120,7 +121,13 @@ export class QuickCaptureController {
     });
   }
 
-  quickTodo(text: string, tags?: string | string[], due?: TodoDue): Promise<CaptureResult> {
+  /** `repeat` only applies with a `due`: a rule counts from the due date. */
+  quickTodo(
+    text: string,
+    tags?: string | string[],
+    due?: TodoDue,
+    repeat?: TodoRepeat,
+  ): Promise<CaptureResult> {
     const path = `${this.files.appFolder()}/inbox.todos.md`;
     return this.append(
       path,
@@ -133,7 +140,9 @@ export class QuickCaptureController {
         if (!due) return next;
         // The entry is appended last, so its position is the end of the file.
         const data = parseTodos(next);
-        return serializeTodos(setDueOnData(data, data.items.length - 1, due));
+        const index = data.items.length - 1;
+        const dated = setDueOnData(data, index, due);
+        return serializeTodos(repeat ? setRepeatOnData(dated, index, repeat) : dated);
       },
       'Todo added',
     );

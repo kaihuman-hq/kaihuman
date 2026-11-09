@@ -40,6 +40,7 @@ const icons = {
   info: { ios: 'info.circle', material: 'info' },
   warning: { ios: 'exclamationmark.triangle.fill', material: 'warning' },
   refresh: { ios: 'arrow.clockwise', material: 'refresh' },
+  repeat: { ios: 'repeat', material: 'repeat' },
   filter: { ios: 'line.3.horizontal.decrease', material: 'filter_list' },
   sort: { ios: 'arrow.up.arrow.down', material: 'sort' },
   empty: { ios: 'tray', material: 'inbox' },

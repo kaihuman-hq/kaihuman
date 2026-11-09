@@ -16,5 +16,6 @@ export * from './rss.js';
 export * from './streams.js';
 export * from './time-tracking.js';
 export * from './timezones.js';
+export * from './todo-repeat.js';
 export * from './todos.js';
 export * from './travel.js';

@@ -12,6 +12,10 @@ export function createExpoCacheFs(): CacheFs | null {
       if (slash < 0) return;
       new Directory(root, path.slice(0, slash)).create({ intermediates: true, idempotent: true });
     };
+    // Write a sibling temp file, then rename it over the target: a crash mid-write leaves the
+    // old file whole instead of a truncated one (expo's own write truncates in place).
+    const tempFor = (path: string) => fileAt(`${path}.tmp`);
+    const commit = (path: string) => tempFor(path).moveSync(fileAt(path), { overwrite: true });
     return {
       readSync(path) {
         const f = fileAt(path);
@@ -19,9 +23,8 @@ export function createExpoCacheFs(): CacheFs | null {
       },
       writeSync(path, text) {
         ensureParent(path);
-        const f = fileAt(path);
-        if (!f.exists) f.create({ intermediates: true });
-        f.writeSync(text);
+        tempFor(path).writeSync(text);
+        commit(path);
       },
       async read(path) {
         const f = fileAt(path);
@@ -29,9 +32,8 @@ export function createExpoCacheFs(): CacheFs | null {
       },
       async write(path, text) {
         ensureParent(path);
-        const f = fileAt(path);
-        if (!f.exists) f.create({ intermediates: true });
-        await f.write(text);
+        await tempFor(path).write(text);
+        commit(path);
       },
       async remove(path) {
         const f = fileAt(path);

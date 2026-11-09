@@ -92,6 +92,9 @@ struct CompleteTodoIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let store = SharedTodoStore.shared
         guard let result = store.toggle(itemId: todo.id) else {
+            if store.load()?.items.first(where: { $0.id == todo.id })?.pending == true {
+                return .result(dialog: "Done: \(todo.text). The app moves it to its next due date.")
+            }
             return .result(dialog: "That todo is already done or gone.")
         }
         // Reload before the network call so the widgets reflect it immediately.

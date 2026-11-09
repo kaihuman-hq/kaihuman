@@ -47,3 +47,17 @@ describe('todosFromSnapshot due dates', () => {
     expect(soon?.fireAt).toBe(Date.UTC(2026, 10, 10, 14) - settings.minutesBefore * 60_000);
   });
 });
+
+describe('todosFromSnapshot repeat', () => {
+  it('parses the rule of an item with its own due date only', () => {
+    expect(only([item({ dueDate: '2026-11-10', repeatRule: 'weekly:mon,thu' })]).repeat).toEqual({
+      unit: 'week',
+      interval: 1,
+      weekdays: [0, 3],
+    });
+    expect(
+      only([item({ milestoneDueDate: '2026-12-01', repeatRule: 'daily' })]).repeat,
+    ).toBeUndefined();
+    expect(only([item({ dueDate: '2026-11-10', repeatRule: 'nonsense' })]).repeat).toBeUndefined();
+  });
+});

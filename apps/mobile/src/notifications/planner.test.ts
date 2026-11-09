@@ -1,3 +1,4 @@
+import type { TodoRepeat } from '@kaihuman/formats';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -296,5 +297,81 @@ describe('planNotifications', () => {
     expect(planNotifications([...t].reverse(), [], on(), NOW, BERLIN)).toEqual(
       planNotifications(t, [], on(), NOW, BERLIN),
     );
+  });
+});
+
+describe('planNotifications for recurring todos', () => {
+  const daily = { unit: 'day', interval: 1 } as const;
+  const ids = (todos: PlannerTodo[], now = NOW) =>
+    planNotifications(todos, [], on(), now, 'UTC').map((n) => n.id);
+
+  it('plans the current due and the following occurrence, with per-occurrence ids', () => {
+    const plan = planNotifications(
+      [todo('a', { dueDate: '2026-06-11', repeat: daily })],
+      [],
+      on(),
+      NOW,
+      'UTC',
+    );
+    expect(plan.map((n) => [n.id, n.fireAt])).toEqual([
+      ['kh:due-today:a@2026-06-11', Date.UTC(2026, 5, 11, 9)],
+      ['kh:due-today:a@2026-06-12', Date.UTC(2026, 5, 12, 9)],
+    ]);
+    expect(plan.every((n) => n.todoId === 'a')).toBe(true);
+  });
+
+  it('keeps the id of an occurrence once completing makes it the current one', () => {
+    const before = ids([todo('a', { dueDate: '2026-06-11', repeat: daily })]);
+    const after = ids([todo('a', { dueDate: '2026-06-12', repeat: daily })]);
+    expect(after).toContain(before[1]);
+  });
+
+  it('plans the next occurrence of an overdue recurring todo, still counting it overdue', () => {
+    const plan = planNotifications(
+      [todo('a', { dueDate: '2026-06-08', repeat: daily })],
+      [],
+      on(),
+      NOW,
+      'UTC',
+    );
+    expect(plan.map((n) => n.id)).toEqual(['kh:due-today:a@2026-06-10', 'kh:overdue:2026-06-10']);
+  });
+
+  it('skips a timed occurrence that already passed today', () => {
+    const noon = Date.UTC(2026, 5, 10, 12);
+    const plan = planNotifications(
+      [todo('a', { dueDate: '2026-06-10', dueTime: '08:00', repeat: daily })],
+      [],
+      on({ kinds: { ...on().kinds, overdue: false } }),
+      noon,
+      'UTC',
+    );
+    expect(plan.map((n) => [n.id, n.fireAt])).toEqual([
+      ['kh:due-soon:a@2026-06-11', Date.UTC(2026, 5, 11, 7, 45)],
+    ]);
+  });
+
+  it('follows weekday rules and the 7 day horizon', () => {
+    // 2026-06-10 is a Wednesday: Mon/Thu from Thu 06-11 next falls on Mon 06-15.
+    const weekly: TodoRepeat = { unit: 'week', interval: 1, weekdays: [0, 3] };
+    expect(ids([todo('a', { dueDate: '2026-06-11', repeat: weekly })])).toEqual([
+      'kh:due-today:a@2026-06-11',
+      'kh:due-today:a@2026-06-15',
+    ]);
+    const monthly = { unit: 'month', interval: 1, day: 11 } as const;
+    expect(ids([todo('a', { dueDate: '2026-06-11', repeat: monthly })])).toEqual([
+      'kh:due-today:a@2026-06-11',
+    ]);
+  });
+
+  it("adds the following occurrence to that day's digest", () => {
+    const plan = planNotifications(
+      [todo('a', { dueDate: '2026-06-11', repeat: daily }), todo('b', { dueDate: '2026-06-12' })],
+      [],
+      on({ digest: true }),
+      NOW,
+      'UTC',
+    );
+    expect(plan.find((n) => n.id === 'kh:digest:2026-06-12')?.title).toBe('2 todos due today');
   });
 });

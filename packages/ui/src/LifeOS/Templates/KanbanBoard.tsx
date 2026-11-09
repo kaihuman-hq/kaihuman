@@ -15,10 +15,12 @@ import {
   setTodoColor,
   setTodoDue,
   setTodoPriority,
+  setTodoRepeat,
   type TodoColor,
   type TodoData,
   type TodoDue,
   type TodoItem,
+  type TodoRepeat,
   type TodoStatus,
   updateTodoText,
 } from '@kaihuman/formats';
@@ -44,6 +46,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { cn } from '../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../Atoms/Typography';
 import { ScopeToggle } from '../Molecules/ScopeToggle';
+import { RepeatFields, RepeatIcon } from '../Organisms/Widgets/RepeatFields';
 import {
   fileLabel,
   formatFilePath,
@@ -60,6 +63,7 @@ import {
   sortByDue,
 } from './dueView';
 import { moveTodoChanges } from './moveTodo';
+import { buildRepeat, NO_REPEAT, type RepeatState, stateOf } from './repeatView';
 import { type StreamMode, type StreamSort, StreamsBoard } from './StreamsBoard';
 import { FileColorPicker, fileColorHex, PriorityBadge } from './TodoMarks';
 
@@ -769,7 +773,7 @@ const KanbanCard = ({
   agg: AggregatedItem;
   onStatusChange: (filePath: string, itemIndex: number, newStatus: TodoStatus) => void;
   onCyclePriority?: (filePath: string, itemIndex: number) => void;
-  onSetDue?: (filePath: string, itemIndex: number, due?: TodoDue) => void;
+  onSetDue?: (filePath: string, itemIndex: number, due?: TodoDue, repeat?: TodoRepeat) => void;
   onOpenFile?: (path: string) => void;
   onMove?: (targetFilePath: string) => void;
   onEditText?: (filePath: string, itemIndex: number, text: string) => void;
@@ -785,6 +789,7 @@ const KanbanCard = ({
   const [editingDue, setEditingDue] = useState(false);
   const [dueDate, setDueDate] = useState('');
   const [dueTime, setDueTime] = useState('');
+  const [repeatState, setRepeatState] = useState<RepeatState>(NO_REPEAT);
   const moveMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -810,6 +815,7 @@ const KanbanCard = ({
   const openDueEditor = () => {
     setDueDate(item.dueDate ?? '');
     setDueTime(item.dueTime ?? '');
+    setRepeatState(stateOf(item.repeat, item.dueDate));
     setEditingDue(true);
   };
 
@@ -903,6 +909,7 @@ const KanbanCard = ({
                 {badge.label}
               </button>
             )}
+            {item.repeat && item.dueDate && <RepeatIcon repeat={item.repeat} />}
           </div>
 
           {editingDue && onSetDue && (
@@ -913,7 +920,14 @@ const KanbanCard = ({
                 type="date"
                 aria-label="Due date"
                 value={dueDate}
-                onInput={(e) => setDueDate(e.currentTarget.value)}
+                onInput={(e) => {
+                  const value = e.currentTarget.value;
+                  setDueDate(value);
+                  if (!value) {
+                    setDueTime('');
+                    setRepeatState(NO_REPEAT);
+                  }
+                }}
                 className="bg-[var(--los-bg)] border border-[var(--los-border)] text-[10px] font-mono px-1 py-0.5 outline-none focus:border-[var(--los-accent)]"
               />
               <input
@@ -928,13 +942,19 @@ const KanbanCard = ({
                 type="button"
                 disabled={!dueDate}
                 onClick={() => {
-                  onSetDue(filePath, agg.itemIndex, { date: dueDate, time: dueTime || undefined });
+                  onSetDue(
+                    filePath,
+                    agg.itemIndex,
+                    { date: dueDate, time: dueTime || undefined },
+                    buildRepeat(repeatState, dueDate),
+                  );
                   setEditingDue(false);
                 }}
                 className="text-[9px] font-mono px-2 py-0.5 bg-[var(--los-accent)] text-black hover:opacity-90 disabled:opacity-40"
               >
                 SAVE
               </button>
+              <RepeatFields dueDate={dueDate} value={repeatState} onChange={setRepeatState} />
               {item.dueDate && (
                 <button
                   type="button"
@@ -1459,13 +1479,21 @@ export const KanbanBoard = ({
     githubFileStore.saveFile(filePath);
   };
 
-  const handleSetDue = (filePath: string, itemIndex: number, due?: TodoDue) => {
+  const handleSetDue = (
+    filePath: string,
+    itemIndex: number,
+    due?: TodoDue,
+    repeat?: TodoRepeat,
+  ) => {
     const file = openFiles[filePath];
     if (!file) return;
     const data = parseTodos(file.content);
     const item = data.items[itemIndex];
     if (!item) return;
-    githubFileStore.updateFileContent(filePath, serializeTodos(setTodoDue(data, item.id, due)));
+    // A recurrence needs a due date to anchor on, so clearing the date clears the repeat too.
+    const dated = setTodoDue(data, item.id, due);
+    const next = setTodoRepeat(dated, item.id, due ? repeat : undefined);
+    githubFileStore.updateFileContent(filePath, serializeTodos(next));
     githubFileStore.saveFile(filePath);
   };
 

@@ -1,7 +1,9 @@
-import type { Milestone, TodoPrompt } from '@kaihuman/formats';
+import type { Milestone, TodoDue, TodoPrompt, TodoRepeat } from '@kaihuman/formats';
 import { useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoHeader, MonoLabel, MonoText } from '../../Atoms/Typography';
+import { buildRepeat, NO_REPEAT, type RepeatState } from '../../Templates/repeatView';
+import { RepeatFields } from './RepeatFields';
 
 export interface PromptRef {
   prompt: TodoPrompt;
@@ -13,7 +15,14 @@ interface TodoAddFormProps {
   milestones: Milestone[];
   /** Path of the .todos.md file — used to compute the prompt file directory */
   todosFilePath?: string;
-  onAdd: (text: string, tags: string[], milestoneId?: string, promptRef?: PromptRef) => void;
+  onAdd: (
+    text: string,
+    tags: string[],
+    milestoneId?: string,
+    promptRef?: PromptRef,
+    due?: TodoDue,
+    repeat?: TodoRepeat,
+  ) => void;
   onCancel: () => void;
 }
 
@@ -50,6 +59,9 @@ export const TodoAddForm = ({
   const [createPromptFile, setCreatePromptFile] = useState(false);
   const [promptFileName, setPromptFileName] = useState('');
   const [openAfter, setOpenAfter] = useState(false);
+  const [dueDate, setDueDate] = useState('');
+  const [dueTime, setDueTime] = useState('');
+  const [repeat, setRepeat] = useState<RepeatState>(NO_REPEAT);
 
   const basePath = todosFilePath ? dirOf(todosFilePath) : '';
 
@@ -84,7 +96,15 @@ export const TodoAddForm = ({
       promptRef = { prompt: { lines: [], refFile: filePath }, openAfter };
     }
 
-    onAdd(text.trim(), selectedTags, selectedMilestone || undefined, promptRef);
+    const due = dueDate ? { date: dueDate, time: dueTime || undefined } : undefined;
+    onAdd(
+      text.trim(),
+      selectedTags,
+      selectedMilestone || undefined,
+      promptRef,
+      due,
+      buildRepeat(repeat, dueDate || undefined),
+    );
   };
 
   return (
@@ -159,6 +179,37 @@ export const TodoAddForm = ({
               Selected: {selectedTags.map((t) => `#${t}`).join(' ')}
             </MonoText>
           )}
+        </div>
+
+        {/* Due date + recurrence */}
+        <div className="flex flex-col gap-1">
+          <MonoLabel>DUE (optional)</MonoLabel>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              aria-label="Due date"
+              value={dueDate}
+              onInput={(e) => {
+                const value = e.currentTarget.value;
+                setDueDate(value);
+                // No due date, no time and no recurrence.
+                if (!value) {
+                  setDueTime('');
+                  setRepeat(NO_REPEAT);
+                }
+              }}
+              className="bg-[var(--los-bg)] border border-[var(--los-border)] px-2 py-1 text-xs font-mono focus:border-[var(--los-accent)] outline-none transition-colors"
+            />
+            <input
+              type="time"
+              aria-label="Due time"
+              value={dueTime}
+              disabled={!dueDate}
+              onInput={(e) => setDueTime(e.currentTarget.value)}
+              className="bg-[var(--los-bg)] border border-[var(--los-border)] px-2 py-1 text-xs font-mono focus:border-[var(--los-accent)] outline-none transition-colors disabled:opacity-40"
+            />
+          </div>
+          <RepeatFields dueDate={dueDate} value={repeat} onChange={setRepeat} />
         </div>
 
         {/* Milestone */}

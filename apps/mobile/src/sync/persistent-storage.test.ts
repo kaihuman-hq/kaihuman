@@ -66,9 +66,62 @@ describe('key/value driver', () => {
     expect(createFileKeyValueDriver(fs).get('k')).toBeNull();
   });
 
-  it('survives a corrupt file', () => {
+  it('survives a corrupt file and sets it aside instead of losing it', () => {
     const fs = fakeFs(new Map([['kv.json', '{nope']]));
-    expect(createFileKeyValueDriver(fs).get('k')).toBeNull();
+    const kv = createFileKeyValueDriver(fs);
+    expect(kv.get('k')).toBeNull();
+    expect(fs.files.get('kv.json.corrupt')).toBe('{nope');
+  });
+
+  it('writes the backup before the main file, so one copy is always whole', () => {
+    const order: string[] = [];
+    const fs = fakeFs();
+    const write = fs.writeSync;
+    fs.writeSync = (p, t) => {
+      order.push(p);
+      write(p, t);
+    };
+    createFileKeyValueDriver(fs).set('k', 'v');
+    expect(order).toEqual(['kv.json.bak', 'kv.json']);
+    expect(fs.files.get('kv.json.bak')).toBe(fs.files.get('kv.json'));
+  });
+
+  it.each([
+    ['truncated', '{"lifeos_current_repo":"{\\"full'],
+    ['empty', ''],
+  ])('recovers from the backup when kv.json is %s (crash mid-write)', (_, torn) => {
+    const good = JSON.stringify({ lifeos_current_repo: '"o/r"', kh_mobile_dashboard: 'finance' });
+    const fs = fakeFs(
+      new Map([
+        ['kv.json', torn],
+        ['kv.json.bak', good],
+      ]),
+    );
+    const kv = createFileKeyValueDriver(fs);
+    expect(kv.get('lifeos_current_repo')).toBe('"o/r"');
+    expect(kv.get('kh_mobile_dashboard')).toBe('finance');
+    expect(fs.files.get('kv.json')).toBe(good);
+  });
+
+  it('does not rewrite the file when a value is unchanged', () => {
+    const fs = fakeFs();
+    const kv = createFileKeyValueDriver(fs);
+    kv.set('k', 'v');
+    const spy = vi.spyOn(fs, 'writeSync');
+    kv.set('k', 'v');
+    kv.remove('missing');
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing for the session when the file cannot be read', () => {
+    const fs = fakeFs(new Map([['kv.json', '{"k":"v"}']]));
+    fs.readSync = () => {
+      throw new Error('protected data unavailable');
+    };
+    const kv = createFileKeyValueDriver(fs);
+    kv.set('other', 'x');
+    expect(kv.get('other')).toBe('x');
+    expect(fs.files.get('kv.json')).toBe('{"k":"v"}');
   });
 });
 

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { CacheFs } from '../sync/persistent-storage.js';
 
 // Everything that outlives the process on a phone: the cache files, the Keychain, the App Group.
@@ -97,6 +97,15 @@ async function launch() {
   };
 }
 
+beforeAll(() => {
+  // The bootstrap fires network calls and logs it never awaits; a real fetch (401 from GitHub)
+  // or a log landing after teardown made CI fail with "Closing rpc while onUserConsoleLog was pending".
+  vi.stubGlobal('fetch', () => new Promise(() => {}));
+  for (const level of ['log', 'info', 'warn', 'error'] as const) {
+    vi.spyOn(console, level).mockImplementation(() => {});
+  }
+});
+
 afterEach(() => {
   device.files.clear();
   device.keychain.clear();
@@ -146,6 +155,28 @@ describe('cold start', () => {
     };
     expect(next.route.resolveStartRoute(session)).toBe('/dashboard');
     expect(next.route.guardRedirect({ ...session, hydrated: true }, 'login')).toBe('/dashboard');
+    next.stop();
+  });
+
+  it('keeps the repo and dashboard when a crash tore kv.json mid-write', async () => {
+    const first = await launch();
+    first.core.authStore.token.value = 'ghp_saved';
+    first.core.githubProfileStore.currentRepo.value = repo as never;
+    first.dashboards.rememberDashboard('work');
+    await flush();
+    first.stop();
+    // The crash: the main file is cut short while being rewritten.
+    const whole = device.files.get('kv.json') ?? '';
+    device.files.set('kv.json', whole.slice(0, whole.length / 2));
+
+    const next = await launch();
+    expect(next.core.githubProfileStore.currentRepo.value).toMatchObject({ full_name: 'me/life' });
+    expect(next.dashboards.lastDashboardId()).toBe('work');
+    const session = {
+      token: next.core.authStore.token.value,
+      repo: next.core.githubProfileStore.currentRepo.value,
+    };
+    expect(next.route.resolveStartRoute(session)).toBe('/dashboard');
     next.stop();
   });
 

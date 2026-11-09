@@ -25,6 +25,9 @@ import {
   parseTimezones,
   parseTodos,
   serializeTimezones,
+  serializeTodos,
+  setTodoDue,
+  setTodoRepeat,
 } from '@kaihuman/formats';
 import {
   Edit,
@@ -3110,13 +3113,24 @@ const FocusedTileInternal = ({
                   milestones={todoMilestones}
                   todosFilePath={String(tile.id)}
                   onCancel={() => setViewMode('WIDGET')}
-                  onAdd={async (text, tags, milestoneId, promptRef) => {
-                    const newContent = addTodoEntry(tile.rawContent || '', {
+                  onAdd={async (text, tags, milestoneId, promptRef, due, repeat) => {
+                    let newContent = addTodoEntry(tile.rawContent || '', {
                       text,
                       tags,
                       milestoneId,
                       prompt: promptRef?.prompt,
                     });
+                    if (due) {
+                      // addTodoEntry appends, so the new todo is the last item.
+                      const added = parseTodos(newContent);
+                      const id = added.items[added.items.length - 1]?.id;
+                      if (id) {
+                        const dated = setTodoDue(added, id, due);
+                        newContent = serializeTodos(
+                          repeat ? setTodoRepeat(dated, id, repeat) : dated,
+                        );
+                      }
+                    }
                     // Update store directly and await save before creating the prompt
                     // file — running both concurrently causes a 409 Conflict on GitHub.
                     githubFileStore.updateFileContent(String(tile.id), newContent);

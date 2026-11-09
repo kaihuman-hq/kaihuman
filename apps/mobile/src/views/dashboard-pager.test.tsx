@@ -1,11 +1,34 @@
 import { buildDemoSeed, configureCoreStorage, InMemoryStorageAdapter } from '@kaihuman/core';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as controllers from '../components/widgets/tile-controllers.js';
 import { type DashboardPage, loadDashboards } from '../screens/dashboards.js';
 import type { ContentFiles } from '../screens/file-editor-screen.js';
 import { DashboardPager } from './dashboard-pager.js';
 
-afterEach(cleanup);
+const feeds = vi.hoisted(() => {
+  let snap: Record<string, unknown> = {};
+  const listeners = new Set<() => void>();
+  return {
+    ensure: vi.fn(async () => {}),
+    set(next: Record<string, unknown>) {
+      snap = next;
+      for (const fn of listeners) fn();
+    },
+    snapshot: () => snap,
+    subscribe(fn: () => void) {
+      listeners.add(fn);
+      return () => void listeners.delete(fn);
+    },
+  };
+});
+vi.mock('../files/feed-store.js', () => ({ feedStore: feeds }));
+
+afterEach(() => {
+  cleanup();
+  feeds.set({});
+  vi.restoreAllMocks();
+});
 beforeEach(() => configureCoreStorage(new InMemoryStorageAdapter()));
 
 const NOW = new Date(2026, 10, 5, 10, 0, 0);
@@ -138,5 +161,46 @@ describe('DashboardPager states', () => {
     );
     expect(screen.getAllByText('No tiles on this dashboard').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Add files to Alpha in the web console.').length).toBe(1);
+  });
+});
+
+describe('DashboardPager with a tile that throws', () => {
+  it('shows that tile as an inline error and keeps the others', async () => {
+    const real = controllers.presentTile;
+    const pages = await demoPages();
+    const [bad, good] = pages[0]?.files ?? [];
+    vi.spyOn(controllers, 'presentTile').mockImplementation((path, content, now) => {
+      if (path === bad?.path) throw new Error('parser blew up');
+      return real(path, content, now);
+    });
+    render(<DashboardPager pages={pages} now={NOW} onWrite={vi.fn()} onNavigate={vi.fn()} />);
+    expect(screen.getByText('parser blew up')).toBeTruthy();
+    expect(screen.getByText("Couldn't show this tile")).toBeTruthy();
+    expect(good).toBeDefined();
+    expect(screen.getAllByTestId(/^(tile|summary)-/).length).toBeGreaterThan(0);
+  });
+});
+
+describe('DashboardPager RSS tile', () => {
+  it('fetches the feeds and shows the unread count once they arrive', async () => {
+    const pages = (await demoPages()).filter((p) =>
+      p.files.some((f) => f.path.endsWith('.rss.json')),
+    );
+    render(<DashboardPager pages={pages} now={NOW} onWrite={vi.fn()} onNavigate={vi.fn()} />);
+    expect(feeds.ensure).toHaveBeenCalledWith(
+      expect.arrayContaining(['https://hnrss.org/frontpage']),
+    );
+    const item = (guid: string) => ({ title: `Item ${guid}`, link: `https://h/${guid}`, guid });
+    feeds.set({
+      'https://hnrss.org/frontpage': {
+        title: 'HN',
+        fetchedAt: 1,
+        loading: false,
+        items: [item('a'), item('b')],
+      },
+    });
+    const tile = await screen.findByTestId('summary-rss');
+    expect(within(tile).getByText('2')).toBeTruthy();
+    expect(within(tile).getByText('Item a')).toBeTruthy();
   });
 });

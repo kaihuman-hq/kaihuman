@@ -1,4 +1,4 @@
-import type { TodoDue, TodoStatus } from '@kaihuman/formats';
+import type { TodoDue, TodoItem, TodoRepeat, TodoStatus } from '@kaihuman/formats';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import {
@@ -7,7 +7,7 @@ import {
 } from '../screens/focus-session.js';
 import type { BoardItem, KanbanBoardController } from '../screens/kanban-board.js';
 import { TODO_STATUSES } from '../screens/kanban-board.js';
-import { dueBadge } from '../screens/todo-due.js';
+import { completionNotice, dueBadge } from '../screens/todo-due.js';
 import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
@@ -96,6 +96,7 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
   const [, setVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [focusNotice, setFocusNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const { refreshing, onRefresh } = useRefresh();
@@ -130,17 +131,25 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
     setVersion((v) => v + 1);
   };
 
-  const move = async (path: string, index: number, to: TodoStatus) => {
+  const move = async (path: string, index: number, to: TodoStatus, item?: TodoItem) => {
+    // A recurring todo is not finished by Done: it moves to its next occurrence, so say where.
+    const next = to === 'done' && item ? completionNotice(item, new Date()) : undefined;
     const res = await controller.setStatus(path, index, to);
     setError(res.ok ? null : res.error);
+    setNotice(res.ok && next ? next : null);
     if (res.ok) haptics.success();
     else haptics.error();
     setVersion((v) => v + 1);
   };
 
-  const setDue = async (path: string, index: number, due: TodoDue | undefined) => {
+  const setDue = async (
+    path: string,
+    index: number,
+    due: TodoDue | undefined,
+    repeat?: TodoRepeat | null,
+  ) => {
     setDueFor(null);
-    const res = await controller.setDue(path, index, due);
+    const res = await controller.setDue(path, index, due, repeat);
     setError(res.ok ? null : res.error);
     if (res.ok) haptics.success();
     else haptics.error();
@@ -212,7 +221,7 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
                 label: ACTION_LABEL[s],
                 icon: ACTION_ICON[s],
                 side: s === 'done' ? 'leading' : 'trailing',
-                onPress: () => void move(filePath, itemIndex, s),
+                onPress: () => void move(filePath, itemIndex, s, item),
               }),
             ),
             ...(focus?.available && (status === 'backlog' || status === 'in-progress')
@@ -248,13 +257,21 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
               onPress={onOpenTodo ? () => onOpenTodo(`${filePath}#${itemIndex}`) : undefined}
               accessory={
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                  {badge?.repeat ? (
+                    <Icon
+                      name="repeat"
+                      size={14}
+                      color={colors.secondaryLabel}
+                      accessibilityLabel={`Repeats ${badge.repeat}`}
+                    />
+                  ) : null}
                   {badge ? <Badge tone={badge.tone} label={badge.label} /> : null}
                   <Pressable
                     testID={`move-${itemIndex}-${advance.to}`}
                     accessibilityRole="button"
                     accessibilityLabel={`${advance.label}: ${item.text}`}
                     hitSlop={8}
-                    onPress={() => void move(filePath, itemIndex, advance.to)}
+                    onPress={() => void move(filePath, itemIndex, advance.to, item)}
                     android_ripple={{ color: colors.pressed, borderless: true, radius: 24 }}
                     style={({ pressed }) => ({
                       width: metrics.hitTarget,
@@ -324,6 +341,13 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
             {`Couldn't move the todo: ${error}`}
           </Text>
         ) : null}
+        {notice ? (
+          <View accessibilityLiveRegion="polite">
+            <Text variant="footnote" tone="secondary" testID="board-notice">
+              {notice}
+            </Text>
+          </View>
+        ) : null}
         {focusNotice ? (
           <Text variant="footnote" tone="danger" accessibilityRole="summary">
             {focusNotice}
@@ -342,7 +366,8 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
                 }
               : undefined
           }
-          onSelect={(due) => void setDue(dueFor.filePath, dueFor.itemIndex, due)}
+          {...(dueFor.item.repeat && { currentRepeat: dueFor.item.repeat })}
+          onSelect={(due, repeat) => void setDue(dueFor.filePath, dueFor.itemIndex, due, repeat)}
           onClose={() => setDueFor(null)}
         />
       ) : null}

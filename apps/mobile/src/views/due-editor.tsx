@@ -1,10 +1,11 @@
-import type { TodoDue } from '@kaihuman/formats';
+import type { TodoDue, TodoRepeat } from '@kaihuman/formats';
 import PickerModule, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { type ComponentType, useState } from 'react';
 import { Switch, View } from 'react-native';
 import { dateFromDue, dueFromDate, dueSummary } from '../screens/todo-due.js';
 import { useTheme } from '../theme/theme.js';
 import { Button, Text } from '../ui/index.js';
+import { RepeatEditor } from './repeat-editor.js';
 
 type Picking = 'date' | 'time' | null;
 
@@ -23,15 +24,21 @@ const DateTimePicker = PickerModule as unknown as ComponentType<PickerProps>;
 
 /**
  * Due date first, then an optional time. The native picker is a dialog on Android (dismissed on
- * pick) and an inline control on iOS (left open until the user taps Done).
+ * pick) and an inline control on iOS (left open until the user taps Done). With
+ * `onRepeatChange`, a dated todo also gets the repeat editor; clearing the due is the caller's
+ * cue to clear the repeat too.
  */
 export function DueEditor({
   value,
   onChange,
+  repeat,
+  onRepeatChange,
   now = new Date(),
 }: {
   value: TodoDue | undefined;
   onChange: (due: TodoDue | undefined) => void;
+  repeat?: TodoRepeat;
+  onRepeatChange?: (repeat: TodoRepeat | undefined) => void;
   now?: Date;
 }) {
   const { spacing, platform } = useTheme();
@@ -97,6 +104,9 @@ export function DueEditor({
             />
           ) : null}
         </View>
+      ) : null}
+      {value && onRepeatChange ? (
+        <RepeatEditor value={repeat} dueDate={value.date} onChange={onRepeatChange} />
       ) : null}
       {picking ? (
         <DateTimePicker

@@ -1,3 +1,5 @@
+import { anchorRepeat, nextOccurrenceDate, type TodoRepeat } from '@kaihuman/formats';
+
 export type NotificationKind =
   | 'due-today'
   | 'due-soon'
@@ -13,6 +15,8 @@ export interface PlannerTodo {
   dueDate?: string;
   /** HH:MM, wall time in the planner's `tz` */
   dueTime?: string;
+  /** Recurrence counted from `dueDate`; the following occurrence is planned too. */
+  repeat?: TodoRepeat;
 }
 
 export interface PlannerMilestone {
@@ -160,23 +164,27 @@ export function planNotifications(
   const overdue: PlannerTodo[] = [];
   const byDay = new Map<string, PlannerTodo[]>();
 
-  for (const t of open) {
-    if (!t.dueDate) continue;
-    const due = t.dueTime ? zonedTime(t.dueDate, t.dueTime, tz) : undefined;
-    const isOverdue = due === undefined ? t.dueDate < today : due <= now;
-    if (isOverdue) {
-      overdue.push(t);
-      continue;
-    }
-    if (!inHorizon(t.dueDate)) continue;
-    byDay.set(t.dueDate, [...(byDay.get(t.dueDate) ?? []), t]);
+  /** Unix ms of a timed occurrence; undefined for a date-only one. */
+  const dueAt = (t: PlannerTodo, date: string): number | undefined =>
+    t.dueTime ? zonedTime(date, t.dueTime, tz) : undefined;
+  const passed = (t: PlannerTodo, date: string): boolean => {
+    const due = dueAt(t, date);
+    return due === undefined ? date < today : due <= now;
+  };
 
+  // Recurring todos get per-occurrence ids, so the plan for an occurrence keeps its id when the
+  // todo is completed and that occurrence becomes the current one.
+  const planOccurrence = (t: PlannerTodo, date: string): void => {
+    if (!inHorizon(date)) return;
+    byDay.set(date, [...(byDay.get(date) ?? []), t]);
+    const key = t.repeat ? `${t.id}@${date}` : t.id;
+    const due = dueAt(t, date);
     if (due === undefined) {
       if (settings.kinds.dueToday) {
         push({
-          id: `kh:due-today:${t.id}`,
+          id: `kh:due-today:${key}`,
           kind: 'due-today',
-          fireAt: morning(t.dueDate),
+          fireAt: morning(date),
           title: 'Due today',
           body: t.text,
           todoId: t.id,
@@ -185,7 +193,7 @@ export function planNotifications(
       }
     } else if (settings.kinds.dueSoon) {
       push({
-        id: `kh:due-soon:${t.id}`,
+        id: `kh:due-soon:${key}`,
         kind: 'due-soon',
         fireAt: due - settings.minutesBefore * MINUTE,
         title: `Due at ${t.dueTime}`,
@@ -194,6 +202,29 @@ export function planNotifications(
         url: itemUrl(t.id),
       });
     }
+  };
+
+  /**
+   * The first occurrence after the current due that has not passed yet, so a reminder still
+   * fires when the app is not opened again before then. An overdue todo's missed occurrences
+   * are skipped; today's still counts until its time has passed.
+   */
+  const followingOccurrence = (t: PlannerTodo & { dueDate: string; repeat: TodoRepeat }) => {
+    const repeat = anchorRepeat(t.repeat, t.dueDate);
+    let date = nextOccurrenceDate(t.dueDate, repeat, addDays(today, -1));
+    // A timed occurrence today may already be over; two steps always reach the future.
+    for (let i = 0; i < 2 && passed(t, date); i++) {
+      date = nextOccurrenceDate(t.dueDate, repeat, date);
+    }
+    return date;
+  };
+
+  for (const t of open) {
+    if (!t.dueDate) continue;
+    if (passed(t, t.dueDate)) overdue.push(t);
+    else planOccurrence(t, t.dueDate);
+    if (t.repeat)
+      planOccurrence(t, followingOccurrence({ ...t, dueDate: t.dueDate, repeat: t.repeat }));
   }
 
   if (settings.kinds.overdue && overdue.length > 0) {

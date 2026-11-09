@@ -240,3 +240,49 @@ describe('TodoDetailController delete', () => {
     expect(await c.undoRemove()).toEqual({ ok: false, error: 'Nothing to undo' });
   });
 });
+
+describe('TodoDetailController recurring todos', () => {
+  it('sets, changes and clears the repeat; clearing the due clears it too', async () => {
+    const { mem, items } = setup();
+    const c = await ready(`${INBOX}#1`, mem);
+    expect(await c.setRepeat({ unit: 'week', interval: 2, weekdays: [0, 3] })).toEqual({
+      ok: true,
+    });
+    expect(mem.store.get(INBOX)).toContain('::repeat:: every 2 weeks:mon,thu');
+    expect(c.state.kind === 'ready' && c.state.item.repeat).toEqual({
+      unit: 'week',
+      interval: 2,
+      weekdays: [0, 3],
+    });
+    await c.setRepeat({ unit: 'day', interval: 1 });
+    expect(items()[1]?.repeat).toEqual({ unit: 'day', interval: 1 });
+    await c.setRepeat(undefined);
+    expect(items()[1]?.repeat).toBeUndefined();
+
+    await c.setRepeat({ unit: 'month', interval: 1, day: 20 });
+    await c.setDue(undefined);
+    expect(items()[1]).not.toHaveProperty('repeat');
+    expect(mem.store.get(INBOX)).not.toContain('::repeat::');
+  });
+
+  it('refuses a repeat without a due date', async () => {
+    const { mem, items } = setup();
+    const c = await ready(`${INBOX}#0`, mem);
+    expect(await c.setRepeat({ unit: 'day', interval: 1 })).toEqual({
+      ok: false,
+      error: 'Set a due date first',
+    });
+    expect(items()[0]?.repeat).toBeUndefined();
+  });
+
+  it('completing a recurring todo moves it to the next occurrence instead of done', async () => {
+    const { mem, items } = setup();
+    const c = await ready(`${INBOX}#1`, mem);
+    await c.setRepeat({ unit: 'week', interval: 1, weekdays: [4] }); // 2026-11-20 is a Friday
+    expect(await c.setStatus('done')).toEqual({ ok: true });
+    const item = items()[1];
+    expect(item?.status).toBe('backlog');
+    expect(item?.dueDate).toBe('2026-11-27');
+    expect(item?.doneLog).toHaveLength(1);
+  });
+});

@@ -7,12 +7,13 @@ import {
   type TodoData,
   type TodoDue,
   type TodoItem,
+  type TodoRepeat,
   type TodoStatus,
   updateTodoText,
 } from '@kaihuman/formats';
 import { loadTodoFiles, mergeMilestones } from './kanban-board.js';
 import { githubRepoFiles, type RepoFiles } from './quick-capture.js';
-import { setDueOnData } from './todo-due.js';
+import { setDueOnData, setRepeatOnData } from './todo-due.js';
 
 /** A todo addressed like the widgets do: `<path>#<index>`. */
 export interface TodoRef {
@@ -110,8 +111,13 @@ export class TodoDetailController {
     return this.edit((d, i) => setMilestone(d, i, milestoneId));
   }
 
+  /** Clearing the due also clears the repeat; see `setDueOnData`. */
   setDue(due: TodoDue | undefined): Promise<DetailResult> {
     return this.edit((d, i) => setDueOnData(d, i, due));
+  }
+
+  setRepeat(repeat: TodoRepeat | undefined): Promise<DetailResult> {
+    return this.edit((d, i) => setRepeatOnData(d, i, repeat));
   }
 
   addTag(raw: string): Promise<DetailResult> {

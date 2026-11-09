@@ -1,28 +1,37 @@
-import type { TodoDue } from '@kaihuman/formats';
+import type { TodoDue, TodoRepeat } from '@kaihuman/formats';
 import { useState } from 'react';
 import { Modal, Pressable } from 'react-native';
-import { dueFromPreset } from '../screens/todo-due.js';
+import { dueFromPreset, retargetRepeat } from '../screens/todo-due.js';
 import { useTheme } from '../theme/theme.js';
 import { Button, Text } from '../ui/index.js';
 import { DueEditor } from './due-editor.js';
 
-/** Board "Due" menu: Today, Tomorrow, Pick… (native picker), and Clear when a due is set. */
+/**
+ * Board "Due" menu: Today, Tomorrow, Pick… (native picker plus repeat), and Clear when a due is
+ * set. The presets keep the todo's repeat; Pick… saves the repeat edited alongside the date.
+ */
 export function DueSheet({
   title,
   current,
+  currentRepeat,
   onSelect,
   onClose,
   now = new Date(),
 }: {
   title: string;
   current: TodoDue | undefined;
-  /** `undefined` clears the due date. */
-  onSelect: (due: TodoDue | undefined) => void;
+  currentRepeat?: TodoRepeat;
+  /**
+   * `undefined` clears the due date (and with it the repeat). `repeat` is given only by Pick…:
+   * a rule replaces the todo's, `null` clears it.
+   */
+  onSelect: (due: TodoDue | undefined, repeat?: TodoRepeat | null) => void;
   onClose: () => void;
   now?: Date;
 }) {
   const { colors, spacing, shape } = useTheme();
   const [draft, setDraft] = useState<TodoDue | undefined>(current);
+  const [repeat, setRepeat] = useState<TodoRepeat | undefined>(currentRepeat);
   const [picking, setPicking] = useState(false);
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose} visible>
@@ -47,12 +56,23 @@ export function DueSheet({
           </Text>
           {picking ? (
             <>
-              <DueEditor value={draft} onChange={setDraft} now={now} />
+              <DueEditor
+                value={draft}
+                onChange={(next) => {
+                  setRepeat((r) =>
+                    next && r && draft ? retargetRepeat(r, draft.date, next.date) : undefined,
+                  );
+                  setDraft(next);
+                }}
+                {...(repeat && { repeat })}
+                onRepeatChange={setRepeat}
+                now={now}
+              />
               <Button
                 label="Save"
                 testID="due-save"
                 disabled={!draft}
-                onPress={() => onSelect(draft)}
+                onPress={() => onSelect(draft, repeat ?? null)}
                 fullWidth
               />
             </>

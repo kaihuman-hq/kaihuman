@@ -1,4 +1,7 @@
 import { parseFeedXml } from '@kaihuman/formats';
+// Static on purpose: Metro turns a dynamic import of react-native into importAll, which reads every
+// lazy getter on react-native's exports; PushNotificationIOS then throws and kills a release build.
+import { Platform } from 'react-native';
 import type { FeedSnapshot, FeedState } from '../components/widgets/more-tiles.js';
 
 export type FeedFetcher = (url: string) => Promise<string>;
@@ -16,8 +19,6 @@ const getText = async (url: string): Promise<string> => {
 /** Direct fetch first; the proxy when that fails, and on web where CORS blocks it. */
 export const defaultFeedFetcher: FeedFetcher = async (url) => {
   const proxied = () => getText(`${PROXY}${encodeURIComponent(url)}`);
-  // Lazy so node tests never load react-native.
-  const { Platform } = await import('react-native');
   if (Platform.OS === 'web') return proxied();
   try {
     return await getText(url);

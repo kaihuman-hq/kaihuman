@@ -48,6 +48,18 @@ struct SharedTodoItem: Codable, Identifiable {
     // The item's own due date (YYYY-MM-DD) and time (HH:MM), local; absent in older snapshots.
     var dueDate: String?
     var dueTime: String?
+    // Recurrence rule in file syntax (`weekly:mon,thu`) and the occurrence after dueDate.
+    var repeatRule: String?
+    var repeatNextDate: String?
+}
+
+/// The open item due soonest; absent when nothing open has a due date.
+struct SharedNextDue: Codable {
+    var itemId: String
+    var text: String
+    var dueDate: String
+    var dueTime: String?
+    var repeatRule: String?
 }
 
 enum TodoDueState {
@@ -95,6 +107,7 @@ struct SharedTodoSnapshot: Codable {
     var branch: String
     var appFolder: String
     var upcomingMilestone: SharedUpcomingMilestone?
+    var nextDue: SharedNextDue?
     var counts: SharedTodoCounts
     var items: [SharedTodoItem]
     var files: [String: SharedTodoFile]

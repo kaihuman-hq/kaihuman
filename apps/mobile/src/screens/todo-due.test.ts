@@ -1,14 +1,32 @@
-import { parseTodos, serializeTodos, type TodoItem } from '@kaihuman/formats';
+import {
+  MAX_REPEAT_INTERVAL,
+  parseTodos,
+  serializeTodos,
+  type TodoItem,
+  type TodoRepeat,
+} from '@kaihuman/formats';
 import { describe, expect, it } from 'vitest';
 import { KanbanBoardController } from './kanban-board.js';
 import { QuickCaptureController, type RepoFiles } from './quick-capture.js';
 import {
+  completionNotice,
   dateFromDue,
   dueBadge,
   dueFromDate,
   dueFromPreset,
   dueSummary,
+  REPEAT_PRESETS,
+  repeatEveryLabel,
+  repeatFromPreset,
+  repeatPreset,
+  repeatSummary,
+  repeatWeekdays,
+  retargetRepeat,
   setDueOnData,
+  setRepeatOnData,
+  toggleRepeatWeekday,
+  weekdayOf,
+  withRepeatInterval,
 } from './todo-due.js';
 
 // Local noon, so date maths cannot straddle a day by DST or timezone.
@@ -171,5 +189,178 @@ describe('quick todo with a due date', () => {
       error: 'Invalid due date',
     });
     expect(files.store.size).toBe(0);
+  });
+});
+
+// 2026-11-12 is a Thursday.
+const DUE = '2026-11-12';
+
+describe('repeat presets', () => {
+  it('maps every preset to a rule pinned to the due date', () => {
+    expect(REPEAT_PRESETS.map((p) => p.value)).toEqual([
+      'none',
+      'daily',
+      'weekdays',
+      'weekly',
+      'monthly',
+      'yearly',
+    ]);
+    expect(repeatFromPreset('none', DUE)).toBeUndefined();
+    expect(repeatFromPreset('daily', DUE)).toEqual({ unit: 'day', interval: 1 });
+    expect(repeatFromPreset('weekdays', DUE)).toEqual({
+      unit: 'week',
+      interval: 1,
+      weekdays: [0, 1, 2, 3, 4],
+    });
+    expect(repeatFromPreset('weekly', DUE)).toEqual({ unit: 'week', interval: 1, weekdays: [3] });
+    expect(repeatFromPreset('monthly', DUE)).toEqual({ unit: 'month', interval: 1, day: 12 });
+    expect(repeatFromPreset('yearly', DUE)).toEqual({ unit: 'year', interval: 1, date: '11-12' });
+  });
+
+  it('round-trips each preset through repeatPreset, custom rules falling under their unit', () => {
+    for (const { value } of REPEAT_PRESETS) {
+      expect(repeatPreset(repeatFromPreset(value, DUE))).toBe(value);
+    }
+    expect(repeatPreset({ unit: 'week', interval: 2, weekdays: [0, 1, 2, 3, 4] })).toBe('weekly');
+    expect(repeatPreset({ unit: 'day', interval: 3 })).toBe('daily');
+  });
+
+  it('weekdayOf counts from Monday', () => {
+    expect(weekdayOf('2026-11-09')).toBe(0);
+    expect(weekdayOf(DUE)).toBe(3);
+    expect(weekdayOf('2026-11-15')).toBe(6);
+  });
+});
+
+describe('repeat editing helpers', () => {
+  it('clamps the interval to 1..MAX_REPEAT_INTERVAL', () => {
+    const daily = { unit: 'day', interval: 1 } as const;
+    expect(withRepeatInterval(daily, 4)).toEqual({ unit: 'day', interval: 4 });
+    expect(withRepeatInterval(daily, 0).interval).toBe(1);
+    expect(withRepeatInterval(daily, -5).interval).toBe(1);
+    expect(withRepeatInterval(daily, MAX_REPEAT_INTERVAL + 1).interval).toBe(MAX_REPEAT_INTERVAL);
+  });
+
+  it('toggles weekdays, sorted, never leaving the list empty', () => {
+    const weekly: TodoRepeat = { unit: 'week', interval: 2, weekdays: [3] };
+    const two = toggleRepeatWeekday(weekly, 0, DUE);
+    expect(two).toEqual({ unit: 'week', interval: 2, weekdays: [0, 3] });
+    expect(toggleRepeatWeekday(two, 3, DUE)).toEqual({ unit: 'week', interval: 2, weekdays: [0] });
+    expect(toggleRepeatWeekday(weekly, 3, DUE)).toBe(weekly);
+    // A list-less weekly rule fires on the due weekday.
+    expect(repeatWeekdays({ unit: 'week', interval: 1 }, DUE)).toEqual([3]);
+    expect(toggleRepeatWeekday({ unit: 'week', interval: 1 }, 5, DUE)).toEqual({
+      unit: 'week',
+      interval: 1,
+      weekdays: [3, 5],
+    });
+  });
+
+  it('labels the stepper and summarizes rules', () => {
+    expect(repeatEveryLabel({ unit: 'day', interval: 1 })).toBe('Every day');
+    expect(repeatEveryLabel({ unit: 'week', interval: 2 })).toBe('Every 2 weeks');
+    expect(repeatSummary(undefined)).toBe('Does not repeat');
+    expect(repeatSummary({ unit: 'week', interval: 2, weekdays: [0, 3] })).toBe(
+      'Every 2 weeks on Mon, Thu',
+    );
+  });
+
+  it('retargets only the part pinned to the old date', () => {
+    expect(retargetRepeat({ unit: 'week', interval: 1, weekdays: [3] }, DUE, '2026-11-13')).toEqual(
+      { unit: 'week', interval: 1, weekdays: [4] },
+    );
+    const twoDays: TodoRepeat = { unit: 'week', interval: 1, weekdays: [0, 3] };
+    expect(retargetRepeat(twoDays, DUE, '2026-11-13')).toBe(twoDays);
+    expect(retargetRepeat({ unit: 'month', interval: 1, day: 12 }, DUE, '2026-11-20')).toEqual({
+      unit: 'month',
+      interval: 1,
+      day: 20,
+    });
+    expect(retargetRepeat({ unit: 'year', interval: 1, date: '11-12' }, DUE, '2027-01-05')).toEqual(
+      { unit: 'year', interval: 1, date: '01-05' },
+    );
+  });
+});
+
+describe('recurring todos on data', () => {
+  const data = parseTodos(`- [ ] a\n::due:: ${DUE} ::repeat:: weekly:thu\n- [ ] b\n`);
+
+  it('marks the badge of a recurring todo with its rule', () => {
+    const [a, b] = data.items as [TodoItem, TodoItem];
+    expect(dueBadge(a, NOW)).toEqual({ label: 'Nov 12', tone: 'neutral', repeat: 'Weekly on Thu' });
+    expect(dueBadge({ ...b, dueDate: DUE }, NOW)).not.toHaveProperty('repeat');
+  });
+
+  it('clears the repeat with the due date and carries a pinned rule to a new date', () => {
+    expect(setDueOnData(data, 0, undefined).items[0]).not.toHaveProperty('repeat');
+    expect(setDueOnData(data, 0, { date: '2026-11-13' }).items[0]?.repeat).toEqual({
+      unit: 'week',
+      interval: 1,
+      weekdays: [4],
+    });
+  });
+
+  it('sets a repeat only on a dated todo', () => {
+    expect(setRepeatOnData(data, 0, { unit: 'day', interval: 2 }).items[0]?.repeat).toEqual({
+      unit: 'day',
+      interval: 2,
+    });
+    expect(setRepeatOnData(data, 0, undefined).items[0]).not.toHaveProperty('repeat');
+    expect(() => setRepeatOnData(data, 1, { unit: 'day', interval: 1 })).toThrow(
+      'Set a due date first',
+    );
+    expect(() => setRepeatOnData(data, 9, undefined)).toThrow('Todo not found');
+  });
+
+  it('announces the next due when completing a recurring todo only', () => {
+    const [a, b] = data.items as [TodoItem, TodoItem];
+    expect(completionNotice(a, NOW)).toBe('Done. Next due Nov 19, 2026');
+    expect(completionNotice({ ...a, dueTime: '08:00' }, NOW)).toBe(
+      'Done. Next due Nov 19, 2026 at 08:00',
+    );
+    expect(completionNotice(b, NOW)).toBeUndefined();
+  });
+
+  it('quick add stores the due and the repeat on the new todo', async () => {
+    const files = new MemoryFiles(new Map([[INBOX, '- [ ] first\n']]));
+    const c = new QuickCaptureController(files, () => NOW);
+    const res = await c.quickTodo(
+      'water plants',
+      undefined,
+      { date: DUE },
+      {
+        unit: 'week',
+        interval: 1,
+        weekdays: [3],
+      },
+    );
+    expect(res).toMatchObject({ ok: true });
+    expect(files.store.get(INBOX)).toContain('::repeat:: weekly:thu');
+    const items = parseTodos(files.store.get(INBOX) ?? '').items;
+    expect(items[0]?.repeat).toBeUndefined();
+    expect(items[1]).toMatchObject({ dueDate: DUE, repeat: { unit: 'week', weekdays: [3] } });
+  });
+
+  it('the board sets due and repeat in one write, keeps the rule by default and clears it with null', async () => {
+    const files = new MemoryFiles(new Map([[INBOX, '- [ ] a\n']]));
+    const board = new KanbanBoardController(files);
+    await board.load();
+    const rule = { unit: 'month', interval: 1, day: 12 } as const;
+    expect(await board.setDue(INBOX, 0, { date: DUE }, rule)).toEqual({ ok: true });
+    expect(parseTodos(files.store.get(INBOX) ?? '').items[0]?.repeat).toEqual(rule);
+    await board.setDue(INBOX, 0, { date: DUE, time: '09:00' });
+    expect(parseTodos(files.store.get(INBOX) ?? '').items[0]?.repeat).toEqual(rule);
+    await board.setDue(INBOX, 0, { date: DUE }, null);
+    expect(parseTodos(files.store.get(INBOX) ?? '').items[0]?.repeat).toBeUndefined();
+  });
+
+  it('completing on the board advances a recurring todo', async () => {
+    const files = new MemoryFiles(new Map([[INBOX, `- [ ] a\n::due:: ${DUE} ::repeat:: daily\n`]]));
+    const board = new KanbanBoardController(files);
+    await board.load();
+    await board.setStatus(INBOX, 0, 'done');
+    const item = parseTodos(files.store.get(INBOX) ?? '').items[0];
+    expect(item?.status).toBe('backlog');
+    expect((item?.dueDate ?? '') > DUE).toBe(true);
   });
 });

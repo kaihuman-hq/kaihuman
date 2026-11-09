@@ -58,6 +58,14 @@ struct SharedTodoStore {
               let position = snapshot.items.firstIndex(where: { $0.id == itemId }) else { return nil }
         let item = snapshot.items[position]
         guard item.status == .backlog || item.status == .inProgress else { return nil }
+        // Completing a recurring todo moves its due date (packages/formats completeTodo); a line
+        // edit here would finish it for good, so the app applies it from the queue instead.
+        if item.repeatRule != nil {
+            queue(.toggle(itemId: itemId, now: now))
+            snapshot.items[position].pending = true
+            save(snapshot)
+            return nil
+        }
         let millis = PendingWidgetMutation.millis(now)
         guard let result = Self.rewrite(&snapshot, at: position, marker: .done, millis: millis) else { return nil }
 

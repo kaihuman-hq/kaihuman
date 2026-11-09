@@ -86,6 +86,17 @@ object TodoCommit {
         if (target != null && (target == item.status || (target != "backlog" && target != "in-progress"))) return
 
         val now = WidgetClock.now()
+        // Completing a recurring todo moves its due date (packages/formats completeTodo); a line
+        // edit here would finish it for good, so the app applies it from the queue instead.
+        if (target == null && item.repeatRule != null) {
+            queueMutation(context, itemId, null, now)
+            WidgetStore.save(
+                context,
+                snapshot.copy(items = snapshot.items.map { if (it.id == itemId) it.copy(pending = true) else it }),
+            )
+            updateAllWidgets(context)
+            return
+        }
         val marker = when (target) {
             null -> "x"
             "in-progress" -> ">"

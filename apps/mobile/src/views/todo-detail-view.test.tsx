@@ -119,3 +119,33 @@ describe('TodoDetailView', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('TodoDetailView recurring todos', () => {
+  const recurring = () =>
+    new MemoryFiles(new Map([[PATH, '- [ ] water plants\n  ::due:: 2099-01-02\n']]));
+
+  it('sets a repeat from the due section', async () => {
+    const f = recurring();
+    render(
+      <TodoDetailView controller={new TodoDetailController(`${PATH}#0`, f)} onClose={vi.fn()} />,
+    );
+    await waitFor(() => screen.getByLabelText('Repeat Daily'));
+    fireEvent.click(screen.getByLabelText('Repeat Daily'));
+    await waitFor(() => expect(items(f)[0]?.repeat).toEqual({ unit: 'day', interval: 1 }));
+    await waitFor(() => expect(screen.getByTestId('repeat-summary').textContent).toBe('Daily'));
+  });
+
+  it('completing moves to the next occurrence and says when it is due', async () => {
+    const f = recurring();
+    f.store.set(PATH, '- [ ] water plants\n  ::due:: 2099-01-02 ::repeat:: daily\n');
+    render(
+      <TodoDetailView controller={new TodoDetailController(`${PATH}#0`, f)} onClose={vi.fn()} />,
+    );
+    await waitFor(() => screen.getByTestId('todo-status'));
+    fireEvent.click(screen.getByText('Done'));
+    await waitFor(() =>
+      expect(screen.getByTestId('todo-notice').textContent).toBe('Done. Next due Jan 3, 2099'),
+    );
+    expect(items(f)[0]).toMatchObject({ status: 'backlog', dueDate: '2099-01-03' });
+  });
+});

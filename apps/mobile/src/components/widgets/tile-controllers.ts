@@ -42,6 +42,7 @@ import {
   serializeTodos,
   setStatus,
   type TimeTrackingData,
+  type TodoRepeat,
   type TodoStatus,
 } from '@kaihuman/formats';
 import { feedStore } from '../../files/feed-store.js';
@@ -89,6 +90,7 @@ export interface TodoRow {
   milestone?: string;
   dueDate?: string;
   dueTime?: string;
+  repeat?: TodoRepeat;
 }
 
 export interface TodosView {
@@ -114,6 +116,7 @@ export const todosView = (content: string, now: Date, hideOlderThanMs = 3_600_00
       milestone: item.milestoneId ? names.get(item.milestoneId) : undefined,
       ...(item.dueDate && { dueDate: item.dueDate }),
       ...(item.dueTime && { dueTime: item.dueTime }),
+      ...(item.repeat && { repeat: item.repeat }),
     });
   });
   const today = localDate(now);
