@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-11-09 — Mobile: full web parity for todos, kanban, travel, board overview, palette, CSV tables, consumption, time tracking, stocks, timezones
+
+- Todos tile (`todos-tile.ts`, `todos-body.tsx`): an expandable Details panel on the quick add with tags, milestone, due date/time and repeat (reuses `DueEditor`/`RepeatEditor`) and "Create prompt file" (beside the todos file, referenced by the task, optionally opened); tag filter chips; long-press for status, milestone, due and AI prompt; milestone manager sheet (add, rename, date, delete); per-task AI prompt sheet with Copy or share; show older completed; migrate legacy files.
+- Kanban: header search; sort and filter sheet (Newest/Due, due filter, milestone with Upcoming, lists, per-column "Last 2 weeks"); Board/Streams segmented control; streams per todo file with add field, swipe status, priority badge, list colour sheet and long-press reorder. Pure logic moved to `@kaihuman/formats` `todo-board.ts`; the console's `KanbanBoard`, `StreamsBoard` and `dueView` use it.
+- Travel: edit sheet for trips (title, destination, dates, notes, custom fields), delete with confirm, steps of all six types (add, edit, reorder, delete), destination on add. Step labels, fields and `money` moved to `@kaihuman/formats/travel`.
+- Board overview: settings sheet (columns, scope, overdue days, minimum age); tap opens the board.
+- Palette settings: editable — add, edit, delete and reorder engines, assistants and tools, URL parameters with live preview, restore removed defaults.
+- Widget CSVs: Widget/Table segmented control on every widget CSV file; the table sorts by column, filters per column in a sheet, pages by 50 and opens a row detail sheet. The generic CSV/TSV reader uses the same table. Table logic moved into `@kaihuman/formats` `csv.ts`; the web `CsvTableView` uses it.
+- Consumption: Monthly tab (per meter and year: total, per day, change vs last year) and Compare tab (multi-year cumulative or per-day lines, toggle years); long-press a meter to remove it. Month/compare helpers moved to `@kaihuman/formats/consumption`.
+- Time tracking: Daily (work and break hours) line, Weekly and Monthly bars, tap a point for its values.
+- Stocks: Bars, Value, Change and Forecast charts; linear-trend forecast to year end with projection table, all-time high, average growth. `buildPeriodForecast` takes an optional `now`.
+- Timezones: the clocks tick live each second (`use-live-now.ts`), paused while the app is in the background.
+- Tests for every item (mobile 958 → 1087, formats +16).
+
 ## 2026-11-09 — Mobile: add to inbox from the widget, Lock Screen and Siri
 
 - New `kaihuman://quick-inbox` deep link and route (`app/quick-inbox.tsx`): a one-field "Add to inbox" sheet. The keyboard opens at once, Return or Save appends a plain todo to `.kh/inbox.todos.md` and the outbox syncs it.
