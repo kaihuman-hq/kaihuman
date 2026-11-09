@@ -17,12 +17,12 @@ import {
   type Ctx,
   Events,
   ReadLater,
-  Timer,
   Todos,
 } from './tiles/bodies.js';
 import { BoardOverview, PaletteSettings, Rss, Travel } from './tiles/more-bodies.js';
 import { Err, TileIcon } from './tiles/parts.js';
 import { Templates } from './tiles/templates-body.js';
+import { Timer } from './tiles/timetracking-body.js';
 import { Consumption, Habit, Stocks } from './tiles/tracker-bodies.js';
 
 export interface TileProps {

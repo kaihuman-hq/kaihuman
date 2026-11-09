@@ -77,6 +77,7 @@ export type { PeriodPoint, StockPeriod } from '@kaihuman/formats/stocks';
 export * from './actionlog-tile.js';
 export * from './more-tiles.js';
 export * from './templates-tile.js';
+export * from './timetracking-tile.js';
 
 /** Outcome of a mutation that can be rejected; `content` is the file's new text. */
 export type TileResult = { ok: true; content: string } | { ok: false; error: string };

@@ -9,18 +9,14 @@ import {
   type BudgetView,
   bookmarksView,
   clearReadLater,
-  clockIn,
-  clockOut,
   type DataCollectionView,
   deleteBookmarkEntry,
   type EventRow,
   eventDateParts,
-  formatElapsed,
   groupEventsByDay,
   markReadLaterRead,
   type ReadLaterView,
   type TileResult,
-  type TimerView,
   type TodosView,
   toggleTodo,
   type WorldClock,
@@ -50,10 +46,6 @@ export interface Ctx {
 
 const num = (n: number, digits = 2) => n.toFixed(digits);
 const signed = (n: number, digits = 2) => `${n > 0 ? '+' : ''}${n.toFixed(digits)}`;
-const minutes = (m: number) => {
-  const r = Math.round(m);
-  return r >= 60 ? `${Math.floor(r / 60)}h ${r % 60}m` : `${r} min`;
-};
 const hostOf = (url: string) => {
   try {
     return new URL(url).host;
@@ -151,35 +143,6 @@ export function Todos({ view, ctx }: { view: TodosView; ctx: Ctx }) {
         onChangeText={setText}
         onSubmit={add}
         addLabel="Add task"
-      />
-    </>
-  );
-}
-
-export function Timer({ view, ctx }: { view: TimerView; ctx: Ctx }) {
-  const running = view.state === 'running';
-  return (
-    <>
-      <View style={{ gap: 2 }}>
-        <Text variant="largeTitle" mono style={{ fontVariant: ['tabular-nums'] }}>
-          {running ? formatElapsed(view.elapsedSeconds) : '0:00:00'}
-        </Text>
-        <Text variant="subheadline" tone="secondary">
-          {running ? `Running since ${view.since}` : 'Not running'}
-        </Text>
-      </View>
-      <StatRow>
-        <Stat label="Today" value={minutes(view.todayMinutes)} />
-      </StatRow>
-      <Button
-        fullWidth
-        variant={running ? 'tinted' : 'filled'}
-        label={running ? 'Clock out' : 'Clock in'}
-        onPress={() => {
-          if (ctx.apply(running ? clockOut(ctx.content, ctx.now) : clockIn(ctx.content, ctx.now))) {
-            haptics.medium();
-          }
-        }}
       />
     </>
   );
