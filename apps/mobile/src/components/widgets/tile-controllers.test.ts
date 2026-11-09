@@ -20,9 +20,11 @@ import {
   consumptionView,
   dataCollectionView,
   deleteBookmarkEntry,
+  eventDateParts,
   eventsView,
   formatElapsed,
   formatOffset,
+  groupEventsByDay,
   habitView,
   interpolateTemplate,
   logAction,
@@ -169,6 +171,31 @@ describe('.events.csv', () => {
     });
     const mum = eventsView(content, now, 20).find((r) => r.name === 'Mum');
     expect(mum).toMatchObject({ kind: 'birthday', daysUntil: 16, turns: 64 });
+  });
+
+  it('splits a date into calendar-block parts without timezone drift', () => {
+    expect(eventDateParts('2026-11-09')).toEqual({ day: '9', month: 'Nov', weekday: 'Mon' });
+  });
+
+  it('groups rows by day with Today/Tomorrow headings', () => {
+    const row = (name: string, date: string, daysUntil: number) => ({
+      name,
+      date,
+      daysUntil,
+      kind: 'event' as const,
+      label: '',
+    });
+    const groups = groupEventsByDay([
+      row('A', '2026-11-05', 0),
+      row('B', '2026-11-06', 1),
+      row('C', '2026-11-06', 1),
+      row('D', '2026-11-09', 4),
+    ]);
+    expect(groups.map((g) => [g.title, g.rows.map((r) => r.name)])).toEqual([
+      ['Today', ['A']],
+      ['Tomorrow', ['B', 'C']],
+      ['Mon 9 Nov', ['D']],
+    ]);
   });
 
   it('adds an event and validates input', () => {

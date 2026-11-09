@@ -17,7 +17,9 @@ import {
   type DataCollectionView,
   deleteBookmarkEntry,
   type EventRow,
+  eventDateParts,
   formatElapsed,
+  groupEventsByDay,
   type HabitView,
   interpolateTemplate,
   logAction,
@@ -263,7 +265,7 @@ export function Events({ rows, ctx }: { rows: EventRow[]; ctx: Ctx }) {
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const form = useDisclosure();
-  const { colors } = useTheme();
+  const { colors, spacing, shape } = useTheme();
   const save = () => {
     if (ctx.apply(addEvent(ctx.content, { name, startDate: date }))) {
       haptics.success();
@@ -277,27 +279,51 @@ export function Events({ rows, ctx }: { rows: EventRow[]; ctx: Ctx }) {
       {rows.length === 0 ? (
         <EmptyLine>No upcoming events.</EmptyLine>
       ) : (
-        <Rows>
-          {rows.map((r) => (
-            <ItemRow
-              key={`${r.date}-${r.name}`}
-              title={r.name}
-              subtitle={r.turns ? `${r.date}, turns ${r.turns}` : r.date}
-              leading={
-                <Icon
-                  name={r.kind === 'birthday' ? 'star' : 'calendar'}
-                  size={20}
-                  color={colors.accent}
-                />
-              }
-              trailing={
-                <Text variant="subheadline" tone="secondary">
-                  {r.label}
-                </Text>
-              }
-            />
-          ))}
-        </Rows>
+        groupEventsByDay(rows).map((group) => (
+          <View key={group.title} testID={`events-day-${group.title}`}>
+            <Text variant="footnote" weight="600" tone="secondary" accessibilityRole="header">
+              {group.title}
+            </Text>
+            <Rows>
+              {group.rows.map((r) => {
+                const { day, month } = eventDateParts(r.date);
+                const soon = r.daysUntil <= 1;
+                return (
+                  <ItemRow
+                    key={`${r.date}-${r.name}`}
+                    title={r.name}
+                    subtitle={r.turns ? `Turns ${r.turns} · ${r.label}` : r.label}
+                    label={`${r.name}, ${r.label}`}
+                    leading={
+                      <View
+                        accessibilityElementsHidden
+                        style={{
+                          width: 48,
+                          paddingVertical: spacing.xs,
+                          borderRadius: shape.md,
+                          alignItems: 'center',
+                          backgroundColor: soon ? colors.accentSoft : colors.fill,
+                        }}
+                      >
+                        <Text variant="title3" weight="700" mono>
+                          {day}
+                        </Text>
+                        <Text variant="caption2" tone="secondary">
+                          {month.toUpperCase()}
+                        </Text>
+                      </View>
+                    }
+                    trailing={
+                      r.kind === 'birthday' ? (
+                        <Icon name="star" size={18} color={colors.accent} />
+                      ) : undefined
+                    }
+                  />
+                );
+              })}
+            </Rows>
+          </View>
+        ))
       )}
       {form.open ? (
         <>

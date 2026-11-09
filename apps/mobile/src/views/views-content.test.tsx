@@ -160,6 +160,13 @@ describe('tiles', () => {
     expect(onWrite).toHaveBeenCalledTimes(1);
   });
 
+  it('events: grouped by day with a date block, full width', () => {
+    renderTile('events');
+    expect(screen.getByTestId('events-day-Mon 9 Nov')).toBeTruthy();
+    expect(screen.getAllByText('NOV').length).toBeGreaterThan(0);
+    expect(screen.getByText('Team Offsite')).toBeTruthy();
+  });
+
   it('events: add event', () => {
     const { onWrite } = renderTile('events');
     press('Add event');

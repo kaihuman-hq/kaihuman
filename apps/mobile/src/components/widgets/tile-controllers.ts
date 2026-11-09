@@ -308,6 +308,46 @@ export const eventsView = (content: string, now: Date, limit = 8): EventRow[] =>
     };
   });
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Calendar-block parts of a `YYYY-MM-DD` date, computed without a timezone or locale. */
+export const eventDateParts = (iso: string): { day: string; month: string; weekday: string } => {
+  const [y = 0, m = 1, d = 1] = iso.split('-').map(Number);
+  return {
+    day: String(d),
+    month: MONTHS[m - 1] ?? '',
+    weekday: WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] ?? '',
+  };
+};
+
+export interface EventGroup {
+  /** "Today", "Tomorrow", else "Mon 9 Nov". */
+  title: string;
+  rows: EventRow[];
+}
+
+/** Consecutive rows on the same day under one heading; input order (soonest first) is kept. */
+export const groupEventsByDay = (rows: readonly EventRow[]): EventGroup[] => {
+  const groups: (EventGroup & { date: string })[] = [];
+  for (const row of rows) {
+    const last = groups[groups.length - 1];
+    if (last && last.date === row.date) {
+      last.rows.push(row);
+      continue;
+    }
+    const p = eventDateParts(row.date);
+    const title =
+      row.daysUntil === 0
+        ? 'Today'
+        : row.daysUntil === 1
+          ? 'Tomorrow'
+          : `${p.weekday} ${p.day} ${p.month}`;
+    groups.push({ title, date: row.date, rows: [row] });
+  }
+  return groups.map(({ title, rows: r }) => ({ title, rows: r }));
+};
+
 export interface EventDraft {
   name: string;
   /** `YYYY-MM-DD`. */
@@ -1178,7 +1218,7 @@ export const presentTile = (path: string, content: string, now: Date): TileView 
     case 'timetracking':
       return { kind: 'timetracking', view: timerView(content, now) };
     case 'events':
-      return { kind: 'events', view: eventsView(content, now) };
+      return { kind: 'events', view: eventsView(content, now, 30) };
     case 'actionlog':
       return { kind: 'actionlog', view: actionLogView(content) };
     case 'timezones':
