@@ -129,8 +129,11 @@ jobs:
       # compiles. Cache the distribution, give the wrapper 2 minutes, and retry the download.
       - uses: actions/cache@v4
         with:
-          path: ~/.gradle/wrapper/dists
-          key: gradle-wrapper-${{ hashFiles('apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          path: |
+            ~/.gradle/wrapper/dists
+            ~/.gradle/caches/modules-2
+          key: gradle-${{ hashFiles('apps/mobile/android/gradle/wrapper/gradle-wrapper.properties', 'pnpm-lock.yaml') }}
+          restore-keys: gradle-
 
       - name: Download Gradle (with retries)
         working-directory: apps/mobile/android
@@ -152,7 +155,15 @@ jobs:
       # debug key by the Expo template and embeds the JS bundle.
       - name: Assemble release APK
         working-directory: apps/mobile/android
-        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
+        # Maven/GitHub release downloads (e.g. kotlin-compiler-embeddable) sometimes 504; Gradle
+        # keeps finished tasks, so a retry only refetches what failed.
+        run: |
+          for attempt in 1 2 3; do
+            ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64 && exit 0
+            echo "Gradle build failed (attempt $attempt), retrying"
+            sleep $((attempt * 30))
+          done
+          exit 1
 
       - name: Enable KVM
         run: |

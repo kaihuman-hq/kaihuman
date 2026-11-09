@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-09 — CI: retry Android Gradle builds
+
+- `mobile-build.yml` and `mobile-screenshots.yml` cache `~/.gradle/caches/modules-2` and retry the Gradle build up to 3 times: Maven/GitHub release downloads (`kotlin-compiler-embeddable`) returned 504 twice in a row. The cold-start test now stubs `fetch` and console so unawaited bootstrap work cannot log after teardown.
+
 ## 2026-11-09 — Recurring todos (formats, console, mobile, widgets, notifications)
 
 - Format: the todo metadata line gains `::repeat:: <rule>` and `::done:: <date>,…` after `::due::` (older parsers still read `::due::`; files without them round-trip byte for byte). Rules: `daily`, `weekdays`, `weekly[:mon,thu]`, `monthly[:15|last]`, `yearly[:MM-DD]`, `every N days|weeks|months|years[:<on>]`. Pure logic in `packages/formats/src/todo-repeat.ts` (`parseRepeat`, `formatRepeat`, `describeRepeat`, `nextOccurrenceDate`, `anchorRepeat`) and `todos.ts` (`completeTodo`, `nextDue`, `setTodoRepeat`). Date arithmetic runs on UTC calendar days, so DST cannot skip or repeat a day; month-end and Feb 29 clamp and the rule is pinned on first completion (`monthly` → `monthly:31`) so it does not drift.
