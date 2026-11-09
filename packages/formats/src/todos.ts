@@ -23,7 +23,10 @@
  *
  * Metadata line (optional, right after a task): `::updated:: <ms> ::created:: <iso> ::due:: <due>`.
  * `<due>` is a local date `YYYY-MM-DD` or date-time `YYYY-MM-DDTHH:MM`; any part may be absent.
- * `::due::` goes last so parsers that only know `::updated::`/`::created::` still read the line.
+ * `::due::` goes after them so parsers that only know `::updated::`/`::created::` still read the line.
+ * Recurring todos add `::repeat:: <rule>` (see todo-repeat.ts, e.g. `weekly:mon,thu`) and
+ * `::done:: <date>,<date>` (completion log, newest last, capped at DONE_LOG_LIMIT) after `::due::`.
+ * Completing a recurring todo moves `::due::` to the next occurrence instead of marking it done.
  *
  * Status markers:
  *   [ ] = backlog, [>] = in-progress, [x] = done, [-] = rejected
@@ -31,6 +34,14 @@
  * Legacy format (v1): # Group headers with - [ ] tasks.
  * Legacy files are auto-detected; groups become hashtags on migration.
  */
+
+import {
+  anchorRepeat,
+  formatRepeat,
+  nextOccurrenceDate,
+  parseRepeat,
+  type TodoRepeat,
+} from './todo-repeat.js';
 
 export type TodoStatus = 'backlog' | 'in-progress' | 'done' | 'rejected';
 
@@ -101,6 +112,10 @@ export interface TodoItem {
   dueDate?: string; // YYYY-MM-DD, local
   /** HH:MM, local; only set together with dueDate. */
   dueTime?: string;
+  /** Recurrence rule; completing the todo advances the due date instead of finishing it. */
+  repeat?: TodoRepeat;
+  /** Local dates (YYYY-MM-DD) a recurring todo was completed on, oldest first. */
+  doneLog?: string[];
 }
 
 export interface TodoData {
@@ -275,6 +290,10 @@ export const compareDue = (
   return ta < tb ? -1 : ta > tb ? 1 : 0;
 };
 
+/** The value after `::name::` on a metadata line, up to the next `::` field; '' when absent. */
+const metaField = (line: string, name: string): string =>
+  line.match(new RegExp(`::${name}::\\s*(.*?)\\s*(?=::|$)`))?.[1] ?? '';
+
 // ─── Parse ───────────────────────────────────────────────────────────────────
 
 export const parseTodos = (md: string): TodoData => {
@@ -356,8 +375,16 @@ export const parseTodos = (md: string): TodoData => {
     let updatedAt: number | undefined;
     let due: TodoDue | undefined;
     const metaLine = (lines[i + 1] ?? '').trim();
-    if (/^::(updated|created|due)::/.test(metaLine)) {
-      due = parseDue(metaLine.match(/::due::\s*(.*?)\s*(?=::|$)/)?.[1] ?? '');
+    let repeat: TodoRepeat | undefined;
+    let doneLog: string[] | undefined;
+    if (/^::(updated|created|due|repeat|done)::/.test(metaLine)) {
+      due = parseDue(metaField(metaLine, 'due'));
+      repeat = parseRepeat(metaField(metaLine, 'repeat'));
+      const log = metaField(metaLine, 'done')
+        .split(',')
+        .filter((d) => parseDue(d.trim()) && !d.includes('T'))
+        .map((d) => d.trim());
+      if (log.length > 0) doneLog = log;
       const updatedMatch = metaLine.match(/::updated::\s*(\d+)/);
       if (updatedMatch?.[1]) updatedAt = parseInt(updatedMatch[1], 10);
       const createdMatch = metaLine.match(/::created::\s*(\S+)/);
@@ -396,6 +423,8 @@ export const parseTodos = (md: string): TodoData => {
       updatedAt,
       ...(due && { dueDate: due.date }),
       ...(due?.time && { dueTime: due.time }),
+      ...(repeat && { repeat }),
+      ...(doneLog && { doneLog }),
     });
     i++;
   }
@@ -419,11 +448,14 @@ export const serializeTodos = (data: TodoData): string => {
     result += `- ${marker} ${item.text}${suffix ? ` ${suffix}` : ''}\n`;
 
     const due = formatDue(item);
-    if (item.updatedAt || item.createdAt || due) {
+    const doneLog = item.doneLog?.length ? item.doneLog.join(',') : undefined;
+    if (item.updatedAt || item.createdAt || due || item.repeat || doneLog) {
       const metaParts: string[] = [];
       if (item.updatedAt) metaParts.push(`::updated:: ${item.updatedAt}`);
       if (item.createdAt) metaParts.push(`::created:: ${item.createdAt}`);
       if (due) metaParts.push(`::due:: ${due}`);
+      if (item.repeat) metaParts.push(`::repeat:: ${formatRepeat(item.repeat)}`);
+      if (doneLog) metaParts.push(`::done:: ${doneLog}`);
       result += `${metaParts.join(' ')}\n`;
     }
 
@@ -450,6 +482,9 @@ export const migrateLegacyFormat = (md: string): string => {
 export const setStatus = (data: TodoData, index: number, status: TodoStatus): TodoData => {
   const items = [...data.items];
   if (!items[index]) return data;
+  if (status === 'done' && items[index]?.repeat) {
+    return completeTodo(data, (items[index] as TodoItem).id);
+  }
   items[index] = { ...(items[index] as TodoItem), status, updatedAt: Date.now() };
   return { ...data, items };
 };
@@ -541,6 +576,58 @@ export const setTodoDue = (data: TodoData, id: string, due?: TodoDue): TodoData 
     ...(valid?.time && { dueTime: valid.time }),
     updatedAt: Date.now(),
   };
+  return { ...data, items };
+};
+
+/** Most completions kept in `::done::`, so a daily todo's line stays short. */
+export const DONE_LOG_LIMIT = 30;
+
+/** The due that follows `item`'s current one, or undefined for a todo that does not repeat. */
+export const nextDue = (
+  item: Pick<TodoItem, 'dueDate' | 'dueTime' | 'repeat'>,
+  now = Date.now(),
+): TodoDue | undefined => {
+  if (!item.repeat) return undefined;
+  const today = localDateString(now);
+  const date = nextOccurrenceDate(item.dueDate ?? today, item.repeat, today);
+  return item.dueTime ? { date, time: item.dueTime } : { date };
+};
+
+/**
+ * Completes a todo. A recurring one is not finished: its due date moves to the first occurrence
+ * after both the current due date and today, the completion goes into `doneLog`, and it returns
+ * to the backlog. A plain todo is marked done.
+ */
+export const completeTodo = (data: TodoData, id: string, now = Date.now()): TodoData => {
+  const index = data.items.findIndex((item) => item.id === id);
+  const item = data.items[index];
+  if (!item) return data;
+  const items = [...data.items];
+  if (!item.repeat) {
+    items[index] = { ...item, status: 'done', updatedAt: now };
+    return { ...data, items };
+  }
+  const today = localDateString(now);
+  const repeat = anchorRepeat(item.repeat, item.dueDate ?? today);
+  const next = nextDue({ ...item, repeat }, now) as TodoDue;
+  items[index] = {
+    ...item,
+    status: 'backlog',
+    repeat,
+    dueDate: next.date,
+    doneLog: [...(item.doneLog ?? []), today].slice(-DONE_LOG_LIMIT),
+    updatedAt: now,
+  };
+  return { ...data, items };
+};
+
+/** Set or clear (`undefined`) an item's recurrence. */
+export const setTodoRepeat = (data: TodoData, id: string, repeat?: TodoRepeat): TodoData => {
+  const index = data.items.findIndex((item) => item.id === id);
+  if (index < 0) return data;
+  const { repeat: _r, ...rest } = data.items[index] as TodoItem;
+  const items = [...data.items];
+  items[index] = { ...rest, ...(repeat && { repeat }), updatedAt: Date.now() };
   return { ...data, items };
 };
 
