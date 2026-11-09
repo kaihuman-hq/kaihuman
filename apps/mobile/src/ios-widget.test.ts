@@ -23,6 +23,8 @@ const item: Required<WidgetTodoItem> = {
   priority: 'high',
   dueDate: '',
   dueTime: '',
+  repeatRule: '',
+  repeatNextDate: '',
   pending: false,
 };
 const snapshot: Required<WidgetTodoSnapshot> = {
@@ -32,6 +34,7 @@ const snapshot: Required<WidgetTodoSnapshot> = {
   branch: '',
   appFolder: '.kh',
   upcomingMilestone: { id: '', name: '', dueDate: '' },
+  nextDue: { itemId: '', text: '', dueDate: '', dueTime: '', repeatRule: '' },
   counts: {
     inbox: 0,
     inProgress: 0,
@@ -65,12 +68,19 @@ describe('ios widget target', () => {
   const views = read('TodoWidgetViews.swift');
   const widgets = read('KaihumanWidgets.swift');
 
+  it('queues a recurring todo toggle for the app instead of marking it done', () => {
+    const toggle = store.slice(store.indexOf('func toggle('), store.indexOf('func move('));
+    expect(toggle).toMatch(/if item\.repeatRule != nil \{\s*queue\(\.toggle\(/);
+    expect(toggle.indexOf('repeatRule')).toBeLessThan(toggle.indexOf('marker: .done'));
+  });
+
   it('declares every snapshot, item, counts and milestone key', () => {
     const keys = [
       ...Object.keys(item),
       ...Object.keys(snapshot),
       ...Object.keys(snapshot.counts),
       ...Object.keys(snapshot.upcomingMilestone),
+      ...Object.keys(snapshot.nextDue),
       ...Object.keys(snapshot.stats),
       ...Object.keys(snapshot.milestones[0] ?? {}),
       ...Object.keys(snapshot.privacy),

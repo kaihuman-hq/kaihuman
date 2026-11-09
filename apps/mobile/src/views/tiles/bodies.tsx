@@ -106,6 +106,7 @@ function Collapsible<T>({
 }
 
 export function Todos({ view, ctx }: { view: TodosView; ctx: Ctx }) {
+  const { colors, spacing } = useTheme();
   const [text, setText] = useState('');
   const add = () => {
     if (ctx.apply(addTodoTask(ctx.content, text, ctx.now))) {
@@ -125,7 +126,21 @@ export function Todos({ view, ctx }: { view: TodosView; ctx: Ctx }) {
             return (
               <ItemRow
                 key={r.id}
-                trailing={due ? <Badge tone={due.tone} label={due.label} /> : undefined}
+                trailing={
+                  due ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                      {due.repeat ? (
+                        <Icon
+                          name="repeat"
+                          size={14}
+                          color={colors.secondaryLabel}
+                          accessibilityLabel={`Repeats ${due.repeat}`}
+                        />
+                      ) : null}
+                      <Badge tone={due.tone} label={due.label} />
+                    </View>
+                  ) : undefined
+                }
                 testID={`todo-${r.index}`}
                 role="checkbox"
                 checked={done}

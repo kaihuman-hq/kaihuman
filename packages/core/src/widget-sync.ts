@@ -40,7 +40,7 @@ export interface WidgetTodoItem {
   /** HH:MM, local; only with dueDate. */
   dueTime?: string;
   /** Recurrence rule in file syntax (`weekly:mon,thu`); additive in v2. */
-  repeat?: string;
+  repeatRule?: string;
   /** For a recurring item: the occurrence after `dueDate` (YYYY-MM-DD, local). */
   repeatNextDate?: string;
   /** Never set here: the native widget marks toggles it could not commit yet. */
@@ -52,7 +52,7 @@ export interface WidgetNextDue {
   text: string;
   dueDate: string;
   dueTime?: string;
-  repeat?: string;
+  repeatRule?: string;
 }
 
 export interface WidgetMilestoneSummary {
@@ -268,7 +268,7 @@ export const buildWidgetTodoSnapshot = (
         ...(item.priority && { priority: item.priority }),
         ...(item.dueDate && { dueDate: item.dueDate }),
         ...(item.dueTime && { dueTime: item.dueTime }),
-        ...(item.repeat && { repeat: formatRepeat(item.repeat) }),
+        ...(item.repeat && { repeatRule: formatRepeat(item.repeat) }),
         ...(following && { repeatNextDate: following.date }),
       });
     });
@@ -281,7 +281,7 @@ export const buildWidgetTodoSnapshot = (
         text: soonest.text,
         dueDate: soonest.dueDate,
         ...(soonest.dueTime && { dueTime: soonest.dueTime }),
-        ...(soonest.repeat && { repeat: soonest.repeat }),
+        ...(soonest.repeatRule && { repeatRule: soonest.repeatRule }),
       }
     : undefined;
 

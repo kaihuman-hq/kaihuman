@@ -10,12 +10,13 @@ import {
   type TodoData,
   type TodoDue,
   type TodoItem,
+  type TodoRepeat,
   type TodoStatus,
   updateMilestone,
   updateTodoText,
 } from '@kaihuman/formats';
 import { githubRepoFiles, type RepoFiles } from './quick-capture.js';
-import { setDueOnData } from './todo-due.js';
+import { setDueOnData, setRepeatOnData } from './todo-due.js';
 
 export const TODO_STATUSES = [
   'backlog',
@@ -200,9 +201,22 @@ export class KanbanBoardController {
     });
   }
 
-  /** Sets (or with `undefined`, clears) the due date, like the other per-card edits. */
-  setDue(path: string, index: number, due: TodoDue | undefined): Promise<BoardResult> {
-    return this.edit(path, (d) => setDueOnData(d, index, due));
+  /**
+   * Sets (or with `undefined`, clears) the due date, like the other per-card edits. `repeat`
+   * replaces the rule in the same write (`null` clears it); left out, the rule is kept.
+   */
+  setDue(
+    path: string,
+    index: number,
+    due: TodoDue | undefined,
+    repeat?: TodoRepeat | null,
+  ): Promise<BoardResult> {
+    return this.edit(path, (d) => {
+      const dated = setDueOnData(d, index, due);
+      return due && repeat !== undefined
+        ? setRepeatOnData(dated, index, repeat ?? undefined)
+        : dated;
+    });
   }
 
   addTodo(

@@ -254,15 +254,15 @@ describe('schema v2', () => {
       opts,
     );
     expect(s.items.find((i) => i.text === 'gym')).toMatchObject({
-      repeat: 'weekly:fri',
+      repeatRule: 'weekly:fri',
       repeatNextDate: '2026-06-19',
     });
-    expect(s.items.find((i) => i.text === 'later')?.repeat).toBeUndefined();
+    expect(s.items.find((i) => i.text === 'later')?.repeatRule).toBeUndefined();
     expect(s.nextDue).toMatchObject({
       text: 'gym',
       dueDate: '2026-06-12',
       dueTime: '07:00',
-      repeat: 'weekly:fri',
+      repeatRule: 'weekly:fri',
     });
   });
 

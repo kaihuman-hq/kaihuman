@@ -49,6 +49,9 @@ data class WidgetTodoItem(
     /** The item's own due date (YYYY-MM-DD) and time (HH:MM), local; absent in older snapshots. */
     val dueDate: String? = null,
     val dueTime: String? = null,
+    /** Recurrence rule in file syntax and the occurrence after dueDate; absent for one-off todos. */
+    val repeatRule: String? = null,
+    val repeatNextDate: String? = null,
     /** Set by the widget when a toggle/move could not be committed yet. */
     val pending: Boolean = false,
     val raw: JSONObject? = null,
@@ -67,6 +70,8 @@ data class WidgetTodoItem(
         putOrRemove("priority", priority)
         putOrRemove("dueDate", dueDate)
         putOrRemove("dueTime", dueTime)
+        putOrRemove("repeatRule", repeatRule)
+        putOrRemove("repeatNextDate", repeatNextDate)
         if (pending) put("pending", true) else remove("pending")
     }
 
@@ -89,6 +94,8 @@ data class WidgetTodoItem(
                 priority = o.str("priority"),
                 dueDate = o.str("dueDate"),
                 dueTime = o.str("dueTime"),
+                repeatRule = o.str("repeatRule"),
+                repeatNextDate = o.str("repeatNextDate"),
                 pending = o.optBoolean("pending", false),
                 raw = o,
             )

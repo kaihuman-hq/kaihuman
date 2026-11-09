@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, TextInput, View } from 'react-native';
 import { TODO_STATUSES } from '../screens/kanban-board.js';
 import type { TodoDetailController } from '../screens/todo-detail.js';
+import { completionNotice } from '../screens/todo-due.js';
 import { useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
@@ -67,6 +68,7 @@ export function TodoDetailView({ controller, onClose }: TodoDetailViewProps) {
   const [draft, setDraft] = useState('');
   const [titleError, setTitleError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [tagDraft, setTagDraft] = useState('');
   const [tagError, setTagError] = useState<string | null>(null);
 
@@ -144,6 +146,14 @@ export function TodoDetailView({ controller, onClose }: TodoDetailViewProps) {
     else haptics.error();
     rerender();
     return res;
+  };
+
+  // A recurring todo is not finished by Done: it moves to its next occurrence, so say where.
+  const changeStatus = async (status: TodoStatus) => {
+    const current = controller.state.kind === 'ready' ? controller.state.item : undefined;
+    const next = status === 'done' && current ? completionNotice(current, new Date()) : undefined;
+    const res = await run(() => controller.setStatus(status));
+    setNotice(res.ok && next ? next : null);
   };
 
   const addTag = async (raw: string) => {
@@ -245,8 +255,15 @@ export function TodoDetailView({ controller, onClose }: TodoDetailViewProps) {
             testID="todo-status"
             options={TODO_STATUSES.map((s) => ({ value: s, label: SEGMENT[s] }))}
             value={item.status}
-            onChange={(s) => void run(() => controller.setStatus(s))}
+            onChange={(s) => void changeStatus(s)}
           />
+          {notice ? (
+            <View accessibilityLiveRegion="polite" style={{ paddingTop: spacing.sm }}>
+              <Text variant="footnote" tone="secondary" testID="todo-notice">
+                {notice}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </Section>
 
@@ -319,7 +336,12 @@ export function TodoDetailView({ controller, onClose }: TodoDetailViewProps) {
 
       <Section header="Due">
         {card(
-          <DueEditor value={due} onChange={(next) => void run(() => controller.setDue(next))} />,
+          <DueEditor
+            value={due}
+            onChange={(next) => void run(() => controller.setDue(next))}
+            {...(item.repeat && { repeat: item.repeat })}
+            onRepeatChange={(next) => void run(() => controller.setRepeat(next))}
+          />,
         )}
       </Section>
 

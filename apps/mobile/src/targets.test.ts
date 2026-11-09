@@ -480,6 +480,8 @@ const fullItem: Required<Omit<WidgetTodoItem, 'priority' | 'pending'>> = {
   milestoneDueDate: '2026-01-01',
   dueDate: '2026-01-02',
   dueTime: '09:00',
+  repeatRule: 'weekly:mon',
+  repeatNextDate: '2026-01-05',
   updatedAt: 1,
 };
 const fullSnapshot: Required<
@@ -496,6 +498,8 @@ const fullSnapshot: Required<
     | 'ideas'
     | 'cards'
     | 'habits'
+    // Not read by Android; kept verbatim in its raw copy like the other v2 keys.
+    | 'nextDue'
   >
 > & { counts: V1Counts; items: (typeof fullItem)[] } = {
   updatedAt: 1,
@@ -516,6 +520,12 @@ const snapshotKeys = [
 ];
 
 describe('Kotlin widget sources', () => {
+  it('queues a recurring todo completion for the app instead of marking it done', () => {
+    const src = kotlin('TodoCommit.kt');
+    expect(src).toMatch(/target == null && item\.repeatRule != null\) \{\s*queueMutation\(/);
+    expect(src.indexOf('item.repeatRule')).toBeLessThan(src.indexOf('TodoMarkdown.setMarker('));
+  });
+
   it('uses every WidgetTodoSnapshot JSON key', () => {
     const src = kotlinAll();
     for (const key of new Set(snapshotKeys)) expect(src, key).toContain(`"${key}"`);
