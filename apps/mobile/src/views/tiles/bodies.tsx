@@ -19,7 +19,6 @@ import {
   type TileResult,
   type TodosView,
   toggleTodo,
-  type WorldClock,
 } from '../../components/widgets/tile-controllers.js';
 import { dueBadge } from '../../screens/todo-due.js';
 import { useTheme } from '../../theme/theme.js';
@@ -239,26 +238,6 @@ export function Events({ rows, ctx }: { rows: EventRow[]; ctx: Ctx }) {
         <Button label="Add event" icon="add" size="medium" variant="tinted" onPress={form.show} />
       )}
     </>
-  );
-}
-
-export function Clocks({ clocks }: { clocks: WorldClock[] }) {
-  if (clocks.length === 0) return <EmptyLine>No time zones configured.</EmptyLine>;
-  return (
-    <Rows>
-      {clocks.map((c) => (
-        <ItemRow
-          key={c.id}
-          title={c.name}
-          subtitle={`${c.date}, UTC${c.offset}`}
-          trailing={
-            <Text variant="title3" mono style={{ fontVariant: ['tabular-nums'] }}>
-              {c.time}
-            </Text>
-          }
-        />
-      ))}
-    </Rows>
   );
 }
 

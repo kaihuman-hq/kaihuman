@@ -12,7 +12,6 @@ import { ActionLog } from './tiles/actionlog-body.js';
 import {
   Bookmarks,
   Budget,
-  Clocks,
   Collection,
   type Ctx,
   Events,
@@ -23,6 +22,7 @@ import { BoardOverview, PaletteSettings, Rss, Travel } from './tiles/more-bodies
 import { Err, TileIcon } from './tiles/parts.js';
 import { Templates } from './tiles/templates-body.js';
 import { Timer } from './tiles/timetracking-body.js';
+import { Clocks } from './tiles/timezones-body.js';
 import { Consumption, Habit, Stocks } from './tiles/tracker-bodies.js';
 
 export interface TileProps {
@@ -132,7 +132,7 @@ function TileBody({ tile, ctx }: { tile: TileData; ctx: Ctx }) {
     case 'actionlog':
       return <ActionLog ctx={ctx} />;
     case 'timezones':
-      return <Clocks clocks={tile.view} />;
+      return <Clocks clocks={tile.view} ctx={ctx} />;
     case 'readitlater':
       return <ReadLater view={tile.view} ctx={ctx} />;
     case 'bookmarks':
