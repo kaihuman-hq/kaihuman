@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import {
   addTimezone,
@@ -6,11 +6,13 @@ import {
   removeTimezone,
   searchZones,
   type WorldClock,
+  worldClocksView,
   yearProgress,
 } from '../../components/widgets/tile-controllers.js';
 import { Button, haptics, Icon, Text, TextField } from '../../ui/index.js';
 import type { Ctx } from './bodies.js';
 import { EmptyLine, ItemRow, Meter, Rows, Stat, StatRow, useDisclosure } from './parts.js';
+import { useLiveNow } from './use-live-now.js';
 
 /** Hermes has no `crypto.randomUUID`; ids only need to be unique within one small file. */
 const newId = (): string => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -56,9 +58,18 @@ function AddZone({ ctx }: { ctx: Ctx }) {
   );
 }
 
-export function Clocks({ clocks, ctx }: { clocks: WorldClock[]; ctx: Ctx }) {
-  const local = localClock(ctx.now);
-  const year = yearProgress(ctx.now);
+/** The big clock shows seconds, so the whole tile re-reads the time every second. */
+export function Clocks({ clocks: initial, ctx }: { clocks: WorldClock[]; ctx: Ctx }) {
+  const now = useLiveNow(ctx.now, 1000);
+  const minute = Math.floor(now.getTime() / 60_000);
+  // Zone rows show HH:mm, so they only need recomputing when the minute changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `minute` stands in for `now`
+  const clocks = useMemo(
+    () => (now === ctx.now ? initial : worldClocksView(ctx.content, now)),
+    [minute, ctx.now, ctx.content, initial],
+  );
+  const local = localClock(now);
+  const year = yearProgress(now);
   return (
     <>
       <View style={{ gap: 2 }}>
