@@ -1,7 +1,7 @@
 import { Children, type ReactNode, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, Pressable, View } from 'react-native';
 import { useTheme } from '../../theme/theme.js';
-import { Divider, Icon, type IconName, Text, TextField } from '../../ui/index.js';
+import { Divider, Icon, type IconName, SwipeReveal, Text, TextField } from '../../ui/index.js';
 
 export interface RowAction {
   label: string;
@@ -61,6 +61,8 @@ export interface ItemRowProps {
   mono?: boolean;
   onPress?: () => void;
   actions?: readonly RowAction[];
+  /** Also reveal `actions` by swiping (native only); long press stays as the fallback. */
+  swipe?: boolean;
   role?: 'button' | 'checkbox' | 'link';
   checked?: boolean;
   expanded?: boolean;
@@ -76,6 +78,7 @@ export function ItemRow({
   done,
   onPress,
   actions,
+  swipe,
   role = 'button',
   checked,
   expanded,
@@ -115,7 +118,7 @@ export function ItemRow({
     </View>
   );
   if (!interactive) return <View testID={testID}>{body(false)}</View>;
-  return (
+  const pressable = (
     <Pressable
       accessibilityRole={role}
       accessibilityLabel={label ?? title}
@@ -130,6 +133,14 @@ export function ItemRow({
       {({ pressed }) => body(pressed)}
     </Pressable>
   );
+  if (swipe && actions?.length && Platform.OS !== 'web') {
+    return (
+      <SwipeReveal actions={actions} testID={testID ? `${testID}-swipeable` : undefined}>
+        {pressable}
+      </SwipeReveal>
+    );
+  }
+  return pressable;
 }
 
 /** A round check marker; filled when `on`. */

@@ -1,5 +1,7 @@
 import {
+  filterRssItems,
   formatElapsed,
+  type RssFilter,
   type TileKind,
   type TileView,
 } from '../../components/widgets/tile-controllers.js';
@@ -50,7 +52,11 @@ const out = (stat: string, statLabel: string, items: readonly string[] = []): Ti
 });
 
 /** Plain data for a summary card; `now` is unused today but keeps the signature stable for clocks. */
-export function summarizeTile(tile: TileView, _now: Date): TileSummary {
+export function summarizeTile(
+  tile: TileView,
+  _now: Date,
+  rssFilter: RssFilter = 'unread',
+): TileSummary {
   switch (tile.kind) {
     case 'todos':
       return out(
@@ -145,7 +151,7 @@ export function summarizeTile(tile: TileView, _now: Date): TileSummary {
       return out(
         String(tile.view.unreadCount),
         'unread',
-        tile.view.items.filter((i) => i.unread).map((i) => i.title),
+        filterRssItems(tile.view.items, rssFilter).map((i) => i.title),
       );
     case 'travel':
       return tile.view.next

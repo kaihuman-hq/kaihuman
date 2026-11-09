@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { openBrowserAsync } from 'expo-web-browser';
+import { Platform } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   BoardOverviewView,
@@ -7,7 +8,7 @@ import type {
   PaletteSettingsView,
   TravelView,
 } from '../../components/widgets/tile-controllers.js';
-import { rssView, travelView } from '../../components/widgets/tile-controllers.js';
+import { markRssRead, rssView, travelView } from '../../components/widgets/tile-controllers.js';
 import type { ContentFiles } from '../../screens/file-editor-screen.js';
 import type { Ctx } from './bodies.js';
 import { BoardOverview, PaletteSettings, Rss, relativeDate, Travel } from './more-bodies.js';
@@ -95,6 +96,46 @@ describe('Rss', () => {
     expect(openBrowserAsync).toHaveBeenCalledWith('https://a.test/2');
     const written = (apply.mock.calls[0] as unknown as [string])[0];
     expect(JSON.parse(written).feedOptions[0].read).toContain('g2');
+  });
+
+  it('defaults to Unread and the All toggle brings read items back', async () => {
+    store.set(snapshot);
+    render(<Rss view={rssView(feedsFile, snapshot, NOW)} ctx={ctx(feedsFile)} />);
+    expect(await screen.findByText('Fresh two')).toBeTruthy();
+    expect(screen.queryByText('Read one')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    expect(screen.getByText('Read one')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Unread' }));
+    expect(screen.queryByText('Read one')).toBeNull();
+  });
+
+  it('says so when every item is read', () => {
+    const allRead = JSON.stringify({
+      feedOptions: [{ id: 'f1', url: 'https://a.test/feed', read: ['g1', 'g2'] }],
+      readLater: [],
+    });
+    store.set(snapshot);
+    render(<Rss view={rssView(allRead, snapshot, NOW)} ctx={ctx(allRead)} />);
+    expect(screen.getByText('No unread items.')).toBeTruthy();
+  });
+
+  describe('swipe to mark read', () => {
+    const realOS = Platform.OS;
+    afterEach(() => {
+      (Platform as { OS: string }).OS = realOS;
+    });
+
+    it('persists through the same write as opening, for unread items only', () => {
+      (Platform as { OS: string }).OS = 'ios';
+      store.set(snapshot);
+      const apply = vi.fn(() => true);
+      render(<Rss view={rssView(feedsFile, snapshot, NOW)} ctx={ctx(feedsFile, apply)} />);
+      fireEvent.click(screen.getByRole('button', { name: 'All' }));
+      expect(screen.getAllByTestId('swipe-action-Mark read')).toHaveLength(1);
+      fireEvent.click(screen.getByTestId('swipe-action-Mark read'));
+      expect(openBrowserAsync).not.toHaveBeenCalled();
+      expect(apply).toHaveBeenCalledWith(markRssRead(feedsFile, 'f1', 'g2'));
+    });
   });
 
   it('shows loading and per-feed errors', () => {

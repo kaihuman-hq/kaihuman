@@ -143,6 +143,12 @@ export const rssView = (content: string, feeds: FeedSnapshot, _now: Date): RssVi
   return { feeds: feedRows, items: all.slice(0, RSS_ITEM_LIMIT), unreadCount };
 };
 
+/** Which items the RSS list shows; Unread is the default everywhere. */
+export type RssFilter = 'unread' | 'all';
+
+export const filterRssItems = (items: readonly RssItemRow[], filter: RssFilter): RssItemRow[] =>
+  filter === 'unread' ? items.filter((i) => i.unread) : [...items];
+
 export const markRssRead = (content: string, feedId: string, key: string): string =>
   serializeRssConfig(markRssItemRead(parseRssConfig(content), feedId, key));
 

@@ -7,9 +7,11 @@ import {
   addTravelTrip,
   type BoardOverviewView,
   boardOverviewView,
+  filterRssItems,
   markRssRead,
   type PaletteEntryRow,
   type PaletteSettingsView,
+  type RssFilter,
   type RssView,
   removeRssFeedById,
   rssView,
@@ -19,7 +21,7 @@ import {
 import { useEnsureFeeds, useFeedSnapshot } from '../../files/use-feeds.js';
 import { type ContentFiles, githubContentFiles } from '../../screens/file-editor-screen.js';
 import { useTheme } from '../../theme/theme.js';
-import { Badge, Button, haptics, Icon, Text, TextField } from '../../ui/index.js';
+import { Badge, Button, haptics, Icon, SegmentedControl, Text, TextField } from '../../ui/index.js';
 import type { Ctx } from './bodies.js';
 import { EmptyLine, ItemRow, QuickAdd, Rows, useDisclosure } from './parts.js';
 
@@ -39,10 +41,16 @@ export function relativeDate(iso: string | null, now: Date): string {
   return iso.slice(0, 10);
 }
 
+const RSS_FILTERS = [
+  { value: 'unread', label: 'Unread' },
+  { value: 'all', label: 'All' },
+] as const;
+
 export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
   const { colors, spacing } = useTheme();
   const snapshot = useFeedSnapshot();
   const [url, setUrl] = useState('');
+  const [filter, setFilter] = useState<RssFilter>('unread');
   // The tile's own view has no fetched items yet; recompute with the live snapshot.
   const view: RssView = useMemo(
     () => rssView(ctx.content, snapshot, ctx.now),
@@ -60,6 +68,7 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
     ctx.apply(markRssRead(ctx.content, feedId, key));
     if (link) void openBrowserAsync(link).catch(() => {});
   };
+  const shown = filterRssItems(view.items, filter);
   const loading = view.feeds.some((f) => f.status === 'loading');
   const failed = view.feeds.filter((f) => f.status === 'error');
   return (
@@ -67,6 +76,12 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
       <Text variant="footnote" tone="secondary">
         {`${view.unreadCount} unread in ${view.feeds.length} ${view.feeds.length === 1 ? 'feed' : 'feeds'}`}
       </Text>
+      <SegmentedControl
+        testID="rss-filter"
+        options={RSS_FILTERS}
+        value={filter}
+        onChange={setFilter}
+      />
       {loading ? (
         <View
           accessibilityRole="progressbar"
@@ -93,13 +108,17 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
           </View>
         </View>
       ))}
-      {view.items.length === 0 ? (
+      {shown.length === 0 ? (
         <EmptyLine>
-          {view.feeds.length === 0 ? 'No feeds yet. Add one below.' : 'No items to show.'}
+          {view.feeds.length === 0
+            ? 'No feeds yet. Add one below.'
+            : view.items.length > 0
+              ? 'No unread items.'
+              : 'No items to show.'}
         </EmptyLine>
       ) : (
         <Rows>
-          {view.items.slice(0, 30).map((i) => (
+          {shown.slice(0, 30).map((i) => (
             <ItemRow
               key={`${i.feedId}-${i.key}`}
               testID={`rss-${i.key}`}
@@ -119,6 +138,19 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
                 />
               }
               onPress={() => open(i.feedId, i.key, i.link)}
+              swipe
+              actions={
+                i.unread
+                  ? [
+                      {
+                        label: 'Mark read',
+                        onPress: () => {
+                          ctx.apply(markRssRead(ctx.content, i.feedId, i.key));
+                        },
+                      },
+                    ]
+                  : undefined
+              }
             />
           ))}
         </Rows>
