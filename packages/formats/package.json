@@ -10,6 +10,8 @@
     "./skills/*": "./skills/*",
     "./business": "./src/business/index.ts",
     "./share": "./src/share/index.ts",
+    "./stocks": "./src/stocks.ts",
+    "./consumption": "./src/consumption.ts",
     "./dist/*": "./dist/*",
     "./business-templates/*": "./business-templates/*"
   },

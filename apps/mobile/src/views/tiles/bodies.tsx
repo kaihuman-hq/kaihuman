@@ -25,7 +25,6 @@ import {
   markReadLaterRead,
   missingParameters,
   type ReadLaterView,
-  type StocksView,
   type TemplateRow,
   type TemplatesView,
   type TileResult,
@@ -570,41 +569,6 @@ export function Budget({ view }: { view: BudgetView }) {
           ))}
         </View>
       ) : null}
-    </>
-  );
-}
-
-export function Stocks({ view }: { view: StocksView | null }) {
-  if (!view) return <EmptyLine>No stock data.</EmptyLine>;
-  const up = view.profit >= 0;
-  return (
-    <>
-      <View style={{ gap: 2 }}>
-        <Text
-          variant="caption2"
-          tone="secondary"
-          weight="600"
-          style={{ textTransform: 'uppercase' }}
-        >
-          Value
-        </Text>
-        <Text variant="largeTitle" mono style={{ fontVariant: ['tabular-nums'] }}>
-          {num(view.latestValue)}
-        </Text>
-        <Text
-          variant="subheadline"
-          mono
-          tone={up ? 'success' : 'danger'}
-          style={{ fontVariant: ['tabular-nums'] }}
-        >
-          {`${up ? '▲' : '▼'} ${signed(view.profit)} (${signed(view.profitPct, 1)}%)`}
-        </Text>
-      </View>
-      <StatRow>
-        <Stat label="Invested" value={num(view.invested)} />
-        <Stat label="Profit" value={signed(view.profit)} tone={up ? 'success' : 'danger'} />
-        <Stat label="Below peak" value={`${num(Math.abs(view.drawdownPct), 1)}%`} />
-      </StatRow>
     </>
   );
 }

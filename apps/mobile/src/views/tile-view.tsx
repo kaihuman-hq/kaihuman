@@ -19,13 +19,13 @@ import {
   Events,
   Habit,
   ReadLater,
-  Stocks,
   Templates,
   Timer,
   Todos,
 } from './tiles/bodies.js';
 import { BoardOverview, PaletteSettings, Rss, Travel } from './tiles/more-bodies.js';
 import { Err, TileIcon } from './tiles/parts.js';
+import { Stocks } from './tiles/tracker-bodies.js';
 
 export interface TileProps {
   path: string;
@@ -142,7 +142,7 @@ function TileBody({ tile, ctx }: { tile: TileData; ctx: Ctx }) {
     case 'budget':
       return <Budget view={tile.view} />;
     case 'stocks':
-      return <Stocks view={tile.view} />;
+      return <Stocks view={tile.view} ctx={ctx} />;
     case 'consumption':
       return <Consumption meters={tile.view} />;
     case 'datacollection':

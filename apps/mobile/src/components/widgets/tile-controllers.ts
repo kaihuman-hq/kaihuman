@@ -45,6 +45,14 @@ import {
   type TodoRepeat,
   type TodoStatus,
 } from '@kaihuman/formats';
+import {
+  addEntry as addStockEntry,
+  aggregateByPeriod,
+  getStats,
+  type PeriodPoint,
+  parseStocks,
+  type StockPeriod,
+} from '@kaihuman/formats/stocks';
 import { feedStore } from '../../files/feed-store.js';
 import {
   type BoardOverviewView,
@@ -57,6 +65,7 @@ import {
   travelView,
 } from './more-tiles.js';
 
+export type { PeriodPoint, StockPeriod } from '@kaihuman/formats/stocks';
 export * from './more-tiles.js';
 
 /** Outcome of a mutation that can be rejected; `content` is the file's new text. */
@@ -713,50 +722,68 @@ export interface StocksView {
   profit: number;
   profitPct: number;
   changeVsPrev: number | null;
+  changeVsPrevPct: number | null;
+  /** Compound annual growth, once the file spans a year. */
+  cagr: number | null;
   allTimeHigh: number;
   /** Negative percentage below the all-time high. */
   drawdownPct: number;
   series: StockPoint[];
+  /** Latest value per period, oldest first, as the web's overview table shows it. */
+  periods: Record<StockPeriod, PeriodPoint[]>;
 }
 
-/** Comma files hold the amount invested at each step; legacy `;` files hold the running total. */
+/**
+ * Parsing is shared with the web, which writes `DD.MM.YYYY HH:MM:SS` stamps; an ISO-only
+ * parser here dropped every row of a web-written file and the tile showed no data.
+ */
 export const stocksView = (content: string): StocksView | null => {
-  const legacy =
-    content
-      .split('\n')
-      .find((l) => l.trim() && !l.startsWith('#'))
-      ?.includes(';') ?? false;
-  const sep = legacy ? ';' : ',';
-  const rows: { date: string; value: number; invest: number }[] = [];
-  for (const line of content.split('\n')) {
-    const p = line.trim().split(sep);
-    const date = (p[0] ?? '').trim().slice(0, 10);
-    if (!ISO_DAY.test(date)) continue;
-    const value = Number.parseFloat((p[1] ?? '').replace(',', '.'));
-    if (Number.isNaN(value)) continue;
-    rows.push({ date, value, invest: Number.parseFloat((p[2] ?? '0').replace(',', '.')) || 0 });
-  }
-  if (rows.length === 0) return null;
-  rows.sort((a, b) => a.date.localeCompare(b.date));
+  const entries = parseStocks(content);
+  const stats = getStats(entries);
+  if (!stats) return null;
   let invested = 0;
-  const series = rows.map((r) => {
-    invested = legacy ? Math.max(invested, r.invest) : invested + r.invest;
-    return { date: r.date, value: r.value, invested };
+  const series = entries.map((e) => {
+    invested += e.invest;
+    return { date: localDate(e.timestamp), value: e.value, invested };
   });
-  const latest = series[series.length - 1] as StockPoint;
-  const prev = series[series.length - 2];
-  const allTimeHigh = Math.max(...series.map((s) => s.value));
-  const profit = latest.value - latest.invested;
   return {
-    latestValue: latest.value,
-    invested: latest.invested,
-    profit,
-    profitPct: latest.invested > 0 ? (profit / latest.invested) * 100 : 0,
-    changeVsPrev: prev ? latest.value - prev.value : null,
-    allTimeHigh,
-    drawdownPct: allTimeHigh > 0 ? ((latest.value - allTimeHigh) / allTimeHigh) * 100 : 0,
+    latestValue: stats.latestValue,
+    invested: stats.latestInvest,
+    profit: stats.latestProfit,
+    profitPct: stats.latestProfitPct,
+    changeVsPrev: stats.changeVsPrev,
+    changeVsPrevPct: stats.changeVsPrevPct,
+    cagr: stats.cagr,
+    allTimeHigh: stats.allTimeHigh,
+    drawdownPct: stats.drawdownPct,
     series,
+    periods: {
+      weekly: aggregateByPeriod(entries, 'weekly'),
+      monthly: aggregateByPeriod(entries, 'monthly'),
+      yearly: aggregateByPeriod(entries, 'yearly'),
+    },
   };
+};
+
+const parseAmount = (raw: string): number => Number.parseFloat(raw.trim().replace(',', '.'));
+
+/** Adds a value reading, with the amount newly invested since the last one (blank means none). */
+export const addStockValue = (
+  content: string,
+  value: string,
+  invest: string,
+  date: string,
+  now: Date,
+): TileResult => {
+  const v = parseAmount(value);
+  if (Number.isNaN(v)) return { ok: false, error: 'Enter the current value as a number.' };
+  const i = invest.trim() ? parseAmount(invest) : 0;
+  if (Number.isNaN(i)) return { ok: false, error: 'Enter the invested amount as a number.' };
+  const day = date.trim() || localDate(now);
+  if (!ISO_DAY.test(day)) return { ok: false, error: 'Use a date like 2026-01-31.' };
+  const at = parseLocalDate(day);
+  at.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+  return ok(addStockEntry(content, v, i, at));
 };
 
 // ─── .consumption.csv ────────────────────────────────────────────────────────

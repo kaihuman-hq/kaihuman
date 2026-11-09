@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sameDayLastYear } from './ConsumptionLogic';
+import { sameDayLastYear } from './consumption.js';
 
 describe('sameDayLastYear', () => {
   it('returns the same calendar day one year earlier', () => {

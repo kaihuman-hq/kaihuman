@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-09 — Mobile: widget fixes and web parity (stocks, consumption, habit, …)
+
+- Stocks (bug): the tile was empty for files the web wrote. Root cause: the mobile parser only read ISO dates, the web writes `DD.MM.YYYY HH:MM:SS`, so every row was dropped. The web's parsing moved to `@kaihuman/formats/stocks` (and consumption to `@kaihuman/formats/consumption`; `packages/ui` re-exports both) and mobile uses it. The tile gains week/month/year periods with bars and a list, change vs last, CAGR and an "Add value" form.
+
 ## 2026-11-09 — CI: retry Android Gradle builds
 
 - `mobile-build.yml` and `mobile-screenshots.yml` cache `~/.gradle/caches/modules-2` and retry the Gradle build up to 3 times: Maven/GitHub release downloads (`kotlin-compiler-embeddable`) returned 504 twice in a row. The cold-start test now stubs `fetch` and console so unawaited bootstrap work cannot log after teardown.

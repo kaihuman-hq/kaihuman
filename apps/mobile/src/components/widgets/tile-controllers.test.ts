@@ -353,6 +353,15 @@ describe('.stocks.csv', () => {
     expect(view?.invested).toBe(1500);
     expect(stocksView('')).toBeNull();
   });
+
+  // Regression: the web writes `DD.MM.YYYY HH:MM:SS` stamps and blank invest cells; the tile was empty.
+  it('reads files the web wrote, with German timestamps and a header', () => {
+    const view = stocksView(
+      'timestamp,current value,invest\n01.12.2024 09:00:00,5690,5000\n01.01.2025 09:00:00,6100,500\n03.02.2025 10:30:00,6400,\n',
+    );
+    expect(view).toMatchObject({ latestValue: 6400, invested: 5500, profit: 900 });
+    expect(view?.series.map((s) => s.date)).toEqual(['2024-12-01', '2025-01-01', '2025-02-03']);
+  });
 });
 
 describe('.consumption.csv', () => {
