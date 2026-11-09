@@ -478,6 +478,8 @@ const fullItem: Required<Omit<WidgetTodoItem, 'priority' | 'pending'>> = {
   milestoneId: 'm',
   milestoneName: 'M',
   milestoneDueDate: '2026-01-01',
+  dueDate: '2026-01-02',
+  dueTime: '09:00',
   updatedAt: 1,
 };
 const fullSnapshot: Required<
@@ -804,7 +806,18 @@ describe('Android system surfaces', () => {
       expect(xml).toContain(`android:shortcutId="add_${kind}"`);
       expect(xml).toContain(`android:data="kaihuman://quick-${kind}"`);
     }
-    expect(xml.match(/android:targetClass="com\.kaihuman\.app\.MainActivity"/g)).toHaveLength(4);
+    expect(xml.match(/android:targetClass="com\.kaihuman\.app\.MainActivity"/g)).toHaveLength(5);
+  });
+
+  it('has a search shortcut with its icon and labels', () => {
+    const xml = read('targets/android-widget/res/xml/kh_shortcuts.xml');
+    expect(xml).toContain('android:shortcutId="search"');
+    expect(xml).toContain('android:data="kaihuman://search"');
+    expect(xml).toContain('@drawable/kh_ic_search');
+    expect(read('targets/android-widget/res/drawable/kh_ic_search.xml')).toContain('<vector');
+    const strings = read('targets/android-widget/res/values/kh_strings_surfaces.xml');
+    expect(strings).toContain('name="kh_shortcut_search_short"');
+    expect(strings).toContain('name="kh_shortcut_search_long"');
   });
 
   it('implements the three focus functions in the Android module', () => {

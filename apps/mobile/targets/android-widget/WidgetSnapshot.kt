@@ -46,6 +46,9 @@ data class WidgetTodoItem(
     val milestoneDueDate: String? = null,
     val updatedAt: Long? = null,
     val priority: String? = null,
+    /** The item's own due date (YYYY-MM-DD) and time (HH:MM), local; absent in older snapshots. */
+    val dueDate: String? = null,
+    val dueTime: String? = null,
     /** Set by the widget when a toggle/move could not be committed yet. */
     val pending: Boolean = false,
     val raw: JSONObject? = null,
@@ -62,6 +65,8 @@ data class WidgetTodoItem(
         putOrRemove("milestoneDueDate", milestoneDueDate)
         putOrRemove("updatedAt", updatedAt)
         putOrRemove("priority", priority)
+        putOrRemove("dueDate", dueDate)
+        putOrRemove("dueTime", dueTime)
         if (pending) put("pending", true) else remove("pending")
     }
 
@@ -82,6 +87,8 @@ data class WidgetTodoItem(
                 milestoneDueDate = o.str("milestoneDueDate"),
                 updatedAt = if (o.isNull("updatedAt")) null else o.optLong("updatedAt"),
                 priority = o.str("priority"),
+                dueDate = o.str("dueDate"),
+                dueTime = o.str("dueTime"),
                 pending = o.optBoolean("pending", false),
                 raw = o,
             )

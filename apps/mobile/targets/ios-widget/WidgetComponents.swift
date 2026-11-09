@@ -242,8 +242,16 @@ struct TodoRow: View {
         }
     }
 
+    private var dueSuffix: String {
+        switch item.dueState() {
+        case .overdue: return " · overdue"
+        case .today: return " · today"
+        case nil: return ""
+        }
+    }
+
     private func text(_ theme: WidgetTheme, pending: Bool) -> some View {
-        Text(item.text)
+        Text(item.text + dueSuffix)
             .font(.system(size: fontSize, weight: .medium))
             .strikethrough(pending)
             .foregroundStyle(pending ? theme.secondary : theme.label)

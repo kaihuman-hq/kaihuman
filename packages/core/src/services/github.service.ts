@@ -353,16 +353,31 @@ export class GithubService {
     });
   }
 
+  // Last head per branch with its ETag: a conditional GET that answers 304 is not rate limited
+  // and lets mobile poll cheaply.
+  private readonly heads = new Map<string, { etag: string; sha: string }>();
+
   /** Current commit SHA of a branch. */
   async getHeadSha(owner: string, repo: string, branch: string): Promise<string> {
     const client = this.getClient();
-    const { data } = await client.git.getRef({
-      owner,
-      repo,
-      ref: `heads/${branch}`,
-      ...noStore,
-    });
-    return data.object.sha;
+    const key = `${owner}/${repo}@${branch}`;
+    const known = this.heads.get(key);
+    try {
+      const res = await client.git.getRef({
+        owner,
+        repo,
+        ref: `heads/${branch}`,
+        ...(known ? { headers: { 'if-none-match': known.etag } } : {}),
+        ...noStore,
+      });
+      const etag = res.headers?.etag;
+      if (etag) this.heads.set(key, { etag, sha: res.data.object.sha });
+      else this.heads.delete(key);
+      return res.data.object.sha;
+    } catch (err) {
+      if (known && (err as { status?: number }).status === 304) return known.sha;
+      throw err;
+    }
   }
 
   /**

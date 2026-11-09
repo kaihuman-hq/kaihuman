@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "dashboards": [{ "id": "default", "name": "Main" }],
+  "entries": [
+    { "path": ".lifeos/a.todos.md", "dashboard": "default" },
+    { "path": ".lifeos/b.habit.csv", "dashboard": "default" },
+    { "path": ".lifeos/gone.events.csv", "dashboard": "default" }
+  ],
+  "files": {}
+}

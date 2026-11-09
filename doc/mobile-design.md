@@ -191,7 +191,8 @@ app/
   login.tsx                   Stack screen, no header
   (tabs)/_layout.tsx          NativeTabs host, five tabs
     (today)/_layout.tsx       Stack for Today
-      dashboard.tsx           /dashboard
+      dashboard.tsx           /dashboard (dashboard pager)
+      dashboard/tile.tsx      /dashboard/tile?path=… (tile detail)
     (board)/_layout.tsx       Stack for Board
       board.tsx               /board
     (capture)/_layout.tsx     Stack for Capture
@@ -219,7 +220,7 @@ Expo-router groups `(…)` do not appear in URLs, so every path above is unchang
 
 | Tab | Path | Icon (outline / fill) | Content |
 | --- | --- | --- | --- |
-| Today | `/dashboard` | `home` | Dashboard tiles |
+| Today | `/dashboard` | `home` | One page per console dashboard (§7.6) |
 | Board | `/board` | `board` | Kanban over `.todos.md` files |
 | Capture | `/capture` | `capture` | Launcher for the five quick-capture kinds |
 | Ideas | `/ideas` | `ideas` | Ideas list |
@@ -248,6 +249,22 @@ Each quick screen has a single primary action in the header or footer. Saving us
 ### 7.5 Deep links
 
 Unchanged: `kaihuman://board`, `kaihuman://quick-todo|note|log|idea|knowledge`, `kaihuman://files/...`, and the auth callback. Groups do not change paths, so `parseDeepLink` in `src/navigation/routes.ts` keeps its URLs.
+
+### 7.6 Today: dashboard pager
+
+- **Source.** The same `${appFolder}/.dashboard.config.json` the web console reads, through `parseDashboardConfig` / `resolveDashboards` in `@kaihuman/core`: dashboard order, entry order, `.lifeos/` → `.kh/` rewrite, entries for missing files dropped. Mobile also drops `skipOnMobile` entries.
+- **Pager.** A horizontal `FlatList` with `pagingEnabled` (no `react-native-pager-view`). Each page scrolls vertically and has its own pull-to-refresh. The fixed header shows the date, the dashboard name (`title1`) with a chevron, and page dots (hidden with one page). Tapping the name opens a bottom sheet listing the dashboards, the current one checked. A page change fires `haptics.selection()` and is remembered (`kh_mobile_dashboard`). The native header is hidden on this screen.
+- **Tile size classes** (`TILE_SIZE` in `src/views/tiles/summary.ts`):
+
+  | Class | Kinds | Presentation |
+  | --- | --- | --- |
+  | compact | habit, timetracking, timezones, budget, stocks, consumption, datacollection | Summary card in a 2-column grid (1 column when `fontScale > 1.3` or width < 360) |
+  | medium | events, actionlog, readitlater, bookmarks, prompts, commands | Full-width summary card |
+  | full | todos | The full interactive tile inline |
+
+  A summary card shows a stat, its label and up to three items, plus "See all", which pushes `/dashboard/tile?path=…` with the full tile. Files the console renders but mobile has no tile for get a card with "Open file".
+- **Empty states.** No config (or no entries) → one "Today" page with every tile file and a hint to group tiles into dashboards in the web console. A dashboard with no tiles → "No tiles on this dashboard".
+- Shortcuts sit on the first page only.
 
 ## 8. Platform rules
 
@@ -334,6 +351,7 @@ Legacy `src/views/primitives.tsx` and `src/theme/tokens.ts` were deleted on 2026
 Follow-up session. One bullet per screen. Each screen uses only `src/ui/` primitives and `useTheme()`, and passes §10 and §4.3 at 200% text.
 
 - **Login** (`app/login.tsx`, `src/views/login-view.tsx`): no header. Logo, one filled `Button` for GitHub sign-in (official GitHub mark via `react-native-svg`, `GithubMark`, coloured with the label), one line of helper text.
+- **Onboarding** (`app/onboarding.tsx`, `src/views/onboarding-view.tsx`): no header, no swipe back. Shown after sign-in when no repo is selected. Explanation, confirm `Card` (preselected plausible repo), searchable `Section` of `ListRow`s with `Badge` Private/Public, `EmptyState` for none/loading, error `Card` with retry. Routing rules live in `src/navigation/start-route.ts`.
 - **Dashboard** (`app/dashboard.tsx`, `src/views/dashboard-view.tsx`, `tile-view.tsx`): Today tab. Tiles become `Card` and `StatTile`. Numbers in mono.
 - **Board** (`app/board.tsx`, `src/views/kanban-view.tsx`): Board tab. Large title, `SegmentedControl` for status filter, `Chip` for tags, FAB on Android.
 - **Capture** (new `app/(tabs)/(capture)/capture.tsx`): Launcher `Section` with five `ListRow`s (Todo, Note, Log, Idea, Knowledge), each pushing its `quick-*` sheet.
@@ -366,3 +384,38 @@ Follow-up session. One bullet per screen. Each screen uses only `src/ui/` primit
 2. **Android status colours are iOS values.** `success`, `warning`, `danger` and `info` on Android come from the iOS palette through the spread in `theme.ts`. Generating Material 3 tonal status colours is a follow-up.
 3. **Icon outline and fill.** `src/ui/icon.tsx` uses the SF `.fill` variant as the default for most names. §5 requires outline for unselected controls and fill for selected tabs. Still open: split the map into outline and fill names.
 4. **Open question: detail routes.**
+
+## 14. File kinds: console parity
+
+Source of truth for the console: `FocusedTileInternal` in `packages/ui/src/LifeOS/Layouts/MainApp.tsx` (one widget per suffix, a TABLE view for every CSV, `EncryptedTileWrapper` for `.enc`, CodeMirror for everything else). Mobile routing: `fileKindForPath` (`apps/mobile/src/files/file-kinds.ts`) picks the viewer; the Files browser opens the viewer by default and keeps **View source** in the header menu. Parsers live in `packages/formats` (RSS, CSV and board-overview config moved there so console and mobile share them).
+
+Status: **built** = new native view in this change, **there** = native view existed, **fallback** = source editor with a "No viewer for .xyz yet" note.
+
+| Kind (suffix) | Console view / tile | Parser (`@kaihuman/formats`) | Mobile file view | Mobile tile | Status |
+| --- | --- | --- | --- | --- | --- |
+| `.todos.md` | TodoWidget / tile | `todos` | Todos body | full | there (file view built) |
+| `.habit.csv` | HabitTrackerWidget / tile | `habits` | Habit body | compact | there (file view built) |
+| `.timetracking.csv` | TimeTrackingWidget / tile | `time-tracking` | Timer body | compact | there (file view built) |
+| `.events.csv` | EventsWidget / tile | `events` | Events body | medium | there (file view built) |
+| `.actionlog.md` | ActionLogWidget / tile | `action-log` | Action log body | medium | there (file view built) |
+| `.timezones.json` | TimezoneWidget / tile | `timezones` | World clocks body | compact | there (file view built) |
+| `.readitlater.json` | ReadItLaterWidget / tile | `read-later` | Read it later body | medium | there (file view built) |
+| `.bookmarks.json` | BookmarksWidget / tile | mobile `tile-controllers` | Bookmarks body | medium | there (file view built) |
+| `.budget.csv` | BudgetWidget / tile | mobile `tile-controllers` | Budget body | compact | there (file view built) |
+| `.stocks.csv` | StocksWidget / tile | mobile `tile-controllers` | Stocks body | compact | there (file view built) |
+| `.consumption.csv` | ConsumptionWidget / tile | mobile `tile-controllers` | Consumption body | compact | there (file view built) |
+| `.data-collection.csv` | DataCollectionWidget / tile | mobile `tile-controllers` | Data collection body | compact | there (file view built) |
+| `.prompts.md` | PromptsWidget / tile | `prompts` | Templates body | medium | there (file view built) |
+| `.commands.md` | CommandsWidget / tile | `commands` | Templates body | medium | there (file view built) |
+| `.rss.json` | RssWidget / tile | `rss` (new, DOM-free) | RSS items: title, source, date, unread; opens in the in-app browser; add feed, mark read | medium | built |
+| `.travel.json` | TravelWidget / tile | `travel` | Next trip + trips; add trip | medium | built |
+| `.board-overview.json` | BoardOverviewWidget / tile | `board-overview` (new) + `todos` | Status columns across all todo files | medium | built |
+| `command-palette.settings.json` | CommandPaletteSettingsWidget / tile | `palette-settings` | Engines, assistants, tools, problems | compact | built |
+| `*.csv`, `*.tsv` (generic) | CsvTableView (TABLE) / — | `csv` (new) | Scrollable table | — | built |
+| `*.md` (notes, wiki, ideas, knowledge) | CodeMirror / — | mobile `wiki-blocks` | Rendered Markdown | — | built |
+| `*.json` | CodeMirror / — | `JSON.parse` | Pretty-printed with summary | — | built |
+| `*.yaml`, `*.yml` | CodeMirror / — | — | Indented key/value reader | — | built |
+| `*.png/jpg/gif/webp/svg` | — | — | Image (SVG via react-native-svg) | — | built |
+| `*.txt`, `*.log`, no extension | CodeMirror / — | — | Plain text | — | built |
+| `*.enc` | EncryptedTileWrapper | core `encrypt`/`decrypt` | Unlock, then the inner kind's view | — | there (inner view built) |
+| anything else | CodeMirror / — | — | Source editor + "No viewer for .xyz yet" | — | fallback |

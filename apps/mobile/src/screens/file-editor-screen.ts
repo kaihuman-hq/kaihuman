@@ -1,4 +1,13 @@
-import { decrypt, encrypt, githubFileStore, passwordStore, type TreeItem } from '@kaihuman/core';
+import {
+  decrypt,
+  encrypt,
+  githubFileStore,
+  githubProfileStore,
+  passwordStore,
+  type TreeItem,
+} from '@kaihuman/core';
+import { syncActions } from '../sync/actions.js';
+import { canServeFromCache } from '../sync/revalidate.js';
 
 /**
  * The slice of the repository file store the content screens use. Injected so controllers run
@@ -18,16 +27,30 @@ export interface ContentFiles {
 
 export const githubContentFiles: ContentFiles = {
   tree: () => githubFileStore.tree.value,
-  refresh: () => githubFileStore.loadTree(),
+  async refresh() {
+    const repo = githubProfileStore.currentRepo.peek()?.full_name;
+    const hasTree =
+      githubFileStore.loadedRepo.peek() === repo && githubFileStore.tree.peek().length > 0;
+    // With a tree on screen a focus refresh is stale-gated and cheap; the first load must complete.
+    await syncActions().refreshAll({ reason: hasTree ? 'focus' : 'pull' });
+  },
   async read(path) {
+    const open = githubFileStore.openFiles.peek()[path];
+    const item = githubFileStore.tree.peek().find((t) => t.path === path);
+    // The tree sha says whether the cached copy is current, so unchanged files cost no request.
+    if (open && canServeFromCache(open, item, githubFileStore.dirtyFiles.peek().has(path))) {
+      return open.content;
+    }
     await githubFileStore.openFile(path);
-    const file = githubFileStore.openFiles.value[path];
+    const file = githubFileStore.openFiles.peek()[path];
     if (!file) throw new Error(`Could not open ${path}`);
     return file.content;
   },
   async write(path, content) {
     githubFileStore.updateFileContent(path, content);
-    await githubFileStore.saveFile(path);
+    // Persist the dirty copy so input survives the app being killed; the outbox pushes it later.
+    await githubFileStore.flushPendingWrites();
+    syncActions().notifyLocalWrite();
   },
   create: (path, content) => githubFileStore.createFile(path, content),
   remove: (path) => githubFileStore.deleteFile(path),

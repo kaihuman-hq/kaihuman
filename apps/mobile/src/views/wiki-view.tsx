@@ -6,6 +6,7 @@ import {
   type WikiSegment,
   wikiPageHref,
 } from '../screens/wiki-screen.js';
+import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
 import { type TextVariant, useTheme } from '../theme/theme.js';
 import {
   Chip,
@@ -57,7 +58,13 @@ function Inlines({
   });
 }
 
-function WikiBlockView({ block, onOpen }: { block: WikiBlock; onOpen: (path: string) => void }) {
+export function WikiBlockView({
+  block,
+  onOpen,
+}: {
+  block: WikiBlock;
+  onOpen: (path: string) => void;
+}) {
   const theme = useTheme();
   const { colors, spacing, shape } = theme;
   // Generous leading keeps long pages comfortable to read.
@@ -138,7 +145,8 @@ export function WikiPageView({
   const { colors, spacing } = useTheme();
   const [, setRev] = useState(0);
   const [loaded, setLoaded] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, onRefresh } = useRefresh();
+  const rev = useSyncRevision();
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -153,9 +161,10 @@ export function WikiPageView({
     }
   }, [controller]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` re-reads after a sync
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, rev]);
 
   const page = controller.page(path);
   // The header shows the same title as the page body, which prefers the H1's capitalisation.
@@ -187,13 +196,8 @@ export function WikiPageView({
 
   const { title, blocks } = withoutTitleHeading(page.title, wikiBlocks(controller.render(path)));
   const backlinks = controller.backlinks(path);
-  const refresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
   return (
-    <Screen refreshing={refreshing} onRefresh={refresh}>
+    <Screen refreshing={refreshing} onRefresh={onRefresh}>
       <View style={{ gap: spacing.sm, paddingHorizontal: spacing.xs }}>
         <Text variant="title1" accessibilityRole="header">
           {title}
@@ -234,7 +238,9 @@ export function WikiView({ controller }: { controller: WikiScreenController }) {
   const { colors, spacing } = theme;
   const [, setRev] = useState(0);
   const [loaded, setLoaded] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, onRefresh } = useRefresh();
+  const rev = useSyncRevision();
+  useFocusRefresh();
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState<string | null>(null);
@@ -251,15 +257,10 @@ export function WikiView({ controller }: { controller: WikiScreenController }) {
     }
   }, [controller]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` re-reads after a sync
   useEffect(() => {
     void load();
-  }, [load]);
-
-  const refresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
+  }, [load, rev]);
 
   const q = query.trim().toLowerCase();
   const pages = controller
@@ -268,7 +269,7 @@ export function WikiView({ controller }: { controller: WikiScreenController }) {
   const tags = controller.allTags();
 
   return (
-    <Screen refreshing={refreshing} onRefresh={refresh}>
+    <Screen refreshing={refreshing} onRefresh={onRefresh}>
       <TextField
         label="Search pages"
         value={query}

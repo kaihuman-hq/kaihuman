@@ -1,13 +1,15 @@
 import { webcrypto } from 'node:crypto';
 import { encrypt, type TreeItem } from '@kaihuman/core';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   type ContentFiles,
   FileEditorController,
   type PasswordPort,
 } from '../screens/file-editor-screen.js';
-import { FileBrowserView, FileEditorView } from './file-editor-view.js';
+import { FileBrowserView, FileEditorView, type FileMode } from './file-editor-view.js';
+import { FileModeToggle } from './file-mode-toggle.js';
 import { MoreView } from './more-view.js';
 
 afterEach(cleanup);
@@ -100,7 +102,7 @@ describe('FileEditorView', () => {
       },
     );
     const controller = new FileEditorController({ files, passwords: passwords() });
-    render(<FileEditorView controller={controller} path="n.md" />);
+    render(<FileEditorView controller={controller} path="n.md" mode="source" />);
     const field = await screen.findByLabelText('Content');
     expect(screen.getByText('No changes')).toBeTruthy();
     fireEvent.change(field, { target: { value: 'new' } });
@@ -108,8 +110,15 @@ describe('FileEditorView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect((await screen.findByRole('alert')).textContent).toBe('conflict');
     expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    // Regression: the error used to render while Save was still busy, so this retry was dropped.
+    expect(screen.getByRole('button', { name: 'Save' }).getAttribute('aria-disabled')).not.toBe(
+      'true',
+    );
     fail = false;
     map.set('n.md', 'old');
+    // findByRole resolves on the DOM change, before passive effects run; react-native-web's
+    // Pressable applies its new `disabled` in useEffect, so flush effects or the tap is dropped.
+    await act(async () => {});
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Saved')).toBeTruthy();
   });
@@ -118,7 +127,7 @@ describe('FileEditorView', () => {
     const cipher = await encrypt('secret', 'pw');
     const { files } = memory({ 'v.md.enc': cipher });
     const controller = new FileEditorController({ files, passwords: passwords() });
-    render(<FileEditorView controller={controller} path="v.md.enc" />);
+    render(<FileEditorView controller={controller} path="v.md.enc" mode="source" />);
     const input = (await screen.findByLabelText('Passphrase')) as HTMLInputElement;
     expect(input.type).toBe('password');
     expect((screen.getByRole('button', { name: 'Unlock' }) as HTMLButtonElement).disabled).toBe(
@@ -144,6 +153,71 @@ describe('FileEditorView', () => {
     render(<FileEditorView controller={controller} path="gone.md" />);
     expect(await screen.findByText("Couldn't open the file")).toBeTruthy();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy());
+  });
+});
+
+vi.mock('../files/feed-store.js', () => ({
+  feedStore: { snapshot: () => ({}), subscribe: () => () => {}, ensure: async () => {} },
+}));
+
+/** Holds the mode like the route does, with a button standing in for the header toggle. */
+function Harness({ controller, path }: { controller: FileEditorController; path: string }) {
+  const [mode, setMode] = useState<FileMode>('view');
+  return (
+    <>
+      <FileModeToggle mode={mode} onChange={setMode} />
+      <FileEditorView controller={controller} path={path} mode={mode} />
+    </>
+  );
+}
+
+describe('FileEditorView viewers', () => {
+  it('opens an .rss.json as the RSS tile, and View source switches to the editor', async () => {
+    const { files } = memory({ 'f.rss.json': '{"feedOptions":[],"readLater":[]}' });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    render(<Harness controller={controller} path="f.rss.json" />);
+    expect(await screen.findByTestId('tile-rss')).toBeTruthy();
+    expect(screen.queryByLabelText('Content')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'View source' }));
+    expect(await screen.findByLabelText('Content')).toBeTruthy();
+    expect(screen.queryByTestId('tile-rss')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    expect(await screen.findByTestId('tile-rss')).toBeTruthy();
+  });
+
+  it('writes from a viewer through edit and save', async () => {
+    const { map, files } = memory({ 'f.travel.json': '' });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    render(<FileEditorView controller={controller} path="f.travel.json" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Add trip' }));
+    fireEvent.change(screen.getByLabelText('Trip name'), { target: { value: 'Oslo' } });
+    fireEvent.change(screen.getByLabelText('Start (YYYY-MM-DD)'), {
+      target: { value: '2026-12-01' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save trip' }));
+    await waitFor(() =>
+      expect(JSON.parse(map.get('f.travel.json') as string).trips).toHaveLength(1),
+    );
+  });
+
+  it('opens an unknown kind in the editor with a no-viewer note', async () => {
+    const { files } = memory({ 'd.drawio': '<mxfile/>' });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    render(<FileEditorView controller={controller} path="d.drawio" />);
+    expect(await screen.findByLabelText('Content')).toBeTruthy();
+    expect(screen.getByText(/No viewer for \.drawio yet/)).toBeTruthy();
+  });
+
+  it('unlocks an encrypted markdown file into the reader', async () => {
+    const cipher = await encrypt('# Secret title', 'pw');
+    const { files } = memory({ 'v.md.enc': cipher });
+    const controller = new FileEditorController({ files, passwords: passwords() });
+    render(<FileEditorView controller={controller} path="v.md.enc" />);
+    fireEvent.change(await screen.findByLabelText('Passphrase'), { target: { value: 'pw' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }));
+    expect(await screen.findByRole('heading', { name: 'Secret title' })).toBeTruthy();
+    expect(screen.getByText('Encrypted file')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Lock' })).toBeTruthy();
   });
 });
 

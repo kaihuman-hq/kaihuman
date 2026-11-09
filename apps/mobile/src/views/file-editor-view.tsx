@@ -1,10 +1,12 @@
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
+import { fileKindForPath, hasViewer } from '../files/file-kinds.js';
 import type {
   DirectoryEntry,
   FileEditorController,
   FileEditorState,
 } from '../screens/file-editor-screen.js';
+import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
 import {
   Badge,
@@ -20,6 +22,7 @@ import {
   Text,
   TextField,
 } from '../ui/index.js';
+import { FileContentView, NoViewerNote } from './file-views.js';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -110,7 +113,9 @@ export function FileBrowserView({
   const [, setRev] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, onRefresh } = useRefresh();
+  const rev = useSyncRevision();
+  useFocusRefresh();
 
   const load = useCallback(
     () =>
@@ -125,10 +130,11 @@ export function FileBrowserView({
     [controller],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` re-reads after a sync
   useEffect(() => {
-    setLoading(true);
+    // Only the first load shows the skeleton; revision reloads swap data in place.
     load().finally(() => setLoading(false));
-  }, [load]);
+  }, [load, rev]);
 
   const go = (fn: () => void) => {
     haptics.selection();
@@ -169,14 +175,7 @@ export function FileBrowserView({
   };
 
   return (
-    <Screen
-      title="Files"
-      refreshing={refreshing}
-      onRefresh={() => {
-        setRefreshing(true);
-        load().finally(() => setRefreshing(false));
-      }}
-    >
+    <Screen title="Files" refreshing={refreshing} onRefresh={onRefresh}>
       {/* At the root the title already says where you are. */}
       {folder ? (
         <Breadcrumbs
@@ -219,12 +218,17 @@ export function FileBrowserView({
   );
 }
 
+/** `view` shows the native reader or tile; `source` is the raw text editor. */
+export type FileMode = 'view' | 'source';
+
 export function FileEditorView({
   controller,
   path,
+  mode = 'view',
 }: {
   controller: FileEditorController;
   path: string;
+  mode?: FileMode;
 }) {
   const theme = useTheme();
   const { colors, spacing, shape } = theme;
@@ -252,6 +256,20 @@ export function FileEditorView({
 
   const sync = () => setState(controller.state);
 
+  // A sync can bring a newer copy; re-read unless local edits are pending.
+  const rev = useSyncRevision();
+  const firstRev = useRef(rev);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a new revision re-reads
+  useEffect(() => {
+    if (rev === firstRev.current) return;
+    const current = controller.state;
+    if (current.status !== 'open' || current.dirty) return;
+    controller
+      .open(path)
+      .then(setState)
+      .catch(() => {});
+  }, [rev]);
+
   const unlock = () => {
     if (!passphrase || unlocking) return;
     setUnlocking(true);
@@ -267,23 +285,21 @@ export function FileEditorView({
       .finally(() => setUnlocking(false));
   };
 
-  const save = () => {
+  // The outcome and the end of `saving` are set in one synchronous block so they render
+  // together; otherwise the error showed while Save was still disabled and a retry tap was lost.
+  const save = async () => {
     setError(null);
     setSaving(true);
-    controller
-      .save()
-      .then(() => {
-        setSaved(true);
-        haptics.success();
-      })
-      .catch((e: unknown) => {
-        setError(messageOf(e));
-        haptics.error();
-      })
-      .finally(() => {
-        setSaving(false);
-        sync();
-      });
+    try {
+      await controller.save();
+      setSaved(true);
+      haptics.success();
+    } catch (e: unknown) {
+      setError(messageOf(e));
+      haptics.error();
+    }
+    setSaving(false);
+    sync();
   };
 
   const pathLabel = (
@@ -341,6 +357,44 @@ export function FileEditorView({
     );
   }
 
+  const kind = fileKindForPath(path);
+  if (state.status === 'open' && mode === 'view' && hasViewer(kind.view)) {
+    // Viewer writes take the sync engine's optimistic path: edit, then save.
+    const write = (next: string) => {
+      controller.edit(next);
+      sync();
+      void save();
+    };
+    return (
+      <Screen
+        footer={
+          state.encrypted ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <Text variant="footnote" tone="secondary" style={{ flex: 1 }}>
+                Encrypted file
+              </Text>
+              <Button
+                label="Lock"
+                variant="plain"
+                size="medium"
+                onPress={() => {
+                  haptics.selection();
+                  controller.lock();
+                  setSaved(false);
+                  sync();
+                }}
+              />
+            </View>
+          ) : undefined
+        }
+      >
+        {pathLabel}
+        {error ? <InlineError>{error}</InlineError> : null}
+        <FileContentView path={path} content={state.content} onWrite={write} />
+      </Screen>
+    );
+  }
+
   if (state.status === 'open') {
     const dirty = state.dirty;
     return (
@@ -379,12 +433,19 @@ export function FileEditorView({
                 }}
               />
             ) : null}
-            <Button label="Save" size="medium" disabled={!dirty} loading={saving} onPress={save} />
+            <Button
+              label="Save"
+              size="medium"
+              disabled={!dirty}
+              loading={saving}
+              onPress={() => void save()}
+            />
           </View>
         }
       >
         <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
           {pathLabel}
+          {kind.view.type === 'unknown' ? <NoViewerNote ext={kind.view.ext} /> : null}
           {error ? <InlineError>{error}</InlineError> : null}
         </View>
         <TextInput

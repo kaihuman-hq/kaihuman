@@ -41,7 +41,7 @@ export class InMemorySharedContainer implements SharedContainer {
 const isTodoPath = (path: string): boolean =>
   /^\.(kh|lifeos)\//.test(path) && path.endsWith('.todos.md');
 
-const currentSnapshot = () => {
+export const currentSnapshot = () => {
   const repo = githubProfileStore.currentRepo.value;
   if (!repo) return null;
   const open = githubFileStore.openFiles.value;

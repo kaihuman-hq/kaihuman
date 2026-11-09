@@ -24,6 +24,7 @@ import {
   Timer,
   Todos,
 } from './tiles/bodies.js';
+import { BoardOverview, PaletteSettings, Rss, Travel } from './tiles/more-bodies.js';
 import { Err, TileIcon } from './tiles/parts.js';
 
 export interface TileProps {
@@ -52,6 +53,10 @@ export const TILE_META: Record<TileKind, { title: string; icon: IconName }> = {
   datacollection: { title: 'Data collection', icon: 'table' },
   prompts: { title: 'Prompts', icon: 'prompt' },
   commands: { title: 'Commands', icon: 'terminal' },
+  rss: { title: 'RSS feeds', icon: 'rss' },
+  travel: { title: 'Travel', icon: 'travel' },
+  boardoverview: { title: 'Board overview', icon: 'board' },
+  palettesettings: { title: 'Palette settings', icon: 'settings' },
 };
 
 const nameOf = (path: string) => path.slice(path.lastIndexOf('/') + 1);
@@ -138,6 +143,14 @@ function TileBody({ tile, ctx }: { tile: TileData; ctx: Ctx }) {
       return <Templates view={tile.view} ctx={ctx} kind="prompt" />;
     case 'commands':
       return <Templates view={tile.view} ctx={ctx} kind="command" />;
+    case 'rss':
+      return <Rss view={tile.view} ctx={ctx} />;
+    case 'travel':
+      return <Travel view={tile.view} ctx={ctx} />;
+    case 'boardoverview':
+      return <BoardOverview view={tile.view} ctx={ctx} />;
+    case 'palettesettings':
+      return <PaletteSettings view={tile.view} />;
     default: {
       const unhandled: never = tile;
       return unhandled;

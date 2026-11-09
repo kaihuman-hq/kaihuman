@@ -48,7 +48,7 @@ export function RepoSelectorView({
   };
 
   return (
-    <Screen title="Repositories" scroll refreshing={loading} onRefresh={refresh}>
+    <Screen title="Repositories" scroll syncStatus={false} refreshing={loading} onRefresh={refresh}>
       {error ? (
         <Card>
           <View style={{ gap: spacing.sm }} accessibilityRole="alert">

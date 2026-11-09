@@ -11,6 +11,23 @@ vi.mock('expo-symbols', () => ({
     }),
 }));
 
+// The sync runtime talks to GitHub and native modules; Screen's status banner only needs its types.
+vi.mock('../sync/runtime.js', () => ({
+  refreshAll: vi.fn(async () => {}),
+  requestFocusRefresh: vi.fn(),
+  resolveConflict: vi.fn(),
+}));
+
+// Real expo-router needs the native navigation stack; views only use the focus hook here.
+// Tests that need routing mock the module themselves.
+vi.mock('expo-router', () => ({ useFocusEffect: () => {} }));
+
+// The native date picker is Flow source with no web build; render a marker the tests can find.
+vi.mock('@react-native-community/datetimepicker', () => ({
+  default: ({ mode, testID }: Record<string, any>) =>
+    createElement('div', { 'data-testid': testID, 'data-mode': mode }),
+}));
+
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(async () => {}),
   impactAsync: vi.fn(async () => {}),
@@ -54,5 +71,13 @@ vi.mock('react-native-svg', () => {
     (tag: string) =>
     ({ testID, fill, children }: Record<string, any>) =>
       createElement(tag, { 'data-testid': testID, fill }, children);
-  return { Svg: el('svg'), Path: el('path') };
+  const SvgXml = ({ xml, testID }: Record<string, any>) =>
+    createElement('div', { 'data-testid': testID ?? 'svg-xml', 'data-xml': xml });
+  return { Svg: el('svg'), Path: el('path'), SvgXml };
 });
+
+// The in-app browser is a native sheet; tests assert the URL it was asked to open.
+vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn(async () => ({ type: 'opened' })) }));
+
+// expo-crypto pulls in the Expo runtime, which needs a native host.
+vi.mock('expo-crypto', async () => ({ randomUUID: (await import('node:crypto')).randomUUID }));

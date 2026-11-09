@@ -11,7 +11,7 @@ import {
   routeToHref,
   startLinkHandling,
 } from './pending-url.js';
-import { startTokenSync } from './token-sync.js';
+import { startTokenSync, tokenHydrated } from './token-sync.js';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -87,6 +87,41 @@ describe('token sync', () => {
     stop();
   });
 
+  it('does not delete the Keychain token when the read fails (locked device)', async () => {
+    stored = 'saved';
+    const remove = vi.fn(async () => {});
+    const stop = startTokenSync({
+      secure: { ...secure, get: async () => Promise.reject(new Error('locked')), remove },
+      shared: fakeNative(),
+    });
+    await stop.ready;
+    expect(remove).not.toHaveBeenCalled();
+    expect(stored).toBe('saved');
+    stop();
+  });
+
+  it('marks the session hydrated only once the Keychain answered', async () => {
+    let answer: (t: string | null) => void = () => {};
+    const stop = startTokenSync({
+      secure: {
+        ...secure,
+        get: () =>
+          new Promise((r) => {
+            answer = r;
+          }),
+      },
+      shared: fakeNative(),
+    });
+    tokenHydrated.value = false;
+    await flush();
+    expect(tokenHydrated.value).toBe(false);
+    answer('saved');
+    await stop.ready;
+    expect(tokenHydrated.value).toBe(true);
+    expect(authStore.token.value).toBe('saved');
+    stop();
+  });
+
   it('never mirrors demo tokens and stops after dispose', async () => {
     const shared = fakeNative();
     const stop = startTokenSync({ secure, shared });
@@ -114,6 +149,19 @@ describe('links', () => {
     expect(routeToHref({ name: 'inbox' })).toBe('/board');
     expect(routeToHref({ name: 'file', path: '.kh/a b/c.md' })).toBe('/files/.kh/a%20b/c.md');
     expect(routeToHref({ name: 'auth-callback', accessToken: 'x' })).toBe('/');
+  });
+
+  it('opens a widget or notification item link in the todo detail screen', () => {
+    const nav = vi.fn();
+    handleUrl('kaihuman://board?item=.kh%2Finbox.todos.md%232', nav);
+    expect(nav).toHaveBeenCalledWith('/board/todo?id=.kh%2Finbox.todos.md%232');
+  });
+
+  it('falls back to the board filter for ids the detail screen cannot address', () => {
+    expect(routeToHref({ name: 'board', item: 'item-2' })).toBe('/board?item=item-2');
+    expect(routeToHref({ name: 'board', milestone: 'm', item: '.kh/a.todos.md#0' })).toBe(
+      '/board?milestone=m&item=.kh%2Fa.todos.md%230',
+    );
   });
 
   it('kaihuman://demo enters demo mode once and opens the dashboard', () => {

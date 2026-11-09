@@ -63,7 +63,7 @@ milestones:
 ---
 
 - [ ] backlog task #tag1 #tag2
-::updated:: 1758600000000 ::created:: 2026-09-23T08:00:00.000Z
+::updated:: 1758600000000 ::created:: 2026-09-23T08:00:00.000Z ::due:: 2026-11-10T14:00
 - [>] in-progress task #tag !v1.0
 - [x] done task #tag
 - [-] rejected task
@@ -80,6 +80,7 @@ milestones:
 
 - `#tag` tokens become `tags`; `!id` links a milestone.
 - The optional line right after a task holds `::updated::` (Unix ms) and `::created::` (ISO).
+- The same line may end with `::due::`, the task's own due date: a local date `YYYY-MM-DD` or date-time `YYYY-MM-DDTHH:MM` (`dueDate`, `dueTime`). It goes last so older parsers, which only read `::updated::`/`::created::`, still read the line; they drop `::due::` when they rewrite the file. Malformed values are ignored. Files without `::due::` round-trip byte for byte.
 - Lines indented 2+ spaces starting with `> ` are the task's prompt; `> ref:<path>` points at a prompt file.
 - Legacy files with `# Group` headings are detected (`isLegacyFormat`); each group becomes a tag, and `migrateLegacyFormat` rewrites the file flat.
 

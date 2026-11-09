@@ -1,9 +1,11 @@
-import {
-  type CoreStorageAdapter,
-  InMemoryStorageAdapter,
-  type PendingMutation,
-  type RecordStore,
-} from '@kaihuman/core';
+// Deep imports, not the package root: the root builds every store, and this file loads before
+// storage is installed (see src/runtime/storage-entry.ts).
+import type {
+  CoreStorageAdapter,
+  PendingMutation,
+  RecordStore,
+} from '@kaihuman/core/src/storage/adapter.ts';
+import { InMemoryStorageAdapter } from '@kaihuman/core/src/storage/memory-adapter.ts';
 
 /** Synchronous key/value driver (expo-secure-store sync API, MMKV, SharedPreferences). */
 export interface KeyValueDriver {
@@ -31,7 +33,12 @@ export interface MobileStorageDrivers {
   mirror?: (key: string, value: string | null) => void;
 }
 
-const SECURE_KEYS: ReadonlySet<string> = new Set(['lifeos_gh_token']);
+// Remembered file passwords are secrets too: they must never land in the plain-file KV driver.
+const SECURE_KEYS: ReadonlySet<string> = new Set([
+  'lifeos_gh_token',
+  'kaihuman_saved_passwords',
+  'lifosy_saved_passwords',
+]);
 const MIRRORED_KEYS: ReadonlySet<string> = new Set(['lifeos_gh_token', 'lifeos_current_repo']);
 
 /**

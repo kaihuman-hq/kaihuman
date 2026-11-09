@@ -48,4 +48,16 @@
             android:targetPackage="com.kaihuman.app"
             android:targetClass="com.kaihuman.app.MainActivity" />
     </shortcut>
+    <shortcut
+        android:shortcutId="search"
+        android:enabled="true"
+        android:icon="@drawable/kh_ic_search"
+        android:shortcutShortLabel="@string/kh_shortcut_search_short"
+        android:shortcutLongLabel="@string/kh_shortcut_search_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="kaihuman://search"
+            android:targetPackage="com.kaihuman.app"
+            android:targetClass="com.kaihuman.app.MainActivity" />
+    </shortcut>
 </shortcuts>

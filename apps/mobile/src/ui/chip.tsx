@@ -8,9 +8,11 @@ export interface ChipProps {
   selected?: boolean;
   onPress?: () => void;
   icon?: IconName;
+  /** Overrides the spoken label, e.g. "Remove tag x" for a chip that reads "#x". */
+  accessibilityLabel?: string;
 }
 
-export function Chip({ label, selected = false, onPress, icon }: ChipProps) {
+export function Chip({ label, selected = false, onPress, icon, accessibilityLabel }: ChipProps) {
   const theme = useTheme();
   const { colors, spacing } = theme;
   const ios = theme.platform === 'ios';
@@ -43,7 +45,7 @@ export function Chip({ label, selected = false, onPress, icon }: ChipProps) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ selected }}
       aria-selected={selected}
       onPress={onPress}

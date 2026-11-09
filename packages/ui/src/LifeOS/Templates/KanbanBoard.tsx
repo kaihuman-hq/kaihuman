@@ -13,9 +13,11 @@ import {
   setMilestone,
   setStatus,
   setTodoColor,
+  setTodoDue,
   setTodoPriority,
   type TodoColor,
   type TodoData,
+  type TodoDue,
   type TodoItem,
   type TodoStatus,
   updateTodoText,
@@ -49,6 +51,14 @@ import {
   usePersistedScope,
   withBusinessFiles,
 } from '../scope-files';
+import {
+  type BoardSort,
+  DUE_FILTER_LABELS,
+  type DueFilter,
+  dueBadge,
+  matchesDueFilter,
+  sortByDue,
+} from './dueView';
 import { moveTodoChanges } from './moveTodo';
 import { type StreamMode, type StreamSort, StreamsBoard } from './StreamsBoard';
 import { FileColorPicker, fileColorHex, PriorityBadge } from './TodoMarks';
@@ -752,12 +762,14 @@ const KanbanCard = ({
   onMove,
   onEditText,
   onCyclePriority,
+  onSetDue,
   otherFilePaths,
   borderColor,
 }: {
   agg: AggregatedItem;
   onStatusChange: (filePath: string, itemIndex: number, newStatus: TodoStatus) => void;
   onCyclePriority?: (filePath: string, itemIndex: number) => void;
+  onSetDue?: (filePath: string, itemIndex: number, due?: TodoDue) => void;
   onOpenFile?: (path: string) => void;
   onMove?: (targetFilePath: string) => void;
   onEditText?: (filePath: string, itemIndex: number, text: string) => void;
@@ -770,6 +782,9 @@ const KanbanCard = ({
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
+  const [editingDue, setEditingDue] = useState(false);
+  const [dueDate, setDueDate] = useState('');
+  const [dueTime, setDueTime] = useState('');
   const moveMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -789,6 +804,13 @@ const KanbanCard = ({
       JSON.stringify({ filePath: agg.filePath, itemIndex: agg.itemIndex }),
     );
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const badge = dueBadge(item);
+  const openDueEditor = () => {
+    setDueDate(item.dueDate ?? '');
+    setDueTime(item.dueTime ?? '');
+    setEditingDue(true);
   };
 
   const canMove = onMove && otherFilePaths && otherFilePaths.length > 0;
@@ -867,7 +889,73 @@ const KanbanCard = ({
                 !{item.milestoneId}
               </span>
             )}
+            {badge && (
+              <button
+                type="button"
+                title="Edit due date"
+                disabled={!onSetDue}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openDueEditor();
+                }}
+                className={cn('text-[9px] font-mono border px-1', badge.className)}
+              >
+                {badge.label}
+              </button>
+            )}
           </div>
+
+          {editingDue && onSetDue && (
+            // biome-ignore lint/a11y/noStaticElementInteractions: stop propagation wrapper
+            // biome-ignore lint/a11y/useKeyWithClickEvents: stop propagation wrapper
+            <div className="flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <input
+                type="date"
+                aria-label="Due date"
+                value={dueDate}
+                onInput={(e) => setDueDate(e.currentTarget.value)}
+                className="bg-[var(--los-bg)] border border-[var(--los-border)] text-[10px] font-mono px-1 py-0.5 outline-none focus:border-[var(--los-accent)]"
+              />
+              <input
+                type="time"
+                aria-label="Due time"
+                value={dueTime}
+                disabled={!dueDate}
+                onInput={(e) => setDueTime(e.currentTarget.value)}
+                className="bg-[var(--los-bg)] border border-[var(--los-border)] text-[10px] font-mono px-1 py-0.5 outline-none focus:border-[var(--los-accent)] disabled:opacity-40"
+              />
+              <button
+                type="button"
+                disabled={!dueDate}
+                onClick={() => {
+                  onSetDue(filePath, agg.itemIndex, { date: dueDate, time: dueTime || undefined });
+                  setEditingDue(false);
+                }}
+                className="text-[9px] font-mono px-2 py-0.5 bg-[var(--los-accent)] text-black hover:opacity-90 disabled:opacity-40"
+              >
+                SAVE
+              </button>
+              {item.dueDate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetDue(filePath, agg.itemIndex, undefined);
+                    setEditingDue(false);
+                  }}
+                  className="text-[9px] font-mono px-2 py-0.5 border border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+                >
+                  CLEAR
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setEditingDue(false)}
+                className="text-[9px] font-mono px-2 py-0.5 border border-[var(--los-border)] text-[var(--los-muted)] hover:text-[var(--los-fg)]"
+              >
+                CANCEL
+              </button>
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <MonoText className="text-[9px] text-[var(--los-muted)] opacity-60 truncate max-w-[60%]">
@@ -892,6 +980,20 @@ const KanbanCard = ({
                 >
                   <Pencil size={9} />
                   EDIT
+                </button>
+              )}
+              {onSetDue && !editingDue && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openDueEditor();
+                  }}
+                  title="Set due date"
+                  className="text-[9px] font-mono text-[var(--los-muted)] hover:text-[var(--los-accent)] border border-[var(--los-border)] px-1.5 py-0.5 transition-colors flex items-center gap-1"
+                >
+                  <CalendarDays size={9} />
+                  DUE
                 </button>
               )}
               {promptRefFile && onOpenFile && (
@@ -1178,6 +1280,8 @@ export const KanbanBoard = ({
   }, [tree]);
 
   const [milestoneFilter, setMilestoneFilter] = useState<string>('');
+  const [dueFilter, setDueFilter] = useState<DueFilter>('all');
+  const [boardSort, setBoardSort] = useState<BoardSort>('newest');
   const [showUpcoming, setShowUpcoming] = useState(false);
   const [showMilestoneManager, setShowMilestoneManager] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
@@ -1265,6 +1369,7 @@ export const KanbanBoard = ({
       data.items.forEach((item, idx) => {
         if (milestoneFilter && item.milestoneId !== milestoneFilter) return;
         if (showUpcoming && upcomingMilestone && item.milestoneId !== upcomingMilestone.id) return;
+        if (!matchesDueFilter(item, dueFilter)) return;
         if (q) {
           const matchesText = item.text.toLowerCase().includes(q);
           const matchesTag = item.tags.some((t) => t.toLowerCase().includes(q));
@@ -1275,7 +1380,15 @@ export const KanbanBoard = ({
       });
     }
     return result;
-  }, [parsedFiles, milestoneFilter, showUpcoming, upcomingMilestone, focusedFiles, searchQuery]);
+  }, [
+    parsedFiles,
+    milestoneFilter,
+    showUpcoming,
+    upcomingMilestone,
+    focusedFiles,
+    searchQuery,
+    dueFilter,
+  ]);
 
   const focusedFileData = useMemo(() => {
     if (focusedFiles.size !== 1) return null;
@@ -1343,6 +1456,16 @@ export const KanbanBoard = ({
     if (!item) return;
     const newData = setTodoPriority(data, item.id, cyclePriority(item.priority));
     githubFileStore.updateFileContent(filePath, serializeTodos(newData));
+    githubFileStore.saveFile(filePath);
+  };
+
+  const handleSetDue = (filePath: string, itemIndex: number, due?: TodoDue) => {
+    const file = openFiles[filePath];
+    if (!file) return;
+    const data = parseTodos(file.content);
+    const item = data.items[itemIndex];
+    if (!item) return;
+    githubFileStore.updateFileContent(filePath, serializeTodos(setTodoDue(data, item.id, due)));
     githubFileStore.saveFile(filePath);
   };
 
@@ -1570,6 +1693,28 @@ export const KanbanBoard = ({
               </select>
             )}
 
+            <select
+              aria-label="Filter by due date"
+              value={dueFilter}
+              onChange={(e) => setDueFilter(e.currentTarget.value as DueFilter)}
+              className="bg-[var(--los-bg)] border border-[var(--los-border)] text-xs font-mono px-2 py-1 focus:border-[var(--los-accent)] outline-none transition-colors"
+            >
+              {(Object.keys(DUE_FILTER_LABELS) as DueFilter[]).map((f) => (
+                <option key={f} value={f}>
+                  {DUE_FILTER_LABELS[f]}
+                </option>
+              ))}
+            </select>
+
+            <HeaderToggle
+              value={boardSort}
+              onChange={setBoardSort}
+              options={[
+                ['newest', 'NEWEST'],
+                ['due', 'DUE'],
+              ]}
+            />
+
             <button
               type="button"
               onClick={() => setColorMode((v) => !v)}
@@ -1699,9 +1844,13 @@ export const KanbanBoard = ({
         <div className="flex-1 overflow-x-auto overflow-y-hidden flex">
           {COLUMNS.map((col) => {
             const colItems = allItems.filter((a) => a.item.status === col.status);
-            const filteredItems = filterByAge(colItems, showRecentOnly[col.status]).sort((a, b) =>
-              (b.item.createdAt ?? '').localeCompare(a.item.createdAt ?? ''),
-            );
+            const aged = filterByAge(colItems, showRecentOnly[col.status]);
+            const filteredItems =
+              boardSort === 'due'
+                ? sortByDue(aged)
+                : aged.sort((a, b) =>
+                    (b.item.createdAt ?? '').localeCompare(a.item.createdAt ?? ''),
+                  );
             const ColIcon = col.icon;
             const isFiltered = showRecentOnly[col.status];
             return (
@@ -1787,9 +1936,10 @@ export const KanbanBoard = ({
                       empty
                     </div>
                   ) : (
-                    AGE_BUCKETS.map((bucket) => {
+                    // Age dividers would break the due order, so due sort shows one flat list.
+                    (boardSort === 'due' ? AGE_BUCKETS.slice(0, 1) : AGE_BUCKETS).map((bucket) => {
                       const bucketItems = filteredItems.filter(
-                        (a) => getAgeBucket(a.item.createdAt) === bucket.key,
+                        (a) => boardSort === 'due' || getAgeBucket(a.item.createdAt) === bucket.key,
                       );
                       if (bucketItems.length === 0) return null;
                       return (
@@ -1812,6 +1962,7 @@ export const KanbanBoard = ({
                                 onOpenFile={onOpenFile}
                                 onEditText={handleEditText}
                                 onCyclePriority={handleCyclePriority}
+                                onSetDue={handleSetDue}
                                 onMove={
                                   todoFilePaths.length > 1
                                     ? (targetPath) =>

@@ -9,15 +9,8 @@
     "icon": "./assets/icon.png",
     "ios": {
       "bundleIdentifier": "com.kaihuman.app",
-      "entitlements": {
-        "com.apple.security.application-groups": [
-          "group.com.kaihuman.app"
-        ]
-      },
+      "buildNumber": "2",
       "infoPlist": {
-        "NSSupportsLiveActivities": true,
-        "KHAppGroup": "group.com.kaihuman.app",
-        "KHKeychainService": "com.kaihuman.app",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -26,10 +19,13 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#E6FF4A"
-      }
+      },
+      "versionCode": 1
     },
     "plugins": [
       "expo-router",
+      "expo-background-task",
+      ["expo-notifications", { "color": "#E6FF4A" }],
       "./plugins/with-kaihuman-widgets.ts"
     ],
     "extra": {

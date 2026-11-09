@@ -19,6 +19,7 @@ export interface GithubRepo {
   };
   default_branch: string;
   updated_at: string;
+  pushed_at?: string | null;
 }
 
 export class GithubProfileStore {

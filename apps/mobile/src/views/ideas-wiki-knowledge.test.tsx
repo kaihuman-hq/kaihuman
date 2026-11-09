@@ -148,8 +148,9 @@ describe('WikiView reader', () => {
       />,
     );
     expect(await screen.findByRole('heading', { name: 'Clients' })).toBeTruthy();
-    // The native header must match the body title, not the lower-case file name.
-    expect(onTitle).toHaveBeenCalledWith('Clients');
+    // The native header must match the body title, not the lower-case file name. The view reports
+    // it from an effect after the heading renders, so wait for it rather than racing it.
+    await waitFor(() => expect(onTitle).toHaveBeenCalledWith('Clients'));
     expect(screen.getByRole('heading', { name: 'Active' })).toBeTruthy();
     const body = screen.getByTestId('wiki-page').textContent ?? '';
     expect(body).not.toContain('#');

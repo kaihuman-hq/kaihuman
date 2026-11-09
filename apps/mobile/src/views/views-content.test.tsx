@@ -18,7 +18,7 @@ import {
 import { IdeasScreenController } from '../screens/ideas-screen.js';
 import { KnowledgeScreenController } from '../screens/knowledge-screen.js';
 import { WikiScreenController } from '../screens/wiki-screen.js';
-import { DashboardView } from './dashboard-view.js';
+import { DashboardPager } from './dashboard-pager.js';
 import { FileBrowserView, FileEditorView } from './file-editor-view.js';
 import { IdeaDetailView, IdeasView } from './ideas-view.js';
 import { KnowledgeView } from './knowledge-view.js';
@@ -80,6 +80,11 @@ const type = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 const press = (name: string | RegExp) => fireEvent.click(screen.getByRole('button', { name }));
 
+// The RSS tile would fetch real feeds on mount.
+vi.mock('../files/feed-store.js', () => ({
+  feedStore: { snapshot: () => ({}), subscribe: () => () => {}, ensure: async () => {} },
+}));
+
 const demo = (suffix: string) => {
   const path = Object.keys(seed).find((p) => p.endsWith(suffix));
   if (!path) throw new Error(`no demo file for ${suffix}`);
@@ -105,6 +110,10 @@ const fixtures: Record<string, { path: string; content: string }> = {
   datacollection: demo('.data-collection.csv'),
   prompts: { path: '.kh/a.prompts.md', content: prompts.content },
   commands: { path: '.kh/a.commands.md', content: commands.content },
+  rss: demo('.rss.json'),
+  travel: demo('.travel.json'),
+  boardoverview: demo('.board-overview.json'),
+  palettesettings: demo('command-palette.settings.json'),
 };
 
 const renderTile = (kind: string, onWrite = vi.fn()) => {
@@ -235,13 +244,14 @@ describe('tiles', () => {
   });
 });
 
-describe('DashboardView', () => {
-  it('lists tiles, skips unrelated files and navigates', () => {
+describe('DashboardPager', () => {
+  it('lists tiles and navigates', () => {
     const onNavigate = vi.fn();
     const todos = fixtures.todos as { path: string; content: string };
     render(
-      <DashboardView
-        tiles={[todos, { path: 'notes.md', content: 'x' }]}
+      <DashboardPager
+        pages={[{ id: 'today', name: 'Today', files: [todos] }]}
+        defaulted
         now={NOW}
         onWrite={vi.fn()}
         onNavigate={onNavigate}
@@ -256,7 +266,15 @@ describe('DashboardView', () => {
   });
 
   it('shows an empty state', () => {
-    render(<DashboardView tiles={[]} now={NOW} onWrite={vi.fn()} onNavigate={vi.fn()} />);
+    render(
+      <DashboardPager
+        pages={[{ id: 'today', name: 'Today', files: [] }]}
+        defaulted
+        now={NOW}
+        onWrite={vi.fn()}
+        onNavigate={vi.fn()}
+      />,
+    );
     expect(screen.getByText('No dashboard files in this repository')).toBeTruthy();
   });
 });
@@ -368,7 +386,7 @@ describe('file editor', () => {
   it('edits and saves a plain file', async () => {
     const { map, files } = memoryFiles({ 'n.md': 'old' });
     const controller = new FileEditorController({ files, passwords: passwordPort() });
-    render(<FileEditorView controller={controller} path="n.md" />);
+    render(<FileEditorView controller={controller} path="n.md" mode="source" />);
     const field = (await screen.findByLabelText('Content')) as HTMLTextAreaElement;
     expect(field.value).toBe('old');
     expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
@@ -382,7 +400,7 @@ describe('file editor', () => {
     const cipher = await encrypt('secret text', 'hunter2');
     const { map, files } = memoryFiles({ 'vault.md.enc': cipher });
     const controller = new FileEditorController({ files, passwords: passwordPort() });
-    render(<FileEditorView controller={controller} path="vault.md.enc" />);
+    render(<FileEditorView controller={controller} path="vault.md.enc" mode="source" />);
     await screen.findByLabelText('Passphrase');
     type('Passphrase', 'wrong');
     press('Unlock');

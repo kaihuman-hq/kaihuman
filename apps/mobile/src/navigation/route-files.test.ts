@@ -47,9 +47,26 @@ describe('expo-router route files', () => {
     expect(readFileSync(`${appDir}(tabs)/ideas/_layout.tsx`, 'utf8')).toContain('name="[slug]"');
   });
 
+  it('has a global search route registered in the root stack', () => {
+    expect(existsSync(`${appDir}search.tsx`)).toBe(true);
+    expect(readFileSync(`${appDir}_layout.tsx`, 'utf8')).toContain('name="search"');
+  });
+
+  it('has a todo detail route registered in the board stack', () => {
+    expect(existsSync(`${appDir}(tabs)/board/todo.tsx`)).toBe(true);
+    expect(readFileSync(`${appDir}(tabs)/board/_layout.tsx`, 'utf8')).toContain('name="todo"');
+  });
+
   it('gives every pushed root-stack screen a web back control', () => {
     const root = readFileSync(`${appDir}_layout.tsx`, 'utf8');
-    for (const name of ['analytics', 'wiki/index', 'wiki/[...page]', 'knowledge', 'repos']) {
+    for (const name of [
+      'analytics',
+      'search',
+      'wiki/index',
+      'wiki/[...page]',
+      'knowledge',
+      'repos',
+    ]) {
       const screen = new RegExp(`name="${name.replace(/[[\].]/g, '\\$&')}"[\\s\\S]*?/>`).exec(
         root,
       )?.[0];

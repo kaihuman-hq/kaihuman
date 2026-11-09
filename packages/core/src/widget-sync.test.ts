@@ -227,6 +227,20 @@ describe('schema v2', () => {
     expect(s.items[0]?.priority).toBe('high');
   });
 
+  it('carries the item due date and time when present', () => {
+    const s = buildWidgetTodoSnapshot(
+      { '.kh/a.todos.md': file('- [ ] a\n::due:: 2026-11-10T14:00\n- [ ] b\n') },
+      'o/r',
+      'main',
+      NOW,
+      opts,
+    );
+    const a = s.items.find((i) => i.text === 'a');
+    const b = s.items.find((i) => i.text === 'b');
+    expect(a).toMatchObject({ dueDate: '2026-11-10', dueTime: '14:00' });
+    expect(b && 'dueDate' in b).toBe(false);
+  });
+
   it('toggle preserves options', () => {
     const id = snap.items[0]?.id ?? '';
     const res = applyWidgetTodoToggle(snap, id, NOW);

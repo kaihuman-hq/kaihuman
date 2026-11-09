@@ -1,5 +1,95 @@
 # Progress
 
+## 2026-11-08 — Mobile: native views for every file kind (console parity)
+
+- Opening a file in Files showed raw source (e.g. an RSS file on iPhone). `fileKindForPath` (`src/files/file-kinds.ts`) now routes each file to a native viewer; "View source" is a header action (`toggle-source`), and unknown kinds open the editor with a "No viewer for .xyz yet" note. Inventory table: `doc/mobile-design.md` §14.
+- New tiles (dashboard and file view): RSS (`.rss.json`: items with title, source, date and unread state, opens in the in-app browser, add/remove feed, mark read), travel (next trip, trips, add trip), board overview (status columns across all todo files), command-palette settings. The 14 existing widget kinds now also open as their tile in Files.
+- Readers: rendered Markdown (wiki block renderer), CSV/TSV table, pretty JSON, YAML, images (SVG via react-native-svg, raster via the blob API), plain text. `.enc` files unlock, then show the inner kind's view. Viewer edits go through the optimistic save path (re-encrypted for `.enc`).
+- `@kaihuman/formats` gains DOM-free `rss` (RSS 2.0 + Atom), `csv` and `board-overview`; the console's `RssLogic` and board-overview config delegate to them.
+- `screens.png` regenerated with a section per file kind (`scripts/contact-sheet.cjs`). Deflaked the editor save test (react-native-web applies `disabled` in an effect; the test now flushes effects before the retry tap).
+- Demo seed: travel, prompts, commands, palette settings, generic CSV, JSON, SVG, text, an encrypted note (passphrase `demo`) and a `.drawio` fallback example, plus a Tools dashboard.
+## 2026-11-08 — Mobile: offline global search
+
+- New `/search` screen: native header search bar (iOS and Android), with an in-view field on the web preview. It is reached from a magnifier button on the Today and Ideas headers, from `kaihuman://search?q=` and from an Android launcher shortcut. Results are grouped by kind (todos, ideas, wiki, knowledge, notes, logs, bookmarks, files) with highlighted matches, body snippets, recent searches, and empty and no-results states. Tapping a result opens the todo detail, idea, wiki page or file route, or the bookmark URL.
+- Matching reuses `@kaihuman/palette` (`filterModeItems` and `findMatches`); there is no second engine. `src/search/index.ts` builds an incremental, sha-keyed index from the cached tree and file contents. It re-indexes on `useSyncRevision`, yields every 8 ms, and a newer run cancels an older one. Files whose content is not cached on the device are indexed by name only.
+- Tests: ranked grouped results, document extraction per kind, incremental updates and cancellation, routing per kind, the view, and deep links. The large-fixture perf test (3 000 files, 25 000 docs) builds the index in about 130 ms, with each chunk under 50 ms and each query under 100 ms. `docs/screens.png` gains a search column.
+
+## 2026-11-08 — Mobile: state survives relaunch (repo, token, cache, outbox, settings)
+
+- Bug from an iPhone: after reopening the app no repo was selected and data was gone. Causes: device storage was installed in a root-layout `useEffect`, after every `@kaihuman/core` store had been built on in-memory storage (only the repo was patched back); secrets (`lifeos_gh_token`, auth records, remembered file passwords) lived only in memory; the Keychain read used the default `WHEN_UNLOCKED` accessibility, and a failed read *deleted* the Keychain token; `index.tsx` and the root guard routed before the token was restored.
+- New app entry `apps/mobile/index.ts` imports `src/runtime/storage-entry.ts` before `expo-router/entry`, so storage exists before any store. The storage modules deep-import core's `storage/` files, not the package root. `bootStorage` throws in dev and logs + shows a non-blocking banner (`SyncStatusBanner`) in production when the file system is missing or a store read storage first (`hasCoreStorage()` in core). Web keeps localStorage + IndexedDB, like the PWA.
+- Secrets go to expo-secure-store (sync API, `AFTER_FIRST_UNLOCK`, keys sanitised to `[A-Za-z0-9._-]`); nothing is deleted after a failed (locked-device) read. Routing waits for `tokenHydrated`. Signing in with a token clears a persisted `lifeos_logged_out` flag.
+- Tests: cold-start integration test (real bootstrap, fake files + Keychain + App Group, `vi.resetModules` relaunch restores token, repo, cached + dirty files, outbox, saved password, reminder flag, dashboard page, notification settings → `/dashboard`), guard waits for hydration, missing file system is reported, secure driver, token-sync read failure.
+- No Maestro relaunch step: the screenshot flows run in demo mode, which is never persisted by design.
+
+## 2026-11-08 — CI: more time for iOS screenshots
+
+- `mobile-screenshots.yml` iOS job: timeout 60 → 90 min, screenshot step 40 → 55 min. The job was cancelled at 60 min after a 27-min Release build and 19 of 20 screenshots (about 1 min each).
+
+## 2026-11-08 — Mobile: todo detail/edit screen
+
+- New pushed screen `/board/todo?id=<path>#<index>` (`app/(tabs)/board/todo.tsx`, `views/todo-detail-view.tsx`): grouped form with multi-line title (debounced autosave), status, milestone, tags (add/remove, suggestions from the repo), due date + optional time (existing picker, Clear), read-only created/updated/file, and Delete with confirm and Undo. No Save button: every change goes through the sync engine's optimistic write path, which already refreshes widgets and reschedules notifications.
+- `screens/todo-detail.ts` (`TodoDetailController`) re-reads the file before each edit, serialises edits, follows the item when its index shifts (by `createdAt`, else text) and reports not-found when it was deleted elsewhere. Conflicts reuse `SyncStatusBanner`.
+- Opened by tapping a board row, and by `kaihuman://board?item=<path>#<index>` links (widgets, notification taps); other item ids still fall back to the board filter.
+- The `.todos.md` format has no notes/description field (only AI `prompt` lines), so the screen has none.
+- Fix: the web preview rendered blank because `expo-battery`/`expo-network` listeners and the notification response APIs throw on web. Sync now treats those listeners as optional and notifications are not started on web (regression test `sync/runtime-web.test.ts`).
+
+## 2026-11-08 — CI: survive Gradle download timeouts
+
+- `mobile-build.yml` and `mobile-screenshots.yml` cache `~/.gradle/wrapper/dists`, raise the wrapper `networkTimeout` to 120 s and retry the Gradle download up to 5 times before building. Android jobs failed twice on services.gradle.org (504, then the 10 s wrapper timeout) before compiling.
+
+## 2026-11-08 — Todo format: per-item due dates
+
+- `.todos.md` items take an optional `::due:: YYYY-MM-DD` or `::due:: YYYY-MM-DDTHH:MM` (local) at the end of the metadata line (`dueDate`, `dueTime`). Older parsers still read the line and ignore it; files without it round-trip byte for byte; malformed values are ignored. `@kaihuman/formats` adds `setTodoDue`, `dueStatus`, `compareDue`, `formatDue`, `parseDue`; widget snapshot items carry `dueDate`/`dueTime` (additive). Documented in `packages/docspack/docs/70-file-formats.md`.
+
+## 2026-11-08 — Console board: set, show, sort and filter todo due dates
+
+- Kanban cards show a due badge (Overdue / Today / short date such as "Nov 10 14:00") and a DUE action opens an inline date + optional time editor (SAVE / CLEAR) using `setTodoDue`. The header gains a due filter (All / Overdue / Due today / Has due date) and a NEWEST / DUE sort toggle (DUE drops the age dividers and puts undated cards last).
+- Pure logic in `packages/ui/src/LifeOS/Templates/dueView.ts` with tests; the board component lives in `@kaihuman/ui`, so the change is there rather than in `apps/console`.
+
+## 2026-11-08 — Mobile: per-todo due dates in notifications, reminder prompt, widget due state
+
+- Notifications: `todosFromSnapshot` now uses the item's own `dueDate`/`dueTime` and falls back to the milestone date (never a time), so timed todos get a "due-soon" notification `minutesBefore` their due time.
+- First-run soft prompt: one card "Get reminded when todos are due" (Enable / Not now) at `/reminders`, shown once when onboarding (or login with a repo) finishes; Enable reuses `setNotificationsEnabled`. Decision logic and the shown flag live in `notifications/soft-prompt.ts`; `guardRedirect` routes through the card while `reminderPromptPending`.
+- Widgets: iOS and Android decode `dueDate`/`dueTime` additively and Next up rows append " · overdue" / " · today" for open items (local time).
+
+## 2026-11-08 — Mobile: set, show and quick-set todo due dates
+
+- New `@react-native-community/datetimepicker` dependency. `screens/todo-due.ts` holds the pure logic (Today/Tomorrow presets, picker to `TodoDue` conversion, badge label and tone, `setDueOnData`), tested in `todo-due.test.ts` and `views/due-ui.test.tsx`.
+- Board: due/overdue badge on each card, and a "Due" swipe action opening a sheet with Today, Tomorrow, Pick… (native picker, optional time) and Clear; `KanbanBoardController.setDue` writes through the same edit path as status changes. Todos tile rows show the same badge. Quick todo has a due date (then optional time) field via `QuickCaptureController.quickTodo(text, tags, due)`.
+- Known: `src/ios-widget.test.ts` and `src/targets.test.ts` fail type-check until the widget targets read `dueDate`/`dueTime` (from the formats change); left to the widget work.
+
+## 2026-11-08 — Mobile: home screen pages follow the console dashboards
+
+- `@kaihuman/core` gains `parseDashboardConfig`, `resolveDashboards` and `dashboardConfigPath` (same rules as the console: `.lifeos/` rewrite, tree filter, entry order, `skipOnMobile` on mobile). The mobile home is now a horizontal pager with one page per dashboard (`dashboard-pager.tsx`, `screens/dashboards.ts`); without a config it falls back to a single "Today" page of all tile files. Compact tiles (habit, timer, clocks, budget, stocks, consumption, data collection) and medium ones (events, action log, read it later, bookmarks, prompts, commands) show as summary cards with "See all" opening `/dashboard/tile?path=...`; todos stay interactive inline; console-only files offer "Open file".
+- Header: date, dashboard name (tap → sheet to jump), page dots; page changes are remembered and use a selection haptic. Pull-to-refresh on every page calls the sync engine's `useRefresh()`; pages re-read on `useSyncRevision()`. Empty states for no config and for an empty dashboard.
+- `scripts/screens.cjs` takes chained clicks (`route@A@B`); regenerated `apps/mobile/docs/screens.png` with the Finance page and a tile detail. `doc/mobile-design.md` §7.6 added.
+
+## 2026-11-08 — Mobile: automatic sync (stale-while-revalidate)
+
+- Root cause of stale data on device: (1) no triggers — the console's `installAutoSync` is DOM-only and mobile had no AppState/network equivalent, so `syncNow`/`flushOutbox` never ran; (2) no persistent cache — `MobileStorageAdapter` was never installed, so tree, files, dirty edits and the selected repo lived in memory; (3) screens snapshot data on mount; (4) every read was a network GET. Details in `apps/mobile/src/sync/README.md`.
+- `apps/mobile/src/sync`: fake-timer-tested scheduler (launch, foreground, focus when > 30 s stale, pull, 60 s poll with backoff paused offline/background/Low Power, debounced after writes, offline → online, `expo-background-task`), engine (sync → widget replay → outbox → widget snapshot + timeline reload → `rescheduleNotifications()` → revision bump only when data changed), file-system persistent cache (`expo-file-system`, secrets stay out), cache-first reads and optimistic writes in the content ports.
+- Core: `getHeadSha` sends `If-None-Match`; a 304 reuses the cached head, so an unchanged repo costs one free request.
+- UI: `useRefresh()` (haptic pull), `useSyncRevision()`, `useFocusRefresh()`, `<SyncStatusBanner />` in `Screen` ("Updated just now", "Syncing…", "Offline · 2 changes pending", error with Retry, conflicts with Keep mine / Use theirs). Wired into Today, Board, Ideas, Wiki, Knowledge and Files.
+## 2026-11-08 — Mobile: local due-date notifications
+
+- `expo-notifications` (~58.1.8, config plugin in `app.json`), local only: no push server, no APNs key. Pure `planNotifications(todos, milestones, settings, now, tz)` (`apps/mobile/src/notifications/planner.ts`) plans due-today (morning time, default 09:00), due-soon (N min before a timed due, default 15), one overdue summary, milestone-due-tomorrow and an optional daily digest ("3 todos due today"), nearest first under the iOS 64-pending cap. `scheduler.ts` diffs against the OS schedule by stable ids (`kh:<kind>:<id>`) and a content signature, so edits reschedule and done/rejected todos cancel.
+- Actions: Done (queues the widget toggle mutation and runs `WidgetBridge.reconcile`), Snooze 1h; a tap opens `kaihuman://board?item=…`. More → Notifications: master toggle (asks permission in context, links to system settings when denied), digest, morning time, minutes before, per-kind toggles.
+- `rescheduleNotifications()` from `src/notifications/index.ts` runs on file changes and is exported for the sync/background refresh. The todo format has no per-item due date: items use their milestone's `dueDate`; the timed path is ready for when the format gains a time. Tests cover time zones, DST, cancel, reschedule and the cap.
+## 2026-11-08 — Mobile: first-run repository onboarding
+
+- After GitHub or token sign-in with no repo selected, the app now goes to a full `/onboarding` step (title, explanation, search, recently pushed first, Private/Public badges, confirm card). A single plausible kaihuman/life-os/`kh` repo is preselected but still needs "Use this repository". Empty, loading and error (with retry, and "Sign in again" on a rejected token) states are covered. Choosing a repo does `router.replace('/dashboard')`, so back never returns to login or onboarding.
+- One pure decision in `src/navigation/start-route.ts`: `resolveStartRoute({ token, repo })` plus `guardRedirect` used by the root layout, so later launches skip both screens, a lost token goes to login and a token without a repo goes to the selector. Core `GithubRepo` gains optional `pushed_at`. Tests: `start-route.test.ts`, `onboarding-view.test.tsx`. `doc/mobile-design.md` updated.
+
+
+## 2026-11-08 — Mobile: build numbers committed in git
+
+- `apps/mobile/eas.json` uses `appVersionSource: local`; `app.json` holds `ios.buildNumber` and `android.versionCode`. `scripts/release.mjs` (`release:ios`, `release:android`) bumps the number, commits and pushes it, then runs `eas build --auto-submit`, so the number sent to a store is always in git. Fixes App Store Connect rejecting a reused build number. Tests cover the bump. `doc/mobile-testflight.md` updated.
+
+## 2026-11-07 — Mobile: declare exempt encryption for App Store Connect
+
+- `apps/mobile/app.json` sets `ios.infoPlist.ITSAppUsesNonExemptEncryption: false`, so TestFlight builds no longer stop at "Missing Compliance". App Group, `KHAppGroup`, `KHKeychainService`, `NSSupportsLiveActivities` and the EAS `appExtensions` stay derived by the config plugin / `app.config.ts`, not duplicated in `app.json`. `doc/mobile-testflight.md` updated.
+
 ## 2026-11-07 — Auth worker: automatic Cloudflare deploy
 
 - `.github/workflows/deploy-auth-worker.yml` lints, type-checks, tests and runs `wrangler deploy` for `apps/auth-worker` on pushes to `main` that touch it, and on manual dispatch. Uses the existing `CF_API_TOKEN`/`CF_ACCOUNT_ID` secrets; worker secrets stay on Cloudflare.

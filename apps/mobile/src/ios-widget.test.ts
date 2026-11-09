@@ -21,6 +21,8 @@ const item: Required<WidgetTodoItem> = {
   milestoneDueDate: '',
   updatedAt: 0,
   priority: 'high',
+  dueDate: '',
+  dueTime: '',
   pending: false,
 };
 const snapshot: Required<WidgetTodoSnapshot> = {

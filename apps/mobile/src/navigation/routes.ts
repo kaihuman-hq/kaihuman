@@ -12,6 +12,7 @@ export type Route =
   | { name: 'board'; milestone?: string; item?: string }
   | { name: 'inbox' }
   | { name: 'demo' }
+  | { name: 'search'; q?: string }
   | { name: 'file'; path: string };
 
 const QUICK_KINDS: readonly QuickKind[] = ['todo', 'note', 'log', 'idea', 'knowledge'];
@@ -50,6 +51,10 @@ export function parseDeepLink(url: string): Route | null {
   if (head === 'inbox' && rest.length === 0) return { name: 'inbox' };
   // Non-interactive "Try demo" (used by CI screenshots).
   if (head === 'demo' && rest.length === 0) return { name: 'demo' };
+  if (head === 'search' && rest.length === 0) {
+    const q = param('q');
+    return { name: 'search', ...(q && { q }) };
+  }
   if (head === 'files' && rest.length > 0) {
     try {
       return { name: 'file', path: rest.map(decodeURIComponent).join('/') };
@@ -87,6 +92,8 @@ export const routeToUrl = (route: Exclude<Route, { name: 'auth-callback' }>): st
       return `${APP_SCHEME}://inbox`;
     case 'demo':
       return `${APP_SCHEME}://demo`;
+    case 'search':
+      return withQuery(`${APP_SCHEME}://search`, { q: route.q });
     case 'file':
       return `${APP_SCHEME}://files/${route.path.split('/').map(encodeURIComponent).join('/')}`;
   }

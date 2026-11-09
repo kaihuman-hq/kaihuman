@@ -19,7 +19,7 @@ eas init          # creates the Expo project and writes extra.eas.projectId; com
 
 ## Deploy auth-worker first
 
-"Sign in with GitHub" opens `<auth-worker>/login?client=mobile` and expects the worker to redirect to `kaihuman://auth/callback?access_token=…`. That redirect lives in `apps/auth-worker/src/index.ts`; deploy the worker (`wrangler deploy` in `apps/auth-worker`) before building or testing, otherwise the sign-in page never returns to the app. Until then, use "Use a personal access token".
+"Sign in with GitHub" opens `<auth-worker>/login?client=mobile` and expects the worker to redirect to `kaihuman://auth/callback?access_token=…`. That redirect lives in `apps/auth-worker/src/index.ts`. Pushes to `main` that touch `apps/auth-worker/**` deploy it (`.github/workflows/deploy-auth-worker.yml`).
 
 ## Build
 
@@ -33,7 +33,13 @@ EAS asks, once:
 2. Whether to **log in to the Apple account and let EAS manage credentials**: answer yes. EAS then creates the distribution certificate, the App IDs, the App Group `group.com.kaihuman.app`, and the provisioning profiles for **both** the app (`com.kaihuman.app`) and the widget extension (`com.kaihuman.app.widgets`, declared under `extra.eas.build.experimental.ios.appExtensions`).
 3. Whether to register the app in App Store Connect when you submit (below).
 
-Version numbers: `cli.appVersionSource` is `remote` and `production` has `autoIncrement`, so the build number rises on every build. Bump `version` in `app.json` for a new marketing version.
+Version numbers live in git: `cli.appVersionSource` is `local`, so EAS reads `ios.buildNumber` and `android.versionCode` from `app.json`. App Store Connect rejects a build number it has seen before, so every upload needs a new build with a higher number. Use the release script instead of plain `eas build` for store builds:
+
+```sh
+pnpm --filter @kaihuman/mobile release:ios      # or release:android
+```
+
+It refuses to run if `app.json` has uncommitted changes, pulls, raises the build number by one, commits and pushes `chore(mobile): ios build N`, then runs `eas build -p ios --profile production --auto-submit` (build and TestFlight upload in one go). The number is committed before the build starts, so a failed build only skips a number. Bump `version` in `app.json` for a new marketing version.
 
 ## Submit to TestFlight
 
@@ -50,7 +56,7 @@ It also asks for the **ASC App ID** (numeric) if the app does not exist yet; EAS
 
 ### Export compliance (decide this)
 
-The app does **not** set `ITSAppUsesNonExemptEncryption`, on purpose. It uses HTTPS (exempt), but it also encrypts user data itself with AES-GCM-256 / PBKDF2 through `@noble/ciphers` and the WebCrypto polyfill (`src/runtime/crypto-polyfill.ts`). That is encryption beyond the operating system's, so Apple's questionnaire treats it as non-exempt (it usually qualifies for the standard-encryption exemption, which needs a self-classification report in some regions). With the key unset, App Store Connect asks the export-compliance questions for each build. Answer them for your situation, or ask a lawyer. If you conclude the app is exempt, add `"ITSAppUsesNonExemptEncryption": false` to `ios.infoPlist` in `app.json` to skip the prompt.
+`app.json` sets `ios.infoPlist.ITSAppUsesNonExemptEncryption: false` (owner's decision, 2026-11-07), so App Store Connect does not ask the export-compliance questions per build. The app uses HTTPS and encrypts user data itself with AES-GCM-256 / PBKDF2 (`@noble/ciphers`, `src/runtime/crypto-polyfill.ts`): standard algorithms that usually qualify for the encryption exemption, which may need a self-classification report in some regions. Remove the key if that assessment changes.
 
 ## TestFlight testers
 
@@ -70,8 +76,8 @@ Edit **only** `ios.bundleIdentifier` in `apps/mobile/app.json`. The widget id (`
 - **Bundle ID is not available / already taken**: pick another id (reverse-DNS of a domain you own), change it as above, run `eas build` again.
 - **App Group missing / profile does not include the group**: in the Apple developer portal check Identifiers → App Groups has `group.<id>`, and both App IDs (app and `.widgets`) have App Groups enabled with it. Easiest fix: `eas credentials -p ios` → remove the provisioning profiles (and, if needed, the App IDs' capability) and run the build again so EAS regenerates them.
 - **Free-plan build quota**: the free plan has a small monthly build allowance and iOS builds can queue for a long time. Check expo.dev → Billing. Wait for the reset, or pay for a plan. `--local` builds need macOS, so they are not an option on Linux.
-- **Rebuild**: `eas build -p ios --profile production` (a new build number is assigned), then `eas submit -p ios --latest`. Or `eas build -p ios --profile production --auto-submit`.
-- **Build number already used**: the remote counter is the source of truth; run `eas build:version:get -p ios` / `eas build:version:set -p ios`.
+- **Rebuild**: `pnpm --filter @kaihuman/mobile release:ios`. Re-running `eas submit --latest` without a new build re-sends the same build number and fails.
+- **Build number already used**: App Store Connect already has that number (for example from an earlier remote-counter build). Run the release script again; each run raises the number by one.
 
 ## Optional: development client
 

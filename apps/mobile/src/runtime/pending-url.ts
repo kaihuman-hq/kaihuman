@@ -1,5 +1,6 @@
 import { authStore, demoMode, enterDemoMode } from '@kaihuman/core';
 import { parseDeepLink, type Route, routeQuery } from '../navigation/routes.js';
+import { parseTodoRef, todoDetailHref } from '../screens/todo-detail.js';
 
 /** Enters demo mode unless already in it, so a deep link plus its route file do not reseed twice. */
 export function enterDemoOnce(): void {
@@ -15,11 +16,17 @@ export const routeToHref = (route: Route): string => {
     case 'ideas':
       return routeQuery('/ideas', { status: route.status });
     case 'board':
+      // Widget and notification links name one todo: open it, unless the link also scopes a milestone.
+      if (route.item && !route.milestone && parseTodoRef(route.item)) {
+        return todoDetailHref(route.item);
+      }
       return routeQuery('/board', { milestone: route.milestone, item: route.item });
     case 'inbox': // no dedicated inbox screen yet; the board lists inbox items
       return '/board';
     case 'demo':
       return '/dashboard';
+    case 'search':
+      return routeQuery('/search', { q: route.q });
     case 'file':
       return `/files/${route.path.split('/').map(encodeURIComponent).join('/')}`;
   }

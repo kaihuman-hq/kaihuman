@@ -44,6 +44,19 @@ import {
   type TimeTrackingData,
   type TodoStatus,
 } from '@kaihuman/formats';
+import { feedStore } from '../../files/feed-store.js';
+import {
+  type BoardOverviewView,
+  boardOverviewView,
+  type PaletteSettingsView,
+  paletteSettingsView,
+  type RssView,
+  rssView,
+  type TravelView,
+  travelView,
+} from './more-tiles.js';
+
+export * from './more-tiles.js';
 
 /** Outcome of a mutation that can be rejected; `content` is the file's new text. */
 export type TileResult = { ok: true; content: string } | { ok: false; error: string };
@@ -74,6 +87,8 @@ export interface TodoRow {
   status: TodoStatus;
   tags: string[];
   milestone?: string;
+  dueDate?: string;
+  dueTime?: string;
 }
 
 export interface TodosView {
@@ -97,6 +112,8 @@ export const todosView = (content: string, now: Date, hideOlderThanMs = 3_600_00
       status: item.status,
       tags: item.tags,
       milestone: item.milestoneId ? names.get(item.milestoneId) : undefined,
+      ...(item.dueDate && { dueDate: item.dueDate }),
+      ...(item.dueTime && { dueTime: item.dueTime }),
     });
   });
   const today = localDate(now);
@@ -992,7 +1009,11 @@ export type TileView =
   | { kind: 'consumption'; view: ConsumptionMeter[] }
   | { kind: 'datacollection'; view: DataCollectionView }
   | { kind: 'prompts'; view: TemplatesView }
-  | { kind: 'commands'; view: TemplatesView };
+  | { kind: 'commands'; view: TemplatesView }
+  | { kind: 'rss'; view: RssView }
+  | { kind: 'travel'; view: TravelView }
+  | { kind: 'boardoverview'; view: BoardOverviewView }
+  | { kind: 'palettesettings'; view: PaletteSettingsView };
 
 export type TileKind = TileView['kind'];
 
@@ -1011,6 +1032,10 @@ const TILE_SUFFIXES: readonly (readonly [string, TileKind])[] = [
   ['.data-collection.csv', 'datacollection'],
   ['.prompts.md', 'prompts'],
   ['.commands.md', 'commands'],
+  ['.rss.json', 'rss'],
+  ['.travel.json', 'travel'],
+  ['.board-overview.json', 'boardoverview'],
+  ['command-palette.settings.json', 'palettesettings'],
 ];
 
 export const TILE_EXTENSIONS: readonly string[] = TILE_SUFFIXES.map(([suffix]) => suffix);
@@ -1050,6 +1075,14 @@ export const presentTile = (path: string, content: string, now: Date): TileView 
       return { kind: 'prompts', view: promptsView(content) };
     case 'commands':
       return { kind: 'commands', view: commandsView(content) };
+    case 'rss':
+      return { kind: 'rss', view: rssView(content, feedStore.snapshot(), now) };
+    case 'travel':
+      return { kind: 'travel', view: travelView(content, now) };
+    case 'boardoverview':
+      return { kind: 'boardoverview', view: boardOverviewView(content, [], now) };
+    case 'palettesettings':
+      return { kind: 'palettesettings', view: paletteSettingsView(content) };
     default:
       return undefined;
   }

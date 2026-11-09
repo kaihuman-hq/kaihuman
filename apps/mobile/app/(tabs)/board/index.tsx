@@ -4,6 +4,7 @@ import { Pressable } from 'react-native';
 import { KaihumanShared } from '../../../modules/kaihuman-shared/index.js';
 import { FocusSessionController } from '../../../src/screens/focus-session.js';
 import { KanbanBoardController } from '../../../src/screens/kanban-board.js';
+import { todoDetailHref } from '../../../src/screens/todo-detail.js';
 import { useTheme } from '../../../src/theme/theme.js';
 import { Icon } from '../../../src/ui/index.js';
 import { KanbanView } from '../../../src/views/kanban-view.js';
@@ -49,6 +50,7 @@ export default function Board() {
       <KanbanView
         controller={controller}
         focus={focus}
+        onOpenTodo={(id) => router.push(todoDetailHref(id))}
         onAddTodo={platform === 'ios' ? undefined : add}
       />
     </>

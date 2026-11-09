@@ -162,6 +162,7 @@ describe('WidgetBridge', () => {
     const item = snap.items.find((i: { text: string }) => i.text === 'write plan');
 
     const save = mockSave();
+    const flush = vi.spyOn(githubFileStore, 'flushPendingWrites').mockResolvedValue(undefined);
     await container.write(
       PENDING_WIDGET_MUTATIONS_FILE,
       JSON.stringify([
@@ -174,7 +175,9 @@ describe('WidgetBridge', () => {
     expect(githubFileStore.openFiles.value['.kh/inbox.todos.md']?.content).toContain(
       '- [x] write plan',
     );
-    expect(save).toHaveBeenCalledWith('.kh/inbox.todos.md');
+    // Optimistic: persisted locally now, pushed by the outbox in the sync run.
+    expect(flush).toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
     expect(container.files.get(PENDING_WIDGET_MUTATIONS_FILE)).toBe('[]');
     const after = JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}');
     expect(after.items.some((i: { text: string }) => i.text === 'write plan')).toBe(false);

@@ -60,6 +60,10 @@ const icons = {
   table: { ios: 'tablecells', material: 'table_chart' },
   prompt: { ios: 'text.bubble', material: 'chat' },
   list: { ios: 'list.bullet', material: 'format_list_bulleted' },
+  rss: { ios: 'dot.radiowaves.up.forward', material: 'rss_feed' },
+  travel: { ios: 'airplane', material: 'flight' },
+  code: { ios: 'curlybraces', material: 'data_object' },
+  image: { ios: 'photo', material: 'image' },
 } as const satisfies Record<string, IconDef>;
 
 export type IconName = keyof typeof icons;

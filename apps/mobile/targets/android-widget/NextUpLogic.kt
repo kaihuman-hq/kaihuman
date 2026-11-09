@@ -31,6 +31,23 @@ fun WidgetTodoSnapshot.nextUpRows(source: TodoSource, size: WidgetSizeClass, sta
 fun WidgetTodoSnapshot.boardRows(source: TodoSource, size: WidgetSizeClass, stale: Boolean = false): List<WidgetTodoItem> =
     items(source).take(boardRowLimit(size, stale))
 
+enum class DueState { Overdue, Today }
+
+/**
+ * Overdue when the date has passed, or it is today and the time (if any) has; Today otherwise.
+ * Open items only. [today] is local YYYY-MM-DD and [nowHm] local HH:MM; both sort as strings.
+ */
+fun dueStateOf(item: WidgetTodoItem, today: String, nowHm: String): DueState? {
+    val due = item.dueDate ?: return null
+    if (item.status != "backlog" && item.status != "in-progress") return null
+    return when {
+        due < today -> DueState.Overdue
+        due > today -> null
+        item.dueTime != null && item.dueTime <= nowHm -> DueState.Overdue
+        else -> DueState.Today
+    }
+}
+
 enum class EmptyCopy { NothingInProgress, NothingUpNext, InboxZero, NothingOpenHere, BacklogEmpty, NothingHere }
 
 fun nextUpEmpty(source: TodoSource): EmptyCopy = when (source) {

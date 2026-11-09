@@ -1,0 +1,11 @@
+{
+  "dashboards": [{ "id": "ok", "name": "Fine" }, { "id": 3 }, "nope", { "id": "noname" }],
+  "entries": [
+    { "path": ".kh/a.todos.md", "dashboard": "ok" },
+    { "path": 7, "dashboard": "ok" },
+    { "dashboard": "ok" },
+    { "path": ".kh/b.habit.csv", "dashboard": 1 },
+    null,
+    { "path": ".kh/c.habit.csv", "dashboard": "ok", "skipOnMobile": "yes" }
+  ]
+}

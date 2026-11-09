@@ -1,4 +1,4 @@
-import { authStore, enterDemoMode } from '@kaihuman/core';
+import { authStore, enterDemoMode, getCoreStorage } from '@kaihuman/core';
 import { APP_SCHEME, parseDeepLink } from '../navigation/routes.js';
 
 /** Where the auth-worker sends the browser when `client=mobile`; the auth session watches for it. */
@@ -43,6 +43,8 @@ export class LoginScreenController {
   signInWithToken(token: string): boolean {
     const trimmed = token.trim();
     if (!trimmed) return false;
+    // Like the OAuth callback: a persisted logout flag would wipe this token on the next launch.
+    getCoreStorage().removeItem('lifeos_logged_out');
     authStore.token.value = trimmed;
     return true;
   }

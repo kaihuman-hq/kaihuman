@@ -10,8 +10,14 @@ import {
   logIdea,
   newIdea,
   parseIdeaHandoffs,
+  parseTodos,
+  serializeTodos,
   slugifyIdeaTitle,
+  type TodoDue,
 } from '@kaihuman/formats';
+import { syncActions } from '../sync/actions.js';
+import { canServeFromCache } from '../sync/revalidate.js';
+import { setDueOnData } from './todo-due.js';
 
 /**
  * The file access the mobile controllers need. Kept narrow so controllers can be tested without
@@ -38,23 +44,24 @@ export const githubRepoFiles: RepoFiles = {
       .filter((t) => t.type === 'blob' && t.path.endsWith('.todos.md'))
       .map((t) => t.path),
   async read(path) {
-    if (!githubFileStore.openFiles.peek()[path]) {
-      if (!this.exists(path)) return null;
+    const open = githubFileStore.openFiles.peek()[path];
+    const item = githubFileStore.tree.peek().find((t) => t.path === path);
+    if (!open || !canServeFromCache(open, item, githubFileStore.dirtyFiles.peek().has(path))) {
+      if (!item) return null;
       await githubFileStore.openFile(path);
     }
     return githubFileStore.openFiles.peek()[path]?.content ?? null;
   },
   async write(path, content) {
     if (githubFileStore.openFiles.peek()[path]) {
+      // Optimistic: the edit is stored locally and the outbox pushes it, so a slow or missing
+      // network never loses or blocks a capture. Conflicts are surfaced by the sync banner.
       githubFileStore.updateFileContent(path, content);
-      await githubFileStore.saveFile(path);
+      await githubFileStore.flushPendingWrites();
     } else {
       await githubFileStore.createFile(path, content);
     }
-    // saveFile reports failures through a signal instead of throwing, which would look like success.
-    if (githubFileStore.dirtyFiles.peek().has(path)) {
-      throw new Error(githubFileStore.error.peek() ?? `Could not save ${path}`);
-    }
+    syncActions().notifyLocalWrite();
   },
 };
 
@@ -113,12 +120,21 @@ export class QuickCaptureController {
     });
   }
 
-  quickTodo(text: string, tags?: string | string[]): Promise<CaptureResult> {
+  quickTodo(text: string, tags?: string | string[], due?: TodoDue): Promise<CaptureResult> {
     const path = `${this.files.appFolder()}/inbox.todos.md`;
     return this.append(
       path,
-      (current) =>
-        addTodoEntry(current, { text: text.trim(), tags: parseTagInput(tags) }, this.clock()),
+      (current) => {
+        const next = addTodoEntry(
+          current,
+          { text: text.trim(), tags: parseTagInput(tags) },
+          this.clock(),
+        );
+        if (!due) return next;
+        // The entry is appended last, so its position is the end of the file.
+        const data = parseTodos(next);
+        return serializeTodos(setDueOnData(data, data.items.length - 1, due));
+      },
       'Todo added',
     );
   }

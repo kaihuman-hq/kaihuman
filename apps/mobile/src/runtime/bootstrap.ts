@@ -1,30 +1,46 @@
-import Constants from 'expo-constants';
 import { getRandomValues } from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
 import { AppState } from 'react-native';
 import { KaihumanShared } from '../../modules/kaihuman-shared/index.js';
 import { WidgetBridge } from '../adapters/widget-bridge.js';
+import { rescheduleNotifications, startNotifications } from '../notifications/index.js';
+import { registerBackgroundSync } from '../sync/background.js';
+import { setRescheduleNotifications } from '../sync/notifications-hook.js';
+import { startSync } from '../sync/runtime.js';
 import { installCryptoPolyfill } from './crypto-polyfill.js';
 import { createNativeContainer } from './native-container.js';
 import { type LinkDeps, startLinkHandling } from './pending-url.js';
-import { KEYCHAIN_SERVICE, SECURE_TOKEN_KEY, startTokenSync } from './token-sync.js';
-
-// Must match the widgets' keychain service, which is the iOS bundle id (see the widgets plugin).
-// expo-constants' typings resolve the default import to the module namespace here (see app/login.tsx).
-const expoConfig = (Constants as { expoConfig?: { ios?: { bundleIdentifier?: string } } | null })
-  .expoConfig;
-const secureOptions = { keychainService: expoConfig?.ios?.bundleIdentifier ?? KEYCHAIN_SERVICE };
+import { secureOptions } from './secure-options.js';
+import { SECURE_TOKEN_KEY, startTokenSync } from './token-sync.js';
 
 let active: (() => void) | null = null;
+let notificationNavigator: (href: string) => void = () => undefined;
+
+/** The router is only available inside React; notification taps navigate through this. */
+export function setNotificationNavigator(navigate: (href: string) => void): void {
+  notificationNavigator = navigate;
+}
+
+let ready: Promise<unknown> = Promise.resolve();
+
+/** Resolves once the Keychain token has been loaded into the auth store. */
+export const bootstrapReady = (): Promise<unknown> => ready;
 
 /** One-time app setup; idempotent while active. Returns a disposer that also allows a fresh start. */
 export function bootstrap(): () => void {
   if (active) return active;
   installCryptoPolyfill(globalThis, { getRandomValues });
-  const bridge = new WidgetBridge(createNativeContainer(KaihumanShared));
+  // Device storage is already installed by the app entry (src/runtime/storage-entry.ts).
+  const container = createNativeContainer(KaihumanShared);
+  const bridge = new WidgetBridge(container);
   const stopBridge = bridge.start();
   void bridge.reconcile().catch(() => undefined);
+  const stopNotifications = startNotifications({
+    container,
+    bridge,
+    navigate: (href) => notificationNavigator(href),
+  });
   const stopToken = startTokenSync({
     shared: KaihumanShared,
     secure: {
@@ -33,8 +49,15 @@ export function bootstrap(): () => void {
       remove: () => SecureStore.deleteItemAsync(SECURE_TOKEN_KEY, secureOptions),
     },
   });
+  ready = stopToken.ready;
+  // Every sync run (foreground or background) re-plans local notifications from fresh todos.
+  setRescheduleNotifications(rescheduleNotifications);
+  const stopSync = startSync({ bridge, tokenReady: ready });
+  void registerBackgroundSync();
   active = () => {
+    stopSync();
     stopBridge();
+    stopNotifications();
     stopToken();
     active = null;
   };

@@ -9,6 +9,13 @@ const json = (body: unknown, status = 200) =>
     headers: { 'content-type': 'application/json' },
   });
 
+const headerOf = (call: unknown[] | undefined, name: string) => {
+  const first = call?.[0];
+  const init = call?.[1] as RequestInit | undefined;
+  const h = new Headers(first instanceof Request ? first.headers : init?.headers);
+  return h.get(name);
+};
+
 describe('GithubService cache bypass', () => {
   const fetchMock = vi.fn();
   let prevToken: string | null;
@@ -46,6 +53,31 @@ describe('GithubService cache bypass', () => {
     await new GithubService().fetchRepoTree('o', 'r', 'main');
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('git/ref');
     expect(fetchMock.mock.calls[0]?.[1]?.cache).toBe('no-store');
+  });
+
+  it('revalidates the branch head with If-None-Match and serves the cached sha on 304', async () => {
+    const svc = new GithubService();
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ object: { sha: 'head1' } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json', etag: '"abc"' },
+      }),
+    );
+    expect(await svc.getHeadSha('o', 'r', 'main')).toBe('head1');
+    expect(headerOf(fetchMock.mock.calls[0], 'if-none-match')).toBeNull();
+
+    fetchMock.mockResolvedValueOnce(
+      new Response(null, { status: 304, headers: { etag: '"abc"' } }),
+    );
+    expect(await svc.getHeadSha('o', 'r', 'main')).toBe('head1');
+    expect(headerOf(fetchMock.mock.calls[1], 'if-none-match')).toBe('"abc"');
+    expect(fetchMock.mock.calls[1]?.[1]?.cache).toBe('no-store');
+  });
+
+  it('still reports a real error and keeps ETags per branch', async () => {
+    const svc = new GithubService();
+    fetchMock.mockResolvedValueOnce(json({ message: 'Not Found' }, 404));
+    await expect(svc.getHeadSha('o', 'r', 'main')).rejects.toMatchObject({ status: 404 });
   });
 });
 
