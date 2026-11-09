@@ -5,6 +5,13 @@
 - Stocks (bug): the tile was empty for files the web wrote. Root cause: the mobile parser only read ISO dates, the web writes `DD.MM.YYYY HH:MM:SS`, so every row was dropped. The web's parsing moved to `@kaihuman/formats/stocks` (and consumption to `@kaihuman/formats/consumption`; `packages/ui` re-exports both) and mobile uses it. The tile gains week/month/year periods with bars and a list, change vs last, CAGR and an "Add value" form.
 - Consumption (bug): nothing could be added on mobile; the tile was read-only and its own parser missed `DD.MM.YYYY` and the old `Zeitstempel,Datum,…` layout. It now uses the shared parser and has "Add reading" (date, one field per meter with the last reading as a hint; a gap-filled day is replaced), "Add meter" (name, unit, yearly target), this year's use against the target, a Recent list with same day last year, and yearly totals.
 
+## 2026-11-09 — Mobile: RSS filter and swipe, one-column dashboard, events redesign, board file header
+
+- RSS (file view and dashboard tile): Unread/All segmented toggle, default Unread (`filterRssItems`, `summarizeTile(…, rssFilter)`); unread items swipe to "Mark read" through `markRssRead`, the same write as opening an item (new `SwipeReveal` in `src/ui`, `ItemRow swipe`; long press stays as the fallback).
+- Dashboard: compact tiles (habits etc.) no longer share a two-column grid; every tile is full width in one column.
+- Events: grouped by day (Today/Tomorrow/`Mon 9 Nov`), date block (day/month), title and countdown, full width; the tile shows up to 30 events like the web focus mode. The `.events.csv` format has no time or location, so neither is shown (the web widget has none either).
+- Board: header naming the todo file (path for one file, count and short names for several).
+
 ## 2026-11-09 — CI: retry Android Gradle builds
 
 - `mobile-build.yml` and `mobile-screenshots.yml` cache `~/.gradle/caches/modules-2` and retry the Gradle build up to 3 times: Maven/GitHub release downloads (`kotlin-compiler-embeddable`) returned 504 twice in a row. The cold-start test now stubs `fetch` and console so unawaited bootstrap work cannot log after teardown.

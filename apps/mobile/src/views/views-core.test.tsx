@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { Platform } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FocusSessionController } from '../screens/focus-session.js';
-import { KanbanBoardController } from '../screens/kanban-board.js';
+import { describeBoardFiles, KanbanBoardController } from '../screens/kanban-board.js';
 import { LoginScreenController } from '../screens/login-screen.js';
 import { QuickCaptureController, type RepoFiles } from '../screens/quick-capture.js';
 import { RepoSelectorController } from '../screens/repo-selector-screen.js';
@@ -147,6 +147,24 @@ describe('KanbanView', () => {
     expect(parseTodos(files.store.get('.kh/inbox.todos.md') ?? '').items[0]?.status).toBe(
       'in-progress',
     );
+  });
+});
+
+describe('KanbanView file header', () => {
+  it('names the todo file the board shows', async () => {
+    render(<KanbanView controller={new KanbanBoardController(todoFiles())} />);
+    await waitFor(() => expect(screen.getByText('write tests')).toBeTruthy());
+    expect(screen.getByTestId('board-file').textContent).toContain('.kh/inbox.todos.md');
+  });
+});
+
+describe('describeBoardFiles', () => {
+  it('shows the path for one file and a count with short names for many', () => {
+    expect(describeBoardFiles(['a/b.todos.md'])).toEqual({ label: 'a/b.todos.md' });
+    expect(describeBoardFiles(['a/b.todos.md', 'c.todos.md'])).toEqual({
+      label: '2 todo files',
+      detail: 'b.todos.md, c.todos.md',
+    });
   });
 });
 

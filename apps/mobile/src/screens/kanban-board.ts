@@ -44,6 +44,18 @@ export interface BoardFilter {
 
 export type BoardResult = { ok: true } | { ok: false; error: string };
 
+/** Header text naming the file(s) a board shows: the path itself, or a count plus short names. */
+export const describeBoardFiles = (
+  paths: readonly string[],
+): { label: string; detail?: string } => {
+  const [only] = paths;
+  if (only !== undefined && paths.length === 1) return { label: only };
+  return {
+    label: `${paths.length} todo files`,
+    detail: paths.map((p) => p.slice(p.lastIndexOf('/') + 1)).join(', '),
+  };
+};
+
 /** `.todos.md` files to aggregate: all in the tree, plus the inbox even before it exists. */
 export const todoFilePaths = (files: RepoFiles): string[] => {
   const inbox = `${files.appFolder()}/inbox.todos.md`;

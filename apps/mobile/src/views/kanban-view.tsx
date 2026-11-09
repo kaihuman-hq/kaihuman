@@ -6,7 +6,7 @@ import {
   NOTIFICATIONS_DENIED_MESSAGE,
 } from '../screens/focus-session.js';
 import type { BoardItem, KanbanBoardController } from '../screens/kanban-board.js';
-import { TODO_STATUSES } from '../screens/kanban-board.js';
+import { describeBoardFiles, TODO_STATUSES } from '../screens/kanban-board.js';
 import { completionNotice, dueBadge } from '../screens/todo-due.js';
 import { useFocusRefresh, useRefresh, useSyncRevision } from '../sync/hooks.js';
 import { useTheme } from '../theme/theme.js';
@@ -88,6 +88,26 @@ export interface KanbanViewProps {
   focus?: FocusSessionController;
   /** Opens the detail screen for a card, addressed `<path>#<index>`. */
   onOpenTodo?: (id: string) => void;
+}
+
+function BoardFile({ paths }: { paths: readonly string[] }) {
+  const { spacing, colors } = useTheme();
+  const { label, detail } = describeBoardFiles(paths);
+  return (
+    <View testID="board-file" accessible accessibilityLabel={`Board file: ${label}`}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+        <Icon name="note" size={14} color={colors.secondaryLabel} />
+        <Text variant="footnote" mono tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
+          {label}
+        </Text>
+      </View>
+      {detail ? (
+        <Text variant="caption2" tone="secondary" numberOfLines={2}>
+          {detail}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanViewProps) {
@@ -312,6 +332,7 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
   return (
     <View style={{ flex: 1 }}>
       <Screen title="Board" refreshing={refreshing} onRefresh={onRefresh}>
+        {loading || loadError ? null : <BoardFile paths={controller.paths} />}
         <SegmentedControl
           testID="board-status"
           options={options}
