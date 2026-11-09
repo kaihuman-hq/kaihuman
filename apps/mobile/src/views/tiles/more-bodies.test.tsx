@@ -2,14 +2,10 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { openBrowserAsync } from 'expo-web-browser';
 import { Platform } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type {
-  FeedSnapshot,
-  PaletteSettingsView,
-  TravelView,
-} from '../../components/widgets/tile-controllers.js';
+import type { FeedSnapshot, TravelView } from '../../components/widgets/tile-controllers.js';
 import { markRssRead, rssView, travelView } from '../../components/widgets/tile-controllers.js';
 import type { Ctx } from './bodies.js';
-import { PaletteSettings, Rss, relativeDate, Travel } from './more-bodies.js';
+import { Rss, relativeDate, Travel } from './more-bodies.js';
 
 const store = vi.hoisted(() => {
   let snap: Record<string, unknown> = {};
@@ -199,34 +195,5 @@ describe('Travel', () => {
     const view: TravelView = { currency: 'USD', totalLabel: '0.00 USD', next: null, trips: [] };
     render(<Travel view={view} ctx={ctx('')} />);
     expect(screen.queryByText('Next trip')).toBeNull();
-  });
-});
-
-describe('PaletteSettings', () => {
-  const entry = {
-    prefix: 'g',
-    name: 'Google',
-    detail: 'https://g.test',
-    enabled: true,
-    problem: null,
-  };
-  it('lists sections and shows problems in the danger tone', () => {
-    const view: PaletteSettingsView = {
-      engines: [entry],
-      assistants: [],
-      tools: [{ ...entry, prefix: 'b', name: 'Broken', enabled: false, problem: 'Missing url' }],
-      problems: ['Tool "Broken" is invalid'],
-    };
-    render(<PaletteSettings view={view} />);
-    expect(screen.getByText('Search engines')).toBeTruthy();
-    expect(screen.queryByText('Assistants')).toBeNull();
-    expect(screen.getByText('Tools')).toBeTruthy();
-    expect(screen.getByRole('alert').textContent).toContain('Tool "Broken" is invalid');
-    expect(screen.getByText('Missing url')).toBeTruthy();
-    expect(screen.getByText('On')).toBeTruthy();
-  });
-  it('says so when nothing is configured', () => {
-    render(<PaletteSettings view={{ engines: [], assistants: [], tools: [], problems: [] }} />);
-    expect(screen.getByText('Nothing configured.')).toBeTruthy();
   });
 });

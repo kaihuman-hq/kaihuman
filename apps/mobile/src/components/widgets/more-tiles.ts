@@ -8,11 +8,8 @@ import {
   markRssItemRead,
   parseRssConfig,
   type RssItem,
-  readPaletteSettings,
   removeRssFeed,
-  searchEngineProblem,
   serializeRssConfig,
-  toolProblem,
 } from '@kaihuman/formats';
 
 import type { TileResult } from './tile-controllers.js';
@@ -146,42 +143,5 @@ export const removeRssFeedById = (content: string, feedId: string): string =>
   serializeRssConfig(removeRssFeed(parseRssConfig(content), feedId));
 
 export * from './board-overview-tile.js';
+export * from './palette-settings-tile.js';
 export * from './travel-tile.js';
-
-// ─── command-palette.settings.json ───────────────────────────────────────────
-
-export interface PaletteEntryRow {
-  prefix: string;
-  name: string;
-  detail: string;
-  enabled: boolean;
-  problem: string | null;
-}
-
-export interface PaletteSettingsView {
-  engines: PaletteEntryRow[];
-  assistants: PaletteEntryRow[];
-  tools: PaletteEntryRow[];
-  problems: string[];
-}
-
-export const paletteSettingsView = (content: string): PaletteSettingsView => {
-  const { settings, error } = readPaletteSettings(content);
-  const row = (
-    prefix: string,
-    name: string,
-    detail: string,
-    problem: string | null,
-  ): PaletteEntryRow => ({ prefix, name, detail, enabled: problem === null, problem });
-  const engines = settings.searchEngines.map((e) => row('', e.name, e.url, searchEngineProblem(e)));
-  const assistants = settings.assistants.map((a) =>
-    row('', a.name, a.url, searchEngineProblem(a, 'An assistant')),
-  );
-  const tools = settings.tools.map((t, i) =>
-    row(t.prefix, t.name, t.description ?? t.url, toolProblem(t, settings.tools.slice(0, i))),
-  );
-  const problems = [...engines, ...assistants, ...tools]
-    .map((r) => r.problem)
-    .filter((p): p is string => p !== null);
-  return { engines, assistants, tools, problems: error ? [error, ...problems] : problems };
-};

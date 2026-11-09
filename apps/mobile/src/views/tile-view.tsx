@@ -164,7 +164,7 @@ function TileBody({ tile, ctx }: { tile: TileData; ctx: Ctx }) {
     case 'boardoverview':
       return <BoardOverview view={tile.view} ctx={ctx} />;
     case 'palettesettings':
-      return <PaletteSettings view={tile.view} />;
+      return <PaletteSettings view={tile.view} ctx={ctx} />;
     default: {
       const unhandled: never = tile;
       return unhandled;

@@ -6,8 +6,6 @@ import {
   addRssFeedUrl,
   filterRssItems,
   markRssRead,
-  type PaletteEntryRow,
-  type PaletteSettingsView,
   type RssFilter,
   type RssView,
   removeRssFeedById,
@@ -15,7 +13,7 @@ import {
 } from '../../components/widgets/tile-controllers.js';
 import { useEnsureFeeds, useFeedSnapshot } from '../../files/use-feeds.js';
 import { useTheme } from '../../theme/theme.js';
-import { Badge, haptics, Icon, SegmentedControl, Text } from '../../ui/index.js';
+import { haptics, Icon, SegmentedControl, Text } from '../../ui/index.js';
 import type { Ctx } from './bodies.js';
 import { EmptyLine, ItemRow, QuickAdd, Rows } from './parts.js';
 
@@ -184,65 +182,5 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
 }
 
 export { BoardOverview } from './board-overview-body.js';
+export { PaletteSettings } from './palette-settings-body.js';
 export { Travel } from './travel-body.js';
-
-function PaletteSection({ title, rows }: { title: string; rows: PaletteEntryRow[] }) {
-  const { colors } = useTheme();
-  if (rows.length === 0) return null;
-  return (
-    <>
-      <Text variant="footnote" tone="secondary" weight="600" style={{ textTransform: 'uppercase' }}>
-        {title}
-      </Text>
-      <Rows>
-        {rows.map((r) => (
-          <ItemRow
-            key={`${r.prefix}-${r.name}`}
-            title={r.name}
-            subtitle={r.problem ?? (r.detail || undefined)}
-            leading={
-              <Text variant="subheadline" mono color={colors.accent}>
-                {r.prefix}
-              </Text>
-            }
-            trailing={
-              r.problem ? (
-                <Badge tone="danger" label="Problem" />
-              ) : (
-                <Badge tone={r.enabled ? 'success' : 'neutral'} label={r.enabled ? 'On' : 'Off'} />
-              )
-            }
-          />
-        ))}
-      </Rows>
-    </>
-  );
-}
-
-export function PaletteSettings({ view }: { view: PaletteSettingsView }) {
-  const { colors, spacing } = useTheme();
-  return (
-    <>
-      {view.problems.map((p) => (
-        <View
-          key={p}
-          accessibilityRole="alert"
-          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}
-        >
-          <Icon name="warning" size={17} color={colors.danger} />
-          <View style={{ flex: 1 }}>
-            <Text variant="footnote" tone="danger">
-              {p}
-            </Text>
-          </View>
-        </View>
-      ))}
-      <PaletteSection title="Search engines" rows={view.engines} />
-      <PaletteSection title="Assistants" rows={view.assistants} />
-      <PaletteSection title="Tools" rows={view.tools} />
-      {view.engines.length + view.assistants.length + view.tools.length === 0 ? (
-        <EmptyLine>Nothing configured.</EmptyLine>
-      ) : null}
-    </>
-  );
-}
