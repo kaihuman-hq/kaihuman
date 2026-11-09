@@ -5,11 +5,8 @@
  */
 import {
   addRssFeed,
-  type BoardOverviewConfig,
   markRssItemRead,
-  parseBoardOverviewConfig,
   parseRssConfig,
-  parseTodos,
   type RssItem,
   readPaletteSettings,
   removeRssFeed,
@@ -22,7 +19,6 @@ import type { TileResult } from './tile-controllers.js';
 
 const ok = (content: string): TileResult => ({ ok: true, content });
 const fail = (error: string): TileResult => ({ ok: false, error });
-const DAY_MS = 86_400_000;
 
 const httpHref = (url: string): string | null => {
   try {
@@ -149,92 +145,8 @@ export const addRssFeedUrl = (content: string, url: string, id: string): TileRes
 export const removeRssFeedById = (content: string, feedId: string): string =>
   serializeRssConfig(removeRssFeed(parseRssConfig(content), feedId));
 
+export * from './board-overview-tile.js';
 export * from './travel-tile.js';
-
-// ─── .board-overview.json ────────────────────────────────────────────────────
-
-export interface BoardItem {
-  text: string;
-  file: string;
-  ageDays: number;
-  overdue: boolean;
-}
-
-export interface BoardColumn {
-  status: 'backlog' | 'in-progress' | 'done' | 'rejected';
-  label: string;
-  count: number;
-  items: BoardItem[];
-}
-
-export interface BoardOverviewView {
-  /** Only the columns the config enables. */
-  columns: BoardColumn[];
-  overdueCount: number;
-  files: number;
-}
-
-const BUSINESS_PREFIX = '.kh/business/';
-
-const COLUMNS: readonly {
-  status: BoardColumn['status'];
-  label: string;
-  flag: keyof BoardOverviewConfig;
-}[] = [
-  { status: 'backlog', label: 'Inbox', flag: 'showBacklog' },
-  { status: 'in-progress', label: 'In Progress', flag: 'showInProgress' },
-  { status: 'done', label: 'Done', flag: 'showDone' },
-  { status: 'rejected', label: 'Rejected', flag: 'showRejected' },
-];
-
-export const boardOverviewView = (
-  configContent: string,
-  todoFiles: readonly { path: string; content: string }[],
-  now: Date,
-): BoardOverviewView => {
-  const cfg = parseBoardOverviewConfig(configContent);
-  const scope = cfg.scope ?? 'all';
-  const files = todoFiles.filter(
-    (f) => scope === 'all' || (scope === 'business') === f.path.startsWith(BUSINESS_PREFIX),
-  );
-  const nowMs = now.getTime();
-  const minAge = cfg.minAgeDays * DAY_MS;
-  const overdueAfter = cfg.overdueDays * DAY_MS;
-  const buckets = new Map<BoardColumn['status'], BoardItem[]>();
-  let overdueCount = 0;
-
-  for (const file of files) {
-    for (const item of parseTodos(file.content).items) {
-      const created = item.createdAt ? Date.parse(item.createdAt) : Number.NaN;
-      const createdMs = Number.isNaN(created) ? 0 : created;
-      if (minAge > 0 && createdMs > 0 && nowMs - createdMs < minAge) continue;
-      let overdue = false;
-      if (item.status === 'in-progress' && cfg.showOverdue) {
-        const ts = item.updatedAt ?? (createdMs || null);
-        overdue = !ts || nowMs - ts >= overdueAfter;
-        if (overdue) overdueCount++;
-      }
-      const since = createdMs || item.updatedAt || 0;
-      const list = buckets.get(item.status) ?? [];
-      list.push({
-        text: item.text,
-        file: file.path,
-        ageDays: since ? Math.max(0, Math.floor((nowMs - since) / DAY_MS)) : 0,
-        overdue,
-      });
-      buckets.set(item.status, list);
-    }
-  }
-
-  return {
-    columns: COLUMNS.filter((c) => cfg[c.flag]).map(({ status, label }) => {
-      const items = (buckets.get(status) ?? []).sort((a, b) => b.ageDays - a.ageDays);
-      return { status, label, count: items.length, items };
-    }),
-    overdueCount,
-    files: files.length,
-  };
-};
 
 // ─── command-palette.settings.json ───────────────────────────────────────────
 

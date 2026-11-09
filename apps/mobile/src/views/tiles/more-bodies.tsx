@@ -1,11 +1,9 @@
 import { randomUUID } from 'expo-crypto';
 import { openBrowserAsync } from 'expo-web-browser';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import {
   addRssFeedUrl,
-  type BoardOverviewView,
-  boardOverviewView,
   filterRssItems,
   markRssRead,
   type PaletteEntryRow,
@@ -16,7 +14,6 @@ import {
   rssView,
 } from '../../components/widgets/tile-controllers.js';
 import { useEnsureFeeds, useFeedSnapshot } from '../../files/use-feeds.js';
-import { type ContentFiles, githubContentFiles } from '../../screens/file-editor-screen.js';
 import { useTheme } from '../../theme/theme.js';
 import { Badge, haptics, Icon, SegmentedControl, Text } from '../../ui/index.js';
 import type { Ctx } from './bodies.js';
@@ -186,114 +183,8 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
   );
 }
 
+export { BoardOverview } from './board-overview-body.js';
 export { Travel } from './travel-body.js';
-
-const TODO_FILE = /\.todos\.md$/i;
-
-/** Reads every `.todos.md` in the repository; null while loading. */
-function useTodoFiles(files: ContentFiles): { path: string; content: string }[] | null {
-  const [loaded, setLoaded] = useState<{ path: string; content: string }[] | null>(null);
-  useEffect(() => {
-    let live = true;
-    const paths = files
-      .tree()
-      .filter((t) => t.type !== 'tree' && TODO_FILE.test(t.path))
-      .map((t) => t.path);
-    void Promise.all(
-      paths.map((path) =>
-        files.read(path).then(
-          (content) => ({ path, content }),
-          () => null,
-        ),
-      ),
-    ).then((rows) => {
-      if (live) setLoaded(rows.filter((r): r is { path: string; content: string } => r !== null));
-    });
-    return () => {
-      live = false;
-    };
-  }, [files]);
-  return loaded;
-}
-
-export function BoardOverview({
-  view: initial,
-  ctx,
-  files = githubContentFiles,
-}: {
-  view: BoardOverviewView;
-  ctx: Ctx;
-  files?: ContentFiles;
-}) {
-  const { colors, spacing, shape } = useTheme();
-  const todoFiles = useTodoFiles(files);
-  const view: BoardOverviewView = useMemo(
-    () => (todoFiles ? boardOverviewView(ctx.content, todoFiles, ctx.now) : initial),
-    [todoFiles, ctx.content, ctx.now, initial],
-  );
-  if (!todoFiles) {
-    return (
-      <View
-        accessibilityRole="progressbar"
-        accessibilityLabel="Loading boards"
-        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}
-      >
-        <ActivityIndicator color={colors.secondaryLabel} />
-        <Text variant="footnote" tone="secondary">
-          Loading boards
-        </Text>
-      </View>
-    );
-  }
-  return (
-    <>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-        <Text variant="footnote" tone="secondary" style={{ flex: 1 }}>
-          {`${view.files} ${view.files === 1 ? 'todo file' : 'todo files'}`}
-        </Text>
-        {view.overdueCount > 0 ? (
-          <Badge tone="danger" label={`${view.overdueCount} overdue`} />
-        ) : null}
-      </View>
-      {view.columns.map((c) => (
-        <View
-          key={c.status}
-          testID={`board-col-${c.status}`}
-          style={{
-            backgroundColor: colors.fill,
-            borderRadius: shape.md,
-            padding: spacing.md,
-            gap: spacing.xs,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Text variant="subheadline" weight="600" style={{ flex: 1 }}>
-              {c.label}
-            </Text>
-            <Text variant="subheadline" mono tone="secondary">
-              {c.count}
-            </Text>
-          </View>
-          {c.items.slice(0, 3).map((i) => (
-            <Text
-              key={`${i.file}-${i.text}`}
-              variant="footnote"
-              tone={i.overdue ? 'danger' : 'secondary'}
-              numberOfLines={1}
-            >
-              {i.text}
-            </Text>
-          ))}
-          {c.count > 3 ? (
-            <Text variant="caption2" tone="secondary">
-              {`+${c.count - 3} more`}
-            </Text>
-          ) : null}
-        </View>
-      ))}
-    </>
-  );
-}
 
 function PaletteSection({ title, rows }: { title: string; rows: PaletteEntryRow[] }) {
   const { colors } = useTheme();

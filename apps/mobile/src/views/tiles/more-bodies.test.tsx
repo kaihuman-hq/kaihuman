@@ -3,15 +3,13 @@ import { openBrowserAsync } from 'expo-web-browser';
 import { Platform } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
-  BoardOverviewView,
   FeedSnapshot,
   PaletteSettingsView,
   TravelView,
 } from '../../components/widgets/tile-controllers.js';
 import { markRssRead, rssView, travelView } from '../../components/widgets/tile-controllers.js';
-import type { ContentFiles } from '../../screens/file-editor-screen.js';
 import type { Ctx } from './bodies.js';
-import { BoardOverview, PaletteSettings, Rss, relativeDate, Travel } from './more-bodies.js';
+import { PaletteSettings, Rss, relativeDate, Travel } from './more-bodies.js';
 
 const store = vi.hoisted(() => {
   let snap: Record<string, unknown> = {};
@@ -201,44 +199,6 @@ describe('Travel', () => {
     const view: TravelView = { currency: 'USD', totalLabel: '0.00 USD', next: null, trips: [] };
     render(<Travel view={view} ctx={ctx('')} />);
     expect(screen.queryByText('Next trip')).toBeNull();
-  });
-});
-
-describe('BoardOverview', () => {
-  const view: BoardOverviewView = { columns: [], overdueCount: 0, files: 0 };
-  const files = (read: Record<string, string>): ContentFiles =>
-    ({
-      tree: () =>
-        Object.keys(read).map((path) => ({
-          path,
-          mode: '100644',
-          type: 'blob' as const,
-          sha: path,
-          url: '',
-        })),
-      read: async (p: string) => read[p] as string,
-    }) as unknown as ContentFiles;
-
-  it('loads .todos.md files and shows columns with counts and first items', async () => {
-    const todo = '# T\n\n- [ ] Write tests\n- [>] Doing it\n';
-    render(
-      <BoardOverview
-        view={view}
-        ctx={ctx('')}
-        files={files({ 'a.todos.md': todo, 'notes.md': 'ignored' })}
-      />,
-    );
-    expect(screen.getByRole('progressbar', { name: 'Loading boards' })).toBeTruthy();
-    expect(await screen.findByText('Write tests')).toBeTruthy();
-    expect(screen.getByText('1 todo file')).toBeTruthy();
-    expect(screen.getByTestId('board-col-backlog')).toBeTruthy();
-    expect(screen.getByTestId('board-col-in-progress')).toBeTruthy();
-  });
-
-  it('flags overdue items', async () => {
-    const todo = '# T\n\n- [>] Stuck item\n';
-    render(<BoardOverview view={view} ctx={ctx('')} files={files({ 'a.todos.md': todo })} />);
-    expect(await screen.findByText('1 overdue')).toBeTruthy();
   });
 });
 
