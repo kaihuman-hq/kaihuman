@@ -73,7 +73,17 @@ vi.mock('react-native-svg', () => {
       createElement(tag, { 'data-testid': testID, fill }, children);
   const SvgXml = ({ xml, testID }: Record<string, any>) =>
     createElement('div', { 'data-testid': testID ?? 'svg-xml', 'data-xml': xml });
-  return { Svg: el('svg'), Path: el('path'), SvgXml };
+  const Svg = el('svg');
+  return {
+    Svg,
+    Path: el('path'),
+    G: el('g'),
+    Line: el('line'),
+    Rect: el('rect'),
+    Circle: el('circle'),
+    Text: el('text'),
+    SvgXml,
+  };
 });
 
 // The in-app browser is a native sheet; tests assert the URL it was asked to open.

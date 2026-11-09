@@ -3,31 +3,22 @@ import { cn } from '../../../utils';
 import {
   addColumn,
   addConsumptionEntry,
+  type CompareMode,
   type ConsumptionData,
+  compareYearData,
   getMonthlyStats,
   getYearlyStats,
+  MONTH_NAMES,
   type MonthlyStats,
+  monthPctChange,
   parseConsumption,
   removeColumn,
   sameDayLastYear,
   serializeConsumption,
+  toggleCompareYear,
   type YearlyStats,
 } from './ConsumptionLogic';
 
-const MONTH_NAMES = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
 const YEAR_COLORS = [
   '#60a5fa',
   '#4ade80',
@@ -703,14 +694,9 @@ const MonthlyView = ({
 }) => {
   const col = data.columns.find((c) => c.key === metricKey);
   const yearStats = monthlyStats.filter((s) => s.year === year);
-  const prevYearStats = monthlyStats.filter((s) => s.year === year - 1);
 
-  const getPctChange = (month: number): number | null => {
-    const curr = yearStats.find((s) => s.month === month)?.avgPerDayByKey[metricKey] ?? null;
-    const prev = prevYearStats.find((s) => s.month === month)?.avgPerDayByKey[metricKey] ?? null;
-    if (curr === null || prev === null || prev === 0) return null;
-    return ((curr - prev) / prev) * 100;
-  };
+  const getPctChange = (month: number): number | null =>
+    monthPctChange(monthlyStats, year, month, metricKey);
 
   return (
     <div className="p-4 overflow-x-auto">
@@ -833,7 +819,7 @@ const YearlyView = ({
 
 // --- Multi-year monthly comparison chart ---
 
-type ChartMode = 'avg' | 'cumulative';
+type ChartMode = CompareMode;
 
 const CompareView = ({
   data,
@@ -861,46 +847,16 @@ const CompareView = ({
     return () => obs.disconnect();
   }, []);
 
-  const toggleYear = (year: number) => {
-    setActiveYears((prev) => {
-      // All selected → click one → isolate it
-      if (prev.size === years.length) return new Set([year]);
-      // Sole selection clicked again → reset to all
-      if (prev.size === 1 && prev.has(year)) return new Set(years);
-      // Otherwise toggle membership
-      const next = new Set(prev);
-      if (next.has(year)) next.delete(year);
-      else next.add(year);
-      // If that would empty the set, reset to all
-      return next.size === 0 ? new Set(years) : next;
-    });
-  };
+  const toggleYear = (year: number) =>
+    setActiveYears((prev) => toggleCompareYear(prev, years, year));
 
   const col = data.columns.find((c) => c.key === metricKey);
 
   // Per year: 12 values based on mode
-  const yearData = useMemo(() => {
-    return years.map((year) => {
-      const monthly = MONTH_NAMES.map((_, i) => {
-        const m = i + 1;
-        const stats = monthlyStats.find((s) => s.year === year && s.month === m);
-        if (!stats) return null;
-        return chartMode === 'avg'
-          ? (stats.avgPerDayByKey[metricKey] ?? null)
-          : (stats.totalByKey[metricKey] ?? null);
-      });
-
-      if (chartMode === 'cumulative') {
-        let cumSum = 0;
-        return monthly.map((v) => {
-          if (v === null) return null;
-          cumSum += v;
-          return cumSum;
-        });
-      }
-      return monthly;
-    });
-  }, [years, monthlyStats, metricKey, chartMode]);
+  const yearData = useMemo(
+    () => compareYearData(monthlyStats, years, metricKey, chartMode),
+    [years, monthlyStats, metricKey, chartMode],
+  );
 
   // Only use active years for scale
   const activeIndices = years.map((y, i) => (activeYears.has(y) ? i : -1)).filter((i) => i >= 0);

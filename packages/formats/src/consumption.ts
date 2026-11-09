@@ -469,3 +469,70 @@ export function getYearlyStats(data: ConsumptionData): YearlyStats[] {
 export function sameDayLastYear(date: string): string {
   return `${String(Number(date.slice(0, 4)) - 1).padStart(4, '0')}${date.slice(4)}`;
 }
+
+export const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+export type CompareMode = 'avg' | 'cumulative';
+
+/** Change of a month's average per day against the same month a year earlier, in percent. */
+export function monthPctChange(
+  stats: readonly MonthlyStats[],
+  year: number,
+  month: number,
+  key: string,
+): number | null {
+  const curr = stats.find((s) => s.year === year && s.month === month)?.avgPerDayByKey[key];
+  const prev = stats.find((s) => s.year === year - 1 && s.month === month)?.avgPerDayByKey[key];
+  if (curr === undefined || prev === undefined || prev === 0) return null;
+  return ((curr - prev) / prev) * 100;
+}
+
+/** Twelve values (Jan..Dec) per year; `null` where a month has no data. Cumulative mode is a running sum. */
+export function compareYearData(
+  stats: readonly MonthlyStats[],
+  years: readonly number[],
+  key: string,
+  mode: CompareMode,
+): (number | null)[][] {
+  return years.map((year) => {
+    const monthly = MONTH_NAMES.map((_, i) => {
+      const s = stats.find((m) => m.year === year && m.month === i + 1);
+      if (!s) return null;
+      return (mode === 'avg' ? s.avgPerDayByKey[key] : s.totalByKey[key]) ?? null;
+    });
+    if (mode !== 'cumulative') return monthly;
+    let sum = 0;
+    return monthly.map((v) => {
+      if (v === null) return null;
+      sum += v;
+      return sum;
+    });
+  });
+}
+
+/** Legend tap: from "all" isolate the year, a lone year resets to all, otherwise toggle (never empty). */
+export function toggleCompareYear(
+  active: ReadonlySet<number>,
+  years: readonly number[],
+  year: number,
+): Set<number> {
+  if (active.size === years.length) return new Set([year]);
+  if (active.size === 1 && active.has(year)) return new Set(years);
+  const next = new Set(active);
+  if (next.has(year)) next.delete(year);
+  else next.add(year);
+  return next.size === 0 ? new Set(years) : next;
+}
