@@ -5,40 +5,24 @@
  */
 import {
   addRssFeed,
-  addTrip,
   type BoardOverviewConfig,
   markRssItemRead,
-  nextTrip,
   parseBoardOverviewConfig,
   parseRssConfig,
   parseTodos,
-  parseTravel,
   type RssItem,
   readPaletteSettings,
   removeRssFeed,
   searchEngineProblem,
   serializeRssConfig,
-  serializeTravel,
-  sortTrips,
   toolProblem,
-  totalCost,
-  tripCost,
 } from '@kaihuman/formats';
 
 import type { TileResult } from './tile-controllers.js';
 
 const ok = (content: string): TileResult => ({ ok: true, content });
 const fail = (error: string): TileResult => ({ ok: false, error });
-const pad = (n: number): string => String(n).padStart(2, '0');
 const DAY_MS = 86_400_000;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-const isoLocalDay = (d: Date): string =>
-  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const dayNumber = (iso: string): number => {
-  const [y, m, d] = iso.split('-').map(Number);
-  return Math.round(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1) / DAY_MS);
-};
 
 const httpHref = (url: string): string | null => {
   try {
@@ -165,81 +149,7 @@ export const addRssFeedUrl = (content: string, url: string, id: string): TileRes
 export const removeRssFeedById = (content: string, feedId: string): string =>
   serializeRssConfig(removeRssFeed(parseRssConfig(content), feedId));
 
-// ─── .travel.json ────────────────────────────────────────────────────────────
-
-export interface TripRow {
-  id: string;
-  name: string;
-  dateRange: string;
-  cost: number;
-  costLabel: string;
-  steps: number;
-  status: 'upcoming' | 'current' | 'past';
-}
-
-export interface TravelView {
-  currency: string;
-  totalLabel: string;
-  next: { name: string; daysUntil: number } | null;
-  trips: TripRow[];
-}
-
-export const travelView = (content: string, now: Date): TravelView => {
-  const doc = parseTravel(content);
-  const today = isoLocalDay(now);
-  const label = (n: number) => `${n.toFixed(2)} ${doc.currency}`;
-  const trips = sortTrips(doc.trips).map((trip): TripRow => {
-    const { start, end } = trip;
-    const last = end ?? start;
-    const status: TripRow['status'] =
-      start === undefined || start > today
-        ? 'upcoming'
-        : last !== undefined && last < today
-          ? 'past'
-          : 'current';
-    const cost = tripCost(trip);
-    return {
-      id: trip.id,
-      name: trip.title,
-      dateRange: start ? (end && end !== start ? `${start} – ${end}` : start) : 'No dates',
-      cost,
-      costLabel: label(cost),
-      steps: trip.steps.length,
-      status,
-    };
-  });
-  const next = nextTrip(doc, today);
-  return {
-    currency: doc.currency,
-    totalLabel: label(totalCost(doc)),
-    next: next?.start
-      ? { name: next.title, daysUntil: Math.max(0, dayNumber(next.start) - dayNumber(today)) }
-      : null,
-    trips,
-  };
-};
-
-export const addTravelTrip = (
-  content: string,
-  draft: { name: string; start: string; end: string },
-  id: string,
-): TileResult => {
-  const name = draft.name.trim();
-  const start = draft.start.trim();
-  const end = draft.end.trim();
-  if (!name) return fail('Give the trip a name');
-  if ((start && !ISO_DATE.test(start)) || (end && !ISO_DATE.test(end))) {
-    return fail('Dates must look like 2026-11-05');
-  }
-  if (end && !start) return fail('Add a start date');
-  if (start && end && end < start) return fail('The trip cannot end before it starts');
-  const doc = addTrip(
-    parseTravel(content),
-    { title: name, ...(start ? { start } : {}), ...(end ? { end } : {}) },
-    id,
-  );
-  return ok(serializeTravel(doc));
-};
+export * from './travel-tile.js';
 
 // ─── .board-overview.json ────────────────────────────────────────────────────
 

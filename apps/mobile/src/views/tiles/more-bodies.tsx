@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import {
   addRssFeedUrl,
-  addTravelTrip,
   type BoardOverviewView,
   boardOverviewView,
   filterRssItems,
@@ -15,15 +14,13 @@ import {
   type RssView,
   removeRssFeedById,
   rssView,
-  type TravelView,
-  type TripRow,
 } from '../../components/widgets/tile-controllers.js';
 import { useEnsureFeeds, useFeedSnapshot } from '../../files/use-feeds.js';
 import { type ContentFiles, githubContentFiles } from '../../screens/file-editor-screen.js';
 import { useTheme } from '../../theme/theme.js';
-import { Badge, Button, haptics, Icon, SegmentedControl, Text, TextField } from '../../ui/index.js';
+import { Badge, haptics, Icon, SegmentedControl, Text } from '../../ui/index.js';
 import type { Ctx } from './bodies.js';
-import { EmptyLine, ItemRow, QuickAdd, Rows, useDisclosure } from './parts.js';
+import { EmptyLine, ItemRow, QuickAdd, Rows } from './parts.js';
 
 const DAY = 86_400_000;
 
@@ -189,109 +186,7 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
   );
 }
 
-const TRIP_TONE: Record<TripRow['status'], 'success' | 'accent' | 'neutral'> = {
-  current: 'success',
-  upcoming: 'accent',
-  past: 'neutral',
-};
-
-export function Travel({ view, ctx }: { view: TravelView; ctx: Ctx }) {
-  const { colors, spacing, shape } = useTheme();
-  const [name, setName] = useState('');
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
-  const form = useDisclosure();
-  const save = () => {
-    if (ctx.apply(addTravelTrip(ctx.content, { name, start, end }, randomUUID().slice(0, 8)))) {
-      haptics.success();
-      setName('');
-      setStart('');
-      setEnd('');
-      form.hide();
-    } else haptics.error();
-  };
-  return (
-    <>
-      {view.next ? (
-        <View
-          accessibilityLabel={`Next trip, ${view.next.name}, ${view.next.daysUntil} days`}
-          accessible
-          style={{
-            backgroundColor: colors.accentSoft,
-            borderRadius: shape.md,
-            padding: spacing.md,
-            gap: spacing.xxs,
-          }}
-        >
-          <Text variant="caption2" weight="600" style={{ textTransform: 'uppercase' }}>
-            Next trip
-          </Text>
-          <Text variant="title3">{view.next.name}</Text>
-          <Text variant="subheadline" tone="secondary">
-            {view.next.daysUntil === 0
-              ? 'Starts today'
-              : `In ${view.next.daysUntil} ${view.next.daysUntil === 1 ? 'day' : 'days'}`}
-          </Text>
-        </View>
-      ) : null}
-      {view.trips.length === 0 ? (
-        <EmptyLine>No trips planned.</EmptyLine>
-      ) : (
-        <Rows>
-          {view.trips.map((t) => (
-            <ItemRow
-              key={t.id}
-              testID={`trip-${t.id}`}
-              title={t.name}
-              subtitle={`${t.dateRange} · ${t.steps} ${t.steps === 1 ? 'step' : 'steps'}`}
-              trailing={
-                <View style={{ alignItems: 'flex-end', gap: spacing.xxs }}>
-                  <Text variant="subheadline" mono>
-                    {t.costLabel}
-                  </Text>
-                  <Badge tone={TRIP_TONE[t.status]} label={t.status} />
-                </View>
-              }
-            />
-          ))}
-        </Rows>
-      )}
-      {view.trips.length > 0 ? (
-        <Text variant="footnote" tone="secondary">
-          {`Total ${view.totalLabel}`}
-        </Text>
-      ) : null}
-      {form.open ? (
-        <>
-          <TextField label="Trip name" value={name} onChangeText={setName} returnKeyType="next" />
-          <TextField
-            label="Start (YYYY-MM-DD)"
-            value={start}
-            onChangeText={setStart}
-            placeholder="2026-12-24"
-            keyboardType="numbers-and-punctuation"
-            returnKeyType="next"
-          />
-          <TextField
-            label="End (YYYY-MM-DD)"
-            value={end}
-            onChangeText={setEnd}
-            placeholder="2026-12-31"
-            keyboardType="numbers-and-punctuation"
-            returnKeyType="done"
-            onSubmitEditing={save}
-          />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Button label="Save trip" size="medium" onPress={save} />
-            <Button label="Cancel" size="medium" variant="plain" onPress={form.hide} />
-          </View>
-        </>
-      ) : (
-        <Button label="Add trip" icon="add" size="medium" variant="tinted" onPress={form.show} />
-      )}
-    </>
-  );
-}
+export { Travel } from './travel-body.js';
 
 const TODO_FILE = /\.todos\.md$/i;
 

@@ -6,9 +6,13 @@ import {
   deleteTrip,
   emptyStep,
   mapsLink,
+  money,
   moveStep,
   nextTrip,
   parseTravel,
+  STEP_FIELDS,
+  STEP_LABEL,
+  STEP_TYPES,
   type StepType,
   serializeTravel,
   sortTrips,
@@ -207,5 +211,22 @@ describe('mapsLink', () => {
   });
   it('is undefined with neither', () => {
     expect(mapsLink(step)).toBeUndefined();
+  });
+});
+
+describe('step metadata', () => {
+  it('lists only fields that exist on a fresh step of that type', () => {
+    for (const type of STEP_TYPES) {
+      const step = emptyStep(type, 'x') as unknown as Record<string, unknown>;
+      for (const field of STEP_FIELDS[type]) {
+        // Optional fields are absent until filled in.
+        if (field.key === 'tollRef' || field.key === 'description') continue;
+        expect(step, `${type}.${field.key}`).toHaveProperty(field.key);
+      }
+      expect(STEP_LABEL[type]).toBeTruthy();
+    }
+  });
+  it('formats money with the currency', () => {
+    expect(money(12.5, 'EUR')).toBe('12.50 EUR');
   });
 });
