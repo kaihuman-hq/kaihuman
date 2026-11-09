@@ -149,6 +149,28 @@ describe('cold start', () => {
     next.stop();
   });
 
+  it('keeps the repo and dashboard when a crash tore kv.json mid-write', async () => {
+    const first = await launch();
+    first.core.authStore.token.value = 'ghp_saved';
+    first.core.githubProfileStore.currentRepo.value = repo as never;
+    first.dashboards.rememberDashboard('work');
+    await flush();
+    first.stop();
+    // The crash: the main file is cut short while being rewritten.
+    const whole = device.files.get('kv.json') ?? '';
+    device.files.set('kv.json', whole.slice(0, whole.length / 2));
+
+    const next = await launch();
+    expect(next.core.githubProfileStore.currentRepo.value).toMatchObject({ full_name: 'me/life' });
+    expect(next.dashboards.lastDashboardId()).toBe('work');
+    const session = {
+      token: next.core.authStore.token.value,
+      repo: next.core.githubProfileStore.currentRepo.value,
+    };
+    expect(next.route.resolveStartRoute(session)).toBe('/dashboard');
+    next.stop();
+  });
+
   it('never writes the token into the plain cache files', async () => {
     const app = await launch();
     app.core.authStore.token.value = 'ghp_secret';

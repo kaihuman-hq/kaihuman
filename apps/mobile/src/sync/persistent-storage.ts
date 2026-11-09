@@ -53,18 +53,51 @@ export function createFileRecordDriver(fs: CacheFs): RecordDriver {
   };
 }
 
-/** Synchronous KV: core reads it while constructing stores, so it must be in memory. */
+const KV_BACKUP = `${KV_FILE}.bak`;
+
+/** Parses a kv file; null for missing, empty, truncated or non-object text. */
+function parseKv(raw: string | null): Record<string, string> | null {
+  if (!raw) return null;
+  try {
+    const value: unknown = JSON.parse(raw);
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, string>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Synchronous KV: core reads it while constructing stores, so it must be in memory.
+ * Every write goes to the backup first and then the main file, so at any moment one of them is
+ * whole; a load takes the first that parses. Store constructors write at once, so falling back
+ * to an empty map would overwrite the user's repo and settings with nothing.
+ */
 export function createFileKeyValueDriver(fs: CacheFs): KeyValueDriver {
   let data: Record<string, string> = {};
+  // A read that throws (e.g. file protection before first unlock) is not "no data": write
+  // nothing this session, or the empty in-memory map would replace the real file.
+  let readOnly = false;
   try {
     const raw = fs.readSync(KV_FILE);
-    if (raw) data = JSON.parse(raw) as Record<string, string>;
+    const main = parseKv(raw);
+    const backup = main ? null : parseKv(fs.readSync(KV_BACKUP));
+    data = main ?? backup ?? {};
+    if (!main && backup) fs.writeSync(KV_FILE, JSON.stringify(backup));
+    // Nothing usable: set the unreadable text aside rather than lose it to the next write.
+    else if (!main && raw) fs.writeSync(`${KV_FILE}.corrupt`, raw);
   } catch {
-    data = {};
+    readOnly = true;
   }
+  let saved = JSON.stringify(data);
   const persist = () => {
+    const text = JSON.stringify(data);
+    if (readOnly || text === saved) return;
     try {
-      fs.writeSync(KV_FILE, JSON.stringify(data));
+      fs.writeSync(KV_BACKUP, text);
+      fs.writeSync(KV_FILE, text);
+      saved = text;
     } catch {
       // The in-memory copy still serves this session.
     }
