@@ -38,14 +38,6 @@ import {
   serializeTimeTracking,
   type TimeTrackingData,
 } from '@kaihuman/formats';
-import {
-  addEntry as addStockEntry,
-  aggregateByPeriod,
-  getStats,
-  type PeriodPoint,
-  parseStocks,
-  type StockPeriod,
-} from '@kaihuman/formats/stocks';
 
 import { feedStore } from '../../files/feed-store.js';
 import { type ConsumptionView, consumptionView } from './consumption-tile.js';
@@ -60,13 +52,14 @@ import {
   travelView,
 } from './more-tiles.js';
 import { type TodosView, todosView } from './todos-tile.js';
+import { type StocksView, stocksView } from './stocks-tile.js';
 
-export type { PeriodPoint, StockPeriod } from '@kaihuman/formats/stocks';
 export * from './actionlog-tile.js';
 export * from './bookmarks-tile.js';
 export * from './consumption-tile.js';
 export * from './more-tiles.js';
 export * from './read-later-tile.js';
+export * from './stocks-tile.js';
 export * from './templates-tile.js';
 export * from './timetracking-tile.js';
 export * from './timezones-tile.js';
@@ -721,86 +714,6 @@ export const budgetView = (content: string): BudgetView => {
   };
 };
 
-// ─── .stocks.csv ─────────────────────────────────────────────────────────────
-
-export interface StockPoint {
-  /** `YYYY-MM-DD`. */
-  date: string;
-  value: number;
-  /** Total invested up to and including this point. */
-  invested: number;
-}
-
-export interface StocksView {
-  latestValue: number;
-  invested: number;
-  profit: number;
-  profitPct: number;
-  changeVsPrev: number | null;
-  changeVsPrevPct: number | null;
-  /** Compound annual growth, once the file spans a year. */
-  cagr: number | null;
-  allTimeHigh: number;
-  /** Negative percentage below the all-time high. */
-  drawdownPct: number;
-  series: StockPoint[];
-  /** Latest value per period, oldest first, as the web's overview table shows it. */
-  periods: Record<StockPeriod, PeriodPoint[]>;
-}
-
-/**
- * Parsing is shared with the web, which writes `DD.MM.YYYY HH:MM:SS` stamps; an ISO-only
- * parser here dropped every row of a web-written file and the tile showed no data.
- */
-export const stocksView = (content: string): StocksView | null => {
-  const entries = parseStocks(content);
-  const stats = getStats(entries);
-  if (!stats) return null;
-  let invested = 0;
-  const series = entries.map((e) => {
-    invested += e.invest;
-    return { date: localDate(e.timestamp), value: e.value, invested };
-  });
-  return {
-    latestValue: stats.latestValue,
-    invested: stats.latestInvest,
-    profit: stats.latestProfit,
-    profitPct: stats.latestProfitPct,
-    changeVsPrev: stats.changeVsPrev,
-    changeVsPrevPct: stats.changeVsPrevPct,
-    cagr: stats.cagr,
-    allTimeHigh: stats.allTimeHigh,
-    drawdownPct: stats.drawdownPct,
-    series,
-    periods: {
-      weekly: aggregateByPeriod(entries, 'weekly'),
-      monthly: aggregateByPeriod(entries, 'monthly'),
-      yearly: aggregateByPeriod(entries, 'yearly'),
-    },
-  };
-};
-
-const parseAmount = (raw: string): number => Number.parseFloat(raw.trim().replace(',', '.'));
-
-/** Adds a value reading, with the amount newly invested since the last one (blank means none). */
-export const addStockValue = (
-  content: string,
-  value: string,
-  invest: string,
-  date: string,
-  now: Date,
-): TileResult => {
-  const v = parseAmount(value);
-  if (Number.isNaN(v)) return { ok: false, error: 'Enter the current value as a number.' };
-  const i = invest.trim() ? parseAmount(invest) : 0;
-  if (Number.isNaN(i)) return { ok: false, error: 'Enter the invested amount as a number.' };
-  const day = date.trim() || localDate(now);
-  if (!ISO_DAY.test(day)) return { ok: false, error: 'Use a date like 2026-01-31.' };
-  const at = parseLocalDate(day);
-  at.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-  return ok(addStockEntry(content, v, i, at));
-};
-
 // ─── .data-collection.csv ────────────────────────────────────────────────────
 
 export interface CollectionColumn {
@@ -1036,7 +949,7 @@ export const presentTile = (path: string, content: string, now: Date): TileView 
     case 'budget':
       return { kind: 'budget', view: budgetView(content) };
     case 'stocks':
-      return { kind: 'stocks', view: stocksView(content) };
+      return { kind: 'stocks', view: stocksView(content, now) };
     case 'consumption':
       return { kind: 'consumption', view: consumptionView(content, now) };
     case 'datacollection':

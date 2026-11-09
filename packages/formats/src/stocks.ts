@@ -385,6 +385,7 @@ function getRemainingPeriodLabels(period: StockPeriod, after: Date): string[] {
 export function buildPeriodForecast(
   aggregated: PeriodPoint[],
   period: StockPeriod,
+  now: Date = new Date(),
 ): PeriodForecast | null {
   if (aggregated.length < 2) return null;
 
@@ -403,12 +404,12 @@ export function buildPeriodForecast(
     growthRates.length > 0 ? growthRates.reduce((a, b) => a + b, 0) / growthRates.length : 0;
 
   // Remaining period labels from the last known aggregated period's date perspective
-  const remainingLabels = getRemainingPeriodLabels(period, new Date());
+  const remainingLabels = getRemainingPeriodLabels(period, now);
   const periodsRemaining = remainingLabels.length;
 
   // Project forward from the end of the lookback window
   const baseIndex = recent.length;
-  const forecastYear = new Date().getFullYear();
+  const forecastYear = now.getFullYear();
   const forecastPoints: ForecastPoint[] = remainingLabels.map((label, i) => {
     let relativeLabel: string;
     if (period === 'weekly') {

@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { Circle, G, Line, Path, Svg, Text as SvgText } from 'react-native-svg';
+import { Circle, G, Line, Path, Rect, Svg, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../../theme/theme.js';
 
 /** Fixed drawing space; the SVG scales to the card width through its viewBox. */
@@ -33,6 +33,8 @@ export interface LineChartProps {
   series: readonly LineSeries[];
   /** One label per x slot, `''` to skip; only these are drawn. */
   xLabels: readonly string[];
+  /** Draw the zero line, for series that cross it (percent change). */
+  zeroLine?: boolean;
   testID?: string;
 }
 
@@ -47,7 +49,7 @@ const range = (series: readonly LineSeries[], zero: boolean): [number, number] =
 };
 
 /** Multi-series line/area chart on a shared index axis. Pure SVG, no interaction. */
-export function LineChart({ label, series, xLabels, testID }: LineChartProps) {
+export function LineChart({ label, series, xLabels, zeroLine, testID }: LineChartProps) {
   const { colors } = useTheme();
   const n = Math.max(xLabels.length, ...series.map((s) => s.values.length), 1);
   const [lo, hi] = range(
@@ -121,6 +123,16 @@ export function LineChart({ label, series, xLabels, testID }: LineChartProps) {
             </G>
           );
         })}
+        {zeroLine && lo < 0 && hi > 0 ? (
+          <Line
+            x1={PAD.left}
+            y1={y(0)}
+            x2={W - PAD.right}
+            y2={y(0)}
+            stroke={colors.secondaryLabel}
+            strokeWidth={0.8}
+          />
+        ) : null}
         {xLabels.map((l, i) =>
           l ? (
             <SvgText
@@ -164,4 +176,93 @@ export function LineChart({ label, series, xLabels, testID }: LineChartProps) {
 /** A coloured key: line sample + text, optionally tappable by the caller. */
 export function Swatch({ color }: { color: string }) {
   return <View style={{ width: 14, height: 3, borderRadius: 2, backgroundColor: color }} />;
+}
+
+export interface BarGroup {
+  label: string;
+  /** One non-negative value per bar in the group. */
+  values: readonly number[];
+}
+
+/** Grouped vertical bars from zero; one colour per bar position. */
+export function GroupedBars({
+  label,
+  groups,
+  colors: barColors,
+  testID,
+}: {
+  label: string;
+  groups: readonly BarGroup[];
+  colors: readonly string[];
+  testID?: string;
+}) {
+  const { colors } = useTheme();
+  const hi = Math.max(1, ...groups.flatMap((g) => g.values));
+  const slot = CW / Math.max(groups.length, 1);
+  const bars = Math.max(barColors.length, 1);
+  const barW = Math.max((slot * 0.8) / bars, 1);
+  const every = Math.max(Math.ceil(groups.length / 8), 1);
+  return (
+    <View testID={testID} accessible accessibilityRole="image" accessibilityLabel={label}>
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
+        {[0, 0.5, 1].map((t) => {
+          const gy = PAD.top + t * CH;
+          return (
+            <G key={t}>
+              <Line
+                x1={PAD.left}
+                y1={gy}
+                x2={W - PAD.right}
+                y2={gy}
+                stroke={colors.separator}
+                strokeWidth={0.6}
+                strokeDasharray="3 3"
+              />
+              <SvgText
+                x={PAD.left - 4}
+                y={gy + 3}
+                fontSize={9}
+                textAnchor="end"
+                fill={colors.secondaryLabel}
+              >
+                {axisNumber(hi * (1 - t))}
+              </SvgText>
+            </G>
+          );
+        })}
+        {groups.map((g, gi) => {
+          const x0 = PAD.left + gi * slot + (slot - barW * bars) / 2;
+          return (
+            <G key={g.label}>
+              {g.values.map((v, bi) => {
+                const h = (Math.max(v, 0) / hi) * CH;
+                return (
+                  <Rect
+                    // biome-ignore lint/suspicious/noArrayIndexKey: bar position is the identity
+                    key={bi}
+                    x={x0 + bi * barW}
+                    y={PAD.top + CH - h}
+                    width={barW}
+                    height={h}
+                    fill={barColors[bi]}
+                  />
+                );
+              })}
+              {gi % every === 0 || gi === groups.length - 1 ? (
+                <SvgText
+                  x={x0 + (barW * bars) / 2}
+                  y={H - 6}
+                  fontSize={9}
+                  textAnchor="middle"
+                  fill={colors.secondaryLabel}
+                >
+                  {g.label}
+                </SvgText>
+              ) : null}
+            </G>
+          );
+        })}
+      </Svg>
+    </View>
+  );
 }

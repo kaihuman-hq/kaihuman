@@ -222,7 +222,7 @@ describe('tiles', () => {
     expect(screen.getByText('Income')).toBeTruthy();
     cleanup();
     renderTile('stocks');
-    expect(screen.getByText('Profit')).toBeTruthy();
+    expect(screen.getAllByText('Profit').length).toBeGreaterThan(0);
     cleanup();
     renderTile('consumption');
     expect(screen.getAllByText(/^Reading \d+ on /).length).toBeGreaterThan(0);
