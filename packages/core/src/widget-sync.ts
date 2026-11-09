@@ -1,11 +1,15 @@
 import {
   addTodoEntry,
+  compareDue,
+  completeTodo,
+  formatRepeat,
   getUpcomingMilestone,
   IDEAS_FOLDER,
   type IdeaActivityLevel,
   ideaActivity,
   ideaSlugOf,
   type Milestone,
+  nextDue,
   OPEN_IDEA_STATUSES,
   parseHabitData,
   parseIdea,
@@ -35,8 +39,20 @@ export interface WidgetTodoItem {
   dueDate?: string;
   /** HH:MM, local; only with dueDate. */
   dueTime?: string;
+  /** Recurrence rule in file syntax (`weekly:mon,thu`); additive in v2. */
+  repeat?: string;
+  /** For a recurring item: the occurrence after `dueDate` (YYYY-MM-DD, local). */
+  repeatNextDate?: string;
   /** Never set here: the native widget marks toggles it could not commit yet. */
   pending?: boolean;
+}
+
+export interface WidgetNextDue {
+  itemId: string;
+  text: string;
+  dueDate: string;
+  dueTime?: string;
+  repeat?: string;
 }
 
 export interface WidgetMilestoneSummary {
@@ -99,6 +115,8 @@ export interface WidgetTodoSnapshot {
   branch: string;
   appFolder: '.kh' | '.lifeos';
   upcomingMilestone?: { id: string; name: string; dueDate?: string };
+  /** The open item due soonest (overdue first); absent when no open item has a due date. */
+  nextDue?: WidgetNextDue;
   counts: {
     inbox: number;
     inProgress: number;
@@ -235,6 +253,7 @@ export const buildWidgetTodoSnapshot = (
       else if (filePath === inboxPath) counts.inbox++;
       else counts.backlog++;
       const milestone = data.milestones.find((m) => m.id === item.milestoneId);
+      const following = item.dueDate ? nextDue(item, now.getTime()) : undefined;
       all.push({
         id: widgetItemId(filePath, indexInFile),
         filePath,
@@ -249,9 +268,22 @@ export const buildWidgetTodoSnapshot = (
         ...(item.priority && { priority: item.priority }),
         ...(item.dueDate && { dueDate: item.dueDate }),
         ...(item.dueTime && { dueTime: item.dueTime }),
+        ...(item.repeat && { repeat: formatRepeat(item.repeat) }),
+        ...(following && { repeatNextDate: following.date }),
       });
     });
   }
+
+  const soonest = all.filter((i) => i.dueDate).sort(compareDue)[0];
+  const nextDueItem: WidgetNextDue | undefined = soonest?.dueDate
+    ? {
+        itemId: soonest.id,
+        text: soonest.text,
+        dueDate: soonest.dueDate,
+        ...(soonest.dueTime && { dueTime: soonest.dueTime }),
+        ...(soonest.repeat && { repeat: soonest.repeat }),
+      }
+    : undefined;
 
   const upcoming = getUpcomingMilestone(milestones);
   // Stable sort keeps file order within a rank.
@@ -283,6 +315,7 @@ export const buildWidgetTodoSnapshot = (
     ...(upcoming && {
       upcomingMilestone: { id: upcoming.id, name: upcoming.name, dueDate: upcoming.dueDate },
     }),
+    ...(nextDueItem && { nextDue: nextDueItem }),
     counts,
     stats: {
       doneByDay,
@@ -354,9 +387,15 @@ export const applyWidgetTodoMove = (
   const current = data.items[target.indexInFile];
   if (!current || current.text !== target.text) return null;
 
-  const items = [...data.items];
-  items[target.indexInFile] = { ...current, status, updatedAt: now.getTime() };
-  const updatedContent = serializeTodos({ ...data, items });
+  // A recurring todo is never finished: completing it moves its due date to the next occurrence.
+  let updated: TodoData;
+  if (status === 'done') updated = completeTodo(data, current.id, now.getTime());
+  else {
+    const items = [...data.items];
+    items[target.indexInFile] = { ...current, status, updatedAt: now.getTime() };
+    updated = { ...data, items };
+  }
+  const updatedContent = serializeTodos(updated);
   return {
     snapshot: rebuild(snapshot, target.filePath, file.sha, updatedContent, now),
     updatedFilePath: target.filePath,

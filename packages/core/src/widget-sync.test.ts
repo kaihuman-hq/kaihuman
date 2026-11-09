@@ -241,6 +241,57 @@ describe('schema v2', () => {
     expect(b && 'dueDate' in b).toBe(false);
   });
 
+  it('exposes recurrence, the following occurrence and the soonest due item', () => {
+    const s = buildWidgetTodoSnapshot(
+      {
+        '.kh/a.todos.md': file(
+          '- [ ] later\n::due:: 2026-06-20\n- [ ] gym\n::due:: 2026-06-12T07:00 ::repeat:: weekly:fri\n- [x] old\n::due:: 2026-01-01\n',
+        ),
+      },
+      'o/r',
+      'main',
+      NOW,
+      opts,
+    );
+    expect(s.items.find((i) => i.text === 'gym')).toMatchObject({
+      repeat: 'weekly:fri',
+      repeatNextDate: '2026-06-19',
+    });
+    expect(s.items.find((i) => i.text === 'later')?.repeat).toBeUndefined();
+    expect(s.nextDue).toMatchObject({
+      text: 'gym',
+      dueDate: '2026-06-12',
+      dueTime: '07:00',
+      repeat: 'weekly:fri',
+    });
+  });
+
+  it('omits nextDue when no open item has a due date', () => {
+    const s = buildWidgetTodoSnapshot(
+      { '.kh/a.todos.md': file('- [ ] a\n') },
+      'o/r',
+      'main',
+      NOW,
+      opts,
+    );
+    expect(s.nextDue).toBeUndefined();
+  });
+
+  it('toggling a recurring item advances its due date instead of finishing it', () => {
+    const s = buildWidgetTodoSnapshot(
+      { '.kh/a.todos.md': file('- [ ] gym\n::due:: 2026-06-10 ::repeat:: daily\n') },
+      'o/r',
+      'main',
+      NOW,
+      opts,
+    );
+    const res = applyWidgetTodoToggle(s, s.items[0]?.id ?? '', NOW);
+    expect(res?.updatedContent).toContain(
+      '::due:: 2026-06-11 ::repeat:: daily ::done:: 2026-06-10',
+    );
+    expect(res?.snapshot.items[0]).toMatchObject({ status: 'backlog', dueDate: '2026-06-11' });
+  });
+
   it('toggle preserves options', () => {
     const id = snap.items[0]?.id ?? '';
     const res = applyWidgetTodoToggle(snap, id, NOW);
