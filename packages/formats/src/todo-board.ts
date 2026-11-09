@@ -98,3 +98,18 @@ export const sortStreams = <F extends StreamFile>(
 const ALL_STATUSES: TodoStatus[] = ['backlog', 'in-progress', 'done', 'rejected'];
 export const actionsFor = (status: TodoStatus): TodoStatus[] =>
   ALL_STATUSES.filter((s) => s !== status);
+
+export const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+
+/** Touched within two weeks; an item with no usable timestamp always counts as recent. */
+export const isRecent = (item: TodoItem, now = Date.now()): boolean => {
+  const ts = item.updatedAt ?? (item.createdAt ? new Date(item.createdAt).getTime() : null);
+  return !ts || ts >= now - TWO_WEEKS_MS;
+};
+
+/** The console's per-column "2W" filter; `recentOnly` false keeps everything. */
+export const filterRecent = <T extends { item: TodoItem }>(
+  items: T[],
+  recentOnly: boolean,
+  now = Date.now(),
+): T[] => (recentOnly ? items.filter((a) => isRecent(a.item, now)) : items);

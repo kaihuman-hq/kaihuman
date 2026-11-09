@@ -4,6 +4,7 @@ import {
   type Milestone,
   type StreamMode,
   type StreamSort,
+  type TodoStatus,
 } from '@kaihuman/formats';
 import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
@@ -22,6 +23,8 @@ export interface BoardOptions {
   files: readonly string[];
   streamMode: StreamMode;
   streamSort: StreamSort;
+  /** Per-column "last two weeks" limit; finished columns start limited, like the console. */
+  recent: Record<TodoStatus, boolean>;
 }
 
 export const DEFAULT_OPTIONS: BoardOptions = {
@@ -31,6 +34,7 @@ export const DEFAULT_OPTIONS: BoardOptions = {
   files: [],
   streamMode: 'active',
   streamSort: 'count',
+  recent: { backlog: false, 'in-progress': false, done: true, rejected: true },
 };
 
 /** How many non-default choices are active, for the badge on the filter button. */
@@ -50,6 +54,7 @@ export const toBoardFilter = (o: BoardOptions, search: string, tag?: string): Bo
   sort: o.sort,
   upcoming: o.upcoming,
   files: o.files,
+  recent: o.recent,
   ...(tag && { tag }),
   ...(o.milestoneId && { milestoneId: o.milestoneId }),
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   actionsFor,
+  filterRecent,
   matchesBoardSearch,
   matchesDueFilter,
   sortByDue,
@@ -96,5 +97,19 @@ describe('streams', () => {
   });
   it('actionsFor lists the other statuses', () => {
     expect(actionsFor('done')).toEqual(['backlog', 'in-progress', 'rejected']);
+  });
+});
+
+describe('filterRecent', () => {
+  const now = new Date('2026-11-08T12:00:00Z').getTime();
+  const rows = [
+    { item: todo({ id: 'fresh', updatedAt: now - 1000 }) },
+    { item: todo({ id: 'stale', updatedAt: now - 30 * 86_400_000 }) },
+    { item: todo({ id: 'old-created', createdAt: '2026-01-01T00:00:00Z' }) },
+    { item: todo({ id: 'none' }) },
+  ];
+  it('drops items older than two weeks but keeps ones without a timestamp', () => {
+    expect(filterRecent(rows, true, now).map((r) => r.item.id)).toEqual(['fresh', 'none']);
+    expect(filterRecent(rows, false, now)).toHaveLength(4);
   });
 });

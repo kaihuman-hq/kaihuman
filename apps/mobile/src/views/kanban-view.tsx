@@ -1,4 +1,4 @@
-import type { TodoDue, TodoItem, TodoRepeat, TodoStatus } from '@kaihuman/formats';
+import type { TodoColor, TodoDue, TodoItem, TodoRepeat, TodoStatus } from '@kaihuman/formats';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import {
@@ -141,7 +141,11 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
   const [tag, setTag] = useState<string | undefined>();
   const [view, setView] = useState<BoardView>('board');
   const [search, setSearch] = useState('');
-  const [options, setOptions] = useState<BoardOptions>(DEFAULT_OPTIONS);
+  // Seeds the controller too, so the default "2W" limit on finished columns applies from the start.
+  const [options, setOptions] = useState<BoardOptions>(() => {
+    controller.setFilter(toBoardFilter(DEFAULT_OPTIONS, ''));
+    return DEFAULT_OPTIONS;
+  });
   const [filterOpen, setFilterOpen] = useState(false);
   const [dueFor, setDueFor] = useState<BoardItem | null>(null);
 
@@ -192,6 +196,20 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
     const res = await controller.cyclePriority(path, index);
     setError(res.ok ? null : res.error);
     if (!res.ok) haptics.error();
+    setVersion((v) => v + 1);
+  };
+  const streamColor = async (path: string, color?: TodoColor) => {
+    const res = await controller.setColor(path, color);
+    setError(res.ok ? null : res.error);
+    if (res.ok) haptics.success();
+    else haptics.error();
+    setVersion((v) => v + 1);
+  };
+  const streamMove = async (path: string, from: number, to: number) => {
+    const res = await controller.moveItem(path, from, to);
+    setError(res.ok ? null : res.error);
+    if (res.ok) haptics.success();
+    else haptics.error();
     setVersion((v) => v + 1);
   };
   const streamAdd = async (path: string, text: string) => {
@@ -277,6 +295,8 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
         onStatus={(p, i, s) => void streamStatus(p, i, s)}
         onCyclePriority={(p, i) => void streamPriority(p, i)}
         onAdd={(p, t) => void streamAdd(p, t)}
+        onColor={(p, c) => void streamColor(p, c)}
+        onMove={(p, f, t) => void streamMove(p, f, t)}
         onOpenTodo={onOpenTodo}
       />
     );
@@ -434,6 +454,21 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
             options={statusOptions}
             value={status}
             onChange={setStatus}
+          />
+        ) : null}
+        {view === 'board' ? (
+          <Chip
+            label="Last 2 weeks"
+            icon="clock"
+            selected={options.recent[status]}
+            onPress={() =>
+              applyFilter({
+                options: {
+                  ...options,
+                  recent: { ...options.recent, [status]: !options.recent[status] },
+                },
+              })
+            }
           />
         ) : null}
         {view === 'board' && tags.length > 0 ? (

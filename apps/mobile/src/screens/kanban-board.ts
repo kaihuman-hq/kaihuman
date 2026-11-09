@@ -4,10 +4,12 @@ import {
   type BoardSort,
   cyclePriority,
   type DueFilter,
+  filterRecent,
   getUpcomingMilestone,
   type Milestone,
   matchesBoardSearch,
   matchesDueFilter,
+  moveTodo,
   parseTodos,
   removeMilestone,
   type StreamMode,
@@ -15,11 +17,13 @@ import {
   serializeTodos,
   setMilestone,
   setStatus,
+  setTodoColor,
   setTodoPriority,
   sortByDue,
   sortByNewest,
   sortStreams,
   streamItems,
+  type TodoColor,
   type TodoData,
   type TodoDue,
   type TodoItem,
@@ -59,6 +63,8 @@ export interface BoardFilter {
   upcoming?: boolean;
   /** Card order inside a column; defaults to newest first. */
   sort?: BoardSort;
+  /** Columns limited to todos touched in the last two weeks (the console's "2W"). */
+  recent?: Partial<Record<TodoStatus, boolean>>;
 }
 
 /** One stream: a todo file with the rows its mode and the search keep. */
@@ -162,7 +168,16 @@ export class KanbanBoardController {
 
   columns(now = Date.now()): BoardColumns {
     const columns: BoardColumns = { backlog: [], 'in-progress': [], done: [], rejected: [] };
-    const { search, tag, milestoneId, files, due = 'all', upcoming, sort = 'newest' } = this.filter;
+    const {
+      search,
+      tag,
+      milestoneId,
+      files,
+      due = 'all',
+      upcoming,
+      sort = 'newest',
+      recent = {},
+    } = this.filter;
     const wantedTag = tag?.toLowerCase();
     const upcomingId = upcoming ? this.upcomingMilestone?.id : undefined;
     for (const { path, data } of this.loaded) {
@@ -180,8 +195,10 @@ export class KanbanBoardController {
         columns[item.status].push({ item, itemIndex, filePath: path });
       });
     }
-    for (const status of TODO_STATUSES)
-      columns[status] = sort === 'due' ? sortByDue(columns[status]) : sortByNewest(columns[status]);
+    for (const status of TODO_STATUSES) {
+      const aged = filterRecent(columns[status], recent[status] ?? false, now);
+      columns[status] = sort === 'due' ? sortByDue(aged) : sortByNewest(aged);
+    }
     return columns;
   }
 
@@ -193,6 +210,19 @@ export class KanbanBoardController {
       data,
       rows: streamItems(data, mode, query),
     }));
+  }
+
+  /** Sets (or with `undefined`, clears) the file colour, persisted in the file's front matter. */
+  setColor(path: string, color?: TodoColor): Promise<BoardResult> {
+    return this.edit(path, (d) => setTodoColor(d, color));
+  }
+
+  /** Moves a todo within its file (`to` is a position in the file, as in the console). */
+  moveItem(path: string, from: number, to: number): Promise<BoardResult> {
+    return this.edit(path, (d) => {
+      if (!d.items[from] || !d.items[to]) throw new Error('Todo not found');
+      return moveTodo(d, from, to);
+    });
   }
 
   /** Cycles none, high, super-high, ultra-high, none like the console's priority badge. */

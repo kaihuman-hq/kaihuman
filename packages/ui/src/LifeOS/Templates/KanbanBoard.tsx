@@ -3,6 +3,7 @@ import {
   addMilestone,
   addTodoEntry,
   cyclePriority,
+  filterRecent,
   getUpcomingMilestone,
   type Milestone,
   matchesBoardSearch,
@@ -90,8 +91,6 @@ const NEXT_STATUS: Record<TodoStatus, TodoStatus> = {
   rejected: 'backlog',
 };
 
-const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
-
 const BADGE_COLORS = [
   '#60a5fa', // blue
   '#4ade80', // green
@@ -108,13 +107,7 @@ const BADGE_COLORS = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function filterByAge(items: AggregatedItem[], recentOnly: boolean): AggregatedItem[] {
-  if (!recentOnly) return items;
-  const cutoff = Date.now() - TWO_WEEKS_MS;
-  return items.filter((a) => {
-    const ts = a.item.updatedAt ?? (a.item.createdAt ? new Date(a.item.createdAt).getTime() : null);
-    if (!ts) return true;
-    return ts >= cutoff;
-  });
+  return filterRecent(items, recentOnly);
 }
 
 // ─── Age buckets ──────────────────────────────────────────────────────────────

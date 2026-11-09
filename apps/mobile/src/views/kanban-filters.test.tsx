@@ -1,6 +1,6 @@
 import { parseTodos } from '@kaihuman/formats';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { KanbanBoardController } from '../screens/kanban-board.js';
 import type { RepoFiles } from '../screens/quick-capture.js';
 import { KanbanView } from './kanban-view.js';
@@ -159,5 +159,86 @@ describe('KanbanView search, filters and streams', () => {
     fireEvent.click(screen.getByTestId('filter-done'));
     await waitFor(() => expect(screen.getByText('old thing')).toBeTruthy());
     expect(screen.queryByText('write docs')).toBeNull();
+  });
+});
+
+describe('KanbanBoardController colour, reorder and recent filter', () => {
+  it('persists a stream colour in the file and clears it', async () => {
+    const { c, f } = await loaded();
+    expect((await c.setColor('.kh/side.todos.md', 'sky')).ok).toBe(true);
+    expect(parseTodos(f.store.get('.kh/side.todos.md') ?? '').color).toBe('sky');
+    await c.setColor('.kh/side.todos.md', undefined);
+    expect(parseTodos(f.store.get('.kh/side.todos.md') ?? '').color).toBeUndefined();
+  });
+
+  it('moves an item within its file and rejects a bad position', async () => {
+    const { c, f } = await loaded();
+    expect((await c.moveItem('.kh/side.todos.md', 1, 0)).ok).toBe(true);
+    expect(parseTodos(f.store.get('.kh/side.todos.md') ?? '').items.map((i) => i.text)).toEqual([
+      'side two',
+      'side quest',
+    ]);
+    expect((await c.moveItem('.kh/side.todos.md', 0, 9)).ok).toBe(false);
+  });
+
+  it('limits a column to the last two weeks', async () => {
+    const f = files();
+    const old = Date.now() - 30 * 86_400_000;
+    f.store.set(
+      '.kh/inbox.todos.md',
+      `- [x] stale\n::updated:: ${old}\n- [x] fresh\n::updated:: ${Date.now()}\n`,
+    );
+    const { c } = await loaded(f);
+    expect(c.columns().done).toHaveLength(2);
+    c.setFilter({ recent: { done: true } });
+    expect(c.columns().done.map((b) => b.item.text)).toEqual(['fresh']);
+  });
+});
+
+describe('KanbanView colour, reorder and recent chip', () => {
+  it('picks a stream colour from the swatches', async () => {
+    const f = files();
+    render(<KanbanView controller={new KanbanBoardController(f)} />);
+    await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
+    fireEvent.click(screen.getByText('Streams'));
+    await waitFor(() => expect(screen.getByTestId('stream-color-side')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('stream-color-side'));
+    fireEvent.click(screen.getByTestId('color-teal'));
+    await waitFor(() =>
+      expect(parseTodos(f.store.get('.kh/side.todos.md') ?? '').color).toBe('teal'),
+    );
+  });
+
+  it('reorders from the long-press menu', async () => {
+    const f = files();
+    render(<KanbanView controller={new KanbanBoardController(f)} />);
+    await waitFor(() => expect(screen.getByText('write docs')).toBeTruthy());
+    fireEvent.click(screen.getByText('Streams'));
+    await waitFor(() => expect(screen.getByTestId('stream-card-side-1')).toBeTruthy());
+    vi.useFakeTimers();
+    fireEvent.mouseDown(screen.getByTestId('stream-card-side-1'), {
+      button: 0,
+      buttons: 1,
+      clientX: 5,
+      clientY: 5,
+    });
+    vi.advanceTimersByTime(1000);
+    vi.useRealTimers();
+    fireEvent.click(await screen.findByTestId('move-top'));
+    await waitFor(() =>
+      expect(parseTodos(f.store.get('.kh/side.todos.md') ?? '').items[0]?.text).toBe('side two'),
+    );
+  });
+
+  it('toggles the 2W chip for the current column', async () => {
+    const f = files();
+    const old = Date.now() - 30 * 86_400_000;
+    f.store.set('.kh/inbox.todos.md', `- [x] stale\n::updated:: ${old}\n- [ ] open\n`);
+    render(<KanbanView controller={new KanbanBoardController(f)} />);
+    await waitFor(() => expect(screen.getByText('open')).toBeTruthy());
+    fireEvent.click(screen.getByText('Done 0'));
+    expect(screen.queryByText('stale')).toBeNull();
+    fireEvent.click(screen.getByText('Last 2 weeks'));
+    await waitFor(() => expect(screen.getByText('stale')).toBeTruthy());
   });
 });
