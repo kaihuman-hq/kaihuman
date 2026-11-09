@@ -9,8 +9,9 @@ import { useTheme } from '../theme/theme.js';
 import type { IconName } from '../ui/index.js';
 import { Badge, Card, ErrorBoundary, Text } from '../ui/index.js';
 import { ActionLog } from './tiles/actionlog-body.js';
-import { Budget, Collection, type Ctx, Events, Todos } from './tiles/bodies.js';
+import { Collection, type Ctx, Events, Todos } from './tiles/bodies.js';
 import { Bookmarks } from './tiles/bookmarks-body.js';
+import { Budget } from './tiles/budget-body.js';
 import { BoardOverview, PaletteSettings, Rss, Travel } from './tiles/more-bodies.js';
 import { Err, TileIcon } from './tiles/parts.js';
 import { ReadLater } from './tiles/read-later-body.js';
@@ -132,7 +133,7 @@ function TileBody({ tile, ctx }: { tile: TileData; ctx: Ctx }) {
     case 'bookmarks':
       return <Bookmarks initial={tile.view} ctx={ctx} />;
     case 'budget':
-      return <Budget view={tile.view} />;
+      return <Budget ctx={ctx} />;
     case 'stocks':
       return <Stocks view={tile.view} ctx={ctx} />;
     case 'consumption':

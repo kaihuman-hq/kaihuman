@@ -3,7 +3,6 @@ import { View } from 'react-native';
 import {
   addEvent,
   addTodoTask,
-  type BudgetView,
   type DataCollectionView,
   type EventRow,
   eventDateParts,
@@ -15,17 +14,7 @@ import {
 import { dueBadge } from '../../screens/todo-due.js';
 import { useTheme } from '../../theme/theme.js';
 import { Badge, Button, haptics, Icon, Text, TextField } from '../../ui/index.js';
-import {
-  CheckCircle,
-  EmptyLine,
-  ItemRow,
-  Meter,
-  QuickAdd,
-  Rows,
-  Stat,
-  StatRow,
-  useDisclosure,
-} from './parts.js';
+import { CheckCircle, EmptyLine, ItemRow, QuickAdd, Rows, useDisclosure } from './parts.js';
 
 export interface Ctx {
   content: string;
@@ -36,7 +25,6 @@ export interface Ctx {
 }
 
 const num = (n: number, digits = 2) => n.toFixed(digits);
-const signed = (n: number, digits = 2) => `${n > 0 ? '+' : ''}${n.toFixed(digits)}`;
 
 export function Todos({ view, ctx }: { view: TodosView; ctx: Ctx }) {
   const { colors, spacing } = useTheme();
@@ -194,50 +182,6 @@ export function Events({ rows, ctx }: { rows: EventRow[]; ctx: Ctx }) {
       ) : (
         <Button label="Add event" icon="add" size="medium" variant="tinted" onPress={form.show} />
       )}
-    </>
-  );
-}
-
-export function Budget({ view }: { view: BudgetView }) {
-  const top = view.categories.slice(0, 5);
-  const max = Math.max(1, ...top.map((c) => c.value));
-  return (
-    <>
-      <StatRow>
-        <Stat label="Income" value={num(view.income)} />
-        <Stat label="Spending" value={num(view.spending)} />
-        <Stat label="Net" value={signed(view.net)} tone={view.net < 0 ? 'danger' : 'success'} />
-      </StatRow>
-      {top.length > 0 ? (
-        <View style={{ gap: 12, paddingTop: 4 }}>
-          <Text
-            variant="footnote"
-            tone="secondary"
-            weight="600"
-            style={{ textTransform: 'uppercase' }}
-          >
-            Top spending
-          </Text>
-          {top.map((c) => (
-            <View key={c.id} style={{ gap: 4 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text variant="subheadline">{c.id}</Text>
-                </View>
-                <Text
-                  variant="subheadline"
-                  mono
-                  tone="secondary"
-                  style={{ fontVariant: ['tabular-nums'] }}
-                >
-                  {num(c.value)}
-                </Text>
-              </View>
-              <Meter value={c.value / max} label={`${c.id} spending`} />
-            </View>
-          ))}
-        </View>
-      ) : null}
     </>
   );
 }
