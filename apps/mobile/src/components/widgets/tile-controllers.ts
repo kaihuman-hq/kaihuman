@@ -51,8 +51,8 @@ import {
   type TravelView,
   travelView,
 } from './more-tiles.js';
-import { type TodosView, todosView } from './todos-tile.js';
 import { type StocksView, stocksView } from './stocks-tile.js';
+import { type TodosView, todosView } from './todos-tile.js';
 
 export * from './actionlog-tile.js';
 export * from './bookmarks-tile.js';
