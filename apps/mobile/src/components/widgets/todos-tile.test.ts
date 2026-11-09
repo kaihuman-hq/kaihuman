@@ -8,6 +8,8 @@ import {
   filterByTag,
   migrateTodos,
   normalizeTag,
+  promptFilePath,
+  promptFileStem,
   promptText,
   setTodoDueAt,
   setTodoMilestoneAt,
@@ -144,5 +146,20 @@ describe('prompts and migration', () => {
     const legacy = '- [ ] old task #a\n';
     expect(todosView(migrateTodos(legacy), now).legacy).toBe(false);
     expect(todosView(content, now).legacy).toBe(false);
+  });
+});
+
+describe('prompt files', () => {
+  it('derives a stem and a path beside the todos file', () => {
+    expect(promptFileStem('Plan the Launch!')).toBe('plan-the-launch');
+    expect(promptFileStem('!!!')).toBe('prompt');
+    expect(promptFilePath('.kh/a.todos.md', 'notes')).toBe('.kh/notes.md');
+    expect(promptFilePath('a.todos.md', 'notes.md')).toBe('notes.md');
+    expect(promptFilePath('a.todos.md', '  ')).toBeUndefined();
+  });
+
+  it('references the prompt file from the new task', () => {
+    const out = text(addTodoTask('', 'Write', now, [], { promptFile: '.kh/write.md' }));
+    expect(parseTodos(out).items[0]?.prompt?.refFile).toBe('.kh/write.md');
   });
 });

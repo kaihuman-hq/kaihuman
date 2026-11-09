@@ -29,6 +29,10 @@ export interface TileProps {
   now: Date;
   /** Persists the file's new text. */
   onWrite: (path: string, content: string) => void | Promise<void>;
+  /** Creates another file, for tiles that spawn one (todo prompt files). */
+  onCreateFile?: (path: string, content: string) => Promise<void>;
+  /** Opens a repository file in the editor. */
+  onOpenFile?: (path: string) => void;
 }
 
 /** Friendly heading and glyph per tile kind; the file name stays as a mono caption. */
@@ -73,7 +77,7 @@ export function Tile(props: TileProps) {
   );
 }
 
-function TileCard({ path, tile, content, now, onWrite }: TileProps) {
+function TileCard({ path, tile, content, now, onWrite, onCreateFile, onOpenFile }: TileProps) {
   const [error, setError] = useState<string | null>(null);
   const { spacing } = useTheme();
   const meta = TILE_META[tile.kind];
@@ -92,7 +96,15 @@ function TileCard({ path, tile, content, now, onWrite }: TileProps) {
     setError(result.error);
     return false;
   };
-  const ctx: Ctx = { content, now, apply, error };
+  const ctx: Ctx = {
+    content,
+    now,
+    apply,
+    error,
+    path,
+    ...(onCreateFile && { createFile: onCreateFile }),
+    ...(onOpenFile && { openFile: onOpenFile }),
+  };
   return (
     <Card>
       <View testID={`tile-${tile.kind}`} style={{ gap: spacing.md }}>

@@ -73,6 +73,7 @@ interface PageProps {
   error?: string | null;
   onRefresh?: () => void;
   onWrite: (path: string, content: string) => void | Promise<void>;
+  onCreateFile?: (path: string, content: string) => Promise<void>;
   onNavigate: (href: string) => void;
 }
 
@@ -87,6 +88,7 @@ function Page({
   error,
   onRefresh,
   onWrite,
+  onCreateFile,
   onNavigate,
 }: PageProps) {
   const { colors, spacing, metrics } = useTheme();
@@ -120,6 +122,8 @@ function Page({
           content={item.content}
           now={now}
           onWrite={onWrite}
+          {...(onCreateFile && { onCreateFile })}
+          onOpenFile={(file) => onNavigate(`/files/${file}`)}
         />
       ) : (
         <SummaryTile path={item.path} tile={item.tile} now={now} onSeeAll={() => open(item.path)} />
@@ -318,6 +322,7 @@ export interface DashboardPagerProps {
   /** Pull-to-refresh hook point for every page. */
   onRefresh?: () => void;
   onWrite: (path: string, content: string) => void | Promise<void>;
+  onCreateFile?: (path: string, content: string) => Promise<void>;
   onNavigate: (href: string) => void;
 }
 
@@ -331,6 +336,7 @@ export function DashboardPager({
   error,
   onRefresh,
   onWrite,
+  onCreateFile,
   onNavigate,
 }: DashboardPagerProps) {
   const { colors, spacing, metrics } = useTheme();
@@ -423,6 +429,7 @@ export function DashboardPager({
             error={error}
             onRefresh={onRefresh}
             onWrite={onWrite}
+            {...(onCreateFile && { onCreateFile })}
             onNavigate={onNavigate}
           />
         )}

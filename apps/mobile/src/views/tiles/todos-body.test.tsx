@@ -1,5 +1,5 @@
 import { parseTodos } from '@kaihuman/formats';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Alert, type AlertButton, Share } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -121,5 +121,53 @@ describe('Todos tile', () => {
     expect(share).toHaveBeenCalledWith({ message: 'Summarise' });
     fireEvent.click(screen.getByRole('button', { name: 'Save prompt' }));
     expect(parseTodos(written()).items[0]?.prompt?.lines).toEqual(['Summarise']);
+  });
+});
+
+describe('Todos tile: prompt file', () => {
+  const mountWithFiles = (content: string, openFile?: (p: string) => void) => {
+    const apply = vi.fn((_: unknown) => true);
+    const createFile = vi.fn(async (_p: string, _c: string) => {});
+    const ctx: Ctx = {
+      content,
+      now: NOW,
+      apply,
+      error: null,
+      path: '.kh/inbox.todos.md',
+      createFile,
+      ...(openFile && { openFile }),
+    };
+    render(<Todos view={todosView(content, NOW)} ctx={ctx} />);
+    return { apply, createFile };
+  };
+
+  it('creates the prompt file beside the todos file, defaulting its name to the task', async () => {
+    const open = vi.fn();
+    const { apply, createFile } = mountWithFiles(seed, open);
+    fireEvent.click(screen.getByTestId('todo-details-toggle'));
+    fireEvent.change(screen.getByLabelText('New task'), { target: { value: 'Plan the Launch!' } });
+    fireEvent.click(screen.getByRole('switch', { name: 'Create prompt file' }));
+    expect((screen.getByLabelText('Prompt file name') as HTMLInputElement).value).toBe(
+      'plan-the-launch',
+    );
+    fireEvent.click(screen.getByRole('switch', { name: 'Open it afterwards' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add task' }));
+    const added = parseTodos((apply.mock.calls.at(-1)?.[0] as { content: string }).content);
+    expect(added.items.at(-1)?.prompt?.refFile).toBe('.kh/plan-the-launch.md');
+    await waitFor(() => expect(createFile).toHaveBeenCalledWith('.kh/plan-the-launch.md', ''));
+    await waitFor(() => expect(open).toHaveBeenCalledWith('.kh/plan-the-launch.md'));
+  });
+
+  it('creates nothing when the switch is off', () => {
+    const { createFile } = mountWithFiles(seed);
+    fireEvent.change(screen.getByLabelText('New task'), { target: { value: 'Plain' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add task' }));
+    expect(createFile).not.toHaveBeenCalled();
+  });
+
+  it('hides the option where files cannot be created', () => {
+    mount(seed);
+    fireEvent.click(screen.getByTestId('todo-details-toggle'));
+    expect(screen.queryByRole('switch', { name: 'Create prompt file' })).toBeNull();
   });
 });

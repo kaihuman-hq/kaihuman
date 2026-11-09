@@ -17,6 +17,12 @@ export interface Ctx {
   /** Writes a mutator's result and shows its error, if it was rejected. */
   apply: (result: string | TileResult) => boolean;
   error: string | null;
+  /** The tile's own file path; lets a tile place related files beside it. */
+  path?: string;
+  /** Creates another repository file (e.g. a todo's prompt file). */
+  createFile?: (path: string, content: string) => Promise<void>;
+  /** Opens a repository file in the editor. */
+  openFile?: (path: string) => void;
 }
 
 export function Events({ rows, ctx }: { rows: EventRow[]; ctx: Ctx }) {

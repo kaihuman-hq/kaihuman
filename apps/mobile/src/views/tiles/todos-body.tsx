@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   Share,
+  Switch,
   View,
 } from 'react-native';
 import {
@@ -17,6 +18,8 @@ import {
   filterByTag,
   migrateTodos,
   normalizeTag,
+  promptFilePath,
+  promptFileStem,
   promptText,
   setTodoDueAt,
   setTodoMilestoneAt,
@@ -84,6 +87,8 @@ function Sheet({
   );
 }
 
+const dirOf = (path: string): string => path.slice(0, path.lastIndexOf('/') + 1);
+
 const Wrap = ({ children }: { children: ReactNode }) => {
   const { spacing } = useTheme();
   return (
@@ -99,9 +104,19 @@ interface Draft {
   milestoneId?: string;
   due?: TodoDue;
   repeat?: TodoRepeat;
+  /** Create a prompt file beside the todos file and reference it from the task. */
+  promptFile: boolean;
+  promptName: string;
+  openAfter: boolean;
 }
 
-const EMPTY_DRAFT: Draft = { tags: [], newTag: '' };
+const EMPTY_DRAFT: Draft = {
+  tags: [],
+  newTag: '',
+  promptFile: false,
+  promptName: '',
+  openAfter: false,
+};
 
 /** Tags, milestone, due date and repeat for the task being typed, as on the web add form. */
 function AddDetails({
@@ -109,11 +124,16 @@ function AddDetails({
   draft,
   setDraft,
   now,
+  taskText,
+  promptFiles,
 }: {
   view: TodosView;
   draft: Draft;
   setDraft: (next: Draft) => void;
   now: Date;
+  taskText: string;
+  /** Where the prompt file would go; undefined when files cannot be created here. */
+  promptFiles?: { dir: string; canOpen: boolean };
 }) {
   const { spacing } = useTheme();
   const tags = [...new Set([...view.tags, ...draft.tags])].sort();
@@ -210,6 +230,51 @@ function AddDetails({
         onRepeatChange={(repeat) => setDraft({ ...draft, repeat })}
         now={now}
       />
+      {promptFiles ? (
+        <View style={{ gap: spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <Text variant="body" style={{ flex: 1 }}>
+              Create prompt file
+            </Text>
+            <Switch
+              testID="prompt-file-toggle"
+              accessibilityLabel="Create prompt file"
+              value={draft.promptFile}
+              onValueChange={(on) =>
+                setDraft({
+                  ...draft,
+                  promptFile: on,
+                  promptName: draft.promptName || (on ? promptFileStem(taskText) : ''),
+                })
+              }
+            />
+          </View>
+          {draft.promptFile ? (
+            <>
+              <TextField
+                label="Prompt file name"
+                placeholder="prompt.md"
+                value={draft.promptName}
+                onChangeText={(promptName) => setDraft({ ...draft, promptName })}
+                helper={`Full path: ${promptFilePath(`${promptFiles.dir}x`, draft.promptName || 'prompt')}`}
+              />
+              {promptFiles.canOpen ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                  <Text variant="body" style={{ flex: 1 }}>
+                    Open it afterwards
+                  </Text>
+                  <Switch
+                    testID="prompt-open-toggle"
+                    accessibilityLabel="Open it afterwards"
+                    value={draft.openAfter}
+                    onValueChange={(openAfter) => setDraft({ ...draft, openAfter })}
+                  />
+                </View>
+              ) : null}
+            </>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -445,10 +510,19 @@ export function Todos({ view: initial, ctx }: { view: TodosView; ctx: Ctx }) {
   const target =
     open && open.kind !== 'milestones' ? view.rows.find((r) => r.index === open.index) : undefined;
 
+  const promptFiles =
+    ctx.path && ctx.createFile
+      ? { dir: dirOf(ctx.path), canOpen: Boolean(ctx.openFile) }
+      : undefined;
   const add = () => {
     const pending = normalizeTag(draft.newTag);
     const tags = pending ? [...draft.tags, pending] : draft.tags;
+    const promptFile =
+      promptFiles && draft.promptFile
+        ? promptFilePath(ctx.path ?? '', draft.promptName)
+        : undefined;
     const result = addTodoTask(ctx.content, text, ctx.now, tags, {
+      ...(promptFile && { promptFile }),
       ...(draft.milestoneId && { milestoneId: draft.milestoneId }),
       ...(draft.due && { due: draft.due }),
       ...(draft.repeat && { repeat: draft.repeat }),
@@ -458,7 +532,18 @@ export function Todos({ view: initial, ctx }: { view: TodosView; ctx: Ctx }) {
       setText('');
       setDraft(EMPTY_DRAFT);
       setDetails(false);
+      if (promptFile) void createPromptFile(promptFile, draft.openAfter);
     } else haptics.error();
+  };
+  const [fileError, setFileError] = useState<string | null>(null);
+  const createPromptFile = async (file: string, openAfter: boolean) => {
+    try {
+      setFileError(null);
+      await ctx.createFile?.(file, '');
+      if (openAfter) ctx.openFile?.(file);
+    } catch (e) {
+      setFileError(`Could not create ${file}: ${e instanceof Error ? e.message : 'failed'}`);
+    }
   };
 
   const actionsFor = (r: TodoRow): RowAction[] => [
@@ -608,7 +693,21 @@ export function Todos({ view: initial, ctx }: { view: TodosView; ctx: Ctx }) {
         testID="todo-details-toggle"
         onPress={() => setDetails(!details)}
       />
-      {details ? <AddDetails view={view} draft={draft} setDraft={setDraft} now={ctx.now} /> : null}
+      {details ? (
+        <AddDetails
+          view={view}
+          draft={draft}
+          setDraft={setDraft}
+          now={ctx.now}
+          taskText={text}
+          promptFiles={promptFiles}
+        />
+      ) : null}
+      {fileError ? (
+        <Text variant="footnote" tone="danger" accessibilityRole="summary">
+          {fileError}
+        </Text>
+      ) : null}
 
       {open?.kind === 'milestones' ? (
         <MilestoneSheet view={view} ctx={ctx} onClose={() => setOpen(null)} />

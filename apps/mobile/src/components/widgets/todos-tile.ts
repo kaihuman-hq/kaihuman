@@ -144,6 +144,8 @@ export const setTodoStatusAt = (
 };
 
 export interface NewTodoDetails {
+  /** Path of a prompt file to reference (`ref:`); the caller creates the file. */
+  promptFile?: string;
   milestoneId?: string;
   due?: TodoDue;
   repeat?: TodoRepeat;
@@ -163,7 +165,8 @@ export const addTodoTask = (
     return fail('Unknown milestone');
   }
   const cleanTags = [...new Set(tags.map(normalizeTag).filter(Boolean))];
-  let next = addTodo(data, clean, cleanTags, details.milestoneId, undefined, now);
+  const prompt = details.promptFile ? { lines: [], refFile: details.promptFile } : undefined;
+  let next = addTodo(data, clean, cleanTags, details.milestoneId, prompt, now);
   const index = next.items.length - 1;
   try {
     if (details.due) next = setDueOnData(next, index, details.due);
@@ -259,6 +262,26 @@ export const deleteMilestone = (content: string, id: string): TileResult => {
   const data = parseTodos(content);
   if (!data.milestones.some((m) => m.id === id)) return fail('Milestone not found');
   return ok(serializeTodos(removeMilestone(data, id)));
+};
+
+// ─── Prompt files ────────────────────────────────────────────────────────────
+
+/** File name stem for a task's prompt file, as the web add form suggests it. */
+export const promptFileStem = (taskText: string): string =>
+  taskText
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || 'prompt';
+
+/** `name` beside the todos file, with `.md` added when missing; undefined for a blank name. */
+export const promptFilePath = (todosPath: string, name: string): string | undefined => {
+  const trimmed = name.trim();
+  if (!trimmed) return undefined;
+  const slash = todosPath.lastIndexOf('/');
+  const dir = slash >= 0 ? todosPath.slice(0, slash + 1) : '';
+  return `${dir}${trimmed.endsWith('.md') ? trimmed : `${trimmed}.md`}`;
 };
 
 // ─── AI prompts ──────────────────────────────────────────────────────────────

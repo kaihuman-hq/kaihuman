@@ -51,6 +51,7 @@ export default function Dashboard() {
         error={error}
         onRefresh={onRefresh}
         onNavigate={(href) => router.push(href as never)}
+        onCreateFile={(path, content) => githubContentFiles.create(path, content)}
         onWrite={async (path, content) => {
           await githubContentFiles.write(path, content);
           const patch = (p: DashboardPage): DashboardPage => ({
