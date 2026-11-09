@@ -1,12 +1,25 @@
 import {
   addMilestone,
   addTodoEntry,
+  type BoardSort,
+  cyclePriority,
+  type DueFilter,
+  getUpcomingMilestone,
   type Milestone,
+  matchesBoardSearch,
+  matchesDueFilter,
   parseTodos,
   removeMilestone,
+  type StreamMode,
+  type StreamSort,
   serializeTodos,
   setMilestone,
   setStatus,
+  setTodoPriority,
+  sortByDue,
+  sortByNewest,
+  sortStreams,
+  streamItems,
   type TodoData,
   type TodoDue,
   type TodoItem,
@@ -40,6 +53,19 @@ export interface BoardFilter {
   milestoneId?: string;
   /** Restrict to these files; empty or absent means all. */
   files?: readonly string[];
+  /** Due-date state; absent means all. */
+  due?: DueFilter;
+  /** Only todos of the next milestone that is still due (the console's UPCOMING toggle). */
+  upcoming?: boolean;
+  /** Card order inside a column; defaults to newest first. */
+  sort?: BoardSort;
+}
+
+/** One stream: a todo file with the rows its mode and the search keep. */
+export interface Stream {
+  path: string;
+  data: TodoData;
+  rows: { item: TodoItem; index: number }[];
 }
 
 export type BoardResult = { ok: true } | { ok: false; error: string };
@@ -129,11 +155,16 @@ export class KanbanBoardController {
     return [...tags].sort();
   }
 
-  columns(): BoardColumns {
+  /** The milestone the "upcoming" filter scopes to, if any is still due. */
+  get upcomingMilestone(): Milestone | undefined {
+    return getUpcomingMilestone(this.milestones);
+  }
+
+  columns(now = Date.now()): BoardColumns {
     const columns: BoardColumns = { backlog: [], 'in-progress': [], done: [], rejected: [] };
-    const { search, tag, milestoneId, files } = this.filter;
-    const q = search?.trim().toLowerCase();
+    const { search, tag, milestoneId, files, due = 'all', upcoming, sort = 'newest' } = this.filter;
     const wantedTag = tag?.toLowerCase();
+    const upcomingId = upcoming ? this.upcomingMilestone?.id : undefined;
     for (const { path, data } of this.loaded) {
       if (files?.length && !files.includes(path)) continue;
       data.items.forEach((item, itemIndex) => {
@@ -142,19 +173,35 @@ export class KanbanBoardController {
         if (pinnedItem && item.id !== pinnedItem && `${path}#${itemIndex}` !== pinnedItem) return;
         if (this.pinned.milestoneId && item.milestoneId !== this.pinned.milestoneId) return;
         if (milestoneId && item.milestoneId !== milestoneId) return;
+        if (upcomingId && item.milestoneId !== upcomingId) return;
         if (wantedTag && !item.tags.some((t) => t.toLowerCase() === wantedTag)) return;
-        if (
-          q &&
-          !item.text.toLowerCase().includes(q) &&
-          !item.tags.some((t) => t.toLowerCase().includes(q)) &&
-          !item.milestoneId?.toLowerCase().includes(q)
-        ) {
-          return;
-        }
+        if (!matchesDueFilter(item, due, now)) return;
+        if (!matchesBoardSearch(item, search ?? '')) return;
         columns[item.status].push({ item, itemIndex, filePath: path });
       });
     }
+    for (const status of TODO_STATUSES)
+      columns[status] = sort === 'due' ? sortByDue(columns[status]) : sortByNewest(columns[status]);
     return columns;
+  }
+
+  /** Streams view: every todo file as a stream, busiest or newest first, high priority leading. */
+  streams(mode: StreamMode, sort: StreamSort): Stream[] {
+    const query = this.filter.search ?? '';
+    return sortStreams(this.loaded, sort, mode, query).map(({ path, data }) => ({
+      path,
+      data,
+      rows: streamItems(data, mode, query),
+    }));
+  }
+
+  /** Cycles none, high, super-high, ultra-high, none like the console's priority badge. */
+  cyclePriority(path: string, index: number): Promise<BoardResult> {
+    return this.edit(path, (d) => {
+      const item = d.items[index];
+      if (!item) throw new Error('Todo not found');
+      return setTodoPriority(d, item.id, cyclePriority(item.priority));
+    });
   }
 
   /** Writes one file and only then adopts it, so a failed save leaves the board matching the repo. */

@@ -5,6 +5,7 @@ import {
   cyclePriority,
   getUpcomingMilestone,
   type Milestone,
+  matchesBoardSearch,
   moveTodo,
   parseTodos,
   removeMilestone,
@@ -1382,7 +1383,6 @@ export const KanbanBoard = ({
 
   // Aggregate all items
   const allItems = useMemo<AggregatedItem[]>(() => {
-    const q = searchQuery.trim().toLowerCase();
     const result: AggregatedItem[] = [];
     for (const { path, data } of parsedFiles) {
       if (focusedFiles.size > 0 && !focusedFiles.has(path)) continue;
@@ -1390,12 +1390,7 @@ export const KanbanBoard = ({
         if (milestoneFilter && item.milestoneId !== milestoneFilter) return;
         if (showUpcoming && upcomingMilestone && item.milestoneId !== upcomingMilestone.id) return;
         if (!matchesDueFilter(item, dueFilter)) return;
-        if (q) {
-          const matchesText = item.text.toLowerCase().includes(q);
-          const matchesTag = item.tags.some((t) => t.toLowerCase().includes(q));
-          const matchesMilestone = !!item.milestoneId?.toLowerCase().includes(q);
-          if (!matchesText && !matchesTag && !matchesMilestone) return;
-        }
+        if (!matchesBoardSearch(item, searchQuery)) return;
         result.push({ item, itemIndex: idx, filePath: path });
       });
     }

@@ -1,14 +1,13 @@
-import { compareDue, type DueStatus, dueStatus, type TodoItem } from '@kaihuman/formats';
+import { type DueStatus, dueStatus, type TodoItem } from '@kaihuman/formats';
 
-export type DueFilter = 'all' | 'overdue' | 'today' | 'has-due';
-export type BoardSort = 'newest' | 'due';
-
-export const DUE_FILTER_LABELS: Record<DueFilter, string> = {
-  all: 'All due dates',
-  overdue: 'Overdue',
-  today: 'Due today',
-  'has-due': 'Has due date',
-};
+// The filter and sort logic lives in @kaihuman/formats so the mobile board shares it.
+export {
+  type BoardSort,
+  DUE_FILTER_LABELS,
+  type DueFilter,
+  matchesDueFilter,
+  sortByDue,
+} from '@kaihuman/formats';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -38,13 +37,3 @@ export const dueBadge = (item: TodoItem, now = Date.now()): DueBadgeView | undef
   const label = status === 'overdue' ? 'Overdue' : status === 'today' ? 'Today' : shortDate(item);
   return { label, status, className: BADGE_CLASS[status] };
 };
-
-export const matchesDueFilter = (item: TodoItem, filter: DueFilter, now = Date.now()): boolean => {
-  if (filter === 'all') return true;
-  if (filter === 'has-due') return !!item.dueDate;
-  return dueStatus(item, now) === filter;
-};
-
-/** Stable sort by due date (undated last); the input is not mutated. */
-export const sortByDue = <T extends { item: TodoItem }>(items: T[]): T[] =>
-  [...items].sort((a, b) => compareDue(a.item, b.item));
