@@ -1,6 +1,14 @@
 import { parseTimeTracking } from '@kaihuman/formats';
 import { describe, expect, it } from 'vitest';
-import { addBreak, timeHistoryView } from './timetracking-tile.js';
+import {
+  addBreak,
+  chartView,
+  formatHours,
+  labelIndices,
+  linePath,
+  msToNextBoundary,
+  timeHistoryView,
+} from './timetracking-tile.js';
 
 // Thursday 2026-11-05, 10:00 local. The week starts Monday 2026-11-02.
 const now = new Date(2026, 10, 5, 10, 0, 0);
@@ -78,5 +86,49 @@ describe('addBreak', () => {
     expect(addBreak('iso date;time\n2026-11-04;08:00,12:00\n', 15, now).ok).toBe(false);
     expect(addBreak('iso date;time\n2026-11-05;08:00,08:30\n', 30, now).ok).toBe(false);
     expect(addBreak('iso date;time\n2026-11-05;08:00\n', 15, now).ok).toBe(false);
+  });
+});
+
+const chartToday = new Date();
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const iso = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const content = `iso date;time\n${iso(chartToday)};08:00,12:00,13:00,17:00\n`;
+
+describe('chartView', () => {
+  it('daily has work and break hours', () => {
+    const v = chartView(content, 'daily');
+    expect(v.points).toEqual([{ label: iso(chartToday), work: 8, breaks: 1 }]);
+    expect(v.totalHours).toBe(8);
+    expect(v.maxHours).toBe(8);
+  });
+
+  it('monthly and weekly aggregate work hours', () => {
+    const m = chartView(content, 'monthly');
+    expect(m.points).toEqual([{ label: iso(chartToday).slice(0, 7), work: 8, breaks: 0 }]);
+    expect(chartView(content, 'weekly').points[0]?.work).toBe(8);
+  });
+
+  it('empty file keeps a usable scale', () => {
+    const v = chartView('iso date;time\n', 'monthly');
+    expect(v.points).toEqual([]);
+    expect(v.maxHours).toBe(1);
+  });
+});
+
+describe('helpers', () => {
+  it('linePath scales into the box', () => {
+    expect(linePath([0, 2], 2, 100, 50)).toBe('M 0.0 50.0 L 100.0 0.0');
+    expect(linePath([1], 2, 100, 50)).toBe('M 50.0 25.0');
+  });
+  it('labelIndices thins long axes', () => {
+    expect(labelIndices(3)).toEqual([0, 1, 2]);
+    expect(labelIndices(10)).toEqual([0, 3, 6, 9]);
+  });
+  it('formatHours rounds to one decimal', () => {
+    expect(formatHours(7.55)).toBe('7.6h');
+  });
+  it('msToNextBoundary', () => {
+    expect(msToNextBoundary(61_500, 60_000)).toBe(58_500);
+    expect(msToNextBoundary(120_000, 60_000)).toBe(60_000);
   });
 });

@@ -4,6 +4,7 @@
  */
 import {
   type DayEntry,
+  getChartData,
   localDate,
   parseTimeTracking,
   serializeTimeTracking,
@@ -129,3 +130,69 @@ export const addBreak = (content: string, minutes: number, now: Date): TileResul
   }
   return { ok: false, error: `No finished interval today is longer than ${minutes} min.` };
 };
+
+export type ChartMode = 'daily' | 'weekly' | 'monthly';
+
+export const CHART_MODES: readonly { value: ChartMode; label: string }[] = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+];
+
+export interface ChartPoint {
+  label: string;
+  /** Work hours in the bucket. */
+  work: number;
+  /** Break hours; only the daily series has them. */
+  breaks: number;
+}
+
+export interface ChartView {
+  mode: ChartMode;
+  points: ChartPoint[];
+  /** Top of the value axis, never below 1 so an empty chart still has a scale. */
+  maxHours: number;
+  totalHours: number;
+}
+
+/** Same series the web charts show, from the shared aggregation in `@kaihuman/formats`. */
+export const chartView = (content: string, mode: ChartMode): ChartView => {
+  const data = getChartData(parseTimeTracking(content));
+  const points: ChartPoint[] =
+    mode === 'daily'
+      ? data.daily.map((d) => ({ label: d.date, work: d.workHours, breaks: d.breakHours }))
+      : mode === 'weekly'
+        ? data.weekly.map((d) => ({ label: d.week, work: d.hours, breaks: 0 }))
+        : data.monthly.map((d) => ({ label: d.month, work: d.hours, breaks: 0 }));
+  const maxHours = Math.max(1, ...points.map((p) => Math.max(p.work, p.breaks)));
+  const totalHours = Math.round(points.reduce((s, p) => s + p.work, 0) * 100) / 100;
+  return { mode, points, maxHours, totalHours };
+};
+
+/** SVG path through the values, scaled into a `width` x `height` box (y grows downward). */
+export const linePath = (
+  values: readonly number[],
+  maxHours: number,
+  width: number,
+  height: number,
+): string => {
+  const x = (i: number) => (values.length <= 1 ? width / 2 : (i / (values.length - 1)) * width);
+  const y = (v: number) => height - (v / maxHours) * height;
+  return values
+    .map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`)
+    .join(' ');
+};
+
+/** Evenly thinned label indices so a long axis shows about `max` labels. */
+export const labelIndices = (count: number, max = 4): number[] => {
+  const all = Array.from({ length: count }, (_, i) => i);
+  if (count <= max) return all;
+  const step = Math.ceil(count / max);
+  return all.filter((i) => i % step === 0);
+};
+
+export const formatHours = (h: number): string => `${Math.round(h * 10) / 10}h`;
+
+/** Milliseconds until the next whole `unitMs` boundary after `nowMs`; a full unit when exactly on one. */
+export const msToNextBoundary = (nowMs: number, unitMs: number): number =>
+  unitMs - (nowMs % unitMs);

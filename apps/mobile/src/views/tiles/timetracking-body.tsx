@@ -13,6 +13,7 @@ import { useTheme } from '../../theme/theme.js';
 import { Button, haptics, SegmentedControl, Text } from '../../ui/index.js';
 import type { Ctx } from './bodies.js';
 import { EmptyLine, ItemRow, Rows, Stat, StatRow } from './parts.js';
+import { Charts } from './timetracking-charts.js';
 
 export const hours = (m: number): string => {
   const r = Math.round(m);
@@ -158,6 +159,7 @@ export function Timer({ view, ctx }: { view: TimerView; ctx: Ctx }) {
             ))}
         </Rows>
       )}
+      <Charts content={ctx.content} />
     </>
   );
 }
