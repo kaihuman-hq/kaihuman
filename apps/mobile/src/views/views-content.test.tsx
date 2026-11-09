@@ -209,8 +209,9 @@ describe('tiles', () => {
     expect(screen.queryAllByTestId(/^bookmark-/)).toHaveLength(0);
     expect(screen.getByText('No bookmarks match.')).toBeTruthy();
     type('Search bookmarks', '');
-    type('Bookmark URL', 'https://new.example.org/');
     press('Add bookmark');
+    type('Bookmark URL', 'https://new.example.org/');
+    press('Save bookmark');
     expect(onWrite.mock.calls[0]?.[1]).toContain('https://new.example.org/');
     // Delete lives in the long-press menu; see dashboard-tiles.test.tsx.
     expect(onWrite).toHaveBeenCalledTimes(1);

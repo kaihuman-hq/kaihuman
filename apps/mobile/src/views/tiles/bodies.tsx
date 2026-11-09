@@ -1,14 +1,10 @@
 import { useState } from 'react';
-import { Linking, View } from 'react-native';
+import { View } from 'react-native';
 import {
-  addBookmarkEntry,
   addEvent,
   addTodoTask,
-  type BookmarksView,
   type BudgetView,
-  bookmarksView,
   type DataCollectionView,
-  deleteBookmarkEntry,
   type EventRow,
   eventDateParts,
   groupEventsByDay,
@@ -41,41 +37,6 @@ export interface Ctx {
 
 const num = (n: number, digits = 2) => n.toFixed(digits);
 const signed = (n: number, digits = 2) => `${n > 0 ? '+' : ''}${n.toFixed(digits)}`;
-const hostOf = (url: string) => {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
-};
-/** Lists past this length collapse behind a "Show all" button. */
-const COLLAPSED = 5;
-
-function Collapsible<T>({
-  items,
-  noun,
-  children,
-}: {
-  items: readonly T[];
-  noun: string;
-  children: (shown: readonly T[]) => React.ReactNode;
-}) {
-  const [all, setAll] = useState(false);
-  const shown = all ? items : items.slice(0, COLLAPSED);
-  return (
-    <>
-      {children(shown)}
-      {items.length > COLLAPSED ? (
-        <Button
-          variant="plain"
-          size="small"
-          label={all ? 'Show fewer' : `Show all ${items.length} ${noun}`}
-          onPress={() => setAll(!all)}
-        />
-      ) : null}
-    </>
-  );
-}
 
 export function Todos({ view, ctx }: { view: TodosView; ctx: Ctx }) {
   const { colors, spacing } = useTheme();
@@ -233,80 +194,6 @@ export function Events({ rows, ctx }: { rows: EventRow[]; ctx: Ctx }) {
       ) : (
         <Button label="Add event" icon="add" size="medium" variant="tinted" onPress={form.show} />
       )}
-    </>
-  );
-}
-
-export function Bookmarks({ initial, ctx }: { initial: BookmarksView; ctx: Ctx }) {
-  const [query, setQuery] = useState('');
-  const [url, setUrl] = useState('');
-  const { colors } = useTheme();
-  // The tile's own view is unfiltered; searching re-derives it from the file text.
-  const view = query.trim() ? bookmarksView(ctx.content, { text: query }, ctx.now) : initial;
-  const save = () => {
-    if (ctx.apply(addBookmarkEntry(ctx.content, { url }, ctx.now))) {
-      haptics.success();
-      setUrl('');
-    } else haptics.error();
-  };
-  return (
-    <>
-      <TextField
-        label="Search bookmarks"
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Title or address"
-        returnKeyType="search"
-      />
-      {view.bookmarks.length === 0 ? (
-        <EmptyLine>{query.trim() ? 'No bookmarks match.' : 'No bookmarks yet.'}</EmptyLine>
-      ) : (
-        <Collapsible items={view.bookmarks} noun="bookmarks">
-          {(shown) => (
-            <Rows>
-              {shown.map((b) => (
-                <ItemRow
-                  key={b.id}
-                  testID={`bookmark-${b.id}`}
-                  title={b.title}
-                  subtitle={hostOf(b.url)}
-                  leading={
-                    <Icon name={b.pinned ? 'star' : 'bookmark'} size={20} color={colors.accent} />
-                  }
-                  trailing={
-                    <Icon
-                      name="chevronRight"
-                      size={14}
-                      color={colors.tertiaryLabel}
-                      weight="semibold"
-                    />
-                  }
-                  onPress={() => void Linking.openURL(b.url).catch(() => {})}
-                  actions={[
-                    {
-                      label: 'Delete bookmark',
-                      destructive: true,
-                      onPress: () => {
-                        if (ctx.apply(deleteBookmarkEntry(ctx.content, b.id, ctx.now)))
-                          haptics.warning();
-                      },
-                    },
-                  ]}
-                />
-              ))}
-            </Rows>
-          )}
-        </Collapsible>
-      )}
-      <QuickAdd
-        label="Bookmark URL"
-        placeholder="https://"
-        keyboardType="url"
-        value={url}
-        onChangeText={setUrl}
-        onSubmit={save}
-        addLabel="Add bookmark"
-      />
     </>
   );
 }
