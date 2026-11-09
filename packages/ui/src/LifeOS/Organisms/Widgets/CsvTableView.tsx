@@ -1,21 +1,17 @@
+import {
+  type CsvSort,
+  csvCellText as cellDisplay,
+  csvTableRows,
+  isComplexCell as isComplex,
+  nextCsvSort,
+  pageCsvRows,
+  parseCsvTable,
+  setCsvFilter,
+} from '@kaihuman/formats';
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Filter } from 'lucide-preact';
 import { useMemo, useState } from 'preact/hooks';
 import { cn } from '../../../utils';
 import { MonoLabel, MonoText } from '../../Atoms/Typography';
-
-const PAGE_SIZE = 50;
-
-function isComplex(v: unknown): v is object {
-  return typeof v === 'object' && v !== null;
-}
-
-function cellDisplay(v: unknown): string {
-  if (isComplex(v)) {
-    const s = JSON.stringify(v);
-    return s.length > 60 ? `${s.slice(0, 60)}…` : s;
-  }
-  return String(v ?? '');
-}
 
 export interface CsvTableViewProps {
   content?: string;
@@ -23,9 +19,7 @@ export interface CsvTableViewProps {
 }
 
 export const CsvTableView = ({ content, data }: CsvTableViewProps) => {
-  const [sortConfig, setSortConfig] = useState<{ key: number; direction: 'asc' | 'desc' } | null>(
-    null,
-  );
+  const [sortConfig, setSortConfig] = useState<CsvSort | null>(null);
   const [filters, setFilters] = useState<Record<number, string>>({});
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
@@ -34,86 +28,24 @@ export const CsvTableView = ({ content, data }: CsvTableViewProps) => {
   const { headers, rows } = useMemo(() => {
     if (data) return data;
     if (!content) return { headers: [], rows: [] as unknown[][] };
-    const lines = content
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l);
-    if (lines.length === 0) return { headers: [], rows: [] as unknown[][] };
-
-    const firstLine = lines[0];
-    if (!firstLine) return { headers: [], rows: [] as unknown[][] };
-
-    // Strip bracket metadata before detecting separator to avoid semicolons
-    // inside [...] being mistaken for the field separator.
-    const lineForSepDetect = firstLine.replace(/\[[^\]]*\]/g, '');
-    const separator = lineForSepDetect.includes(';') ? ';' : ',';
-
-    const headers = firstLine.split(separator).map((h) => {
-      const trimmed = h.trim();
-      // Decode bracket-encoded column metadata: ColName[title:X;unit:Y] → ColName
-      const bracketIdx = trimmed.indexOf('[');
-      return bracketIdx > 0 ? trimmed.slice(0, bracketIdx).trim() : trimmed;
-    });
-    const rows: unknown[][] = lines
-      .slice(1)
-      .map((line) => line.split(separator).map((c) => c.trim()));
-
-    return { headers, rows };
+    return parseCsvTable(content);
   }, [content, data]);
 
-  // Filtering
-  const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
-      return Object.entries(filters).every(([colIndex, filterValue]) => {
-        const cellValue = cellDisplay(row[Number.parseInt(colIndex, 10)]);
-        return cellValue.toLowerCase().includes(filterValue.toLowerCase());
-      });
-    });
-  }, [rows, filters]);
+  const sortedRows = useMemo(
+    () => csvTableRows(rows, filters, sortConfig),
+    [rows, filters, sortConfig],
+  );
 
-  // Sorting
-  const sortedRows = useMemo(() => {
-    if (!sortConfig) return filteredRows;
-    const sorted = [...filteredRows];
-    sorted.sort((a, b) => {
-      const valA = cellDisplay(a[sortConfig.key]);
-      const valB = cellDisplay(b[sortConfig.key]);
-
-      const numA = parseFloat(valA);
-      const numB = parseFloat(valB);
-
-      if (!Number.isNaN(numA) && !Number.isNaN(numB)) {
-        return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
-      }
-
-      return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-    });
-    return sorted;
-  }, [filteredRows, sortConfig]);
-
-  const totalPages = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const pagedRows = sortedRows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+  const { rows: pagedRows, page: safePage, totalPages } = pageCsvRows(sortedRows, page);
 
   const handleSort = (index: number) => {
     setPage(0);
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === index && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key: index, direction });
+    setSortConfig(nextCsvSort(sortConfig, index));
   };
 
   const handleFilterChange = (index: number, value: string) => {
     setPage(0);
-    setFilters((prev) => {
-      if (!value) {
-        const next = { ...prev };
-        delete next[index];
-        return next;
-      }
-      return { ...prev, [index]: value };
-    });
+    setFilters((prev) => setCsvFilter(prev, index, value));
   };
 
   return (

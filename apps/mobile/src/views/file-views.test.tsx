@@ -43,10 +43,42 @@ describe('CsvTable', () => {
     expect(screen.getByText('pear')).toBeTruthy();
     expect(screen.getByText('2 rows')).toBeTruthy();
   });
-  it('notes truncation for long files', () => {
-    const rows = Array.from({ length: 250 }, (_, i) => `r${i},${i}`).join('\n');
+  it('pages 50 rows at a time', () => {
+    const rows = Array.from({ length: 120 }, (_, i) => `r${i},${i}`).join('\n');
     render(<CsvTable content={`k,v\n${rows}`} path="big.csv" />);
-    expect(screen.getByText('Showing 200 of 250 rows')).toBeTruthy();
+    expect(screen.getByText('120 rows')).toBeTruthy();
+    expect(screen.getByText('1 / 3')).toBeTruthy();
+    expect(screen.queryByText('r50')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText('r50')).toBeTruthy();
+    expect(screen.getByText('2 / 3')).toBeTruthy();
+  });
+  it('sorts by header tap, asc then desc', () => {
+    render(<CsvTable content={'n,q\nb,10\na,9\nc,100\n'} path="a.csv" />);
+    const order = () =>
+      screen.getAllByRole('button', { name: /^Row / }).map((r) => r.textContent?.slice(0, 1));
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by q' }));
+    expect(order()).toEqual(['a', 'b', 'c']);
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by q' }));
+    expect(order()).toEqual(['c', 'b', 'a']);
+  });
+  it('filters a column from the sheet', () => {
+    render(<CsvTable content={'n,q\nbeta,1\nalpha,2\n'} path="a.csv" />);
+    fireEvent.click(screen.getByTestId('csv-filter-button'));
+    fireEvent.change(screen.getByLabelText('n'), { target: { value: 'alp' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.getByText('1 row')).toBeTruthy();
+    expect(screen.queryByText('beta')).toBeNull();
+  });
+  it('opens every column of a row in a detail sheet', () => {
+    render(<CsvTable content={'n,q\nbeta,1\n'} path="a.csv" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Row 1' }));
+    expect(screen.getByTestId('csv-detail-sheet').textContent).toMatch(/nbeta\s*q1/);
+  });
+  it('strips bracket metadata and splits on ;', () => {
+    render(<CsvTable content={'Amt[unit:EUR;x:y];Note\n5;hi\n'} path="a.csv" />);
+    expect(screen.getByText('Amt')).toBeTruthy();
+    expect(screen.getByText('hi')).toBeTruthy();
   });
 });
 
@@ -123,6 +155,24 @@ describe('FileContentView', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save trip' }));
     expect(JSON.parse(onWrite.mock.calls[0]?.[0]).trips[0].title).toBe('Oslo');
+  });
+  it('toggles widget CSV files between tile and table', () => {
+    render(
+      <FileContentView
+        path="m.budget.csv"
+        content={'Date,Amount\n2026-01-01,5\n'}
+        onWrite={noWrite}
+      />,
+    );
+    expect(screen.queryByTestId('reader-csv')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Table' }));
+    expect(screen.getByTestId('reader-csv')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Widget' }));
+    expect(screen.queryByTestId('reader-csv')).toBeNull();
+  });
+  it('shows no toggle for non-CSV widget files', () => {
+    render(<FileContentView path="x.travel.json" content="" onWrite={noWrite} />);
+    expect(screen.queryByTestId('csv-look')).toBeNull();
   });
   it('falls back to the note for unknown kinds', () => {
     render(<FileContentView path="d.drawio" content="<x/>" onWrite={noWrite} />);
