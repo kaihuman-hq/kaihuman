@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { CacheFs } from '../sync/persistent-storage.js';
 
 // Everything that outlives the process on a phone: the cache files, the Keychain, the App Group.
@@ -96,6 +96,15 @@ async function launch() {
     notifications: await import('../notifications/index.js'),
   };
 }
+
+beforeAll(() => {
+  // The bootstrap fires network calls and logs it never awaits; a real fetch (401 from GitHub)
+  // or a log landing after teardown made CI fail with "Closing rpc while onUserConsoleLog was pending".
+  vi.stubGlobal('fetch', () => new Promise(() => {}));
+  for (const level of ['log', 'info', 'warn', 'error'] as const) {
+    vi.spyOn(console, level).mockImplementation(() => {});
+  }
+});
 
 afterEach(() => {
   device.files.clear();
