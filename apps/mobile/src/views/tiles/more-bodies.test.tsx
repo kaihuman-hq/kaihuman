@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FeedSnapshot, TravelView } from '../../components/widgets/tile-controllers.js';
 import { markRssRead, rssView, travelView } from '../../components/widgets/tile-controllers.js';
+import { swipeTranslation } from '../../ui/test-setup.js';
 import type { Ctx } from './bodies.js';
 import { Rss, relativeDate, Travel } from './more-bodies.js';
 
@@ -128,6 +129,24 @@ describe('Rss', () => {
       expect(screen.getAllByTestId('swipe-action-Mark read')).toHaveLength(1);
       fireEvent.click(screen.getByTestId('swipe-action-Mark read'));
       expect(openBrowserAsync).not.toHaveBeenCalled();
+      expect(apply).toHaveBeenCalledWith(markRssRead(feedsFile, 'f1', 'g2'));
+    });
+
+    it('runs the action directly on a full swipe, but not on a short one', () => {
+      (Platform as { OS: string }).OS = 'ios';
+      store.set(snapshot);
+      const apply = vi.fn(() => true);
+      render(<Rss view={rssView(feedsFile, snapshot, NOW)} ctx={ctx(feedsFile, apply)} />);
+      fireEvent.click(screen.getByRole('button', { name: 'All' }));
+      const release = screen.getByTestId('rss-g2-swipeable-willopen');
+
+      swipeTranslation.value = -80; // button just revealed
+      fireEvent.click(release);
+      expect(apply).not.toHaveBeenCalled();
+
+      swipeTranslation.value = -300; // past half the row
+      fireEvent.click(release);
+      expect(apply).toHaveBeenCalledTimes(1);
       expect(apply).toHaveBeenCalledWith(markRssRead(feedsFile, 'f1', 'g2'));
     });
   });

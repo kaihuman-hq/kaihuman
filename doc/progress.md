@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-10 — Mobile: RSS full swipe, animations
+
+- RSS items: a long right-to-left swipe (past half the row, never under 1.5 buttons) runs "Mark read" directly with a haptic buzz when armed; the row slides out, fades and collapses its height, then the action fires. With reduced motion the action runs at once. Threshold logic in `ui/swipe-logic.ts` (tested); `SwipeReveal`/`ItemRow` take an opt-in `fullSwipe`.
+- Motion (`ui/motion.tsx`, Reanimated, honours the OS reduce-motion setting): press-scale on `Button`, `Fab` and `Chip`; fade-in on `EmptyState`; spring pop on `CheckCircle`; add/remove fade and sibling glide on kanban cards, stream cards, ideas and the tile-body `Rows` (rows already on screen do not animate on mount; keys follow row content via `contentKeys`). `Section` gets an opt-in `animated` prop. Android stack screens slide in from the right. Dashboard tiles untouched; sheets already use the `Modal` slide/fade.
+- Tests: swipe threshold, content keys, full vs short swipe on the RSS body; Reanimated stand-in in `ui/test-setup.ts`.
+
 ## 2026-11-09 — Tests: extension teardown race, mobile render timeouts
 
 - Mobile `dom` tests get a 20s timeout: full tile and dashboard renders took over 5s on the shared CI runner.

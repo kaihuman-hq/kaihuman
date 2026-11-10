@@ -400,7 +400,7 @@ export function IdeasView({ controller }: { controller: IdeasScreenController })
             />
           )
         ) : (
-          <Section>
+          <Section animated>
             {entries.map((e) => (
               <ListRow
                 key={e.slug}

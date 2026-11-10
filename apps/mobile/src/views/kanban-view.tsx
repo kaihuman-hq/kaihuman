@@ -13,6 +13,7 @@ import { useTheme } from '../theme/theme.js';
 import {
   Badge,
   Chip,
+  contentKeys,
   EmptyState,
   Fab,
   haptics,
@@ -311,10 +312,12 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
     );
   } else {
     const advance = ADVANCE[status];
+    const keyFor = contentKeys();
     body = (
-      <Section header={`${LABEL[status]} · ${cards.length}`}>
+      <Section animated header={`${LABEL[status]} · ${cards.length}`}>
         {cards.map((card) => {
           const { item, itemIndex, filePath } = card;
+          const rowKey = keyFor(`${filePath}:${item.text}`);
           const badge = dueBadge(item, new Date());
           // Done sits on the leading edge so the common "finish it" swipe mirrors Mail's read/unread;
           // Delete is the red, outermost trailing action.
@@ -352,7 +355,7 @@ export function KanbanView({ controller, onAddTodo, focus, onOpenTodo }: KanbanV
           ];
           return (
             <ListRow
-              key={`${filePath}:${itemIndex}`}
+              key={rowKey}
               testID={`card-${itemIndex}`}
               title={item.text}
               subtitle={item.tags.length ? item.tags.map((t) => `#${t}`).join(' ') : undefined}

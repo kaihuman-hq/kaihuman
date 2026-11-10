@@ -1,6 +1,7 @@
 import { Pressable, View } from 'react-native';
 import { useTheme } from '../theme/theme.js';
 import { Icon, type IconName } from './icon.js';
+import { Animated, usePressScale } from './motion.js';
 import { Text } from './text.js';
 
 export interface ChipProps {
@@ -14,6 +15,7 @@ export interface ChipProps {
 
 export function Chip({ label, selected = false, onPress, icon, accessibilityLabel }: ChipProps) {
   const theme = useTheme();
+  const press = usePressScale();
   const { colors, spacing } = theme;
   const ios = theme.platform === 'ios';
   const fg = selected ? colors.onAccentSoft : colors.label;
@@ -43,18 +45,21 @@ export function Chip({ label, selected = false, onPress, icon, accessibilityLabe
 
   if (!onPress) return <View style={style}>{content}</View>;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ selected }}
-      aria-selected={selected}
-      onPress={onPress}
-      hitSlop={{ top: 6, bottom: 6 }}
-      android_ripple={ios ? undefined : { color: colors.pressed }}
-      style={({ pressed }) => [style, { opacity: pressed && ios ? 0.7 : 1 }]}
-    >
-      {content}
-    </Pressable>
+    <Animated.View style={[{ alignSelf: 'flex-start' }, press.style]}>
+      <Pressable
+        {...press.handlers}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityState={{ selected }}
+        aria-selected={selected}
+        onPress={onPress}
+        hitSlop={{ top: 6, bottom: 6 }}
+        android_ripple={ios ? undefined : { color: colors.pressed }}
+        style={({ pressed }) => [style, { opacity: pressed && ios ? 0.7 : 1 }]}
+      >
+        {content}
+      </Pressable>
+    </Animated.View>
   );
 }
 
