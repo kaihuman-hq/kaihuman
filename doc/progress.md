@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-10 — Mobile redesign mockups (design only)
+
+- `apps/mobile/docs/redesign/`: HTML mockups + 2× PNGs (light and dark) for a square 2-column dashboard, all 18 tiles, a center ＋ tab quick menu, a counts-only todos tile with detail and add sheet, and improved iOS widgets (today-only tasks, one-row habit activity, timer). `README.md` lists decisions, animation notes and web vs mobile gaps. No app code changed.
+
 ## 2026-11-09 — Tests: extension teardown race, mobile render timeouts
 
 - Mobile `dom` tests get a 20s timeout: full tile and dashboard renders took over 5s on the shared CI runner.
