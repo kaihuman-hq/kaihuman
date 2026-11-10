@@ -1,9 +1,11 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { Pressable } from 'react-native';
 import { presentTile } from '../../../src/components/widgets/tile-controllers.js';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
-import { EmptyState, errorMessage, InlineError, Screen } from '../../../src/ui/index.js';
+import { EmptyState, errorMessage, Icon, InlineError, Screen } from '../../../src/ui/index.js';
 import { TILE_META, Tile } from '../../../src/views/tile-view.js';
+import { TodosDetailView } from '../../../src/views/todos-detail-view.js';
 
 export default function TileDetail() {
   const { path } = useLocalSearchParams<{ path: string }>();
@@ -28,15 +30,39 @@ export default function TileDetail() {
 
   // A file the controller chokes on shows an inline error instead of closing the app.
   const tile = path && content !== null ? safePresent(path, content, now) : undefined;
+  const isTodos = tile !== undefined && !(tile instanceof Error) && tile.kind === 'todos';
+  const addTodo = () =>
+    router.push(`/dashboard/todo-add?path=${encodeURIComponent(path ?? '')}` as never);
   return (
     <>
       <Stack.Screen
-        options={{ title: tile && !(tile instanceof Error) ? TILE_META[tile.kind].title : 'Tile' }}
+        options={{
+          title: tile && !(tile instanceof Error) ? TILE_META[tile.kind].title : 'Tile',
+          headerRight: isTodos
+            ? () => (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="New todo"
+                  onPress={addTodo}
+                >
+                  <Icon name="add" size={22} />
+                </Pressable>
+              )
+            : undefined,
+        }}
       />
       <Screen keyboard>
         {path && tile && content !== null ? (
           tile instanceof Error ? (
             <InlineError what="this tile" message={tile.message} />
+          ) : tile.kind === 'todos' ? (
+            <TodosDetailView
+              path={path}
+              content={content}
+              now={now}
+              onWrite={write}
+              onAdd={addTodo}
+            />
           ) : (
             <Tile
               path={path}

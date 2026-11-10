@@ -81,22 +81,29 @@ describe('DashboardPager with the demo seed', () => {
     expect(screen.getByRole('button', { name: 'Choose dashboard, current Reading' })).toBeTruthy();
   });
 
-  it('renders compact tiles as summaries and todos in full', async () => {
+  it('renders every tile as a square glance in a two-column grid', async () => {
     await setup();
-    // Overview: todos (full), timer + habit (compact), events + actionlog (medium).
-    expect(screen.getByTestId('tile-todos')).toBeTruthy();
-    expect(screen.getByTestId('summary-habit')).toBeTruthy();
-    expect(screen.queryByTestId('tile-habit')).toBeNull();
-    expect(screen.getByTestId('summary-events')).toBeTruthy();
+    const grid = screen.getAllByTestId('dashboard-grid')[0] as HTMLElement;
+    expect(grid.getAttribute('style')).toContain('flex-wrap');
+    // Overview: todos show counts, the habit a 7-day row, no inline todo list any more.
+    const todos = screen.getAllByTestId(/^square-.*\.todos\.md$/)[0] as HTMLElement;
+    expect(within(todos).getByTestId('tile-counts')).toBeTruthy();
+    const habit = within(grid).getByTestId('square-.kh/health.habit.csv');
+    expect(within(habit).getByTestId('viz-days')).toBeTruthy();
+    expect(screen.queryByTestId('tile-todos')).toBeNull();
   });
 
-  it('stacks every tile in one column, compact ones included', async () => {
+  it('has no shortcut row on page 1', async () => {
     await setup();
-    for (const id of ['summary-habit', 'summary-timetracking', 'summary-events']) {
-      const el = screen.queryByTestId(id);
-      if (el) expect(el.closest('[style*="flex-wrap"]')).toBeNull();
-    }
-    expect(screen.getByTestId('summary-habit').closest('[style*="flex-wrap"]')).toBeNull();
+    expect(screen.queryByTestId('nav-/quick-todo')).toBeNull();
+  });
+
+  it('runs a one-tap quick action and writes the file', async () => {
+    const onWrite = vi.fn();
+    await setup({ onWrite });
+    const habit = screen.getByTestId('square-.kh/health.habit.csv');
+    fireEvent.click(within(habit).getByTestId('tile-quick-action'));
+    expect(onWrite).toHaveBeenCalledWith('.kh/health.habit.csv', expect.any(String));
   });
 
   it('offers Open file for kinds the app has no tile for', async () => {
@@ -114,9 +121,9 @@ describe('DashboardPager with the demo seed', () => {
     expect(onNavigate).toHaveBeenCalledWith('/files/notes/x.drawio');
   });
 
-  it('See all opens the tile route', async () => {
+  it('tapping a tile opens its deep dive', async () => {
     const { onNavigate } = await setup();
-    fireEvent.click(screen.getByRole('button', { name: 'See all Habit' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Health,/ }));
     expect(onNavigate).toHaveBeenCalledWith(
       `/dashboard/tile?path=${encodeURIComponent('.kh/health.habit.csv')}`,
     );
@@ -208,8 +215,8 @@ describe('DashboardPager RSS tile', () => {
         items: [item('a'), item('b')],
       },
     });
-    const tile = await screen.findByTestId('summary-rss');
-    expect(within(tile).getByText('2')).toBeTruthy();
+    const tile = await screen.findByTestId(/^square-.*\.rss\.json$/);
+    expect(await within(tile).findByText('2')).toBeTruthy();
     expect(within(tile).getByText('Item a')).toBeTruthy();
   });
 });

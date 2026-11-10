@@ -21,6 +21,16 @@ export default function TodayLayout() {
           ...webBackOptions('/dashboard'),
         }}
       />
+      <Stack.Screen
+        name="todo-add"
+        options={{
+          title: 'New todo',
+          presentation: 'formSheet',
+          sheetGrabberVisible: true,
+          sheetAllowedDetents: [0.5, 1],
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 }

@@ -53,7 +53,7 @@ vi.mock('react-native-reanimated', async () => {
   const { View } = await vi.importActual<Record<string, any>>('react-native-web');
   const builder = () => {
     const b: Record<string, any> = {};
-    for (const k of ['duration', 'delay', 'springify', 'reduceMotion']) b[k] = () => b;
+    for (const k of ['duration', 'delay', 'springify', 'damping', 'reduceMotion']) b[k] = () => b;
     return b;
   };
   const AnimatedView = ({ entering, exiting, layout, ...rest }: Record<string, any>) =>
@@ -78,6 +78,7 @@ vi.mock('react-native-reanimated', async () => {
     View: AnimatedView,
     FadeIn: builder(),
     FadeOut: builder(),
+    FadeInDown: builder(),
     LinearTransition: builder(),
     LayoutAnimationConfig: ({ children }: Record<string, any>) => children,
     useReducedMotion: () => false,
