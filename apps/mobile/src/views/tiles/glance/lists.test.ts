@@ -55,6 +55,14 @@ describe('todosGlance', () => {
   content = text(setTodoStatusAt(content, idx('Active'), 'in-progress', NOW));
   content = text(setTodoStatusAt(content, idx('Finished'), 'done', NOW));
 
+  it('counts only rows the Focus filter keeps', () => {
+    const view = todosView(content, NOW);
+    const none = todosGlance({ ...input(path, content), filter: { area: 'work' } }, view);
+    expect(none.counts?.map((c) => c.value)).toEqual([0, 0, 0]);
+    const all = todosGlance({ ...input(path, content), filter: { area: 'todos' } }, view);
+    expect(all.counts?.map((c) => c.value)).toEqual([2, 1, 1]);
+  });
+
   it('counts open, doing and overdue with a share bar and an add screen', () => {
     const g = todosGlance(input(path, content), todosView(content, NOW));
     expect(g).toMatchObject({ title: 'Todos', icon: 'todo', tint: 'olive', hero: '', label: '' });

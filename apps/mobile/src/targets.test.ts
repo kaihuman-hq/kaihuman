@@ -524,6 +524,7 @@ const fullSnapshot: Required<
   Omit<
     WidgetTodoSnapshot,
     | 'schemaVersion'
+    | 'filter'
     | 'stats'
     | 'milestones'
     | 'tags'

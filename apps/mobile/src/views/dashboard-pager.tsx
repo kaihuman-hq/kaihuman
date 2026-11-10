@@ -18,6 +18,7 @@ import {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { focusFilter } from '../adapters/focus-filter.js';
 import { presentTile, type TileView } from '../components/widgets/tile-controllers.js';
 import { useEnsureFeeds, useFeedSnapshot } from '../files/use-feeds.js';
 import {
@@ -155,7 +156,10 @@ function Page({
   // Palette settings are not a glance tile (README decision 7): they live in More → Settings.
   const cells = shown.flatMap((item): { item: Shown; glance: Glance | null }[] => {
     if (item.failed !== undefined || !item.tile) return [{ item, glance: null }];
-    const glance = glanceOf({ path: item.path, content: item.content, now }, item.tile);
+    const glance = glanceOf(
+      { path: item.path, content: item.content, now, filter: focusFilter.value },
+      item.tile,
+    );
     return glance ? [{ item, glance }] : [];
   });
   const startEdit = onStartEdit

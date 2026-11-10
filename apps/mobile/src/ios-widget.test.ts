@@ -57,11 +57,12 @@ const snapshot: Required<WidgetTodoSnapshot> = {
   cards: [{ path: '', title: '', excerpt: '', tags: [] }],
   habits: [{ path: '', name: '', doneToday: false, streakDays: 0, days: [], pending: false }],
   timer: { path: '', label: '', startedAt: 0, todayMinutes: 0, pending: false },
+  filter: { tags: [], area: '', board: '', label: '' },
 };
 const statuses: WidgetTodoItem['status'][] = ['backlog', 'in-progress', 'done', 'rejected'];
 
 const pendingKeys = ['kind', 'itemId', 'status', 'text', 'path', 'date', 'timestamp'];
-const mutationKinds = ['toggle', 'move', 'capture', 'habit', 'timer-stop'];
+const mutationKinds = ['toggle', 'move', 'capture', 'habit', 'timer-stop', 'digest'];
 
 const hasProperty = (swift: string, key: string): boolean =>
   new RegExp(`\\bvar ${key}\\s*:`).test(swift);
@@ -94,6 +95,7 @@ describe('ios widget target', () => {
       ...Object.keys(snapshot.habits[0] ?? {}),
       ...Object.keys(snapshot.todayCounts),
       ...Object.keys(snapshot.timer),
+      ...Object.keys(snapshot.filter),
       ...Object.keys({ sha: '', content: '' }),
     ];
     for (const key of keys) expect(hasProperty(models, key), key).toBe(true);
@@ -184,6 +186,7 @@ describe('ios widget target', () => {
       QuickAddWidget: read('QuickAddWidget.swift'),
       DueTodayWidget: read('DueTodayWidget.swift'),
       TimerWidget: read('TimerWidget.swift'),
+      TodayDashboardWidget: read('TodayDashboardWidget.swift'),
     };
     const families: Record<keyof typeof widgetFiles, string[]> = {
       InboxTodoWidget: [
@@ -211,6 +214,7 @@ describe('ios widget target', () => {
       QuickAddWidget: ['systemSmall', 'accessoryCircular', 'accessoryRectangular'],
       DueTodayWidget: ['accessoryCircular', 'accessoryRectangular', 'accessoryInline'],
       TimerWidget: ['systemSmall'],
+      TodayDashboardWidget: ['systemExtraLarge'],
     };
     const kinds = Object.keys(widgetFiles) as Array<keyof typeof widgetFiles>;
     const familiesOf = (swift: string): string[] =>

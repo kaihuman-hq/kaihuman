@@ -128,7 +128,21 @@ export interface WidgetExtras {
   timer?: WidgetTimer;
 }
 
+/**
+ * Set by a Focus filter (iOS `SetFocusFilterIntent`): widgets and the app show only matching todos.
+ * Every set dimension must match: any of `tags`, the `area` (todo file name) and the `board`
+ * (milestone id or name).
+ */
+export interface WidgetFilter {
+  tags?: string[];
+  area?: string;
+  board?: string;
+  /** The Focus's name, shown on the extra-large widget. */
+  label?: string;
+}
+
 export interface WidgetSnapshotOptions {
+  filter?: WidgetFilter;
   /** IANA zone used for "today" and week boundaries. Defaults to the device zone. */
   timeZone?: string;
   lockScreenText?: boolean;
@@ -181,6 +195,8 @@ export interface WidgetTodoSnapshot {
   cards?: WidgetKnowledgeCard[];
   habits?: WidgetHabit[];
   timer?: WidgetTimer;
+  /** Active Focus filter; `items` stay unfiltered so mutations resolve, readers apply it. */
+  filter?: WidgetFilter;
 }
 
 /**
@@ -193,7 +209,9 @@ export type PendingWidgetMutation =
   | { kind: 'capture'; text: string; timestamp: number }
   | { kind: 'habit'; path: string; date: string; timestamp: number }
   /** Stops the running interval of a `.timetracking.csv` at `timestamp` (the widget's tap). */
-  | { kind: 'timer-stop'; path: string; timestamp: number };
+  | { kind: 'timer-stop'; path: string; timestamp: number }
+  /** A digest text a Shortcut ("Use Model") saved; the app writes it to `logs/digest-<date>.md`. */
+  | { kind: 'digest'; text: string; date: string; timestamp: number };
 
 type WidgetFiles = WidgetTodoSnapshot['files'];
 
@@ -393,6 +411,7 @@ export const buildWidgetTodoSnapshot = (
     ...(options.cards && { cards: options.cards }),
     ...(options.habits && { habits: options.habits }),
     ...(options.timer && { timer: options.timer }),
+    ...(options.filter && { filter: options.filter }),
   };
 };
 

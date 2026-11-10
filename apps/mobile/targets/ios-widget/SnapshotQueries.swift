@@ -85,9 +85,12 @@ extension SharedTodoSnapshot {
         item.status == .backlog && item.filePath == inboxPath
     }
 
-    /// Open todos in "next up" order: in progress first, then priority, then file order.
+    /// Open todos in "next up" order: in progress first, then priority, then file order. The active
+    /// Focus filter (FocusFilter.swift) hides the rest, so every widget and intent honours it.
     var nextUp: [SharedTodoItem] {
-        let open = items.enumerated().filter { $0.element.status == .backlog || $0.element.status == .inProgress }
+        let open = items.enumerated().filter {
+            ($0.element.status == .backlog || $0.element.status == .inProgress) && matchesFocusFilter($0.element)
+        }
         return open.sorted { lhs, rhs in
             let left = (lhs.element.status == .inProgress ? 0 : 1, Self.priorityRank(lhs.element.priority), lhs.offset)
             let right = (rhs.element.status == .inProgress ? 0 : 1, Self.priorityRank(rhs.element.priority), rhs.offset)

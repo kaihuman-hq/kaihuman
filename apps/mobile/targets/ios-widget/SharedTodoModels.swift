@@ -100,6 +100,14 @@ struct SharedPrivacy: Codable {
     var lockScreenText: Bool
 }
 
+/// Mirrors WidgetFilter in packages/core/src/widget-sync.ts: set by the Focus filter intent.
+struct SharedFocusFilter: Codable, Equatable {
+    var tags: [String]?
+    var area: String?
+    var board: String?
+    var label: String?
+}
+
 struct SharedTodoSnapshot: Codable {
     var schemaVersion: Int?
     var updatedAt: Int64
@@ -117,6 +125,7 @@ struct SharedTodoSnapshot: Codable {
     var tags: [String]?
     var privacy: SharedPrivacy?
     var timeZone: String?
+    var filter: SharedFocusFilter?
     var ideas: SharedIdeas?
     var cards: [SharedCard]?
     var habits: [SharedHabit]?
@@ -206,6 +215,11 @@ struct PendingWidgetMutation: Codable {
 
     static func habit(path: String, date: String, now: Date = Date()) -> PendingWidgetMutation {
         PendingWidgetMutation(kind: "habit", path: path, date: date, timestamp: millis(now))
+    }
+
+    /// A digest text for `logs/digest-<date>.md`; the app writes it when it replays the queue.
+    static func digest(text: String, date: String, now: Date = Date()) -> PendingWidgetMutation {
+        PendingWidgetMutation(kind: "digest", text: text, date: date, timestamp: millis(now))
     }
 
     /// The app stops the interval at `timestamp`, the tap, not when it replays the queue.

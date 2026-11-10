@@ -25,4 +25,5 @@ export * from './sync/merge.js';
 export * from './utils/crypto.js';
 export * from './utils/git-blob-sha.js';
 export * from './utils/push-notifications.js';
+export * from './widget-filter.js';
 export * from './widget-sync.js';

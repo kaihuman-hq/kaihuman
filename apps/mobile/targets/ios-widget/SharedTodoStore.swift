@@ -35,6 +35,9 @@ struct SharedTodoStore {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupId)
     }
 
+    /// A file in the App Group container (FocusFilter.swift keeps its own file there).
+    func containerFileURL(_ name: String) -> URL? { containerURL?.appendingPathComponent(name) }
+
     // MARK: Snapshot persistence
 
     func load() -> SharedTodoSnapshot? {
