@@ -118,7 +118,8 @@ vi.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
         renderRightActions?.({ value: 0 }, translation, methods),
         createElement('div', {
           'data-testid': testID ? `${testID}-willopen` : undefined,
-          onClick: () => onSwipeableWillOpen?.('right', methods),
+          // gesture-handler 3 names the travel direction: opening the trailing buttons is 'left'.
+          onClick: () => onSwipeableWillOpen?.('left', methods),
         }),
       );
     },

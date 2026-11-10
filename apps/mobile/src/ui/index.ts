@@ -30,7 +30,6 @@ export {
   FadeInView,
   MotionItem,
   MotionList,
-  usePop,
   usePressScale,
 } from './motion.js';
 export { Screen, type ScreenProps, ScreenTitle } from './screen.js';

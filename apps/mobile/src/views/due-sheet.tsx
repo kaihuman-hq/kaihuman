@@ -1,13 +1,13 @@
 import type { TodoDue, TodoRepeat } from '@kaihuman/formats';
 import { useState } from 'react';
 import { Modal, Pressable } from 'react-native';
-import { dueFromPreset, retargetRepeat } from '../screens/todo-due.js';
+import { DUE_PRESETS, dueFromPreset, retargetRepeat } from '../screens/todo-due.js';
 import { useTheme } from '../theme/theme.js';
 import { Button, Text } from '../ui/index.js';
 import { DueEditor } from './due-editor.js';
 
 /**
- * Board "Due" menu: Today, Tomorrow, Pick… (native picker plus repeat), and Clear when a due is
+ * Board "Due" menu: the quick presets, Pick… (native picker plus repeat), and Clear when a due is
  * set. The presets keep the todo's repeat; Pick… saves the repeat edited alongside the date.
  */
 export function DueSheet({
@@ -78,20 +78,16 @@ export function DueSheet({
             </>
           ) : (
             <>
-              <Button
-                label="Today"
-                testID="due-today"
-                variant="tinted"
-                fullWidth
-                onPress={() => onSelect(dueFromPreset('today', now))}
-              />
-              <Button
-                label="Tomorrow"
-                testID="due-tomorrow"
-                variant="tinted"
-                fullWidth
-                onPress={() => onSelect(dueFromPreset('tomorrow', now))}
-              />
+              {DUE_PRESETS.map(({ preset, label }) => (
+                <Button
+                  key={preset}
+                  label={label}
+                  testID={`due-${preset}`}
+                  variant="tinted"
+                  fullWidth
+                  onPress={() => onSelect(dueFromPreset(preset, now))}
+                />
+              ))}
               <Button
                 label="Pick…"
                 testID="due-pick"

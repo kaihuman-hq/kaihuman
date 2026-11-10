@@ -1,25 +1,13 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { BackHandler, PanResponder, Pressable, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
-import { scheduleOnRN } from 'react-native-worklets';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import type { QuickMenuAction } from '../screens/quick-menu.js';
 import { useTheme } from '../theme/theme.js';
 import { Icon, Text } from '../ui/index.js';
 import { tintColors } from './tiles/square/tone.js';
 
-/** Docs/redesign "Animation notes": scrim to 42 % in 180 ms, sheet spring damping 18, items 20 ms apart. */
+// Opens and closes without animation on purpose; only the drag-to-dismiss follows the finger.
 const SCRIM_OPACITY = 0.42;
-const SCRIM_MS = 180;
-const SHEET_SPRING = { damping: 18, stiffness: 220 };
-const STAGGER_MS = 20;
-/** Far enough to hide any sheet; the real height is not known before layout. */
-const OFFSCREEN = 800;
 const DISMISS_DRAG = 120;
 
 export interface QuickMenuProps {
@@ -36,13 +24,10 @@ export interface QuickMenuProps {
 
 /**
  * The ＋ quick menu: Capture (quick-* sheets) and Track (one-tap entries from the user's tiles).
- * An overlay above the tab bar rather than a Modal, so the rotated ＋ stays on top as the close control.
+ * An overlay above the tab bar rather than a Modal, so the ＋ (shown as × while open) stays on top as the close control.
  */
 export function QuickMenu(props: QuickMenuProps) {
   const { open, onClose } = props;
-  // Stays mounted through the exit animation.
-  const [mounted, setMounted] = useState(open);
-  if (open && !mounted) setMounted(true);
 
   useEffect(() => {
     if (!open) return;
@@ -53,38 +38,12 @@ export function QuickMenu(props: QuickMenuProps) {
     return () => sub.remove();
   }, [open, onClose]);
 
-  return mounted ? <QuickMenuSheet {...props} onHidden={() => setMounted(false)} /> : null;
+  return open ? <QuickMenuSheet {...props} /> : null;
 }
 
-function QuickMenuSheet({
-  open,
-  capture,
-  track,
-  last,
-  onRun,
-  onClose,
-  bottomOffset,
-  onHidden,
-}: QuickMenuProps & { onHidden: () => void }) {
+function QuickMenuSheet({ capture, track, last, onRun, onClose, bottomOffset }: QuickMenuProps) {
   const { colors, spacing, shape } = useTheme();
-  const scrim = useSharedValue(0);
-  const offset = useSharedValue(OFFSCREEN);
   const drag = useSharedValue(0);
-
-  useEffect(() => {
-    if (open) {
-      drag.set(0);
-      scrim.set(withTiming(SCRIM_OPACITY, { duration: SCRIM_MS }));
-      offset.set(withSpring(0, SHEET_SPRING));
-      return;
-    }
-    scrim.set(withTiming(0, { duration: SCRIM_MS }));
-    offset.set(
-      withTiming(OFFSCREEN, { duration: 220 }, (finished?: boolean) => {
-        if (finished) scheduleOnRN(onHidden);
-      }),
-    );
-  }, [open, scrim, offset, drag, onHidden]);
 
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -95,31 +54,30 @@ function QuickMenuSheet({
       onPanResponderMove: (_e, g) => drag.set(Math.max(0, g.dy)),
       onPanResponderRelease: (_e, g) => {
         if (g.dy > DISMISS_DRAG || g.vy > 1) onCloseRef.current();
-        else drag.set(withSpring(0, SHEET_SPRING));
+        else drag.set(0);
       },
     }),
   ).current;
 
-  const scrimStyle = useAnimatedStyle(() => ({ opacity: scrim.get() }));
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: offset.get() + drag.get() }],
-  }));
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: drag.get() }] }));
 
-  let index = 0;
-  const item = (a: QuickMenuAction) => (
-    <QuickItem key={a.id} action={a} index={index++} open={open} onRun={onRun} />
-  );
+  const item = (a: QuickMenuAction) => <QuickItem key={a.id} action={a} onRun={onRun} />;
 
   return (
     <View
       testID="quick-menu"
       style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: bottomOffset }}
     >
-      <Animated.View
-        style={[
-          { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000' },
-          scrimStyle,
-        ]}
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#000',
+          opacity: SCRIM_OPACITY,
+        }}
       >
         <Pressable
           testID="quick-menu-scrim"
@@ -127,7 +85,7 @@ function QuickMenuSheet({
           onPress={onClose}
           style={{ flex: 1 }}
         />
-      </Animated.View>
+      </View>
       <Animated.View
         {...pan.panHandlers}
         accessibilityViewIsModal
@@ -224,30 +182,14 @@ function Chip({ action, size }: { action: QuickMenuAction; size: number }) {
 
 function QuickItem({
   action,
-  index,
-  open,
   onRun,
 }: {
   action: QuickMenuAction;
-  index: number;
-  open: boolean;
   onRun: (action: QuickMenuAction) => void;
 }) {
   const { spacing } = useTheme();
-  const p = useSharedValue(0);
-  useEffect(() => {
-    p.set(
-      open
-        ? withDelay(index * STAGGER_MS, withSpring(1, SHEET_SPRING))
-        : withTiming(0, { duration: 120 }),
-    );
-  }, [open, index, p]);
-  const style = useAnimatedStyle(() => ({
-    opacity: Math.min(1, p.get()),
-    transform: [{ scale: 0.8 + 0.2 * p.get() }],
-  }));
   return (
-    <Animated.View style={[{ width: '25%', alignItems: 'center' }, style]}>
+    <View style={{ width: '25%', alignItems: 'center' }}>
       <Pressable
         testID={`quick-${action.id}`}
         accessibilityRole="button"
@@ -260,6 +202,6 @@ function QuickItem({
           {action.label}
         </Text>
       </Pressable>
-    </Animated.View>
+    </View>
   );
 }

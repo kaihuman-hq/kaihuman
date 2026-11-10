@@ -2,7 +2,6 @@ import { Children, isValidElement, type ReactNode, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, Pressable, View } from 'react-native';
 import { useTheme } from '../../theme/theme.js';
 import {
-  Animated,
   Divider,
   Icon,
   type IconName,
@@ -11,7 +10,6 @@ import {
   SwipeReveal,
   Text,
   TextField,
-  usePop,
 } from '../../ui/index.js';
 
 export interface RowAction {
@@ -164,27 +162,23 @@ export function ItemRow({
 /** A round check marker; filled when `on`. */
 export function CheckCircle({ on }: { on: boolean }) {
   const { colors } = useTheme();
-  const pop = usePop(on);
   return (
-    <Animated.View
+    <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[
-        {
-          width: 24,
-          height: 24,
-          borderRadius: 12,
-          borderWidth: on ? 0 : 2,
-          borderColor: colors.secondaryLabel,
-          backgroundColor: on ? colors.accentFill : 'transparent',
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        pop,
-      ]}
+      style={{
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        borderWidth: on ? 0 : 2,
+        borderColor: colors.secondaryLabel,
+        backgroundColor: on ? colors.accentFill : 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
       {on ? <Icon name="check" size={14} color={colors.onAccentFill} weight="bold" /> : null}
-    </Animated.View>
+    </View>
   );
 }
 

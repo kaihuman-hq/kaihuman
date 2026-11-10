@@ -1,7 +1,5 @@
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { type DesignPlatform, useTheme } from '../theme/theme.js';
 import { haptics, Icon, type IconName, Text } from '../ui/index.js';
 
@@ -142,12 +140,6 @@ function PlusButton({
   onLongPress: () => void;
 }) {
   const { colors } = useTheme();
-  const turn = useSharedValue(open ? 1 : 0);
-  useEffect(() => {
-    // Springs skip themselves under the system reduce-motion setting (ReduceMotion.System).
-    turn.set(withSpring(open ? 1 : 0, { damping: 16, stiffness: 260 }));
-  }, [open, turn]);
-  const style = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.get() * 45}deg` }] }));
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
       <Pressable
@@ -179,9 +171,10 @@ function PlusButton({
           elevation: 6,
         }}
       >
-        <Animated.View style={style}>
+        {/* Turned into an × while open, without animating the turn. */}
+        <View style={{ transform: [{ rotate: open ? '45deg' : '0deg' }] }}>
           <Icon name="add" size={28} color={colors.onAccentFill} />
-        </Animated.View>
+        </View>
       </Pressable>
     </View>
   );

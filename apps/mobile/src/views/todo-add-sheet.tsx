@@ -2,7 +2,7 @@ import { parseTodos, serializeTodos, setTodoPriority, type TodoRepeat } from '@k
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { addTodoTask } from '../components/widgets/todos-tile.js';
-import { type DuePreset, dueFromPreset } from '../screens/todo-due.js';
+import { DUE_PRESETS, type DuePreset, dueFromPreset } from '../screens/todo-due.js';
 import { useTheme } from '../theme/theme.js';
 import { Button, Chip, haptics, Text, TextField } from '../ui/index.js';
 
@@ -114,18 +114,15 @@ export function TodoAddSheet({ path, content, now, onWrite, onClose }: TodoAddSh
         testID="todo-add-input"
       />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-        <Chip
-          label="Today"
-          icon="calendar"
-          selected={due === 'today'}
-          onPress={() => toggleDue('today')}
-        />
-        <Chip
-          label="Tomorrow"
-          icon="calendar"
-          selected={due === 'tomorrow'}
-          onPress={() => toggleDue('tomorrow')}
-        />
+        {DUE_PRESETS.map(({ preset, label }) => (
+          <Chip
+            key={preset}
+            label={label}
+            icon="calendar"
+            selected={due === preset}
+            onPress={() => toggleDue(preset)}
+          />
+        ))}
         <Chip
           label={priority ? PRIORITY_LABEL[priority] : 'Priority'}
           icon="flag"

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { ACTION_WIDTH, fullSwipeThreshold, isFullSwipe } from './swipe-logic.js';
+import {
+  ACTION_WIDTH,
+  fullSwipeThreshold,
+  isFullSwipe,
+  shouldRunFullSwipe,
+} from './swipe-logic.js';
 
 describe('full swipe threshold', () => {
   it('is half the row width on a normal row', () => {
@@ -24,6 +29,19 @@ describe('full swipe threshold', () => {
   it('ignores a swipe towards the other edge', () => {
     expect(isFullSwipe(300, 400)).toBe(false);
     expect(isFullSwipe(0, 400)).toBe(false);
+  });
+});
+
+describe('shouldRunFullSwipe', () => {
+  // Regression: gesture-handler 3 reports 'left' when the trailing buttons open; checking
+  // 'right' meant a full swipe slid the row but never marked the RSS item read.
+  it('runs on a full right-to-left swipe, which opens towards the left', () => {
+    expect(shouldRunFullSwipe('left', -300, 400)).toBe(true);
+  });
+
+  it('does not run when the leading side opens or the swipe is short', () => {
+    expect(shouldRunFullSwipe('right', -300, 400)).toBe(false);
+    expect(shouldRunFullSwipe('left', -ACTION_WIDTH, 400)).toBe(false);
   });
 });
 

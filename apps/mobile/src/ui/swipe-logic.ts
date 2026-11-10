@@ -26,3 +26,16 @@ export function isFullSwipe(translation: number, rowWidth: number): boolean {
   'worklet';
   return translation <= -fullSwipeThreshold(rowWidth);
 }
+
+/**
+ * Whether an `onSwipeableWillOpen` should run the full-swipe action. ReanimatedSwipeable
+ * (gesture-handler 3) names the direction the row travels, so opening the trailing buttons
+ * reports 'left', not 'right'.
+ */
+export function shouldRunFullSwipe(
+  direction: 'left' | 'right',
+  translation: number,
+  rowWidth: number,
+): boolean {
+  return direction === 'left' && isFullSwipe(translation, rowWidth);
+}

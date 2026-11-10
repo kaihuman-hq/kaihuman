@@ -32,6 +32,7 @@ import {
   FULL_SWIPE_COLLAPSE_MS,
   FULL_SWIPE_SLIDE_MS,
   isFullSwipe,
+  shouldRunFullSwipe,
 } from './swipe-logic.js';
 import { Text } from './text.js';
 
@@ -332,7 +333,7 @@ export function SwipeReveal({
         overshootRight={fullSwipe}
         onSwipeableWillOpen={(direction) => {
           const t = translation.current?.get() ?? 0;
-          if (outermost && direction === 'right' && isFullSwipe(t, width.get())) {
+          if (outermost && shouldRunFullSwipe(direction, t, width.get())) {
             runFullSwipe(outermost);
           } else {
             haptics.selection();

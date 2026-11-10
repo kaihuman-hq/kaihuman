@@ -82,6 +82,19 @@ describe('TodoAddSheet', () => {
     expect(item?.tags).toEqual(['work']);
   });
 
+  it('next weekday chips pick the coming Saturday or Monday', () => {
+    const { type, submit, items } = mount();
+    type('weekend');
+    chip('Next Saturday');
+    submit();
+    expect(items().at(-1)?.dueDate).toBe('2026-11-14');
+    type('week');
+    chip('Next Saturday');
+    chip('Next Monday');
+    submit();
+    expect(items().at(-1)?.dueDate).toBe('2026-11-16');
+  });
+
   it('toggling a due chip twice clears it; repeat alone implies today', () => {
     const { type, submit, items } = mount();
     type('a');

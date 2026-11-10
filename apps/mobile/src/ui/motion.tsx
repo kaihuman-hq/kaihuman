@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import Animated, {
   FadeIn,
@@ -9,7 +8,6 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
@@ -73,22 +71,6 @@ export function FadeInView({
       {children}
     </Animated.View>
   );
-}
-
-/** Style that pops the element (shrink, then spring back) whenever `on` turns true: the checkbox toggle. */
-export function usePop(on: boolean) {
-  const scale = useSharedValue(1);
-  useEffect(() => {
-    if (on) {
-      scale.set(
-        withSequence(
-          withTiming(0.7, { duration: 70 }),
-          withSpring(1, { damping: 8, stiffness: 300, mass: 0.6 }),
-        ),
-      );
-    }
-  }, [on, scale]);
-  return useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
 }
 
 export { Animated };

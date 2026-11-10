@@ -1,18 +1,9 @@
 import { Link } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
-import {
-  FadeInDown,
-  LayoutAnimationConfig,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
 import type { TileResult } from '../../../components/widgets/tile-controllers.js';
 import { useTheme } from '../../../theme/theme.js';
-import { Animated, haptics, Icon, Text, usePressScale } from '../../../ui/index.js';
+import { haptics, Icon, Text } from '../../../ui/index.js';
 import type { Glance, QuickAction } from '../glance/types.js';
 import { MiniViz, VIZ_HEIGHT } from './mini-viz.js';
 import { tintColors, toneColor } from './tone.js';
@@ -53,8 +44,6 @@ function QuickButton({
 }) {
   const theme = useTheme();
   const { colors } = theme;
-  const scale = useSharedValue(1);
-  const pop = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
   const stop = action.icon === 'stop';
   const done = action.kind === 'tap' && action.done === true;
   // An unticked check waits in a neutral ring; ticked, it fills like the ＋ buttons.
@@ -62,34 +51,24 @@ function QuickButton({
   const bg = muted ? colors.fill : colors.accentFill;
   const fg = muted ? colors.label : colors.onAccentFill;
   return (
-    <Animated.View style={pop}>
-      <Pressable
-        testID="tile-quick-action"
-        accessibilityRole="button"
-        accessibilityLabel={action.label || `Add to ${title}`}
-        accessibilityState={{ checked: action.kind === 'tap' ? done : undefined }}
-        hitSlop={8}
-        onPress={() => {
-          scale.set(
-            withSequence(
-              withTiming(1.15, { duration: 90 }),
-              withSpring(1, { damping: 10, stiffness: 300 }),
-            ),
-          );
-          onPress();
-        }}
-        style={{
-          width: 30,
-          height: 30,
-          borderRadius: 15,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: bg,
-        }}
-      >
-        <Icon name={action.icon} size={stop ? 11 : 15} color={fg} weight="bold" />
-      </Pressable>
-    </Animated.View>
+    <Pressable
+      testID="tile-quick-action"
+      accessibilityRole="button"
+      accessibilityLabel={action.label || `Add to ${title}`}
+      accessibilityState={{ checked: action.kind === 'tap' ? done : undefined }}
+      hitSlop={8}
+      onPress={onPress}
+      style={{
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: bg,
+      }}
+    >
+      <Icon name={action.icon} size={stop ? 11 : 15} color={fg} weight="bold" />
+    </Pressable>
   );
 }
 
@@ -142,35 +121,28 @@ function Hero({ glance }: { glance: Glance }) {
           </Text>
         </View>
       ) : null}
-      {/* Only changes roll in; the first paint is static. */}
-      <LayoutAnimationConfig skipEntering>
-        <Animated.View
-          key={glance.hero}
-          entering={FadeInDown.springify().damping(16)}
-          style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
+        <Text
+          testID="tile-hero"
+          mono
+          numberOfLines={1}
+          style={{
+            fontSize: 34,
+            lineHeight: 40,
+            fontWeight: '600',
+            letterSpacing: -1,
+            flexShrink: 1,
+            color: glance.heroTone ? toneColor(theme, glance.heroTone) : colors.label,
+          }}
         >
-          <Text
-            testID="tile-hero"
-            mono
-            numberOfLines={1}
-            style={{
-              fontSize: 34,
-              lineHeight: 40,
-              fontWeight: '600',
-              letterSpacing: -1,
-              flexShrink: 1,
-              color: glance.heroTone ? toneColor(theme, glance.heroTone) : colors.label,
-            }}
-          >
-            {glance.hero}
+          {glance.hero}
+        </Text>
+        {glance.unit ? (
+          <Text variant="subheadline" tone="secondary" mono numberOfLines={1}>
+            {glance.unit}
           </Text>
-          {glance.unit ? (
-            <Text variant="subheadline" tone="secondary" mono numberOfLines={1}>
-              {glance.unit}
-            </Text>
-          ) : null}
-        </Animated.View>
-      </LayoutAnimationConfig>
+        ) : null}
+      </View>
       {glance.label || glance.delta ? (
         <Text variant="footnote" tone="secondary" numberOfLines={1}>
           {glance.delta ? (
@@ -193,16 +165,12 @@ function TileLink({
   onLongPress,
   label,
   children,
-  pressStyle,
-  handlers,
 }: {
   href: string;
   onOpen: () => void;
   onLongPress?: () => void;
   label: string;
   children: ReactNode;
-  pressStyle: object;
-  handlers: { onPressIn: () => void; onPressOut: () => void };
 }) {
   const pressable = (onPress?: () => void) => (
     <Pressable
@@ -210,14 +178,10 @@ function TileLink({
       accessibilityLabel={label}
       onPress={onPress}
       onLongPress={onLongPress}
-      onPressIn={() => {
-        handlers.onPressIn();
-        haptics.light();
-      }}
-      onPressOut={handlers.onPressOut}
+      onPressIn={() => haptics.light()}
       style={{ flex: 1 }}
     >
-      <Animated.View style={[{ flex: 1 }, pressStyle]}>{children}</Animated.View>
+      <View style={{ flex: 1 }}>{children}</View>
     </Pressable>
   );
   if (Platform.OS === 'ios') {
@@ -246,7 +210,6 @@ export function SquareTile({
   const theme = useTheme();
   const { colors, scheme, platform } = theme;
   const tint = tintColors(theme, glance.tint);
-  const press = usePressScale();
   const [error, setError] = useState<string | null>(null);
 
   const runAction = (action: QuickAction) => {
@@ -289,8 +252,6 @@ export function SquareTile({
         onOpen={() => onNavigate(href)}
         {...(onLongPress && { onLongPress })}
         label={`${glance.title}, ${glance.counts ? glance.counts.map((c) => `${c.value} ${c.label}`).join(', ') : `${glance.hero} ${glance.unit ?? ''} ${glance.label}`.trim()}`}
-        pressStyle={press.style}
-        handlers={press.handlers}
       >
         <View
           testID={`glance-${glance.title}`}

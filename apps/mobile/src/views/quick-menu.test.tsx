@@ -39,6 +39,13 @@ const renderMenu = (over: Partial<QuickMenuProps> = {}) => {
 };
 
 describe('QuickMenu', () => {
+  it('appears and disappears at once, without an exit animation', () => {
+    const { props, rerender } = renderMenu();
+    expect(screen.getByTestId('quick-menu')).toBeTruthy();
+    rerender(<QuickMenu {...props} open={false} />);
+    expect(screen.queryByTestId('quick-menu')).toBeNull();
+  });
+
   it('lists Capture and Track groups and the last action row', () => {
     renderMenu();
     expect(screen.getByText('CAPTURE')).toBeTruthy();

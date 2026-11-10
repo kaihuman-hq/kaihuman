@@ -10,14 +10,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import {
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withDelay,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { focusFilter } from '../adapters/focus-filter.js';
 import { presentTile, type TileView } from '../components/widgets/tile-controllers.js';
 import { useEnsureFeeds, useFeedSnapshot } from '../files/use-feeds.js';
@@ -77,8 +70,6 @@ function Hint({ children }: { children: ReactNode }) {
 interface PageProps {
   page: DashboardPage;
   width: number;
-  /** The page on screen; its tiles stagger in when it becomes current. */
-  active: boolean;
   defaulted: boolean;
   now: Date;
   loading: boolean;
@@ -92,40 +83,9 @@ interface PageProps {
   onStartEdit?: () => void;
 }
 
-const STAGGER_MS = 30;
-
-/** Page swipe: tiles rise in one after another, 30 ms apart (README animation notes). */
-function Stagger({
-  index,
-  active,
-  width,
-  children,
-}: {
-  index: number;
-  active: boolean;
-  width: number | '100%';
-  children: ReactNode;
-}) {
-  const reduced = useReducedMotion();
-  const progress = useSharedValue(active || reduced ? 1 : 0);
-  useEffect(() => {
-    if (reduced) return;
-    if (active) {
-      progress.set(0);
-      progress.set(withDelay(index * STAGGER_MS, withSpring(1, { damping: 18, stiffness: 220 })));
-    }
-  }, [active, index, progress, reduced]);
-  const style = useAnimatedStyle(() => ({
-    opacity: 0.4 + progress.get() * 0.6,
-    transform: [{ translateY: (1 - progress.get()) * 14 }, { scale: 0.96 + progress.get() * 0.04 }],
-  }));
-  return <Animated.View style={[{ width }, style]}>{children}</Animated.View>;
-}
-
 function Page({
   page,
   width,
-  active,
   defaulted,
   now,
   loading,
@@ -249,17 +209,12 @@ function Page({
               testID="dashboard-grid"
               style={{ flexDirection: 'row', flexWrap: 'wrap', gap: TILE_GAP }}
             >
-              {cells.map((cell, i) => (
-                <Stagger
-                  key={cell.item.path}
-                  index={i}
-                  active={active}
-                  width={cell.glance ? side : '100%'}
-                >
+              {cells.map((cell) => (
+                <View key={cell.item.path} style={{ width: cell.glance ? side : '100%' }}>
                   <ErrorBoundary what="this tile" resetKey={cell.item.content} onRetry={onRefresh}>
                     {renderCell(cell)}
                   </ErrorBoundary>
-                </Stagger>
+                </View>
               ))}
             </View>
           </>
@@ -547,7 +502,6 @@ export function DashboardPager({
           <Page
             page={item}
             width={width}
-            active={i === index}
             defaulted={defaulted}
             now={now}
             loading={loading}

@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-10 — Mobile: RSS full swipe marks read, quick due dates, calmer motion
+
+- RSS full swipe (right to left) slid the row but never marked it read. Cause: gesture-handler 3's `ReanimatedSwipeable` reports `onSwipeableWillOpen` as `'left'` when the trailing buttons open; `SwipeReveal` checked `'right'`. Fix in `shouldRunFullSwipe` (`src/ui/swipe-logic.ts`); the test mock now reports the real direction, so the RSS swipe test is a regression test.
+- Todos: quick due presets Today, Tomorrow, Next Saturday, Next Monday (next such day strictly after today) in the add sheet, the board Due sheet and the due editor (todo detail, quick capture). `DUE_PRESETS` / `dueFromPreset` in `src/screens/todo-due.ts`, with tests.
+- Motion: removed the dashboard tile entrance stagger, hero roll-in, tile press scale, quick-action pop and checkbox pop; the ＋ button no longer spins (shows × while open); the ＋ menu opens and closes without scrim fade, sheet spring or item stagger; the Android FAB has no press scale. Row exit/layout fades and the full-swipe slide-out stay.
+
 ## 2026-11-10 — Mobile iOS: fix EAS build error in the scan intent
 
 - `VisualIntelligenceIntents.swift`: the EAS Xcode SDK types `SemanticContentDescriptor.pixelBuffer` as `CVReadOnlyPixelBuffer`, while CI's iOS 26.5 SDK still uses `CVPixelBuffer`. An overload for each type, so the file compiles with both.
