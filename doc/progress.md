@@ -14,6 +14,10 @@
 - Motion (`ui/motion.tsx`, Reanimated, honours the OS reduce-motion setting): press-scale on `Button`, `Fab` and `Chip`; fade-in on `EmptyState`; spring pop on `CheckCircle`; add/remove fade and sibling glide on kanban cards, stream cards, ideas and the tile-body `Rows` (rows already on screen do not animate on mount; keys follow row content via `contentKeys`). `Section` gets an opt-in `animated` prop. Android stack screens slide in from the right. Dashboard tiles untouched; sheets already use the `Modal` slide/fade.
 - Tests: swipe threshold, content keys, full vs short swipe on the RSS body; Reanimated stand-in in `ui/test-setup.ts`.
 
+## 2026-11-10 — Mobile redesign mockups (design only)
+
+- `apps/mobile/docs/redesign/`: HTML mockups + 2× PNGs (light and dark) for a square 2-column dashboard, all 18 tiles, a center ＋ tab quick menu, a counts-only todos tile with detail and add sheet, and improved iOS widgets (today-only tasks, one-row habit activity, timer). `README.md` lists decisions, animation notes and web vs mobile gaps. No app code changed.
+
 ## 2026-11-09 — Tests: extension teardown race, mobile render timeouts
 
 - Mobile `dom` tests get a 20s timeout: full tile and dashboard renders took over 5s on the shared CI runner.
@@ -163,7 +167,6 @@
 
 - After GitHub or token sign-in with no repo selected, the app now goes to a full `/onboarding` step (title, explanation, search, recently pushed first, Private/Public badges, confirm card). A single plausible kaihuman/life-os/`kh` repo is preselected but still needs "Use this repository". Empty, loading and error (with retry, and "Sign in again" on a rejected token) states are covered. Choosing a repo does `router.replace('/dashboard')`, so back never returns to login or onboarding.
 - One pure decision in `src/navigation/start-route.ts`: `resolveStartRoute({ token, repo })` plus `guardRedirect` used by the root layout, so later launches skip both screens, a lost token goes to login and a token without a repo goes to the selector. Core `GithubRepo` gains optional `pushed_at`. Tests: `start-route.test.ts`, `onboarding-view.test.tsx`. `doc/mobile-design.md` updated.
-
 
 ## 2026-11-08 — Mobile: build numbers committed in git
 
@@ -394,7 +397,6 @@
 - Fix 6: `renameFile` and the new `commitTransform(paths, transform, message)` (used by the Kanban move) are one `commitFiles` with `expectedHeadSha`, retried on `ConflictError`. The tree smart merge keeps a cached-only entry only when it is unpushed (`sha === ''`) or just committed (`pendingCommit`, was `pendingBinary`).
 - In-memory GitHub service: `saveFile`/`deleteFile` advance the head. Tests: `sync-phase2.test.ts` (causes 2, 5, 6), `auto-sync.test.ts`, `UnsyncedIndicator.test.tsx`, editor test for remote content under a clean editor.
 - Review fixes: a sync/`ensureFresh`/`commitTransform` run no longer reconciles against a listing older than a save (save-generation guard, saved tree sha kept, head not recorded when a path was skipped) or after a repo switch; edits typed during `commitTransform`/`renameFile` commits are replayed instead of overwritten; `deleteFile`/`renameFolder` clear dirty state so the outbox stops retrying removed paths; `commitTransform` makes no commit for an empty change set; the Kanban move re-finds the dragged todo by text and `createdAt` (`moveTodo.ts`) instead of a stale index.
-
 
 ## 2026-11-05 — Sync fixes, phase 1 (no blind overwrite, durable edits, no-store reads)
 
@@ -2035,7 +2037,6 @@ field name — the long version read `Tags, separated by spaces or commas (3/3)`
 Checks: `tsc -b` clean; biome clean; extension vitest 194 of 194 (8 new for the walk,
 2 for the forced sync); extension build green.
 
-
 ## 2026-09-22 — which bookmarks get used, counted locally and merged hourly
 
 **The `bookmarks` permission is optional now.** It moved to `optional_permissions`,
@@ -2090,7 +2091,6 @@ your browser bookmarks from the popup first".
 Checks: `tsc` clean in both apps; biome clean; extension vitest 186 of 186 (21 new,
 across the merge rules and the sync cycle), console vitest 90 of 90 (8 new, for the
 carried fields and the sort); extension and console builds green.
-
 
 ## 2026-09-22 — the palette does everything the popup does, and remembers what you did
 
@@ -2155,7 +2155,6 @@ biome clean on every file touched; extension vitest 165 of 165 (35 new, across t
 flattener, both caches, the import, recents, repo switching and the palette's new
 modes); extension and console builds green.
 
-
 ## 2026-09-22 — a letter-key shortcut, and repo hits that open in the console
 
 Two follow-ups on the palette.
@@ -2186,7 +2185,6 @@ Checks: `tsc -b` clean; biome clean; extension vitest 127 of 127 (4 new for the 
 link, including the encoding round-trip); extension build green; and the built
 extension loaded into Chromium under Playwright reports the command bound to
 `Ctrl+Shift+K`.
-
 
 ## 2026-09-22 — the palette shortcut did nothing in tabs that were already open
 
@@ -2241,7 +2239,6 @@ Checks: `tsc -b` clean; biome clean on every file touched; extension vitest 123 
 script, the retry while the module starts, the badge on both refusal paths, and
 clearing a stale badge); extension build green.
 
-
 ## 2026-09-22 — bookmarking the current page, from the popup and the palette
 
 The bookmarks mirror was read-only; both browser surfaces can now write to it.
@@ -2269,7 +2266,6 @@ lands on one URL.
 Checks: `tsc -b` clean in the extension; biome clean on every file touched;
 extension vitest 119 of 119 (19 new — the write path against a stubbed Contents
 API, and the action row in jsdom); extension build green.
-
 
 ## 2026-09-22 — bookmarks: a repo file type, a cached mirror, and a palette on a shortcut
 
@@ -2335,7 +2331,6 @@ module, the worker messages and the palette in jsdom); `@lifosy/ui`, console and
 extension builds green. `turbo` itself cannot spawn child processes in this
 sandbox ("Exec format error"), which is why the per-package scripts were run
 directly — it fails the same way on `@lifosy/config`'s `echo`.
-
 
 ## 2026-09-16 — cascivo 1.3.0: the editor gutter stops drifting
 
