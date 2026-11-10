@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { actionLogList, actionLogReport, actionLogStats } from './actionlog-tile.js';
+import {
+  actionLogList,
+  actionLogReport,
+  actionLogStats,
+  entryTime,
+  groupByDay,
+  stripTags,
+} from './actionlog-tile.js';
 
 const NOW = new Date(2026, 10, 9, 12, 0, 0);
 const FILE = `---
@@ -50,5 +57,37 @@ describe('actionLogReport', () => {
   it('ranks tags by count then name and caps the list', () => {
     expect(actionLogReport(FILE, NOW).topTags[0]).toEqual({ tag: 'run', count: 3 });
     expect(actionLogReport(FILE, NOW, 2).topTags).toHaveLength(2);
+  });
+});
+
+describe('groupByDay', () => {
+  it('groups newest first under Today, Yesterday and dated headings', () => {
+    const { entries } = actionLogList(FILE);
+    const groups = groupByDay(entries, new Date(2026, 10, 9, 12, 0, 0));
+    expect(groups.map((g) => g.title)).toEqual([
+      'Yesterday',
+      'Thu, Nov 5, 2026',
+      'Tue, Oct 20, 2026',
+      'Tue, Sep 15, 2026',
+      'Wed, Oct 1, 2025',
+    ]);
+    expect(groupByDay(entries, new Date(2026, 10, 8, 12))[0]?.title).toBe('Today');
+    expect(groups[0]?.day).toBe('2026-11-08');
+  });
+  it('keeps several entries of one day together', () => {
+    const groups = groupByDay(
+      actionLogList('- 2026-11-08 09:00:00 B\n- 2026-11-08 07:00:00 A').entries,
+      new Date(2026, 10, 8),
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.entries.map((e) => e.description)).toEqual(['B', 'A']);
+  });
+});
+
+describe('entry text helpers', () => {
+  it('reads the time of day and strips inline tags for display', () => {
+    expect(entryTime('2026-11-08 09:05:30')).toBe('09:05');
+    expect(stripTags('Ran 5k #run #health')).toBe('Ran 5k');
+    expect(stripTags('#solo')).toBe('#solo');
   });
 });

@@ -86,3 +86,45 @@ export const actionLogReport = (content: string, now: Date, topTags = 5): Action
       .slice(0, topTags),
   };
 };
+
+const TAG_TEXT = /\s*#[\w-]+/g;
+
+/** The entry text without its inline `#tags` (shown as chips); a tags-only entry keeps them. */
+export const stripTags = (description: string): string =>
+  description.replace(TAG_TEXT, '').trim() || description;
+
+/** `HH:mm` of a log timestamp. */
+export const entryTime = (timestamp: string): string => timestamp.slice(11, 16);
+
+export interface ActionLogDay {
+  /** `YYYY-MM-DD`. */
+  day: string;
+  /** Today, Yesterday, or e.g. `Thu, Nov 5, 2026`. */
+  title: string;
+  entries: ActionLogEntry[];
+}
+
+const dayTitle = (day: string, now: Date): string => {
+  const today = stamp(now).slice(0, 10);
+  if (day === today) return 'Today';
+  if (day === stamp(new Date(now.getTime() - 86_400_000)).slice(0, 10)) return 'Yesterday';
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+/** Groups newest-first entries into consecutive days, for sticky day headers. */
+export const groupByDay = (entries: readonly ActionLogEntry[], now: Date): ActionLogDay[] => {
+  const days: ActionLogDay[] = [];
+  for (const e of entries) {
+    const day = e.timestamp.slice(0, 10);
+    const last = days[days.length - 1];
+    if (last?.day === day) last.entries.push(e);
+    else days.push({ day, title: dayTitle(day, now), entries: [e] });
+  }
+  return days;
+};

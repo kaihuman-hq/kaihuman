@@ -362,6 +362,29 @@ export const logAction = (
   return ok(serializeActionLog(appendAction(parseActionLog(content), text, tags, now)));
 };
 
+const sameEntry = (a: ActionLogEntry, b: ActionLogEntry): boolean =>
+  a.timestamp === b.timestamp && a.description === b.description;
+
+/** Rewrites one entry's text (keeping its time); tags are re-read from the new text. */
+export const editAction = (content: string, entry: ActionLogEntry, text: string): TileResult => {
+  const description = text.trim();
+  if (!description) return fail('Enter what you did');
+  const data = parseActionLog(content);
+  const i = data.entries.findIndex((e) => sameEntry(e, entry));
+  if (i < 0) return fail('That entry is gone');
+  const tags = [...description.matchAll(/#([\w-]+)/g)].map((m) => m[1] as string);
+  data.entries[i] = { timestamp: entry.timestamp, description, tags: [...new Set(tags)] };
+  return ok(serializeActionLog(data));
+};
+
+export const deleteAction = (content: string, entry: ActionLogEntry): TileResult => {
+  const data = parseActionLog(content);
+  const i = data.entries.findIndex((e) => sameEntry(e, entry));
+  if (i < 0) return fail('That entry is gone');
+  data.entries.splice(i, 1);
+  return ok(serializeActionLog(data));
+};
+
 // ─── .timezones.json ─────────────────────────────────────────────────────────
 
 export interface WorldClock {

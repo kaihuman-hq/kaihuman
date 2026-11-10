@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-10 — Mobile: action log full view
+
+- Opening an `.actionlog.md` file now shows `ActionLogFull` instead of the dashboard tile body (the tile is untouched). The entry field is pinned at the top (return submits, optional `autoFocus`, keyboard-avoiding screen); below it search and tag filter chips, then the log newest first in a `SectionList` with sticky day headers (Today, Yesterday, dated), the time per entry and `#tags` as badges.
+- Swipe a row (full swipe deletes) or tap it to edit: the text goes into the top field, time is kept, tags are re-read from the text. Rows animate in and out (`MotionItem`). Catch-up with the web log: edit and delete were missing on mobile.
+- New `editAction`, `deleteAction`, `groupByDay`, `entryTime`, `stripTags` with tests.
+
 ## 2026-11-10 — Mobile: dashboard swipe, "Bad credentials" banner, automatic sync, widget due today
 
 - Dashboard swipe (root cause): `githubFileStore.openFile` returned at once when the same file was already loading, so a second reader found nothing in `openFiles`. Two dashboard loads overlap after every sync that bumps the revision (cold start in particular), the config read failed, `loadDashboards` treated it as "no config" and collapsed every dashboard into one "Today" page, so there was nothing to swipe to. The repository was never forgotten. Fixes: a concurrent `openFile` waits for the load in flight; an unreadable config now fails the load (the screen keeps its pages) instead of falling back; `takeLatest` drops a load that finishes after a newer one.
