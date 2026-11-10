@@ -22,6 +22,7 @@ import withKaihumanWidgets, {
   type CopyFs,
   copyAndroidWidgetSources,
   deriveIosIds,
+  IOS_QUICK_ACTIONS,
   IOS_WIDGET_TARGET,
   iosWidgetTarget,
   kotlinVersionFromCatalog,
@@ -31,6 +32,7 @@ import withKaihumanWidgets, {
   WIDGET_ONLY_SOURCES,
   widgetBuildSettings,
   withIosAppGroup,
+  withIosQuickActions,
   withLiveActivities,
   withUrlScheme,
   type XcodeEditor,
@@ -41,6 +43,7 @@ import {
   type PendingWidgetMutation,
   WIDGET_TODOS_FILE,
 } from './adapters/widget-bridge.js';
+import { parseDeepLink } from './navigation/routes.js';
 import {
   planEventReminders,
   planMilestoneReminders,
@@ -79,6 +82,39 @@ describe('config plugin transforms', () => {
     expect(
       withIosAppGroup({}).ios?.entitlements?.['com.apple.security.application-groups'],
     ).toEqual(['group.com.kaihuman.app']);
+  });
+
+  it('adds the home-screen quick actions once, keeping items other plugins added', () => {
+    const foreign = { UIApplicationShortcutItemType: 'other', UIApplicationShortcutItemTitle: 'X' };
+    const once = withIosQuickActions({
+      ios: { infoPlist: { UIApplicationShortcutItems: [foreign], Keep: 1 } },
+    });
+    const twice = withIosQuickActions(once);
+    expect(twice).toEqual(once);
+    const items = once.ios?.infoPlist?.UIApplicationShortcutItems as Record<string, string>[];
+    expect(items.map((i) => i.UIApplicationShortcutItemTitle)).toEqual([
+      'New todo',
+      'Quick note',
+      'Log entry',
+      'Search',
+      'Today',
+      'X',
+    ]);
+    expect(once.ios?.infoPlist?.Keep).toBe(1);
+    for (const item of items.slice(0, -1))
+      expect(item.UIApplicationShortcutItemIconSymbolName).toBeTruthy();
+    // iOS shows at most four static items above the system ones on some devices; we ship five.
+    expect(IOS_QUICK_ACTIONS.length).toBeLessThanOrEqual(5);
+  });
+
+  it('only uses quick-action types the app routes as deep links', () => {
+    for (const action of IOS_QUICK_ACTIONS) {
+      expect(parseDeepLink(action.type), action.type).not.toBeNull();
+    }
+    const plugged = withKaihumanWidgets({});
+    expect(plugged.ios?.infoPlist?.UIApplicationShortcutItems).toHaveLength(
+      IOS_QUICK_ACTIONS.length,
+    );
   });
 
   it('declares Live Activity support in the app Info.plist, keeping other keys', () => {
@@ -774,6 +810,35 @@ describe('kaihuman-shared native module', () => {
     }
   });
 
+  it('routes quick actions and Spotlight taps through an app delegate subscriber', () => {
+    const cfg = JSON.parse(read(`${moduleDir}/expo-module.config.json`)) as {
+      apple: { appDelegateSubscribers?: string[] };
+    };
+    expect(cfg.apple.appDelegateSubscribers).toEqual(['KaihumanAppDelegate']);
+    const delegate = read(`${moduleDir}/ios/KaihumanAppDelegate.swift`);
+    expect(delegate).toContain('public class KaihumanAppDelegate: ExpoAppDelegateSubscriber');
+    expect(delegate).toContain('launchOptions?[.shortcutItem]');
+    expect(delegate).toContain('performActionFor shortcutItem: UIApplicationShortcutItem');
+    expect(delegate).toContain('CSSearchableItemActionType');
+    expect(delegate).toContain('CSSearchableItemActivityIdentifier');
+    expect(delegate).toContain('"pending-url"');
+    expect(delegate).toContain('"group.com.kaihuman.app"');
+    expect(delegate).toContain('hasPrefix("kaihuman://")');
+  });
+
+  it('indexes Spotlight items and mirrors the focus session for the Control Center toggle', () => {
+    expect(swift).toContain('Function("indexSpotlight")');
+    expect(swift).toContain('CSSearchableIndex.default()');
+    expect(swift).toContain('"kaihuman.todo", "kaihuman.note"');
+    expect(read(`${moduleDir}/index.ts`)).toContain('indexSpotlight?(json: string): void;');
+    const focus = read('targets/ios-widget/FocusIntents.swift');
+    for (const key of ['"focus-activity-id"', '"FocusTimerControl"']) {
+      expect(swift).toContain(key);
+      expect(focus).toContain(key);
+    }
+    expect(swift.match(/self\.setFocusActivity\(/g)?.length).toBe(3);
+  });
+
   it('uses the keys the widget targets read', () => {
     for (const key of ['"group.com.kaihuman.app"', '"github-token"', '"pending-url"']) {
       expect(swift).toContain(key);
@@ -824,7 +889,19 @@ describe('Android system surfaces', () => {
       expect(xml).toContain(`android:shortcutId="add_${kind}"`);
       expect(xml).toContain(`android:data="kaihuman://quick-${kind}"`);
     }
-    expect(xml.match(/android:targetClass="com\.kaihuman\.app\.MainActivity"/g)).toHaveLength(5);
+    expect(xml.match(/android:targetClass="com\.kaihuman\.app\.MainActivity"/g)).toHaveLength(6);
+  });
+
+  it('has a Today shortcut with its icon and labels', () => {
+    const xml = read('targets/android-widget/res/xml/kh_shortcuts.xml');
+    expect(xml).toContain('android:shortcutId="today"');
+    expect(xml).toContain('android:data="kaihuman://today"');
+    expect(xml).toContain('@drawable/kh_ic_today');
+    expect(read('targets/android-widget/res/drawable/kh_ic_today.xml')).toContain('<vector');
+    const strings = read('targets/android-widget/res/values/kh_strings_surfaces.xml');
+    expect(strings).toContain('name="kh_shortcut_today_short"');
+    expect(strings).toContain('name="kh_shortcut_today_long"');
+    expect(parseDeepLink('kaihuman://today')).toEqual({ name: 'today' });
   });
 
   it('has a search shortcut with its icon and labels', () => {

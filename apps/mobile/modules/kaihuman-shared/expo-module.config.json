@@ -1,5 +1,10 @@
 {
   "platforms": ["apple", "android"],
-  "apple": { "modules": ["KaihumanSharedModule"] },
-  "android": { "modules": ["com.kaihuman.shared.KaihumanSharedModule"] }
+  "apple": {
+    "modules": ["KaihumanSharedModule"],
+    "appDelegateSubscribers": ["KaihumanAppDelegate"]
+  },
+  "android": {
+    "modules": ["com.kaihuman.shared.KaihumanSharedModule"]
+  }
 }

@@ -14,7 +14,11 @@ export type Route =
   | { name: 'inbox' }
   | { name: 'demo' }
   | { name: 'search'; q?: string }
-  | { name: 'file'; path: string };
+  | { name: 'file'; path: string }
+  /** Home-screen quick action "Today": the dashboard. */
+  | { name: 'today' }
+  /** The capture tab's kind picker (Control Center "Capture"). */
+  | { name: 'capture' };
 
 const QUICK_KINDS: readonly QuickKind[] = ['todo', 'note', 'log', 'idea', 'knowledge', 'inbox'];
 
@@ -50,6 +54,8 @@ export function parseDeepLink(url: string): Route | null {
     return { name: 'ideas', ...(known && { status }) };
   }
   if (head === 'inbox' && rest.length === 0) return { name: 'inbox' };
+  if (head === 'today' && rest.length === 0) return { name: 'today' };
+  if (head === 'capture' && rest.length === 0) return { name: 'capture' };
   // Non-interactive "Try demo" (used by CI screenshots).
   if (head === 'demo' && rest.length === 0) return { name: 'demo' };
   if (head === 'search' && rest.length === 0) {
@@ -97,5 +103,9 @@ export const routeToUrl = (route: Exclude<Route, { name: 'auth-callback' }>): st
       return withQuery(`${APP_SCHEME}://search`, { q: route.q });
     case 'file':
       return `${APP_SCHEME}://files/${route.path.split('/').map(encodeURIComponent).join('/')}`;
+    case 'today':
+      return `${APP_SCHEME}://today`;
+    case 'capture':
+      return `${APP_SCHEME}://capture`;
   }
 };

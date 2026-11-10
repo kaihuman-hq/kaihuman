@@ -13,6 +13,15 @@
 - Search (index, ranking, highlighted snippets, recents) already existed but was hard to find and only matched files opened before. Now: a Search tab (iOS native search role, web tab bar) plus the header button on every tab root (was Today and Ideas only). The screen moved to `screens/search-screen.tsx`, shared by `/search` and the tab.
 - Content warm-up (`search/warm.ts`, `warmSearchContent`): while search is open, uncached text files (`.md`, `.bookmarks.json`, `.txt`; max 300, 4 at a time) are fetched and indexed; stops on the first failure (offline) and the cached copies keep working. `pickWarmPaths` is pure and tested, so Spotlight/App Intents can reuse the index code.
 - Tests: `warm.test.ts`, `route-files.test.ts`.
+## 2026-11-10 — Mobile iOS: quick actions, Lock Screen widgets and controls, Siri and Spotlight
+
+- Home-screen quick actions (long-press the icon): New todo, Quick note, Log entry, Search, Today. Static `UIApplicationShortcutItems` from the config plugin. `KaihumanAppDelegate` (an Expo app delegate subscriber in `kaihuman-shared`) turns a tapped item into its deep link: it writes `pending-url` on a cold launch and opens the link when the app is running. New routes `kaihuman://today` (dashboard) and `kaihuman://capture`. Android gets a Today static shortcut.
+- Lock Screen: new Due today widget (circular, rectangular, inline; overdue counts). The Habits widget adds circular and inline best-streak views.
+- iOS 18 controls: Capture (opens the capture tab) and a Focus timer toggle (`ToggleFocusTimerIntent`, run in the app process). The toggle starts a 25-minute Live Activity on the next todo or ends it. Running state is shared through the App Group key `focus-activity-id`, which the native module and the intents keep in step.
+- Siri: App Shortcuts for add note, log, search (Siri asks for the text) and what's due today, plus `KaihumanItemEntity` (todos and notes, `IndexedEntity` on iOS 18) with `OpenItemIntent`. That is 9 shortcuts in total.
+- Spotlight: `src/spotlight` publishes todos and notes from the search index (`src/search/shared-index.ts`, split out of `store.ts` so bootstrap avoids React imports) to `spotlight-items.json` and Core Spotlight. Debounced, deduped, max 500.
+- `doc/apple-intelligence.md`: feasibility, limits with Expo, plan (assistant schemas, Foundation Models, iOS 27).
+- Tests: quick-action plist transform and routing, subscriber and Spotlight source checks, controls, focus key drift, new widget families and previews, Siri intents and entity keys, Spotlight adapter and sync, today/capture routes, Android Today shortcut.
 
 ## 2026-11-10 — Mobile: dashboard swipe, "Bad credentials" banner, automatic sync, widget due today
 

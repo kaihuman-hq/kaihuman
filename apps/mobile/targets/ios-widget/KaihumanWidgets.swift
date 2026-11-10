@@ -37,11 +37,13 @@ struct KaihumanWidgets: WidgetBundle {
             NewLogControl()
             NewIdeaControl()
             AddToInboxControl()
+            CaptureControl()
+            FocusTimerControl()
         }
     }
 }
 
-/// The v2 set: board column, milestone, ideas, knowledge card, habits and the focus Live Activity.
+/// The v2 set: board column, milestone, ideas, knowledge card, habits, due today and the focus Live Activity.
 struct KaihumanV2Widgets: WidgetBundle {
     @WidgetBundleBuilder
     var body: some Widget {
@@ -50,6 +52,7 @@ struct KaihumanV2Widgets: WidgetBundle {
         IdeaPipelineWidget()
         KnowledgeCardWidget()
         HabitsWidget()
+        DueTodayWidget()
         FocusLiveActivity()
     }
 }

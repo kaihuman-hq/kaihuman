@@ -11,8 +11,8 @@ struct HabitsWidget: Widget {
                 .modifier(KaihumanBackground())
         }
         .configurationDisplayName("Habits")
-        .description("Today's habits. Tap Log to check one in.")
-        .supportedFamilies([.systemSmall, .accessoryRectangular])
+        .description("Today's habits and streaks. Tap Log to check one in.")
+        .supportedFamilies([.systemSmall, .accessoryRectangular, .accessoryCircular, .accessoryInline])
     }
 }
 
@@ -57,12 +57,19 @@ struct HabitsContent: View {
     private var freshness: SnapshotFreshness { snapshot.freshness(at: entry.date) }
     private var habits: [SharedHabit] { snapshot.habits ?? [] }
     private var doneCount: Int { habits.filter { snapshot.habitDone($0, at: entry.date) }.count }
+    /// The Lock Screen shows one number: the longest running habit streak.
+    private var bestStreak: Int { habits.map(\.streakDays).max() ?? 0 }
 
     var body: some View {
         if habits.isEmpty {
             switch style.family {
-            case .accessoryRectangular:
+            case .accessoryRectangular, .accessoryInline:
                 Text("No habits yet").font(.system(size: 13, weight: .semibold))
+            case .accessoryCircular:
+                ZStack {
+                    AccessoryWidgetBackground()
+                    Image(systemName: "flame").font(.system(size: 18, weight: .semibold))
+                }
             default:
                 VStack(alignment: .leading, spacing: 8) {
                     WidgetHeader(title: "HABITS", theme: theme)
@@ -71,6 +78,10 @@ struct HabitsContent: View {
             }
         } else if style.family == .accessoryRectangular {
             rectangular
+        } else if style.family == .accessoryCircular {
+            circular
+        } else if style.family == .accessoryInline {
+            inline
         } else {
             small
         }
@@ -137,6 +148,23 @@ struct HabitsContent: View {
         }
     }
 
+    private var circular: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            VStack(spacing: 0) {
+                Image(systemName: "flame.fill").font(.system(size: 11)).widgetAccentable()
+                Text("\(bestStreak)")
+                    .font(WidgetTheme.number(22))
+                    .minimumScaleFactor(0.6)
+                    .widgetAccentable()
+            }
+        }
+    }
+
+    private var inline: some View {
+        Text("\(Image(systemName: "flame.fill")) \(bestStreak)d streak · \(doneCount)/\(habits.count) today")
+    }
+
     private var rectangular: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
@@ -194,4 +222,17 @@ private extension TodoEntry {
 } timeline: {
     TodoEntry.preview
     TodoEntry(date: Date(), snapshot: .previewPrivate)
+}
+
+#Preview("Circular", as: .accessoryCircular) {
+    HabitsWidget()
+} timeline: {
+    TodoEntry.preview
+    TodoEntry.previewNoHabits
+}
+
+#Preview("Inline", as: .accessoryInline) {
+    HabitsWidget()
+} timeline: {
+    TodoEntry.preview
 }

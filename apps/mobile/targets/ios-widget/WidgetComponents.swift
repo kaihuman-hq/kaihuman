@@ -7,6 +7,7 @@ enum DeepLink {
     static let board = URL(string: "kaihuman://board")!
     static let inbox = URL(string: "kaihuman://inbox")!
     static let ideas = URL(string: "kaihuman://ideas")!
+    static let today = URL(string: "kaihuman://today")!
 
     private static func url(host: String, path: String = "", query: [String: String] = [:]) -> URL {
         var components = URLComponents()

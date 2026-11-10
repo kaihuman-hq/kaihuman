@@ -60,4 +60,16 @@
             android:targetPackage="com.kaihuman.app"
             android:targetClass="com.kaihuman.app.MainActivity" />
     </shortcut>
+    <shortcut
+        android:shortcutId="today"
+        android:enabled="true"
+        android:icon="@drawable/kh_ic_today"
+        android:shortcutShortLabel="@string/kh_shortcut_today_short"
+        android:shortcutLongLabel="@string/kh_shortcut_today_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="kaihuman://today"
+            android:targetPackage="com.kaihuman.app"
+            android:targetClass="com.kaihuman.app.MainActivity" />
+    </shortcut>
 </shortcuts>

@@ -150,6 +150,16 @@ describe('links', () => {
     expect(routeToHref({ name: 'inbox' })).toBe('/board');
     expect(routeToHref({ name: 'file', path: '.kh/a b/c.md' })).toBe('/files/.kh/a%20b/c.md');
     expect(routeToHref({ name: 'auth-callback', accessToken: 'x' })).toBe('/');
+    expect(routeToHref({ name: 'today' })).toBe('/dashboard');
+    expect(routeToHref({ name: 'capture' })).toBe('/capture');
+  });
+
+  it('routes the quick-action and Control Center links today and capture', () => {
+    const nav = vi.fn();
+    handleUrl('kaihuman://today', nav);
+    handleUrl('kaihuman://capture', nav);
+    handleUrl('kaihuman://today/extra', nav);
+    expect(nav.mock.calls).toEqual([['/dashboard'], ['/capture']]);
   });
 
   it('opens a widget or notification item link in the todo detail screen', () => {

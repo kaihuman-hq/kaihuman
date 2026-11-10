@@ -128,6 +128,16 @@ extension SharedTodoSnapshot {
         return items(for: source).filter { $0.dueDate == today }
     }
 
+    /// Open todos due today or earlier (the Due today widget, Siri "what's due today").
+    /// Dates are `YYYY-MM-DD`, so string order is date order.
+    func dueByToday(at now: Date) -> [SharedTodoItem] {
+        let today = dayKey(at: now)
+        return items(for: .all).filter { item in
+            guard let due = item.dueDate else { return false }
+            return due <= today
+        }
+    }
+
     /// Every tag known to the snapshot, for the source picker.
     var allTags: [String] {
         tags ?? Array(Set(items.flatMap { $0.tags })).sorted()
