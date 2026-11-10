@@ -17,6 +17,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="board" options={{ title: 'Board' }} />
         <Tabs.Screen name="capture" options={{ title: 'Capture' }} />
         <Tabs.Screen name="ideas" options={{ title: 'Ideas' }} />
+        <Tabs.Screen name="search" options={{ title: 'Search' }} />
         <Tabs.Screen name="more" options={{ title: 'More' }} />
       </Tabs>
     );
@@ -54,6 +55,10 @@ export default function TabsLayout() {
           md="lightbulb"
         />
         <NativeTabs.Trigger.Label>Ideas</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="search" role="search">
+        <NativeTabs.Trigger.Icon sf="magnifyingglass" md="search" />
+        <NativeTabs.Trigger.Label>Search</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="more">
         <NativeTabs.Trigger.Icon

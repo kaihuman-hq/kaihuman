@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-10 — Mobile: search reachable everywhere, searches all synced content
+
+- Search (index, ranking, highlighted snippets, recents) already existed but was hard to find and only matched files opened before. Now: a Search tab (iOS native search role, web tab bar) plus the header button on every tab root (was Today and Ideas only). The screen moved to `screens/search-screen.tsx`, shared by `/search` and the tab.
+- Content warm-up (`search/warm.ts`, `warmSearchContent`): while search is open, uncached text files (`.md`, `.bookmarks.json`, `.txt`; max 300, 4 at a time) are fetched and indexed; stops on the first failure (offline) and the cached copies keep working. `pickWarmPaths` is pure and tested, so Spotlight/App Intents can reuse the index code.
+- Tests: `warm.test.ts`, `route-files.test.ts`.
+
 ## 2026-11-10 — Mobile: dashboard swipe, "Bad credentials" banner, automatic sync, widget due today
 
 - Dashboard swipe (root cause): `githubFileStore.openFile` returned at once when the same file was already loading, so a second reader found nothing in `openFiles`. Two dashboard loads overlap after every sync that bumps the revision (cold start in particular), the config read failed, `loadDashboards` treated it as "no config" and collapsed every dashboard into one "Today" page, so there was nothing to swipe to. The repository was never forgotten. Fixes: a concurrent `openFile` waits for the load in flight; an unreadable config now fails the load (the screen keeps its pages) instead of falling back; `takeLatest` drops a load that finishes after a newer one.
