@@ -29,7 +29,7 @@ describe('full swipe threshold', () => {
 
 describe('contentKeys', () => {
   it('keys by content and suffixes duplicates, stable when another row is removed', async () => {
-    const { contentKeys } = await import('./motion.js');
+    const { contentKeys } = await import('./content-keys.js');
     const a = contentKeys();
     expect([a('x'), a('y'), a('x')]).toEqual(['x#0', 'y#0', 'x#1']);
     const b = contentKeys();
