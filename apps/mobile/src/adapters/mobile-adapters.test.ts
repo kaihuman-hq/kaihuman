@@ -5,6 +5,7 @@ import {
   githubProfileStore,
   type PendingMutation,
 } from '@kaihuman/core';
+import { localDate } from '@kaihuman/formats';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type KeyValueDriver, MobileStorageAdapter, type RecordDriver } from './mobile-storage.js';
 import {
@@ -279,6 +280,29 @@ describe('WidgetBridge', () => {
     );
   });
 
+  it('stops a running timer at the widget tap and skips a stopped one', async () => {
+    const container = new InMemorySharedContainer();
+    mockSave();
+    const TIMER = '.kh/deep-work.timetracking.csv';
+    const tap = new Date();
+    tap.setHours(11, 20, 0, 0);
+    const day = localDate(tap);
+    githubFileStore.openFiles.value = {
+      ...githubFileStore.openFiles.value,
+      [TIMER]: { content: `iso date;time\n${day};09:00,10:00,11:00\n`, sha: 't1' },
+    };
+    await queue(container, [
+      { kind: 'timer-stop', path: TIMER, timestamp: tap.getTime() },
+      { kind: 'timer-stop', path: TIMER, timestamp: tap.getTime() + 60_000 },
+      { kind: 'timer-stop', path: '.kh/missing.timetracking.csv', timestamp: 3 },
+      { kind: 'timer-stop', timestamp: 4 },
+    ]);
+    expect(await new WidgetBridge(container).reconcile()).toBe(1);
+    expect(githubFileStore.openFiles.value[TIMER]?.content).toBe(
+      `iso date;time\n${day};09:00,10:00,11:00,11:20\n`,
+    );
+  });
+
   it('skips malformed entries and malformed JSON', async () => {
     const container = new InMemorySharedContainer();
     const save = mockSave();
@@ -311,5 +335,27 @@ describe('WidgetBridge', () => {
     expect(snap.habits[0]).toMatchObject({ path: HABIT, name: 'Run', doneToday: false });
     expect(snap.cards[0]).toMatchObject({ path: '.kh/wiki/a.md', title: 'A' });
     expect(Object.keys(snap.files)).toEqual(['.kh/inbox.todos.md']);
+  });
+
+  it('puts the running timer, habit days and today list in the snapshot', async () => {
+    const container = new InMemorySharedContainer();
+    const today = localDate(new Date());
+    githubFileStore.openFiles.value = {
+      ...githubFileStore.openFiles.value,
+      [HABIT]: { content: `iso date;goal reached\n${today};x`, sha: 'h' },
+      '.kh/deep-work.timetracking.csv': { content: `iso date;time\n${today};00:00\n`, sha: 't' },
+    };
+    await new WidgetBridge(container).sync();
+    const snap = JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}');
+    expect(snap.habits[0].days).toEqual([false, false, false, false, false, false, true]);
+    expect(snap.timer).toMatchObject({
+      path: '.kh/deep-work.timetracking.csv',
+      label: 'Deep work',
+      todayMinutes: 0,
+      startedAt: new Date(`${today}T00:00:00`).getTime(),
+    });
+    // TODOS has one undated in-progress item: today lists it, not the undated backlog one.
+    expect(snap.todayItems.map((i: { text: string }) => i.text)).toEqual(['ship phase 2']);
+    expect(snap.todayCounts).toEqual({ left: 1, done: 0, overdue: 0 });
   });
 });

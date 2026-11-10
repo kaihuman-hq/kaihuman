@@ -137,6 +137,9 @@ struct RenderHarness {
         let habits = { (e: TodoEntry, f: WidgetFamily, m: WidgetRenderingMode, s: ColorScheme) in
             AnyView(HabitsView(entry: e, family: f, renderingMode: m, colorScheme: s))
         }
+        let timer = { (e: TodoEntry, f: WidgetFamily, m: WidgetRenderingMode, s: ColorScheme) in
+            AnyView(TimerView(entry: e, family: f, renderingMode: m, colorScheme: s))
+        }
         let backlogBoard = TodoEntry(date: Date(), snapshot: .preview, source: .backlog)
         // The Live Activity itself needs ActivityKit; its Lock Screen layout is a plain view.
         let focus = Tile(
@@ -172,6 +175,8 @@ struct RenderHarness {
             ("Knowledge card · medium", tiles("cards", [.systemMedium], make: cards)),
             ("Knowledge card · large", tiles("cards", [.systemLarge], make: cards)),
             ("Habits", tiles("habits", [.systemSmall, .accessoryRectangular], make: habits)),
+            ("Habits · medium", tiles("habits", [.systemMedium], make: habits)),
+            ("Timer", tiles("timer", [.systemSmall], make: timer)),
             ("Focus Live Activity · Lock Screen", [focus]),
         ]
         let rows = v1Rows + v2Rows
