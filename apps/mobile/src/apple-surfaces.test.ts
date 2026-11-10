@@ -37,6 +37,9 @@ describe('focus session surfaces (proposal 2.3)', () => {
     expect(bundle.slice(bundle.indexOf('if #available(iOS 18.0, *)'))).toContain(
       'FocusLiveActivityFamilies()',
     );
+    // Regression: previews must use the iOS 18 widget (the plain one is gone) and say so.
+    expect(activity).not.toMatch(/FocusLiveActivity\(\)/);
+    expect(activity.match(/@available\(iOS 18\.0, \*\)\n#Preview/g)).toHaveLength(3);
     // Regression: WidgetBundleBuilder has no buildEither (else fails) and `#unavailable` crashed swiftc.
     expect(bundle).not.toMatch(/\}\s*else\s*\{|#unavailable/);
     expect(activity.match(/ActivityConfiguration\(for:/g)).toHaveLength(1);

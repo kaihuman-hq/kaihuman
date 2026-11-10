@@ -209,20 +209,23 @@ extension FocusActivityAttributes.ContentState {
     }
 }
 
+@available(iOS 18.0, *)
 #Preview("Lock Screen", as: .content, using: FocusActivityAttributes.preview) {
-    FocusLiveActivity()
+    FocusLiveActivityFamilies()
 } contentStates: {
     FocusActivityAttributes.ContentState.preview
 }
 
+@available(iOS 18.0, *)
 #Preview("Expanded", as: .dynamicIsland(.expanded), using: FocusActivityAttributes.preview) {
-    FocusLiveActivity()
+    FocusLiveActivityFamilies()
 } contentStates: {
     FocusActivityAttributes.ContentState.preview
 }
 
+@available(iOS 18.0, *)
 #Preview("Small family", as: .content, using: FocusActivityAttributes.preview) {
-    FocusLiveActivity()
+    FocusLiveActivityFamilies()
 } contentStates: {
     FocusActivityAttributes.ContentState.preview
 }
