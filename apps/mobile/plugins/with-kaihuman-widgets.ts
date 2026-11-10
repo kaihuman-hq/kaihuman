@@ -161,6 +161,9 @@ export const SHARED_APP_SOURCES: readonly string[] = [
   'StopTimerIntent.swift',
   'FocusActivityAttributes.swift',
   'FocusIntents.swift',
+  // Focus filter (SetFocusFilterIntent lives in targets/ios-app-intents) and the Stop Focus intent.
+  'FocusFilter.swift',
+  'FocusStopIntent.swift',
 ];
 
 /**
@@ -173,6 +176,7 @@ export const WIDGET_ONLY_SOURCES: readonly string[] = [
   'ControlWidgets.swift',
   'DueTodayWidget.swift',
   'FocusLiveActivity.swift',
+  'FocusStopControl.swift',
   'HabitsWidget.swift',
   'IdeaPipelineWidget.swift',
   'InboxCountWidget.swift',
@@ -185,6 +189,7 @@ export const WIDGET_ONLY_SOURCES: readonly string[] = [
   'QuickCaptureWidget.swift',
   'Theme.swift',
   'TimerWidget.swift',
+  'TodayDashboardWidget.swift',
   'TodayRow.swift',
   'TodoWidgetViews.swift',
   'WeeklyDoneWidget.swift',

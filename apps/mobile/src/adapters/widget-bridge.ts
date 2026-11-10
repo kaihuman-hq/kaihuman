@@ -16,6 +16,7 @@ import {
 } from '@kaihuman/formats';
 import { effect } from '@preact/signals';
 import { githubRepoFiles } from '../screens/quick-capture.js';
+import { focusFilter, refreshFocusFilter } from './focus-filter.js';
 
 export type { PendingWidgetMutation };
 
@@ -47,7 +48,7 @@ export class InMemorySharedContainer implements SharedContainer {
 const isTodoPath = (path: string): boolean =>
   /^\.(kh|lifeos)\//.test(path) && path.endsWith('.todos.md');
 
-export const currentSnapshot = () => {
+export const currentSnapshot = (filter = focusFilter.peek()) => {
   const repo = githubProfileStore.currentRepo.value;
   if (!repo) return null;
   const open = githubFileStore.openFiles.value;
@@ -61,6 +62,7 @@ export const currentSnapshot = () => {
   return buildWidgetTodoSnapshot(files, repo.full_name, repo.default_branch, now, {
     timeZone,
     ...buildWidgetExtras(open, now, timeZone),
+    ...(filter && { filter }),
     lockScreenText: true, // no privacy setting exists yet; v2 reserves the flag for it
   });
 };
@@ -90,6 +92,8 @@ const isMutation = (m: unknown): m is PendingWidgetMutation => {
       return str('path') && str('date');
     case 'timer-stop':
       return str('path');
+    case 'digest':
+      return str('text') && str('date');
     default:
       return false;
   }
@@ -137,7 +141,8 @@ export class WidgetBridge {
   private async writeSnapshot(): Promise<void> {
     // A partial snapshot would replace the widget's last good one with missing or no todos.
     if (!snapshotComplete()) return;
-    const snapshot = currentSnapshot();
+    // The Focus filter intent changes the file while the app sleeps; a sync folds it in.
+    const snapshot = currentSnapshot(await refreshFocusFilter(this.container));
     if (!snapshot) return;
     // updatedAt would make every sync look different.
     const json = JSON.stringify({ ...snapshot, updatedAt: 0 });
@@ -190,6 +195,18 @@ export class WidgetBridge {
       const last = entry?.intervals[entry.intervals.length - 1];
       if (!last || last.end !== undefined) return false;
       await githubRepoFiles.write(m.path, serializeTimeTracking(toggleStartStop(data, at)));
+      return true;
+    }
+    if (m.kind === 'digest') {
+      // One file per day: a second digest the same day is appended, not lost.
+      const path = `logs/digest-${m.date}.md`;
+      const existing = (await githubRepoFiles.read(path)) ?? '';
+      await githubRepoFiles.write(
+        path,
+        existing === ''
+          ? `# Digest ${m.date}\n\n${m.text}\n`
+          : `${existing.trimEnd()}\n\n${m.text}\n`,
+      );
       return true;
     }
     if (m.kind === 'habit') {

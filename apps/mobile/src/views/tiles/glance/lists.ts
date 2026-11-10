@@ -1,3 +1,4 @@
+import { matchesWidgetFilter } from '@kaihuman/core';
 import { localDate, parseActionLog } from '@kaihuman/formats';
 import {
   type ActionLogView,
@@ -36,20 +37,25 @@ const hostOf = (url: string): string => {
   }
 };
 
-export function todosGlance({ path, now }: GlanceInput, view: TodosView): Glance {
+export function todosGlance({ path, now, filter }: GlanceInput, view: TodosView): Glance {
+  const rows = view.rows.filter((r) =>
+    matchesWidgetFilter(
+      { tags: r.tags, filePath: path, milestoneId: r.milestoneId, milestoneName: r.milestone },
+      filter,
+    ),
+  );
   const today = localDate(now);
   let open = 0;
   let doing = 0;
   let overdue = 0;
   let done = 0;
-  for (const row of view.rows) {
+  for (const row of rows) {
     if (row.status === 'done') done++;
     else if (row.status !== 'backlog' && row.status !== 'in-progress') continue;
     else if (row.dueDate && row.dueDate < today) overdue++;
     else if (row.status === 'in-progress') doing++;
     else open++;
   }
-  const rows = view.rows;
   const isOverdue = (r: (typeof rows)[number]): boolean =>
     (r.status === 'backlog' || r.status === 'in-progress') && !!r.dueDate && r.dueDate < today;
   return {

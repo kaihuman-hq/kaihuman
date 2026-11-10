@@ -1,3 +1,4 @@
+import type { WidgetFilter } from '@kaihuman/core';
 import type { TileResult } from '../../../components/widgets/tile-controllers.js';
 import type { IconName } from '../../../ui/index.js';
 
@@ -102,4 +103,6 @@ export interface GlanceInput {
   path: string;
   content: string;
   now: Date;
+  /** Active Focus filter: todo tiles show only matching rows. */
+  filter?: WidgetFilter;
 }

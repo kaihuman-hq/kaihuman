@@ -290,6 +290,39 @@ describe('WidgetBridge', () => {
     );
   });
 
+  it('writes a queued digest to logs/ and appends a second one the same day', async () => {
+    const container = new InMemorySharedContainer();
+    mockSave();
+    await queue(container, [
+      { kind: 'digest', text: 'Shipped the filter.', date: '2026-06-10', timestamp: 1 },
+      { kind: 'digest', text: 'Evening: tests green.', date: '2026-06-10', timestamp: 2 },
+      { kind: 'digest', text: '', date: '2026-06-10', timestamp: 3 },
+    ]);
+    expect(await new WidgetBridge(container).reconcile()).toBe(2);
+    expect(githubFileStore.openFiles.value['logs/digest-2026-06-10.md']?.content).toBe(
+      '# Digest 2026-06-10\n\nShipped the filter.\n\nEvening: tests green.\n',
+    );
+  });
+
+  it('folds the Focus filter file into the snapshot and rewrites when it changes', async () => {
+    const container = new InMemorySharedContainer();
+    const bridge = new WidgetBridge(container);
+    await bridge.sync();
+    expect(JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}').filter).toBeUndefined();
+    const reloads = container.reloads;
+
+    await container.write('focus-filter.json', JSON.stringify({ tags: ['#work'], label: 'Work' }));
+    await bridge.sync();
+    const snap = JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}');
+    expect(snap.filter).toEqual({ tags: ['work'], label: 'Work' });
+    expect(snap.items).toHaveLength(2); // readers filter; the snapshot keeps every item
+    expect(container.reloads).toBeGreaterThan(reloads);
+
+    await container.write('focus-filter.json', '{}');
+    await bridge.sync();
+    expect(JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}').filter).toBeUndefined();
+  });
+
   it('stops a running timer at the widget tap and skips a stopped one', async () => {
     const container = new InMemorySharedContainer();
     mockSave();

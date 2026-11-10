@@ -220,3 +220,7 @@
 | Nano-like file editor | via file browser | 2026-03-19 |
 | Dashboard config view | `d` | 2026-03-19 |
 | Repo git sync before file actions | automatic | 2026-03-19 |
+| Focus session on the Dynamic Island, Watch Smart Stack, Mac menu bar and CarPlay (small activity family), plus a Stop focus control for the Action button | iOS 18+, `FocusLiveActivity.swift`, `FocusStopControl.swift` | 2026-11-10 |
+| Focus filters: a system Focus shows only todos with chosen tags, from one list or one board, in the app's Today tiles, widgets and Siri/Shortcuts | iOS Settings > Focus, `KaihumanFocusFilter.swift`, `packages/core/src/widget-filter.ts` | 2026-11-10 |
+| Extra-large Today dashboard widget (iOS 27) | home screen, `TodayDashboardWidget.swift` | 2026-11-10 |
+| "Save digest" Shortcuts action: chain "Use Model" into `logs/digest-<date>.md` | Shortcuts, `SaveDigestIntent.swift` | 2026-11-10 |

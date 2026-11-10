@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-11-10 — Mobile iOS: Focus session on every surface, Focus filters, extra-large Today, digest intent
+
+Proposals 2.3 and 2.5 of `doc/apple-proposals.md`. No Swift compiler in this environment: the Swift is checked by source-text tests (`apple-surfaces.test.ts`) and **must be built and tried on a device** before release.
+
+- Focus Live Activity: iOS 18 registers the `.small` activity family (`FocusLiveActivityFamilies`) for the Watch Smart Stack, macOS 26 menu bar and CarPlay Dashboard (`FocusSmallView`: title and countdown, no buttons). iOS 17 keeps the old configuration; the bundle picks one. The island is one shared `FocusActivityUI.island`; compact and minimal stay an icon plus a short countdown, which is what the iOS 27 landscape island shows (no landscape-specific API was confirmed, so none is used).
+- `StopFocusIntent` (LiveActivityIntent) and `StopFocusControl`: a stop-only control for the Action button, Control Center and the Lock Screen. A Watch control target is **not** added: this repo wires targets with its own config plugin, not `@bacons/apple-targets`, so a watch extension is next-step work. Until then watchOS 26 runs iPhone controls on the phone.
+- Focus filters: `KaihumanFocusFilter: SetFocusFilterIntent` (tags, list, board) writes `focus-filter.json` and patches `filter` into the widget snapshot. Every widget and intent honours it through `nextUp`; the Today dashboard tiles in the app filter through `focusFilter`. `@kaihuman/core` gets `WidgetFilter`, `applyWidgetFilter`, `matchesWidgetFilter`, `parseWidgetFilter` (area = the todo file name). Counts widgets (`counts.*`) are not filtered yet.
+- `TodayDashboardWidget`: extra-large (`systemExtraLarge`) Today list with counts, habits and the next milestone, titled with the active filter; registered behind `#available(iOS 27.0, *)`.
+- `SaveDigestIntent` (not an App Shortcut, so the 10-shortcut cap is untouched): takes the previous Shortcut action's text ("Use Model" output), queues a `digest` mutation; the app writes `logs/digest-<date>.md` (a second digest the same day appends).
+- Tests: `widget-filter.test.ts` (core), focus filter and digest cases in `mobile-adapters.test.ts`, `lists.test.ts`, `apple-surfaces.test.ts`.
+
 ## 2026-11-10 — Mobile: merge redesign with dashboard edit mode and search
 
 - Tab bar is the redesign's Today · Board · ＋ · Ideas · More; the Search tab is dropped (its route stays, hidden) and search opens from the header search button on every tab root, including a search button in the Today pager header. `web-tab-bar.tsx` removed (unused).
