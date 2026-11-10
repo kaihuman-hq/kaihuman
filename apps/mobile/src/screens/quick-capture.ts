@@ -17,6 +17,7 @@ import {
   type TodoRepeat,
 } from '@kaihuman/formats';
 import { syncActions } from '../sync/actions.js';
+import { whenRepoReady } from '../sync/repo-ready.js';
 import { canServeFromCache } from '../sync/revalidate.js';
 import { setDueOnData, setRepeatOnData } from './todo-due.js';
 
@@ -34,6 +35,8 @@ export interface RepoFiles {
   read(path: string): Promise<string | null>;
   /** Creates or overwrites; rejects when the save fails. */
   write(path: string, content: string): Promise<void>;
+  /** Waits until reads see the repo's real files; false when it is still not loaded. */
+  ready?(): Promise<boolean>;
 }
 
 export const githubRepoFiles: RepoFiles = {
@@ -64,7 +67,10 @@ export const githubRepoFiles: RepoFiles = {
     }
     syncActions().notifyLocalWrite();
   },
+  ready: () => whenRepoReady(),
 };
+
+export const REPO_NOT_READY = 'Your repo is still loading. Try again in a moment.';
 
 export type CaptureResult =
   | { ok: true; path: string; message: string }
@@ -102,6 +108,8 @@ export class QuickCaptureController {
     if (this.busy) return { ok: false, error: 'Another capture is still saving' };
     this.busy = true;
     try {
+      // A widget cold-launches the app straight into a capture sheet, before the tree is loaded.
+      if (this.files.ready && !(await this.files.ready())) throw new Error(REPO_NOT_READY);
       return { ok: true, path, message: await work() };
     } catch (err) {
       return { ok: false, error: message(err) };
@@ -201,6 +209,7 @@ export class QuickCaptureController {
     if (this.busy) return fail('Another capture is still saving');
     this.busy = true;
     try {
+      if (this.files.ready && !(await this.files.ready())) return fail(REPO_NOT_READY);
       let handoffs: IdeaHandoff[];
       try {
         handoffs = parseIdeaHandoffs(text);

@@ -22,6 +22,13 @@ describe('expo-router route files', () => {
     }
   });
 
+  it('opens the widget "+" on the same New todo sheet as the in-app add', () => {
+    const inbox = readFileSync(`${appDir}quick-inbox.tsx`, 'utf8');
+    const todo = readFileSync(`${appDir}quick-todo.tsx`, 'utf8');
+    expect(inbox).toContain('<QuickCaptureScreen kind="todo" />');
+    expect(todo).toContain('<QuickCaptureScreen kind="todo" />');
+  });
+
   it('presents every quick-capture route as a sheet in the root stack', () => {
     const root = readFileSync(`${appDir}_layout.tsx`, 'utf8');
     for (const kind of Object.keys(quickKinds)) expect(root).toContain(`'quick-${kind}'`);
