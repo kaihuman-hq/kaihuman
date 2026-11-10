@@ -59,6 +59,14 @@ export const currentSnapshot = () => {
   });
 };
 
+/** True when the tree is known and every todo file it lists is open. */
+export const snapshotComplete = (): boolean => {
+  const tree = githubFileStore.tree.peek();
+  if (tree.length === 0) return false;
+  const open = githubFileStore.openFiles.peek();
+  return tree.every((t) => t.type !== 'blob' || !isTodoPath(t.path) || t.path in open);
+};
+
 const isMutation = (m: unknown): m is PendingWidgetMutation => {
   if (typeof m !== 'object' || m === null) return false;
   const o = m as Record<string, unknown>;
@@ -96,6 +104,21 @@ export class WidgetBridge {
     });
   }
 
+  /**
+   * Opens every todo file the tree lists, so the snapshot covers all of them and not only the
+   * ones a screen opened. Cache-first: a file costs a request only when its blob moved. Without
+   * this a background launch (no screen mounted) wrote an empty widget.
+   */
+  async load(): Promise<void> {
+    for (const path of githubRepoFiles.todoPaths().filter(isTodoPath)) {
+      try {
+        await githubRepoFiles.read(path);
+      } catch {
+        // One unreadable file must not keep the others from the widget; the snapshot waits for it.
+      }
+    }
+  }
+
   /** Writes the snapshot when it changed; resolves once the write (and reload) finished. */
   sync(): Promise<void> {
     const run = this.queue.then(() => this.writeSnapshot());
@@ -104,6 +127,8 @@ export class WidgetBridge {
   }
 
   private async writeSnapshot(): Promise<void> {
+    // A partial snapshot would replace the widget's last good one with missing or no todos.
+    if (!snapshotComplete()) return;
     const snapshot = currentSnapshot();
     if (!snapshot) return;
     // updatedAt would make every sync look different.

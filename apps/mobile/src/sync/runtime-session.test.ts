@@ -27,7 +27,13 @@ describe('startSync', () => {
     const loadTree = vi.spyOn(githubFileStore, 'loadTree').mockResolvedValue(undefined);
     vi.spyOn(githubFileStore, 'flushOutbox').mockResolvedValue(undefined);
     const { startSync } = await import('./runtime.js');
-    const stop = startSync({ bridge: { reconcile: async () => 0, sync: async () => undefined } });
+    const stop = startSync({
+      bridge: {
+        load: async () => undefined,
+        reconcile: async () => 0,
+        sync: async () => undefined,
+      },
+    });
     await vi.waitFor(() => expect(loadTree).toHaveBeenCalled()); // the launch run
     loadTree.mockClear();
 

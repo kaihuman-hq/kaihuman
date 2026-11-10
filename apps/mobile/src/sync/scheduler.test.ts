@@ -184,6 +184,65 @@ describe('foreground', () => {
   });
 });
 
+describe('foreground after a long background', () => {
+  it('queues a fresh run behind one iOS froze while suspended, when data is > 2 min old', async () => {
+    const h = make({ manual: true });
+    h.sched.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    h.gates[0]?.(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.calls).toEqual(['foreground']);
+    h.sched.setActive(false);
+    void h.sched.trigger('background'); // started just before suspension, never answers
+    await vi.advanceTimersByTimeAsync(0);
+    vi.setSystemTime(Date.now() + 3 * 60_000);
+    h.sched.setActive(true);
+    h.gates[1]?.(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.calls).toEqual(['foreground', 'background', 'foreground']);
+  });
+
+  it('joins the run in flight when data is fresh', async () => {
+    const h = make({ manual: true });
+    h.sched.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    h.gates[0]?.(true);
+    await vi.advanceTimersByTimeAsync(0);
+    h.sched.setActive(false);
+    void h.sched.trigger('background');
+    await vi.advanceTimersByTimeAsync(0);
+    vi.setSystemTime(Date.now() + 30_000);
+    h.sched.setActive(true);
+    h.gates[1]?.(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.calls).toEqual(['foreground', 'background']);
+  });
+});
+
+describe('leaving the foreground', () => {
+  it('pushes a debounced edit at once instead of after iOS suspends the app', async () => {
+    const h = make();
+    h.sched.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    vi.setSystemTime(Date.now() + 10_000);
+    void h.sched.trigger('write');
+    h.sched.setActive(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.calls).toEqual(['foreground', 'write']);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(h.calls).toEqual(['foreground', 'write']);
+  });
+
+  it('starts nothing when no edit is waiting', async () => {
+    const h = make();
+    h.sched.setActive(true);
+    await vi.advanceTimersByTimeAsync(0);
+    h.sched.setActive(false);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(h.calls).toEqual(['foreground']);
+  });
+});
+
 describe('polling', () => {
   it('polls every 60 s while active, online and not in low power mode', async () => {
     const h = make();

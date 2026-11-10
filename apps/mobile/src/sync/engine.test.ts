@@ -63,6 +63,9 @@ const makeStore = () => {
 const setup = (overrides: Partial<Parameters<typeof createSyncEngine>[0]> = {}) => {
   const fake = makeStore();
   const widgets = {
+    load: vi.fn(async () => {
+      fake.state.order.push('widgetLoad');
+    }),
     reconcile: vi.fn(async () => {
       fake.state.order.push('reconcile');
     }),
@@ -99,11 +102,13 @@ describe('run steps', () => {
     expect(await t.engine.run('poll')).toBe(true);
     expect(t.state.order).toEqual([
       'loadTree',
+      'widgetLoad',
       'reconcile',
       'flushOutbox',
       'widgetSync',
       'reschedule',
       'syncNow',
+      'widgetLoad',
       'reconcile',
       'flushOutbox',
       'widgetSync',
@@ -329,6 +334,59 @@ describe('401 recovery', () => {
     expect(await t.engine.run('poll')).toBe(false);
     expect(recoverAuth).not.toHaveBeenCalled();
     expect(syncStatus.value.error).toBe('network down');
+    t.engine.dispose();
+  });
+});
+
+describe('a pull skipped by a save in flight', () => {
+  it('pulls again after the outbox, so web edits are not left behind', async () => {
+    const t = setup();
+    await t.engine.run('launch');
+    t.state.order.length = 0;
+    const outcomes = ['skipped', 'synced'];
+    t.store.syncNow = async () => {
+      t.state.order.push('syncNow');
+      return outcomes.shift() as 'skipped' | 'synced';
+    };
+    expect(await t.engine.run('poll')).toBe(true);
+    expect(t.state.order.filter((s) => s === 'syncNow' || s === 'flushOutbox')).toEqual([
+      'syncNow',
+      'flushOutbox',
+      'syncNow',
+    ]);
+    t.engine.dispose();
+  });
+
+  it('does not count as fresh when the retry is skipped too', async () => {
+    const t = setup();
+    await t.engine.run('launch');
+    const syncedAt = syncStatus.value.lastSyncedAt;
+    t.state.syncOutcome = 'skipped';
+    expect(await t.engine.run('poll')).toBe(false);
+    expect(syncStatus.value).toMatchObject({ phase: 'idle', error: null, lastSyncedAt: syncedAt });
+    t.engine.dispose();
+  });
+});
+
+describe('widget load', () => {
+  it('opens the todo files before the snapshot, even when nothing changed remotely', async () => {
+    const t = setup();
+    await t.engine.run('launch');
+    t.state.syncOutcome = 'unchanged';
+    t.widgets.load.mockClear();
+    await t.engine.run('background');
+    expect(t.widgets.load).toHaveBeenCalledTimes(1);
+    expect(t.state.order.lastIndexOf('widgetLoad')).toBeLessThan(
+      t.state.order.lastIndexOf('widgetSync'),
+    );
+    t.engine.dispose();
+  });
+
+  it('a failing load does not stop the run', async () => {
+    const t = setup();
+    t.widgets.load.mockRejectedValueOnce(new Error('disk'));
+    expect(await t.engine.run('launch')).toBe(true);
+    expect(t.widgets.sync).toHaveBeenCalled();
     t.engine.dispose();
   });
 });

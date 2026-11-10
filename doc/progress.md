@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-11-10 — Mobile: sync reliability (widget after background, stale foreground, skipped pulls)
+
+- Audit of when the app could show older data than GitHub. HTTP layer is fine: head and contents reads bypass the 60 s HTTP cache (React Native's fetch honours `no-store`), trees and blobs are read by sha, cached copies are served only when the tree lists the same sha, and every save is sha-checked (409/422 → 3-way merge or conflict banner, never an overwrite).
+- Widget (bug): the snapshot was built only from files a screen had opened. A background run after a cold launch has none open, so it wrote an empty widget. `WidgetBridge.load()` now opens every todo file the tree lists (cache-first) before the snapshot, and no snapshot is written while the tree is unknown or a listed todo file is not open.
+- Skipped pull (bug): `syncNow` skips while a save is in flight, and the run still counted as fresh, so web edits waited for the next poll. The engine pulls again after the outbox; a run that pulled nothing leaves `lastSyncedAt` unchanged.
+- Foreground: when data is older than 2 min, a run still in flight (possibly a request iOS froze during suspension) no longer satisfies the foreground; a fresh run is queued behind it. Leaving the foreground pushes a debounced edit at once instead of after suspension.
+- Background: verified registration, the `expo-background-task` plugin (Info.plist modes and identifier) and that the task pulls and refreshes the widget. iOS limits documented in `apps/mobile/src/sync/README.md`.
+- Regression tests: `scheduler`, `engine`, `background` (new), `mobile-adapters` (widget completeness).
+
 ## 2026-11-10 — Mobile: dashboard swipe, "Bad credentials" banner, automatic sync, widget due today
 
 - Dashboard swipe (root cause): `githubFileStore.openFile` returned at once when the same file was already loading, so a second reader found nothing in `openFiles`. Two dashboard loads overlap after every sync that bumps the revision (cold start in particular), the config read failed, `loadDashboards` treated it as "no config" and collapsed every dashboard into one "Today" page, so there was nothing to swipe to. The repository was never forgotten. Fixes: a concurrent `openFile` waits for the load in flight; an unreadable config now fails the load (the screen keeps its pages) instead of falling back; `takeLatest` drops a load that finishes after a newer one.

@@ -21,7 +21,11 @@ vi.mock('react-native', () => ({
 describe('startSync on a platform without some Expo listeners', () => {
   it('starts and stops without throwing', async () => {
     const { startSync } = await import('./runtime.js');
-    const bridge = { reconcile: async () => 0, sync: async () => undefined };
+    const bridge = {
+      load: async () => undefined,
+      reconcile: async () => 0,
+      sync: async () => undefined,
+    };
     let stop: (() => void) | undefined;
     expect(() => {
       stop = startSync({ bridge });

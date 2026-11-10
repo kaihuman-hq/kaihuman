@@ -34,6 +34,15 @@ const kvDriver = (): KeyValueDriver & { map: Map<string, string> } => {
   };
 };
 
+const blob = (path: string, sha: string) => ({
+  path,
+  sha,
+  type: 'blob' as const,
+  mode: '100644',
+  url: '',
+  size: 0,
+});
+
 const TODOS = '# Todos\n\n- [ ] write plan\n- [>] ship phase 2\n';
 
 describe('MobileStorageAdapter', () => {
@@ -123,6 +132,7 @@ describe('WidgetBridge', () => {
   beforeEach(() => {
     configureCoreStorage(new MobileStorageAdapter());
     githubProfileStore.currentRepo.value = repo;
+    githubFileStore.tree.value = [blob('.kh/inbox.todos.md', 's1'), blob('notes.md', 'n')];
     githubFileStore.openFiles.value = {
       '.kh/inbox.todos.md': { content: TODOS, sha: 's1' },
       'notes.md': { content: 'x', sha: 'n' },
@@ -311,5 +321,78 @@ describe('WidgetBridge', () => {
     expect(snap.habits[0]).toMatchObject({ path: HABIT, name: 'Run', doneToday: false });
     expect(snap.cards[0]).toMatchObject({ path: '.kh/wiki/a.md', title: 'A' });
     expect(Object.keys(snap.files)).toEqual(['.kh/inbox.todos.md']);
+  });
+});
+
+describe('WidgetBridge completeness (background launch)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  beforeEach(() => {
+    configureCoreStorage(new MobileStorageAdapter());
+    githubProfileStore.currentRepo.value = repo;
+    githubFileStore.dirtyFiles.value = new Set();
+    githubFileStore.openFiles.value = {};
+  });
+
+  it('writes nothing before the tree is known, so a headless launch keeps the last widget', async () => {
+    githubFileStore.tree.value = [];
+    const container = new InMemorySharedContainer();
+    await container.write(WIDGET_TODOS_FILE, '{"old":true}');
+    await new WidgetBridge(container).sync();
+    expect(container.files.get(WIDGET_TODOS_FILE)).toBe('{"old":true}');
+    expect(container.reloads).toBe(0);
+  });
+
+  it('writes nothing while a todo file the tree lists is not open', async () => {
+    githubFileStore.tree.value = [blob('.kh/inbox.todos.md', 's1'), blob('.kh/work.todos.md', 'w')];
+    githubFileStore.openFiles.value = { '.kh/inbox.todos.md': { content: TODOS, sha: 's1' } };
+    const container = new InMemorySharedContainer();
+    await new WidgetBridge(container).sync();
+    expect(container.files.has(WIDGET_TODOS_FILE)).toBe(false);
+  });
+
+  it('load opens every todo file the tree lists, then sync writes all of them', async () => {
+    githubFileStore.tree.value = [
+      blob('.kh/inbox.todos.md', 's1'),
+      blob('.kh/work.todos.md', 'w'),
+      blob('notes.md', 'n'),
+    ];
+    const contents: Record<string, string> = {
+      '.kh/inbox.todos.md': TODOS,
+      '.kh/work.todos.md': '# Work\n\n- [ ] from the web\n',
+    };
+    const open = vi.spyOn(githubFileStore, 'openFile').mockImplementation(async (path) => {
+      githubFileStore.openFiles.value = {
+        ...githubFileStore.openFiles.value,
+        [path]: { content: contents[path] ?? '', sha: path === '.kh/work.todos.md' ? 'w' : 's1' },
+      };
+    });
+    const container = new InMemorySharedContainer();
+    const bridge = new WidgetBridge(container);
+    await bridge.load();
+    expect(open.mock.calls.map(([p]) => p).sort()).toEqual([
+      '.kh/inbox.todos.md',
+      '.kh/work.todos.md',
+    ]);
+    await bridge.sync();
+    const snap = JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}');
+    expect(Object.keys(snap.files).sort()).toEqual(['.kh/inbox.todos.md', '.kh/work.todos.md']);
+    expect(snap.items.some((i: { text: string }) => i.text === 'from the web')).toBe(true);
+  });
+
+  it('load serves an up-to-date open copy from memory without a request', async () => {
+    githubFileStore.tree.value = [blob('.kh/inbox.todos.md', 's1')];
+    githubFileStore.openFiles.value = { '.kh/inbox.todos.md': { content: TODOS, sha: 's1' } };
+    const open = vi.spyOn(githubFileStore, 'openFile').mockResolvedValue(undefined);
+    await new WidgetBridge(new InMemorySharedContainer()).load();
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('load re-reads an open copy the tree says is behind', async () => {
+    githubFileStore.tree.value = [blob('.kh/inbox.todos.md', 's2')];
+    githubFileStore.openFiles.value = { '.kh/inbox.todos.md': { content: TODOS, sha: 's1' } };
+    const open = vi.spyOn(githubFileStore, 'openFile').mockResolvedValue(undefined);
+    await new WidgetBridge(new InMemorySharedContainer()).load();
+    expect(open).toHaveBeenCalledWith('.kh/inbox.todos.md');
   });
 });

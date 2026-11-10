@@ -13,6 +13,7 @@ import { type SyncTrigger, syncStatus } from './status.js';
 
 /** The widget bridge as sync uses it; `WidgetBridge` satisfies this. */
 export interface SyncWidgets {
+  load(): Promise<unknown>;
   reconcile(): Promise<unknown>;
   sync(): Promise<unknown>;
 }
@@ -29,6 +30,7 @@ function ensure() {
     store: githubFileStore,
     currentRepo: () => githubProfileStore.currentRepo.peek()?.full_name ?? null,
     widgets: {
+      load: async () => widgets?.load(),
       reconcile: async () => widgets?.reconcile(),
       sync: async () => widgets?.sync(),
     },
