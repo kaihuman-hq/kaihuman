@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-10 — Research: Apple platform proposals
+
+- New `doc/apple-proposals.md`: the top 3 Apple Intelligence features (offline smart capture with Foundation Models, Siri AI app skills and App Schemas, scan to entry with Visual Intelligence and Vision) and 5 proposals that use the newest Apple features (weekly review on PCC, kb-mcp as a Siri/MCP tool, Focus session on every surface, HealthKit and Journaling Suggestions, Focus filters with the extra-large widget and Shortcuts "Use Model"). Each item gives the API, Expo feasibility, effort, iOS version and risk, with sources checked on 2026-11-10. Research only, no code changes.
+
 ## 2026-11-10 — Mobile: sync reliability (widget after background, stale foreground, skipped pulls)
 
 - Audit of when the app could show older data than GitHub. HTTP layer is fine: head and contents reads bypass the 60 s HTTP cache (React Native's fetch honours `no-store`), trees and blobs are read by sha, cached copies are served only when the tree lists the same sha, and every save is sha-checked (409/422 → 3-way merge or conflict banner, never an overwrite).
