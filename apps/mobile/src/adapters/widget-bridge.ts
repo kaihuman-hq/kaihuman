@@ -9,6 +9,7 @@ import {
 } from '@kaihuman/core';
 import {
   checkIn,
+  IDEAS_FOLDER,
   localDate,
   parseTimeTracking,
   serializeTimeTracking,
@@ -16,6 +17,7 @@ import {
 } from '@kaihuman/formats';
 import { effect } from '@preact/signals';
 import { githubRepoFiles } from '../screens/quick-capture.js';
+import { repoReady } from '../sync/repo-ready.js';
 import { focusFilter, refreshFocusFilter } from './focus-filter.js';
 
 export type { PendingWidgetMutation };
@@ -48,6 +50,12 @@ export class InMemorySharedContainer implements SharedContainer {
 const isTodoPath = (path: string): boolean =>
   /^\.(kh|lifeos)\//.test(path) && path.endsWith('.todos.md');
 
+/** Files buildWidgetExtras reads for the habit, timer and idea widgets. */
+const isExtraPath = (path: string): boolean =>
+  (/^\.(kh|lifeos)\//.test(path) &&
+    (path.endsWith('.habit.csv') || path.endsWith('.timetracking.csv'))) ||
+  (path.startsWith(`${IDEAS_FOLDER}/`) && path.endsWith('.md'));
+
 export const currentSnapshot = (filter = focusFilter.peek()) => {
   const repo = githubProfileStore.currentRepo.value;
   if (!repo) return null;
@@ -69,8 +77,9 @@ export const currentSnapshot = (filter = focusFilter.peek()) => {
 
 /** True when the tree is known and every todo file it lists is open. */
 export const snapshotComplete = (): boolean => {
+  // A tree that is only a capture's optimistic file (loadTree not run yet) is not the repo.
+  if (!repoReady()) return false;
   const tree = githubFileStore.tree.peek();
-  if (tree.length === 0) return false;
   const open = githubFileStore.openFiles.peek();
   return tree.every((t) => t.type !== 'blob' || !isTodoPath(t.path) || t.path in open);
 };
@@ -122,7 +131,14 @@ export class WidgetBridge {
    * this a background launch (no screen mounted) wrote an empty widget.
    */
   async load(): Promise<void> {
-    for (const path of githubRepoFiles.todoPaths().filter(isTodoPath)) {
+    // Habits, timers and ideas first: the widget extras are built from open files only, so a
+    // headless run that opened just the todos wrote a snapshot without them (empty Habits and
+    // Timer widgets). Before the todos, so the first complete snapshot already has them.
+    const extras = githubFileStore.tree
+      .peek()
+      .filter((t) => t.type === 'blob' && isExtraPath(t.path))
+      .map((t) => t.path);
+    for (const path of [...extras, ...githubRepoFiles.todoPaths().filter(isTodoPath)]) {
       try {
         await githubRepoFiles.read(path);
       } catch {
@@ -158,6 +174,10 @@ export class WidgetBridge {
    * newer edits. Returns the number applied.
    */
   async reconcile(): Promise<number> {
+    // Replaying before the repo and every todo file are loaded found no item (dropped toggles)
+    // or wrote a capture into an empty inbox that the first loadTree then discarded. The queue
+    // stays put; the sync run calls this again once load() has opened the files.
+    if (!snapshotComplete()) return 0;
     const raw = await this.container.read(PENDING_WIDGET_MUTATIONS_FILE);
     if (!raw) return 0;
     let parsed: unknown;
@@ -172,15 +192,30 @@ export class WidgetBridge {
     await this.container.write(PENDING_WIDGET_MUTATIONS_FILE, '[]');
 
     let applied = 0;
+    const failed: PendingWidgetMutation[] = [];
     for (const mutation of pending) {
       try {
         if (await this.replay(mutation)) applied++;
       } catch {
-        // One failed write must not drop the rest of the queue.
+        // One failed write must not drop the rest of the queue, nor itself: it is retried.
+        failed.push(mutation);
       }
     }
+    if (failed.length > 0) await this.requeue(failed);
     if (applied > 0) await this.sync();
     return applied;
+  }
+
+  /** Puts failed mutations back ahead of any the widget queued meanwhile. */
+  private async requeue(failed: PendingWidgetMutation[]): Promise<void> {
+    let queued: unknown;
+    try {
+      queued = JSON.parse((await this.container.read(PENDING_WIDGET_MUTATIONS_FILE)) ?? '[]');
+    } catch {
+      queued = [];
+    }
+    const rest = (Array.isArray(queued) ? queued : []).filter(isMutation);
+    await this.container.write(PENDING_WIDGET_MUTATIONS_FILE, JSON.stringify([...failed, ...rest]));
   }
 
   private async replay(m: PendingWidgetMutation): Promise<boolean> {

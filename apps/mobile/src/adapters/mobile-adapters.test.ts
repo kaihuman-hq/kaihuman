@@ -133,6 +133,7 @@ describe('WidgetBridge', () => {
   beforeEach(() => {
     configureCoreStorage(new MobileStorageAdapter());
     githubProfileStore.currentRepo.value = repo;
+    githubFileStore.loadedRepo.value = repo.full_name;
     githubFileStore.tree.value = [blob('.kh/inbox.todos.md', 's1'), blob('notes.md', 'n')];
     githubFileStore.openFiles.value = {
       '.kh/inbox.todos.md': { content: TODOS, sha: 's1' },
@@ -260,6 +261,8 @@ describe('WidgetBridge', () => {
 
   it('creates the inbox for a capture when it does not exist', async () => {
     const container = new InMemorySharedContainer();
+    // Not in the tree: the repo has no inbox yet (a listed but unopened one must not be replaced).
+    githubFileStore.tree.value = [blob('notes.md', 'n')];
     githubFileStore.openFiles.value = {};
     const create = vi.spyOn(githubFileStore, 'createFile').mockImplementation(async (p, c) => {
       githubFileStore.openFiles.value = { [p]: { content: c, sha: '' } };
@@ -270,6 +273,72 @@ describe('WidgetBridge', () => {
       '.kh/inbox.todos.md',
       expect.stringContaining('- [ ] first'),
     );
+  });
+
+  it('keeps the queue until the repo tree is loaded (cold launch from a widget)', async () => {
+    const container = new InMemorySharedContainer();
+    const create = vi.spyOn(githubFileStore, 'createFile').mockResolvedValue(undefined);
+    githubFileStore.loadedRepo.value = null;
+    githubFileStore.openFiles.value = {};
+    const entries = [{ kind: 'capture', text: 'from widget', timestamp: 1 }];
+    await queue(container, entries);
+    expect(await new WidgetBridge(container).reconcile()).toBe(0);
+    expect(create).not.toHaveBeenCalled();
+    expect(JSON.parse(container.files.get(PENDING_WIDGET_MUTATIONS_FILE) ?? '[]')).toEqual(entries);
+    // An existing inbox the tree lists but that is not open yet must not be recreated either.
+    githubFileStore.loadedRepo.value = repo.full_name;
+    expect(await new WidgetBridge(container).reconcile()).toBe(0);
+    expect(create).not.toHaveBeenCalled();
+
+    mockSave();
+    vi.spyOn(githubFileStore, 'flushPendingWrites').mockResolvedValue(undefined);
+    githubFileStore.openFiles.value = { '.kh/inbox.todos.md': { content: TODOS, sha: 's1' } };
+    expect(await new WidgetBridge(container).reconcile()).toBe(1);
+    expect(githubFileStore.openFiles.value['.kh/inbox.todos.md']?.content).toContain(
+      '- [ ] from widget',
+    );
+    expect(githubFileStore.openFiles.value['.kh/inbox.todos.md']?.content).toContain('write plan');
+  });
+
+  it('re-queues a mutation whose write failed instead of dropping it', async () => {
+    const container = new InMemorySharedContainer();
+    vi.spyOn(githubFileStore, 'flushPendingWrites').mockRejectedValue(new Error('disk full'));
+    const entries = [{ kind: 'capture', text: 'keep me', timestamp: 1 }];
+    await queue(container, entries);
+    expect(await new WidgetBridge(container).reconcile()).toBe(0);
+    expect(JSON.parse(container.files.get(PENDING_WIDGET_MUTATIONS_FILE) ?? '[]')).toEqual(entries);
+  });
+
+  it('does not write a snapshot before the repo tree is loaded', async () => {
+    const container = new InMemorySharedContainer();
+    githubFileStore.loadedRepo.value = null;
+    await new WidgetBridge(container).sync();
+    expect(container.files.has(WIDGET_TODOS_FILE)).toBe(false);
+  });
+
+  it('opens habit and timer files so a headless snapshot keeps those widgets', async () => {
+    const container = new InMemorySharedContainer();
+    const TIMER = '.kh/deep-work.timetracking.csv';
+    githubFileStore.tree.value = [
+      blob('.kh/inbox.todos.md', 's1'),
+      blob(HABIT, 'h1'),
+      blob(TIMER, 't1'),
+    ];
+    githubFileStore.openFiles.value = { '.kh/inbox.todos.md': { content: TODOS, sha: 's1' } };
+    const opened: string[] = [];
+    vi.spyOn(githubFileStore, 'openFile').mockImplementation(async (path: string) => {
+      opened.push(path);
+      githubFileStore.openFiles.value = {
+        ...githubFileStore.openFiles.value,
+        [path]: { content: 'iso date;goal reached\n', sha: 'x' },
+      };
+    });
+    const bridge = new WidgetBridge(container);
+    await bridge.load();
+    await bridge.sync();
+    expect(opened).toEqual([HABIT, TIMER]);
+    const snap = JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}');
+    expect(snap.habits?.map((h: { path: string }) => h.path)).toEqual([HABIT]);
   });
 
   it('checks in a habit on the current file and skips an already checked day', async () => {

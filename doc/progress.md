@@ -6,6 +6,14 @@
 - Todos: quick due presets Today, Tomorrow, Next Saturday, Next Monday (next such day strictly after today) in the add sheet, the board Due sheet and the due editor (todo detail, quick capture). `DUE_PRESETS` / `dueFromPreset` in `src/screens/todo-due.ts`, with tests.
 - Motion: removed the dashboard tile entrance stagger, hero roll-in, tile press scale, quick-action pop and checkbox pop; the ＋ button no longer spins (shows × while open); the ＋ menu opens and closes without scrim fade, sheet spring or item stagger; the Android FAB has no press scale. Row exit/layout fades and the full-swipe slide-out stay.
 
+## 2026-11-10 — Mobile: widget capture lost, widget add sheet, stale widget values
+
+- Widget "+" (`kaihuman://quick-inbox`) now opens the same "New todo" sheet as the in-app add (`/quick-todo`) instead of the one-field inbox sheet.
+- Lost widget todos: the widget cold-launches the app into the capture sheet before the repo tree loads. The inbox read returned null, the save created a new inbox with only that line, and the first `loadTree` (repo "switch" from null) cleared open files. Captures now wait for the tree (`src/sync/repo-ready.ts`, 20 s, then an error and the text stays).
+- Lost widget queue: bootstrap replayed `pending-widget-mutations.json` before the repo loaded, emptied the file and dropped every item it could not apply. `WidgetBridge.reconcile` now waits until every todo file is open, and puts failed replays back in the queue.
+- Stale or missing widget values: a headless/background run opened only todo files, so habit, timer and idea widgets lost their data. `load()` now opens those files first. No snapshot is written before the repo tree is loaded.
+- Tests: `mobile-adapters.test.ts`, `todos-and-capture.test.ts`, `route-files.test.ts`.
+
 ## 2026-11-10 — Mobile iOS: fix EAS build error in the scan intent
 
 - `VisualIntelligenceIntents.swift`: the EAS Xcode SDK types `SemanticContentDescriptor.pixelBuffer` as `CVReadOnlyPixelBuffer`, while CI's iOS 26.5 SDK still uses `CVPixelBuffer`. An overload for each type, so the file compiles with both.
