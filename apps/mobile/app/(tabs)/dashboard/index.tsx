@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { type DashboardPage, loadDashboards } from '../../../src/screens/dashboards.js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type DashboardPage, loadDashboards, takeLatest } from '../../../src/screens/dashboards.js';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
 import { useFocusRefresh, useRefresh, useSyncRevision } from '../../../src/sync/hooks.js';
 import { DashboardPager } from '../../../src/views/dashboard-pager.js';
@@ -17,13 +17,22 @@ export default function Dashboard() {
   useFocusRefresh();
   const [error, setError] = useState<string | null>(null);
 
+  const loadLatest = useMemo(
+    () =>
+      takeLatest(async () => {
+        await githubContentFiles.refresh();
+        return loadDashboards(githubContentFiles);
+      }),
+    [],
+  );
+
   const load = useCallback(async () => {
-    await githubContentFiles.refresh();
-    const result = await loadDashboards(githubContentFiles);
+    const result = await loadLatest();
+    if (!result) return;
     setPages(result.pages);
     setDefaulted(result.defaulted);
     setNow(new Date());
-  }, []);
+  }, [loadLatest]);
 
   const run = useCallback(async () => {
     try {

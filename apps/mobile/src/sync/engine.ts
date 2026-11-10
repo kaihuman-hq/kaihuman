@@ -1,5 +1,6 @@
 import { Logger } from '@kaihuman/core';
 import { effect } from '@preact/signals';
+import { type AuthRecovery, isAuthFailure } from './auth-recovery.js';
 import { shouldFullLoad } from './revalidate.js';
 import { type SyncStatus, type SyncTrigger, syncRevision, syncStatus } from './status.js';
 
@@ -33,6 +34,8 @@ export interface SyncEngineDeps {
   isOnline(): boolean;
   /** Asks the scheduler for a debounced 'write' run (used after a conflict decision). */
   requestWrite(): void;
+  /** Called when a run fails with a 401: checks, replaces or ends the session (auth-recovery.ts). */
+  recoverAuth?: () => Promise<AuthRecovery>;
   now?: () => number;
 }
 
@@ -96,6 +99,18 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
   }
 
   async function run(trigger: SyncTrigger): Promise<boolean> {
+    const ok = await attempt(trigger);
+    const { error } = syncStatus.peek();
+    if (ok || !deps.recoverAuth || !isAuthFailure(error)) return ok;
+    const outcome = await deps.recoverAuth();
+    // The token works (now): one retry clears the banner instead of waiting for the next poll.
+    if (outcome === 'valid' || outcome === 'replaced') return attempt(trigger);
+    // The login screen explains it; a "Bad credentials" banner behind it would only confuse.
+    if (outcome === 'signed-out') patch({ phase: 'idle', error: null });
+    return false;
+  }
+
+  async function attempt(trigger: SyncTrigger): Promise<boolean> {
     patch({ phase: 'syncing' });
     let failure: string | null = null;
     // Screens reload on every bump, and a reload can start another refresh, so only bump for

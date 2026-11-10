@@ -1,3 +1,4 @@
+import { authStore, demoMode, getCoreStorage } from '@kaihuman/core';
 import { getRandomValues } from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
@@ -5,6 +6,7 @@ import { AppState } from 'react-native';
 import { KaihumanShared } from '../../modules/kaihuman-shared/index.js';
 import { WidgetBridge } from '../adapters/widget-bridge.js';
 import { rescheduleNotifications, startNotifications } from '../notifications/index.js';
+import { checkGithubToken, recoverAuth } from '../sync/auth-recovery.js';
 import { registerBackgroundSync } from '../sync/background.js';
 import { setRescheduleNotifications } from '../sync/notifications-hook.js';
 import { startSync } from '../sync/runtime.js';
@@ -52,7 +54,27 @@ export function bootstrap(): () => void {
   ready = stopToken.ready;
   // Every sync run (foreground or background) re-plans local notifications from fresh todos.
   setRescheduleNotifications(rescheduleNotifications);
-  const stopSync = startSync({ bridge, tokenReady: ready });
+  const stopSync = startSync({
+    bridge,
+    tokenReady: ready,
+    // The token lives in three places (core's key, core's auth record, the widgets' Keychain item);
+    // after a 401 any copy GitHub still accepts beats signing the user out.
+    recoverAuth: () =>
+      recoverAuth({
+        token: () => (demoMode.peek() ? null : authStore.token.peek()),
+        candidates: async () => [
+          await SecureStore.getItemAsync(SECURE_TOKEN_KEY, secureOptions).catch(() => null),
+          await getCoreStorage()
+            .getRecord<string>('auth', 'token')
+            .catch(() => undefined),
+        ],
+        check: (token) => checkGithubToken(token),
+        adopt: (token) => {
+          authStore.token.value = token;
+        },
+        signOut: () => authStore.logout(),
+      }),
+  });
   void registerBackgroundSync();
   active = () => {
     stopSync();

@@ -1,11 +1,14 @@
-import { githubFileStore, githubProfileStore } from '@kaihuman/core';
+import { authStore, githubFileStore, githubProfileStore } from '@kaihuman/core';
+import { effect } from '@preact/signals';
 import * as Battery from 'expo-battery';
 import * as Network from 'expo-network';
 import { AppState } from 'react-native';
 import { setSyncActions } from './actions.js';
+import { type AuthRecovery, sessionNotice } from './auth-recovery.js';
 import { createSyncEngine, type SyncEngine } from './engine.js';
 import { rescheduleNotifications } from './notifications-hook.js';
 import { createSyncScheduler, type SyncScheduler } from './scheduler.js';
+import { watchSession } from './session-watch.js';
 import { type SyncTrigger, syncStatus } from './status.js';
 
 /** The widget bridge as sync uses it; `WidgetBridge` satisfies this. */
@@ -17,6 +20,7 @@ export interface SyncWidgets {
 let widgets: SyncWidgets | null = null;
 let online = true;
 let tokenReady: Promise<unknown> = Promise.resolve();
+let authRecovery: (() => Promise<AuthRecovery>) | null = null;
 let runtime: { scheduler: SyncScheduler; engine: SyncEngine } | null = null;
 
 function ensure() {
@@ -31,6 +35,7 @@ function ensure() {
     reschedule: rescheduleNotifications,
     isOnline: () => online,
     requestWrite: () => notifyLocalWrite(),
+    recoverAuth: async () => (authRecovery ? authRecovery() : 'unknown'),
   });
   const scheduler = createSyncScheduler({
     // A run needs the Keychain token, which hydrates asynchronously after a cold start.
@@ -102,11 +107,23 @@ const optional = (subscribe: () => { remove(): void }): { remove(): void } => {
 export function startSync(opts: {
   bridge: SyncWidgets;
   tokenReady?: Promise<unknown>;
+  /** Checks, replaces or ends the session after a 401 (see auth-recovery.ts). */
+  recoverAuth?: () => Promise<AuthRecovery>;
 }): () => void {
   widgets = opts.bridge;
   if (opts.tokenReady) tokenReady = opts.tokenReady;
+  authRecovery = opts.recoverAuth ?? null;
   const { scheduler } = ensure();
   let stopped = false;
+
+  // Sign-in, re-login and repo switches sync at once instead of waiting for a poll.
+  const stopSession = watchSession(
+    () => [authStore.token.value, githubProfileStore.currentRepo.value?.full_name ?? null],
+    () => void scheduler.trigger('pull'),
+  );
+  const stopNotice = effect(() => {
+    if (authStore.token.value) sessionNotice.value = null;
+  });
 
   const appSub = AppState.addEventListener('change', (state) => {
     scheduler.setActive(state === 'active');
@@ -133,6 +150,9 @@ export function startSync(opts: {
 
   return () => {
     stopped = true;
+    stopSession();
+    stopNotice();
+    authRecovery = null;
     appSub.remove();
     netSub.remove();
     powerSub.remove();

@@ -52,9 +52,19 @@ export const githubContentFiles: ContentFiles = {
     await githubFileStore.flushPendingWrites();
     syncActions().notifyLocalWrite();
   },
-  create: (path, content) => githubFileStore.createFile(path, content),
-  remove: (path) => githubFileStore.deleteFile(path),
-  rename: (from, to) => githubFileStore.renameFile(from, to),
+  // Every edit asks for a (debounced) sync, not only content writes.
+  async create(path, content) {
+    await githubFileStore.createFile(path, content);
+    syncActions().notifyLocalWrite();
+  },
+  async remove(path) {
+    await githubFileStore.deleteFile(path);
+    syncActions().notifyLocalWrite();
+  },
+  async rename(from, to) {
+    await githubFileStore.renameFile(from, to);
+    syncActions().notifyLocalWrite();
+  },
 };
 
 /** Direct children (blob files) of a folder, `''` being the repository root. */

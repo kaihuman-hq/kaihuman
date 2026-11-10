@@ -290,3 +290,45 @@ describe('conflicts', () => {
     t.engine.dispose();
   });
 });
+
+describe('401 recovery', () => {
+  const badCredentials = (t: ReturnType<typeof setup>, times: number) => {
+    let left = times;
+    t.store.syncNow = async () => {
+      if (left-- > 0) throw new Error('Bad credentials - https://docs.github.com/rest');
+      return 'synced';
+    };
+  };
+
+  it('retries once and shows no banner when the token turns out to be fine', async () => {
+    // Regression: one rejected request left "Bad credentials" on screen for a valid session.
+    const recoverAuth = vi.fn(async () => 'valid' as const);
+    const t = setup({ recoverAuth });
+    await t.engine.run('launch');
+    badCredentials(t, 1);
+    expect(await t.engine.run('poll')).toBe(true);
+    expect(recoverAuth).toHaveBeenCalledOnce();
+    expect(syncStatus.value).toMatchObject({ phase: 'idle', error: null });
+    t.engine.dispose();
+  });
+
+  it('clears the banner when the session had to end', async () => {
+    const t = setup({ recoverAuth: async () => 'signed-out' });
+    await t.engine.run('launch');
+    badCredentials(t, 5);
+    expect(await t.engine.run('poll')).toBe(false);
+    expect(syncStatus.value).toMatchObject({ phase: 'idle', error: null });
+    t.engine.dispose();
+  });
+
+  it('leaves other failures alone', async () => {
+    const recoverAuth = vi.fn(async () => 'valid' as const);
+    const t = setup({ recoverAuth });
+    await t.engine.run('launch');
+    t.state.syncThrows = true;
+    expect(await t.engine.run('poll')).toBe(false);
+    expect(recoverAuth).not.toHaveBeenCalled();
+    expect(syncStatus.value.error).toBe('network down');
+    t.engine.dispose();
+  });
+});

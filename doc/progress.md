@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-10 — Mobile: dashboard swipe, "Bad credentials" banner, automatic sync, widget due today
+
+- Dashboard swipe (root cause): `githubFileStore.openFile` returned at once when the same file was already loading, so a second reader found nothing in `openFiles`. Two dashboard loads overlap after every sync that bumps the revision (cold start in particular), the config read failed, `loadDashboards` treated it as "no config" and collapsed every dashboard into one "Today" page, so there was nothing to swipe to. The repository was never forgotten. Fixes: a concurrent `openFile` waits for the load in flight; an unreadable config now fails the load (the screen keeps its pages) instead of falling back; `takeLatest` drops a load that finishes after a newer one.
+- "Bad credentials": a 401 stayed as a banner until logout + login, even when only one request was rejected or a newer stored copy of the token was valid. On a 401 the engine now asks GitHub (`/user`) about the session's token (`sync/auth-recovery.ts`): valid → retry once, no banner; rejected → adopt another stored copy that works (Keychain, core's auth record); none → sign out with a notice on the login screen. GitHub revokes the oldest OAuth token after 10 sign-ins for the same app, which is the likely way a token goes bad.
+- Automatic sync: sign-in, re-login and repository switches trigger a sync (`sync/session-watch.ts`); creating, deleting and renaming files also request one. Launch, foreground, edits and polling already did.
+- iOS Next up widget lists only open todos due today (snapshot time zone), with "Nothing due today" as the empty state.
+- Regression tests for each (core `sync-phase2.test.ts`; mobile `dashboards`, `engine`, `auth-recovery`, `session-watch`, `runtime-session`, `login-repos`, `ios-widget`).
+
 ## 2026-11-09 — Tests: extension teardown race, mobile render timeouts
 
 - Mobile `dom` tests get a 20s timeout: full tile and dashboard renders took over 5s on the shared CI runner.

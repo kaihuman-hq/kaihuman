@@ -455,3 +455,16 @@ describe('phase 2 review fixes', () => {
     expect(commit).not.toHaveBeenCalled();
   });
 });
+
+describe('openFile', () => {
+  it('lets a concurrent caller wait for the load in flight instead of returning empty-handed', async () => {
+    // Regression: the second call returned at once, before the file was in openFiles, so the
+    // mobile dashboard read its config as missing and collapsed to a single page.
+    const a = device();
+    await a.loadTree();
+    const first = a.openFile(FILE);
+    await a.openFile(FILE);
+    expect(a.openFiles.value[FILE]?.content).toBe(V0);
+    await first;
+  });
+});

@@ -5,6 +5,7 @@ import {
   lastDashboardId,
   loadDashboards,
   rememberDashboard,
+  takeLatest,
 } from './dashboards.js';
 import type { ContentFiles } from './file-editor-screen.js';
 
@@ -79,6 +80,13 @@ describe('loadDashboards', () => {
     expect(reads.filter((p) => p === '.kh/x.todos.md')).toHaveLength(1);
   });
 
+  it('fails instead of collapsing to one page when the config cannot be read', async () => {
+    // Regression: an unreadable config was treated as missing, so the pager dropped to "Today".
+    const seed = buildDemoSeed(NOW).files;
+    const { files } = fakeFiles(seed, ['.kh/.dashboard.config.json']);
+    await expect(loadDashboards(files)).rejects.toThrow('boom');
+  });
+
   it('leaves out files that fail to read', async () => {
     const seed = buildDemoSeed(NOW).files;
     const { files } = fakeFiles(seed, ['.kh/health.habit.csv']);
@@ -94,5 +102,30 @@ describe('remembered dashboard', () => {
     expect(lastDashboardId()).toBeNull();
     rememberDashboard('finance');
     expect(lastDashboardId()).toBe('finance');
+  });
+});
+
+describe('takeLatest', () => {
+  it('drops a load that finishes after a newer one started', async () => {
+    // Regression: an older dashboard load landing last replaced the newer pages.
+    const resolvers: Array<(v: string) => void> = [];
+    const load = takeLatest(() => new Promise<string>((r) => resolvers.push(r)));
+    const older = load();
+    const newer = load();
+    resolvers[1]?.('new');
+    resolvers[0]?.('old');
+    expect(await newer).toBe('new');
+    expect(await older).toBeNull();
+  });
+
+  it("rethrows only the latest call's error", async () => {
+    let n = 0;
+    const load = takeLatest(async () => {
+      n += 1;
+      throw new Error(`fail ${n}`);
+    });
+    const older = load();
+    await expect(load()).rejects.toThrow('fail 2');
+    expect(await older).toBeNull();
   });
 });
