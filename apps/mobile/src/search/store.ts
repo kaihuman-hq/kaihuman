@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { useSyncRevision } from '../sync/index.js';
 import { useSignalValue } from '../views/use-signal.js';
 import { parseRecentSearches, withRecentSearch } from './search.js';
+import { cachedRead, refreshSearchIndex, searchIndex } from './shared-index.js';
 import { pickWarmPaths } from './warm.js';
-import { refreshSearchIndex, searchIndex } from './shared-index.js';
 
 export { cachedRead, refreshSearchIndex, searchIndex } from './shared-index.js';
 
