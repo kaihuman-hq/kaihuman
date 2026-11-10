@@ -6,19 +6,9 @@ import WidgetKit
 /// Focus session on the Lock Screen, StandBy and Dynamic Island. The countdown is a system timer
 /// (`Text(timerInterval:)`), so the activity needs no updates while it runs.
 ///
-/// iOS 18+ also declares the `.small` activity family (`FocusLiveActivityFamilies`), which the
-/// system shows in the Apple Watch Smart Stack, the macOS 26 menu bar and CarPlay. iOS 17 keeps
-/// this plain configuration; the bundle picks one, so the attributes type is never registered twice.
-struct FocusLiveActivity: Widget {
-    var body: some WidgetConfiguration {
-        ActivityConfiguration(for: FocusActivityAttributes.self) { context in
-            FocusActivityContent(context: context)
-        } dynamicIsland: { context in
-            FocusActivityUI.island(context)
-        }
-    }
-}
-
+/// The `.small` activity family shows it in the Apple Watch Smart Stack, the macOS 26 menu bar and
+/// CarPlay. iOS 18+ only: a plain iOS 17 variant needs an if/else in the widget bundle, which
+/// `WidgetBundleBuilder` cannot express.
 @available(iOS 18.0, *)
 struct FocusLiveActivityFamilies: Widget {
     var body: some WidgetConfiguration {

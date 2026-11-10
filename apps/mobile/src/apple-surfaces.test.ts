@@ -33,15 +33,15 @@ describe('focus session surfaces (proposal 2.3)', () => {
     expect(activity.slice(from, activity.indexOf('enum FocusStyle'))).not.toContain('Button(');
   });
 
-  it('registers exactly one activity configuration per OS version', () => {
-    expect(bundle).toMatch(
-      /if #available\(iOS 18\.0, \*\) \{\s*FocusLiveActivityFamilies\(\)\s*\}\s*if #unavailable\(iOS 18\.0\) \{\s*FocusLiveActivity\(\)\s*\}/,
+  it('registers exactly one activity configuration', () => {
+    expect(bundle.slice(bundle.indexOf('if #available(iOS 18.0, *)'))).toContain(
+      'FocusLiveActivityFamilies()',
     );
-    // Regression: WidgetBundleBuilder has no buildEither, so an else branch fails to compile.
-    expect(bundle).not.toMatch(/\}\s*else\s*\{/);
-    expect(activity.match(/ActivityConfiguration\(for:/g)).toHaveLength(2);
+    // Regression: WidgetBundleBuilder has no buildEither (else fails) and `#unavailable` crashed swiftc.
+    expect(bundle).not.toMatch(/\}\s*else\s*\{|#unavailable/);
+    expect(activity.match(/ActivityConfiguration\(for:/g)).toHaveLength(1);
     // The island is built once and shared, so compact and minimal stay identical on both.
-    expect(activity.match(/FocusActivityUI\.island\(context\)/g)).toHaveLength(2);
+    expect(activity.match(/FocusActivityUI\.island\(context\)/g)).toHaveLength(1);
   });
 
   it('keeps compact and minimal to an icon and a short countdown for the landscape island', () => {

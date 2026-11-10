@@ -2,7 +2,7 @@
 
 ## 2026-11-10 — Mobile iOS: fix widget bundle compile error
 
-- `KaihumanWidgets.swift`: `WidgetBundleBuilder` has no if/else, so the focus Live Activity uses two one-sided availability branches. Found by the first macOS CI build.
+- `KaihumanWidgets.swift`: `WidgetBundleBuilder` has no if/else, and `#unavailable` crashed the Swift compiler. The focus Live Activity now registers once, in the iOS 18 block, so iOS 17 has no Live Activity. Found by the first macOS CI builds.
 
 ## 2026-11-10 — Mobile: Apple Intelligence smart capture, scan to entry, weekly review
 

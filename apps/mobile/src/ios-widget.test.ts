@@ -231,7 +231,7 @@ describe('ios widget target', () => {
       }
       expect(widgets).toContain('AppIntentConfiguration');
       expect(widgets).toContain('NextUpConfigurationIntent');
-      expect(widgets).toContain('        FocusLiveActivity()');
+      expect(widgets).toContain('            FocusLiveActivityFamilies()');
     });
 
     it('configures the board column and milestone widgets from the snapshot', () => {

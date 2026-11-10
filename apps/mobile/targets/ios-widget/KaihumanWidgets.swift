@@ -30,7 +30,6 @@ struct KaihumanWidgets: WidgetBundle {
         InboxCountWidget()
         // Nested so the builder never sees more than ten children (older SDKs cap buildBlock).
         KaihumanV2Widgets().body
-        KaihumanFocusWidgets().body
         // ControlWidget needs the iOS 18 SDK runtime; the extension itself deploys to 17.0.
         if #available(iOS 18.0, *) {
             NewTodoControl()
@@ -41,6 +40,13 @@ struct KaihumanWidgets: WidgetBundle {
             CaptureControl()
             FocusTimerControl()
             StopFocusControl()
+            // Live Activity with the iOS 18 `.small` family (Watch, CarPlay, Mac). iOS 17 has no Live
+            // Activity: the builder has no if/else, and a negative availability check crashed swiftc.
+            FocusLiveActivityFamilies()
+        }
+        // iOS 27 extra-large size; the gate keeps older systems from listing it.
+        if #available(iOS 27.0, *) {
+            TodayDashboardWidget()
         }
     }
 }
@@ -56,24 +62,5 @@ struct KaihumanV2Widgets: WidgetBundle {
         HabitsWidget()
         DueTodayWidget()
         TimerWidget()
-    }
-}
-
-/// The focus Live Activity (small family from iOS 18) and the iOS 27 extra-large Today dashboard.
-/// Declared after the controls on purpose: src/ios-widget.test.ts reads the first iOS 18 block.
-struct KaihumanFocusWidgets: WidgetBundle {
-    @WidgetBundleBuilder
-    var body: some Widget {
-        // WidgetBundleBuilder has no buildEither, so two one-sided branches instead of if/else.
-        if #available(iOS 18.0, *) {
-            FocusLiveActivityFamilies()
-        }
-        if #unavailable(iOS 18.0) {
-            FocusLiveActivity()
-        }
-        // iOS 27 extra-large size; the view needs nothing newer, the gate keeps older systems from listing it.
-        if #available(iOS 27.0, *) {
-            TodayDashboardWidget()
-        }
     }
 }
