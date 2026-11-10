@@ -1,8 +1,10 @@
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { nextDashboardId, saveDashboardEdits } from '../../../src/screens/dashboard-edit.js';
 import { type DashboardPage, loadDashboards, takeLatest } from '../../../src/screens/dashboards.js';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
 import { useFocusRefresh, useRefresh, useSyncRevision } from '../../../src/sync/hooks.js';
+import type { DashboardEditor } from '../../../src/views/dashboard-editor.js';
 import { DashboardPager } from '../../../src/views/dashboard-pager.js';
 
 export default function Dashboard() {
@@ -48,6 +50,21 @@ export default function Dashboard() {
     run().finally(() => setLoading(false));
   }, [run, rev]);
 
+  // Edits re-read the config and save through the sync engine's normal write path.
+  const editor: DashboardEditor = {
+    tree: githubContentFiles
+      .tree()
+      .filter((i) => i.type !== 'tree')
+      .map((i) => i.path),
+    onEdit: async (edits) => {
+      const fallback = defaulted ? { shown: pages[0]?.files.map((f) => f.path) ?? [] } : undefined;
+      await saveDashboardEdits(githubContentFiles, edits, fallback);
+      await load();
+    },
+    onCreateFile: (path, content) => githubContentFiles.create(path, content),
+    newDashboardId: () => nextDashboardId(githubContentFiles),
+  };
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
@@ -59,6 +76,7 @@ export default function Dashboard() {
         refreshing={refreshing}
         error={error}
         onRefresh={onRefresh}
+        editor={editor}
         onNavigate={(href) => router.push(href as never)}
         onCreateFile={(path, content) => githubContentFiles.create(path, content)}
         onWrite={async (path, content) => {

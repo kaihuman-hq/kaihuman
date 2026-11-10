@@ -21,6 +21,7 @@ import {
 import { SyncStatusBanner } from '../sync/sync-status-banner.js';
 import { useTheme } from '../theme/theme.js';
 import {
+  Button,
   EmptyState,
   ErrorBoundary,
   errorMessage,
@@ -30,6 +31,7 @@ import {
   Text,
 } from '../ui/index.js';
 import { useInsets } from '../ui/insets.js';
+import { type DashboardEditor, DashboardsSheet, EditTiles } from './dashboard-editor.js';
 import { Shortcuts, Skeleton } from './dashboard-view.js';
 import { Tile } from './tile-view.js';
 import { TILE_SIZE } from './tiles/summary.js';
@@ -75,6 +77,9 @@ interface PageProps {
   onWrite: (path: string, content: string) => void | Promise<void>;
   onCreateFile?: (path: string, content: string) => Promise<void>;
   onNavigate: (href: string) => void;
+  /** Set on the current page while editing: its tiles show as an editable list. */
+  edit?: { pages: readonly DashboardPage[]; editor: DashboardEditor };
+  onStartEdit?: () => void;
 }
 
 function Page({
@@ -90,8 +95,11 @@ function Page({
   onWrite,
   onCreateFile,
   onNavigate,
+  edit,
+  onStartEdit,
 }: PageProps) {
   const { colors, spacing, metrics } = useTheme();
+  const [scrollEnabled, setScrollEnabled] = useState(true);
   const insets = useInsets();
   // RSS tiles count unread items from fetched feeds, so fetch them here and redraw on arrival.
   useFeedSnapshot();
@@ -108,7 +116,22 @@ function Page({
   const open = (path: string) => onNavigate(tileRoute(path));
   const renderOne = (item: Shown) => (
     <ErrorBoundary what="this tile" resetKey={item.content} onRetry={onRefresh}>
-      {renderTile(item)}
+      {onStartEdit ? (
+        // Not accessible itself, so the tile's own controls stay reachable by screen readers.
+        <Pressable
+          accessible={false}
+          onLongPress={() => {
+            haptics.medium();
+            onStartEdit();
+          }}
+          delayLongPress={450}
+          testID={`tile-hold-${item.path}`}
+        >
+          {renderTile(item)}
+        </Pressable>
+      ) : (
+        renderTile(item)
+      )}
     </ErrorBoundary>
   );
   const renderTile = (item: Shown) =>
@@ -135,6 +158,7 @@ function Page({
   return (
     <View style={{ width }} testID={`dashboard-page-${page.id}`}>
       <ScrollView
+        scrollEnabled={scrollEnabled}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         refreshControl={
@@ -153,36 +177,50 @@ function Page({
           gap: spacing.md,
         }}
       >
-        {index === 0 ? <Shortcuts onNavigate={onNavigate} /> : null}
-        {loading ? <Skeleton /> : null}
-        {!loading && error && shown.length === 0 ? (
-          <EmptyState
-            icon="warning"
-            title="Couldn't load your tiles"
-            message={error}
-            action={onRefresh ? { label: 'Try again', onPress: onRefresh } : undefined}
+        {edit ? (
+          <EditTiles
+            page={page}
+            pages={edit.pages}
+            editor={edit.editor}
+            onScrollEnabled={setScrollEnabled}
           />
         ) : null}
-        {!loading && !error && defaulted && shown.length > 0 ? (
-          <Hint>Group tiles into dashboards in the web console; they show up here as pages.</Hint>
-        ) : null}
-        {!loading && !error && shown.length === 0 && defaulted ? (
-          <EmptyState
-            icon="empty"
-            title="No dashboard files in this repository"
-            message="Add a todo list, habit or bookmarks file and it shows up here as a tile."
-          />
-        ) : null}
-        {!loading && !error && shown.length === 0 && !defaulted ? (
-          <EmptyState
-            icon="empty"
-            title="No tiles on this dashboard"
-            message={`Add files to ${page.name} in the web console.`}
-          />
-        ) : null}
-        {shown.map((item) => (
-          <Fragment key={item.path}>{renderOne(item)}</Fragment>
-        ))}
+        {!edit && index === 0 ? <Shortcuts onNavigate={onNavigate} /> : null}
+        {loading && !edit ? <Skeleton /> : null}
+        {edit ? null : (
+          <>
+            {!loading && error && shown.length === 0 ? (
+              <EmptyState
+                icon="warning"
+                title="Couldn't load your tiles"
+                message={error}
+                action={onRefresh ? { label: 'Try again', onPress: onRefresh } : undefined}
+              />
+            ) : null}
+            {!loading && !error && defaulted && shown.length > 0 ? (
+              <Hint>
+                Group tiles into dashboards in the web console; they show up here as pages.
+              </Hint>
+            ) : null}
+            {!loading && !error && shown.length === 0 && defaulted ? (
+              <EmptyState
+                icon="empty"
+                title="No dashboard files in this repository"
+                message="Add a todo list, habit or bookmarks file and it shows up here as a tile."
+              />
+            ) : null}
+            {!loading && !error && shown.length === 0 && !defaulted ? (
+              <EmptyState
+                icon="empty"
+                title="No tiles on this dashboard"
+                message={`Add files to ${page.name} in the web console.`}
+              />
+            ) : null}
+            {shown.map((item) => (
+              <Fragment key={item.path}>{renderOne(item)}</Fragment>
+            ))}
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -324,6 +362,8 @@ export interface DashboardPagerProps {
   onWrite: (path: string, content: string) => void | Promise<void>;
   onCreateFile?: (path: string, content: string) => Promise<void>;
   onNavigate: (href: string) => void;
+  /** Turns on edit mode (Edit button and long-press on a tile). */
+  editor?: DashboardEditor;
 }
 
 /** Home screen: one swipeable page per console dashboard under a fixed header. */
@@ -338,6 +378,7 @@ export function DashboardPager({
   onWrite,
   onCreateFile,
   onNavigate,
+  editor,
 }: DashboardPagerProps) {
   const { colors, spacing, metrics } = useTheme();
   const insets = useInsets();
@@ -346,6 +387,9 @@ export function DashboardPager({
   const items = pages.length > 0 ? pages : [PLACEHOLDER];
   const [currentId, setCurrentId] = useState<string | null>(lastDashboardId);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [dashboardsOpen, setDashboardsOpen] = useState(false);
+  const canEdit = editor !== undefined && !loading;
   const found = items.findIndex((p) => p.id === currentId);
   const index = found < 0 ? 0 : found;
   const current = items[index] as DashboardPage;
@@ -374,9 +418,30 @@ export function DashboardPager({
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
       <View style={{ paddingHorizontal: metrics.screenMargin, paddingTop: spacing.sm }}>
-        <Text variant="subheadline" tone="secondary">
-          {dateLine(now)}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Text variant="subheadline" tone="secondary" style={{ flex: 1 }}>
+            {dateLine(now)}
+          </Text>
+          {canEdit && editing ? (
+            <Button
+              label="Dashboards"
+              variant="plain"
+              size="small"
+              onPress={() => setDashboardsOpen(true)}
+              testID="dashboard-manage"
+            />
+          ) : null}
+          {canEdit ? (
+            <Button
+              label={editing ? 'Done' : 'Edit'}
+              accessibilityLabel={editing ? 'Done editing' : 'Edit dashboard'}
+              variant={editing ? 'filled' : 'plain'}
+              size="small"
+              onPress={() => setEditing((e) => !e)}
+              testID="dashboard-edit"
+            />
+          ) : null}
+        </View>
         {items.length > 1 ? (
           <Pressable
             accessibilityRole="button"
@@ -411,6 +476,8 @@ export function DashboardPager({
         data={items}
         horizontal
         pagingEnabled
+        // Paging off while editing, so dragging a tile cannot swipe to another dashboard.
+        scrollEnabled={!editing}
         showsHorizontalScrollIndicator={false}
         keyExtractor={(p) => p.id}
         initialScrollIndex={index}
@@ -431,9 +498,19 @@ export function DashboardPager({
             onWrite={onWrite}
             {...(onCreateFile && { onCreateFile })}
             onNavigate={onNavigate}
+            {...(editing && editor && i === index && { edit: { pages: items, editor } })}
+            {...(canEdit && !editing && { onStartEdit: () => setEditing(true) })}
           />
         )}
       />
+      {editor ? (
+        <DashboardsSheet
+          visible={dashboardsOpen}
+          pages={items}
+          editor={editor}
+          onClose={() => setDashboardsOpen(false)}
+        />
+      ) : null}
       <DashboardMenu
         visible={menuOpen}
         pages={items}

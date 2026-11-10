@@ -22,6 +22,13 @@
 - Spotlight: `src/spotlight` publishes todos and notes from the search index (`src/search/shared-index.ts`, split out of `store.ts` so bootstrap avoids React imports) to `spotlight-items.json` and Core Spotlight. Debounced, deduped, max 500.
 - `doc/apple-intelligence.md`: feasibility, limits with Expo, plan (assistant schemas, Foundation Models, iOS 27).
 - Tests: quick-action plist transform and routing, subscriber and Spotlight source checks, controls, focus key drift, new widget families and previews, Siri intents and entity keys, Spotlight adapter and sync, today/capture routes, Android Today shortcut.
+## 2026-11-10 — Mobile: edit dashboards
+
+- Edit mode on the Today pager (Edit button in the header, or long-press a tile): the current dashboard's tiles become a list with drag handle (reorder), remove, and tile settings (move to another dashboard, hide on mobile). Add tile picks a kind, then an existing file of that kind or a new one (starters copied from the web new-file wizard). A Dashboards sheet adds, renames, reorders and deletes dashboards (delete asks twice; the last one cannot go). Horizontal paging is off while editing.
+- Round-trip safe: `applyDashboardEdits` in core edits the raw config JSON, so `theme`, `navbar`, `files`, unknown keys and unknown per-entry fields survive; reorder only moves the tiles the phone shows, hidden (`skipOnMobile`, missing-file) entries keep their slots; invalid JSON is refused, never overwritten. Output is the console's `JSON.stringify(…, null, 2)`.
+- Saves re-read the latest config and go through `githubContentFiles.write`/`create` (sync engine outbox). Editing the fallback "Today" page first places its tiles on the config's first dashboard.
+- Pure helpers for the coming square grid: `dropIndex` (list or N-column grid), `moveItem`, `newTileFile`, `retargetFallback`.
+- Tests: core `dashboard-edit.test.ts`; mobile `screens/dashboard-edit.test.ts`, `views/dashboard-editor.test.tsx`.
 
 ## 2026-11-10 — Mobile: dashboard swipe, "Bad credentials" banner, automatic sync, widget due today
 
