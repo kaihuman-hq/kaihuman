@@ -138,6 +138,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Mobile redesign: square 2-column dashboard tiles with quick actions, ＋ tab with Capture + Track menu (long-press repeats), todos detail (Today · Doing · Open · Done) and add sheet, Settings → Command palette, iOS Today/Habit/Habits/Timer widgets | `apps/mobile/src/views/tiles/glance/`, `apps/mobile/src/views/tiles/square/`, `apps/mobile/src/views/quick-menu.tsx`, `apps/mobile/src/navigation/app-tab-bar.tsx`, `apps/mobile/targets/ios-widget/` | 2026-11-10 |
 | Web parity for tiles: todos details/milestones/AI prompt/tag filter, kanban search/filters/sort/streams, travel editing, board overview settings, editable palette settings, widget CSV table view, consumption monthly/compare, time tracking and stocks charts, live timezone clocks | `apps/mobile/src/views/tiles`, `apps/mobile/src/views/kanban-*.tsx`, `apps/mobile/src/views/csv-table.tsx` | 2026-11-09 |
 | Offline global search: native header search bar, grouped and highlighted results across todos, ideas, wiki, knowledge, notes, logs, bookmarks and files; recent searches; incremental index on sync revision; `kaihuman://search?q=`; Android launcher shortcut | `apps/mobile/src/search`, `apps/mobile/app/search.tsx` | 2026-11-08 |
 | Automatic sync: cache shown instantly, revalidated on launch/foreground/focus/pull/60 s poll/write/reconnect/background; optimistic offline writes; sync status line with conflicts | `apps/mobile/src/sync` | 2026-11-08 |

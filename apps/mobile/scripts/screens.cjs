@@ -3,7 +3,7 @@
 // `route@Text` clicks the first element showing Text after load (detail views that live inside one route);
 // `route@A@B` clicks A, then B (e.g. the dashboard menu, then a dashboard).
 // Steps may also be `fill:Label=value` (type into the field with that aria-label) `testid:id` (click by testID) or `label:Text` (click by aria-label; the dashboard picker's title changes with the last page).
-// FULLPAGE=1 captures the whole scrollable content instead of one viewport.
+// FULLPAGE=1 captures the whole scrollable content instead of one viewport. SCALE=2 renders at 2x.
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -104,7 +104,7 @@ const devices = [
       const ctx = await browser.newContext({
         viewport: d.viewport,
         colorScheme: scheme,
-        deviceScaleFactor: 1,
+        deviceScaleFactor: Number(process.env.SCALE ?? 1),
       });
       const page = await ctx.newPage();
       page.on('pageerror', (e) => errors.push(`${d.name}/${scheme}: ${e.message}`));
