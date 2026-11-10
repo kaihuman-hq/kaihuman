@@ -8,6 +8,7 @@ const ICONS: Record<string, IconName> = {
   board: 'board',
   capture: 'capture',
   ideas: 'ideas',
+  search: 'search',
   more: 'more',
 };
 

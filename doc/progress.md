@@ -8,6 +8,11 @@
 - Foreground: when data is older than 2 min, a run still in flight (possibly a request iOS froze during suspension) no longer satisfies the foreground; a fresh run is queued behind it. Leaving the foreground pushes a debounced edit at once instead of after suspension.
 - Background: verified registration, the `expo-background-task` plugin (Info.plist modes and identifier) and that the task pulls and refreshes the widget. iOS limits documented in `apps/mobile/src/sync/README.md`.
 - Regression tests: `scheduler`, `engine`, `background` (new), `mobile-adapters` (widget completeness).
+## 2026-11-10 — Mobile: search reachable everywhere, searches all synced content
+
+- Search (index, ranking, highlighted snippets, recents) already existed but was hard to find and only matched files opened before. Now: a Search tab (iOS native search role, web tab bar) plus the header button on every tab root (was Today and Ideas only). The screen moved to `screens/search-screen.tsx`, shared by `/search` and the tab.
+- Content warm-up (`search/warm.ts`, `warmSearchContent`): while search is open, uncached text files (`.md`, `.bookmarks.json`, `.txt`; max 300, 4 at a time) are fetched and indexed; stops on the first failure (offline) and the cached copies keep working. `pickWarmPaths` is pure and tested, so Spotlight/App Intents can reuse the index code.
+- Tests: `warm.test.ts`, `route-files.test.ts`.
 
 ## 2026-11-10 — Mobile: dashboard swipe, "Bad credentials" banner, automatic sync, widget due today
 
