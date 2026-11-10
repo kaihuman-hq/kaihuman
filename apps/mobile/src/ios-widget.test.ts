@@ -406,8 +406,7 @@ describe('ios widget target', () => {
       const queries = read('SnapshotQueries.swift');
       expect(queries).toContain('48 * 3600');
       expect(queries).toContain('6 * 3600');
-      expect(views).toContain('Inbox zero');
-      expect(views).toContain('Nothing in progress — pick from backlog');
+      expect(views).toContain('Nothing due today');
       expect(read('InboxCountWidget.swift')).toContain('Inbox zero');
     });
 
@@ -651,6 +650,18 @@ describe('ios widget target', () => {
       .join('\n');
     // A bare "\(n) todos" reads "1 todos"; every count must pick the singular for 1.
     expect(swift).not.toMatch(/\\\([\w.]+\) todos/);
-    expect(views).toContain('case .all: return "Nothing up next"');
+    expect(views).toContain('private var emptyTitle: String { "Nothing due today" }');
+  });
+  it('lists only todos due today in the Next up widget', () => {
+    // Regression: the tasks widget listed every open todo, dated or not.
+    expect(views).toContain('snapshot.dueToday(for: entry.source, at: entry.date)');
+    expect(views).not.toContain('snapshot.items(for: entry.source)');
+    const queries = read('SnapshotQueries.swift');
+    expect(queries).toMatch(
+      /func dueToday\(for source: TodoSourceFilter, at now: Date\)[\s\S]*?items\(for: source\)\.filter \{ \$0\.dueDate == today \}/,
+    );
+    // The day is taken in the snapshot's zone, like the midnight timeline entry that refreshes it.
+    expect(queries).toMatch(/func dayKey\(at now: Date\)[\s\S]*?resolvedCalendar\.dateComponents/);
+    expect(read('PreviewData.swift')).toContain('dueDate: today');
   });
 });

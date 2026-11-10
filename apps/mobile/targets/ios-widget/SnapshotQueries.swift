@@ -116,6 +116,18 @@ extension SharedTodoSnapshot {
         }
     }
 
+    /// `now` as `YYYY-MM-DD` in the snapshot's zone, the format of `SharedTodoItem.dueDate`.
+    func dayKey(at now: Date) -> String {
+        let c = resolvedCalendar.dateComponents([.year, .month, .day], from: now)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    /// The tasks widget lists only open todos due today: undated and overdue ones stay in the app.
+    func dueToday(for source: TodoSourceFilter, at now: Date) -> [SharedTodoItem] {
+        let today = dayKey(at: now)
+        return items(for: source).filter { $0.dueDate == today }
+    }
+
     /// Every tag known to the snapshot, for the source picker.
     var allTags: [String] {
         tags ?? Array(Set(items.flatMap { $0.tags })).sorted()

@@ -9,6 +9,9 @@ extension SharedTodoSnapshot {
     static var preview: SharedTodoSnapshot { sample(updatedAgo: 60) }
 
     static func sample(updatedAgo seconds: TimeInterval, now: Date = Date()) -> SharedTodoSnapshot {
+        // Next up shows only todos due today, so the samples are due on the preview's day.
+        let day = Calendar.current.dateComponents([.year, .month, .day], from: now)
+        let today = String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0)
         func item(
             _ index: Int, _ text: String, _ status: TodoStatus, tags: [String] = [],
             file: String = ".kh/backlog.todos.md", priority: String? = nil, pending: Bool? = nil
@@ -16,7 +19,7 @@ extension SharedTodoSnapshot {
             SharedTodoItem(
                 id: "\(file)#\(index)", filePath: file, indexInFile: index, text: text, status: status,
                 tags: tags, milestoneId: "m1", milestoneName: "Widgets v1", milestoneDueDate: "2026-11-20",
-                updatedAt: nil, priority: priority, pending: pending
+                updatedAt: nil, priority: priority, pending: pending, dueDate: today
             )
         }
         let items = [

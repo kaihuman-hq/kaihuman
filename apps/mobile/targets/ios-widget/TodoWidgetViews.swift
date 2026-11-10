@@ -42,7 +42,7 @@ struct NextUpContent: View {
     let style: WidgetStyle
 
     private var theme: WidgetTheme { style.theme }
-    private var items: [SharedTodoItem] { snapshot.items(for: entry.source) }
+    private var items: [SharedTodoItem] { snapshot.dueToday(for: entry.source, at: entry.date) }
     private var freshness: SnapshotFreshness { snapshot.freshness(at: entry.date) }
     private var doneToday: Int { snapshot.doneToday(at: entry.date) }
 
@@ -59,14 +59,7 @@ struct NextUpContent: View {
 
     // MARK: Copy
 
-    private var emptyTitle: String {
-        switch entry.source {
-        case .inProgress: return "Nothing in progress — pick from backlog"
-        case .all: return "Nothing up next"
-        case .inbox: return "Inbox zero"
-        case .backlog, .tag, .milestone: return "Nothing open here"
-        }
-    }
+    private var emptyTitle: String { "Nothing due today" }
 
     private var sourceLabel: String {
         switch entry.source {
@@ -87,7 +80,7 @@ struct NextUpContent: View {
             if snapshot.showsLockScreenText, let first = items.first {
                 Text("\(Image(systemName: "checklist")) \(first.text)").privacySensitive()
             } else {
-                Text("\(Image(systemName: "checklist")) \(items.count) \(items.count == 1 ? "todo" : "todos") · \(doneToday) done today")
+                Text("\(Image(systemName: "checklist")) \(items.count) due today · \(doneToday) done")
             }
         }
     }
@@ -103,7 +96,7 @@ struct NextUpContent: View {
                         .font(WidgetTheme.number(22))
                         .minimumScaleFactor(0.6)
                         .widgetAccentable()
-                    Text("open").font(.system(size: 9, weight: .semibold))
+                    Text("today").font(.system(size: 9, weight: .semibold))
                 }
             }
         }
@@ -128,7 +121,7 @@ struct NextUpContent: View {
                     Text("+\(items.count - 1) more").font(.system(size: 12)).foregroundStyle(.secondary)
                 }
             } else {
-                Text("\(items.count) \(items.count == 1 ? "todo" : "todos") open").font(.system(size: 14, weight: .semibold))
+                Text("\(items.count) \(items.count == 1 ? "todo" : "todos") due today").font(.system(size: 14, weight: .semibold))
             }
             if freshness != .fresh {
                 Text("Synced \(freshness.hours)h ago").font(.system(size: 11)).foregroundStyle(.secondary)
@@ -168,7 +161,7 @@ struct NextUpContent: View {
                     Spacer(minLength: 0)
                     AddToInboxButton(theme: theme, size: 26)
                 }
-                Text("open").font(.system(size: 13, weight: .medium)).foregroundStyle(theme.label).padding(.top, 4)
+                Text("today").font(.system(size: 13, weight: .medium)).foregroundStyle(theme.label).padding(.top, 4)
                 Text("\(doneToday) done today")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(theme.secondary)
@@ -198,7 +191,7 @@ struct NextUpContent: View {
     private var large: some View {
         VStack(alignment: .leading, spacing: 8) {
             WidgetHeader(
-                title: "NEXT UP · \(sourceLabel.uppercased())", trailing: "\(items.count) open", theme: theme,
+                title: "NEXT UP · \(sourceLabel.uppercased())", trailing: "\(items.count) today", theme: theme,
                 showsAdd: true
             )
             if items.isEmpty {
