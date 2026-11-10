@@ -16,6 +16,7 @@ import {
   Badge,
   type BadgeTone,
   Button,
+  contentKeys,
   EmptyState,
   type IconName,
   ListRow,
@@ -83,6 +84,7 @@ export function StreamsList({
     <View style={{ gap: spacing.lg }}>
       {streams.map(({ path, rows, data }) => {
         const name = streamName(path);
+        const keyFor = contentKeys();
         const submit = () => {
           const text = drafts[path]?.trim();
           if (!text) return;
@@ -90,7 +92,7 @@ export function StreamsList({
           setDrafts((d) => ({ ...d, [path]: '' }));
         };
         return (
-          <Section key={path} header={`${name} · ${rows.length}`}>
+          <Section animated key={path} header={`${name} · ${rows.length}`}>
             <ListRow
               testID={`stream-color-${name}`}
               title="List colour"
@@ -134,7 +136,7 @@ export function StreamsList({
                 }));
                 return (
                   <ListRow
-                    key={`${path}:${index}`}
+                    key={keyFor(`${path}:${item.text}`)}
                     testID={`stream-card-${name}-${index}`}
                     title={item.text}
                     subtitle={
