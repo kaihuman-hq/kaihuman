@@ -138,6 +138,7 @@
 
 | Feature | Location | Added |
 |---------|----------|-------|
+| Dashboard editing: Edit button or long-press a tile; drag to reorder, remove, add (pick a kind, then an existing file or create one with the web wizard's starter), tile settings (move to another dashboard, hide on mobile); Dashboards sheet to add, rename, reorder and delete. Saves edit the raw `.dashboard.config.json` (unknown fields kept) via the sync engine's write path | `packages/core/src/models/dashboard-edit.ts`, `apps/mobile/src/screens/dashboard-edit.ts`, `apps/mobile/src/views/dashboard-editor.tsx` | 2026-11-10 |
 | Web parity for tiles: todos details/milestones/AI prompt/tag filter, kanban search/filters/sort/streams, travel editing, board overview settings, editable palette settings, widget CSV table view, consumption monthly/compare, time tracking and stocks charts, live timezone clocks | `apps/mobile/src/views/tiles`, `apps/mobile/src/views/kanban-*.tsx`, `apps/mobile/src/views/csv-table.tsx` | 2026-11-09 |
 | Offline global search: native header search bar, grouped and highlighted results across todos, ideas, wiki, knowledge, notes, logs, bookmarks and files; recent searches; incremental index on sync revision; `kaihuman://search?q=`; Android launcher shortcut | `apps/mobile/src/search`, `apps/mobile/app/search.tsx` | 2026-11-08 |
 | Automatic sync: cache shown instantly, revalidated on launch/foreground/focus/pull/60 s poll/write/reconnect/background; optimistic offline writes; sync status line with conflicts | `apps/mobile/src/sync` | 2026-11-08 |

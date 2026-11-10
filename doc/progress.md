@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-10 — Mobile: edit dashboards
+
+- Edit mode on the Today pager (Edit button in the header, or long-press a tile): the current dashboard's tiles become a list with drag handle (reorder), remove, and tile settings (move to another dashboard, hide on mobile). Add tile picks a kind, then an existing file of that kind or a new one (starters copied from the web new-file wizard). A Dashboards sheet adds, renames, reorders and deletes dashboards (delete asks twice; the last one cannot go). Horizontal paging is off while editing.
+- Round-trip safe: `applyDashboardEdits` in core edits the raw config JSON, so `theme`, `navbar`, `files`, unknown keys and unknown per-entry fields survive; reorder only moves the tiles the phone shows, hidden (`skipOnMobile`, missing-file) entries keep their slots; invalid JSON is refused, never overwritten. Output is the console's `JSON.stringify(…, null, 2)`.
+- Saves re-read the latest config and go through `githubContentFiles.write`/`create` (sync engine outbox). Editing the fallback "Today" page first places its tiles on the config's first dashboard.
+- Pure helpers for the coming square grid: `dropIndex` (list or N-column grid), `moveItem`, `newTileFile`, `retargetFallback`.
+- Tests: core `dashboard-edit.test.ts`; mobile `screens/dashboard-edit.test.ts`, `views/dashboard-editor.test.tsx`.
+
 ## 2026-11-10 — Mobile: dashboard swipe, "Bad credentials" banner, automatic sync, widget due today
 
 - Dashboard swipe (root cause): `githubFileStore.openFile` returned at once when the same file was already loading, so a second reader found nothing in `openFiles`. Two dashboard loads overlap after every sync that bumps the revision (cold start in particular), the config read failed, `loadDashboards` treated it as "no config" and collapsed every dashboard into one "Today" page, so there was nothing to swipe to. The repository was never forgotten. Fixes: a concurrent `openFile` waits for the load in flight; an unreadable config now fails the load (the screen keeps its pages) instead of falling back; `takeLatest` drops a load that finishes after a newer one.
