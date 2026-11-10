@@ -8,6 +8,16 @@
 - Scan to entry (1.3): new Scan screen (`/scan`, More tab) turns a document camera scan into a budget line, trip, todo or meter reading. Visual Intelligence `IntentValueQuery` (`targets/ios-app-intents/VisualIntelligenceIntents.swift`) offers the four kinds in the camera and screenshot search; picking one opens `kaihuman://scan?kind=&text=`.
 - Weekly review (2.1): new screen (`/weekly-review`, More tab) builds done todos, habit streaks, time tracked, spend and open loops in TS, has the model write prose (PCC when available, else on-device) above the facts, and writes `logs/weekly-review-<date>.md` (never overwrites) and opens it. Without a model it writes a fixed template. The PCC model API is not wired yet (iOS 27 SDK API unverified), so `server` reports unavailable.
 - Needs a Mac build and device test: no Swift compiler on CI; Swift is covered by source-text tests (`src/intelligence/native-sources.test.ts`).
+## 2026-11-10 — Mobile: Siri App Schemas, app skills and open-ended queries (proposal 1.2)
+
+- Spotlight/Siri file (`spotlight-items.json`) now has log entries (kind `log`, link `kaihuman://files/<log>#<n>`) and a `date` (`YYYY-MM-DD`: log day, todo due day). `SearchDoc` gained `date`.
+- `FindItemsIntent`: find todos, notes, log entries by words, kind and day range, answered without opening the app. Not an App Shortcut (still 9 of 10).
+- App-target launch hook `KaihumanAppLaunchHook` (`targets/ios-app-intents/AppLaunchHook.swift`): `updateAppShortcutParameters()` and `CSSearchableIndex.indexAppEntities` (iOS 18). The pod's app delegate and `indexSpotlight` call it by Objective-C name.
+- `AssistantSchemas.swift`: `.journal` entry/createEntry/search for notes and log (iOS 18), `.reminders` entity/createReminder for todos (iOS 27, API names unverified). Behind Swift flags set by the new opt-in plugin `plugins/with-kaihuman-app-schemas.ts`; not registered in `app.json` until a Mac build passes.
+- `kaihuman://quick-log?text=` / `quick-note?text=` prefill the capture sheet (journal createEntry uses it).
+- Siri AI app skills: `targets/ios-app-intents/skills/{todos,notes,log}/SKILL.md` (format and bundling unverified; not copied into the app yet).
+- View Annotations: not done (RN views are not SwiftUI). See `doc/apple-intelligence.md`.
+- Tests: `src/app-schemas.test.ts` (Swift/SKILL.md source text, plugin), spotlight and deep-link cases.
 
 ## 2026-11-10 — Mobile: merge redesign with dashboard edit mode and search
 

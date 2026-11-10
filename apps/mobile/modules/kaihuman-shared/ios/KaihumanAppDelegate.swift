@@ -8,6 +8,15 @@ private let appGroupId =
   Bundle.main.object(forInfoDictionaryKey: "KHAppGroup") as? String ?? "group.com.kaihuman.app"
 private let pendingUrlKey = "pending-url"
 
+/// Runs KaihumanAppLaunchHook.run() from the app target (targets/ios-app-intents/AppLaunchHook.swift):
+/// entity indexing needs the entity type, which this pod cannot see. No-op if the class is absent.
+func runAppLaunchHook() {
+  guard let hook = NSClassFromString("KaihumanAppLaunchHook") as AnyObject?,
+        hook.responds(to: NSSelectorFromString("run"))
+  else { return }
+  _ = hook.perform(NSSelectorFromString("run"))
+}
+
 public class KaihumanAppDelegate: ExpoAppDelegateSubscriber {
   /// The item the app was cold-launched with; iOS also passes it to performActionFor afterwards.
   private var launchShortcutType: String?
@@ -31,6 +40,7 @@ public class KaihumanAppDelegate: ExpoAppDelegateSubscriber {
       launchShortcutType = item.type
       UserDefaults(suiteName: appGroupId)?.set(item.type, forKey: pendingUrlKey)
     }
+    runAppLaunchHook()
     return true
   }
 

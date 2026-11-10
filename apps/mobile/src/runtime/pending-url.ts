@@ -12,7 +12,7 @@ export const routeToHref = (route: Route): string => {
     case 'auth-callback':
       return '/';
     case 'quick-capture':
-      return routeQuery(`/quick-${route.kind}`, { idea: route.idea });
+      return routeQuery(`/quick-${route.kind}`, { idea: route.idea, text: route.text });
     case 'ideas':
       return routeQuery('/ideas', { status: route.status });
     case 'board':

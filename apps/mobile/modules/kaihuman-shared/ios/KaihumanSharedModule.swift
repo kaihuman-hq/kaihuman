@@ -13,7 +13,7 @@ private let pendingUrlKey = "pending-url"
 // Names must match FocusTimerState in targets/ios-widget/FocusIntents.swift.
 private let focusActivityIdKey = "focus-activity-id"
 private let focusControlKind = "FocusTimerControl"
-private let spotlightDomains = ["kaihuman.todo", "kaihuman.note"]
+private let spotlightDomains = ["kaihuman.todo", "kaihuman.note", "kaihuman.log"]
 
 /// One row of spotlight-items.json (src/spotlight/spotlight.ts). `id` is the deep link.
 private struct SpotlightRow: Decodable {
@@ -153,6 +153,7 @@ public class KaihumanSharedModule: Module {
       index.deleteSearchableItems(withDomainIdentifiers: spotlightDomains) { _ in
         index.indexSearchableItems(items)
       }
+      runAppLaunchHook() // spotlight-items.json just changed: re-index the app entities
     }
   }
 }
