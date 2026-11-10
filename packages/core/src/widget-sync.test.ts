@@ -162,6 +162,57 @@ describe('schema v2', () => {
   const opts = { timeZone: 'UTC', knowledgeInbox: 3, weeklyGoal: 10, lockScreenText: false };
   const snap = buildWidgetTodoSnapshot(f, 'o/r', 'main', NOW, opts);
 
+  it('lists today: overdue, then in progress, then due today; no future or undated backlog', () => {
+    const s = buildWidgetTodoSnapshot(
+      {
+        '.kh/a.todos.md': file(
+          [
+            '- [ ] undated backlog',
+            '- [ ] future\n::due:: 2026-06-11',
+            '- [ ] today late\n::due:: 2026-06-10T18:00',
+            '- [>] working undated',
+            '- [ ] overdue\n::due:: 2026-06-08',
+            '- [ ] today early\n::due:: 2026-06-10T09:00',
+            '- [>] overdue and working\n::due:: 2026-06-09',
+            '- [x] done today',
+            `::updated:: ${NOW.getTime() - 1000}`,
+            '- [-] rejected today\n::due:: 2026-06-10',
+            '',
+          ].join('\n'),
+        ),
+        '.kh/inbox.todos.md': file('- [ ] inbox today\n::due:: 2026-06-10\n'),
+      },
+      'o/r',
+      'main',
+      NOW,
+      opts,
+    );
+    expect(s.todayItems.map((i) => i.text)).toEqual([
+      'overdue',
+      'overdue and working',
+      'working undated',
+      'today early',
+      'today late',
+      'inbox today',
+    ]);
+    expect(s.todayCounts).toEqual({ left: 6, done: 1, overdue: 2 });
+  });
+
+  it('recomputes today after a widget toggle', () => {
+    const base = buildWidgetTodoSnapshot(
+      { '.kh/a.todos.md': file('- [ ] t\n::due:: 2026-06-10\n') },
+      'o/r',
+      'main',
+      NOW,
+      opts,
+    );
+    expect(base.todayCounts).toEqual({ left: 1, done: 0, overdue: 0 });
+    const id = base.todayItems[0]?.id ?? '';
+    const res = applyWidgetTodoToggle(base, id, NOW);
+    expect(res?.snapshot.todayItems).toEqual([]);
+    expect(res?.snapshot.todayCounts).toEqual({ left: 0, done: 1, overdue: 0 });
+  });
+
   it('exposes version, options, tags, milestones and stats', () => {
     expect(WIDGET_SCHEMA_VERSION).toBe(2);
     expect(snap.schemaVersion).toBe(2);
@@ -329,11 +380,20 @@ describe('applyWidgetTodoMove', () => {
     expect(applyWidgetTodoMove(drift, drift.items[0]?.id ?? '', 'done', later)).toBeNull();
   });
 
-  it('carries ideas, cards, habits and options through a move', () => {
+  it('carries ideas, cards, habits, timer and options through a move', () => {
     const extras = {
       ideas: { byStatus: { seed: 1 }, hot: [] },
       cards: [{ path: '.kh/wiki/a.md', title: 'A', excerpt: 'x', tags: [] }],
-      habits: [{ path: '.kh/run.habit.csv', name: 'Run', doneToday: false, streakDays: 2 }],
+      habits: [
+        {
+          path: '.kh/run.habit.csv',
+          name: 'Run',
+          doneToday: false,
+          streakDays: 2,
+          days: [false, false, false, false, false, true, false],
+        },
+      ],
+      timer: { path: '.kh/w.timetracking.csv', label: 'W', startedAt: 1, todayMinutes: 5 },
     };
     const base = buildWidgetTodoSnapshot(files, 'o/r', 'main', NOW, {
       timeZone: 'UTC',
@@ -482,10 +542,70 @@ describe('buildWidgetExtras', () => {
       '.kh/old.habit.csv': csv(['2026-06-01']),
     });
     expect(extras.habits).toEqual([
-      { path: '.kh/morning-run.habit.csv', name: 'Morning run', doneToday: true, streakDays: 3 },
-      { path: '.kh/old.habit.csv', name: 'Old', doneToday: false, streakDays: 0 },
-      { path: '.kh/read.habit.csv', name: 'Read', doneToday: false, streakDays: 2 },
+      {
+        path: '.kh/morning-run.habit.csv',
+        name: 'Morning run',
+        doneToday: true,
+        streakDays: 3,
+        days: [false, false, false, false, true, true, true],
+      },
+      {
+        path: '.kh/old.habit.csv',
+        name: 'Old',
+        doneToday: false,
+        streakDays: 0,
+        days: [false, false, false, false, false, false, false],
+      },
+      {
+        path: '.kh/read.habit.csv',
+        name: 'Read',
+        doneToday: false,
+        streakDays: 2,
+        days: [false, false, false, false, true, true, false],
+      },
     ]);
+  });
+
+  it('lists 7 habit days oldest first, ending today in the zone', () => {
+    const f = { '.kh/r.habit.csv': csv(['2026-06-04', '2026-06-05', '2026-06-11']) };
+    // 2026-06-10T23:30Z is 2026-06-11 in Prague: the window is 06-05 .. 06-11.
+    const days = buildWidgetExtras(f, new Date('2026-06-10T23:30:00Z'), 'Europe/Prague').habits?.[0]
+      ?.days;
+    expect(days).toEqual([true, false, false, false, false, false, true]);
+  });
+
+  const tt = (rows: string[]) => ({ content: `iso date;time\n${rows.join('\n')}\n` });
+
+  it('reports the running timer of today with its start instant and closed minutes', () => {
+    const extras = buildWidgetExtras(
+      {
+        '.kh/deep-work.timetracking.csv': tt(['2026-06-10;08:00,09:30,10:00,10:45,11:15']),
+        '.kh/admin.timetracking.csv': tt(['2026-06-10;07:00,11:00']),
+      },
+      NOW,
+      'Europe/Prague',
+    );
+    // 11:15 in Prague (UTC+2 in June) is 09:15Z.
+    expect(extras.timer).toEqual({
+      path: '.kh/deep-work.timetracking.csv',
+      label: 'Deep work',
+      startedAt: Date.parse('2026-06-10T09:15:00Z'),
+      todayMinutes: 135,
+    });
+  });
+
+  it('falls back to the busiest stopped timer and ignores other days and open yesterdays', () => {
+    const extras = run({
+      '.kh/a.timetracking.csv': tt(['2026-06-10;08:00,08:30', '2026-06-09;09:00']),
+      '.kh/b.timetracking.csv': tt(['2026-06-10;08:00,10:00', '2026-06-09;01:00,23:00']),
+    });
+    expect(extras.timer).toEqual({ path: '.kh/b.timetracking.csv', label: 'B', todayMinutes: 120 });
+    expect(run({ '.kh/a.timetracking.csv': tt([]) }).timer).toEqual({
+      path: '.kh/a.timetracking.csv',
+      label: 'A',
+      todayMinutes: 0,
+    });
+    expect('timer' in run({ '.kh/inbox.todos.md': { content: '' } })).toBe(false);
   });
 
   it('uses the zone for doneToday (23:30Z is already tomorrow in Prague)', () => {

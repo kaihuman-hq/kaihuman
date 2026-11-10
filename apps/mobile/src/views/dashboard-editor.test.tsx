@@ -1,5 +1,5 @@
 import { configureCoreStorage, InMemoryStorageAdapter } from '@kaihuman/core';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardPage } from '../screens/dashboards.js';
 import type { DashboardEditor } from './dashboard-editor.js';
@@ -46,6 +46,15 @@ function setup(over: Partial<DashboardEditor> = {}) {
 }
 const startEditing = () => fireEvent.click(screen.getByTestId('dashboard-edit'));
 
+/** Holds the tile long enough for react-native-web to fire onLongPress. */
+const longPress = (el: HTMLElement) => {
+  vi.useFakeTimers();
+  fireEvent.mouseDown(el, { button: 0, buttons: 1, clientX: 5, clientY: 5 });
+  vi.advanceTimersByTime(1000);
+  fireEvent.mouseUp(el, { button: 0, clientX: 5, clientY: 5 });
+  vi.useRealTimers();
+};
+
 describe('dashboard edit mode', () => {
   it('has no Edit button without an editor', () => {
     render(<DashboardPager pages={PAGES} now={NOW} onWrite={vi.fn()} onNavigate={vi.fn()} />);
@@ -61,6 +70,20 @@ describe('dashboard edit mode', () => {
     expect(screen.getByRole('button', { name: 'Done editing' })).toBeTruthy();
     fireEvent.click(screen.getByTestId('dashboard-edit'));
     expect(screen.queryByTestId('dashboard-edit-tiles')).toBeNull();
+  });
+
+  it('enters edit mode on a long-press of a square tile', () => {
+    setup();
+    const tile = screen.getByTestId('square-.kh/a.habit.csv');
+    longPress(within(tile).getAllByRole('button')[0] as HTMLElement);
+    expect(screen.getByTestId('dashboard-edit-tiles')).toBeTruthy();
+  });
+
+  it('offers search from the Today header', () => {
+    const onNavigate = vi.fn();
+    render(<DashboardPager pages={PAGES} now={NOW} onWrite={vi.fn()} onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByTestId('dashboard-search'));
+    expect(onNavigate).toHaveBeenCalledWith('/search');
   });
 
   it('removes a tile', async () => {

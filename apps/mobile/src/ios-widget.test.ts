@@ -50,15 +50,18 @@ const snapshot: Required<WidgetTodoSnapshot> = {
   privacy: { lockScreenText: true },
   timeZone: '',
   items: [],
+  todayItems: [],
+  todayCounts: { left: 0, done: 0, overdue: 0 },
   files: {},
   ideas: { byStatus: {}, hot: [{ slug: '', title: '', level: 'hot' }] },
   cards: [{ path: '', title: '', excerpt: '', tags: [] }],
-  habits: [{ path: '', name: '', doneToday: false, streakDays: 0, pending: false }],
+  habits: [{ path: '', name: '', doneToday: false, streakDays: 0, days: [], pending: false }],
+  timer: { path: '', label: '', startedAt: 0, todayMinutes: 0, pending: false },
 };
 const statuses: WidgetTodoItem['status'][] = ['backlog', 'in-progress', 'done', 'rejected'];
 
 const pendingKeys = ['kind', 'itemId', 'status', 'text', 'path', 'date', 'timestamp'];
-const mutationKinds = ['toggle', 'move', 'capture', 'habit'];
+const mutationKinds = ['toggle', 'move', 'capture', 'habit', 'timer-stop'];
 
 const hasProperty = (swift: string, key: string): boolean =>
   new RegExp(`\\bvar ${key}\\s*:`).test(swift);
@@ -89,6 +92,8 @@ describe('ios widget target', () => {
       ...Object.keys(snapshot.ideas.hot[0] ?? {}),
       ...Object.keys(snapshot.cards[0] ?? {}),
       ...Object.keys(snapshot.habits[0] ?? {}),
+      ...Object.keys(snapshot.todayCounts),
+      ...Object.keys(snapshot.timer),
       ...Object.keys({ sha: '', content: '' }),
     ];
     for (const key of keys) expect(hasProperty(models, key), key).toBe(true);
@@ -178,6 +183,7 @@ describe('ios widget target', () => {
       HabitsWidget: read('HabitsWidget.swift'),
       QuickAddWidget: read('QuickAddWidget.swift'),
       DueTodayWidget: read('DueTodayWidget.swift'),
+      TimerWidget: read('TimerWidget.swift'),
     };
     const families: Record<keyof typeof widgetFiles, string[]> = {
       InboxTodoWidget: [
@@ -195,9 +201,16 @@ describe('ios widget target', () => {
       MilestoneCountdownWidget: ['systemSmall', 'accessoryRectangular', 'accessoryCircular'],
       IdeaPipelineWidget: ['systemSmall', 'systemMedium'],
       KnowledgeCardWidget: ['systemMedium', 'systemLarge'],
-      HabitsWidget: ['systemSmall', 'accessoryRectangular', 'accessoryCircular', 'accessoryInline'],
+      HabitsWidget: [
+        'systemSmall',
+        'systemMedium',
+        'accessoryRectangular',
+        'accessoryCircular',
+        'accessoryInline',
+      ],
       QuickAddWidget: ['systemSmall', 'accessoryCircular', 'accessoryRectangular'],
       DueTodayWidget: ['accessoryCircular', 'accessoryRectangular', 'accessoryInline'],
+      TimerWidget: ['systemSmall'],
     };
     const kinds = Object.keys(widgetFiles) as Array<keyof typeof widgetFiles>;
     const familiesOf = (swift: string): string[] =>
@@ -269,6 +282,33 @@ describe('ios widget target', () => {
       expect(widgetFiles.HabitsWidget).toContain('Button(intent: LogHabitIntent(path:');
     });
 
+    it('shows a habit week with today outlined and animates counts and the check-in', () => {
+      const habits = widgetFiles.HabitsWidget;
+      expect(habits).toContain('snapshot.habitWeek(habit, at: entry.date)');
+      expect(habits).toContain('.transition(.scale)');
+      expect(habits).toContain('.contentTransition(.numericText())');
+      expect(habits).toContain('"day streak"');
+      expect(habits).toContain('"\\(doneCount)/\\(habits.count) today"');
+      // Today's cell follows habitDone, so a widget check-in shows before the app syncs.
+      expect(read('SnapshotQueries.swift')).toMatch(
+        /func habitWeek\([\s\S]*?days\[6\] = habitDone\(habit, at: now\)/,
+      );
+    });
+
+    it('ticks the timer without reloads and stops it through the app queue', () => {
+      const timer = widgetFiles.TimerWidget;
+      expect(timer).toContain('Text(timerInterval:');
+      expect(timer).toContain('Button(intent: StopTimerIntent(path:');
+      expect(timer).toContain('DeepLink.tile(path:');
+      expect(timer).toContain('components.host = "dashboard"');
+      expect(timer).toContain('components.path = "/tile"');
+      const stop = read('StopTimerIntent.swift');
+      expect(stop).toContain('queue(.timerStop(path: path, now: now))');
+      expect(stop).toContain('reloadTimelines(ofKind: Self.widgetKind)');
+      expect(stop).toContain('"TimerWidget"');
+      expect(stop).not.toContain('URLSession');
+    });
+
     it('supports the right families per widget', () => {
       for (const kind of kinds) expect(familiesOf(widgetFiles[kind]), kind).toEqual(families[kind]);
     });
@@ -298,6 +338,7 @@ describe('ios widget target', () => {
         'KnowledgeCardWidget.swift',
         'HabitsWidget.swift',
         'DueTodayWidget.swift',
+        'TimerWidget.swift',
       ]) {
         const swift = read(file);
         expect(swift, file).toMatch(
@@ -748,16 +789,29 @@ describe('ios widget target', () => {
     expect(swift).not.toMatch(/\\\([\w.]+\) todos/);
     expect(views).toContain('private var emptyTitle: String { "Nothing due today" }');
   });
-  it('lists only todos due today in the Next up widget', () => {
-    // Regression: the tasks widget listed every open todo, dated or not.
-    expect(views).toContain('snapshot.dueToday(for: entry.source, at: entry.date)');
+  it('lists only today in the Today widget: overdue, in progress and due today', () => {
+    // Regression: the tasks widget listed every open todo, dated or not. Decision 8 then widened
+    // "due today" to overdue + in progress + due today, the same rule as todayItems in core.
+    expect(views).toContain('snapshot.todayTasks(for: entry.source, at: entry.date)');
     expect(views).not.toContain('snapshot.items(for: entry.source)');
     const queries = read('SnapshotQueries.swift');
-    expect(queries).toMatch(
-      /func dueToday\(for source: TodoSourceFilter, at now: Date\)[\s\S]*?items\(for: source\)\.filter \{ \$0\.dueDate == today \}/,
+    const group = queries.slice(
+      queries.indexOf('func todayGroup('),
+      queries.indexOf('func todayTasks('),
     );
+    expect(group).toContain('guard item.status == .backlog || item.status == .inProgress');
+    expect(group).toContain('if let due = item.dueDate, due < today { return 0 }');
+    expect(group).toContain('if item.status == .inProgress { return 1 }');
+    expect(group).toContain('return item.dueDate == today ? 2 : nil');
+    expect(queries).toMatch(/func todayTasks\([\s\S]*?items\(for: source\)/);
     // The day is taken in the snapshot's zone, like the midnight timeline entry that refreshes it.
     expect(queries).toMatch(/func dayKey\(at now: Date\)[\s\S]*?resolvedCalendar\.dateComponents/);
-    expect(read('PreviewData.swift')).toContain('dueDate: today');
+    expect(read('PreviewData.swift')).toContain(
+      'dueDate: undated ? nil : (overdue ? earlier : today)',
+    );
+    expect(views).toContain('Text("\\(items.count) left")');
+    expect(views).toContain('Text("left of \\(total)")');
+    expect(views).toContain('.contentTransition(.numericText())');
+    expect(read('TodayRow.swift')).toContain('Button(intent: ToggleTodoIntent(itemId: item.id))');
   });
 });

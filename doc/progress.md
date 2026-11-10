@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-10 — Mobile: merge redesign with dashboard edit mode and search
+
+- Tab bar is the redesign's Today · Board · ＋ · Ideas · More; the Search tab is dropped (its route stays, hidden) and search opens from the header search button on every tab root, including a search button in the Today pager header. `web-tab-bar.tsx` removed (unused).
+- Square tile grid keeps edit mode: the Edit header button and long-press on a square tile (`SquareTile` `onLongPress`) enter it.
+- iOS: Habits widget has small/medium plus circular/inline lock-screen families; `DueTodayWidget` and `TimerWidget` both registered in `KaihumanV2Widgets`.
+
 ## 2026-11-10 — Research: Apple platform proposals
 
 - New `doc/apple-proposals.md`: the top 3 Apple Intelligence features (offline smart capture with Foundation Models, Siri AI app skills and App Schemas, scan to entry with Visual Intelligence and Vision) and 5 proposals that use the newest Apple features (weekly review on PCC, kb-mcp as a Siri/MCP tool, Focus session on every surface, HealthKit and Journaling Suggestions, Focus filters with the extra-large widget and Shortcuts "Use Model"). Each item gives the API, Expo feasibility, effort, iOS version and risk, with sources checked on 2026-11-10. Research only, no code changes.
@@ -42,6 +48,16 @@
 - Opening an `.actionlog.md` file now shows `ActionLogFull` instead of the dashboard tile body (the tile is untouched). The entry field is pinned at the top (return submits, optional `autoFocus`, keyboard-avoiding screen); below it search and tag filter chips, then the log newest first in a `SectionList` with sticky day headers (Today, Yesterday, dated), the time per entry and `#tags` as badges.
 - Swipe a row (full swipe deletes) or tap it to edit: the text goes into the top field, time is kept, tags are re-read from the text. Rows animate in and out (`MotionItem`). Catch-up with the web log: edit and delete were missing on mobile.
 - New `editAction`, `deleteAction`, `groupByDay`, `entryTime`, `stripTags` with tests.
+
+## 2026-11-10 — Mobile redesign implemented (square tiles, ＋ tab, todos detail, iOS widgets)
+
+- Dashboard: every tile is a square in a 2-column grid (`tileSide`, 13 pt gutters) built from a pure per-kind `Glance` (`views/tiles/glance/`: hero, label, one ≤40 pt visual, optional quick action). Square shell in `views/tiles/square/` with press scale + light haptic, quick-action pop + success haptic, hero roll on change, iOS zoom into the deep dive (`Link.AppleZoom`). Page dots stretch; tiles stagger 30 ms on page change. Shortcut row and `TILE_SIZE` layout removed from the pager; palette settings leave the grid.
+- Quick actions: tap (habit ✓, timer start/stop, consumption +1) write directly; one-field (budget, log, meter, data, read later, bookmarks) open `/quick-entry`; todos open `/dashboard/todo-add`; events and travel open the detail. Budget files have no monthly limit, so the budget tile shows spending this month.
+- Todos: counts-only tile; detail screen with Today · Doing · Open · Done (`screens/todo-segments.ts`), 600 ms undo on check, swipe delete, long-press start; add sheet with Today/Tomorrow/Priority/Repeat/#tag chips, return adds and keeps the sheet open (`TextField` `keepFocusOnSubmit`).
+- Tab bar Today · Board · ＋ · Ideas · More on every platform (`navigation/app-tab-bar.tsx`; native tabs cannot raise a centre button or long-press). ＋ opens the Capture + Track menu (scrim 180 ms, spring sheet, 20 ms item stagger, ＋ rotates to ×); long-press repeats the last action. `/capture` still resolves. More → Settings holds Command palette and Notifications.
+- iOS widgets: Today lists due today + overdue + in progress; Habit small with a 7-day row and ✓; new Habits medium and Timer small (`Text(timerInterval:)`, stop intent queued as `timer-stop`). Snapshot (still v2) adds `todayItems`, `todayCounts`, `habits[].days`, `timer`. Swift not compiled here.
+- Real-app renders: `apps/mobile/docs/redesign/impl-*.png` (`SCALE=2 node scripts/screens.cjs`).
+- Tests: glance per kind, square tile, pager grid, todo segments/detail/add, quick menu model + view, tab bar, quick entry, settings, widget-sync today/habits/timer, `timer-stop` replay, widget Swift assertions.
 
 ## 2026-11-10 — Mobile: dashboard swipe, "Bad credentials" banner, automatic sync, widget due today
 

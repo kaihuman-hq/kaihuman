@@ -58,9 +58,12 @@ describe('expo-router route files', () => {
     expect(readFileSync(`${appDir}_layout.tsx`, 'utf8')).toContain('name="search"');
   });
 
-  it('offers search as a tab and as a header button on every tab root', () => {
+  it('keeps search as a hidden tab route and a header button on every tab root', () => {
     expect(existsSync(`${appDir}(tabs)/search/index.tsx`)).toBe(true);
-    expect(readFileSync(`${appDir}(tabs)/_layout.tsx`, 'utf8')).toContain('name="search"');
+    // The redesign tab bar has no Search tab; the route stays so /search links resolve.
+    expect(readFileSync(`${appDir}(tabs)/_layout.tsx`, 'utf8')).toMatch(
+      /name="search" options=\{\{[^}]*href: null/,
+    );
     for (const tab of ['dashboard', 'board', 'capture', 'ideas', 'more']) {
       expect(readFileSync(`${appDir}(tabs)/${tab}/_layout.tsx`, 'utf8')).toContain('<SearchButton');
     }

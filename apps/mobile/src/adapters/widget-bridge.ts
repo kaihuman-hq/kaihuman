@@ -7,7 +7,13 @@ import {
   githubProfileStore,
   type PendingWidgetMutation,
 } from '@kaihuman/core';
-import { checkIn } from '@kaihuman/formats';
+import {
+  checkIn,
+  localDate,
+  parseTimeTracking,
+  serializeTimeTracking,
+  toggleStartStop,
+} from '@kaihuman/formats';
 import { effect } from '@preact/signals';
 import { githubRepoFiles } from '../screens/quick-capture.js';
 
@@ -82,6 +88,8 @@ const isMutation = (m: unknown): m is PendingWidgetMutation => {
       return str('text');
     case 'habit':
       return str('path') && str('date');
+    case 'timer-stop':
+      return str('path');
     default:
       return false;
   }
@@ -171,6 +179,19 @@ export class WidgetBridge {
   }
 
   private async replay(m: PendingWidgetMutation): Promise<boolean> {
+    if (m.kind === 'timer-stop') {
+      const content = await githubRepoFiles.read(m.path);
+      if (content === null) return false;
+      // Stop at the tap, not at replay time; a timer already stopped (or restarted on another
+      // day) is left alone.
+      const at = new Date(m.timestamp);
+      const data = parseTimeTracking(content);
+      const entry = data.entries.find((e) => e.date === localDate(at));
+      const last = entry?.intervals[entry.intervals.length - 1];
+      if (!last || last.end !== undefined) return false;
+      await githubRepoFiles.write(m.path, serializeTimeTracking(toggleStartStop(data, at)));
+      return true;
+    }
     if (m.kind === 'habit') {
       const content = await githubRepoFiles.read(m.path);
       if (content === null) return false;

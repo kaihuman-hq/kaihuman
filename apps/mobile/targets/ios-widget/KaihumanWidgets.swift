@@ -1,7 +1,7 @@
 import SwiftUI
 import WidgetKit
 
-/// Next up. The kind string predates the restyle and stays so already-placed widgets survive.
+/// Today (was Next up). The kind string predates the restyle and stays so already-placed widgets survive.
 struct InboxTodoWidget: Widget {
     let kind = "InboxTodoWidget"
 
@@ -10,8 +10,8 @@ struct InboxTodoWidget: Widget {
             NextUpEntryView(entry: entry)
                 .modifier(KaihumanBackground())
         }
-        .configurationDisplayName("Next up")
-        .description("Your next todos. Tap a circle to complete one.")
+        .configurationDisplayName("Today")
+        .description("Today's todos: overdue, in progress and due today. Tap a circle to complete one.")
         .supportedFamilies([
             .systemSmall, .systemMedium, .systemLarge,
             .accessoryCircular, .accessoryRectangular, .accessoryInline,
@@ -43,7 +43,7 @@ struct KaihumanWidgets: WidgetBundle {
     }
 }
 
-/// The v2 set: board column, milestone, ideas, knowledge card, habits, due today and the focus Live Activity.
+/// The v2 set: board column, milestone, ideas, knowledge card, habits, due today, timer and the focus Live Activity.
 struct KaihumanV2Widgets: WidgetBundle {
     @WidgetBundleBuilder
     var body: some Widget {
@@ -53,6 +53,7 @@ struct KaihumanV2Widgets: WidgetBundle {
         KnowledgeCardWidget()
         HabitsWidget()
         DueTodayWidget()
+        TimerWidget()
         FocusLiveActivity()
     }
 }

@@ -8,6 +8,8 @@ export default function MoreLayout() {
     <Stack screenOptions={options}>
       <Stack.Screen name="index" options={{ title: 'More', headerRight: () => <SearchButton /> }} />
       <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
+      <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+      <Stack.Screen name="palette" options={{ title: 'Command palette' }} />
     </Stack>
   );
 }

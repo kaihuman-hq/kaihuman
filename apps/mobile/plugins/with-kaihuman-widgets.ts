@@ -153,11 +153,12 @@ export const SHARED_APP_SOURCES: readonly string[] = [
   'ToggleTodoIntent.swift',
   'QuickCaptureTodoIntent.swift',
   'OpenQuickCaptureIntent.swift',
-  // v2 intents: board Start, background capture, knowledge Next, habit Log, Focus Live Activity.
+  // v2 intents: board Start, background capture, knowledge Next, habit Log, timer Stop, Focus Live Activity.
   'StartTodoIntent.swift',
   'CaptureTodoIntent.swift',
   'NextKnowledgeCardIntent.swift',
   'LogHabitIntent.swift',
+  'StopTimerIntent.swift',
   'FocusActivityAttributes.swift',
   'FocusIntents.swift',
 ];
@@ -183,6 +184,8 @@ export const WIDGET_ONLY_SOURCES: readonly string[] = [
   'QuickAddWidget.swift',
   'QuickCaptureWidget.swift',
   'Theme.swift',
+  'TimerWidget.swift',
+  'TodayRow.swift',
   'TodoWidgetViews.swift',
   'WeeklyDoneWidget.swift',
   'WidgetComponents.swift',

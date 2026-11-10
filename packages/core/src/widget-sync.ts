@@ -13,6 +13,7 @@ import {
   OPEN_IDEA_STATUSES,
   parseHabitData,
   parseIdea,
+  parseTimeTracking,
   parseTodos,
   serializeTodos,
   type TodoData,
@@ -86,8 +87,37 @@ export interface WidgetHabit {
   name: string;
   doneToday: boolean;
   streakDays: number;
+  /** Reached per local day for the last 7 days, oldest first; the last entry is today. */
+  days: boolean[];
   /** Never set here: the native widget marks check-ins it queued for the app. */
   pending?: boolean;
+}
+
+/** The running (or, when none runs, the busiest) `.timetracking.csv` timer of today. */
+export interface WidgetTimer {
+  /** Repo path of the `.timetracking.csv` file. */
+  path: string;
+  /** Humanised file name. */
+  label: string;
+  /**
+   * Epoch ms the open interval of today started; absent while stopped. Widgets tick from it
+   * (`Text(timerInterval:)`), so a running timer needs no reloads.
+   */
+  startedAt?: number;
+  /** Closed intervals of today only: a widget adds the live part from `startedAt`. */
+  todayMinutes: number;
+  /** Never set here: the native widget marks a stop it queued for the app. */
+  pending?: boolean;
+}
+
+/** Counts behind the Today widget. */
+export interface WidgetTodayCounts {
+  /** `todayItems.length`. */
+  left: number;
+  /** Items completed today, any due date (same as `counts.doneToday`), so left + done = today's total. */
+  done: number;
+  /** Open items whose due date has passed. */
+  overdue: number;
 }
 
 export interface WidgetExtras {
@@ -95,6 +125,7 @@ export interface WidgetExtras {
   ideas?: WidgetIdeaSummary;
   cards?: WidgetKnowledgeCard[];
   habits?: WidgetHabit[];
+  timer?: WidgetTimer;
 }
 
 export interface WidgetSnapshotOptions {
@@ -106,6 +137,7 @@ export interface WidgetSnapshotOptions {
   ideas?: WidgetIdeaSummary;
   cards?: WidgetKnowledgeCard[];
   habits?: WidgetHabit[];
+  timer?: WidgetTimer;
 }
 
 export interface WidgetTodoSnapshot {
@@ -137,11 +169,18 @@ export interface WidgetTodoSnapshot {
   privacy: { lockScreenText: boolean };
   timeZone: string;
   items: WidgetTodoItem[];
+  /**
+   * The Today widget's list: open items that are overdue, in progress or due today, in that
+   * order (each group by due date and time, then `items` order). Undated or future backlog stays out.
+   */
+  todayItems: WidgetTodoItem[];
+  todayCounts: WidgetTodayCounts;
   files: Record<string, { sha: string; content: string }>;
   // v2 widget set (optional: absent when the app has none of that data loaded)
   ideas?: WidgetIdeaSummary;
   cards?: WidgetKnowledgeCard[];
   habits?: WidgetHabit[];
+  timer?: WidgetTimer;
 }
 
 /**
@@ -152,7 +191,9 @@ export type PendingWidgetMutation =
   | { kind?: 'toggle'; itemId: string; timestamp: number }
   | { kind: 'move'; itemId: string; status: 'backlog' | 'in-progress'; timestamp: number }
   | { kind: 'capture'; text: string; timestamp: number }
-  | { kind: 'habit'; path: string; date: string; timestamp: number };
+  | { kind: 'habit'; path: string; date: string; timestamp: number }
+  /** Stops the running interval of a `.timetracking.csv` at `timestamp` (the widget's tap). */
+  | { kind: 'timer-stop'; path: string; timestamp: number };
 
 type WidgetFiles = WidgetTodoSnapshot['files'];
 
@@ -292,6 +333,20 @@ export const buildWidgetTodoSnapshot = (
     .sort((a, b) => a.r - b.r)
     .map((x) => x.item);
 
+  // 0 overdue, 1 in progress, 2 due today; anything else is not on today's list.
+  const todayGroup = (i: WidgetTodoItem): number | undefined => {
+    if (i.dueDate && i.dueDate < today) return 0;
+    if (i.status === 'in-progress') return 1;
+    return i.dueDate === today ? 2 : undefined;
+  };
+  const todayItems = items
+    .flatMap((item) => {
+      const group = todayGroup(item);
+      return group === undefined ? [] : [{ item, group }];
+    })
+    .sort((a, b) => a.group - b.group || compareDue(a.item, b.item))
+    .map((x) => x.item);
+
   counts.doneToday = doneDays.get(today) ?? 0;
   const monday = shiftDay(today, -weekdayIndex(today));
   const doneByDay = Array.from({ length: 7 }, (_, i) => doneDays.get(shiftDay(monday, i)) ?? 0);
@@ -327,10 +382,17 @@ export const buildWidgetTodoSnapshot = (
     privacy: { lockScreenText: options.lockScreenText ?? true },
     timeZone,
     items,
+    todayItems,
+    todayCounts: {
+      left: todayItems.length,
+      done: counts.doneToday,
+      overdue: todayItems.filter((i) => todayGroup(i) === 0).length,
+    },
     files,
     ...(options.ideas && { ideas: options.ideas }),
     ...(options.cards && { cards: options.cards }),
     ...(options.habits && { habits: options.habits }),
+    ...(options.timer && { timer: options.timer }),
   };
 };
 
@@ -350,6 +412,7 @@ const optionsOf = (snapshot: WidgetTodoSnapshot): WidgetSnapshotOptions => ({
   ideas: snapshot.ideas,
   cards: snapshot.cards,
   habits: snapshot.habits,
+  timer: snapshot.timer,
 });
 
 const rebuild = (
@@ -519,6 +582,52 @@ const habitStreak = (reached: Set<string>, today: string): number => {
   return streak;
 };
 
+const minutesOf = (hm: string): number | undefined => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
+  return m ? Number(m[1]) * 60 + Number(m[2]) : undefined;
+};
+
+/** Epoch ms of wall-clock `day` + `minutes` in `timeZone` (two passes settle DST edges). */
+const zonedEpoch = (day: string, minutes: number, timeZone: string): number => {
+  const wall = Date.parse(`${day}T00:00:00Z`) + minutes * 60_000;
+  const offset = (ms: number): number => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).formatToParts(new Date(ms));
+    const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+    const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'));
+    return asUtc - Math.floor(ms / 60_000) * 60_000;
+  };
+  const first = wall - offset(wall);
+  return wall - offset(first);
+};
+
+/** Today's timer of one `.timetracking.csv`: closed minutes and the open interval's start. */
+const timerOf = (path: string, csv: string, today: string, timeZone: string): WidgetTimer => {
+  const entry = parseTimeTracking(csv).entries.find((e) => e.date === today);
+  let todayMinutes = 0;
+  let startedAt: number | undefined;
+  for (const interval of entry?.intervals ?? []) {
+    const start = minutesOf(interval.start);
+    if (start === undefined) continue;
+    const end = interval.end === undefined ? undefined : minutesOf(interval.end);
+    if (interval.end === undefined) startedAt = zonedEpoch(today, start, timeZone);
+    else if (end !== undefined && end >= start) todayMinutes += end - start;
+  }
+  return {
+    path,
+    label: humanise(basenameOf(path).replace(/\.timetracking\.csv$/, '')),
+    ...(startedAt !== undefined && { startedAt }),
+    todayMinutes,
+  };
+};
+
 /**
  * Derives the v2 widget extras from loaded files. Only trimmed summaries leave this function
  * (doc §5.4); `.enc` files are ciphertext and never count.
@@ -586,13 +695,23 @@ export const buildWidgetExtras = (
         name: humanise(basenameOf(path).replace(/\.habit\.csv$/, '')),
         doneToday: reached.has(today),
         streakDays: habitStreak(reached, today),
+        days: Array.from({ length: 7 }, (_, i) => reached.has(shiftDay(today, i - 6))),
       };
     });
+
+  // The running timer wins (latest start), else the one with the most time today.
+  const timer = paths
+    .filter((p) => p.startsWith(`${folder}/`) && p.endsWith('.timetracking.csv'))
+    .map((p) => timerOf(p, content(p), today, timeZone))
+    .sort(
+      (a, b) => (b.startedAt ?? -1) - (a.startedAt ?? -1) || b.todayMinutes - a.todayMinutes,
+    )[0];
 
   return {
     knowledgeInbox,
     ...(ideaCount > 0 && { ideas: { byStatus, hot } }),
     ...(cards.length > 0 && { cards }),
     ...(habits.length > 0 && { habits }),
+    ...(timer && { timer }),
   };
 };

@@ -536,6 +536,9 @@ const fullSnapshot: Required<
     | 'habits'
     // Not read by Android; kept verbatim in its raw copy like the other v2 keys.
     | 'nextDue'
+    | 'todayItems'
+    | 'todayCounts'
+    | 'timer'
   >
 > & { counts: V1Counts; items: (typeof fullItem)[] } = {
   updatedAt: 1,

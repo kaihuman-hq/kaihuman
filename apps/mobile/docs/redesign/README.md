@@ -1,6 +1,6 @@
-# Mobile redesign — design only (2026-11-10)
+# Mobile redesign (2026-11-10)
 
-Mockups for review before implementation. No app code changed.
+Mockups, approved and implemented. Renders of the real app (web preview, 2×): `impl-*.png` (dashboard page 1 and 2, quick menu, todos detail and add, settings; light and dark).
 Source: `*.html` (shared `kit.css`, `kit.js`). Render: `node render.mjs` (global Playwright, 2× PNG).
 
 | File | Shows |

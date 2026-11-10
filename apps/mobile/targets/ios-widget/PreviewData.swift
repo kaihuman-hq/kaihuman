@@ -9,25 +9,32 @@ extension SharedTodoSnapshot {
     static var preview: SharedTodoSnapshot { sample(updatedAgo: 60) }
 
     static func sample(updatedAgo seconds: TimeInterval, now: Date = Date()) -> SharedTodoSnapshot {
-        // Next up shows only todos due today, so the samples are due on the preview's day.
-        let day = Calendar.current.dateComponents([.year, .month, .day], from: now)
-        let today = String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0)
+        // Today lists overdue, in-progress and due-today todos, so most samples are due on the
+        // preview's day; one is overdue and one in-progress todo has no date.
+        func key(_ date: Date) -> String {
+            let day = Calendar.current.dateComponents([.year, .month, .day], from: date)
+            return String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0)
+        }
+        let today = key(now)
+        let earlier = key(now.addingTimeInterval(-3 * 86_400))
         func item(
             _ index: Int, _ text: String, _ status: TodoStatus, tags: [String] = [],
-            file: String = ".kh/backlog.todos.md", priority: String? = nil, pending: Bool? = nil
+            file: String = ".kh/backlog.todos.md", priority: String? = nil, pending: Bool? = nil,
+            overdue: Bool = false, undated: Bool = false, time: String? = nil
         ) -> SharedTodoItem {
             SharedTodoItem(
                 id: "\(file)#\(index)", filePath: file, indexInFile: index, text: text, status: status,
                 tags: tags, milestoneId: "m1", milestoneName: "Widgets v1", milestoneDueDate: "2026-11-20",
-                updatedAt: nil, priority: priority, pending: pending, dueDate: today
+                updatedAt: nil, priority: priority, pending: pending,
+                dueDate: undated ? nil : (overdue ? earlier : today), dueTime: time
             )
         }
         let items = [
-            item(0, "Ship widget sync v2", .inProgress, tags: ["work"], priority: "high"),
+            item(0, "Ship widget sync v2", .inProgress, tags: ["work"], priority: "high", undated: true),
             item(1, "Review PR #182", .backlog, tags: ["work"], priority: "medium"),
-            item(2, "Book dentist", .backlog, tags: ["life"], file: ".kh/inbox.todos.md"),
+            item(2, "Book dentist", .backlog, tags: ["life"], file: ".kh/inbox.todos.md", time: "10:00"),
             item(3, "Write release notes", .backlog, tags: ["work"], pending: true),
-            item(4, "Renew passport", .backlog, tags: ["life"]),
+            item(4, "Renew passport", .backlog, tags: ["life"], overdue: true),
             item(5, "Plan Q1 roadmap", .backlog, tags: ["work"]),
             item(6, "Fix flaky CI test", .inProgress, tags: ["work"]),
             item(7, "Draft hiring plan", .backlog, tags: ["work"]),
@@ -75,10 +82,24 @@ extension SharedTodoSnapshot {
                 ),
             ],
             habits: [
-                SharedHabit(path: ".kh/habits/read.habit.csv", name: "Read 20 pages", doneToday: true, streakDays: 12, pending: nil),
-                SharedHabit(path: ".kh/habits/walk.habit.csv", name: "Walk outside", doneToday: false, streakDays: 3, pending: nil),
-                SharedHabit(path: ".kh/habits/stretch.habit.csv", name: "Stretch", doneToday: true, streakDays: 1, pending: true),
-            ]
+                SharedHabit(
+                    path: ".kh/habits/read.habit.csv", name: "Read 20 pages", doneToday: true, streakDays: 12,
+                    days: [true, true, false, true, true, true, true], pending: nil
+                ),
+                SharedHabit(
+                    path: ".kh/habits/walk.habit.csv", name: "Walk outside", doneToday: false, streakDays: 3,
+                    days: [true, false, true, false, true, true, false], pending: nil
+                ),
+                SharedHabit(
+                    path: ".kh/habits/stretch.habit.csv", name: "Stretch", doneToday: true, streakDays: 1,
+                    days: [true, true, true, true, true, false, true], pending: true
+                ),
+            ],
+            // 1:24 into the current interval, 3 h 52 m today in all.
+            timer: SharedTimer(
+                path: ".kh/deep-work.timetracking.csv", label: "Deep work",
+                startedAt: Int64((now.timeIntervalSince1970 - 84 * 60) * 1000), todayMinutes: 148, pending: nil
+            )
         )
     }
 
