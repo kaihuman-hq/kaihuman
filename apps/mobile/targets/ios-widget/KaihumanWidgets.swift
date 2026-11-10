@@ -64,9 +64,11 @@ struct KaihumanV2Widgets: WidgetBundle {
 struct KaihumanFocusWidgets: WidgetBundle {
     @WidgetBundleBuilder
     var body: some Widget {
+        // WidgetBundleBuilder has no buildEither, so two one-sided branches instead of if/else.
         if #available(iOS 18.0, *) {
             FocusLiveActivityFamilies()
-        } else {
+        }
+        if #unavailable(iOS 18.0) {
             FocusLiveActivity()
         }
         // iOS 27 extra-large size; the view needs nothing newer, the gate keeps older systems from listing it.

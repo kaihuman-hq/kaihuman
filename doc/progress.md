@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-10 — Mobile iOS: fix widget bundle compile error
+
+- `KaihumanWidgets.swift`: `WidgetBundleBuilder` has no if/else, so the focus Live Activity uses two one-sided availability branches. Found by the first macOS CI build.
+
 ## 2026-11-10 — Mobile: Apple Intelligence smart capture, scan to entry, weekly review
 
 - New Expo module `modules/kaihuman-intelligence` (iOS only): a small generic API (`availability`, `generateText`, `generateJson` with a JSON Schema subset mapped to `DynamicGenerationSchema`, `recognizeDocument` with Vision `RecognizeDocumentsRequest` and the document camera). Prompts, schemas, validation and fallbacks are pure TS in `src/intelligence/` with vitest tests.

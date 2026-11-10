@@ -35,8 +35,10 @@ describe('focus session surfaces (proposal 2.3)', () => {
 
   it('registers exactly one activity configuration per OS version', () => {
     expect(bundle).toMatch(
-      /if #available\(iOS 18\.0, \*\) \{\s*FocusLiveActivityFamilies\(\)\s*\} else \{\s*FocusLiveActivity\(\)\s*\}/,
+      /if #available\(iOS 18\.0, \*\) \{\s*FocusLiveActivityFamilies\(\)\s*\}\s*if #unavailable\(iOS 18\.0\) \{\s*FocusLiveActivity\(\)\s*\}/,
     );
+    // Regression: WidgetBundleBuilder has no buildEither, so an else branch fails to compile.
+    expect(bundle).not.toMatch(/\}\s*else\s*\{/);
     expect(activity.match(/ActivityConfiguration\(for:/g)).toHaveLength(2);
     // The island is built once and shared, so compact and minimal stay identical on both.
     expect(activity.match(/FocusActivityUI\.island\(context\)/g)).toHaveLength(2);
