@@ -29,6 +29,11 @@
 - Saves re-read the latest config and go through `githubContentFiles.write`/`create` (sync engine outbox). Editing the fallback "Today" page first places its tiles on the config's first dashboard.
 - Pure helpers for the coming square grid: `dropIndex` (list or N-column grid), `moveItem`, `newTileFile`, `retargetFallback`.
 - Tests: core `dashboard-edit.test.ts`; mobile `screens/dashboard-edit.test.ts`, `views/dashboard-editor.test.tsx`.
+## 2026-11-10 — Mobile: action log full view
+
+- Opening an `.actionlog.md` file now shows `ActionLogFull` instead of the dashboard tile body (the tile is untouched). The entry field is pinned at the top (return submits, optional `autoFocus`, keyboard-avoiding screen); below it search and tag filter chips, then the log newest first in a `SectionList` with sticky day headers (Today, Yesterday, dated), the time per entry and `#tags` as badges.
+- Swipe a row (full swipe deletes) or tap it to edit: the text goes into the top field, time is kept, tags are re-read from the text. Rows animate in and out (`MotionItem`). Catch-up with the web log: edit and delete were missing on mobile.
+- New `editAction`, `deleteAction`, `groupByDay`, `entryTime`, `stripTags` with tests.
 
 ## 2026-11-10 — Mobile: dashboard swipe, "Bad credentials" banner, automatic sync, widget due today
 

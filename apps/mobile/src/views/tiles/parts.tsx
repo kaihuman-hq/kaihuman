@@ -295,6 +295,7 @@ export function QuickAdd({
   addLabel,
   placeholder,
   keyboardType,
+  autoFocus,
 }: {
   label: string;
   value: string;
@@ -303,6 +304,7 @@ export function QuickAdd({
   addLabel: string;
   placeholder?: string;
   keyboardType?: 'default' | 'url';
+  autoFocus?: boolean;
 }) {
   const { colors, spacing, metrics } = useTheme();
   return (
@@ -315,6 +317,7 @@ export function QuickAdd({
           placeholder={placeholder}
           returnKeyType="done"
           onSubmitEditing={onSubmit}
+          autoFocus={autoFocus}
           keyboardType={keyboardType}
           autoCapitalize={keyboardType === 'url' ? 'none' : 'sentences'}
         />

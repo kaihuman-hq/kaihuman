@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
+import { tileKindForPath } from '../components/widgets/tile-controllers.js';
 import { fileKindForPath, hasViewer } from '../files/file-kinds.js';
 import type {
   DirectoryEntry,
@@ -22,6 +23,7 @@ import {
   Text,
   TextField,
 } from '../ui/index.js';
+import { ActionLogFull } from './actionlog-full.js';
 import { FileContentView, NoViewerNote } from './file-views.js';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -365,8 +367,12 @@ export function FileEditorView({
       sync();
       void save();
     };
+    // The log owns its scrolling (pinned entry field, sticky day headers), so the screen must not scroll.
+    const fullLog = tileKindForPath(kind.innerPath) === 'actionlog';
     return (
       <Screen
+        scroll={!fullLog}
+        keyboard={fullLog}
         footer={
           state.encrypted ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
@@ -390,7 +396,11 @@ export function FileEditorView({
       >
         {pathLabel}
         {error ? <InlineError>{error}</InlineError> : null}
-        <FileContentView path={path} content={state.content} onWrite={write} />
+        {fullLog ? (
+          <ActionLogFull content={state.content} now={new Date()} onWrite={write} />
+        ) : (
+          <FileContentView path={path} content={state.content} onWrite={write} />
+        )}
       </Screen>
     );
   }
