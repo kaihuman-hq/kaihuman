@@ -263,12 +263,13 @@ describe('DashboardPager', () => {
         onNavigate={onNavigate}
       />,
     );
-    expect(screen.getAllByTestId(/^tile-/)).toHaveLength(1);
-    for (const label of ['Board', 'Analytics', 'Ideas', 'Wiki', 'Knowledge', 'Files', 'Repos']) {
-      expect(screen.getByRole('button', { name: label })).toBeTruthy();
-    }
-    press('Quick todo');
-    expect(onNavigate).toHaveBeenCalledWith('/quick-todo');
+    expect(screen.getAllByTestId(/^square-/)).toHaveLength(1);
+    // The shortcut row moved into the ＋ tab's quick menu.
+    expect(screen.queryByRole('button', { name: 'Quick todo' })).toBeNull();
+    fireEvent.click(screen.getByTestId('tile-quick-action'));
+    expect(onNavigate).toHaveBeenCalledWith(
+      `/dashboard/todo-add?path=${encodeURIComponent(todos.path)}`,
+    );
   });
 
   it('shows an empty state', () => {

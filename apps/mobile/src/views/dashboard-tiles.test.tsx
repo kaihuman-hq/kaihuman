@@ -112,7 +112,7 @@ describe('DashboardPager states', () => {
   it('keeps showing tiles when a refresh fails', () => {
     const f = file('projects.todos.md');
     render(<DashboardPager pages={today([f])} error="Offline" {...props} />);
-    expect(screen.getByTestId('tile-todos')).toBeTruthy();
+    expect(screen.getByTestId(`square-${f.path}`)).toBeTruthy();
     expect(screen.queryByText("Couldn't load your tiles")).toBeNull();
   });
 

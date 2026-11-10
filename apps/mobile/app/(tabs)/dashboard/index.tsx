@@ -2,8 +2,17 @@ import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type DashboardPage, loadDashboards, takeLatest } from '../../../src/screens/dashboards.js';
 import { githubContentFiles } from '../../../src/screens/file-editor-screen.js';
+import { setLoadedTiles, tileWrite } from '../../../src/screens/loaded-tiles.js';
 import { useFocusRefresh, useRefresh, useSyncRevision } from '../../../src/sync/hooks.js';
 import { DashboardPager } from '../../../src/views/dashboard-pager.js';
+import { useSignalValue } from '../../../src/views/use-signal.js';
+
+const patchFile =
+  (path: string, content: string) =>
+  (p: DashboardPage): DashboardPage => ({
+    ...p,
+    files: p.files.map((f) => (f.path === path ? { path, content } : f)),
+  });
 
 export default function Dashboard() {
   const router = useRouter();
@@ -30,6 +39,8 @@ export default function Dashboard() {
     const result = await loadLatest();
     if (!result) return;
     setPages(result.pages);
+    // The ＋ menu builds its Track entries from these.
+    setLoadedTiles(result.pages.flatMap((p) => p.files));
     setDefaulted(result.defaulted);
     setNow(new Date());
   }, [loadLatest]);
@@ -48,6 +59,14 @@ export default function Dashboard() {
     run().finally(() => setLoading(false));
   }, [run, rev]);
 
+  // A ＋ menu or quick-entry write shows on the tiles without waiting for a sync.
+  const written = useSignalValue(tileWrite);
+  useEffect(() => {
+    if (!written) return;
+    setPages((prev) => prev.map(patchFile(written.path, written.content)));
+    setNow(new Date());
+  }, [written]);
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
@@ -63,11 +82,7 @@ export default function Dashboard() {
         onCreateFile={(path, content) => githubContentFiles.create(path, content)}
         onWrite={async (path, content) => {
           await githubContentFiles.write(path, content);
-          const patch = (p: DashboardPage): DashboardPage => ({
-            ...p,
-            files: p.files.map((f) => (f.path === path ? { path, content } : f)),
-          });
-          setPages((prev) => prev.map(patch));
+          setPages((prev) => prev.map(patchFile(path, content)));
           setNow(new Date());
         }}
       />
