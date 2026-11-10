@@ -82,6 +82,11 @@ export default function RootLayout() {
             }}
           />
         ))}
+        <Stack.Screen name="scan" options={{ title: 'Scan', ...webBack('/capture') }} />
+        <Stack.Screen
+          name="weekly-review"
+          options={{ title: 'Weekly review', ...webBack('/more') }}
+        />
         <Stack.Screen
           name="analytics"
           options={{ title: 'Analytics', headerLargeTitle: largeTitles, ...webBack('/more') }}

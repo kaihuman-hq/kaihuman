@@ -33,6 +33,10 @@ export const routeToHref = (route: Route): string => {
       return '/dashboard';
     case 'capture':
       return '/capture';
+    case 'scan':
+      return routeQuery('/scan', { kind: route.kind, text: route.text });
+    case 'weekly-review':
+      return '/weekly-review';
   }
 };
 

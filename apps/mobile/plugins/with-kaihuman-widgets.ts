@@ -156,6 +156,7 @@ export const SHARED_APP_SOURCES: readonly string[] = [
   // v2 intents: board Start, background capture, knowledge Next, habit Log, timer Stop, Focus Live Activity.
   'StartTodoIntent.swift',
   'CaptureTodoIntent.swift',
+  'SmartCaptureModel.swift',
   'NextKnowledgeCardIntent.swift',
   'LogHabitIntent.swift',
   'StopTimerIntent.swift',

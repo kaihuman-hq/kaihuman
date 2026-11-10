@@ -694,8 +694,8 @@ describe('ios widget target', () => {
       expect(capture).toMatch(/@Parameter\(title: "Todo"\)\s+var text: String/);
       expect(capture).toContain('some IntentResult & ProvidesDialog');
       expect(capture).toContain('"Added to inbox"');
-      expect(capture).toContain('store.appendCapture(text: trimmed)');
-      expect(capture).toContain('queueing: .capture(text: trimmed)');
+      expect(capture).toContain('store.appendCapture(text: line)');
+      expect(capture).toContain('queueing: .capture(text: line)');
     });
 
     it('answers "Add to kaihuman inbox" from Siri, Shortcuts and Spotlight', () => {

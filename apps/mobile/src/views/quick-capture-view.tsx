@@ -1,6 +1,7 @@
 import type { TodoDue, TodoRepeat } from '@kaihuman/formats';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { smartInbox } from '../intelligence/smart-inbox.js';
 import type { QuickKind } from '../navigation/routes.js';
 import type { QuickCaptureController } from '../screens/quick-capture.js';
 import { retargetRepeat } from '../screens/todo-due.js';
@@ -117,7 +118,7 @@ export function QuickCaptureView({
           kind === 'todo'
             ? await controller.quickTodo(text, value, due, due && repeat)
             : kind === 'inbox'
-              ? await controller.quickTodo(text)
+              ? await smartInbox(text, { controller })
               : kind === 'log'
                 ? await controller.quickLog(text, value)
                 : kind === 'knowledge'

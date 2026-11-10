@@ -5,7 +5,12 @@ import * as SecureStore from 'expo-secure-store';
 import { AppState } from 'react-native';
 import { KaihumanShared } from '../../modules/kaihuman-shared/index.js';
 import { WidgetBridge } from '../adapters/widget-bridge.js';
+import { setAppIntelligence } from '../intelligence/app-model.js';
+import { startSmartCaptureDrain } from '../intelligence/drain.js';
+import { nativeIntelligence } from '../intelligence/native.js';
+import { githubCaptureFiles, saveCapture } from '../intelligence/save-capture.js';
 import { rescheduleNotifications, startNotifications } from '../notifications/index.js';
+import { QuickCaptureController } from '../screens/quick-capture.js';
 import { refreshSearchIndex, searchIndex } from '../search/shared-index.js';
 import { startSpotlightSync } from '../spotlight/sync.js';
 import { checkGithubToken, recoverAuth } from '../sync/auth-recovery.js';
@@ -88,7 +93,24 @@ export function bootstrap(): () => void {
         onChange: (listener) => githubFileStore.openFiles.subscribe(listener),
       })
     : () => undefined;
+  setAppIntelligence(nativeIntelligence());
+  const shared = KaihumanShared;
+  const stopDrain = shared
+    ? startSmartCaptureDrain({
+        store: {
+          read: (n) => shared.readSharedFile(n),
+          write: (n, c) => shared.writeSharedFile(n, c),
+        },
+        onTree: (listener) => githubFileStore.tree.subscribe((tree) => listener(tree.length > 0)),
+        save: (capture) =>
+          saveCapture(capture, {
+            controller: new QuickCaptureController(),
+            files: githubCaptureFiles,
+          }),
+      })
+    : () => undefined;
   active = () => {
+    stopDrain();
     stopSpotlight();
     stopSync();
     stopBridge();

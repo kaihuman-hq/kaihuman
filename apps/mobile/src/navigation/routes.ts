@@ -1,4 +1,5 @@
 import { isIdeaStatus } from '@kaihuman/formats';
+import { isScanKind, type ScanKind } from '../intelligence/scan-kinds.js';
 
 export const APP_SCHEME = 'kaihuman';
 
@@ -18,7 +19,10 @@ export type Route =
   /** Home-screen quick action "Today": the dashboard. */
   | { name: 'today' }
   /** The capture tab's kind picker (Control Center "Capture"). */
-  | { name: 'capture' };
+  | { name: 'capture' }
+  /** Scan to entry; Visual Intelligence passes the recognised text and the picked kind. */
+  | { name: 'scan'; kind?: ScanKind; text?: string }
+  | { name: 'weekly-review' };
 
 const QUICK_KINDS: readonly QuickKind[] = ['todo', 'note', 'log', 'idea', 'knowledge', 'inbox'];
 
@@ -56,6 +60,12 @@ export function parseDeepLink(url: string): Route | null {
   if (head === 'inbox' && rest.length === 0) return { name: 'inbox' };
   if (head === 'today' && rest.length === 0) return { name: 'today' };
   if (head === 'capture' && rest.length === 0) return { name: 'capture' };
+  if (head === 'weekly-review' && rest.length === 0) return { name: 'weekly-review' };
+  if (head === 'scan' && rest.length === 0) {
+    const kind = param('kind');
+    const text = param('text');
+    return { name: 'scan', ...(isScanKind(kind) && { kind }), ...(text && { text }) };
+  }
   // Non-interactive "Try demo" (used by CI screenshots).
   if (head === 'demo' && rest.length === 0) return { name: 'demo' };
   if (head === 'search' && rest.length === 0) {
@@ -107,5 +117,9 @@ export const routeToUrl = (route: Exclude<Route, { name: 'auth-callback' }>): st
       return `${APP_SCHEME}://today`;
     case 'capture':
       return `${APP_SCHEME}://capture`;
+    case 'scan':
+      return withQuery(`${APP_SCHEME}://scan`, { kind: route.kind, text: route.text });
+    case 'weekly-review':
+      return `${APP_SCHEME}://weekly-review`;
   }
 };

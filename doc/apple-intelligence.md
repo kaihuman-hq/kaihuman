@@ -12,6 +12,7 @@ Status: November 2026. Written for `apps/mobile` (Expo SDK 58, React Native 0.88
 | Todos and notes as entities | `KaihumanItemEntity` (`AppEntity`, `IndexedEntity` on iOS 18), `EntityStringQuery`, `OpenItemIntent` | `targets/ios-app-intents/ItemEntity.swift` |
 | Spotlight search results | Core Spotlight items from `spotlight-items.json`; a tap opens the item's deep link | `modules/kaihuman-shared/ios/*`, `src/spotlight/*` |
 | Action button | Any App Shortcut or iOS 18 control (Focus timer is the natural pick) | — |
+| Smart capture, scan to entry, weekly review (Foundation Models, Vision, Visual Intelligence) | `kaihuman-intelligence` Expo module (generic model + OCR bridge); logic and fallbacks in TS | `modules/kaihuman-intelligence/*`, `src/intelligence/*`, `SmartCaptureModel.swift`, `VisualIntelligenceIntents.swift` |
 | Writing Tools | Free: RN `TextInput` is a `UITextView`/`UITextField`, so iOS 18.1+ offers Writing Tools in every editor | — |
 
 Phrases (each must contain the app name): "Add a todo in kaihuman", "Add a note in kaihuman", "Log in kaihuman", "Search kaihuman", "What's due today in kaihuman", "What's next in kaihuman", "Complete ‹todo› in kaihuman", "Add to kaihuman inbox", "Open ‹item› in kaihuman".
@@ -53,7 +54,7 @@ With Expo, this needs a small Expo module (Swift) that wraps `LanguageModelSessi
 1. Device QA of what shipped (see below).
 2. Add a tiny app-target Swift hook (e.g. an `ExpoAppDelegateSubscriber` compiled into the app target by the plugin, not the pod) that calls `updateAppShortcutParameters()` and `indexAppEntities`. Then switch Spotlight to entity indexing.
 3. Adopt `.journal.createEntry` for log entries once the app-target hook exists.
-4. Foundation Models capture parsing behind an availability check, with today's plain capture as the fallback.
+4. ~~Foundation Models capture parsing~~ shipped (see table). Next: wire the PCC model for the weekly review once the iOS 27 API is confirmed.
 5. Revisit iOS 27 App Schemas when the docs are stable.
 
 ## Needs testing on a device
@@ -64,3 +65,6 @@ With Expo, this needs a small Expo module (Swift) that wraps `LanguageModelSessi
 - Lock Screen: Due today (3 families), Habits circular/inline streak.
 - Controls: Capture opens the capture tab. The Focus timer toggle starts a Live Activity on the next todo, stops it, and shows the right state after the app starts or ends a session itself.
 - Action button bound to the Focus timer control and to an App Shortcut.
+- Foundation Models: Add to inbox sheet with "pay rent friday #money" (todo, due, tag), "coffee 4.50" (budget line), "did my run" (habit check-in); same via Siri "Add to kaihuman inbox", then open the app and check the queue is filed. Turn Apple Intelligence off and check the plain capture.
+- Scan: receipt, boarding pass, meter photo; Visual Intelligence camera and screenshot search show the four kaihuman suggestions (iPhone 15 Pro or later).
+- Weekly review with and without Apple Intelligence; the file opens in the editor.

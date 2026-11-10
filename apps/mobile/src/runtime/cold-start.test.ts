@@ -57,6 +57,7 @@ vi.mock('../../modules/kaihuman-shared/index.js', () => ({
     consumePendingUrl: () => null,
   },
 }));
+vi.mock('../../modules/kaihuman-intelligence/index.js', () => ({ KaihumanIntelligence: null }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios', select: (o: Record<string, unknown>) => o.ios ?? o.default },
   AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },

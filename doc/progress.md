@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-11-10 — Mobile: Apple Intelligence smart capture, scan to entry, weekly review
+
+- New Expo module `modules/kaihuman-intelligence` (iOS only): a small generic API (`availability`, `generateText`, `generateJson` with a JSON Schema subset mapped to `DynamicGenerationSchema`, `recognizeDocument` with Vision `RecognizeDocumentsRequest` and the document camera). Prompts, schemas, validation and fallbacks are pure TS in `src/intelligence/` with vitest tests.
+- Smart capture (proposal 1.1): the Add to inbox sheet asks the on-device model for a typed capture (todo with due and tags, log, budget line, habit check-in) and saves it to the module's file; without a model, or on a bad result, it saves the plain inbox todo as before. Budget and habit captures without a matching file become log entries.
+- Siri "Add to inbox" parses with Foundation Models in `CaptureTodoIntent` (`targets/ios-widget/SmartCaptureModel.swift`): a plain todo still saves at once (tags appended); other kinds go to the App Group file `smart-captures.json`, which the app files once the repo tree loads.
+- Scan to entry (1.3): new Scan screen (`/scan`, More tab) turns a document camera scan into a budget line, trip, todo or meter reading. Visual Intelligence `IntentValueQuery` (`targets/ios-app-intents/VisualIntelligenceIntents.swift`) offers the four kinds in the camera and screenshot search; picking one opens `kaihuman://scan?kind=&text=`.
+- Weekly review (2.1): new screen (`/weekly-review`, More tab) builds done todos, habit streaks, time tracked, spend and open loops in TS, has the model write prose (PCC when available, else on-device) above the facts, and writes `logs/weekly-review-<date>.md` (never overwrites) and opens it. Without a model it writes a fixed template. The PCC model API is not wired yet (iOS 27 SDK API unverified), so `server` reports unavailable.
+- Needs a Mac build and device test: no Swift compiler on CI; Swift is covered by source-text tests (`src/intelligence/native-sources.test.ts`).
+
 ## 2026-11-10 — Mobile: merge redesign with dashboard edit mode and search
 
 - Tab bar is the redesign's Today · Board · ＋ · Ideas · More; the Search tab is dropped (its route stays, hidden) and search opens from the header search button on every tab root, including a search button in the Today pager header. `web-tab-bar.tsx` removed (unused).
