@@ -9,10 +9,12 @@ export interface SpotlightSourceDoc {
   kind: string;
   title: string;
   subtitle?: string;
+  date?: string;
   path: string;
 }
 
-export type SpotlightKind = 'todo' | 'note';
+/** Todos are the reminders-like kind; notes and log entries the journal-like ones (App Schemas). */
+export type SpotlightKind = 'todo' | 'note' | 'log';
 
 /** One row of `spotlight-items.json`. KaihumanItemEntity.swift and the Spotlight indexer decode it. */
 export interface SpotlightItem {
@@ -21,6 +23,8 @@ export interface SpotlightItem {
   kind: SpotlightKind;
   title: string;
   subtitle?: string;
+  /** `YYYY-MM-DD`: log entry day or todo due day. FindItemsIntent filters on it. */
+  date?: string;
 }
 
 export const SPOTLIGHT_ITEMS_FILE = 'spotlight-items.json';
@@ -34,8 +38,18 @@ const urlOf = (doc: SpotlightSourceDoc): string | null => {
     return routeToUrl({ name: 'board', item: doc.id.slice(TODO_PREFIX.length) });
   }
   if (doc.kind === 'note') return routeToUrl({ name: 'file', path: doc.path });
+  // Entries share their log file, so the fragment keeps each link unique; routing ignores it.
+  if (doc.kind === 'log') {
+    const entry = doc.id.slice(doc.id.lastIndexOf('#') + 1);
+    return `${routeToUrl({ name: 'file', path: doc.path })}#${entry}`;
+  }
   return null;
 };
+
+const DAY = /^\d{4}-\d{2}-\d{2}/;
+
+/** The calendar day of an ISO date or timestamp, as written (no time zone shift). */
+export const dayOf = (date?: string): string | undefined => DAY.exec(date ?? '')?.[0];
 
 /** Todos and notes as Spotlight items, deduped by link, capped, untitled ones dropped. */
 export function spotlightItems(
@@ -50,11 +64,13 @@ export function spotlightItems(
     const id = urlOf(doc);
     if (!id || !title || seen.has(id)) continue;
     seen.add(id);
+    const day = dayOf(doc.date);
     items.push({
       id,
       kind: doc.kind as SpotlightKind,
       title,
       ...(doc.subtitle && { subtitle: doc.subtitle }),
+      ...(day && { date: day }),
     });
   }
   return items;

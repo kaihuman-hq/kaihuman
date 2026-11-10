@@ -4,6 +4,7 @@ import { parseDeepLink } from '../navigation/routes.js';
 import { FOCUS_MINUTES } from '../screens/focus-session.js';
 import { docsForFile } from '../search/documents.js';
 import {
+  dayOf,
   MAX_SPOTLIGHT_ITEMS,
   publishSpotlight,
   SPOTLIGHT_ITEMS_FILE,
@@ -27,6 +28,31 @@ describe('spotlightItems', () => {
     expect(items[0]?.id).toBe('kaihuman://board?item=.kh%2Finbox.todos.md%230');
     expect(items[2]?.id).toBe('kaihuman://files/notes/trip.md');
     for (const item of items) expect(parseDeepLink(item.id), item.id).not.toBeNull();
+  });
+
+  it('adds log entries with a unique routed link each, and the day of logs and due todos', () => {
+    const log = docsForFile(
+      '.kh/inbox.actionlog.md',
+      '- 2026-11-03 09:15:00 Booked flights\n- 2026-11-04 18:00:00 Packed\n',
+    );
+    const due = docsForFile(
+      '.kh/inbox.todos.md',
+      '- [ ] Book hotel\n  ::updated:: 1 ::due:: 2026-11-12\n',
+    );
+    const items = spotlightItems([...log, ...due]);
+    expect(items.filter((i) => i.kind === 'log').map((i) => [i.title, i.date])).toEqual([
+      ['Booked flights', '2026-11-03'],
+      ['Packed', '2026-11-04'],
+    ]);
+    expect(items.find((i) => i.kind === 'todo')).toMatchObject({
+      title: 'Book hotel',
+      date: '2026-11-12',
+    });
+    expect(new Set(items.map((i) => i.id)).size).toBe(items.length);
+    expect(items[0]?.id).toMatch(/^kaihuman:\/\/files\/\.kh\/inbox\.actionlog\.md#\d+$/);
+    for (const item of items) expect(parseDeepLink(item.id), item.id).not.toBeNull();
+    expect(dayOf('2026-11-03T09:15:00.000Z')).toBe('2026-11-03');
+    expect(dayOf('soon')).toBeUndefined();
   });
 
   it('drops untitled and duplicate docs and caps the list', () => {

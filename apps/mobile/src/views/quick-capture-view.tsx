@@ -76,12 +76,14 @@ const DISMISS_DELAY_MS = 800;
 export function QuickCaptureView({
   controller,
   kind,
+  initialText,
   onDone,
   headerAction,
   onHeaderState,
 }: {
   controller: QuickCaptureController;
   kind: QuickKind;
+  initialText?: string;
   /** Called shortly after a successful save so the sheet can dismiss. */
   onDone?: () => void;
   /** True when the header owns the primary action; the view then draws no button. */
@@ -89,7 +91,7 @@ export function QuickCaptureView({
   onHeaderState?: (state: CaptureHeaderState) => void;
 }) {
   const { spacing, colors } = useTheme();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText ?? '');
   const [extra, setExtra] = useState('');
   const [due, setDue] = useState<TodoDue | undefined>();
   const [repeat, setRepeat] = useState<TodoRepeat | undefined>();

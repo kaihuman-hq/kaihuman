@@ -8,7 +8,7 @@ export type QuickKind = 'todo' | 'note' | 'log' | 'idea' | 'knowledge' | 'inbox'
 export type Route =
   | { name: 'auth-callback'; accessToken: string | null }
   /** `idea` (log only) targets that idea's log instead of the action log. */
-  | { name: 'quick-capture'; kind: QuickKind; idea?: string }
+  | { name: 'quick-capture'; kind: QuickKind; idea?: string; text?: string }
   | { name: 'ideas'; status?: string }
   | { name: 'board'; milestone?: string; item?: string }
   | { name: 'inbox' }
@@ -19,6 +19,9 @@ export type Route =
   | { name: 'today' }
   /** The capture tab's kind picker (Control Center "Capture"). */
   | { name: 'capture' };
+
+/** Longest `text` a quick-capture link may prefill. */
+export const MAX_PREFILL = 2000;
 
 const QUICK_KINDS: readonly QuickKind[] = ['todo', 'note', 'log', 'idea', 'knowledge', 'inbox'];
 
@@ -72,7 +75,14 @@ export function parseDeepLink(url: string): Route | null {
   const kind = head?.startsWith('quick-') ? head.slice('quick-'.length) : undefined;
   if (rest.length === 0 && kind && (QUICK_KINDS as readonly string[]).includes(kind)) {
     const idea = kind === 'log' ? param('idea') : undefined;
-    return { name: 'quick-capture', kind: kind as QuickKind, ...(idea && { idea }) };
+    // Prefill from Siri (journal createEntry schema intent); capped so a link can't flood the editor.
+    const text = param('text')?.slice(0, MAX_PREFILL);
+    return {
+      name: 'quick-capture',
+      kind: kind as QuickKind,
+      ...(idea && { idea }),
+      ...(text && { text }),
+    };
   }
   return null;
 }
@@ -90,7 +100,10 @@ export const routeQuery = withQuery;
 export const routeToUrl = (route: Exclude<Route, { name: 'auth-callback' }>): string => {
   switch (route.name) {
     case 'quick-capture':
-      return withQuery(`${APP_SCHEME}://quick-${route.kind}`, { idea: route.idea });
+      return withQuery(`${APP_SCHEME}://quick-${route.kind}`, {
+        idea: route.idea,
+        text: route.text,
+      });
     case 'ideas':
       return withQuery(`${APP_SCHEME}://ideas`, { status: route.status });
     case 'board':

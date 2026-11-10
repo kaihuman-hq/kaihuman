@@ -11,7 +11,16 @@ import { CAPTURE_TITLES, type CaptureHeaderState, QuickCaptureView } from './qui
  * expo-router has no partial dynamic segments (`quick-[kind]` never matches), so each
  * `kaihuman://quick-<kind>` deep link gets its own static route file rendering this screen.
  */
-export function QuickCaptureScreen({ kind, idea }: { kind: QuickKind; idea?: string }) {
+export function QuickCaptureScreen({
+  kind,
+  idea,
+  text,
+}: {
+  kind: QuickKind;
+  idea?: string;
+  /** Prefill, e.g. from `kaihuman://quick-log?text=…` sent by Siri. */
+  text?: string;
+}) {
   const controller = useMemo(() => {
     const c = new QuickCaptureController();
     c.targetIdea = idea ?? null;
@@ -51,6 +60,7 @@ export function QuickCaptureScreen({ kind, idea }: { kind: QuickKind; idea?: str
       <QuickCaptureView
         controller={controller}
         kind={kind}
+        initialText={text}
         onDone={dismiss}
         headerAction={headerAction}
         onHeaderState={setHeader}

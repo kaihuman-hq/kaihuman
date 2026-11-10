@@ -1,10 +1,10 @@
 import AppIntents
 import Foundation
 
-// Todos and notes for Siri, Shortcuts and Spotlight. The app writes spotlight-items.json into the
+// Todos, notes and log entries for Siri, Shortcuts and Spotlight. The app writes spotlight-items.json into the
 // App Group (src/spotlight/spotlight.ts) from its search index; the same rows feed Core Spotlight.
 
-/// A todo or note. `id` is its kaihuman:// deep link.
+/// A todo, note or log entry. `id` is its kaihuman:// deep link.
 struct KaihumanItemEntity: AppEntity, Codable {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "kaihuman item")
     static let defaultQuery = KaihumanItemQuery()
@@ -13,13 +13,37 @@ struct KaihumanItemEntity: AppEntity, Codable {
     var kind: String
     var title: String
     var subtitle: String?
+    /// `YYYY-MM-DD`: a log entry's day or a todo's due day (SpotlightItem.date).
+    var date: String?
 
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(
             title: "\(title)",
             subtitle: subtitle.map { "\($0)" },
-            image: .init(systemName: kind == "todo" ? "checkmark.circle" : "note.text")
+            image: .init(systemName: KaihumanItemKind(rawValue: kind)?.systemImage ?? "note.text")
         )
+    }
+}
+
+/// The `kind` values of spotlight-items.json (SpotlightKind in src/spotlight/spotlight.ts).
+enum KaihumanItemKind: String, AppEnum {
+    case todo
+    case note
+    case log
+
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Item kind")
+    static let caseDisplayRepresentations: [KaihumanItemKind: DisplayRepresentation] = [
+        .todo: DisplayRepresentation(title: "Todo"),
+        .note: DisplayRepresentation(title: "Note"),
+        .log: DisplayRepresentation(title: "Log entry"),
+    ]
+
+    var systemImage: String {
+        switch self {
+        case .todo: return "checkmark.circle"
+        case .note: return "note.text"
+        case .log: return "book.closed"
+        }
     }
 }
 
@@ -41,12 +65,40 @@ enum KaihumanItemStore {
 
     /// Every word must appear in the title or subtitle, in any order and case.
     static func matching(_ query: String, in items: [KaihumanItemEntity]) -> [KaihumanItemEntity] {
-        let words = query.split(whereSeparator: \.isWhitespace).map(String.init)
-        guard !words.isEmpty else { return [] }
+        guard !words(query).isEmpty else { return [] }
+        return find(text: query, in: items)
+    }
+
+    /// Open-ended lookup for Siri: words (all must match), kind, and an inclusive `YYYY-MM-DD`
+    /// day range. Items without a date never match a range. Day strings compare in order.
+    static func find(
+        text: String? = nil,
+        kind: KaihumanItemKind? = nil,
+        from: String? = nil,
+        to: String? = nil,
+        in items: [KaihumanItemEntity]
+    ) -> [KaihumanItemEntity] {
+        let wanted = words(text ?? "")
         return items.filter { item in
+            if let kind, item.kind != kind.rawValue { return false }
+            if from != nil || to != nil {
+                guard let day = item.date else { return false }
+                if let from, day < from { return false }
+                if let to, day > to { return false }
+            }
             let haystack = "\(item.title) \(item.subtitle ?? "")"
-            return words.allSatisfy { haystack.localizedCaseInsensitiveContains($0) }
+            return wanted.allSatisfy { haystack.localizedCaseInsensitiveContains($0) }
         }
+    }
+
+    /// A date as the local `YYYY-MM-DD` the JSON uses.
+    static func day(_ date: Date, calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    private static func words(_ text: String) -> [String] {
+        text.split(whereSeparator: \.isWhitespace).map(String.init)
     }
 }
 

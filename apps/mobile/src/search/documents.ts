@@ -24,6 +24,8 @@ export interface SearchDoc {
   text?: string;
   /** Tags and the like: searched, never shown. */
   keywords?: string;
+  /** ISO date or timestamp: a log entry's time, a todo's due date. Lets Siri ask "last week". */
+  date?: string;
   path: string;
   target: SearchTarget;
 }
@@ -104,6 +106,7 @@ function todoDocs(path: string, text: string): SearchDoc[] {
       title: item.text,
       subtitle: [item.status, milestone, basename(path)].filter(Boolean).join(' · '),
       keywords: [...item.tags, milestone].filter(Boolean).join(' '),
+      ...(item.dueDate && { date: item.dueDate }),
       path,
       target: { type: 'route' as const, href: todoDetailHref(id) },
     };
@@ -117,6 +120,7 @@ function logDocs(path: string, text: string): SearchDoc[] {
     title: entry.description,
     subtitle: entry.timestamp,
     keywords: entry.tags.join(' '),
+    date: entry.timestamp,
     path,
     target: fileTarget(path),
   }));
