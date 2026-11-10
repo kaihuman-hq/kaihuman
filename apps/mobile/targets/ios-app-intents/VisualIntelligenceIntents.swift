@@ -107,7 +107,14 @@ struct KaihumanVisualSearchQuery: IntentValueQuery {
     }
 
     private static func cgImage(_ buffer: CVPixelBuffer) -> CGImage? {
-        CIContext().createCGImage(CIImage(cvPixelBuffer: buffer), from: CIImage(cvPixelBuffer: buffer).extent)
+        let image = CIImage(cvPixelBuffer: buffer)
+        return CIContext().createCGImage(image, from: image.extent)
+    }
+
+    // Newer SDKs type `pixelBuffer` as CVReadOnlyPixelBuffer (CVPixelBuffer in the iOS 26.5 SDK);
+    // both overloads exist so the file compiles with either Xcode.
+    private static func cgImage(_ buffer: CVReadOnlyPixelBuffer) -> CGImage? {
+        buffer.withUnsafeBuffer { cgImage($0) }
     }
 }
 #endif

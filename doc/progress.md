@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-10 — Mobile iOS: fix EAS build error in the scan intent
+
+- `VisualIntelligenceIntents.swift`: the EAS Xcode SDK types `SemanticContentDescriptor.pixelBuffer` as `CVReadOnlyPixelBuffer`, while CI's iOS 26.5 SDK still uses `CVPixelBuffer`. An overload for each type, so the file compiles with both.
+
 ## 2026-11-10 — Mobile iOS: fix widget bundle compile error
 
 - `KaihumanWidgets.swift`: `WidgetBundleBuilder` has no if/else, and `#unavailable` crashed the Swift compiler. The focus Live Activity now registers once, in the iOS 18 block, so iOS 17 has no Live Activity. Found by the first macOS CI builds.
