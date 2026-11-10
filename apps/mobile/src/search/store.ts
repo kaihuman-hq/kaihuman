@@ -3,18 +3,12 @@ import { signal } from '@preact/signals';
 import { useEffect, useState } from 'react';
 import { useSyncRevision } from '../sync/index.js';
 import { useSignalValue } from '../views/use-signal.js';
-import { SearchIndex } from './index.js';
 import { parseRecentSearches, withRecentSearch } from './search.js';
+import { refreshSearchIndex, searchIndex } from './shared-index.js';
+
+export { cachedRead, refreshSearchIndex, searchIndex } from './shared-index.js';
 
 const RECENTS_KEY = 'kh.mobile.recent-searches';
-
-export const searchIndex = new SearchIndex();
-
-/** Cached content only: search never waits on the network, so unopened files match by name. */
-export const cachedRead = (path: string): string | null =>
-  githubFileStore.openFiles.peek()[path]?.content ?? null;
-
-export const refreshSearchIndex = () => searchIndex.update(githubFileStore.tree.peek(), cachedRead);
 
 const loadRecents = (): string[] => {
   try {

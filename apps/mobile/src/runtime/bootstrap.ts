@@ -1,4 +1,4 @@
-import { authStore, demoMode, getCoreStorage } from '@kaihuman/core';
+import { authStore, demoMode, getCoreStorage, githubFileStore } from '@kaihuman/core';
 import { getRandomValues } from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
@@ -6,6 +6,8 @@ import { AppState } from 'react-native';
 import { KaihumanShared } from '../../modules/kaihuman-shared/index.js';
 import { WidgetBridge } from '../adapters/widget-bridge.js';
 import { rescheduleNotifications, startNotifications } from '../notifications/index.js';
+import { refreshSearchIndex, searchIndex } from '../search/shared-index.js';
+import { startSpotlightSync } from '../spotlight/sync.js';
 import { checkGithubToken, recoverAuth } from '../sync/auth-recovery.js';
 import { registerBackgroundSync } from '../sync/background.js';
 import { setRescheduleNotifications } from '../sync/notifications-hook.js';
@@ -76,7 +78,18 @@ export function bootstrap(): () => void {
       }),
   });
   void registerBackgroundSync();
+  const stopSpotlight = KaihumanShared
+    ? startSpotlightSync({
+        native: KaihumanShared,
+        refresh: async () => {
+          await refreshSearchIndex();
+          return searchIndex.docs();
+        },
+        onChange: (listener) => githubFileStore.openFiles.subscribe(listener),
+      })
+    : () => undefined;
   active = () => {
+    stopSpotlight();
     stopSync();
     stopBridge();
     stopNotifications();

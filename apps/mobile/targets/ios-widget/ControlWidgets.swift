@@ -65,7 +65,6 @@ struct NewIdeaControl: ControlWidget {
     }
 }
 
-
 @available(iOS 18.0, *)
 struct AddToInboxControl: ControlWidget {
     static let kind = "AddToInboxControl"
@@ -78,5 +77,45 @@ struct AddToInboxControl: ControlWidget {
         }
         .displayName("Add to inbox")
         .description("Add one line to your kaihuman inbox.")
+    }
+}
+
+@available(iOS 18.0, *)
+struct CaptureControl: ControlWidget {
+    static let kind = "CaptureControl"
+
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: Self.kind) {
+            ControlWidgetButton(action: OpenDestinationIntent(destination: .capture)) {
+                Label("Capture", systemImage: "square.and.pencil")
+            }
+        }
+        .displayName("Capture")
+        .description("Pick what to capture in kaihuman.")
+    }
+}
+
+@available(iOS 18.0, *)
+struct FocusTimerValueProvider: ControlValueProvider {
+    var previewValue: Bool { false }
+
+    func currentValue() async throws -> Bool {
+        FocusTimerState.isRunning
+    }
+}
+
+/// Start/stop a focus session. Also the natural Action button control.
+@available(iOS 18.0, *)
+struct FocusTimerControl: ControlWidget {
+    static let kind = FocusTimerState.controlKind
+
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: Self.kind, provider: FocusTimerValueProvider()) { isRunning in
+            ControlWidgetToggle("Focus timer", isOn: isRunning, action: ToggleFocusTimerIntent()) { on in
+                Label(on ? "Focusing" : "Start focus", systemImage: on ? "timer.circle.fill" : "timer")
+            }
+        }
+        .displayName("Focus timer")
+        .description("Start a focus session on your next todo, or stop it.")
     }
 }

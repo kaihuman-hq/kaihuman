@@ -29,6 +29,10 @@ export const routeToHref = (route: Route): string => {
       return routeQuery('/search', { q: route.q });
     case 'file':
       return `/files/${route.path.split('/').map(encodeURIComponent).join('/')}`;
+    case 'today':
+      return '/dashboard';
+    case 'capture':
+      return '/capture';
   }
 };
 

@@ -1,6 +1,8 @@
 import ActivityKit
+import CoreSpotlight
 import ExpoModulesCore
 import Foundation
+import UniformTypeIdentifiers
 import WidgetKit
 
 // Names must match targets/ios-widget/SharedTodoStore.swift and QuickCaptureTodoIntent.swift.
@@ -8,6 +10,18 @@ private let appGroupId =
   Bundle.main.object(forInfoDictionaryKey: "KHAppGroup") as? String ?? "group.com.kaihuman.app"
 private let tokenDefaultsKey = "github-token"
 private let pendingUrlKey = "pending-url"
+// Names must match FocusTimerState in targets/ios-widget/FocusIntents.swift.
+private let focusActivityIdKey = "focus-activity-id"
+private let focusControlKind = "FocusTimerControl"
+private let spotlightDomains = ["kaihuman.todo", "kaihuman.note"]
+
+/// One row of spotlight-items.json (src/spotlight/spotlight.ts). `id` is the deep link.
+private struct SpotlightRow: Decodable {
+    var id: String
+    var kind: String
+    var title: String
+    var subtitle: String?
+}
 
 // A copy of targets/ios-widget/FocusActivityAttributes.swift: this pod cannot see the app target's
 // sources, and ActivityKit pairs an activity with the widget UI by the attributes type name.
@@ -29,6 +43,18 @@ public class KaihumanSharedModule: Module {
 
   private var defaults: UserDefaults? {
     UserDefaults(suiteName: appGroupId)
+  }
+
+  /// Mirrors the running session for the Control Center focus toggle.
+  private func setFocusActivity(_ id: String?) {
+    if let id {
+      defaults?.set(id, forKey: focusActivityIdKey)
+    } else {
+      defaults?.removeObject(forKey: focusActivityIdKey)
+    }
+    if #available(iOS 18.0, *) {
+      ControlCenter.shared.reloadControls(ofKind: focusControlKind)
+    }
   }
 
   public func definition() -> ModuleDefinition {
@@ -80,6 +106,7 @@ public class KaihumanSharedModule: Module {
           content: ActivityContent(state: state, staleDate: nil, relevanceScore: 100),
           pushType: nil
         )
+        self.setFocusActivity(activity.id)
         return activity.id
       } catch {
         return nil
@@ -101,8 +128,31 @@ public class KaihumanSharedModule: Module {
     AsyncFunction("endFocusActivity") { (activityId: String) in
       guard #available(iOS 16.2, *),
             let activity = Activity<FocusActivityAttributes>.activities.first(where: { $0.id == activityId })
-      else { return }
+      else {
+        self.setFocusActivity(nil)
+        return
+      }
       await activity.end(nil, dismissalPolicy: .immediate)
+      self.setFocusActivity(nil)
+    }
+
+    // Replaces our Core Spotlight items. Tapping one opens its deep link (KaihumanAppDelegate.swift).
+    Function("indexSpotlight") { (json: String) in
+      guard let data = json.data(using: .utf8),
+            let rows = try? JSONDecoder().decode([SpotlightRow].self, from: data)
+      else { return }
+      let items = rows.map { row -> CSSearchableItem in
+        let attributes = CSSearchableItemAttributeSet(contentType: UTType.text)
+        attributes.title = row.title
+        attributes.contentDescription = row.subtitle
+        return CSSearchableItem(
+          uniqueIdentifier: row.id, domainIdentifier: "kaihuman.\(row.kind)", attributeSet: attributes
+        )
+      }
+      let index = CSSearchableIndex.default()
+      index.deleteSearchableItems(withDomainIdentifiers: spotlightDomains) { _ in
+        index.indexSearchableItems(items)
+      }
     }
   }
 }

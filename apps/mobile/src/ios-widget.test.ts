@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { WidgetTodoItem, WidgetTodoSnapshot } from '@kaihuman/core';
 import { describe, expect, it } from 'vitest';
 import { PENDING_WIDGET_MUTATIONS_FILE, WIDGET_TODOS_FILE } from './adapters/widget-bridge.js';
+import { SPOTLIGHT_ITEMS_FILE } from './spotlight/spotlight.js';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'targets', 'ios-widget');
 const read = (name: string): string => readFileSync(join(dir, name), 'utf8');
@@ -176,6 +177,7 @@ describe('ios widget target', () => {
       KnowledgeCardWidget: read('KnowledgeCardWidget.swift'),
       HabitsWidget: read('HabitsWidget.swift'),
       QuickAddWidget: read('QuickAddWidget.swift'),
+      DueTodayWidget: read('DueTodayWidget.swift'),
     };
     const families: Record<keyof typeof widgetFiles, string[]> = {
       InboxTodoWidget: [
@@ -193,8 +195,9 @@ describe('ios widget target', () => {
       MilestoneCountdownWidget: ['systemSmall', 'accessoryRectangular', 'accessoryCircular'],
       IdeaPipelineWidget: ['systemSmall', 'systemMedium'],
       KnowledgeCardWidget: ['systemMedium', 'systemLarge'],
-      HabitsWidget: ['systemSmall', 'accessoryRectangular'],
+      HabitsWidget: ['systemSmall', 'accessoryRectangular', 'accessoryCircular', 'accessoryInline'],
       QuickAddWidget: ['systemSmall', 'accessoryCircular', 'accessoryRectangular'],
+      DueTodayWidget: ['accessoryCircular', 'accessoryRectangular', 'accessoryInline'],
     };
     const kinds = Object.keys(widgetFiles) as Array<keyof typeof widgetFiles>;
     const familiesOf = (swift: string): string[] =>
@@ -294,6 +297,7 @@ describe('ios widget target', () => {
         'IdeaPipelineWidget.swift',
         'KnowledgeCardWidget.swift',
         'HabitsWidget.swift',
+        'DueTodayWidget.swift',
       ]) {
         const swift = read(file);
         expect(swift, file).toMatch(
@@ -517,7 +521,8 @@ describe('ios widget target', () => {
     it('provides Siri phrases that all name the app', () => {
       expect(shortcuts).toContain('AppShortcutsProvider');
       const blocks = [...shortcuts.matchAll(/phrases:\s*\[([^\]]*)\]/g)].map((m) => m[1] ?? '');
-      expect(blocks).toHaveLength(4);
+      // The system caps an app at 10 App Shortcuts.
+      expect(blocks).toHaveLength(9);
       for (const block of blocks) {
         const phrases = block.match(/"[^"]*"/g) ?? [];
         expect(phrases.length).toBeGreaterThan(0);
@@ -528,9 +533,50 @@ describe('ios widget target', () => {
         'WhatsNextIntent()',
         'CompleteTodoIntent()',
         'CaptureTodoIntent()',
+        'AddNoteIntent()',
+        'AddLogIntent()',
+        'SearchKaihumanIntent()',
+        'DueTodayIntent()',
+        'OpenItemIntent()',
       ]) {
         expect(shortcuts).toContain(intent);
       }
+    });
+
+    const siri = readFileSync(join(intentsDir, 'SiriIntents.swift'), 'utf8');
+    const entity = readFileSync(join(intentsDir, 'ItemEntity.swift'), 'utf8');
+
+    it('opens note, log and search through pending-url with deep links the app routes', () => {
+      for (const name of ['AddNoteIntent', 'AddLogIntent', 'SearchKaihumanIntent']) {
+        expect(siri).toMatch(new RegExp(`struct ${name}: AppIntent[^}]*openAppWhenRun = true`));
+      }
+      expect(siri).toContain('QuickCaptureKind.note.url');
+      expect(siri).toContain('QuickCaptureKind.log.url');
+      expect(siri).toContain('components.host = "search"');
+      expect(siri).toContain('URLQueryItem(name: "q"');
+      expect(siri).toContain('forKey: "pending-url"');
+    });
+
+    it('answers what is due today from the snapshot without opening the app', () => {
+      expect(siri).toMatch(/struct DueTodayIntent: AppIntent[\s\S]*ProvidesDialog/);
+      expect(siri).not.toMatch(/struct DueTodayIntent[^}]*openAppWhenRun/);
+      expect(siri).toContain('snapshot.dueByToday(at: Date())');
+      // Shared by the widget and the app, so it lives in a shared source.
+      expect(read('SnapshotQueries.swift')).toContain('func dueByToday(at now: Date)');
+    });
+
+    it('exposes todos and notes as indexed entities read from the Spotlight file', () => {
+      expect(entity).toContain('struct KaihumanItemEntity: AppEntity, Codable');
+      expect(entity).toContain('extension KaihumanItemEntity: IndexedEntity {}');
+      expect(entity).toContain('@available(iOS 18.0, *)');
+      expect(entity).toContain('EntityStringQuery');
+      expect(entity).toContain(`static let file = "${SPOTLIGHT_ITEMS_FILE}"`);
+      expect(entity).toContain('struct OpenItemIntent: OpenIntent');
+      // The Swift entity decodes exactly the keys of SpotlightItem.
+      for (const key of ['id', 'kind', 'title', 'subtitle']) {
+        expect(entity).toMatch(new RegExp(`var ${key}: String`));
+      }
+      expect(shortcuts).toContain('"Open \\(\\.$target) in \\(.applicationName)"');
     });
 
     it('answers and completes from the cached snapshot', () => {
@@ -544,7 +590,57 @@ describe('ios widget target', () => {
     });
 
     it('stays out of the widget extension and has no second @main', () => {
-      for (const swift of [intents, shortcuts]) expect(swift).not.toMatch(/@main|WidgetBundle/);
+      for (const swift of [intents, shortcuts, siri, entity]) {
+        expect(swift).not.toMatch(/@main|WidgetBundle/);
+      }
+    });
+  });
+
+  describe('lock screen controls', () => {
+    const controls = read('ControlWidgets.swift');
+    const bundle = read('KaihumanWidgets.swift');
+    const focus = read('FocusIntents.swift');
+
+    it('registers every control, iOS 18 gated', () => {
+      const kinds = [...controls.matchAll(/struct (\w+): ControlWidget \{/g)].map((m) => m[1]);
+      expect(kinds).toEqual([
+        'NewTodoControl',
+        'NewNoteControl',
+        'NewLogControl',
+        'NewIdeaControl',
+        'AddToInboxControl',
+        'CaptureControl',
+        'FocusTimerControl',
+      ]);
+      const gated = bundle.slice(bundle.indexOf('if #available(iOS 18.0, *)'));
+      for (const kind of kinds) expect(gated).toContain(`            ${kind}()`);
+      expect(controls.match(/@available\(iOS 18\.0, \*\)/g)?.length).toBe(kinds.length + 1);
+    });
+
+    it('opens the capture tab through a routed deep link', () => {
+      expect(controls).toContain('OpenDestinationIntent(destination: .capture)');
+      const open = read('OpenQuickCaptureIntent.swift');
+      expect(open).toContain('enum KaihumanDestination: String, AppEnum');
+      for (const c of ['capture', 'today', 'search']) expect(open).toContain(`case ${c}`);
+      expect(open).toContain('"kaihuman://\\(rawValue)"');
+    });
+
+    it('toggles the focus timer in the app process, starting on the next todo', () => {
+      expect(controls).toContain(
+        'ControlWidgetToggle("Focus timer", isOn: isRunning, action: ToggleFocusTimerIntent())',
+      );
+      expect(controls).toContain('struct FocusTimerValueProvider: ControlValueProvider');
+      expect(controls).toContain('FocusTimerState.isRunning');
+      expect(focus).toContain('struct ToggleFocusTimerIntent: SetValueIntent, LiveActivityIntent');
+      expect(focus).toContain('SharedTodoStore.shared.load()?.nextUp.first');
+      expect(focus).toContain('static let defaultMinutes = 25');
+      expect(focus).toContain('ControlCenter.shared.reloadControls(ofKind: controlKind)');
+      // FocusDone also ends the session, so the toggle must turn off.
+      const done = focus.slice(
+        focus.indexOf('struct FocusDoneIntent'),
+        focus.indexOf('struct FocusExtendIntent'),
+      );
+      expect(done).toContain('FocusTimerState.set(activityId: nil)');
     });
   });
 

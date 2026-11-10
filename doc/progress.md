@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-11-10 — Mobile iOS: quick actions, Lock Screen widgets and controls, Siri and Spotlight
+
+- Home-screen quick actions (long-press the icon): New todo, Quick note, Log entry, Search, Today. Static `UIApplicationShortcutItems` from the config plugin. `KaihumanAppDelegate` (an Expo app delegate subscriber in `kaihuman-shared`) turns a tapped item into its deep link: it writes `pending-url` on a cold launch and opens the link when the app is running. New routes `kaihuman://today` (dashboard) and `kaihuman://capture`. Android gets a Today static shortcut.
+- Lock Screen: new Due today widget (circular, rectangular, inline; overdue counts). The Habits widget adds circular and inline best-streak views.
+- iOS 18 controls: Capture (opens the capture tab) and a Focus timer toggle (`ToggleFocusTimerIntent`, run in the app process). The toggle starts a 25-minute Live Activity on the next todo or ends it. Running state is shared through the App Group key `focus-activity-id`, which the native module and the intents keep in step.
+- Siri: App Shortcuts for add note, log, search (Siri asks for the text) and what's due today, plus `KaihumanItemEntity` (todos and notes, `IndexedEntity` on iOS 18) with `OpenItemIntent`. That is 9 shortcuts in total.
+- Spotlight: `src/spotlight` publishes todos and notes from the search index (`src/search/shared-index.ts`, split out of `store.ts` so bootstrap avoids React imports) to `spotlight-items.json` and Core Spotlight. Debounced, deduped, max 500.
+- `doc/apple-intelligence.md`: feasibility, limits with Expo, plan (assistant schemas, Foundation Models, iOS 27).
+- Tests: quick-action plist transform and routing, subscriber and Spotlight source checks, controls, focus key drift, new widget families and previews, Siri intents and entity keys, Spotlight adapter and sync, today/capture routes, Android Today shortcut.
+
 ## 2026-11-10 — Mobile: dashboard swipe, "Bad credentials" banner, automatic sync, widget due today
 
 - Dashboard swipe (root cause): `githubFileStore.openFile` returned at once when the same file was already loading, so a second reader found nothing in `openFiles`. Two dashboard loads overlap after every sync that bumps the revision (cold start in particular), the config read failed, `loadDashboards` treated it as "no config" and collapsed every dashboard into one "Today" page, so there was nothing to swipe to. The repository was never forgotten. Fixes: a concurrent `openFile` waits for the load in flight; an unreadable config now fails the load (the screen keeps its pages) instead of falling back; `takeLatest` drops a load that finishes after a newer one.
