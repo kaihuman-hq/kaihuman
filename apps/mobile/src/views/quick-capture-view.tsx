@@ -1,6 +1,7 @@
 import type { TodoDue, TodoRepeat } from '@kaihuman/formats';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { smartInbox } from '../intelligence/smart-inbox.js';
 import type { QuickKind } from '../navigation/routes.js';
 import type { QuickCaptureController } from '../screens/quick-capture.js';
 import { retargetRepeat } from '../screens/todo-due.js';
@@ -76,12 +77,14 @@ const DISMISS_DELAY_MS = 800;
 export function QuickCaptureView({
   controller,
   kind,
+  initialText,
   onDone,
   headerAction,
   onHeaderState,
 }: {
   controller: QuickCaptureController;
   kind: QuickKind;
+  initialText?: string;
   /** Called shortly after a successful save so the sheet can dismiss. */
   onDone?: () => void;
   /** True when the header owns the primary action; the view then draws no button. */
@@ -89,7 +92,7 @@ export function QuickCaptureView({
   onHeaderState?: (state: CaptureHeaderState) => void;
 }) {
   const { spacing, colors } = useTheme();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText ?? '');
   const [extra, setExtra] = useState('');
   const [due, setDue] = useState<TodoDue | undefined>();
   const [repeat, setRepeat] = useState<TodoRepeat | undefined>();
@@ -117,7 +120,7 @@ export function QuickCaptureView({
           kind === 'todo'
             ? await controller.quickTodo(text, value, due, due && repeat)
             : kind === 'inbox'
-              ? await controller.quickTodo(text)
+              ? await smartInbox(text, { controller })
               : kind === 'log'
                 ? await controller.quickLog(text, value)
                 : kind === 'knowledge'

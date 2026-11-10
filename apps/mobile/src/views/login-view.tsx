@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import type { LoginScreenController, OpenAuthSession } from '../screens/login-screen.js';
+import { sessionNotice } from '../sync/auth-recovery.js';
 import { useTheme } from '../theme/theme.js';
 import { Button, GithubMark, haptics, Screen, Text, TextField } from '../ui/index.js';
+import { useSignalValue } from './use-signal.js';
 
 const MARK = 88;
 
@@ -59,6 +61,7 @@ export function LoginView({
   tokenRef.current = token;
 
   const [browserError, setBrowserError] = useState<string | null>(null);
+  const notice = useSignalValue(sessionNotice);
 
   const signInWithBrowser = async () => {
     setBrowserError(null);
@@ -104,6 +107,11 @@ export function LoginView({
         </View>
 
         <View style={{ gap: spacing.md }}>
+          {notice ? (
+            <Text variant="footnote" tone="danger" align="center" testID="login-session-notice">
+              {notice}
+            </Text>
+          ) : null}
           <Button
             label="Sign in with GitHub"
             leading={(color) => <GithubMark color={color} />}

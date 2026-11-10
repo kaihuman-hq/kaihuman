@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { WidgetTodoItem, WidgetTodoSnapshot } from '@kaihuman/core';
 import { describe, expect, it } from 'vitest';
 import { PENDING_WIDGET_MUTATIONS_FILE, WIDGET_TODOS_FILE } from './adapters/widget-bridge.js';
+import { SPOTLIGHT_ITEMS_FILE } from './spotlight/spotlight.js';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'targets', 'ios-widget');
 const read = (name: string): string => readFileSync(join(dir, name), 'utf8');
@@ -49,15 +50,19 @@ const snapshot: Required<WidgetTodoSnapshot> = {
   privacy: { lockScreenText: true },
   timeZone: '',
   items: [],
+  todayItems: [],
+  todayCounts: { left: 0, done: 0, overdue: 0 },
   files: {},
   ideas: { byStatus: {}, hot: [{ slug: '', title: '', level: 'hot' }] },
   cards: [{ path: '', title: '', excerpt: '', tags: [] }],
-  habits: [{ path: '', name: '', doneToday: false, streakDays: 0, pending: false }],
+  habits: [{ path: '', name: '', doneToday: false, streakDays: 0, days: [], pending: false }],
+  timer: { path: '', label: '', startedAt: 0, todayMinutes: 0, pending: false },
+  filter: { tags: [], area: '', board: '', label: '' },
 };
 const statuses: WidgetTodoItem['status'][] = ['backlog', 'in-progress', 'done', 'rejected'];
 
 const pendingKeys = ['kind', 'itemId', 'status', 'text', 'path', 'date', 'timestamp'];
-const mutationKinds = ['toggle', 'move', 'capture', 'habit'];
+const mutationKinds = ['toggle', 'move', 'capture', 'habit', 'timer-stop', 'digest'];
 
 const hasProperty = (swift: string, key: string): boolean =>
   new RegExp(`\\bvar ${key}\\s*:`).test(swift);
@@ -88,6 +93,9 @@ describe('ios widget target', () => {
       ...Object.keys(snapshot.ideas.hot[0] ?? {}),
       ...Object.keys(snapshot.cards[0] ?? {}),
       ...Object.keys(snapshot.habits[0] ?? {}),
+      ...Object.keys(snapshot.todayCounts),
+      ...Object.keys(snapshot.timer),
+      ...Object.keys(snapshot.filter),
       ...Object.keys({ sha: '', content: '' }),
     ];
     for (const key of keys) expect(hasProperty(models, key), key).toBe(true);
@@ -176,6 +184,9 @@ describe('ios widget target', () => {
       KnowledgeCardWidget: read('KnowledgeCardWidget.swift'),
       HabitsWidget: read('HabitsWidget.swift'),
       QuickAddWidget: read('QuickAddWidget.swift'),
+      DueTodayWidget: read('DueTodayWidget.swift'),
+      TimerWidget: read('TimerWidget.swift'),
+      TodayDashboardWidget: read('TodayDashboardWidget.swift'),
     };
     const families: Record<keyof typeof widgetFiles, string[]> = {
       InboxTodoWidget: [
@@ -193,8 +204,17 @@ describe('ios widget target', () => {
       MilestoneCountdownWidget: ['systemSmall', 'accessoryRectangular', 'accessoryCircular'],
       IdeaPipelineWidget: ['systemSmall', 'systemMedium'],
       KnowledgeCardWidget: ['systemMedium', 'systemLarge'],
-      HabitsWidget: ['systemSmall', 'accessoryRectangular'],
+      HabitsWidget: [
+        'systemSmall',
+        'systemMedium',
+        'accessoryRectangular',
+        'accessoryCircular',
+        'accessoryInline',
+      ],
       QuickAddWidget: ['systemSmall', 'accessoryCircular', 'accessoryRectangular'],
+      DueTodayWidget: ['accessoryCircular', 'accessoryRectangular', 'accessoryInline'],
+      TimerWidget: ['systemSmall'],
+      TodayDashboardWidget: ['systemExtraLarge'],
     };
     const kinds = Object.keys(widgetFiles) as Array<keyof typeof widgetFiles>;
     const familiesOf = (swift: string): string[] =>
@@ -211,7 +231,7 @@ describe('ios widget target', () => {
       }
       expect(widgets).toContain('AppIntentConfiguration');
       expect(widgets).toContain('NextUpConfigurationIntent');
-      expect(widgets).toContain('        FocusLiveActivity()');
+      expect(widgets).toContain('            FocusLiveActivityFamilies()');
     });
 
     it('configures the board column and milestone widgets from the snapshot', () => {
@@ -266,6 +286,33 @@ describe('ios widget target', () => {
       expect(widgetFiles.HabitsWidget).toContain('Button(intent: LogHabitIntent(path:');
     });
 
+    it('shows a habit week with today outlined and animates counts and the check-in', () => {
+      const habits = widgetFiles.HabitsWidget;
+      expect(habits).toContain('snapshot.habitWeek(habit, at: entry.date)');
+      expect(habits).toContain('.transition(.scale)');
+      expect(habits).toContain('.contentTransition(.numericText())');
+      expect(habits).toContain('"day streak"');
+      expect(habits).toContain('"\\(doneCount)/\\(habits.count) today"');
+      // Today's cell follows habitDone, so a widget check-in shows before the app syncs.
+      expect(read('SnapshotQueries.swift')).toMatch(
+        /func habitWeek\([\s\S]*?days\[6\] = habitDone\(habit, at: now\)/,
+      );
+    });
+
+    it('ticks the timer without reloads and stops it through the app queue', () => {
+      const timer = widgetFiles.TimerWidget;
+      expect(timer).toContain('Text(timerInterval:');
+      expect(timer).toContain('Button(intent: StopTimerIntent(path:');
+      expect(timer).toContain('DeepLink.tile(path:');
+      expect(timer).toContain('components.host = "dashboard"');
+      expect(timer).toContain('components.path = "/tile"');
+      const stop = read('StopTimerIntent.swift');
+      expect(stop).toContain('queue(.timerStop(path: path, now: now))');
+      expect(stop).toContain('reloadTimelines(ofKind: Self.widgetKind)');
+      expect(stop).toContain('"TimerWidget"');
+      expect(stop).not.toContain('URLSession');
+    });
+
     it('supports the right families per widget', () => {
       for (const kind of kinds) expect(familiesOf(widgetFiles[kind]), kind).toEqual(families[kind]);
     });
@@ -294,6 +341,8 @@ describe('ios widget target', () => {
         'IdeaPipelineWidget.swift',
         'KnowledgeCardWidget.swift',
         'HabitsWidget.swift',
+        'DueTodayWidget.swift',
+        'TimerWidget.swift',
       ]) {
         const swift = read(file);
         expect(swift, file).toMatch(
@@ -406,8 +455,7 @@ describe('ios widget target', () => {
       const queries = read('SnapshotQueries.swift');
       expect(queries).toContain('48 * 3600');
       expect(queries).toContain('6 * 3600');
-      expect(views).toContain('Inbox zero');
-      expect(views).toContain('Nothing in progress — pick from backlog');
+      expect(views).toContain('Nothing due today');
       expect(read('InboxCountWidget.swift')).toContain('Inbox zero');
     });
 
@@ -518,7 +566,8 @@ describe('ios widget target', () => {
     it('provides Siri phrases that all name the app', () => {
       expect(shortcuts).toContain('AppShortcutsProvider');
       const blocks = [...shortcuts.matchAll(/phrases:\s*\[([^\]]*)\]/g)].map((m) => m[1] ?? '');
-      expect(blocks).toHaveLength(4);
+      // The system caps an app at 10 App Shortcuts.
+      expect(blocks).toHaveLength(9);
       for (const block of blocks) {
         const phrases = block.match(/"[^"]*"/g) ?? [];
         expect(phrases.length).toBeGreaterThan(0);
@@ -529,9 +578,50 @@ describe('ios widget target', () => {
         'WhatsNextIntent()',
         'CompleteTodoIntent()',
         'CaptureTodoIntent()',
+        'AddNoteIntent()',
+        'AddLogIntent()',
+        'SearchKaihumanIntent()',
+        'DueTodayIntent()',
+        'OpenItemIntent()',
       ]) {
         expect(shortcuts).toContain(intent);
       }
+    });
+
+    const siri = readFileSync(join(intentsDir, 'SiriIntents.swift'), 'utf8');
+    const entity = readFileSync(join(intentsDir, 'ItemEntity.swift'), 'utf8');
+
+    it('opens note, log and search through pending-url with deep links the app routes', () => {
+      for (const name of ['AddNoteIntent', 'AddLogIntent', 'SearchKaihumanIntent']) {
+        expect(siri).toMatch(new RegExp(`struct ${name}: AppIntent[^}]*openAppWhenRun = true`));
+      }
+      expect(siri).toContain('QuickCaptureKind.note.url');
+      expect(siri).toContain('QuickCaptureKind.log.url');
+      expect(siri).toContain('components.host = "search"');
+      expect(siri).toContain('URLQueryItem(name: "q"');
+      expect(siri).toContain('forKey: "pending-url"');
+    });
+
+    it('answers what is due today from the snapshot without opening the app', () => {
+      expect(siri).toMatch(/struct DueTodayIntent: AppIntent[\s\S]*ProvidesDialog/);
+      expect(siri).not.toMatch(/struct DueTodayIntent[^}]*openAppWhenRun/);
+      expect(siri).toContain('snapshot.dueByToday(at: Date())');
+      // Shared by the widget and the app, so it lives in a shared source.
+      expect(read('SnapshotQueries.swift')).toContain('func dueByToday(at now: Date)');
+    });
+
+    it('exposes todos and notes as indexed entities read from the Spotlight file', () => {
+      expect(entity).toContain('struct KaihumanItemEntity: AppEntity, Codable');
+      expect(entity).toContain('extension KaihumanItemEntity: IndexedEntity {}');
+      expect(entity).toContain('@available(iOS 18.0, *)');
+      expect(entity).toContain('EntityStringQuery');
+      expect(entity).toContain(`static let file = "${SPOTLIGHT_ITEMS_FILE}"`);
+      expect(entity).toContain('struct OpenItemIntent: OpenIntent');
+      // The Swift entity decodes exactly the keys of SpotlightItem.
+      for (const key of ['id', 'kind', 'title', 'subtitle']) {
+        expect(entity).toMatch(new RegExp(`var ${key}: String`));
+      }
+      expect(shortcuts).toContain('"Open \\(\\.$target) in \\(.applicationName)"');
     });
 
     it('answers and completes from the cached snapshot', () => {
@@ -545,7 +635,57 @@ describe('ios widget target', () => {
     });
 
     it('stays out of the widget extension and has no second @main', () => {
-      for (const swift of [intents, shortcuts]) expect(swift).not.toMatch(/@main|WidgetBundle/);
+      for (const swift of [intents, shortcuts, siri, entity]) {
+        expect(swift).not.toMatch(/@main|WidgetBundle/);
+      }
+    });
+  });
+
+  describe('lock screen controls', () => {
+    const controls = read('ControlWidgets.swift');
+    const bundle = read('KaihumanWidgets.swift');
+    const focus = read('FocusIntents.swift');
+
+    it('registers every control, iOS 18 gated', () => {
+      const kinds = [...controls.matchAll(/struct (\w+): ControlWidget \{/g)].map((m) => m[1]);
+      expect(kinds).toEqual([
+        'NewTodoControl',
+        'NewNoteControl',
+        'NewLogControl',
+        'NewIdeaControl',
+        'AddToInboxControl',
+        'CaptureControl',
+        'FocusTimerControl',
+      ]);
+      const gated = bundle.slice(bundle.indexOf('if #available(iOS 18.0, *)'));
+      for (const kind of kinds) expect(gated).toContain(`            ${kind}()`);
+      expect(controls.match(/@available\(iOS 18\.0, \*\)/g)?.length).toBe(kinds.length + 1);
+    });
+
+    it('opens the capture tab through a routed deep link', () => {
+      expect(controls).toContain('OpenDestinationIntent(destination: .capture)');
+      const open = read('OpenQuickCaptureIntent.swift');
+      expect(open).toContain('enum KaihumanDestination: String, AppEnum');
+      for (const c of ['capture', 'today', 'search']) expect(open).toContain(`case ${c}`);
+      expect(open).toContain('"kaihuman://\\(rawValue)"');
+    });
+
+    it('toggles the focus timer in the app process, starting on the next todo', () => {
+      expect(controls).toContain(
+        'ControlWidgetToggle("Focus timer", isOn: isRunning, action: ToggleFocusTimerIntent())',
+      );
+      expect(controls).toContain('struct FocusTimerValueProvider: ControlValueProvider');
+      expect(controls).toContain('FocusTimerState.isRunning');
+      expect(focus).toContain('struct ToggleFocusTimerIntent: SetValueIntent, LiveActivityIntent');
+      expect(focus).toContain('SharedTodoStore.shared.load()?.nextUp.first');
+      expect(focus).toContain('static let defaultMinutes = 25');
+      expect(focus).toContain('ControlCenter.shared.reloadControls(ofKind: controlKind)');
+      // FocusDone also ends the session, so the toggle must turn off.
+      const done = focus.slice(
+        focus.indexOf('struct FocusDoneIntent'),
+        focus.indexOf('struct FocusExtendIntent'),
+      );
+      expect(done).toContain('FocusTimerState.set(activityId: nil)');
     });
   });
 
@@ -558,8 +698,8 @@ describe('ios widget target', () => {
       expect(capture).toMatch(/@Parameter\(title: "Todo"\)\s+var text: String/);
       expect(capture).toContain('some IntentResult & ProvidesDialog');
       expect(capture).toContain('"Added to inbox"');
-      expect(capture).toContain('store.appendCapture(text: trimmed)');
-      expect(capture).toContain('queueing: .capture(text: trimmed)');
+      expect(capture).toContain('store.appendCapture(text: line)');
+      expect(capture).toContain('queueing: .capture(text: line)');
     });
 
     it('answers "Add to kaihuman inbox" from Siri, Shortcuts and Spotlight', () => {
@@ -651,6 +791,31 @@ describe('ios widget target', () => {
       .join('\n');
     // A bare "\(n) todos" reads "1 todos"; every count must pick the singular for 1.
     expect(swift).not.toMatch(/\\\([\w.]+\) todos/);
-    expect(views).toContain('case .all: return "Nothing up next"');
+    expect(views).toContain('private var emptyTitle: String { "Nothing due today" }');
+  });
+  it('lists only today in the Today widget: overdue, in progress and due today', () => {
+    // Regression: the tasks widget listed every open todo, dated or not. Decision 8 then widened
+    // "due today" to overdue + in progress + due today, the same rule as todayItems in core.
+    expect(views).toContain('snapshot.todayTasks(for: entry.source, at: entry.date)');
+    expect(views).not.toContain('snapshot.items(for: entry.source)');
+    const queries = read('SnapshotQueries.swift');
+    const group = queries.slice(
+      queries.indexOf('func todayGroup('),
+      queries.indexOf('func todayTasks('),
+    );
+    expect(group).toContain('guard item.status == .backlog || item.status == .inProgress');
+    expect(group).toContain('if let due = item.dueDate, due < today { return 0 }');
+    expect(group).toContain('if item.status == .inProgress { return 1 }');
+    expect(group).toContain('return item.dueDate == today ? 2 : nil');
+    expect(queries).toMatch(/func todayTasks\([\s\S]*?items\(for: source\)/);
+    // The day is taken in the snapshot's zone, like the midnight timeline entry that refreshes it.
+    expect(queries).toMatch(/func dayKey\(at now: Date\)[\s\S]*?resolvedCalendar\.dateComponents/);
+    expect(read('PreviewData.swift')).toContain(
+      'dueDate: undated ? nil : (overdue ? earlier : today)',
+    );
+    expect(views).toContain('Text("\\(items.count) left")');
+    expect(views).toContain('Text("left of \\(total)")');
+    expect(views).toContain('.contentTransition(.numericText())');
+    expect(read('TodayRow.swift')).toContain('Button(intent: ToggleTodoIntent(itemId: item.id))');
   });
 });

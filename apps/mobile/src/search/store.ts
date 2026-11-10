@@ -3,18 +3,13 @@ import { signal } from '@preact/signals';
 import { useEffect, useState } from 'react';
 import { useSyncRevision } from '../sync/index.js';
 import { useSignalValue } from '../views/use-signal.js';
-import { SearchIndex } from './index.js';
 import { parseRecentSearches, withRecentSearch } from './search.js';
+import { cachedRead, refreshSearchIndex, searchIndex } from './shared-index.js';
+import { pickWarmPaths } from './warm.js';
+
+export { cachedRead, refreshSearchIndex, searchIndex } from './shared-index.js';
 
 const RECENTS_KEY = 'kh.mobile.recent-searches';
-
-export const searchIndex = new SearchIndex();
-
-/** Cached content only: search never waits on the network, so unopened files match by name. */
-export const cachedRead = (path: string): string | null =>
-  githubFileStore.openFiles.peek()[path]?.content ?? null;
-
-export const refreshSearchIndex = () => searchIndex.update(githubFileStore.tree.peek(), cachedRead);
 
 const loadRecents = (): string[] => {
   try {
@@ -44,6 +39,29 @@ export function clearRecentSearches(): void {
   saveRecents([]);
 }
 
+const WARM_LIMIT = 300;
+const WARM_BATCH = 4;
+
+/**
+ * Fetches content of files not opened yet, a few at a time, so content search covers the repo.
+ * Stops at the first failure (offline) or when `isLive` turns false; the cache serves it later.
+ */
+export async function warmSearchContent(isLive: () => boolean, onBatch: () => void): Promise<void> {
+  const paths = pickWarmPaths(
+    githubFileStore.tree.peek(),
+    (p) => cachedRead(p) !== null,
+    WARM_LIMIT,
+  );
+  for (let i = 0; i < paths.length && isLive(); i += WARM_BATCH) {
+    try {
+      await Promise.all(paths.slice(i, i + WARM_BATCH).map((p) => githubFileStore.openFile(p)));
+    } catch {
+      return;
+    }
+    if (isLive()) onBatch();
+  }
+}
+
 /**
  * Keeps the index current while a screen is mounted and returns a number that changes when it
  * does, so the screen queries again.
@@ -58,6 +76,13 @@ export function useSearchIndex(): number {
     void refreshSearchIndex().then(() => {
       if (live) setVersion(searchIndex.version);
     });
+    void warmSearchContent(
+      () => live,
+      () =>
+        void refreshSearchIndex().then(() => {
+          if (live) setVersion(searchIndex.version);
+        }),
+    );
     return () => {
       live = false;
     };

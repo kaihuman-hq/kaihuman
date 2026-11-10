@@ -1,5 +1,115 @@
 # Progress
 
+## 2026-11-10 — Mobile iOS: fix widget bundle compile error
+
+- `KaihumanWidgets.swift`: `WidgetBundleBuilder` has no if/else, and `#unavailable` crashed the Swift compiler. The focus Live Activity now registers once, in the iOS 18 block, so iOS 17 has no Live Activity. Found by the first macOS CI builds.
+
+## 2026-11-10 — Mobile: Apple Intelligence smart capture, scan to entry, weekly review
+
+- New Expo module `modules/kaihuman-intelligence` (iOS only): a small generic API (`availability`, `generateText`, `generateJson` with a JSON Schema subset mapped to `DynamicGenerationSchema`, `recognizeDocument` with Vision `RecognizeDocumentsRequest` and the document camera). Prompts, schemas, validation and fallbacks are pure TS in `src/intelligence/` with vitest tests.
+- Smart capture (proposal 1.1): the Add to inbox sheet asks the on-device model for a typed capture (todo with due and tags, log, budget line, habit check-in) and saves it to the module's file; without a model, or on a bad result, it saves the plain inbox todo as before. Budget and habit captures without a matching file become log entries.
+- Siri "Add to inbox" parses with Foundation Models in `CaptureTodoIntent` (`targets/ios-widget/SmartCaptureModel.swift`): a plain todo still saves at once (tags appended); other kinds go to the App Group file `smart-captures.json`, which the app files once the repo tree loads.
+- Scan to entry (1.3): new Scan screen (`/scan`, More tab) turns a document camera scan into a budget line, trip, todo or meter reading. Visual Intelligence `IntentValueQuery` (`targets/ios-app-intents/VisualIntelligenceIntents.swift`) offers the four kinds in the camera and screenshot search; picking one opens `kaihuman://scan?kind=&text=`.
+- Weekly review (2.1): new screen (`/weekly-review`, More tab) builds done todos, habit streaks, time tracked, spend and open loops in TS, has the model write prose (PCC when available, else on-device) above the facts, and writes `logs/weekly-review-<date>.md` (never overwrites) and opens it. Without a model it writes a fixed template. The PCC model API is not wired yet (iOS 27 SDK API unverified), so `server` reports unavailable.
+- Needs a Mac build and device test: no Swift compiler on CI; Swift is covered by source-text tests (`src/intelligence/native-sources.test.ts`).
+## 2026-11-10 — Mobile: Siri App Schemas, app skills and open-ended queries (proposal 1.2)
+
+- Spotlight/Siri file (`spotlight-items.json`) now has log entries (kind `log`, link `kaihuman://files/<log>#<n>`) and a `date` (`YYYY-MM-DD`: log day, todo due day). `SearchDoc` gained `date`.
+- `FindItemsIntent`: find todos, notes, log entries by words, kind and day range, answered without opening the app. Not an App Shortcut (still 9 of 10).
+- App-target launch hook `KaihumanAppLaunchHook` (`targets/ios-app-intents/AppLaunchHook.swift`): `updateAppShortcutParameters()` and `CSSearchableIndex.indexAppEntities` (iOS 18). The pod's app delegate and `indexSpotlight` call it by Objective-C name.
+- `AssistantSchemas.swift`: `.journal` entry/createEntry/search for notes and log (iOS 18), `.reminders` entity/createReminder for todos (iOS 27, API names unverified). Behind Swift flags set by the new opt-in plugin `plugins/with-kaihuman-app-schemas.ts`; not registered in `app.json` until a Mac build passes.
+- `kaihuman://quick-log?text=` / `quick-note?text=` prefill the capture sheet (journal createEntry uses it).
+- Siri AI app skills: `targets/ios-app-intents/skills/{todos,notes,log}/SKILL.md` (format and bundling unverified; not copied into the app yet).
+- View Annotations: not done (RN views are not SwiftUI). See `doc/apple-intelligence.md`.
+- Tests: `src/app-schemas.test.ts` (Swift/SKILL.md source text, plugin), spotlight and deep-link cases.
+## 2026-11-10 — Mobile iOS: Focus session on every surface, Focus filters, extra-large Today, digest intent
+
+Proposals 2.3 and 2.5 of `doc/apple-proposals.md`. No Swift compiler in this environment: the Swift is checked by source-text tests (`apple-surfaces.test.ts`) and **must be built and tried on a device** before release.
+
+- Focus Live Activity: iOS 18 registers the `.small` activity family (`FocusLiveActivityFamilies`) for the Watch Smart Stack, macOS 26 menu bar and CarPlay Dashboard (`FocusSmallView`: title and countdown, no buttons). iOS 17 keeps the old configuration; the bundle picks one. The island is one shared `FocusActivityUI.island`; compact and minimal stay an icon plus a short countdown, which is what the iOS 27 landscape island shows (no landscape-specific API was confirmed, so none is used).
+- `StopFocusIntent` (LiveActivityIntent) and `StopFocusControl`: a stop-only control for the Action button, Control Center and the Lock Screen. A Watch control target is **not** added: this repo wires targets with its own config plugin, not `@bacons/apple-targets`, so a watch extension is next-step work. Until then watchOS 26 runs iPhone controls on the phone.
+- Focus filters: `KaihumanFocusFilter: SetFocusFilterIntent` (tags, list, board) writes `focus-filter.json` and patches `filter` into the widget snapshot. Every widget and intent honours it through `nextUp`; the Today dashboard tiles in the app filter through `focusFilter`. `@kaihuman/core` gets `WidgetFilter`, `applyWidgetFilter`, `matchesWidgetFilter`, `parseWidgetFilter` (area = the todo file name). Counts widgets (`counts.*`) are not filtered yet.
+- `TodayDashboardWidget`: extra-large (`systemExtraLarge`) Today list with counts, habits and the next milestone, titled with the active filter; registered behind `#available(iOS 27.0, *)`.
+- `SaveDigestIntent` (not an App Shortcut, so the 10-shortcut cap is untouched): takes the previous Shortcut action's text ("Use Model" output), queues a `digest` mutation; the app writes `logs/digest-<date>.md` (a second digest the same day appends).
+- Tests: `widget-filter.test.ts` (core), focus filter and digest cases in `mobile-adapters.test.ts`, `lists.test.ts`, `apple-surfaces.test.ts`.
+
+## 2026-11-10 — Mobile: merge redesign with dashboard edit mode and search
+
+- Tab bar is the redesign's Today · Board · ＋ · Ideas · More; the Search tab is dropped (its route stays, hidden) and search opens from the header search button on every tab root, including a search button in the Today pager header. `web-tab-bar.tsx` removed (unused).
+- Square tile grid keeps edit mode: the Edit header button and long-press on a square tile (`SquareTile` `onLongPress`) enter it.
+- iOS: Habits widget has small/medium plus circular/inline lock-screen families; `DueTodayWidget` and `TimerWidget` both registered in `KaihumanV2Widgets`.
+
+## 2026-11-10 — Research: Apple platform proposals
+
+- New `doc/apple-proposals.md`: the top 3 Apple Intelligence features (offline smart capture with Foundation Models, Siri AI app skills and App Schemas, scan to entry with Visual Intelligence and Vision) and 5 proposals that use the newest Apple features (weekly review on PCC, kb-mcp as a Siri/MCP tool, Focus session on every surface, HealthKit and Journaling Suggestions, Focus filters with the extra-large widget and Shortcuts "Use Model"). Each item gives the API, Expo feasibility, effort, iOS version and risk, with sources checked on 2026-11-10. Research only, no code changes.
+
+## 2026-11-10 — Mobile: sync reliability (widget after background, stale foreground, skipped pulls)
+
+- Audit of when the app could show older data than GitHub. HTTP layer is fine: head and contents reads bypass the 60 s HTTP cache (React Native's fetch honours `no-store`), trees and blobs are read by sha, cached copies are served only when the tree lists the same sha, and every save is sha-checked (409/422 → 3-way merge or conflict banner, never an overwrite).
+- Widget (bug): the snapshot was built only from files a screen had opened. A background run after a cold launch has none open, so it wrote an empty widget. `WidgetBridge.load()` now opens every todo file the tree lists (cache-first) before the snapshot, and no snapshot is written while the tree is unknown or a listed todo file is not open.
+- Skipped pull (bug): `syncNow` skips while a save is in flight, and the run still counted as fresh, so web edits waited for the next poll. The engine pulls again after the outbox; a run that pulled nothing leaves `lastSyncedAt` unchanged.
+- Foreground: when data is older than 2 min, a run still in flight (possibly a request iOS froze during suspension) no longer satisfies the foreground; a fresh run is queued behind it. Leaving the foreground pushes a debounced edit at once instead of after suspension.
+- Background: verified registration, the `expo-background-task` plugin (Info.plist modes and identifier) and that the task pulls and refreshes the widget. iOS limits documented in `apps/mobile/src/sync/README.md`.
+- Regression tests: `scheduler`, `engine`, `background` (new), `mobile-adapters` (widget completeness).
+
+## 2026-11-10 — Mobile: search reachable everywhere, searches all synced content
+
+- Search (index, ranking, highlighted snippets, recents) already existed but was hard to find and only matched files opened before. Now: a Search tab (iOS native search role, web tab bar) plus the header button on every tab root (was Today and Ideas only). The screen moved to `screens/search-screen.tsx`, shared by `/search` and the tab.
+- Content warm-up (`search/warm.ts`, `warmSearchContent`): while search is open, uncached text files (`.md`, `.bookmarks.json`, `.txt`; max 300, 4 at a time) are fetched and indexed; stops on the first failure (offline) and the cached copies keep working. `pickWarmPaths` is pure and tested, so Spotlight/App Intents can reuse the index code.
+- Tests: `warm.test.ts`, `route-files.test.ts`.
+
+## 2026-11-10 — Mobile iOS: quick actions, Lock Screen widgets and controls, Siri and Spotlight
+
+- Home-screen quick actions (long-press the icon): New todo, Quick note, Log entry, Search, Today. Static `UIApplicationShortcutItems` from the config plugin. `KaihumanAppDelegate` (an Expo app delegate subscriber in `kaihuman-shared`) turns a tapped item into its deep link: it writes `pending-url` on a cold launch and opens the link when the app is running. New routes `kaihuman://today` (dashboard) and `kaihuman://capture`. Android gets a Today static shortcut.
+- Lock Screen: new Due today widget (circular, rectangular, inline; overdue counts). The Habits widget adds circular and inline best-streak views.
+- iOS 18 controls: Capture (opens the capture tab) and a Focus timer toggle (`ToggleFocusTimerIntent`, run in the app process). The toggle starts a 25-minute Live Activity on the next todo or ends it. Running state is shared through the App Group key `focus-activity-id`, which the native module and the intents keep in step.
+- Siri: App Shortcuts for add note, log, search (Siri asks for the text) and what's due today, plus `KaihumanItemEntity` (todos and notes, `IndexedEntity` on iOS 18) with `OpenItemIntent`. That is 9 shortcuts in total.
+- Spotlight: `src/spotlight` publishes todos and notes from the search index (`src/search/shared-index.ts`, split out of `store.ts` so bootstrap avoids React imports) to `spotlight-items.json` and Core Spotlight. Debounced, deduped, max 500.
+- `doc/apple-intelligence.md`: feasibility, limits with Expo, plan (assistant schemas, Foundation Models, iOS 27).
+- Tests: quick-action plist transform and routing, subscriber and Spotlight source checks, controls, focus key drift, new widget families and previews, Siri intents and entity keys, Spotlight adapter and sync, today/capture routes, Android Today shortcut.
+
+## 2026-11-10 — Mobile: edit dashboards
+
+- Edit mode on the Today pager (Edit button in the header, or long-press a tile): the current dashboard's tiles become a list with drag handle (reorder), remove, and tile settings (move to another dashboard, hide on mobile). Add tile picks a kind, then an existing file of that kind or a new one (starters copied from the web new-file wizard). A Dashboards sheet adds, renames, reorders and deletes dashboards (delete asks twice; the last one cannot go). Horizontal paging is off while editing.
+- Round-trip safe: `applyDashboardEdits` in core edits the raw config JSON, so `theme`, `navbar`, `files`, unknown keys and unknown per-entry fields survive; reorder only moves the tiles the phone shows, hidden (`skipOnMobile`, missing-file) entries keep their slots; invalid JSON is refused, never overwritten. Output is the console's `JSON.stringify(…, null, 2)`.
+- Saves re-read the latest config and go through `githubContentFiles.write`/`create` (sync engine outbox). Editing the fallback "Today" page first places its tiles on the config's first dashboard.
+- Pure helpers for the coming square grid: `dropIndex` (list or N-column grid), `moveItem`, `newTileFile`, `retargetFallback`.
+- Tests: core `dashboard-edit.test.ts`; mobile `screens/dashboard-edit.test.ts`, `views/dashboard-editor.test.tsx`.
+
+## 2026-11-10 — Mobile: action log full view
+
+- Opening an `.actionlog.md` file now shows `ActionLogFull` instead of the dashboard tile body (the tile is untouched). The entry field is pinned at the top (return submits, optional `autoFocus`, keyboard-avoiding screen); below it search and tag filter chips, then the log newest first in a `SectionList` with sticky day headers (Today, Yesterday, dated), the time per entry and `#tags` as badges.
+- Swipe a row (full swipe deletes) or tap it to edit: the text goes into the top field, time is kept, tags are re-read from the text. Rows animate in and out (`MotionItem`). Catch-up with the web log: edit and delete were missing on mobile.
+- New `editAction`, `deleteAction`, `groupByDay`, `entryTime`, `stripTags` with tests.
+
+## 2026-11-10 — Mobile redesign implemented (square tiles, ＋ tab, todos detail, iOS widgets)
+
+- Dashboard: every tile is a square in a 2-column grid (`tileSide`, 13 pt gutters) built from a pure per-kind `Glance` (`views/tiles/glance/`: hero, label, one ≤40 pt visual, optional quick action). Square shell in `views/tiles/square/` with press scale + light haptic, quick-action pop + success haptic, hero roll on change, iOS zoom into the deep dive (`Link.AppleZoom`). Page dots stretch; tiles stagger 30 ms on page change. Shortcut row and `TILE_SIZE` layout removed from the pager; palette settings leave the grid.
+- Quick actions: tap (habit ✓, timer start/stop, consumption +1) write directly; one-field (budget, log, meter, data, read later, bookmarks) open `/quick-entry`; todos open `/dashboard/todo-add`; events and travel open the detail. Budget files have no monthly limit, so the budget tile shows spending this month.
+- Todos: counts-only tile; detail screen with Today · Doing · Open · Done (`screens/todo-segments.ts`), 600 ms undo on check, swipe delete, long-press start; add sheet with Today/Tomorrow/Priority/Repeat/#tag chips, return adds and keeps the sheet open (`TextField` `keepFocusOnSubmit`).
+- Tab bar Today · Board · ＋ · Ideas · More on every platform (`navigation/app-tab-bar.tsx`; native tabs cannot raise a centre button or long-press). ＋ opens the Capture + Track menu (scrim 180 ms, spring sheet, 20 ms item stagger, ＋ rotates to ×); long-press repeats the last action. `/capture` still resolves. More → Settings holds Command palette and Notifications.
+- iOS widgets: Today lists due today + overdue + in progress; Habit small with a 7-day row and ✓; new Habits medium and Timer small (`Text(timerInterval:)`, stop intent queued as `timer-stop`). Snapshot (still v2) adds `todayItems`, `todayCounts`, `habits[].days`, `timer`. Swift not compiled here.
+- Real-app renders: `apps/mobile/docs/redesign/impl-*.png` (`SCALE=2 node scripts/screens.cjs`).
+- Tests: glance per kind, square tile, pager grid, todo segments/detail/add, quick menu model + view, tab bar, quick entry, settings, widget-sync today/habits/timer, `timer-stop` replay, widget Swift assertions.
+
+## 2026-11-10 — Mobile: dashboard swipe, "Bad credentials" banner, automatic sync, widget due today
+
+- Dashboard swipe (root cause): `githubFileStore.openFile` returned at once when the same file was already loading, so a second reader found nothing in `openFiles`. Two dashboard loads overlap after every sync that bumps the revision (cold start in particular), the config read failed, `loadDashboards` treated it as "no config" and collapsed every dashboard into one "Today" page, so there was nothing to swipe to. The repository was never forgotten. Fixes: a concurrent `openFile` waits for the load in flight; an unreadable config now fails the load (the screen keeps its pages) instead of falling back; `takeLatest` drops a load that finishes after a newer one.
+- "Bad credentials": a 401 stayed as a banner until logout + login, even when only one request was rejected or a newer stored copy of the token was valid. On a 401 the engine now asks GitHub (`/user`) about the session's token (`sync/auth-recovery.ts`): valid → retry once, no banner; rejected → adopt another stored copy that works (Keychain, core's auth record); none → sign out with a notice on the login screen. GitHub revokes the oldest OAuth token after 10 sign-ins for the same app, which is the likely way a token goes bad.
+- Automatic sync: sign-in, re-login and repository switches trigger a sync (`sync/session-watch.ts`); creating, deleting and renaming files also request one. Launch, foreground, edits and polling already did.
+- iOS Next up widget lists only open todos due today (snapshot time zone), with "Nothing due today" as the empty state.
+- Regression tests for each (core `sync-phase2.test.ts`; mobile `dashboards`, `engine`, `auth-recovery`, `session-watch`, `runtime-session`, `login-repos`, `ios-widget`).
+
+## 2026-11-10 — Mobile: RSS full swipe, animations
+
+- RSS items: a long right-to-left swipe (past half the row, never under 1.5 buttons) runs "Mark read" directly with a haptic buzz when armed; the row slides out, fades and collapses its height, then the action fires. With reduced motion the action runs at once. Threshold logic in `ui/swipe-logic.ts` (tested); `SwipeReveal`/`ItemRow` take an opt-in `fullSwipe`.
+- Motion (`ui/motion.tsx`, Reanimated, honours the OS reduce-motion setting): press-scale on `Button`, `Fab` and `Chip`; fade-in on `EmptyState`; spring pop on `CheckCircle`; add/remove fade and sibling glide on kanban cards, stream cards, ideas and the tile-body `Rows` (rows already on screen do not animate on mount; keys follow row content via `contentKeys`). `Section` gets an opt-in `animated` prop. Android stack screens slide in from the right. Dashboard tiles untouched; sheets already use the `Modal` slide/fade.
+- Tests: swipe threshold, content keys, full vs short swipe on the RSS body; Reanimated stand-in in `ui/test-setup.ts`.
+
+## 2026-11-10 — Mobile redesign mockups (design only)
+
+- `apps/mobile/docs/redesign/`: HTML mockups + 2× PNGs (light and dark) for a square 2-column dashboard, all 18 tiles, a center ＋ tab quick menu, a counts-only todos tile with detail and add sheet, and improved iOS widgets (today-only tasks, one-row habit activity, timer). `README.md` lists decisions, animation notes and web vs mobile gaps. No app code changed.
+
 ## 2026-11-09 — Tests: extension teardown race, mobile render timeouts
 
 - Mobile `dom` tests get a 20s timeout: full tile and dashboard renders took over 5s on the shared CI runner.
@@ -25,6 +135,7 @@
 - iOS: a "+" in the Next up (small, medium, large) and Inbox widget headers; a new **Add to inbox** widget (`QuickAddWidget`: Home Screen small, Lock Screen circular and rectangular); an iOS 18 **Add to inbox** control (Control Center, Lock Screen, Action button). All of them open the sheet (`QuickCaptureKind.inbox`). Siri, Shortcuts and Spotlight get the phrase "Add to kaihuman inbox" on the existing background `CaptureTodoIntent`, which adds without opening the app and queues the capture for the app when it cannot commit.
 - Android: a "+" in the Inbox widget header opens the same sheet.
 - Tests: deep-link parsing and routing, the one-field sheet, ordered replay of queued captures, and static checks of the Swift and Kotlin sources.
+
 ## 2026-11-09 — Mobile: widget fixes and web parity (stocks, consumption, habit, …)
 
 - Stocks (bug): the tile was empty for files the web wrote. Root cause: the mobile parser only read ISO dates, the web writes `DD.MM.YYYY HH:MM:SS`, so every row was dropped. The web's parsing moved to `@kaihuman/formats/stocks` (and consumption to `@kaihuman/formats/consumption`; `packages/ui` re-exports both) and mobile uses it. The tile gains week/month/year periods with bars and a list, change vs last, CAGR and an "Add value" form.
@@ -77,6 +188,7 @@
 - `@kaihuman/formats` gains DOM-free `rss` (RSS 2.0 + Atom), `csv` and `board-overview`; the console's `RssLogic` and board-overview config delegate to them.
 - `screens.png` regenerated with a section per file kind (`scripts/contact-sheet.cjs`). Deflaked the editor save test (react-native-web applies `disabled` in an effect; the test now flushes effects before the retry tap).
 - Demo seed: travel, prompts, commands, palette settings, generic CSV, JSON, SVG, text, an encrypted note (passphrase `demo`) and a `.drawio` fallback example, plus a Tools dashboard.
+
 ## 2026-11-08 — Mobile: offline global search
 
 - New `/search` screen: native header search bar (iOS and Android), with an in-view field on the web preview. It is reached from a magnifier button on the Today and Ideas headers, from `kaihuman://search?q=` and from an Android launcher shortcut. Results are grouped by kind (todos, ideas, wiki, knowledge, notes, logs, bookmarks, files) with highlighted matches, body snippets, recent searches, and empty and no-results states. Tapping a result opens the todo detail, idea, wiki page or file route, or the bookmark URL.
@@ -140,16 +252,17 @@
 - `apps/mobile/src/sync`: fake-timer-tested scheduler (launch, foreground, focus when > 30 s stale, pull, 60 s poll with backoff paused offline/background/Low Power, debounced after writes, offline → online, `expo-background-task`), engine (sync → widget replay → outbox → widget snapshot + timeline reload → `rescheduleNotifications()` → revision bump only when data changed), file-system persistent cache (`expo-file-system`, secrets stay out), cache-first reads and optimistic writes in the content ports.
 - Core: `getHeadSha` sends `If-None-Match`; a 304 reuses the cached head, so an unchanged repo costs one free request.
 - UI: `useRefresh()` (haptic pull), `useSyncRevision()`, `useFocusRefresh()`, `<SyncStatusBanner />` in `Screen` ("Updated just now", "Syncing…", "Offline · 2 changes pending", error with Retry, conflicts with Keep mine / Use theirs). Wired into Today, Board, Ideas, Wiki, Knowledge and Files.
+
 ## 2026-11-08 — Mobile: local due-date notifications
 
 - `expo-notifications` (~58.1.8, config plugin in `app.json`), local only: no push server, no APNs key. Pure `planNotifications(todos, milestones, settings, now, tz)` (`apps/mobile/src/notifications/planner.ts`) plans due-today (morning time, default 09:00), due-soon (N min before a timed due, default 15), one overdue summary, milestone-due-tomorrow and an optional daily digest ("3 todos due today"), nearest first under the iOS 64-pending cap. `scheduler.ts` diffs against the OS schedule by stable ids (`kh:<kind>:<id>`) and a content signature, so edits reschedule and done/rejected todos cancel.
 - Actions: Done (queues the widget toggle mutation and runs `WidgetBridge.reconcile`), Snooze 1h; a tap opens `kaihuman://board?item=…`. More → Notifications: master toggle (asks permission in context, links to system settings when denied), digest, morning time, minutes before, per-kind toggles.
 - `rescheduleNotifications()` from `src/notifications/index.ts` runs on file changes and is exported for the sync/background refresh. The todo format has no per-item due date: items use their milestone's `dueDate`; the timed path is ready for when the format gains a time. Tests cover time zones, DST, cancel, reschedule and the cap.
+
 ## 2026-11-08 — Mobile: first-run repository onboarding
 
 - After GitHub or token sign-in with no repo selected, the app now goes to a full `/onboarding` step (title, explanation, search, recently pushed first, Private/Public badges, confirm card). A single plausible kaihuman/life-os/`kh` repo is preselected but still needs "Use this repository". Empty, loading and error (with retry, and "Sign in again" on a rejected token) states are covered. Choosing a repo does `router.replace('/dashboard')`, so back never returns to login or onboarding.
 - One pure decision in `src/navigation/start-route.ts`: `resolveStartRoute({ token, repo })` plus `guardRedirect` used by the root layout, so later launches skip both screens, a lost token goes to login and a token without a repo goes to the selector. Core `GithubRepo` gains optional `pushed_at`. Tests: `start-route.test.ts`, `onboarding-view.test.tsx`. `doc/mobile-design.md` updated.
-
 
 ## 2026-11-08 — Mobile: build numbers committed in git
 
@@ -381,7 +494,6 @@
 - In-memory GitHub service: `saveFile`/`deleteFile` advance the head. Tests: `sync-phase2.test.ts` (causes 2, 5, 6), `auto-sync.test.ts`, `UnsyncedIndicator.test.tsx`, editor test for remote content under a clean editor.
 - Review fixes: a sync/`ensureFresh`/`commitTransform` run no longer reconciles against a listing older than a save (save-generation guard, saved tree sha kept, head not recorded when a path was skipped) or after a repo switch; edits typed during `commitTransform`/`renameFile` commits are replayed instead of overwritten; `deleteFile`/`renameFolder` clear dirty state so the outbox stops retrying removed paths; `commitTransform` makes no commit for an empty change set; the Kanban move re-finds the dragged todo by text and `createdAt` (`moveTodo.ts`) instead of a stale index.
 
-
 ## 2026-11-05 — Sync fixes, phase 1 (no blind overwrite, durable edits, no-store reads)
 
 - Fix 1: `GithubFileStore.saveFile` no longer re-sends stale content on 409/422 ("user wins" removed). New `reconcile(path)` reads the remote copy (no-store), three-way merges it with the working copy's base, then saves with the remote sha or fills `fileConflicts`. `keep_local` only overrides the version the user saw. `upsertRepoFile` takes a merge function and retries on 409/422; the push config merges subscriptions; raw notes are created without a read.
@@ -508,6 +620,7 @@
 
 - Design for `@kaihuman/mobile` (`apps/mobile`, Option B: Expo + React Native) with full console feature parity and interactive iOS (SwiftUI WidgetKit + AppIntents) and Android (Jetpack Glance) Todo widgets: `doc/mobile.md`.
 - 5-phase autonomous implementation plan (`doc/mobile-plan.md`) and Antigravity workspace orchestrator skill (`.agents/skills/mobile-orchestrator/SKILL.md`) so each phase runs in a fresh subagent context window with zero breaking changes to `apps/console`. No code yet.
+
 ## 2026-10-27 — Business, phase 2: console pages
 
 - `loadBusinessRepo(files, treePaths?)` in `@kaihuman/formats/business` parses and validates every business file into typed records, client file lists, artifact paths and findings; one broken file never stops the rest. `checkBusinessRepo` now uses it and keeps only its cross-file rules. New path helpers `isBusinessPath`, `clientOfPath`, `Scope` and `inScope`.
@@ -1709,6 +1822,7 @@ ingest / query / lint), the `.kh/` knowledge base already had the layers but not
 
 Checks: console tsc clean, vitest 116/116 (22 new), biome clean in console and ui; ui build green;
 extension tsc + build green, vitest 233/233 (14 new); kb-mcp build, tsc and biome clean, vitest 42/42.
+
 ## 2026-09-23 — CLI login checks the console's `state`
 
 - **The gap:** `apps/cli` sent no `state` to `/auth/cli` and took any callback carrying a token. Any
@@ -2021,7 +2135,6 @@ field name — the long version read `Tags, separated by spaces or commas (3/3)`
 Checks: `tsc -b` clean; biome clean; extension vitest 194 of 194 (8 new for the walk,
 2 for the forced sync); extension build green.
 
-
 ## 2026-09-22 — which bookmarks get used, counted locally and merged hourly
 
 **The `bookmarks` permission is optional now.** It moved to `optional_permissions`,
@@ -2076,7 +2189,6 @@ your browser bookmarks from the popup first".
 Checks: `tsc` clean in both apps; biome clean; extension vitest 186 of 186 (21 new,
 across the merge rules and the sync cycle), console vitest 90 of 90 (8 new, for the
 carried fields and the sort); extension and console builds green.
-
 
 ## 2026-09-22 — the palette does everything the popup does, and remembers what you did
 
@@ -2141,7 +2253,6 @@ biome clean on every file touched; extension vitest 165 of 165 (35 new, across t
 flattener, both caches, the import, recents, repo switching and the palette's new
 modes); extension and console builds green.
 
-
 ## 2026-09-22 — a letter-key shortcut, and repo hits that open in the console
 
 Two follow-ups on the palette.
@@ -2172,7 +2283,6 @@ Checks: `tsc -b` clean; biome clean; extension vitest 127 of 127 (4 new for the 
 link, including the encoding round-trip); extension build green; and the built
 extension loaded into Chromium under Playwright reports the command bound to
 `Ctrl+Shift+K`.
-
 
 ## 2026-09-22 — the palette shortcut did nothing in tabs that were already open
 
@@ -2227,7 +2337,6 @@ Checks: `tsc -b` clean; biome clean on every file touched; extension vitest 123 
 script, the retry while the module starts, the badge on both refusal paths, and
 clearing a stale badge); extension build green.
 
-
 ## 2026-09-22 — bookmarking the current page, from the popup and the palette
 
 The bookmarks mirror was read-only; both browser surfaces can now write to it.
@@ -2255,7 +2364,6 @@ lands on one URL.
 Checks: `tsc -b` clean in the extension; biome clean on every file touched;
 extension vitest 119 of 119 (19 new — the write path against a stubbed Contents
 API, and the action row in jsdom); extension build green.
-
 
 ## 2026-09-22 — bookmarks: a repo file type, a cached mirror, and a palette on a shortcut
 
@@ -2321,7 +2429,6 @@ module, the worker messages and the palette in jsdom); `@lifosy/ui`, console and
 extension builds green. `turbo` itself cannot spawn child processes in this
 sandbox ("Exec format error"), which is why the per-package scripts were run
 directly — it fails the same way on `@lifosy/config`'s `echo`.
-
 
 ## 2026-09-16 — cascivo 1.3.0: the editor gutter stops drifting
 
@@ -2426,6 +2533,7 @@ now pins `1.94.1` with the `rustfmt` and `clippy` components, which rustup
 resolves and fetches automatically.
 
 Formatting only; the diff is line-wrapping and `cargo test` passes unchanged.
+
 ## 2026-09-16 — `.prompts.md`: a prompt library in one searchable file
 
 A new file type for storing reusable prompts. One file holds many prompts; each
@@ -2435,6 +2543,7 @@ documented in [`doc/prompts-format.md`](prompts-format.md).
 The format is one H2 per prompt with tags inline on the heading line:
 
 ```markdown
+
 ## Refactor to hooks #react #refactor
 
 Convert the class component below into a function component using hooks.
@@ -2476,6 +2585,7 @@ a standard markdown escape that renders literally and round-trips losslessly.
 
 Scoped to the widget deliberately: no cross-file "Prompts" nav view, and the
 existing one-file-per-prompt `ref:` link on todos (`TodoLogic`) is untouched.
+
 ## 2026-09-15 — cascivo 1.x
 
 The six `@cascivo/*` packages move off 0.x: `core` 0.2.3, `react` 0.3.8,

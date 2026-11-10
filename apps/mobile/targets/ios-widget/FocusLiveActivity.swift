@@ -5,47 +5,115 @@ import WidgetKit
 
 /// Focus session on the Lock Screen, StandBy and Dynamic Island. The countdown is a system timer
 /// (`Text(timerInterval:)`), so the activity needs no updates while it runs.
-struct FocusLiveActivity: Widget {
+///
+/// The `.small` activity family shows it in the Apple Watch Smart Stack, the macOS 26 menu bar and
+/// CarPlay. iOS 18+ only: a plain iOS 17 variant needs an if/else in the widget bundle, which
+/// `WidgetBundleBuilder` cannot express.
+@available(iOS 18.0, *)
+struct FocusLiveActivityFamilies: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: FocusActivityAttributes.self) { context in
-            FocusLockScreenView(
-                attributes: context.attributes, state: context.state, activityId: context.activityID
-            )
-            .activityBackgroundTint(FocusStyle.theme.background)
-            .activitySystemActionForegroundColor(WidgetTheme.volt)
+            FocusActivityContent(context: context)
         } dynamicIsland: { context in
-            let theme = FocusStyle.theme
-            return DynamicIsland {
-                DynamicIslandExpandedRegion(.leading) {
-                    Image(systemName: "scope")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(theme.accent)
-                }
-                DynamicIslandExpandedRegion(.trailing) {
-                    FocusTimerText(state: context.state, size: 24)
-                        .frame(maxWidth: 90, alignment: .trailing)
-                }
-                DynamicIslandExpandedRegion(.center) {
-                    Text(context.attributes.todoText)
-                        .font(.system(size: 14, weight: .semibold))
-                        .lineLimit(2)
-                        .privacySensitive()
-                }
-                DynamicIslandExpandedRegion(.bottom) {
-                    FocusButtons(
-                        todoId: context.attributes.todoId, activityId: context.activityID, theme: theme
-                    )
-                }
-            } compactLeading: {
-                Image(systemName: "scope").foregroundStyle(theme.accent)
-            } compactTrailing: {
-                FocusTimerText(state: context.state, size: 13)
-                    .frame(maxWidth: 48)
-            } minimal: {
-                Image(systemName: "scope").foregroundStyle(theme.accent)
-            }
-            .keylineTint(WidgetTheme.volt)
+            FocusActivityUI.island(context)
         }
+        .supplementalActivityFamilies([.small])
+    }
+}
+
+/// Lock Screen / StandBy / banner content plus, on iOS 18, the small family.
+struct FocusActivityContent: View {
+    let context: ActivityViewContext<FocusActivityAttributes>
+
+    var body: some View {
+        Group {
+            if #available(iOS 18.0, *) {
+                FocusFamilyView(attributes: context.attributes, state: context.state, activityId: context.activityID)
+            } else {
+                FocusLockScreenView(
+                    attributes: context.attributes, state: context.state, activityId: context.activityID
+                )
+            }
+        }
+        .activityBackgroundTint(FocusStyle.theme.background)
+        .activitySystemActionForegroundColor(WidgetTheme.volt)
+    }
+}
+
+@available(iOS 18.0, *)
+struct FocusFamilyView: View {
+    @Environment(\.activityFamily) private var family
+    let attributes: FocusActivityAttributes
+    let state: FocusActivityAttributes.ContentState
+    var activityId = ""
+
+    var body: some View {
+        switch family {
+        case .small: FocusSmallView(attributes: attributes, state: state)
+        default: FocusLockScreenView(attributes: attributes, state: state, activityId: activityId)
+        }
+    }
+}
+
+enum FocusActivityUI {
+    /// Expanded: icon, title and countdown with Done / +5m. Compact and minimal are what the system
+    /// shows on the iOS 27 landscape island too, so they stay one icon and a short countdown.
+    static func island(_ context: ActivityViewContext<FocusActivityAttributes>) -> DynamicIsland {
+        let theme = FocusStyle.theme
+        return DynamicIsland {
+            DynamicIslandExpandedRegion(.leading) {
+                Image(systemName: "scope")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(theme.accent)
+            }
+            DynamicIslandExpandedRegion(.trailing) {
+                FocusTimerText(state: context.state, size: 24)
+                    .frame(maxWidth: 90, alignment: .trailing)
+            }
+            DynamicIslandExpandedRegion(.center) {
+                Text(context.attributes.todoText)
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(2)
+                    .privacySensitive()
+            }
+            DynamicIslandExpandedRegion(.bottom) {
+                FocusButtons(
+                    todoId: context.attributes.todoId, activityId: context.activityID, theme: theme
+                )
+            }
+        } compactLeading: {
+            Image(systemName: "scope").foregroundStyle(theme.accent)
+        } compactTrailing: {
+            FocusTimerText(state: context.state, size: 13)
+                .frame(maxWidth: 48)
+        } minimal: {
+            Image(systemName: "scope").foregroundStyle(theme.accent)
+        }
+        .keylineTint(WidgetTheme.volt)
+    }
+}
+
+/// Watch Smart Stack, Mac menu bar and CarPlay Dashboard: no buttons (CarPlay is view-only and the
+/// Watch routes taps to the phone), just what is being done and the countdown.
+struct FocusSmallView: View {
+    let attributes: FocusActivityAttributes
+    let state: FocusActivityAttributes.ContentState
+
+    var body: some View {
+        let theme = FocusStyle.theme
+        HStack(spacing: 8) {
+            Image(systemName: "scope").foregroundStyle(theme.accent)
+            Text(attributes.todoText)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(theme.label)
+                .lineLimit(1)
+                .privacySensitive()
+            Spacer(minLength: 4)
+            FocusTimerText(state: state, size: 17)
+                .frame(maxWidth: 64, alignment: .trailing)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
     }
 }
 
@@ -141,14 +209,23 @@ extension FocusActivityAttributes.ContentState {
     }
 }
 
+@available(iOS 18.0, *)
 #Preview("Lock Screen", as: .content, using: FocusActivityAttributes.preview) {
-    FocusLiveActivity()
+    FocusLiveActivityFamilies()
 } contentStates: {
     FocusActivityAttributes.ContentState.preview
 }
 
+@available(iOS 18.0, *)
 #Preview("Expanded", as: .dynamicIsland(.expanded), using: FocusActivityAttributes.preview) {
-    FocusLiveActivity()
+    FocusLiveActivityFamilies()
+} contentStates: {
+    FocusActivityAttributes.ContentState.preview
+}
+
+@available(iOS 18.0, *)
+#Preview("Small family", as: .content, using: FocusActivityAttributes.preview) {
+    FocusLiveActivityFamilies()
 } contentStates: {
     FocusActivityAttributes.ContentState.preview
 }

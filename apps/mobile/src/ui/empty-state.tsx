@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import { useTheme } from '../theme/theme.js';
 import { Button } from './button.js';
 import { Icon, type IconName } from './icon.js';
+import { FadeInView } from './motion.js';
 import { Text } from './text.js';
 
 export interface EmptyStateProps {
@@ -15,7 +16,7 @@ export function EmptyState({ icon, title, message, action }: EmptyStateProps) {
   const theme = useTheme();
   const { spacing, colors } = theme;
   return (
-    <View
+    <FadeInView
       style={{
         alignItems: 'center',
         paddingVertical: spacing.xxl,
@@ -37,6 +38,6 @@ export function EmptyState({ icon, title, message, action }: EmptyStateProps) {
           <Button label={action.label} onPress={action.onPress} variant="tinted" size="medium" />
         </View>
       ) : null}
-    </View>
+    </FadeInView>
   );
 }

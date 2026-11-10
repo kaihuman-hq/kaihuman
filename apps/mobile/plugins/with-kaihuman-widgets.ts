@@ -153,13 +153,18 @@ export const SHARED_APP_SOURCES: readonly string[] = [
   'ToggleTodoIntent.swift',
   'QuickCaptureTodoIntent.swift',
   'OpenQuickCaptureIntent.swift',
-  // v2 intents: board Start, background capture, knowledge Next, habit Log, Focus Live Activity.
+  // v2 intents: board Start, background capture, knowledge Next, habit Log, timer Stop, Focus Live Activity.
   'StartTodoIntent.swift',
   'CaptureTodoIntent.swift',
+  'SmartCaptureModel.swift',
   'NextKnowledgeCardIntent.swift',
   'LogHabitIntent.swift',
+  'StopTimerIntent.swift',
   'FocusActivityAttributes.swift',
   'FocusIntents.swift',
+  // Focus filter (SetFocusFilterIntent lives in targets/ios-app-intents) and the Stop Focus intent.
+  'FocusFilter.swift',
+  'FocusStopIntent.swift',
 ];
 
 /**
@@ -170,7 +175,9 @@ export const SHARED_APP_SOURCES: readonly string[] = [
 export const WIDGET_ONLY_SOURCES: readonly string[] = [
   'BoardColumnWidget.swift',
   'ControlWidgets.swift',
+  'DueTodayWidget.swift',
   'FocusLiveActivity.swift',
+  'FocusStopControl.swift',
   'HabitsWidget.swift',
   'IdeaPipelineWidget.swift',
   'InboxCountWidget.swift',
@@ -182,6 +189,9 @@ export const WIDGET_ONLY_SOURCES: readonly string[] = [
   'QuickAddWidget.swift',
   'QuickCaptureWidget.swift',
   'Theme.swift',
+  'TimerWidget.swift',
+  'TodayDashboardWidget.swift',
+  'TodayRow.swift',
   'TodoWidgetViews.swift',
   'WeeklyDoneWidget.swift',
   'WidgetComponents.swift',
@@ -239,6 +249,50 @@ export const withLiveActivities = (config: ExpoConfigLike): ExpoConfigLike => {
         [INFO_APP_GROUP_KEY]: ids.appGroup,
         [INFO_KEYCHAIN_SERVICE_KEY]: ids.bundleId,
       },
+    },
+  };
+};
+
+/** One home-screen quick action (long-press the app icon). `type` is the deep link it opens. */
+export interface IosQuickAction {
+  type: string;
+  title: string;
+  /** SF Symbol name. */
+  symbol: string;
+}
+
+/**
+ * Static `UIApplicationShortcutItems`. KaihumanQuickActions.swift (kaihuman-shared) hands the
+ * item's `type` to the app as a deep link, so every type must be a link `parseDeepLink` routes.
+ */
+export const IOS_QUICK_ACTIONS: readonly IosQuickAction[] = [
+  { type: 'kaihuman://quick-todo', title: 'New todo', symbol: 'plus.circle' },
+  { type: 'kaihuman://quick-note', title: 'Quick note', symbol: 'note.text' },
+  { type: 'kaihuman://quick-log', title: 'Log entry', symbol: 'book.closed' },
+  { type: 'kaihuman://search', title: 'Search', symbol: 'magnifyingglass' },
+  { type: 'kaihuman://today', title: 'Today', symbol: 'sun.max' },
+];
+
+const QUICK_ACTIONS_KEY = 'UIApplicationShortcutItems';
+
+/** Adds the quick actions to Info.plist, replacing ours and keeping items other plugins added. */
+export const withIosQuickActions = (config: ExpoConfigLike): ExpoConfigLike => {
+  const ours = new Set(IOS_QUICK_ACTIONS.map((a) => a.type));
+  const current = config.ios?.infoPlist?.[QUICK_ACTIONS_KEY];
+  const others = (Array.isArray(current) ? current : []).filter(
+    (item: { UIApplicationShortcutItemType?: string }) =>
+      !ours.has(item?.UIApplicationShortcutItemType ?? ''),
+  );
+  const items = IOS_QUICK_ACTIONS.map((a) => ({
+    UIApplicationShortcutItemType: a.type,
+    UIApplicationShortcutItemTitle: a.title,
+    UIApplicationShortcutItemIconSymbolName: a.symbol,
+  }));
+  return {
+    ...config,
+    ios: {
+      ...config.ios,
+      infoPlist: { ...config.ios?.infoPlist, [QUICK_ACTIONS_KEY]: [...items, ...others] },
     },
   };
 };
@@ -692,7 +746,7 @@ const withKaihumanWidgets = (
   config: ExpoConfigLike,
   options: PluginOptions = {},
 ): ExpoConfigLike => {
-  let next = withLiveActivities(withUrlScheme(withIosAppGroup(config)));
+  let next = withIosQuickActions(withLiveActivities(withUrlScheme(withIosAppGroup(config))));
 
   next = composeMod<AndroidManifest>(next, 'android', 'manifest', (cfg) => ({
     ...cfg,

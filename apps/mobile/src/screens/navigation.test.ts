@@ -8,7 +8,7 @@ import {
   isDemoMode,
 } from '@kaihuman/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { parseDeepLink, routeToUrl } from '../navigation/routes.js';
+import { MAX_PREFILL, parseDeepLink, routeToUrl } from '../navigation/routes.js';
 import { routeToHref } from '../runtime/pending-url.js';
 import { LoginScreenController } from './login-screen.js';
 import { RepoSelectorController } from './repo-selector-screen.js';
@@ -29,6 +29,21 @@ beforeEach(() => {
 });
 
 describe('parseDeepLink', () => {
+  it('carries capped prefill text on quick-capture links, both ways (Siri journal entries)', () => {
+    const route = { name: 'quick-capture', kind: 'log', text: 'Booked the hotel & car' } as const;
+    const url = routeToUrl(route);
+    expect(url).toBe('kaihuman://quick-log?text=Booked%20the%20hotel%20%26%20car');
+    expect(parseDeepLink(url)).toEqual(route);
+    expect(routeToHref(route)).toBe('/quick-log?text=Booked%20the%20hotel%20%26%20car');
+    const long = parseDeepLink(`kaihuman://quick-note?text=${'a'.repeat(MAX_PREFILL + 10)}`);
+    expect(long).toMatchObject({ kind: 'note' });
+    expect((long as { text: string }).text).toHaveLength(MAX_PREFILL);
+    expect(parseDeepLink('kaihuman://quick-note?text=')).toEqual({
+      name: 'quick-capture',
+      kind: 'note',
+    });
+  });
+
   it('parses every route', () => {
     expect(parseDeepLink('kaihuman://auth/callback?access_token=gho_1')).toEqual({
       name: 'auth-callback',

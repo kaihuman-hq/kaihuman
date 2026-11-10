@@ -11,8 +11,8 @@ struct HabitsWidget: Widget {
                 .modifier(KaihumanBackground())
         }
         .configurationDisplayName("Habits")
-        .description("Today's habits. Tap Log to check one in.")
-        .supportedFamilies([.systemSmall, .accessoryRectangular])
+        .description("Your habit streaks and the last 7 days. Tap ✓ to check in today.")
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryCircular, .accessoryInline])
     }
 }
 
@@ -57,84 +57,177 @@ struct HabitsContent: View {
     private var freshness: SnapshotFreshness { snapshot.freshness(at: entry.date) }
     private var habits: [SharedHabit] { snapshot.habits ?? [] }
     private var doneCount: Int { habits.filter { snapshot.habitDone($0, at: entry.date) }.count }
+    /// The Lock Screen shows one number: the longest running habit streak.
+    private var bestStreak: Int { habits.map(\.streakDays).max() ?? 0 }
 
     var body: some View {
         if habits.isEmpty {
             switch style.family {
-            case .accessoryRectangular:
+            case .accessoryRectangular, .accessoryInline:
                 Text("No habits yet").font(.system(size: 13, weight: .semibold))
+            case .accessoryCircular:
+                ZStack {
+                    AccessoryWidgetBackground()
+                    Image(systemName: "flame").font(.system(size: 18, weight: .semibold))
+                }
             default:
                 VStack(alignment: .leading, spacing: 8) {
                     WidgetHeader(title: "HABITS", theme: theme)
                     EmptyStateView(title: "No habits yet", subtitle: "Add a habit file in the app", theme: theme)
                 }
             }
-        } else if style.family == .accessoryRectangular {
-            rectangular
         } else {
-            small
-        }
-    }
-
-    // MARK: Rows
-
-    private func glyph(_ habit: SharedHabit) -> some View {
-        let done = snapshot.habitDone(habit, at: entry.date)
-        let symbol = habit.pending == true ? "clock" : (done ? "checkmark.circle.fill" : "circle")
-        return Image(systemName: symbol)
-            .font(.system(size: 15))
-            .foregroundStyle(habit.pending == true ? theme.warning : (done ? theme.success : theme.secondary))
-            .widgetAccentable()
-    }
-
-    private func streak(_ habit: SharedHabit) -> some View {
-        HStack(spacing: 2) {
-            Image(systemName: "flame.fill").font(.system(size: 9))
-            Text("\(habit.streakDays)").font(.system(size: 11, weight: .semibold, design: .monospaced))
-        }
-        .foregroundStyle(theme.secondary)
-    }
-
-    private func logButton(_ habit: SharedHabit) -> some View {
-        Button(intent: LogHabitIntent(path: habit.path)) {
-            Text("Log")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(theme.onFill)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(theme.fill))
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func row(_ habit: SharedHabit) -> some View {
-        let done = snapshot.habitDone(habit, at: entry.date)
-        return HStack(spacing: 6) {
-            glyph(habit)
-            Text(habit.name)
-                .font(.system(size: 12.5, weight: .medium))
-                .foregroundStyle(done ? theme.secondary : theme.label)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .privacySensitive()
-            if done {
-                streak(habit)
-            } else {
-                logButton(habit)
+            switch style.family {
+            case .accessoryRectangular: rectangular
+            case .accessoryCircular: circular
+            case .accessoryInline: inline
+            case .systemMedium: medium
+            default: small
             }
         }
     }
 
+    // MARK: Parts
+
+    /// ✓ checks in today in-widget; done (or queued) shows a filled check that does nothing.
+    private func checkButton(_ habit: SharedHabit, size: CGFloat = 28) -> some View {
+        let done = snapshot.habitDone(habit, at: entry.date)
+        let symbol = habit.pending == true ? "clock" : "checkmark"
+        let face = Image(systemName: symbol)
+            .font(.system(size: size * 0.5, weight: .bold))
+            .foregroundStyle(done ? theme.label : theme.onFill)
+            .frame(width: size, height: size)
+            .background(Circle().fill(done ? theme.button : theme.fill))
+            .widgetAccentable()
+        return Group {
+            if done {
+                face.accessibilityLabel("\(habit.name) done today")
+            } else {
+                Button(intent: LogHabitIntent(path: habit.path)) { face.contentShape(Circle()) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Check in \(habit.name)")
+            }
+        }
+    }
+
+    /// Seven cells, oldest first; today is outlined so it reads without colour.
+    private func week(_ habit: SharedHabit, height: CGFloat) -> some View {
+        let days = snapshot.habitWeek(habit, at: entry.date)
+        let reached = days.filter { $0 }.count
+        return HStack(spacing: 4) {
+            ForEach(0..<7, id: \.self) { index in
+                ZStack {
+                    RoundedRectangle(cornerRadius: 5).fill(theme.track)
+                    if days[index] {
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(theme.accent)
+                            .widgetAccentable()
+                            .transition(.scale)
+                    }
+                }
+                .overlay {
+                    if index == 6 {
+                        RoundedRectangle(cornerRadius: 5).strokeBorder(theme.label, lineWidth: 2)
+                    }
+                }
+                .frame(height: height)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(reached) of the last 7 days")
+    }
+
     // MARK: Families
 
+    /// One habit: the first one, so the widget does not jump between habits during the day.
     private var small: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            WidgetHeader(title: "HABITS", trailing: "\(doneCount)/\(habits.count)", theme: theme)
-            ForEach(habits.prefix(3)) { habit in row(habit) }
+        let habit = habits[0]
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center) {
+                Text(habit.name.uppercased())
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(theme.accent)
+                    .lineLimit(1)
+                    .privacySensitive()
+                    .widgetAccentable()
+                Spacer(minLength: 4)
+                checkButton(habit)
+            }
+            Text("\(habit.streakDays)")
+                .font(WidgetTheme.number(44))
+                .foregroundStyle(theme.label)
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+                .contentTransition(.numericText())
+                .padding(.top, 6)
+            Text("day streak")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(theme.secondary)
+                .padding(.top, 3)
+            Spacer(minLength: 0)
+            if freshness != .fresh {
+                StaleFooter(freshness: freshness, theme: theme).padding(.bottom, 6)
+            }
+            week(habit, height: 20)
+        }
+    }
+
+    /// Up to three habits, one row each: name, 7 days, streak.
+    private var medium: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("HABITS")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(theme.accent)
+                    .widgetAccentable()
+                Spacer(minLength: 4)
+                Text("\(doneCount)/\(habits.count) today")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(theme.secondary)
+                    .contentTransition(.numericText())
+            }
+            Spacer(minLength: 0)
+            VStack(spacing: 12) {
+                ForEach(habits.prefix(3)) { habit in
+                    HStack(spacing: 10) {
+                        Text(habit.name)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(theme.label)
+                            .lineLimit(1)
+                            .frame(width: 84, alignment: .leading)
+                            .privacySensitive()
+                        week(habit, height: 16)
+                        Text("\(habit.streakDays)")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundStyle(theme.secondary)
+                            .contentTransition(.numericText())
+                            .frame(width: 24, alignment: .trailing)
+                    }
+                }
+            }
             Spacer(minLength: 0)
             StaleFooter(freshness: freshness, theme: theme)
         }
+    }
+
+    private var circular: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            VStack(spacing: 0) {
+                Image(systemName: "flame.fill").font(.system(size: 11)).widgetAccentable()
+                Text("\(bestStreak)")
+                    .font(WidgetTheme.number(22))
+                    .minimumScaleFactor(0.6)
+                    .widgetAccentable()
+            }
+        }
+    }
+
+    private var inline: some View {
+        Text("\(Image(systemName: "flame.fill")) \(bestStreak)d streak · \(doneCount)/\(habits.count) today")
     }
 
     private var rectangular: some View {
@@ -189,9 +282,30 @@ private extension TodoEntry {
     TodoEntry.previewSignedOut
 }
 
+#Preview("Medium", as: .systemMedium) {
+    HabitsWidget()
+} timeline: {
+    TodoEntry.preview
+    TodoEntry.previewNoHabits
+    TodoEntry.previewStale
+}
+
 #Preview("Rectangular", as: .accessoryRectangular) {
     HabitsWidget()
 } timeline: {
     TodoEntry.preview
     TodoEntry(date: Date(), snapshot: .previewPrivate)
+}
+
+#Preview("Circular", as: .accessoryCircular) {
+    HabitsWidget()
+} timeline: {
+    TodoEntry.preview
+    TodoEntry.previewNoHabits
+}
+
+#Preview("Inline", as: .accessoryInline) {
+    HabitsWidget()
+} timeline: {
+    TodoEntry.preview
 }

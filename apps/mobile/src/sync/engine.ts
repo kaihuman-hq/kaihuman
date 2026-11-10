@@ -1,5 +1,6 @@
 import { Logger } from '@kaihuman/core';
 import { effect } from '@preact/signals';
+import { type AuthRecovery, isAuthFailure } from './auth-recovery.js';
 import { shouldFullLoad } from './revalidate.js';
 import { type SyncStatus, type SyncTrigger, syncRevision, syncStatus } from './status.js';
 
@@ -28,11 +29,14 @@ export interface SyncEngineDeps {
   store: SyncStoreSlice;
   /** Full name of the selected repository, or null. */
   currentRepo(): string | null;
-  widgets: { reconcile(): Promise<unknown>; sync(): Promise<unknown> };
+  /** `load` opens every todo file so the snapshot `sync` writes is complete (widget-bridge.ts). */
+  widgets: { load(): Promise<unknown>; reconcile(): Promise<unknown>; sync(): Promise<unknown> };
   reschedule(): Promise<void> | void;
   isOnline(): boolean;
   /** Asks the scheduler for a debounced 'write' run (used after a conflict decision). */
   requestWrite(): void;
+  /** Called when a run fails with a 401: checks, replaces or ends the session (auth-recovery.ts). */
+  recoverAuth?: () => Promise<AuthRecovery>;
   now?: () => number;
 }
 
@@ -83,30 +87,50 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
       Object.keys(store.fileConflicts.peek()).sort(),
     ]);
 
-  /** Returns whether the remote side may have changed what screens show. */
-  async function pull(): Promise<boolean> {
+  /** 'synced' when the remote side may have changed what screens show; 'skipped' pulled nothing. */
+  async function pull(): Promise<'synced' | 'unchanged' | 'skipped'> {
     if (shouldFullLoad(store.loadedRepo.peek(), deps.currentRepo(), store.tree.peek().length)) {
       await store.loadTree();
       // loadTree reports failures through `error` instead of throwing.
       const error = store.error.peek();
       if (error) throw new Error(error);
-      return true;
+      return 'synced';
     }
-    return (await store.syncNow()) === 'synced';
+    const outcome = await store.syncNow();
+    return outcome === 'synced' || outcome === 'skipped' ? outcome : 'unchanged';
   }
 
   async function run(trigger: SyncTrigger): Promise<boolean> {
+    const ok = await attempt(trigger);
+    const { error } = syncStatus.peek();
+    if (ok || !deps.recoverAuth || !isAuthFailure(error)) return ok;
+    const outcome = await deps.recoverAuth();
+    // The token works (now): one retry clears the banner instead of waiting for the next poll.
+    if (outcome === 'valid' || outcome === 'replaced') return attempt(trigger);
+    // The login screen explains it; a "Bad credentials" banner behind it would only confuse.
+    if (outcome === 'signed-out') patch({ phase: 'idle', error: null });
+    return false;
+  }
+
+  async function attempt(trigger: SyncTrigger): Promise<boolean> {
     patch({ phase: 'syncing' });
     let failure: string | null = null;
     // Screens reload on every bump, and a reload can start another refresh, so only bump for
     // runs that may have changed data. A cheap 'unchanged' poll must not.
     const before = snapshot();
     let changed = false;
+    let pulled = false;
     try {
       if (trigger === 'write') await store.flushPendingWrites();
-      changed = await pull();
+      let outcome = await pull();
+      await bestEffort('widget load', () => deps.widgets.load());
       await bestEffort('widget reconcile', () => deps.widgets.reconcile());
       await store.flushOutbox();
+      // syncNow skips while a save is in flight; the outbox has settled it, so pull now. Counting
+      // the run as fresh without a pull would hide web edits until the next poll.
+      if (outcome === 'skipped') outcome = await pull();
+      changed = outcome === 'synced';
+      pulled = outcome !== 'skipped';
       // Edits that are still unsent and not conflicted failed to push.
       const stuck = [...store.dirtyFiles.peek()].some((p) => !(p in store.fileConflicts.peek()));
       if (stuck && store.error.peek()) failure = store.error.peek();
@@ -118,6 +142,11 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
     if (changed || snapshot() !== before) syncRevision.value += 1;
     const pending = store.dirtyFiles.peek().size;
     const conflicts = Object.keys(store.fileConflicts.peek());
+    if (failure === null && !pulled) {
+      // Not an error, but not fresh either: the scheduler keeps the data stale and tries again.
+      patch({ phase: 'idle', pending, conflicts });
+      return false;
+    }
     if (failure === null) {
       patch({ phase: 'idle', lastSyncedAt: now(), pending, conflicts, error: null });
       return true;

@@ -22,6 +22,20 @@ const WORKSPACE: readonly WorkspaceLink[] = [
     tone: 'warning',
   },
   {
+    href: '/weekly-review',
+    title: 'Weekly review',
+    subtitle: 'Your week, written to logs/',
+    icon: 'analytics',
+    tone: 'accent',
+  },
+  {
+    href: '/scan',
+    title: 'Scan',
+    subtitle: 'Receipt, ticket or meter to an entry',
+    icon: 'capture',
+    tone: 'success',
+  },
+  {
     href: '/wiki',
     title: 'Wiki',
     subtitle: 'Pages and backlinks',
@@ -43,11 +57,11 @@ const WORKSPACE: readonly WorkspaceLink[] = [
     tone: 'info',
   },
   {
-    href: '/more/notifications',
-    title: 'Notifications',
-    subtitle: 'Reminders for due todos and milestones',
-    icon: 'clock',
-    tone: 'danger',
+    href: '/more/settings',
+    title: 'Settings',
+    subtitle: 'Command palette and notifications',
+    icon: 'settings',
+    tone: 'neutral',
   },
   {
     href: '/repos',

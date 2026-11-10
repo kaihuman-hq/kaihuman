@@ -65,6 +65,9 @@ const icons = {
   travel: { ios: 'airplane', material: 'flight' },
   code: { ios: 'curlybraces', material: 'data_object' },
   image: { ios: 'photo', material: 'image' },
+  play: { ios: 'play.fill', material: 'play_arrow' },
+  stop: { ios: 'stop.fill', material: 'stop' },
+  copy: { ios: 'doc.on.doc', material: 'content_copy' },
 } as const satisfies Record<string, IconDef>;
 
 export type IconName = keyof typeof icons;

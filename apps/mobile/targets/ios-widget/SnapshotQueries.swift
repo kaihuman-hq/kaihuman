@@ -85,9 +85,12 @@ extension SharedTodoSnapshot {
         item.status == .backlog && item.filePath == inboxPath
     }
 
-    /// Open todos in "next up" order: in progress first, then priority, then file order.
+    /// Open todos in "next up" order: in progress first, then priority, then file order. The active
+    /// Focus filter (FocusFilter.swift) hides the rest, so every widget and intent honours it.
     var nextUp: [SharedTodoItem] {
-        let open = items.enumerated().filter { $0.element.status == .backlog || $0.element.status == .inProgress }
+        let open = items.enumerated().filter {
+            ($0.element.status == .backlog || $0.element.status == .inProgress) && matchesFocusFilter($0.element)
+        }
         return open.sorted { lhs, rhs in
             let left = (lhs.element.status == .inProgress ? 0 : 1, Self.priorityRank(lhs.element.priority), lhs.offset)
             let right = (rhs.element.status == .inProgress ? 0 : 1, Self.priorityRank(rhs.element.priority), rhs.offset)
@@ -113,6 +116,70 @@ extension SharedTodoSnapshot {
         case .backlog: return open.filter { $0.status == .backlog && !isInbox($0) }
         case .tag(let tag): return open.filter { $0.tags.contains(tag) }
         case .milestone(let id): return open.filter { $0.milestoneId == id }
+        }
+    }
+
+    /// `now` as `YYYY-MM-DD` in the snapshot's zone, the format of `SharedTodoItem.dueDate`.
+    func dayKey(at now: Date) -> String {
+        let c = resolvedCalendar.dateComponents([.year, .month, .day], from: now)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    /// Which group of the Today list an open item is in: overdue, in progress, due today; nil = not today.
+    /// Mirrors `todayItems` in packages/core/src/widget-sync.ts.
+    func todayGroup(_ item: SharedTodoItem, today: String) -> Int? {
+        guard item.status == .backlog || item.status == .inProgress else { return nil }
+        if let due = item.dueDate, due < today { return 0 }
+        if item.status == .inProgress { return 1 }
+        return item.dueDate == today ? 2 : nil
+    }
+
+    /// The Today widget: open todos that are overdue, in progress or due today, in that order, each
+    /// group by due date and time. Undated and future backlog stay in the app. Derived from `items`
+    /// (not `todayItems`) so the midnight entry rolls over and widget toggles drop out at once.
+    func todayTasks(for source: TodoSourceFilter, at now: Date) -> [SharedTodoItem] {
+        let today = dayKey(at: now)
+        let open = items(for: source)
+        var ranked: [(key: (Int, String, String, Int), item: SharedTodoItem)] = []
+        for (offset, item) in open.enumerated() {
+            guard let group = todayGroup(item, today: today) else { continue }
+            ranked.append((key: (group, item.dueDate ?? "9999-99-99", item.dueTime ?? "99:99", offset), item: item))
+        }
+        // `offset` breaks ties, so the source order (in progress, priority, file) survives the unstable sort.
+        return ranked.sorted { $0.key < $1.key }.map { $0.item }
+    }
+
+    func overdueCount(in tasks: [SharedTodoItem], at now: Date) -> Int {
+        let today = dayKey(at: now)
+        return tasks.filter { todayGroup($0, today: today) == 0 }.count
+    }
+
+    /// Trailing label of a Today row: weekday for overdue, time when due today, else the first tag.
+    func todayLabel(for item: SharedTodoItem, at now: Date) -> String? {
+        let today = dayKey(at: now)
+        if let due = item.dueDate, due < today {
+            let parts = due.split(separator: "-").compactMap { Int($0) }
+            let calendar = resolvedCalendar
+            guard parts.count == 3,
+                  let date = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+            else { return due }
+            let formatter = DateFormatter()
+            formatter.calendar = calendar
+            formatter.timeZone = calendar.timeZone
+            formatter.setLocalizedDateFormatFromTemplate("EEE")
+            return formatter.string(from: date)
+        }
+        if item.dueDate == today, let time = item.dueTime { return time }
+        return item.tags.first.map { "#\($0)" }
+    }
+
+    /// Open todos due today or earlier (the Due today widget, Siri "what's due today").
+    /// Dates are `YYYY-MM-DD`, so string order is date order.
+    func dueByToday(at now: Date) -> [SharedTodoItem] {
+        let today = dayKey(at: now)
+        return items(for: .all).filter { item in
+            guard let due = item.dueDate else { return false }
+            return due <= today
         }
     }
 
@@ -213,6 +280,29 @@ extension SharedTodoSnapshot {
     /// The snapshot only knows "done today" as of its last sync; a habit ticked yesterday is open again.
     func habitDone(_ habit: SharedHabit, at now: Date) -> Bool {
         habit.doneToday && resolvedCalendar.isDate(updatedDate, inSameDayAs: now)
+    }
+
+    /// The last 7 days of a habit, oldest first, ending at `now`. Days the snapshot has not seen
+    /// yet (it was written on an earlier day) are open; today follows `habitDone`, so a widget
+    /// check-in fills it at once.
+    func habitWeek(_ habit: SharedHabit, at now: Date) -> [Bool] {
+        let calendar = resolvedCalendar
+        let known = Array((habit.days ?? []).suffix(7))
+        var days = Array(repeating: false, count: 7 - known.count) + known
+        let shift = calendar.dateComponents(
+            [.day], from: calendar.startOfDay(for: updatedDate), to: calendar.startOfDay(for: now)
+        ).day ?? 0
+        if shift > 0 {
+            let n = min(shift, 7)
+            days = Array(days.dropFirst(n)) + Array(repeating: false, count: n)
+        }
+        days[6] = habitDone(habit, at: now)
+        return days
+    }
+
+    /// The timer's open interval start, if it runs.
+    var timerStart: Date? {
+        timer?.startedAt.map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) }
     }
 
     /// Idea statuses in pipeline order first, then any the app invented.

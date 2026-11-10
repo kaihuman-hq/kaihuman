@@ -1,7 +1,7 @@
 import SwiftUI
 import WidgetKit
 
-/// Next up. The kind string predates the restyle and stays so already-placed widgets survive.
+/// Today (was Next up). The kind string predates the restyle and stays so already-placed widgets survive.
 struct InboxTodoWidget: Widget {
     let kind = "InboxTodoWidget"
 
@@ -10,8 +10,8 @@ struct InboxTodoWidget: Widget {
             NextUpEntryView(entry: entry)
                 .modifier(KaihumanBackground())
         }
-        .configurationDisplayName("Next up")
-        .description("Your next todos. Tap a circle to complete one.")
+        .configurationDisplayName("Today")
+        .description("Today's todos: overdue, in progress and due today. Tap a circle to complete one.")
         .supportedFamilies([
             .systemSmall, .systemMedium, .systemLarge,
             .accessoryCircular, .accessoryRectangular, .accessoryInline,
@@ -37,11 +37,21 @@ struct KaihumanWidgets: WidgetBundle {
             NewLogControl()
             NewIdeaControl()
             AddToInboxControl()
+            CaptureControl()
+            FocusTimerControl()
+            StopFocusControl()
+            // Live Activity with the iOS 18 `.small` family (Watch, CarPlay, Mac). iOS 17 has no Live
+            // Activity: the builder has no if/else, and a negative availability check crashed swiftc.
+            FocusLiveActivityFamilies()
+        }
+        // iOS 27 extra-large size; the gate keeps older systems from listing it.
+        if #available(iOS 27.0, *) {
+            TodayDashboardWidget()
         }
     }
 }
 
-/// The v2 set: board column, milestone, ideas, knowledge card, habits and the focus Live Activity.
+/// The v2 set: board column, milestone, ideas, knowledge card, habits, due today, timer.
 struct KaihumanV2Widgets: WidgetBundle {
     @WidgetBundleBuilder
     var body: some Widget {
@@ -50,6 +60,7 @@ struct KaihumanV2Widgets: WidgetBundle {
         IdeaPipelineWidget()
         KnowledgeCardWidget()
         HabitsWidget()
-        FocusLiveActivity()
+        DueTodayWidget()
+        TimerWidget()
     }
 }

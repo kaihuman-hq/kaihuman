@@ -16,6 +16,8 @@ export interface KaihumanSharedModule {
   /** Moves the end of a running focus activity (e.g. to extend or shorten the timer). */
   updateFocusActivity?(activityId: string, plannedEndMs: number): void;
   endFocusActivity?(activityId: string): void;
+  /** iOS: replaces the app's Core Spotlight items with these (JSON of SpotlightItem[]). */
+  indexSpotlight?(json: string): void;
 }
 
 /** Null where the native module is not linked (tests, web, Expo Go). */

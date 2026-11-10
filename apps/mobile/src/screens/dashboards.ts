@@ -38,6 +38,25 @@ export const rememberDashboard = (id: string): void => {
 };
 
 /**
+ * Wraps `load` so only the most recently started call delivers. Loads overlap (a sync bumps the
+ * revision while one is still reading), and an older one finishing last must not overwrite the
+ * newer pages; superseded calls resolve to null, their errors included.
+ */
+export function takeLatest<T>(load: () => Promise<T>): () => Promise<T | null> {
+  let latest = 0;
+  return async () => {
+    const mine = ++latest;
+    try {
+      const value = await load();
+      return mine === latest ? value : null;
+    } catch (err) {
+      if (mine === latest) throw err;
+      return null;
+    }
+  };
+}
+
+/**
  * The user's console dashboards as pages. Without a config (or one that places nothing) every
  * tile file in the repository shows on a single "Today" page, which is what the app did before
  * dashboards existed; `defaulted` lets the view explain how to get real pages.
@@ -50,14 +69,11 @@ export async function loadDashboards(
     .filter((i) => i.type !== 'tree')
     .map((i) => i.path);
 
-  let configText: string | null = null;
-  if (tree.includes(dashboardConfigPath(tree))) {
-    try {
-      configText = await files.read(dashboardConfigPath(tree));
-    } catch {
-      // Treated like a missing config: the default page still shows the tiles.
-    }
-  }
+  // A config that exists but cannot be read right now is not a missing config: falling back to
+  // the single "Today" page made the pager lose its other pages (and swiping) until the next
+  // change. Throw instead, so the screen keeps the pages it already shows.
+  const configPath = dashboardConfigPath(tree);
+  const configText = tree.includes(configPath) ? await files.read(configPath) : null;
   const resolved = resolveDashboards(parseDashboardConfig(configText), tree, { mobile: true });
   const defaulted = resolved.every((d) => d.paths.length === 0);
   const layout = defaulted

@@ -1,7 +1,18 @@
-import { Children, type ReactNode, useState } from 'react';
+import { Children, isValidElement, type ReactNode, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, Pressable, View } from 'react-native';
 import { useTheme } from '../../theme/theme.js';
-import { Divider, Icon, type IconName, SwipeReveal, Text, TextField } from '../../ui/index.js';
+import {
+  Animated,
+  Divider,
+  Icon,
+  type IconName,
+  MotionItem,
+  MotionList,
+  SwipeReveal,
+  Text,
+  TextField,
+  usePop,
+} from '../../ui/index.js';
 
 export interface RowAction {
   label: string;
@@ -39,15 +50,15 @@ function showActions(title: string, actions: readonly RowAction[]) {
 export function Rows({ children }: { children?: ReactNode }) {
   const rows = Children.toArray(children);
   return (
-    <View>
+    <MotionList>
       {rows.map((row, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional
-        <View key={i}>
+        // Rows keep their own key so a removed one animates out instead of the last.
+        <MotionItem key={isValidElement(row) && row.key != null ? row.key : i}>
           {i > 0 ? <Divider /> : null}
           {row}
-        </View>
+        </MotionItem>
       ))}
-    </View>
+    </MotionList>
   );
 }
 
@@ -63,6 +74,8 @@ export interface ItemRowProps {
   actions?: readonly RowAction[];
   /** Also reveal `actions` by swiping (native only); long press stays as the fallback. */
   swipe?: boolean;
+  /** With `swipe`: a long swipe runs the last action directly instead of revealing its button. */
+  fullSwipe?: boolean;
   role?: 'button' | 'checkbox' | 'link';
   checked?: boolean;
   expanded?: boolean;
@@ -79,6 +92,7 @@ export function ItemRow({
   onPress,
   actions,
   swipe,
+  fullSwipe,
   role = 'button',
   checked,
   expanded,
@@ -135,7 +149,11 @@ export function ItemRow({
   );
   if (swipe && actions?.length && Platform.OS !== 'web') {
     return (
-      <SwipeReveal actions={actions} testID={testID ? `${testID}-swipeable` : undefined}>
+      <SwipeReveal
+        actions={actions}
+        fullSwipe={fullSwipe}
+        testID={testID ? `${testID}-swipeable` : undefined}
+      >
         {pressable}
       </SwipeReveal>
     );
@@ -146,23 +164,27 @@ export function ItemRow({
 /** A round check marker; filled when `on`. */
 export function CheckCircle({ on }: { on: boolean }) {
   const { colors } = useTheme();
+  const pop = usePop(on);
   return (
-    <View
+    <Animated.View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={{
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        borderWidth: on ? 0 : 2,
-        borderColor: colors.secondaryLabel,
-        backgroundColor: on ? colors.accentFill : 'transparent',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
+      style={[
+        {
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          borderWidth: on ? 0 : 2,
+          borderColor: colors.secondaryLabel,
+          backgroundColor: on ? colors.accentFill : 'transparent',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        pop,
+      ]}
     >
       {on ? <Icon name="check" size={14} color={colors.onAccentFill} weight="bold" /> : null}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -273,6 +295,7 @@ export function QuickAdd({
   addLabel,
   placeholder,
   keyboardType,
+  autoFocus,
 }: {
   label: string;
   value: string;
@@ -281,6 +304,7 @@ export function QuickAdd({
   addLabel: string;
   placeholder?: string;
   keyboardType?: 'default' | 'url';
+  autoFocus?: boolean;
 }) {
   const { colors, spacing, metrics } = useTheme();
   return (
@@ -293,6 +317,7 @@ export function QuickAdd({
           placeholder={placeholder}
           returnKeyType="done"
           onSubmitEditing={onSubmit}
+          autoFocus={autoFocus}
           keyboardType={keyboardType}
           autoCapitalize={keyboardType === 'url' ? 'none' : 'sentences'}
         />

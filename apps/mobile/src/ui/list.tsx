@@ -1,13 +1,38 @@
-import { Children, createContext, type ReactNode, useContext, useRef } from 'react';
-import { ActionSheetIOS, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Children, createContext, isValidElement, type ReactNode, useContext, useRef } from 'react';
+import {
+  ActionSheetIOS,
+  Alert,
+  type LayoutChangeEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
 import SwipeableModule, {
   type SwipeableMethods,
   type SwipeableProps,
 } from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Animated, {
+  type SharedValue,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { type Palette, useTheme } from '../theme/theme.js';
 import { haptics } from './haptics.js';
 import { Icon, type IconName } from './icon.js';
+import { MotionItem, MotionList, useReducedMotion } from './motion.js';
 import { useScreenInset } from './screen.js';
+import {
+  ACTION_WIDTH,
+  FULL_SWIPE_COLLAPSE_DELAY_MS,
+  FULL_SWIPE_COLLAPSE_MS,
+  FULL_SWIPE_SLIDE_MS,
+  isFullSwipe,
+} from './swipe-logic.js';
 import { Text } from './text.js';
 
 // NodeNext types this CJS-flagged subpath's default export as the module namespace; at runtime it
@@ -23,15 +48,18 @@ const RowPosition = createContext<{ last: boolean }>({ last: true });
 export interface SectionProps {
   header?: string;
   footer?: string;
+  /** Rows fade in when added, fade out when removed and let the others glide; rows need stable keys. */
+  animated?: boolean;
   children?: ReactNode;
 }
 
-export function Section({ header, footer, children }: SectionProps) {
+export function Section({ header, footer, animated = false, children }: SectionProps) {
   const theme = useTheme();
   const { colors, spacing, shape, metrics } = theme;
   const ios = theme.platform === 'ios';
   const grouped = useScreenInset() === 'grouped';
   const rows = Children.toArray(children);
+  const inList = (nodes: ReactNode) => (animated ? <MotionList>{nodes}</MotionList> : nodes);
   // iOS cards inset themselves unless the screen already does; Android rows run edge to edge,
   // so they cancel the screen margin to keep ripples full-bleed.
   const horizontal = ios
@@ -67,15 +95,25 @@ export function Section({ header, footer, children }: SectionProps) {
             : undefined
         }
       >
-        {rows.map((child, index) => (
-          <RowPosition.Provider
-            // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional
-            key={index}
-            value={{ last: index === rows.length - 1 }}
-          >
-            {child}
-          </RowPosition.Provider>
-        ))}
+        {inList(
+          rows.map((child, index) => {
+            const position = (
+              <RowPosition.Provider
+                // biome-ignore lint/suspicious/noArrayIndexKey: rows without a key are positional
+                key={index}
+                value={{ last: index === rows.length - 1 }}
+              >
+                {child}
+              </RowPosition.Provider>
+            );
+            if (!animated) return position;
+            return (
+              <MotionItem key={isValidElement(child) && child.key != null ? child.key : index}>
+                {position}
+              </MotionItem>
+            );
+          }),
+        )}
       </View>
       {footer ? (
         <Text
@@ -116,8 +154,6 @@ function revealOrder(actions: readonly SwipeAction[], side: 'leading' | 'trailin
   const risky = mine.filter((a) => a.destructive);
   return side === 'trailing' ? [...safe, ...risky] : [...risky, ...safe];
 }
-
-const ACTION_WIDTH = 80;
 
 function actionColors(c: Palette, action: SwipeAction, index: number, ios: boolean) {
   if (action.destructive) return { fill: c.danger, text: c.onDanger };
@@ -187,55 +223,148 @@ function toneColors(c: Palette, tone: IconTone): { fill: string; glyph: string }
   return { fill, glyph: tone === 'danger' ? c.onDanger : c.onStatus };
 }
 
-/** Swipe-to-reveal wrapper for rows that are not a `ListRow`; native only, pass the row as children. */
+/** Buzzes once when a drag crosses into (or back out of) full-swipe range. Renders nothing. */
+function FullSwipeProbe({
+  translation,
+  width,
+}: {
+  translation: SharedValue<number>;
+  width: SharedValue<number>;
+}) {
+  useAnimatedReaction(
+    () => isFullSwipe(translation.get(), width.get()),
+    (armed: boolean, was: boolean | null | undefined) => {
+      if (armed && !was) scheduleOnRN(haptics.medium);
+    },
+  );
+  return null;
+}
+
+/**
+ * Swipe-to-reveal wrapper for rows that are not a `ListRow`; native only, pass the row as children.
+ * With `fullSwipe`, dragging a long way towards the leading edge runs the outermost trailing
+ * action directly: the row slides out, collapses and the action fires once it is gone.
+ */
 export function SwipeReveal({
   actions,
   testID,
+  fullSwipe = false,
   children,
 }: {
   actions: readonly SwipeAction[];
   testID?: string;
+  fullSwipe?: boolean;
   children: ReactNode;
 }) {
   const theme = useTheme();
   const ios = theme.platform === 'ios';
+  const reduced = useReducedMotion();
   const ref = useRef<SwipeableMethods>(null);
+  const translation = useRef<SharedValue<number> | null>(null);
+  const width = useSharedValue(0);
+  const rowHeight = useSharedValue(0);
+  const slide = useSharedValue(0);
+  const fade = useSharedValue(1);
+  const collapse = useSharedValue(1);
   const leading = revealOrder(actions, 'leading');
   const trailing = revealOrder(actions, 'trailing');
+  const outermost = fullSwipe ? trailing[trailing.length - 1] : undefined;
+
   const trigger = (action: SwipeAction, methods: SwipeableMethods) => {
     methods.close();
     if (action.destructive) haptics.warning();
     else haptics.success();
     action.onPress();
   };
+
+  // The row may outlive the action (e.g. "mark read" in a list that keeps read items).
+  const finishFullSwipe = (action: SwipeAction) => {
+    action.onPress();
+    setTimeout(() => {
+      slide.set(0);
+      fade.set(1);
+      collapse.set(1);
+      ref.current?.close();
+    }, 80);
+  };
+
+  const runFullSwipe = (action: SwipeAction) => {
+    if (action.destructive) haptics.warning();
+    else haptics.success();
+    if (reduced) {
+      action.onPress();
+      ref.current?.close();
+      return;
+    }
+    slide.set(withTiming(-width.get(), { duration: FULL_SWIPE_SLIDE_MS }));
+    fade.set(withTiming(0, { duration: FULL_SWIPE_SLIDE_MS }));
+    collapse.set(
+      withDelay(
+        FULL_SWIPE_COLLAPSE_DELAY_MS,
+        withTiming(0, { duration: FULL_SWIPE_COLLAPSE_MS }, (finished?: boolean) => {
+          if (finished) scheduleOnRN(finishFullSwipe, action);
+        }),
+      ),
+    );
+  };
+
+  const wrapStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: slide.get() }],
+    opacity: fade.get(),
+    // Height is only pinned once collapsing starts; until then the row sizes itself.
+    ...(collapse.get() < 1 ? { height: rowHeight.get() * collapse.get() } : null),
+  }));
+
   return (
-    <ReanimatedSwipeable
-      ref={ref}
-      testID={testID}
-      friction={2}
-      overshootLeft={false}
-      overshootRight={false}
-      onSwipeableWillOpen={() => haptics.selection()}
-      renderLeftActions={
-        leading.length
-          ? (_p, _t, methods) => (
-              <SwipeButtons actions={leading} methods={methods} onTrigger={trigger} />
-            )
-          : undefined
-      }
-      renderRightActions={
-        trailing.length
-          ? (_p, _t, methods) => (
-              <SwipeButtons actions={trailing} methods={methods} onTrigger={trigger} />
-            )
-          : undefined
-      }
-      childrenContainerStyle={{
-        backgroundColor: ios ? theme.colors.surface : theme.colors.background,
+    <Animated.View
+      style={[{ overflow: 'hidden' }, wrapStyle]}
+      onLayout={(e: LayoutChangeEvent) => {
+        if (collapse.get() < 1) return;
+        width.set(e.nativeEvent.layout.width);
+        rowHeight.set(e.nativeEvent.layout.height);
       }}
     >
-      {children}
-    </ReanimatedSwipeable>
+      <ReanimatedSwipeable
+        ref={ref}
+        testID={testID}
+        friction={fullSwipe ? 1 : 2}
+        overshootLeft={false}
+        overshootRight={fullSwipe}
+        onSwipeableWillOpen={(direction) => {
+          const t = translation.current?.get() ?? 0;
+          if (outermost && direction === 'right' && isFullSwipe(t, width.get())) {
+            runFullSwipe(outermost);
+          } else {
+            haptics.selection();
+          }
+        }}
+        renderLeftActions={
+          leading.length
+            ? (_p, _t, methods) => (
+                <SwipeButtons actions={leading} methods={methods} onTrigger={trigger} />
+              )
+            : undefined
+        }
+        renderRightActions={
+          trailing.length
+            ? (_p, t, methods) => {
+                translation.current = t;
+                return (
+                  <>
+                    {outermost ? <FullSwipeProbe translation={t} width={width} /> : null}
+                    <SwipeButtons actions={trailing} methods={methods} onTrigger={trigger} />
+                  </>
+                );
+              }
+            : undefined
+        }
+        childrenContainerStyle={{
+          backgroundColor: ios ? theme.colors.surface : theme.colors.background,
+        }}
+      >
+        {children}
+      </ReanimatedSwipeable>
+    </Animated.View>
   );
 }
 

@@ -13,6 +13,9 @@ export function useStackScreenOptions(): NativeStackNavigationOptions {
     headerShadowVisible: false,
     headerTitleAlign: platform === 'android' ? 'left' : undefined,
     headerBackButtonDisplayMode: 'minimal',
+    // iOS already pushes with the native slide; Android's default fade felt abrupt next to it.
+    // The native stack skips the animation itself when the OS asks for reduced motion.
+    animation: platform === 'android' ? 'slide_from_right' : 'default',
   };
 }
 

@@ -24,6 +24,15 @@ export {
   type SwipeAction,
   SwipeReveal,
 } from './list.js';
+export {
+  Animated,
+  contentKeys,
+  FadeInView,
+  MotionItem,
+  MotionList,
+  usePop,
+  usePressScale,
+} from './motion.js';
 export { Screen, type ScreenProps, ScreenTitle } from './screen.js';
 export { SegmentedControl, type SegmentedControlProps } from './segmented.js';
 export { Text, type TextProps, type TextTone } from './text.js';

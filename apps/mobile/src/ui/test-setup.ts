@@ -1,6 +1,9 @@
 import { createContext, createElement } from 'react';
 import { vi } from 'vitest';
 
+/** Row translation the swipeable stand-in reports; tests set it before triggering a swipe. */
+export const swipeTranslation = { value: 0 };
+
 // Native modules cannot load in jsdom; these stand-ins keep the markup observable.
 vi.mock('expo-symbols', () => ({
   SymbolView: ({ name, accessibilityLabel, accessible }: Record<string, any>) =>
@@ -44,19 +47,81 @@ vi.mock('expo-router/react-navigation', () => ({
   HeaderShownContext: createContext(false),
 }));
 
+// Reanimated needs the native worklet runtime. Animations resolve instantly to their target value
+// (finish callbacks fire at once) and the layout-animation props are dropped from the markup.
+vi.mock('react-native-reanimated', async () => {
+  const { View } = await vi.importActual<Record<string, any>>('react-native-web');
+  const builder = () => {
+    const b: Record<string, any> = {};
+    for (const k of ['duration', 'delay', 'springify', 'damping', 'reduceMotion']) b[k] = () => b;
+    return b;
+  };
+  const AnimatedView = ({ entering, exiting, layout, ...rest }: Record<string, any>) =>
+    createElement(View, rest);
+  const sharedValue = (v: unknown) => {
+    const sv = {
+      value: v,
+      get: () => sv.value,
+      set: (n: unknown) => {
+        sv.value = n;
+      },
+    };
+    return sv;
+  };
+  const settle =
+    (_unused?: unknown) => (to: unknown, _opts?: unknown, done?: (finished: boolean) => void) => {
+      done?.(true);
+      return to;
+    };
+  return {
+    default: { View: AnimatedView },
+    View: AnimatedView,
+    FadeIn: builder(),
+    FadeOut: builder(),
+    FadeInDown: builder(),
+    LinearTransition: builder(),
+    LayoutAnimationConfig: ({ children }: Record<string, any>) => children,
+    useReducedMotion: () => false,
+    useSharedValue: (v: unknown) => sharedValue(v),
+    useAnimatedStyle: () => ({}),
+    useAnimatedReaction: () => {},
+    withTiming: settle(),
+    withSpring: settle(),
+    withDelay: (_ms: number, v: unknown) => v,
+    withSequence: (...v: unknown[]) => v[v.length - 1],
+  };
+});
+
+vi.mock('react-native-worklets', () => ({
+  scheduleOnRN: (fn: (...a: unknown[]) => void, ...args: unknown[]) => fn(...args),
+}));
+
 // The native gesture stack needs a worklet runtime. This stand-in renders both action sets
 // inline so tests can press the revealed buttons.
 vi.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
   const methods = { close: vi.fn(), openLeft: vi.fn(), openRight: vi.fn(), reset: vi.fn() };
   return {
-    default: ({ children, renderLeftActions, renderRightActions, testID }: Record<string, any>) =>
-      createElement(
+    default: ({
+      children,
+      renderLeftActions,
+      renderRightActions,
+      onSwipeableWillOpen,
+      testID,
+    }: Record<string, any>) => {
+      // Clicking the stand-in button reports a release with `swipeTranslation` as the row's offset.
+      const translation = { value: swipeTranslation.value, get: () => swipeTranslation.value };
+      return createElement(
         'div',
         { 'data-testid': testID },
-        renderLeftActions?.({ value: 0 }, { value: 0 }, methods),
+        renderLeftActions?.({ value: 0 }, translation, methods),
         children,
-        renderRightActions?.({ value: 0 }, { value: 0 }, methods),
-      ),
+        renderRightActions?.({ value: 0 }, translation, methods),
+        createElement('div', {
+          'data-testid': testID ? `${testID}-willopen` : undefined,
+          onClick: () => onSwipeableWillOpen?.('right', methods),
+        }),
+      );
+    },
   };
 });
 

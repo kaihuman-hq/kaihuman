@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useTheme } from '../theme/theme.js';
 import { haptics } from './haptics.js';
 import { Icon, type IconName } from './icon.js';
+import { Animated, usePressScale } from './motion.js';
 import { Text } from './text.js';
 
 export type ButtonVariant = 'filled' | 'tinted' | 'plain' | 'outlined' | 'destructive';
@@ -40,6 +41,7 @@ export function Button({
   const { colors, metrics, shape, spacing } = theme;
   const ios = theme.platform === 'ios';
   const inactive = disabled || loading;
+  const press = usePressScale();
 
   const height = size === 'large' ? metrics.buttonHeight : size === 'medium' ? 40 : 32;
   // Small buttons stay visually compact but keep a full-size touch target.
@@ -68,51 +70,54 @@ export function Button({
   };
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: inactive, busy: loading }}
-      disabled={inactive}
-      onPress={handlePress}
-      hitSlop={{ top: slop, bottom: slop }}
-      testID={testID}
-      android_ripple={ios ? undefined : { color: colors.pressed }}
-      style={({ pressed }) => ({
-        minHeight: height,
-        paddingHorizontal: variant === 'plain' ? spacing.sm : size === 'small' ? spacing.md : 20,
-        borderRadius: shape.button,
-        backgroundColor: palette.bg,
-        borderWidth: palette.border ? 1 : 0,
-        borderColor: palette.border,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-        gap: spacing.sm,
-        overflow: 'hidden',
-        alignSelf: fullWidth ? 'stretch' : 'flex-start',
-        opacity: pressed && ios ? 0.7 : 1,
-      })}
-    >
-      {loading ? <ActivityIndicator size="small" color={palette.fg} /> : null}
-      {!loading && leading ? <View>{leading(palette.fg)}</View> : null}
-      {!loading && icon && !leading ? (
-        <View>
-          <Icon
-            name={icon}
-            size={size === 'small' ? 16 : 18}
-            color={palette.fg}
-            weight="semibold"
-          />
-        </View>
-      ) : null}
-      <Text
-        variant={ios ? (size === 'large' ? 'headline' : 'subheadline') : 'subheadline'}
-        weight={ios ? '600' : '500'}
-        color={palette.fg}
-        align="center"
+    <Animated.View style={[{ alignSelf: fullWidth ? 'stretch' : 'flex-start' }, press.style]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ disabled: inactive, busy: loading }}
+        disabled={inactive}
+        onPress={handlePress}
+        {...press.handlers}
+        hitSlop={{ top: slop, bottom: slop }}
+        testID={testID}
+        android_ripple={ios ? undefined : { color: colors.pressed }}
+        style={({ pressed }) => ({
+          minHeight: height,
+          paddingHorizontal: variant === 'plain' ? spacing.sm : size === 'small' ? spacing.md : 20,
+          borderRadius: shape.button,
+          backgroundColor: palette.bg,
+          borderWidth: palette.border ? 1 : 0,
+          borderColor: palette.border,
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'row',
+          gap: spacing.sm,
+          overflow: 'hidden',
+          alignSelf: 'stretch',
+          opacity: pressed && ios ? 0.7 : 1,
+        })}
       >
-        {label}
-      </Text>
-    </Pressable>
+        {loading ? <ActivityIndicator size="small" color={palette.fg} /> : null}
+        {!loading && leading ? <View>{leading(palette.fg)}</View> : null}
+        {!loading && icon && !leading ? (
+          <View>
+            <Icon
+              name={icon}
+              size={size === 'small' ? 16 : 18}
+              color={palette.fg}
+              weight="semibold"
+            />
+          </View>
+        ) : null}
+        <Text
+          variant={ios ? (size === 'large' ? 'headline' : 'subheadline') : 'subheadline'}
+          weight={ios ? '600' : '500'}
+          color={palette.fg}
+          align="center"
+        >
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }

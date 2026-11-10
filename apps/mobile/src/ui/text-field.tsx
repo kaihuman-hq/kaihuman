@@ -16,6 +16,8 @@ export interface TextFieldProps {
   keyboardType?: KeyboardTypeOptions;
   returnKeyType?: ReturnKeyTypeOptions;
   onSubmitEditing?: () => void;
+  /** Keep focus after return, for fields that add in bursts. */
+  keepFocusOnSubmit?: boolean;
   /** Focus on mount, e.g. the main field of a capture sheet. */
   autoFocus?: boolean;
   onFocus?: () => void;
@@ -36,6 +38,7 @@ export function TextField({
   keyboardType,
   returnKeyType,
   onSubmitEditing,
+  keepFocusOnSubmit,
   autoFocus,
   onFocus,
   onBlur,
@@ -60,6 +63,7 @@ export function TextField({
       keyboardType={keyboardType}
       returnKeyType={returnKeyType}
       onSubmitEditing={onSubmitEditing}
+      submitBehavior={keepFocusOnSubmit ? 'submit' : undefined}
       autoFocus={autoFocus}
       onFocus={() => {
         setFocused(true);

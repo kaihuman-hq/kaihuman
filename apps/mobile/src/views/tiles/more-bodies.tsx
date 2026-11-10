@@ -131,6 +131,7 @@ export function Rss({ view: initial, ctx }: { view: RssView; ctx: Ctx }) {
               }
               onPress={() => open(i.feedId, i.key, i.link)}
               swipe
+              fullSwipe
               actions={
                 i.unread
                   ? [

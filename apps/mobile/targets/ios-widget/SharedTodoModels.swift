@@ -100,6 +100,14 @@ struct SharedPrivacy: Codable {
     var lockScreenText: Bool
 }
 
+/// Mirrors WidgetFilter in packages/core/src/widget-sync.ts: set by the Focus filter intent.
+struct SharedFocusFilter: Codable, Equatable {
+    var tags: [String]?
+    var area: String?
+    var board: String?
+    var label: String?
+}
+
 struct SharedTodoSnapshot: Codable {
     var schemaVersion: Int?
     var updatedAt: Int64
@@ -117,9 +125,32 @@ struct SharedTodoSnapshot: Codable {
     var tags: [String]?
     var privacy: SharedPrivacy?
     var timeZone: String?
+    var filter: SharedFocusFilter?
     var ideas: SharedIdeas?
     var cards: [SharedCard]?
     var habits: [SharedHabit]?
+    // Today widget, habit week and timer (additive in v2; the widget derives today from `items`
+    // itself so a midnight entry and local toggles stay right, see SnapshotQueries.todayTasks).
+    var todayItems: [SharedTodoItem]?
+    var todayCounts: SharedTodayCounts?
+    var timer: SharedTimer?
+}
+
+struct SharedTodayCounts: Codable {
+    var left: Int
+    var done: Int
+    var overdue: Int
+}
+
+/// The running (or busiest) `.timetracking.csv` timer of today.
+struct SharedTimer: Codable {
+    var path: String
+    var label: String
+    /// Epoch ms the open interval started; nil while stopped.
+    var startedAt: Int64?
+    /// Closed intervals of today only; the live part comes from `startedAt`.
+    var todayMinutes: Int
+    var pending: Bool?
 }
 
 struct SharedHotIdea: Codable, Identifiable {
@@ -148,13 +179,16 @@ struct SharedHabit: Codable, Identifiable {
     var name: String
     var doneToday: Bool
     var streakDays: Int
+    /// Reached per day for the 7 days ending on the snapshot's day, oldest first.
+    var days: [Bool]?
     var pending: Bool?
     var id: String { path }
 }
 
 /// Something the widget or an intent did that the main app must commit (see widget-bridge.ts).
 /// One flat struct for the TS union: `kind` is nil in v1 files (always a toggle); the other
-/// optionals are filled per kind (move: itemId + status, capture: text, habit: path + date).
+/// optionals are filled per kind (move: itemId + status, capture: text, habit: path + date,
+/// timer-stop: path).
 struct PendingWidgetMutation: Codable {
     var kind: String?
     var itemId: String?
@@ -181,5 +215,15 @@ struct PendingWidgetMutation: Codable {
 
     static func habit(path: String, date: String, now: Date = Date()) -> PendingWidgetMutation {
         PendingWidgetMutation(kind: "habit", path: path, date: date, timestamp: millis(now))
+    }
+
+    /// A digest text for `logs/digest-<date>.md`; the app writes it when it replays the queue.
+    static func digest(text: String, date: String, now: Date = Date()) -> PendingWidgetMutation {
+        PendingWidgetMutation(kind: "digest", text: text, date: date, timestamp: millis(now))
+    }
+
+    /// The app stops the interval at `timestamp`, the tap, not when it replays the queue.
+    static func timerStop(path: String, now: Date = Date()) -> PendingWidgetMutation {
+        PendingWidgetMutation(kind: "timer-stop", path: path, timestamp: millis(now))
     }
 }

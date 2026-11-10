@@ -19,7 +19,9 @@ import {
   consumptionColumns,
   consumptionView,
   dataCollectionView,
+  deleteAction,
   deleteBookmarkEntry,
+  editAction,
   eventDateParts,
   eventsView,
   formatElapsed,
@@ -275,6 +277,25 @@ describe('.actionlog.md', () => {
     expect(top?.tags).toEqual(expect.arrayContaining(['dev', 'work']));
     expect(top?.timestamp).toBe('2026-11-05 10:00:00');
     expect(logAction(content, ' ', now).ok).toBe(false);
+  });
+
+  it('edits and deletes one entry, keeping the others', () => {
+    const [target, other] = actionLogView(content, 2).entries;
+    if (!target || !other) throw new Error('demo needs two entries');
+    const edited = editAction(content, target, 'Changed #fresh');
+    expect(edited.ok).toBe(true);
+    if (!edited.ok) return;
+    const after = actionLogView(edited.content, 100).entries;
+    const hit = after.find((e) => e.timestamp === target.timestamp);
+    expect(hit?.description).toBe('Changed #fresh');
+    expect(hit?.tags).toEqual(['fresh']);
+    expect(after.find((e) => e.description === other.description)).toBeTruthy();
+    expect(editAction(content, target, '  ').ok).toBe(false);
+    const gone = deleteAction(content, target);
+    expect(gone.ok).toBe(true);
+    if (!gone.ok) return;
+    expect(actionLogView(gone.content, 100).entries).toHaveLength(after.length - 1);
+    expect(deleteAction(content, { ...target, description: 'nope' }).ok).toBe(false);
   });
 });
 

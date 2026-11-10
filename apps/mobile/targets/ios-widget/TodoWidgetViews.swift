@@ -1,7 +1,7 @@
 import SwiftUI
 import WidgetKit
 
-/// Next up. Pure view: family, rendering mode and colour scheme are parameters so a renderer
+/// Today (kind "InboxTodoWidget", formerly Next up). Pure view: family, rendering mode and colour scheme are parameters so a renderer
 /// outside WidgetKit (ImageRenderer in CI) can drive every variant.
 struct NextUpView: View {
     let entry: TodoEntry
@@ -42,9 +42,12 @@ struct NextUpContent: View {
     let style: WidgetStyle
 
     private var theme: WidgetTheme { style.theme }
-    private var items: [SharedTodoItem] { snapshot.items(for: entry.source) }
+    /// Overdue, in progress and due today (decision 8 of docs/redesign/README.md).
+    private var items: [SharedTodoItem] { snapshot.todayTasks(for: entry.source, at: entry.date) }
     private var freshness: SnapshotFreshness { snapshot.freshness(at: entry.date) }
     private var doneToday: Int { snapshot.doneToday(at: entry.date) }
+    private var total: Int { items.count + doneToday }
+    private var overdue: Int { snapshot.overdueCount(in: items, at: entry.date) }
 
     var body: some View {
         switch style.family {
@@ -59,14 +62,7 @@ struct NextUpContent: View {
 
     // MARK: Copy
 
-    private var emptyTitle: String {
-        switch entry.source {
-        case .inProgress: return "Nothing in progress — pick from backlog"
-        case .all: return "Nothing up next"
-        case .inbox: return "Inbox zero"
-        case .backlog, .tag, .milestone: return "Nothing open here"
-        }
-    }
+    private var emptyTitle: String { "Nothing due today" }
 
     private var sourceLabel: String {
         switch entry.source {
@@ -87,7 +83,7 @@ struct NextUpContent: View {
             if snapshot.showsLockScreenText, let first = items.first {
                 Text("\(Image(systemName: "checklist")) \(first.text)").privacySensitive()
             } else {
-                Text("\(Image(systemName: "checklist")) \(items.count) \(items.count == 1 ? "todo" : "todos") · \(doneToday) done today")
+                Text("\(Image(systemName: "checklist")) \(items.count) left today · \(doneToday) done")
             }
         }
     }
@@ -103,7 +99,7 @@ struct NextUpContent: View {
                         .font(WidgetTheme.number(22))
                         .minimumScaleFactor(0.6)
                         .widgetAccentable()
-                    Text("open").font(.system(size: 9, weight: .semibold))
+                    Text("today").font(.system(size: 9, weight: .semibold))
                 }
             }
         }
@@ -113,7 +109,7 @@ struct NextUpContent: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Image(systemName: "diamond.fill").font(.system(size: 9)).widgetAccentable()
-                Text("NEXT UP").font(.system(size: 11, weight: .bold)).tracking(0.6).widgetAccentable()
+                Text("TODAY").font(.system(size: 11, weight: .bold)).tracking(0.6).widgetAccentable()
                 Spacer(minLength: 0)
                 Text("\(items.count)").font(.system(size: 11, weight: .semibold, design: .monospaced))
             }
@@ -128,7 +124,7 @@ struct NextUpContent: View {
                     Text("+\(items.count - 1) more").font(.system(size: 12)).foregroundStyle(.secondary)
                 }
             } else {
-                Text("\(items.count) \(items.count == 1 ? "todo" : "todos") open").font(.system(size: 14, weight: .semibold))
+                Text("\(items.count) \(items.count == 1 ? "todo" : "todos") today").font(.system(size: 14, weight: .semibold))
             }
             if freshness != .fresh {
                 Text("Synced \(freshness.hours)h ago").font(.system(size: 11)).foregroundStyle(.secondary)
@@ -141,52 +137,88 @@ struct NextUpContent: View {
 
     private var small: some View {
         VStack(alignment: .leading, spacing: 9) {
-            WidgetHeader(title: "NEXT UP", trailing: "\(items.count)", theme: theme, showsAdd: true)
+            HStack {
+                Text("TODAY")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(theme.accent)
+                    .widgetAccentable()
+                Spacer(minLength: 4)
+                Text("\(items.count) left")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(theme.secondary)
+                    .contentTransition(.numericText())
+                AddToInboxButton(theme: theme)
+            }
             if items.isEmpty {
                 EmptyStateView(title: emptyTitle, theme: theme)
             } else {
                 VStack(alignment: .leading, spacing: 9) {
-                    ForEach(items.prefix(3)) { item in TodoRow(item: item, style: style) }
+                    ForEach(items.prefix(3)) { item in TodayRow(item: item, style: style) }
                 }
                 Spacer(minLength: 0)
             }
-            StaleFooter(freshness: freshness, theme: theme)
+            if freshness != .fresh {
+                StaleFooter(freshness: freshness, theme: theme)
+            } else {
+                HStack(spacing: 7) {
+                    ProgressBar(fraction: Double(doneToday) / Double(max(1, total)), theme: theme)
+                        .frame(width: 60)
+                    Text("\(doneToday)/\(total) done")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(theme.secondary)
+                        .contentTransition(.numericText())
+                }
+            }
         }
     }
 
     private var medium: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: 4) {
-                    Text("\(items.count)")
-                        .font(WidgetTheme.number(40))
-                        .foregroundStyle(theme.label)
-                        .minimumScaleFactor(0.6)
-                        .lineLimit(1)
-                        .padding(.top, 12)
+                HStack(alignment: .center, spacing: 4) {
+                    Text("TODAY")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(0.8)
+                        .foregroundStyle(theme.accent)
                         .widgetAccentable()
                     Spacer(minLength: 0)
-                    AddToInboxButton(theme: theme, size: 26)
+                    AddToInboxButton(theme: theme, size: 22)
                 }
-                Text("open").font(.system(size: 13, weight: .medium)).foregroundStyle(theme.label).padding(.top, 4)
-                Text("\(doneToday) done today")
+                Text("\(items.count)")
+                    .font(WidgetTheme.number(44))
+                    .foregroundStyle(theme.label)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .contentTransition(.numericText())
+                    .padding(.top, 8)
+                    .widgetAccentable()
+                Text("left of \(total)")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(theme.secondary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .contentTransition(.numericText())
+                    .padding(.top, 3)
+                if overdue > 0 {
+                    Text("\(overdue) overdue")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(theme.warning)
+                        .lineLimit(1)
+                        .contentTransition(.numericText())
+                }
                 Spacer(minLength: 0)
-                ProgressBar(
-                    fraction: Double(doneToday) / Double(max(1, doneToday + items.count)), theme: theme
-                )
+                ProgressBar(fraction: Double(doneToday) / Double(max(1, total)), theme: theme)
             }
-            .frame(width: 92)
+            .frame(width: 96)
             .padding(.trailing, 14)
             Rectangle().fill(theme.separator).frame(width: 0.5)
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 9) {
                 if items.isEmpty {
                     EmptyStateView(title: emptyTitle, theme: theme)
                 } else {
-                    ForEach(items.prefix(4)) { item in TodoRow(item: item, style: style) }
+                    ForEach(items.prefix(4)) { item in
+                        TodayRow(item: item, style: style, trailing: snapshot.todayLabel(for: item, at: entry.date))
+                    }
                     Spacer(minLength: 0)
                 }
                 footer
@@ -198,7 +230,7 @@ struct NextUpContent: View {
     private var large: some View {
         VStack(alignment: .leading, spacing: 8) {
             WidgetHeader(
-                title: "NEXT UP · \(sourceLabel.uppercased())", trailing: "\(items.count) open", theme: theme,
+                title: "TODAY · \(sourceLabel.uppercased())", trailing: "\(items.count) left", theme: theme,
                 showsAdd: true
             )
             if items.isEmpty {

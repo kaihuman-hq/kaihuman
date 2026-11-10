@@ -29,6 +29,8 @@ const QUICK_ROUTES = [
   'quick-idea',
   'quick-knowledge',
   'quick-inbox',
+  // The ＋ menu's one-field Track entry (`?path=`); not a deep link.
+  'quick-entry',
 ];
 
 export default function RootLayout() {
@@ -80,6 +82,11 @@ export default function RootLayout() {
             }}
           />
         ))}
+        <Stack.Screen name="scan" options={{ title: 'Scan', ...webBack('/capture') }} />
+        <Stack.Screen
+          name="weekly-review"
+          options={{ title: 'Weekly review', ...webBack('/more') }}
+        />
         <Stack.Screen
           name="analytics"
           options={{ title: 'Analytics', headerLargeTitle: largeTitles, ...webBack('/more') }}

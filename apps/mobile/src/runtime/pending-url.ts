@@ -12,7 +12,7 @@ export const routeToHref = (route: Route): string => {
     case 'auth-callback':
       return '/';
     case 'quick-capture':
-      return routeQuery(`/quick-${route.kind}`, { idea: route.idea });
+      return routeQuery(`/quick-${route.kind}`, { idea: route.idea, text: route.text });
     case 'ideas':
       return routeQuery('/ideas', { status: route.status });
     case 'board':
@@ -29,6 +29,14 @@ export const routeToHref = (route: Route): string => {
       return routeQuery('/search', { q: route.q });
     case 'file':
       return `/files/${route.path.split('/').map(encodeURIComponent).join('/')}`;
+    case 'today':
+      return '/dashboard';
+    case 'capture':
+      return '/capture';
+    case 'scan':
+      return routeQuery('/scan', { kind: route.kind, text: route.text });
+    case 'weekly-review':
+      return '/weekly-review';
   }
 };
 

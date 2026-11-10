@@ -25,11 +25,22 @@ struct CaptureTodoIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .result(dialog: "Nothing to add.") }
+        var line = trimmed
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, *), let parsed = await SmartCaptureParser.parse(trimmed, now: Date()) {
+            if parsed.kind == "todo" && parsed.due == nil {
+                line = parsed.inboxLine
+            } else {
+                SmartCaptureQueue.append(original: trimmed, parsed)
+                return .result(dialog: "Saved. kaihuman files it when it opens next.")
+            }
+        }
+        #endif
         let store = SharedTodoStore.shared
         // Nil means the capture could only be queued (no cached inbox file); either way it is saved.
-        if let result = store.appendCapture(text: trimmed) {
+        if let result = store.appendCapture(text: line) {
             WidgetCenter.shared.reloadAllTimelines()
-            await store.push(result, message: "widget: capture todo", queueing: .capture(text: trimmed))
+            await store.push(result, message: "widget: capture todo", queueing: .capture(text: line))
         } else {
             WidgetCenter.shared.reloadAllTimelines()
         }

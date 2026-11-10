@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LoginScreenController } from '../screens/login-screen.js';
 import { RepoSelectorController } from '../screens/repo-selector-screen.js';
+import { SESSION_EXPIRED, sessionNotice } from '../sync/auth-recovery.js';
 import { LoginView } from './login-view.js';
 import { RepoSelectorView } from './repo-selector-view.js';
 
@@ -32,6 +33,13 @@ describe('LoginView', () => {
     render(<LoginView controller={controller} openAuthSession={vi.fn()} onSignedIn={onSignedIn} />);
     return { onSignedIn };
   };
+
+  it('explains why the session ended after GitHub rejected its token', () => {
+    sessionNotice.value = SESSION_EXPIRED;
+    setup();
+    expect(screen.getByTestId('login-session-notice').textContent).toBe(SESSION_EXPIRED);
+    sessionNotice.value = null;
+  });
 
   it('hides the token field until requested', () => {
     setup();

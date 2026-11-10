@@ -75,3 +75,39 @@ struct OpenIdeaLogIntent: AppIntent {
         return .result()
     }
 }
+
+/// App screens that are not capture sheets: Control Center "Capture", Siri "Today", search.
+enum KaihumanDestination: String, AppEnum {
+    case capture
+    case today
+    case search
+
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Screen")
+    static let caseDisplayRepresentations: [KaihumanDestination: DisplayRepresentation] = [
+        .capture: DisplayRepresentation(title: "Capture"),
+        .today: DisplayRepresentation(title: "Today"),
+        .search: DisplayRepresentation(title: "Search"),
+    ]
+
+    var url: String { "kaihuman://\(rawValue)" }
+}
+
+/// Opens the app on one screen through the same `pending-url` hand-off as the capture buttons.
+struct OpenDestinationIntent: AppIntent {
+    static let title: LocalizedStringResource = "Open kaihuman"
+    static let openAppWhenRun = true
+
+    @Parameter(title: "Screen", default: .today)
+    var destination: KaihumanDestination
+
+    init() {}
+
+    init(destination: KaihumanDestination) {
+        self.destination = destination
+    }
+
+    func perform() async throws -> some IntentResult {
+        UserDefaults(suiteName: SharedTodoStore.appGroupId)?.set(destination.url, forKey: "pending-url")
+        return .result()
+    }
+}

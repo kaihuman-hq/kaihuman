@@ -43,12 +43,45 @@ import {
 the background or in Low Power Mode), `write` (debounced 1.5 s after a local write), `online`
 (offline → online), `background` (expo-background-task, ~15 min minimum, OS-scheduled).
 
+- Foreground always syncs (a 304 head check is free). When the data is older than 2 min, a run
+  still in flight does not count: it may be a request iOS froze while the app was suspended, so
+  a fresh run is queued behind it. The banner shows "Syncing…" meanwhile; screens re-read on the
+  `syncRevision` bump, so what was on screen stays until the new data is there (no blank flash).
+- Leaving the foreground pushes a debounced edit at once: iOS suspends the app within seconds.
+- A pull skipped because a save was in flight is retried after the outbox. A run that still
+  pulled nothing is not counted as fresh (`lastSyncedAt` unchanged).
+
+## Staleness guarantees
+
+- Mutable reads (branch head, contents by path) bypass the HTTP cache (`cache: 'no-store'`;
+  React Native's whatwg-fetch adds a `_=<time>` query, so NSURLCache cannot answer from its
+  60 s cache). Trees and blobs are read by sha, which never changes.
+- A cached copy is served only when the tree lists the same blob sha (`canServeFromCache`).
+- Every save sends the sha it is based on. 409/422 (remote moved) → 3-way merge with the remote;
+  overlapping changes → conflict banner. Nothing overwrites a newer remote.
+
+## Background sync (iOS)
+
+`background.ts` defines the task at module scope (`app/_layout.tsx` imports it first) and
+registers it at boot when Background App Refresh is available. The `expo-background-task` config
+plugin (in `app.json`) adds `UIBackgroundModes: processing` and the `BGTaskSchedulerPermittedIdentifiers`
+entry. A run boots headless, pulls, opens every todo file (cache-first) and rewrites the widget
+snapshot, then reloads the widget timelines. A snapshot is written only when every todo file the
+tree lists is open, so a headless launch never replaces a good widget with an empty one.
+
+iOS limits: the 15 min interval is a minimum, not a schedule. iOS runs the task when it decides
+(battery, usage, network), often a few times a day, never after the user force-quits the app or
+while Background App Refresh or Low Power Mode is off, and gives it about 30 s. Fresh data within
+minutes needs the app in the foreground. Test on a device with Xcode's "Simulate Background Fetch"
+or `e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"com.expo.modules.backgroundtask.processing"]`.
+
 ## A sync run
 
 1. First run for a repo: `loadTree()` (cached tree shown first). Later: `syncNow()`, which
    reads the branch head with `If-None-Match` (a 304 is free and changes nothing) and lists the
    tree only when the head moved, then reconciles changed open files (3-way merge on dirty ones).
-2. Replay widget mutations, then `flushOutbox()` (sha-checked saves; backoff in core).
+2. Open every todo file (cache-first), replay widget mutations, then `flushOutbox()` (sha-checked
+   saves; backoff in core). Pull again if step 1 was skipped by a save in flight.
 3. Widget snapshot + `reloadAllTimelines()` when it changed; `rescheduleNotifications()`.
 4. Bump `syncRevision` so mounted screens re-read from cache.
 

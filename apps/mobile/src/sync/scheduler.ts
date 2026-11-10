@@ -15,6 +15,11 @@ export interface SchedulerDeps {
   /** Data younger than this needs no refresh on tab focus. */
   staleMs?: number;
   writeDebounceMs?: number;
+  /**
+   * On returning to the foreground with data older than this, a run in flight does not count:
+   * it may be a request iOS froze when it suspended the app, so a fresh run is queued behind it.
+   */
+  foregroundStaleMs?: number;
 }
 
 export interface SyncScheduler {
@@ -39,6 +44,7 @@ export function createSyncScheduler(deps: SchedulerDeps): SyncScheduler {
   const throttleMs = deps.throttleMs ?? 2_000;
   const staleMs = deps.staleMs ?? 30_000;
   const writeDebounceMs = deps.writeDebounceMs ?? 1_500;
+  const foregroundStaleMs = deps.foregroundStaleMs ?? 120_000;
 
   let active = false;
   let online = true;
@@ -54,7 +60,8 @@ export function createSyncScheduler(deps: SchedulerDeps): SyncScheduler {
   // A trigger that arrived while offline: replayed when the network returns.
   let offlineDemand = false;
 
-  const stale = () => lastSuccess === null || deps.now() - lastSuccess > staleMs;
+  const olderThan = (ms: number) => lastSuccess === null || deps.now() - lastSuccess > ms;
+  const stale = () => olderThan(staleMs);
 
   const clearPoll = () => {
     if (pollTimer !== null) deps.clearTimeout(pollTimer);
@@ -134,8 +141,17 @@ export function createSyncScheduler(deps: SchedulerDeps): SyncScheduler {
     setActive(next) {
       const was = active;
       active = next;
-      if (!next) clearPoll();
-      else if (!was) {
+      if (!next) {
+        clearPoll();
+        // iOS suspends the app seconds after it leaves the screen: an edit still waiting for the
+        // debounce would stay on the phone, and the web would keep showing the older version.
+        if (was && writeTimer !== null) {
+          deps.clearTimeout(writeTimer);
+          writeTimer = null;
+          void dispatch('write');
+        }
+      } else if (!was) {
+        if (running && online && olderThan(foregroundStaleMs)) queued ??= 'foreground';
         schedulePoll();
         void dispatch('foreground');
       }

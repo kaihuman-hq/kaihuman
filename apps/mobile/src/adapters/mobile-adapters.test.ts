@@ -5,6 +5,7 @@ import {
   githubProfileStore,
   type PendingMutation,
 } from '@kaihuman/core';
+import { localDate } from '@kaihuman/formats';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type KeyValueDriver, MobileStorageAdapter, type RecordDriver } from './mobile-storage.js';
 import {
@@ -33,6 +34,15 @@ const kvDriver = (): KeyValueDriver & { map: Map<string, string> } => {
     remove: (k) => void map.delete(k),
   };
 };
+
+const blob = (path: string, sha: string) => ({
+  path,
+  sha,
+  type: 'blob' as const,
+  mode: '100644',
+  url: '',
+  size: 0,
+});
 
 const TODOS = '# Todos\n\n- [ ] write plan\n- [>] ship phase 2\n';
 
@@ -123,6 +133,7 @@ describe('WidgetBridge', () => {
   beforeEach(() => {
     configureCoreStorage(new MobileStorageAdapter());
     githubProfileStore.currentRepo.value = repo;
+    githubFileStore.tree.value = [blob('.kh/inbox.todos.md', 's1'), blob('notes.md', 'n')];
     githubFileStore.openFiles.value = {
       '.kh/inbox.todos.md': { content: TODOS, sha: 's1' },
       'notes.md': { content: 'x', sha: 'n' },
@@ -279,6 +290,62 @@ describe('WidgetBridge', () => {
     );
   });
 
+  it('writes a queued digest to logs/ and appends a second one the same day', async () => {
+    const container = new InMemorySharedContainer();
+    mockSave();
+    await queue(container, [
+      { kind: 'digest', text: 'Shipped the filter.', date: '2026-06-10', timestamp: 1 },
+      { kind: 'digest', text: 'Evening: tests green.', date: '2026-06-10', timestamp: 2 },
+      { kind: 'digest', text: '', date: '2026-06-10', timestamp: 3 },
+    ]);
+    expect(await new WidgetBridge(container).reconcile()).toBe(2);
+    expect(githubFileStore.openFiles.value['logs/digest-2026-06-10.md']?.content).toBe(
+      '# Digest 2026-06-10\n\nShipped the filter.\n\nEvening: tests green.\n',
+    );
+  });
+
+  it('folds the Focus filter file into the snapshot and rewrites when it changes', async () => {
+    const container = new InMemorySharedContainer();
+    const bridge = new WidgetBridge(container);
+    await bridge.sync();
+    expect(JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}').filter).toBeUndefined();
+    const reloads = container.reloads;
+
+    await container.write('focus-filter.json', JSON.stringify({ tags: ['#work'], label: 'Work' }));
+    await bridge.sync();
+    const snap = JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}');
+    expect(snap.filter).toEqual({ tags: ['work'], label: 'Work' });
+    expect(snap.items).toHaveLength(2); // readers filter; the snapshot keeps every item
+    expect(container.reloads).toBeGreaterThan(reloads);
+
+    await container.write('focus-filter.json', '{}');
+    await bridge.sync();
+    expect(JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}').filter).toBeUndefined();
+  });
+
+  it('stops a running timer at the widget tap and skips a stopped one', async () => {
+    const container = new InMemorySharedContainer();
+    mockSave();
+    const TIMER = '.kh/deep-work.timetracking.csv';
+    const tap = new Date();
+    tap.setHours(11, 20, 0, 0);
+    const day = localDate(tap);
+    githubFileStore.openFiles.value = {
+      ...githubFileStore.openFiles.value,
+      [TIMER]: { content: `iso date;time\n${day};09:00,10:00,11:00\n`, sha: 't1' },
+    };
+    await queue(container, [
+      { kind: 'timer-stop', path: TIMER, timestamp: tap.getTime() },
+      { kind: 'timer-stop', path: TIMER, timestamp: tap.getTime() + 60_000 },
+      { kind: 'timer-stop', path: '.kh/missing.timetracking.csv', timestamp: 3 },
+      { kind: 'timer-stop', timestamp: 4 },
+    ]);
+    expect(await new WidgetBridge(container).reconcile()).toBe(1);
+    expect(githubFileStore.openFiles.value[TIMER]?.content).toBe(
+      `iso date;time\n${day};09:00,10:00,11:00,11:20\n`,
+    );
+  });
+
   it('skips malformed entries and malformed JSON', async () => {
     const container = new InMemorySharedContainer();
     const save = mockSave();
@@ -311,5 +378,100 @@ describe('WidgetBridge', () => {
     expect(snap.habits[0]).toMatchObject({ path: HABIT, name: 'Run', doneToday: false });
     expect(snap.cards[0]).toMatchObject({ path: '.kh/wiki/a.md', title: 'A' });
     expect(Object.keys(snap.files)).toEqual(['.kh/inbox.todos.md']);
+  });
+
+  it('puts the running timer, habit days and today list in the snapshot', async () => {
+    const container = new InMemorySharedContainer();
+    const today = localDate(new Date());
+    githubFileStore.openFiles.value = {
+      ...githubFileStore.openFiles.value,
+      [HABIT]: { content: `iso date;goal reached\n${today};x`, sha: 'h' },
+      '.kh/deep-work.timetracking.csv': { content: `iso date;time\n${today};00:00\n`, sha: 't' },
+    };
+    await new WidgetBridge(container).sync();
+    const snap = JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}');
+    expect(snap.habits[0].days).toEqual([false, false, false, false, false, false, true]);
+    expect(snap.timer).toMatchObject({
+      path: '.kh/deep-work.timetracking.csv',
+      label: 'Deep work',
+      todayMinutes: 0,
+      startedAt: new Date(`${today}T00:00:00`).getTime(),
+    });
+    // TODOS has one undated in-progress item: today lists it, not the undated backlog one.
+    expect(snap.todayItems.map((i: { text: string }) => i.text)).toEqual(['ship phase 2']);
+    expect(snap.todayCounts).toEqual({ left: 1, done: 0, overdue: 0 });
+  });
+});
+
+describe('WidgetBridge completeness (background launch)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  beforeEach(() => {
+    configureCoreStorage(new MobileStorageAdapter());
+    githubProfileStore.currentRepo.value = repo;
+    githubFileStore.dirtyFiles.value = new Set();
+    githubFileStore.openFiles.value = {};
+  });
+
+  it('writes nothing before the tree is known, so a headless launch keeps the last widget', async () => {
+    githubFileStore.tree.value = [];
+    const container = new InMemorySharedContainer();
+    await container.write(WIDGET_TODOS_FILE, '{"old":true}');
+    await new WidgetBridge(container).sync();
+    expect(container.files.get(WIDGET_TODOS_FILE)).toBe('{"old":true}');
+    expect(container.reloads).toBe(0);
+  });
+
+  it('writes nothing while a todo file the tree lists is not open', async () => {
+    githubFileStore.tree.value = [blob('.kh/inbox.todos.md', 's1'), blob('.kh/work.todos.md', 'w')];
+    githubFileStore.openFiles.value = { '.kh/inbox.todos.md': { content: TODOS, sha: 's1' } };
+    const container = new InMemorySharedContainer();
+    await new WidgetBridge(container).sync();
+    expect(container.files.has(WIDGET_TODOS_FILE)).toBe(false);
+  });
+
+  it('load opens every todo file the tree lists, then sync writes all of them', async () => {
+    githubFileStore.tree.value = [
+      blob('.kh/inbox.todos.md', 's1'),
+      blob('.kh/work.todos.md', 'w'),
+      blob('notes.md', 'n'),
+    ];
+    const contents: Record<string, string> = {
+      '.kh/inbox.todos.md': TODOS,
+      '.kh/work.todos.md': '# Work\n\n- [ ] from the web\n',
+    };
+    const open = vi.spyOn(githubFileStore, 'openFile').mockImplementation(async (path) => {
+      githubFileStore.openFiles.value = {
+        ...githubFileStore.openFiles.value,
+        [path]: { content: contents[path] ?? '', sha: path === '.kh/work.todos.md' ? 'w' : 's1' },
+      };
+    });
+    const container = new InMemorySharedContainer();
+    const bridge = new WidgetBridge(container);
+    await bridge.load();
+    expect(open.mock.calls.map(([p]) => p).sort()).toEqual([
+      '.kh/inbox.todos.md',
+      '.kh/work.todos.md',
+    ]);
+    await bridge.sync();
+    const snap = JSON.parse(container.files.get(WIDGET_TODOS_FILE) ?? '{}');
+    expect(Object.keys(snap.files).sort()).toEqual(['.kh/inbox.todos.md', '.kh/work.todos.md']);
+    expect(snap.items.some((i: { text: string }) => i.text === 'from the web')).toBe(true);
+  });
+
+  it('load serves an up-to-date open copy from memory without a request', async () => {
+    githubFileStore.tree.value = [blob('.kh/inbox.todos.md', 's1')];
+    githubFileStore.openFiles.value = { '.kh/inbox.todos.md': { content: TODOS, sha: 's1' } };
+    const open = vi.spyOn(githubFileStore, 'openFile').mockResolvedValue(undefined);
+    await new WidgetBridge(new InMemorySharedContainer()).load();
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('load re-reads an open copy the tree says is behind', async () => {
+    githubFileStore.tree.value = [blob('.kh/inbox.todos.md', 's2')];
+    githubFileStore.openFiles.value = { '.kh/inbox.todos.md': { content: TODOS, sha: 's1' } };
+    const open = vi.spyOn(githubFileStore, 'openFile').mockResolvedValue(undefined);
+    await new WidgetBridge(new InMemorySharedContainer()).load();
+    expect(open).toHaveBeenCalledWith('.kh/inbox.todos.md');
   });
 });

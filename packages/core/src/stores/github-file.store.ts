@@ -730,14 +730,22 @@ export class GithubFileStore {
   }
 
   pendingFiles = signal(new Set<string>()); // Track in-flight requests
+  private openingFiles = new Map<string, Promise<void>>();
 
-  async openFile(path: string) {
-    // If pending, just wait (or ignore, assuming previous call handles it)
-    if (this.pendingFiles.value.has(path)) {
-      logger.warn(`File ${path} is already loading. Ignoring duplicate request.`);
-      return;
-    }
+  /**
+   * A second caller for a file that is already loading waits for that load. Returning early made
+   * it read `openFiles` before the file was there, so a concurrent reader (e.g. two dashboard
+   * loads after a sync) saw "not found" and dropped the file.
+   */
+  openFile(path: string): Promise<void> {
+    const inFlight = this.openingFiles.get(path);
+    if (inFlight) return inFlight;
+    const load = this.loadFile(path).finally(() => this.openingFiles.delete(path));
+    this.openingFiles.set(path, load);
+    return load;
+  }
 
+  private async loadFile(path: string) {
     const repo = githubProfileStore.currentRepo.value;
     if (!repo) return;
 
